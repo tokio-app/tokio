@@ -144,9 +144,15 @@ const INTERNAL_EVENTS: TOKIO_EVENTS[] = [
 export const isLiveEvent = (event: TOKIO_EVENTS): event is AppEvents =>
   !INTERNAL_EVENTS.includes(event);
 
-// Typed as Record<AppEvents, ...> so a new live event can't be left out of the alert triggers.
-export const ALERT_TRIGGER_LABELS: Record<AppEvents, string> = {
+// An alert trigger that isn't a live event: chat messages with emotes.
+export const EMOTE_TRIGGER = "tokio:alert:emote";
+
+export type AlertTrigger = AppEvents | typeof EMOTE_TRIGGER;
+
+// Typed as Record<AlertTrigger, ...> so a new live event can't be left out of the alert triggers.
+export const ALERT_TRIGGER_LABELS: Record<AlertTrigger, string> = {
   [TOKIO_EVENTS.CHAT]: "Chat",
+  [EMOTE_TRIGGER]: "Emote",
   [TOKIO_EVENTS.SHARE]: "Share",
   [TOKIO_EVENTS.FOLLOW]: "Follow",
   [TOKIO_EVENTS.GIFT]: "Gift",

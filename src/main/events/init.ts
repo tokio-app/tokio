@@ -6,6 +6,7 @@ import {
   AppEvents,
   ChatEvent,
   CustomGift,
+  EMOTE_TRIGGER,
   FEEDBACK_CODES,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -123,6 +124,8 @@ const registerConnectorEvents = ({
   };
 
   for (const trigger of ALERT_TRIGGERS) {
+    // Not a live event, AlertsService matches emote alerts on chat events.
+    if (trigger === EMOTE_TRIGGER) continue;
     const listener = (d: TokioEventMap[typeof trigger]) => {
       dispatchAlert(trigger, d).catch((error) => {
         notifier.report({
@@ -228,6 +231,29 @@ const registerConnectorEvents = ({
   conn.on(TOKIO_EVENTS.CHAT, (d) => {
     handleChat(d).catch((error) => {
       notifier.report({ source: "system", error, context: TOKIO_EVENTS.CHAT });
+    });
+  });
+
+  // TikTok can't list a LIVE's emotes, so the profile keeps the ones viewers
+  // use, whatever features are on.
+  const recordEmotes = async (d: ChatEvent) => {
+    const res = await store.recordEmotes(d.comment.emotes);
+    if (!res.success) {
+      // Saving logged it. The emote is tried again on its next chat.
+      notifier.warn(
+        "alerts",
+        FEEDBACK_CODES.EMOTES_SAVE_FAILED,
+        "Unable to save the LIVE's new emotes.",
+        { key: "emotes", windowMs: REPEAT_NOTICE_MS },
+      );
+    } else if (res.data) {
+      win.webContents.send(APP_EVENTS_RESPONSE.EMOTES, { data: res.data });
+    }
+  };
+  conn.on(TOKIO_EVENTS.CHAT, (d) => {
+    if (d.comment.emotes.length === 0) return;
+    recordEmotes(d).catch((error) => {
+      notifier.report({ source: "alerts", error, context: TOKIO_EVENTS.CHAT });
     });
   });
 

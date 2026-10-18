@@ -1,11 +1,13 @@
 import { Alert, Profile } from "@/common/schemas";
 import {
   AppEvents,
+  EMOTE_TRIGGER,
   MyInstantsSound,
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
 import { formatError } from "@/common/util";
+import { hasKeyword, isUser } from "@/helper/chat";
 import Logger from "@/logger";
 import { createHash } from "node:crypto";
 import { access, readFile, unlink, writeFile } from "node:fs/promises";
@@ -205,10 +207,13 @@ export class AlertsService extends Service {
     // Called for an alert whose sound can't be read
     onError?: (alert: Alert, error?: string) => void,
   ) {
-    const channel = settings.simultaneous ? `alerts:${type}` : "alerts";
-
     for (const alert of settings.items) {
       if (!this._matches(alert, type, payload) || !alert.sound) continue;
+
+      // By the alert's trigger, emote alerts come with chat events.
+      const channel = settings.simultaneous
+        ? `alerts:${alert.trigger.type}`
+        : "alerts";
 
       const res = await this.readSound(alert.sound.file);
       if (!res.success || !res.data) {
@@ -231,8 +236,37 @@ export class AlertsService extends Service {
     type: AppEvents,
     payload: TokioEventMap[AppEvents],
   ) {
-    if (!alert.enabled || !alert.sound || alert.trigger.type !== type) {
-      return false;
+    if (!alert.enabled || !alert.sound) return false;
+
+    const chat =
+      type === TOKIO_EVENTS.CHAT &&
+      typeof payload === "object" &&
+      payload !== null &&
+      "comment" in payload
+        ? payload.comment
+        : null;
+
+    // Emote alerts aren't a live event of their own, they match chats.
+    if (alert.trigger.type === EMOTE_TRIGGER) {
+      if (!chat) return false;
+      const { emotes } = alert.trigger;
+      return emotes.length === 0
+        ? chat.emotes.length > 0
+        : chat.emotes.some((emote) => emotes.includes(emote.emoteID));
+    }
+
+    if (alert.trigger.type !== type) return false;
+
+    if (chat) return hasKeyword(chat.content, alert.trigger.keyword);
+
+    if (
+      (type === TOKIO_EVENTS.MEMBER_JOIN ||
+        type === TOKIO_EVENTS.SUPER_FAN_JOIN) &&
+      typeof payload === "object" &&
+      payload !== null &&
+      "user" in payload
+    ) {
+      return isUser(payload.user, alert.trigger.user);
     }
 
     if (

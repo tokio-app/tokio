@@ -7,6 +7,7 @@ import {
   AlertSound,
   OverlayConfig,
   Profile,
+  SavedEmote,
   StoreSchema,
   TestOverlay,
 } from "../../schemas";
@@ -81,6 +82,7 @@ export enum APP_EVENTS_RESPONSE {
   UPDATE_ALERTS_SETTINGS = "app:alerts:res:update:settings",
   SEARCH_SOUNDS = "app:alerts:res:search:sounds",
   SET_ALERT_SOUND = "app:alerts:res:set:sound",
+  EMOTES = "app:alerts:res:emotes",
 
   // SOUND LIBRARY
   GET_SOUNDS = "app:sounds:res",
@@ -252,6 +254,10 @@ export interface AppEventsResponseMap {
     id: string;
     sound?: Alert["sound"];
   }>;
+  // Pushed when a chat brings a new emote to the active profile
+  [APP_EVENTS_RESPONSE.EMOTES]: {
+    data: SavedEmote[];
+  };
 
   // SOUND LIBRARY
   // success is false when the last upload or removal failed

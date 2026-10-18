@@ -1,3 +1,6 @@
+import { UserData } from "@/common/types";
+import { escapeRegExp } from "es-toolkit";
+
 function getEmojiRegex() {
   let EMOJI_REGEX: RegExp;
   try {
@@ -38,4 +41,35 @@ export function cleanText(
 
   const final = collapseWhitespace ? out.replace(/\s+/g, " ").trim() : out;
   return final.toLowerCase();
+}
+
+/**
+ * Whether the chat has the keyword as a whole word or phrase, ignoring case,
+ * accents and emojis. An empty keyword matches any chat.
+ */
+export function hasKeyword(content: string, keyword: string): boolean {
+  const needle = cleanText(keyword, { asciiOnly: true });
+  if (!needle) return true;
+
+  // Letters and digits around it would make it part of another word.
+  const pattern = new RegExp(
+    String.raw`(?<![\p{L}\p{N}])${escapeRegExp(needle)}(?![\p{L}\p{N}])`,
+    "u",
+  );
+  return pattern.test(cleanText(content, { asciiOnly: true }));
+}
+
+/**
+ * Whether the viewer is the one named: by handle, with or without the @, or
+ * by name, ignoring case, accents and emojis. An empty name means anyone.
+ */
+export function isUser(user: UserData, name: string): boolean {
+  const wanted = name.trim();
+  if (!wanted) return true;
+
+  if (user.handle.toLowerCase() === wanted.replace(/^@/, "").toLowerCase()) {
+    return true;
+  }
+  const username = cleanText(user.username, { asciiOnly: true });
+  return username !== "" && username === cleanText(wanted, { asciiOnly: true });
 }

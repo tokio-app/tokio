@@ -1,6 +1,8 @@
 import { Alert, Profile } from "@/common/schemas";
 import {
   AppEvents,
+  ChatEvent,
+  EMOTE_TRIGGER,
   GiftEvent,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -28,10 +30,22 @@ const FIXTURE = resolve("test/fixtures/myinstants-search.html");
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 
+const trigger = (
+  type: Alert["trigger"]["type"],
+  filters: Partial<Alert["trigger"]> = {},
+): Alert["trigger"] => ({
+  type,
+  gifts: [],
+  emotes: [],
+  keyword: "",
+  user: "",
+  ...filters,
+});
+
 const alert = (overrides: Partial<Alert> = {}): Alert => ({
   id: "alert-1",
   enabled: true,
-  trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+  trigger: trigger(TOKIO_EVENTS.FOLLOW),
   sound: { name: "Ding", file: "ding.mp3" },
   volume: 80,
   ...overrides,
@@ -48,6 +62,19 @@ const user = { username: "Viewer", handle: "viewer", profilePictures: [] };
 const gift = (id: string, repeatEnd: boolean): GiftEvent => ({
   user,
   gift: { id, coins: 1, repeatEnd, type: 1, name: "Rose", comboCount: 1 },
+});
+
+const chat = (content: string, ...emoteIDs: string[]): ChatEvent => ({
+  user,
+  comment: {
+    content,
+    lang: "en",
+    emotes: emoteIDs.map((emoteID, index) => ({
+      emoteID,
+      index,
+      images: [`https://example.com/${emoteID}.webp`],
+    })),
+  },
 });
 
 const htmlResponse = (html: string, status = 200) =>
@@ -126,7 +153,7 @@ describe("AlertsService", () => {
       const items = [
         alert({ enabled: false }),
         alert({ sound: null }),
-        alert({ trigger: { type: TOKIO_EVENTS.SHARE, gifts: [] } }),
+        alert({ trigger: trigger(TOKIO_EVENTS.SHARE) }),
         alert({ sound: { name: "Gone", file: "gone.mp3" } }),
       ];
 
@@ -156,9 +183,7 @@ describe("AlertsService", () => {
     });
 
     it("fires gift alerts once per combo, when it ends", async () => {
-      const alerts = settings([
-        alert({ trigger: { type: TOKIO_EVENTS.GIFT, gifts: [] } }),
-      ]);
+      const alerts = settings([alert({ trigger: trigger(TOKIO_EVENTS.GIFT) })]);
 
       expect(await run(TOKIO_EVENTS.GIFT, gift("5655", false), alerts)).toEqual(
         [],
@@ -170,7 +195,7 @@ describe("AlertsService", () => {
 
     it("only fires gift alerts for the chosen gifts", async () => {
       const alerts = settings([
-        alert({ trigger: { type: TOKIO_EVENTS.GIFT, gifts: [5655] } }),
+        alert({ trigger: trigger(TOKIO_EVENTS.GIFT, { gifts: [5655] }) }),
       ]);
 
       expect(
@@ -178,6 +203,79 @@ describe("AlertsService", () => {
       ).toHaveLength(1);
       expect(await run(TOKIO_EVENTS.GIFT, gift("1", true), alerts)).toEqual([]);
     });
+
+    it("fires chat alerts without a keyword on every message", async () => {
+      const alerts = settings([alert({ trigger: trigger(TOKIO_EVENTS.CHAT) })]);
+
+      expect(await run(TOKIO_EVENTS.CHAT, chat("hello"), alerts)).toHaveLength(
+        1,
+      );
+    });
+
+    it("only fires chat alerts on messages with the keyword", async () => {
+      const alerts = settings([
+        alert({ trigger: trigger(TOKIO_EVENTS.CHAT, { keyword: "hi" }) }),
+      ]);
+
+      expect(
+        await run(TOKIO_EVENTS.CHAT, chat("Hi there!"), alerts),
+      ).toHaveLength(1);
+      expect(await run(TOKIO_EVENTS.CHAT, chat("this"), alerts)).toEqual([]);
+    });
+
+    it("fires emote alerts without picks on chats with any emote", async () => {
+      const alerts = settings([alert({ trigger: trigger(EMOTE_TRIGGER) })]);
+
+      expect(await run(TOKIO_EVENTS.CHAT, chat("", "e1"), alerts)).toHaveLength(
+        1,
+      );
+      expect(await run(TOKIO_EVENTS.CHAT, chat("hello"), alerts)).toEqual([]);
+      expect(await run(TOKIO_EVENTS.FOLLOW, { user }, alerts)).toEqual([]);
+    });
+
+    it("only fires emote alerts for the picked emotes, once per chat", async () => {
+      const alerts = settings([
+        alert({ trigger: trigger(EMOTE_TRIGGER, { emotes: ["e1"] }) }),
+      ]);
+
+      expect(
+        await run(TOKIO_EVENTS.CHAT, chat("", "e1", "e1", "e2"), alerts),
+      ).toHaveLength(1);
+      expect(await run(TOKIO_EVENTS.CHAT, chat("", "e2"), alerts)).toEqual([]);
+    });
+
+    it("gives emote alerts their own queue when simultaneous", async () => {
+      const items = [
+        alert({ id: "chat", trigger: trigger(TOKIO_EVENTS.CHAT) }),
+        alert({ id: "emote", trigger: trigger(EMOTE_TRIGGER) }),
+      ];
+
+      const sent = await run(
+        TOKIO_EVENTS.CHAT,
+        chat("", "e1"),
+        settings(items, true),
+      );
+
+      expect(sent.map((a) => a.channel)).toEqual([
+        `alerts:${TOKIO_EVENTS.CHAT}`,
+        `alerts:${EMOTE_TRIGGER}`,
+      ]);
+    });
+
+    it.each([TOKIO_EVENTS.MEMBER_JOIN, TOKIO_EVENTS.SUPER_FAN_JOIN] as const)(
+      "fires %s alerts for anyone or only for the named viewer",
+      async (type) => {
+        const anyone = settings([alert({ trigger: trigger(type) })]);
+        const named = settings([
+          alert({ trigger: trigger(type, { user: "@Viewer" }) }),
+        ]);
+        const other = { ...user, username: "Other", handle: "other" };
+
+        expect(await run(type, { user: other }, anyone)).toHaveLength(1);
+        expect(await run(type, { user }, named)).toHaveLength(1);
+        expect(await run(type, { user: other }, named)).toEqual([]);
+      },
+    );
   });
 
   describe("readSound", () => {

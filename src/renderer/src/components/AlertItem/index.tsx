@@ -1,9 +1,15 @@
 import { Alert, ALERT_TRIGGERS } from "@/common/schemas";
-import { ALERT_TRIGGER_LABELS, CustomGift, TOKIO_EVENTS } from "@/common/types";
+import {
+  ALERT_TRIGGER_LABELS,
+  CustomGift,
+  EMOTE_TRIGGER,
+  TOKIO_EVENTS,
+} from "@/common/types";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { FiTrash2 } from "react-icons/fi";
 import {
   Btn,
+  Input,
   MultiSelect,
   Select,
   SelectOption,
@@ -21,9 +27,68 @@ const TRIGGER_OPTIONS = ALERT_TRIGGERS.map((value) => ({
   label: ALERT_TRIGGER_LABELS[value],
 })) as SelectOption<Trigger>[];
 
+type FilterProps = {
+  alert: Alert;
+  gifts: CustomGift[];
+  emotes: SelectOption<string>[];
+  onChange: (trigger: Alert["trigger"]) => void;
+};
+
+// Narrows the trigger: the gifts, emotes, chat keyword or viewer it reacts to.
+function TriggerFilter({ alert, gifts, emotes, onChange }: FilterProps) {
+  const { trigger } = alert;
+
+  switch (trigger.type) {
+    case TOKIO_EVENTS.GIFT:
+      return (
+        <MultiSelect
+          className={styles.fill}
+          searchable
+          placeholder="Any gift"
+          options={gifts}
+          value={trigger.gifts}
+          onChange={(ids) => onChange({ ...trigger, gifts: ids })}
+        />
+      );
+    case EMOTE_TRIGGER:
+      return (
+        <MultiSelect
+          className={styles.fill}
+          placeholder="Any emote"
+          options={emotes}
+          value={trigger.emotes}
+          onChange={(ids) => onChange({ ...trigger, emotes: ids })}
+        />
+      );
+    case TOKIO_EVENTS.CHAT:
+      return (
+        <Input
+          className={styles.fill}
+          placeholder="Any message"
+          value={trigger.keyword}
+          onChange={(e) => onChange({ ...trigger, keyword: e.target.value })}
+        />
+      );
+    case TOKIO_EVENTS.MEMBER_JOIN:
+    case TOKIO_EVENTS.SUPER_FAN_JOIN:
+      return (
+        <Input
+          className={styles.fill}
+          placeholder="Anyone"
+          title="A viewer's @handle or name"
+          value={trigger.user}
+          onChange={(e) => onChange({ ...trigger, user: e.target.value })}
+        />
+      );
+    default:
+      return <div className={styles.delimiter} />;
+  }
+}
+
 type Props = {
   alert: Alert;
   gifts: CustomGift[];
+  emotes: SelectOption<string>[];
   // This alert's sound is loading or playing
   testing: boolean;
   onTest: (req: AlertTestRequest) => void;
@@ -35,6 +100,7 @@ type Props = {
 export function AlertItem({
   alert,
   gifts,
+  emotes,
   testing,
   onTest,
   onChange,
@@ -80,20 +146,12 @@ export function AlertItem({
       </div>
 
       <div className={styles.cell}>
-        {alert.trigger.type === TOKIO_EVENTS.GIFT ? (
-          <MultiSelect
-            className={styles.fill}
-            searchable
-            placeholder="Any gift"
-            options={gifts}
-            value={alert.trigger.gifts}
-            onChange={(ids) =>
-              onChange({ ...alert, trigger: { ...alert.trigger, gifts: ids } })
-            }
-          />
-        ) : (
-          <div className={styles.delimiter} />
-        )}
+        <TriggerFilter
+          alert={alert}
+          gifts={gifts}
+          emotes={emotes}
+          onChange={(trigger) => onChange({ ...alert, trigger })}
+        />
       </div>
 
       <div className={styles.cell}>

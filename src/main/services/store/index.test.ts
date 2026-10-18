@@ -379,6 +379,106 @@ describe("StoreManagerService", () => {
       ).toBe("streamer");
       expect((await readJSON(defaultProfileFile)).connector.username).toBe("");
     });
+
+    it("loads profiles saved before emotes and alert filters", async () => {
+      const old: Partial<Profile> = structuredClone(defaultProfile);
+      delete old.emotes;
+      const item = (id: string, type: TOKIO_EVENTS) => ({
+        id,
+        enabled: true,
+        trigger: { type, gifts: [] },
+        sound: null,
+        volume: 100,
+      });
+      const items = [item("chat", TOKIO_EVENTS.CHAT)];
+      await writeFile(
+        defaultProfileFile,
+        JSON.stringify({ ...old, alerts: { ...old.alerts, items } }),
+      );
+
+      const profile = await (await init()).getProfileData();
+
+      expect(profile?.emotes).toEqual([]);
+      expect(profile?.alerts.items.map((a) => a.trigger)).toEqual([
+        {
+          type: TOKIO_EVENTS.CHAT,
+          gifts: [],
+          emotes: [],
+          keyword: "",
+          user: "",
+        },
+      ]);
+    });
+  });
+
+  describe("emotes", () => {
+    const emote = (
+      emoteID: string,
+      image = `https://example.com/${emoteID}.webp`,
+    ) => ({ emoteID, index: 0, images: [image] });
+
+    const saved = (id: string) => ({
+      id,
+      image: `https://example.com/${id}.webp`,
+    });
+
+    it("saves new emotes to the profile in the order they appear", async () => {
+      const store = await init();
+
+      const res = await store.recordEmotes([
+        emote("e1"),
+        emote("e2"),
+        emote("e1"),
+      ]);
+
+      expect(res).toEqual({ success: true, data: [saved("e1"), saved("e2")] });
+      expect((await readJSON(defaultProfileFile)).emotes).toEqual(res.data);
+    });
+
+    it("only returns the list when it changed", async () => {
+      const store = await init();
+      await store.recordEmotes([emote("e1")]);
+
+      const res = await store.recordEmotes([
+        emote("e1"),
+        emote(""),
+        { emoteID: "e3", index: 0, images: [] },
+      ]);
+
+      expect(res).toEqual({ success: true });
+      expect((await store.getProfileData())?.emotes).toEqual([saved("e1")]);
+    });
+
+    it("keeps the emotes of chats saved at the same time", async () => {
+      const store = await init();
+
+      await Promise.all([
+        store.recordEmotes([emote("e1")]),
+        store.recordEmotes([emote("e2")]),
+      ]);
+
+      expect((await readJSON(defaultProfileFile)).emotes).toEqual([
+        saved("e1"),
+        saved("e2"),
+      ]);
+    });
+
+    it("updates a saved emote's image once per run", async () => {
+      await writeFile(
+        defaultProfileFile,
+        JSON.stringify({
+          ...defaultProfile,
+          emotes: [{ id: "e1", image: "old" }],
+        }),
+      );
+      const store = await init();
+
+      const res = await store.recordEmotes([emote("e1", "new")]);
+      const again = await store.recordEmotes([emote("e1", "newer")]);
+
+      expect(res.data).toEqual([{ id: "e1", image: "new" }]);
+      expect(again).toEqual({ success: true });
+    });
   });
 
   describe("sounds", () => {
@@ -406,7 +506,13 @@ describe("StoreManagerService", () => {
             {
               id: "a",
               enabled: false,
-              trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+              trigger: {
+                type: TOKIO_EVENTS.FOLLOW,
+                gifts: [],
+                emotes: [],
+                keyword: "",
+                user: "",
+              },
               sound,
               volume: 100,
             },

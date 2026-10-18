@@ -42,10 +42,12 @@ Music requests use the same permissions and protection settings as text-to-speec
 
 ### Alerts
 
-Play a sound for any LIVE event: chat messages, follows, shares, likes, gifts, envelopes, Super Fan events, new members, viewer counts and song changes.
+Play a sound for any LIVE event: chat messages, emotes, follows, shares, likes, gifts, envelopes, Super Fan events, new members, viewer counts and song changes.
 
 - Upload your own sounds or search [MyInstants](https://www.myinstants.com) from inside the app. Your sound library is shared by all your profiles.
 - Set each alert's volume. Gift alerts can react to any gift or only to the ones you pick, and fire once per combo.
+- Chat alerts can react to every message or only to messages with a keyword. Emote alerts can react to any emote or only to the ones you pick. TikTok doesn't list a LIVE's emotes, so each profile saves the ones viewers use.
+- Member Join and Super Fan Join alerts can react to anyone or only to the viewer you name, by @handle or name.
 - Play alerts one after another in a queue, or let different events play at the same time.
 
 ### Overlays

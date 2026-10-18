@@ -94,4 +94,5 @@ export const defaultProfile: Profile = {
     queue_length: 100,
     items: [],
   },
+  emotes: [],
 };

@@ -1,14 +1,17 @@
-import { Alert, Profile } from "@/common/schemas";
+import { Alert, Profile, SavedEmote } from "@/common/schemas";
 import { CustomGift } from "@/common/types";
 import { AlertItem, EmptyState } from "@/components";
 import { AlertTestRequest, Updater } from "@/hooks";
+import { useMemo } from "react";
 import styles from "../alerts.module.css";
+import { emoteOptions } from "../helper";
 
 const COLUMNS = ["Actions", "Enabled", "Trigger", "", "Sound", "Volume"];
 
 type Props = {
   items: Alert[];
   gifts: CustomGift[];
+  emotes: SavedEmote[];
   // Id of the sound test loading or playing
   testing: string | null;
   onTest: (req: AlertTestRequest) => void;
@@ -19,11 +22,14 @@ type Props = {
 export function ItemsSection({
   items,
   gifts,
+  emotes,
   testing,
   onTest,
   update,
   onPickSound,
 }: Props) {
+  const emoteChoices = useMemo(() => emoteOptions(emotes), [emotes]);
+
   return (
     <div className={styles.items}>
       <div className={styles.columns}>
@@ -44,6 +50,7 @@ export function ItemsSection({
             key={alert.id}
             alert={alert}
             gifts={gifts}
+            emotes={emoteChoices}
             testing={testing === alert.id}
             onTest={onTest}
             onChange={(changed) =>

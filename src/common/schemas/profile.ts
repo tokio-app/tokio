@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TOKIO_EVENTS } from "../types/connector";
+import { AlertTrigger, EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
 
 const PermissionsSchema = z.object({
   all: z.boolean(),
@@ -23,11 +23,20 @@ const MusicControl = z.object({
 });
 
 // Every live event (AppEvents) can trigger an alert.
-const AlertTriggerSchema = z
+const LiveTriggerSchema = z
   .enum(TOKIO_EVENTS)
   .exclude(["CONNECTED", "DISCONNECTED", "MUSIC_PROCCESS_ENDED"]);
 
-export const ALERT_TRIGGERS = AlertTriggerSchema.options;
+const AlertTriggerSchema = z.union([
+  LiveTriggerSchema,
+  z.literal(EMOTE_TRIGGER),
+]);
+
+// Emote is listed right after Chat, the event it comes from.
+export const ALERT_TRIGGERS = LiveTriggerSchema.options.flatMap(
+  (trigger): AlertTrigger[] =>
+    trigger === TOKIO_EVENTS.CHAT ? [trigger, EMOTE_TRIGGER] : [trigger],
+);
 
 // file is a basename inside the sounds folder
 export const AlertSoundSchema = z.object({
@@ -42,9 +51,21 @@ const AlertSchema = z.object({
     type: AlertTriggerSchema,
     // Only used by gift alerts. Empty means any gift.
     gifts: z.array(z.number()),
+    // Only used by emote alerts. Empty means any emote.
+    emotes: z.array(z.string()).default([]),
+    // Only used by chat alerts. Empty means any message.
+    keyword: z.string().default(""),
+    // Only used by member and super fan join alerts. A handle or name, empty
+    // means anyone.
+    user: z.string().default(""),
   }),
   sound: AlertSoundSchema.nullable(),
   volume: z.number().min(0).max(100),
+});
+
+const SavedEmoteSchema = z.object({
+  id: z.string(),
+  image: z.string(),
 });
 
 // TODO: Finish Profile schema
@@ -113,9 +134,13 @@ export const ProfileSchema = z.object({
       items: z.array(AlertSchema).default([]),
     })
     .default({ simultaneous: false, queue_length: 100, items: [] }),
+  // TikTok can't list a LIVE's emotes, so they're collected as viewers use
+  // them, in the order they first appeared.
+  emotes: z.array(SavedEmoteSchema).default([]),
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;
 export type Permissions = z.infer<typeof PermissionsSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
 export type AlertSound = z.infer<typeof AlertSoundSchema>;
+export type SavedEmote = z.infer<typeof SavedEmoteSchema>;

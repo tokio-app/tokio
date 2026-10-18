@@ -6,10 +6,12 @@ import {
   OverlayMetadata,
   Profile,
   ProfileSchema,
+  SavedEmote,
   StoreSchema,
   StoreZodSchema,
   TestOverlay,
 } from "@/common/schemas";
+import { Emotes } from "@/common/types";
 import { defaultProfile, formatError } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
@@ -41,6 +43,10 @@ export class StoreManagerService extends Service {
   private _storeData: StoreSchema | null = null;
   private _memoryProfile: Profile | null = null;
   private _rebuilt = false;
+  // Emote saves run one after another, so one doesn't drop another's emotes.
+  private _emoteSave: Promise<unknown> = Promise.resolve();
+  // Emotes whose image was already compared since the app started
+  private _checkedEmotes = new Set<string>();
 
   public setLogFile(logFile: string) {
     this._logFile = logFile;
@@ -353,6 +359,49 @@ export class StoreManagerService extends Service {
       }
     }
     return false;
+  }
+
+  /**
+   * Adds a chat's new emotes to the active profile. data is the new list,
+   * only set when it changed.
+   */
+  public recordEmotes(
+    emotes: Emotes[],
+  ): Promise<{ success: boolean; data?: SavedEmote[] }> {
+    const save = this._emoteSave.then(() => this._recordEmotes(emotes));
+    this._emoteSave = save.catch(() => {});
+    return save;
+  }
+
+  private async _recordEmotes(
+    emotes: Emotes[],
+  ): Promise<{ success: boolean; data?: SavedEmote[] }> {
+    const profile = await this.getProfileData();
+    if (!profile) return { success: false };
+
+    const saved = [...profile.emotes];
+    let changed = false;
+    for (const { emoteID: id, images } of emotes) {
+      const image = images[0];
+      if (!id || !image) continue;
+
+      const index = saved.findIndex((e) => e.id === id);
+      if (index === -1) {
+        saved.push({ id, image });
+        changed = true;
+      } else if (!this._checkedEmotes.has(id) && saved[index].image !== image) {
+        // Once per run, in case TikTok moves the image.
+        saved[index] = { id, image };
+        changed = true;
+      }
+      this._checkedEmotes.add(id);
+    }
+
+    if (!changed) return { success: true };
+    if (!(await this.updateProfileData({ emotes: saved }))) {
+      return { success: false };
+    }
+    return { success: true, data: saved };
   }
 
   // Kept in memory only, they're reset when the app loads.

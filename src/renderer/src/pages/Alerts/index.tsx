@@ -1,4 +1,4 @@
-import { Profile } from "@/common/schemas";
+import { Profile, SavedEmote } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, CustomGift } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import { Page, SoundPicker } from "@/components";
@@ -24,6 +24,7 @@ export function Alerts() {
   // Last settings sent to main
   const [saved, setSaved] = useState(defaultProfile["alerts"]);
   const [gifts, setGifts] = useState<CustomGift[]>([]);
+  const [emotes, setEmotes] = useState<SavedEmote[]>([]);
   // Id of the alert whose sound is being picked
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   // Settings changed but not sent to main yet
@@ -39,10 +40,16 @@ export function Alerts() {
     if (!res?.success) return;
     setSettings(res.profile!.alerts);
     setSaved(res.profile!.alerts);
+    setEmotes(res.profile!.emotes);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_GIFTS, (res) => {
     if (res) setGifts(res.data);
+  });
+
+  // New emotes arrive while connected.
+  useIpcListener(APP_EVENTS_RESPONSE.EMOTES, (res) => {
+    if (res) setEmotes(res.data);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.UPDATE_ALERTS_SETTINGS, (res) => {
@@ -104,6 +111,7 @@ export function Alerts() {
         <ItemsSection
           items={settings.items}
           gifts={gifts}
+          emotes={emotes}
           testing={test.testing}
           onTest={test.toggle}
           update={update}
