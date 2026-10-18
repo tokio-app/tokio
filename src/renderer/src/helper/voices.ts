@@ -1,9 +1,6 @@
 import { VoiceData, VoiceEngine } from "@/common/types";
 import type { SelectOption } from "@/components/Elements";
 
-// What voice previews say
-export const VOICE_SAMPLE = "Hello! This is how I sound.";
-
 export const voiceKey = (voice: VoiceData) =>
   `${voice.engine}|${voice.lang}|${voice.name}`;
 
@@ -22,6 +19,29 @@ function languageName(lang: string): string {
     return displayNames.of(lang) ?? lang;
   } catch {
     return lang;
+  }
+}
+
+const ENGLISH_SAMPLE = "Hello! This is how I sound.";
+
+// What voice previews say, in the voice's language: the language's own name
+// and today's date, e.g. "español (Argentina). sábado, 18 de octubre de 2026.".
+// Languages Intl doesn't know get the English line.
+export function voiceSample(lang: string): string {
+  try {
+    if (Intl.DisplayNames.supportedLocalesOf(lang).length === 0) {
+      return ENGLISH_SAMPLE;
+    }
+    // Variants are left out, they're named in Latin letters (zh-CN-liaoning).
+    const { language, script, region } = new Intl.Locale(lang);
+    const tag = [language, script, region].filter(Boolean).join("-");
+    const name = new Intl.DisplayNames([lang], { type: "language" }).of(tag);
+    const date = new Intl.DateTimeFormat(lang, { dateStyle: "full" }).format(
+      new Date(),
+    );
+    return `${name}. ${date}.`;
+  } catch {
+    return ENGLISH_SAMPLE;
   }
 }
 

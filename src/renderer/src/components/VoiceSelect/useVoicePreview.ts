@@ -1,5 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceData } from "@/common/types";
-import { VOICE_SAMPLE, voiceKey } from "@/helper/voices";
+import { voiceKey, voiceSample } from "@/helper/voices";
 import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useEffect, useRef, useState } from "react";
@@ -43,7 +43,7 @@ export function useVoicePreview({
 
     window.api.emit(APP_EVENTS.GET_TTS_TEST, {
       id: ID_PREFIX + key,
-      text: VOICE_SAMPLE,
+      text: voiceSample(voice.lang),
       voice,
     });
   };
