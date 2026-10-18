@@ -1,6 +1,6 @@
 {
   "name": "tokio",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0-alpha.5",
   "description": "Make your TikTok LIVE react to chat, gifts, likes and more",
   "main": "./out/main/index.js",
   "type": "module",
