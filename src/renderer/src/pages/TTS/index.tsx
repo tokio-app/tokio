@@ -23,6 +23,9 @@ import { ProtectionFields } from "./sections/ProtectionFields";
 import { ReplacementsSection } from "./sections/ReplacementsSection";
 import { VoiceSection } from "./sections/VoiceSection";
 
+// Id of the tester's requests, voice previews share the event
+const TEST_ID = "tts-test";
+
 export function TTS() {
   const { getQueue } = useAudio();
   const testQueue = getQueue("tts_test");
@@ -50,9 +53,9 @@ export function TTS() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_TTS_TEST, (res) => {
-    if (!res?.success) return;
+    if (res?.id !== TEST_ID) return;
     setTestLoading(false);
-    testQueue.enqueue(res.data!, true);
+    if (res.success) testQueue.enqueue(res.data!, true);
   });
 
   return (
@@ -70,6 +73,7 @@ export function TTS() {
           onTest={(text) => {
             setTestLoading(true);
             window.api.emit(APP_EVENTS.GET_TTS_TEST, {
+              id: TEST_ID,
               text,
               voice: draft.voice,
             });

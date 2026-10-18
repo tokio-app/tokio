@@ -54,12 +54,13 @@ events.push(
 
 events.push(
   APP_EVENTS.GET_TTS_TEST,
-  async ({ ttsService }, e, { text, voice }) => {
+  async ({ ttsService }, e, { id, text, voice }) => {
     const res = await ttsService.generateBuffer(text, voice);
     if (!res.success || !res.buffer) {
       throw res.error ?? new Error("The engine returned no audio.");
     }
     e.reply(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
+      id,
       data: new Uint8Array(res.buffer),
       success: true,
     });
@@ -69,7 +70,12 @@ events.push(
       code: FEEDBACK_CODES.TTS_GENERATION_FAILED,
       message: "Unable to generate the test audio. Try another voice.",
     },
-    onError: replyFailure(APP_EVENTS_RESPONSE.GET_TTS_TEST),
+    onError: (e, error, { id }) =>
+      e.reply(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
+        success: false,
+        id,
+        error,
+      }),
   },
 );
 

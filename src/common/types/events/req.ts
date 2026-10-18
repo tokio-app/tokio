@@ -119,8 +119,10 @@ export interface AppEventsMap {
     settings: Profile["tts"];
   };
 
-  //TTS PAGE TESTER
+  //TTS PAGE TESTER AND VOICE PREVIEWS
   [APP_EVENTS.GET_TTS_TEST]: {
+    // Echoed in the response, so each listener knows its own tests
+    id: string;
     text: string;
     voice: VoiceData;
   };

@@ -135,9 +135,10 @@ export interface AppEventsResponseMap {
   //TTS PAGE
   [APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS]: Reply;
 
-  //TTS PAGE TESTER
+  //TTS PAGE TESTER AND VOICE PREVIEWS
   [APP_EVENTS_RESPONSE.GET_TTS_TEST]: Reply<{
-    data?: Uint8Array<ArrayBufferLike>;
+    id: string;
+    data?: Uint8Array;
   }>;
 
   //MUSIC PAGE
