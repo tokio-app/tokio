@@ -63,6 +63,7 @@ export function useAlertTest() {
             gain: res.volume / 100,
             key: res.id,
             onEnded: () => finish(res.id),
+            ...res.filters,
           })
           .then((queued) => {
             if (!queued) finish(res.id);

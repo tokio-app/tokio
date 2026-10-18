@@ -1,4 +1,4 @@
-import { Alert, Profile } from "@/common/schemas";
+import { Alert, AlertTts, Profile } from "@/common/schemas";
 import {
   AppEvents,
   EMOTE_TRIGGER,
@@ -6,9 +6,10 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { formatError } from "@/common/util";
+import { formatAlertMessage, formatError, TaskQueue } from "@/common/util";
 import { hasKeyword, isUser } from "@/helper/chat";
 import Logger from "@/logger";
+import type { TTSService } from "@/services/tts";
 import { createHash } from "node:crypto";
 import { access, readFile, unlink, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
@@ -31,7 +32,12 @@ export interface AlertAudio {
   channel: string;
   maxQueueLength: number;
   id?: string;
+  // A TTS alert's speed and pitch, for this sound only
+  filters?: { speed: number; pitch: number };
 }
+
+// What TTS alerts speak with, the TTS service.
+type Speaker = Pick<TTSService, "prepareText" | "generateBuffer">;
 
 export const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg"];
 
@@ -51,6 +57,11 @@ export class AlertsService extends Service {
   // Keyed by sound file name, in least recently used order
   private _cache = new Map<string, Uint8Array>();
   private _cacheBytes = 0;
+  private _speaker: Speaker | null = null;
+  // Alert messages waiting for the voice engine, see _queueSpeech
+  private _speech = new TaskQueue();
+  // Bumped by clearSpeech, so a message made after it is dropped
+  private _speechRun = 0;
 
   public setLogFile(logFile: string): void {
     this._logFile = logFile;
@@ -58,6 +69,10 @@ export class AlertsService extends Service {
 
   public setSoundsFolder(folder: string): void {
     this._soundsFolder = folder;
+  }
+
+  public setSpeaker(speaker: Speaker): void {
+    this._speaker = speaker;
   }
 
   /**
@@ -197,37 +212,143 @@ export class AlertsService extends Service {
   }
 
   /**
+   * Speaks a TTS alert's message, filled with the live event's values. The
+   * TTS settings' banned words and replacements apply: skipped is set when
+   * there's nothing to say.
+   */
+  public async speak(
+    tts: AlertTts,
+    payload: TokioEventMap[AppEvents],
+    settings: Profile["tts"],
+  ): Promise<AlertsResult<Uint8Array> & { skipped?: boolean }> {
+    const text = this._message(tts, payload, settings);
+    if (text === null) return { success: false, skipped: true };
+    return this._generate(tts, text);
+  }
+
+  /**
+   * Stops the alert messages waiting to be spoken, and drops the one being
+   * made.
+   */
+  public clearSpeech() {
+    this._speechRun++;
+    this._speech.stop();
+  }
+
+  /**
    * Plays every enabled alert that matches the live event.
    */
   public async handle<K extends AppEvents>(
     type: K,
     payload: TokioEventMap[K],
-    settings: Profile["alerts"],
+    profile: Pick<Profile, "alerts" | "tts">,
     send: (audio: AlertAudio) => void,
-    // Called for an alert whose sound can't be read
+    // Called for an alert whose sound can't be read or spoken
     onError?: (alert: Alert, error?: string) => void,
   ) {
+    const settings = profile.alerts;
     for (const alert of settings.items) {
-      if (!this._matches(alert, type, payload) || !alert.sound) continue;
+      if (!this._matches(alert, type, payload)) continue;
 
       // By the alert's trigger, emote alerts come with chat events.
       const channel = settings.simultaneous
         ? `alerts:${alert.trigger.type}`
         : "alerts";
+      const { tts, sound } = alert;
+      const play = (data: Uint8Array) =>
+        send({
+          data,
+          volume: alert.volume,
+          channel,
+          maxQueueLength: settings.queue_length,
+          id: alert.id,
+          filters: tts ? { speed: tts.speed, pitch: tts.pitch } : undefined,
+        });
 
-      const res = await this.readSound(alert.sound.file);
+      // A message is spoken instead of the sound.
+      if (tts) {
+        this._queueSpeech(tts, payload, profile.tts, play, (error) =>
+          onError?.(alert, error),
+        );
+        continue;
+      }
+      if (!sound) continue;
+
+      const res = await this.readSound(sound.file);
       if (!res.success || !res.data) {
         onError?.(alert, res.error);
         continue;
       }
+      play(res.data);
+    }
+  }
 
-      send({
-        data: res.data,
-        volume: alert.volume,
-        channel,
-        maxQueueLength: settings.queue_length,
-        id: alert.id,
-      });
+  /**
+   * Like chat TTS: messages are made one at a time, with the TTS cooldown
+   * between them and no more than its queue length waiting, so a burst of
+   * events can't flood the voice engine. The rest are dropped.
+   */
+  private _queueSpeech(
+    tts: AlertTts,
+    payload: TokioEventMap[AppEvents],
+    settings: Profile["tts"],
+    play: (data: Uint8Array) => void,
+    onError: (error?: string) => void,
+  ) {
+    // Checked before queueing, so blocked messages don't take a place.
+    const text = this._message(tts, payload, settings);
+    if (text === null) return;
+
+    const { cooldown, queue_length } = settings.protection;
+    this._speech.setQueueOptions({
+      gapTime: cooldown,
+      maxQueueLength: queue_length,
+    });
+    const run = this._speechRun;
+    this._speech.enqueue(async () => {
+      const res = await this._generate(tts, text);
+      // Cleared while it was being made
+      if (run !== this._speechRun) return;
+      if (res.success && res.data) play(res.data);
+      else onError(res.error);
+    });
+  }
+
+  // The message filled with the event, null when the TTS settings block it.
+  private _message(
+    tts: AlertTts,
+    payload: TokioEventMap[AppEvents],
+    settings: Profile["tts"],
+  ): string | null {
+    const text = formatAlertMessage(tts.message, payload);
+    return this._speaker ? this._speaker.prepareText(text, settings) : text;
+  }
+
+  private async _generate(
+    tts: AlertTts,
+    text: string,
+  ): Promise<AlertsResult<Uint8Array>> {
+    try {
+      if (!this._speaker) throw new Error("No TTS to speak with.");
+
+      // Fixed messages, like a thanks for following, are only made once.
+      const { engine, lang, name } = tts.voice;
+      const key = `tts:${hash(`${engine}|${lang}|${name}|${text}`)}`;
+      const cached = this._cache.get(key);
+      if (cached) {
+        this._remember(key, cached);
+        return { success: true, data: cached };
+      }
+
+      const res = await this._speaker.generateBuffer(text, tts.voice);
+      if (!res.success || !res.buffer) {
+        throw res.error ?? new Error("The engine returned no audio.");
+      }
+      const data = new Uint8Array(res.buffer);
+      this._remember(key, data);
+      return { success: true, data };
+    } catch (error) {
+      return this._fail("Unable to speak alert", error);
     }
   }
 
@@ -236,7 +357,7 @@ export class AlertsService extends Service {
     type: AppEvents,
     payload: TokioEventMap[AppEvents],
   ) {
-    if (!alert.enabled || !alert.sound) return false;
+    if (!alert.enabled || (!alert.sound && !alert.tts)) return false;
 
     const chat =
       type === TOKIO_EVENTS.CHAT &&

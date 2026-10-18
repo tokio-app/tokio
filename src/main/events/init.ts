@@ -108,17 +108,31 @@ const registerConnectorEvents = ({
     await alerts.handle(
       type,
       payload,
-      profile.alerts,
+      profile,
       (audio) => {
         win.webContents.send(APP_EVENTS_RESPONSE.ALERT_AUDIO, audio);
       },
       (alert) => {
-        notifier.warn(
-          "alerts",
-          FEEDBACK_CODES.ALERT_SOUND_MISSING,
-          `The sound of the ${ALERT_TRIGGER_LABELS[alert.trigger.type]} alert is missing. Pick it again in Alerts.`,
-          { key: `alert:${alert.id}`, windowMs: REPEAT_NOTICE_MS },
-        );
+        const label = ALERT_TRIGGER_LABELS[alert.trigger.type];
+        const options = {
+          key: `alert:${alert.id}`,
+          windowMs: REPEAT_NOTICE_MS,
+        };
+        if (alert.tts) {
+          notifier.warn(
+            "alerts",
+            FEEDBACK_CODES.ALERT_TTS_FAILED,
+            `Unable to speak the ${label} alert. Try another voice in Alerts.`,
+            options,
+          );
+        } else {
+          notifier.warn(
+            "alerts",
+            FEEDBACK_CODES.ALERT_SOUND_MISSING,
+            `The sound of the ${label} alert is missing. Pick it again in Alerts.`,
+            options,
+          );
+        }
       },
     );
   };
@@ -184,6 +198,7 @@ const registerConnectorEvents = ({
     sendLikes.cancel();
     music.clearHandler();
     tts.clearTalk();
+    alerts.clearSpeech();
     win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
     win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: false,
@@ -327,6 +342,7 @@ events.push(
         updaterService.setLogFile(files.logs.system);
         notifier.setLogFiles(files.logs);
         alertsService.setSoundsFolder(folders.soundsFolder);
+        alertsService.setSpeaker(ttsService);
       },
     );
     await storeManagerService.initialize(

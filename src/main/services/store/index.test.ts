@@ -403,6 +403,7 @@ describe("StoreManagerService", () => {
       const profile = await (await init()).getProfileData();
 
       expect(profile?.emotes).toEqual([]);
+      expect(profile?.alerts.items[0].tts).toBeNull();
       expect(profile?.alerts.items.map((a) => a.trigger)).toEqual([
         {
           type: TOKIO_EVENTS.CHAT,
@@ -518,6 +519,7 @@ describe("StoreManagerService", () => {
                 user: "",
               },
               sound,
+              tts: null,
               volume: 100,
             },
           ],

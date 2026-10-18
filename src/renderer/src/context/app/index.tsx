@@ -34,7 +34,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!res) return;
     const queue = getQueue(res.channel);
     queue.setQueueOptions({ maxQueueLength: res.maxQueueLength, gapTime: 0.2 });
-    queue.enqueue(res.data, true, { gain: res.volume / 100, key: res.id });
+    queue.enqueue(res.data, true, {
+      gain: res.volume / 100,
+      key: res.id,
+      ...res.filters,
+    });
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.ALERT_CLEAR, () => stopQueues("alerts"));

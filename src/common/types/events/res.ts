@@ -18,6 +18,8 @@ import { UpdateStatus } from "../updates";
 
 type WindowState = { state: "normal" | "maximized" };
 
+type AlertFilters = { speed: number; pitch: number };
+
 export enum APP_EVENTS_RESPONSE {
   // INIT
   LOAD_APP = "app:load:res:all",
@@ -234,6 +236,8 @@ export interface AppEventsResponseMap {
     maxQueueLength: number;
     // Alert the sound belongs to, so volume changes reach it while playing
     id?: string;
+    // A TTS alert's speed and pitch, for this sound only
+    filters?: AlertFilters;
   };
   // Drops queued and playing alert sounds
   [APP_EVENTS_RESPONSE.ALERT_CLEAR]: void;
@@ -241,6 +245,7 @@ export interface AppEventsResponseMap {
     id: string;
     data?: Uint8Array;
     volume: number;
+    filters?: AlertFilters;
   }>;
   [APP_EVENTS_RESPONSE.UPDATE_ALERTS_SETTINGS]: Reply;
   [APP_EVENTS_RESPONSE.SEARCH_SOUNDS]: Reply<{

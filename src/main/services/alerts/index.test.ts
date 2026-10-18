@@ -1,4 +1,4 @@
-import { Alert, Profile } from "@/common/schemas";
+import { Alert, AlertTts, Profile } from "@/common/schemas";
 import {
   AppEvents,
   ChatEvent,
@@ -7,6 +7,7 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
+import { defaultProfile, delay } from "@/common/util";
 import {
   mkdir,
   mkdtemp,
@@ -18,7 +19,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from "vitest";
 import {
   AlertAudio,
   AlertsService,
@@ -47,14 +48,16 @@ const alert = (overrides: Partial<Alert> = {}): Alert => ({
   enabled: true,
   trigger: trigger(TOKIO_EVENTS.FOLLOW),
   sound: { name: "Ding", file: "ding.mp3" },
+  tts: null,
   volume: 80,
   ...overrides,
 });
 
-const settings = (items: Alert[], simultaneous = false): Profile["alerts"] => ({
-  simultaneous,
-  queue_length: 100,
-  items,
+type AlertProfile = Pick<Profile, "alerts" | "tts">;
+
+const settings = (items: Alert[], simultaneous = false): AlertProfile => ({
+  alerts: { simultaneous, queue_length: 100, items },
+  tts: defaultProfile.tts,
 });
 
 const user = { username: "Viewer", handle: "viewer", profilePictures: [] };
@@ -102,7 +105,7 @@ describe("AlertsService", () => {
     const run = async <K extends AppEvents>(
       type: K,
       payload: TokioEventMap[K],
-      alerts: Profile["alerts"],
+      alerts: AlertProfile,
     ) => {
       const sent: AlertAudio[] = [];
       await service.handle(type, payload, alerts, (audio) => sent.push(audio));
@@ -276,6 +279,190 @@ describe("AlertsService", () => {
         expect(await run(type, { user: other }, named)).toEqual([]);
       },
     );
+
+    describe("text-to-speech", () => {
+      const voice = { engine: "Edge", name: "Ava", lang: "en-US" };
+      const tts = (message: string): AlertTts => ({
+        voice,
+        message,
+        speed: 1.5,
+        pitch: 0.8,
+      });
+      const speaking = (message: string, sound: Alert["sound"] = null) =>
+        alert({
+          trigger: trigger(TOKIO_EVENTS.GIFT),
+          sound,
+          tts: tts(message),
+        });
+      const said = (audio: AlertAudio) => Buffer.from(audio.data).toString();
+      const giftFrom = (username: string): GiftEvent => ({
+        ...gift("5655", true),
+        user: { ...user, username },
+      });
+
+      // The TTS settings, with no cooldown unless changed
+      const withTts = (
+        items: Alert[],
+        change: (p: Profile["tts"]["protection"]) => void = () => {},
+      ): AlertProfile => {
+        const tts = structuredClone(defaultProfile.tts);
+        tts.protection.cooldown = 0;
+        change(tts.protection);
+        return { ...settings(items), tts };
+      };
+
+      let prepareText: Mock;
+      let generateBuffer: Mock;
+      let sent: AlertAudio[];
+      let onError: Mock;
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+        prepareText = vi.fn((text: string) => text);
+        generateBuffer = vi.fn(async (text: string) => ({
+          success: true,
+          buffer: Buffer.from(text),
+        }));
+        service.setSpeaker({ prepareText, generateBuffer });
+        sent = [];
+        onError = vi.fn();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      const handle = (payload: GiftEvent, alerts: AlertProfile) =>
+        service.handle(
+          TOKIO_EVENTS.GIFT,
+          payload,
+          alerts,
+          (audio) => sent.push(audio),
+          onError,
+        );
+
+      // Runs the alerts, then lets the queued messages be made.
+      const speak = async (payload: GiftEvent, alerts: AlertProfile) => {
+        await handle(payload, alerts);
+        await vi.advanceTimersByTimeAsync(0);
+      };
+
+      // Each message takes a second to make.
+      const slowly = () =>
+        generateBuffer.mockImplementation(async (text: string) => {
+          await delay(1000);
+          return { success: true, buffer: Buffer.from(text) };
+        });
+
+      it("speaks the message filled with the event, at its speed and pitch", async () => {
+        await speak(
+          gift("5655", true),
+          withTts([speaking("Thanks {username} for the {gift}")]),
+        );
+
+        expect(generateBuffer).toHaveBeenCalledExactlyOnceWith(
+          "Thanks Viewer for the Rose",
+          voice,
+        );
+        expect(sent).toHaveLength(1);
+        expect(said(sent[0])).toBe("Thanks Viewer for the Rose");
+        expect(sent[0]).toMatchObject({
+          volume: 80,
+          channel: "alerts",
+          id: "alert-1",
+          filters: { speed: 1.5, pitch: 0.8 },
+        });
+      });
+
+      it("speaks instead of playing the sound", async () => {
+        await speak(
+          gift("5655", true),
+          withTts([speaking("Thanks", { name: "Ding", file: "ding.mp3" })]),
+        );
+
+        expect(sent.map(said)).toEqual(["Thanks"]);
+      });
+
+      it("stays silent when the TTS settings block the message", async () => {
+        prepareText.mockReturnValue(null);
+        const alerts = withTts([speaking("Thanks {username}")]);
+
+        await speak(gift("5655", true), alerts);
+
+        expect(prepareText).toHaveBeenCalledWith("Thanks Viewer", alerts.tts);
+        expect(generateBuffer).not.toHaveBeenCalled();
+        expect(sent).toEqual([]);
+        expect(onError).not.toHaveBeenCalled();
+      });
+
+      it("reports a message that can't be spoken", async () => {
+        generateBuffer.mockResolvedValue({
+          success: false,
+          error: new Error("offline"),
+        });
+        const failing = speaking("Thanks");
+
+        await speak(gift("5655", true), withTts([failing]));
+
+        expect(onError).toHaveBeenCalledExactlyOnceWith(failing, "offline");
+      });
+
+      it("makes the same message once", async () => {
+        const alerts = withTts([speaking("Thanks for the {gift}")]);
+
+        await speak(gift("5655", true), alerts);
+        await speak(gift("5655", true), alerts);
+
+        expect(generateBuffer).toHaveBeenCalledOnce();
+        expect(sent.map(said)).toEqual([
+          "Thanks for the Rose",
+          "Thanks for the Rose",
+        ]);
+      });
+
+      it("makes one message at a time, with the TTS cooldown between them", async () => {
+        const alerts = withTts([speaking("Thanks {username}")], (p) => {
+          p.cooldown = 2;
+        });
+
+        await handle(giftFrom("Ann"), alerts);
+        await handle(giftFrom("Bob"), alerts);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(sent.map(said)).toEqual(["Thanks Ann"]);
+
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(sent.map(said)).toEqual(["Thanks Ann", "Thanks Bob"]);
+      });
+
+      it("drops messages beyond the TTS queue length", async () => {
+        slowly();
+        const alerts = withTts([speaking("Thanks {username}")], (p) => {
+          p.queue_length = 1;
+        });
+
+        // Ann is being made, Bob waits and Cid doesn't fit.
+        for (const name of ["Ann", "Bob", "Cid"]) {
+          await handle(giftFrom(name), alerts);
+        }
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(generateBuffer).toHaveBeenCalledTimes(2);
+        expect(sent.map(said)).toEqual(["Thanks Ann", "Thanks Bob"]);
+      });
+
+      it("drops the waiting messages and the one being made when cleared", async () => {
+        slowly();
+        const alerts = withTts([speaking("Thanks {username}")]);
+
+        await handle(giftFrom("Ann"), alerts);
+        await handle(giftFrom("Bob"), alerts);
+        service.clearSpeech();
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(generateBuffer).toHaveBeenCalledOnce();
+        expect(sent).toEqual([]);
+      });
+    });
   });
 
   describe("readSound", () => {

@@ -1,4 +1,4 @@
-import { Profile, SavedEmote } from "@/common/schemas";
+import { Alert, Profile, SavedEmote } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, CustomGift } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import { Page, SoundPicker } from "@/components";
@@ -11,6 +11,7 @@ import {
 } from "@/hooks";
 import isEqual from "fast-deep-equal";
 import { useEffect, useRef, useState } from "react";
+import { ttsDefaultsOf } from "./helper";
 import { HeaderSection } from "./sections/HeaderSection";
 import { ItemsSection } from "./sections/ItemsSection";
 
@@ -25,6 +26,10 @@ export function Alerts() {
   const [saved, setSaved] = useState(defaultProfile["alerts"]);
   const [gifts, setGifts] = useState<CustomGift[]>([]);
   const [emotes, setEmotes] = useState<SavedEmote[]>([]);
+  // What a new TTS message starts with: the TTS page's voice
+  const [ttsDefaults, setTtsDefaults] = useState(() =>
+    ttsDefaultsOf(defaultProfile.tts),
+  );
   // Id of the alert whose sound is being picked
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   // Settings changed but not sent to main yet
@@ -41,6 +46,7 @@ export function Alerts() {
     setSettings(res.profile!.alerts);
     setSaved(res.profile!.alerts);
     setEmotes(res.profile!.emotes);
+    setTtsDefaults(ttsDefaultsOf(res.profile!.tts));
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_GIFTS, (res) => {
@@ -57,14 +63,18 @@ export function Alerts() {
     if (res && !res.success) window.api.emit(APP_EVENTS.GET_PROFILE);
   });
 
-  useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, (res) => {
-    if (!res?.success || !res.sound) return;
-    const sound = res.sound;
+  // An alert plays a sound or speaks a message, picking one drops the other.
+  const setOutput = (id: string, output: Pick<Alert, "sound" | "tts">) => {
     update((s) => {
-      const alert = s.items.find((a) => a.id === res.id);
-      if (alert) alert.sound = sound;
+      const alert = s.items.find((a) => a.id === id);
+      if (alert) Object.assign(alert, output);
     });
     setPickerFor(null);
+  };
+
+  useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, (res) => {
+    if (!res?.success || !res.sound) return;
+    setOutput(res.id, { sound: res.sound, tts: null });
   });
 
   useEffect(() => {
@@ -99,6 +109,8 @@ export function Alerts() {
     [],
   );
 
+  const pickerAlert = settings.items.find((a) => a.id === pickerFor);
+
   return (
     <>
       <Page width="wide">
@@ -119,18 +131,14 @@ export function Alerts() {
         />
       </Page>
 
-      {pickerFor && (
+      {pickerAlert && (
         <SoundPicker
-          id={pickerFor}
+          alert={pickerAlert}
+          ttsDefaults={ttsDefaults}
           testing={test.testing}
           onTest={test.toggle}
-          onSelect={(sound) => {
-            update((s) => {
-              const alert = s.items.find((a) => a.id === pickerFor);
-              if (alert) alert.sound = sound;
-            });
-            setPickerFor(null);
-          }}
+          onSelect={(sound) => setOutput(pickerAlert.id, { sound, tts: null })}
+          onSelectTts={(tts) => setOutput(pickerAlert.id, { sound: null, tts })}
           onClose={() => setPickerFor(null)}
         />
       )}

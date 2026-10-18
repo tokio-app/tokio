@@ -44,6 +44,22 @@ export const AlertSoundSchema = z.object({
   file: z.string(),
 });
 
+const VoiceSchema = z.object({
+  // Empty for voices saved before the engines were combined, they keep
+  // the provider that was selected in Settings then.
+  engine: z.string().default(""),
+  name: z.string(),
+  lang: z.string(),
+});
+
+const AlertTtsSchema = z.object({
+  voice: VoiceSchema,
+  // Can hold the trigger's variables, see ALERT_MESSAGE_VARIABLES
+  message: z.string(),
+  speed: z.number().min(0.5).max(2),
+  pitch: z.number().min(0.5).max(2),
+});
+
 const AlertSchema = z.object({
   id: z.string(),
   enabled: z.boolean(),
@@ -60,6 +76,8 @@ const AlertSchema = z.object({
     user: z.string().default(""),
   }),
   sound: AlertSoundSchema.nullable(),
+  // Spoken instead of the sound when set
+  tts: AlertTtsSchema.nullable().default(null),
   volume: z.number().min(0).max(100),
 });
 
@@ -106,13 +124,7 @@ export const ProfileSchema = z.object({
     }),
   }),
   tts: z.object({
-    voice: z.object({
-      // Empty for voices saved before the engines were combined, they keep
-      // the provider that was selected in Settings then.
-      engine: z.string().default(""),
-      name: z.string(),
-      lang: z.string(),
-    }),
+    voice: VoiceSchema,
     filters: z.object({
       speed: z.number(),
       pitch: z.number(),
@@ -158,3 +170,4 @@ export type Permissions = z.infer<typeof PermissionsSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
 export type AlertSound = z.infer<typeof AlertSoundSchema>;
 export type SavedEmote = z.infer<typeof SavedEmoteSchema>;
+export type AlertTts = z.infer<typeof AlertTtsSchema>;

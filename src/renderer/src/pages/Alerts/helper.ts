@@ -1,4 +1,4 @@
-import { Alert, SavedEmote } from "@/common/schemas";
+import { Alert, AlertTts, Profile, SavedEmote } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
 import { SelectOption } from "@/components";
 
@@ -14,7 +14,17 @@ export function createAlert(): Alert {
       user: "",
     },
     sound: null,
+    tts: null,
     volume: 100,
+  };
+}
+
+// A new TTS message starts with the TTS page's voice, speed and pitch.
+export function ttsDefaultsOf(tts: Profile["tts"]): Omit<AlertTts, "message"> {
+  return {
+    voice: tts.voice,
+    speed: tts.filters.speed,
+    pitch: tts.filters.pitch,
   };
 }
 

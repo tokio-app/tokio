@@ -125,11 +125,12 @@ events.push(
 events.push(
   APP_EVENTS.ACTIVE_FEATURES,
   // No notice on success, the switches already show the new state.
-  async ({ storeManagerService, win }, _, data) => {
+  async ({ storeManagerService, alertsService, win }, _, data) => {
     storeManagerService.updateActiveFeatures({
       ...data,
     });
     if (data.alerts === false) {
+      alertsService.clearSpeech();
       win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
     }
   },

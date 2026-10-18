@@ -1,6 +1,6 @@
-import { TokioPayload } from "../connector";
+import { AlertTrigger, TokioPayload } from "../connector";
 import { CustomGift } from "../overlay";
-import { OverlayConfig, Profile } from "../../schemas";
+import { AlertTts, OverlayConfig, Profile } from "../../schemas";
 import { VoiceData } from "../store";
 
 export enum APP_EVENTS {
@@ -236,7 +236,12 @@ export interface AppEventsMap {
   [APP_EVENTS.IMPORT_SOUND]: {
     id: string;
   };
-  [APP_EVENTS.TEST_ALERT]: ({ file: string } | { url: string }) & {
+  // A TTS test speaks the message filled with a sample of the trigger
+  [APP_EVENTS.TEST_ALERT]: (
+    | { file: string }
+    | { url: string }
+    | { tts: AlertTts; trigger: AlertTrigger }
+  ) & {
     volume: number;
     // Identifies the test: the alert id, or the url for previews
     id: string;

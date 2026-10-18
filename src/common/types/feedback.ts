@@ -81,6 +81,7 @@ export enum FEEDBACK_CODES {
   SOUND_REMOVED = "sound_removed",
   ALERT_FAILED = "alert_failed",
   ALERT_SOUND_MISSING = "alert_sound_missing",
+  ALERT_TTS_FAILED = "alert_tts_failed",
   SOUNDS_LOAD_FAILED = "sounds_load_failed",
   SOUND_SEARCH_FAILED = "sound_search_failed",
   SOUND_DOWNLOAD_FAILED = "sound_download_failed",

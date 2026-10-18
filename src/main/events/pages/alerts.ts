@@ -1,11 +1,17 @@
+import { AlertTts } from "@/common/schemas";
 import {
+  AlertTrigger,
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
+  EMOTE_TRIGGER,
   FEEDBACK_CODES,
+  TOKIO_EVENTS,
 } from "@/common/types";
+import { generateTikTokEventSample } from "@/common/util";
 import { createStack, replyFailure } from "@/helper/events";
-import { LoggedError } from "@/helper/feedback";
+import { AppFailure, LoggedError } from "@/helper/feedback";
 import { AUDIO_EXTENSIONS } from "@/services/alerts";
+import { AppHandlerVariables } from "@/types";
 import { dialog } from "electron";
 
 const events = createStack("alerts");
@@ -141,13 +147,45 @@ events.push(
   },
 );
 
+// A TTS test speaks the message filled with sample values for its trigger.
+const speakTest = async (
+  { alertsService, storeManagerService }: AppHandlerVariables,
+  tts: AlertTts,
+  trigger: AlertTrigger,
+) => {
+  const profile = await storeManagerService.getProfileData();
+  if (!profile) throw new Error("The active profile is missing.");
+  const event = trigger === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : trigger;
+  const res = await alertsService.speak(
+    tts,
+    generateTikTokEventSample(event).data,
+    profile.tts,
+  );
+  if (res.skipped) {
+    throw new AppFailure(
+      FEEDBACK_CODES.ALERT_TTS_FAILED,
+      "The message is empty or has a banned word.",
+      { level: "warning" },
+    );
+  }
+  if (!res.success) {
+    throw new AppFailure(
+      FEEDBACK_CODES.ALERT_TTS_FAILED,
+      "Unable to speak the message. Try another voice.",
+      { logged: true },
+    );
+  }
+  return res;
+};
+
 events.push(
   APP_EVENTS.TEST_ALERT,
-  async ({ alertsService }, e, data) => {
-    const res =
-      "url" in data
-        ? await alertsService.fetchSound(data.url)
-        : await alertsService.readSound(data.file);
+  async (services, e, data) => {
+    const { alertsService } = services;
+    let res;
+    if ("tts" in data) res = await speakTest(services, data.tts, data.trigger);
+    else if ("url" in data) res = await alertsService.fetchSound(data.url);
+    else res = await alertsService.readSound(data.file);
     if (!res.success) throw new LoggedError(res.error);
 
     e.reply(APP_EVENTS_RESPONSE.TEST_ALERT, {
@@ -155,6 +193,10 @@ events.push(
       id: data.id,
       data: res.data,
       volume: data.volume,
+      filters:
+        "tts" in data
+          ? { speed: data.tts.speed, pitch: data.tts.pitch }
+          : undefined,
     });
   },
   {

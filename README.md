@@ -48,6 +48,7 @@ Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gif
 - Set each alert's volume. Gift alerts can react to any gift or only to the ones you pick, and fire once per combo.
 - Chat alerts can react to every message or only to messages with a keyword. Emote alerts can react to any emote or only to the ones you pick. TikTok doesn't list a LIVE's emotes, so each profile saves the ones viewers use.
 - Member Join and Super Fan Join alerts can react to anyone or only to the viewer you name, by @handle or name.
+- Instead of a sound, an alert can speak a message with text-to-speech, in its own voice, speed and pitch. Messages can include details of the event, such as `{username}`, `{gift}` or `{count}`, and the TTS page's banned words, replacements, cooldown and queue length apply.
 - Play alerts one after another in a queue, or let different events play at the same time.
 
 ### Overlays
