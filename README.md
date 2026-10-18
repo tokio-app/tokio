@@ -21,7 +21,7 @@ Enter your TikTok username to connect to your LIVE. Turn each feature on or off 
 
 Chat messages are read aloud as they come in.
 
-- **Voices** from three engines, all in one list: TikTok's own voices, Microsoft Edge voices, and, on Windows, the voices installed on the system (SAPI and OneCore, including older 32-bit voices). Adjust speed, pitch and volume.
+- **Voices** from three engines, all in one list: TikTok's own voices, Microsoft Edge voices, and, on Windows, the voices installed on the system (SAPI and OneCore, including older 32-bit voices). Search the list, filter it by engine and language, and play any voice to hear it before you pick it. Adjust speed, pitch and volume.
 - **Format**: choose which messages get read and how, for example `{username} {comment}` or only messages that start with a command.
 - **Replacements**: teach the voice how to say acronyms, slang and names.
 - **Permissions**: let everyone talk, or only followers, superfans or moderators. You can also set a minimum fan level, a whitelist and a blacklist.

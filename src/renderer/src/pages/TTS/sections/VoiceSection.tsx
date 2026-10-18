@@ -1,25 +1,22 @@
 import { Profile } from "@/common/schemas";
-import { VoiceData, VoiceEngine } from "@/common/types";
 import {
   Btn,
   Field,
   FormGrid,
   Input,
   Section,
-  Select,
   Slider,
+  VoiceSelect,
 } from "@/components";
-import { AudioQueue, voiceKey, voiceOptions } from "@/helper";
+import { AudioQueue } from "@/helper";
 import { Updater } from "@/hooks";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import styles from "../tts.module.css";
 
 type Settings = Profile["tts"];
 
 interface Props {
   settings: Settings;
-  voices: VoiceData[];
-  engines: VoiceEngine[];
   testLoading: boolean;
   testQueue: AudioQueue;
   update: Updater<Settings>;
@@ -28,18 +25,12 @@ interface Props {
 
 export function VoiceSection({
   settings,
-  voices,
-  engines,
   testLoading,
   testQueue,
   update,
   onTest,
 }: Props) {
   const [testMessage, setTestMessage] = useState("");
-  const options = useMemo(
-    () => voiceOptions(voices, engines),
-    [voices, engines],
-  );
   const { filters } = settings;
 
   return (
@@ -49,18 +40,14 @@ export function VoiceSection({
     >
       <FormGrid>
         <Field label="Voice Selection">
-          <Select
-            searchable
-            options={options}
-            value={voiceKey(settings.voice)}
-            placeholder={`${settings.voice.lang} - ${settings.voice.name}`}
-            onChange={(key) => {
-              const voice = voices.find((v) => voiceKey(v) === key);
-              if (voice)
-                update((s) => {
-                  s.voice = voice;
-                });
-            }}
+          <VoiceSelect
+            value={settings.voice}
+            filters={filters}
+            onChange={(voice) =>
+              update((s) => {
+                s.voice = voice;
+              })
+            }
           />
         </Field>
 

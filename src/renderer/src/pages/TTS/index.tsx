@@ -1,9 +1,4 @@
-import {
-  APP_EVENTS,
-  APP_EVENTS_RESPONSE,
-  VoiceData,
-  VoiceEngine,
-} from "@/common/types";
+import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import {
   FloatingSave,
   Page,
@@ -15,7 +10,6 @@ import {
   useAudio,
   useEditableSettings,
   useIpcListener,
-  useIpcRequest,
 } from "@/hooks";
 import { useState } from "react";
 import { FormatSection } from "./sections/FormatSection";
@@ -30,8 +24,6 @@ export function TTS() {
   const { getQueue } = useAudio();
   const testQueue = getQueue("tts_test");
 
-  const [voices, setVoices] = useState<VoiceData[]>([]);
-  const [engines, setEngines] = useState<VoiceEngine[]>([]);
   const [testLoading, setTestLoading] = useState(false);
 
   const { draft, update, hasChanges, save } = useEditableSettings(
@@ -43,14 +35,6 @@ export function TTS() {
         volume: settings.filters.volume / 100,
       }),
   );
-
-  useIpcRequest(APP_EVENTS.GET_VOICES);
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_VOICES, (res) => {
-    if (!res?.success) return;
-    setVoices(res.voices!);
-    setEngines(res.engines!);
-  });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_TTS_TEST, (res) => {
     if (res?.id !== TEST_ID) return;
@@ -65,8 +49,6 @@ export function TTS() {
       <Page>
         <VoiceSection
           settings={draft}
-          voices={voices}
-          engines={engines}
           testLoading={testLoading}
           testQueue={testQueue}
           update={update}

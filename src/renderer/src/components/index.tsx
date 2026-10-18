@@ -15,3 +15,4 @@ export * from "./SoundPicker";
 export * from "./Toasts";
 export * from "./UpdateButton";
 export * from "./VariableList";
+export * from "./VoiceSelect";

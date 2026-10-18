@@ -1,0 +1,107 @@
+/* FIELD (looks like a Select) */
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--background-primary);
+  background-color: var(--background-secondary);
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.field_label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.chevron {
+  flex-shrink: 0;
+}
+
+/* Name and details, shared by the field and the rows. The details give way
+   first when there's no room. */
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details {
+  flex-shrink: 1000;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* PICKER */
+
+.filters {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.filter {
+  flex-shrink: 0;
+  width: 180px;
+}
+
+.list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 360px;
+  padding-right: var(--space-2);
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--background-secondary);
+}
+
+/* Picks the voice */
+.pick {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pick:hover .name,
+.current .name {
+  color: var(--accent-primary);
+}
+
+.status {
+  margin: var(--space-4) 0;
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+  text-align: center;
+}

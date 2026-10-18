@@ -1,21 +1,13 @@
 import { AlertTts } from "@/common/schemas";
-import {
-  AlertTrigger,
-  APP_EVENTS,
-  APP_EVENTS_RESPONSE,
-  VoiceData,
-  VoiceEngine,
-} from "@/common/types";
+import { AlertTrigger } from "@/common/types";
 import { ALERT_MESSAGE_VARIABLES } from "@/common/util";
-import { voiceKey, voiceOptions } from "@/helper/voices";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
-import { useIpcListener } from "@/hooks/useIpcListener";
-import { useIpcRequest } from "@/hooks/useIpcRequest";
-import { useMemo, useRef, useState } from "react";
-import { Input, Select, Slider } from "../Elements";
+import { useRef } from "react";
+import { Input, Slider } from "../Elements";
 import { Field } from "../Page";
 import { PlayButton, PREVIEW_VOLUME } from "../PlayButton";
 import { VariableList } from "../VariableList";
+import { VoiceSelect } from "../VoiceSelect";
 import styles from "./soundpicker.module.css";
 
 type Props = {
@@ -36,22 +28,7 @@ export function TtsTab({
   testing,
   onTest,
 }: Props) {
-  const [voices, setVoices] = useState<VoiceData[]>([]);
-  const [engines, setEngines] = useState<VoiceEngine[]>([]);
   const messageRef = useRef<HTMLInputElement>(null);
-
-  useIpcRequest(APP_EVENTS.GET_VOICES);
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_VOICES, (res) => {
-    if (!res?.success) return;
-    setVoices(res.voices!);
-    setEngines(res.engines!);
-  });
-
-  const options = useMemo(
-    () => voiceOptions(voices, engines),
-    [voices, engines],
-  );
   const testId = `${alertId}:tts`;
 
   return (
@@ -87,15 +64,10 @@ export function TtsTab({
       </Field>
 
       <Field label="Voice">
-        <Select
-          searchable
-          options={options}
-          value={voiceKey(value.voice)}
-          placeholder={`${value.voice.lang} - ${value.voice.name}`}
-          onChange={(key) => {
-            const voice = voices.find((v) => voiceKey(v) === key);
-            if (voice) onChange({ ...value, voice });
-          }}
+        <VoiceSelect
+          value={value.voice}
+          filters={value}
+          onChange={(voice) => onChange({ ...value, voice })}
         />
       </Field>
 
