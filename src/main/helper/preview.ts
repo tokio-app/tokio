@@ -6,8 +6,8 @@ const PREVIEW_BACKGROUND = "#121212";
 /**
  * The file a preview URL (`local-resource:///C:/.../overlays/<id>/index.html`)
  * points at, or null when it's outside the overlays folder or the folders
- * aren't known yet. Previews run the overlays' own code, which can load these
- * URLs, so nothing else on disk is served.
+ * aren't known yet. Previews run the overlays' own code, which can fetch these
+ * URLs (see withPreviewCORS), so nothing else on disk is served.
  */
 export function previewFile(
   url: string,
@@ -34,6 +34,23 @@ export function previewFile(
     inside.startsWith(`..${sep}`) ||
     isAbsolute(inside);
   return outside ? null : file;
+}
+
+/**
+ * Lets a preview load its own scripts, styles, fonts and data. Previews are on
+ * `local-resource:`, which has no origin, so Chromium checks every module
+ * script, `crossorigin` stylesheet, font and fetch against CORS, and builds
+ * from Vite and other bundlers load their code that way. The scheme is
+ * registered with `corsEnabled` for it in src/main/index.ts.
+ */
+export function withPreviewCORS(res: Response): Response {
+  const headers = new Headers(res.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
 }
 
 /**

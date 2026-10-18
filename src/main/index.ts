@@ -1,7 +1,11 @@
 import { APP_EVENTS_RESPONSE } from "@/common/types";
 import { formatError } from "@/common/util";
 import { Notifier } from "@/helper/feedback";
-import { previewFile, withPreviewBackground } from "@/helper/preview";
+import {
+  previewFile,
+  withPreviewBackground,
+  withPreviewCORS,
+} from "@/helper/preview";
 import Logger from "@/logger";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
@@ -41,6 +45,17 @@ app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 app.commandLine.appendSwitch("disable-backgrounding-occluded-windows", "true");
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
+
+// Overlay previews load their files from local-resource:, which has no origin.
+// Without CORS on it, Chromium blocks module scripts, crossorigin styles, fonts
+// and fetch, so overlays built with Vite never run. See withPreviewCORS.
+// Schemes can only be registered before the app is ready.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "local-resource",
+    privileges: { corsEnabled: true, supportFetchAPI: true },
+  },
+]);
 
 const services: AppServices = {
   alertsService: new AlertsService(),
@@ -162,7 +177,7 @@ app.whenReady().then(async () => {
     if (!file) return new Response(null, { status: 404 });
 
     const res = await net.fetch(pathToFileURL(file).href);
-    return withPreviewBackground(res, file);
+    return withPreviewCORS(await withPreviewBackground(res, file));
   });
 
   createWindows();

@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { previewFile, withPreviewBackground } from "./preview";
+import { previewFile, withPreviewBackground, withPreviewCORS } from "./preview";
 
 const page = "<!doctype html><html><body>Overlay</body></html>";
 
@@ -35,6 +35,21 @@ describe("previewFile", () => {
   it("refuses everything before the folders are known", () => {
     const file = join(folder, "a", "index.html");
     expect(previewFile(previewURL(file), undefined)).toBeNull();
+  });
+});
+
+describe("withPreviewCORS", () => {
+  it("lets previews load their own files", async () => {
+    const res = withPreviewCORS(
+      new Response("console.log(1)", {
+        status: 200,
+        headers: { "content-type": "text/javascript" },
+      }),
+    );
+
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    expect(res.headers.get("content-type")).toBe("text/javascript");
+    expect(await res.text()).toBe("console.log(1)");
   });
 });
 
