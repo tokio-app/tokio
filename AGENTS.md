@@ -170,6 +170,10 @@ The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
+## Overlays repo
+
+The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`), which has its own `AGENTS.md`. Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change. Its releases publish a catalog of every overlay at `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`).
+
 ## Conventions
 
 - Run `yarn format` on files you touch, and fix lint warnings in code you touch.
