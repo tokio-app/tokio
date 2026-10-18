@@ -22,10 +22,10 @@ const MusicControl = z.object({
   command: z.string(),
 });
 
-// Every live event (AppEvents) can trigger an alert.
+// Every live event (AppEvents) but Room Users can trigger an alert.
 const LiveTriggerSchema = z
   .enum(TOKIO_EVENTS)
-  .exclude(["CONNECTED", "DISCONNECTED", "MUSIC_PROCCESS_ENDED"]);
+  .exclude(["CONNECTED", "DISCONNECTED", "MUSIC_PROCCESS_ENDED", "ROOM_USER"]);
 
 const AlertTriggerSchema = z.union([
   LiveTriggerSchema,
@@ -62,6 +62,20 @@ const AlertSchema = z.object({
   sound: AlertSoundSchema.nullable(),
   volume: z.number().min(0).max(100),
 });
+
+// Room Users alerts are no longer possible. Dropping the saved ones keeps
+// the profile loading.
+const RoomUserAlertSchema = z.object({
+  trigger: z.object({ type: z.literal(TOKIO_EVENTS.ROOM_USER) }),
+});
+
+const AlertItemsSchema = z.preprocess(
+  (items) =>
+    Array.isArray(items)
+      ? items.filter((item) => !RoomUserAlertSchema.safeParse(item).success)
+      : items,
+  z.array(AlertSchema),
+);
 
 const SavedEmoteSchema = z.object({
   id: z.string(),
@@ -131,7 +145,7 @@ export const ProfileSchema = z.object({
       simultaneous: z.boolean().default(false),
       // Max sounds waiting per queue
       queue_length: z.number().min(1).default(100),
-      items: z.array(AlertSchema).default([]),
+      items: AlertItemsSchema.default([]),
     })
     .default({ simultaneous: false, queue_length: 100, items: [] }),
   // TikTok can't list a LIVE's emotes, so they're collected as viewers use

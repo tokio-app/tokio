@@ -390,7 +390,11 @@ describe("StoreManagerService", () => {
         sound: null,
         volume: 100,
       });
-      const items = [item("chat", TOKIO_EVENTS.CHAT)];
+      const items = [
+        item("chat", TOKIO_EVENTS.CHAT),
+        // Room Users can't trigger alerts anymore
+        item("room", TOKIO_EVENTS.ROOM_USER),
+      ];
       await writeFile(
         defaultProfileFile,
         JSON.stringify({ ...old, alerts: { ...old.alerts, items } }),

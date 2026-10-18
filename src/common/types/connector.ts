@@ -147,7 +147,10 @@ export const isLiveEvent = (event: TOKIO_EVENTS): event is AppEvents =>
 // An alert trigger that isn't a live event: chat messages with emotes.
 export const EMOTE_TRIGGER = "tokio:alert:emote";
 
-export type AlertTrigger = AppEvents | typeof EMOTE_TRIGGER;
+// Room Users isn't one: it comes every few seconds and is meant for overlays.
+// Keep it in sync with the exclude list of AlertTriggerSchema.
+export type AlertTrigger =
+  Exclude<AppEvents, TOKIO_EVENTS.ROOM_USER> | typeof EMOTE_TRIGGER;
 
 // Typed as Record<AlertTrigger, ...> so a new live event can't be left out of the alert triggers.
 export const ALERT_TRIGGER_LABELS: Record<AlertTrigger, string> = {
@@ -162,7 +165,6 @@ export const ALERT_TRIGGER_LABELS: Record<AlertTrigger, string> = {
   [TOKIO_EVENTS.SUPER_FAN_BOX]: "Super Fan Box",
   [TOKIO_EVENTS.SUPER_FAN_JOIN]: "Super Fan Join",
   [TOKIO_EVENTS.MEMBER_JOIN]: "Member Join",
-  [TOKIO_EVENTS.ROOM_USER]: "Room Users",
   [TOKIO_EVENTS.MUSIC_CHANGE]: "Music Change",
 };
 

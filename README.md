@@ -42,7 +42,7 @@ Music requests use the same permissions and protection settings as text-to-speec
 
 ### Alerts
 
-Play a sound for any LIVE event: chat messages, emotes, follows, shares, likes, gifts, envelopes, Super Fan events, new members, viewer counts and song changes.
+Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gifts, envelopes, Super Fan events, new members and song changes.
 
 - Upload your own sounds or search [MyInstants](https://www.myinstants.com) from inside the app. Your sound library is shared by all your profiles.
 - Set each alert's volume. Gift alerts can react to any gift or only to the ones you pick, and fire once per combo.
