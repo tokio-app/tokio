@@ -81,8 +81,3 @@
   align-items: center;
   gap: var(--space-1);
 }
-
-.hint {
-  color: var(--font-secondary);
-  font-size: var(--font-sm);
-}

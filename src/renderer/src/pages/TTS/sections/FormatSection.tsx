@@ -1,6 +1,7 @@
 import { Profile } from "@/common/schemas";
-import { Field, Input, RadioGroup, Section } from "@/components";
+import { Field, Input, RadioGroup, Section, VariableList } from "@/components";
 import { Updater } from "@/hooks";
+import { useRef } from "react";
 import styles from "../tts.module.css";
 
 type Format = Profile["tts"]["format"];
@@ -14,6 +15,9 @@ const MODE_VALUES: Record<Mode, string> = {
   custom: "",
 };
 
+// The ones TTSService fills in the template, see _parseText
+const TEMPLATE_VARIABLES = ["username", "handle", "comment"];
+
 interface Props {
   format: Format;
   update: Updater<Format>;
@@ -21,6 +25,7 @@ interface Props {
 
 export function FormatSection({ format, update }: Props) {
   const custom = format.trigger.mode === "custom";
+  const templateRef = useRef<HTMLInputElement>(null);
 
   return (
     <Section
@@ -79,6 +84,7 @@ export function FormatSection({ format, update }: Props) {
 
       <Field label="Message Template">
         <Input
+          ref={templateRef}
           value={format.template}
           onChange={(e) =>
             update((f) => {
@@ -86,9 +92,16 @@ export function FormatSection({ format, update }: Props) {
             })
           }
         />
-        <p className={styles.hint}>
-          Variables: {"{username}"}, {"{nickname}"}, {"{comment}"}
-        </p>
+        <VariableList
+          variables={TEMPLATE_VARIABLES}
+          inputRef={templateRef}
+          value={format.template}
+          onChange={(template) =>
+            update((f) => {
+              f.template = template;
+            })
+          }
+        />
       </Field>
     </Section>
   );

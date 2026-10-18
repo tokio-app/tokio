@@ -1,0 +1,27 @@
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.label {
+  color: var(--font-primary);
+  font-weight: 600;
+}
+
+.variable {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.variable:hover,
+.variable:focus-visible {
+  color: var(--accent-primary);
+}

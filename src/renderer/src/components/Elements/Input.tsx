@@ -1,12 +1,12 @@
 import { cx } from "@/helper/cx";
-import { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { ComponentProps, TextareaHTMLAttributes } from "react";
 import styles from "./elements.module.css";
 
 export function Input({
   className,
   type = "text",
   ...rest
-}: InputHTMLAttributes<HTMLInputElement>) {
+}: ComponentProps<"input">) {
   return (
     <input type={type} className={cx(styles.input, className)} {...rest} />
   );

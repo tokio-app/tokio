@@ -20,11 +20,6 @@
   font-weight: 700;
 }
 
-.hint {
-  font-size: var(--font-md);
-  color: var(--font-secondary);
-}
-
 /* REPLACEMENTS */
 
 .replacements {

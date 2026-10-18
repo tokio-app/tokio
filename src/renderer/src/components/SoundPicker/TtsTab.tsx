@@ -11,10 +11,11 @@ import { voiceKey, voiceOptions } from "@/helper/voices";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Input, Select, Slider } from "../Elements";
 import { Field } from "../Page";
 import { PlayButton, PREVIEW_VOLUME } from "../PlayButton";
+import { VariableList } from "../VariableList";
 import styles from "./soundpicker.module.css";
 
 type Props = {
@@ -37,6 +38,7 @@ export function TtsTab({
 }: Props) {
   const [voices, setVoices] = useState<VoiceData[]>([]);
   const [engines, setEngines] = useState<VoiceEngine[]>([]);
+  const messageRef = useRef<HTMLInputElement>(null);
 
   useIpcRequest(APP_EVENTS.GET_VOICES);
 
@@ -50,7 +52,6 @@ export function TtsTab({
     () => voiceOptions(voices, engines),
     [voices, engines],
   );
-  const variables = ALERT_MESSAGE_VARIABLES[trigger];
   const testId = `${alertId}:tts`;
 
   return (
@@ -58,6 +59,7 @@ export function TtsTab({
       <Field label="Message">
         <div className={styles.tts_message}>
           <Input
+            ref={messageRef}
             placeholder="Type what the alert says..."
             value={value.message}
             onChange={(e) => onChange({ ...value, message: e.target.value })}
@@ -75,11 +77,13 @@ export function TtsTab({
             }
           />
         </div>
-        <p className={styles.hint}>
-          {variables.length > 0
-            ? `Variables: ${variables.map((v) => `{${v}}`).join(", ")}`
-            : "This event has no variables."}
-        </p>
+        <VariableList
+          variables={ALERT_MESSAGE_VARIABLES[trigger]}
+          inputRef={messageRef}
+          value={value.message}
+          onChange={(message) => onChange({ ...value, message })}
+          empty="This event has no variables."
+        />
       </Field>
 
       <Field label="Voice">
