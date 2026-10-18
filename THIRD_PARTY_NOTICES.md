@@ -2,11 +2,11 @@
 
 ## Summary
 
-| What                                                              | License                                                                                                                          |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Tokio's own source code in this repository                        | MIT ([`LICENSE`](LICENSE)), except the file below                                                                                |
-| `src/main/services/tts/providers/edge/common/drm-v2.ts`           | LGPL-3.0-only ([`LICENSES/LGPL-3.0.txt`](LICENSES/LGPL-3.0.txt), which builds on [`LICENSES/GPL-3.0.txt`](LICENSES/GPL-3.0.txt)) |
-| **The distributed application** (installer and installed program) | **AGPL-3.0-only** as a whole ([`LICENSES/AGPL-3.0.txt`](LICENSES/AGPL-3.0.txt)), because it includes the AGPL dependencies below |
+| What                                                    | License                                                                                                                          |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Tokio's own source code in this repository              | MIT ([`LICENSE`](LICENSE)), except the file below                                                                                |
+| `src/main/services/tts/providers/edge/common/drm-v2.ts` | LGPL-3.0-only ([`LICENSES/LGPL-3.0.txt`](LICENSES/LGPL-3.0.txt), which builds on [`LICENSES/GPL-3.0.txt`](LICENSES/GPL-3.0.txt)) |
+| **The distributed application**                         | **AGPL-3.0-only** as a whole ([`LICENSES/AGPL-3.0.txt`](LICENSES/AGPL-3.0.txt)), because it includes the AGPL dependencies below |
 
 Tokio's own files stay MIT and can be reused under MIT on their own. The application built from them includes `tiktok-live-connector` and `tiktok-live-proto`, which are licensed AGPL-3.0-only. So anyone who distributes the application, modified or not, must do so under the AGPL-3.0, including making the complete corresponding source available.
 
@@ -65,10 +65,6 @@ The [react-icons](https://github.com/react-icons/react-icons) package (MIT) bund
 | Lucide (`lu`)                                                            | Lucide contributors                                                   | ISC                                                                                                                                                               |
 
 Check this table when adding an icon set: react-icons also contains sets under CC BY-SA, MPL-2.0 and other licenses with extra conditions.
-
-## Installer
-
-The Tokio installer (`src/installer/`) is a separate MIT program, written in Rust, that downloads and installs the application on Windows, macOS and Linux. Its third-party components are its Rust crates (including wry and tao), the Microsoft Edge WebView2 Loader (Windows), React and VS Code Codicons. On macOS and Linux it also includes option-ext, under the [MPL-2.0](LICENSES/MPL-2.0.txt), unmodified. Their notices are in [`src/installer/THIRD_PARTY_NOTICES.txt`](src/installer/THIRD_PARTY_NOTICES.txt) and, for the crates, the generated [`src/installer/licenses/rust-crates.txt`](src/installer/licenses/rust-crates.txt). Both are embedded in the installer together with the full license texts.
 
 ## Services
 

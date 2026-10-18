@@ -4,7 +4,6 @@
     "src/renderer/src/env.d.ts",
     "src/renderer/src/**/*",
     "src/renderer/src/**/*.tsx",
-    "src/installer/**/*",
     "src/music/**/*",
     "src/preload/*.d.ts",
     "src/common/**/*",

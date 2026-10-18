@@ -27,9 +27,8 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-  runAfterFinish: false
-# NOTE: The installer (src/installer) finds these artifacts on the latest GitHub release by these names
-# (see release_lookup in src/installer/build.rs). Keep them in sync.
+# NOTE: The website (tokio-web, src/lib/release.ts) finds these artifacts on the latest GitHub release
+# by these names, and build-app.yml uploads them by these names. Keep them in sync.
 mac:
   icon: "build/icon.png"
   # Ad-hoc signature, so Apple Silicon runs the app without a certificate. Replace with a Developer ID

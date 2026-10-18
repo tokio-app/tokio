@@ -11,18 +11,16 @@ Stack: Electron 39, electron-vite, React 19, TypeScript, TanStack Router, Expres
 ```sh
 yarn dev                  # build the music window UI, then electron-vite dev
 yarn test                 # vitest (yarn test:watch to watch)
-yarn typecheck            # tsc for node (main/preload/common) and web (renderer/music/installer)
+yarn typecheck            # tsc for node (main/preload/common) and web (renderer/music)
 yarn lint                 # oxlint --type-aware
 yarn format               # prettier --write .
 yarn build                # typecheck + music UI + electron-vite build
 yarn build:win            # build + package (also build:mac, build:linux)
 yarn tts:edge:check       # live check of the Edge TTS provider (needs network)
-yarn build:installer      # installer UI + Rust installer into installer-out/ (needs Rust)
-yarn licenses:installer   # regenerate the installer's crate notices (needs cargo-about)
 yarn release:notes [tag]  # print a release's notes (the next release's without a tag)
 ```
 
-Verify changes with `yarn test`, `yarn typecheck` and `yarn lint`. For the Edge TTS provider, also run `yarn tts:edge:check`. For the installer, also run `yarn build:installer` and `cargo clippy --manifest-path src/installer/Cargo.toml -- -D warnings`.
+Verify changes with `yarn test`, `yarn typecheck` and `yarn lint`. For the Edge TTS provider, also run `yarn tts:edge:check`.
 
 ### Tests
 
@@ -47,11 +45,10 @@ Verify changes with `yarn test`, `yarn typecheck` and `yarn lint`. For the Edge 
 | `src/music/`                          | Separate music window UI, built as a single file into `music-out/`                      |
 | `src/common/`                         | Shared by both processes: Zod schemas, event types, constants, utils                    |
 | `src/ui/`                             | Web-only code shared by the main and music windows: design tokens, base CSS, `TitleBar` |
-| `src/installer/`                      | Installer (Rust, wry + tao) with a React UI. Leave it alone unless the task is about it |
-| `scripts/`                            | Repo maintenance scripts (`clean`, `todos`, `edge-tts`, `installer`)                    |
+| `scripts/`                            | Repo maintenance scripts (`clean`, `todos`, `edge-tts`, `release-notes`)                |
 | `LICENSES/`, `THIRD_PARTY_NOTICES.md` | Third-party license texts and notices, shipped to the app's `resources/licenses`        |
 
-Generated, don't edit: `out/`, `music-out/`, `installer-out/`, `build/` output, `src/installer/dist/`, `src/installer/target/`, `src/installer/licenses/`.
+Generated, don't edit: `out/`, `music-out/`, `build/` output.
 
 ## Path aliases
 
@@ -92,7 +89,7 @@ Code in `src/common/` must not import from `src/main` or `src/renderer`, and mus
 ### Updates
 
 - `UpdaterService` (`src/main/services/updater`) wraps electron-updater's `autoUpdater`. It's loaded with a dynamic `import()` because the package is CJS and main builds to ESM, so use its default export. Tests inject a fake `Updater` instead.
-- It reads the GitHub release marked latest (`allowPrerelease = false`), like the installer. Without that, the library would allow prereleases on its own for `-alpha` versions.
+- It reads the GitHub release marked latest (`allowPrerelease = false`). Without that, the library would allow prereleases on its own for `-alpha` versions.
 - Windows (NSIS) and Linux (AppImage) download in the background and install on restart. macOS builds are ad-hoc signed, which Squirrel.Mac rejects, so mac only checks (`manual: true`) and opens the release page.
 - Status reaches the renderer as `UpdateStatus` (`src/common/types/updates.ts`) on `UPDATE_STATUS`, pushed on every change. Read it with `useUpdateStatus`. `UpdateButton` (title bar and About) restarts or opens the release page, and asks first while a LIVE is connected.
 - Checks run 15s after `LOAD_APP` and then every 6h while `settings.updates.auto` is on. A failed background check is only logged, since it's usually just offline; About shows a failed manual check. The updater logs its own errors through `<Updater>`, so don't log them again.
@@ -152,17 +149,15 @@ Tokio's source is MIT; treat license compliance as part of every change.
   - `THIRD_PARTY_NOTICES.md` (including its Services list for new online services) and `LICENSES/`
   - the license banner in `electron.vite.config.ts` (the bundler strips header comments)
   - `COMPONENTS` and `SERVICES` in `src/renderer/src/pages/About/helper.ts`, which mirror the non-npm parts of `THIRD_PARTY_NOTICES.md`
-  - `src/installer/THIRD_PARTY_NOTICES.txt` when the installer's dependencies change. After changing `Cargo.toml`/`Cargo.lock`, run `yarn licenses:installer` and check crate licenses against `src/installer/about.toml`
 - The About page shows the AGPL's "Appropriate Legal Notices"; keep it reachable from the sidebar. Its package list comes from `LicensesService`, which walks the production dependency tree, so new dependencies need no changes there.
 - Keep `"license": "MIT"` in `package.json`; it describes the repository's own code.
 
 ## CI and releases
 
 - `ci.yml` (PRs and `main`): Prettier check, lint, typecheck and tests on Linux and Windows. Non-draft PRs, `main`, and draft PRs whose latest commit contains `[ci]` also package the app via `build-app.yml`; `chore(release): ...` commits skip packaging.
-- `installer.yml` builds the installer when `src/installer` or `scripts/installer` change.
-- `release.yml` runs on a `v<version>` tag matching `package.json` and attaches the packages, installers and update files to a draft GitHub release. `scripts/release-notes` writes its notes from the Conventional Commits since the previous `v*` tag (`chore(release)` commits are skipped); a rerun keeps the draft's notes.
+- `release.yml` runs on a `v<version>` tag matching `package.json` and attaches the packages and update files to a draft GitHub release. `scripts/release-notes` writes its notes from the Conventional Commits since the previous `v*` tag (`chore(release)` commits are skipped); a rerun keeps the draft's notes.
 
-To release: bump `version` in `package.json`, commit, push a `v<version>` tag, then review and publish the draft (only published releases feed the installer and auto-updates). Keep `artifactName` in `electron-builder.yml`, the upload paths in `build-app.yml` and `release_lookup` in `src/installer/build.rs` in sync.
+To release: bump `version` in `package.json`, commit, push a `v<version>` tag, then review and publish the draft (only published releases feed auto-updates and the website's download links). Keep `artifactName` in `electron-builder.yml`, the upload paths in `build-app.yml` and the website's `src/lib/release.ts` in sync.
 
 ## Website
 
@@ -170,7 +165,7 @@ The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../
 
 - features, settings, chat commands or install steps in `README.md`
 - the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, or `TOKIO_EVENTS` names and payloads
-- package or installer file names (its `src/lib/release.ts` matches them)
+- package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
 ## Conventions
@@ -180,4 +175,4 @@ The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../
 - Keep the server port (`37891`) and existing event names stable; overlays and saved data depend on them.
 - Respect inline `NOTE: DO NOT CHANGE` markers.
 - Inside a folder with a barrel `index` (`common/types`, `common/schemas`, `components`, `context`, `hooks`), import sibling files directly, never through the barrel, to avoid import cycles.
-- `npx fallow -c .\.fallowrc.json health` (also `dead-code`, `dupes`) reports import cycles, dead code and duplication. The music and installer UIs are entry points in `.fallowrc.json`.
+- `npx fallow -c .\.fallowrc.json health` (also `dead-code`, `dupes`) reports import cycles, dead code and duplication. The music window UI is an entry point in `.fallowrc.json`.

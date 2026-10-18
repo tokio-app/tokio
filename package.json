@@ -40,9 +40,6 @@
     "build:win": "yarn build && electron-builder --win",
     "build:mac": "yarn build && electron-builder --mac",
     "build:linux": "yarn build && electron-builder --linux",
-    "build:installer:ui": "vite build --config src/installer/vite.config.ts",
-    "build:installer": "yarn build:installer:ui && node ./scripts/installer/index.js",
-    "licenses:installer": "cargo about generate --manifest-path src/installer/Cargo.toml -c src/installer/about.toml -o src/installer/licenses/rust-crates.txt src/installer/about.hbs",
     "clean": "node ./scripts/clean/index.js",
     "todos": "node ./scripts/todos/index.js",
     "release:notes": "node ./scripts/release-notes/index.js",
@@ -97,7 +94,6 @@
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^7.2.6",
-    "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^5.0.3"
   }
 }

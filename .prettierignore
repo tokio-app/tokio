@@ -5,5 +5,3 @@ LICENSE.md
 tsconfig.json
 tsconfig.*.json
 test/fixtures
-src/installer/target
-src/installer/about.hbs

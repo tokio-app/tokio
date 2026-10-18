@@ -11,6 +11,3 @@ bin
 obj
 output
 music-out
-installer-out
-
-src/installer/target

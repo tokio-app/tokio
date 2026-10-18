@@ -1,8 +1,7 @@
 name: Release
 
-# Push a tag v<version> matching package.json to build every platform and the installers into a
-# draft GitHub release. Publish the draft to make it the latest release, which the installer and
-# auto-updates read.
+# Push a tag v<version> matching package.json to build every platform into a draft GitHub release.
+# Publish the draft to make it the latest release, which auto-updates and the website read.
 on:
   push:
     tags: ["v*"]
@@ -28,12 +27,8 @@ jobs:
     needs: verify
     uses: ./.github/workflows/build-app.yml
 
-  installer:
-    needs: verify
-    uses: ./.github/workflows/installer.yml
-
   release:
-    needs: [app, installer]
+    needs: app
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

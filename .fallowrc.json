@@ -4,8 +4,7 @@
     "src/main/index.ts",
     "src/preload/index.ts",
     "src/renderer/src/main.tsx",
-    "src/music/src/main.tsx",
-    "src/installer/ui/main.tsx"
+    "src/music/src/main.tsx"
   ],
   "ignoreDependencies": ["electron-updater"],
   "ignoreExports": [

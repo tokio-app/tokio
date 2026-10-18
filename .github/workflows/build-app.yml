@@ -36,7 +36,7 @@ jobs:
       - name: Build
         run: yarn build
 
-      # The files must match the artifactName patterns in electron-builder.yml; the installer looks them up by name.
+      # The files must match the artifactName patterns in electron-builder.yml; the website looks them up by name.
       - name: Package
         run: yarn electron-builder ${{ matrix.flag }} --publish never
         env:

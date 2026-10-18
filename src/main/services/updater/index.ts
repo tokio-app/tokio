@@ -93,8 +93,8 @@ export class UpdaterService extends Service {
     updater.forceDevUpdateConfig = process.env[DEV_ENV] === "1";
     updater.autoDownload = !this.manual;
     updater.autoInstallOnAppQuit = !this.manual;
-    // Only the release GitHub marks as latest, like the installer. The
-    // updater would otherwise allow prereleases for -alpha versions.
+    // Only the release GitHub marks as latest. The updater would otherwise
+    // allow prereleases for -alpha versions.
     updater.allowPrerelease = false;
     updater.allowDowngrade = false;
     updater.logger = this.logger();

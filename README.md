@@ -70,7 +70,7 @@ Building your own overlay? Create a test ID on the **Tools** page and send your 
 
 Download Tokio from the [latest release](https://github.com/tokio-app/tokio/releases/latest).
 
-- **Windows**: run `Tokio-Installer-windows-x64.exe`. It downloads and installs the latest version of Tokio. To skip the installer, use the app's own setup, `tokio-<version>-setup.exe`.
+- **Windows**: run `tokio-<version>-setup.exe`. It installs Tokio for your user and opens it.
 - **macOS and Linux**: download the app itself: `tokio-<version>-mac-arm64.zip` (Apple Silicon), `tokio-<version>-mac-x64.zip` (Intel) or `tokio-<version>-x86_64.AppImage`.
 
 ### Platforms
@@ -126,14 +126,6 @@ yarn build:win    # build the Windows setup into dist/
 yarn build:mac    # build the macOS zips into dist/ (on macOS)
 yarn build:linux  # build the Linux AppImage into dist/
 ```
-
-The small download-and-install program in `src/installer/` is written in Rust and runs on Windows, macOS and Linux. Building it needs a [Rust toolchain](https://rustup.rs) (1.85+); on Linux also `libwebkit2gtk-4.1-dev`, `libssl-dev` and `libdbus-1-dev`.
-
-```sh
-yarn build:installer  # build the installer for this system into installer-out/
-```
-
-The installer doesn't need rebuilding for new versions: when it runs, it downloads the app from the latest GitHub release, picking the `yarn build:win`, `build:mac` or `build:linux` artifact for its system by name. Set `INSTALLER_URL` at build time to download from a fixed URL instead.
 
 Want to help? Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
 

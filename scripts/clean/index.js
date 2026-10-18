@@ -7,5 +7,4 @@ bulk_removal(
   "**/dist",
   "**/bin",
   "**/obj",
-  "src/installer/target",
 );
