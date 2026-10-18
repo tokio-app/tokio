@@ -12,6 +12,9 @@ interface EnqueueOptions {
   key?: string;
   // Called when the item finishes playing, not when the queue is stopped
   onEnded?: () => void;
+  // Per item speed and pitch, used instead of the queue's filters
+  speed?: number;
+  pitch?: number;
 }
 
 interface QueueItem extends EnqueueOptions {
@@ -23,6 +26,8 @@ interface ActiveItem {
   player: Tone.GrainPlayer;
   gainNode: Tone.Gain;
   key?: string;
+  // Has its own speed and pitch, which setFilters leaves alone
+  ownFilters: boolean;
 }
 
 export class AudioQueue {
@@ -65,7 +70,8 @@ export class AudioQueue {
       this.currentFilters.pitch = Math.max(0.5, Math.min(filters.pitch, 2.0));
     }
 
-    this.active.forEach(({ player }) => {
+    this.active.forEach(({ player, ownFilters }) => {
+      if (ownFilters) return;
       if (filters.speed !== undefined) {
         player.playbackRate = this.currentFilters.speed;
       }
@@ -83,7 +89,7 @@ export class AudioQueue {
   async enqueue(
     input: string | Uint8Array | ArrayBuffer,
     autoplay: boolean = true,
-    { gain = 1, key, onEnded }: EnqueueOptions = {},
+    { gain = 1, key, onEnded, speed, pitch }: EnqueueOptions = {},
   ) {
     if (this.pending() >= this.maxQueueLength) {
       console.warn("AudioQueue: Max queue length reached. Ignoring input.");
@@ -127,7 +133,7 @@ export class AudioQueue {
         return false;
       }
 
-      this.queue.push({ buffer: toneBuffer, gain, key, onEnded });
+      this.queue.push({ buffer: toneBuffer, gain, key, onEnded, speed, pitch });
 
       if (autoplay) {
         this.start();
@@ -201,12 +207,15 @@ export class AudioQueue {
     }
 
     while (this.queue.length > 0) {
-      const { buffer, gain, key, onEnded } = this.queue.shift()!;
+      const next = this.queue.shift()!;
+      const { buffer, gain, key, onEnded } = next;
+      const speed = next.speed ?? this.currentFilters.speed;
+      const pitch = next.pitch ?? this.currentFilters.pitch;
 
       const player = new Tone.GrainPlayer({
         url: buffer,
-        playbackRate: this.currentFilters.speed,
-        detune: Math.log2(this.currentFilters.pitch) * 1200,
+        playbackRate: speed,
+        detune: Math.log2(pitch) * 1200,
         grainSize: 0.1,
         overlap: 0.05,
       });
@@ -214,7 +223,12 @@ export class AudioQueue {
       const gainNode = new Tone.Gain(gain).connect(this.gainNode);
       player.connect(gainNode);
       player.start(this.nextPlayTime);
-      this.active.push({ player, gainNode, key });
+      this.active.push({
+        player,
+        gainNode,
+        key,
+        ownFilters: next.speed !== undefined || next.pitch !== undefined,
+      });
 
       player.onstop = () => {
         this.active = this.active.filter((item) => item.player !== player);
@@ -223,7 +237,7 @@ export class AudioQueue {
         onEnded?.();
       };
 
-      const actualDuration = buffer.duration / this.currentFilters.speed;
+      const actualDuration = buffer.duration / speed;
 
       this.nextPlayTime += actualDuration + this.gapTime;
     }
