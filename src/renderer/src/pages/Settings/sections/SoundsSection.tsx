@@ -30,7 +30,7 @@ export function SoundsSection() {
     <Section
       icon={<FiMusic />}
       title="Sound Library"
-      description="Upload your own sounds to use them in alerts on any profile."
+      description="Sounds you upload or download from MyInstants, for alerts on any profile."
       actions={
         <Btn onClick={() => window.api.emit(APP_EVENTS.UPLOAD_SOUNDS)}>
           <FiUpload /> Upload
@@ -38,7 +38,7 @@ export function SoundsSection() {
       }
     >
       {sounds.length === 0 ? (
-        <EmptyState>No sounds uploaded yet.</EmptyState>
+        <EmptyState>No sounds yet.</EmptyState>
       ) : (
         <div className={styles.library}>
           {sounds.map((sound) => {

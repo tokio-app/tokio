@@ -323,13 +323,13 @@ describe("AlertsService", () => {
       expect(fetchMock).toHaveBeenCalledOnce();
     });
 
-    it("parses search results and marks the downloaded ones", async () => {
+    it("parses search results with the file each saves to", async () => {
       const html = await readFile(FIXTURE, "utf-8");
       const fetchMock = vi.fn(async (url: string) =>
         url.endsWith(".mp3") ? new Response(bytes(1)) : htmlResponse(html),
       );
       vi.stubGlobal("fetch", fetchMock);
-      await service.downloadSound(SOUND_URL, "BRUH");
+      const download = await service.downloadSound(SOUND_URL, "BRUH");
 
       const res = await service.search("bruh");
 
@@ -342,11 +342,11 @@ describe("AlertsService", () => {
         data: {
           hasNextPage: false,
           sounds: [
-            { name: "BRUH", url: SOUND_URL, saved: true },
+            { name: "BRUH", url: SOUND_URL, file: download.data?.file },
             {
               name: "yeah boiii i i i",
               url: "https://www.myinstants.com/media/sounds/yeah-boiii-i-i-i.mp3",
-              saved: false,
+              file: expect.stringMatching(/^[0-9a-f]{32}\.mp3$/),
             },
           ],
         },

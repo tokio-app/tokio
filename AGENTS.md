@@ -79,7 +79,7 @@ Code in `src/common/` must not import from `src/main` or `src/renderer`, and mus
 
 ### Alerts
 
-- Saved per profile in `Profile.alerts` (`simultaneous`, `queue_length`, `items`). Uploaded sounds are a library shared by all profiles, in `settings.sounds`.
+- Saved per profile in `Profile.alerts` (`simultaneous`, `queue_length`, `items`). Uploaded, browsed and downloaded sounds go to a library shared by all profiles, in `settings.sounds`.
 - `AlertTriggerSchema` (`src/common/schemas/profile.ts`) derives the triggers from `TOKIO_EVENTS`. A new live event needs a label in `ALERT_TRIGGER_LABELS` (`src/common/types/connector.ts`) or typecheck fails; a new internal event goes in the schema's `exclude` list.
 - `registerConnectorEvents` (`src/main/events/init.ts`) passes every trigger to `AlertsService.handle` while `activeFeatures.alerts` is on. `MUSIC_CHANGE` comes from `MusicService`, the rest from the connector. Gift alerts fire once per combo, on `repeatEnd`.
 - Sound files in the `sounds` folder are named by a hash of their content (uploads) or URL (MyInstants), and alerts store only the basename. Read them through `AlertsService.readSound` (keeps paths inside the folder, caches). Check `StoreManagerService.isSoundInUse` before deleting one.

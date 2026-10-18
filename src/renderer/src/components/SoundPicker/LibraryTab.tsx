@@ -1,7 +1,9 @@
 import { AlertSound } from "@/common/schemas";
+import { APP_EVENTS } from "@/common/types";
+import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useState } from "react";
-import { FiCheck } from "react-icons/fi";
+import { FiTrash2 } from "react-icons/fi";
 import { Btn, Input } from "../Elements";
 import { PlayButton, PREVIEW_VOLUME } from "../PlayButton";
 import styles from "./soundpicker.module.css";
@@ -21,7 +23,7 @@ export function LibraryTab({ library, testing, onTest, onSelect }: Props) {
 
   const emptyText =
     library.length === 0
-      ? "No uploaded sounds. Add them in Settings, or browse for a file."
+      ? "No sounds yet. Download one from MyInstants, upload them in Settings, or browse for a file."
       : "No sounds match.";
 
   return (
@@ -33,30 +35,42 @@ export function LibraryTab({ library, testing, onTest, onSelect }: Props) {
       />
 
       <div className={styles.list}>
-        {sounds.map((sound) => (
-          <div key={sound.file} className={styles.row}>
-            <span className={styles.name} title={sound.name}>
-              {sound.name}
-            </span>
-            <PlayButton
-              playing={testing === sound.file}
-              onClick={() =>
-                onTest({
-                  id: sound.file,
-                  file: sound.file,
-                  volume: PREVIEW_VOLUME,
-                })
-              }
-            />
-            <Btn
-              variant="icon"
-              title="Use this sound"
-              onClick={() => onSelect(sound)}
-            >
-              <FiCheck size={20} />
-            </Btn>
-          </div>
-        ))}
+        {sounds.map((sound) => {
+          const test = {
+            id: sound.file,
+            file: sound.file,
+            volume: PREVIEW_VOLUME,
+          };
+          return (
+            <div key={sound.file} className={styles.row}>
+              <button
+                type="button"
+                className={cx(styles.name, styles.pick)}
+                title={sound.name}
+                onClick={() => onSelect(sound)}
+              >
+                {sound.name}
+              </button>
+              <PlayButton
+                playing={testing === sound.file}
+                onClick={() => onTest(test)}
+              />
+              <Btn
+                variant="icon"
+                title="Remove"
+                onClick={() => {
+                  // Testing the same sound again stops it.
+                  if (testing === sound.file) onTest(test);
+                  window.api.emit(APP_EVENTS.REMOVE_SOUND, {
+                    file: sound.file,
+                  });
+                }}
+              >
+                <FiTrash2 size={20} />
+              </Btn>
+            </div>
+          );
+        })}
 
         {sounds.length === 0 && <p className={styles.status}>{emptyText}</p>}
       </div>

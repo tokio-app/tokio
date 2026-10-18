@@ -66,9 +66,15 @@ events.push(
 
 events.push(
   APP_EVENTS.DOWNLOAD_SOUND,
-  async ({ alertsService, notifier }, e, { id, url, name }) => {
+  async (
+    { alertsService, storeManagerService, notifier },
+    e,
+    { id, url, name },
+  ) => {
     const res = await alertsService.downloadSound(url, name);
-    if (!res.success) throw new LoggedError(res.error);
+    if (!res.success || !res.data) throw new LoggedError(res.error);
+    // Downloads also go to the sound library.
+    await storeManagerService.addSound(res.data);
     e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
       id,

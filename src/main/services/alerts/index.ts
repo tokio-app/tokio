@@ -267,13 +267,7 @@ export class AlertsService extends Service {
         throw new Error(`MyInstants responded with status: ${response.status}`);
       }
 
-      const parsed = await this._parseSoundsFromHtml(await response.text());
-      const sounds = await Promise.all(
-        parsed.map(async (sound) => ({
-          ...sound,
-          saved: await this._isSaved(this._fileForUrl(sound.url)),
-        })),
-      );
+      const sounds = await this._parseSoundsFromHtml(await response.text());
 
       return {
         success: true,
@@ -302,11 +296,8 @@ export class AlertsService extends Service {
 
         const match = playScript?.match(/play\('([^']+)'/);
         if (name && match?.[1]) {
-          sounds.push({
-            name,
-            url: `${this.BASE_URL}${match[1]}`,
-            saved: false,
-          });
+          const url = `${this.BASE_URL}${match[1]}`;
+          sounds.push({ name, url, file: this._fileForUrl(url) });
         }
       },
     );

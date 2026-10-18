@@ -32,6 +32,19 @@
   white-space: nowrap;
 }
 
+/* A name that picks the sound */
+.pick {
+  border: none;
+  background: none;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pick:hover {
+  color: var(--accent-primary);
+}
+
 .status {
   margin: var(--space-4) 0;
   color: var(--font-secondary);

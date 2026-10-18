@@ -70,8 +70,10 @@ export function SoundPicker({ id, testing, onTest, onSelect, onClose }: Props) {
       <MyInstantsTab
         id={id}
         hidden={tab !== "myinstants"}
+        library={library}
         testing={testing}
         onTest={onTest}
+        onSelect={onSelect}
       />
 
       {saveFailed && <p className={styles.error}>Couldn't save that sound.</p>}
