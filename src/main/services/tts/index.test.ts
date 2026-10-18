@@ -218,6 +218,26 @@ describe("TTSService", () => {
     });
   });
 
+  describe("prepareText", () => {
+    it("applies the replacements", () => {
+      const s = settings((s) => {
+        s.replacements = [{ old: "lol", new: "laughing" }];
+      });
+
+      expect(service.prepareText("Thanks lol", s)).toBe("Thanks laughing");
+    });
+
+    it("refuses empty text and text with banned words", () => {
+      const s = settings((s) => {
+        s.protection.banned = ["Spoiler"];
+      });
+
+      expect(service.prepareText("  ", s)).toBeNull();
+      expect(service.prepareText("Thanks SPOILER fan", s)).toBeNull();
+      expect(service.prepareText("Thanks fan", s)).toBe("Thanks fan");
+    });
+  });
+
   describe("text", () => {
     it("fills the template variables", async () => {
       const s = settings((s) => {

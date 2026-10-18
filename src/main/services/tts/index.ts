@@ -88,16 +88,40 @@ export class TTSService extends ProviderService<TTSProvider> {
       }
     }
 
-    const contentLower = chat.comment.content.toLowerCase();
-    const banned = settings.protection.banned.some((b) =>
-      contentLower.includes(b.toLowerCase()),
-    );
+    const banned = this._hasBanned(chat.comment.content, settings);
     const over_length =
       chat.comment.content.length > settings.protection.comment_length;
 
     if (banned || over_length) return false;
 
     return hasPermission(settings.permissions, chat.user);
+  }
+
+  private _hasBanned(text: string, settings: Profile["tts"]) {
+    const lower = text.toLowerCase();
+    return settings.protection.banned.some((b) =>
+      lower.includes(b.toLowerCase()),
+    );
+  }
+
+  private _replace(text: string, settings: Profile["tts"]) {
+    let out = text;
+    for (const repl of settings.replacements) {
+      if (!repl.old) continue;
+      // A function keeps "$&" and the like in the new text literal.
+      out = out.replace(this._replacementRegExp(repl.old), () => repl.new);
+    }
+    return out;
+  }
+
+  /**
+   * Text from elsewhere than chat, such as an alert's message, with the
+   * same protection: null when it's empty or has a banned word, otherwise
+   * with the replacements applied.
+   */
+  public prepareText(text: string, settings: Profile["tts"]): string | null {
+    if (text.trim() === "" || this._hasBanned(text, settings)) return null;
+    return this._replace(text, settings);
   }
 
   private _escapeRegExp(str: string) {
@@ -139,18 +163,7 @@ export class TTSService extends ProviderService<TTSProvider> {
       template = chat.comment.content;
     }
 
-    if (settings.replacements && settings.replacements.length > 0) {
-      for (const repl of settings.replacements) {
-        if (!repl.old) continue;
-        // A function keeps "$&" and the like in the new text literal.
-        template = template.replace(
-          this._replacementRegExp(repl.old),
-          () => repl.new,
-        );
-      }
-    }
-
-    return template;
+    return this._replace(template, settings);
   }
 
   public clearTalk() {
