@@ -1,7 +1,7 @@
 import { APP_EVENTS_RESPONSE } from "@/common/types";
 import { formatError } from "@/common/util";
 import { Notifier } from "@/helper/feedback";
-import { withPreviewBackground } from "@/helper/preview";
+import { previewFile, withPreviewBackground } from "@/helper/preview";
 import Logger from "@/logger";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
@@ -152,18 +152,17 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  // Overlay previews, see withPreviewBackground
+  // Overlay previews, see previewFile and withPreviewBackground. The
+  // folders are set when the app loads, before any preview.
   protocol.handle("local-resource", async (request) => {
-    const requestUrl = new URL(request.url);
+    const file = previewFile(
+      request.url,
+      services.pathManagerService.folders?.overlaysFolder,
+    );
+    if (!file) return new Response(null, { status: 404 });
 
-    let decodedPath = decodeURIComponent(requestUrl.pathname);
-
-    if (process.platform === "win32" && decodedPath.match(/^\/[a-zA-Z]:\//)) {
-      decodedPath = decodedPath.slice(1);
-    }
-
-    const res = await net.fetch(pathToFileURL(decodedPath).href);
-    return withPreviewBackground(res, decodedPath);
+    const res = await net.fetch(pathToFileURL(file).href);
+    return withPreviewBackground(res, file);
   });
 
   createWindows();
