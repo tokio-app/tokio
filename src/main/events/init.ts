@@ -282,7 +282,6 @@ events.push(
       licensesService,
       updaterService,
       notifier,
-      win,
     } = handler;
 
     await pathManagerService.initialize(
@@ -380,10 +379,6 @@ events.push(
       await storeManagerService.updateServerSettings(false);
     }
 
-    win.setResizable(true);
-    win.setSize(1200, 800);
-    win.setMinimumSize(1200, 800);
-    win.center();
     e.reply(APP_EVENTS_RESPONSE.LOAD_APP, {
       success: true,
     });

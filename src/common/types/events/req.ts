@@ -11,6 +11,7 @@ export enum APP_EVENTS {
   MINIMIZE_WINDOW = "app:window:req:minimize",
   MAXIMIZE_WINDOW = "app:window:req:maximize",
   CLOSE_WINDOW = "app:window:req:close",
+  SHOW_WINDOW = "app:window:req:show",
 
   MINIMIZE_MUSIC_WINDOW = "app:music:window:req:minimize",
   MAXIMIZE_MUSIC_WINDOW = "app:music:window:req:maximize",
@@ -100,6 +101,7 @@ export interface AppEventsMap {
   [APP_EVENTS.MINIMIZE_WINDOW]: void;
   [APP_EVENTS.MAXIMIZE_WINDOW]: void;
   [APP_EVENTS.CLOSE_WINDOW]: void;
+  [APP_EVENTS.SHOW_WINDOW]: void;
 
   [APP_EVENTS.MINIMIZE_MUSIC_WINDOW]: void;
   [APP_EVENTS.MAXIMIZE_MUSIC_WINDOW]: void;

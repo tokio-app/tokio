@@ -60,6 +60,8 @@ export interface AppServices {
 export interface AppHandlerVariables extends AppServices {
   readonly app: App;
   readonly win: CustomBrowserWindow;
+  // Closed once the main window shows
+  readonly splash: BrowserWindow;
   readonly ipcMain: IpcMain;
   readonly shell: Shell;
   readonly session: typeof Session;

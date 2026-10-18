@@ -82,13 +82,35 @@ const APP_PRELOAD = join(__dirname, "../preload/index.mjs");
 
 let win: BrowserWindow | null = null;
 
+// A page of the renderer build, served by the dev server in development
+function loadPage(window: BrowserWindow, page: string) {
+  if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
+    window.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/${page}`);
+  } else {
+    window.loadFile(join(__dirname, `../renderer/${page}`));
+  }
+}
+
 function createWindows(): void {
-  win = new BrowserWindow({
+  // Shown while the main window loads hidden at its full size, so the
+  // window never resizes from the splash to the app.
+  const splash = new BrowserWindow({
     width: 600,
-    minWidth: 600,
     height: 400,
-    minHeight: 400,
     resizable: false,
+    show: false,
+    titleBarStyle: "hidden",
+    title: "Tokio",
+    center: true,
+    autoHideMenuBar: true,
+    icon: APP_ICON,
+  });
+
+  win = new BrowserWindow({
+    width: 1200,
+    minWidth: 1200,
+    height: 800,
+    minHeight: 800,
     show: false,
     titleBarStyle: "hidden",
     title: "Tokio",
@@ -111,6 +133,7 @@ function createWindows(): void {
   new Handler({
     app,
     win,
+    splash,
     shell,
     ipcMain,
     session,
@@ -118,11 +141,8 @@ function createWindows(): void {
     ...services,
   }).init(events);
 
-  if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-    win.loadURL(process.env["ELECTRON_RENDERER_URL"]);
-  } else {
-    win.loadFile(join(__dirname, "../renderer/index.html"));
-  }
+  loadPage(splash, "splash.html");
+  loadPage(win, "index.html");
 }
 
 app.whenReady().then(async () => {

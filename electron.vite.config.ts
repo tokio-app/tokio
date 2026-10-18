@@ -55,6 +55,14 @@ export default defineConfig({
     define: {
       __APP_VERSION__: JSON.stringify(version),
     },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve("src/renderer/index.html"),
+          splash: resolve("src/renderer/splash.html"),
+        },
+      },
+    },
     plugins: [react()],
   },
 });

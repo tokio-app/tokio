@@ -2,12 +2,12 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
-import { SplashScreen } from "@/splash";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 /**
- * Shows the splash screen until main has loaded, and plays the audio main
- * sends for TTS and alerts on any page.
+ * Renders the app once main has loaded, then asks main to show this window in
+ * place of the splash window. Also plays the audio main sends for TTS and
+ * alerts on any page.
  */
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [appLoading, setAppLoading] = useState(true);
@@ -17,6 +17,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useIpcRequest(APP_EVENTS.LOAD_APP);
 
   useIpcListener(APP_EVENTS_RESPONSE.LOAD_APP, () => setAppLoading(false));
+
+  useEffect(() => {
+    if (!appLoading) window.api.emit(APP_EVENTS.SHOW_WINDOW);
+  }, [appLoading]);
 
   useIpcListener(APP_EVENTS_RESPONSE.TTS_AUDIO, (res) => {
     if (!res) return;
@@ -35,5 +39,5 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useIpcListener(APP_EVENTS_RESPONSE.ALERT_CLEAR, () => stopQueues("alerts"));
 
-  return appLoading ? <SplashScreen /> : children;
+  return appLoading ? null : children;
 }

@@ -25,8 +25,8 @@ export const NotificationsContext =
   createContext<NotificationsContextType | null>(null);
 
 /**
- * Keeps the notices main sends and shows them as toasts. Mounted above the
- * splash screen, so notices sent while the app loads aren't lost.
+ * Keeps the notices main sends and shows them as toasts. Mounted above
+ * AppProvider, so notices sent while the app loads aren't lost.
  */
 export function NotificationsProvider({
   children,

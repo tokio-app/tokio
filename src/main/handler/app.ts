@@ -23,10 +23,15 @@ import {
   type session as Session,
   type Shell,
 } from "electron";
+import { setTimeout as sleep } from "node:timers/promises";
+
+// Least time the splash stays on screen, so a fast start doesn't flash it
+const SPLASH_MIN_MS = 2000;
 
 export class AppHandler implements AppHandlerVariables {
   public readonly app: App;
   public readonly win: CustomBrowserWindow;
+  public readonly splash: BrowserWindow;
   public readonly ipcMain: IpcMain;
   public readonly shell: Shell;
   public readonly session: typeof Session;
@@ -51,17 +56,49 @@ export class AppHandler implements AppHandlerVariables {
 
   public async initApp() {
     this.initSession();
+    this.initSplash();
     this.initWindow();
+  }
+
+  /**
+   * Shows the splash until the renderer has drawn the app and sends
+   * SHOW_WINDOW, then swaps it for the main window.
+   */
+  private initSplash() {
+    let shownAt = Date.now();
+    // StrictMode sends SHOW_WINDOW twice
+    let requested = false;
+    let revealed = false;
+
+    this.splash.once("ready-to-show", () => {
+      shownAt = Date.now();
+      this.splash.show();
+    });
+
+    // Closing the splash quits, as the app hasn't shown yet
+    this.splash.on("closed", () => {
+      if (!revealed) this.win.close();
+    });
+
+    this.ipcMain.on(APP_EVENTS.SHOW_WINDOW, async () => {
+      if (requested) return;
+      requested = true;
+
+      const wait = SPLASH_MIN_MS - (Date.now() - shownAt);
+      if (wait > 0) await sleep(wait);
+
+      // The splash was closed meanwhile, so the app is quitting
+      if (this.splash.isDestroyed()) return;
+      revealed = true;
+      this.win.show();
+      this.splash.close();
+    });
   }
 
   private initWindow() {
     this.win.webContents.setWindowOpenHandler((details) => {
       this.shell.openExternal(details.url);
       return { action: "deny" };
-    });
-
-    this.win?.on("ready-to-show", () => {
-      this.win?.show();
     });
 
     this.ipcMain.on(APP_EVENTS.MINIMIZE_WINDOW, () => {
