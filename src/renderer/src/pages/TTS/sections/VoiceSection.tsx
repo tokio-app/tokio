@@ -7,10 +7,9 @@ import {
   Input,
   Section,
   Select,
-  SelectOption,
   Slider,
 } from "@/components";
-import { AudioQueue } from "@/helper";
+import { AudioQueue, voiceKey, voiceOptions } from "@/helper";
 import { Updater } from "@/hooks";
 import { useMemo, useState } from "react";
 import styles from "../tts.module.css";
@@ -25,25 +24,6 @@ interface Props {
   testQueue: AudioQueue;
   update: Updater<Settings>;
   onTest: (text: string) => void;
-}
-
-const voiceKey = (voice: VoiceData) =>
-  `${voice.engine}|${voice.lang}|${voice.name}`;
-
-// Voices grouped by engine and language, in the order the groups first appear.
-function voiceOptions(
-  voices: VoiceData[],
-  engines: VoiceEngine[],
-): SelectOption<string>[] {
-  const labels = new Map(engines.map((e) => [e.id, e.label]));
-  const groups = new Map<string, SelectOption<string>[]>();
-  for (const voice of voices) {
-    const group = `${labels.get(voice.engine) ?? voice.engine} · ${voice.lang}`;
-    const options = groups.get(group) ?? [];
-    options.push({ value: voiceKey(voice), label: voice.name, group });
-    groups.set(group, options);
-  }
-  return [...groups.values()].flat();
 }
 
 export function VoiceSection({
