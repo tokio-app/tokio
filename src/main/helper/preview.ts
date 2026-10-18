@@ -54,13 +54,18 @@ export function withPreviewCORS(res: Response): Response {
 }
 
 /**
- * Gives an overlay page loaded as a preview (through `local-resource:`) the
- * app's background. Overlays are transparent so they can sit on the stream,
- * and Chromium only draws ClearType text on an opaque background, so their
- * text looked rough next to the app's. The files and what the overlay server
- * sends stay as they are. Other files pass through.
+ * Styles an overlay page loaded as a preview (through `local-resource:`):
+ * - The app's background. Overlays are transparent so they can sit on the
+ *   stream, and Chromium only draws ClearType text on an opaque background, so
+ *   their text looked rough next to the app's.
+ * - No scrollbars, as OBS's default browser source CSS does. Previews can't be
+ *   scrolled (the Iframe ignores the pointer), so a page taller than the
+ *   preview only showed a scrollbar that can't be used.
+ *
+ * The files and what the overlay server sends stay as they are. Other files
+ * pass through.
  */
-export async function withPreviewBackground(
+export async function withPreviewStyles(
   res: Response,
   path: string,
 ): Promise<Response> {
@@ -68,7 +73,7 @@ export async function withPreviewBackground(
 
   // After everything else, so it wins over the overlay's own styles. Adding
   // it before the doctype would switch the page to quirks mode.
-  const html = `${await res.text()}<style>html{background-color:${PREVIEW_BACKGROUND}!important}</style>`;
+  const html = `${await res.text()}<style>html{background-color:${PREVIEW_BACKGROUND}!important}html,body{overflow:hidden!important}</style>`;
   const headers = new Headers(res.headers);
   headers.delete("content-length");
   return new Response(html, { status: res.status, headers });

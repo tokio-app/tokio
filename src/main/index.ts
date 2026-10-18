@@ -3,8 +3,8 @@ import { formatError } from "@/common/util";
 import { Notifier } from "@/helper/feedback";
 import {
   previewFile,
-  withPreviewBackground,
   withPreviewCORS,
+  withPreviewStyles,
 } from "@/helper/preview";
 import Logger from "@/logger";
 import { AlertsService } from "@/services/alerts";
@@ -167,8 +167,8 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  // Overlay previews, see previewFile and withPreviewBackground. The
-  // folders are set when the app loads, before any preview.
+  // Overlay previews, see previewFile and withPreviewStyles. The folders
+  // are set when the app loads, before any preview.
   protocol.handle("local-resource", async (request) => {
     const file = previewFile(
       request.url,
@@ -177,7 +177,7 @@ app.whenReady().then(async () => {
     if (!file) return new Response(null, { status: 404 });
 
     const res = await net.fetch(pathToFileURL(file).href);
-    return withPreviewCORS(await withPreviewBackground(res, file));
+    return withPreviewCORS(await withPreviewStyles(res, file));
   });
 
   createWindows();
