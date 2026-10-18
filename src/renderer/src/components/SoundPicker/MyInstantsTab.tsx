@@ -22,7 +22,7 @@ export function MyInstantsTab({ id, hidden, testing, onTest }: Props) {
   // Url of the sound being downloaded
   const [downloading, setDownloading] = useState<string | null>(null);
 
-  const { sounds, loading, failed, search, listRef, sentinelRef } =
+  const { sounds, loading, error, search, retry, listRef, sentinelRef } =
     useSoundSearch(!hidden);
 
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, (res) => {
@@ -86,14 +86,18 @@ export function MyInstantsTab({ id, hidden, testing, onTest }: Props) {
         ))}
 
         {loading && <p className={styles.status}>Loading...</p>}
-        {!loading && sounds.length === 0 && !failed && (
+        {!loading && sounds.length === 0 && !error && (
           <p className={styles.status}>No sounds found.</p>
+        )}
+        {error && (
+          <div className={styles.failed}>
+            <p>{error}</p>
+            <Btn onClick={retry}>Try again</Btn>
+          </div>
         )}
 
         <div ref={sentinelRef} />
       </div>
-
-      {failed && <p className={styles.error}>Couldn't reach MyInstants.</p>}
     </div>
   );
 }

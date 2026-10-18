@@ -17,7 +17,8 @@ export function useSoundSearch(active: boolean) {
   const [sounds, setSounds] = useState<MyInstantsSound[]>([]);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  // Message of the last request's failure
+  const [error, setError] = useState<string | null>(null);
 
   // Latest request, so responses to older ones are ignored
   const request = useRef({ query: "", page: 1 });
@@ -27,7 +28,7 @@ export function useSoundSearch(active: boolean) {
   const load = useCallback((query: string, p: number) => {
     request.current = { query, page: p };
     setLoading(true);
-    setFailed(false);
+    setError(null);
     window.api.emit(APP_EVENTS.SEARCH_SOUNDS, { query, page: p });
   }, []);
 
@@ -37,6 +38,8 @@ export function useSoundSearch(active: boolean) {
     load(query, 1);
   };
 
+  const retry = () => load(request.current.query, request.current.page);
+
   useEffect(() => {
     const removeSearchSounds = window.api.on(
       APP_EVENTS_RESPONSE.SEARCH_SOUNDS,
@@ -45,10 +48,17 @@ export function useSoundSearch(active: boolean) {
         if (!res || res.query !== req.query || res.page !== req.page) return;
 
         setLoading(false);
+
+        // Keeps the page, so a retry loads the one that failed.
+        if (!res.success) {
+          setError(res.error?.message ?? "Unable to reach MyInstants.");
+          // A new search's failure shouldn't show the last search's results.
+          if (res.page === 1) setSounds([]);
+          return;
+        }
+
         setPage(res.page);
         setHasNextPage(res.hasNextPage);
-        setFailed(!res.success);
-
         setSounds((prev) => {
           if (res.page === 1) return res.data;
           const seen = new Set(prev.map((s) => s.url));
@@ -66,7 +76,10 @@ export function useSoundSearch(active: boolean) {
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
-    if (!sentinel || !active || loading || !hasNextPage) return undefined;
+    // After a failure, only the retry button loads again.
+    if (!sentinel || !active || loading || error || !hasNextPage) {
+      return undefined;
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -77,7 +90,7 @@ export function useSoundSearch(active: boolean) {
     observer.observe(sentinel);
 
     return () => observer.disconnect();
-  }, [active, loading, hasNextPage, activeQuery, page, load]);
+  }, [active, loading, error, hasNextPage, activeQuery, page, load]);
 
-  return { sounds, loading, failed, search, listRef, sentinelRef };
+  return { sounds, loading, error, search, retry, listRef, sentinelRef };
 }

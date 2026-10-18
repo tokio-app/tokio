@@ -335,6 +335,7 @@ describe("AlertsService", () => {
 
       expect(fetchMock).toHaveBeenLastCalledWith(
         "https://www.myinstants.com/search/?name=bruh&page=1",
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       );
       expect(res).toEqual({
         success: true,
@@ -378,6 +379,28 @@ describe("AlertsService", () => {
 
       expect((await service.search("x")).success).toBe(false);
       expect((await service.getTrending(0)).success).toBe(false);
+    });
+
+    it("gives up on a request that doesn't answer", async () => {
+      const controller = new AbortController();
+      const timeout = vi
+        .spyOn(AbortSignal, "timeout")
+        .mockReturnValue(controller.signal);
+      vi.stubGlobal(
+        "fetch",
+        (_url: string, init: RequestInit) =>
+          new Promise((_, reject) => {
+            init.signal?.addEventListener("abort", () =>
+              reject(init.signal?.reason),
+            );
+          }),
+      );
+
+      const pending = service.search("x");
+      controller.abort(new DOMException("timeout", "TimeoutError"));
+
+      expect((await pending).success).toBe(false);
+      expect(timeout).toHaveBeenCalledWith(15_000);
     });
   });
 });

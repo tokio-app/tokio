@@ -10,6 +10,7 @@
   display: flex;
   flex-direction: column;
   height: 360px;
+  padding-right: var(--space-2);
   overflow-y: auto;
 }
 
@@ -32,6 +33,17 @@
 }
 
 .status {
+  margin: var(--space-4) 0;
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+  text-align: center;
+}
+
+.failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
   margin: var(--space-4) 0;
   color: var(--font-secondary);
   font-size: var(--font-md);

@@ -43,6 +43,8 @@ const hash = (data: string | Uint8Array) =>
 export class AlertsService extends Service {
   private readonly BASE_URL = "https://www.myinstants.com";
   private readonly MAX_PER_PAGE = 36;
+  // A slow MyInstants would otherwise keep the picker loading for minutes
+  private readonly REQUEST_TIMEOUT_MS = 15_000;
   private _soundsFolder = "";
   // Keyed by sound file name, in least recently used order
   private _cache = new Map<string, Uint8Array>();
@@ -94,7 +96,7 @@ export class AlertsService extends Service {
       const local = await this.readSound(file, false);
       if (local.success) return local;
 
-      const response = await fetch(url);
+      const response = await this._fetch(url);
       if (!response.ok) {
         throw new Error(`MyInstants responded with status: ${response.status}`);
       }
@@ -256,7 +258,7 @@ export class AlertsService extends Service {
     try {
       if (page < 1) throw new Error("Page must be a positive integer.");
 
-      const response = await fetch(url.toString());
+      const response = await this._fetch(url.toString());
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -310,6 +312,11 @@ export class AlertsService extends Service {
     );
 
     return sounds;
+  }
+
+  // The signal also covers reading the body.
+  private _fetch(url: string) {
+    return fetch(url, { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT_MS) });
   }
 
   private _fileForUrl(url: string) {

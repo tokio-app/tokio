@@ -50,7 +50,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_SEARCH_FAILED,
-      message: "Unable to search MyInstants.",
+      message: "Unable to reach MyInstants. Try again in a few minutes.",
     },
     onError: (e, error, { query, page }) =>
       e.reply(APP_EVENTS_RESPONSE.SEARCH_SOUNDS, {
