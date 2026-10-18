@@ -6,6 +6,7 @@ import {
   PlayButton,
   PREVIEW_VOLUME,
   Section,
+  testProps,
 } from "@/components";
 import { useAlertTest, useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
@@ -42,11 +43,11 @@ export function SoundsSection() {
       ) : (
         <div className={styles.library}>
           {sounds.map((sound) => {
-            const playing = test.testing === sound.file;
+            const playing = test.testing?.id === sound.file;
             return (
               <div key={sound.file} className={styles.library_item}>
                 <PlayButton
-                  playing={playing}
+                  {...testProps(test.testing, sound.file)}
                   onClick={() =>
                     test.toggle({
                       id: sound.file,

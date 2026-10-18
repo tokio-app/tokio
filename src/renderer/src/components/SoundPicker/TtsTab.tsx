@@ -5,7 +5,12 @@ import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useRef } from "react";
 import { Input, Slider } from "../Elements";
 import { Field } from "../Page";
-import { PlayButton, PREVIEW_VOLUME } from "../PlayButton";
+import {
+  PlayButton,
+  PREVIEW_VOLUME,
+  TestState,
+  testProps,
+} from "../PlayButton";
 import { VariableList } from "../VariableList";
 import { VoiceSelect } from "../VoiceSelect";
 import styles from "./soundpicker.module.css";
@@ -16,7 +21,7 @@ type Props = {
   trigger: AlertTrigger;
   value: AlertTts;
   onChange: (tts: AlertTts) => void;
-  testing: string | null;
+  testing: TestState;
   onTest: (req: AlertTestRequest) => void;
 };
 
@@ -42,7 +47,7 @@ export function TtsTab({
             onChange={(e) => onChange({ ...value, message: e.target.value })}
           />
           <PlayButton
-            playing={testing === testId}
+            {...testProps(testing, testId)}
             disabled={value.message.trim() === ""}
             onClick={() =>
               onTest({

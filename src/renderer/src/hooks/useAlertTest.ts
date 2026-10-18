@@ -1,4 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, AppEventsMap } from "@/common/types";
+import type { TestState } from "@/components/PlayButton";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAudio } from "./useAudio";
 
@@ -6,13 +7,13 @@ export type AlertTestRequest = AppEventsMap[APP_EVENTS.TEST_ALERT];
 
 /**
  * Plays one alert sound test at a time. Starting a test cancels the one
- * playing, and `testing` holds the id of the test loading or playing.
+ * playing, and `testing` holds the test loading or playing.
  */
 export function useAlertTest() {
   const { getQueue } = useAudio();
   const queue = getQueue("alert-test");
 
-  const [testing, setTesting] = useState<string | null>(null);
+  const [testing, setTesting] = useState<TestState>(null);
   // Read by IPC callbacks, which would otherwise see a stale `testing`
   const current = useRef<string | null>(null);
 
@@ -20,6 +21,11 @@ export function useAlertTest() {
     if (current.current !== id) return;
     current.current = null;
     setTesting(null);
+  }, []);
+
+  // The test's audio is playing, it's no longer loading.
+  const started = useCallback((id: string) => {
+    setTesting((t) => (t?.id === id ? { id, loading: false } : t));
   }, []);
 
   const stop = useCallback(() => {
@@ -32,7 +38,7 @@ export function useAlertTest() {
     (req: AlertTestRequest) => {
       queue.stop();
       current.current = req.id;
-      setTesting(req.id);
+      setTesting({ id: req.id, loading: true });
       window.api.emit(APP_EVENTS.TEST_ALERT, req);
     },
     [queue],
@@ -67,6 +73,7 @@ export function useAlertTest() {
           })
           .then((queued) => {
             if (!queued) finish(res.id);
+            else started(res.id);
           });
       },
     );
@@ -75,7 +82,7 @@ export function useAlertTest() {
       removeTestAlert();
       queue.stop();
     };
-  }, [queue, finish]);
+  }, [queue, finish, started]);
 
   return { testing, toggle, stop };
 }

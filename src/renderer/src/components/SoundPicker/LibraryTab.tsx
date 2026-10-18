@@ -5,12 +5,17 @@ import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import { Btn, Input } from "../Elements";
-import { PlayButton, PREVIEW_VOLUME } from "../PlayButton";
+import {
+  PlayButton,
+  PREVIEW_VOLUME,
+  TestState,
+  testProps,
+} from "../PlayButton";
 import styles from "./soundpicker.module.css";
 
 type Props = {
   library: AlertSound[];
-  testing: string | null;
+  testing: TestState;
   onTest: (req: AlertTestRequest) => void;
   onSelect: (sound: AlertSound) => void;
 };
@@ -52,7 +57,7 @@ export function LibraryTab({ library, testing, onTest, onSelect }: Props) {
                 {sound.name}
               </button>
               <PlayButton
-                playing={testing === sound.file}
+                {...testProps(testing, sound.file)}
                 onClick={() => onTest(test)}
               />
               <Btn
@@ -60,7 +65,7 @@ export function LibraryTab({ library, testing, onTest, onSelect }: Props) {
                 title="Remove"
                 onClick={() => {
                   // Testing the same sound again stops it.
-                  if (testing === sound.file) onTest(test);
+                  if (testing?.id === sound.file) onTest(test);
                   window.api.emit(APP_EVENTS.REMOVE_SOUND, {
                     file: sound.file,
                   });

@@ -6,7 +6,12 @@ import { useIpcListener } from "@/hooks/useIpcListener";
 import { useState } from "react";
 import { FiDownload, FiTrash2 } from "react-icons/fi";
 import { Btn, Input } from "../Elements";
-import { PlayButton, PREVIEW_VOLUME } from "../PlayButton";
+import {
+  PlayButton,
+  PREVIEW_VOLUME,
+  TestState,
+  testProps,
+} from "../PlayButton";
 import styles from "./soundpicker.module.css";
 import { useSoundSearch } from "./useSoundSearch";
 
@@ -17,7 +22,7 @@ type Props = {
   hidden: boolean;
   // Downloaded sounds are in the library
   library: AlertSound[];
-  testing: string | null;
+  testing: TestState;
   onTest: (req: AlertTestRequest) => void;
   onSelect: (sound: AlertSound) => void;
 };
@@ -78,7 +83,7 @@ export function MyInstantsTab({
                 </span>
               )}
               <PlayButton
-                playing={testing === sound.url}
+                {...testProps(testing, sound.url)}
                 onClick={() =>
                   onTest({
                     id: sound.url,

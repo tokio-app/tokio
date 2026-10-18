@@ -6,6 +6,7 @@ import { useIpcRequest } from "@/hooks/useIpcRequest";
 import { useState } from "react";
 import { Btn, Tabs } from "../Elements";
 import { Modal } from "../Modal";
+import type { TestState } from "../PlayButton";
 import { LibraryTab } from "./LibraryTab";
 import { MyInstantsTab } from "./MyInstantsTab";
 import styles from "./soundpicker.module.css";
@@ -24,8 +25,8 @@ type Props = {
   alert: Alert;
   // Voice, speed and pitch a new TTS message starts with
   ttsDefaults: Omit<AlertTts, "message">;
-  // Id of the sound test loading or playing
-  testing: string | null;
+  // The sound test loading or playing
+  testing: TestState;
   onTest: (req: AlertTestRequest) => void;
   // Picks a sound from the library, which is already saved
   onSelect: (sound: AlertSound) => void;

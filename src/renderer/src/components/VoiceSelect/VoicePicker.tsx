@@ -11,7 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Btn, Input, Select } from "../Elements";
 import { Modal } from "../Modal";
-import { PlayButton } from "../PlayButton";
+import { PlayButton, testProps } from "../PlayButton";
 import { useVoicePreview } from "./useVoicePreview";
 import styles from "./voiceselect.module.css";
 
@@ -109,7 +109,7 @@ export function VoicePicker({
               <span className={styles.details}>{details}</span>
             </button>
             <PlayButton
-              playing={preview.previewing === key}
+              {...testProps(preview.previewing, key)}
               onClick={() => preview.toggle(voice)}
             />
           </div>

@@ -3,14 +3,15 @@ import { voiceKey, voiceSample } from "@/helper/voices";
 import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useEffect, useRef, useState } from "react";
+import type { TestState } from "../PlayButton";
 
 // Test ids of the previews, so the TTS page's tester is ignored
 const ID_PREFIX = "voice-preview:";
 
 /**
  * Speaks a sample line with one voice at a time. Previewing a voice cancels
- * the one playing, and `previewing` holds the key of the voice loading or
- * playing.
+ * the one playing, and `previewing` holds the preview loading or playing, with
+ * the voice's key as id.
  */
 export function useVoicePreview({
   speed,
@@ -22,7 +23,7 @@ export function useVoicePreview({
   const { getQueue } = useAudio();
   const queue = getQueue("voice-preview");
 
-  const [previewing, setPreviewing] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState<TestState>(null);
   // Read by the IPC callback, which would otherwise see a stale `previewing`
   const current = useRef<string | null>(null);
 
@@ -32,13 +33,18 @@ export function useVoicePreview({
     setPreviewing(null);
   };
 
+  // The preview's audio is playing, it's no longer loading.
+  const started = (key: string) => {
+    setPreviewing((p) => (p?.id === key ? { id: key, loading: false } : p));
+  };
+
   // Previewing the voice playing stops it.
   const toggle = (voice: VoiceData) => {
     const key = voiceKey(voice);
     const playing = current.current === key;
     queue.stop();
     current.current = playing ? null : key;
-    setPreviewing(current.current);
+    setPreviewing(playing ? null : { id: key, loading: true });
     if (playing) return;
 
     window.api.emit(APP_EVENTS.GET_TTS_TEST, {
@@ -63,6 +69,7 @@ export function useVoicePreview({
       .enqueue(res.data, true, { speed, pitch, onEnded: () => finish(key) })
       .then((queued) => {
         if (!queued) finish(key);
+        else started(key);
       });
   });
 

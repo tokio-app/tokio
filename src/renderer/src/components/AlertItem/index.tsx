@@ -16,7 +16,7 @@ import {
   Slider,
   Toggle,
 } from "../Elements";
-import { PlayButton } from "../PlayButton";
+import { PlayButton, TestState, testProps } from "../PlayButton";
 import styles from "./alertitem.module.css";
 
 type Trigger = Alert["trigger"]["type"];
@@ -89,8 +89,8 @@ type Props = {
   alert: Alert;
   gifts: CustomGift[];
   emotes: SelectOption<string>[];
-  // This alert's sound is loading or playing
-  testing: boolean;
+  // The sound test loading or playing, maybe this alert's
+  testing: TestState;
   onTest: (req: AlertTestRequest) => void;
   onChange: (alert: Alert) => void;
   onRemove: () => void;
@@ -115,7 +115,7 @@ export function AlertItem({
     <div className={styles.row}>
       <div className={styles.cell}>
         <PlayButton
-          playing={testing}
+          {...testProps(testing, alert.id)}
           size={24}
           disabled={!sound && !tts}
           onClick={() => {
