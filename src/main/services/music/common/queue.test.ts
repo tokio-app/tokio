@@ -157,7 +157,7 @@ describe("MusicQueue", () => {
       expect(titles(queue)).toEqual(["a"]);
     });
 
-    it("keeps the current song when removing history", async () => {
+    it("leaves the songs that already played", async () => {
       const queue = new MusicQueue();
       queue.enqueue("a", song("a"), () => {});
       queue.enqueue("b", song("b"), () => {});
@@ -166,8 +166,33 @@ describe("MusicQueue", () => {
 
       queue.revoke("a");
 
-      expect(titles(queue)).toEqual(["b", "c"]);
+      expect(titles(queue)).toEqual(["a", "b", "c"]);
       expect(playing(queue)).toBe("b");
+    });
+
+    it("removes a new request for a song that already played", async () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a (first)"), () => {});
+      await vi.advanceTimersByTimeAsync(1000);
+      queue.enqueue("b", song("b"), () => {});
+      queue.enqueue("a", song("a (again)"), () => {});
+
+      queue.revoke("a");
+
+      expect(titles(queue)).toEqual(["a (first)", "b"]);
+      expect(playing(queue)).toBe("b");
+    });
+
+    it("removes every request still waiting for the song", () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("b", song("b (first)"), () => {});
+      queue.enqueue("c", song("c"), () => {});
+      queue.enqueue("b", song("b (again)"), () => {});
+
+      queue.revoke("b");
+
+      expect(titles(queue)).toEqual(["a", "c"]);
     });
   });
 

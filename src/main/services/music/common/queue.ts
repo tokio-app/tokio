@@ -143,19 +143,15 @@ export class MusicQueue {
     this._currentIndex = 0;
   }
 
+  // Removes every request for the song that's still waiting. Songs that
+  // played or are playing stay.
   public revoke(id: string) {
-    const index = this._queue.findIndex((item) => item.id === id);
+    const kept = this._queue.filter(
+      (item, index) => index <= this._currentIndex || item.id !== id,
+    );
+    if (kept.length === this._queue.length) return;
 
-    if (index === -1 || index === this._currentIndex) {
-      return;
-    }
-
-    this._queue.splice(index, 1);
-
-    if (index < this._currentIndex) {
-      this._currentIndex--;
-    }
-
+    this._queue = kept;
     this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
   }
 
