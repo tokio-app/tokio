@@ -3,6 +3,7 @@ import { TOKIO_EVENTS } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { TikTokConnectorService } from "@/services/connector";
+import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { TTSService } from "@/services/tts";
@@ -341,6 +342,48 @@ describe("StoreManagerService", () => {
       expect(saved?.name).toBe("Stream");
     });
 
+    // Bug: the file is saved over the profile that has it
+    it.fails("never saves a new profile over an existing file", async () => {
+      const store = await init();
+      await store.updateProfileData({ connector: { username: "streamer" } });
+
+      expect(
+        await store.createNewProfile("default.json", "Default"),
+      ).toBeNull();
+
+      expect((await readJSON(defaultProfileFile)).connector.username).toBe(
+        "streamer",
+      );
+    });
+
+    // Bug: the copy is saved over the profile that has the file
+    it.fails("never clones over an existing file", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.updateActiveProfile("stream.json");
+      await store.updateProfileData({ connector: { username: "streamer" } });
+
+      expect(
+        await store.cloneProfile("default.json", "stream.json", "Stream"),
+      ).toBeNull();
+
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+      expect((await readJSON(stream)).connector.username).toBe("streamer");
+    });
+
+    // Bug: the file name is joined to the folder as it is
+    it.fails("keeps profile files inside the profiles folder", async () => {
+      const store = await init();
+
+      expect(
+        await store.createNewProfile("../outside.json", "Outside"),
+      ).toBeNull();
+
+      await expect(
+        readFile(join(paths.folders.profilesFolder, "..", "outside.json")),
+      ).rejects.toThrow();
+    });
+
     it("clones a profile under a new name", async () => {
       const store = await init();
       await store.updateProfileData({ connector: { username: "streamer" } });
@@ -414,6 +457,94 @@ describe("StoreManagerService", () => {
         },
       ]);
     });
+  });
+
+  describe("export and import", () => {
+    let elsewhere: string;
+
+    beforeEach(async () => {
+      elsewhere = await mkdtemp(join(tmpdir(), "tokio-test-"));
+    });
+
+    afterEach(async () => {
+      await rm(elsewhere, { recursive: true, force: true });
+    });
+
+    // A profile saved outside Tokio, such as one another streamer shared
+    const shared = async (
+      file: string,
+      data: unknown = { ...defaultProfile, name: "Shared" },
+    ) => {
+      const path = join(elsewhere, file);
+      await writeFile(path, JSON.stringify(data));
+      return path;
+    };
+
+    it("exports a profile where the user picked", async () => {
+      const store = await init();
+      await store.updateProfileData({ connector: { username: "streamer" } });
+      const dest = join(elsewhere, "backup.json");
+
+      expect(await store.exportProfile("default.json", dest)).toBe(true);
+
+      expect((await readJSON(dest)).connector.username).toBe("streamer");
+    });
+
+    it("fails to export a profile that isn't there", async () => {
+      const error = vi.spyOn(Logger, "error");
+      const store = await init();
+
+      expect(
+        await store.exportProfile("missing.json", join(elsewhere, "x.json")),
+      ).toBe(false);
+      expect(error).toHaveBeenCalled();
+    });
+
+    it("imports a profile and lists it under its file's name", async () => {
+      const store = await init();
+
+      expect(await store.importProfile(await shared("Night_Stream.json"))).toBe(
+        true,
+      );
+
+      expect(store.getProfiles()).toContainEqual({
+        file: "Night_Stream.json",
+        name: "night stream",
+      });
+      const copy = join(paths.folders.profilesFolder, "Night_Stream.json");
+      expect((await readJSON(copy)).name).toBe("Shared");
+    });
+
+    it("refuses a file that isn't a Tokio profile", async () => {
+      vi.spyOn(Logger, "error");
+      const store = await init();
+
+      expect(
+        await store.importProfile(await shared("notes.json", { hello: "x" })),
+      ).toBe(false);
+      expect(store.getProfiles()).toHaveLength(1);
+    });
+
+    // Bug: the import is saved over the profile with the same file name
+    it.fails(
+      "imports under a free file name instead of overwriting",
+      async () => {
+        const store = await init();
+        await store.updateProfileData({ connector: { username: "streamer" } });
+
+        expect(await store.importProfile(await shared("default.json"))).toBe(
+          true,
+        );
+
+        expect((await readJSON(defaultProfileFile)).connector.username).toBe(
+          "streamer",
+        );
+        expect(store.getProfiles()).toContainEqual({
+          file: "default-2.json",
+          name: "default 2",
+        });
+      },
+    );
   });
 
   describe("emotes", () => {
