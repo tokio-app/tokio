@@ -4,7 +4,6 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { SERVER_PORT } from "@/common/util";
-import { cleanText } from "@/helper/chat";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
 import { StoreManagerService } from "@/services/store";
@@ -13,6 +12,18 @@ import { ReplyEvent } from "@/types";
 import { dialog } from "electron";
 
 const events = createStack("system");
+
+// Two profiles can't share a name, whatever its case and surrounding spaces.
+const assertNameFree = (store: StoreManagerService, name: string) => {
+  const wanted = name.toLowerCase();
+  if (store.getProfiles().some((p) => p.name.trim().toLowerCase() === wanted)) {
+    throw new AppFailure(
+      FEEDBACK_CODES.PROFILE_EXISTS,
+      `A profile named "${name}" already exists.`,
+      { level: "warning" },
+    );
+  }
+};
 
 // Changes to the settings also send the updated settings and profiles.
 const replySettings = (e: ReplyEvent, store: StoreManagerService) => {
@@ -41,8 +52,10 @@ events.push(
 
 events.push(
   APP_EVENTS.CREATE_PROFILE,
-  async ({ storeManagerService, notifier }, e, { name }) => {
-    const fileName = cleanText(name).replace(/\s/, "_") + ".json";
+  async ({ storeManagerService, notifier }, e, { name: input }) => {
+    const name = input.trim();
+    assertNameFree(storeManagerService, name);
+    const fileName = await storeManagerService.profileFileFor(name);
     const res = await storeManagerService.createNewProfile(fileName, name);
     if (!res) throw new Error(`The profile ${fileName} was not created.`);
 
@@ -67,8 +80,10 @@ events.push(
 
 events.push(
   APP_EVENTS.CLONE_PROFILE,
-  async ({ storeManagerService, notifier }, e, { name, ref }) => {
-    const fileName = cleanText(name).replace(/\s/, "_") + ".json";
+  async ({ storeManagerService, notifier }, e, { name: input, ref }) => {
+    const name = input.trim();
+    assertNameFree(storeManagerService, name);
+    const fileName = await storeManagerService.profileFileFor(name);
     const res = await storeManagerService.cloneProfile(ref, fileName, name);
     if (!res) throw new Error(`The profile ${ref} was not cloned.`);
 

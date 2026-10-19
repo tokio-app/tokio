@@ -342,8 +342,7 @@ describe("StoreManagerService", () => {
       expect(saved?.name).toBe("Stream");
     });
 
-    // Bug: the file is saved over the profile that has it
-    it.fails("never saves a new profile over an existing file", async () => {
+    it("never saves a new profile over an existing file", async () => {
       const store = await init();
       await store.updateProfileData({ connector: { username: "streamer" } });
 
@@ -356,8 +355,7 @@ describe("StoreManagerService", () => {
       );
     });
 
-    // Bug: the copy is saved over the profile that has the file
-    it.fails("never clones over an existing file", async () => {
+    it("never clones over an existing file", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");
       await store.updateActiveProfile("stream.json");
@@ -371,8 +369,7 @@ describe("StoreManagerService", () => {
       expect((await readJSON(stream)).connector.username).toBe("streamer");
     });
 
-    // Bug: the file name is joined to the folder as it is
-    it.fails("keeps profile files inside the profiles folder", async () => {
+    it("keeps profile files inside the profiles folder", async () => {
       const store = await init();
 
       expect(
@@ -382,6 +379,25 @@ describe("StoreManagerService", () => {
       await expect(
         readFile(join(paths.folders.profilesFolder, "..", "outside.json")),
       ).rejects.toThrow();
+    });
+
+    it("names a profile's file after it, in safe characters", async () => {
+      const store = await init();
+
+      expect(await store.profileFileFor("Chill Stream")).toBe(
+        "chill-stream.json",
+      );
+      expect(await store.profileFileFor("Café Ñandú!")).toBe("cafe-nandu.json");
+      expect(await store.profileFileFor("../../outside")).toBe("outside.json");
+      expect(await store.profileFileFor("🎮🎮")).toBe("profile.json");
+    });
+
+    it("adds a number to a file another profile has, listed or on disk", async () => {
+      const store = await init();
+      await writeFile(join(paths.folders.profilesFolder, "stream.json"), "{}");
+
+      expect(await store.profileFileFor("Default")).toBe("default-2.json");
+      expect(await store.profileFileFor("Stream")).toBe("stream-2.json");
     });
 
     it("clones a profile under a new name", async () => {
@@ -525,26 +541,22 @@ describe("StoreManagerService", () => {
       expect(store.getProfiles()).toHaveLength(1);
     });
 
-    // Bug: the import is saved over the profile with the same file name
-    it.fails(
-      "imports under a free file name instead of overwriting",
-      async () => {
-        const store = await init();
-        await store.updateProfileData({ connector: { username: "streamer" } });
+    it("imports under a free file name instead of overwriting", async () => {
+      const store = await init();
+      await store.updateProfileData({ connector: { username: "streamer" } });
 
-        expect(await store.importProfile(await shared("default.json"))).toBe(
-          true,
-        );
+      expect(await store.importProfile(await shared("default.json"))).toBe(
+        true,
+      );
 
-        expect((await readJSON(defaultProfileFile)).connector.username).toBe(
-          "streamer",
-        );
-        expect(store.getProfiles()).toContainEqual({
-          file: "default-2.json",
-          name: "default 2",
-        });
-      },
-    );
+      expect((await readJSON(defaultProfileFile)).connector.username).toBe(
+        "streamer",
+      );
+      expect(store.getProfiles()).toContainEqual({
+        file: "default-2.json",
+        name: "default 2",
+      });
+    });
   });
 
   describe("emotes", () => {

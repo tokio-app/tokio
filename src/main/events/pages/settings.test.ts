@@ -41,6 +41,9 @@ function profileStore({ fail = false } = {}) {
   return {
     getSettings: () => appSettings,
     getProfiles: () => [...profiles],
+    profileFileFor: vi.fn(
+      async (name: string) => `${name.toLowerCase().replace(/ /g, "-")}.json`,
+    ),
     createNewProfile: vi.fn(async (file: string, name: string) =>
       add(file, name),
     ),
@@ -103,7 +106,7 @@ describe("settings events", () => {
       });
 
       expect(store.createNewProfile).toHaveBeenCalledExactlyOnceWith(
-        expect.any(String),
+        "chill-stream.json",
         "Chill Stream",
       );
       expect(log).toEqual([
@@ -150,8 +153,7 @@ describe("settings events", () => {
       ]);
     });
 
-    // The name only becomes a lowercase file name, which the store overwrites
-    it.fails.each(["stream", "Default", "  Stream  "])(
+    it.each(["stream", "Default", "  Stream  "])(
       'refuses "%s", a name another profile has',
       async (name) => {
         const store = profileStore();
@@ -183,7 +185,7 @@ describe("settings events", () => {
 
       expect(store.cloneProfile).toHaveBeenCalledExactlyOnceWith(
         "stream.json",
-        expect.any(String),
+        "chill-stream.json",
         "Chill Stream",
       );
       expect(log).toEqual([
@@ -233,8 +235,7 @@ describe("settings events", () => {
       ]);
     });
 
-    // The name only becomes a lowercase file name, which the store overwrites
-    it.fails.each(["stream", "Default", "  Stream  "])(
+    it.each(["stream", "Default", "  Stream  "])(
       'refuses "%s", a name another profile has',
       async (name) => {
         const store = profileStore();

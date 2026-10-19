@@ -15,6 +15,7 @@ import { Emotes } from "@/common/types";
 import { defaultProfile, formatError } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
+import { isInside } from "@/helper/path";
 import Logger from "@/logger";
 import { AUDIO_EXTENSIONS } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
@@ -25,6 +26,7 @@ import { safeStorage } from "electron";
 import { debounce } from "es-toolkit";
 import { EventEmitter } from "events";
 import { access, copyFile, readdir } from "fs/promises";
+import { randomUUID } from "node:crypto";
 import { basename, extname, join, resolve } from "path";
 import { Service } from "../shared";
 
@@ -517,6 +519,14 @@ export class StoreManagerService extends Service {
     this._ensureInitialized();
     if (!fileName || !profileName) return null;
 
+    if (!(await this._isFreeProfileFile(fileName))) {
+      Logger.error(
+        `<System> Refused to create the profile file ${fileName}, it isn't a free file name.`,
+        this._logFile,
+      );
+      return null;
+    }
+
     const newPath = join(
       this._pathManagerService.folders.profilesFolder,
       fileName,
@@ -547,6 +557,13 @@ export class StoreManagerService extends Service {
   ): Promise<EntityMetadata | null> {
     this._ensureInitialized();
     if (!referenceFileName || !newFileName || !newProfileName) return null;
+    if (!(await this._isFreeProfileFile(newFileName))) {
+      Logger.error(
+        `<System> Refused to clone into the profile file ${newFileName}, it isn't a free file name.`,
+        this._logFile,
+      );
+      return null;
+    }
 
     const refPath = join(
       this._pathManagerService.folders.profilesFolder,
@@ -600,9 +617,14 @@ export class StoreManagerService extends Service {
     );
   }
 
+  // Under the name of its file, or a free one when a profile has it.
   public async importProfile(ref: string): Promise<boolean> {
+    this._ensureInitialized();
+    if (!ref) return false;
+    const file = await this._freeProfileFile(basename(ref, extname(ref)));
     const result = await this._importEntity(
       ref,
+      file,
       this._pathManagerService.folders.profilesFolder,
       ProfileSchema,
       "profile",
@@ -610,6 +632,44 @@ export class StoreManagerService extends Service {
     if (!result) return false;
     await this.addProfile(result);
     return true;
+  }
+
+  /**
+   * A free file for a new profile, named after it in lowercase ASCII letters,
+   * digits, "-" and "_", with a number added when another profile has it.
+   */
+  public async profileFileFor(name: string): Promise<string> {
+    this._ensureInitialized();
+    const slug = cleanText(name, { asciiOnly: true })
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .slice(0, 64)
+      .replace(/^-+|-+$/g, "");
+    return this._freeProfileFile(slug || "profile");
+  }
+
+  // `base`.json, or `base`-2.json and on when it's taken
+  private async _freeProfileFile(base: string): Promise<string> {
+    for (let n = 1; n <= 1000; n++) {
+      const file = n === 1 ? `${base}.json` : `${base}-${n}.json`;
+      if (await this._isFreeProfileFile(file)) return file;
+    }
+    return `${randomUUID()}.json`;
+  }
+
+  // A plain file name in the profiles folder that no profile has, listed or
+  // on disk, where file names don't differ only by case.
+  private async _isFreeProfileFile(file: string): Promise<boolean> {
+    const folder = this._pathManagerService.folders.profilesFolder;
+    const path = join(folder, file);
+    if (basename(file) !== file || !isInside(folder, path)) return false;
+    const listed = this._storeData!.profiles.some(
+      (p) => p.file.toLowerCase() === file.toLowerCase(),
+    );
+    if (listed) return false;
+    return access(path).then(
+      () => false,
+      () => true,
+    );
   }
 
   private async _exportEntity(
@@ -654,6 +714,7 @@ export class StoreManagerService extends Service {
 
   private async _importEntity(
     ref: string,
+    file: string,
     destFolder: string,
     schema: any,
     typeName: string,
@@ -661,7 +722,6 @@ export class StoreManagerService extends Service {
     if (!ref) return null;
 
     const refPath = resolve(ref);
-    const file = basename(refPath);
     const newPath = join(destFolder, file);
 
     const existingData = await this._jsonManagerService.loadFile(
