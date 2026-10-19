@@ -78,6 +78,7 @@
   );
 }
 
+/* Centered, so a short handle doesn't leave a gap before the button */
 .username {
   flex: 1;
   height: 48px;
@@ -85,6 +86,7 @@
   border-color: var(--background-secondary-hover);
   border-radius: var(--radius-md);
   font-size: var(--font-lg);
+  text-align: center;
   transition: border-color var(--transition-fast);
 }
 
