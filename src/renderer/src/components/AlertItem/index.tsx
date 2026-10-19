@@ -16,6 +16,7 @@ import {
   Slider,
   Toggle,
 } from "../Elements";
+import { GiftMultiSelect } from "../GiftSelect";
 import { PlayButton, TestState, testProps } from "../PlayButton";
 import styles from "./alertitem.module.css";
 
@@ -41,11 +42,9 @@ function TriggerFilter({ alert, gifts, emotes, onChange }: FilterProps) {
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
       return (
-        <MultiSelect
-          className={styles.fill}
-          searchable
+        <GiftMultiSelect
           placeholder="Any gift"
-          options={gifts}
+          gifts={gifts}
           value={trigger.gifts}
           onChange={(ids) => onChange({ ...trigger, gifts: ids })}
         />

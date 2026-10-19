@@ -168,10 +168,12 @@ describe("SettingField", () => {
     expect(within(container).getByText("Rose")).toBeInTheDocument();
 
     await user.click(within(container).getByText("Rose"));
-    await user.type(screen.getByPlaceholderText("Search..."), "heart");
-    await user.click(inList(container, "Heart Me")!);
+    const picker = within(screen.getByRole("dialog"));
+    await user.type(picker.getByPlaceholderText("Search gifts..."), "heart");
+    await user.click(picker.getByTitle("Heart Me"));
 
     expect(onChange).toHaveBeenCalledWith(7934);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("picks several of the gifts", async () => {
@@ -183,7 +185,9 @@ describe("SettingField", () => {
     });
 
     await user.click(within(container).getByText("Rose"));
-    await user.click(inList(container, "GG")!);
+    const picker = within(screen.getByRole("dialog"));
+    await user.click(picker.getByTitle("GG"));
+    await user.click(picker.getByRole("button", { name: "Done" }));
 
     expect(onChange).toHaveBeenCalledWith([5655, 6064]);
   });

@@ -334,7 +334,7 @@ describe("Alerts", () => {
   });
 
   it("picks the gifts of a gift alert from main's list", async () => {
-    const { user, container } = await load([
+    const { user } = await load([
       alert("alert-1", { trigger: trigger(TOKIO_EVENTS.GIFT) }),
     ]);
     await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
@@ -342,15 +342,40 @@ describe("Alerts", () => {
     });
 
     await user.click(rows()[0].getByText("Any gift"));
-    await user.click(inList(container, "Lion")!);
+    const dialog = within(screen.getByRole("dialog"));
+    await user.click(dialog.getByTitle("Lion"));
+    await user.click(dialog.getByRole("button", { name: "Done" }));
 
     expect(rows()[0].getByText("Lion")).toBeInTheDocument();
     await wait(300);
     expect(saves()[0].items[0].trigger.gifts).toEqual([5]);
   });
 
+  it("lists an alert's gifts first when its picker opens again", async () => {
+    const { user } = await load([
+      alert("alert-1", { trigger: trigger(TOKIO_EVENTS.GIFT) }),
+    ]);
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
+      data: [gift(1, "Rose"), gift(5, "Lion"), gift(9, "Galaxy")],
+    });
+    const dialog = () => within(screen.getByRole("dialog"));
+    const listed = () =>
+      dialog()
+        .getAllByRole("checkbox")
+        .map((box) => box.closest("label")!.title);
+
+    await user.click(rows()[0].getByText("Any gift"));
+    expect(listed()).toEqual(["Rose", "Lion", "Galaxy"]);
+    await user.click(dialog().getByTitle("Galaxy"));
+    await user.click(dialog().getByRole("button", { name: "Done" }));
+
+    await user.click(rows()[0].getByText("Galaxy"));
+
+    expect(listed()).toEqual(["Galaxy", "Rose", "Lion"]);
+  });
+
   it("offers the gifts saved from LIVEs with TikTok's, as they arrive", async () => {
-    const { user, container } = await load([
+    const { user } = await load([
       alert("alert-1", { trigger: trigger(TOKIO_EVENTS.GIFT) }),
     ]);
     await send(APP_EVENTS_RESPONSE.GET_GIFTS, { data: [gift(1, "Rose")] });
@@ -359,14 +384,17 @@ describe("Alerts", () => {
     });
 
     await user.click(rows()[0].getByText("Any gift"));
-    expect(inList(container, "Rose")).not.toBeNull();
-    expect(inList(container, "Galaxy")).not.toBeNull();
-    expect(inList(container, "Comet")).toBeNull();
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.queryByTitle("Rose")).not.toBeNull();
+    expect(dialog.queryByTitle("Galaxy")).not.toBeNull();
+    expect(dialog.queryByTitle("Comet")).toBeNull();
 
+    // While the picker is open
     await send(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, {
       data: [gift(9, "Galaxy"), gift(5, "Comet")],
     });
-    await user.click(inList(container, "Comet")!);
+    await user.click(dialog.getByTitle("Comet"));
+    await user.click(dialog.getByRole("button", { name: "Done" }));
 
     expect(rows()[0].getByText("Comet")).toBeInTheDocument();
     await wait(300);

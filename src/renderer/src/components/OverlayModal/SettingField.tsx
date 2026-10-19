@@ -14,6 +14,7 @@ import {
   Slider,
   Toggle,
 } from "../Elements";
+import { GiftMultiSelect, GiftSelect } from "../GiftSelect";
 import styles from "./overlaymodal.module.css";
 
 type Value = string | number;
@@ -110,16 +111,14 @@ export function SettingField({ field, gifts, onChange, onReset }: Props) {
     case "gifts":
       return stacked(
         field.attributes.multiple ? (
-          <MultiSelect
-            searchable
-            options={gifts}
+          <GiftMultiSelect
+            gifts={gifts}
             value={asList(field.attributes.value)}
             onChange={onChange}
           />
         ) : (
-          <Select
-            searchable
-            options={gifts}
+          <GiftSelect
+            gifts={gifts}
             value={asSingle(field.attributes.value)}
             onChange={onChange}
           />

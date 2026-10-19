@@ -191,11 +191,13 @@ describe("AlertItem", () => {
 
   it("narrows a gift alert to the gifts picked", async () => {
     const item = alert({}, { type: TOKIO_EVENTS.GIFT });
-    const { user, container, onChange } = setup(item);
+    const { user, onChange } = setup(item);
     expect(filters()).toEqual(["Any gift"]);
 
-    await user.click(screen.getByText("Any gift"));
-    await user.click(inList(container, "GG")!);
+    await user.click(screen.getByRole("button", { name: "Any gift" }));
+    const picker = within(screen.getByRole("dialog"));
+    await user.click(picker.getByTitle("GG"));
+    await user.click(picker.getByRole("button", { name: "Done" }));
 
     expect(onChange).toHaveBeenCalledWith({
       ...item,

@@ -1,0 +1,166 @@
+/* FIELD (looks like a Select) */
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--background-primary);
+  background-color: var(--background-secondary);
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.field_label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.field_images {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.field_img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.placeholder {
+  color: var(--font-secondary);
+}
+
+.chevron {
+  flex-shrink: 0;
+}
+
+/* Shared by the field and the rows */
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The field's coins give way first when there's no room */
+.details {
+  flex-shrink: 1000;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* PICKER */
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sort {
+  flex-shrink: 0;
+  width: 200px;
+}
+
+.operator {
+  flex-shrink: 0;
+  width: 160px;
+}
+
+.amount {
+  flex-shrink: 0;
+  width: 100px;
+}
+
+.unit {
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+}
+
+/* What's shown and selected, and the actions on them */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.count {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  height: 360px;
+  padding-right: var(--space-2);
+  overflow-y: auto;
+}
+
+/* A gift: a button that picks it, or a label that checks it */
+.row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-1) 0;
+  border: none;
+  border-bottom: 1px solid var(--background-secondary);
+  background: none;
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover .name,
+.current .name {
+  color: var(--accent-primary);
+}
+
+.img {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.coins {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.status {
+  margin: var(--space-4) 0;
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+  text-align: center;
+}
