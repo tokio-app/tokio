@@ -8,6 +8,7 @@
     "src/preload/*.d.ts",
     "src/common/**/*",
     "src/ui/**/*",
+    "test/renderer/**/*",
   ],
   "compilerOptions": {
     "composite": true,
@@ -18,7 +19,8 @@
       ],
       "@/*":["./src/renderer/src/*"],
       "@/common/*":["./src/common/*"],
-      "@/ui/*":["./src/ui/*"]
+      "@/ui/*":["./src/ui/*"],
+      "@test/*":["./test/renderer/*"]
     }
   }
 }

@@ -77,7 +77,8 @@ const aboutRoute = createRoute({
   component: About,
 });
 
-const routeTree = rootRoute.addChildren([
+// Exported for tests, which render it in memory history
+export const routeTree = rootRoute.addChildren([
   homeRoute,
   overlaysRoute,
   officialOverlaysRoute,

@@ -10,7 +10,7 @@ Stack: Electron 39, electron-vite, React 19, TypeScript, TanStack Router, Expres
 
 ```sh
 yarn dev                  # build the music window UI, then electron-vite dev
-yarn test                 # vitest (yarn test:watch to watch)
+yarn test                 # vitest (yarn test:watch to watch, --project renderer for the UI)
 yarn typecheck            # tsc for node (main/preload/common) and web (renderer/music)
 yarn lint                 # oxlint --type-aware
 yarn format               # prettier --write .
@@ -24,9 +24,13 @@ Verify changes with `yarn test`, `yarn typecheck` and `yarn lint`. For the Edge 
 
 ### Tests
 
-- Vitest runs in Node, without Electron or network. Tests sit next to the code as `<file>.test.ts` under `src/main` and `src/common`.
+- Vitest runs in Node, without Electron or network, in two projects: `main` (`src/main`, `src/common`) and `renderer` (jsdom with Testing Library: `src/renderer`, `src/ui`, `src/music`). `yarn test --project renderer` runs one. Tests sit next to the code as `<file>.test.ts(x)`.
 - `test/setup.ts` mocks `electron` (`safeStorage` round-trips plain text) and silences the console. Spy on `Logger` to assert logs.
 - Give services a temp folder (`mkdtemp(join(tmpdir(), "tokio-test-"))`) through their setters or `initialize`, stub `fetch` with `vi.stubGlobal`, and use fake timers for the queues.
+- Renderer tests get a fresh fake `window.api` before each one (`test/renderer/setup.ts`). `send` from `@test/ipc` pushes a reply from main inside `act` (await it), and `sent` lists what the renderer emitted.
+- Render with `renderWithProviders` (`@test/render`), which adds fake audio queues, the real notifications and unsaved-changes providers, and a `user`. Pages that navigate use `renderApp(path)`: the real routes in memory history. Components never reach Tone.js; `audio.queue(name)` is the fake queue they got. Builders and replies are in `@test/fixtures`.
+- jsdom has no layout. `test/renderer/dom.ts` gives elements a size (virtualized lists like `Select` render nothing at zero), fakes the observers (`intersect()` fires `IntersectionObserver`) and `scrollTo`. A `jest` shim lets Testing Library run with `vi.useFakeTimers()`; give user-event `advanceTimers: (ms) => vi.advanceTimersByTime(ms)`.
+- Query by role and visible text. `Field` labels aren't tied to their controls, and `Select` is a clickable div whose list is portaled to the body, so use placeholders, text or `within` there. `@test/queries` has `inList` (an item of a portaled list) and `section` (queries inside a section, by its heading). Mock `copy-to-clipboard` and spy on `window.open`.
 - Fixtures live in `test/fixtures`; Prettier skips them so saved HTML keeps its markup.
 - `it.fails` marks a known bug. Turn it into `it` when the bug is fixed.
 
@@ -55,6 +59,7 @@ Generated, don't edit: `out/`, `music-out/`, `build/` output.
 - Main process: `@/*` → `src/main/*`, `@/common/*` → `src/common/*`
 - Renderer: `@/*` (preferred) and `@renderer/*` → `src/renderer/src/*`, plus `@/common/*` and `@/ui/*` → `src/ui/*`
 - Music window: `@/common/*` and `@/ui/*` only.
+- Renderer tests: the renderer's, plus `@test/*` → `test/renderer/*`.
 
 Code in `src/common/` must not import from `src/main` or `src/renderer`, and must stay free of Node/Electron-only APIs if the renderer uses it.
 
