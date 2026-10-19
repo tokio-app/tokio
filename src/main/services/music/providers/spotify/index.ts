@@ -20,6 +20,8 @@ export class Spotify extends MusicProvider {
   private _cachedDeviceId: string | null = null;
   private _isActive: boolean = false;
   private _refreshTimeout: NodeJS.Timeout | null = null;
+  // Counts disconnects, so a refresh that ends after one is dropped
+  private _session = 0;
   private _events: EventEmitter;
 
   constructor(clientId?: string, redirectUri?: string) {
@@ -180,6 +182,9 @@ export class Spotify extends MusicProvider {
 
   public disconnect(): void {
     if (!this._isActive) return;
+    if (this._refreshTimeout) clearTimeout(this._refreshTimeout);
+    this._refreshTimeout = null;
+    this._session++;
     this._accessToken = null;
     this._refreshToken = null;
     this._isActive = false;
@@ -284,6 +289,7 @@ export class Spotify extends MusicProvider {
 
   private async refreshAccessToken(): Promise<void> {
     if (!this._refreshToken) throw new Error("No refresh token available.");
+    const session = this._session;
 
     const body = new URLSearchParams({
       client_id: this._clientId,
@@ -302,6 +308,7 @@ export class Spotify extends MusicProvider {
     }
 
     const data = await response.json();
+    if (session !== this._session) return;
     this._accessToken = data.access_token;
 
     if (data.refresh_token) {

@@ -694,8 +694,7 @@ describe("Spotify", () => {
       expect(ended).not.toHaveBeenCalled();
     });
 
-    // disconnect() doesn't clear _refreshTimeout, so the refresh still fires and fails
-    it.fails("cancels the scheduled token refresh", async () => {
+    it("cancels the scheduled token refresh", async () => {
       const fetch = stubFetch();
       const spotify = await login();
 
@@ -707,30 +706,24 @@ describe("Spotify", () => {
       expect(console.error).not.toHaveBeenCalled();
     });
 
-    // refreshAccessToken stores the tokens and schedules the next refresh even after disconnect()
-    it.fails(
-      "doesn't bring the session back when a refresh finishes after it",
-      async () => {
-        let finishRefresh = (_response: Response) => {};
-        const fetch = stubFetch({
-          refresh: () =>
-            new Promise<Response>((resolve) => {
-              finishRefresh = resolve;
-            }),
-        });
-        const spotify = await login();
-        await vi.advanceTimersByTimeAsync((3600 - 60) * 1000);
-        expect(refreshes(fetch)).toHaveLength(1);
+    it("doesn't bring the session back when a refresh finishes after it", async () => {
+      let finishRefresh = (_response: Response) => {};
+      const fetch = stubFetch({
+        refresh: () =>
+          new Promise<Response>((resolve) => {
+            finishRefresh = resolve;
+          }),
+      });
+      const spotify = await login();
+      await vi.advanceTimersByTimeAsync((3600 - 60) * 1000);
+      expect(refreshes(fetch)).toHaveLength(1);
 
-        spotify.disconnect();
-        finishRefresh(json({ ...REFRESHED, refresh_token: "next" }));
-        await vi.advanceTimersByTimeAsync(3600 * 1000);
+      spotify.disconnect();
+      finishRefresh(json({ ...REFRESHED, refresh_token: "next" }));
+      await vi.advanceTimersByTimeAsync(3600 * 1000);
 
-        expect(refreshes(fetch)).toHaveLength(1);
-        await expect(spotify.playerStatus()).rejects.toThrow(
-          "Not authenticated",
-        );
-      },
-    );
+      expect(refreshes(fetch)).toHaveLength(1);
+      await expect(spotify.playerStatus()).rejects.toThrow("Not authenticated");
+    });
   });
 });
