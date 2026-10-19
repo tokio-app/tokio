@@ -1,4 +1,5 @@
 export * from "./alerts";
+export * from "./catalog";
 export * from "./constants";
 export * from "./samples";
 

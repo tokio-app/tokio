@@ -17,3 +17,11 @@
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: var(--space-8) var(--space-6);
 }
+
+/* On Official Overlays while installed ones have updates */
+.update_dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-primary);
+}

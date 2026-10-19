@@ -9,6 +9,7 @@ import {
   Alerts,
   Home,
   Music,
+  OfficialOverlays,
   Overlays,
   Settings,
   Tools,
@@ -30,6 +31,14 @@ const overlaysRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/overlays",
   component: Overlays,
+});
+
+// Opened from the gallery. Under /overlays, so the sidebar keeps Overlays
+// active.
+const officialOverlaysRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/overlays/official",
+  component: OfficialOverlays,
 });
 
 const ttsRoute = createRoute({
@@ -71,6 +80,7 @@ const aboutRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   homeRoute,
   overlaysRoute,
+  officialOverlaysRoute,
   ttsRoute,
   alertsRoute,
   musicRoute,

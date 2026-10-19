@@ -4,7 +4,7 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
-import { LoggedError } from "@/helper/feedback";
+import { AppFailure, LoggedError } from "@/helper/feedback";
 import { dialog } from "electron";
 
 const events = createStack("overlays");
@@ -75,6 +75,79 @@ events.push(
         success: false,
         data: overlayService.getOverlays(),
         error,
+      }),
+  },
+);
+
+events.push(
+  APP_EVENTS.GET_OVERLAY_CATALOG,
+  async ({ overlayService }, e) => {
+    const res = await overlayService.getCatalog();
+    if (!res.success) throw new LoggedError("Unable to read the catalog.");
+    e.reply(APP_EVENTS_RESPONSE.GET_OVERLAY_CATALOG, {
+      success: true,
+      data: res.data,
+    });
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.OVERLAY_CATALOG_FAILED,
+      message:
+        "Unable to load the official overlays. Check your internet connection.",
+    },
+    // The page shows it, with a button to try again.
+    notify: false,
+    onError: replyFailure(APP_EVENTS_RESPONSE.GET_OVERLAY_CATALOG),
+  },
+);
+
+events.push(
+  APP_EVENTS.INSTALL_OVERLAY,
+  async ({ overlayService, notifier }, e, { id }) => {
+    const updating = overlayService
+      .getOverlays()
+      .some((o) => o.id === id && !o.external);
+    const gifts = await overlayService.getGifts();
+    const res = await overlayService.installFromCatalog(id, gifts);
+    if (!res.success) {
+      throw new AppFailure(
+        updating
+          ? FEEDBACK_CODES.OVERLAY_UPDATE_FAILED
+          : FEEDBACK_CODES.OVERLAY_INSTALL_FAILED,
+        `Unable to ${updating ? "update" : "install"} the overlay. Check your internet connection and try again.`,
+        { logged: true },
+      );
+    }
+
+    e.reply(APP_EVENTS_RESPONSE.GET_OVERLAYS, {
+      success: true,
+      data: overlayService.getOverlays(),
+    });
+    e.reply(APP_EVENTS_RESPONSE.INSTALL_OVERLAY, { success: true, id });
+    if (updating) {
+      notifier.success(
+        "overlays",
+        FEEDBACK_CODES.OVERLAY_UPDATED,
+        "Overlay updated. Refresh it in your streaming app to load the new version.",
+      );
+    } else {
+      notifier.success(
+        "overlays",
+        FEEDBACK_CODES.OVERLAY_INSTALLED,
+        "Overlay installed.",
+      );
+    }
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.OVERLAY_INSTALL_FAILED,
+      message: "Unable to install the overlay.",
+    },
+    onError: (e, error, { id }) =>
+      e.reply(APP_EVENTS_RESPONSE.INSTALL_OVERLAY, {
+        success: false,
+        error,
+        id,
       }),
   },
 );

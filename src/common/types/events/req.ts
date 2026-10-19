@@ -64,6 +64,8 @@ export enum APP_EVENTS {
   SEND_OVERLAY_DATA = "app:overlays:send:data",
   TEST_OVERLAY = "app:overlays:test",
   REMOVE_OVERLAY = "app:overlays:remove",
+  GET_OVERLAY_CATALOG = "app:overlays:get:catalog",
+  INSTALL_OVERLAY = "app:overlays:install",
 
   // TOOLS
   GET_TEST_OVERLAYS = "app:tools:overlays:get",
@@ -214,6 +216,10 @@ export interface AppEventsMap {
     id: string;
   };
   [APP_EVENTS.REMOVE_OVERLAY]: { id: string };
+  [APP_EVENTS.GET_OVERLAY_CATALOG]: void;
+  // Installs the catalog's version of an official overlay, or updates the
+  // installed one
+  [APP_EVENTS.INSTALL_OVERLAY]: { id: string };
 
   // TOOLS
   [APP_EVENTS.GET_TEST_OVERLAYS]: void;

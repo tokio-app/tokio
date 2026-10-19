@@ -1,6 +1,15 @@
 import { APP_EVENTS, TokioPayload, TokioPreviewMessage } from "@/common/types";
 
 /**
+ * The hint on Official Overlays while installed ones have updates, or
+ * undefined without any.
+ */
+export function updatesHint(count: number): string | undefined {
+  if (count === 0) return undefined;
+  return count === 1 ? "1 update available" : `${count} updates available`;
+}
+
+/**
  * Sends a payload to an overlay's preview iframes: the card, its full size
  * view and the settings preview.
  */

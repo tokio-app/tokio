@@ -26,14 +26,22 @@ describe("findOverlays", () => {
   const info = (name: string, config = false) =>
     `name: ${name}\nversion: 1.0.0\nconfig: ${config}\n`;
 
-  it("lists the overlays that still load, as imported ones", async () => {
+  // Imported overlays are named by a UUID, official ones by their catalog id.
+  const imported = "8f14e45f-ceea-4672-9a8e-1b2c3d4e5f60";
+
+  it("lists the overlays that still load", async () => {
     await overlay("b-clock", {
       "info.yaml": info("Clock"),
       "index.html": "<h1>clock</h1>",
     });
-    await overlay("a-chat", {
+    await overlay(imported, {
       "info.yml": info("Chat"),
       "index.html": "<p>chat</p>",
+    });
+    // An install in progress
+    await overlay(".install-1", {
+      "info.yaml": info("Clock"),
+      "index.html": "<h1>clock</h1>",
     });
     await overlay("no-html", { "info.yaml": info("Broken") });
     await overlay("bad-info", {
@@ -48,7 +56,7 @@ describe("findOverlays", () => {
 
     expect(await findOverlays(folder, new YAMLManagerService())).toEqual([
       {
-        id: "a-chat",
+        id: imported,
         name: "Chat",
         version: "1.0.0",
         config: false,
@@ -59,7 +67,7 @@ describe("findOverlays", () => {
         name: "Clock",
         version: "1.0.0",
         config: false,
-        external: true,
+        external: false,
       },
     ]);
   });

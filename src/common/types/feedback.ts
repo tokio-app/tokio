@@ -62,12 +62,17 @@ export enum FEEDBACK_CODES {
 
   // OVERLAYS
   OVERLAY_IMPORTED = "overlay_imported",
+  OVERLAY_INSTALLED = "overlay_installed",
+  OVERLAY_UPDATED = "overlay_updated",
   OVERLAY_SAVED = "overlay_saved",
   OVERLAY_REMOVED = "overlay_removed",
   TEST_OVERLAY_ADDED = "test_overlay_added",
   TEST_OVERLAY_REMOVED = "test_overlay_removed",
   OVERLAYS_LOAD_FAILED = "overlays_load_failed",
   OVERLAY_IMPORT_FAILED = "overlay_import_failed",
+  OVERLAY_CATALOG_FAILED = "overlay_catalog_failed",
+  OVERLAY_INSTALL_FAILED = "overlay_install_failed",
+  OVERLAY_UPDATE_FAILED = "overlay_update_failed",
   OVERLAY_CONFIG_FAILED = "overlay_config_failed",
   OVERLAY_SAVE_FAILED = "overlay_save_failed",
   OVERLAY_REMOVE_FAILED = "overlay_remove_failed",

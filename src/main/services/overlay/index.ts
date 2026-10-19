@@ -1,4 +1,6 @@
 import {
+  CatalogOverlay,
+  mergeOverlayConfig,
   OverlayConfig,
   OverlayConfigSchema,
   OverlayMetadata,
@@ -15,7 +17,7 @@ import {
 import { formatError, generateTikTokEventSample } from "@/common/util";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
-import { cp, rm } from "node:fs/promises";
+import { access, cp, readdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { JSONManagerService } from "../json";
 import { ServerService } from "../server";
@@ -28,6 +30,7 @@ import {
   processHTML,
   processOverlay,
 } from "./common";
+import { downloadOverlay, extractZip, fetchCatalog } from "./common/catalog";
 
 // The parts of the store that keep the overlay lists.
 type OverlayStore = Pick<
@@ -35,10 +38,19 @@ type OverlayStore = Pick<
   | "wasRebuilt"
   | "getSettings"
   | "addOverlayInfo"
+  | "updateOverlayInfo"
   | "removeOverlayInfo"
   | "addTestOverlay"
   | "removeTestOverlay"
 >;
+
+// The catalog is read again after this long, so new versions show up while
+// Tokio stays open.
+export const CATALOG_TTL_MS = 15 * 60 * 1000;
+
+// Folders of installs in progress, inside the overlays folder so they can be
+// renamed into place. See installFromCatalog.
+const STAGING_FOLDER = /^\.(install|old)-/;
 
 export interface OverlayResult<T = undefined> {
   success: boolean;
@@ -53,6 +65,9 @@ export class OverlayService extends Service {
   private _json: JSONManagerService;
   private _server: ServerService;
   private _store: OverlayStore;
+  private _catalog: { overlays: CatalogOverlay[]; time: number } | null = null;
+  // Installs in progress, by overlay id
+  private _installs = new Map<string, Promise<OverlayResult>>();
 
   public setLogFile(logFile: string): void {
     this._logFile = logFile;
@@ -80,6 +95,8 @@ export class OverlayService extends Service {
    * config into its HTML and serves it. Overlays that fail are forgotten.
    */
   public async load(gifts: CustomGift[]): Promise<void> {
+    await this._removeStaging();
+
     if (this._store.wasRebuilt()) {
       for (const overlay of await findOverlays(this._folder, this._yaml)) {
         await this._store.addOverlayInfo(overlay);
@@ -177,15 +194,64 @@ export class OverlayService extends Service {
   }
 
   /**
-   * Deletes an imported overlay with its settings and stops serving it.
-   * Official overlays aren't removed here.
+   * The official overlays, from the catalog of tokio-app/overlays. It's read
+   * again after CATALOG_TTL_MS, and a failure isn't kept, so the next call
+   * tries again.
+   */
+  public async getCatalog(): Promise<OverlayResult<CatalogOverlay[]>> {
+    if (this._catalog && Date.now() - this._catalog.time < CATALOG_TTL_MS) {
+      return { success: true, data: this._catalog.overlays };
+    }
+
+    try {
+      const { overlays, dropped } = await fetchCatalog();
+      if (dropped.length > 0) {
+        Logger.warn(
+          `<Overlays> Skipped catalog entries that can't be read: ${dropped.join(", ")}`,
+          this._logFile,
+        );
+      }
+      this._catalog = { overlays, time: Date.now() };
+      return { success: true, data: overlays };
+    } catch (error) {
+      // Usually just offline.
+      Logger.warn(
+        `<Overlays> Unable to read the overlay catalog -- ${formatError(error)}`,
+        this._logFile,
+      );
+      return { success: false };
+    }
+  }
+
+  /**
+   * Installs the catalog's version of an official overlay, or updates the
+   * installed one, keeping the saved settings that still apply. It's served
+   * under its catalog id, so its URL never changes.
+   */
+  public installFromCatalog(
+    id: string,
+    gifts: CustomGift[],
+  ): Promise<OverlayResult> {
+    // A second request for the same overlay gets the first one's result.
+    let install = this._installs.get(id);
+    if (!install) {
+      install = this._installFromCatalog(id, gifts).finally(() =>
+        this._installs.delete(id),
+      );
+      this._installs.set(id, install);
+    }
+    return install;
+  }
+
+  /**
+   * Deletes an installed overlay, official or imported, with its settings and
+   * stops serving it.
    */
   public async remove(id: string): Promise<OverlayResult> {
     // Only stored ids, so the renderer's id can't point outside the folder
-    const overlay = this._store.getSettings().overlays.find((o) => o.id === id);
-    if (!overlay?.external) {
+    if (!this._store.getSettings().overlays.some((o) => o.id === id)) {
       Logger.warn(
-        `<Overlays> Unable to remove overlay ${id}, it isn't an imported overlay.`,
+        `<Overlays> Unable to remove overlay ${id}, it isn't installed.`,
         this._logFile,
       );
       return { success: false };
@@ -341,6 +407,148 @@ export class OverlayService extends Service {
       gifts,
     );
     return html.success ? res.data!.info : null;
+  }
+
+  private async _installFromCatalog(
+    id: string,
+    gifts: CustomGift[],
+  ): Promise<OverlayResult> {
+    const catalog = await this.getCatalog();
+    const entry = catalog.data?.find((o) => o.id === id);
+    if (!entry) {
+      // getCatalog logged why it has no catalog.
+      if (catalog.success) {
+        Logger.warn(
+          `<Overlays> Unable to install overlay ${id}, it isn't in the catalog.`,
+          this._logFile,
+        );
+      }
+      return { success: false };
+    }
+
+    const installed = this._store
+      .getSettings()
+      .overlays.find((o) => o.id === id);
+    if (installed?.external) {
+      Logger.warn(
+        `<Overlays> Unable to install overlay ${id}, an imported overlay has its id.`,
+        this._logFile,
+      );
+      return { success: false };
+    }
+
+    const update = installed !== undefined;
+    const staging = join(this._folder, `.install-${randomUUID()}`);
+    try {
+      const info = await this._prepare(entry, staging, update, gifts);
+      await this._swap(staging, this._dir(id));
+      await this._track({ ...info, id }, update);
+      return { success: true };
+    } catch (error) {
+      Logger.error(
+        `<Overlays> Unable to install overlay ${id} -- ${formatError(error)}`,
+        this._logFile,
+        error,
+      );
+      await rm(staging, { recursive: true, force: true }).catch(() => {});
+      return { success: false };
+    }
+  }
+
+  /**
+   * Downloads an official overlay into `staging` and makes it ready to serve:
+   * checked like an import, with the installed version's settings when it's
+   * an update. Throws when it can't.
+   */
+  private async _prepare(
+    entry: CatalogOverlay,
+    staging: string,
+    update: boolean,
+    gifts: CustomGift[],
+  ): Promise<OverlayMetadata> {
+    await extractZip(await downloadOverlay(entry), staging);
+
+    const res = await processOverlay(staging, this._yaml, false);
+    if (!res.success || !hasSetupBlock(res.data!.htmlContent)) {
+      throw new Error("The download isn't a valid overlay.");
+    }
+
+    let config = res.data!.config;
+    const saved = update && config && (await this.getConfig(entry.id)).data;
+    if (config && saved) {
+      config = mergeOverlayConfig(config, saved);
+      const kept = await this._yaml.saveFile(
+        res.paths!.config,
+        OverlayConfigSchema,
+        config,
+      );
+      if (!kept) throw new Error("Unable to keep its settings.");
+    }
+
+    const html = await processHTML(
+      entry.id,
+      res.data!.htmlContent,
+      staging,
+      "value",
+      config,
+      gifts,
+    );
+    if (!html.success) throw new Error("Unable to write its HTML.");
+    return { ...res.data!.info, external: false };
+  }
+
+  // Serves an installed official overlay and saves it in the store.
+  private async _track(
+    overlay: OverlayMetadata & { id: string },
+    update: boolean,
+  ): Promise<void> {
+    const app = { ...overlay, path: this._dir(overlay.id) };
+    const loaded = this._overlays.findIndex((o) => o.id === overlay.id);
+    // An update is already served from its folder, now with the new files.
+    if (loaded === -1) this._register(app, true);
+    else this._overlays[loaded] = app;
+
+    if (update) await this._store.updateOverlayInfo(overlay);
+    else await this._store.addOverlayInfo(overlay);
+  }
+
+  /**
+   * Puts a prepared overlay in place of the installed one, if any. Both are
+   * renamed within the overlays folder, so the old version stays whole until
+   * the new one is in place.
+   */
+  private async _swap(staging: string, dir: string): Promise<void> {
+    const old = join(this._folder, `.old-${randomUUID()}`);
+    const replacing = await access(dir).then(
+      () => true,
+      () => false,
+    );
+    if (replacing) await rename(dir, old);
+
+    try {
+      await rename(staging, dir);
+    } catch (error) {
+      if (replacing) await rename(old, dir).catch(() => {});
+      throw error;
+    }
+
+    if (replacing) {
+      await rm(old, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
+  // Folders left by an install that was cut short.
+  private async _removeStaging(): Promise<void> {
+    const entries = await readdir(this._folder, { withFileTypes: true }).catch(
+      () => [],
+    );
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !STAGING_FOLDER.test(entry.name)) continue;
+      await rm(join(this._folder, entry.name), {
+        recursive: true,
+        force: true,
+      }).catch(() => {});
+    }
   }
 
   private _register(overlay: OverlayApp, rebuild: boolean): void {

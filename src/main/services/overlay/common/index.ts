@@ -12,12 +12,18 @@ import { join } from "node:path";
 
 const SCRIPT_REGEX = /<script id="tokio-setup">[\s\S]*?<\/script>/i;
 
+// Imported overlays are named by a random UUID, official ones by their id in
+// the catalog.
+const IMPORTED_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Where Tokio writes the overlay's ID, and its settings when it has them.
 export const hasSetupBlock = (html: string) => SCRIPT_REGEX.test(html);
 
 /**
  * Overlays installed in the overlays folder, each in a folder named by its id.
- * Lets a rebuilt store get its overlay list back.
+ * Lets a rebuilt store get its overlay list back. Folders starting with a dot
+ * are installs in progress.
  */
 export async function findOverlays(
   folder: string,
@@ -28,11 +34,11 @@ export async function findOverlays(
   );
   const overlays: (OverlayMetadata & { id: string })[] = [];
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (!entry.isDirectory()) continue;
-    // Every overlay in the folder was imported, see APP_EVENTS.IMPORT_OVERLAY.
-    const res = await processOverlay(join(folder, entry.name), yaml, true);
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    const external = IMPORTED_ID.test(entry.name);
+    const res = await processOverlay(join(folder, entry.name), yaml, external);
     if (res.success && res.data) {
-      overlays.push({ ...res.data.info, id: entry.name });
+      overlays.push({ ...res.data.info, id: entry.name, external });
     }
   }
   return overlays;

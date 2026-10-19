@@ -4,6 +4,8 @@ import { defaultStoreData, generateTikTokEventSample } from "@/common/util";
 import { JSONManagerService } from "@/services/json";
 import { ServerService } from "@/services/server";
 import { YAMLManagerService } from "@/services/yaml";
+import { strToU8, zipSync } from "fflate";
+import { createHash } from "node:crypto";
 import {
   mkdir,
   mkdtemp,
@@ -24,7 +26,8 @@ import {
   vi,
 } from "vitest";
 import { processHTML } from "./common";
-import { OverlayService } from "./index";
+import { CATALOG_URL, RELEASES_PREFIX } from "./common/catalog";
+import { CATALOG_TTL_MS, OverlayService } from "./index";
 
 vi.mock("./common", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./common")>();
@@ -50,6 +53,54 @@ const config = (value: string) =>
 
 const gifts: CustomGift[] = [{ value: 1, label: "Rose", img: "", coins: 1 }];
 
+// A release of an official overlay's zip, as tokio-overlays builds it, with
+// its settings at their defaults.
+const release = (version: string, files: Record<string, string> = {}) => {
+  const zip = zipSync(
+    Object.fromEntries(
+      Object.entries({
+        "info.yaml": `name: Gift Jar\nversion: ${version}\nconfig: true\n`,
+        "config.yaml": config("Hello"),
+        "index.html": `<body>${SETUP}</body>`,
+        ...files,
+      }).map(([name, content]) => [name, strToU8(content)]),
+    ),
+  );
+  return {
+    zip,
+    entry: {
+      id: "gift-jar",
+      name: "Gift Jar",
+      version,
+      description: "Gifts drop into a jar.",
+      config: true,
+      url: `${RELEASES_PREFIX}v${version}/gift-jar.zip`,
+      size: zip.length,
+      sha256: createHash("sha256").update(zip).digest("hex"),
+      preview: null,
+    },
+  };
+};
+
+// Serves a catalog of the releases and their zips.
+const publish = (...releases: ReturnType<typeof release>[]) => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (url === CATALOG_URL) {
+      return Response.json({
+        schema: 1,
+        release: "0.1.1",
+        overlays: releases.map((r) => r.entry),
+      });
+    }
+    const found = releases.find((r) => r.entry.url === url);
+    return found
+      ? new Response(found.zip)
+      : new Response(null, { status: 404 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+};
+
 describe("OverlayService", () => {
   let root: string;
   let folder: string;
@@ -70,6 +121,9 @@ describe("OverlayService", () => {
     }),
     addOverlayInfo: async (o: OverlayMetadata & { id: string }) => {
       stored.push(o);
+    },
+    updateOverlayInfo: async (o: OverlayMetadata & { id: string }) => {
+      stored = stored.map((s) => (s.id === o.id ? o : s));
     },
     removeOverlayInfo: async (id: string) => {
       stored = stored.filter((o) => o.id !== id);
@@ -121,6 +175,7 @@ describe("OverlayService", () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await rm(root, { recursive: true, force: true });
   });
 
@@ -188,16 +243,40 @@ describe("OverlayService", () => {
     });
 
     it("recovers the installed overlays when the store was rebuilt", async () => {
-      await overlay(join(folder, "clock"), {
+      // Imported overlays are named by a UUID, official ones by their id.
+      const imported = "0b5c6a52-3f7e-4c1a-9d0e-2a4b6c8d0e1f";
+      await overlay(join(folder, imported), {
         "info.yaml": info("Clock"),
         "index.html": "<h1>clock</h1>",
+      });
+      await overlay(join(folder, "gift-jar"), {
+        "info.yaml": info("Gift Jar"),
+        "index.html": "<h1>jar</h1>",
       });
       rebuilt = true;
 
       await service.load(gifts);
 
-      expect(stored).toMatchObject([{ id: "clock", external: true }]);
-      expect(mount).toHaveBeenCalledWith("clock", join(folder, "clock"), false);
+      expect(stored).toMatchObject([
+        { id: imported, name: "Clock", external: true },
+        { id: "gift-jar", name: "Gift Jar", external: false },
+      ]);
+      expect(mount).toHaveBeenCalledWith(
+        imported,
+        join(folder, imported),
+        false,
+      );
+    });
+
+    it("deletes what an install cut short left behind", async () => {
+      await configurable(join(folder, ".install-1"));
+      await configurable(join(folder, ".old-2"));
+      rebuilt = true;
+
+      await service.load(gifts);
+
+      expect(await readdir(folder)).toEqual([]);
+      expect(stored).toEqual([]);
     });
   });
 
@@ -294,14 +373,155 @@ describe("OverlayService", () => {
       expect(unmount).not.toHaveBeenCalled();
     });
 
-    it("keeps official overlays", async () => {
+    it("deletes an official overlay", async () => {
       await configurable(join(folder, "title"));
       stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
 
-      expect(await service.remove("title")).toMatchObject({ success: false });
+      expect(await service.remove("title")).toEqual({ success: true });
 
-      expect(await readdir(folder)).toEqual(["title"]);
+      expect(await readdir(folder)).toEqual([]);
+      expect(stored).toEqual([]);
+      expect(unmount).toHaveBeenCalledWith("title");
+    });
+  });
+
+  describe("getCatalog", () => {
+    it("reads the catalog again only after a while", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const fetchMock = publish(release("1.0.0"));
+
+      expect(await service.getCatalog()).toEqual({
+        success: true,
+        data: [release("1.0.0").entry],
+      });
+      await service.getCatalog();
+      expect(fetchMock).toHaveBeenCalledOnce();
+
+      vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+      await service.getCatalog();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("tries again after a failure", async () => {
+      const fetchMock = vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      expect(await service.getCatalog()).toEqual({ success: false });
+      expect(await service.getCatalog()).toEqual({ success: false });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("installFromCatalog", () => {
+    const dir = () => join(folder, "gift-jar");
+
+    it("serves an official overlay under its catalog id", async () => {
+      publish(release("1.0.0"));
+
+      expect(await service.installFromCatalog("gift-jar", gifts)).toEqual({
+        success: true,
+      });
+
+      expect(await readdir(folder)).toEqual(["gift-jar"]);
+      expect(stored).toEqual([
+        {
+          id: "gift-jar",
+          name: "Gift Jar",
+          version: "1.0.0",
+          config: true,
+          external: false,
+        },
+      ]);
+      expect(mount).toHaveBeenCalledExactlyOnceWith("gift-jar", dir(), true);
+      const html = await readFile(join(dir(), "index.html"), "utf-8");
+      expect(html).toContain(`window.__OVERLAY_ID__ = "gift-jar"`);
+      expect(html).toContain(`window.__OVERLAY_CONFIG__ = {"title":"Hello"}`);
+    });
+
+    it("updates an installed overlay and keeps its settings", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      publish(release("1.0.0", { "old.js": "1" }));
+      await service.installFromCatalog("gift-jar", gifts);
+      const saved = (await service.getConfig("gift-jar")).data!;
+      const field = saved.fields[0];
+      if (field.type !== "input") throw new Error("Expected an input field");
+      field.attributes.value = "Mine";
+      await service.saveConfig("gift-jar", saved, gifts);
+      mount.mockClear();
+
+      vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+      publish(release("1.0.1", { "new.js": "2" }));
+      expect(await service.installFromCatalog("gift-jar", gifts)).toEqual({
+        success: true,
+      });
+
+      // No staging folder or old copy is left.
+      expect(await readdir(folder)).toEqual(["gift-jar"]);
+      expect((await readdir(dir())).sort()).toEqual([
+        "config.yaml",
+        "index.html",
+        "info.yaml",
+        "new.js",
+      ]);
+      expect(stored).toMatchObject([{ id: "gift-jar", version: "1.0.1" }]);
+      expect(service.getOverlays()).toMatchObject([
+        { id: "gift-jar", version: "1.0.1", external: false },
+      ]);
+      expect(mount).not.toHaveBeenCalled();
+      expect(
+        (await service.getConfig("gift-jar")).data!.fields[0].attributes.value,
+      ).toBe("Mine");
+      expect(await readFile(join(dir(), "index.html"), "utf-8")).toContain(
+        `window.__OVERLAY_CONFIG__ = {"title":"Mine"}`,
+      );
+    });
+
+    it("leaves nothing behind when the download doesn't match", async () => {
+      const broken = release("1.0.0");
+      broken.entry.sha256 = "0".repeat(64);
+      publish(broken);
+
+      expect(await service.installFromCatalog("gift-jar", gifts)).toEqual({
+        success: false,
+      });
+
+      expect(await readdir(folder)).toEqual([]);
+      expect(stored).toEqual([]);
+      expect(mount).not.toHaveBeenCalled();
+    });
+
+    it("refuses a download that isn't a valid overlay", async () => {
+      publish(release("1.0.0", { "index.html": "<body></body>" }));
+
+      expect(await service.installFromCatalog("gift-jar", gifts)).toEqual({
+        success: false,
+      });
+      expect(await readdir(folder)).toEqual([]);
+    });
+
+    it("fails for an overlay that isn't in the catalog", async () => {
+      publish(release("1.0.0"));
+
+      expect(await service.installFromCatalog("top-likes", gifts)).toEqual({
+        success: false,
+      });
+      expect(await readdir(folder)).toEqual([]);
+    });
+
+    it("installs once when asked twice at the same time", async () => {
+      const fetchMock = publish(release("1.0.0"));
+
+      const results = await Promise.all([
+        service.installFromCatalog("gift-jar", gifts),
+        service.installFromCatalog("gift-jar", gifts),
+      ]);
+
+      expect(results).toEqual([{ success: true }, { success: true }]);
       expect(stored).toHaveLength(1);
+      // The catalog, then the zip
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     });
   });
 

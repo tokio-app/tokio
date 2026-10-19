@@ -84,7 +84,7 @@ export const SERVICES: { name: string; note: string }[] = [
   { name: "Spotify and YouTube", note: "Music requests." },
   {
     name: "GitHub",
-    note: "Update checks and downloads, from Tokio's releases.",
+    note: "Update checks and downloads, from Tokio's releases, and the official overlays (their list, previews and downloads), from the releases of tokio-app/overlays.",
   },
   {
     name: "MyInstants",

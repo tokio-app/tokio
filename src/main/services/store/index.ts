@@ -302,6 +302,17 @@ export class StoreManagerService extends Service {
     this._storeData!.settings.overlays.push(info);
     await this._queueSave();
   }
+  // Replaces the stored overlay with the same id, keeping its place.
+  public async updateOverlayInfo(
+    info: OverlayMetadata & { id: string },
+  ): Promise<void> {
+    this._ensureInitialized();
+    this._storeData!.settings.overlays = this._storeData!.settings.overlays.map(
+      (o) => (o.id === info.id ? info : o),
+    );
+    await this._queueSave();
+  }
+
   public async removeOverlayInfo(id: string): Promise<void> {
     this._ensureInitialized();
     this._storeData!.settings.overlays =

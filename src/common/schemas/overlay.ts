@@ -170,6 +170,54 @@ export function resetOverlayConfig(config: OverlayConfig): OverlayConfig {
 }
 
 /**
+ * A new version's config with the saved values that still fit it. A value is
+ * kept from a field with the same id and type when it's of the same kind as
+ * the new default, among the options (dropdowns) and within the range
+ * (sliders). Other fields keep the new version's values.
+ */
+export function mergeOverlayConfig(
+  next: OverlayConfig,
+  saved: OverlayConfig,
+): OverlayConfig {
+  const merged = structuredClone(next);
+  for (const field of merged.fields) {
+    const old = saved.fields.find(
+      (f) => f.id === field.id && f.type === field.type,
+    );
+    if (old && fits(field, old.attributes.value)) {
+      // fits checked it against the field's default.
+      Object.assign(field.attributes, {
+        value: structuredClone(old.attributes.value),
+      });
+    }
+  }
+  return merged;
+}
+
+// Whether a saved value can be the field's value.
+function fits(field: OverlayConfigField, value: unknown): boolean {
+  const fallback: unknown = field.attributes.default;
+  if (Array.isArray(fallback) !== Array.isArray(value)) return false;
+  if (!Array.isArray(value) && typeof value !== typeof fallback) return false;
+
+  if (field.type === "dropdown") {
+    const options = new Set(field.attributes.options.map((o) => o.value));
+    const values: unknown[] = Array.isArray(value) ? value : [value];
+    return values.every(
+      (v) => (typeof v === "string" || typeof v === "number") && options.has(v),
+    );
+  }
+  if (field.type === "slider") {
+    return (
+      typeof value === "number" &&
+      value >= field.attributes.min &&
+      value <= field.attributes.max
+    );
+  }
+  return true;
+}
+
+/**
  * The settings an overlay reads, keyed by field id: each field's value (or
  * default), colors with their `#` and gift ids resolved to the gifts.
  */

@@ -53,7 +53,9 @@ Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gif
 
 ### Overlays
 
-Import overlays in **Settings → Imported Overlays**, where you can also remove them, and set them up from the gallery on the **Overlays** page: colors, text, the gifts they react to, and anything else an overlay offers. Each overlay gets its own URL on your computer (`http://tokio-app.local:37891/...`). Copy it from the gallery and add it to your streaming app (see [Adding an overlay](#adding-an-overlay)).
+On the **Overlays** page, **Official Overlays** opens the overlays made for Tokio, with a preview of each. Install the ones you want, or remove them there. A dot on the button means a new version is out, and **Update** installs it and keeps your settings. To use your own overlays, import them in **Settings → Imported Overlays**, where you can also remove them.
+
+Set them up from the gallery on the **Overlays** page: colors, text, the gifts they react to, and anything else an overlay offers. Tokio gives each overlay its own URL on your computer, `http://tokio-app.local:37891/<overlay-id>/`. Copy it from the gallery and add it to your streaming app (see [Adding an overlay](#adding-an-overlay)).
 
 ### Profiles and settings
 

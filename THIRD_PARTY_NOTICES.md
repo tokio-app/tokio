@@ -74,5 +74,5 @@ Tokio talks to these online services. None of them is covered by Tokio's license
 - **Euler Stream** (`api.eulerstream.com`): request signing used by tiktok-live-connector.
 - **Microsoft:** Edge's Read Aloud service (the Edge voices), which isn't an official public API.
 - **Spotify and YouTube:** music requests.
-- **GitHub** (`github.com`, `api.github.com`): update checks and downloads, from Tokio's releases.
+- **GitHub** (`github.com`, `api.github.com`): update checks and downloads, from Tokio's releases, and the official overlays (their list, previews and downloads), from the releases of `tokio-app/overlays`.
 - **MyInstants** (`www.myinstants.com`): sound search and downloads for alerts, read from the public website rather than an official API. Its sounds are uploaded by its users and aren't covered by Tokio's license.

@@ -5,6 +5,7 @@ import { CustomGift, OverlayConfigRedux } from "../overlay";
 import {
   Alert,
   AlertSound,
+  CatalogOverlay,
   OverlayConfig,
   Profile,
   SavedEmote,
@@ -72,6 +73,8 @@ export enum APP_EVENTS_RESPONSE {
   SAVE_OVERLAY_CONFIG = "app:overlays:res:save:config",
   GET_GIFTS = "app:overlays:res:get:gifts",
   TEST_OVERLAY = "app:overlays:res:test",
+  GET_OVERLAY_CATALOG = "app:overlays:res:get:catalog",
+  INSTALL_OVERLAY = "app:overlays:res:install",
 
   // TOOLS
   GET_TEST_OVERLAYS = "app:tools:res:overlays:get",
@@ -217,6 +220,13 @@ export interface AppEventsResponseMap {
     payloads: TokioPayload[];
     id: string;
   };
+  [APP_EVENTS_RESPONSE.GET_OVERLAY_CATALOG]: Reply<{
+    data?: CatalogOverlay[];
+  }>;
+  // A successful install also replies GET_OVERLAYS with the new list.
+  [APP_EVENTS_RESPONSE.INSTALL_OVERLAY]: Reply<{
+    id: string;
+  }>;
 
   // TOOLS
   // Adding and removing a test overlay also reply with the updated list.

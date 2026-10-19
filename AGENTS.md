@@ -96,6 +96,17 @@ Code in `src/common/` must not import from `src/main` or `src/renderer`, and mus
 - Overlay code can load any `local-resource:` URL, so the handler serves only files inside the overlays folder (`previewFile`). Don't widen it.
 - The `Iframe` ignores the pointer, so previews can't be scrolled or clicked. `withPreviewStyles` appends a style to the page giving it the app's background (for ClearType text) and hiding scrollbars, as OBS's default CSS does. The files on disk and what the overlay server sends stay unchanged.
 
+### Official overlays
+
+- Official overlays come from the catalog of `tokio-app/overlays` (see Overlays repo). They're listed on their own page, **Official Overlays** (`pages/OfficialOverlays`, route `/overlays/official`), opened from the gallery's header. `OverlayService.getCatalog` reads the catalog when that page or the Overlays page opens and keeps it for 15 minutes (`CATALOG_TTL_MS`). A failure isn't kept, and Official Overlays shows it with Try again.
+- The Overlays page reads the catalog only for the dot on its **Official Overlays** button, shown while an installed official overlay has another version (`countUpdates` in `src/common/util/catalog.ts`, next to `catalogState`, which gives each card Install, Update or Installed).
+- `parseCatalog` (`services/overlay/common/catalog.ts`) drops entries that don't parse (`CatalogOverlaySchema`, `src/common/schemas/catalog.ts`) or whose zip isn't under `https://github.com/tokio-app/overlays/releases/download/`, and previews from anywhere else. Only fetch that prefix.
+- The renderer sends only the id (`INSTALL_OVERLAY`); main looks the entry up in its catalog, so it never downloads a URL from the renderer.
+- `installFromCatalog` downloads the zip, checks its size and SHA-256 against the catalog, and extracts it (`extractZip`, refusing paths outside the folder) into `.install-<uuid>` inside the overlays folder. It's then checked like an import. Renaming it into place keeps it on the same drive and the old version whole until the new one is in. `load` deletes `.install-*` and `.old-*` leftovers.
+- An official overlay's folder, id and URL path are its catalog id (`http://tokio-app.local:37891/gift-jar/`), and it's stored with `external: false` (Verified in the gallery). Imported overlays get a random UUID, which is how `findOverlays` tells them apart when the store is rebuilt.
+- An update keeps the saved settings that still fit the new `config.yaml` (`mergeOverlayConfig`, `src/common/schemas/overlay.ts`) and replaces the store entry in place. Streaming apps keep the old page until refreshed, as the success notice says. The gallery keys cards by id and version, so previews reload.
+- Official overlays are removed from their card on Official Overlays, imported ones in **Settings → Imported Overlays**. Both use `REMOVE_OVERLAY`.
+
 ### Updates
 
 - `UpdaterService` (`src/main/services/updater`) wraps electron-updater's `autoUpdater`. It's loaded with a dynamic `import()` because the package is CJS and main builds to ESM, so use its default export. Tests inject a fake `Updater` instead.
@@ -134,7 +145,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 
 ### Renderer
 
-- Each page is a folder `src/renderer/src/pages/<Page>/` with `index.tsx`, `<page>.module.css`, an optional `helper.ts` and `sections/*Section.tsx`. Export it from `pages/index.tsx`, route it in `router/index.tsx` (hash history) and add sidebar links to `NAV_ITEMS` in `router/Layout`.
+- Each page is a folder `src/renderer/src/pages/<Page>/` with `index.tsx`, `<page>.module.css`, an optional `helper.ts` and `sections/*Section.tsx`. Export it from `pages/index.tsx`, route it in `router/index.tsx` (hash history) and add sidebar links to `NAV_ITEMS` in `router/Layout`. A page opened from another page instead of the sidebar (Official Overlays) gets a path under its parent's (`/overlays/official`), which keeps the parent's sidebar item active, and a back button in its header (`Section`'s `icon`).
 - Build pages from `components/Page` (`Page`, `Section`, `Field`, `FormGrid`, `EmptyState`); a page module only holds page-specific layout.
 - Components are folders with `index.tsx` and `<name>.module.css`, re-exported from `components/index.tsx`. Use the primitives in `components/Elements` before creating new ones; they take colors from the tokens, not props. `Modal` is the only modal shell.
 - Style with CSS Modules and the tokens in `src/ui/styles/tokens.css` (colors, `--space-*`, `--font-*`, `--radius-*`, `--z-*`), not raw values.
@@ -180,7 +191,7 @@ The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../
 
 ## Overlays repo
 
-The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`), which has its own `AGENTS.md`. Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change. Its releases publish a catalog of every overlay at `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`).
+The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`), which has its own `AGENTS.md`. Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change. Its releases publish a catalog of every overlay at `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`), which Tokio installs from (see Official overlays). A new catalog schema (a renamed or removed field) needs `CatalogOverlaySchema` and `parseCatalog` to read both.
 
 ## Conventions
 

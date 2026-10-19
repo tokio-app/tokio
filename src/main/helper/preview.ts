@@ -1,4 +1,5 @@
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { resolve } from "node:path";
+import { isInside } from "./path";
 
 // --background-primary in src/ui/styles/tokens.css, what previews sit on
 const PREVIEW_BACKGROUND = "#121212";
@@ -26,14 +27,7 @@ export function previewFile(
   }
 
   const file = resolve(path);
-  // Empty for the folder itself, absolute for another drive on Windows.
-  const inside = relative(resolve(overlaysFolder), file);
-  const outside =
-    !inside ||
-    inside === ".." ||
-    inside.startsWith(`..${sep}`) ||
-    isAbsolute(inside);
-  return outside ? null : file;
+  return isInside(overlaysFolder, file) ? file : null;
 }
 
 /**
