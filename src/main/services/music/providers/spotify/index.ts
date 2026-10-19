@@ -220,6 +220,7 @@ export class Spotify extends MusicProvider {
   }
 
   public async playerStatus(): Promise<CurrentSongInfo | null> {
+    if (!this._isActive) return null;
     const searchRes = await this.fetchApi(`/me/player`);
     const song = this._parseSong(searchRes?.item);
     if (!song) return null;
@@ -249,7 +250,7 @@ export class Spotify extends MusicProvider {
     if (!track) return null;
 
     const artistNames =
-      track.artists?.map((a: any) => a.name).join(", ") ?? "Unknown Artist";
+      track.artists?.map((a: any) => a.name).join(", ") || "Unknown Artist";
 
     return {
       album: track.album?.uri ?? "Unknown",

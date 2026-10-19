@@ -360,6 +360,17 @@ describe("Spotify", () => {
       });
     });
 
+    it("names an unknown artist when the track lists none", async () => {
+      stubFetch({
+        api: () => json({ tracks: { items: [{ ...track, artists: [] }] } }),
+      });
+      const spotify = await login();
+
+      expect((await spotify.searchSong("song"))?.title).toMatch(
+        / - Unknown Artist$/,
+      );
+    });
+
     it("returns null when nothing is found", async () => {
       stubFetch({ api: () => json({ tracks: { items: [] } }) });
       const spotify = await login();
@@ -414,6 +425,13 @@ describe("Spotify", () => {
       const spotify = await login();
 
       expect(await spotify.playerStatus()).toBeNull();
+    });
+
+    it("returns null while disconnected, without a request", async () => {
+      const fetch = stubFetch({ api: () => json({ item: track }) });
+
+      expect(await new Spotify("client-id").playerStatus()).toBeNull();
+      expect(apiRequests(fetch)).toEqual([]);
     });
   });
 
@@ -719,7 +737,7 @@ describe("Spotify", () => {
       await vi.advanceTimersByTimeAsync(3600 * 1000);
 
       expect(refreshes(fetch)).toHaveLength(1);
-      await expect(spotify.playerStatus()).rejects.toThrow("Not authenticated");
+      expect(spotify.isActive()).toBe(false);
     });
   });
 });
