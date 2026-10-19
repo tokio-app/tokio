@@ -183,6 +183,27 @@ describe("MusicQueue", () => {
       expect(playing(queue)).toBe("b");
     });
 
+    it("matches the request whatever its case, spaces and accents", () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("Café   Song", song("café"), () => {});
+
+      queue.revoke(" cafe song ");
+
+      expect(titles(queue)).toEqual(["a"]);
+    });
+
+    it("does nothing without a song", () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("🎵", song("emoji"), () => {});
+
+      queue.revoke("");
+      queue.revoke("🎵");
+
+      expect(titles(queue)).toEqual(["a", "emoji"]);
+    });
+
     it("removes every request still waiting for the song", () => {
       const queue = new MusicQueue();
       queue.enqueue("a", song("a"), () => {});

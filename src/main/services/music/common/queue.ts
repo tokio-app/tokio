@@ -4,9 +4,13 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
+import { cleanText } from "@/helper/chat";
 import EventEmitter from "node:events";
 
 type PlayAction = () => void | Promise<void>;
+
+// Requests are compared like chat keywords
+const requestKey = (text: string) => cleanText(text, { asciiOnly: true });
 
 interface QueueItem {
   id: string;
@@ -143,11 +147,14 @@ export class MusicQueue {
     this._currentIndex = 0;
   }
 
-  // Removes every request for the song that's still waiting. Songs that
-  // played or are playing stay.
+  // Removes every request for the song that's still waiting, whatever its
+  // case, spaces and accents. Songs that played or are playing stay.
   public revoke(id: string) {
+    const key = requestKey(id);
+    if (!key) return;
     const kept = this._queue.filter(
-      (item, index) => index <= this._currentIndex || item.id !== id,
+      (item, index) =>
+        index <= this._currentIndex || requestKey(item.id) !== key,
     );
     if (kept.length === this._queue.length) return;
 
