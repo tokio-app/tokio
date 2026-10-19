@@ -26,7 +26,7 @@ The reference implementation is [rany2/edge-tts](https://github.com/rany2/edge-t
    yarn tts:edge:check --voice es-MX-DaliaNeural --text "Hola" --out test.mp3
    ```
 
-   It prints `PASS`/`FAIL` for each stage: `token v2` (reference vectors), `voices` and `synthesis`. It exits with code 1 on any failure.
+   It prints `PASS`/`FAIL` for the `voices` and `synthesis` stages and exits with code 1 on any failure. The token v2 reference vectors need no network, so they live in `common/drm.test.ts` and run with `yarn test`.
 
 2. Or read the user's log. Every provider error is logged as `<tts> Unable to generate audio - Edge <stage> ...`, with the HTTP status and token versions when they apply.
 
@@ -34,7 +34,7 @@ The reference implementation is [rany2/edge-tts](https://github.com/rany2/edge-t
 | ------------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `handshake`/`voices` HTTP 403 `Rejected for every token version`    | Chromium version, token algorithm or client token changed | Compare upstream `constants.py` (`CHROMIUM_FULL_VERSION`, `SEC_MS_GEC_VERSION`, `TRUSTED_CLIENT_TOKEN`) and `drm.py`. Try a candidate first with `--chromium <version>`. The Chromium version **is** enforced. |
 | HTTP 403 on synthesis with one token version only                   | Microsoft enforces a newer token version on that endpoint | Put the newer version first in `TOKEN_VERSIONS`. Since 2026-10, synthesis needs v2; the voice list still accepts v1.                                                                                           |
-| `token v2` vectors FAIL                                             | `drm-v2.ts` was edited incorrectly                        | Diff it against upstream `drm.py`.                                                                                                                                                                             |
+| `yarn test` fails on the token v2 vectors in `common/drm.test.ts`   | `drm-v2.ts` was edited incorrectly                        | Diff it against upstream `drm.py`.                                                                                                                                                                             |
 | `synthesis` `Socket closed ... (code 1007, Unsupported voice X)`    | Voice retired, or the profile holds a bad name            | Normally prevented: the provider falls back to `DEFAULT_VOICE` when the voice isn't in the list. Check `DEFAULT_VOICE` still exists.                                                                           |
 | `synthesis` socket closed with another code, or an unexpected frame | Message format changed                                    | Compare `communicate.py` (`send_command_request`, `ssml_headers_plus_data`, `mkssml`, the frame parsing in `__stream`).                                                                                        |
 | `no-audio`                                                          | Service accepted the request but sent no audio            | Check `OUTPUT_FORMAT` and the SSML against upstream.                                                                                                                                                           |
@@ -45,7 +45,7 @@ The reference implementation is [rany2/edge-tts](https://github.com/rany2/edge-t
 1. Port the upstream generator into its **own file**, e.g. `common/drm-v3.ts`, as `(ticks: string, clientToken: string) => string`. `ticks` is the 5-minute-floored Windows file time that `drm.ts` passes in. Upstream code is LGPLv3, so the port is LGPL-3.0-only. Give it the same header as `drm-v2.ts` (SPDX line, upstream commit, original authors, dated modification notice). List it in `THIRD_PARTY_NOTICES.md` at the repository root and in the banner in `electron.vite.config.ts`.
 2. Add the version to `TokenVersion` in `types/index.ts` and to `TOKEN_GENERATORS` in `common/drm.ts`.
 3. Put it first in `TOKEN_VERSIONS` in `config/index.ts`. The 403 loop falls back to the older versions.
-4. Generate reference vectors with upstream, for example `generate_sec_ms_gec_v2(1700000000)`. Add them to `scripts/edge-tts/index.ts` and run `yarn tts:edge:check`.
+4. Generate reference vectors with upstream, for example `generate_sec_ms_gec_v2(1700000000)`. Add them to `common/drm.test.ts` and run `yarn test`.
 
 ## Licensing
 

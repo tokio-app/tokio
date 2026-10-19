@@ -7,7 +7,6 @@ import {
   EdgeTTSError,
   edgeShortName,
 } from "../../src/main/services/tts/providers/edge";
-import { tokenForTimestamp } from "../../src/main/services/tts/providers/edge/common/drm";
 import type { TokenVersion } from "../../src/main/services/tts/providers/edge/types";
 
 const { values } = parseArgs({
@@ -55,22 +54,6 @@ function isMp3(buffer: Buffer) {
   return id3 || sync;
 }
 
-// Reference vectors from upstream edge-tts generate_sec_ms_gec_v2, see README.md.
-const V2_VECTORS: [number, string][] = [
-  [
-    0,
-    "52BC7A17B50DFEC9-28C4394775C8751CD2F6859C030C06DB1489ACAB3B3A7651831FC26895177ED6",
-  ],
-  [
-    1700000000,
-    "2CD23A2CA0B2595A-F3C846C370E05F9CC83ACC5F995C5F5D87A4D0F14CE8936A0F902E64099E38A2",
-  ],
-  [
-    1792000000.5,
-    "31DE969FFA38E06B-BD29DC903722D717D852F4F854F2386D98C8D3A93663E1A1AE89223A876AFDB4",
-  ],
-];
-
 async function main() {
   const cfg = tts.config;
   console.log(
@@ -78,20 +61,6 @@ async function main() {
   );
   let failed = false;
 
-  const mismatches = V2_VECTORS.filter(
-    ([ts, expected]) =>
-      tokenForTimestamp("2", ts, cfg.TRUSTED_CLIENT_TOKEN) !== expected,
-  );
-  if (mismatches.length === 0) {
-    console.log(
-      `PASS  token v2   ${V2_VECTORS.length} reference vectors match`,
-    );
-  } else {
-    console.log(
-      `FAIL  token v2   ${mismatches.length}/${V2_VECTORS.length} reference vectors differ`,
-    );
-    failed = true;
-  }
   // Locales can have more than two parts (e.g. zh-CN-liaoning), prefer the voice list.
   let lang = values.voice.split("-").slice(0, 2).join("-");
   let name = values.voice.split("-").slice(2).join("-");
