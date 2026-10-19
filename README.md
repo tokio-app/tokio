@@ -29,14 +29,14 @@ Chat messages are read aloud as they come in.
 
 ### Music requests
 
-Viewers request songs from chat, played from **YouTube** or **Spotify** in a separate player window. The chat commands can be renamed or turned off:
+Viewers request songs from chat, played from **YouTube** or **Spotify** in a separate player window. The chat commands can be renamed or turned off, and viewers can type them in any case:
 
-| Command   | Action                             |
-| --------- | ---------------------------------- |
-| `!play`   | Request a song                     |
-| `!next`   | Skip to the next song              |
-| `!last`   | Go back to the last song           |
-| `!revoke` | Remove your request from the queue |
+| Command   | Action                                   |
+| --------- | ---------------------------------------- |
+| `!play`   | Request a song                           |
+| `!next`   | Skip to the next song                    |
+| `!last`   | Go back to the last song                 |
+| `!revoke` | Remove a song from the queue by its name |
 
 Music requests use the same permissions and protection settings as text-to-speech.
 
