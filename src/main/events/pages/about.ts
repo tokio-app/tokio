@@ -44,6 +44,7 @@ events.push(
 
     e.reply(APP_EVENTS_RESPONSE.GET_LICENSE_TEXT, {
       success: true,
+      id,
       data: res.data,
     });
   },
@@ -52,7 +53,12 @@ events.push(
       code: FEEDBACK_CODES.LICENSE_LOAD_FAILED,
       message: "Unable to read the license.",
     },
-    onError: replyFailure(APP_EVENTS_RESPONSE.GET_LICENSE_TEXT),
+    onError: (e, error, { id }) =>
+      e.reply(APP_EVENTS_RESPONSE.GET_LICENSE_TEXT, {
+        success: false,
+        id,
+        error,
+      }),
   },
 );
 

@@ -33,7 +33,9 @@ export function Overlays() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG, (res) => {
-    if (res?.success) setConfig(res.data!);
+    // A late reply for an overlay that's no longer being customized
+    if (!res || res.id !== configId) return;
+    if (res.success) setConfig(res.data!);
     // Main has already reported the failure.
     else closeModal();
   });

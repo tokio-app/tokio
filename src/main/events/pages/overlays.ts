@@ -174,14 +174,23 @@ events.push(
   async ({ overlayService }, e, { id }) => {
     const res = await overlayService.getConfig(id);
     if (!res.success) throw new Error(`Unable to read overlay ${id}.`);
-    e.reply(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG, res);
+    e.reply(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG, {
+      success: true,
+      id,
+      data: res.data,
+    });
   },
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAY_CONFIG_FAILED,
       message: "Unable to load the overlay's settings.",
     },
-    onError: replyFailure(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG),
+    onError: (e, error, { id }) =>
+      e.reply(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG, {
+        success: false,
+        id,
+        error,
+      }),
   },
 );
 

@@ -206,7 +206,9 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.GET_OVERLAYS]: Reply<{
     data?: OverlayApp[];
   }>;
+  // `id` is the overlay asked for, so a late reply for another is ignored
   [APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG]: Reply<{
+    id: string;
     data?: OverlayConfig;
   }>;
   [APP_EVENTS_RESPONSE.GET_GIFTS]: {
@@ -285,7 +287,9 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.GET_ABOUT]: Reply<{
     data?: AboutInfo;
   }>;
+  // `id` is the document asked for, also when it fails
   [APP_EVENTS_RESPONSE.GET_LICENSE_TEXT]: Reply<{
+    id: string;
     data?: LicenseText;
   }>;
 

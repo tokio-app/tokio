@@ -22,13 +22,11 @@ export function LicenseModal({ id, onClose, onView }: Props) {
   }, [id]);
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_LICENSE_TEXT, (res) => {
-    if (!res) return;
-    if (!res.success) {
-      // Main already notified the failure
-      onClose();
-    } else if (res.data?.id === id) {
-      setLicense(res.data);
-    }
+    // Replies for a document that's no longer shown are ignored
+    if (!res || res.id !== id) return;
+    // Main already notified the failure
+    if (!res.success) onClose();
+    else setLicense(res.data ?? null);
   });
 
   // Only the notices shipped with the app are rendered, never package files
