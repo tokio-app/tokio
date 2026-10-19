@@ -21,8 +21,8 @@ Enter your TikTok username to connect to your LIVE. Turn each feature on or off 
 
 Chat messages are read aloud as they come in.
 
-- **Voices** from three engines, all in one list: TikTok's own voices, Microsoft Edge voices, and, on Windows, the voices installed on the system (SAPI and OneCore, including older 32-bit voices). Search the list, filter it by engine and language, and play any voice to hear a short line in its language before you pick it. Adjust speed, pitch and volume.
-- **Format**: choose which messages get read and how, for example `{username} {comment}` or only messages that start with a command.
+- **Voices** from three engines, all in one list: TikTok's own voices, Microsoft Edge voices, and, on Windows, the voices installed on the system (SAPI and OneCore, including older 32-bit voices). Search the list, filter it by engine and language, and play any voice to hear a short line in its language before you pick it. Adjust speed, pitch and volume, and test a message to hear it the way chat is read.
+- **Format**: choose which messages get read and how, for example `{username} {comment}` or only messages that start with a command. Turn on **Remove Emojis** so the voice doesn't read them out; messages that are only emojis are then skipped.
 - **Replacements**: teach the voice how to say acronyms, slang and names.
 - **Permissions**: let everyone talk, or only followers, superfans or moderators. You can also set a minimum fan level, a whitelist and a blacklist.
 - **Protection**: a cooldown per viewer and a maximum queue length keep the chat from flooding the voice.
@@ -48,7 +48,7 @@ Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gif
 - Set each alert's volume. Gift alerts can react to any gift or only to the ones you pick, and fire once per combo. TikTok's gift list can miss some gifts, like ones from other regions, so Tokio also saves the ones viewers send that aren't on it, for all your profiles.
 - Chat alerts can react to every message or only to messages with a keyword. Emote alerts can react to any emote or only to the ones you pick. TikTok doesn't list a LIVE's emotes, so each profile saves the ones viewers use.
 - Member Join and Super Fan Join alerts can react to anyone or only to the viewer you name, by @handle or name.
-- Instead of a sound, an alert can speak a message with text-to-speech, in its own voice, speed and pitch. Messages can include details of the event, such as `{username}`, `{gift}` or `{count}`, and the TTS page's banned words, replacements, cooldown and queue length apply.
+- Instead of a sound, an alert can speak a message with text-to-speech, in its own voice, speed and pitch. Messages can include details of the event, such as `{username}`, `{gift}` or `{count}`, and the TTS page's banned words, replacements, emoji setting, cooldown and queue length apply.
 - Play alerts one after another in a queue, or let different events play at the same time.
 
 ### Overlays
