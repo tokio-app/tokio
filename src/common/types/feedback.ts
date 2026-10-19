@@ -48,6 +48,7 @@ export enum FEEDBACK_CODES {
   CONNECT_FAILED = "connect_failed",
   DISCONNECT_FAILED = "disconnect_failed",
   FEATURES_UPDATE_FAILED = "features_update_failed",
+  ACTIVITY_FEED_UPDATED = "activity_feed_updated",
 
   // TTS
   TTS_VOICES_FAILED = "tts_voices_failed",

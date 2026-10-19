@@ -134,6 +134,29 @@ events.push(
 );
 
 events.push(
+  APP_EVENTS.SET_ACTIVITY_FEED,
+  async ({ storeManagerService, liveService, notifier }, e, { feed }) => {
+    await storeManagerService.updateActivityFeed(feed);
+    liveService.setFeed(feed);
+    e.reply(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+      data: liveService.getSession(),
+    });
+    notifier.success(
+      "system",
+      FEEDBACK_CODES.ACTIVITY_FEED_UPDATED,
+      "Activity feed updated.",
+    );
+  },
+  {
+    source: "system",
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "Unable to save the activity feed.",
+    },
+  },
+);
+
+events.push(
   APP_EVENTS.ACTIVE_FEATURES,
   // No notice on success, the switches already show the new state.
   async ({ storeManagerService, alertsService, win }, _, data) => {

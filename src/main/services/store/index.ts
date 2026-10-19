@@ -1,4 +1,5 @@
 import {
+  ActivityFeed,
   AlertSound,
   AppProvider,
   AppSettings,
@@ -300,6 +301,12 @@ export class StoreManagerService extends Service {
   public async updateUpdatesSettings(auto: boolean): Promise<void> {
     this._ensureInitialized();
     this._storeData!.settings.updates = { auto };
+    await this._queueSave();
+  }
+
+  public async updateActivityFeed(feed: ActivityFeed): Promise<void> {
+    this._ensureInitialized();
+    this._storeData!.settings.activityFeed = { ...feed };
     await this._queueSave();
   }
 

@@ -18,7 +18,11 @@ import {
   TOKIO_EVENTS,
   UserData,
 } from "@/common/types";
-import { defaultProfile, generateTikTokEventSample } from "@/common/util";
+import {
+  defaultProfile,
+  defaultStoreData,
+  generateTikTokEventSample,
+} from "@/common/util";
 import config from "@/config";
 import Logger from "@/logger";
 import type { AlertsService } from "@/services/alerts";
@@ -158,7 +162,11 @@ function setup() {
   const conn = eventSource();
   const music = eventSource();
   const features = { tts: false, music: false, alerts: true };
-  const settings = { server: { enabled: true }, updates: { auto: false } };
+  const settings = {
+    server: { enabled: true },
+    updates: { auto: false },
+    activityFeed: { ...defaultStoreData.settings.activityFeed },
+  };
 
   const pathManagerService = {
     files,
@@ -623,6 +631,20 @@ describe("init events", () => {
       vi.advanceTimersByTime(1000);
 
       expect(sessions(s)).toHaveLength(1);
+    });
+
+    it("keeps the kinds of events the saved feed shows", async () => {
+      const s = setup();
+      s.settings.activityFeed.chat = false;
+      await load(s);
+      connect(s);
+
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hidden"));
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+
+      expect(sessions(s).at(-1)).toMatchObject({
+        activity: [expect.objectContaining({ type: "follow" })],
+      });
     });
 
     it("ends the session when the LIVE disconnects, keeping its feed", async () => {

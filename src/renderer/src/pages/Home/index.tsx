@@ -8,6 +8,7 @@ import { NO_SESSION } from "./helper";
 import { ActivitySection } from "./sections/ActivitySection";
 import { DashboardSection } from "./sections/DashboardSection";
 import { FeaturesSection } from "./sections/FeaturesSection";
+import { FeedModal } from "./sections/FeedModal";
 
 export function Home() {
   const [username, setUsername] = useState(defaultProfile.connector.username);
@@ -16,6 +17,8 @@ export function Home() {
     defaultStoreData.settings.activeFeatures,
   );
   const [server, setServer] = useState({ enabled: false, overlays: 0 });
+  const [feed, setFeed] = useState(defaultStoreData.settings.activityFeed);
+  const [editingFeed, setEditingFeed] = useState(false);
   const [musicConnected, setMusicConnected] = useState(false);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,6 +42,7 @@ export function Home() {
     if (!res?.success) return;
     const settings = res.data!.settings;
     setFeatures(settings.activeFeatures);
+    setFeed(settings.activityFeed);
     setServer({
       enabled: settings.server.enabled,
       overlays: settings.overlays.length,
@@ -75,58 +79,75 @@ export function Home() {
   const { totals } = session;
 
   return (
-    <Page width="wide">
-      <div className={styles.dashboard}>
-        <div className={styles.column}>
-          <DashboardSection
-            username={username}
-            connected={connected}
-            loading={loading}
-            startedAt={session.startedAt}
-            stats={[
-              { label: "Viewers", value: views.current },
-              { label: "Likes", value: likes },
-              { label: "Total views", value: views.total },
-            ]}
-            onUsernameChange={setUsername}
-            onConnect={() => {
-              if (!username.replace("@", "").trim()) return;
-              setLoading(true);
-              window.api.emit(APP_EVENTS.CONNECT, { username });
-            }}
-            onDisconnect={() => {
-              setLoading(true);
-              window.api.emit(APP_EVENTS.DISCONNECT);
-            }}
-          />
+    <>
+      {editingFeed && (
+        <FeedModal
+          feed={feed}
+          onClose={() => setEditingFeed(false)}
+          onSave={(saved) => {
+            // Main answers with the feed's events, without the hidden ones
+            window.api.emit(APP_EVENTS.SET_ACTIVITY_FEED, { feed: saved });
+            setFeed(saved);
+            setEditingFeed(false);
+          }}
+        />
+      )}
 
-          <FeaturesSection
-            features={features}
-            profile={profile}
-            musicConnected={musicConnected}
-            server={server}
-            onChange={(feature, enabled) => {
-              window.api.emit(APP_EVENTS.ACTIVE_FEATURES, {
-                [feature]: enabled,
-              });
-              updateFeatures((f) => {
-                f[feature] = enabled;
-              });
-            }}
+      <Page width="wide">
+        <div className={styles.dashboard}>
+          <div className={styles.column}>
+            <DashboardSection
+              username={username}
+              connected={connected}
+              loading={loading}
+              startedAt={session.startedAt}
+              stats={[
+                { label: "Viewers", value: views.current },
+                { label: "Likes", value: likes },
+                { label: "Total views", value: views.total },
+              ]}
+              onUsernameChange={setUsername}
+              onConnect={() => {
+                if (!username.replace("@", "").trim()) return;
+                setLoading(true);
+                window.api.emit(APP_EVENTS.CONNECT, { username });
+              }}
+              onDisconnect={() => {
+                setLoading(true);
+                window.api.emit(APP_EVENTS.DISCONNECT);
+              }}
+            />
+
+            <FeaturesSection
+              features={features}
+              profile={profile}
+              musicConnected={musicConnected}
+              server={server}
+              onChange={(feature, enabled) => {
+                window.api.emit(APP_EVENTS.ACTIVE_FEATURES, {
+                  [feature]: enabled,
+                });
+                updateFeatures((f) => {
+                  f[feature] = enabled;
+                });
+              }}
+            />
+          </div>
+
+          <ActivitySection
+            connected={connected}
+            totals={[
+              { label: "New followers", value: totals.followers },
+              { label: "Shares", value: totals.shares },
+              { label: "Gifts", value: totals.gifts },
+              { label: "Coins", value: totals.coins },
+            ]}
+            activity={session.activity}
+            feedOff={!Object.values(feed).some(Boolean)}
+            onFeedSettings={() => setEditingFeed(true)}
           />
         </div>
-
-        <ActivitySection
-          connected={connected}
-          totals={[
-            { label: "New followers", value: totals.followers },
-            { label: "Shares", value: totals.shares },
-            { label: "Gifts", value: totals.gifts },
-            { label: "Coins", value: totals.coins },
-          ]}
-          activity={session.activity}
-        />
-      </div>
-    </Page>
+      </Page>
+    </>
   );
 }

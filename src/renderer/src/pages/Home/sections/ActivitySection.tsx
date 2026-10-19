@@ -1,7 +1,8 @@
 import { ActivityItem, ActivityUser } from "@/common/types";
-import { EmptyState, Section } from "@/components";
+import { Btn, EmptyState, Section } from "@/components";
 import { cx } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
+import { FiSettings } from "react-icons/fi";
 import styles from "../home.module.css";
 import { joinedText, Stat, statText } from "../helper";
 
@@ -11,6 +12,9 @@ interface Props {
   totals: Stat[];
   // Newest first
   activity: ActivityItem[];
+  // Every kind of event is hidden
+  feedOff: boolean;
+  onFeedSettings: () => void;
 }
 
 function Avatar({ user }: { user: ActivityUser }) {
@@ -81,9 +85,30 @@ function Event({ item }: { item: ActivityItem }) {
   );
 }
 
-export function ActivitySection({ connected, totals, activity }: Props) {
+function emptyText(connected: boolean, feedOff: boolean) {
+  if (feedOff) {
+    return "Every event is hidden. Pick what the feed shows in its settings.";
+  }
+  if (connected) return "Waiting for the first event…";
+  return "Your LIVE's events show up here once you're connected.";
+}
+
+export function ActivitySection({
+  connected,
+  totals,
+  activity,
+  feedOff,
+  onFeedSettings,
+}: Props) {
   return (
-    <Section title="Activity">
+    <Section
+      title="Activity"
+      actions={
+        <Btn variant="icon" title="Feed settings" onClick={onFeedSettings}>
+          <FiSettings size={18} />
+        </Btn>
+      }
+    >
       <div className={styles.totals}>
         {totals.map(({ label, value }) => {
           const { text, title } = statText(value, connected);
@@ -100,11 +125,7 @@ export function ActivitySection({ connected, totals, activity }: Props) {
 
       <div className={styles.feed}>
         {activity.length === 0 ? (
-          <EmptyState>
-            {connected
-              ? "Waiting for the first event…"
-              : "Chats, gifts and follows show up here once you're connected."}
-          </EmptyState>
+          <EmptyState>{emptyText(connected, feedOff)}</EmptyState>
         ) : (
           // Not a live region, a busy chat would flood screen readers
           <ol className={styles.feed_list} aria-label="Activity">

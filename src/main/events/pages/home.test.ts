@@ -11,6 +11,7 @@ import home from "./home";
 
 const stats = { likes: 3, viewers: 2, views: 10 };
 const noStats = { likes: 0, viewers: 0, views: 0 };
+const noTotals = { followers: 0, shares: 0, gifts: 0, coins: 0 };
 
 describe("home events", () => {
   describe("CONNECT", () => {
@@ -204,6 +205,68 @@ describe("home events", () => {
         { data: session },
       ]);
       expect(h.notices).toEqual([]);
+    });
+  });
+
+  describe("SET_ACTIVITY_FEED", () => {
+    const feed = {
+      chat: false,
+      gift: true,
+      follow: true,
+      share: true,
+      superfan: true,
+      join: false,
+    };
+
+    it("saves the feed and replies with the events it still shows", async () => {
+      const session = { startedAt: 1000, totals: noTotals, activity: [] };
+      const updateActivityFeed = vi.fn(async () => {});
+      const setFeed = vi.fn();
+      const h = createHandler({
+        storeManagerService: { updateActivityFeed },
+        liveService: { setFeed, getSession: () => session },
+      });
+
+      await h.invoke(home, APP_EVENTS.SET_ACTIVITY_FEED, { feed });
+
+      expect(updateActivityFeed).toHaveBeenCalledWith(feed);
+      expect(setFeed).toHaveBeenCalledWith(feed);
+      expect(h.sent()).toEqual([
+        [APP_EVENTS_RESPONSE.LIVE_SESSION, { data: session }],
+        [
+          "notice",
+          expect.objectContaining({
+            level: "success",
+            code: FEEDBACK_CODES.ACTIVITY_FEED_UPDATED,
+            message: "Activity feed updated.",
+          }),
+        ],
+      ]);
+    });
+
+    it("leaves the feed as it was when saving fails", async () => {
+      vi.spyOn(Logger, "error");
+      const setFeed = vi.fn();
+      const h = createHandler({
+        storeManagerService: {
+          updateActivityFeed: async () => {
+            throw new Error("not initialized");
+          },
+        },
+        liveService: { setFeed },
+      });
+
+      await h.invoke(home, APP_EVENTS.SET_ACTIVITY_FEED, { feed });
+
+      expect(setFeed).not.toHaveBeenCalled();
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          source: "system",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          message: "Unable to save the activity feed.",
+        }),
+      ]);
     });
   });
 

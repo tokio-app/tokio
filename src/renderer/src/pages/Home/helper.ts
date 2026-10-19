@@ -1,4 +1,4 @@
-import { Alert } from "@/common/schemas";
+import { ActivityFeed, Alert } from "@/common/schemas";
 import { ActivityUser, LiveSession } from "@/common/types";
 import { formatStat } from "@/helper";
 
@@ -8,6 +8,16 @@ export const NO_SESSION: LiveSession = {
   totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
   activity: [],
 };
+
+// The kinds of events the feed can show, as its settings list them
+export const FEED_KINDS: { kind: keyof ActivityFeed; label: string }[] = [
+  { kind: "chat", label: "Chats" },
+  { kind: "gift", label: "Gifts" },
+  { kind: "follow", label: "Follows" },
+  { kind: "share", label: "Shares" },
+  { kind: "superfan", label: "New Super Fans" },
+  { kind: "join", label: "Viewers joining" },
+];
 
 const plural = (count: number, word: string) =>
   `${count} ${count === 1 ? word : `${word}s`}`;

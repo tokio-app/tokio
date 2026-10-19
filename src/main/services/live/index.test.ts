@@ -1,3 +1,4 @@
+import { ActivityFeed } from "@/common/schemas";
 import {
   ChatEvent,
   Emotes,
@@ -5,6 +6,7 @@ import {
   TOKIO_EVENTS,
   UserData,
 } from "@/common/types";
+import { defaultStoreData } from "@/common/util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ACTIVITY_LIMIT, LiveService } from "./index";
 
@@ -237,5 +239,63 @@ describe("LiveService", () => {
     expect(before.activity).toEqual([
       { id: 1, type: "join", users: [shown("kai")], count: 1 },
     ]);
+  });
+
+  describe("feed", () => {
+    // Every kind of event but these
+    const hiding = (...kinds: (keyof ActivityFeed)[]): ActivityFeed => {
+      const feed = { ...defaultStoreData.settings.activityFeed };
+      for (const kind of kinds) feed[kind] = false;
+      return feed;
+    };
+
+    it("leaves hidden events out, still counting them", () => {
+      live.setFeed(hiding("chat", "gift", "superfan"));
+
+      expect(live.record(TOKIO_EVENTS.CHAT, chat("kenji", "hi"))).toBe(false);
+      expect(live.record(TOKIO_EVENTS.SUPER_FAN, { user: viewer("yui") })).toBe(
+        false,
+      );
+      expect(live.record(TOKIO_EVENTS.GIFT, gift({ comboCount: 2 }))).toBe(
+        true,
+      );
+      live.record(TOKIO_EVENTS.FOLLOW, { user: viewer("sora") });
+
+      expect(live.getSession()).toEqual({
+        startedAt: null,
+        totals: { followers: 1, shares: 0, gifts: 2, coins: 2 },
+        activity: [{ id: 1, type: "follow", user: shown("sora") }],
+      });
+    });
+
+    it("drops the events it no longer shows", () => {
+      live.record(TOKIO_EVENTS.CHAT, chat("kenji", "hi"));
+      live.record(TOKIO_EVENTS.FOLLOW, { user: viewer("sora") });
+
+      live.setFeed(hiding("chat"));
+
+      expect(live.getSession().activity).toEqual([
+        { id: 2, type: "follow", user: shown("sora") },
+      ]);
+    });
+
+    it("keeps joins in one item across hidden events", () => {
+      live.setFeed(hiding("chat"));
+
+      join(live, "kai");
+      live.record(TOKIO_EVENTS.CHAT, chat("kai", "hi"));
+      join(live, "yui");
+
+      expect(live.getSession().activity).toEqual([
+        { id: 1, type: "join", users: [shown("kai"), shown("yui")], count: 2 },
+      ]);
+    });
+
+    it("leaves joins out while they're hidden", () => {
+      live.setFeed(hiding("join"));
+
+      expect(join(live, "kai")).toBe(false);
+      expect(live.getSession().activity).toEqual([]);
+    });
   });
 });

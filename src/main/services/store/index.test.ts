@@ -293,6 +293,32 @@ describe("StoreManagerService", () => {
     });
   });
 
+  describe("activity feed", () => {
+    it("shows every event for stores saved before the setting", async () => {
+      const { activityFeed: _feed, ...settings } = defaultStoreData.settings;
+      await writeFile(
+        storeFile,
+        JSON.stringify({ ...defaultStoreData, settings }),
+      );
+
+      const store = await init();
+
+      expect(store.getSettings().activityFeed).toEqual(
+        defaultStoreData.settings.activityFeed,
+      );
+    });
+
+    it("saves what the feed shows", async () => {
+      const store = await init();
+      const feed = { ...defaultStoreData.settings.activityFeed, chat: false };
+
+      await store.updateActivityFeed(feed);
+
+      expect((await readJSON(storeFile)).settings.activityFeed).toEqual(feed);
+      expect((await init()).getSettings().activityFeed).toEqual(feed);
+    });
+  });
+
   describe("live state", () => {
     afterEach(() => {
       vi.useRealTimers();

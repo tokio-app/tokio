@@ -23,6 +23,14 @@ export const defaultStoreData: StoreSchema = {
       music: false,
       alerts: false,
     },
+    activityFeed: {
+      chat: true,
+      gift: true,
+      follow: true,
+      share: true,
+      superfan: true,
+      join: true,
+    },
     liveStats: {
       likes: 0,
       viewers: 0,

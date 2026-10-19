@@ -1,3 +1,4 @@
+import { ActivityFeed } from "@/common/schemas";
 import {
   Activity,
   ActivityItem,
@@ -8,6 +9,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
+import { defaultStoreData } from "@/common/util";
 import { Service } from "../shared";
 
 // The feed keeps this many of the latest events
@@ -61,17 +63,17 @@ export class LiveService extends Service {
   private _activity: ActivityItem[] = [];
   // Never reset, so ids stay unique across LIVEs
   private _lastId = 0;
+  // The kinds of events the feed keeps. Totals count all of them.
+  private _feed: ActivityFeed = { ...defaultStoreData.settings.activityFeed };
 
   private readonly _recorders: Recorders = {
-    [TOKIO_EVENTS.CHAT]: ({ user, comment }) => {
+    [TOKIO_EVENTS.CHAT]: ({ user, comment }) =>
       this._add({
         type: "chat",
         user: activityUser(user),
         text: comment.content,
         emotes: comment.emotes.flatMap((emote) => emote.images.slice(0, 1)),
-      });
-      return true;
-    },
+      }),
     [TOKIO_EVENTS.GIFT]: ({ user, gift }) => {
       // Once per combo, like gift alerts
       if (!gift.repeatEnd) return false;
@@ -96,10 +98,8 @@ export class LiveService extends Service {
       this._add({ type: "share", user: activityUser(user) });
       return true;
     },
-    [TOKIO_EVENTS.SUPER_FAN]: ({ user }) => {
-      this._add({ type: "superfan", user: activityUser(user) });
-      return true;
-    },
+    [TOKIO_EVENTS.SUPER_FAN]: ({ user }) =>
+      this._add({ type: "superfan", user: activityUser(user) }),
     [TOKIO_EVENTS.MEMBER_JOIN]: ({ user }) => this._join(activityUser(user)),
   };
 
@@ -117,6 +117,12 @@ export class LiveService extends Service {
   /** Ends the LIVE. Its feed stays until the next one starts. */
   public end() {
     this._startedAt = null;
+  }
+
+  /** Sets the kinds of events the feed keeps, dropping the ones it hides. */
+  public setFeed(feed: ActivityFeed) {
+    this._feed = { ...feed };
+    this._activity = this._activity.filter((item) => this._feed[item.type]);
   }
 
   /**
@@ -139,14 +145,18 @@ export class LiveService extends Service {
     };
   }
 
-  private _add(activity: Activity) {
+  // False when the feed hides it
+  private _add(activity: Activity): boolean {
+    if (!this._feed[activity.type]) return false;
     this._activity.unshift({ ...activity, id: ++this._lastId });
     this._activity.splice(ACTIVITY_LIMIT);
+    return true;
   }
 
   // Joins in a row share the newest item, so a busy LIVE doesn't fill the
-  // feed with them.
+  // feed with them. Hidden events between them don't count.
   private _join(user: ActivityUser): boolean {
+    if (!this._feed.join) return false;
     const last = this._activity[0];
     if (last?.type !== "join") {
       this._add({ type: "join", users: [user], count: 1 });

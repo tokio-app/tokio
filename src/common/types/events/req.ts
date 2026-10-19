@@ -1,6 +1,6 @@
 import { AlertTrigger, TokioPayload } from "../connector";
 import { CustomGift } from "../overlay";
-import { AlertTts, OverlayConfig, Profile } from "../../schemas";
+import { ActivityFeed, AlertTts, OverlayConfig, Profile } from "../../schemas";
 import { VoiceData } from "../store";
 
 export enum APP_EVENTS {
@@ -55,6 +55,7 @@ export enum APP_EVENTS {
   IS_CONNECTED = "app:home:isconnected",
   ACTIVE_FEATURES = "app:home:activefeatures",
   GET_LIVE_SESSION = "app:home:session",
+  SET_ACTIVITY_FEED = "app:home:set:feed",
 
   // OVERLAYS
   IMPORT_OVERLAY = "app:overlays:add",
@@ -203,6 +204,8 @@ export interface AppEventsMap {
     alerts?: boolean;
   };
   [APP_EVENTS.GET_LIVE_SESSION]: void;
+  // Main replies LIVE_SESSION without the events the feed no longer shows
+  [APP_EVENTS.SET_ACTIVITY_FEED]: { feed: ActivityFeed };
 
   // OVERLAYS
   [APP_EVENTS.IMPORT_OVERLAY]: void;

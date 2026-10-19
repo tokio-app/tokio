@@ -9,6 +9,7 @@ import {
 import { send, sent, sentEvents } from "@test/ipc";
 import { renderApp } from "@test/render";
 import { act, screen, within } from "@testing-library/react";
+import type { UserEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const connected = (stats = { views: 1234, viewers: 12, likes: 5 }) =>
@@ -314,7 +315,7 @@ describe("Home", () => {
 
       expect(
         page().getByText(
-          "Chats, gifts and follows show up here once you're connected.",
+          "Your LIVE's events show up here once you're connected.",
         ),
       ).toBeInTheDocument();
     });
@@ -327,6 +328,99 @@ describe("Home", () => {
       expect(
         page().getByText("Waiting for the first event…"),
       ).toBeInTheDocument();
+    });
+
+    it("says when every event is hidden", async () => {
+      await renderApp();
+      await connected();
+
+      await send(
+        APP_EVENTS_RESPONSE.GET_SETTINGS,
+        settingsReply((s) => {
+          s.settings.activityFeed = {
+            chat: false,
+            gift: false,
+            follow: false,
+            share: false,
+            superfan: false,
+            join: false,
+          };
+        }),
+      );
+
+      expect(
+        page().getByText(
+          "Every event is hidden. Pick what the feed shows in its settings.",
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("feed settings", () => {
+    const dialog = () => within(screen.getByRole("dialog"));
+    const kind = (name: string) => dialog().getByRole("checkbox", { name });
+    const openSettings = (user: UserEvent) =>
+      user.click(page().getByRole("button", { name: "Feed settings" }));
+
+    it("starts from what the feed shows", async () => {
+      const { user } = await renderApp();
+      await send(
+        APP_EVENTS_RESPONSE.GET_SETTINGS,
+        settingsReply((s) => {
+          s.settings.activityFeed.chat = false;
+        }),
+      );
+
+      await openSettings(user);
+
+      expect(kind("Chats")).not.toBeChecked();
+      for (const name of [
+        "Gifts",
+        "Follows",
+        "Shares",
+        "New Super Fans",
+        "Viewers joining",
+      ]) {
+        expect(kind(name)).toBeChecked();
+      }
+    });
+
+    it("saves the events picked", async () => {
+      const { user } = await renderApp();
+      await openSettings(user);
+
+      await user.click(kind("Chats"));
+      await user.click(kind("Viewers joining"));
+      await user.click(dialog().getByRole("button", { name: "Save" }));
+
+      expect(sent(APP_EVENTS.SET_ACTIVITY_FEED)).toEqual([
+        {
+          feed: {
+            chat: false,
+            gift: true,
+            follow: true,
+            share: true,
+            superfan: true,
+            join: false,
+          },
+        },
+      ]);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+      await openSettings(user);
+      expect(kind("Chats")).not.toBeChecked();
+    });
+
+    it("changes nothing on Cancel", async () => {
+      const { user } = await renderApp();
+      await openSettings(user);
+
+      await user.click(kind("Chats"));
+      await user.click(dialog().getByRole("button", { name: "Cancel" }));
+
+      expect(sent(APP_EVENTS.SET_ACTIVITY_FEED)).toEqual([]);
+      await openSettings(user);
+      expect(kind("Chats")).toBeChecked();
     });
   });
 

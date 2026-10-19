@@ -441,6 +441,7 @@ const startApp = async (handler: AppHandlerVariables) => {
   }
 
   const settings = storeManagerService.getSettings();
+  liveService.setFeed(settings.activityFeed);
 
   // Before the server starts, so it serves the overlays right away. The
   // gifts saved last time are used when there are any, so startup doesn't
