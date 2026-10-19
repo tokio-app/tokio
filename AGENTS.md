@@ -11,6 +11,8 @@ Stack: Electron 39, electron-vite, React 19, TypeScript, TanStack Router, Expres
 ```sh
 yarn dev                  # build the music window UI, then electron-vite dev
 yarn test                 # vitest (yarn test:watch to watch, --project renderer for the UI)
+yarn test:coverage        # vitest with a coverage report in coverage/
+yarn test:e2e             # build the app and drive it with Playwright (close Tokio first)
 yarn typecheck            # tsc for node (main/preload/common) and web (renderer/music)
 yarn lint                 # oxlint --type-aware
 yarn format               # prettier --write .
@@ -20,18 +22,22 @@ yarn tts:edge:check       # live check of the Edge TTS provider (needs network)
 yarn release:notes [tag]  # print a release's notes (the next release's without a tag)
 ```
 
-Verify changes with `yarn test`, `yarn typecheck` and `yarn lint`. For the Edge TTS provider, also run `yarn tts:edge:check`.
+Verify changes with `yarn test`, `yarn typecheck` and `yarn lint`. For the Edge TTS provider, also run `yarn tts:edge:check`, and for windows, the preload or startup, `yarn test:e2e`.
 
 ### Tests
 
-- Vitest runs in Node, without Electron or network, in two projects: `main` (`src/main`, `src/common`) and `renderer` (jsdom with Testing Library: `src/renderer`, `src/ui`, `src/music`). `yarn test --project renderer` runs one. Tests sit next to the code as `<file>.test.ts(x)`.
-- `test/setup.ts` mocks `electron` (`safeStorage` round-trips plain text) and silences the console. Spy on `Logger` to assert logs.
+- Vitest runs in Node, without Electron or network, in two projects: `main` (`src/main`, `src/common`, `src/preload`, and the scripts' `*.test.js`) and `renderer` (jsdom with Testing Library: `src/renderer`, `src/ui`, `src/music`). `yarn test --project renderer` runs one. Tests sit next to the code as `<file>.test.ts(x)`.
+- `test/setup.ts` mocks `electron` with the fakes in `test/main/electron.ts` and resets them before each test: windows, views and webContents that record what they get, `ipcMain`, `app`, `session`, `protocol`, `shell`, `dialog`, `net` and a `safeStorage` that round-trips plain text. Import them from `@test/electron`. Their state survives `vi.resetModules()`.
+- The setup also silences the console, and Logger only writes to absolute paths, so tests can name log files `"system.log"`. Spy on `Logger` to assert logs; after `vi.resetModules()`, on the copy the re-imported code got.
+- Test IPC handlers with `createHandler(stubs)` from `@test/handler`: the services the handler uses as partial stubs (anything else it reaches for fails the test), fake windows and a real `Notifier`. `invoke(stack, APP_EVENTS.X, data)` runs a page's handler as the Handler does; read `replies(channel)`, `pushed(channel)`, `notices`, or `sent()` for all of them in order. `eventSource()` stands in for the live events of the connector and the music service.
+- `restoreMocks` only restores spies. `vi.fn` mocks keep their calls and implementation, so create them in each test.
 - Give services a temp folder (`mkdtemp(join(tmpdir(), "tokio-test-"))`) through their setters or `initialize`, stub `fetch` with `vi.stubGlobal`, and use fake timers for the queues.
 - Renderer tests get a fresh fake `window.api` before each one (`test/renderer/setup.ts`). `send` from `@test/ipc` pushes a reply from main inside `act` (await it), and `sent` lists what the renderer emitted.
 - Render with `renderWithProviders` (`@test/render`), which adds fake audio queues, the real notifications and unsaved-changes providers, and a `user`. Pages that navigate use `renderApp(path)`: the real routes in memory history. Components never reach Tone.js; `audio.queue(name)` is the fake queue they got. Builders and replies are in `@test/fixtures`.
 - jsdom has no layout. `test/renderer/dom.ts` gives elements a size (virtualized lists like `Select` render nothing at zero), fakes the observers (`intersect()` fires `IntersectionObserver`) and `scrollTo`. A `jest` shim lets Testing Library run with `vi.useFakeTimers()`; give user-event `advanceTimers: (ms) => vi.advanceTimersByTime(ms)`.
 - Query by role and visible text. `Field` labels aren't tied to their controls, and `Select` is a clickable div whose list is portaled to the body, so use placeholders, text or `within` there. `@test/queries` has `inList` (an item of a portaled list) and `section` (queries inside a section, by its heading). Mock `copy-to-clipboard` and spy on `window.open`.
 - Fixtures live in `test/fixtures`; Prettier skips them so saved HTML keeps its markup.
+- `e2e/` drives the built app with Playwright's `_electron` (`yarn test:e2e`). It runs in a temporary folder that main reads from `TOKIO_HOME`, setting `home` and `userData`, and answers native dialogs from main with `electronApp.evaluate`. It needs port 37891, so close Tokio first. CI runs it in the `e2e` job.
 - `it.fails` marks a known bug. Turn it into `it` when the bug is fixed.
 
 ## Agent models
@@ -60,6 +66,7 @@ Generated, don't edit: `out/`, `music-out/`, `build/` output.
 - Renderer: `@/*` (preferred) and `@renderer/*` → `src/renderer/src/*`, plus `@/common/*` and `@/ui/*` → `src/ui/*`
 - Music window: `@/common/*` and `@/ui/*` only.
 - Renderer tests: the renderer's, plus `@test/*` → `test/renderer/*`.
+- Main tests: the main process's, plus `@test/*` → `test/main/*`.
 
 Code in `src/common/` must not import from `src/main` or `src/renderer`, and must stay free of Node/Electron-only APIs if the renderer uses it.
 
@@ -166,6 +173,8 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 
 Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load.
 
+Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name.
+
 ## Licensing
 
 Tokio's source is MIT; treat license compliance as part of every change.
@@ -178,12 +187,13 @@ Tokio's source is MIT; treat license compliance as part of every change.
   - `THIRD_PARTY_NOTICES.md` (including its Services list for new online services) and `LICENSES/`
   - the license banner in `electron.vite.config.ts` (the bundler strips header comments)
   - `COMPONENTS` and `SERVICES` in `src/renderer/src/pages/About/helper.ts`, which mirror the non-npm parts of `THIRD_PARTY_NOTICES.md`
+  - `src/renderer/src/pages/About/notices.test.ts` fails when they drift: icon sets in use, the services, license texts, the AGPL dependencies' versions (an upgrade needs a license check), the LGPL header and the banner
 - The About page shows the AGPL's "Appropriate Legal Notices"; keep it reachable from the sidebar. Its package list comes from `LicensesService`, which walks the production dependency tree, so new dependencies need no changes there.
 - Keep `"license": "MIT"` in `package.json`; it describes the repository's own code.
 
 ## CI and releases
 
-- `ci.yml` (PRs and `main`): Prettier check, lint, typecheck and tests on Linux and Windows. Non-draft PRs, `main`, and draft PRs whose latest commit contains `[ci]` also package the app via `build-app.yml`; `chore(release): ...` commits skip packaging.
+- `ci.yml` (PRs and `main`): Prettier check, lint, typecheck and tests on Linux and Windows, and the `e2e` job (`yarn test:e2e`, under xvfb on Linux). Non-draft PRs, `main`, and draft PRs whose latest commit contains `[ci]` also package the app via `build-app.yml`; `chore(release): ...` commits skip packaging.
 - `release.yml` runs on a `v<version>` tag matching `package.json` and publishes a GitHub release with the packages and update files. `gh release create` uploads them before publishing. `scripts/release-notes` writes its notes from the Conventional Commits since the previous `v*` tag (`chore(release)` commits are skipped); a rerun only replaces the files, so edited notes are kept.
 - Versions with a `-` (`0.1.0-alpha.5`) are published as regular releases, not prereleases: auto-updates and the website only read the latest release.
 - It then sends a `repository_dispatch` (`release`) to `tokio-app/website`, which rebuilds the download page. That needs the `WEBSITE_DISPATCH_TOKEN` secret (a fine-grained token with Contents read and write on `tokio-app/website`). Without it the step only warns.
