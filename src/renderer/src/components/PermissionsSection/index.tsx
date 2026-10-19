@@ -1,6 +1,6 @@
 import { Permissions } from "@/common/schemas";
 import { Updater } from "@/hooks/useImmerState";
-import { Check, Input, ListTextarea } from "../Elements";
+import { Check, ListTextarea, NumberInput } from "../Elements";
 import { Field, Section } from "../Page";
 import styles from "./permissionssection.module.css";
 
@@ -47,15 +47,14 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
             })
           }
         />
-        <Input
-          type="number"
+        <NumberInput
           min={0}
           className={styles.level}
           value={permissions.level.value}
           disabled={!permissions.level.enabled}
-          onChange={(e) =>
+          onChange={(level) =>
             update((p) => {
-              p.level.value = Number(e.target.value);
+              p.level.value = level;
             })
           }
         />

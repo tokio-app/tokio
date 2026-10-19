@@ -1,5 +1,5 @@
 import { Profile } from "@/common/schemas";
-import { Field, FormGrid, Input, ListTextarea } from "@/components";
+import { Field, FormGrid, ListTextarea, NumberInput } from "@/components";
 import { Updater } from "@/hooks";
 
 type Protection = Profile["tts"]["protection"];
@@ -17,12 +17,11 @@ export function ProtectionFields({ protection, update }: Props) {
     <>
       <FormGrid>
         <Field label="Max Comment Length" hint="(characters)">
-          <Input
-            type="number"
+          <NumberInput
             value={protection.comment_length}
-            onChange={(e) =>
+            onChange={(length) =>
               update((p) => {
-                p.comment_length = Number(e.target.value);
+                p.comment_length = length;
               })
             }
           />

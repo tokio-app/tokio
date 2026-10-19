@@ -3,6 +3,7 @@ export * from "./Check";
 export * from "./Color";
 export * from "./Input";
 export * from "./ListTextarea";
+export * from "./NumberInput";
 export * from "./RadioGroup";
 export * from "./Select";
 export * from "./Slider";

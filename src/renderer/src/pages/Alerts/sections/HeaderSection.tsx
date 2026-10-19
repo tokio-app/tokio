@@ -1,5 +1,5 @@
 import { Profile } from "@/common/schemas";
-import { Btn, Input, Section, Toggle } from "@/components";
+import { Btn, NumberInput, Section, Toggle } from "@/components";
 import { Updater } from "@/hooks";
 import { MdOutlineAddAlert } from "react-icons/md";
 import styles from "../alerts.module.css";
@@ -41,17 +41,14 @@ export function HeaderSection({ simultaneous, queueLength, update }: Props) {
         />
         <label className={styles.queue_length}>
           Max queue length
-          <Input
-            type="number"
+          <NumberInput
             min={1}
+            integer
             className={styles.number_input}
             value={queueLength}
-            onChange={(e) =>
+            onChange={(length) =>
               update((s) => {
-                s.queue_length = Math.max(
-                  1,
-                  Math.floor(Number(e.target.value)) || 1,
-                );
+                s.queue_length = length;
               })
             }
           />

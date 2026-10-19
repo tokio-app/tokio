@@ -9,6 +9,7 @@ import {
   Color,
   Input,
   MultiSelect,
+  NumberInput,
   Select,
   Slider,
   Toggle,
@@ -72,18 +73,19 @@ export function SettingField({ field, gifts, onChange, onReset }: Props) {
   switch (field.type) {
     case "input":
       return stacked(
-        <Input
-          type={field.attributes.mode}
-          placeholder={field.attributes.placeholder}
-          value={field.attributes.value}
-          onChange={(e) =>
-            onChange(
-              field.attributes.mode === "number"
-                ? Number(e.target.value)
-                : e.target.value,
-            )
-          }
-        />,
+        field.attributes.mode === "number" ? (
+          <NumberInput
+            placeholder={field.attributes.placeholder}
+            value={Number(field.attributes.value)}
+            onChange={onChange}
+          />
+        ) : (
+          <Input
+            placeholder={field.attributes.placeholder}
+            value={field.attributes.value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        ),
       );
 
     case "dropdown":

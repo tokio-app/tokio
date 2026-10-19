@@ -1,7 +1,7 @@
 import { Profile } from "@/common/schemas";
 import { Updater } from "@/hooks/useImmerState";
 import { ReactNode } from "react";
-import { Input } from "../Elements";
+import { NumberInput } from "../Elements";
 import { Field, FormGrid, Section } from "../Page";
 
 // Limits shared by the TTS and Music settings
@@ -32,23 +32,21 @@ export function ProtectionSection({
     >
       <FormGrid>
         <Field label="Cooldown" hint="(seconds)">
-          <Input
-            type="number"
+          <NumberInput
             value={protection.cooldown}
-            onChange={(e) =>
+            onChange={(cooldown) =>
               update((p) => {
-                p.cooldown = Number(e.target.value);
+                p.cooldown = cooldown;
               })
             }
           />
         </Field>
         <Field label="Max Queue Length">
-          <Input
-            type="number"
+          <NumberInput
             value={protection.queue_length}
-            onChange={(e) =>
+            onChange={(length) =>
               update((p) => {
-                p.queue_length = Number(e.target.value);
+                p.queue_length = length;
               })
             }
           />
