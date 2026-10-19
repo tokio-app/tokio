@@ -314,22 +314,18 @@ describe("Spotify", () => {
       expect(windows()).toHaveLength(1);
     });
 
-    // handleRedirect closes the window and resolves nothing without a code or an error
-    it.fails(
-      "fails when the callback has neither a code nor an error",
-      async () => {
-        stubFetch();
-        const done = vi.fn();
-        new Spotify("client-id").connect().then(done);
+    it("fails when the callback has neither a code nor an error", async () => {
+      stubFetch();
+      const done = vi.fn();
+      new Spotify("client-id").connect().then(done);
 
-        redirect(callback({ state: "abc" }));
-        await vi.advanceTimersByTimeAsync(0);
+      redirect(callback({ state: "abc" }));
+      await vi.advanceTimersByTimeAsync(0);
 
-        expect(done).toHaveBeenCalledWith(
-          expect.objectContaining({ success: false }),
-        );
-      },
-    );
+      expect(done).toHaveBeenCalledWith(
+        expect.objectContaining({ success: false }),
+      );
+    });
   });
 
   describe("searchSong", () => {

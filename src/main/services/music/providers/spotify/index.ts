@@ -133,7 +133,9 @@ export class Spotify extends MusicProvider {
 
         const urlObj = new URL(url);
         const code = urlObj.searchParams.get("code");
-        const error = urlObj.searchParams.get("error");
+        // The window is gone, so a callback without a code can only fail
+        const error =
+          urlObj.searchParams.get("error") ?? (code ? null : "no code");
 
         cleanupView();
 
