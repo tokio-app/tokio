@@ -47,7 +47,7 @@ export function Overlays() {
   useIpcListener(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, (res) => {
     setSaving(false);
     if (!res?.success) return;
-    postToOverlay(res.id!, { type: "tokio:config", data: res.data! });
+    postToOverlay(res.id, { type: "tokio:config", data: res.data! });
     closeModal();
   });
 

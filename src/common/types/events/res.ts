@@ -214,9 +214,10 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.GET_GIFTS]: {
     data: CustomGift[];
   };
+  // `id` is the overlay saved, also when it fails
   [APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG]: Reply<{
+    id: string;
     data?: OverlayConfigRedux;
-    id?: string;
   }>;
   [APP_EVENTS_RESPONSE.TEST_OVERLAY]: {
     payloads: TokioPayload[];

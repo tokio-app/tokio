@@ -321,7 +321,10 @@ describe("Overlays", () => {
     await user.type(dialog().getByPlaceholderText("Type a title"), "!");
     await user.click(dialog().getByRole("button", { name: "Save" }));
 
-    await send(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, failure());
+    await send(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, {
+      ...failure(),
+      id: "gift-jar",
+    });
 
     expect(dialog().getByRole("button", { name: "Save" })).not.toHaveAttribute(
       "aria-busy",

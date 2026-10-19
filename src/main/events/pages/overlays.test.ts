@@ -490,27 +490,15 @@ describe("overlays events", () => {
       ]);
     });
 
-    it("replies a failure when the settings can't be saved", async () => {
+    it("replies the failure with the overlay's id and notifies", async () => {
       const h = failing();
 
       await h.invoke(overlays, APP_EVENTS.SAVE_OVERLAY_CONFIG, request);
 
       expect(h.replies(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG)).toEqual([
-        expect.objectContaining({ success: false, error: failure }),
+        { success: false, id: "gift-jar", error: failure },
       ]);
       expect(h.notices).toEqual([expect.objectContaining(failure)]);
-    });
-
-    // AGENTS.md: a request about one item gets its id back, failures
-    // included. The failure reply is replyFailure's, which has no id.
-    it.fails("replies the id when the settings can't be saved", async () => {
-      const h = failing();
-
-      await h.invoke(overlays, APP_EVENTS.SAVE_OVERLAY_CONFIG, request);
-
-      expect(h.replies(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG)).toEqual([
-        { success: false, error: failure, id: "gift-jar" },
-      ]);
     });
   });
 

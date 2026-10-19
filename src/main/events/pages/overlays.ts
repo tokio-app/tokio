@@ -231,7 +231,12 @@ events.push(
       code: FEEDBACK_CODES.OVERLAY_SAVE_FAILED,
       message: "Unable to save the overlay's settings.",
     },
-    onError: replyFailure(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG),
+    onError: (e, error, { id }) =>
+      e.reply(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, {
+        success: false,
+        id,
+        error,
+      }),
   },
 );
 
