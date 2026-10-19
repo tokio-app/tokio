@@ -521,6 +521,17 @@ describe("MusicService", () => {
       expect(played()).toEqual(["song", "other"]);
     });
 
+    it("matches commands in any case and keeps the song's", async () => {
+      const { request, searched, queue } = setup();
+
+      await request("!Play Song A");
+      await request("!PLAY Song B");
+      await request("!NEXT");
+
+      expect(searched()).toEqual(["Song A", "Song B"]);
+      expect(queue()).toEqual(["Song A", "Song B (playing)"]);
+    });
+
     it("doesn't take a longer word for a command", async () => {
       const { request, provider } = setup();
 

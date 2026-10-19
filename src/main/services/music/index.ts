@@ -155,14 +155,15 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue.revoke(query);
   }
 
-  // The control a chat calls, with its command alone or followed by a space
-  // and the args. Empty commands call nothing. Null when the control is off or
-  // the viewer may not use it.
+  // The control a chat calls, with its command in any case, alone or followed
+  // by a space and the args. Empty commands call nothing. Null when the
+  // control is off or the viewer may not use it.
   private _match(settings: Profile["music"], chat: ChatEvent) {
     const { content } = chat.comment;
     const control = Object.values(settings.controls).find(({ command }) => {
-      const name = command.trim();
-      if (!name || !content.startsWith(name)) return false;
+      const name = command.trim().toLowerCase();
+      if (!name) return false;
+      if (content.slice(0, name.length).toLowerCase() !== name) return false;
       const next = content.charAt(name.length);
       return next === "" || /\s/.test(next);
     });
