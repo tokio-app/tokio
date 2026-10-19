@@ -101,6 +101,12 @@ Code in `src/common/` must not import from `src/main` or `src/renderer`, and mus
 - MyInstants has no API; `AlertsService` scrapes it with cheerio. Only fetch `www.myinstants.com` URLs.
 - Main sends sounds with `ALERT_AUDIO` on a queue (`channel`): one `alerts` queue, or `alerts:<trigger>` per trigger when `simultaneous` is on. `ALERT_CLEAR` (on disconnect and when the feature turns off) stops every `alerts*` queue. Tests and previews use `useAlertTest` on the `alert-test` queue, so clearing never cuts them.
 
+### Live session
+
+- `LiveService` (`src/main/services/live`) keeps the connected LIVE in memory for the Home page (`LiveSession`, `src/common/types/live.ts`): when it started, the new followers, shares, gifts and coins since then, and its last 100 events. `registerConnectorEvents` records the `ACTIVITY_EVENTS`, starts the session on a successful `CONNECTED` and ends it on `DISCONNECTED`, and pushes `LIVE_SESSION` with the stats' 250ms throttle. Home asks for it with `GET_LIVE_SESSION`.
+- Gifts count once per combo, on `repeatEnd`, like gift alerts. Joins in a row share one item, which names the first two viewers and counts the rest. Likes and room updates stay out of the feed; the stats show them.
+- The feed stays after the LIVE ends, until the next one starts. Viewers, likes, views and the totals show only while connected.
+
 ### Overlay previews
 
 - The Overlays page shows each overlay in an `Iframe` named `TOKIO_APP-<id>`, loaded from disk through `local-resource:` so previews work with the overlay server off. `postToOverlay` posts `TOKIO_PREVIEW` messages to it, which `@tokioapp/overlay` reads instead of opening a WebSocket.
