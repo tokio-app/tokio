@@ -1,5 +1,11 @@
+import { songRenderer } from "@test/fixtures";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { confirmLoggedOut } from "./index";
+import {
+  confirmLoggedOut,
+  getHighResThumbnailUrl,
+  parseDurationToSeconds,
+  parseSongRenderer,
+} from "./index";
 
 const INTERVAL = 1500;
 
@@ -109,5 +115,94 @@ describe("confirmLoggedOut", () => {
 
     expect(check).toHaveBeenCalledTimes(1);
     expect(done).toHaveBeenCalledWith("stale");
+  });
+});
+
+// A song row of a search result, as YouTube Music's API sends it
+const renderer = songRenderer;
+
+describe("parseSongRenderer", () => {
+  it("reads the video, title, duration and thumbnail", () => {
+    expect(parseSongRenderer(renderer())).toEqual({
+      album: "Unknown",
+      track: "dQw4w9WgXcQ",
+      title: "Song - Artist",
+      thumbnail: "https://lh3.googleusercontent.com/abc=w480-h480-l90-rj",
+      duration: 205_000,
+    });
+  });
+
+  it("takes the duration from the run that looks like a time", () => {
+    const song = parseSongRenderer(
+      renderer({
+        columns: [["Song"], ["Artist", " • ", "1:02:03", " • ", "Album"]],
+      }),
+    );
+
+    expect(song?.duration).toBe(3_723_000);
+  });
+
+  it("gives a duration of 0 without a time", () => {
+    const song = parseSongRenderer(
+      renderer({ columns: [["Song"], ["Artist", " • ", "Album"]] }),
+    );
+
+    expect(song?.duration).toBe(0);
+  });
+
+  it("fills missing titles with Unknown", () => {
+    expect(parseSongRenderer(renderer({ columns: [] }))?.title).toBe(
+      "Unknown - Unknown",
+    );
+    expect(parseSongRenderer(renderer({ columns: [["Song"]] }))?.title).toBe(
+      "Song - Unknown",
+    );
+  });
+
+  it("returns null without a video id or a renderer", () => {
+    expect(parseSongRenderer(renderer({ videoId: "" }))).toBeNull();
+    expect(parseSongRenderer({ flexColumns: [] })).toBeNull();
+    expect(parseSongRenderer(undefined)).toBeNull();
+    expect(parseSongRenderer(null)).toBeNull();
+  });
+});
+
+describe("parseDurationToSeconds", () => {
+  it("reads seconds, minutes and hours", () => {
+    expect(parseDurationToSeconds("45")).toBe(45);
+    expect(parseDurationToSeconds("3:25")).toBe(205);
+    expect(parseDurationToSeconds("1:02:03")).toBe(3723);
+    expect(parseDurationToSeconds(" 3:25 ")).toBe(205);
+  });
+
+  it("returns 0 for empty or invalid input", () => {
+    expect(parseDurationToSeconds(undefined)).toBe(0);
+    expect(parseDurationToSeconds("")).toBe(0);
+    expect(parseDurationToSeconds("Album")).toBe(0);
+    expect(parseDurationToSeconds("3:")).toBe(0);
+    expect(parseDurationToSeconds("1.5")).toBe(0);
+  });
+});
+
+describe("getHighResThumbnailUrl", () => {
+  it("replaces the size suffix", () => {
+    expect(
+      getHighResThumbnailUrl(
+        "https://lh3.googleusercontent.com/abc=w120-h120-l90-rj",
+      ),
+    ).toBe("https://lh3.googleusercontent.com/abc=w480-h480-l90-rj");
+    expect(
+      getHighResThumbnailUrl("https://lh3.googleusercontent.com/abc=w60-h60"),
+    ).toBe("https://lh3.googleusercontent.com/abc=w480-h480-l90-rj");
+  });
+
+  it("keeps URLs without a size suffix", () => {
+    const url = "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg";
+
+    expect(getHighResThumbnailUrl(url)).toBe(url);
+  });
+
+  it("gives an empty string without a URL", () => {
+    expect(getHighResThumbnailUrl(undefined)).toBe("");
   });
 });
