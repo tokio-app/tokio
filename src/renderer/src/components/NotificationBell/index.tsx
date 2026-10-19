@@ -33,6 +33,7 @@ export function NotificationBell({
 }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   useClickOutside([ref], () => setOpen(false), open);
 
@@ -42,17 +43,35 @@ export function NotificationBell({
   }, [open, history, onSeen]);
 
   return (
-    <div className={styles.container} ref={ref}>
+    <div
+      className={styles.container}
+      ref={ref}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || !open) return;
+        e.stopPropagation();
+        setOpen(false);
+        toggleRef.current?.focus();
+      }}
+    >
       <Btn
+        ref={toggleRef}
         variant="icon"
         title="Notifications"
+        // The badge would name it otherwise
+        aria-label={
+          unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
+        }
+        aria-expanded={open}
         active={open}
         className={styles.toggle}
         onClick={() => setOpen((o) => !o)}
       >
         <FiBell size={18} />
         {unread > 0 && (
-          <span className={cx(styles.badge, unreadError && styles.badge_error)}>
+          <span
+            aria-hidden
+            className={cx(styles.badge, unreadError && styles.badge_error)}
+          >
             {unread > 9 ? "9+" : unread}
           </span>
         )}

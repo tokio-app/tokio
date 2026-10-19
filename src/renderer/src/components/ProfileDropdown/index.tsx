@@ -20,39 +20,59 @@ export function ProfileDropdown({
 }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   useClickOutside([ref], () => setOpen(false), open);
 
+  const close = () => {
+    setOpen(false);
+    toggleRef.current?.focus();
+  };
+
   return (
-    <div className={styles.container} ref={ref}>
-      <div
-        onClick={() => {
-          if (!disabled) setOpen((o) => !o);
-        }}
+    <div
+      className={styles.container}
+      ref={ref}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || !open) return;
+        e.stopPropagation();
+        close();
+      }}
+    >
+      <button
+        ref={toggleRef}
+        type="button"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
         className={cx(
           styles.toggle,
           open && styles.toggle_open,
           disabled && styles.toggle_disabled,
         )}
       >
-        <div className={styles.avatar}>🌹</div>
+        <span className={styles.avatar} aria-hidden>
+          🌹
+        </span>
         <span>{active.name}</span>
         <FiChevronDown
           size={14}
           className={cx(styles.chevron, open && styles.chevron_open)}
         />
-      </div>
+      </button>
 
       {open && (
         <div className={styles.menu}>
           {profiles.map((profile) => {
             const isActive = profile.file === active.file;
             return (
-              <div
+              <button
                 key={profile.file}
+                type="button"
+                aria-current={isActive || undefined}
                 className={cx(styles.item, isActive && styles.item_active)}
                 onClick={() => {
-                  setOpen(false);
+                  close();
                   if (!isActive) onProfileSelected(profile.file);
                 }}
               >
@@ -60,7 +80,7 @@ export function ProfileDropdown({
                 {isActive && (
                   <FiCheck size={14} color="var(--accent-primary)" />
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
