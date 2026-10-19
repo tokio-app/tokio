@@ -80,8 +80,9 @@ export class MusicService extends ProviderService<MusicProvider> {
   }
 
   public handle(chat: ChatEvent, settings: Profile["music"]) {
-    if (!this._valid(settings, chat)) return;
-    const parsed = this._parseText(settings, chat);
+    const match = this._match(settings, chat);
+    if (!match) return;
+    const { control, args } = match;
 
     this._queue.setQueueOptions({
       gapTime: settings.protection.cooldown,
@@ -90,24 +91,22 @@ export class MusicService extends ProviderService<MusicProvider> {
 
     this._music_queue.setMaxSize(settings.protection.queue_length);
 
-    if (parsed.command === settings.controls.play.command) {
+    const { controls } = settings;
+    if (control === controls.play) {
       this._queue.enqueue(async () => {
-        this.play(parsed.args);
+        this.play(args);
       });
-    }
-    if (parsed.command === settings.controls.next.command) {
+    } else if (control === controls.next) {
       this._queue.enqueue(async () => {
         this.next();
       });
-    }
-    if (parsed.command === settings.controls.last.command) {
+    } else if (control === controls.last) {
       this._queue.enqueue(async () => {
         this.previous();
       });
-    }
-    if (parsed.command === settings.controls.revoke.command) {
+    } else if (control === controls.revoke) {
       this._queue.enqueue(async () => {
-        this.revoke(parsed.args);
+        this.revoke(args);
       });
     }
   }
@@ -150,32 +149,23 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue.revoke(query);
   }
 
-  private _parseText(settings: Profile["music"], chat: ChatEvent) {
-    const matchedControl = Object.values(settings.controls).find((c) =>
-      chat.comment.content.startsWith(c.command),
-    );
-
-    const command = matchedControl!.command;
-
-    const args = chat.comment.content.slice(command.length).trim();
+  // The control a chat calls, with its command alone or followed by a space
+  // and the args. Empty commands call nothing. Null when the control is off or
+  // the viewer may not use it.
+  private _match(settings: Profile["music"], chat: ChatEvent) {
+    const { content } = chat.comment;
+    const control = Object.values(settings.controls).find(({ command }) => {
+      const name = command.trim();
+      if (!name || !content.startsWith(name)) return false;
+      const next = content.charAt(name.length);
+      return next === "" || /\s/.test(next);
+    });
+    if (!control?.enabled) return null;
+    if (!hasPermission(settings.permissions, chat.user)) return null;
 
     return {
-      command,
-      args,
+      control,
+      args: content.slice(control.command.trim().length).trim(),
     };
-  }
-
-  private _valid(settings: Profile["music"], chat: ChatEvent) {
-    if (chat.comment.content === "") return false;
-
-    const matchedControl = Object.values(settings.controls).find((c) =>
-      chat.comment.content.startsWith(c.command),
-    );
-
-    if (!matchedControl || !matchedControl.enabled) {
-      return false;
-    }
-
-    return hasPermission(settings.permissions, chat.user);
   }
 }

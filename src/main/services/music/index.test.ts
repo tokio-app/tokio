@@ -544,8 +544,7 @@ describe("MusicService", () => {
       expect(played()).toEqual(["song", "other"]);
     });
 
-    // _valid and _parseText match commands with startsWith
-    it.fails("doesn't take a longer word for a command", async () => {
+    it("doesn't take a longer word for a command", async () => {
       const { request, provider } = setup();
 
       await request("!player");
@@ -553,8 +552,7 @@ describe("MusicService", () => {
       expect(provider.searchSong).not.toHaveBeenCalled();
     });
 
-    // startsWith("") is true, so an empty command matches every message
-    it.fails("never matches a control whose command is empty", async () => {
+    it("never matches a control whose command is empty", async () => {
       const { request, provider } = setup();
       const music = settings((m) => {
         m.controls.play.command = "";
