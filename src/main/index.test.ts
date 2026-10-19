@@ -101,6 +101,7 @@ describe("main process entry", () => {
       process.off("uncaughtExceptionMonitor", fatal.exception);
     if (fatal.rejection) process.off("unhandledRejection", fatal.rejection);
     fatal = {};
+    vi.unstubAllEnvs();
   });
 
   it("registers local-resource with CORS and fetch before the app is ready", async () => {
@@ -245,5 +246,20 @@ describe("main process entry", () => {
       undefined,
       expect.any(Error),
     );
+  });
+
+  it("keeps its data in TOKIO_HOME when it's set", async () => {
+    vi.stubEnv("TOKIO_HOME", "/tmp/tokio-e2e");
+    await start();
+
+    expect(app.setPath).toHaveBeenCalledWith("home", "/tmp/tokio-e2e");
+    expect(app.setPath).toHaveBeenCalledWith("userData", "/tmp/tokio-e2e");
+  });
+
+  it("uses the usual folders otherwise", async () => {
+    vi.stubEnv("TOKIO_HOME", "");
+    await start();
+
+    expect(app.setPath).not.toHaveBeenCalled();
   });
 });

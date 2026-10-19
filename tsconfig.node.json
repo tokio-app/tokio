@@ -1,6 +1,6 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
-  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*","src/common/**/*", "scripts/**/*", "test/**/*", "vitest.config.ts"],
+  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*","src/common/**/*", "scripts/**/*", "test/**/*", "e2e/**/*", "vitest.config.ts", "playwright.config.ts"],
   // Renderer test helpers need the DOM, tsconfig.web.json checks them
   "exclude": ["test/renderer/**"],
   "compilerOptions": {

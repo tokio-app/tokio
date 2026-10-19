@@ -45,6 +45,41 @@ jobs:
       - name: Test
         run: yarn test
 
+  # Builds the app and runs it with Playwright, see e2e/.
+  e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    name: e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Install packages
+        run: yarn install --frozen-lockfile
+
+      # Electron needs a display, which the Linux runner doesn't have
+      - name: End-to-end tests
+        if: runner.os == 'Linux'
+        run: xvfb-run -a yarn test:e2e
+
+      - name: End-to-end tests
+        if: runner.os != 'Linux'
+        run: yarn test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-results-${{ matrix.os }}
+          path: test-results/
+          if-no-files-found: ignore
+
   # Packaged builds run on pushes and ready PRs. Draft PRs only get the checks, unless the
   # latest commit message contains [ci] (see .github/pull_request_template.md). Release commits
   # (chore(release): ...) skip them: their tag runs release.yml, which packages the same commit.

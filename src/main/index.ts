@@ -46,6 +46,13 @@ app.commandLine.appendSwitch("disable-backgrounding-occluded-windows", "true");
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
 
+// End-to-end tests run the app in a temporary folder, see e2e/.
+const testHome = process.env.TOKIO_HOME;
+if (testHome) {
+  app.setPath("home", testHome);
+  app.setPath("userData", testHome);
+}
+
 // Overlay previews load their files from local-resource:, which has no origin.
 // Without CORS on it, Chromium blocks module scripts, crossorigin styles, fonts
 // and fetch, so overlays built with Vite never run. See withPreviewCORS.
