@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { hasKeyword, isUser } from "./chat";
+import { hasKeyword, isUser, removeEmojis } from "./chat";
+
+describe("removeEmojis", () => {
+  it.each([
+    ["skin tones", "👍🏽"],
+    ["ZWJ sequences", "👩🏽‍💻👨‍👩‍👧‍👦"],
+    ["emoji and text styles", "❤\uFE0F❤\uFE0E"],
+    ["flags", "🇺🇸🇲🇽🏳️‍🌈"],
+    // England's, whose letters are tags
+    [
+      "tag flags",
+      "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}",
+    ],
+    ["keycaps", "1️⃣#️⃣"],
+  ])("removes %s whole", (_, emojis) => {
+    expect(removeEmojis(`hi ${emojis}!`)).toBe("hi !");
+  });
+
+  it("leaves text alone", () => {
+    // Devanagari joins some letters with a ZWJ
+    const text = "C# #1 *bold* 1+1=2 ¿qué? 日本語 क्\u200Dष";
+
+    expect(removeEmojis(text)).toBe(text);
+  });
+
+  it("replaces each emoji with the text given", () => {
+    expect(removeEmojis("I❤️you", " ")).toBe("I you");
+  });
+});
 
 describe("hasKeyword", () => {
   it("matches any chat without a keyword", () => {
@@ -50,6 +78,10 @@ describe("isUser", () => {
     expect(isUser(user, "lucia")).toBe(true);
     expect(isUser(user, "LUCÍA ")).toBe(true);
     expect(isUser(user, "luc")).toBe(false);
+  });
+
+  it("ignores the skin tones of emojis in the name", () => {
+    expect(isUser({ ...user, username: "Ana 👋🏽" }, "ana")).toBe(true);
   });
 
   it("never matches a name that is only emojis", () => {

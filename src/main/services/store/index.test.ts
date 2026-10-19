@@ -493,6 +493,20 @@ describe("StoreManagerService", () => {
         },
       ]);
     });
+
+    it("loads profiles saved before emoji removal, reading emojis", async () => {
+      const old = structuredClone(defaultProfile);
+      old.connector.username = "streamer";
+      const format: Partial<Profile["tts"]["format"]> = old.tts.format;
+      delete format.remove_emojis;
+      await writeFile(defaultProfileFile, JSON.stringify(old));
+
+      const profile = await (await init()).getProfileData();
+
+      // The file was loaded, not replaced with the defaults
+      expect(profile?.connector.username).toBe("streamer");
+      expect(profile?.tts.format.remove_emojis).toBe(false);
+    });
   });
 
   describe("export and import", () => {

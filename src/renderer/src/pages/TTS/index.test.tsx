@@ -17,6 +17,7 @@ const loaded = profileReply((p) => {
   p.tts.format = {
     template: "{username} says {comment}",
     trigger: { mode: "custom", value: "!say" },
+    remove_emojis: true,
   };
   p.tts.replacements = [{ old: "brb", new: "be right back" }];
   p.tts.protection = {
@@ -38,6 +39,8 @@ const testMessage = () =>
 const customTrigger = () => screen.getByPlaceholderText("!tts");
 const template = () => field("Message Template").getByRole("textbox");
 const mode = (label: RegExp) => screen.getByRole("radio", { name: label });
+const removeEmojis = () =>
+  screen.getByRole("checkbox", { name: "Remove Emojis" });
 
 async function setup(reply = loaded) {
   const app = renderWithProviders(<TTS />);
@@ -75,6 +78,7 @@ describe("TTS", () => {
     expect(customTrigger()).toHaveValue("!say");
     expect(customTrigger()).toBeEnabled();
     expect(template()).toHaveValue("{username} says {comment}");
+    expect(removeEmojis()).toBeChecked();
 
     expect(screen.getByPlaceholderText(/Word to replace/)).toHaveValue("brb");
     expect(screen.getByPlaceholderText(/How it sounds/)).toHaveValue(
@@ -284,6 +288,15 @@ describe("TTS", () => {
       mode: "custom",
       value: "!speak",
     });
+  });
+
+  it("turns emoji removal off", async () => {
+    const { user } = await setup();
+
+    await user.click(removeEmojis());
+
+    expect(removeEmojis()).not.toBeChecked();
+    expect((await draft(user)).format.remove_emojis).toBe(false);
   });
 
   it("adds a clicked variable to the template", async () => {

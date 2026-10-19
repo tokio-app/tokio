@@ -1,6 +1,7 @@
 import { Profile } from "@/common/schemas";
 import { ChatEvent, VoiceData, VoiceEngine } from "@/common/types";
 import { formatError, TaskQueue } from "@/common/util";
+import { removeEmojis } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
@@ -81,7 +82,10 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   private _valid(settings: Profile["tts"], chat: ChatEvent) {
-    if (chat.comment.content === "") return false;
+    // Nothing to read, like a comment of only emojis when they're removed
+    if (this._clean(chat.comment.content, settings).trim() === "") {
+      return false;
+    }
     if (settings.format.trigger.mode !== "any") {
       if (!chat.comment.content.startsWith(settings.format.trigger.value)) {
         return false;
@@ -114,14 +118,24 @@ export class TTSService extends ProviderService<TTSProvider> {
     return out;
   }
 
+  // The replacements, then the emojis they left when emojis aren't read. A
+  // space keeps the words around an emoji apart ("I❤️you").
+  private _clean(text: string, settings: Profile["tts"]) {
+    const out = this._replace(text, settings);
+    if (!settings.format.remove_emojis) return out;
+    return removeEmojis(out, " ").replace(/\s+/g, " ").trim();
+  }
+
   /**
    * Text from elsewhere than chat, such as an alert's message, with the
-   * same protection: null when it's empty or has a banned word, otherwise
-   * with the replacements applied.
+   * same protection: null when it has a banned word or nothing to read,
+   * otherwise with the replacements applied and, when set, the emojis
+   * removed.
    */
   public prepareText(text: string, settings: Profile["tts"]): string | null {
-    if (text.trim() === "" || this._hasBanned(text, settings)) return null;
-    return this._replace(text, settings);
+    if (this._hasBanned(text, settings)) return null;
+    const out = this._clean(text, settings);
+    return out.trim() === "" ? null : out;
   }
 
   private _escapeRegExp(str: string) {
@@ -163,7 +177,7 @@ export class TTSService extends ProviderService<TTSProvider> {
       template = chat.comment.content;
     }
 
-    return this._replace(template, settings);
+    return this._clean(template, settings);
   }
 
   public clearTalk() {

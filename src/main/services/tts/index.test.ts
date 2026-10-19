@@ -174,8 +174,15 @@ describe("TTSService", () => {
   });
 
   describe("filters", () => {
-    it("ignores empty comments", async () => {
-      expect(await say("")).toEqual([]);
+    it("ignores comments with nothing to read, not even the name", async () => {
+      const s = settings((s) => {
+        s.format.template = "{username} {comment}";
+        s.replacements = [{ old: "lol", new: "" }];
+      });
+
+      expect(await say("", s)).toEqual([]);
+      expect(await say("  ", s)).toEqual([]);
+      expect(await say("lol", s)).toEqual([]);
     });
 
     it("needs the trigger prefix unless the mode is any", async () => {
@@ -235,6 +242,55 @@ describe("TTSService", () => {
       expect(service.prepareText("  ", s)).toBeNull();
       expect(service.prepareText("Thanks SPOILER fan", s)).toBeNull();
       expect(service.prepareText("Thanks fan", s)).toBe("Thanks fan");
+    });
+
+    it("removes the emojis when set, refusing text with nothing else", () => {
+      const s = settings((s) => {
+        s.format.remove_emojis = true;
+      });
+
+      expect(service.prepareText("Thanks 🌸 fan 🎉", s)).toBe("Thanks fan");
+      expect(service.prepareText("🎉🎉", s)).toBeNull();
+      expect(service.prepareText("🎉🎉", settings())).toBe("🎉🎉");
+    });
+  });
+
+  describe("emojis", () => {
+    const removing = (change: (s: TTSSettings) => void = () => {}) =>
+      settings((s) => {
+        s.format.remove_emojis = true;
+        change(s);
+      });
+
+    it("reads them unless they're removed", async () => {
+      expect(await say("hi 😂")).toEqual(["hi 😂"]);
+      expect(await say("hi 😂 👍🏽", removing())).toEqual(["hi"]);
+    });
+
+    it("removes them from the name too, keeping the words apart", async () => {
+      const s = removing((s) => {
+        s.format.template = "{username} says {comment}";
+      });
+      const lucia = { ...viewer, username: "Lucía 🔥" };
+
+      expect(await say(chat("I❤️you", lucia), s)).toEqual(["Lucía says I you"]);
+    });
+
+    it("skips comments of only emojis, without reading the name", async () => {
+      const s = removing((s) => {
+        s.format.template = "{username} {comment}";
+      });
+
+      expect(await say("😂😂😂", s)).toEqual([]);
+    });
+
+    it("applies the replacements first", async () => {
+      const s = removing((s) => {
+        s.replacements = [{ old: "❤️", new: "love" }];
+      });
+
+      expect(await say("I ❤️ you 😂", s)).toEqual(["I love you"]);
+      expect(await say("❤️", s)).toEqual(["love"]);
     });
   });
 

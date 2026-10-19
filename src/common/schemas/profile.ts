@@ -137,6 +137,8 @@ export const ProfileSchema = z.object({
         mode: z.enum(["any", "dot", "slash", "custom"]),
         value: z.string(),
       }),
+      // Emojis are left out of what's read, chat and alert messages alike
+      remove_emojis: z.boolean().default(false),
     }),
     protection: z.object({
       cooldown: z.number(),

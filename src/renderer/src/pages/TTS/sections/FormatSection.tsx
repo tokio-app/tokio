@@ -1,5 +1,12 @@
 import { Profile } from "@/common/schemas";
-import { Field, Input, RadioGroup, Section, VariableList } from "@/components";
+import {
+  Check,
+  Field,
+  Input,
+  RadioGroup,
+  Section,
+  VariableList,
+} from "@/components";
 import { Updater } from "@/hooks";
 import { useRef } from "react";
 import styles from "../tts.module.css";
@@ -103,6 +110,16 @@ export function FormatSection({ format, update }: Props) {
           }
         />
       </Field>
+
+      <Check
+        label="Remove Emojis"
+        checked={format.remove_emojis}
+        onChange={(e) =>
+          update((f) => {
+            f.remove_emojis = e.target.checked;
+          })
+        }
+      />
     </Section>
   );
 }

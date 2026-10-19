@@ -80,6 +80,7 @@ export const defaultProfile: Profile = {
         mode: "any",
         value: "",
       },
+      remove_emojis: false,
     },
     protection: {
       comment_length: 300,

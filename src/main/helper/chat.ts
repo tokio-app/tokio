@@ -1,19 +1,18 @@
 import { UserData } from "@/common/types";
 import { escapeRegExp } from "es-toolkit";
 
-function getEmojiRegex() {
-  let EMOJI_REGEX: RegExp;
-  try {
-    EMOJI_REGEX = new RegExp(
-      String.raw`(?:\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?)*)|(?:[#*0-9]\uFE0F?\u20E3)|(?:\p{Regional_Indicator}{2})`,
-      "gu",
-    );
-  } catch {
-    EMOJI_REGEX =
-      /(?:[\u{1F300}-\u{1FAFF}](?:\uFE0F|\uFE0E)?(?:\u200D[\u{1F300}-\u{1FAFF}](?:\uFE0F|\uFE0E)?)*)|(?:[#*0-9]\uFE0F?\u20E3)|(?:[\u{1F1E6}-\u{1F1FF}]{2})/gu;
-  }
+// A pictograph or skin tone with what modifies it (skin tone, text or emoji
+// style, the tags of flags like England's), joined to others by ZWJ.
+const EMOJI_PART = String.raw`[\p{Extended_Pictographic}\p{Emoji_Modifier}][\p{Emoji_Modifier}\uFE0E\uFE0F\u{E0020}-\u{E007F}]*`;
+// Those, keycaps and flags
+const EMOJI_REGEX = new RegExp(
+  String.raw`${EMOJI_PART}(?:\u200D${EMOJI_PART})*|[#*0-9]\uFE0F?\u20E3|\p{Regional_Indicator}+`,
+  "gu",
+);
 
-  return EMOJI_REGEX;
+/** The text without emojis, each one replaced with `by`. */
+export function removeEmojis(text: string, by = ""): string {
+  return text.replace(EMOJI_REGEX, by);
 }
 
 export function cleanText(
@@ -23,7 +22,7 @@ export function cleanText(
   const { collapseWhitespace = true, asciiOnly = false } = opts;
   if (!input) return "";
 
-  let out = input.replace(getEmojiRegex(), "");
+  let out = removeEmojis(input);
 
   try {
     out = out.normalize("NFKC");
