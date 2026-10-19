@@ -1,10 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import {
-  FloatingSave,
-  Page,
-  PermissionsSection,
-  ProtectionSection,
-} from "@/components";
+import { Page, PermissionsSection, ProtectionSection } from "@/components";
 import {
   scopeUpdater,
   useAudio,
@@ -26,14 +21,11 @@ export function TTS() {
 
   const [testLoading, setTestLoading] = useState(false);
 
-  const { draft, update, hasChanges, save } = useEditableSettings(
-    "tts",
-    "TTS",
-    (settings) =>
-      testQueue.setFilters({
-        ...settings.filters,
-        volume: settings.filters.volume / 100,
-      }),
+  const { settings, update } = useEditableSettings("tts", ({ tts }) =>
+    testQueue.setFilters({
+      ...tts.filters,
+      volume: tts.filters.volume / 100,
+    }),
   );
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_TTS_TEST, (res) => {
@@ -43,54 +35,50 @@ export function TTS() {
   });
 
   return (
-    <>
-      <FloatingSave visible={hasChanges} onSave={save} />
+    <Page>
+      <VoiceSection
+        settings={settings}
+        testLoading={testLoading}
+        testQueue={testQueue}
+        update={update}
+        onTest={(text) => {
+          setTestLoading(true);
+          // Read like chat, with the settings on the page, saved or not
+          window.api.emit(APP_EVENTS.GET_TTS_TEST, {
+            id: TEST_ID,
+            text,
+            voice: settings.voice,
+            settings,
+          });
+        }}
+      />
 
-      <Page>
-        <VoiceSection
-          settings={draft}
-          testLoading={testLoading}
-          testQueue={testQueue}
-          update={update}
-          onTest={(text) => {
-            setTestLoading(true);
-            // Read like chat, with the settings on the page, saved or not
-            window.api.emit(APP_EVENTS.GET_TTS_TEST, {
-              id: TEST_ID,
-              text,
-              voice: draft.voice,
-              settings: draft,
-            });
-          }}
-        />
+      <FormatSection
+        format={settings.format}
+        update={scopeUpdater(update, "format")}
+      />
 
-        <FormatSection
-          format={draft.format}
-          update={scopeUpdater(update, "format")}
-        />
+      <PermissionsSection
+        feature="TTS"
+        permissions={settings.permissions}
+        update={scopeUpdater(update, "permissions")}
+      />
 
-        <PermissionsSection
-          feature="TTS"
-          permissions={draft.permissions}
-          update={scopeUpdater(update, "permissions")}
-        />
-
-        <ProtectionSection
-          feature="TTS"
-          protection={draft.protection}
+      <ProtectionSection
+        feature="TTS"
+        protection={settings.protection}
+        update={scopeUpdater(update, "protection")}
+      >
+        <ProtectionFields
+          protection={settings.protection}
           update={scopeUpdater(update, "protection")}
-        >
-          <ProtectionFields
-            protection={draft.protection}
-            update={scopeUpdater(update, "protection")}
-          />
-        </ProtectionSection>
-
-        <ReplacementsSection
-          replacements={draft.replacements}
-          update={scopeUpdater(update, "replacements")}
         />
-      </Page>
-    </>
+      </ProtectionSection>
+
+      <ReplacementsSection
+        replacements={settings.replacements}
+        update={scopeUpdater(update, "replacements")}
+      />
+    </Page>
   );
 }

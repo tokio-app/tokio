@@ -1,7 +1,6 @@
 import { EntityMetadata } from "@/common/schemas";
 import { APP_EVENTS } from "@/common/types";
 import { Btn, Field, Section, Select } from "@/components";
-import { useUnsavedChanges } from "@/hooks";
 import { FiCopy, FiDownload, FiPlus, FiUpload, FiUsers } from "react-icons/fi";
 import styles from "../settings.module.css";
 
@@ -20,8 +19,6 @@ export function ProfileSection({
   onNew,
   onClone,
 }: Props) {
-  const { confirmDiscard } = useUnsavedChanges();
-
   return (
     <Section
       icon={<FiUsers />}
@@ -38,11 +35,9 @@ export function ProfileSection({
             disabled={locked}
             options={profiles.map((p) => ({ label: p.name, value: p.file }))}
             value={active.file}
-            onChange={async (file) => {
+            onChange={(file) => {
               // Main answers with the new settings, which updates the page.
-              if (await confirmDiscard()) {
-                window.api.emit(APP_EVENTS.SET_PROFILE, { file });
-              }
+              window.api.emit(APP_EVENTS.SET_PROFILE, { file });
             }}
           />
         </Field>

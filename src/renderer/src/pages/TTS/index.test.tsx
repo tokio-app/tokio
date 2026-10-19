@@ -3,8 +3,8 @@ import { engine, failure, profileReply, voice } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { section } from "@test/queries";
 import { renderWithProviders } from "@test/render";
-import { fireEvent, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TTS } from ".";
 
 const aria = voice("en-US-AriaNeural");
@@ -32,7 +32,6 @@ const loaded = profileReply((p) => {
 const field = (label: string | RegExp) =>
   within(screen.getByText(label).closest("div")!);
 
-const saveButton = () => screen.getByRole("button", { name: "Save changes" });
 const testButton = () => screen.getByRole("button", { name: "Test Voice" });
 const testMessage = () =>
   screen.getByPlaceholderText("Type a message to test how the TTS sounds...");
@@ -43,18 +42,28 @@ const removeEmojis = () =>
   screen.getByRole("checkbox", { name: "Remove Emojis" });
 
 async function setup(reply = loaded) {
-  const app = renderWithProviders(<TTS />);
+  const app = renderWithProviders(<TTS />, {
+    user: { advanceTimers: (ms) => vi.advanceTimersByTime(ms) },
+  });
   await send(APP_EVENTS_RESPONSE.GET_PROFILE, reply);
   return { ...app, queue: app.audio.queue("tts_test") };
 }
 
-type User = Awaited<ReturnType<typeof setup>>["user"];
+const wait = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 
-// Saves, and returns what was sent: the draft
-async function draft(user: User) {
-  await user.click(saveButton());
+// The settings saved once the changes settle
+async function saved() {
+  await wait(300);
   return sent(APP_EVENTS.UPDATE_TTS_SETTINGS).at(-1)!.settings;
 }
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("TTS", () => {
   it("asks main for the profile and the voices", () => {
@@ -105,14 +114,14 @@ describe("TTS", () => {
     });
   });
 
-  it("saves the draft once something changed", async () => {
+  it("saves a change 300ms later", async () => {
     const { user } = await setup();
-    expect(saveButton()).toBeDisabled();
 
     await user.type(template(), "!");
-    expect(saveButton()).toBeEnabled();
+    await wait(299);
+    expect(sent(APP_EVENTS.UPDATE_TTS_SETTINGS)).toEqual([]);
 
-    await user.click(saveButton());
+    await wait(1);
     expect(sent(APP_EVENTS.UPDATE_TTS_SETTINGS)).toEqual([
       {
         settings: {
@@ -124,21 +133,6 @@ describe("TTS", () => {
         },
       },
     ]);
-    expect(saveButton()).toBeEnabled();
-
-    await send(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS, { success: true });
-
-    expect(saveButton()).toBeDisabled();
-  });
-
-  it("keeps the save button when saving fails", async () => {
-    const { user } = await setup();
-    await user.type(template(), "!");
-
-    await user.click(saveButton());
-    await send(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS, failure());
-
-    expect(saveButton()).toBeEnabled();
   });
 
   it("tests the voice only with a message", async () => {
@@ -235,7 +229,7 @@ describe("TTS", () => {
         settings: { ...loaded.profile.tts, voice: guy },
       },
     ]);
-    expect((await draft(user)).voice).toEqual(guy);
+    expect((await saved()).voice).toEqual(guy);
   });
 
   it("tests with the settings on the page, saved or not", async () => {
@@ -252,7 +246,7 @@ describe("TTS", () => {
   });
 
   it("changes the filters and the test queue's with the sliders", async () => {
-    const { user, queue } = await setup();
+    const { queue } = await setup();
 
     fireEvent.change(field("Speed (1.5x)").getByRole("slider"), {
       target: { value: "1.2" },
@@ -272,7 +266,7 @@ describe("TTS", () => {
     expect(screen.getByText("Speed (1.2x)")).toBeInTheDocument();
     expect(screen.getByText("Pitch (1.3)")).toBeInTheDocument();
     expect(screen.getByText("Volume (40%)")).toBeInTheDocument();
-    expect((await draft(user)).filters).toEqual({
+    expect((await saved()).filters).toEqual({
       speed: 1.2,
       pitch: 1.3,
       volume: 40,
@@ -283,7 +277,7 @@ describe("TTS", () => {
     const { user } = await setup();
 
     await user.click(mode(/Read All Comments/));
-    expect((await draft(user)).format.trigger).toEqual({
+    expect((await saved()).format.trigger).toEqual({
       mode: "any",
       value: "",
     });
@@ -291,13 +285,13 @@ describe("TTS", () => {
     expect(customTrigger()).toHaveValue("");
 
     await user.click(mode(/Dot Prefix/));
-    expect((await draft(user)).format.trigger).toEqual({
+    expect((await saved()).format.trigger).toEqual({
       mode: "dot",
       value: ".",
     });
 
     await user.click(mode(/Slash Prefix/));
-    expect((await draft(user)).format.trigger).toEqual({
+    expect((await saved()).format.trigger).toEqual({
       mode: "slash",
       value: "/",
     });
@@ -307,7 +301,7 @@ describe("TTS", () => {
     expect(customTrigger()).toHaveValue("");
 
     await user.type(customTrigger(), "!speak");
-    expect((await draft(user)).format.trigger).toEqual({
+    expect((await saved()).format.trigger).toEqual({
       mode: "custom",
       value: "!speak",
     });
@@ -319,7 +313,7 @@ describe("TTS", () => {
     await user.click(removeEmojis());
 
     expect(removeEmojis()).not.toBeChecked();
-    expect((await draft(user)).format.remove_emojis).toBe(false);
+    expect((await saved()).format.remove_emojis).toBe(false);
   });
 
   it("adds a clicked variable to the template", async () => {
@@ -328,7 +322,7 @@ describe("TTS", () => {
     await user.click(screen.getByRole("button", { name: "{handle}" }));
 
     expect(template()).toHaveValue("{username} says {comment}{handle}");
-    expect((await draft(user)).format.template).toBe(
+    expect((await saved()).format.template).toBe(
       "{username} says {comment}{handle}",
     );
   });
@@ -353,7 +347,7 @@ describe("TTS", () => {
       replacements.getByPlaceholderText(/How it sounds/),
       "good game",
     );
-    expect((await draft(user)).replacements).toEqual([
+    expect((await saved()).replacements).toEqual([
       { old: "gg", new: "good game" },
     ]);
 
@@ -361,8 +355,7 @@ describe("TTS", () => {
     expect(
       replacements.getByText("No custom replacements added."),
     ).toBeInTheDocument();
-    // Back to the saved settings
-    expect(saveButton()).toBeDisabled();
+    expect((await saved()).replacements).toEqual([]);
   });
 
   it("removes the replacement whose button is clicked", async () => {
@@ -379,7 +372,7 @@ describe("TTS", () => {
     await user.click(removeFirst);
 
     expect(screen.getByPlaceholderText(/Word to replace/)).toHaveValue("gg");
-    expect((await draft(user)).replacements).toEqual([
+    expect((await saved()).replacements).toEqual([
       { old: "gg", new: "good game" },
     ]);
   });
@@ -400,7 +393,7 @@ describe("TTS", () => {
     await user.clear(banned);
     await user.type(banned, "one, two ,, three");
 
-    expect((await draft(user)).protection).toEqual({
+    expect((await saved()).protection).toEqual({
       cooldown: 8,
       queue_length: 3,
       comment_length: 99,
@@ -430,7 +423,7 @@ describe("TTS", () => {
     await user.type(field("Whitelist").getByRole("textbox"), "alice, bob");
     await user.type(field("Blacklist").getByRole("textbox"), "troll");
 
-    expect((await draft(user)).permissions).toEqual({
+    expect((await saved()).permissions).toEqual({
       all: false,
       followers: true,
       superfans: false,

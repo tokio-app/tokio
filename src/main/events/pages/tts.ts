@@ -29,7 +29,7 @@ events.push(
 
 events.push(
   APP_EVENTS.UPDATE_TTS_SETTINGS,
-  async ({ storeManagerService, notifier }, e, { settings }) => {
+  async ({ storeManagerService }, e, { settings }) => {
     const res = await storeManagerService.updateProfileData({
       tts: settings,
     });
@@ -37,11 +37,6 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS, {
       success: true,
     });
-    notifier.success(
-      "system",
-      FEEDBACK_CODES.PROFILE_SAVED,
-      "TTS settings saved.",
-    );
   },
   {
     source: "system",

@@ -1,12 +1,10 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { useUnsavedChanges } from "@/hooks";
 import { failure, settingsReply } from "@test/fixtures";
 import { send, sent, sentEvents } from "@test/ipc";
 import { inList, section } from "@test/queries";
 import { renderWithProviders } from "@test/render";
-import { screen, waitFor, within } from "@testing-library/react";
-import { useEffect } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { Settings } from ".";
 
 const profiles = settingsReply((s) => {
@@ -25,22 +23,6 @@ const connected = (success: boolean) =>
     success,
     stats: { views: 0, viewers: 0, likes: 0 },
   });
-
-// A page with unsaved settings, like TTS with a change
-function DirtyEditor({ discard }: { discard: () => void }) {
-  const { register } = useUnsavedChanges();
-  useEffect(
-    () =>
-      register({
-        label: "TTS",
-        isDirty: () => true,
-        save: async () => true,
-        discard,
-      }),
-    [register, discard],
-  );
-  return null;
-}
 
 async function setup(reply = profiles) {
   const app = renderWithProviders(<Settings />);
@@ -148,55 +130,7 @@ describe("Settings", () => {
       await user.click(section("Live Profiles").getByText("Horror"));
       await user.click(inList(container, "Default")!);
 
-      await waitFor(() =>
-        expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([
-          { file: "default.json" },
-        ]),
-      );
-    });
-
-    it("switches only after the unsaved changes are handled", async () => {
-      const discard = vi.fn();
-      const { user, container } = renderWithProviders(
-        <>
-          <DirtyEditor discard={discard} />
-          <Settings />
-        </>,
-      );
-      await send(APP_EVENTS_RESPONSE.GET_SETTINGS, profiles);
-
-      await user.click(section("Live Profiles").getByText("Horror"));
-      await user.click(inList(container, "Default")!);
-      expect(
-        dialog().getByText(/You have unsaved TTS settings/),
-      ).toBeInTheDocument();
-      expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([]);
-
-      await user.click(dialog().getByRole("button", { name: "Discard" }));
-
-      expect(discard).toHaveBeenCalled();
-      await waitFor(() =>
-        expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([
-          { file: "default.json" },
-        ]),
-      );
-    });
-
-    it("stays on the profile when the unsaved changes prompt is canceled", async () => {
-      const { user, container } = renderWithProviders(
-        <>
-          <DirtyEditor discard={vi.fn()} />
-          <Settings />
-        </>,
-      );
-      await send(APP_EVENTS_RESPONSE.GET_SETTINGS, profiles);
-
-      await user.click(section("Live Profiles").getByText("Horror"));
-      await user.click(inList(container, "Default")!);
-      await user.click(dialog().getByRole("button", { name: "Cancel" }));
-
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([]);
+      expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([{ file: "default.json" }]);
     });
 
     it("can't switch while connected", async () => {

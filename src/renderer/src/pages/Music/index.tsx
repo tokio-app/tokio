@@ -1,10 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import {
-  FloatingSave,
-  Page,
-  PermissionsSection,
-  ProtectionSection,
-} from "@/components";
+import { Page, PermissionsSection, ProtectionSection } from "@/components";
 import {
   scopeUpdater,
   useEditableSettings,
@@ -19,10 +14,7 @@ export function Music() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { draft, update, hasChanges, save } = useEditableSettings(
-    "music",
-    "Music",
-  );
+  const { settings, update } = useEditableSettings("music");
 
   useIpcRequest(APP_EVENTS.IS_MUSIC_CONNECTED);
 
@@ -32,44 +24,38 @@ export function Music() {
   });
 
   return (
-    <>
-      <FloatingSave visible={hasChanges} onSave={save} />
+    <Page>
+      <ProviderSection
+        provider={settings.provider}
+        update={scopeUpdater(update, "provider")}
+        connected={connected}
+        loading={loading}
+        onConnect={() => {
+          setLoading(true);
+          if (connected) {
+            window.api.emit(APP_EVENTS.DISCONNECT_MUSIC);
+          } else {
+            window.api.emit(APP_EVENTS.CONNECT_MUSIC, { ...settings.provider });
+          }
+        }}
+      />
 
-      <Page>
-        <ProviderSection
-          provider={draft.provider}
-          update={scopeUpdater(update, "provider")}
-          connected={connected}
-          loading={loading}
-          onConnect={() => {
-            setLoading(true);
-            // The provider connects with what is shown, so save it first.
-            save();
-            if (connected) {
-              window.api.emit(APP_EVENTS.DISCONNECT_MUSIC);
-            } else {
-              window.api.emit(APP_EVENTS.CONNECT_MUSIC, { ...draft.provider });
-            }
-          }}
-        />
+      <ControlsSection
+        controls={settings.controls}
+        update={scopeUpdater(update, "controls")}
+      />
 
-        <ControlsSection
-          controls={draft.controls}
-          update={scopeUpdater(update, "controls")}
-        />
+      <PermissionsSection
+        feature="Music"
+        permissions={settings.permissions}
+        update={scopeUpdater(update, "permissions")}
+      />
 
-        <PermissionsSection
-          feature="Music"
-          permissions={draft.permissions}
-          update={scopeUpdater(update, "permissions")}
-        />
-
-        <ProtectionSection
-          feature="Music"
-          protection={draft.protection}
-          update={scopeUpdater(update, "protection")}
-        />
-      </Page>
-    </>
+      <ProtectionSection
+        feature="Music"
+        protection={settings.protection}
+        update={scopeUpdater(update, "protection")}
+      />
+    </Page>
   );
 }

@@ -1,10 +1,10 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { failure, profileReply } from "@test/fixtures";
-import { send, sent, sentEvents } from "@test/ipc";
+import { profileReply } from "@test/fixtures";
+import { send, sent } from "@test/ipc";
 import { section } from "@test/queries";
 import { renderWithProviders } from "@test/render";
-import { fireEvent, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Music } from ".";
 
 const loaded = profileReply((p) => {
@@ -20,28 +20,37 @@ const youtube = profileReply();
 const field = (label: string) =>
   within(screen.getByText(label).closest("div")!);
 
-const saveButton = () => screen.getByRole("button", { name: "Save changes" });
 const tab = (name: string) => screen.getByRole("tab", { name });
 const clientId = () =>
   screen.getByPlaceholderText("Enter your Spotify Client ID...");
 const connectButton = () => screen.getByRole("button", { name: "Connect" });
 
 async function setup(reply = loaded) {
-  const app = renderWithProviders(<Music />);
+  const app = renderWithProviders(<Music />, {
+    user: { advanceTimers: (ms) => vi.advanceTimersByTime(ms) },
+  });
   await send(APP_EVENTS_RESPONSE.GET_PROFILE, reply);
   return app;
 }
 
-type User = Awaited<ReturnType<typeof setup>>["user"];
+const wait = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 
-// Saves, and returns what was sent: the draft
-async function draft(user: User) {
-  await user.click(saveButton());
+// The settings saved once the changes settle
+async function saved() {
+  await wait(300);
   return sent(APP_EVENTS.UPDATE_MUSIC_SETTINGS).at(-1)!.settings;
 }
 
 const musicConnected = (success = true) =>
   send(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, { success });
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("Music", () => {
   it("asks main for the profile and whether music is connected", () => {
@@ -80,7 +89,7 @@ describe("Music", () => {
     await user.click(tab("Spotify"));
 
     expect(tab("Spotify")).toHaveAttribute("aria-selected", "true");
-    expect((await draft(user)).provider).toEqual({ name: "Spotify", key: "" });
+    expect((await saved()).provider).toEqual({ name: "Spotify", key: "" });
 
     await user.click(tab("YouTube"));
     expect(tab("YouTube")).toHaveAttribute("aria-selected", "true");
@@ -96,13 +105,13 @@ describe("Music", () => {
 
     await user.type(clientId(), "my-client");
     expect(connectButton()).toBeEnabled();
-    expect((await draft(user)).provider).toEqual({
+    expect((await saved()).provider).toEqual({
       name: "Spotify",
       key: "my-client",
     });
   });
 
-  it("saves, then connects with the provider, loading until main answers", async () => {
+  it("connects with the provider shown, loading until main answers", async () => {
     const { user } = await setup(youtube);
     const connect = connectButton();
     await user.click(tab("Spotify"));
@@ -110,13 +119,6 @@ describe("Music", () => {
 
     await user.click(connect);
 
-    const events = sentEvents();
-    expect(events.indexOf(APP_EVENTS.UPDATE_MUSIC_SETTINGS)).toBeLessThan(
-      events.indexOf(APP_EVENTS.CONNECT_MUSIC),
-    );
-    expect(sent(APP_EVENTS.UPDATE_MUSIC_SETTINGS)[0].settings.provider).toEqual(
-      { name: "Spotify", key: "my-client" },
-    );
     expect(sent(APP_EVENTS.CONNECT_MUSIC)).toEqual([
       { name: "Spotify", key: "my-client" },
     ]);
@@ -172,7 +174,7 @@ describe("Music", () => {
     await user.click(screen.getByRole("checkbox", { name: "Revoke" }));
     expect(screen.getByPlaceholderText("!revoke")).toBeDisabled();
 
-    expect((await draft(user)).controls).toEqual({
+    expect((await saved()).controls).toEqual({
       play: { enabled: true, command: "!sr" },
       next: { enabled: true, command: "!next" },
       last: { enabled: true, command: "!last" },
@@ -191,22 +193,22 @@ describe("Music", () => {
       target: { value: "2" },
     });
 
-    const saved = await draft(user);
-    expect(saved.permissions.superfans).toBe(true);
-    expect(saved.protection).toEqual({ cooldown: 10, queue_length: 2 });
+    const settings = await saved();
+    expect(settings.permissions.superfans).toBe(true);
+    expect(settings.protection).toEqual({ cooldown: 10, queue_length: 2 });
     expect(
       section("Protection").queryByText("Max Comment Length"),
     ).not.toBeInTheDocument();
   });
 
-  it("saves the draft once something changed", async () => {
+  it("saves a change 300ms later", async () => {
     const { user } = await setup();
-    expect(saveButton()).toBeDisabled();
 
     await user.click(screen.getByRole("checkbox", { name: "Last" }));
-    expect(saveButton()).toBeEnabled();
+    await wait(299);
+    expect(sent(APP_EVENTS.UPDATE_MUSIC_SETTINGS)).toEqual([]);
 
-    await user.click(saveButton());
+    await wait(1);
     expect(sent(APP_EVENTS.UPDATE_MUSIC_SETTINGS)).toEqual([
       {
         settings: {
@@ -218,18 +220,5 @@ describe("Music", () => {
         },
       },
     ]);
-
-    await send(APP_EVENTS_RESPONSE.UPDATE_MUSIC_SETTINGS, { success: true });
-    expect(saveButton()).toBeDisabled();
-  });
-
-  it("keeps the save button when saving fails", async () => {
-    const { user } = await setup();
-    await user.click(screen.getByRole("checkbox", { name: "Last" }));
-
-    await user.click(saveButton());
-    await send(APP_EVENTS_RESPONSE.UPDATE_MUSIC_SETTINGS, failure());
-
-    expect(saveButton()).toBeEnabled();
   });
 });

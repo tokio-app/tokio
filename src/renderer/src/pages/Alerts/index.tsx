@@ -1,29 +1,20 @@
-import { Alert, Profile, SavedEmote } from "@/common/schemas";
+import { Alert, SavedEmote } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, CustomGift } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import { Page, SoundPicker } from "@/components";
 import {
   useAlertTest,
   useAudio,
-  useImmerState,
+  useEditableSettings,
   useIpcListener,
   useIpcRequest,
 } from "@/hooks";
-import isEqual from "fast-deep-equal";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ttsDefaultsOf } from "./helper";
 import { HeaderSection } from "./sections/HeaderSection";
 import { ItemsSection } from "./sections/ItemsSection";
 
-// Groups quick changes, like dragging a volume slider, into one save.
-const SAVE_DELAY = 300;
-
 export function Alerts() {
-  const [settings, update, setSettings] = useImmerState(
-    defaultProfile["alerts"],
-  );
-  // Last settings sent to main
-  const [saved, setSaved] = useState(defaultProfile["alerts"]);
   const [gifts, setGifts] = useState<CustomGift[]>([]);
   // Gifts seen in LIVEs that TikTok's list doesn't have
   const [customGifts, setCustomGifts] = useState<CustomGift[]>([]);
@@ -34,26 +25,17 @@ export function Alerts() {
   );
   // Id of the alert whose sound is being picked
   const [pickerFor, setPickerFor] = useState<string | null>(null);
-  // Settings changed but not sent to main yet
-  const pendingSave = useRef<Profile["alerts"] | null>(null);
+
+  const { settings, update } = useEditableSettings("alerts", (profile) => {
+    setEmotes(profile.emotes);
+    setTtsDefaults(ttsDefaultsOf(profile.tts));
+  });
 
   const { setItemGain } = useAudio();
   const test = useAlertTest();
 
-  useIpcRequest(APP_EVENTS.GET_PROFILE);
   useIpcRequest(APP_EVENTS.GET_GIFTS);
   useIpcRequest(APP_EVENTS.GET_CUSTOM_GIFTS);
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
-    if (!res?.success) return;
-    // A change still waiting was made to the profile shown before, sending
-    // it on leaving would write it into this one.
-    pendingSave.current = null;
-    setSettings(res.profile!.alerts);
-    setSaved(res.profile!.alerts);
-    setEmotes(res.profile!.emotes);
-    setTtsDefaults(ttsDefaultsOf(res.profile!.tts));
-  });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_GIFTS, (res) => {
     if (res) setGifts(res.data);
@@ -67,11 +49,6 @@ export function Alerts() {
   // New emotes arrive while connected.
   useIpcListener(APP_EVENTS_RESPONSE.EMOTES, (res) => {
     if (res) setEmotes(res.data);
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.UPDATE_ALERTS_SETTINGS, (res) => {
-    // Resync with what is actually saved
-    if (res && !res.success) window.api.emit(APP_EVENTS.GET_PROFILE);
   });
 
   // An alert plays a sound or speaks a message, picking one drops the other.
@@ -89,37 +66,12 @@ export function Alerts() {
     setOutput(res.id, { sound: res.sound, tts: null });
   });
 
-  useEffect(() => {
-    if (isEqual(settings, saved)) return undefined;
-
-    pendingSave.current = settings;
-    const timer = setTimeout(() => {
-      window.api.emit(APP_EVENTS.UPDATE_ALERTS_SETTINGS, { settings });
-      pendingSave.current = null;
-      setSaved(settings);
-    }, SAVE_DELAY);
-
-    return () => clearTimeout(timer);
-  }, [settings, saved]);
-
   // Apply volume changes to sounds that are already waiting or playing.
   useEffect(() => {
     settings.items.forEach((alert) => {
       setItemGain(alert.id, alert.volume / 100);
     });
   }, [settings.items, setItemGain]);
-
-  // Don't lose a change made right before leaving the page.
-  useEffect(
-    () => () => {
-      if (pendingSave.current) {
-        window.api.emit(APP_EVENTS.UPDATE_ALERTS_SETTINGS, {
-          settings: pendingSave.current,
-        });
-      }
-    },
-    [],
-  );
 
   const pickerAlert = settings.items.find((a) => a.id === pickerFor);
 

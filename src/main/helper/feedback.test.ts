@@ -83,15 +83,15 @@ describe("Notifier", () => {
   });
 
   it("sends every success and info, unless given a window", () => {
-    const saved = (windowMs?: number) =>
-      notifier.success("system", FEEDBACK_CODES.PROFILE_SAVED, "Saved.", {
+    const switched = (windowMs?: number) =>
+      notifier.success("system", FEEDBACK_CODES.PROFILE_SWITCHED, "Switched.", {
         windowMs,
       });
 
-    expect(saved()).toBe(true);
-    expect(saved()).toBe(true);
-    expect(saved(1000)).toBe(true);
-    expect(saved(1000)).toBe(false);
+    expect(switched()).toBe(true);
+    expect(switched()).toBe(true);
+    expect(switched(1000)).toBe(true);
+    expect(switched(1000)).toBe(false);
     expect(sent.map((n) => n.level)).toEqual(["success", "success", "success"]);
   });
 

@@ -56,7 +56,7 @@ describe("tts events", () => {
   describe("UPDATE_TTS_SETTINGS", () => {
     const settings = { ...defaultProfile.tts, voice };
 
-    it("saves the TTS section of the profile and notifies", async () => {
+    it("saves the TTS section of the profile without a notice, since it's an autosave", async () => {
       const updateProfileData = vi.fn(async () => true);
       const h = createHandler({ storeManagerService: { updateProfileData } });
 
@@ -68,14 +68,7 @@ describe("tts events", () => {
       expect(h.replies(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS)).toEqual([
         { success: true },
       ]);
-      expect(h.notices).toEqual([
-        expect.objectContaining({
-          level: "success",
-          source: "system",
-          code: FEEDBACK_CODES.PROFILE_SAVED,
-          message: "TTS settings saved.",
-        }),
-      ]);
+      expect(h.notices).toEqual([]);
     });
 
     it("reports a failed save as the system's", async () => {

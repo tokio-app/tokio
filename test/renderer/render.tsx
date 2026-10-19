@@ -1,6 +1,5 @@
 import { AudioContext } from "@/context/audio";
 import { NotificationsProvider } from "@/context/notifications";
-import { UnsavedProvider } from "@/context/unsaved";
 import {
   createMemoryHistory,
   createRouter,
@@ -25,9 +24,7 @@ export function providers() {
 
   const wrapper = ({ children }: { children: ReactNode }) => (
     <AudioContext.Provider value={audio.value}>
-      <NotificationsProvider>
-        <UnsavedProvider>{children}</UnsavedProvider>
-      </NotificationsProvider>
+      <NotificationsProvider>{children}</NotificationsProvider>
     </AudioContext.Provider>
   );
 

@@ -7,11 +7,10 @@ import {
   useIpcListener,
   useIpcRequest,
   useNotifications,
-  useUnsavedChanges,
   useUpdateStatus,
 } from "@/hooks";
 import { TitleBar } from "@/ui/TitleBar";
-import { Link, Outlet, useBlocker } from "@tanstack/react-router";
+import { Link, Outlet } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BsLightningCharge } from "react-icons/bs";
 import { FiHome, FiInfo, FiMusic, FiSettings, FiVolume2 } from "react-icons/fi";
@@ -34,7 +33,6 @@ const NAV_ITEMS = [
 
 export function Layout() {
   const { resumeContext } = useAudio();
-  const { confirmDiscard } = useUnsavedChanges();
   const notifications = useNotifications();
   const updateStatus = useUpdateStatus();
 
@@ -61,13 +59,6 @@ export function Layout() {
     resumeContext();
   }, [resumeContext]);
 
-  // Leaving a page with unsaved settings asks first. Only in-app navigation:
-  // blocking beforeunload makes Electron refuse to close or reload the window.
-  useBlocker({
-    shouldBlockFn: async () => !(await confirmDiscard()),
-    enableBeforeUnload: false,
-  });
-
   return (
     <div className={styles.container}>
       <TitleBar target="main" logo={Logo}>
@@ -75,11 +66,9 @@ export function Layout() {
           disabled={isConnected}
           profiles={profiles}
           active={activeProfile}
-          onProfileSelected={async (file) => {
-            if (await confirmDiscard()) {
-              window.api.emit(APP_EVENTS.SET_PROFILE, { file });
-            }
-          }}
+          onProfileSelected={(file) =>
+            window.api.emit(APP_EVENTS.SET_PROFILE, { file })
+          }
         />
         <UpdateButton status={updateStatus} connected={isConnected} />
         <NotificationBell

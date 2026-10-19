@@ -154,7 +154,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 - Throw `new AppFailure(code, message, { level: "warning", cause })` for an expected failure with its own message or level. A canceled dialog is not a failure: just `return`.
 - Log failures once. If a service already logged it, throw `new LoggedError(res.error)` or pass `{ logged: true }` to `AppFailure`.
 - `notifier` (in the handler's services) pushes `APP_EVENTS_RESPONSE.NOTIFY`: `notifier.report({ source, error, fallback })` logs and notifies; `notifier.error/warn/info/success(source, code, message, { key, windowMs })` sends a notice. Repeated warnings and errors are dropped within `windowMs` (5s default); use a longer window for failures that can repeat on every live event.
-- User actions that change something call `notifier.success(...)` after the reply, where the handler succeeds. Reads, status checks, tests, autosaves (alerts) and controls whose state the UI already shows (Home's feature switches) send nothing. Success codes are past tense (`PROFILE_SAVED`); failures end in `_FAILED`.
+- User actions that change something call `notifier.success(...)` after the reply, where the handler succeeds. Reads, status checks, tests, autosaves (TTS, music, alerts) and controls whose state the UI already shows (Home's feature switches) send nothing. Success codes are past tense (`PROFILE_CREATED`); failures end in `_FAILED`.
 - Background failures (TTS, music playback, missing alert sounds, gifts, server port, LIVE ending) are reported from `src/main/events/init.ts` through service callbacks. Services don't know about the notifier.
 - The renderer shows notices via `NotificationsProvider` (mounted above `AppProvider`, since load-time notices arrive before the splash closes): `Toasts` and the title bar's `NotificationBell`. Pages don't show notices themselves.
 
@@ -165,9 +165,9 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 - Components are folders with `index.tsx` and `<name>.module.css`, re-exported from `components/index.tsx`. Use the primitives in `components/Elements` before creating new ones; they take colors from the tokens, not props. `Modal` is the only modal shell.
 - Keep controls usable from the keyboard. `Modal` takes the focus while open and gives it back, and Escape closes the innermost one; popovers inside it (`Select`, `Color`) handle Escape first and stop it. `Select` is a combobox with a listbox. Number fields use `NumberInput`, which can be emptied while typing and reports only valid numbers. Something hidden only by CSS also needs `tabIndex={-1}` and `aria-hidden`.
 - Style with CSS Modules and the tokens in `src/ui/styles/tokens.css` (colors, `--space-*`, `--font-*`, `--radius-*`, `--z-*`), not raw values.
-- Global state is in `context/` (`app`, `audio`, `notifications`, `unsaved`); shared hooks are in `hooks/`. Notably:
+- Global state is in `context/` (`app`, `audio`, `notifications`); shared hooks are in `hooks/`. Notably:
   - `useImmerState` returns an immer `Updater`; `scopeUpdater(update, key)` hands a section one field.
-  - `useEditableSettings(section, label)` edits a profile section as a draft and registers with `UnsavedProvider`, which asks to save or discard on profile switch or navigation. Call `confirmDiscard()` from `useUnsavedChanges` before anything else that reloads the profile.
+  - `useEditableSettings(section, onLoad?)` loads a profile section (TTS, Music, Alerts) and saves it 300ms after the last change, so quick changes go in one save. A change still waiting is sent when the page closes and dropped when another profile loads, and a failed save reloads the profile.
 - Audio plays through named `AudioQueue`s (`helper/audio.ts`) from `useAudio().getQueue(name)`. `onEnded` doesn't run when a queue is stopped, and `maxQueueLength` counts waiting and playing items.
 
 ### Persistence

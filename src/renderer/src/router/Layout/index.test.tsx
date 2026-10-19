@@ -2,7 +2,7 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { notification, profileReply, settingsReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 const sidebar = () => within(screen.getByRole("navigation"));
@@ -16,14 +16,6 @@ const profiles = settingsReply((s) => {
   ];
   s.settings.activeProfile = { file: "default.json", name: "Default" };
 });
-
-// Opens TTS with a change that isn't saved yet
-async function editTTS() {
-  const app = await renderApp("/tts");
-  await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
-  await app.user.click(screen.getByRole("button", { name: "Add Replacement" }));
-  return app;
-}
 
 describe("Layout", () => {
   it("links every page from the sidebar", async () => {
@@ -82,72 +74,30 @@ describe("Layout", () => {
     expect(router.state.location.pathname).toBe("/tools");
   });
 
-  it("leaves a page without asking when nothing changed", async () => {
-    const { user } = await renderApp("/tts");
+  it("saves a change still waiting when leaving a page", async () => {
+    const { user, router } = await renderApp("/tts");
     await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
+    await user.click(screen.getByRole("button", { name: "Add Replacement" }));
 
     await user.click(sidebar().getByRole("link", { name: "Home" }));
-
-    expect(
-      await screen.findByRole("heading", { name: "Dashboard" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  it("asks before leaving unsaved settings, and Cancel stays", async () => {
-    const { user, router } = await editTTS();
-
-    await user.click(sidebar().getByRole("link", { name: "Home" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("You have unsaved TTS settings.");
-
-    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/tts");
-  });
-
-  it("leaves without the changes on Discard", async () => {
-    const { user, router } = await editTTS();
-
-    await user.click(sidebar().getByRole("link", { name: "Home" }));
-    await user.click(await screen.findByRole("button", { name: "Discard" }));
 
     expect(
       await screen.findByRole("heading", { name: "Dashboard" }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/");
-    expect(sent(APP_EVENTS.UPDATE_TTS_SETTINGS)).toEqual([]);
+    expect(
+      sent(APP_EVENTS.UPDATE_TTS_SETTINGS).map((s) => s.settings.replacements),
+    ).toEqual([[{ old: "", new: "" }]]);
   });
 
-  it("leaves once main saved the changes", async () => {
-    const { user, router } = await editTTS();
-
-    await user.click(sidebar().getByRole("link", { name: "Home" }));
-    await user.click(await screen.findByRole("button", { name: "Save" }));
-
-    const [saved] = sent(APP_EVENTS.UPDATE_TTS_SETTINGS);
-    expect(saved.settings.replacements).toEqual([{ old: "", new: "" }]);
-    expect(router.state.location.pathname).toBe("/tts");
-
-    await send(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS, { success: true });
-
-    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
-  });
-
-  it("switches profiles from the title bar, after the unsaved changes", async () => {
-    const { user } = await editTTS();
+  it("switches profiles from the title bar", async () => {
+    const { user } = await renderApp();
     await send(APP_EVENTS_RESPONSE.GET_SETTINGS, profiles);
 
     await user.click(titleBar().getByText("Default"));
     await user.click(titleBar().getByText("Horror"));
-    expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([]);
 
-    await user.click(await screen.findByRole("button", { name: "Discard" }));
-
-    await waitFor(() =>
-      expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([{ file: "horror.json" }]),
-    );
+    expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([{ file: "horror.json" }]);
   });
 
   it("locks the profile while connected", async () => {

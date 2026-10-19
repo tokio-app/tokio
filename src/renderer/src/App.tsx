@@ -1,10 +1,5 @@
 import { RouterProvider } from "@tanstack/react-router";
-import {
-  AppProvider,
-  AudioProvider,
-  NotificationsProvider,
-  UnsavedProvider,
-} from "./context";
+import { AppProvider, AudioProvider, NotificationsProvider } from "./context";
 import { router } from "./router";
 
 declare module "@tanstack/react-router" {
@@ -19,9 +14,7 @@ export default function App() {
       {/* Outside AppProvider, so notices sent while loading are shown */}
       <NotificationsProvider>
         <AppProvider>
-          <UnsavedProvider>
-            <RouterProvider router={router} />
-          </UnsavedProvider>
+          <RouterProvider router={router} />
         </AppProvider>
       </NotificationsProvider>
     </AudioProvider>

@@ -14,7 +14,7 @@ let onMusicEnded: (() => void) | null = null;
 
 events.push(
   APP_EVENTS.UPDATE_MUSIC_SETTINGS,
-  async ({ storeManagerService, notifier }, e, { settings }) => {
+  async ({ storeManagerService }, e, { settings }) => {
     const res = await storeManagerService.updateProfileData({
       music: settings,
     });
@@ -22,11 +22,6 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.UPDATE_MUSIC_SETTINGS, {
       success: true,
     });
-    notifier.success(
-      "system",
-      FEEDBACK_CODES.PROFILE_SAVED,
-      "Music settings saved.",
-    );
   },
   {
     source: "system",

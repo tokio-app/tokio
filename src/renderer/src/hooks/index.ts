@@ -7,5 +7,4 @@ export * from "./useIpcListener";
 export * from "./useIpcRequest";
 export * from "./useNotifications";
 export * from "./usePopover";
-export * from "./useUnsavedChanges";
 export * from "./useUpdateStatus";

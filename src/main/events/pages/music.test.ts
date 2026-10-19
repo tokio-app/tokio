@@ -30,7 +30,7 @@ const settings: Profile["music"] = defaultProfile.music;
 
 describe("music events", () => {
   describe("UPDATE_MUSIC_SETTINGS", () => {
-    it("saves the settings and says so", async () => {
+    it("saves the settings without a notice, since it's an autosave", async () => {
       const { music, createHandler } = await load();
       const updateProfileData = vi.fn(async (_data: Partial<Profile>) => true);
       const h = createHandler({ storeManagerService: { updateProfileData } });
@@ -43,14 +43,7 @@ describe("music events", () => {
       expect(h.replies(APP_EVENTS_RESPONSE.UPDATE_MUSIC_SETTINGS)).toEqual([
         { success: true },
       ]);
-      expect(h.notices).toEqual([
-        expect.objectContaining({
-          level: "success",
-          source: "system",
-          code: FEEDBACK_CODES.PROFILE_SAVED,
-          message: "Music settings saved.",
-        }),
-      ]);
+      expect(h.notices).toEqual([]);
     });
 
     it("reports a failed save as the system's", async () => {

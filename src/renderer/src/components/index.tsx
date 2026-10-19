@@ -1,6 +1,5 @@
 export * from "./AlertItem";
 export * from "./Elements";
-export * from "./FloatingSave";
 export * from "./Iframe";
 export * from "./Modal";
 export * from "./NotificationBell";
