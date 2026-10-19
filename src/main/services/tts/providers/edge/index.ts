@@ -17,10 +17,13 @@ export function edgeDisplayName(voice: EdgeVoice): string {
   return suffix.replace(/Neural$/, "").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
 }
 
-// Also accepts the raw suffix (e.g. "JorgeNeural") saved by earlier versions.
+// Also accepts the raw suffix (e.g. "JorgeNeural") saved by earlier versions,
+// and a whole ShortName, the display name of a voice whose ShortName doesn't
+// start with its Locale. Names alone have no "-".
 export function edgeShortName({ lang, name }: ProviderVoice): string {
   const suffix = name.replaceAll(" ", "");
-  return `${lang}-${suffix.endsWith("Neural") ? suffix : `${suffix}Neural`}`;
+  const neural = suffix.endsWith("Neural") ? suffix : `${suffix}Neural`;
+  return suffix.includes("-") ? neural : `${lang}-${neural}`;
 }
 
 export class EdgeTTS extends TTSProvider {

@@ -43,8 +43,7 @@ describe("Edge voice names", () => {
     expect(roundTrip(v)).toBe(shortName);
   });
 
-  // edgeDisplayName keeps the whole ShortName, and edgeShortName adds the Locale in front of it.
-  it.fails("round-trips a ShortName whose prefix isn't its Locale", () => {
+  it("round-trips a ShortName whose prefix isn't its Locale", () => {
     expect(roundTrip(voice("en-US-AvaNeural", "en-GB"))).toBe(
       "en-US-AvaNeural",
     );
