@@ -1,5 +1,6 @@
 import { cx } from "@/helper/cx";
 import { usePopover } from "@/hooks/usePopover";
+import { useRef } from "react";
 import { HexAlphaColorPicker, HexColorInput } from "react-colorful";
 import { createPortal } from "react-dom";
 import styles from "./elements.module.css";
@@ -11,16 +12,31 @@ type Props = {
 };
 
 export function Color({ value, onChange }: Props) {
-  const { open, toggle, position, anchorRef, popoverRef } = usePopover(8);
+  const { open, toggle, close, position, anchorRef, popoverRef } =
+    usePopover(8);
+  const swatchRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div ref={anchorRef} className={styles.color_anchor}>
+    // The picker is portaled, but its keys still bubble up here
+    <div
+      ref={anchorRef}
+      className={styles.color_anchor}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || !open) return;
+        // Closes the picker, not a modal it's in
+        e.stopPropagation();
+        close();
+        swatchRef.current?.focus();
+      }}
+    >
       <button
+        ref={swatchRef}
         type="button"
         className={styles.color_swatch}
         style={{ backgroundColor: value }}
         onClick={toggle}
         aria-label="Choose color"
+        aria-expanded={open}
       />
 
       {open &&

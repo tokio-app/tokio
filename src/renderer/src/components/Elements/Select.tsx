@@ -1,7 +1,15 @@
 import { cx } from "@/helper/cx";
 import { usePopover } from "@/hooks/usePopover";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ReactNode, useMemo, useRef, useState } from "react";
+import {
+  KeyboardEvent,
+  ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { FiChevronDown } from "react-icons/fi";
 import { VscClose } from "react-icons/vsc";
@@ -74,6 +82,7 @@ export function MultiSelect<V extends Value>({
   return (
     <SelectBase
       {...common}
+      multiple
       isSelected={(v) => selected.has(v)}
       onPick={(v) => {
         onChange(
@@ -93,6 +102,7 @@ export function MultiSelect<V extends Value>({
                 {!common.disabled && (
                   <button
                     type="button"
+                    aria-label={`Remove ${chip.label}`}
                     className={styles.select_chip_remove}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -117,66 +127,9 @@ type BaseProps<V extends Value> = CommonProps<V> & {
   isSelected: (value: V) => boolean;
   // Returns whether to close the list
   onPick: (value: V) => boolean;
+  // More than one option can be picked
+  multiple?: boolean;
 };
-
-function SelectBase<V extends Value>({
-  options,
-  searchable,
-  placeholder = "Select an option...",
-  className,
-  disabled,
-  display,
-  isSelected,
-  onPick,
-}: BaseProps<V>) {
-  const { open, toggle, close, position, anchorRef, popoverRef } = usePopover();
-
-  return (
-    <div ref={anchorRef} className={className}>
-      <div
-        className={cx(
-          styles.select_display,
-          disabled && styles.select_display_disabled,
-        )}
-        onClick={disabled ? undefined : toggle}
-      >
-        {display ?? (
-          <span className={styles.select_placeholder}>{placeholder}</span>
-        )}
-        <FiChevronDown
-          size={16}
-          className={cx(
-            styles.select_chevron,
-            open && styles.select_chevron_open,
-          )}
-        />
-      </div>
-
-      {open &&
-        createPortal(
-          <div
-            ref={popoverRef}
-            className={styles.popover}
-            style={{
-              top: position.top,
-              left: position.left,
-              width: position.width,
-            }}
-          >
-            <SelectMenu
-              options={options}
-              searchable={searchable}
-              isSelected={isSelected}
-              onPick={(v) => {
-                if (onPick(v)) close();
-              }}
-            />
-          </div>,
-          document.body,
-        )}
-    </div>
-  );
-}
 
 type Row<V extends Value> =
   | { kind: "group"; label: string }
@@ -206,22 +159,214 @@ function buildRows<V extends Value>(
   return rows;
 }
 
-// Mounted only while open, so the search starts empty every time.
-function SelectMenu<V extends Value>({
+const firstOption = <V extends Value>(rows: Row<V>[]) =>
+  rows.findIndex((row) => row.kind === "option");
+
+type Move = "next" | "previous" | "first" | "last";
+
+const MOVES: Partial<Record<string, Move>> = {
+  ArrowDown: "next",
+  ArrowUp: "previous",
+  Home: "first",
+  End: "last",
+};
+
+function SelectBase<V extends Value>({
   options,
   searchable,
+  placeholder = "Select an option...",
+  className,
+  disabled,
+  display,
   isSelected,
   onPick,
-}: {
-  options: SelectOption<V>[];
-  searchable?: boolean;
-  isSelected: (value: V) => boolean;
-  onPick: (value: V) => void;
-}) {
+  multiple,
+}: BaseProps<V>) {
+  const { open, toggle, close, position, anchorRef, popoverRef } = usePopover();
+  const displayRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
   const [search, setSearch] = useState("");
-  const listRef = useRef<HTMLDivElement>(null);
+  // Row the keyboard is on, -1 for none
+  const [active, setActive] = useState(-1);
 
   const rows = useMemo(() => buildRows(options, search), [options, search]);
+  const optionId = (index: number) => `${listId}-${index}`;
+  const activeId =
+    open && rows[active]?.kind === "option" ? optionId(active) : undefined;
+
+  // Opens on the selected option, with an empty search
+  const openList = () => {
+    const all = buildRows(options, "");
+    const selected = all.findIndex(
+      (row) => row.kind === "option" && isSelected(row.option.value),
+    );
+    setSearch("");
+    setActive(selected !== -1 ? selected : firstOption(all));
+    toggle();
+  };
+
+  // The list is portaled, so the focus comes back to the select
+  const closeList = () => {
+    close();
+    displayRef.current?.focus();
+  };
+
+  const pick = (value: V) => {
+    if (onPick(value)) closeList();
+  };
+
+  const move = (to: Move) => {
+    const indexes = rows.flatMap((row, i) =>
+      row.kind === "option" ? [i] : [],
+    );
+    if (indexes.length === 0) return;
+    const at = indexes.indexOf(active);
+    const last = indexes.length - 1;
+    const target = {
+      first: 0,
+      last,
+      next: at === -1 ? 0 : Math.min(at + 1, last),
+      previous: at === -1 ? last : Math.max(at - 1, 0),
+    }[to];
+    setActive(indexes[target]);
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>, fromSearch = false) => {
+    if (!open) {
+      if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(e.key)) {
+        e.preventDefault();
+        openList();
+      }
+      return;
+    }
+
+    // The search keeps these for its text
+    if (fromSearch && [" ", "Home", "End"].includes(e.key)) return;
+
+    const to = MOVES[e.key];
+    if (to) {
+      e.preventDefault();
+      move(to);
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const row = rows[active];
+      if (row?.kind === "option") pick(row.option.value);
+    } else if (e.key === "Escape") {
+      // Closes the list, not a modal it's in
+      e.preventDefault();
+      e.stopPropagation();
+      closeList();
+    } else if (e.key === "Tab") {
+      // The search is portaled to the end of the page, Tab would land there
+      if (fromSearch) {
+        e.preventDefault();
+        closeList();
+      } else {
+        close();
+      }
+    }
+  };
+
+  return (
+    <div ref={anchorRef} className={className}>
+      <div
+        ref={displayRef}
+        role="combobox"
+        tabIndex={disabled ? -1 : 0}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={searchable ? undefined : activeId}
+        aria-disabled={disabled || undefined}
+        className={cx(
+          styles.select_display,
+          disabled && styles.select_display_disabled,
+        )}
+        onClick={disabled ? undefined : () => (open ? close() : openList())}
+        onKeyDown={(e) => {
+          // Keys on the chips' remove buttons are theirs
+          if (!disabled && e.target === e.currentTarget) onKeyDown(e);
+        }}
+      >
+        {display ?? (
+          <span className={styles.select_placeholder}>{placeholder}</span>
+        )}
+        <FiChevronDown
+          size={16}
+          className={cx(
+            styles.select_chevron,
+            open && styles.select_chevron_open,
+          )}
+        />
+      </div>
+
+      {open &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            className={styles.popover}
+            style={{
+              top: position.top,
+              left: position.left,
+              width: position.width,
+            }}
+          >
+            <SelectMenu
+              rows={rows}
+              listId={listId}
+              optionId={optionId}
+              active={active}
+              activeId={activeId}
+              multiple={multiple}
+              searchable={searchable}
+              search={search}
+              isSelected={isSelected}
+              onSearch={(text) => {
+                setSearch(text);
+                setActive(firstOption(buildRows(options, text)));
+              }}
+              onActive={setActive}
+              onPick={pick}
+              onKeyDown={(e) => onKeyDown(e, true)}
+            />
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+// Mounted only while open
+function SelectMenu<V extends Value>({
+  rows,
+  listId,
+  optionId,
+  active,
+  activeId,
+  multiple,
+  searchable,
+  search,
+  isSelected,
+  onSearch,
+  onActive,
+  onPick,
+  onKeyDown,
+}: {
+  rows: Row<V>[];
+  listId: string;
+  optionId: (index: number) => string;
+  active: number;
+  activeId: string | undefined;
+  multiple?: boolean;
+  searchable?: boolean;
+  search: string;
+  isSelected: (value: V) => boolean;
+  onSearch: (text: string) => void;
+  onActive: (index: number) => void;
+  onPick: (value: V) => void;
+  onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
+}) {
+  const listRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -230,6 +375,13 @@ function SelectMenu<V extends Value>({
       rows[index].kind === "group" ? GROUP_HEIGHT : OPTION_HEIGHT,
     overscan: 5,
   });
+
+  // Keeps the keyboard's option in view
+  useEffect(() => {
+    if (active >= 0 && active < rows.length) {
+      virtualizer.scrollToIndex(active, { align: "auto" });
+    }
+  }, [active, rows.length, virtualizer]);
 
   return (
     <>
@@ -240,13 +392,23 @@ function SelectMenu<V extends Value>({
             placeholder="Search..."
             className={styles.select_search_input}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            aria-controls={listId}
+            aria-activedescendant={activeId}
+            aria-autocomplete="list"
+            onChange={(e) => onSearch(e.target.value)}
+            onKeyDown={onKeyDown}
             autoFocus
           />
         </div>
       )}
 
-      <div ref={listRef} className={styles.select_list}>
+      <div
+        ref={listRef}
+        id={listId}
+        role="listbox"
+        aria-multiselectable={multiple || undefined}
+        className={styles.select_list}
+      >
         {rows.length === 0 ? (
           <div className={styles.select_empty}>No options found</div>
         ) : (
@@ -256,9 +418,12 @@ function SelectMenu<V extends Value>({
           >
             {virtualizer.getVirtualItems().map((item) => {
               const row = rows[item.index];
+              const selected =
+                row.kind === "option" && isSelected(row.option.value);
               return (
                 <div
                   key={item.key}
+                  role="presentation"
                   className={styles.select_row}
                   style={{
                     height: item.size,
@@ -269,11 +434,17 @@ function SelectMenu<V extends Value>({
                     <div className={styles.select_group}>{row.label}</div>
                   ) : (
                     <div
+                      id={optionId(item.index)}
+                      role="option"
+                      aria-selected={selected}
                       className={cx(
                         styles.select_item,
-                        isSelected(row.option.value) &&
-                          styles.select_item_active,
+                        selected && styles.select_item_active,
+                        item.index === active && styles.select_item_focused,
                       )}
+                      // Keeps the focus on the select or its search
+                      onMouseDown={(e) => e.preventDefault()}
+                      onMouseMove={() => onActive(item.index)}
                       onClick={() => onPick(row.option.value)}
                     >
                       {row.option.img && (
