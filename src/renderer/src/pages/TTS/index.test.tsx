@@ -1,0 +1,406 @@
+import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { engine, failure, profileReply, voice } from "@test/fixtures";
+import { send, sent } from "@test/ipc";
+import { section } from "@test/queries";
+import { renderWithProviders } from "@test/render";
+import { fireEvent, screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { TTS } from ".";
+
+const aria = voice("en-US-AriaNeural");
+const guy = voice("en-US-GuyNeural");
+const data = new Uint8Array([1, 2, 3]);
+
+const loaded = profileReply((p) => {
+  p.tts.voice = aria;
+  p.tts.filters = { speed: 1.5, pitch: 0.8, volume: 70 };
+  p.tts.format = {
+    template: "{username} says {comment}",
+    trigger: { mode: "custom", value: "!say" },
+  };
+  p.tts.replacements = [{ old: "brb", new: "be right back" }];
+  p.tts.protection = {
+    cooldown: 5,
+    queue_length: 20,
+    comment_length: 150,
+    banned: ["spoiler", "ad"],
+  };
+});
+
+// The field under a label: the label and its control share a div
+const field = (label: string | RegExp) =>
+  within(screen.getByText(label).closest("div")!);
+
+const saveButton = () => screen.getByRole("button", { name: "Save changes" });
+const testButton = () => screen.getByRole("button", { name: "Test Voice" });
+const testMessage = () =>
+  screen.getByPlaceholderText("Type a message to test how the TTS sounds...");
+const customTrigger = () => screen.getByPlaceholderText("!tts");
+const template = () => field("Message Template").getByRole("textbox");
+const mode = (label: RegExp) => screen.getByRole("radio", { name: label });
+
+async function setup(reply = loaded) {
+  const app = renderWithProviders(<TTS />);
+  await send(APP_EVENTS_RESPONSE.GET_PROFILE, reply);
+  return { ...app, queue: app.audio.queue("tts_test") };
+}
+
+type User = Awaited<ReturnType<typeof setup>>["user"];
+
+// Saves, and returns what was sent: the draft
+async function draft(user: User) {
+  await user.click(saveButton());
+  return sent(APP_EVENTS.UPDATE_TTS_SETTINGS).at(-1)!.settings;
+}
+
+describe("TTS", () => {
+  it("asks main for the profile and the voices", () => {
+    renderWithProviders(<TTS />);
+
+    expect(sent(APP_EVENTS.GET_PROFILE)).toHaveLength(1);
+    expect(sent(APP_EVENTS.GET_VOICES)).toHaveLength(1);
+  });
+
+  it("fills in the loaded settings", async () => {
+    await setup();
+
+    expect(
+      screen.getByRole("button", { name: /en-US-AriaNeural/ }),
+    ).toBeInTheDocument();
+    expect(field("Speed (1.5x)").getByRole("slider")).toHaveValue("1.5");
+    expect(field("Pitch (0.8)").getByRole("slider")).toHaveValue("0.8");
+    expect(field("Volume (70%)").getByRole("slider")).toHaveValue("70");
+
+    expect(mode(/Custom Command/)).toBeChecked();
+    expect(customTrigger()).toHaveValue("!say");
+    expect(customTrigger()).toBeEnabled();
+    expect(template()).toHaveValue("{username} says {comment}");
+
+    expect(screen.getByPlaceholderText(/Word to replace/)).toHaveValue("brb");
+    expect(screen.getByPlaceholderText(/How it sounds/)).toHaveValue(
+      "be right back",
+    );
+
+    expect(field("Cooldown").getByRole("spinbutton")).toHaveValue(5);
+    expect(field("Max Queue Length").getByRole("spinbutton")).toHaveValue(20);
+    expect(field("Max Comment Length").getByRole("spinbutton")).toHaveValue(
+      150,
+    );
+    expect(screen.getByPlaceholderText("word1, word2, word3...")).toHaveValue(
+      "spoiler, ad",
+    );
+  });
+
+  it("applies the loaded filters to the test queue", async () => {
+    const { queue } = await setup();
+
+    expect(queue.setFilters).toHaveBeenCalledWith({
+      speed: 1.5,
+      pitch: 0.8,
+      volume: 0.7,
+    });
+  });
+
+  it("saves the draft once something changed", async () => {
+    const { user } = await setup();
+    expect(saveButton()).toBeDisabled();
+
+    await user.type(template(), "!");
+    expect(saveButton()).toBeEnabled();
+
+    await user.click(saveButton());
+    expect(sent(APP_EVENTS.UPDATE_TTS_SETTINGS)).toEqual([
+      {
+        settings: {
+          ...loaded.profile.tts,
+          format: {
+            ...loaded.profile.tts.format,
+            template: "{username} says {comment}!",
+          },
+        },
+      },
+    ]);
+    expect(saveButton()).toBeEnabled();
+
+    await send(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS, { success: true });
+
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it("keeps the save button when saving fails", async () => {
+    const { user } = await setup();
+    await user.type(template(), "!");
+
+    await user.click(saveButton());
+    await send(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS, failure());
+
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it("tests the voice only with a message", async () => {
+    const { user } = await setup();
+    expect(testButton()).toBeDisabled();
+
+    await user.type(testMessage(), "Hi");
+    expect(testButton()).toBeEnabled();
+
+    await user.clear(testMessage());
+    expect(testButton()).toBeDisabled();
+  });
+
+  it("tests the voice with the message, loading until main answers", async () => {
+    const { user, queue } = await setup();
+    const test = testButton();
+
+    await user.type(testMessage(), "Hello chat");
+    await user.click(test);
+
+    expect(sent(APP_EVENTS.GET_TTS_TEST)).toEqual([
+      { id: "tts-test", text: "Hello chat", voice: aria },
+    ]);
+    expect(test).toHaveAttribute("aria-busy", "true");
+
+    await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
+      success: true,
+      id: "tts-test",
+      data,
+    });
+
+    expect(queue.enqueue).toHaveBeenCalledWith(data, true);
+    expect(test).not.toHaveAttribute("aria-busy");
+  });
+
+  it("stops loading without playing when the test fails", async () => {
+    const { user, queue } = await setup();
+    const test = testButton();
+    await user.type(testMessage(), "Hello chat");
+    await user.click(test);
+
+    await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
+      ...failure(),
+      id: "tts-test",
+    });
+
+    expect(queue.enqueue).not.toHaveBeenCalled();
+    expect(test).not.toHaveAttribute("aria-busy");
+  });
+
+  it("ignores test replies meant for voice previews", async () => {
+    const { user, queue } = await setup();
+    const test = testButton();
+    await user.type(testMessage(), "Hello chat");
+    await user.click(test);
+
+    await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
+      success: true,
+      id: "voice-preview:edge|en-US|en-US-AriaNeural",
+      data,
+    });
+
+    expect(queue.enqueue).not.toHaveBeenCalled();
+    expect(test).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("tests and saves the voice picked from the list", async () => {
+    const { user } = await setup();
+    await send(APP_EVENTS_RESPONSE.GET_VOICES, {
+      success: true,
+      voices: [aria, guy],
+      engines: [engine("edge", "Edge")],
+    });
+
+    await user.click(screen.getByRole("button", { name: /en-US-AriaNeural/ }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByTitle("en-US-GuyNeural"),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.type(testMessage(), "Hello chat");
+    await user.click(testButton());
+
+    expect(sent(APP_EVENTS.GET_TTS_TEST)).toEqual([
+      { id: "tts-test", text: "Hello chat", voice: guy },
+    ]);
+    expect((await draft(user)).voice).toEqual(guy);
+  });
+
+  it("changes the filters and the test queue's with the sliders", async () => {
+    const { user, queue } = await setup();
+
+    fireEvent.change(field("Speed (1.5x)").getByRole("slider"), {
+      target: { value: "1.2" },
+    });
+    expect(queue.setFilters).toHaveBeenLastCalledWith({ speed: 1.2 });
+
+    fireEvent.change(field("Pitch (0.8)").getByRole("slider"), {
+      target: { value: "1.3" },
+    });
+    expect(queue.setFilters).toHaveBeenLastCalledWith({ pitch: 1.3 });
+
+    fireEvent.change(field("Volume (70%)").getByRole("slider"), {
+      target: { value: "40" },
+    });
+    expect(queue.setFilters).toHaveBeenLastCalledWith({ volume: 0.4 });
+
+    expect(screen.getByText("Speed (1.2x)")).toBeInTheDocument();
+    expect(screen.getByText("Pitch (1.3)")).toBeInTheDocument();
+    expect(screen.getByText("Volume (40%)")).toBeInTheDocument();
+    expect((await draft(user)).filters).toEqual({
+      speed: 1.2,
+      pitch: 1.3,
+      volume: 40,
+    });
+  });
+
+  it("sets the trigger of each format mode", async () => {
+    const { user } = await setup();
+
+    await user.click(mode(/Read All Comments/));
+    expect((await draft(user)).format.trigger).toEqual({
+      mode: "any",
+      value: "",
+    });
+    expect(customTrigger()).toBeDisabled();
+    expect(customTrigger()).toHaveValue("");
+
+    await user.click(mode(/Dot Prefix/));
+    expect((await draft(user)).format.trigger).toEqual({
+      mode: "dot",
+      value: ".",
+    });
+
+    await user.click(mode(/Slash Prefix/));
+    expect((await draft(user)).format.trigger).toEqual({
+      mode: "slash",
+      value: "/",
+    });
+
+    await user.click(mode(/Custom Command/));
+    expect(customTrigger()).toBeEnabled();
+    expect(customTrigger()).toHaveValue("");
+
+    await user.type(customTrigger(), "!speak");
+    expect((await draft(user)).format.trigger).toEqual({
+      mode: "custom",
+      value: "!speak",
+    });
+  });
+
+  it("adds a clicked variable to the template", async () => {
+    const { user } = await setup();
+
+    await user.click(screen.getByRole("button", { name: "{handle}" }));
+
+    expect(template()).toHaveValue("{username} says {comment}{handle}");
+    expect((await draft(user)).format.template).toBe(
+      "{username} says {comment}{handle}",
+    );
+  });
+
+  it("adds, edits and removes replacements", async () => {
+    const { user } = await setup(profileReply());
+    const replacements = section("Replacements");
+    expect(
+      replacements.getByText("No custom replacements added."),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add Replacement" }));
+    expect(
+      replacements.queryByText("No custom replacements added."),
+    ).not.toBeInTheDocument();
+    expect(replacements.getByPlaceholderText(/Word to replace/)).toHaveValue(
+      "",
+    );
+
+    await user.type(replacements.getByPlaceholderText(/Word to replace/), "gg");
+    await user.type(
+      replacements.getByPlaceholderText(/How it sounds/),
+      "good game",
+    );
+    expect((await draft(user)).replacements).toEqual([
+      { old: "gg", new: "good game" },
+    ]);
+
+    await user.click(replacements.getByRole("button", { name: "Remove" }));
+    expect(
+      replacements.getByText("No custom replacements added."),
+    ).toBeInTheDocument();
+    // Back to the saved settings
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it("removes the replacement whose button is clicked", async () => {
+    const { user } = await setup(
+      profileReply((p) => {
+        p.tts.replacements = [
+          { old: "brb", new: "be right back" },
+          { old: "gg", new: "good game" },
+        ];
+      }),
+    );
+
+    const [removeFirst] = screen.getAllByRole("button", { name: "Remove" });
+    await user.click(removeFirst);
+
+    expect(screen.getByPlaceholderText(/Word to replace/)).toHaveValue("gg");
+    expect((await draft(user)).replacements).toEqual([
+      { old: "gg", new: "good game" },
+    ]);
+  });
+
+  it("changes the protection limits and the banned words", async () => {
+    const { user } = await setup();
+
+    fireEvent.change(field("Cooldown").getByRole("spinbutton"), {
+      target: { value: "8" },
+    });
+    fireEvent.change(field("Max Queue Length").getByRole("spinbutton"), {
+      target: { value: "3" },
+    });
+    fireEvent.change(field("Max Comment Length").getByRole("spinbutton"), {
+      target: { value: "99" },
+    });
+    const banned = screen.getByPlaceholderText("word1, word2, word3...");
+    await user.clear(banned);
+    await user.type(banned, "one, two ,, three");
+
+    expect((await draft(user)).protection).toEqual({
+      cooldown: 8,
+      queue_length: 3,
+      comment_length: 99,
+      banned: ["one", "two", "three"],
+    });
+  });
+
+  it("changes who may use TTS", async () => {
+    const { user } = await setup();
+    const permissions = section("Permissions");
+    const level = permissions.getByRole("spinbutton");
+    expect(level).toBeDisabled();
+
+    await user.click(screen.getByRole("checkbox", { name: "Allow Everyone" }));
+    await user.click(screen.getByRole("checkbox", { name: "Followers Only" }));
+    await user.click(screen.getByRole("checkbox", { name: "Moderators Only" }));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Minimum Fan Level" }),
+    );
+    expect(level).toBeEnabled();
+    fireEvent.change(level, { target: { value: "10" } });
+
+    expect(permissions.queryByText("Whitelist")).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("checkbox", { name: "Enable Whitelist / Blacklist" }),
+    );
+    await user.type(field("Whitelist").getByRole("textbox"), "alice, bob");
+    await user.type(field("Blacklist").getByRole("textbox"), "troll");
+
+    expect((await draft(user)).permissions).toEqual({
+      all: false,
+      followers: true,
+      superfans: false,
+      moderators: true,
+      level: { enabled: true, value: 10 },
+      list: { enabled: true, white: ["alice", "bob"], black: ["troll"] },
+    });
+  });
+});
