@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useId, useRef, useState } from "react";
 import { VscClose } from "react-icons/vsc";
 import { Btn } from "../Elements";
 import styles from "./modal.module.css";
@@ -6,6 +6,7 @@ import styles from "./modal.module.css";
 type Props = {
   title: string;
   description?: string;
+  // Also called on Escape
   onClose: () => void;
   // With onConfirm and no footer, the footer is Cancel and a confirm button
   onConfirm?: () => void;
@@ -29,6 +30,21 @@ export function Modal({
   maxWidth = "400px",
   children,
 }: Props) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // What had the focus before it opened, read before an autoFocus inside
+  const [opener] = useState(() => document.activeElement);
+
+  // Takes the focus, so Escape reaches it, and gives it back on close.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.contains(document.activeElement)) dialog.focus();
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
+  }, [opener]);
+
   const actions =
     footer ??
     (onConfirm && (
@@ -42,9 +58,26 @@ export function Modal({
 
   return (
     <div className={styles.backdrop}>
-      <div role="dialog" className={styles.card} style={{ maxWidth }}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
+        className={styles.card}
+        style={{ maxWidth }}
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") return;
+          // Only the innermost dialog closes, e.g. a picker over a modal
+          e.stopPropagation();
+          onClose();
+        }}
+      >
         <div className={styles.header}>
-          <h3 className={styles.title}>{title}</h3>
+          <h3 id={titleId} className={styles.title}>
+            {title}
+          </h3>
           {closeButton && (
             <Btn variant="icon" title="Close" onClick={onClose}>
               <VscClose size={24} />
@@ -52,7 +85,11 @@ export function Modal({
           )}
         </div>
 
-        {description && <p className={styles.description}>{description}</p>}
+        {description && (
+          <p id={descriptionId} className={styles.description}>
+            {description}
+          </p>
+        )}
 
         {children && <div className={styles.body}>{children}</div>}
 
