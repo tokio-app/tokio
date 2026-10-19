@@ -11,8 +11,10 @@ export class TikTokTTS extends TTSProvider {
   private sessionId: string | undefined;
 
   private getURL(text: string, speaker: string, lang: string) {
-    const preparedText = prepareText(text, lang);
-    return `${config.API_URL}/?text_speaker=${speaker}&req_text=${preparedText}&speaker_map_type=0&aid=1233`;
+    // prepareText joins the words with +, the query's spaces, so a "#" or "%"
+    // in a word can't cut or garble the text.
+    const words = prepareText(text, lang).split("+").map(encodeURIComponent);
+    return `${config.API_URL}/?text_speaker=${encodeURIComponent(speaker)}&req_text=${words.join("+")}&speaker_map_type=0&aid=1233`;
   }
 
   private async generateB64TTSALT(

@@ -180,8 +180,7 @@ describe("TikTokTTS", () => {
       expect(lastUrl().searchParams.get("text_speaker")).toBe("es_mx_002");
     });
 
-    // getURL puts the text in the URL without encoding it, so a "#" starts the URL's fragment.
-    it.fails("keeps the whole text in the request", async () => {
+    it("keeps the whole text in the request", async () => {
       post.mockResolvedValue({
         data: { status_code: 0, data: { v_str: b64("mp3") } },
       });
@@ -189,7 +188,7 @@ describe("TikTokTTS", () => {
       await tts.generateBuffer("We're #1 & proud", "en", "Jessie");
 
       const params = lastUrl().searchParams;
-      expect(params.get("req_text")).toMatch(/^We're[ +]#1[ +]and[ +]proud$/);
+      expect(params.get("req_text")).toBe("We're #1 and proud");
       expect(params.get("aid")).toBe("1233");
     });
   });
