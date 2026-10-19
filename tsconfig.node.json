@@ -10,7 +10,8 @@
     "strictPropertyInitialization": false,
     "paths": {
       "@/*":["./src/main/*"],
-      "@/common/*":["./src/common/*"]
+      "@/common/*":["./src/common/*"],
+      "@test/*":["./test/main/*"]
     },
     "types": ["electron-vite/node"]
   }

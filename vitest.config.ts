@@ -17,6 +17,7 @@ export default defineConfig({
         resolve: {
           // Same aliases as the main process in electron.vite.config.ts
           alias: {
+            "@test": resolve("test/main"),
             "@/common": resolve("src/common"),
             "@": resolve("src/main"),
           },
@@ -24,7 +25,12 @@ export default defineConfig({
         test: {
           name: "main",
           environment: "node",
-          include: ["src/main/**/*.test.ts", "src/common/**/*.test.ts"],
+          include: [
+            "src/main/**/*.test.ts",
+            "src/common/**/*.test.ts",
+            "src/preload/**/*.test.ts",
+            "scripts/**/*.test.js",
+          ],
           setupFiles: ["test/setup.ts"],
         },
       },

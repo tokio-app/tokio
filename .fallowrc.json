@@ -8,6 +8,7 @@
     "src/music/src/main.tsx"
   ],
   "ignoreDependencies": ["electron-updater"],
+  "ignoreFindings": ["test/main/electron.ts"],
   "ignoreExports": [
     {
       "file": "src/renderer/src/components/Elements/elements.module.css",
