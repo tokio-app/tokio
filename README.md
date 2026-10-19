@@ -45,7 +45,7 @@ Music requests use the same permissions and protection settings as text-to-speec
 Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gifts, envelopes, Super Fan events, new members and song changes.
 
 - Upload your own sounds or search [MyInstants](https://www.myinstants.com) from inside the app. Your sound library is shared by all your profiles.
-- Set each alert's volume. Gift alerts can react to any gift or only to the ones you pick, and fire once per combo.
+- Set each alert's volume. Gift alerts can react to any gift or only to the ones you pick, and fire once per combo. TikTok's gift list can miss some gifts, like ones from other regions, so Tokio also saves the ones viewers send that aren't on it, for all your profiles.
 - Chat alerts can react to every message or only to messages with a keyword. Emote alerts can react to any emote or only to the ones you pick. TikTok doesn't list a LIVE's emotes, so each profile saves the ones viewers use.
 - Member Join and Super Fan Join alerts can react to anyone or only to the viewer you name, by @handle or name.
 - Instead of a sound, an alert can speak a message with text-to-speech, in its own voice, speed and pitch. Messages can include details of the event, such as `{username}`, `{gift}` or `{count}`, and the TTS page's banned words, replacements, cooldown and queue length apply.
