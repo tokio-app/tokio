@@ -176,9 +176,11 @@ Tokio's source is MIT; treat license compliance as part of every change.
 ## CI and releases
 
 - `ci.yml` (PRs and `main`): Prettier check, lint, typecheck and tests on Linux and Windows. Non-draft PRs, `main`, and draft PRs whose latest commit contains `[ci]` also package the app via `build-app.yml`; `chore(release): ...` commits skip packaging.
-- `release.yml` runs on a `v<version>` tag matching `package.json` and attaches the packages and update files to a draft GitHub release. `scripts/release-notes` writes its notes from the Conventional Commits since the previous `v*` tag (`chore(release)` commits are skipped); a rerun keeps the draft's notes.
+- `release.yml` runs on a `v<version>` tag matching `package.json` and publishes a GitHub release with the packages and update files. `gh release create` uploads them before publishing. `scripts/release-notes` writes its notes from the Conventional Commits since the previous `v*` tag (`chore(release)` commits are skipped); a rerun only replaces the files, so edited notes are kept.
+- Versions with a `-` (`0.1.0-alpha.5`) are published as regular releases, not prereleases: auto-updates and the website only read the latest release.
+- It then sends a `repository_dispatch` (`release`) to `tokio-app/website`, which rebuilds the download page. That needs the `WEBSITE_DISPATCH_TOKEN` secret (a fine-grained token with Contents read and write on `tokio-app/website`). Without it the step only warns.
 
-To release: bump `version` in `package.json`, commit, push a `v<version>` tag, then review and publish the draft (only published releases feed auto-updates and the website's download links). Keep `artifactName` in `electron-builder.yml`, the upload paths in `build-app.yml` and the website's `src/lib/release.ts` in sync.
+To release: bump `version` in `package.json`, commit, and push a `v<version>` tag. The release goes out to auto-updates as soon as the workflow publishes it. Keep `artifactName` in `electron-builder.yml`, the upload paths in `build-app.yml` and the website's `src/lib/release.ts` in sync.
 
 ## Website
 

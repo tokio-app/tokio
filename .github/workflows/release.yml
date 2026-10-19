@@ -1,7 +1,7 @@
 name: Release
 
-# Push a tag v<version> matching package.json to build every platform into a draft GitHub release.
-# Publish the draft to make it the latest release, which auto-updates and the website read.
+# Push a tag v<version> matching package.json to build every platform and publish a GitHub release.
+# It becomes the latest release, which auto-updates and the website read, and the website rebuilds.
 on:
   push:
     tags: ["v*"]
@@ -50,16 +50,30 @@ jobs:
           path: assets
           merge-multiple: true
 
-      - name: Create draft release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           ls -l assets
-          # A rerun only replaces the files, so notes already edited in the draft are kept.
+          # A rerun only replaces the files, so notes already edited in the release are kept.
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" assets/* --clobber
           else
-            gh release create "$GITHUB_REF_NAME" assets/* --draft --verify-tag \
+            # gh uploads the files before publishing, so the update files are there when
+            # auto-updates see it. Alphas (0.1.0-alpha.5) aren't marked as prereleases: the
+            # updater and the website only read the latest release.
+            gh release create "$GITHUB_REF_NAME" assets/* --verify-tag \
               --title "Tokio ${GITHUB_REF_NAME#v}" --notes-file release-notes.md
           fi
+
+      # Rebuilds the website, so its download page shows the new version.
+      - name: Update the website
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::WEBSITE_DISPATCH_TOKEN isn't set, so the website wasn't rebuilt. Run its Deploy workflow by hand."
+            exit 0
+          fi
+          gh api repos/tokio-app/website/dispatches -f event_type=release
