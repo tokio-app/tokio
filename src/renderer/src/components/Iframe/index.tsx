@@ -25,7 +25,12 @@ export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
       ? normalizedPath
       : `/${normalizedPath}`;
 
-    return `local-resource://${encodeURI(pathWithSlash)}`;
+    // encodeURI leaves # and ? alone, which would cut the path short
+    const encoded = encodeURI(pathWithSlash).replace(
+      /[#?]/g,
+      encodeURIComponent,
+    );
+    return `local-resource://${encoded}`;
   }, [source]);
 
   if (!source) {
