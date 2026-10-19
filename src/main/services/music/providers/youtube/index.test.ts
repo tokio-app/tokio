@@ -366,8 +366,7 @@ describe("YouTubeMusic", () => {
       expect(navigate("https://www.google.com/")).toBe(true);
     });
 
-    // The hostname check uses includes(), so any host containing youtube.com passes
-    it.fails("blocks hosts that only look like YouTube", () => {
+    it("blocks hosts that only look like YouTube", () => {
       const { view } = open();
       const navigate = (url: string) => {
         const event = cancelableEvent({ url });

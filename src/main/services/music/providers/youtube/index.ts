@@ -18,6 +18,12 @@ import {
 } from "./common";
 import config from "./config";
 
+// Where the player's window may go: YouTube and Google's sign-in
+const isYouTubeOrLogin = (hostname: string) =>
+  hostname === "accounts.google.com" ||
+  hostname === "youtube.com" ||
+  hostname.endsWith(".youtube.com");
+
 export class YouTubeMusic extends MusicProvider {
   private _ytView: WebContentsView | null = null;
   private _shellWindow: BrowserWindow | null = null;
@@ -76,11 +82,7 @@ export class YouTubeMusic extends MusicProvider {
     });
 
     this._ytView.webContents.on("will-navigate", (event) => {
-      const url = new URL(event.url);
-      if (
-        !url.hostname.includes("accounts.google.com") &&
-        !url.hostname.includes("youtube.com")
-      ) {
+      if (!isYouTubeOrLogin(new URL(event.url).hostname)) {
         event.preventDefault();
       }
     });
