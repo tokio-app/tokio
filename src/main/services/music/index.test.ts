@@ -461,8 +461,7 @@ describe("MusicService", () => {
       expect(played()).toEqual(["A", "B"]);
     });
 
-    // The queued action calls provider.play(info) without returning its promise, so the rejection is lost
-    it.fails("reports a track the provider fails to play", async () => {
+    it("reports a track the provider fails to play", async () => {
       const { request, provider, onPlaybackError, logError } = listen();
       const error = new Error(
         "No active devices. Play a song on Spotify first.",
@@ -479,56 +478,34 @@ describe("MusicService", () => {
       );
     });
 
-    describe("before the song is queued", () => {
-      // Today these failures are unhandled rejections, which would fail the
-      // whole run. Vitest leaves them alone while the test listens for them.
-      const dropped = vi.fn<(reason: unknown) => void>();
-      const realSetImmediate = setImmediate;
+    it("reports a failed search and logs it", async () => {
+      const { request, provider, onPlaybackError, logError } = listen();
+      const error = new Error("search failed");
+      provider.searchSong.mockImplementation(() => rejected(error));
 
-      beforeEach(() => {
-        process.on("unhandledRejection", dropped);
-      });
+      await request("!play Song");
 
-      afterEach(async () => {
-        // Node reports unhandled rejections once the current task is done
-        await new Promise((resolve) => realSetImmediate(resolve));
-        process.off("unhandledRejection", dropped);
-        dropped.mockReset();
-      });
+      expect(onPlaybackError).toHaveBeenCalledWith("Song", error);
+      expect(logError).toHaveBeenCalledWith(
+        expect.stringContaining("<Music>"),
+        "music.log",
+        error,
+      );
+    });
 
-      // The queued task calls this.play(query) without returning its promise, so a failed search is lost
-      it.fails("reports a failed search and logs it", async () => {
-        const { request, provider, onPlaybackError, logError } = listen();
-        const error = new Error("search failed");
-        provider.searchSong.mockImplementation(() => rejected(error));
+    it("reports a failed player read and logs it", async () => {
+      const { request, provider, onPlaybackError, logError } = listen();
+      const error = new Error("Not authenticated. Call authenticate() first.");
+      provider.playerStatus.mockImplementation(() => rejected(error));
 
-        await request("!play Song");
+      await request("!play Song");
 
-        expect(onPlaybackError).toHaveBeenCalledWith(expect.any(String), error);
-        expect(logError).toHaveBeenCalledWith(
-          expect.stringContaining("<Music>"),
-          "music.log",
-          error,
-        );
-      });
-
-      // The queued task calls this.play(query) without returning its promise, so a failed player read is lost
-      it.fails("reports a failed player read and logs it", async () => {
-        const { request, provider, onPlaybackError, logError } = listen();
-        const error = new Error(
-          "Not authenticated. Call authenticate() first.",
-        );
-        provider.playerStatus.mockImplementation(() => rejected(error));
-
-        await request("!play Song");
-
-        expect(onPlaybackError).toHaveBeenCalledWith(expect.any(String), error);
-        expect(logError).toHaveBeenCalledWith(
-          expect.stringContaining("<Music>"),
-          "music.log",
-          error,
-        );
-      });
+      expect(onPlaybackError).toHaveBeenCalledWith("Song", error);
+      expect(logError).toHaveBeenCalledWith(
+        expect.stringContaining("<Music>"),
+        "music.log",
+        error,
+      );
     });
   });
 

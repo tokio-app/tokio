@@ -15,12 +15,7 @@ export class MusicService extends ProviderService<MusicProvider> {
     super();
     this._queue = new TaskQueue();
     this._music_queue = new MusicQueue(Infinity, (id, error) => {
-      Logger.error(
-        `<Music> Unable to play track [${id}] -- ${formatError(error)}`,
-        this._logFile,
-        error,
-      );
-      this._onPlaybackError?.(id, error);
+      this._playbackFailed(id, error);
     });
     this.addProvider("YouTube", new YouTubeMusic(), true);
     this.addProvider("Spotify", new Spotify());
@@ -93,22 +88,33 @@ export class MusicService extends ProviderService<MusicProvider> {
 
     const { controls } = settings;
     if (control === controls.play) {
-      this._queue.enqueue(async () => {
-        this.play(args);
-      });
+      this._queue.enqueue(() => this._request(args));
     } else if (control === controls.next) {
-      this._queue.enqueue(async () => {
-        this.next();
-      });
+      this._queue.enqueue(() => this.next());
     } else if (control === controls.last) {
-      this._queue.enqueue(async () => {
-        this.previous();
-      });
+      this._queue.enqueue(() => this.previous());
     } else if (control === controls.revoke) {
-      this._queue.enqueue(async () => {
-        this.revoke(args);
-      });
+      this._queue.enqueue(() => this.revoke(args));
     }
+  }
+
+  // A song request that can't be found or started is reported like a song
+  // that couldn't be played.
+  private async _request(query: string) {
+    try {
+      await this.play(query);
+    } catch (error) {
+      this._playbackFailed(query, error);
+    }
+  }
+
+  private _playbackFailed(id: string, error: unknown) {
+    Logger.error(
+      `<Music> Unable to play track [${id}] -- ${formatError(error)}`,
+      this._logFile,
+      error,
+    );
+    this._onPlaybackError?.(id, error);
   }
 
   private async play(query: string) {
@@ -129,9 +135,9 @@ export class MusicService extends ProviderService<MusicProvider> {
 
     if (info === null) return;
 
-    this._music_queue.enqueue(query, info, () => {
-      this._current?.provider?.play(info);
-    });
+    this._music_queue.enqueue(query, info, () =>
+      this._current?.provider?.play(info),
+    );
   }
 
   private async next() {
