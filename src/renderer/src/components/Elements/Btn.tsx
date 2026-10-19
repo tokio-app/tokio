@@ -1,5 +1,5 @@
 import { cx } from "@/helper/cx";
-import { ButtonHTMLAttributes } from "react";
+import { ComponentProps } from "react";
 import styles from "./elements.module.css";
 import { Spinner } from "./Spinner";
 
@@ -13,7 +13,7 @@ type Props = {
   pulse?: boolean;
   // Shows a spinner and ignores clicks
   loading?: boolean;
-} & ButtonHTMLAttributes<HTMLButtonElement>;
+} & ComponentProps<"button">;
 
 export function Btn({
   variant = "default",
@@ -24,6 +24,7 @@ export function Btn({
   className,
   children,
   type = "button",
+  onClick,
   ...rest
 }: Props) {
   return (
@@ -39,6 +40,12 @@ export function Btn({
         active && pulse && styles.btn_pulse,
         className,
       )}
+      // CSS only holds the pointer back, Enter and Space still click it.
+      // Stopping the click also keeps a submit button from submitting.
+      onClick={(e) => {
+        if (loading) e.preventDefault();
+        else onClick?.(e);
+      }}
       {...rest}
     >
       {loading ? <Spinner /> : children}

@@ -41,6 +41,7 @@ export function Tabs<T extends string>({
           type="button"
           role="tab"
           aria-selected={tab.value === value}
+          disabled={disabled}
           className={cx(styles.tab, tab.value === value && styles.tab_active)}
           style={{ "--tab-accent": tab.accent } as CSSProperties}
           onClick={() => onChange(tab.value)}
