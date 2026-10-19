@@ -3,30 +3,46 @@ import { defaultProfile, defaultStoreData } from "@/common/util";
 import { Page } from "@/components";
 import { useImmerState, useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
-import { ConnectSection } from "./sections/ConnectSection";
+import styles from "./home.module.css";
+import { NO_SESSION } from "./helper";
+import { ActivitySection } from "./sections/ActivitySection";
+import { DashboardSection } from "./sections/DashboardSection";
 import { FeaturesSection } from "./sections/FeaturesSection";
-import { StatsSection } from "./sections/StatsSection";
 
 export function Home() {
   const [username, setUsername] = useState(defaultProfile.connector.username);
+  const [profile, setProfile] = useState(defaultProfile);
   const [features, updateFeatures, setFeatures] = useImmerState(
     defaultStoreData.settings.activeFeatures,
   );
+  const [server, setServer] = useState({ enabled: false, overlays: 0 });
+  const [musicConnected, setMusicConnected] = useState(false);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [likes, setLikes] = useState(0);
   const [views, setViews] = useState({ current: 0, total: 0 });
+  const [session, setSession] = useState(NO_SESSION);
 
   useIpcRequest(APP_EVENTS.GET_PROFILE);
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
   useIpcRequest(APP_EVENTS.IS_CONNECTED);
+  useIpcRequest(APP_EVENTS.IS_MUSIC_CONNECTED);
+  useIpcRequest(APP_EVENTS.GET_LIVE_SESSION);
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
-    if (res?.success) setUsername(res.profile!.connector.username);
+    if (!res?.success) return;
+    setProfile(res.profile!);
+    setUsername(res.profile!.connector.username);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
-    if (res?.success) setFeatures(res.data!.settings.activeFeatures);
+    if (!res?.success) return;
+    const settings = res.data!.settings;
+    setFeatures(settings.activeFeatures);
+    setServer({
+      enabled: settings.server.enabled,
+      overlays: settings.overlays.length,
+    });
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {
@@ -47,42 +63,70 @@ export function Home() {
     if (res?.likes) setLikes(res.likes);
   });
 
+  // Also when the player window closes
+  useIpcListener(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, (res) => {
+    setMusicConnected(res?.success ?? false);
+  });
+
+  useIpcListener(APP_EVENTS_RESPONSE.LIVE_SESSION, (res) => {
+    if (res) setSession(res.data);
+  });
+
+  const { totals } = session;
+
   return (
-    <Page>
-      <ConnectSection
-        username={username}
-        connected={connected}
-        loading={loading}
-        onUsernameChange={setUsername}
-        onConnect={() => {
-          if (!username.replace("@", "").trim()) return;
-          setLoading(true);
-          window.api.emit(APP_EVENTS.CONNECT, { username });
-        }}
-        onDisconnect={() => {
-          setLoading(true);
-          window.api.emit(APP_EVENTS.DISCONNECT);
-        }}
-      />
+    <Page width="wide">
+      <div className={styles.dashboard}>
+        <div className={styles.column}>
+          <DashboardSection
+            username={username}
+            connected={connected}
+            loading={loading}
+            startedAt={session.startedAt}
+            stats={[
+              { label: "Viewers", value: views.current },
+              { label: "Likes", value: likes },
+              { label: "Total views", value: views.total },
+            ]}
+            onUsernameChange={setUsername}
+            onConnect={() => {
+              if (!username.replace("@", "").trim()) return;
+              setLoading(true);
+              window.api.emit(APP_EVENTS.CONNECT, { username });
+            }}
+            onDisconnect={() => {
+              setLoading(true);
+              window.api.emit(APP_EVENTS.DISCONNECT);
+            }}
+          />
 
-      <FeaturesSection
-        features={features}
-        onChange={(feature, enabled) => {
-          window.api.emit(APP_EVENTS.ACTIVE_FEATURES, { [feature]: enabled });
-          updateFeatures((f) => {
-            f[feature] = enabled;
-          });
-        }}
-      />
+          <FeaturesSection
+            features={features}
+            profile={profile}
+            musicConnected={musicConnected}
+            server={server}
+            onChange={(feature, enabled) => {
+              window.api.emit(APP_EVENTS.ACTIVE_FEATURES, {
+                [feature]: enabled,
+              });
+              updateFeatures((f) => {
+                f[feature] = enabled;
+              });
+            }}
+          />
+        </div>
 
-      <StatsSection
-        connected={connected}
-        stats={[
-          { label: "Viewers", value: views.current },
-          { label: "Likes", value: likes },
-          { label: "Total Views", value: views.total },
-        ]}
-      />
+        <ActivitySection
+          connected={connected}
+          totals={[
+            { label: "New followers", value: totals.followers },
+            { label: "Shares", value: totals.shares },
+            { label: "Gifts", value: totals.gifts },
+            { label: "Coins", value: totals.coins },
+          ]}
+          activity={session.activity}
+        />
+      </div>
     </Page>
   );
 }

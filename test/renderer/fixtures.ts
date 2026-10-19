@@ -6,9 +6,11 @@ import type {
   StoreSchema,
 } from "@/common/schemas";
 import {
+  ActivityUser,
   AppNotification,
   CustomGift,
   FEEDBACK_CODES,
+  LiveSession,
   MyInstantsSound,
   OverlayApp,
   PackageLicense,
@@ -76,6 +78,21 @@ export const gift = (value: number, label: string): CustomGift => ({
   label,
   img: `https://example.com/${slug(label)}.png`,
   coins: value,
+});
+
+/** A viewer in the Home page's feed, with a picture. */
+export const viewer = (name: string): ActivityUser => ({
+  handle: slug(name),
+  name,
+  picture: `https://example.com/${slug(name)}.png`,
+});
+
+/** LIVE_SESSION's data: no LIVE and nothing counted, changed by `patch`. */
+export const liveSession = (patch: Partial<LiveSession> = {}): LiveSession => ({
+  startedAt: null,
+  totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
+  activity: [],
+  ...patch,
 });
 
 let notices = 0;

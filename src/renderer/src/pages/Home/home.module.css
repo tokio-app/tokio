@@ -1,38 +1,85 @@
-/* CONNECT */
+/* The feed on the right, as tall as the sections on the left */
+.dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-8);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* DASHBOARD */
 
 .status {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 6px var(--space-3);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--background-secondary-hover);
-  background-color: var(--background-secondary);
-  color: var(--font-primary);
-  font-size: var(--font-sm);
+  color: var(--font-secondary);
+  font-size: var(--font-md);
   font-weight: 600;
 }
 
+.status_live {
+  color: var(--font-primary);
+}
+
+.timer {
+  font-variant-numeric: tabular-nums;
+}
+
 .dot {
+  flex-shrink: 0;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background-color: var(--offline);
 }
 
-.dot_online {
+.dot_on {
   background-color: var(--success);
 }
 
-.connect_row {
+.dot_live {
+  background-color: var(--accent-primary);
+  animation: live 1.6s ease-in-out infinite;
+}
+
+@keyframes live {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* A soft rose wash, warmer while LIVE */
+.connect {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--background-secondary);
+  border-radius: var(--radius-xl);
+  background: radial-gradient(
+    circle at 0 0,
+    color-mix(in srgb, var(--accent-primary) 8%, transparent),
+    transparent 70%
+  );
+  transition: border-color var(--transition-fast);
+}
+
+.connect_live {
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  background: radial-gradient(
+    circle at 0 0,
+    color-mix(in srgb, var(--accent-primary) 16%, transparent),
+    transparent 70%
+  );
 }
 
 .username {
-  max-width: 350px;
+  flex: 1;
   height: 48px;
   padding: 0 var(--space-4);
   border-color: var(--background-secondary-hover);
@@ -49,23 +96,9 @@
   width: 180px;
 }
 
-/* FEATURES */
-
-.features {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-6);
-  padding: var(--space-5) var(--space-6);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--background-secondary-hover);
-  background-color: var(--background-secondary);
-}
-
-/* STATS */
-
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-6);
 }
 
@@ -85,9 +118,177 @@
 }
 
 .stat_label {
-  font-size: var(--font-xs);
+  font-size: var(--font-sm);
   font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
   color: var(--font-secondary);
+}
+
+/* FEATURES */
+
+.features {
+  border: 1px solid var(--background-secondary);
+  border-radius: var(--radius-lg);
+}
+
+.feature {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+}
+
+.feature + .feature {
+  border-top: 1px solid var(--background-secondary);
+}
+
+/* The overlay server has a dot where the others have a toggle */
+.feature_name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--font-md);
+  color: var(--font-primary);
+}
+
+.feature_dot {
+  display: flex;
+  justify-content: center;
+  width: 40px;
+}
+
+.feature_status {
+  overflow: hidden;
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feature_warn {
+  color: var(--warning);
+}
+
+.feature_link {
+  display: flex;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--font-secondary);
+  outline: none;
+  transition: color var(--transition-fast);
+}
+
+.feature_link:hover,
+.feature_link:focus-visible {
+  color: var(--accent-primary);
+}
+
+.feature_link:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent-primary);
+}
+
+/* ACTIVITY */
+
+/* Counted since connecting, quieter than TikTok's numbers */
+.totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-6);
+}
+
+.total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.total_value {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--font-primary);
+}
+
+/* The list scrolls inside the column instead of making the page taller */
+.feed {
+  position: relative;
+  flex: 1;
+  min-height: 280px;
+}
+
+.feed_list {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  border: 1px solid var(--background-secondary);
+  border-radius: var(--radius-lg);
+  list-style: none;
+}
+
+.event {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-md);
+  line-height: 1.5;
+  color: var(--font-primary);
+}
+
+.event + .event {
+  border-top: 1px solid var(--background-secondary);
+}
+
+.event_quiet {
+  align-items: center;
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.event_body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.event_name {
+  font-weight: 700;
+}
+
+.event_message {
+  color: var(--font-secondary);
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background-color: var(--background-secondary);
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.inline_img {
+  width: 20px;
+  height: 20px;
+  margin-left: var(--space-1);
+  vertical-align: middle;
+  object-fit: contain;
+}
+
+.coins {
+  margin-left: var(--space-1);
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot_live {
+    animation: none;
+  }
 }
