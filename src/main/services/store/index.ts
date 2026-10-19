@@ -443,14 +443,24 @@ export class StoreManagerService extends Service {
     this._debouncedSave();
   }
 
-  public async updateActiveProfile(activeProfileFile: string) {
+  /**
+   * Makes a profile of the list the active one. False, and nothing changes,
+   * when it isn't listed or its file can't be loaded.
+   */
+  public async updateActiveProfile(file: string): Promise<boolean> {
     this._ensureInitialized();
-    this._storeData!.settings.activeProfile =
-      this._storeData?.profiles.find((p) => p.file === activeProfileFile) ||
-      defaultStoreData.profiles[0];
+    const entity = this._storeData!.profiles.find((p) => p.file === file);
+    if (!entity) return false;
+    const profile = await this._jsonManagerService.loadFile(
+      join(this._pathManagerService.folders.profilesFolder, file),
+      ProfileSchema,
+    );
+    if (!profile) return false;
 
+    this._storeData!.settings.activeProfile = entity;
     await this._queueSave();
-    this._memoryProfile = await this._getProfileData();
+    this._memoryProfile = profile;
+    return true;
   }
 
   // The connector provider. TTS engines aren't picked, every voice names one.

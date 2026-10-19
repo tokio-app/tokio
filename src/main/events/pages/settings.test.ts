@@ -264,7 +264,9 @@ describe("settings events", () => {
       let active = defaultProfile;
       const storeManagerService = {
         updateActiveProfile: vi.fn(async (file: string) => {
-          active = profiles.find((p) => p.file === file) ?? defaultProfile;
+          const profile = profiles.find((p) => p.file === file);
+          if (profile) active = profile;
+          return profile !== undefined;
         }),
         getProfileData: vi.fn(async () =>
           missing ? null : { name: active.name },
@@ -332,10 +334,27 @@ describe("settings events", () => {
       ]);
     });
 
-    it("notifies without a reply when the profile can't be loaded", async () => {
-      const { h } = setup({ missing: true });
+    it("keeps the active profile when the store can't switch to it", async () => {
+      const { h } = setup();
 
       await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "gone.json" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([]);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.PROFILE_LOAD_FAILED,
+          message:
+            "Unable to switch to that profile. Its file is missing or damaged.",
+        }),
+      ]);
+    });
+
+    it("notifies without a reply when the profile can't be read after", async () => {
+      const { h } = setup({ missing: true });
+
+      await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
 
       expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([]);
       expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([]);

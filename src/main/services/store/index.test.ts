@@ -414,13 +414,33 @@ describe("StoreManagerService", () => {
       expect(copy?.connector.username).toBe("streamer");
     });
 
-    it("falls back to the default profile for an unknown file", async () => {
+    it("refuses to switch to a profile that isn't listed", async () => {
       const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.updateActiveProfile("stream.json");
 
-      await store.updateActiveProfile("missing.json");
+      expect(await store.updateActiveProfile("missing.json")).toBe(false);
+
+      expect(store.getSettings().activeProfile.file).toBe("stream.json");
+    });
+
+    it("keeps the active profile when the new one's file is gone or damaged", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.createNewProfile("night.json", "Night");
+      await writeFile(join(paths.folders.profilesFolder, "stream.json"), "{");
+      await rm(join(paths.folders.profilesFolder, "night.json"));
+      vi.spyOn(Logger, "error");
+
+      expect(await store.updateActiveProfile("stream.json")).toBe(false);
+      expect(await store.updateActiveProfile("night.json")).toBe(false);
 
       expect(store.getSettings().activeProfile).toEqual(
         defaultStoreData.profiles[0],
+      );
+      expect((await store.getProfileData())?.name).toBe("Default");
+      expect((await readJSON(storeFile)).settings.activeProfile.file).toBe(
+        "default.json",
       );
     });
 
@@ -428,7 +448,7 @@ describe("StoreManagerService", () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");
 
-      await store.updateActiveProfile("stream.json");
+      expect(await store.updateActiveProfile("stream.json")).toBe(true);
       await store.updateProfileData({ connector: { username: "streamer" } });
 
       expect((await store.getProfileData())?.name).toBe("Stream");

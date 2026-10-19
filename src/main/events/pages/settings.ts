@@ -116,7 +116,12 @@ events.push(
         { level: "warning" },
       );
     }
-    await storeManagerService.updateActiveProfile(file);
+    if (!(await storeManagerService.updateActiveProfile(file))) {
+      throw new AppFailure(
+        FEEDBACK_CODES.PROFILE_LOAD_FAILED,
+        "Unable to switch to that profile. Its file is missing or damaged.",
+      );
+    }
     const profile = await storeManagerService.getProfileData();
     const profiles = storeManagerService.getProfiles();
     if (!profile || !profiles) throw new Error(`Unable to load ${file}.`);
