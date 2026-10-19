@@ -46,6 +46,7 @@ Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gif
 
 - Upload your own sounds or search [MyInstants](https://www.myinstants.com) from inside the app. Your sound library is shared by all your profiles.
 - Set each alert's volume. Gift alerts can react to any gift or only to the ones you pick, and fire once per combo. TikTok's gift list can miss some gifts, like ones from other regions, so Tokio also saves the ones viewers send that aren't on it, for all your profiles.
+- Pick gifts from a list: search it by name, filter it by price (exactly, more than, less than, at least, at most or between two amounts of coins) and sort it by price or name. The gifts already picked come first. **Select all shown** checks every gift the filters leave, such as all the gifts worth 1,000 coins or more.
 - Chat alerts can react to every message or only to messages with a keyword. Emote alerts can react to any emote or only to the ones you pick. TikTok doesn't list a LIVE's emotes, so each profile saves the ones viewers use.
 - Member Join and Super Fan Join alerts can react to anyone or only to the viewer you name, by @handle or name.
 - Instead of a sound, an alert can speak a message with text-to-speech, in its own voice, speed and pitch. Messages can include details of the event, such as `{username}`, `{gift}` or `{count}`, and the TTS page's banned words, replacements, emoji setting, cooldown and queue length apply.
@@ -55,7 +56,7 @@ Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gif
 
 On the **Overlays** page, **Official Overlays** opens the overlays made for Tokio, with a preview of each. Install the ones you want, or remove them there. A dot on the button means a new version is out, and **Update** installs it and keeps your settings. To use your own overlays, import them in **Settings → Imported Overlays**, where you can also remove them.
 
-Set them up from the gallery on the **Overlays** page: colors, text, the gifts they react to, and anything else an overlay offers. Tokio gives each overlay its own URL on your computer, `http://tokio-app.local:37891/<overlay-id>/`. Copy it from the gallery and add it to your streaming app (see [Adding an overlay](#adding-an-overlay)).
+Set them up from the gallery on the **Overlays** page: colors, text, the gifts they react to (picked from the same list as gift alerts), and anything else an overlay offers. Tokio gives each overlay its own URL on your computer, `http://tokio-app.local:37891/<overlay-id>/`. Copy it from the gallery and add it to your streaming app (see [Adding an overlay](#adding-an-overlay)).
 
 ### Profiles and settings
 
