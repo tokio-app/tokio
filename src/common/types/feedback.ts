@@ -53,6 +53,7 @@ export enum FEEDBACK_CODES {
   // TTS
   TTS_VOICES_FAILED = "tts_voices_failed",
   TTS_GENERATION_FAILED = "tts_generation_failed",
+  TTS_TEST_BLOCKED = "tts_test_blocked",
 
   // MUSIC
   MUSIC_CONNECTED = "music_connected",

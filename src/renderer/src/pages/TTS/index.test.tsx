@@ -160,7 +160,12 @@ describe("TTS", () => {
     await user.click(test);
 
     expect(sent(APP_EVENTS.GET_TTS_TEST)).toEqual([
-      { id: "tts-test", text: "Hello chat", voice: aria },
+      {
+        id: "tts-test",
+        text: "Hello chat",
+        voice: aria,
+        settings: loaded.profile.tts,
+      },
     ]);
     expect(test).toHaveAttribute("aria-busy", "true");
 
@@ -223,9 +228,27 @@ describe("TTS", () => {
     await user.click(testButton());
 
     expect(sent(APP_EVENTS.GET_TTS_TEST)).toEqual([
-      { id: "tts-test", text: "Hello chat", voice: guy },
+      {
+        id: "tts-test",
+        text: "Hello chat",
+        voice: guy,
+        settings: { ...loaded.profile.tts, voice: guy },
+      },
     ]);
     expect((await draft(user)).voice).toEqual(guy);
+  });
+
+  it("tests with the settings on the page, saved or not", async () => {
+    const { user } = await setup();
+    await user.click(removeEmojis());
+
+    await user.type(testMessage(), "Hello chat");
+    await user.click(testButton());
+
+    expect(sent(APP_EVENTS.GET_TTS_TEST).at(-1)?.settings).toEqual({
+      ...loaded.profile.tts,
+      format: { ...loaded.profile.tts.format, remove_emojis: false },
+    });
   });
 
   it("changes the filters and the test queue's with the sliders", async () => {

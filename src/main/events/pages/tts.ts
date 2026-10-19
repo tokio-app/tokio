@@ -4,6 +4,7 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
+import { AppFailure } from "@/helper/feedback";
 
 const events = createStack("tts");
 
@@ -54,8 +55,17 @@ events.push(
 
 events.push(
   APP_EVENTS.GET_TTS_TEST,
-  async ({ ttsService }, e, { id, text, voice }) => {
-    const res = await ttsService.generateBuffer(text, voice);
+  async ({ ttsService }, e, { id, text, voice, settings }) => {
+    // The tester's message is read like chat, previews say their line as is.
+    const spoken = settings ? ttsService.prepareText(text, settings) : text;
+    if (spoken === null) {
+      throw new AppFailure(
+        FEEDBACK_CODES.TTS_TEST_BLOCKED,
+        "This message wouldn't be read aloud: it has a banned word or nothing left to read.",
+        { level: "warning" },
+      );
+    }
+    const res = await ttsService.generateBuffer(spoken, voice);
     if (!res.success || !res.buffer) {
       throw res.error ?? new Error("The engine returned no audio.");
     }

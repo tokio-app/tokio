@@ -147,5 +147,58 @@ describe("tts events", () => {
         expect.objectContaining({ level: "error", source: "tts", ...failure }),
       ]);
     });
+
+    describe("from the tester, with the page's settings", () => {
+      const settings = defaultProfile.tts;
+      const tester = { id: "tts-test", text: "Hello 😂", voice, settings };
+
+      it("reads the message like chat", async () => {
+        const prepareText = vi.fn(() => "Hello");
+        const generateBuffer = vi.fn(async () => ({
+          success: true,
+          buffer: Buffer.from([1]),
+        }));
+        const h = createHandler({
+          ttsService: { prepareText, generateBuffer },
+        });
+
+        await h.invoke(tts, APP_EVENTS.GET_TTS_TEST, tester);
+
+        expect(prepareText).toHaveBeenCalledExactlyOnceWith(
+          "Hello 😂",
+          settings,
+        );
+        expect(generateBuffer).toHaveBeenCalledExactlyOnceWith("Hello", voice);
+        expect(h.replies(APP_EVENTS_RESPONSE.GET_TTS_TEST)).toEqual([
+          { success: true, id: "tts-test", data: new Uint8Array([1]) },
+        ]);
+      });
+
+      it("warns without speaking when the settings leave nothing to read", async () => {
+        const generateBuffer = vi.fn();
+        const h = createHandler({
+          ttsService: { prepareText: () => null, generateBuffer },
+        });
+
+        await h.invoke(tts, APP_EVENTS.GET_TTS_TEST, tester);
+
+        const failure = {
+          code: FEEDBACK_CODES.TTS_TEST_BLOCKED,
+          message:
+            "This message wouldn't be read aloud: it has a banned word or nothing left to read.",
+        };
+        expect(generateBuffer).not.toHaveBeenCalled();
+        expect(h.replies(APP_EVENTS_RESPONSE.GET_TTS_TEST)).toEqual([
+          { success: false, id: "tts-test", error: failure },
+        ]);
+        expect(h.notices).toEqual([
+          expect.objectContaining({
+            level: "warning",
+            source: "tts",
+            ...failure,
+          }),
+        ]);
+      });
+    });
   });
 });

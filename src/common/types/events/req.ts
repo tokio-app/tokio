@@ -128,6 +128,9 @@ export interface AppEventsMap {
     id: string;
     text: string;
     voice: VoiceData;
+    // The tester's, which reads its message like chat: with these banned
+    // words, replacements and emoji setting. Previews say their line as is.
+    settings?: Profile["tts"];
   };
 
   //MUSIC PAGE

@@ -54,10 +54,12 @@ export function TTS() {
           update={update}
           onTest={(text) => {
             setTestLoading(true);
+            // Read like chat, with the settings on the page, saved or not
             window.api.emit(APP_EVENTS.GET_TTS_TEST, {
               id: TEST_ID,
               text,
               voice: draft.voice,
+              settings: draft,
             });
           }}
         />
