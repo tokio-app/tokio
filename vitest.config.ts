@@ -11,6 +11,12 @@ export default defineConfig({
   test: {
     restoreMocks: true,
     unstubGlobals: true,
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts", "src/music/vite.config.ts"],
+      reporter: ["text-summary", "html"],
+    },
     projects: [
       {
         extends: true,
