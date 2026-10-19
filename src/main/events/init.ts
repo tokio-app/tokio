@@ -1,4 +1,4 @@
-import { ALERT_TRIGGERS } from "@/common/schemas";
+import { ALERT_TRIGGERS, AppSettings } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
   APP_EVENTS,
@@ -304,130 +304,163 @@ events.push(
   },
 );
 
+// The renderer sends LOAD_APP each time its page loads, also on a reload in
+// development. Every one is answered, but the app starts once, so listeners
+// and the updater aren't added again.
+const started = new WeakMap<AppHandlerVariables, Promise<AppSettings>>();
+// Listeners stay added when a start that failed is tried again
+const wired = new WeakSet<AppHandlerVariables>();
+
+// Sets up the services and starts the server.
+const startApp = async (handler: AppHandlerVariables) => {
+  const {
+    app,
+    storeManagerService,
+    pathManagerService,
+    connectorService,
+    ttsService,
+    musicService,
+    serverService,
+    overlayService,
+    urlManagerService,
+    jsonManagerService,
+    yamlManagerService,
+    alertsService,
+    licensesService,
+    updaterService,
+    notifier,
+  } = handler;
+
+  await pathManagerService.initialize(
+    app.getPath("home"),
+    config.APP.folderName,
+    ({ files, folders }) => {
+      connectorService.setLogFile(files.logs.connector);
+      ttsService.setLogFile(files.logs.tts);
+      serverService.setLogFile(files.logs.server);
+      overlayService.setLogFile(files.logs.overlays);
+      urlManagerService.setLogFile(files.logs.system);
+      storeManagerService.setLogFile(files.logs.system);
+      jsonManagerService.setLogFile(files.logs.system);
+      alertsService.setLogFile(files.logs.alerts);
+      musicService.setLogFile(files.logs.music);
+      licensesService.setLogFile(files.logs.system);
+      updaterService.setLogFile(files.logs.system);
+      notifier.setLogFiles(files.logs);
+      alertsService.setSoundsFolder(folders.soundsFolder);
+      alertsService.setSpeaker(ttsService);
+    },
+  );
+  await storeManagerService.initialize(
+    config.DB.name,
+    {
+      connector: connectorService,
+      tts: ttsService,
+    },
+    jsonManagerService,
+    pathManagerService,
+  );
+  overlayService.initialize(
+    {
+      folder: pathManagerService.folders.overlaysFolder,
+      giftsFile: pathManagerService.files.gifts,
+    },
+    {
+      yaml: yamlManagerService,
+      json: jsonManagerService,
+      server: serverService,
+      store: storeManagerService,
+    },
+  );
+  storeManagerService.updateLiveStats({
+    likes: 0,
+    viewers: 0,
+    views: 0,
+  });
+  if (!wired.has(handler)) {
+    wired.add(handler);
+    serverService.initEvents(connectorService, musicService);
+    registerConnectorEvents(handler);
+  }
+
+  const settings = storeManagerService.getSettings();
+
+  // Before the server starts, so it serves the overlays right away. The
+  // gifts saved last time are used when there are any, so startup doesn't
+  // wait for TikTok, and fresh ones replace them once they arrive.
+  const cachedGifts = await overlayService.getGifts();
+  if (cachedGifts.length > 0) {
+    await overlayService.load(cachedGifts);
+    void fetchOverlayGifts(connectorService)
+      .then(async (gifts) => {
+        if (gifts.length > 0) await overlayService.refreshGifts(gifts);
+      })
+      .catch((error) => {
+        notifier.report({
+          source: "overlays",
+          error: new AppFailure(
+            FEEDBACK_CODES.GIFTS_FETCH_FAILED,
+            "Unable to update the gifts from TikTok. Overlays use the ones saved last time.",
+            { level: "warning", cause: error },
+          ),
+        });
+      });
+  } else {
+    const gifts = await fetchOverlayGifts(connectorService);
+    if (gifts.length === 0) {
+      notifier.warn(
+        "overlays",
+        FEEDBACK_CODES.GIFTS_FETCH_FAILED,
+        "Unable to get the gifts from TikTok. Overlay gift options stay empty until the next start.",
+      );
+    }
+    await overlayService.load(gifts);
+  }
+
+  // A taken port shouldn't stop the app, the server is turned off instead.
+  if (!(await serverService.toggleServer(settings.server.enabled))) {
+    notifier.report({
+      source: "server",
+      error: new AppFailure(
+        FEEDBACK_CODES.SERVER_START_FAILED,
+        `The overlay server couldn't start, port ${SERVER_PORT} may be in use. It has been turned off.`,
+        { level: "warning" },
+      ),
+    });
+    await storeManagerService.updateServerSettings(false);
+  }
+
+  return settings;
+};
+
 events.push(
   APP_EVENTS.LOAD_APP,
   async (handler, e) => {
-    const {
-      app,
-      storeManagerService,
-      pathManagerService,
-      connectorService,
-      ttsService,
-      musicService,
-      serverService,
-      overlayService,
-      urlManagerService,
-      jsonManagerService,
-      yamlManagerService,
-      alertsService,
-      licensesService,
-      updaterService,
-      notifier,
-    } = handler;
-
-    await pathManagerService.initialize(
-      app.getPath("home"),
-      config.APP.folderName,
-      ({ files, folders }) => {
-        connectorService.setLogFile(files.logs.connector);
-        ttsService.setLogFile(files.logs.tts);
-        serverService.setLogFile(files.logs.server);
-        overlayService.setLogFile(files.logs.overlays);
-        urlManagerService.setLogFile(files.logs.system);
-        storeManagerService.setLogFile(files.logs.system);
-        jsonManagerService.setLogFile(files.logs.system);
-        alertsService.setLogFile(files.logs.alerts);
-        musicService.setLogFile(files.logs.music);
-        licensesService.setLogFile(files.logs.system);
-        updaterService.setLogFile(files.logs.system);
-        notifier.setLogFiles(files.logs);
-        alertsService.setSoundsFolder(folders.soundsFolder);
-        alertsService.setSpeaker(ttsService);
-      },
-    );
-    await storeManagerService.initialize(
-      config.DB.name,
-      {
-        connector: connectorService,
-        tts: ttsService,
-      },
-      jsonManagerService,
-      pathManagerService,
-    );
-    overlayService.initialize(
-      {
-        folder: pathManagerService.folders.overlaysFolder,
-        giftsFile: pathManagerService.files.gifts,
-      },
-      {
-        yaml: yamlManagerService,
-        json: jsonManagerService,
-        server: serverService,
-        store: storeManagerService,
-      },
-    );
-    serverService.initEvents(connectorService, musicService);
-    storeManagerService.updateLiveStats({
-      likes: 0,
-      viewers: 0,
-      views: 0,
-    });
-    registerConnectorEvents(handler);
-
-    const settings = storeManagerService.getSettings();
-
-    // Before the server starts, so it serves the overlays right away. The
-    // gifts saved last time are used when there are any, so startup doesn't
-    // wait for TikTok, and fresh ones replace them once they arrive.
-    const cachedGifts = await overlayService.getGifts();
-    if (cachedGifts.length > 0) {
-      await overlayService.load(cachedGifts);
-      void fetchOverlayGifts(connectorService)
-        .then(async (gifts) => {
-          if (gifts.length > 0) await overlayService.refreshGifts(gifts);
-        })
-        .catch((error) => {
-          notifier.report({
-            source: "overlays",
-            error: new AppFailure(
-              FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-              "Unable to update the gifts from TikTok. Overlays use the ones saved last time.",
-              { level: "warning", cause: error },
-            ),
-          });
-        });
-    } else {
-      const gifts = await fetchOverlayGifts(connectorService);
-      if (gifts.length === 0) {
-        notifier.warn(
-          "overlays",
-          FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-          "Unable to get the gifts from TikTok. Overlay gift options stay empty until the next start.",
-        );
-      }
-      await overlayService.load(gifts);
-    }
-
-    // A taken port shouldn't stop the app, the server is turned off instead.
-    if (!(await serverService.toggleServer(settings.server.enabled))) {
-      notifier.report({
-        source: "server",
-        error: new AppFailure(
-          FEEDBACK_CODES.SERVER_START_FAILED,
-          `The overlay server couldn't start, port ${SERVER_PORT} may be in use. It has been turned off.`,
-          { level: "warning" },
-        ),
+    let start = started.get(handler);
+    const first = start === undefined;
+    if (!start) {
+      const attempt = startApp(handler);
+      start = attempt;
+      started.set(handler, attempt);
+      // The next load tries again
+      attempt.catch(() => {
+        if (started.get(handler) === attempt) started.delete(handler);
       });
-      await storeManagerService.updateServerSettings(false);
     }
+    const settings = await start;
 
     e.reply(APP_EVENTS_RESPONSE.LOAD_APP, {
       success: true,
     });
-    notifier.info("system", FEEDBACK_CODES.APP_LOADED, "Tokio is ready.");
+    if (!first) return;
+    handler.notifier.info(
+      "system",
+      FEEDBACK_CODES.APP_LOADED,
+      "Tokio is ready.",
+    );
 
     await initUpdater(handler);
-    updaterService.start(settings.updates.auto);
+    handler.updaterService.start(settings.updates.auto);
   },
   {
     failure: {

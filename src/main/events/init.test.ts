@@ -1184,5 +1184,77 @@ describe("init events", () => {
       );
       expect(s.updaterService.start).not.toHaveBeenCalled();
     });
+
+    // A chat read aloud, to count the listeners LOAD_APP added
+    const chatAloud = async (s: Setup) => {
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
+      await vi.waitFor(() => expect(s.ttsService.talk).toHaveBeenCalled());
+      await flushPromises();
+    };
+
+    it("starts the app once when the page loads again", async () => {
+      const s = setup();
+      s.features.tts = true;
+
+      await load(s);
+      await load(s);
+      await chatAloud(s);
+
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        { success: true },
+        { success: true },
+      ]);
+      expect(s.pathManagerService.initialize).toHaveBeenCalledOnce();
+      expect(s.storeManagerService.initialize).toHaveBeenCalledOnce();
+      expect(s.serverService.initEvents).toHaveBeenCalledOnce();
+      expect(s.overlayService.load).toHaveBeenCalledOnce();
+      expect(s.updaterService.initialize).toHaveBeenCalledOnce();
+      expect(s.updaterService.start).toHaveBeenCalledOnce();
+      expect(noticesFor(s, FEEDBACK_CODES.APP_LOADED)).toHaveLength(1);
+      expect(s.ttsService.talk).toHaveBeenCalledOnce();
+    });
+
+    it("answers a load that comes while the app is starting once it's up", async () => {
+      const s = setup();
+      let started = () => {};
+      s.storeManagerService.initialize.mockImplementation(
+        () => new Promise<void>((done) => (started = done)),
+      );
+
+      const first = load(s);
+      const second = load(s);
+      await vi.waitFor(() =>
+        expect(s.storeManagerService.initialize).toHaveBeenCalled(),
+      );
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([]);
+      started();
+      await Promise.all([first, second]);
+
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        { success: true },
+        { success: true },
+      ]);
+      expect(s.storeManagerService.initialize).toHaveBeenCalledOnce();
+      expect(s.updaterService.start).toHaveBeenCalledOnce();
+    });
+
+    it("starts again on the next load after failing, adding the listeners once", async () => {
+      const s = setup();
+      s.features.tts = true;
+      s.overlayService.load.mockRejectedValueOnce(new Error("EBUSY"));
+
+      await load(s);
+      await load(s);
+      await chatAloud(s);
+
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        expect.objectContaining({ success: false }),
+        { success: true },
+      ]);
+      expect(s.storeManagerService.initialize).toHaveBeenCalledTimes(2);
+      expect(s.serverService.initEvents).toHaveBeenCalledOnce();
+      expect(s.ttsService.talk).toHaveBeenCalledOnce();
+      expect(s.updaterService.start).toHaveBeenCalledOnce();
+    });
   });
 });
