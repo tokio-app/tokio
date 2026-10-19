@@ -1,0 +1,78 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { usePopover } from "./usePopover";
+
+function Popover() {
+  const { open, toggle, position, anchorRef, popoverRef } = usePopover(8);
+
+  return (
+    <div>
+      <div ref={anchorRef} data-testid="anchor">
+        <button onClick={toggle}>Open</button>
+      </div>
+      {open && (
+        <div ref={popoverRef} role="menu" style={position}>
+          Menu
+          <div data-testid="menu-list" />
+        </div>
+      )}
+      <p>Elsewhere</p>
+      <div data-testid="page" />
+    </div>
+  );
+}
+
+describe("usePopover", () => {
+  it("opens under its anchor, after the gap", async () => {
+    const user = userEvent.setup();
+    render(<Popover />);
+    vi.spyOn(
+      screen.getByTestId("anchor"),
+      "getBoundingClientRect",
+    ).mockReturnValue(new DOMRect(12, 20, 200, 20));
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+
+    expect(screen.getByRole("menu")).toHaveStyle({
+      top: "48px",
+      left: "12px",
+      width: "200px",
+    });
+  });
+
+  it("closes when toggled again", async () => {
+    const user = userEvent.setup();
+    render(<Popover />);
+    const button = screen.getByRole("button", { name: "Open" });
+
+    await user.click(button);
+    await user.click(button);
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("closes on a press outside, not inside", async () => {
+    const user = userEvent.setup();
+    render(<Popover />);
+    await user.click(screen.getByRole("button", { name: "Open" }));
+
+    await user.click(screen.getByText("Menu"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Elsewhere"));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("closes when something else scrolls, since it doesn't follow its anchor", async () => {
+    const user = userEvent.setup();
+    render(<Popover />);
+    await user.click(screen.getByRole("button", { name: "Open" }));
+
+    fireEvent.scroll(screen.getByTestId("menu-list"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    fireEvent.scroll(screen.getByTestId("page"));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+});
