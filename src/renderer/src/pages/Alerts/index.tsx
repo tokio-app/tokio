@@ -43,6 +43,9 @@ export function Alerts() {
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
     if (!res?.success) return;
+    // A change still waiting was made to the profile shown before, sending
+    // it on leaving would write it into this one.
+    pendingSave.current = null;
     setSettings(res.profile!.alerts);
     setSaved(res.profile!.alerts);
     setEmotes(res.profile!.emotes);
@@ -69,7 +72,8 @@ export function Alerts() {
       const alert = s.items.find((a) => a.id === id);
       if (alert) Object.assign(alert, output);
     });
-    setPickerFor(null);
+    // A download for another alert can finish while this picker is open
+    setPickerFor((current) => (current === id ? null : current));
   };
 
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, (res) => {
