@@ -134,6 +134,7 @@ const giftEventFactory = (): GiftEvent => {
       type: randomInt(1, 3),
       name: selectedGift.label,
       comboCount,
+      image: selectedGift.img,
     },
   };
 };

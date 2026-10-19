@@ -57,6 +57,7 @@ export interface GiftEvent {
     type: number;
     name: string;
     comboCount: number;
+    image: string;
   };
 }
 

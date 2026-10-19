@@ -64,7 +64,15 @@ const user = { username: "Viewer", handle: "viewer", profilePictures: [] };
 
 const gift = (id: string, repeatEnd: boolean): GiftEvent => ({
   user,
-  gift: { id, coins: 1, repeatEnd, type: 1, name: "Rose", comboCount: 1 },
+  gift: {
+    id,
+    coins: 1,
+    repeatEnd,
+    type: 1,
+    name: "Rose",
+    comboCount: 1,
+    image: "",
+  },
 });
 
 const chat = (content: string, ...emoteIDs: string[]): ChatEvent => ({

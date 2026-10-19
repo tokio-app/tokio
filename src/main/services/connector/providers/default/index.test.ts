@@ -197,7 +197,12 @@ describe("TikTokLiveConnector", () => {
       const gift = {
         user: rawUser,
         giftId: 5655,
-        gift: { type: 1, name: "Rose", diamondCount: 1 },
+        gift: {
+          type: 1,
+          name: "Rose",
+          diamondCount: 1,
+          image: { urlList: ["g"] },
+        },
         repeatCount: 3,
       };
 
@@ -217,6 +222,7 @@ describe("TikTokLiveConnector", () => {
           repeatEnd: true,
           coins: 1,
           comboCount: 3,
+          image: "g",
         },
       });
     });

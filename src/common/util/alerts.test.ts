@@ -17,6 +17,7 @@ describe("formatAlertMessage", () => {
         type: 1,
         name: "Rose",
         comboCount: 3,
+        image: "",
       },
     };
 

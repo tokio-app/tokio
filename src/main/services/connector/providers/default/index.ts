@@ -286,6 +286,7 @@ export class TikTokLiveConnector extends ConnectorProvider {
         repeatEnd: this.withDefault(tdata.repeatEnd, 1) == 1,
         coins: this.withDefault(tdata.gift?.diamondCount, 0),
         comboCount: this.withDefault(tdata.repeatCount, 0),
+        image: this.withDefault(tdata.gift?.image?.urlList?.[0], ""),
       };
       const data: GiftEvent = {
         user,
