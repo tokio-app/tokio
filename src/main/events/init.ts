@@ -8,6 +8,7 @@ import {
   CustomGift,
   EMOTE_TRIGGER,
   FEEDBACK_CODES,
+  GiftEvent,
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
@@ -96,6 +97,7 @@ const registerConnectorEvents = ({
   ttsService: tts,
   musicService: music,
   alertsService: alerts,
+  overlayService: overlays,
   notifier,
 }: AppHandlerVariables) => {
   const dispatchAlert = async <K extends AppEvents>(
@@ -272,6 +274,31 @@ const registerConnectorEvents = ({
     });
   });
 
+  // TikTok's gift list misses some gifts, like other regions' ones, so the
+  // ones viewers send that aren't on it are saved for every profile,
+  // whatever features are on.
+  const recordGift = async (d: GiftEvent) => {
+    const res = await overlays.recordGift(d.gift);
+    if (!res.success) {
+      // Saving logged it. The gift is tried again when it's sent again.
+      notifier.warn(
+        "alerts",
+        FEEDBACK_CODES.GIFTS_SAVE_FAILED,
+        "Unable to save the LIVE's new gifts.",
+        { key: "gifts", windowMs: REPEAT_NOTICE_MS },
+      );
+    } else if (res.data) {
+      win.webContents.send(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, {
+        data: res.data,
+      });
+    }
+  };
+  conn.on(TOKIO_EVENTS.GIFT, (d) => {
+    recordGift(d).catch((error) => {
+      notifier.report({ source: "alerts", error, context: TOKIO_EVENTS.GIFT });
+    });
+  });
+
   music.onPlaybackError(() => {
     notifier.warn(
       "music",
@@ -364,6 +391,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     {
       folder: pathManagerService.folders.overlaysFolder,
       giftsFile: pathManagerService.files.gifts,
+      customGiftsFile: pathManagerService.files.customGifts,
     },
     {
       yaml: yamlManagerService,

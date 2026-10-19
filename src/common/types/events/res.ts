@@ -88,6 +88,7 @@ export enum APP_EVENTS_RESPONSE {
   SEARCH_SOUNDS = "app:alerts:res:search:sounds",
   SET_ALERT_SOUND = "app:alerts:res:set:sound",
   EMOTES = "app:alerts:res:emotes",
+  CUSTOM_GIFTS = "app:alerts:res:gifts",
 
   // SOUND LIBRARY
   GET_SOUNDS = "app:sounds:res",
@@ -276,6 +277,11 @@ export interface AppEventsResponseMap {
   // Pushed when a chat brings a new emote to the active profile
   [APP_EVENTS_RESPONSE.EMOTES]: {
     data: SavedEmote[];
+  };
+  // Gifts viewers sent that TikTok's list doesn't have. The reply to
+  // GET_CUSTOM_GIFTS, pushed again when a LIVE brings a new one.
+  [APP_EVENTS_RESPONSE.CUSTOM_GIFTS]: {
+    data: CustomGift[];
   };
 
   // SOUND LIBRARY

@@ -38,6 +38,7 @@ export class PathManagerService {
         overlays: join(this.folders.logsFolder, "overlays.log"),
       },
       gifts: join(this.folders.extraFolder, "gifts.json"),
+      customGifts: join(this.folders.extraFolder, "custom-gifts.json"),
     };
 
     const folderPaths = Object.values(this.folders);

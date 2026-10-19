@@ -516,6 +516,44 @@ describe("alerts events", () => {
     });
   });
 
+  describe("GET_CUSTOM_GIFTS", () => {
+    const galaxy = { value: 9, label: "Galaxy", img: "galaxy.png", coins: 1 };
+
+    it("answers with the gifts saved from LIVEs", async () => {
+      const h = createHandler({
+        overlayService: { getCustomGifts: async () => [galaxy] },
+      });
+
+      await h.invoke(alerts, APP_EVENTS.GET_CUSTOM_GIFTS);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.CUSTOM_GIFTS)).toEqual([
+        { data: [galaxy] },
+      ]);
+    });
+
+    it("answers with no gifts when they can't be read", async () => {
+      const h = createHandler({
+        overlayService: {
+          getCustomGifts: async () => {
+            throw new Error("EACCES");
+          },
+        },
+      });
+
+      await h.invoke(alerts, APP_EVENTS.GET_CUSTOM_GIFTS);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.CUSTOM_GIFTS)).toEqual([
+        { data: [] },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          code: FEEDBACK_CODES.GIFTS_FETCH_FAILED,
+          message: "Unable to load the gifts saved from your LIVEs.",
+        }),
+      ]);
+    });
+  });
+
   describe("GET_SOUNDS", () => {
     it("answers with the sound library", async () => {
       const h = createHandler({

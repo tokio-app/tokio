@@ -79,6 +79,7 @@ export enum APP_EVENTS {
   DOWNLOAD_SOUND = "app:alerts:download:sound",
   IMPORT_SOUND = "app:alerts:import:sound",
   TEST_ALERT = "app:alerts:test",
+  GET_CUSTOM_GIFTS = "app:alerts:get:gifts",
 
   // SOUND LIBRARY
   GET_SOUNDS = "app:sounds:get",
@@ -254,6 +255,7 @@ export interface AppEventsMap {
     // Identifies the test: the alert id, or the url for previews
     id: string;
   };
+  [APP_EVENTS.GET_CUSTOM_GIFTS]: void;
 
   // SOUND LIBRARY
   [APP_EVENTS.GET_SOUNDS]: void;

@@ -95,6 +95,7 @@ export enum FEEDBACK_CODES {
   SOUND_READ_FAILED = "sound_read_failed",
   SOUND_REMOVE_FAILED = "sound_remove_failed",
   EMOTES_SAVE_FAILED = "emotes_save_failed",
+  GIFTS_SAVE_FAILED = "gifts_save_failed",
 }
 
 export type FeedbackLevel = "success" | "info" | "warning" | "error";

@@ -25,6 +25,8 @@ export function Alerts() {
   // Last settings sent to main
   const [saved, setSaved] = useState(defaultProfile["alerts"]);
   const [gifts, setGifts] = useState<CustomGift[]>([]);
+  // Gifts seen in LIVEs that TikTok's list doesn't have
+  const [customGifts, setCustomGifts] = useState<CustomGift[]>([]);
   const [emotes, setEmotes] = useState<SavedEmote[]>([]);
   // What a new TTS message starts with: the TTS page's voice
   const [ttsDefaults, setTtsDefaults] = useState(() =>
@@ -40,6 +42,7 @@ export function Alerts() {
 
   useIpcRequest(APP_EVENTS.GET_PROFILE);
   useIpcRequest(APP_EVENTS.GET_GIFTS);
+  useIpcRequest(APP_EVENTS.GET_CUSTOM_GIFTS);
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
     if (!res?.success) return;
@@ -54,6 +57,11 @@ export function Alerts() {
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_GIFTS, (res) => {
     if (res) setGifts(res.data);
+  });
+
+  // The reply, then new ones while connected
+  useIpcListener(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, (res) => {
+    if (res) setCustomGifts(res.data);
   });
 
   // New emotes arrive while connected.
@@ -127,6 +135,7 @@ export function Alerts() {
         <ItemsSection
           items={settings.items}
           gifts={gifts}
+          customGifts={customGifts}
           emotes={emotes}
           testing={test.testing}
           onTest={test.toggle}

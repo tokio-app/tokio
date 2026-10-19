@@ -91,6 +91,7 @@ describe("Alerts", () => {
 
     expect(sent(APP_EVENTS.GET_PROFILE)).toHaveLength(1);
     expect(sent(APP_EVENTS.GET_GIFTS)).toHaveLength(1);
+    expect(sent(APP_EVENTS.GET_CUSTOM_GIFTS)).toHaveLength(1);
   });
 
   it("lists the profile's alerts", async () => {
@@ -344,6 +345,30 @@ describe("Alerts", () => {
     await user.click(inList(container, "Lion")!);
 
     expect(rows()[0].getByText("Lion")).toBeInTheDocument();
+    await wait(300);
+    expect(saves()[0].items[0].trigger.gifts).toEqual([5]);
+  });
+
+  it("offers the gifts saved from LIVEs with TikTok's, as they arrive", async () => {
+    const { user, container } = await load([
+      alert("alert-1", { trigger: trigger(TOKIO_EVENTS.GIFT) }),
+    ]);
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, { data: [gift(1, "Rose")] });
+    await send(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, {
+      data: [gift(9, "Galaxy")],
+    });
+
+    await user.click(rows()[0].getByText("Any gift"));
+    expect(inList(container, "Rose")).not.toBeNull();
+    expect(inList(container, "Galaxy")).not.toBeNull();
+    expect(inList(container, "Comet")).toBeNull();
+
+    await send(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, {
+      data: [gift(9, "Galaxy"), gift(5, "Comet")],
+    });
+    await user.click(inList(container, "Comet")!);
+
+    expect(rows()[0].getByText("Comet")).toBeInTheDocument();
     await wait(300);
     expect(saves()[0].items[0].trigger.gifts).toEqual([5]);
   });

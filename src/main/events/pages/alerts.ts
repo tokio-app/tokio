@@ -214,6 +214,23 @@ events.push(
   },
 );
 
+// The ones that follow are pushed with CUSTOM_GIFTS.
+events.push(
+  APP_EVENTS.GET_CUSTOM_GIFTS,
+  async ({ overlayService }, e) => {
+    e.reply(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, {
+      data: await overlayService.getCustomGifts(),
+    });
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.GIFTS_FETCH_FAILED,
+      message: "Unable to load the gifts saved from your LIVEs.",
+    },
+    onError: (e) => e.reply(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, { data: [] }),
+  },
+);
+
 events.push(
   APP_EVENTS.GET_SOUNDS,
   ({ storeManagerService }, e) => {

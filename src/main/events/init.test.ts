@@ -12,6 +12,7 @@ import {
   Files,
   Folders,
   Gift,
+  GiftEvent,
   LikeEvent,
   RoomUserEvent,
   TOKIO_EVENTS,
@@ -22,6 +23,7 @@ import config from "@/config";
 import Logger from "@/logger";
 import type { AlertsService } from "@/services/alerts";
 import type { MusicService } from "@/services/music";
+import type { OverlayService } from "@/services/overlay";
 import type { StoreManagerService } from "@/services/store";
 import type { TTSService } from "@/services/tts";
 import type { UpdaterService } from "@/services/updater";
@@ -49,6 +51,7 @@ const files: Files = {
     overlays: "overlays.log",
   },
   gifts: "extra/gifts.json",
+  customGifts: "extra/custom-gifts.json",
 };
 
 const folders: Folders = {
@@ -98,6 +101,19 @@ const emote = (id: string): Emotes => ({
 const chat = (content: string, emotes: Emotes[] = []): ChatEvent => ({
   user,
   comment: { content, emotes, lang: "en" },
+});
+
+const giftEvent = (id: string, name: string): GiftEvent => ({
+  user,
+  gift: {
+    id,
+    name,
+    coins: 1,
+    repeatEnd: true,
+    type: 1,
+    comboCount: 1,
+    image: `${id}.png`,
+  },
 });
 
 const roomUser = (views: number, viewers: number): RoomUserEvent => ({
@@ -190,6 +206,13 @@ function setup() {
     getGifts: vi.fn(async (): Promise<CustomGift[]> => []),
     load: vi.fn(async (_gifts: CustomGift[]) => {}),
     refreshGifts: vi.fn(async (_gifts: CustomGift[]) => {}),
+    recordGift: vi.fn(
+      async (
+        ..._args: Parameters<OverlayService["recordGift"]>
+      ): Promise<{ success: boolean; data?: CustomGift[] }> => ({
+        success: true,
+      }),
+    ),
   };
   const storeManagerService = {
     setLogFile: vi.fn(),
@@ -774,6 +797,64 @@ describe("init events", () => {
 
       expect(s.storeManagerService.recordEmotes).not.toHaveBeenCalled();
     });
+
+    it("records the gifts viewers send and pushes the new custom gifts", async () => {
+      const s = await live({ alerts: false });
+      const custom = [{ value: 9, label: "Galaxy", img: "9.png", coins: 1 }];
+      s.overlayService.recordGift.mockResolvedValue({
+        success: true,
+        data: custom,
+      });
+      const sent = giftEvent("9", "Galaxy");
+
+      s.conn.emit(TOKIO_EVENTS.GIFT, sent);
+
+      expect(s.overlayService.recordGift).toHaveBeenCalledExactlyOnceWith(
+        sent.gift,
+      );
+      await vi.waitFor(() => {
+        expect(s.h.pushed(APP_EVENTS_RESPONSE.CUSTOM_GIFTS)).toEqual([
+          { data: custom },
+        ]);
+      });
+    });
+
+    it("pushes nothing when a gift changed no custom gift", async () => {
+      const s = await live({ alerts: false });
+
+      s.conn.emit(TOKIO_EVENTS.GIFT, giftEvent("5655", "Rose"));
+
+      expect(s.overlayService.recordGift).toHaveBeenCalledOnce();
+      await flushPromises();
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CUSTOM_GIFTS)).toEqual([]);
+      expect(s.h.notices).toEqual([]);
+    });
+
+    it("warns when the gifts can't be saved, at most once every 30 seconds", async () => {
+      const s = await live({ alerts: false });
+      const warn = vi.spyOn(s.h.handler.notifier, "warn");
+      s.overlayService.recordGift.mockResolvedValue({ success: false });
+
+      s.conn.emit(TOKIO_EVENTS.GIFT, giftEvent("9", "Galaxy"));
+      s.conn.emit(TOKIO_EVENTS.GIFT, giftEvent("8", "Comet"));
+
+      await vi.waitFor(() => {
+        expect(warn).toHaveBeenCalledTimes(2);
+      });
+      expect(warn).toHaveBeenCalledWith(
+        "alerts",
+        FEEDBACK_CODES.GIFTS_SAVE_FAILED,
+        "Unable to save the LIVE's new gifts.",
+        { key: "gifts", windowMs: 30_000 },
+      );
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.GIFTS_SAVE_FAILED,
+        }),
+      ]);
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CUSTOM_GIFTS)).toEqual([]);
+    });
   });
 
   describe("music playback", () => {
@@ -892,6 +973,7 @@ describe("init events", () => {
       expect(locations).toEqual({
         folder: "app/overlays",
         giftsFile: "extra/gifts.json",
+        customGiftsFile: "extra/custom-gifts.json",
       });
       expect(services.yaml).toBe(handler.yamlManagerService);
       expect(services.json).toBe(handler.jsonManagerService);

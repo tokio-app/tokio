@@ -4,13 +4,15 @@ import { AlertItem, EmptyState, TestState } from "@/components";
 import { AlertTestRequest, Updater } from "@/hooks";
 import { useMemo } from "react";
 import styles from "../alerts.module.css";
-import { emoteOptions } from "../helper";
+import { emoteOptions, giftOptions } from "../helper";
 
 const COLUMNS = ["Actions", "Enabled", "Trigger", "", "Sound", "Volume"];
 
 type Props = {
   items: Alert[];
   gifts: CustomGift[];
+  // Gifts seen in LIVEs that TikTok's list doesn't have
+  customGifts: CustomGift[];
   emotes: SavedEmote[];
   // The sound test loading or playing
   testing: TestState;
@@ -22,12 +24,17 @@ type Props = {
 export function ItemsSection({
   items,
   gifts,
+  customGifts,
   emotes,
   testing,
   onTest,
   update,
   onPickSound,
 }: Props) {
+  const giftChoices = useMemo(
+    () => giftOptions(gifts, customGifts),
+    [gifts, customGifts],
+  );
   const emoteChoices = useMemo(() => emoteOptions(emotes), [emotes]);
 
   return (
@@ -49,7 +56,7 @@ export function ItemsSection({
           <AlertItem
             key={alert.id}
             alert={alert}
-            gifts={gifts}
+            gifts={giftChoices}
             emotes={emoteChoices}
             testing={testing}
             onTest={onTest}

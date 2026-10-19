@@ -31,4 +31,5 @@ export interface Files {
     overlays: string;
   };
   gifts: string;
+  customGifts: string;
 }

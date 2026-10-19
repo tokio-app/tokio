@@ -1,5 +1,5 @@
 import { OverlayMetadata, TestOverlay } from "@/common/schemas";
-import { CustomGift, TOKIO_EVENTS } from "@/common/types";
+import { CustomGift, GiftEvent, TOKIO_EVENTS } from "@/common/types";
 import { defaultStoreData, generateTikTokEventSample } from "@/common/util";
 import { JSONManagerService } from "@/services/json";
 import { ServerService } from "@/services/server";
@@ -150,6 +150,9 @@ describe("OverlayService", () => {
       "index.html": `<body>${SETUP}</body>`,
     });
 
+  const readJSON = async (name: string) =>
+    JSON.parse(await readFile(join(root, name), "utf-8"));
+
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), "tokio-test-"));
     folder = join(root, "overlays");
@@ -164,7 +167,11 @@ describe("OverlayService", () => {
     sendToClient = vi.spyOn(server, "sendToClient");
     service = new OverlayService();
     service.initialize(
-      { folder, giftsFile: join(root, "gifts.json") },
+      {
+        folder,
+        giftsFile: join(root, "gifts.json"),
+        customGiftsFile: join(root, "custom-gifts.json"),
+      },
       {
         yaml: new YAMLManagerService(),
         json: new JSONManagerService(),
@@ -202,7 +209,7 @@ describe("OverlayService", () => {
       expect(
         await readFile(join(folder, "title", "index.html"), "utf-8"),
       ).toContain(`window.__OVERLAY_CONFIG__ = {"title":"Saved"}`);
-      expect(await service.getGifts()).toEqual(gifts);
+      expect(await readJSON("gifts.json")).toEqual(gifts);
     });
 
     it("writes gifts that changed after load into the loaded overlays", async () => {
@@ -217,6 +224,7 @@ describe("OverlayService", () => {
       expect(processHTML).toHaveBeenCalledOnce();
       expect(vi.mocked(processHTML).mock.calls[0][5]).toEqual([...gifts, lion]);
       expect(await service.getGifts()).toEqual([...gifts, lion]);
+      expect(await readJSON("gifts.json")).toEqual([...gifts, lion]);
     });
 
     it("leaves the overlays alone when the gifts didn't change", async () => {
@@ -277,6 +285,138 @@ describe("OverlayService", () => {
 
       expect(await readdir(folder)).toEqual([]);
       expect(stored).toEqual([]);
+    });
+  });
+
+  describe("gifts", () => {
+    // A gift as the connector sends it
+    const sent = (
+      id: string,
+      name = `Gift ${id}`,
+      image = `${id}.png`,
+    ): GiftEvent["gift"] => ({
+      id,
+      name,
+      image,
+      coins: 10,
+      type: 1,
+      repeatEnd: true,
+      comboCount: 1,
+    });
+
+    const saved = (
+      value: number,
+      label = `Gift ${value}`,
+      img = `${value}.png`,
+    ): CustomGift => ({ value, label, img, coins: 10 });
+
+    it("keeps TikTok's list once read", async () => {
+      await writeFile(join(root, "gifts.json"), JSON.stringify(gifts));
+      expect(await service.getGifts()).toEqual(gifts);
+
+      await writeFile(join(root, "gifts.json"), "[]");
+
+      expect(await service.getGifts()).toEqual(gifts);
+    });
+
+    it("has no custom gifts before the first one is saved", async () => {
+      expect(await service.getCustomGifts()).toEqual([]);
+    });
+
+    it("reads the custom gifts saved last time", async () => {
+      await writeFile(
+        join(root, "custom-gifts.json"),
+        JSON.stringify([saved(9)]),
+      );
+
+      expect(await service.getCustomGifts()).toEqual([saved(9)]);
+    });
+
+    describe("recordGift", () => {
+      beforeEach(async () => {
+        await service.load(gifts);
+      });
+
+      it("saves a gift TikTok's list doesn't have", async () => {
+        const res = await service.recordGift(sent("9", "Galaxy"));
+
+        expect(res).toEqual({ success: true, data: [saved(9, "Galaxy")] });
+        expect(await readJSON("custom-gifts.json")).toEqual(res.data);
+        expect(await service.getCustomGifts()).toEqual(res.data);
+      });
+
+      it("adds gifts in the order they're sent, and returns the list only when it changed", async () => {
+        await service.recordGift(sent("9"));
+        const res = await service.recordGift(sent("8"));
+        const again = await service.recordGift(sent("9"));
+
+        expect(res.data).toEqual([saved(9), saved(8)]);
+        expect(again).toEqual({ success: true });
+      });
+
+      it("leaves out the gifts TikTok lists", async () => {
+        expect(await service.recordGift(sent("1", "Rose"))).toEqual({
+          success: true,
+        });
+        expect(await service.getCustomGifts()).toEqual([]);
+      });
+
+      it("saves nothing while TikTok's list is empty", async () => {
+        await service.load([]);
+
+        expect(await service.recordGift(sent("9"))).toEqual({
+          success: true,
+        });
+        expect(await service.getCustomGifts()).toEqual([]);
+      });
+
+      it.each([
+        { what: "no id", gift: sent("") },
+        { what: "an id that isn't a number", gift: sent("rose") },
+        { what: "no name", gift: sent("9", "") },
+      ])("skips a gift with $what", async ({ gift }) => {
+        expect(await service.recordGift(gift)).toEqual({ success: true });
+        expect(await service.getCustomGifts()).toEqual([]);
+      });
+
+      it("keeps both gifts of events sent at the same time", async () => {
+        await Promise.all([
+          service.recordGift(sent("9")),
+          service.recordGift(sent("8")),
+        ]);
+
+        expect(await readJSON("custom-gifts.json")).toEqual([
+          saved(9),
+          saved(8),
+        ]);
+      });
+
+      it("updates a saved gift's details once per run", async () => {
+        await writeFile(
+          join(root, "custom-gifts.json"),
+          JSON.stringify([saved(9, "Old", "old.png")]),
+        );
+
+        const res = await service.recordGift(sent("9", "New", "new.png"));
+        const again = await service.recordGift(sent("9", "Newer", "newer.png"));
+
+        expect(res.data).toEqual([saved(9, "New", "new.png")]);
+        expect(again).toEqual({ success: true });
+      });
+
+      it("tries a gift again after a failed save", async () => {
+        // A folder where the file goes
+        await mkdir(join(root, "custom-gifts.json"));
+
+        expect(await service.recordGift(sent("9"))).toEqual({
+          success: false,
+        });
+        expect(await service.getCustomGifts()).toEqual([]);
+
+        await rm(join(root, "custom-gifts.json"), { recursive: true });
+
+        expect((await service.recordGift(sent("9"))).data).toEqual([saved(9)]);
+      });
     });
   });
 

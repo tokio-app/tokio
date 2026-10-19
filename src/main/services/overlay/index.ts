@@ -8,6 +8,7 @@ import {
 } from "@/common/schemas";
 import {
   CustomGift,
+  GiftEvent,
   isLiveEvent,
   OverlayApp,
   OverlayConfigRedux,
@@ -16,6 +17,7 @@ import {
 } from "@/common/types";
 import { formatError, generateTikTokEventSample } from "@/common/util";
 import Logger from "@/logger";
+import { isEqual } from "es-toolkit";
 import { randomUUID } from "node:crypto";
 import { access, cp, readdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -60,6 +62,15 @@ export interface OverlayResult<T = undefined> {
 export class OverlayService extends Service {
   private _folder = "";
   private _giftsFile = "";
+  private _customGiftsFile = "";
+  // TikTok's list, kept once read: every gift of a LIVE is checked against it.
+  private _gifts: CustomGift[] | null = null;
+  // Gifts viewers sent that TikTok's list doesn't have, see recordGift
+  private _customGifts: CustomGift[] | null = null;
+  // Gift saves run one after another, so one doesn't drop another's gift.
+  private _giftSave: Promise<unknown> = Promise.resolve();
+  // Custom gifts whose details were already compared since the app started
+  private _checkedGifts = new Set<number>();
   private _overlays: OverlayApp[] = [];
   private _yaml: YAMLManagerService;
   private _json: JSONManagerService;
@@ -74,7 +85,7 @@ export class OverlayService extends Service {
   }
 
   public initialize(
-    paths: { folder: string; giftsFile: string },
+    paths: { folder: string; giftsFile: string; customGiftsFile: string },
     services: {
       yaml: YAMLManagerService;
       json: JSONManagerService;
@@ -84,6 +95,9 @@ export class OverlayService extends Service {
   ): void {
     this._folder = paths.folder;
     this._giftsFile = paths.giftsFile;
+    this._customGiftsFile = paths.customGiftsFile;
+    this._gifts = null;
+    this._customGifts = null;
     this._yaml = services.yaml;
     this._json = services.json;
     this._server = services.server;
@@ -104,6 +118,7 @@ export class OverlayService extends Service {
     }
 
     await this._json.saveArbitraryFile(this._giftsFile, gifts);
+    this._gifts = gifts;
 
     for (const overlay of this._store.getSettings().overlays) {
       const info = await this._writeHTML(overlay.id, overlay.external!, gifts);
@@ -132,6 +147,7 @@ export class OverlayService extends Service {
     if (JSON.stringify(gifts) === JSON.stringify(await this.getGifts())) return;
 
     await this._json.saveArbitraryFile(this._giftsFile, gifts);
+    this._gifts = gifts;
 
     const loaded = new Set(this._overlays.map((o) => o.id));
     for (const overlay of this._store.getSettings().overlays) {
@@ -331,10 +347,82 @@ export class OverlayService extends Service {
   }
 
   public async getGifts(): Promise<CustomGift[]> {
-    const gifts = await this._json.loadArbitraryFile<CustomGift[]>(
-      this._giftsFile,
-    );
-    return gifts ?? [];
+    if (!this._gifts) {
+      const saved = await this._json.loadArbitraryFile<CustomGift[]>(
+        this._giftsFile,
+      );
+      // A load that finished meanwhile has the newer list.
+      this._gifts ??= saved ?? [];
+    }
+    return this._gifts;
+  }
+
+  // Shared by all profiles, unlike emotes: a gift is the same in every LIVE.
+  public async getCustomGifts(): Promise<CustomGift[]> {
+    if (!this._customGifts) {
+      const saved = await this._json.loadArbitraryFile<CustomGift[]>(
+        this._customGiftsFile,
+      );
+      this._customGifts ??= saved ?? [];
+    }
+    return this._customGifts;
+  }
+
+  /**
+   * Saves a gift a viewer sent when TikTok's list doesn't have it. data is
+   * the new list of custom gifts, only set when it changed.
+   */
+  public recordGift(
+    gift: GiftEvent["gift"],
+  ): Promise<OverlayResult<CustomGift[]>> {
+    const save = this._giftSave.then(() => this._recordGift(gift));
+    this._giftSave = save.catch(() => {});
+    return save;
+  }
+
+  private async _recordGift(
+    gift: GiftEvent["gift"],
+  ): Promise<OverlayResult<CustomGift[]>> {
+    const value = Number(gift.id);
+    // Nothing the picker could show
+    if (!Number.isInteger(value) || value <= 0 || !gift.name) {
+      return { success: true };
+    }
+
+    // An empty list was never fetched, so every gift would look missing.
+    const listed = await this.getGifts();
+    if (listed.length === 0 || listed.some((g) => g.value === value)) {
+      return { success: true };
+    }
+
+    const entry: CustomGift = {
+      value,
+      label: gift.name,
+      img: gift.image,
+      coins: gift.coins,
+    };
+    const saved = [...(await this.getCustomGifts())];
+    const index = saved.findIndex((g) => g.value === value);
+    let changed = false;
+    if (index === -1) {
+      saved.push(entry);
+      changed = true;
+    } else if (
+      !this._checkedGifts.has(value) &&
+      !isEqual(saved[index], entry)
+    ) {
+      // Once per run, in case TikTok renames it or moves its image.
+      saved[index] = entry;
+      changed = true;
+    }
+    this._checkedGifts.add(value);
+
+    if (!changed) return { success: true };
+    if (!(await this._json.saveArbitraryFile(this._customGiftsFile, saved))) {
+      return { success: false };
+    }
+    this._customGifts = saved;
+    return { success: true, data: saved };
   }
 
   public send(id: string, payload: TokioPayload): void {
