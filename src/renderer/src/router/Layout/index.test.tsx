@@ -1,9 +1,9 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { notification, profileReply, settingsReply } from "@test/fixtures";
-import { send, sent } from "@test/ipc";
+import { send, sent, sentEvents } from "@test/ipc";
 import { renderApp } from "@test/render";
 import { screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const sidebar = () => within(screen.getByRole("navigation"));
 // Sections have headers too, the title bar's comes first
@@ -15,6 +15,10 @@ const profiles = settingsReply((s) => {
     { file: "horror.json", name: "Horror" },
   ];
   s.settings.activeProfile = { file: "default.json", name: "Default" };
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("Layout", () => {
@@ -98,6 +102,32 @@ describe("Layout", () => {
     await user.click(titleBar().getByText("Horror"));
 
     expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([{ file: "horror.json" }]);
+  });
+
+  // Sent after the switch, main would save it into the new profile. Timers
+  // are stopped, so only the switch can have sent it.
+  it("saves a change still waiting before switching profiles", async () => {
+    vi.useFakeTimers();
+    const { user } = await renderApp("/tts", {
+      user: { advanceTimers: (ms) => vi.advanceTimersByTime(ms) },
+    });
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
+    await send(APP_EVENTS_RESPONSE.GET_SETTINGS, profiles);
+    await user.click(screen.getByRole("button", { name: "Add Replacement" }));
+
+    await user.click(titleBar().getByText("Default"));
+    await user.click(titleBar().getByText("Horror"));
+
+    expect(
+      sentEvents().filter(
+        (event) =>
+          event === APP_EVENTS.UPDATE_TTS_SETTINGS ||
+          event === APP_EVENTS.SET_PROFILE,
+      ),
+    ).toEqual([APP_EVENTS.UPDATE_TTS_SETTINGS, APP_EVENTS.SET_PROFILE]);
+    expect(
+      sent(APP_EVENTS.UPDATE_TTS_SETTINGS)[0].settings.replacements,
+    ).toEqual([{ old: "", new: "" }]);
   });
 
   it("locks the profile while connected", async () => {

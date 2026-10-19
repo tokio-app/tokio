@@ -6,7 +6,7 @@ import { send, sent } from "@test/ipc";
 import { providers } from "@test/render";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useEditableSettings } from "./useEditableSettings";
+import { flushSettings, useEditableSettings } from "./useEditableSettings";
 
 // The TTS settings, as the TTS page edits them
 function setup(onLoad?: (profile: Profile) => void) {
@@ -141,6 +141,22 @@ describe("useEditableSettings", () => {
     unmount();
 
     expect(saves()).toEqual([]);
+  });
+
+  // Before a profile switch, so it reaches the profile it was made on
+  it("sends a change still waiting right away when flushed, once", async () => {
+    const { setPitch } = setup();
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, loaded);
+
+    act(() => flushSettings());
+    expect(saves()).toEqual([]);
+
+    setPitch(2);
+    act(() => flushSettings());
+    expect(saves().map((s) => s.filters.pitch)).toEqual([2]);
+
+    await wait(300);
+    expect(saves()).toHaveLength(1);
   });
 
   // Sending it on leaving would write it into the new profile

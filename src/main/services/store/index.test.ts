@@ -459,6 +459,33 @@ describe("StoreManagerService", () => {
       expect((await readJSON(defaultProfileFile)).connector.username).toBe("");
     });
 
+    // An autosave can still be writing when the user switches profiles
+    it("keeps the profile switched to when a save of the old one ends after the switch", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => (release = resolve));
+      const updateFile = json.updateFile.bind(json);
+      vi.spyOn(json, "updateFile").mockImplementationOnce(
+        async (file, schema, updates) => {
+          await released;
+          return updateFile(file, schema, updates);
+        },
+      );
+
+      const saving = store.updateProfileData({
+        connector: { username: "streamer" },
+      });
+      await store.updateActiveProfile("stream.json");
+      release();
+
+      expect(await saving).toBe(true);
+      expect((await store.getProfileData())?.name).toBe("Stream");
+      expect((await readJSON(defaultProfileFile)).connector.username).toBe(
+        "streamer",
+      );
+    });
+
     it("loads profiles saved before emotes and alert filters", async () => {
       const old: Partial<Profile> = structuredClone(defaultProfile);
       delete old.emotes;

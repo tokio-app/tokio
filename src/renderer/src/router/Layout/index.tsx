@@ -3,6 +3,7 @@ import { EntityMetadata } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { NotificationBell, ProfileDropdown, UpdateButton } from "@/components";
 import {
+  flushSettings,
   useAudio,
   useIpcListener,
   useIpcRequest,
@@ -66,9 +67,11 @@ export function Layout() {
           disabled={isConnected}
           profiles={profiles}
           active={activeProfile}
-          onProfileSelected={(file) =>
-            window.api.emit(APP_EVENTS.SET_PROFILE, { file })
-          }
+          onProfileSelected={(file) => {
+            // Changes still waiting go to the profile they were made on.
+            flushSettings();
+            window.api.emit(APP_EVENTS.SET_PROFILE, { file });
+          }}
         />
         <UpdateButton status={updateStatus} connected={isConnected} />
         <NotificationBell

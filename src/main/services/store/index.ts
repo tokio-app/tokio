@@ -135,10 +135,16 @@ export class StoreManagerService extends Service {
     }
   }
 
+  private _activeProfileFile() {
+    return this._storeData?.settings.activeProfile.file || "default.json";
+  }
+
   private async _getProfileData() {
-    const bn = this._storeData?.settings.activeProfile.file || "default.json";
     return await this._jsonManagerService.loadFile(
-      join(this._pathManagerService.folders.profilesFolder, bn),
+      join(
+        this._pathManagerService.folders.profilesFolder,
+        this._activeProfileFile(),
+      ),
       ProfileSchema,
     );
   }
@@ -770,16 +776,16 @@ export class StoreManagerService extends Service {
   }
 
   public async updateProfileData(updates: Partial<Profile>): Promise<boolean> {
+    const file = this._activeProfileFile();
     const res = await this._jsonManagerService.updateFile(
-      join(
-        this._pathManagerService.folders.profilesFolder,
-        this._storeData?.settings.activeProfile.file || "default.json",
-      ),
+      join(this._pathManagerService.folders.profilesFolder, file),
       ProfileSchema,
       updates,
     );
     if (!res.success || !res.data) return false;
-    this._memoryProfile = res.data;
+    // A switch while this was writing made another profile active, that's
+    // the one to keep in memory.
+    if (file === this._activeProfileFile()) this._memoryProfile = res.data;
     return true;
   }
 

@@ -2,7 +2,7 @@ import { Profile } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import isEqual from "fast-deep-equal";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useImmerState } from "./useImmerState";
 import { useIpcListener } from "./useIpcListener";
 import { useIpcRequest } from "./useIpcRequest";
@@ -29,10 +29,21 @@ const SAVE_REPLY = {
   alerts: APP_EVENTS_RESPONSE.UPDATE_ALERTS_SETTINGS,
 } as const satisfies Record<Section, APP_EVENTS_RESPONSE>;
 
+// Of every mounted page, see flushSettings
+const flushes = new Set<() => void>();
+
+/**
+ * Sends the changes still waiting right away. Call it before switching
+ * profiles: main saves to the active profile, so they'd land in the new one.
+ */
+export function flushSettings() {
+  flushes.forEach((flush) => flush());
+}
+
 /**
  * A section of the active profile, saved shortly after each change. A change
- * still waiting is sent when the page closes, and dropped when another
- * profile loads.
+ * still waiting is sent when the page closes or flushSettings is called, and
+ * dropped when another profile loads.
  */
 export function useEditableSettings<K extends Section>(
   section: K,
@@ -46,6 +57,14 @@ export function useEditableSettings<K extends Section>(
   const [saved, setSaved] = useState<Profile[K]>(defaultProfile[section]);
   // Settings changed but not sent to main yet
   const pending = useRef<Profile[K] | null>(null);
+
+  const flush = useCallback(() => {
+    const waiting = pending.current;
+    if (!waiting) return;
+    pending.current = null;
+    SAVE[section](waiting);
+    setSaved(waiting);
+  }, [section]);
 
   useIpcRequest(APP_EVENTS.GET_PROFILE);
 
@@ -73,22 +92,20 @@ export function useEditableSettings<K extends Section>(
     }
 
     pending.current = settings;
-    const timer = setTimeout(() => {
-      SAVE[section](settings);
-      pending.current = null;
-      setSaved(settings);
-    }, SAVE_DELAY);
+    const timer = setTimeout(flush, SAVE_DELAY);
 
     return () => clearTimeout(timer);
-  }, [section, settings, saved]);
+  }, [settings, saved, flush]);
 
-  // Don't lose a change made right before leaving the page.
-  useEffect(
-    () => () => {
-      if (pending.current) SAVE[section](pending.current);
-    },
-    [section],
-  );
+  // Sent right away by flushSettings, and when the page closes so a change
+  // made right before leaving isn't lost.
+  useEffect(() => {
+    flushes.add(flush);
+    return () => {
+      flushes.delete(flush);
+      flush();
+    };
+  }, [flush]);
 
   return { settings, update };
 }

@@ -1,6 +1,7 @@
 import { EntityMetadata } from "@/common/schemas";
 import { APP_EVENTS } from "@/common/types";
 import { Btn, Field, Section, Select } from "@/components";
+import { flushSettings } from "@/hooks";
 import { FiCopy, FiDownload, FiPlus, FiUpload, FiUsers } from "react-icons/fi";
 import styles from "../settings.module.css";
 
@@ -36,6 +37,8 @@ export function ProfileSection({
             options={profiles.map((p) => ({ label: p.name, value: p.file }))}
             value={active.file}
             onChange={(file) => {
+              // Changes still waiting go to the profile they were made on.
+              flushSettings();
               // Main answers with the new settings, which updates the page.
               window.api.emit(APP_EVENTS.SET_PROFILE, { file });
             }}

@@ -167,7 +167,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 - Style with CSS Modules and the tokens in `src/ui/styles/tokens.css` (colors, `--space-*`, `--font-*`, `--radius-*`, `--z-*`), not raw values.
 - Global state is in `context/` (`app`, `audio`, `notifications`); shared hooks are in `hooks/`. Notably:
   - `useImmerState` returns an immer `Updater`; `scopeUpdater(update, key)` hands a section one field.
-  - `useEditableSettings(section, onLoad?)` loads a profile section (TTS, Music, Alerts) and saves it 300ms after the last change, so quick changes go in one save. A change still waiting is sent when the page closes and dropped when another profile loads, and a failed save reloads the profile.
+  - `useEditableSettings(section, onLoad?)` loads a profile section (TTS, Music, Alerts) and saves it 300ms after the last change, so quick changes go in one save. A change still waiting is sent when the page closes and dropped when another profile loads, and a failed save reloads the profile. Main saves to whichever profile is active, so call `flushSettings()` before switching profiles: it sends the changes still waiting to the profile they were made on.
 - Audio plays through named `AudioQueue`s (`helper/audio.ts`) from `useAudio().getQueue(name)`. `onEnded` doesn't run when a queue is stopped, and `maxQueueLength` counts waiting and playing items.
 
 ### Persistence
