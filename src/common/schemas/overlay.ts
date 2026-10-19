@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CustomGift, OverlayConfigRedux } from "../types/overlay";
 
 const SectionSchema = z.object({
   name: z.string(),
@@ -166,4 +167,47 @@ export function resetOverlayConfig(config: OverlayConfig): OverlayConfig {
     Object.assign(attributes, { value: structuredClone(attributes.default) });
   }
   return reset;
+}
+
+/**
+ * The settings an overlay reads, keyed by field id: each field's value (or
+ * default), colors with their `#` and gift ids resolved to the gifts.
+ */
+export function getOverlayConfig(
+  data: OverlayConfig,
+  mode: "value" | "default",
+  gifts?: CustomGift[] | null,
+): OverlayConfigRedux {
+  const extracted: OverlayConfigRedux = {};
+
+  const giftsMap = new Map<number, CustomGift>();
+  if (gifts && gifts.length > 0) {
+    for (const g of gifts) {
+      giftsMap.set(g.value, g);
+    }
+  }
+
+  for (const setting of data.fields) {
+    if (setting.type === "gifts") {
+      const val = setting.attributes[mode];
+      if (!gifts || val == null) {
+        extracted[setting.id] = [];
+        continue;
+      }
+
+      const ids = Array.isArray(val) ? val : [val];
+
+      const res = ids
+        .map((id) => giftsMap.get(id))
+        .filter((g): g is CustomGift => g !== undefined);
+
+      extracted[setting.id] = setting.attributes.multiple ? res : res[0];
+    } else if (setting.type === "color") {
+      extracted[setting.id] = `#${setting.attributes[mode]}`;
+    } else {
+      extracted[setting.id] = setting.attributes[mode];
+    }
+  }
+
+  return extracted;
 }

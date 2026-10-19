@@ -1,47 +1,135 @@
-.settings {
+/* The preview on the left, the settings on the right */
+.editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 368px;
+  gap: var(--space-6);
+  height: 520px;
+}
+
+.preview {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  max-height: 560px;
-  padding-right: 6px;
-  overflow-y: auto;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.preview_actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.note {
+  font-size: var(--font-sm);
+  color: var(--font-secondary);
 }
 
 .loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 240px;
+}
+
+/* Only the settings scroll */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-height: 0;
+  padding-right: var(--space-4);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .group {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
   border: none;
 }
 
+/* Same line as the one between page sections, in the middle of the gap. Under
+   the section rather than over the next one, whose legend sits above its box */
+.group:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  bottom: calc(var(--space-8) / -2 - 1px);
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    var(--background-secondary),
+    transparent
+  );
+}
+
 .group_name {
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: 0;
   font-size: var(--font-lg);
   font-weight: 600;
   color: var(--font-primary);
 }
 
+/* A label over its control */
 .field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
 }
 
-.field_label {
+/* The label, then the value and the reset button on the right */
+.field_header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* A control and its label on one line */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
   font-size: var(--font-md);
-  font-weight: 500;
   color: var(--font-primary);
+}
+
+.value {
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--font-secondary);
+}
+
+.slider {
+  height: 24px;
+}
+
+/* The negative margin keeps rows as tall as their text */
+.reset {
+  margin: -6px -6px -6px 0;
+}
+
+.reset_hidden {
+  visibility: hidden;
 }
 
 .footer {
   display: flex;
   justify-content: space-between;
   width: 100%;
+}
+
+.footer_actions {
+  display: flex;
+  gap: var(--space-3);
 }

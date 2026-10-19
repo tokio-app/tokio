@@ -8,7 +8,7 @@ import {
 import { OverlayModal, Page } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
-import { postToOverlay } from "./helper";
+import { postToOverlay, postToPreviews } from "./helper";
 import { GallerySection } from "./sections/GallerySection";
 
 export function Overlays() {
@@ -17,6 +17,8 @@ export function Overlays() {
   // Overlay being customized, and its config once loaded
   const [configId, setConfigId] = useState<string | null>(null);
   const [config, setConfig] = useState<OverlayConfig | null>(null);
+  const [saving, setSaving] = useState(false);
+  const editing = overlays.find((overlay) => overlay.id === configId);
 
   const closeModal = () => {
     setConfigId(null);
@@ -32,6 +34,8 @@ export function Overlays() {
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG, (res) => {
     if (res?.success) setConfig(res.data!);
+    // Main has already reported the failure.
+    else closeModal();
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_GIFTS, (res) => {
@@ -39,29 +43,38 @@ export function Overlays() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, (res) => {
+    setSaving(false);
     if (!res?.success) return;
     postToOverlay(res.id!, { type: "tokio:config", data: res.data! });
     closeModal();
   });
 
+  // Tests from the settings stay in the previews, which show the unsaved
+  // settings, so they never reach the stream.
   useIpcListener(APP_EVENTS_RESPONSE.TEST_OVERLAY, (res) => {
     if (!res) return;
-    for (const payload of res.payloads) postToOverlay(res.id, payload);
-    closeModal();
+    const post = configId === null ? postToOverlay : postToPreviews;
+    for (const payload of res.payloads) post(res.id, payload);
   });
 
   return (
     <>
-      {configId !== null && (
+      {editing && (
         <OverlayModal
+          overlay={editing}
           gifts={gifts}
           config={config}
+          saving={saving}
           onRequestClose={closeModal}
+          onTest={() =>
+            window.api.emit(APP_EVENTS.TEST_OVERLAY, { id: editing.id })
+          }
           onSave={(saved) => {
+            setSaving(true);
             window.api.emit(APP_EVENTS.SAVE_OVERLAY_CONFIG, {
               config: saved,
               gifts,
-              id: configId,
+              id: editing.id,
             });
           }}
         />

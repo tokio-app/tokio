@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { Ref, useMemo, useState } from "react";
 import { PropagateLoader } from "react-spinners";
 import styles from "./iframe.module.css";
 
 interface IframeProps {
   source: string;
   name: string;
+  ref?: Ref<HTMLIFrameElement>;
+  onLoad?: () => void;
 }
 
-export const Iframe = ({ source, name }: IframeProps) => {
+export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
   const [loading, setLoading] = useState(true);
 
   const iframeSrc = useMemo(() => {
@@ -38,6 +40,7 @@ export const Iframe = ({ source, name }: IframeProps) => {
         </div>
       )}
       <iframe
+        ref={ref}
         src={iframeSrc}
         title={`Viewer for ${name}`}
         name={`TOKIO_APP-${name}`}
@@ -45,6 +48,7 @@ export const Iframe = ({ source, name }: IframeProps) => {
         loading="lazy"
         onLoad={() => {
           setLoading(false);
+          onLoad?.();
         }}
         className={styles.iframe_component}
         style={{

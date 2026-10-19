@@ -5,6 +5,7 @@ export * from "./Iframe";
 export * from "./Modal";
 export * from "./NotificationBell";
 export * from "./OverlayModal";
+export * from "./OverlayPreview";
 export * from "./OverlayView";
 export * from "./Page";
 export * from "./PermissionsSection";

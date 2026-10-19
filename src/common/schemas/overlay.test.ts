@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { OverlayConfig, resetOverlayConfig } from "./overlay";
+import { CustomGift } from "../types/overlay";
+import { getOverlayConfig, OverlayConfig, resetOverlayConfig } from "./overlay";
+
+const GIFTS: CustomGift[] = [
+  { value: 1, label: "Rose", img: "rose.png", coins: 1 },
+  { value: 2, label: "Lion", img: "lion.png", coins: 29999 },
+  { value: 3, label: "Heart", img: "heart.png", coins: 5 },
+];
 
 function makeConfig(): OverlayConfig {
   return {
@@ -110,5 +117,49 @@ describe("resetOverlayConfig", () => {
         expect(value).not.toBe(fallback);
       }
     }
+  });
+});
+
+describe("getOverlayConfig", () => {
+  it("keys each field's value by id, with colors prefixed", () => {
+    expect(getOverlayConfig(makeConfig(), "value", GIFTS)).toEqual({
+      title: "changed",
+      mode: ["a"],
+      tint: "#ff0000",
+      show: false,
+      sound: true,
+      gifts: [GIFTS[0]],
+      size: 80,
+    });
+  });
+
+  it("reads the defaults in default mode", () => {
+    expect(getOverlayConfig(makeConfig(), "default", GIFTS)).toMatchObject({
+      title: "initial",
+      tint: "#00ff00",
+      gifts: [GIFTS[1], GIFTS[2]],
+      size: 50,
+    });
+  });
+
+  it("gives one gift for a single gift field", () => {
+    const config = makeConfig();
+    config.fields[5] = {
+      id: "gifts",
+      name: "Gift",
+      section: "general",
+      type: "gifts",
+      attributes: { multiple: false, value: 3, default: 1 },
+    };
+
+    expect(getOverlayConfig(config, "value", GIFTS).gifts).toEqual(GIFTS[2]);
+  });
+
+  it("drops unknown gifts, and gives none without the gift list", () => {
+    const config = makeConfig();
+    config.fields[5].attributes.value = [1, 99];
+
+    expect(getOverlayConfig(config, "value", GIFTS).gifts).toEqual([GIFTS[0]]);
+    expect(getOverlayConfig(config, "value", null).gifts).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
 import {
+  getOverlayConfig,
   OverlayConfig,
   OverlayConfigSchema,
   OverlayMetadata,
@@ -13,45 +14,6 @@ const SCRIPT_REGEX = /<script id="tokio-setup">[\s\S]*?<\/script>/i;
 
 // Where Tokio writes the overlay's ID, and its settings when it has them.
 export const hasSetupBlock = (html: string) => SCRIPT_REGEX.test(html);
-
-export function getOverlayConfig(
-  data: OverlayConfig,
-  mode: "value" | "default",
-  gifts?: CustomGift[] | null,
-): OverlayConfigRedux {
-  const extracted: OverlayConfigRedux = {};
-
-  const giftsMap = new Map<number, CustomGift>();
-  if (gifts && gifts.length > 0) {
-    for (const g of gifts) {
-      giftsMap.set(g.value, g);
-    }
-  }
-
-  for (const setting of data.fields) {
-    if (setting.type === "gifts") {
-      const val = setting.attributes[mode];
-      if (!gifts || val == null) {
-        extracted[setting.id] = [];
-        continue;
-      }
-
-      const ids = Array.isArray(val) ? val : [val];
-
-      const res = ids
-        .map((id) => giftsMap.get(id))
-        .filter((g): g is CustomGift => g !== undefined);
-
-      extracted[setting.id] = setting.attributes.multiple ? res : res[0];
-    } else if (setting.type === "color") {
-      extracted[setting.id] = `#${setting.attributes[mode]}`;
-    } else {
-      extracted[setting.id] = setting.attributes[mode];
-    }
-  }
-
-  return extracted;
-}
 
 /**
  * Overlays installed in the overlays folder, each in a folder named by its id.

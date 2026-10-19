@@ -1,8 +1,7 @@
 import { OverlayApp } from "@/common/types";
 import { getOverlayURL } from "@/common/util";
-import { cx } from "@/helper/cx";
 import copy from "copy-to-clipboard";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { FaRegCopy } from "react-icons/fa";
 import { FiCheck, FiMaximize2 } from "react-icons/fi";
 import { GoUnverified, GoVerified } from "react-icons/go";
@@ -11,10 +10,8 @@ import { VscPackage, VscSettings } from "react-icons/vsc";
 import { Btn } from "../Elements";
 import { Iframe } from "../Iframe";
 import { Modal } from "../Modal";
+import { OverlayPreview, PREVIEW } from "../OverlayPreview";
 import styles from "./overlayview.module.css";
-
-// Size overlays lay out at in the previews. The card zooms it down to fit
-const PREVIEW = { width: 768, height: 432 };
 
 interface Props {
   onTest: (id: string) => void;
@@ -24,21 +21,9 @@ interface Props {
 
 export function OverlayView({ onTest, onCustomize, overlay }: Props) {
   const url = getOverlayURL(overlay.id);
-  const frame = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
   const [expanded, setExpanded] = useState(false);
   // Shows a check on the URL for a moment after copying it
   const [copied, setCopied] = useState(false);
-
-  useLayoutEffect(() => {
-    const el = frame.current;
-    if (!el) return undefined;
-    const observer = new ResizeObserver(() =>
-      setZoom(el.clientWidth / PREVIEW.width),
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     if (!copied) return undefined;
@@ -106,10 +91,7 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
       </div>
 
       {/* Zoomed out so the whole layout fits, the modal shows it full size */}
-      <div ref={frame} className={cx(styles.frame, styles.frame_card)}>
-        <div style={{ ...PREVIEW, zoom }}>
-          <Iframe name={overlay.id} source={overlay.path} />
-        </div>
+      <OverlayPreview overlay={overlay}>
         <Btn
           variant="icon"
           title="Full size"
@@ -118,7 +100,7 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
         >
           <FiMaximize2 size={16} />
         </Btn>
-      </div>
+      </OverlayPreview>
 
       <Btn
         title="Copy URL"

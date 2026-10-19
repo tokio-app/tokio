@@ -1,46 +1,44 @@
 import {
+  getOverlayConfig,
   OverlayConfig,
-  OverlayConfigField,
   resetOverlayConfig,
 } from "@/common/schemas";
-import { CustomGift } from "@/common/types";
-import { memo, useState } from "react";
+import { CustomGift, OverlayApp, TokioPreviewMessage } from "@/common/types";
+import { memo, useEffect, useRef, useState } from "react";
+import { PiShootingStarThin } from "react-icons/pi";
 import { MoonLoader } from "react-spinners";
-import {
-  Btn,
-  Check,
-  Color,
-  Input,
-  MultiSelect,
-  Select,
-  Slider,
-  Toggle,
-} from "../Elements";
+import { Btn } from "../Elements";
 import { Modal } from "../Modal";
+import { OverlayPreview } from "../OverlayPreview";
 import styles from "./overlaymodal.module.css";
+import { sameValue, SettingField } from "./SettingField";
 
 interface Props {
+  overlay: OverlayApp;
   config: OverlayConfig | null;
   gifts: CustomGift[];
+  // Waiting for main to save the config
+  saving: boolean;
   onRequestClose: () => void;
   onSave: (config: OverlayConfig) => void;
-}
-
-type Value = string | number;
-
-// Dropdown values are stored as one value or a list, depending on `multiple`.
-function asList<V extends Value>(value: V | V[]): V[] {
-  return Array.isArray(value) ? value : [value];
-}
-
-function asSingle<V extends Value>(value: V | V[]): V | undefined {
-  return Array.isArray(value) ? value[0] : value;
+  // Plays sample events in the previews
+  onTest: () => void;
 }
 
 export const OverlayModal = memo(
-  ({ config, gifts, onRequestClose, onSave }: Props) => {
+  ({
+    overlay,
+    config,
+    gifts,
+    saving,
+    onRequestClose,
+    onSave,
+    onTest,
+  }: Props) => {
     const [settings, setSettings] = useState<OverlayConfig | null>(config);
     const [prevConfig, setPrevConfig] = useState(config);
+    const preview = useRef<HTMLIFrameElement>(null);
+    const [previewReady, setPreviewReady] = useState(false);
 
     // Load the config once it arrives.
     if (config !== prevConfig) {
@@ -48,166 +46,139 @@ export const OverlayModal = memo(
       setSettings(config);
     }
 
+    // Only this preview shows the unsaved settings. The gallery and the live
+    // overlays get them on save.
+    useEffect(() => {
+      if (!previewReady || settings == null) return;
+      const message: TokioPreviewMessage = {
+        action: "TOKIO_PREVIEW",
+        payload: {
+          type: "tokio:config",
+          data: getOverlayConfig(settings, "value", gifts),
+        },
+      };
+      preview.current?.contentWindow?.postMessage(message, "*");
+    }, [previewReady, settings, gifts]);
+
+    const fields = settings?.fields ?? [];
+    const dirty =
+      config != null &&
+      fields.some(
+        (field, i) =>
+          !sameValue(
+            field.attributes.value,
+            config.fields[i]?.attributes.value,
+          ),
+      );
+    const atDefaults = fields.every((field) =>
+      sameValue(field.attributes.value, field.attributes.default),
+    );
+
     const handleValueChange = (id: string, value: unknown) => {
       setSettings((prev) => {
         if (prev == null) return prev;
         return {
           ...prev,
-          fields: prev.fields.map((field) =>
-            field.id === id
-              ? { ...field, attributes: { ...field.attributes, value } }
-              : field,
-          ) as OverlayConfigField[],
+          fields: prev.fields.map((field) => {
+            if (field.id !== id) return field;
+            const changed = structuredClone(field);
+            // Each control gives a value of its field's type.
+            Object.assign(changed.attributes, { value });
+            return changed;
+          }),
         };
       });
     };
 
-    const renderInput = (field: OverlayConfigField) => {
-      const onChange = (value: unknown) => handleValueChange(field.id, value);
-
-      switch (field.type) {
-        case "input":
-          return (
-            <Input
-              type={field.attributes.mode}
-              placeholder={field.attributes.placeholder}
-              value={field.attributes.value}
-              onChange={(e) =>
-                onChange(
-                  field.attributes.mode === "number"
-                    ? Number(e.target.value)
-                    : e.target.value,
-                )
-              }
-            />
-          );
-
-        case "dropdown":
-          return field.attributes.multiple ? (
-            <MultiSelect
-              searchable={field.attributes.searchable}
-              options={field.attributes.options}
-              value={asList<Value>(field.attributes.value)}
-              onChange={onChange}
-            />
-          ) : (
-            <Select
-              searchable={field.attributes.searchable}
-              options={field.attributes.options}
-              value={asSingle<Value>(field.attributes.value)}
-              onChange={onChange}
-            />
-          );
-
-        case "gifts":
-          return field.attributes.multiple ? (
-            <MultiSelect
-              searchable
-              options={gifts}
-              value={asList(field.attributes.value)}
-              onChange={onChange}
-            />
-          ) : (
-            <Select
-              searchable
-              options={gifts}
-              value={asSingle(field.attributes.value)}
-              onChange={onChange}
-            />
-          );
-
-        case "color":
-          return (
-            <Color
-              value={`#${field.attributes.value}`}
-              onChange={(color) => onChange(color.replace(/^#/, ""))}
-            />
-          );
-
-        case "slider":
-          return (
-            <Slider
-              min={field.attributes.min}
-              max={field.attributes.max}
-              value={field.attributes.value}
-              onChange={onChange}
-              showValue
-            />
-          );
-
-        case "check":
-          return (
-            <Check
-              checked={field.attributes.value}
-              onChange={(e) => onChange(e.target.checked)}
-            />
-          );
-
-        case "toggle":
-          return (
-            <Toggle
-              checked={field.attributes.value}
-              onChange={(e) => onChange(e.target.checked)}
-            />
-          );
-
-        default:
-          return null;
-      }
-    };
-
     return (
       <Modal
-        title="Overlay Settings"
-        maxWidth="500px"
+        title={overlay.name}
+        maxWidth="1040px"
         closeButton
         onClose={onRequestClose}
         footer={
           <div className={styles.footer}>
             <Btn
-              disabled={settings == null}
+              disabled={settings == null || atDefaults}
               onClick={() =>
                 setSettings((prev) =>
                   prev == null ? prev : resetOverlayConfig(prev),
                 )
               }
             >
-              Reset
+              Reset to defaults
             </Btn>
-            <Btn
-              variant="accent"
-              disabled={settings == null}
-              onClick={() => {
-                if (settings != null) onSave(settings);
-              }}
-            >
-              Save
-            </Btn>
+            <div className={styles.footer_actions}>
+              <Btn onClick={onRequestClose}>Cancel</Btn>
+              <Btn
+                variant="accent"
+                disabled={!dirty}
+                loading={saving}
+                onClick={() => {
+                  if (settings != null) onSave(settings);
+                }}
+              >
+                Save
+              </Btn>
+            </div>
           </div>
         }
       >
-        {settings == null ? (
-          <div className={styles.loading}>
-            <MoonLoader color="var(--accent-primary)" size={100} />
+        <div className={styles.editor}>
+          <div className={styles.preview}>
+            <OverlayPreview
+              ref={preview}
+              overlay={overlay}
+              onLoad={() => setPreviewReady(true)}
+            />
+            <div className={styles.preview_actions}>
+              <Btn onClick={onTest}>
+                <PiShootingStarThin size={18} />
+                Test
+              </Btn>
+              <p className={styles.note}>
+                Changes show here first. Save to update your stream.
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className={styles.settings}>
-            {settings.sections.map((section) => (
-              <fieldset key={section.id} className={styles.group}>
-                <legend className={styles.group_name}>{section.name}</legend>
 
-                {settings.fields
-                  .filter((field) => field.section === section.id)
-                  .map((field) => (
-                    <div key={field.id} className={styles.field}>
-                      <label className={styles.field_label}>{field.name}</label>
-                      {renderInput(field)}
-                    </div>
-                  ))}
-              </fieldset>
-            ))}
-          </div>
-        )}
+          {settings == null ? (
+            <div className={styles.loading}>
+              <MoonLoader color="var(--accent-primary)" size={60} />
+            </div>
+          ) : (
+            <div className={styles.settings}>
+              {settings.sections.map((section) => {
+                const sectionFields = fields.filter(
+                  (field) => field.section === section.id,
+                );
+                if (sectionFields.length === 0) return null;
+
+                return (
+                  <fieldset key={section.id} className={styles.group}>
+                    <legend className={styles.group_name}>
+                      {section.name}
+                    </legend>
+                    {sectionFields.map((field) => (
+                      <SettingField
+                        key={field.id}
+                        field={field}
+                        gifts={gifts}
+                        onChange={(value) => handleValueChange(field.id, value)}
+                        onReset={() =>
+                          handleValueChange(
+                            field.id,
+                            structuredClone(field.attributes.default),
+                          )
+                        }
+                      />
+                    ))}
+                  </fieldset>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </Modal>
     );
   },
