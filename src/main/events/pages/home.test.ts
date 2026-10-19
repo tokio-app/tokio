@@ -189,6 +189,24 @@ describe("home events", () => {
     });
   });
 
+  describe("GET_LIVE_SESSION", () => {
+    it("replies with the session without a notice", async () => {
+      const session = {
+        startedAt: 1000,
+        totals: { followers: 1, shares: 0, gifts: 0, coins: 0 },
+        activity: [],
+      };
+      const h = createHandler({ liveService: { getSession: () => session } });
+
+      await h.invoke(home, APP_EVENTS.GET_LIVE_SESSION);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.LIVE_SESSION)).toEqual([
+        { data: session },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+  });
+
   describe("ACTIVE_FEATURES", () => {
     const setup = () => {
       const updateActiveFeatures = vi.fn();

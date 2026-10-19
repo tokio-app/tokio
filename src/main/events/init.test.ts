@@ -22,6 +22,7 @@ import { defaultProfile, generateTikTokEventSample } from "@/common/util";
 import config from "@/config";
 import Logger from "@/logger";
 import type { AlertsService } from "@/services/alerts";
+import { LiveService } from "@/services/live";
 import type { MusicService } from "@/services/music";
 import type { OverlayService } from "@/services/overlay";
 import type { StoreManagerService } from "@/services/store";
@@ -250,6 +251,7 @@ function setup() {
   const urlManagerService = { setLogFile: vi.fn() };
   const jsonManagerService = { setLogFile: vi.fn() };
   const licensesService = { setLogFile: vi.fn() };
+  const liveService = new LiveService();
 
   const h = createHandler({
     pathManagerService,
@@ -264,6 +266,7 @@ function setup() {
     urlManagerService,
     jsonManagerService,
     licensesService,
+    liveService,
     yamlManagerService: {},
   });
 
@@ -285,6 +288,7 @@ function setup() {
     urlManagerService,
     jsonManagerService,
     licensesService,
+    liveService,
   };
 }
 
@@ -554,6 +558,92 @@ describe("init events", () => {
         { likes: 100 },
         { likes: 300 },
       ]);
+    });
+  });
+
+  describe("live session", () => {
+    const noTotals = { followers: 0, shares: 0, gifts: 0, coins: 0 };
+    // What the Home page got, oldest first
+    const sessions = (s: Setup) =>
+      s.h.pushed(APP_EVENTS_RESPONSE.LIVE_SESSION).map(({ data }) => data);
+    const connect = (s: Setup) =>
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+
+    it("starts the session when the LIVE connects", async () => {
+      vi.useFakeTimers({ now: 5000 });
+      const s = await live();
+
+      connect(s);
+
+      expect(sessions(s)).toEqual([
+        { startedAt: 5000, totals: noTotals, activity: [] },
+      ]);
+    });
+
+    it("doesn't start it when connecting fails", async () => {
+      const s = await live();
+
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, { success: false });
+
+      expect(sessions(s)).toEqual([]);
+    });
+
+    it("pushes the LIVE's events at most every 250ms, with the latest session", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      connect(s);
+
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
+      s.conn.emit(TOKIO_EVENTS.GIFT, giftEvent("5655", "Rose"));
+      expect(sessions(s)).toHaveLength(2);
+
+      vi.advanceTimersByTime(250);
+      expect(sessions(s)).toHaveLength(3);
+      expect(sessions(s)[2]).toMatchObject({
+        totals: { followers: 1, shares: 0, gifts: 1, coins: 1 },
+        activity: [
+          expect.objectContaining({ type: "gift" }),
+          expect.objectContaining({ type: "chat", text: "hello" }),
+          expect.objectContaining({ type: "follow" }),
+        ],
+      });
+    });
+
+    it("pushes nothing for events that don't change it", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      connect(s);
+      const combo = giftEvent("5655", "Rose");
+      combo.gift.repeatEnd = false;
+
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(5));
+      s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(10, 1));
+      s.conn.emit(TOKIO_EVENTS.GIFT, combo);
+      vi.advanceTimersByTime(1000);
+
+      expect(sessions(s)).toHaveLength(1);
+    });
+
+    it("ends the session when the LIVE disconnects, keeping its feed", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      connect(s);
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("bye"));
+      // Waits for the throttle
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("see you"));
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+      vi.advanceTimersByTime(1000);
+
+      expect(sessions(s)).toHaveLength(3);
+      expect(sessions(s)[2]).toMatchObject({
+        startedAt: null,
+        activity: [
+          expect.objectContaining({ text: "see you" }),
+          expect.objectContaining({ text: "bye" }),
+        ],
+      });
     });
   });
 

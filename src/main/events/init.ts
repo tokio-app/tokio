@@ -17,6 +17,7 @@ import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
 import { TikTokConnectorService } from "@/services/connector";
+import { ACTIVITY_EVENTS } from "@/services/live";
 import { AppHandlerVariables } from "@/types";
 import { throttle } from "es-toolkit";
 
@@ -98,6 +99,7 @@ const registerConnectorEvents = ({
   musicService: music,
   alertsService: alerts,
   overlayService: overlays,
+  liveService: live,
   notifier,
 }: AppHandlerVariables) => {
   const dispatchAlert = async <K extends AppEvents>(
@@ -181,6 +183,28 @@ const registerConnectorEvents = ({
     store.updateLiveStats({ likes: d.totalLikes });
     sendLikes(d.totalLikes);
   });
+
+  // The Home page's feed and totals, throttled like the stats.
+  const pushSession = () => {
+    win.webContents.send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+      data: live.getSession(),
+    });
+  };
+  const sendSession = throttle(pushSession, STATS_THROTTLE_MS);
+  for (const type of ACTIVITY_EVENTS) {
+    conn.on(type, (d) => {
+      if (live.record(type, d)) sendSession();
+    });
+  }
+  // Added when the app loads, before any connect, so the session has started
+  // by the time the connect is answered.
+  conn.on(TOKIO_EVENTS.CONNECTED, (d) => {
+    if (!d.success) return;
+    live.start();
+    sendSession.cancel();
+    pushSession();
+  });
+
   conn.on(TOKIO_EVENTS.DISCONNECTED, (d) => {
     if (d?.reason === "ended") {
       notifier.info(
@@ -198,6 +222,9 @@ const registerConnectorEvents = ({
     // A late stats update would overwrite the reset below.
     sendViews.cancel();
     sendLikes.cancel();
+    sendSession.cancel();
+    live.end();
+    pushSession();
     music.clearHandler();
     tts.clearTalk();
     alerts.clearSpeech();
@@ -355,6 +382,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     alertsService,
     licensesService,
     updaterService,
+    liveService,
     notifier,
   } = handler;
 
@@ -373,6 +401,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       musicService.setLogFile(files.logs.music);
       licensesService.setLogFile(files.logs.system);
       updaterService.setLogFile(files.logs.system);
+      liveService.setLogFile(files.logs.connector);
       notifier.setLogFiles(files.logs);
       alertsService.setSoundsFolder(folders.soundsFolder);
       alertsService.setSpeaker(ttsService);

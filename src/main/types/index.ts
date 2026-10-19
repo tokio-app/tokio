@@ -11,6 +11,7 @@ import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { LicensesService } from "@/services/licenses";
+import { LiveService } from "@/services/live";
 import { MusicService } from "@/services/music";
 import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
@@ -55,6 +56,7 @@ export interface AppServices {
   readonly alertsService: AlertsService;
   readonly licensesService: LicensesService;
   readonly updaterService: UpdaterService;
+  readonly liveService: LiveService;
 }
 
 export interface AppHandlerVariables extends AppServices {

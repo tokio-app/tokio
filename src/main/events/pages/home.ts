@@ -122,6 +122,17 @@ events.push(
   },
 );
 
+// Also pushed from init as the LIVE goes on
+events.push(
+  APP_EVENTS.GET_LIVE_SESSION,
+  ({ liveService }, e) => {
+    e.reply(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+      data: liveService.getSession(),
+    });
+  },
+  { notify: false },
+);
+
 events.push(
   APP_EVENTS.ACTIVE_FEATURES,
   // No notice on success, the switches already show the new state.

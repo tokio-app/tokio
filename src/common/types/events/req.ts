@@ -54,6 +54,7 @@ export enum APP_EVENTS {
   DISCONNECT = "app:home:disconnect",
   IS_CONNECTED = "app:home:isconnected",
   ACTIVE_FEATURES = "app:home:activefeatures",
+  GET_LIVE_SESSION = "app:home:session",
 
   // OVERLAYS
   IMPORT_OVERLAY = "app:overlays:add",
@@ -201,6 +202,7 @@ export interface AppEventsMap {
     music?: boolean;
     alerts?: boolean;
   };
+  [APP_EVENTS.GET_LIVE_SESSION]: void;
 
   // OVERLAYS
   [APP_EVENTS.IMPORT_OVERLAY]: void;

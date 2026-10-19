@@ -3,6 +3,7 @@ export * from "./alerts";
 export * from "./connector";
 export * from "./events";
 export * from "./feedback";
+export * from "./live";
 export * from "./music";
 export * from "./overlay";
 export * from "./server";

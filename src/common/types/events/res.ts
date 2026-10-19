@@ -13,6 +13,7 @@ import {
   TestOverlay,
 } from "../../schemas";
 import { AppNotification, Reply } from "../feedback";
+import { LiveSession } from "../live";
 import { OverlayApp } from "../server";
 import { VoiceData, VoiceEngine } from "../store";
 import { UpdateStatus } from "../updates";
@@ -66,6 +67,7 @@ export enum APP_EVENTS_RESPONSE {
   CONNECTED = "app:home:res:connect",
   VIEWS = "app:home:res:views",
   LIKES = "app:home:res:likes",
+  LIVE_SESSION = "app:home:res:session",
 
   // OVERLAYS
   GET_OVERLAYS = "app:overlays:res:get",
@@ -201,6 +203,10 @@ export interface AppEventsResponseMap {
   };
   [APP_EVENTS_RESPONSE.LIKES]: {
     likes: number;
+  };
+  // The reply to GET_LIVE_SESSION, pushed again when the session changes
+  [APP_EVENTS_RESPONSE.LIVE_SESSION]: {
+    data: LiveSession;
   };
 
   // OVERLAYS
