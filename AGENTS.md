@@ -67,6 +67,23 @@ Notes that only matter in one area live in `.claude/rules/`. Claude Code loads e
 
 When a change alters what a rule says, update the rule with it. A new area gets its own rule with `paths`.
 
+## Skills
+
+Procedures live in `.claude/skills/<name>/SKILL.md`. Claude Code offers each one as `/<name>` and loads it when a task matches its description.
+
+**Other agents:** before doing one of these tasks, read its `SKILL.md`.
+
+- `release`: publish a version, only when the user asks
+- `verify`: run the checks a change needs
+- `sync-docs`: update the docs and the other repos a change affects
+- `drive-app`: launch the built app to check a change or take screenshots
+- `add-dependency`: add, upgrade or remove a package, with the license checks
+- `live-event`: add or change a TikTok LIVE event end to end
+- `ipc-event`: add an IPC request, reply or push, with its tests
+- `new-page`: add a page to the main window
+
+When a procedure changes, update its skill with it.
+
 ## Architecture
 
 ### Services (main process)
@@ -117,7 +134,7 @@ Tokio's source is MIT; treat license compliance as part of every change.
 
 - **LGPL code stays isolated.** `src/main/services/tts/providers/edge/common/drm-v2.ts` is LGPL-3.0-only (derived from edge-tts). Code ported from edge-tts goes only into its own LGPL file with the same header (SPDX line, upstream commit, authors, dated modification notice). Never copy upstream code into MIT files.
 - **The distributed app is AGPL-3.0-only** because `tiktok-live-connector` and `tiktok-live-proto` are AGPL. Don't patch them in place.
-- **Check licenses when adding or upgrading a dependency**, even minor bumps (tiktok-live-connector went MIT → AGPL in 2.4.1). Ask before adding anything copyleft (GPL, AGPL, LGPL, MPL, CC BY-SA).
+- **Check licenses when adding or upgrading a dependency**, even minor bumps (tiktok-live-connector went MIT → AGPL in 2.4.1). Ask before adding anything copyleft (GPL, AGPL, LGPL, MPL, CC BY-SA). The `add-dependency` skill has the steps.
 - **react-icons:** only use the sets listed under Icons in `THIRD_PARTY_NOTICES.md`, and add a row for any new set.
 - **Keep the notices in sync** when licensed components change:
   - `THIRD_PARTY_NOTICES.md` (including its Services list for new online services) and `LICENSES/`
@@ -134,7 +151,7 @@ Tokio's source is MIT; treat license compliance as part of every change.
 - It then sends a `repository_dispatch` (`release`) to `tokio-app/website`, which rebuilds the download page. That needs the `WEBSITE_DISPATCH_TOKEN` secret (a fine-grained token with Contents read and write on `tokio-app/website`). Without it the step only warns.
 - Versions with a `-` (`0.1.0-alpha.5`) are published as regular releases, not prereleases: auto-updates and the website only read the latest release.
 
-To release: bump `version` in `package.json`, commit, and push a `v<version>` tag. The release goes out to auto-updates as soon as the workflow publishes it. Keep `artifactName` in `electron-builder.yml`, the upload paths in `build-app.yml` and the website's `src/lib/release.ts` in sync.
+To release, use the `release` skill (`/release`). The release goes out to auto-updates as soon as the workflow publishes it. Keep `artifactName` in `electron-builder.yml`, the upload paths in `build-app.yml` and the website's `src/lib/release.ts` in sync.
 
 ## Website
 
