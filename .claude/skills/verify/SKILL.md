@@ -18,6 +18,7 @@ Run them from the repository root, the narrow ones first:
 3. Prettier on the files you touched: `npx prettier --check <files>`, and `--write` to fix them. CI checks the whole repo with `npx prettier --check .`.
 4. When the changed files call for them:
    - `yarn test:e2e` for window setup, the preload or startup: `src/main/index.ts`, `src/main/config/`, `src/preload/`, `src/renderer/src/splash/`, the HTML entries (`src/renderer/index.html`, `src/renderer/splash.html`, `src/music/index.html`), `electron.vite.config.ts`, `e2e/` and `playwright.config.ts`. It builds the app first and needs port 37891, so ask the user to close Tokio and `yarn dev`.
+   - `yarn build:unpack` for `electron-builder.yml`, or for files the app reads at runtime. `npx asar list dist/win-unpacked/resources/app.asar` should show, outside `node_modules`, only `out/`, `music-out/`, `resources/` and `package.json`, and the packaged app should start (the `drive-app` skill's `--exe`).
    - `yarn tts:edge:check` for `src/main/services/tts/providers/edge/`. It needs the network.
    - `npx fallow dead-code` after moving, renaming or deleting code.
    - `git ls-files --eol | grep w/crlf` after a script wrote files: the repo uses LF. `.commitlintrc`, `.editorconfig`, `.gitattributes` and `LICENSE` always show up and are fine.

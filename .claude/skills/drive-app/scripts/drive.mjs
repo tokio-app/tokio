@@ -1,7 +1,10 @@
 // Launches the built app for a one-off check, the way e2e/app.spec.ts does,
 // and runs a steps file against it. See ../SKILL.md.
 //
-//   node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>]
+//   node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>]
+//
+// With --exe it starts a packaged build instead (yarn build:unpack), such as
+// dist/win-unpacked/tokio.exe.
 import { _electron as electron } from "@playwright/test";
 import {
   copyFileSync,
@@ -21,11 +24,11 @@ const repo = resolve(import.meta.dirname, "../../../..");
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { home: { type: "string" } },
+  options: { home: { type: "string" }, exe: { type: "string" } },
 });
 if (positionals.length !== 1) {
   console.error(
-    "Usage: node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>]",
+    "Usage: node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>]",
   );
   process.exit(2);
 }
@@ -38,9 +41,12 @@ if (typeof steps !== "function") {
   process.exit(2);
 }
 
-if (!existsSync(join(repo, "out", "main", "index.js"))) {
+const exe = values.exe && resolve(values.exe);
+if (!existsSync(exe || join(repo, "out", "main", "index.js"))) {
   console.error(
-    "Build the app first: yarn build:music:ui && npx electron-vite build",
+    exe
+      ? `No app at ${exe}: package it first with yarn build:unpack`
+      : "Build the app first: yarn build:music:ui && npx electron-vite build",
   );
   process.exit(1);
 }
@@ -86,8 +92,7 @@ let app;
 let failed = false;
 try {
   app = await electron.launch({
-    args: ["."],
-    cwd: repo,
+    ...(exe ? { executablePath: exe } : { args: ["."], cwd: repo }),
     env: { ...env, TOKIO_HOME: home },
   });
 

@@ -42,7 +42,7 @@ Verify changes with `yarn test`, `yarn typecheck` and `yarn lint`. For the Edge 
 - `LICENSES/`, `THIRD_PARTY_NOTICES.md`: third-party license texts and notices, shipped to the app's `resources/licenses`
 - `build/`: the app icons electron-builder uses
 
-Generated, don't edit: `out/`, `music-out/`, `dist/`.
+Generated, don't edit: `out/`, `music-out/`, `dist/`. The packaged app holds only `out/`, `music-out/`, `resources/` and the production dependencies (`files` in `electron-builder.yml`), so a file the app reads at runtime must live in one of them.
 
 ## Path aliases
 
