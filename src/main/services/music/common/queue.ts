@@ -24,6 +24,8 @@ interface QueueHooks {
   onError?: (id: string, error: unknown) => void;
   // A song started, with the songs as they are then.
   onStart?: (songs: MusicInfo[]) => void;
+  // The ms the player still has to play of a song, 0 when it's done.
+  remaining?: (song: SongInfo) => Promise<number>;
 }
 
 const delayWithAbort = (ms: number, signal?: AbortSignal) => {
@@ -250,6 +252,15 @@ export class MusicQueue {
 
       if (active() && waitTime > 0) {
         await delayWithAbort(waitTime, controller.signal);
+      }
+
+      // Ads and pauses make a song end later than its duration.
+      // shortcut: checked once, so a pause longer than the rest of the song
+      // still cuts it; poll if users ask
+      const { remaining } = this._hooks;
+      if (active() && waitTime > 0 && remaining) {
+        const left = await remaining(item.song).catch(() => 0);
+        if (active() && left > 0) await delayWithAbort(left, controller.signal);
       }
 
       if (!active()) break;

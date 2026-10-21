@@ -152,6 +152,48 @@ describe("MusicQueue", () => {
     expect(b).toHaveBeenCalledOnce();
   });
 
+  describe("remaining", () => {
+    const run = (remaining: (song: SongInfo) => Promise<number>) => {
+      const queue = new MusicQueue({ remaining });
+      const b = vi.fn();
+      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("b", song("b"), b);
+      return b;
+    };
+
+    it("waits what the player still has to play once the song's time is up", async () => {
+      const remaining = vi.fn(async (_song: SongInfo) => 0);
+      const b = run(remaining.mockResolvedValueOnce(500));
+
+      await vi.advanceTimersByTimeAsync(1499);
+      expect(b).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(b).toHaveBeenCalledOnce();
+      expect(remaining).toHaveBeenCalledWith(song("a"));
+    });
+
+    it.each([
+      ["nothing is left", async () => 0],
+      ["it fails", () => Promise.reject(new Error("player gone"))],
+    ])("plays the next song on time when %s", async (_case, remaining) => {
+      const b = run(remaining);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(b).toHaveBeenCalledOnce();
+    });
+
+    it("isn't asked about a song that failed to start", async () => {
+      const remaining = vi.fn(async () => 500);
+      const queue = new MusicQueue({ remaining });
+      queue.enqueue("a", song("a"), () => {
+        throw new Error("player crashed");
+      });
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(remaining).not.toHaveBeenCalled();
+    });
+  });
+
   describe("max size", () => {
     it("drops the newest song when there is no history", () => {
       const queue = new MusicQueue();

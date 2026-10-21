@@ -287,7 +287,7 @@ describe("MusicService", () => {
 
     it("keeps the track the provider is playing and plays the request after it", async () => {
       const { request, provider, played, queue } = setup();
-      provider.playerStatus.mockResolvedValue({
+      provider.playerStatus.mockResolvedValueOnce({
         ...song("Current", 10_000),
         playing: true,
         time: 4_000,
@@ -307,7 +307,7 @@ describe("MusicService", () => {
 
     it("leaves out a track the provider has paused", async () => {
       const { request, provider, played, queue } = setup();
-      provider.playerStatus.mockResolvedValue({
+      provider.playerStatus.mockResolvedValueOnce({
         ...song("Paused"),
         playing: false,
         time: 4_000,
@@ -317,6 +317,37 @@ describe("MusicService", () => {
 
       expect(queue()).toEqual(["New (playing)"]);
       expect(played()).toEqual(["New"]);
+    });
+
+    it("waits for the rest of a song the player is still playing, like after an ad", async () => {
+      const { request, provider, played } = setup();
+      await request("!play A");
+      await request("!play B");
+      provider.playerStatus.mockResolvedValueOnce({
+        ...song("A"),
+        playing: true,
+        time: 7_000,
+      });
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(played()).toEqual(["A"]);
+
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(played()).toEqual(["A", "B"]);
+    });
+
+    it("plays the next song on time when the player moved on", async () => {
+      const { request, provider, played } = setup();
+      await request("!play A");
+      await request("!play B");
+      provider.playerStatus.mockResolvedValueOnce({
+        ...song("Other"),
+        playing: true,
+        time: 1_000,
+      });
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(played()).toEqual(["A", "B"]);
     });
 
     it("doesn't read the player while a request is playing", async () => {

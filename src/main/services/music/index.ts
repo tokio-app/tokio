@@ -23,6 +23,14 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue = new MusicQueue({
       onError: (id, error) => this._playbackFailed(id, error),
       onStart: (songs) => this._onSongChange?.(songs),
+      // What's left while the player still plays the song, after an ad or
+      // a pause. Durations and times are in ms.
+      remaining: async (song) => {
+        const status = await this._current?.provider?.playerStatus();
+        return status?.playing && status.title === song.title
+          ? Math.max(0, status.duration - status.time)
+          : 0;
+      },
     });
     this.addProvider("YouTube", new YouTubeMusic(), true);
     this.addProvider("Spotify", new Spotify());
