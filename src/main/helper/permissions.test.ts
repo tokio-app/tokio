@@ -45,6 +45,16 @@ describe("hasPermission", () => {
       expect(hasPermission(list(["other"], []), user())).toBe(false);
     });
 
+    it("matches handles with or without the @, ignoring case", () => {
+      expect(hasPermission(list(["@Viewer"], []), user())).toBe(true);
+      expect(hasPermission(list([], [" @VIEWER "]), user())).toBe(false);
+    });
+
+    it("never matches an empty entry", () => {
+      expect(hasPermission(list(["", "@"], []), user())).toBe(false);
+      expect(hasPermission(list([], ["", "@"]), user())).toBe(true);
+    });
+
     it("blacklist wins over whitelist", () => {
       expect(hasPermission(list(["viewer"], ["viewer"]), user())).toBe(false);
     });

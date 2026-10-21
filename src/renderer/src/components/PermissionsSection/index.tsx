@@ -74,7 +74,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
         <>
           <Field label="Whitelist" hint="(comma separated)">
             <ListTextarea
-              placeholder="Nickname1, Nickname2, Nickname3, ..."
+              placeholder="@handle1, @handle2, @handle3, ..."
               value={permissions.list.white}
               onChange={(white) =>
                 update((p) => {
@@ -85,7 +85,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
           </Field>
           <Field label="Blacklist" hint="(comma separated)">
             <ListTextarea
-              placeholder="Nickname1, Nickname2, Nickname3, ..."
+              placeholder="@handle1, @handle2, @handle3, ..."
               value={permissions.list.black}
               onChange={(black) =>
                 update((p) => {

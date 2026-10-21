@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasKeyword, isUser, removeEmojis } from "./chat";
+import { hasKeyword, isUser, removeEmojis, sameHandle } from "./chat";
 
 describe("removeEmojis", () => {
   it.each([
@@ -53,6 +53,19 @@ describe("hasKeyword", () => {
     expect(hasKeyword("!sound please", "!sound")).toBe(true);
     expect(hasKeyword("a+b", "a+b")).toBe(true);
     expect(hasKeyword("aab", "a+b")).toBe(false);
+  });
+});
+
+describe("sameHandle", () => {
+  it("ignores the @, case and the spaces around", () => {
+    expect(sameHandle("@Viewer", "viewer")).toBe(true);
+    expect(sameHandle(" viewer ", "@VIEWER")).toBe(true);
+    expect(sameHandle("viewer", "viewer2")).toBe(false);
+  });
+
+  it("never matches an empty handle", () => {
+    expect(sameHandle("", "")).toBe(false);
+    expect(sameHandle("@", "")).toBe(false);
   });
 });
 

@@ -1,5 +1,6 @@
 import { Permissions } from "@/common/schemas";
 import { UserData } from "@/common/types";
+import { sameHandle } from "./chat";
 
 /**
  * Whether a chat user may use a feature (TTS, music requests) under its
@@ -10,9 +11,10 @@ export function hasPermission(permissions: Permissions, user: UserData) {
 
   const { list, level } = permissions;
   if (list.enabled) {
-    const whitelisted =
-      list.white.length === 0 || list.white.includes(user.handle);
-    return whitelisted && !list.black.includes(user.handle);
+    const listed = (handles: string[]) =>
+      handles.some((handle) => sameHandle(handle, user.handle));
+    const whitelisted = list.white.length === 0 || listed(list.white);
+    return whitelisted && !listed(list.black);
   }
 
   // [role required, user has it]

@@ -58,6 +58,18 @@ export function hasKeyword(content: string, keyword: string): boolean {
   return pattern.test(cleanText(content, { asciiOnly: true }));
 }
 
+const bareHandle = (handle: string) =>
+  handle.trim().replace(/^@/, "").toLowerCase();
+
+/**
+ * Whether two handles are the same, with or without the @, ignoring case and
+ * the spaces around them. An empty one matches none.
+ */
+export function sameHandle(a: string, b: string): boolean {
+  const handle = bareHandle(a);
+  return handle !== "" && handle === bareHandle(b);
+}
+
 /**
  * Whether the viewer is the one named: by handle, with or without the @, or
  * by name, ignoring case, accents and emojis. An empty name means anyone.
@@ -66,9 +78,7 @@ export function isUser(user: UserData, name: string): boolean {
   const wanted = name.trim();
   if (!wanted) return true;
 
-  if (user.handle.toLowerCase() === wanted.replace(/^@/, "").toLowerCase()) {
-    return true;
-  }
+  if (sameHandle(wanted, user.handle)) return true;
   const username = cleanText(user.username, { asciiOnly: true });
   return username !== "" && username === cleanText(wanted, { asciiOnly: true });
 }
