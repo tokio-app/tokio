@@ -738,6 +738,21 @@ describe("Spotify", () => {
       expect(refreshes(fetch)[1].body.refresh_token).toBe("refresh");
     });
 
+    it("sends the refresh token a refresh gave instead of the old one", async () => {
+      const fetch = stubFetch({
+        refresh: () => json({ ...REFRESHED, refresh_token: "r2" }),
+      });
+      await login();
+
+      await vi.advanceTimersByTimeAsync((3600 - 60) * 1000);
+      await vi.advanceTimersByTimeAsync((3600 - 60) * 1000);
+
+      expect(refreshes(fetch).map((r) => r.body.refresh_token)).toEqual([
+        "refresh",
+        "r2",
+      ]);
+    });
+
     it("refreshes right away when the token expires within a minute", async () => {
       const fetch = stubFetch();
       fetch.mockImplementationOnce(async () =>
