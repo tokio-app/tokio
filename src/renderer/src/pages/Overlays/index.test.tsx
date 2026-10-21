@@ -331,6 +331,56 @@ describe("Overlays", () => {
     expect(sent(APP_EVENTS.SEND_OVERLAY_DATA)).toEqual([]);
   });
 
+  it("updates the overlay an earlier save was for, and leaves the open settings alone", async () => {
+    const { user } = await customize();
+    await loadConfig();
+    await user.type(dialog().getByPlaceholderText("Type a title"), "!");
+    await user.click(dialog().getByRole("button", { name: "Save" }));
+    await user.click(dialog().getByRole("button", { name: "Cancel" }));
+    await user.click(
+      card("Top Likes").getByRole("button", { name: "Customize" }),
+    );
+    await send(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG, {
+      success: true,
+      id: "top-likes",
+      data: overlayConfig(),
+    });
+
+    const data = { title: "Goal!", size: 50, show: true };
+    await send(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, {
+      success: true,
+      id: "gift-jar",
+      data,
+    });
+
+    expect(
+      dialog().getByRole("heading", { name: "Top Likes" }),
+    ).toBeInTheDocument();
+    expect(dialog().getByRole("button", { name: "Save" })).not.toHaveAttribute(
+      "aria-busy",
+    );
+    expect(sent(APP_EVENTS.SEND_OVERLAY_DATA)).toEqual([
+      { id: "gift-jar", payload: { type: "tokio:config", data } },
+    ]);
+  });
+
+  it("stops saving when the settings close", async () => {
+    const { user } = await customize();
+    await loadConfig();
+    await user.type(dialog().getByPlaceholderText("Type a title"), "!");
+    await user.click(dialog().getByRole("button", { name: "Save" }));
+    await user.click(dialog().getByRole("button", { name: "Cancel" }));
+
+    await user.click(
+      card("Gift Jar").getByRole("button", { name: "Customize" }),
+    );
+    await loadConfig();
+
+    expect(dialog().getByRole("button", { name: "Save" })).not.toHaveAttribute(
+      "aria-busy",
+    );
+  });
+
   it("plays test events on the live overlay and its card", async () => {
     await renderApp("/overlays");
     await overlays(GIFT_JAR, TOP_LIKES);

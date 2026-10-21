@@ -23,6 +23,7 @@ export function Overlays() {
   const closeModal = () => {
     setConfigId(null);
     setConfig(null);
+    setSaving(false);
   };
 
   useIpcRequest(APP_EVENTS.GET_OVERLAYS);
@@ -45,10 +46,14 @@ export function Overlays() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, (res) => {
+    if (!res) return;
+    if (res.success) {
+      postToOverlay(res.id, { type: "tokio:config", data: res.data! });
+    }
+    // A late reply still updates its overlay, but not the settings open now.
+    if (res.id !== configId) return;
     setSaving(false);
-    if (!res?.success) return;
-    postToOverlay(res.id, { type: "tokio:config", data: res.data! });
-    closeModal();
+    if (res.success) closeModal();
   });
 
   // Tests from the settings stay in the previews, which show the unsaved
