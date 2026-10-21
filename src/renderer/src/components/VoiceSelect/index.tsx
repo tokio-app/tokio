@@ -4,12 +4,14 @@ import {
   VoiceData,
   VoiceEngine,
 } from "@/common/types";
+import { cx } from "@/helper/cx";
 import { voiceDetails } from "@/helper/voices";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { FiChevronDown } from "react-icons/fi";
+import elements from "../Elements/elements.module.css";
 import styles from "./voiceselect.module.css";
 import { VoicePicker } from "./VoicePicker";
 
@@ -42,7 +44,7 @@ export function VoiceSelect({ value, filters, onChange }: Props) {
     <>
       <button
         type="button"
-        className={styles.field}
+        className={cx(elements.select_display, styles.field)}
         title={value.name}
         onClick={() => setOpen(true)}
       >
