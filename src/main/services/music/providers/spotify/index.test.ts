@@ -81,8 +81,11 @@ const apiRequests = (fetch: FetchMock) =>
       body: bodyOf(init),
     }));
 
+// The last connect's login page
 const authView = () =>
-  views().find((view) => view.options.webPreferences?.partition === PARTITION)!;
+  views()
+    .filter((view) => view.options.webPreferences?.partition === PARTITION)
+    .at(-1)!;
 
 const redirect = (url: string, event = "will-redirect") => {
   const e = cancelableEvent({});
@@ -312,6 +315,23 @@ describe("Spotify", () => {
 
       await expect(spotify.connect()).resolves.toEqual({ success: true });
       expect(windows()).toHaveLength(1);
+    });
+
+    it("closes a login still open when it connects again", async () => {
+      stubFetch();
+      const spotify = new Spotify("client-id");
+      const first = spotify.connect();
+      const [shell, view] = [windows()[0], authView()];
+
+      const second = spotify.connect();
+
+      expect(shell.isDestroyed()).toBe(true);
+      expect(view.webContents.close).toHaveBeenCalledOnce();
+      expect((await first).success).toBe(false);
+
+      redirect(callback({ code: "the-code" }));
+      await expect(second).resolves.toEqual({ success: true });
+      expect(windows()).toHaveLength(2);
     });
 
     it("fails when the callback has neither a code nor an error", async () => {
@@ -694,6 +714,17 @@ describe("Spotify", () => {
       spotify.disconnect();
 
       expect(ended).not.toHaveBeenCalled();
+    });
+
+    it("closes a login still open, which fails it", async () => {
+      const spotify = new Spotify("client-id");
+      const pending = spotify.connect();
+      const shell = windows()[0];
+
+      spotify.disconnect();
+
+      expect(shell.isDestroyed()).toBe(true);
+      expect((await pending).error?.message).toContain("closed by the user");
     });
 
     it("stops calling a listener removed with off", async () => {

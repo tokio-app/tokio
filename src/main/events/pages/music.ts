@@ -11,6 +11,8 @@ const events = createStack("music");
 
 // The listener of the last connect, replaced on every connect.
 let onMusicEnded: (() => void) | null = null;
+// Counts connects, so the result of one a newer connect replaced is dropped.
+let attempt = 0;
 
 events.push(
   APP_EVENTS.UPDATE_MUSIC_SETTINGS,
@@ -36,13 +38,13 @@ events.push(
 events.push(
   APP_EVENTS.CONNECT_MUSIC,
   async ({ musicService, notifier }, e, { name, key }) => {
+    const current = ++attempt;
     if (onMusicEnded) {
       musicService.off(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, onMusicEnded);
     }
 
-    if (musicService.isActive()) {
-      musicService.disconnect();
-    }
+    // Ends the session, or a login the last connect left open.
+    musicService.disconnect();
 
     musicService.setProvider(name, key);
 
@@ -63,6 +65,7 @@ events.push(
     musicService.on(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, onMusicEnded);
 
     const res = await musicService.connect();
+    if (current !== attempt) return;
     if (!res.success) {
       throw new AppFailure(
         FEEDBACK_CODES.MUSIC_CONNECT_FAILED,

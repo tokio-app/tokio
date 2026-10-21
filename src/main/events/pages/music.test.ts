@@ -77,7 +77,6 @@ describe("music events", () => {
       const events = m.eventSource();
       const musicService = {
         ...events,
-        isActive: vi.fn(() => false),
         disconnect: vi.fn(),
         setProvider: vi.fn((_name: string, _key?: string) => {}),
         connect: vi.fn(
@@ -106,7 +105,6 @@ describe("music events", () => {
         "client-id",
       );
       expect(musicService.connect).toHaveBeenCalledOnce();
-      expect(musicService.disconnect).not.toHaveBeenCalled();
       expect(connected()).toEqual([{ success: true }]);
       expect(h.notices).toEqual([
         expect.objectContaining({
@@ -118,9 +116,10 @@ describe("music events", () => {
       ]);
     });
 
-    it("disconnects the active provider first", async () => {
-      const { musicService, connect } = await setup();
-      musicService.isActive.mockReturnValue(true);
+    it("disconnects the last provider first, without hearing it end", async () => {
+      const { musicService, connect, ended, connected } = await setup();
+      // Like closing a session, or a login still open
+      musicService.disconnect.mockImplementation(ended);
 
       await connect("YouTube");
 
@@ -128,6 +127,32 @@ describe("music events", () => {
       expect(musicService.disconnect.mock.invocationCallOrder[0]).toBeLessThan(
         musicService.setProvider.mock.invocationCallOrder[0],
       );
+      expect(connected()).toEqual([{ success: true }]);
+    });
+
+    it("drops the result of a connect a newer one replaced", async () => {
+      const { h, musicService, connect, connected } = await setup();
+      let finish = (_res: { success: boolean; error?: Error }) => {};
+      musicService.connect.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+
+      const first = connect("YouTube");
+      await connect("Spotify");
+      // Its window was closed by the second connect
+      finish({ success: false, error: new Error("window closed") });
+      await first;
+
+      expect(connected()).toEqual([{ success: true }]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          code: FEEDBACK_CODES.MUSIC_CONNECTED,
+          message: "Connected to Spotify.",
+        }),
+      ]);
     });
 
     it("replies a failure when it can't connect", async () => {

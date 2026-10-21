@@ -45,6 +45,8 @@ export class YouTubeMusic extends MusicProvider {
 
   public connect(requireAuth: boolean = true): Promise<ConnectionResponse> {
     if (this._isActive) return Promise.resolve({ success: true });
+    // A login still open from an earlier connect fails, so one window is left
+    this.disconnect();
 
     this._shellWindow = createWindow();
 
@@ -104,10 +106,13 @@ export class YouTubeMusic extends MusicProvider {
       this._ytView = null;
     });
 
-    this._shellWindow!.show();
+    this._shellWindow.show();
 
     return new Promise((res) => {
+      let isInitializing = true;
+
       const handleAuthAbort = () => {
+        isInitializing = false;
         res({
           success: false,
           error: new Error("Authentication window was closed by the user"),
@@ -117,7 +122,6 @@ export class YouTubeMusic extends MusicProvider {
       this._shellWindow!.once("close", handleAuthAbort);
       this._ytView!.webContents.loadURL(config.YTM_URL);
 
-      let isInitializing = true;
       let hasAttemptedLoginRedirect = false;
       let checkGeneration = 0;
 
@@ -168,6 +172,7 @@ export class YouTubeMusic extends MusicProvider {
             markReady();
           } else {
             if (hasAttemptedLoginRedirect) {
+              isInitializing = false;
               this._shellWindow!.off("close", handleAuthAbort);
               this._isActive = false;
               res({
@@ -178,12 +183,14 @@ export class YouTubeMusic extends MusicProvider {
             }
             hasAttemptedLoginRedirect = true;
             await this._ytView.webContents.session.clearStorageData();
-            await this._ytView!.webContents.loadURL(config.YTM_LOGIN_URL);
+            await this._ytView.webContents.loadURL(config.YTM_LOGIN_URL);
           }
         } catch (err) {
+          isInitializing = false;
           this._isActive = false;
           this._shellWindow!.off("close", handleAuthAbort);
-          res({ success: false, error: err as Error });
+          const error = err instanceof Error ? err : new Error(String(err));
+          res({ success: false, error });
         }
       };
 
@@ -193,29 +200,12 @@ export class YouTubeMusic extends MusicProvider {
     });
   }
 
+  // Ends the session, or fails a login still open. The window's close
+  // listener, added in connect, closes the page and emits the end.
   public disconnect() {
-    if (
-      !this._isActive ||
-      !this._ytView ||
-      this._ytView.webContents.isDestroyed() ||
-      !this._shellWindow ||
-      this._shellWindow.isDestroyed()
-    ) {
-      return;
+    if (this._shellWindow && !this._shellWindow.isDestroyed()) {
+      this._shellWindow.close();
     }
-    this._ytView.webContents.setAudioMuted(true);
-    this._ytView.webContents.loadURL("about:blank");
-    try {
-      this._shellWindow?.contentView.removeChildView(this._ytView);
-    } catch {
-      // View already removed
-    }
-    this._isActive = false;
-    this._ytView.webContents.close();
-    this._shellWindow.close();
-    this.emit(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED);
-    this._ytView = null;
-    this._shellWindow = null;
   }
 
   public async play(info: SongInfo) {

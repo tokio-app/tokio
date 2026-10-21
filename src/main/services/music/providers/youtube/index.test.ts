@@ -72,8 +72,11 @@ const song = (track = "dQw4w9WgXcQ"): SongInfo => ({
   duration: 205_000,
 });
 
+// The last connect's page
 const ytView = () =>
-  views().find((view) => view.options.webPreferences?.partition === PARTITION)!;
+  views()
+    .filter((view) => view.options.webPreferences?.partition === PARTITION)
+    .at(-1)!;
 
 const scripts = (view: FakeWebContentsView, code: string) =>
   view.webContents.executeJavaScript.mock.calls.filter(([c]) => c === code)
@@ -91,7 +94,7 @@ const open = (
   provider = new YouTubeMusic(),
 ) => {
   const pending = provider.connect();
-  const shell = windows()[0];
+  const shell = windows().at(-1)!;
   const view = ytView();
   view.webContents.executeJavaScript.mockImplementation(async (code) =>
     code === LoginJSCode ? loggedIn() : undefined,
@@ -280,6 +283,40 @@ describe("YouTubeMusic", () => {
       expect(view.webContents.session.clearStorageData).toHaveBeenCalledOnce();
       expect(loads(view, config.YTM_LOGIN_URL)).toBe(1);
       expect(provider.isActive()).toBe(false);
+
+      // The window stays open, and its next pages aren't checked
+      const checks = scripts(view, LoginJSCode);
+      finishLoad();
+      await vi.advanceTimersByTimeAsync(CHECKS_MS);
+      expect(scripts(view, LoginJSCode)).toBe(checks);
+    });
+
+    it("closes a login still open when it connects again", async () => {
+      const first = open(() => false);
+      first.finishLoad();
+
+      const second = open(() => false, first.provider);
+      await vi.advanceTimersByTimeAsync(CHECKS_MS);
+
+      await expect(first.pending).resolves.toEqual({
+        success: false,
+        error: new Error("Authentication window was closed by the user"),
+      });
+      expect(first.shell.isDestroyed()).toBe(true);
+      expect(first.view.webContents.close).toHaveBeenCalledOnce();
+      // The first page's login check stopped, and didn't reach the new page
+      expect(scripts(first.view, LoginJSCode)).toBe(1);
+      for (const { view } of [first, second]) {
+        expect(
+          view.webContents.session.clearStorageData,
+        ).not.toHaveBeenCalled();
+        expect(loads(view, config.YTM_LOGIN_URL)).toBe(0);
+      }
+
+      second.view.webContents.executeJavaScript.mockResolvedValue(true);
+      second.finishLoad();
+      await expect(second.pending).resolves.toEqual({ success: true });
+      expect(windows().filter((w) => !w.isDestroyed())).toEqual([second.shell]);
     });
 
     it("resolves once the user logs in on the login page", async () => {
@@ -420,6 +457,19 @@ describe("YouTubeMusic", () => {
 
       provider.disconnect();
       expect(ended).toHaveBeenCalledOnce();
+    });
+
+    it("closes a login still open, which fails it", async () => {
+      const { provider, pending, shell, view } = open(() => false);
+
+      provider.disconnect();
+
+      expect(shell.isDestroyed()).toBe(true);
+      expect(view.webContents.close).toHaveBeenCalledOnce();
+      await expect(pending).resolves.toEqual({
+        success: false,
+        error: new Error("Authentication window was closed by the user"),
+      });
     });
 
     it("does nothing while inactive", () => {

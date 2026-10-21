@@ -5,7 +5,7 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import crypto from "crypto";
-import { WebContentsView } from "electron";
+import { BrowserWindow, WebContentsView } from "electron";
 import { EventEmitter } from "node:events";
 import { ConnectionResponse, createWindow, MusicProvider } from "../../common";
 import { CSSScrollBar } from "./common";
@@ -22,6 +22,8 @@ export class Spotify extends MusicProvider {
   private _refreshTimeout: NodeJS.Timeout | null = null;
   // Counts disconnects, so a refresh that ends after one is dropped
   private _session = 0;
+  // The login window of the last connect
+  private _authWindow: BrowserWindow | null = null;
   private _events: EventEmitter;
 
   constructor(clientId?: string, redirectUri?: string) {
@@ -42,6 +44,8 @@ export class Spotify extends MusicProvider {
 
   public connect(): Promise<ConnectionResponse> {
     if (this._isActive) return Promise.resolve({ success: true });
+    // A login still open from an earlier connect fails, so one window is left
+    this.disconnect();
 
     return new Promise((res) => {
       const codeVerifier = this.generateRandomString(64);
@@ -53,7 +57,7 @@ export class Spotify extends MusicProvider {
         },
       });
 
-      const shellWindow = createWindow();
+      const shellWindow = (this._authWindow = createWindow());
 
       shellWindow.contentView.addChildView(authView);
 
@@ -183,6 +187,10 @@ export class Spotify extends MusicProvider {
   }
 
   public disconnect(): void {
+    // A login still open fails once its window closes
+    if (this._authWindow && !this._authWindow.isDestroyed()) {
+      this._authWindow.close();
+    }
     if (!this._isActive) return;
     if (this._refreshTimeout) clearTimeout(this._refreshTimeout);
     this._refreshTimeout = null;
