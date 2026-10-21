@@ -26,7 +26,7 @@ import { TTSService } from "@/services/tts";
 import { safeStorage } from "electron";
 import { debounce } from "es-toolkit";
 import { EventEmitter } from "events";
-import { access, copyFile, readdir } from "fs/promises";
+import { access, copyFile, readdir, readFile } from "fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, extname, join, resolve } from "path";
 import { Service } from "../shared";
@@ -839,20 +839,20 @@ export class StoreManagerService extends Service {
     }
   }
 
+  // Throws when the store can't be read or copied, so the defaults never
+  // replace the only copy of the user's settings.
   private async _backupCorruptedStore() {
-    try {
-      const corruptedPath = this._storeFilePath.replace(
-        ".json",
-        ".corrupted.json",
-      );
-      await copyFile(this._storeFilePath, corruptedPath);
-      Logger.info(
-        `<System> Backed up corrupted store file to ${corruptedPath}`,
-        this._logFile,
-      );
-    } catch {
-      // Next
-    }
+    await readFile(this._storeFilePath);
+    const name = basename(this._storeFilePath, ".json");
+    const corruptedPath = join(
+      this._pathManagerService.folders.settingsFolder,
+      `${name}.corrupted-${Date.now()}.json`,
+    );
+    await copyFile(this._storeFilePath, corruptedPath);
+    Logger.info(
+      `<System> Backed up corrupted store file to ${corruptedPath}`,
+      this._logFile,
+    );
   }
 
   private _encryptProviderKey(provider: AppProvider): AppProvider {

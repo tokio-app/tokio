@@ -8,7 +8,14 @@ import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { TTSService } from "@/services/tts";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -68,10 +75,25 @@ describe("StoreManagerService", () => {
 
       await init();
 
+      const backups = (await readdir(paths.folders.settingsFolder)).filter(
+        (file) => /^store\.corrupted-\d+\.json$/.test(file),
+      );
+      expect(backups).toHaveLength(1);
       expect(
-        await readFile(storeFile.replace(".json", ".corrupted.json"), "utf-8"),
+        await readFile(join(paths.folders.settingsFolder, backups[0]), "utf-8"),
       ).toBe("{ oops");
       expect(await readJSON(storeFile)).toEqual(defaultStoreData);
+    });
+
+    it("keeps a store it can't read, and doesn't start", async () => {
+      await mkdir(storeFile);
+
+      await expect(init()).rejects.toThrow("Unable to initialize store.");
+
+      expect(await readdir(storeFile)).toEqual([]);
+      expect(await readdir(paths.folders.settingsFolder)).toEqual([
+        "store.json",
+      ]);
     });
 
     it("keeps the Default profile when the store is rebuilt", async () => {
