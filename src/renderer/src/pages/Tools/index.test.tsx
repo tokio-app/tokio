@@ -5,11 +5,8 @@ import { settingsReply } from "@test/fixtures";
 import { send, sent, sentEvents } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
 import { screen, within } from "@testing-library/react";
-import copy from "copy-to-clipboard";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Tools } from ".";
-
-vi.mock("copy-to-clipboard", () => ({ default: vi.fn() }));
 
 const CLOCK: TestOverlay = { id: "4f9c2a", name: "Clock" };
 const GOAL: TestOverlay = { id: "8b1d7e", name: "Goal" };
@@ -28,10 +25,6 @@ function item(name: string) {
 }
 
 describe("Tools", () => {
-  beforeEach(() => {
-    vi.mocked(copy).mockClear();
-  });
-
   it("asks main for the test overlays and the settings", () => {
     renderWithProviders(<Tools />);
 
@@ -167,12 +160,13 @@ describe("Tools", () => {
     await testOverlays(CLOCK, GOAL);
 
     await user.click(item("Goal").getByRole("button", { name: "Copy ID" }));
-    expect(copy).toHaveBeenLastCalledWith(GOAL.id);
+    expect(await navigator.clipboard.readText()).toBe(GOAL.id);
 
     await user.click(
       item("Goal").getByRole("button", { name: "Copy WebSocket URL" }),
     );
-    expect(copy).toHaveBeenLastCalledWith(getOverlaySocketURL(GOAL.id));
-    expect(copy).toHaveBeenCalledTimes(2);
+    expect(await navigator.clipboard.readText()).toBe(
+      getOverlaySocketURL(GOAL.id),
+    );
   });
 });

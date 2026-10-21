@@ -3,14 +3,11 @@ import { getOverlayURL } from "@/common/util";
 import { overlayApp } from "@test/fixtures";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import copy from "copy-to-clipboard";
 import { ReactElement } from "react";
 import { FaRegCopy } from "react-icons/fa";
 import { FiCheck } from "react-icons/fi";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OverlayView } from ".";
-
-vi.mock("copy-to-clipboard", () => ({ default: vi.fn() }));
 
 function setup(overlay: OverlayApp = overlayApp("gift-jar")) {
   const onTest = vi.fn();
@@ -96,13 +93,15 @@ describe("OverlayView", () => {
 
   it("copies the URL and shows a check for a moment", async () => {
     const { user } = setup();
+    // readText waits on jsdom's FileReader, which the fake timers hold
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
     const copyIcon = drawing(<FaRegCopy />);
     const checkIcon = drawing(<FiCheck />);
     expect(shownIcon()).toBe(copyIcon);
 
     await user.click(copyButton());
 
-    expect(copy).toHaveBeenCalledWith(getOverlayURL("gift-jar"));
+    expect(writeText).toHaveBeenCalledWith(getOverlayURL("gift-jar"));
     expect(shownIcon()).toBe(checkIcon);
 
     act(() => vi.advanceTimersByTime(1499));
