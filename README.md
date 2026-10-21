@@ -63,6 +63,7 @@ Set them up from the gallery on the **Overlays** page: colors, text, the gifts t
 ### Profiles and settings
 
 - **Profiles**: keep separate settings for different streams. Create a blank profile or clone an existing one, and switch between them from the title bar.
+- **TikTok LIVE**: your [Euler Stream](https://www.eulerstream.com) API key. Euler Stream signs Tokio's connection to TikTok LIVE, and each user brings their own key: [sign up](https://www.eulerstream.com/register) for free and paste it here. Your [plan](https://www.eulerstream.com/pricing) sets how often you can connect.
 - **Voice engines**: optionally add your TikTok session ID, which the TikTok voices use when it's set.
 - **Overlay server**: turn the local server for overlays on or off.
 - **Updates**: Tokio checks GitHub for new releases on startup and every few hours, downloads them in the background and installs them when you restart from the title bar. On macOS, where the app isn't signed, the button opens the release page instead. Turn automatic checks off in Settings, or check any time from About.
@@ -98,9 +99,10 @@ Every release has builds for Windows (x64), macOS (Apple Silicon and Intel) and 
 
 Set everything up before you go live: Tokio can only connect once your LIVE has started.
 
-1. On Tokio's **Home** page, turn on the features you want for this stream: text-to-speech, music, alerts. Add your overlays to OBS or TikTok LIVE Studio (see [Adding an overlay](#adding-an-overlay)).
-2. Start your LIVE on TikTok.
-3. Enter your `@username` on the **Home** page and connect.
+1. Get a free API key from [Euler Stream](https://www.eulerstream.com/register), which signs the connection to TikTok LIVE, and paste it in **Settings → TikTok LIVE**. You only do this once.
+2. On Tokio's **Home** page, turn on the features you want for this stream: text-to-speech, music, alerts. Add your overlays to OBS or TikTok LIVE Studio (see [Adding an overlay](#adding-an-overlay)).
+3. Start your LIVE on TikTok.
+4. Enter your `@username` on the **Home** page and connect. If the connection drops, Tokio reconnects on its own.
 
 ### Adding an overlay
 
@@ -141,7 +143,7 @@ Want to help? Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](
 
 Tokio's source code is licensed under the [MIT License](LICENSE). One file is an exception: `src/main/services/tts/providers/edge/common/drm-v2.ts` is derived from [edge-tts](https://github.com/rany2/edge-tts) and is licensed under the [GNU LGPL v3.0](LICENSES/LGPL-3.0.txt), which builds on the [GNU GPL v3.0](LICENSES/GPL-3.0.txt).
 
-The **distributed application** includes [tiktok-live-connector](https://github.com/zerodytrash/TikTok-Live-Connector) and its protocol package, which are licensed under the [GNU AGPL v3.0](LICENSES/AGPL-3.0.txt). So the application as a whole is distributed under the AGPL-3.0-only.
+Tokio connects to TikTok LIVE through [@tokioapp/connector](https://github.com/tokio-app/connector), which is also MIT-licensed.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details. The **About** page in the app shows the same notices.
 

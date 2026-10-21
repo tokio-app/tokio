@@ -89,7 +89,8 @@ When a procedure changes, update its skill with it.
 ### Services (main process)
 
 - Each service lives in `src/main/services/<name>/index.ts` and extends `Service` (or `ProviderService<T>`) from `src/main/services/shared`. It's instantiated once in `src/main/index.ts`, added to `AppServices` in `src/main/types`, and injected into `AppHandler` (`src/main/handler/app.ts`).
-- Swappable backends (connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)`. Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. TTS uses every provider at once, as engines (see `.claude/rules/tts.md`). The connector keeps its provider setup (`SET_PROVIDER`), but Settings only shows its form while more than one connector is registered.
+- Swappable backends (connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)`. Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. TTS uses every provider at once, as engines (see `.claude/rules/tts.md`). The connector's provider key is the user's own Euler Stream API key, which signs the connection (`SET_PROVIDER`). Settings → TikTok LIVE always shows it; its provider picker only shows while more than one connector is registered. Never log the key or ship a shared one.
+- The default connector uses `@tokioapp/connector` (our MIT package, `../tokio-connector`), one `TikTokLiveConnection` per connect, with every listener added before `connect()`. It reconnects on its own: a drop it recovers from calls `onReconnect` and keeps the LIVE session, and `DISCONNECTED` only comes once the connection stops (`reason: "ended"`, `"lost"`, or none when the user disconnected). A failed connect's `error.kind` picks the message `home.ts` shows.
 - Log through `Logger` (`@/logger`) with the service's `_logFile` and a `<ServiceName>` prefix, e.g. ``Logger.error(`<Connector> ...`, this._logFile)``. Format errors with `formatError` from `@/common/util`.
 - Fallible service methods return `{ success, error?, data? }` instead of throwing.
 
@@ -119,7 +120,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 - Log failures once. If a service already logged it, throw `new LoggedError(res.error)` or pass `{ logged: true }` to `AppFailure`.
 - `notifier` (in the handler's services) pushes `APP_EVENTS_RESPONSE.NOTIFY`: `notifier.report({ source, error, fallback })` logs and notifies; `notifier.error/warn/info/success(source, code, message, { key, windowMs })` sends a notice. Repeated warnings and errors are dropped within `windowMs` (5s default); use a longer window for failures that can repeat on every live event.
 - User actions that change something call `notifier.success(...)` after the reply, where the handler succeeds. Reads, status checks, tests, autosaves (TTS, music, alerts) and controls whose state the UI already shows (Home's feature switches) send nothing. Success codes are past tense (`PROFILE_CREATED`); failures end in `_FAILED`.
-- Background failures (TTS, music playback, missing alert sounds, gifts, server port, LIVE ending) are reported from `src/main/events/init.ts` through service callbacks. Services don't know about the notifier.
+- Background failures (TTS, music playback, missing alert sounds, gifts, server port, reconnects, LIVE ending) are reported from `src/main/events/init.ts` through service callbacks. Services don't know about the notifier.
 - The renderer shows notices via `NotificationsProvider` (mounted above `AppProvider`, since load-time notices arrive before the splash closes): `Toasts` and the title bar's `NotificationBell`. Pages don't show notices themselves.
 
 ### Persistence
@@ -133,15 +134,15 @@ Profile files are named by `StoreManagerService.profileFileFor`: the name in saf
 Tokio's source is MIT; treat license compliance as part of every change.
 
 - **LGPL code stays isolated.** `src/main/services/tts/providers/edge/common/drm-v2.ts` is LGPL-3.0-only (derived from edge-tts). Code ported from edge-tts goes only into its own LGPL file with the same header (SPDX line, upstream commit, authors, dated modification notice). Never copy upstream code into MIT files.
-- **The distributed app is AGPL-3.0-only** because `tiktok-live-connector` and `tiktok-live-proto` are AGPL. Don't patch them in place.
+- **The distributed app is MIT too**, with that one LGPL file. Keep it that way: no copyleft dependency, and no code from `tiktok-live-connector` 2.4.1 or later or `tiktok-live-proto` 0.2.4 or later (AGPL).
 - **Check licenses when adding or upgrading a dependency**, even minor bumps (tiktok-live-connector went MIT → AGPL in 2.4.1). Ask before adding anything copyleft (GPL, AGPL, LGPL, MPL, CC BY-SA). The `add-dependency` skill has the steps.
 - **react-icons:** only use the sets listed under Icons in `THIRD_PARTY_NOTICES.md`, and add a row for any new set.
 - **Keep the notices in sync** when licensed components change:
   - `THIRD_PARTY_NOTICES.md` (including its Services list for new online services) and `LICENSES/`
   - the license banner in `electron.vite.config.ts` (the bundler strips header comments)
   - `COMPONENTS` and `SERVICES` in `src/renderer/src/pages/About/helper.ts`, which mirror the non-npm parts of `THIRD_PARTY_NOTICES.md`
-  - `src/renderer/src/pages/About/notices.test.ts` fails when they drift: icon sets in use, the services, license texts, the AGPL dependencies' versions (an upgrade needs a license check), the LGPL header and the banner
-- The About page shows the AGPL's "Appropriate Legal Notices"; keep it reachable from the sidebar. Its package list comes from `LicensesService`, which walks the production dependency tree, so new dependencies need no changes there.
+  - `src/renderer/src/pages/About/notices.test.ts` fails when they drift: icon sets in use, the services, license texts, no AGPL, the LGPL header and the banner
+- The About page shows the license notices; keep it reachable from the sidebar. Its package list comes from `LicensesService`, which walks the production dependency tree, so new dependencies need no changes there.
 - Keep `"license": "MIT"` in `package.json`; it describes the repository's own code.
 
 ## CI and releases
