@@ -866,7 +866,10 @@ export class StoreManagerService extends Service {
   }
 
   private _decryptProviderKey(provider: AppProvider): AppProvider {
-    if (!provider.key || !safeStorage?.isEncryptionAvailable()) return provider;
+    // safeStorage output starts with v10/v11 ("djEw"/"djEx" in base64).
+    // Anything else was saved while encryption was unavailable, as plain text.
+    if (!/^djE[wx]/.test(provider.key)) return provider;
+    if (!safeStorage?.isEncryptionAvailable()) return { ...provider, key: "" };
     try {
       const buffer = Buffer.from(provider.key, "base64");
       return { ...provider, key: safeStorage.decryptString(buffer) };

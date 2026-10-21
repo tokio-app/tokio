@@ -326,6 +326,29 @@ describe("StoreManagerService", () => {
 
       expect(store.getSettings().activeConnProvider.key).toBe("");
     });
+
+    it("reads keys saved without encryption as they are", async () => {
+      const data = structuredClone(defaultStoreData);
+      const plain = { name: "Default", key: "plain-key", active: true };
+      data.settings.activeConnProvider = plain;
+      data.settings.providers.tts = [plain];
+      await writeFile(storeFile, JSON.stringify(data));
+      const setProvider = vi.spyOn(connector, "setProvider");
+
+      const store = await init();
+
+      expect(setProvider).toHaveBeenCalledWith("Default", "plain-key");
+      expect(store.getSettings().activeConnProvider.key).toBe("plain-key");
+      expect(store.getVoiceKey("Default")).toBe("plain-key");
+    });
+
+    it("drops an encrypted key while encryption is unavailable", async () => {
+      const store = await init();
+      await store.updateProvider("Default", "euler-key");
+      vi.spyOn(safeStorage, "isEncryptionAvailable").mockReturnValue(false);
+
+      expect(store.getSettings().activeConnProvider.key).toBe("");
+    });
   });
 
   describe("updates", () => {
