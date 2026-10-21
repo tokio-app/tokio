@@ -1,6 +1,7 @@
 import { OverlayMetadata, TestOverlay } from "@/common/schemas";
 import { CustomGift, GiftEvent, TOKIO_EVENTS } from "@/common/types";
 import { defaultStoreData, generateTikTokEventSample } from "@/common/util";
+import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { ServerService } from "@/services/server";
 import { YAMLManagerService } from "@/services/yaml";
@@ -12,6 +13,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  rename,
   rm,
   symlink,
   writeFile,
@@ -34,6 +36,11 @@ import { CATALOG_TTL_MS, OverlayService } from "./index";
 vi.mock("./common", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./common")>();
   return { ...actual, processHTML: vi.fn(actual.processHTML) };
+});
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, rename: vi.fn(actual.rename) };
 });
 
 const SETUP = '<script id="tokio-setup"></script>';
@@ -701,6 +708,56 @@ describe("OverlayService", () => {
       expect(await readFile(join(dir(), "index.html"), "utf-8")).toContain(
         `window.__OVERLAY_CONFIG__ = {"title":"Mine"}`,
       );
+    });
+
+    describe("when an update can't be moved in", () => {
+      beforeEach(async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        publish(release("1.0.0"));
+        await service.installFromCatalog("gift-jar", gifts);
+      });
+
+      // Updates to 1.0.1 while the renames after the first one fail
+      const updateFailing = async (...errors: Error[]) => {
+        vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+        publish(release("1.0.1", { "new.js": "2" }));
+        const fs =
+          await vi.importActual<typeof import("node:fs/promises")>(
+            "node:fs/promises",
+          );
+        const renames = vi.mocked(rename).mockImplementationOnce(fs.rename);
+        for (const error of errors) renames.mockRejectedValueOnce(error);
+        return service.installFromCatalog("gift-jar", gifts);
+      };
+
+      it("puts the installed version back", async () => {
+        const config = () => readFile(join(dir(), "config.yaml"), "utf-8");
+        const installed = await config();
+
+        expect(await updateFailing(new Error("EPERM"))).toEqual({
+          success: false,
+        });
+
+        expect(await readdir(folder)).toEqual(["gift-jar"]);
+        expect(await readdir(dir())).not.toContain("new.js");
+        expect(await config()).toBe(installed);
+        expect(stored).toMatchObject([{ id: "gift-jar", version: "1.0.0" }]);
+      });
+
+      it("logs where the installed version is when it can't be put back", async () => {
+        const error = vi.spyOn(Logger, "error");
+
+        await updateFailing(new Error("EPERM"), new Error("EBUSY"));
+
+        const [old] = (await readdir(folder)).filter((f) =>
+          f.startsWith(".old-"),
+        );
+        expect(error).toHaveBeenCalledWith(
+          expect.stringContaining(join(folder, old)),
+          undefined,
+          expect.objectContaining({ message: "EBUSY" }),
+        );
+      });
     });
 
     it("leaves nothing behind when the download doesn't match", async () => {

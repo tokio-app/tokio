@@ -634,7 +634,16 @@ export class OverlayService extends Service {
     try {
       await rename(staging, dir);
     } catch (error) {
-      if (replacing) await rename(old, dir).catch(() => {});
+      if (replacing) {
+        // The next start deletes .old-* folders, so say where it was left.
+        await rename(old, dir).catch((undo) =>
+          Logger.error(
+            `<Overlays> Unable to put back ${dir}, the installed version is in ${old} -- ${formatError(undo)}`,
+            this._logFile,
+            undo,
+          ),
+        );
+      }
       throw error;
     }
 
