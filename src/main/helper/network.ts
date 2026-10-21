@@ -1,5 +1,6 @@
 import { APP_HOSTNAME, SERVER_PORT } from "@/common/util";
 import dns from "dns";
+import type { WebContents } from "electron";
 
 const OVERLAY_HOSTS = ["localhost", "127.0.0.1", "[::1]", APP_HOSTNAME];
 
@@ -19,6 +20,20 @@ export function isOverlayURL(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+const withoutHash = (url: string) => url.split("#")[0];
+
+/**
+ * Keeps an app page from navigating to another one, e.g. through a link.
+ * Reloads, Vite's included, emit will-navigate to the same URL and go through.
+ */
+export function stayOnPage(contents: WebContents) {
+  contents.on("will-navigate", (event) => {
+    if (withoutHash(event.url) !== withoutHash(contents.getURL())) {
+      event.preventDefault();
+    }
+  });
 }
 
 export async function checkInternetConnection() {

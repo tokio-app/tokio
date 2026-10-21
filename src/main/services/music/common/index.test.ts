@@ -1,5 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { ipcMain, views, windows } from "@test/electron";
+import { cancelableEvent, ipcMain, views, windows } from "@test/electron";
 import { normalize, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createWindow } from "./index";
@@ -78,6 +78,21 @@ describe("createWindow", () => {
       { state: "maximized" },
       { state: "normal" },
     ]);
+  });
+
+  it("keeps the title bar on its page, but lets it reload", () => {
+    const { nav } = open();
+    const page = nav.webContents.getURL();
+    // Whether the title bar may go to the URL
+    const navigate = (url: string) => {
+      const event = cancelableEvent({ url });
+      nav.webContents.emit("will-navigate", event);
+      return !event.defaultPrevented;
+    };
+
+    expect(navigate("https://example.com/")).toBe(false);
+    expect(navigate("file:///C:/x.png")).toBe(false);
+    expect(navigate(`${page}#/other`)).toBe(true);
   });
 
   it("handles the title bar controls on the view, not ipcMain", () => {

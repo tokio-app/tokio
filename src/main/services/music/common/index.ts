@@ -6,6 +6,7 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
+import { stayOnPage } from "@/helper/network";
 import { BrowserWindow, WebContentsView } from "electron";
 import { join } from "node:path";
 
@@ -72,6 +73,7 @@ export function createWindow() {
 
   // The title bar lives in the nav view, so it gets the window state.
   const nav = _navView.webContents;
+  stayOnPage(nav);
   const sendWindowState = () => {
     if (nav.isDestroyed()) return;
     nav.send(APP_EVENTS_RESPONSE.RESIZE_MUSIC_WINDOW, {

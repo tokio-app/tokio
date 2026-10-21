@@ -2,6 +2,7 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import config from "@/config";
 import {
   app,
+  cancelableEvent,
   FakeBrowserWindow,
   ipcMain,
   session,
@@ -139,6 +140,21 @@ describe("AppHandler", () => {
       win.close();
 
       expect(music.isDestroyed()).toBe(true);
+    });
+
+    it("stays on its page, but lets it reload", () => {
+      const { win } = start();
+      void win.loadURL("http://localhost:5173/index.html#/settings");
+      // Whether the page may go to the URL
+      const navigate = (url: string) => {
+        const event = cancelableEvent({ url });
+        win.webContents.emit("will-navigate", event);
+        return !event.defaultPrevented;
+      };
+
+      expect(navigate("https://example.com/")).toBe(false);
+      expect(navigate("file:///C:/x.png")).toBe(false);
+      expect(navigate("http://localhost:5173/index.html#/")).toBe(true);
     });
 
     it("opens links in the browser instead of a new window", () => {
