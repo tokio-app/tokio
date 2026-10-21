@@ -5,7 +5,6 @@
     "src/renderer/src/**/*",
     "src/renderer/src/**/*.tsx",
     "src/music/**/*",
-    "src/preload/*.d.ts",
     "src/common/**/*",
     "src/ui/**/*",
     "test/renderer/**/*",

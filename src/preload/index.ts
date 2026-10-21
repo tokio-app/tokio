@@ -4,7 +4,6 @@ import {
   AppEventsMap,
   AppEventsResponseMap,
 } from "@/common/types";
-import { electronAPI } from "@electron-toolkit/preload";
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
 
 type Callback = (event: IpcRendererEvent, ...args: any[]) => void;
@@ -26,14 +25,12 @@ const api = {
 
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld("electron", electronAPI);
     contextBridge.exposeInMainWorld("api", api);
   } catch (error) {
     console.error(error);
   }
 } else {
-  // @ts-ignore
-  window.electron = electronAPI;
+  // The music title bar runs without context isolation
   // @ts-ignore
   window.api = api;
 }

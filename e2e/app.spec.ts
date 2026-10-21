@@ -81,11 +81,17 @@ test("shows the splash, then the app, with its data in the home folder", async (
 test("keeps Node out of the page", async () => {
   const globals = await page.evaluate(() => ({
     api: "api" in globalThis,
+    electron: "electron" in globalThis,
     require: "require" in globalThis,
     process: "process" in globalThis,
   }));
 
-  expect(globals).toEqual({ api: true, require: false, process: false });
+  expect(globals).toEqual({
+    api: true,
+    electron: false,
+    require: false,
+    process: false,
+  });
 });
 
 test("sets the production CSP on the page loaded from disk", async () => {

@@ -7,10 +7,6 @@ import {
 import { contextBridge, ipcRenderer } from "@test/electron";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@electron-toolkit/preload", () => ({
-  electronAPI: { toolkit: true },
-}));
-
 type Api = {
   on: <T extends APP_EVENTS_RESPONSE>(
     event: T,
@@ -55,12 +51,12 @@ describe("preload", () => {
     Reflect.deleteProperty(process, "contextIsolated");
   });
 
-  it("exposes electron and the api to an isolated page", async () => {
+  it("exposes only the api to an isolated page", async () => {
     const window = await load(true);
 
-    expect(contextBridge.exposeInMainWorld).toHaveBeenCalledWith("electron", {
-      toolkit: true,
-    });
+    expect(
+      contextBridge.exposeInMainWorld.mock.calls.map(([key]) => key),
+    ).toEqual(["api"]);
     expect(exposed()).toBeDefined();
     expect(window).toEqual({});
   });
@@ -76,10 +72,10 @@ describe("preload", () => {
     expect(console.error).toHaveBeenCalledWith(failure);
   });
 
-  it("puts both on the window of a page without isolation", async () => {
+  it("puts only the api on the window of a page without isolation", async () => {
     const window = await load(false);
 
-    expect(window.electron).toEqual({ toolkit: true });
+    expect(Object.keys(window)).toEqual(["api"]);
     expect(isApi(window.api)).toBe(true);
     expect(contextBridge.exposeInMainWorld).not.toHaveBeenCalled();
   });
