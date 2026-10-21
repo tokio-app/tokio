@@ -1,8 +1,8 @@
 /* The feed on the right, as tall as the sections on the left */
 .dashboard {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: var(--space-8);
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--space-10);
 }
 
 .column {
@@ -18,7 +18,7 @@
   align-items: center;
   gap: var(--space-2);
   color: var(--font-secondary);
-  font-size: var(--font-md);
+  font-size: var(--font-sm);
   font-weight: 600;
 }
 
@@ -42,38 +42,22 @@
   background-color: var(--success);
 }
 
+/* Steady, like the title bar's tally */
 .dot_live {
   background-color: var(--accent-primary);
-  animation: live 1.6s ease-in-out infinite;
 }
 
-@keyframes live {
-  50% {
-    opacity: 0.3;
-  }
-}
-
-/* A soft rose wash, warmer while LIVE */
+/* A soft rose wash, Home's one warm spot */
 .connect {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  border: 1px solid var(--background-secondary);
-  border-radius: var(--radius-xl);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background: radial-gradient(
     circle at 0 0,
     color-mix(in srgb, var(--accent-primary) 8%, transparent),
-    transparent 70%
-  );
-  transition: border-color var(--transition-fast);
-}
-
-.connect_live {
-  border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
-  background: radial-gradient(
-    circle at 0 0,
-    color-mix(in srgb, var(--accent-primary) 16%, transparent),
     transparent 70%
   );
 }
@@ -81,25 +65,18 @@
 /* Centered, so a short handle doesn't leave a gap before the button */
 .username {
   flex: 1;
-  height: 48px;
+  height: var(--control-height-lg);
   padding: 0 var(--space-4);
-  border-color: var(--background-secondary-hover);
-  border-radius: var(--radius-md);
   font-size: var(--font-lg);
   text-align: center;
-  transition: border-color var(--transition-fast);
-}
-
-.username:focus {
-  border-color: var(--accent-primary);
 }
 
 .connect_btn {
-  width: 180px;
+  width: 168px;
 }
 
 .key_hint {
-  font-size: var(--font-md);
+  font-size: var(--font-sm);
   color: var(--font-secondary);
   text-align: center;
 }
@@ -108,38 +85,50 @@
   color: var(--accent-primary);
 }
 
+/* TikTok's numbers and the totals read as a readout: muted until LIVE */
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-6);
 }
 
-.stat {
+.stat,
+.total {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding-left: var(--space-4);
-  border-left: 3px solid var(--accent-primary);
+}
+
+.stat_value,
+.total_value {
+  color: var(--font-muted);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.live .stat_value,
+.live .total_value {
+  color: var(--font-primary);
 }
 
 .stat_value {
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--font-primary);
+  font-size: var(--font-3xl);
 }
 
 .stat_label {
   font-size: var(--font-sm);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--font-secondary);
 }
 
 /* FEATURES */
 
 .features {
-  border: 1px solid var(--background-secondary);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
 }
 
 .feature {
@@ -147,18 +136,19 @@
   grid-template-columns: 160px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-4);
+  min-height: 48px;
   padding: var(--space-2) var(--space-4);
 }
 
 .feature + .feature {
-  border-top: 1px solid var(--background-secondary);
+  border-top: 1px solid var(--border);
 }
 
 /* The overlay server has a dot where the others have a toggle, as wide */
 .feature_name {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   font-size: var(--font-md);
   color: var(--font-primary);
 }
@@ -192,11 +182,11 @@
 
 .feature_link:hover,
 .feature_link:focus-visible {
-  color: var(--accent-primary);
+  color: var(--font-primary);
 }
 
 .feature_link:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--accent-primary);
+  box-shadow: inset 0 0 0 1px var(--accent-primary-hover);
 }
 
 /* ACTIVITY */
@@ -208,17 +198,8 @@
   gap: var(--space-4) var(--space-6);
 }
 
-.total {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
 .total_value {
-  font-size: var(--font-xl);
-  font-weight: 700;
-  line-height: 1;
-  color: var(--font-primary);
+  font-size: var(--font-2xl);
 }
 
 /* The list scrolls inside the column instead of making the page taller */
@@ -232,8 +213,9 @@
   position: absolute;
   inset: 0;
   overflow-y: auto;
-  border: 1px solid var(--background-secondary);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
   list-style: none;
 }
 
@@ -243,12 +225,11 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   font-size: var(--font-md);
-  line-height: 1.5;
   color: var(--font-primary);
 }
 
 .event + .event {
-  border-top: 1px solid var(--background-secondary);
+  border-top: 1px solid var(--border);
 }
 
 .event_quiet {
@@ -263,7 +244,7 @@
 }
 
 .event_name {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .event_message {
@@ -275,13 +256,13 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-full);
-  background-color: var(--background-secondary);
+  background-color: var(--border);
   color: var(--font-secondary);
   font-size: var(--font-xs);
-  font-weight: 700;
+  font-weight: 600;
   object-fit: cover;
 }
 
@@ -297,10 +278,4 @@
   margin-left: var(--space-1);
   color: var(--font-secondary);
   font-size: var(--font-sm);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dot_live {
-    animation: none;
-  }
 }
