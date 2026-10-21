@@ -14,12 +14,25 @@ paths:
 - Components are folders with `index.tsx` and `<name>.module.css`, re-exported from `components/index.tsx`. Use the primitives in `components/Elements` before creating new ones; they take colors from the tokens, not props. `Modal` is the only modal shell.
 - The CSP is `config.CSP` (`src/main/config/csp.ts`, which has no imports so `electron.vite.config.ts` can read it). In dev pages get it as a header from `initSession`; built pages load from `file://`, which headers don't reach, so the `tokio:csp` build plugin adds the production policy as a meta tag. That policy has no `connect-src`: pages can't fetch, and audio reaches `AudioQueue` as bytes over IPC. Anything new the renderer loads must fit it.
 - Style with CSS Modules and the tokens in `src/ui/styles/tokens.css` (colors, `--space-*`, `--font-*`, `--radius-*`, `--z-*`), not raw values.
+- The look follows the `frontend-design` skill:
+  - **Surfaces:** one Ink surface (`--background-primary`). Panels (`--background-tertiary`) only for grouped content such as lists and cards. Controls on Field (`--background-secondary`), with `--border` for hairlines and Iron (`--background-secondary-hover`) for hover.
+  - **Rose** (`--accent-primary`) means LIVE or "do this": the tally, primary actions, selection and focus, never decoration. Text on it is `--accent-ink`.
+  - **Radii:** `--radius-md` for controls, `--radius-lg` for panels, `--radius-xl` for dialogs.
+  - **Never:** shadows on cards, pills, or uppercase labels.
+- Type is Archivo (`@fontsource-variable/archivo`, imported by `base.css`), at 400 for text, 500 for labels and controls, 600 for titles.
+  - Live numbers (Home's stats and totals) use the readout: `font-stretch: var(--stretch-readout)`, 700, `tabular-nums`.
+  - Both builds set `assetsInlineLimit: 0`, because the CSP blocks fonts inlined as `data:` URLs.
+- A page of settings uses `<Page width="wide" layout="aside">`. Each section's header sits in a 240px column beside its content, and `Section` wraps the content in `.section_body`, which is `display: contents` in the stacked layout.
+- `TitleBar`'s `live` prop (Layout passes the connection) draws the tally on every page: a rose line along the window's top, and "LIVE" next to the logo.
 
 ## Keyboard
 
 - Keep controls usable from the keyboard. `Modal` takes the focus while open and gives it back, keeps Tab inside it (wrapping between its first and last controls), and Escape closes the innermost one; popovers inside it (`Select`, `Color`) handle Escape first and stop it. `Color`'s picker is portaled: its text field takes the focus when it opens, and Tab out of it goes back to its swatch. Overlay previews (`Iframe`) are out of the Tab order.
-- Don't remove focus outlines: buttons, sliders and the title bar keep the browser's `:focus-visible` ring, and `Toggle` draws one on its track.
-- `Select` is a combobox with a listbox. Number fields use `NumberInput`, which can be emptied while typing and reports only valid numbers. It compares values with `Object.is`, so NaN (an overlay number setting saved as text) shows an empty field.
+- Don't remove focus outlines. Focus looks like this:
+  - Anything without its own focus style gets `base.css`'s rose `:focus-visible` ring; it's drawn inset on the title bar's controls and in the sidebar.
+  - Inputs show a rose border.
+  - `Toggle` draws the ring on its track.
+- `Select` is a combobox with a listbox. Its `OPTION_HEIGHT` is the item's `--control-height` plus the row's 2px padding on each side, so change them together. Number fields use `NumberInput`, which can be emptied while typing and reports only valid numbers. It compares values with `Object.is`, so NaN (an overlay number setting saved as text) shows an empty field.
 - Something hidden only by CSS also needs `tabIndex={-1}` and `aria-hidden`.
 
 ## State, hooks and audio
