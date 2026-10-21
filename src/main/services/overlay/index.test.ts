@@ -112,6 +112,7 @@ describe("OverlayService", () => {
   let mount: MockInstance<ServerService["mount"]>;
   let unmount: MockInstance<ServerService["unmount"]>;
   let sendToClient: MockInstance<ServerService["sendToClient"]>;
+  let server: ServerService;
 
   const store = {
     wasRebuilt: () => rebuilt,
@@ -162,7 +163,7 @@ describe("OverlayService", () => {
     testOverlays = [];
     rebuilt = false;
     // Not started, it only keeps the routes.
-    const server = new ServerService(0);
+    server = new ServerService(0);
     mount = vi.spyOn(server, "mount");
     unmount = vi.spyOn(server, "unmount");
     sendToClient = vi.spyOn(server, "sendToClient");
@@ -440,18 +441,27 @@ describe("OverlayService", () => {
       );
     });
 
-    it("leaves out links to files outside the overlay", async () => {
+    it("leaves out links, so the server can't reach files outside it", async () => {
       const source = join(root, "source");
       await configurable(source);
       const secret = join(root, "secret");
       await overlay(secret, { "key.txt": "private" });
-      // A junction needs no admin rights on Windows, elsewhere it's a link.
+      // Unzipping on macOS or Linux recreates the links a zip holds. A
+      // junction needs no admin rights on Windows, elsewhere it's a link.
       await symlink(secret, join(source, "data"), "junction");
 
       expect(await service.import(source, gifts)).toEqual({ success: true });
 
       const [id] = await readdir(folder);
       expect(await readdir(join(folder, id))).not.toContain("data");
+      await server.start();
+      try {
+        const url = `http://127.0.0.1:${server.getPort()}/${id}`;
+        expect((await fetch(`${url}/index.html`)).status).toBe(200);
+        expect((await fetch(`${url}/data/key.txt`)).status).toBe(404);
+      } finally {
+        server.stop();
+      }
     });
 
     it("writes settings with dollar signs as they are", async () => {
