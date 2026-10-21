@@ -12,6 +12,8 @@ export default {
   DEFAULT_RATE: 0,
   DEFAULT_VOLUME: 100,
   REQUEST_TIMEOUT_MS: 15000,
+  // Until a new host first answers, its requests also wait for PowerShell and the speech engines to load.
+  START_TIMEOUT_MS: 30_000,
   // The PowerShell host exits after this long without requests, the next one respawns it.
   IDLE_TIMEOUT_MS: 5 * 60_000,
 };
