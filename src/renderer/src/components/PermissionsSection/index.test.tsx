@@ -58,11 +58,7 @@ describe("PermissionsSection", () => {
     expect(
       screen.getByRole("heading", { name: "Permissions" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Control exactly who has permission to use the Music system.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Who can use Music.")).toBeInTheDocument();
   });
 
   it("shows the saved roles", () => {

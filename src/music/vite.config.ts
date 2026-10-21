@@ -18,6 +18,8 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, "../../music-out"),
     emptyOutDir: true,
+    // Vite inlines small files as data: URLs, which the CSP blocks for fonts
+    assetsInlineLimit: 0,
   },
   server: {
     port: 8989,

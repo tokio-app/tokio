@@ -4,13 +4,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-2);
   flex-shrink: 0;
   padding: 0 var(--space-4);
   height: var(--control-height);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--background-secondary);
-  background-color: var(--background-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background-color: var(--background-secondary);
   color: var(--font-primary);
   font-size: var(--font-md);
   font-weight: 500;
@@ -18,12 +18,14 @@
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
+    border-color var(--transition-fast),
     color var(--transition-fast),
     opacity var(--transition-fast);
 }
 
 .btn:hover:not(:disabled) {
-  background-color: var(--background-secondary);
+  border-color: var(--background-secondary-hover);
+  background-color: var(--border);
 }
 
 .btn:disabled {
@@ -42,9 +44,19 @@
 }
 
 .btn_accent:hover:not(:disabled) {
+  border-color: transparent;
   background-color: var(--accent-primary-hover);
 }
 
+/* Gray, not a faded rose: there's nothing to do yet */
+.btn_accent:disabled {
+  border-color: var(--border);
+  background-color: var(--background-secondary);
+  color: var(--font-muted);
+  opacity: 1;
+}
+
+/* The 6px padding is what overlaymodal and officialoverlays offset with -6px */
 .btn_icon {
   height: auto;
   padding: 6px;
@@ -54,8 +66,8 @@
 }
 
 .btn_icon:hover:not(:disabled) {
-  background-color: transparent;
-  color: var(--accent-primary);
+  background-color: var(--border);
+  color: var(--font-primary);
 }
 
 .btn_icon:disabled {
@@ -64,15 +76,14 @@
 }
 
 .btn_lg {
-  height: 48px;
-  padding: 0 var(--space-8);
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 700;
+  height: var(--control-height-lg);
+  padding: 0 var(--space-6);
+  font-weight: 600;
 }
 
 /* Playing, or picked */
-.btn_active {
+.btn_active,
+.btn_active:hover:not(:disabled) {
   color: var(--accent-primary);
 }
 
@@ -86,6 +97,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .btn_pulse {
+    animation: none;
+  }
+}
+
 /* BTN END */
 
 /* INPUT START */
@@ -94,16 +111,21 @@
   width: 100%;
   height: var(--control-height);
   padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--background-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
   background-color: var(--background-secondary);
   color: var(--font-primary);
   font-size: var(--font-md);
   outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.input:hover:not(:disabled, :focus) {
+  border-color: var(--background-secondary-hover);
 }
 
 .input:focus {
-  border-color: var(--background-secondary-hover);
+  border-color: var(--accent-primary);
 }
 
 .input:disabled {
@@ -114,7 +136,7 @@
 .textarea {
   height: auto;
   min-height: 80px;
-  padding: 10px var(--space-3);
+  padding: var(--space-2) var(--space-3);
   resize: vertical;
 }
 
@@ -125,7 +147,7 @@
 .choice_label {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   width: fit-content;
   font-size: var(--font-md);
   color: var(--font-primary);
@@ -144,7 +166,7 @@
   display: inline-block;
   position: relative;
   flex-shrink: 0;
-  width: 40px;
+  width: 36px;
   height: 20px;
 }
 
@@ -157,10 +179,10 @@
 .toggle_track {
   position: absolute;
   inset: 0;
-  border-radius: 20px;
-  background-color: var(--background-secondary);
+  border-radius: var(--radius-full);
+  background-color: var(--background-secondary-hover);
   cursor: pointer;
-  transition: background-color 0.4s;
+  transition: background-color var(--transition-fast);
 }
 
 .toggle_track::before {
@@ -172,7 +194,7 @@
   height: 16px;
   border-radius: 50%;
   background-color: var(--font-primary);
-  transition: transform 0.4s;
+  transition: transform var(--transition-fast);
 }
 
 .toggle_input:checked + .toggle_track {
@@ -180,11 +202,11 @@
 }
 
 .toggle_input:checked + .toggle_track::before {
-  transform: translateX(20px);
+  transform: translateX(16px);
 }
 
 .toggle_input:focus-visible + .toggle_track {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid var(--accent-primary-hover);
   outline-offset: 2px;
 }
 
@@ -195,7 +217,7 @@
 .radio_group {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .radio_option {
@@ -206,11 +228,12 @@
   cursor: pointer;
 }
 
+/* Centered on the label's first line */
 .radio_input {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  margin-top: 4px;
+  margin-top: 3px;
   accent-color: var(--accent-primary);
   cursor: pointer;
 }
@@ -218,20 +241,20 @@
 .radio_text {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 2px;
 }
 
 .radio_label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: 15px;
+  font-size: var(--font-md);
   font-weight: 500;
   color: var(--font-primary);
 }
 
 .radio_description {
-  font-size: var(--font-md);
+  font-size: var(--font-sm);
   color: var(--font-secondary);
 }
 
@@ -259,19 +282,19 @@
 }
 
 .slider::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: var(--radius-sm);
-  background: var(--background-secondary);
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--background-secondary-hover);
   cursor: pointer;
 }
 
 .slider::-webkit-slider-thumb {
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   margin-top: -5px;
   border-radius: 50%;
-  background: var(--accent-primary);
+  background: var(--font-primary);
   cursor: pointer;
 }
 
@@ -293,8 +316,8 @@
   display: flex;
   flex-direction: column;
   padding: var(--space-1);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--background-primary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
   background-color: var(--background-secondary);
   box-shadow: var(--shadow-popover);
 }
@@ -303,6 +326,7 @@
 
 /* SELECT START */
 
+/* GiftSelect and VoiceSelect compose this, so their fields look the same */
 .select_display {
   display: flex;
   align-items: center;
@@ -311,18 +335,31 @@
   width: 100%;
   min-height: var(--control-height);
   padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--background-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
   background-color: var(--background-secondary);
   color: var(--font-primary);
   font-size: var(--font-md);
   cursor: pointer;
   overflow: hidden;
+  transition: border-color var(--transition-fast);
+}
+
+.select_display:hover {
+  border-color: var(--background-secondary-hover);
+}
+
+.select_display[aria-expanded="true"] {
+  border-color: var(--accent-primary);
 }
 
 .select_display_disabled {
   color: var(--font-secondary);
   cursor: not-allowed;
+}
+
+.select_display_disabled:hover {
+  border-color: var(--border);
 }
 
 .select_placeholder {
@@ -331,6 +368,7 @@
 
 .select_chevron {
   flex-shrink: 0;
+  color: var(--font-secondary);
   transition: transform var(--transition-fast);
 }
 
@@ -356,7 +394,7 @@
 .select_chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-1) var(--space-2);
   overflow: hidden;
 }
 
@@ -380,25 +418,30 @@
   color: var(--font-primary);
 }
 
+/* The negative offsets cancel .popover's 4px padding */
 .select_search {
   position: sticky;
   top: -4px;
   z-index: 1;
   margin-top: -4px;
-  padding-top: var(--space-2);
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
   background-color: var(--background-secondary);
 }
 
 .select_search_input {
   width: 100%;
-  padding: 6px 10px;
-  border: none;
-  border-bottom: 1px solid var(--font-secondary);
-  border-radius: var(--radius-sm);
+  padding: 6px var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   background-color: var(--background-primary);
   color: var(--font-primary);
   font-size: var(--font-md);
   outline: none;
+}
+
+.select_search_input:focus {
+  border-color: var(--accent-primary);
 }
 
 .select_list {
@@ -411,6 +454,7 @@
   width: 100%;
 }
 
+/* OPTION_HEIGHT in Select.tsx is the item's height plus this padding */
 .select_row {
   position: absolute;
   top: 0;
@@ -422,7 +466,7 @@
 .select_item {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   height: 100%;
   padding: 0 var(--space-3);
   border-radius: var(--radius-sm);
@@ -431,9 +475,13 @@
   cursor: pointer;
 }
 
-.select_item:hover,
 .select_item_active {
-  background-color: var(--background-primary);
+  background-color: var(--accent-soft);
+  color: var(--font-primary);
+}
+
+.select_item:hover {
+  background-color: var(--border);
   color: var(--font-primary);
 }
 
@@ -450,12 +498,11 @@
   padding: 0 var(--space-3) var(--space-1);
   color: var(--font-secondary);
   font-size: var(--font-xs);
-  font-weight: 700;
-  text-transform: uppercase;
+  font-weight: 600;
 }
 
 .select_empty {
-  padding: 10px var(--space-3);
+  padding: var(--space-2) var(--space-3);
   color: var(--font-secondary);
   font-size: var(--font-md);
 }
@@ -472,15 +519,14 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--background-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
   cursor: pointer;
 }
 
 .color_popover {
   gap: var(--space-3);
   padding: var(--space-3);
-  border-radius: var(--radius-lg);
 }
 
 .picker {
@@ -495,12 +541,11 @@
 
 .color_input {
   field-sizing: content;
-  height: 24px;
+  height: 28px;
   padding: 0 var(--space-3);
-  border: none;
-  border-bottom: 1px solid var(--font-primary);
-  border-radius: var(--radius-sm);
-  background-color: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--background-primary);
   color: var(--font-primary);
   font-size: var(--font-md);
   font-weight: 500;
@@ -508,6 +553,10 @@
   text-align: center;
   text-transform: uppercase;
   outline: none;
+}
+
+.color_input:focus {
+  border-color: var(--accent-primary);
 }
 
 /* COLOR END */
@@ -520,13 +569,14 @@
 }
 
 .tabs_underline {
-  border-bottom: 1px solid var(--background-secondary);
+  border-bottom: 1px solid var(--border);
 }
 
 .tabs_pill {
   width: fit-content;
   padding: var(--space-1);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
   background-color: var(--background-secondary);
 }
 
@@ -544,6 +594,7 @@
   background: transparent;
   color: var(--font-secondary);
   font-size: var(--font-md);
+  font-weight: 500;
   cursor: pointer;
   transition:
     color var(--transition-fast),
@@ -563,7 +614,9 @@
   color: var(--tab-accent, currentColor);
 }
 
+/* The underline sits on the row's border */
 .tabs_underline .tab {
+  margin-bottom: -1px;
   padding: var(--space-2) var(--space-3);
   border-bottom: 2px solid transparent;
 }
@@ -573,14 +626,13 @@
 }
 
 .tabs_pill .tab {
-  padding: var(--space-2) var(--space-6);
-  border-radius: var(--radius-sm);
-  font-size: 15px;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-md);
   font-weight: 600;
 }
 
 .tabs_pill .tab_active {
-  background-color: var(--background-primary);
+  background-color: var(--background-secondary-hover);
 }
 
 /* TABS END */

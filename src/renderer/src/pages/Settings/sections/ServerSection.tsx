@@ -11,7 +11,7 @@ export function ServerSection({ enabled, onChange }: Props) {
     <Section
       icon={<FiMonitor />}
       title="Overlay Server"
-      description="Configure the local web server used for overlays."
+      description="Serves your overlays to your streaming app."
     >
       <Check
         label="Enable Server"

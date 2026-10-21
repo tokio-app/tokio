@@ -2,7 +2,7 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { engine, failure } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { VoiceKeysSection } from "./VoiceKeysSection";
 
@@ -15,9 +15,10 @@ const eleven = (key = "") => ({
 const keys = (...engines: ReturnType<typeof azure>[]) =>
   send(APP_EVENTS_RESPONSE.GET_VOICE_KEYS, { success: true, engines });
 
-// An engine's form: its field and the Save button next to it
+// An engine's form, around its field
 const form = (label: string) =>
   within(screen.getByText(label).closest("div")!.parentElement!);
+const saves = () => sent(APP_EVENTS.SET_VOICE_KEY);
 
 describe("VoiceKeysSection", () => {
   it("asks main for the engines that take a key", () => {
@@ -58,54 +59,40 @@ describe("VoiceKeysSection", () => {
     );
   });
 
-  it("saves an engine's key once it changed", async () => {
+  it("saves an engine's key as it's typed, with no Save button", async () => {
     const { user } = renderWithProviders(<VoiceKeysSection />);
     await keys(azure(), eleven("saved-key"));
-    const save = form("Azure voices").getByRole("button", { name: "Save" });
-    expect(save).toBeDisabled();
-    expect(
-      form("ElevenLabs voices").getByRole("button", { name: "Save" }),
-    ).toBeDisabled();
 
     await user.type(screen.getByPlaceholderText("Azure API key..."), "abc");
-    expect(save).toBeEnabled();
+
+    await waitFor(() =>
+      expect(saves().at(-1)).toEqual({ engine: "azure", key: "abc" }),
+    );
+    expect(saves().every(({ engine }) => engine === "azure")).toBe(true);
     expect(
-      form("ElevenLabs voices").getByRole("button", { name: "Save" }),
-    ).toBeDisabled();
-
-    await user.click(save);
-
-    expect(sent(APP_EVENTS.SET_VOICE_KEY)).toEqual([
-      { engine: "azure", key: "abc" },
-    ]);
+      screen.queryByRole("button", { name: "Save" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("can save an empty key to remove one", async () => {
+  it("saves an empty key to remove one", async () => {
     const { user } = renderWithProviders(<VoiceKeysSection />);
     await keys(eleven("saved-key"));
 
     await user.clear(screen.getByPlaceholderText("ElevenLabs API key..."));
-    await user.click(
-      form("ElevenLabs voices").getByRole("button", { name: "Save" }),
-    );
 
-    expect(sent(APP_EVENTS.SET_VOICE_KEY)).toEqual([
-      { engine: "elevenlabs", key: "" },
-    ]);
+    await waitFor(() =>
+      expect(saves()).toEqual([{ engine: "elevenlabs", key: "" }]),
+    );
   });
 
-  it("replaces the typed key when a new one is saved", async () => {
+  it("replaces the typed key when main holds another one", async () => {
     const { user } = renderWithProviders(<VoiceKeysSection />);
     await keys(azure());
     const input = screen.getByPlaceholderText("Azure API key...");
     await user.type(input, "abc");
 
     await keys(azure("abc"));
-
     expect(input).toHaveValue("abc");
-    expect(
-      form("Azure voices").getByRole("button", { name: "Save" }),
-    ).toBeDisabled();
 
     await keys(azure("from-main"));
     expect(input).toHaveValue("from-main");

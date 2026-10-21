@@ -34,7 +34,8 @@ type CommonProps<V extends Value> = {
   "aria-label"?: string;
 };
 
-const OPTION_HEIGHT = 44;
+// The item's --control-height plus .select_row's 2px padding on each side
+const OPTION_HEIGHT = 40;
 const GROUP_HEIGHT = 28;
 
 export function Select<V extends Value>({

@@ -121,7 +121,7 @@ function CatalogList({
   if (!catalog) {
     return (
       <div className={styles.loading}>
-        <MoonLoader color="var(--accent-primary)" size={40} />
+        <MoonLoader color="var(--font-secondary)" size={40} />
       </div>
     );
   }

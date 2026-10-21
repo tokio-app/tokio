@@ -255,9 +255,10 @@ events.push(
   },
 );
 
+// Settings saves it as it's typed: no notice on success
 events.push(
   APP_EVENTS.SET_PROVIDER,
-  async ({ storeManagerService, notifier }, e, { name, key, type }) => {
+  async ({ storeManagerService }, e, { name, key, type }) => {
     const saved = await storeManagerService.updateProvider(name, key);
 
     replySettings(e, storeManagerService);
@@ -266,11 +267,6 @@ events.push(
       type,
       success: true,
     });
-    notifier.success(
-      "system",
-      FEEDBACK_CODES.PROVIDER_UPDATED,
-      "Euler Stream API key saved.",
-    );
   },
   {
     failure: {
@@ -314,9 +310,10 @@ events.push(
   },
 );
 
+// Settings saves it as it's typed: no notice on success
 events.push(
   APP_EVENTS.SET_VOICE_KEY,
-  async ({ storeManagerService, ttsService, notifier }, e, { engine, key }) => {
+  async ({ storeManagerService, ttsService }, e, { engine, key }) => {
     const target = ttsService.getEngines().find((v) => v.id === engine);
     if (!target?.keyLabel) {
       throw new Error(`The voice engine ${engine} takes no key.`);
@@ -330,13 +327,6 @@ events.push(
       success: true,
     });
     replyVoiceKeys(e, ttsService, storeManagerService);
-    notifier.success(
-      "system",
-      FEEDBACK_CODES.PROVIDER_UPDATED,
-      key
-        ? `${target.keyLabel} saved for the ${target.label} voices.`
-        : `${target.keyLabel} removed from the ${target.label} voices.`,
-    );
   },
   {
     failure: {

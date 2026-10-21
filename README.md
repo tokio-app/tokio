@@ -17,7 +17,7 @@ Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok
 
 Enter your TikTok username to connect to your LIVE. Turn each feature on or off for the session, and see what it will do: the TTS voice, whether music is connected, how many alerts are on and whether the overlay server is running.
 
-While you're LIVE, the dashboard shows how long you've been on, the viewers, likes and views, and the new followers, shares, gifts and coins since you connected. Its activity feed lists chats, gifts, follows, shares and viewers joining as they come in, and keeps the last LIVE's until you connect again. The gear next to **Activity** picks which of them the feed shows; hidden ones still count toward the totals.
+While you're LIVE, a rose line at the top of the window shows it on every page, and the dashboard shows how long you've been on, the viewers, likes and views, and the new followers, shares, gifts and coins since you connected. Its activity feed lists chats, gifts, follows, shares and viewers joining as they come in, and keeps the last LIVE's until you connect again. The gear next to **Activity** picks which of them the feed shows; hidden ones still count toward the totals.
 
 ### Text-to-speech
 

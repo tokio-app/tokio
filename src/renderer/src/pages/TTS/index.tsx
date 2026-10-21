@@ -35,7 +35,7 @@ export function TTS() {
   });
 
   return (
-    <Page>
+    <Page width="wide" layout="aside">
       <VoiceSection
         settings={settings}
         testLoading={testLoading}

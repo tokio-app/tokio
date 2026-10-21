@@ -6,11 +6,6 @@
   gap: var(--space-4);
 }
 
-.provider_save {
-  align-self: flex-start;
-  margin-top: var(--space-1);
-}
-
 .link {
   color: var(--accent-primary);
 }
@@ -20,7 +15,7 @@
 .profiles {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 .profile_select {
@@ -39,14 +34,20 @@
   flex-direction: column;
   max-height: 320px;
   overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background-tertiary);
 }
 
 .library_item {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) 0;
-  border-bottom: 1px solid var(--background-secondary);
+  padding: var(--space-2) var(--space-3);
+}
+
+.library_item + .library_item {
+  border-top: 1px solid var(--border);
 }
 
 .library_name {
@@ -65,6 +66,6 @@
 }
 
 .error {
-  color: var(--accent-primary);
+  color: var(--danger);
   font-size: var(--font-sm);
 }

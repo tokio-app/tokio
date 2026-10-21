@@ -31,10 +31,14 @@ export function SoundsSection() {
     <Section
       icon={<FiMusic />}
       title="Sound Library"
-      description="Sounds you upload or download from MyInstants, for alerts on any profile."
+      description="Sounds for alerts, shared by every profile."
       actions={
-        <Btn onClick={() => window.api.emit(APP_EVENTS.UPLOAD_SOUNDS)}>
-          <FiUpload /> Upload
+        <Btn
+          variant="icon"
+          title="Upload"
+          onClick={() => window.api.emit(APP_EVENTS.UPLOAD_SOUNDS)}
+        >
+          <FiUpload size={20} />
         </Btn>
       }
     >

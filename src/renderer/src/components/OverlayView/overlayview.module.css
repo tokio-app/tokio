@@ -3,6 +3,10 @@
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
 }
 
 /* Name and tags on the left, actions on the right */
@@ -41,8 +45,7 @@
   align-items: center;
   gap: var(--space-1);
   color: var(--font-secondary);
-  font-size: var(--font-xs);
-  font-weight: 500;
+  font-size: var(--font-sm);
 }
 
 .buttons {
@@ -56,14 +59,25 @@
 .frame {
   overflow: hidden;
   border-radius: var(--radius-lg);
-  border: 1px dashed var(--accent-primary);
+  border: 1px solid var(--border);
 }
 
-/* Over the preview's corner */
-.expand {
+/* Over the preview's corner, on a translucent square so it reads on any
+   preview. Two classes to win over the icon button's styles */
+.container .expand {
   position: absolute;
   top: var(--space-2);
   right: var(--space-2);
+  background-color: color-mix(
+    in srgb,
+    var(--background-primary) 70%,
+    transparent
+  );
+  color: var(--font-primary);
+}
+
+.container .expand:hover:not(:disabled) {
+  background-color: var(--background-primary);
 }
 
 /* The whole field copies the URL. Two classes to win over Btn's styles */
@@ -72,7 +86,7 @@
   gap: var(--space-3);
   width: 100%;
   padding: 0 var(--space-3);
-  border-color: var(--background-secondary);
+  border-color: var(--border);
   background-color: var(--background-secondary);
   color: var(--font-secondary);
   font-size: var(--font-sm);
@@ -82,11 +96,13 @@
 .container .url:hover:not(:disabled) {
   border-color: var(--background-secondary-hover);
   background-color: var(--background-secondary);
-  color: var(--font-primary);
+  color: var(--font-secondary);
 }
 
 .url_text {
   min-width: 0;
+  text-align: left;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }

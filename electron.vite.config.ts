@@ -70,6 +70,8 @@ export default defineConfig({
       __APP_VERSION__: JSON.stringify(version),
     },
     build: {
+      // Vite inlines small files as data: URLs, which the CSP blocks for fonts
+      assetsInlineLimit: 0,
       rollupOptions: {
         input: {
           index: resolve("src/renderer/index.html"),

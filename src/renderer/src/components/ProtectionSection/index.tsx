@@ -28,7 +28,7 @@ export function ProtectionSection({
   return (
     <Section
       title="Protection"
-      description={`Set limits and word filters to prevent chat from abusing the ${feature} system.`}
+      description={`Limits that keep chat from flooding ${feature}.`}
     >
       <FormGrid>
         <Field label="Cooldown" hint="(seconds)">

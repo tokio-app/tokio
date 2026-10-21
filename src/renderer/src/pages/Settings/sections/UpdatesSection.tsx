@@ -11,7 +11,7 @@ export function UpdatesSection({ enabled, onChange }: Props) {
     <Section
       icon={<FiDownloadCloud />}
       title="Updates"
-      description="Tokio looks for new releases on startup and every few hours. You can always check from About."
+      description="Checked on startup and every few hours."
     >
       <Check
         label="Check for updates automatically"

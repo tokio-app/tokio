@@ -19,10 +19,7 @@ interface Props {
 
 export function ControlsSection({ controls, update }: Props) {
   return (
-    <Section
-      title="Controls"
-      description="Manage the chat commands used to control music playback."
-    >
+    <Section title="Controls" description="Chat commands for playback.">
       <div className={styles.controls}>
         {CONTROLS.map(({ key, label }) => (
           <div key={key} className={styles.control}>

@@ -1,6 +1,7 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { defaultProfile, defaultStoreData } from "@/common/util";
 import { Page } from "@/components";
+import { cx } from "@/helper";
 import { useImmerState, useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
 import styles from "./home.module.css";
@@ -97,7 +98,7 @@ export function Home() {
       )}
 
       <Page width="wide">
-        <div className={styles.dashboard}>
+        <div className={cx(styles.dashboard, connected && styles.live)}>
           <div className={styles.column}>
             <DashboardSection
               username={username}

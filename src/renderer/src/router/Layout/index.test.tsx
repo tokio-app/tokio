@@ -143,6 +143,20 @@ describe("Layout", () => {
     expect(titleBar().queryByText("Horror")).not.toBeInTheDocument();
   });
 
+  // On screen it's a line; screen readers get the word
+  it("marks the title bar LIVE while connected, on any page", async () => {
+    await renderApp("/settings");
+    expect(titleBar().queryByText("LIVE")).not.toBeInTheDocument();
+
+    const stats = { views: 0, viewers: 0, likes: 0 };
+    await send(APP_EVENTS_RESPONSE.CONNECTED, { success: true, stats });
+    expect(titleBar().getByText("LIVE")).toBeInTheDocument();
+
+    // Main sends this when the LIVE ends, is lost, or the user disconnects
+    await send(APP_EVENTS_RESPONSE.CONNECTED, { success: false, stats });
+    expect(titleBar().queryByText("LIVE")).not.toBeInTheDocument();
+  });
+
   it("shows the update button once an update is ready", async () => {
     await renderApp();
     expect(

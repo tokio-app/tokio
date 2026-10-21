@@ -140,7 +140,7 @@ export function OverlayModal({
 
         {settings == null ? (
           <div className={styles.loading}>
-            <MoonLoader color="var(--accent-primary)" size={60} />
+            <MoonLoader color="var(--font-secondary)" size={60} />
           </div>
         ) : (
           <div className={styles.settings}>

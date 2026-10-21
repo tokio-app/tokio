@@ -1,3 +1,4 @@
+@import "@fontsource-variable/archivo/wdth.css";
 @import "./tokens.css";
 
 *,
@@ -30,22 +31,10 @@ body,
 body {
   background-color: var(--background-primary);
   color: var(--font-primary);
-  line-height: 1.6;
+  font-family: var(--font-family);
+  font-size: var(--font-md);
+  line-height: 1.5;
   user-select: none;
-  font-family:
-    Inter,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    "Fira Sans",
-    "Droid Sans",
-    "Helvetica Neue",
-    sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -61,8 +50,21 @@ textarea {
   font-family: inherit;
 }
 
+/* Controls that don't draw their own focus, such as buttons and links */
+:focus-visible {
+  outline: 2px solid var(--accent-primary-hover);
+  outline-offset: 2px;
+}
+
+/* Ash, not muted: a placeholder is often the field's only label */
+::placeholder {
+  color: var(--font-secondary);
+  opacity: 1;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -70,12 +72,14 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--accent-primary);
-  border-radius: var(--radius-xl);
+  border: 2px solid transparent;
+  border-radius: var(--radius-full);
+  background-color: var(--background-secondary-hover);
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--accent-primary-hover);
+  background-color: var(--font-secondary);
 }
 
 input[type="number"]::-webkit-inner-spin-button,

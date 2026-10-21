@@ -7,7 +7,7 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: var(--space-8) var(--space-6);
+  gap: var(--space-6);
 }
 
 /* While the official overlays load */
@@ -22,17 +22,21 @@
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
 }
 
-/* Sized like the live previews, with a solid border since it's a picture */
+/* Sized like the live previews */
 .preview {
   display: flex;
   align-items: center;
   justify-content: center;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border: 1px solid var(--background-secondary);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   background-color: var(--background-primary);
   color: var(--font-secondary);
 }
@@ -73,7 +77,6 @@
   gap: var(--space-1);
   color: var(--font-secondary);
   font-size: var(--font-xs);
-  font-weight: 500;
 }
 
 .actions {
@@ -87,9 +90,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  color: var(--success);
+  color: var(--font-secondary);
   font-size: var(--font-sm);
-  font-weight: 500;
 }
 
 .description {

@@ -1,31 +1,66 @@
 .bar {
   flex-shrink: 0;
-  height: 56px;
+  height: 44px;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: var(--background-secondary);
-  border-bottom: 1px solid var(--background-primary);
+  background-color: var(--background-primary);
+  border-bottom: 1px solid var(--border);
+  position: relative;
   -webkit-app-region: drag;
 }
 
+/* TITLE_BAR_HEIGHT in src/main/services/music/common matches it */
 .compact {
   height: 40px;
 }
 
-.logo {
-  width: 32px;
-  height: 32px;
-  margin-left: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* On air: a rose line at the top's center, fading out to both sides */
+.bar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-primary) 35%,
+    var(--accent-primary) 65%,
+    transparent
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
 }
 
-.logo img {
-  width: 28px;
-  height: 28px;
+.live::before {
+  opacity: 1;
+}
+
+/* The logo is centered over the main window's sidebar */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: calc((var(--rail-width) - 24px) / 2);
+}
+
+.logo {
+  width: 24px;
+  height: 24px;
+}
+
+/* Only screen readers get it */
+.live_label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .items {
@@ -48,14 +83,29 @@
   height: 100%;
   background-color: transparent;
   border: none;
-  color: var(--font-primary);
+  color: var(--font-secondary);
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .control:hover {
-  background-color: var(--background-secondary-hover);
+  background-color: var(--background-secondary);
+  color: var(--font-primary);
 }
 
 .close:hover {
   background-color: var(--danger);
+}
+
+/* Inside, since the controls touch the window's edges */
+.control:focus-visible {
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar::before {
+    transition: none;
+  }
 }

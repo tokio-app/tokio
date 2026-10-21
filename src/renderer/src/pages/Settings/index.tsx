@@ -68,7 +68,7 @@ export function Settings() {
         />
       )}
 
-      <Page>
+      <Page width="wide" layout="aside">
         {/* First: connecting needs its key */}
         <ProvidersSection settings={store.settings} />
 

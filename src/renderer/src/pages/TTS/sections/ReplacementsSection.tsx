@@ -15,7 +15,7 @@ export function ReplacementsSection({ replacements, update }: Props) {
   return (
     <Section
       title="Replacements"
-      description="Force the engine to pronounce acronyms or slang correctly."
+      description="Words to pronounce differently, like brb."
       actions={
         <Btn
           variant="icon"
@@ -26,7 +26,7 @@ export function ReplacementsSection({ replacements, update }: Props) {
             })
           }
         >
-          <FiPlus size={24} />
+          <FiPlus size={20} />
         </Btn>
       }
     >

@@ -4,14 +4,15 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-8);
+  gap: var(--space-6);
 }
 
 .queue_length {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: var(--font-md);
+  gap: var(--space-3);
+  font-size: var(--font-sm);
+  font-weight: 500;
   color: var(--font-primary);
 }
 
@@ -22,24 +23,43 @@
 /* ITEMS */
 
 .items {
-  /* Shared with AlertItem rows */
-  --alerts-columns: 100px 50px 200px 200px 200px 200px;
+  /* Shared with AlertItem rows: 1040px page - 34px panel padding and border */
+  --alerts-columns: 88px 44px repeat(4, minmax(0, 1fr));
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
+}
+
+/* The panel frames the empty state already */
+.items > p {
+  border: none;
+  border-radius: 0;
 }
 
 .columns {
   display: grid;
   grid-template-columns: var(--alerts-columns);
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   height: var(--control-height);
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--background-secondary);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
 }
 
 .column {
-  text-align: center;
-  font-size: var(--font-md);
+  font-size: var(--font-xs);
   font-weight: 500;
+  color: var(--font-secondary);
+}
+
+/* Centered over the buttons and the toggle, at the text's start over fields */
+.column:nth-child(-n + 2) {
+  text-align: center;
+}
+
+.column:nth-child(n + 3):not(:last-child) {
+  padding-left: var(--space-3);
 }

@@ -64,7 +64,7 @@ export function DashboardSection({
         </p>
       }
     >
-      <div className={cx(styles.connect, connected && styles.connect_live)}>
+      <div className={styles.connect}>
         <Input
           className={styles.username}
           placeholder="@username"

@@ -40,10 +40,14 @@ export function OverlaysSection() {
       <Section
         icon={<VscPackage />}
         title="Imported Overlays"
-        description="Overlays you imported. Removing one deletes it and its settings."
+        description="Removing one deletes its settings too."
         actions={
-          <Btn onClick={() => window.api.emit(APP_EVENTS.IMPORT_OVERLAY)}>
-            <LuPackagePlus /> Import
+          <Btn
+            variant="icon"
+            title="Import"
+            onClick={() => window.api.emit(APP_EVENTS.IMPORT_OVERLAY)}
+          >
+            <LuPackagePlus size={20} />
           </Btn>
         }
       >
