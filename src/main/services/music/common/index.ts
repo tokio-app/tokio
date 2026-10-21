@@ -14,6 +14,7 @@ export { MusicQueue } from "./queue";
 export type ConnectionResponse = { success: boolean; error?: Error };
 
 export abstract class MusicProvider {
+  protected _logFile = "";
   public abstract setKey(key: string): void;
   public abstract connect(): Promise<ConnectionResponse>;
   public abstract disconnect(): void;
@@ -29,6 +30,11 @@ export abstract class MusicProvider {
     event: K,
     listener: (data: TokioEventMap[K]) => void,
   ): void;
+
+  // The service's log file, for what fails in the background.
+  public setLogFile(logFile: string) {
+    this._logFile = logFile;
+  }
 }
 
 export function createWindow() {

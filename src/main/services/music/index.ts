@@ -36,6 +36,11 @@ export class MusicService extends ProviderService<MusicProvider> {
     this.addProvider("Spotify", new Spotify());
   }
 
+  public override setLogFile(logFile: string): void {
+    super.setLogFile(logFile);
+    this._providerPool?.forEach((provider) => provider.setLogFile(logFile));
+  }
+
   protected override _validProvider(provider: MusicProvider): boolean {
     return provider instanceof MusicProvider;
   }

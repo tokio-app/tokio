@@ -1,4 +1,5 @@
 import { SongInfo, TOKIO_EVENTS } from "@/common/types";
+import Logger from "@/logger";
 import { cancelableEvent, views, windows } from "@test/electron";
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -489,17 +490,49 @@ describe("Spotify", () => {
       ]);
     });
 
-    it("asks to reconnect when the refresh fails", async () => {
+    it("asks to reconnect and ends the session when the refresh is refused", async () => {
       const fetch = stubFetch({
         api: () => apiError(401, "The access token expired"),
         refresh: () => json({ error: "invalid_grant" }, 400),
+      });
+      const spotify = await login();
+      const ended = vi.fn();
+      spotify.on(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, ended);
+
+      await expect(spotify.searchSong("song")).rejects.toThrow(
+        "Token expired and auto-refresh failed. Please reconnect.",
+      );
+      expect(apiRequests(fetch)).toHaveLength(1);
+      expect(spotify.isActive()).toBe(false);
+      expect(ended).toHaveBeenCalledOnce();
+    });
+
+    it("keeps the session when the token server fails", async () => {
+      stubFetch({
+        api: () => apiError(401, "The access token expired"),
+        refresh: () => json({ error: "server_error" }, 500),
       });
       const spotify = await login();
 
       await expect(spotify.searchSong("song")).rejects.toThrow(
         "Token expired and auto-refresh failed. Please reconnect.",
       );
-      expect(apiRequests(fetch)).toHaveLength(1);
+      expect(spotify.isActive()).toBe(true);
+    });
+
+    it("shares one refresh between requests that expire together", async () => {
+      const fetch = stubFetch({
+        api: (_path, init) =>
+          new Headers(init.headers).get("Authorization") === "Bearer access"
+            ? apiError(401, "The access token expired")
+            : json({ tracks: { items: [track] } }),
+      });
+      const spotify = await login();
+
+      await expect(
+        Promise.all([spotify.searchSong("a"), spotify.searchSong("b")]),
+      ).resolves.toEqual([parsed, parsed]);
+      expect(refreshes(fetch)).toHaveLength(1);
     });
 
     it("asks to reconnect when the token expires again after a refresh", async () => {
@@ -540,6 +573,24 @@ describe("Spotify", () => {
       await expect(spotify.searchSong("song")).rejects.toThrow(
         "Rate Limit Hit. Wait 60 seconds.",
       );
+    });
+
+    it("sends nothing until the wait after a 429 is over", async () => {
+      const fetch = stubFetch({
+        api: () => apiError(429, "Too many requests", { "Retry-After": "7" }),
+      });
+      const spotify = await login();
+      await expect(spotify.searchSong("song")).rejects.toThrow("Wait 7");
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(spotify.searchSong("song")).rejects.toThrow(
+        "Rate Limit Hit. Wait 6 seconds.",
+      );
+      expect(apiRequests(fetch)).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(6000);
+      await expect(spotify.searchSong("song")).rejects.toThrow("Wait 7");
+      expect(apiRequests(fetch)).toHaveLength(2);
     });
 
     it("uses the API's message for other errors", async () => {
@@ -643,6 +694,18 @@ describe("Spotify", () => {
       expect(devicesListed(fetch)).toBe(2);
     });
 
+    it("lists the devices again after a new login", async () => {
+      const fetch = stubFetch({ api: devicesAnd() });
+      const spotify = await login();
+      await spotify.play(parsed);
+
+      spotify.disconnect();
+      await login(spotify);
+      await spotify.play(parsed);
+
+      expect(devicesListed(fetch)).toBe(2);
+    });
+
     it("does nothing while inactive", async () => {
       const fetch = stubFetch({ api: devicesAnd() });
 
@@ -686,6 +749,41 @@ describe("Spotify", () => {
 
       expect(refreshes(fetch)).toHaveLength(1);
     });
+
+    it("logs a refresh that fails, and ends the session when it's refused", async () => {
+      stubFetch({ refresh: () => json({ error: "invalid_grant" }, 400) });
+      const logError = vi.spyOn(Logger, "error").mockImplementation(() => {});
+      const spotify = await login();
+      spotify.setLogFile("music.log");
+
+      await vi.advanceTimersByTimeAsync((3600 - 60) * 1000);
+
+      expect(logError).toHaveBeenCalledExactlyOnceWith(
+        expect.stringContaining("<Music> Unable to refresh the Spotify token"),
+        "music.log",
+        expect.any(Error),
+      );
+      expect(spotify.isActive()).toBe(false);
+    });
+  });
+
+  it("gives every request a timeout of its own", async () => {
+    let expired = true;
+    const fetch = stubFetch({
+      api: () => {
+        if (!expired) return json({ tracks: { items: [track] } });
+        expired = false;
+        return apiError(401, "The access token expired");
+      },
+    });
+    const spotify = await login();
+
+    await spotify.searchSong("song");
+
+    // The code exchange, the request, the refresh and the retry
+    const signals = fetch.mock.calls.map(([, init]) => init?.signal);
+    expect(signals).toEqual(Array(4).fill(expect.any(AbortSignal)));
+    expect(new Set(signals).size).toBe(4);
   });
 
   describe("disconnect", () => {
@@ -748,7 +846,6 @@ describe("Spotify", () => {
       expect(vi.getTimerCount()).toBe(0);
       await vi.advanceTimersByTimeAsync(3600 * 1000);
       expect(refreshes(fetch)).toEqual([]);
-      expect(console.error).not.toHaveBeenCalled();
     });
 
     it("doesn't bring the session back when a refresh finishes after it", async () => {

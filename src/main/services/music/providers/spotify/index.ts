@@ -4,6 +4,8 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
+import { formatError } from "@/common/util";
+import Logger from "@/logger";
 import crypto from "crypto";
 import { BrowserWindow, WebContentsView } from "electron";
 import { EventEmitter } from "node:events";
@@ -22,6 +24,10 @@ export class Spotify extends MusicProvider {
   private _refreshTimeout: NodeJS.Timeout | null = null;
   // Counts disconnects, so a refresh that ends after one is dropped
   private _session = 0;
+  // The refresh in flight, which requests that expire together share
+  private _refreshing: Promise<void> | null = null;
+  // When a 429 lets requests through again
+  private _retryAt = 0;
   // The login window of the last connect
   private _authWindow: BrowserWindow | null = null;
   private _events: EventEmitter;
@@ -195,8 +201,10 @@ export class Spotify extends MusicProvider {
     if (this._refreshTimeout) clearTimeout(this._refreshTimeout);
     this._refreshTimeout = null;
     this._session++;
+    this._refreshing = null;
     this._accessToken = null;
     this._refreshToken = null;
+    this._cachedDeviceId = null;
     this._isActive = false;
     this.emit(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED);
   }
@@ -285,6 +293,7 @@ export class Spotify extends MusicProvider {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
+      signal: AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
     });
 
     const data = await response.json();
@@ -298,7 +307,17 @@ export class Spotify extends MusicProvider {
     }
   }
 
-  private async refreshAccessToken(): Promise<void> {
+  private refreshAccessToken(): Promise<void> {
+    if (!this._refreshing) {
+      const refresh = this._refresh().finally(() => {
+        if (this._refreshing === refresh) this._refreshing = null;
+      });
+      this._refreshing = refresh;
+    }
+    return this._refreshing;
+  }
+
+  private async _refresh(): Promise<void> {
     if (!this._refreshToken) throw new Error("No refresh token available.");
     const session = this._session;
 
@@ -312,9 +331,13 @@ export class Spotify extends MusicProvider {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
+      signal: AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
     });
 
     if (!response.ok) {
+      // A refused refresh token ends the session, a server error keeps it.
+      const refused = response.status === 400 || response.status === 401;
+      if (refused && session === this._session) this.disconnect();
       throw new Error("Failed to refresh token. Session may be revoked.");
     }
 
@@ -336,8 +359,12 @@ export class Spotify extends MusicProvider {
 
     this._refreshTimeout = setTimeout(
       () => {
-        this.refreshAccessToken().catch((err) =>
-          console.error("Auto-refresh failed:", err),
+        this.refreshAccessToken().catch((error) =>
+          Logger.error(
+            `<Music> Unable to refresh the Spotify token -- ${formatError(error)}`,
+            this._logFile,
+            error,
+          ),
         );
       },
       refreshMs > 0 ? refreshMs : 0,
@@ -348,6 +375,10 @@ export class Spotify extends MusicProvider {
     if (!this._accessToken)
       throw new Error("Not authenticated. Call authenticate() first.");
 
+    const wait = Math.ceil((this._retryAt - Date.now()) / 1000);
+    if (wait > 0) throw new Error(`Rate Limit Hit. Wait ${wait} seconds.`);
+
+    // Each try gets its own timeout
     const makeRequest = () =>
       fetch(`https://api.spotify.com/v1${endpoint}`, {
         method,
@@ -356,6 +387,7 @@ export class Spotify extends MusicProvider {
           "Content-Type": "application/json",
         },
         body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
       });
 
     let response = await makeRequest();
@@ -376,7 +408,8 @@ export class Spotify extends MusicProvider {
     if (response.status === 403)
       throw new Error("Premium Required or user not whitelisted.");
     if (response.status === 429) {
-      const retryAfter = response.headers.get("Retry-After") || "60";
+      const retryAfter = Number(response.headers.get("Retry-After")) || 60;
+      this._retryAt = Date.now() + retryAfter * 1000;
       throw new Error(`Rate Limit Hit. Wait ${retryAfter} seconds.`);
     }
 

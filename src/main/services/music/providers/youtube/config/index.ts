@@ -10,4 +10,5 @@ export default {
     "https://accounts.google.com/ServiceLogin?ltmpl=music&service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F",
   LOGIN_CHECK_ATTEMPTS: 3,
   LOGIN_CHECK_INTERVAL_MS: 1500,
+  REQUEST_TIMEOUT_MS: 15_000,
 };

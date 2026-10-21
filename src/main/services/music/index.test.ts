@@ -479,6 +479,15 @@ describe("MusicService", () => {
       provider.isActive.mockReturnValue(true);
       expect(service.isActive()).toBe(true);
     });
+
+    it("gives its log file to the providers", () => {
+      const { service, provider } = setup();
+      const setLogFile = vi.spyOn(provider, "setLogFile");
+
+      service.setLogFile("music.log");
+
+      expect(setLogFile).toHaveBeenCalledExactlyOnceWith("music.log");
+    });
   });
 
   describe("errors", () => {

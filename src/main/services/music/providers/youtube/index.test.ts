@@ -129,6 +129,7 @@ describe("YouTubeMusic", () => {
       const [url, init] = fetch.mock.calls[0];
       expect(url).toBe(config.SEARCH_ENDPOINT);
       expect(init?.method).toBe("POST");
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
       expect(new Headers(init?.headers).get("Content-Type")).toBe(
         "application/json",
       );

@@ -281,6 +281,7 @@ export class YouTubeMusic extends MusicProvider {
         Origin: config.YTM_URL,
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
     });
 
     if (!response.ok) {
