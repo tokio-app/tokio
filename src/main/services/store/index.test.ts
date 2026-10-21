@@ -250,6 +250,33 @@ describe("StoreManagerService", () => {
     });
   });
 
+  describe("saving", () => {
+    it("saves one at a time, so two saves can't mix in the file", async () => {
+      const store = await init();
+      const save = json.saveFile.bind(json);
+      let running = 0;
+      let most = 0;
+      vi.spyOn(json, "saveFile").mockImplementation(async (...args) => {
+        most = Math.max(most, ++running);
+        try {
+          return await save(...args);
+        } finally {
+          running--;
+        }
+      });
+
+      await Promise.all([
+        store.updateServerSettings(true),
+        store.updateUpdatesSettings(false),
+      ]);
+
+      expect(most).toBe(1);
+      const { settings } = await readJSON(storeFile);
+      expect(settings.server.enabled).toBe(true);
+      expect(settings.updates.auto).toBe(false);
+    });
+  });
+
   describe("getSettings", () => {
     it("decrypts keys and lists registered providers that were never saved", async () => {
       const store = await init();

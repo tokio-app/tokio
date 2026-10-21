@@ -48,6 +48,8 @@ export class StoreManagerService extends Service {
   private _rebuilt = false;
   // Emote saves run one after another, so one doesn't drop another's emotes.
   private _emoteSave: Promise<unknown> = Promise.resolve();
+  // The store's own saves, chained by _queueSave. _save never rejects.
+  private _saving: Promise<void> = Promise.resolve();
   // Emotes whose image was already compared since the app started
   private _checkedEmotes = new Set<string>();
 
@@ -814,7 +816,14 @@ export class StoreManagerService extends Service {
       throw new Error("StoreManagerService is not initialized.");
   }
 
-  private async _queueSave() {
+  // Saves write the same temporary file, so they run one after another.
+  private _queueSave() {
+    const save = this._saving.then(() => this._save());
+    this._saving = save;
+    return save;
+  }
+
+  private async _save() {
     try {
       await this._jsonManagerService.saveFile(
         this._storeFilePath,
