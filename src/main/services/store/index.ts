@@ -637,7 +637,8 @@ export class StoreManagerService extends Service {
     );
   }
 
-  // Under the name of its file, or a free one when a profile has it.
+  // Copied to a free file named after its file, and listed under its own
+  // name, numbered when another profile has it.
   public async importProfile(ref: string): Promise<boolean> {
     this._ensureInitialized();
     if (!ref) return false;
@@ -735,7 +736,7 @@ export class StoreManagerService extends Service {
     ref: string,
     file: string,
     destFolder: string,
-    schema: any,
+    schema: typeof ProfileSchema,
     typeName: string,
   ): Promise<EntityMetadata | null> {
     if (!ref) return null;
@@ -755,11 +756,11 @@ export class StoreManagerService extends Service {
       return null;
     }
 
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      schema,
-      existingData,
-    );
+    const name = this._freeProfileName(existingData.name.trim());
+    const saved = await this._jsonManagerService.saveFile(newPath, schema, {
+      ...existingData,
+      name,
+    });
     if (!saved) {
       Logger.error(
         `<System> Failed to write imported ${typeName} file: ${newPath}`,
@@ -768,8 +769,18 @@ export class StoreManagerService extends Service {
       return null;
     }
 
-    const name = cleanText(file.split(".")[0]).replace(/[_.-]/g, " ");
     return { file, name };
+  }
+
+  // `name`, or `name 2` and on when a profile has it, compared as the
+  // settings events do: trimmed and in any case.
+  private _freeProfileName(name: string): string {
+    const taken = new Set(
+      this._storeData!.profiles.map((p) => p.name.trim().toLowerCase()),
+    );
+    let free = name;
+    for (let n = 2; taken.has(free.toLowerCase()); n++) free = `${name} ${n}`;
+    return free;
   }
 
   public async addProfile(

@@ -734,19 +734,20 @@ describe("StoreManagerService", () => {
       expect(error).toHaveBeenCalled();
     });
 
-    it("imports a profile and lists it under its file's name", async () => {
+    it("imports a profile and lists it under its own name", async () => {
       const store = await init();
+      const profile = { ...defaultProfile, name: "  Night Stream " };
 
-      expect(await store.importProfile(await shared("Night_Stream.json"))).toBe(
+      expect(await store.importProfile(await shared("ab.json", profile))).toBe(
         true,
       );
 
       expect(store.getProfiles()).toContainEqual({
-        file: "Night_Stream.json",
-        name: "night stream",
+        file: "ab.json",
+        name: "Night Stream",
       });
-      const copy = join(paths.folders.profilesFolder, "Night_Stream.json");
-      expect((await readJSON(copy)).name).toBe("Shared");
+      const copy = join(paths.folders.profilesFolder, "ab.json");
+      expect((await readJSON(copy)).name).toBe("Night Stream");
     });
 
     it("refuses a file that isn't a Tokio profile", async () => {
@@ -759,21 +760,27 @@ describe("StoreManagerService", () => {
       expect(store.getProfiles()).toHaveLength(1);
     });
 
-    it("imports under a free file name instead of overwriting", async () => {
+    it("imports under a free file and a free name instead of overwriting", async () => {
       const store = await init();
       await store.updateProfileData({ connector: { username: "streamer" } });
+      const copy = await shared("default.json", {
+        ...defaultProfile,
+        name: "default",
+      });
 
-      expect(await store.importProfile(await shared("default.json"))).toBe(
-        true,
-      );
+      expect(await store.importProfile(copy)).toBe(true);
+      expect(await store.importProfile(copy)).toBe(true);
 
       expect((await readJSON(defaultProfileFile)).connector.username).toBe(
         "streamer",
       );
-      expect(store.getProfiles()).toContainEqual({
-        file: "default-2.json",
-        name: "default 2",
-      });
+      expect(store.getProfiles()).toEqual([
+        defaultStoreData.profiles[0],
+        { file: "default-2.json", name: "default 2" },
+        { file: "default-3.json", name: "default 3" },
+      ]);
+      const third = join(paths.folders.profilesFolder, "default-3.json");
+      expect((await readJSON(third)).name).toBe("default 3");
     });
   });
 
