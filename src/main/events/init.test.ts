@@ -690,6 +690,7 @@ describe("init events", () => {
 
     it("stops music requests, TTS and alerts, and resets the stats", async () => {
       const s = await live();
+      s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(10, 1));
 
       s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
 
@@ -701,6 +702,9 @@ describe("init events", () => {
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
         { success: false, stats: noStats },
       ]);
+      expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith(
+        noStats,
+      );
     });
 
     it("says when the LIVE has ended", async () => {

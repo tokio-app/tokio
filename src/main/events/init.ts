@@ -229,6 +229,7 @@ const registerConnectorEvents = ({
     sendViews.cancel();
     sendLikes.cancel();
     sendSession.cancel();
+    store.updateLiveStats({ likes: 0, viewers: 0, views: 0 });
     live.end();
     pushSession();
     music.clearHandler();
