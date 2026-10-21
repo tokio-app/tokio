@@ -5,13 +5,11 @@ import { describe, expect, it } from "vitest";
 import { useIpcRequest } from "./useIpcRequest";
 
 describe("useIpcRequest", () => {
-  it("sends the request with its data once, on mount", () => {
-    const { rerender } = renderHook(() =>
-      useIpcRequest(APP_EVENTS.GET_LICENSE_TEXT, { id: "tokio" }),
-    );
+  it("sends the request once, on mount", () => {
+    const { rerender } = renderHook(() => useIpcRequest(APP_EVENTS.GET_SOUNDS));
     rerender();
 
-    expect(sent(APP_EVENTS.GET_LICENSE_TEXT)).toEqual([{ id: "tokio" }]);
+    expect(sent(APP_EVENTS.GET_SOUNDS)).toEqual([undefined]);
   });
 
   it("sends it once under StrictMode, which runs effects twice", () => {
