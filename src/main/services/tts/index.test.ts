@@ -218,6 +218,28 @@ describe("TTSService", () => {
       expect(await say("no secrets", s)).toHaveLength(1);
     });
 
+    it("drops banned words in other letters, accents or hidden characters", async () => {
+      const s = settings((s) => {
+        s.protection.banned = ["idiot", "Ídolo"];
+      });
+
+      expect(await say("you ｉｄｉｏｔ", s)).toEqual([]);
+      expect(await say("you i\u200Bdiot", s)).toEqual([]);
+      expect(await say("you ídíot", s)).toEqual([]);
+      expect(await say("mi idolo", s)).toEqual([]);
+      expect(await say("you idol", s)).toHaveLength(1);
+    });
+
+    it("drops banned emojis, never matching an empty entry", async () => {
+      const s = settings((s) => {
+        s.protection.banned = ["🍆", "❤️", "", "\u0301"];
+      });
+
+      expect(await say("look 🍆", s)).toEqual([]);
+      expect(await say("I ❤️ you", s)).toEqual([]);
+      expect(await say("hello 🌸", s)).toHaveLength(1);
+    });
+
     it("drops comments from names with banned words", async () => {
       const s = settings((s) => {
         s.protection.banned = ["slur"];

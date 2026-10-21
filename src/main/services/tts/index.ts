@@ -18,6 +18,14 @@ import { EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
 // after this long, like the ones it had when it reloaded or crashed.
 const HOLD_TIMEOUT_MS = 2 * 60_000;
 
+// Without accents, invisible characters or styled letters ("ｉｄｉｏｔ"), so a
+// banned word can't hide behind them.
+const fold = (text: string) =>
+  text
+    .normalize("NFKD")
+    .replace(/[\p{M}\p{Cf}]/gu, "")
+    .toLowerCase();
+
 // Every provider is an engine, and voices name the engine that speaks them.
 // The active provider only speaks voices with no engine, or an unknown one.
 export class TTSService extends ProviderService<TTSProvider> {
@@ -132,10 +140,11 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   private _hasBanned(text: string, settings: Profile["tts"]) {
-    const lower = text.toLowerCase();
-    return settings.protection.banned.some((b) =>
-      lower.includes(b.toLowerCase()),
-    );
+    const folded = fold(text);
+    return settings.protection.banned.some((b) => {
+      const word = fold(b);
+      return word !== "" && folded.includes(word);
+    });
   }
 
   private _replace(text: string, settings: Profile["tts"]) {
