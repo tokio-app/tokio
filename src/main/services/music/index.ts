@@ -29,7 +29,7 @@ export class MusicService extends ProviderService<MusicProvider> {
       // too. Paused, it can't tell when the song ends. Times are in ms.
       remaining: async (song) => {
         const sent = Date.now();
-        const status = await this._current?.provider?.playerStatus();
+        const status = await this._current.provider.playerStatus();
         if (!status) return null;
         if (status.track !== song.track && status.title !== song.title) {
           return 0;
@@ -50,24 +50,14 @@ export class MusicService extends ProviderService<MusicProvider> {
   }
 
   public connect(): Promise<ConnectionResponse> {
-    if (!this._current?.provider)
-      return new Promise((r) =>
-        r({
-          success: false,
-          error: new Error("Music Provider not defined."),
-        }),
-      );
-
     return this._current.provider.connect();
   }
 
   public disconnect() {
-    if (!this._current?.provider) return;
     this._current.provider.disconnect();
   }
 
   public isActive() {
-    if (!this._current?.provider) return false;
     return this._current.provider.isActive();
   }
 
@@ -75,7 +65,6 @@ export class MusicService extends ProviderService<MusicProvider> {
     event: K,
     listener: (data: TokioEventMap[K]) => void,
   ): void {
-    if (!this._current?.provider) return;
     this._current.provider.on(event, listener);
     this._music_queue.on(event, listener);
   }
@@ -84,7 +73,7 @@ export class MusicService extends ProviderService<MusicProvider> {
     event: K,
     listener: (data: TokioEventMap[K]) => void,
   ): void {
-    this._current?.provider?.off(event, listener);
+    this._current.provider.off(event, listener);
     this._music_queue.off(event, listener);
   }
 
@@ -151,8 +140,6 @@ export class MusicService extends ProviderService<MusicProvider> {
   }
 
   private async play(query: string) {
-    if (!this._current?.provider) return;
-
     if (!this._music_queue.getQueueState().isPlaying) {
       const current = await this._current.provider.playerStatus();
       if (current && current.playing) {
@@ -164,27 +151,24 @@ export class MusicService extends ProviderService<MusicProvider> {
       }
     }
 
-    const info = await this._current?.provider.searchSong(query);
+    const info = await this._current.provider.searchSong(query);
 
     if (info === null) return;
 
     this._music_queue.enqueue(query, info, () =>
-      this._current?.provider?.play(info),
+      this._current.provider.play(info),
     );
   }
 
   private async next() {
-    if (!this._current?.provider) return;
     await this._music_queue.triggerNext();
   }
 
   private async previous() {
-    if (!this._current?.provider) return;
     await this._music_queue.triggerPrevious();
   }
 
   private async revoke(query: string) {
-    if (!this._current?.provider) return;
     this._music_queue.revoke(query);
   }
 
