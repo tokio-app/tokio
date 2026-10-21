@@ -98,18 +98,17 @@ test("sets the production CSP on the page loaded from disk", async () => {
   const policy = await page
     .locator('meta[http-equiv="Content-Security-Policy"]')
     .getAttribute("content");
-  const evalBlocked = await page.evaluate(() => {
-    try {
-      // oxlint-disable-next-line no-eval -- the CSP must block it
-      eval("1");
-      return false;
-    } catch {
-      return true;
-    }
+  // An inline script, which the policy refuses. Not eval: what Playwright
+  // evaluates goes through DevTools, which skips the policy's eval check.
+  const inlineRan = await page.evaluate(() => {
+    const script = document.createElement("script");
+    script.textContent = "window.inlineRan = true";
+    document.head.append(script);
+    return "inlineRan" in window;
   });
 
   expect(policy).toBe(CSP.prod);
-  expect(evalBlocked).toBe(true);
+  expect(inlineRan).toBe(false);
 });
 
 test("opens every page from the sidebar", async () => {
