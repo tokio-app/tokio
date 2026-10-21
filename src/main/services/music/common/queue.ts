@@ -74,10 +74,6 @@ export class MusicQueue {
     this._trimQueue();
   }
 
-  public getMaxSize(): number {
-    return this._maxSize;
-  }
-
   public on<K extends TOKIO_EVENTS>(
     event: K,
     listener: (data: TokioEventMap[K]) => void,
@@ -190,27 +186,9 @@ export class MusicQueue {
     }
   }
 
-  public async triggerAt(index: number) {
-    if (index >= 0 && index < this._queue.length) {
-      this.pause();
-      this._currentIndex = index;
-
-      await Promise.resolve();
-      this.play();
-    }
-  }
-
-  public triggerById(id: string) {
-    const index = this._queue.findIndex((item) => item.id === id);
-    if (index !== -1) {
-      this.triggerAt(index);
-    }
-  }
-
   public getQueueState() {
     return {
       isPlaying: this._isPlaying,
-      maxSize: this._maxSize,
     };
   }
 

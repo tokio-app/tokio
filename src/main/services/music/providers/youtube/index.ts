@@ -43,7 +43,7 @@ export class YouTubeMusic extends MusicProvider {
     return this._isActive;
   }
 
-  public connect(requireAuth: boolean = true): Promise<ConnectionResponse> {
+  public connect(): Promise<ConnectionResponse> {
     if (this._isActive) return Promise.resolve({ success: true });
     // A login still open from an earlier connect fails, so one window is left
     this.disconnect();
@@ -145,11 +145,6 @@ export class YouTubeMusic extends MusicProvider {
         if (!isInitializing) return;
 
         try {
-          if (!requireAuth) {
-            markReady();
-            return;
-          }
-
           const isStale = () =>
             generation !== checkGeneration ||
             !isInitializing ||

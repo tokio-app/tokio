@@ -250,17 +250,6 @@ describe("YouTubeMusic", () => {
       expect(windows()).toHaveLength(1);
     });
 
-    it("skips the login check without auth", async () => {
-      const provider = new YouTubeMusic();
-      const pending = provider.connect(false);
-      const view = ytView();
-
-      view.webContents.emit("did-finish-load");
-
-      await expect(pending).resolves.toEqual({ success: true });
-      expect(scripts(view, LoginJSCode)).toBe(0);
-    });
-
     it("sends a logged-out user to the login page once, then fails", async () => {
       const done = vi.fn();
       const { provider, pending, view, finishLoad } = open(() => false);

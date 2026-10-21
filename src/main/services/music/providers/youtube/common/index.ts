@@ -1,5 +1,6 @@
 import { SongInfo } from "@/common/types";
 import { delay } from "@/common/util";
+import config from "../config";
 
 export const PlayerStateJSCode = `
 (() => {
@@ -25,7 +26,7 @@ export const PlayerStateJSCode = `
     artist = artistNode?.textContent?.trim() ?? "";
 
     const rawImageSrc = imageNode?.src?.trim() ?? "";
-    thumbnail = rawImageSrc.replace(/=w\\d+-h\\d+.*$/, "=w480-h480-l90-rj");
+    thumbnail = rawImageSrc.replace(/=w\\d+-h\\d+.*$/, ${JSON.stringify(config.THUMBNAIL_SPEC)});
   }
 
   const title = name && artist ? \`\${name} - \${artist}\` : name || artist;
@@ -123,14 +124,6 @@ export async function confirmLoggedOut(
   return "logged-out";
 }
 
-export const YT_MUSIC_CONFIG = {
-  ENDPOINT: "https://music.youtube.com/youtubei/v1/search?prettyPrint=false",
-  SONG_FILTER_PARAMS: "EgWKAQIIAWoKEAkQBRAKEAMQBA==",
-  CLIENT_NAME: "WEB_REMIX",
-  CLIENT_VERSION: "1.20260928.13.00",
-  THUMBNAIL_SPEC: "=w480-h480-l90-rj",
-};
-
 export const TIME_REGEX = /^(\d+:)*\d+$/;
 
 export function parseDurationToSeconds(
@@ -153,7 +146,7 @@ export function parseDurationToSeconds(
 
 export function getHighResThumbnailUrl(url: string | undefined): string {
   if (!url) return "";
-  return url.replace(/=w\d+-h\d+.*$/, YT_MUSIC_CONFIG.THUMBNAIL_SPEC);
+  return url.replace(/=w\d+-h\d+.*$/, config.THUMBNAIL_SPEC);
 }
 
 export function parseSongRenderer(itemRenderer: any): SongInfo | null {

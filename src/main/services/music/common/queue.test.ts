@@ -225,7 +225,6 @@ describe("MusicQueue", () => {
 
       queue.setMaxSize(0);
 
-      expect(queue.getMaxSize()).toBe(1);
       expect(titles(queue)).toEqual(["a"]);
     });
   });
@@ -340,23 +339,6 @@ describe("MusicQueue", () => {
 
       expect(a).toHaveBeenCalledTimes(2);
       expect(playing(queue)).toBe("a");
-    });
-
-    it("jumps to a song by id and ignores unknown ids", async () => {
-      const queue = new MusicQueue();
-      const c = vi.fn();
-      queue.enqueue("a", song("a"), () => {});
-      queue.enqueue("b", song("b"), () => {});
-      queue.enqueue("c", song("c"), c);
-
-      queue.triggerById("missing");
-      await queue.triggerAt(5);
-      expect(playing(queue)).toBe("a");
-
-      queue.triggerById("c");
-      await vi.advanceTimersByTimeAsync(0);
-      expect(c).toHaveBeenCalledOnce();
-      expect(playing(queue)).toBe("c");
     });
 
     it("clear stops playback and empties the queue", async () => {
