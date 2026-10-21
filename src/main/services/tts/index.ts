@@ -60,7 +60,7 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   public setEngineKey(engine: string, key: string) {
-    this._providerPool?.get(engine)?.setKey(key);
+    this._providerPool?.get(engine)?.setKey(key.trim());
   }
 
   // The voices of every engine. An engine that fails is left out.

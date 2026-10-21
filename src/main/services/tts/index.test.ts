@@ -157,6 +157,14 @@ describe("TTSService", () => {
       expect(tiktok).toHaveBeenCalledExactlyOnceWith("session");
       expect(edge).not.toHaveBeenCalled();
     });
+
+    it("gives a key without the spaces around it", () => {
+      const tiktok = vi.spyOn(engine("Default"), "setKey");
+
+      service.setEngineKey("Default", " session\n");
+
+      expect(tiktok).toHaveBeenCalledExactlyOnceWith("session");
+    });
   });
 
   it("passes the profile's filters and queue options along", async () => {
