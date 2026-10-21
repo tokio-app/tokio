@@ -15,7 +15,6 @@
   font-size: var(--font-md);
   font-weight: 500;
   white-space: nowrap;
-  outline: none;
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
@@ -184,6 +183,11 @@
   transform: translateX(20px);
 }
 
+.toggle_input:focus-visible + .toggle_track {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 /* CHECK & TOGGLE END */
 
 /* RADIO START */
@@ -248,10 +252,6 @@
   width: 100%;
   margin: var(--space-2) 0;
   background: transparent;
-}
-
-.slider:focus {
-  outline: none;
 }
 
 .slider:disabled {

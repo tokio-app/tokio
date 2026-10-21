@@ -48,7 +48,6 @@
   height: 100%;
   background-color: transparent;
   border: none;
-  outline: none;
   color: var(--font-primary);
   cursor: pointer;
 }
