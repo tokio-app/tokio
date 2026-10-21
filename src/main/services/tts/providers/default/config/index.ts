@@ -5,6 +5,8 @@ export default {
   API_URL: "https://api16-normal-v6.tiktokv.com/media/api/text/speech/invoke",
   API_URL_ALT: "https://tiktok-tts.weilnet.workers.dev/api/generation",
   DEFAULT_VOICE: "en_us_001",
+  // A slow endpoint would otherwise hold the TTS queue
+  REQUEST_TIMEOUT_MS: 15_000,
   USER_AGENT,
   HEADERS: {
     "User-Agent": USER_AGENT,

@@ -9,7 +9,7 @@ const { post } = vi.hoisted(() => ({
     (
       url: string,
       body: unknown,
-      options: { headers: Record<string, string> },
+      options: { headers: Record<string, string>; timeout?: number },
     ) => Promise<{ data: unknown }>
   >(),
 }));
@@ -62,7 +62,7 @@ describe("TikTokTTS", () => {
       expect(post).toHaveBeenCalledExactlyOnceWith(
         config.API_URL_ALT,
         { text: "Hello there", voice: "en_us_002" },
-        { headers: config.HEADERS },
+        { headers: config.HEADERS, timeout: config.REQUEST_TIMEOUT_MS },
       );
     });
 
@@ -121,6 +121,7 @@ describe("TikTokTTS", () => {
         ...config.HEADERS,
         Cookie: "sessionid=session-123",
       });
+      expect(options.timeout).toBe(config.REQUEST_TIMEOUT_MS);
       expect(Object.fromEntries(lastUrl().searchParams)).toEqual({
         text_speaker: "en_us_002",
         req_text: "Hello there",

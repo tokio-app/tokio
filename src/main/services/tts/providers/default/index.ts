@@ -30,6 +30,7 @@ export class TikTokTTS extends TTSProvider {
         },
         {
           headers: config.HEADERS,
+          timeout: config.REQUEST_TIMEOUT_MS,
         },
       );
       if (!response.data.success) {
@@ -65,6 +66,7 @@ export class TikTokTTS extends TTSProvider {
           ...config.HEADERS,
           Cookie: `sessionid=${this.sessionId}`,
         },
+        timeout: config.REQUEST_TIMEOUT_MS,
       });
 
       this.checkStatusCode(response.data?.status_code);
