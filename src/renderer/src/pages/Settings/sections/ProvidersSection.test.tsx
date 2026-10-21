@@ -8,7 +8,7 @@ import { settingsReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { inList } from "@test/queries";
 import { renderWithProviders } from "@test/render";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Settings } from "..";
 
@@ -68,18 +68,24 @@ describe("ProvidersSection", () => {
     expect(keyInput()).toHaveValue("euler-key");
   });
 
-  it("saves the connector picked with its key", async () => {
+  it("saves the connector picked with its key, with no Save button", async () => {
     const { user, container } = await setup();
 
     await user.click(providers().getByText("Euler"));
     await user.click(inList(container, "Default")!);
     await user.clear(keyInput());
     await user.type(keyInput(), "new-key");
-    await user.click(providers().getByRole("button", { name: "Save" }));
 
-    expect(sent(APP_EVENTS.SET_PROVIDER)).toEqual([
-      { name: "Default", key: "new-key", type: "connector" },
-    ]);
+    await waitFor(() =>
+      expect(sent(APP_EVENTS.SET_PROVIDER).at(-1)).toEqual({
+        name: "Default",
+        key: "new-key",
+        type: "connector",
+      }),
+    );
+    expect(
+      providers().queryByRole("button", { name: "Save" }),
+    ).not.toBeInTheDocument();
   });
 
   it("starts over from the provider main saved", async () => {

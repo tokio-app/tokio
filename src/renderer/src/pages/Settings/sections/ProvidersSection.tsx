@@ -5,9 +5,9 @@ import {
   EULER_SIGNUP_URL,
   EULER_STREAM_URL,
 } from "@/common/util";
-import { Btn, Field, FormGrid, Input, Section, Select } from "@/components";
-import { useState } from "react";
-import { FiBox, FiSave } from "react-icons/fi";
+import { Field, FormGrid, Input, Section, Select } from "@/components";
+import { useAutosave } from "@/hooks";
+import { FiBox } from "react-icons/fi";
 import styles from "../settings.module.css";
 
 interface Props {
@@ -55,17 +55,13 @@ interface FormProps {
   active: AppProvider;
 }
 
+// Saved as it changes
 function ProviderForm({ type, label, providers, active }: FormProps) {
-  const [name, setName] = useState(active.name);
-  const [key, setKey] = useState(active.key);
-  const [prevActive, setPrevActive] = useState(active);
-
-  // Start over from the saved provider when it changes.
-  if (active !== prevActive) {
-    setPrevActive(active);
-    setName(active.name);
-    setKey(active.key);
-  }
+  const [provider, setProvider] = useAutosave(
+    { name: active.name, key: active.key },
+    ({ name, key }) =>
+      window.api.emit(APP_EVENTS.SET_PROVIDER, { name, key, type }),
+  );
 
   return (
     <div className={styles.provider}>
@@ -74,8 +70,8 @@ function ProviderForm({ type, label, providers, active }: FormProps) {
         <Field label={label}>
           <Select
             options={providers.map((p) => ({ label: p.name, value: p.name }))}
-            value={name}
-            onChange={setName}
+            value={provider.name}
+            onChange={(name) => setProvider((p) => ({ ...p, name }))}
           />
         </Field>
       )}
@@ -83,18 +79,13 @@ function ProviderForm({ type, label, providers, active }: FormProps) {
         <Input
           type="password"
           placeholder="Your API key..."
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
+          value={provider.key}
+          onChange={(e) => {
+            const key = e.target.value;
+            setProvider((p) => ({ ...p, key }));
+          }}
         />
       </Field>
-      <Btn
-        className={styles.provider_save}
-        onClick={() =>
-          window.api.emit(APP_EVENTS.SET_PROVIDER, { name, key, type })
-        }
-      >
-        <FiSave /> Save
-      </Btn>
     </div>
   );
 }

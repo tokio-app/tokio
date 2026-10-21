@@ -9,7 +9,6 @@ export enum FEEDBACK_CODES {
   PROFILE_SWITCHED = "profile_switched",
   PROFILE_IMPORTED = "profile_imported",
   PROFILE_EXPORTED = "profile_exported",
-  PROVIDER_UPDATED = "provider_updated",
   APP_LOAD_FAILED = "app_load_failed",
   SETTINGS_LOAD_FAILED = "settings_load_failed",
   SETTINGS_SAVE_FAILED = "settings_save_failed",

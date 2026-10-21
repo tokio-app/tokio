@@ -569,7 +569,8 @@ describe("settings events", () => {
   });
 
   describe("SET_PROVIDER", () => {
-    it("saves the provider, then sends the settings, the reply and a notice", async () => {
+    // Settings saves it as it's typed, so a success sends no notice
+    it("saves the provider, then sends the settings and the reply", async () => {
       const updateProvider = vi.fn(async () => true);
       const h = createHandler({
         storeManagerService: { ...profileStore(), updateProvider },
@@ -591,10 +592,34 @@ describe("settings events", () => {
           APP_EVENTS_RESPONSE.SET_PROVIDER,
           { type: "connector", success: true },
         ],
-        notice({
-          level: "success",
-          code: FEEDBACK_CODES.PROVIDER_UPDATED,
-          message: "Euler Stream API key saved.",
+      ]);
+    });
+
+    // The page puts the key main still holds back in the field
+    it("sends the settings main holds when the key can't be saved", async () => {
+      const h = createHandler({
+        storeManagerService: {
+          ...profileStore(),
+          updateProvider: vi.fn(async () => false),
+        },
+      });
+
+      await h.invoke(settings, APP_EVENTS.SET_PROVIDER, {
+        name: "Default",
+        key: "secret",
+        type: "connector",
+      });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
+        expect.objectContaining({ success: true }),
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_PROVIDER)).toEqual([
+        expect.objectContaining({ type: "connector", success: false }),
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
         }),
       ]);
     });
@@ -714,7 +739,8 @@ describe("settings events", () => {
       },
     );
 
-    it("saves a key, then sends the keys and a notice", async () => {
+    // Settings saves it as it's typed, so a success sends no notice
+    it("saves a key, then sends the reply and the keys", async () => {
       const { h, storeManagerService } = setup();
 
       const log = await run(h, APP_EVENTS.SET_VOICE_KEY, {
@@ -729,15 +755,32 @@ describe("settings events", () => {
       expect(log).toEqual([
         [APP_EVENTS_RESPONSE.SET_VOICE_KEY, { success: true }],
         [APP_EVENTS_RESPONSE.GET_VOICE_KEYS, keyed],
-        notice({
-          level: "success",
-          code: FEEDBACK_CODES.PROVIDER_UPDATED,
-          message: "Session ID saved for the TikTok voices.",
+      ]);
+    });
+
+    // The page puts the key main still holds back in the field
+    it("sends the keys main holds when a key can't be saved", async () => {
+      const { h, storeManagerService } = setup();
+      storeManagerService.updateVoiceKey.mockResolvedValue(false);
+
+      await h.invoke(settings, APP_EVENTS.SET_VOICE_KEY, {
+        engine: "Default",
+        key: "new-session",
+      });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_VOICE_KEYS)).toEqual([keyed]);
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_VOICE_KEY)).toEqual([
+        expect.objectContaining({ success: false }),
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
         }),
       ]);
     });
 
-    it("says the key was removed when it's empty", async () => {
+    it("removes the key when it's empty", async () => {
       const { h, storeManagerService } = setup();
 
       await h.invoke(settings, APP_EVENTS.SET_VOICE_KEY, {
@@ -749,12 +792,10 @@ describe("settings events", () => {
         "Default",
         "",
       );
-      expect(h.notices).toEqual([
-        expect.objectContaining({
-          level: "success",
-          message: "Session ID removed from the TikTok voices.",
-        }),
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_VOICE_KEY)).toEqual([
+        { success: true },
       ]);
+      expect(h.notices).toEqual([]);
     });
   });
 

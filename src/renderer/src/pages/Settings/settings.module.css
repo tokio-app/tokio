@@ -6,10 +6,6 @@
   gap: var(--space-4);
 }
 
-.provider_save {
-  align-self: flex-start;
-}
-
 .link {
   color: var(--accent-primary);
 }

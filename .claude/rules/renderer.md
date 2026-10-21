@@ -42,4 +42,7 @@ paths:
 - `useImmerState` returns an immer `Updater`; `scopeUpdater(update, key)` hands a section one field.
 - `useEditableSettings(section, onLoad?)` loads a profile section (TTS, Music, Alerts) and saves it 300ms after the last change, so quick changes go in one save. A change still waiting is sent when the page closes and dropped when another profile loads, and a failed save reloads the profile. Nothing is saved before a profile has loaded, so the defaults it starts from never reach one.
 - Main saves to whichever profile is active, so call `flushSettings()` before switching profiles: it sends the changes still waiting to the profile they were made on.
+- `useAutosave(saved, save)` does the same for one field outside the profile, such as the keys in Settings, which have no Save button.
+  - It saves 300ms after the last change, and sends a change still waiting when the field unmounts.
+  - It starts over when `saved` changes, except for main's echo of its own save, which would undo what was typed since.
 - Audio plays through named `AudioQueue`s (`helper/audio.ts`) from `useAudio().getQueue(name)`. `onEnded` doesn't run when a queue is stopped, and `maxQueueLength` counts waiting and playing items.

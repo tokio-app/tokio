@@ -1,8 +1,8 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceEngine } from "@/common/types";
-import { Btn, Field, FormGrid, Input, Section } from "@/components";
-import { useIpcListener, useIpcRequest } from "@/hooks";
+import { Field, FormGrid, Input, Section } from "@/components";
+import { useAutosave, useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
-import { FiKey, FiSave } from "react-icons/fi";
+import { FiKey } from "react-icons/fi";
 import styles from "../settings.module.css";
 
 type EngineKey = VoiceEngine & { key: string };
@@ -34,15 +34,14 @@ export function VoiceKeysSection() {
   );
 }
 
+// Saved as it changes; an empty key removes the saved one
 function KeyForm({ engine }: { engine: EngineKey }) {
-  const [key, setKey] = useState(engine.key);
-  const [prevKey, setPrevKey] = useState(engine.key);
-
-  // Start over from the saved key when it changes.
-  if (engine.key !== prevKey) {
-    setPrevKey(engine.key);
-    setKey(engine.key);
-  }
+  const [key, setKey] = useAutosave(engine.key, (value) =>
+    window.api.emit(APP_EVENTS.SET_VOICE_KEY, {
+      engine: engine.id,
+      key: value,
+    }),
+  );
 
   return (
     <div className={styles.provider}>
@@ -57,15 +56,6 @@ function KeyForm({ engine }: { engine: EngineKey }) {
           onChange={(e) => setKey(e.target.value)}
         />
       </Field>
-      <Btn
-        className={styles.provider_save}
-        disabled={key === engine.key}
-        onClick={() =>
-          window.api.emit(APP_EVENTS.SET_VOICE_KEY, { engine: engine.id, key })
-        }
-      >
-        <FiSave /> Save
-      </Btn>
     </div>
   );
 }
