@@ -34,6 +34,12 @@ type Providers = {
   connector: TikTokConnectorService;
 };
 
+// safeStorage output starts with "v" and two digits: v10 and v11 so far, and a
+// newer key provider adds its own. Anything else was saved while encryption
+// was unavailable, as plain text.
+const isEncrypted = (key: string) =>
+  /^v\d\d$/.test(Buffer.from(key, "base64").subarray(0, 3).toString("latin1"));
+
 export class StoreManagerService extends Service {
   private _jsonManagerService!: JSONManagerService;
   private _pathManagerService!: PathManagerService;
@@ -48,6 +54,9 @@ export class StoreManagerService extends Service {
   private _saving: Promise<boolean> = Promise.resolve(true);
   // Emotes whose image was already compared since the app started
   private _checkedEmotes = new Set<string>();
+  // Saved key (encrypted, in base64) → the key. Filled at startup and as keys
+  // change, so reads don't wait for safeStorage's async calls.
+  private _keys = new Map<string, string>();
 
   public setLogFile(logFile: string) {
     this._logFile = logFile;
@@ -111,14 +120,13 @@ export class StoreManagerService extends Service {
           data,
         );
       } else {
-        const conn_p = this._decryptProviderKey(
-          data.settings.activeConnProvider,
-        );
+        await this._decryptKeys(data.settings);
+        const conn_p = this._withKey(data.settings.activeConnProvider);
         this._providers.connector.setProvider(conn_p.name, conn_p.key);
         // Speaks the voices saved before the engines were combined.
         this._providers.tts.setProvider(data.settings.activeTTSProvider.name);
         for (const saved of data.settings.providers.tts) {
-          const { name, key } = this._decryptProviderKey(saved);
+          const { name, key } = this._withKey(saved);
           if (key) this._providers.tts.setEngineKey(name, key);
         }
       }
@@ -239,21 +247,19 @@ export class StoreManagerService extends Service {
 
     clonedSettings.providers = {
       connector: this._withRegisteredProviders(
-        clonedSettings.providers.connector.map((p) =>
-          this._decryptProviderKey(p),
-        ),
+        clonedSettings.providers.connector.map((p) => this._withKey(p)),
         this._providers.connector,
       ),
       tts: this._withRegisteredProviders(
-        clonedSettings.providers.tts.map((p) => this._decryptProviderKey(p)),
+        clonedSettings.providers.tts.map((p) => this._withKey(p)),
         this._providers.tts,
       ),
     };
 
-    clonedSettings.activeConnProvider = this._decryptProviderKey(
+    clonedSettings.activeConnProvider = this._withKey(
       clonedSettings.activeConnProvider,
     );
-    clonedSettings.activeTTSProvider = this._decryptProviderKey(
+    clonedSettings.activeTTSProvider = this._withKey(
       clonedSettings.activeTTSProvider,
     );
 
@@ -482,7 +488,7 @@ export class StoreManagerService extends Service {
     this._ensureInitialized();
     if (!name) return false;
 
-    const provider = this._encryptProviderKey({
+    const provider = await this._encryptProviderKey({
       name,
       key: key || "",
       active: true,
@@ -509,7 +515,7 @@ export class StoreManagerService extends Service {
     const saved = this._storeData!.settings.providers.tts.find(
       (p) => p.name === engine,
     );
-    return saved ? this._decryptProviderKey(saved).key : "";
+    return saved ? this._withKey(saved).key : "";
   }
 
   // Keys are saved with the provider list, encrypted.
@@ -517,7 +523,7 @@ export class StoreManagerService extends Service {
     this._ensureInitialized();
     const list = this._storeData!.settings.providers.tts;
     const index = list.findIndex((p) => p.name === engine);
-    const saved = this._encryptProviderKey({
+    const saved = await this._encryptProviderKey({
       name: engine,
       key,
       active: list[index]?.active ?? false,
@@ -853,28 +859,60 @@ export class StoreManagerService extends Service {
     );
   }
 
-  private _encryptProviderKey(provider: AppProvider): AppProvider {
-    if (!provider.key || !safeStorage?.isEncryptionAvailable()) return provider;
+  private async _encryptProviderKey(
+    provider: AppProvider,
+  ): Promise<AppProvider> {
+    if (!provider.key || !(await safeStorage?.isAsyncEncryptionAvailable())) {
+      return provider;
+    }
     try {
-      const encryptedBuffer = safeStorage.encryptString(provider.key);
-      return { ...provider, key: encryptedBuffer.toString("base64") };
+      const encrypted = await safeStorage.encryptStringAsync(provider.key);
+      const key = encrypted.toString("base64");
+      this._keys.set(key, provider.key);
+      return { ...provider, key };
     } catch {
       return provider;
     }
   }
 
-  private _decryptProviderKey(provider: AppProvider): AppProvider {
-    // safeStorage output starts with v10/v11 ("djEw"/"djEx" in base64).
-    // Anything else was saved while encryption was unavailable, as plain text.
-    if (!/^djE[wx]/.test(provider.key)) return provider;
-    if (!safeStorage?.isEncryptionAvailable()) return { ...provider, key: "" };
-    try {
-      const buffer = Buffer.from(provider.key, "base64");
-      return { ...provider, key: safeStorage.decryptString(buffer) };
-    } catch {
-      // Encrypted for another computer or account: asked for again instead
-      // of sending the encrypted text as the key.
-      return { ...provider, key: "" };
+  // Nothing touches safeStorage without a saved key: on macOS it can ask for
+  // the Keychain.
+  // shortcut: a key safeStorage asks to re-encrypt (shouldReEncrypt, after the
+  // OS rotated its key) keeps the old encryption until it's saved again;
+  // re-encrypt it here if old keys stop decrypting.
+  private async _decryptKeys(settings: AppSettings) {
+    const encrypted = new Set(
+      [
+        ...settings.providers.connector,
+        ...settings.providers.tts,
+        settings.activeConnProvider,
+        settings.activeTTSProvider,
+      ]
+        .map((p) => p.key)
+        .filter(isEncrypted),
+    );
+    if (!encrypted.size || !(await safeStorage?.isAsyncEncryptionAvailable())) {
+      return;
     }
+    await Promise.all(
+      [...encrypted].map(async (key) => {
+        try {
+          const { result } = await safeStorage.decryptStringAsync(
+            Buffer.from(key, "base64"),
+          );
+          this._keys.set(key, result);
+        } catch {
+          // Left out, so _withKey reads it as ""
+        }
+      }),
+    );
+  }
+
+  // The provider with its key decrypted. One that couldn't be (encrypted for
+  // another computer or account) is asked for again instead of sending the
+  // encrypted text as the key.
+  private _withKey(provider: AppProvider): AppProvider {
+    if (!isEncrypted(provider.key)) return provider;
+    return { ...provider, key: this._keys.get(provider.key) ?? "" };
   }
 }

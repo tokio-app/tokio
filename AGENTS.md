@@ -140,7 +140,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 
 ### Persistence
 
-Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load. Store mutators return whether the store file was written. A profile switch that can't be saved keeps the old profile, and `updateProfileData` throws until the store has loaded.
+Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load. Store mutators return whether the store file was written. A profile switch that can't be saved keeps the old profile, and `updateProfileData` throws until the store has loaded. Provider keys (the Euler key, voice engine keys) are saved encrypted with `safeStorage`'s async calls. The store decrypts them once at startup and reads them from memory, so `getSettings` stays synchronous.
 
 Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name. An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case.
 
