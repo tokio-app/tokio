@@ -53,7 +53,7 @@ After `yarn.lock` changes, reinstall there first with `ELECTRON_SKIP_BINARY_DOWN
 - `LICENSES/`, `THIRD_PARTY_NOTICES.md`: third-party license texts and notices, shipped to the app's `resources/licenses`
 - `build/`: the app icons electron-builder uses
 
-Generated, don't edit: `out/`, `music-out/`, `dist/`. The packaged app holds only `out/`, `music-out/`, `resources/` and the production dependencies (`files` in `electron-builder.yml`), so a file the app reads at runtime must live in one of them.
+Generated, don't edit: `out/`, `music-out/`, `dist/`. The packaged app holds only `out/`, `music-out/`, `resources/` and the production dependencies (`files` in `electron-builder.yml`), so a file the app reads at runtime must live in one of them. Dependencies only the windows import are bundled by Vite, so they ship only their `package.json` and license files (for About), through the `!node_modules/{…}` pattern in `files`; take one out of it if main or the preload starts importing it.
 
 ## Path aliases
 
@@ -100,8 +100,9 @@ When a procedure changes, update its skill with it.
 ### Services (main process)
 
 - Each service lives in `src/main/services/<name>/index.ts` and extends `Service` (or `ProviderService<T>`) from `src/main/services/shared`. It's instantiated once in `src/main/index.ts`, added to `AppServices` in `src/main/types`, and injected into `AppHandler` (`src/main/handler/app.ts`).
-- Swappable backends (connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)`. Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. TTS uses every provider at once, as engines (see `.claude/rules/tts.md`). The connector's provider key is the user's own Euler Stream API key, which signs the connection (`SET_PROVIDER`). Settings → TikTok LIVE always shows it; its provider picker only shows while more than one connector is registered. Never log the key or ship a shared one.
-- The default connector uses `@tokioapp/connector` (our MIT package, `../tokio-connector`), one `TikTokLiveConnection` per connect, with every listener added before `connect()`; a connect that comes while one is connecting gets that one, so only one connection opens. It reconnects on its own: a drop it recovers from calls `onReconnect` and keeps the LIVE session, and `DISCONNECTED` only comes once the connection stops (`reason: "ended"`, `"lost"`, or none when the user disconnected). A failed connect's `error.kind` picks the message `home.ts` shows. The library's warnings and errors go to `connector.log` through its `logger` option; its info and debug lines are dropped.
+- Swappable backends (connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)`. Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. TTS uses every provider at once, as engines (see `.claude/rules/tts.md`). The connector's provider key is the user's own Euler Stream API key, which signs the connection (`SET_PROVIDER`). Settings → TikTok LIVE always shows it; its provider picker only shows while more than one connector is registered. Never log the key or ship a shared one. Each service starts a provider in its constructor, so `_current` is always set.
+- The default connector uses `@tokioapp/connector` (our MIT package, `../tokio-connector`), one `TikTokLiveConnection` per connect, with every listener added before `connect()`; a connect that comes while one is connecting gets that one, so only one connection opens. `isConnected()` is true from the start of a connect, so the profile can't be switched mid-connect, and `CONNECTED` comes only for a connect that worked. It reconnects on its own: a drop it recovers from calls `onReconnect` and keeps the LIVE session, and `DISCONNECTED` only comes once the connection stops (`reason: "ended"`, `"lost"`, or none when the user disconnected). A failed connect's `error.kind` picks the message `home.ts` shows. The library's warnings and errors go to `connector.log` through its `logger` option, with the error they carry; its info and debug lines are dropped.
+- Music providers extend `MusicProvider` (`services/music/common`), which implements `on`/`off`/`emit`. `createWindow(view)` places a provider's page under the music window's title bar.
 - Log through `Logger` (`@/logger`) with the service's `_logFile` and a `<ServiceName>` prefix, e.g. ``Logger.error(`<Connector> ...`, this._logFile)``. Format errors with `formatError` from `@/common/util`.
 - Fallible service methods return `{ success, error?, data? }` instead of throwing.
 
@@ -129,6 +130,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 - `push` options: `failure` (the `AppError` for unexpected throws), `onError(e, error, data, services)` to send the failure reply (`replyFailure(APP_EVENTS_RESPONSE.X)` for a plain `{ success: false, error }`), `notify: false` when the page already shows the failure or for status probes, and `source` to override the stack's.
 - Throw `new AppFailure(code, message, { level: "warning", cause })` for an expected failure with its own message or level. A canceled dialog is not a failure: just `return`.
 - Log failures once. If a service already logged it, throw `new LoggedError(res.error)` or pass `{ logged: true }` to `AppFailure`.
+- A store mutator that returns false couldn't write the store file, and `JSONManagerService` logged why: send the reply that shows what main holds, then throw `saveFailure()` (`SETTINGS_SAVE_FAILED`), with no success notice.
 - `notifier` (in the handler's services) pushes `APP_EVENTS_RESPONSE.NOTIFY`: `notifier.report({ source, error, fallback })` logs and notifies; `notifier.error/warn/info/success(source, code, message, { key, windowMs })` sends a notice. Repeated warnings and errors are dropped within `windowMs` (5s default); use a longer window for failures that can repeat on every live event.
 - User actions that change something call `notifier.success(...)` after the reply, where the handler succeeds. Reads, status checks, tests, autosaves (TTS, music, alerts) and controls whose state the UI already shows (Home's feature switches) send nothing. Success codes are past tense (`PROFILE_CREATED`); failures end in `_FAILED`.
 - Background failures (TTS, music playback, missing alert sounds, gifts, server port, reconnects, LIVE ending) are reported from `src/main/events/init.ts` through service callbacks. Services don't know about the notifier.
@@ -136,9 +138,9 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 
 ### Persistence
 
-Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load.
+Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load. Store mutators return whether the store file was written. A profile switch that can't be saved keeps the old profile, and `updateProfileData` throws until the store has loaded.
 
-Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name.
+Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name. An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case.
 
 A store file that doesn't parse is copied to `tokio.corrupted-<time>.json` next to it and replaced by the defaults. One that can't be read (locked, no access) or copied stops startup ("Tokio couldn't start") and is left as it is.
 
@@ -162,8 +164,8 @@ Tokio's source is MIT; treat license compliance as part of every change.
 
 ## CI and releases
 
-- `ci.yml` (PRs and `main`): Prettier check, lint, typecheck and tests on Linux and Windows, and the `e2e` job (under xvfb on Linux). Non-draft PRs, `main`, and draft PRs whose latest commit contains `[ci]` also package the app via `build-app.yml`; `chore(release): ...` commits skip packaging.
-- `release.yml` runs on a `v<version>` tag matching `package.json` and publishes a GitHub release with the packages and update files. `gh release create` uploads them before publishing. `scripts/release-notes` writes its notes from the Conventional Commits since the previous `v*` tag (`chore(release)` commits are skipped); a rerun only replaces the files, so edited notes are kept.
+- `ci.yml` (PRs and `main`): Prettier check, lint, typecheck and tests on Linux, Windows and macOS, and the `e2e` job (under xvfb on Linux). Non-draft PRs, `main`, and draft PRs whose latest commit contains `[ci]` also package the app via `build-app.yml`; `chore(release): ...` commits skip packaging.
+- `release.yml` runs on a `v<version>` tag matching `package.json` and publishes a GitHub release with the packages and update files. `gh release create` uploads them before publishing. `scripts/release-notes` writes its notes from the Conventional Commits since the previous `v*` tag (`chore(release)` commits are skipped); a rerun only replaces the files, so edited notes are kept. Only its `release` job can write to the repository; the packaging jobs only read it.
 - It then sends a `repository_dispatch` (`release`) to `tokio-app/website`, which rebuilds the download page. That needs the `WEBSITE_DISPATCH_TOKEN` secret (a fine-grained token with Contents read and write on `tokio-app/website`). Without it the step only warns.
 - Versions with a `-` (`0.1.0-alpha.5`) are published as regular releases, not prereleases: auto-updates and the website only read the latest release.
 

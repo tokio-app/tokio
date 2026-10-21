@@ -24,18 +24,19 @@ paths:
   - `invoke(stack, APP_EVENTS.X, data)` runs a page's handler as the Handler does. Read `replies(channel)`, `pushed(channel)`, `notices`, or `sent()` for all of them in order.
   - `eventSource()` stands in for the live events of the connector and the music service.
 - Give services a temp folder (`mkdtemp(join(tmpdir(), "tokio-test-"))`) through their setters or `initialize`, stub `fetch` with `vi.stubGlobal`, and use fake timers for the queues.
+- The Windows TTS script runs for real, on Windows only (`describe.runIf`), in `src/main/services/tts/providers/windows/common/script.test.ts`.
 
 ## Renderer
 
 - Each test gets a fresh fake `window.api` (`test/renderer/setup.ts`). `send` from `@test/ipc` pushes a reply from main inside `act` (await it). `sent(event)` lists the payloads the renderer emitted for an event, and `sentEvents()` the events in order.
-- Render with `renderWithProviders` (`@test/render`), which adds fake audio queues, the real notifications and unsaved-changes providers, and a `user`. Pages that navigate use `renderApp(path)`: the real routes in memory history.
+- Render with `renderWithProviders` (`@test/render`), which adds fake audio queues, the real notifications and unsaved-changes providers, and a `user`. Pages that navigate use `renderApp(path)`: the real routes in memory history, built from `routerOptions` (`@/router`), so the app's error component applies.
   - Components never reach Tone.js; `audio.queue(name)` is the fake queue they got.
   - Builders and replies are in `@test/fixtures`.
   - Entry points (`main.tsx`) run with `runEntry` from `@test/entry`, which gives them the `#root` their `index.html` has.
 - jsdom has no layout. `test/renderer/dom.ts` gives elements a size (virtualized lists like `Select` render nothing at zero), fakes the observers (`intersect()` fires `IntersectionObserver`) and `scrollTo`.
 - A `jest` shim lets Testing Library run with `vi.useFakeTimers()`; give user-event `advanceTimers: (ms) => vi.advanceTimersByTime(ms)`.
 - Query by role and visible text. `Field` (and `SettingField`) names a group after its label, not the control: use `within(getByRole("group", { name }))` or placeholders. `Select` is a clickable div whose list is portaled to the body, so use placeholders, text or `within` there. `@test/queries` has `inList` (an item of a portaled list) and `section` (queries inside a section, by its heading).
-- Mock `copy-to-clipboard` and spy on `window.open`.
+- user-event's `setup()` stubs `navigator.clipboard`: check a copy with `navigator.clipboard.readText()`, or spy on `writeText` under fake timers, where `readText` never resolves. Spy on `window.open`.
 
 ## End to end
 

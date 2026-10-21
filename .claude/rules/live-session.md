@@ -8,7 +8,7 @@ paths:
 # Live session
 
 - `LiveService` (`src/main/services/live`) keeps the connected LIVE in memory for the Home page (`LiveSession`, `src/common/types/live.ts`): when it started, the new followers, shares, gifts and coins since then, and its last 100 events.
-- `registerConnectorEvents` records the `ACTIVITY_EVENTS`, starts the session on a successful `CONNECTED` and ends it on `DISCONNECTED`, and pushes `LIVE_SESSION` with the stats' 250ms throttle. Home asks for it with `GET_LIVE_SESSION`.
+- `registerConnectorEvents` records the `ACTIVITY_EVENTS`, starts the session on `CONNECTED` (which comes only for a connect that worked) and ends it on `DISCONNECTED`, and pushes `LIVE_SESSION` with the stats' 250ms throttle. Home asks for it with `GET_LIVE_SESSION`.
 - Gifts count once per combo, on `repeatEnd`, like gift alerts. Joins in a row share one item, which names the first two viewers and counts the rest, each handle once (`_joined`). Likes and room updates stay out of the feed; the stats show them.
 - The feed stays after the LIVE ends, until the next one starts. Viewers, likes, views and the totals show only while connected.
 - `settings.activityFeed` picks the kinds of events the feed keeps, for every profile. The gear on Home's Activity opens `FeedModal`, which saves it with `SET_ACTIVITY_FEED`. `LiveService.setFeed` applies it when the app loads and on save, dropping the items it now hides.
