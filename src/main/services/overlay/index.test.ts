@@ -124,18 +124,23 @@ describe("OverlayService", () => {
     }),
     addOverlayInfo: async (o: OverlayMetadata & { id: string }) => {
       stored.push(o);
+      return true;
     },
     updateOverlayInfo: async (o: OverlayMetadata & { id: string }) => {
       stored = stored.map((s) => (s.id === o.id ? o : s));
+      return true;
     },
     removeOverlayInfo: async (id: string) => {
       stored = stored.filter((o) => o.id !== id);
+      return true;
     },
     addTestOverlay: async (o: TestOverlay) => {
       testOverlays.push(o);
+      return true;
     },
     removeTestOverlay: async (id: string) => {
       testOverlays = testOverlays.filter((o) => o.id !== id);
+      return true;
     },
   };
 

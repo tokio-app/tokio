@@ -217,9 +217,7 @@ export class OverlayService extends Service {
       }
 
       this._register({ ...info, id, path: dir }, true);
-      await this._store.addOverlayInfo({ ...info, id });
-
-      return { success: true };
+      return { success: await this._store.addOverlayInfo({ ...info, id }) };
     } catch (error) {
       Logger.error(
         `<Overlays> Unable to import overlay from ${basedir} -- ${formatError(error)}`,
@@ -308,8 +306,7 @@ export class OverlayService extends Service {
 
     this._server.unmount(id);
     this._overlays = this._overlays.filter((o) => o.id !== id);
-    await this._store.removeOverlayInfo(id);
-    return { success: true };
+    return { success: await this._store.removeOverlayInfo(id) };
   }
 
   // Paths point at the overlay's HTML file.
@@ -470,15 +467,18 @@ export class OverlayService extends Service {
     const trimmed = name.trim();
     if (!trimmed) return { success: false };
 
-    await this._store.addTestOverlay({ id: randomUUID(), name: trimmed });
-    return { success: true, data: this.getTestOverlays() };
+    const saved = await this._store.addTestOverlay({
+      id: randomUUID(),
+      name: trimmed,
+    });
+    return { success: saved, data: this.getTestOverlays() };
   }
 
   public async removeTestOverlay(
     id: string,
   ): Promise<OverlayResult<TestOverlay[]>> {
-    await this._store.removeTestOverlay(id);
-    return { success: true, data: this.getTestOverlays() };
+    const saved = await this._store.removeTestOverlay(id);
+    return { success: saved, data: this.getTestOverlays() };
   }
 
   /**
@@ -553,8 +553,7 @@ export class OverlayService extends Service {
     try {
       const info = await this._prepare(entry, staging, update, gifts);
       await this._swap(staging, this._dir(id));
-      await this._track({ ...info, id }, update);
-      return { success: true };
+      return { success: await this._track({ ...info, id }, update) };
     } catch (error) {
       Logger.error(
         `<Overlays> Unable to install overlay ${id} -- ${formatError(error)}`,
@@ -612,15 +611,16 @@ export class OverlayService extends Service {
   private async _track(
     overlay: OverlayMetadata & { id: string },
     update: boolean,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const app = { ...overlay, path: this._dir(overlay.id) };
     const loaded = this._overlays.findIndex((o) => o.id === overlay.id);
     // An update is already served from its folder, now with the new files.
     if (loaded === -1) this._register(app, true);
     else this._overlays[loaded] = app;
 
-    if (update) await this._store.updateOverlayInfo(overlay);
-    else await this._store.addOverlayInfo(overlay);
+    return update
+      ? this._store.updateOverlayInfo(overlay)
+      : this._store.addOverlayInfo(overlay);
   }
 
   /**

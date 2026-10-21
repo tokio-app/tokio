@@ -297,6 +297,16 @@ describe("StoreManagerService", () => {
       expect(settings.server.enabled).toBe(true);
       expect(settings.updates.auto).toBe(false);
     });
+
+    it("says when a save fails, and lists no profile it couldn't save", async () => {
+      const store = await init();
+      // A folder where the store writes its temporary file
+      await mkdir(`${storeFile}.tmp`);
+
+      expect(await store.updateServerSettings(true)).toBe(false);
+      expect(await store.createNewProfile("stream.json", "Stream")).toBeNull();
+      expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
+    });
   });
 
   describe("getSettings", () => {
@@ -538,7 +548,7 @@ describe("StoreManagerService", () => {
       await store.createNewProfile("stream.json", "Stream");
       await store.updateActiveProfile("stream.json");
 
-      expect(await store.updateActiveProfile("missing.json")).toBe(false);
+      expect(await store.updateActiveProfile("missing.json")).toBe("missing");
 
       expect(store.getSettings().activeProfile.file).toBe("stream.json");
     });
@@ -551,8 +561,8 @@ describe("StoreManagerService", () => {
       await rm(join(paths.folders.profilesFolder, "night.json"));
       vi.spyOn(Logger, "error");
 
-      expect(await store.updateActiveProfile("stream.json")).toBe(false);
-      expect(await store.updateActiveProfile("night.json")).toBe(false);
+      expect(await store.updateActiveProfile("stream.json")).toBe("missing");
+      expect(await store.updateActiveProfile("night.json")).toBe("missing");
 
       expect(store.getSettings().activeProfile).toEqual(
         defaultStoreData.profiles[0],
@@ -563,11 +573,24 @@ describe("StoreManagerService", () => {
       );
     });
 
+    it("stays on the active profile when the switch can't be saved", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await mkdir(`${storeFile}.tmp`);
+
+      expect(await store.updateActiveProfile("stream.json")).toBe("unsaved");
+
+      expect(store.getSettings().activeProfile).toEqual(
+        defaultStoreData.profiles[0],
+      );
+      expect((await store.getProfileData())?.name).toBe("Default");
+    });
+
     it("switches the profile that updates go to", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");
 
-      expect(await store.updateActiveProfile("stream.json")).toBe(true);
+      expect(await store.updateActiveProfile("stream.json")).toBe("switched");
       await store.updateProfileData({ connector: { username: "streamer" } });
 
       expect((await store.getProfileData())?.name).toBe("Stream");

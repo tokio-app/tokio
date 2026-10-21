@@ -198,7 +198,7 @@ describe("alerts events", () => {
         downloadSound: vi.fn(async (_url: string, _name: string) => res),
       };
       const storeManagerService = {
-        addSound: vi.fn(async (_sound: AlertSound) => {}),
+        addSound: vi.fn(async (_sound: AlertSound) => true),
       };
       const h = createHandler({ alertsService, storeManagerService });
       return { h, alertsService, storeManagerService };
@@ -264,7 +264,7 @@ describe("alerts events", () => {
         importSound: vi.fn(async (_path: string) => res),
       };
       const storeManagerService = {
-        addSound: vi.fn(async (_sound: AlertSound) => {}),
+        addSound: vi.fn(async (_sound: AlertSound) => true),
       };
       const h = createHandler({ alertsService, storeManagerService });
       return { h, alertsService, storeManagerService };
@@ -601,7 +601,7 @@ describe("alerts events", () => {
         ),
       };
       const storeManagerService = {
-        addSound: vi.fn(async (_sound: AlertSound) => {}),
+        addSound: vi.fn(async (_sound: AlertSound) => true),
         getSounds: () => library,
       };
       const h = createHandler({ alertsService, storeManagerService });
@@ -706,7 +706,7 @@ describe("alerts events", () => {
         deleteSound: vi.fn(async (_file: string) => deleted),
       };
       const storeManagerService = {
-        removeSound: vi.fn(async (_file: string) => {}),
+        removeSound: vi.fn(async (_file: string) => true),
         isSoundInUse: vi.fn(async (_file: string) => inUse),
         getSounds: () => [ding],
       };
@@ -768,6 +768,26 @@ describe("alerts events", () => {
       ]);
       expect(h.notices).toEqual([]);
       expect(logError).not.toHaveBeenCalled();
+    });
+
+    it("keeps the file when the library can't be saved", async () => {
+      const { h, alertsService, storeManagerService } = setup(false);
+      storeManagerService.removeSound.mockResolvedValue(false);
+
+      await h.invoke(alerts, APP_EVENTS.REMOVE_SOUND, { file: airhorn.file });
+
+      expect(alertsService.deleteSound).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
+        {
+          success: false,
+          data: [ding],
+          error: {
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+            message:
+              "Tokio couldn't save the change. Check the logs folder for details.",
+          },
+        },
+      ]);
     });
   });
 });

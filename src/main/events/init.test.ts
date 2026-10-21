@@ -240,7 +240,7 @@ function setup() {
     getProfileData: vi.fn(async (): Promise<Profile | null> => profile),
     getProfiles: vi.fn(() => profiles),
     updateLiveStats: vi.fn(),
-    updateServerSettings: vi.fn(async (_enabled: boolean) => {}),
+    updateServerSettings: vi.fn(async (_enabled: boolean) => true),
     recordEmotes: vi.fn(
       async (
         ..._args: Parameters<StoreManagerService["recordEmotes"]>

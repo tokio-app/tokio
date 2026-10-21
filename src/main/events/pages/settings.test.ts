@@ -5,8 +5,14 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { SERVER_PORT } from "@/common/util";
+import { TikTokConnectorService } from "@/services/connector";
+import { JSONManagerService } from "@/services/json";
+import { PathManagerService } from "@/services/path";
+import { StoreManagerService } from "@/services/store";
+import { TTSService } from "@/services/tts";
 import { dialog } from "@test/electron";
 import { createHandler } from "@test/handler";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
@@ -300,14 +306,19 @@ describe("settings events", () => {
   });
 
   describe("SET_PROFILE", () => {
-    const setup = ({ connected = false, missing = false } = {}) => {
+    const setup = ({
+      connected = false,
+      missing = false,
+      unsaved = false,
+    } = {}) => {
       const profiles = [defaultProfile, streamProfile];
       let active = defaultProfile;
       const storeManagerService = {
         updateActiveProfile: vi.fn(async (file: string) => {
+          if (unsaved) return "unsaved";
           const profile = profiles.find((p) => p.file === file);
           if (profile) active = profile;
-          return profile !== undefined;
+          return profile ? "switched" : "missing";
         }),
         getProfileData: vi.fn(async () =>
           missing ? null : { name: active.name },
@@ -388,6 +399,22 @@ describe("settings events", () => {
           code: FEEDBACK_CODES.PROFILE_LOAD_FAILED,
           message:
             "Unable to switch to that profile. Its file is missing or damaged.",
+        }),
+      ]);
+    });
+
+    it("says so when the switch can't be saved", async () => {
+      const { h } = setup({ unsaved: true });
+
+      await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          message:
+            "Tokio couldn't save the change. Check the logs folder for details.",
         }),
       ]);
     });
@@ -543,7 +570,7 @@ describe("settings events", () => {
 
   describe("SET_PROVIDER", () => {
     it("saves the provider, then sends the settings, the reply and a notice", async () => {
-      const updateProvider = vi.fn(async () => null);
+      const updateProvider = vi.fn(async () => true);
       const h = createHandler({
         storeManagerService: { ...profileStore(), updateProvider },
       });
@@ -609,7 +636,7 @@ describe("settings events", () => {
     const setup = () => {
       const storeManagerService = {
         getVoiceKey: vi.fn((engine: string) => keys[engine] ?? ""),
-        updateVoiceKey: vi.fn(async () => {}),
+        updateVoiceKey: vi.fn(async () => true),
       };
       const h = createHandler({
         storeManagerService,
@@ -735,7 +762,7 @@ describe("settings events", () => {
     // toggleServer answers whether the server ended up as asked
     const setup = (result: boolean) => {
       const toggleServer = vi.fn(async () => result);
-      const updateServerSettings = vi.fn(async () => {});
+      const updateServerSettings = vi.fn(async () => true);
       const h = createHandler({
         serverService: { toggleServer },
         storeManagerService: { ...profileStore(), updateServerSettings },
@@ -817,7 +844,7 @@ describe("settings events", () => {
 
   describe("SET_AUTO_UPDATES", () => {
     const setup = () => {
-      const updateUpdatesSettings = vi.fn(async () => {});
+      const updateUpdatesSettings = vi.fn(async () => true);
       const setAuto = vi.fn();
       const h = createHandler({
         storeManagerService: { ...profileStore(), updateUpdatesSettings },
@@ -878,6 +905,47 @@ describe("settings events", () => {
         { success: false, error: failure },
       ]);
       expect(h.notices).toEqual([expect.objectContaining(failure)]);
+    });
+
+    it("reports a change the store couldn't write, without a success notice", async () => {
+      const home = await mkdtemp(join(tmpdir(), "tokio-test-"));
+      const tts = new TTSService();
+      try {
+        const paths = new PathManagerService();
+        await paths.initialize(home, ".tokio");
+        const store = new StoreManagerService();
+        await store.initialize(
+          "store",
+          { tts, connector: new TikTokConnectorService() },
+          new JSONManagerService(),
+          paths,
+        );
+        // A folder where the store writes its temporary file
+        await mkdir(join(paths.folders.settingsFolder, "store.json.tmp"));
+        const h = createHandler({
+          storeManagerService: store,
+          updaterService: { setAuto: vi.fn() },
+        });
+
+        await h.invoke(settings, APP_EVENTS.SET_AUTO_UPDATES, {
+          enabled: false,
+        });
+
+        const failure = {
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          message:
+            "Tokio couldn't save the change. Check the logs folder for details.",
+        };
+        expect(h.replies(APP_EVENTS_RESPONSE.SET_AUTO_UPDATES)).toEqual([
+          { success: false, error: failure },
+        ]);
+        expect(h.notices).toEqual([
+          expect.objectContaining({ level: "error", ...failure }),
+        ]);
+      } finally {
+        tts.dispose();
+        await rm(home, { recursive: true, force: true });
+      }
     });
   });
 
