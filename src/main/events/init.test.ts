@@ -773,6 +773,21 @@ describe("init events", () => {
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([]);
     });
 
+    it("says it once while the connection keeps dropping", async () => {
+      const s = await live();
+      const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
+
+      for (let i = 0; i < 3; i++) {
+        reconnect("reconnecting");
+        reconnect("reconnected");
+      }
+
+      expect(s.h.notices.map((n) => n.code)).toEqual([
+        FEEDBACK_CODES.RECONNECTING,
+        FEEDBACK_CODES.RECONNECTED,
+      ]);
+    });
+
     it.each([undefined, {}])(
       "says it disconnected for any other reason (%o)",
       async (data) => {

@@ -261,6 +261,7 @@ const registerConnectorEvents = ({
         "connector",
         FEEDBACK_CODES.RECONNECTED,
         "Reconnected to the LIVE.",
+        { key: "reconnected", windowMs: REPEAT_NOTICE_MS },
       );
     }
   });
