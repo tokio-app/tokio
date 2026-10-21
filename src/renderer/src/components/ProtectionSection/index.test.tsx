@@ -1,6 +1,6 @@
 import { defaultProfile } from "@/common/util";
 import { useImmerState } from "@/hooks/useImmerState";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -75,6 +75,20 @@ describe("ProtectionSection", () => {
     await user.type(field("Max Queue Length"), "25");
 
     expect(current()).toEqual({ cooldown: 5, queue_length: 25 });
+  });
+
+  it("keeps the limits within their ranges", () => {
+    render(<ProtectionForm />);
+
+    for (const value of ["0", "2.5"]) {
+      fireEvent.change(field("Max Queue Length"), { target: { value } });
+    }
+    fireEvent.change(field("Cooldown"), { target: { value: "-1" } });
+    expect(current()).toEqual({ cooldown: 2, queue_length: 10 });
+
+    // The cooldown takes fractions
+    fireEvent.change(field("Cooldown"), { target: { value: "0.5" } });
+    expect(current().cooldown).toBe(0.5);
   });
 
   it("puts its children after the shared fields", () => {

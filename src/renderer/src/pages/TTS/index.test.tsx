@@ -401,6 +401,19 @@ describe("TTS", () => {
     });
   });
 
+  it("keeps the max comment length a whole number above 0", async () => {
+    await setup();
+
+    for (const value of ["0", "2.5"]) {
+      fireEvent.change(field("Max Comment Length").getByRole("spinbutton"), {
+        target: { value },
+      });
+    }
+
+    await wait(300);
+    expect(sent(APP_EVENTS.UPDATE_TTS_SETTINGS)).toHaveLength(0);
+  });
+
   it("changes who may use TTS", async () => {
     const { user } = await setup();
     const permissions = section("Permissions");

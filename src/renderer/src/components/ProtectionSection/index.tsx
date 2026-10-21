@@ -33,6 +33,7 @@ export function ProtectionSection({
       <FormGrid>
         <Field label="Cooldown" hint="(seconds)">
           <NumberInput
+            min={0}
             value={protection.cooldown}
             onChange={(cooldown) =>
               update((p) => {
@@ -43,6 +44,8 @@ export function ProtectionSection({
         </Field>
         <Field label="Max Queue Length">
           <NumberInput
+            min={1}
+            integer
             value={protection.queue_length}
             onChange={(length) =>
               update((p) => {

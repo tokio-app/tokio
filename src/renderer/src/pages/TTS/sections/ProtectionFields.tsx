@@ -18,6 +18,8 @@ export function ProtectionFields({ protection, update }: Props) {
       <FormGrid>
         <Field label="Max Comment Length" hint="(characters)">
           <NumberInput
+            min={1}
+            integer
             value={protection.comment_length}
             onChange={(length) =>
               update((p) => {
