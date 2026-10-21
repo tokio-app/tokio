@@ -504,6 +504,9 @@ describe("YouTubeMusic", () => {
     it("searches the track, presses Enter and plays the first result", async () => {
       const { provider, view } = await connected();
       const { executeJavaScript, sendInputEvent } = view.webContents;
+      executeJavaScript.mockImplementation(
+        async (code) => code === AfterSearchJSCode,
+      );
 
       const done = provider.play(song("abc123"));
       await vi.advanceTimersByTimeAsync(0);
@@ -522,6 +525,20 @@ describe("YouTubeMusic", () => {
         [{ type: "keyUp", keyCode: "Enter" }],
       ]);
       expect(executeJavaScript).toHaveBeenLastCalledWith(AfterSearchJSCode);
+    });
+
+    it("fails when the page found nothing to play", async () => {
+      const { provider, view } = await connected();
+      // The page's script answers null without a result or play button
+      view.webContents.executeJavaScript.mockResolvedValue(null);
+
+      const done = provider.play(song("abc123"));
+      const failed = expect(done).rejects.toThrow(
+        "Nothing to play for abc123 on YouTube Music.",
+      );
+      await vi.advanceTimersByTimeAsync(250);
+
+      await failed;
     });
 
     it("does nothing without a page", async () => {

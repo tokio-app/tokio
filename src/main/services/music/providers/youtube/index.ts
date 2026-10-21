@@ -225,7 +225,12 @@ export class YouTubeMusic extends MusicProvider {
       keyCode: "Enter",
     });
 
-    await this._ytView.webContents.executeJavaScript(AfterSearchJSCode);
+    // True once it clicked play on the first result
+    const played =
+      await this._ytView.webContents.executeJavaScript(AfterSearchJSCode);
+    if (!played) {
+      throw new Error(`Nothing to play for ${info.track} on YouTube Music.`);
+    }
   }
 
   public on<K extends TOKIO_EVENTS>(
