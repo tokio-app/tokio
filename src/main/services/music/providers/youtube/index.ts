@@ -269,45 +269,41 @@ export class YouTubeMusic extends MusicProvider {
       params: config.SONG_FILTER_PARAMS,
     };
 
-    try {
-      const response = await fetch(config.SEARCH_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Origin: config.YTM_URL,
-        },
-        body: JSON.stringify(payload),
-      });
+    const response = await fetch(config.SEARCH_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: config.YTM_URL,
+      },
+      body: JSON.stringify(payload),
+    });
 
-      if (!response.ok) {
-        throw new Error(
-          `InnerTube API request failed with status: ${response.status}`,
-        );
-      }
+    if (!response.ok) {
+      throw new Error(
+        `InnerTube API request failed with status: ${response.status}`,
+      );
+    }
 
-      const data = await response.json();
+    const data = await response.json();
 
-      const sections =
-        data.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer
-          ?.content?.sectionListRenderer?.contents ?? [];
+    const sections =
+      data.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer
+        ?.content?.sectionListRenderer?.contents ?? [];
 
-      const musicShelf = sections.find(
-        (section: any) => section.musicShelfRenderer,
-      )?.musicShelfRenderer;
+    const musicShelf = sections.find(
+      (section: any) => section.musicShelfRenderer,
+    )?.musicShelfRenderer;
 
-      if (!musicShelf || !musicShelf.contents?.length) {
-        return null;
-      }
-
-      const firstItemRenderer =
-        musicShelf.contents[0]?.musicResponsiveListItemRenderer;
-
-      const result = parseSongRenderer(firstItemRenderer);
-
-      return result;
-    } catch {
+    if (!musicShelf || !musicShelf.contents?.length) {
       return null;
     }
+
+    const firstItemRenderer =
+      musicShelf.contents[0]?.musicResponsiveListItemRenderer;
+
+    const result = parseSongRenderer(firstItemRenderer);
+
+    return result;
   }
 
   private async checkIsLoggedIn(): Promise<boolean> {

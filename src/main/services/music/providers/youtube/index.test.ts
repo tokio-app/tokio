@@ -177,14 +177,19 @@ describe("YouTubeMusic", () => {
       expect(await new YouTubeMusic().searchSong("song")).toBeNull();
     });
 
-    it("returns null when the request fails", async () => {
+    // So the request is reported, not taken for a song that wasn't found
+    it("throws when the request fails", async () => {
       stubFetch(() =>
         json(searchResults([shelf(songRow("first", "Song", "Artist"))]), 500),
       );
-      expect(await new YouTubeMusic().searchSong("song")).toBeNull();
+      await expect(new YouTubeMusic().searchSong("song")).rejects.toThrow(
+        "InnerTube API request failed with status: 500",
+      );
 
       stubFetch(() => Promise.reject(new Error("offline")));
-      expect(await new YouTubeMusic().searchSong("song")).toBeNull();
+      await expect(new YouTubeMusic().searchSong("song")).rejects.toThrow(
+        "offline",
+      );
     });
 
     it("returns null for an empty query without a request", async () => {
