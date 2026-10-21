@@ -148,6 +148,7 @@ export class MusicService extends ProviderService<MusicProvider> {
           current.title,
           current,
           current.time,
+          () => this._current.provider.play(current),
         );
       }
     }

@@ -81,6 +81,7 @@ describe("MusicQueue", () => {
 
     queue.enqueue("a", song("a"), () => {});
     expect(listener).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(0);
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { title: "a", thumbnail: "", playing: true, played: false },
     ]);
@@ -91,10 +92,35 @@ describe("MusicQueue", () => {
 
     await queue.triggerNext();
     expect(listener).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(0);
     expect(onStart).toHaveBeenCalledTimes(2);
     expect(onStart).toHaveBeenLastCalledWith([
       { title: "a", thumbnail: "", playing: false, played: true },
       { title: "b", thumbnail: "", playing: true, played: false },
+    ]);
+  });
+
+  it("calls onStart only for a song that started and still plays", async () => {
+    const onStart = vi.fn();
+    const queue = new MusicQueue({ onStart });
+    queue.enqueue("a", song("a"), () => {
+      throw new Error("player crashed");
+    });
+    // Skipped while it loads
+    queue.enqueue(
+      "b",
+      song("b", 60_000),
+      () => new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    );
+    queue.enqueue("c", song("c", 60_000), () => {});
+
+    await queue.triggerNext();
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(onStart).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ title: "a", played: true }),
+      expect.objectContaining({ title: "b", played: true }),
+      expect.objectContaining({ title: "c", playing: true }),
     ]);
   });
 
@@ -187,7 +213,7 @@ describe("MusicQueue", () => {
     const queue = new MusicQueue();
     const b = vi.fn();
 
-    queue.addCurrentlyPlaying("a", song("a", 1000), 600);
+    queue.addCurrentlyPlaying("a", song("a", 1000), 600, () => {});
     queue.enqueue("b", song("b"), b);
 
     await vi.advanceTimersByTimeAsync(399);

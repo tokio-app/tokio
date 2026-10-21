@@ -303,6 +303,40 @@ describe("MusicService", () => {
       expect(played()).toEqual(["New"]);
     });
 
+    it("doesn't call onSongChange for the track the provider was playing", async () => {
+      const { service, request, provider } = setup();
+      const onSongChange = vi.fn<(songs: MusicInfo[]) => void>();
+      service.onSongChange(onSongChange);
+      provider.playerStatus.mockResolvedValueOnce({
+        ...song("Current"),
+        playing: true,
+        time: 4_000,
+      });
+      provider.searchSong.mockResolvedValue(null);
+
+      await request("!play Nothing");
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(onSongChange).not.toHaveBeenCalled();
+    });
+
+    it("plays the track the provider was playing again on !last", async () => {
+      const { request, provider, played, queue } = setup();
+      provider.playerStatus.mockResolvedValueOnce({
+        ...song("Current", 10_000),
+        playing: true,
+        time: 4_000,
+      });
+      await request("!play New");
+      await vi.advanceTimersByTimeAsync(6_000);
+      expect(played()).toEqual(["New"]);
+
+      await request("!last");
+
+      expect(played()).toEqual(["New", "Current"]);
+      expect(queue()).toEqual(["Current (playing)", "New"]);
+    });
+
     it("leaves out a track the provider has paused", async () => {
       const { request, provider, played, queue } = setup();
       provider.playerStatus.mockResolvedValueOnce({

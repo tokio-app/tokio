@@ -124,17 +124,15 @@ export class MusicQueue {
     this.play();
   }
 
+  // The song the player is playing. Its action plays it when the queue
+  // comes back to it.
   public addCurrentlyPlaying(
     id: string,
     song: SongInfo,
     currentTimeMs: number,
+    action: PlayAction,
   ) {
-    this._queue.push({
-      id,
-      song,
-      action: () => {},
-      startTimeMs: currentTimeMs,
-    });
+    this._queue.push({ id, song, action, startTimeMs: currentTimeMs });
     this._trimQueue();
     this.play();
   }
@@ -220,15 +218,18 @@ export class MusicQueue {
     while (this._currentIndex < this._queue.length && active()) {
       const item = this._queue[this._currentIndex];
 
-      const songs = this.getSongs();
-      this.emit(TOKIO_EVENTS.MUSIC_CHANGE, songs);
-      this._hooks.onStart?.(songs);
+      this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
 
       // A song that fails to start is skipped right away. Two in a row mean
       // the player is gone: the loop stops at the second until a new request.
       let waitTime = 0;
       try {
-        await item.action();
+        // Playing the player's own song again would restart it
+        if (item.startTimeMs === undefined) {
+          await item.action();
+          // Not for a song skipped while it loaded
+          if (active()) this._hooks.onStart?.(this.getSongs());
+        }
         failures = 0;
         waitTime =
           item.startTimeMs !== undefined
