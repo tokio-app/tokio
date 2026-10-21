@@ -12,6 +12,8 @@ import { EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
 // The active provider only speaks voices with no engine, or an unknown one.
 export class TTSService extends ProviderService<TTSProvider> {
   private _queue: TaskQueue;
+  // Bumped by clearTalk, so a message made after it is dropped
+  private _run = 0;
 
   constructor() {
     super();
@@ -181,7 +183,11 @@ export class TTSService extends ProviderService<TTSProvider> {
     return this._clean(template, settings);
   }
 
+  /**
+   * Stops the messages waiting to be spoken, and drops the one being made.
+   */
   public clearTalk() {
+    this._run++;
     this._queue.stop();
   }
 
@@ -205,8 +211,11 @@ export class TTSService extends ProviderService<TTSProvider> {
       gapTime: settings.protection.cooldown,
       maxQueueLength: settings.protection.queue_length,
     });
+    const run = this._run;
     this._queue.enqueue(async () => {
       const res = await this.generateBuffer(text, settings.voice);
+      // Cleared while it was being made
+      if (run !== this._run) return;
       if (res.success) {
         callback?.({
           data: res.buffer,

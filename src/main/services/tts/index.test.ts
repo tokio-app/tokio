@@ -420,4 +420,23 @@ describe("TTSService", () => {
 
     expect(spoken).toEqual(["first"]);
   });
+
+  it("clearTalk drops the message being made", async () => {
+    let release = () => {};
+    vi.spyOn(service, "generateBuffer").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ success: true, buffer: Buffer.from("hi") });
+        }),
+    );
+    const callback = vi.fn();
+
+    service.talk(chat("hi"), settings(), callback);
+    await new Promise((r) => setTimeout(r));
+    service.clearTalk();
+    release();
+    await new Promise((r) => setTimeout(r));
+
+    expect(callback).not.toHaveBeenCalled();
+  });
 });

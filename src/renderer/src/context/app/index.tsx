@@ -30,6 +30,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     queue.enqueue(res.data, true);
   });
 
+  useIpcListener(APP_EVENTS_RESPONSE.TTS_CLEAR, () => stopQueues("tts_data"));
+
   useIpcListener(APP_EVENTS_RESPONSE.ALERT_AUDIO, (res) => {
     if (!res) return;
     const queue = getQueue(res.channel);

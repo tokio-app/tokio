@@ -234,6 +234,7 @@ const registerConnectorEvents = ({
     music.clearHandler();
     tts.clearTalk();
     alerts.clearSpeech();
+    win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
     win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
     win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: false,

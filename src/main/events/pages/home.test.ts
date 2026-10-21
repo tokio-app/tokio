@@ -319,23 +319,38 @@ describe("home events", () => {
   describe("ACTIVE_FEATURES", () => {
     const setup = () => {
       const updateActiveFeatures = vi.fn();
+      const clearTalk = vi.fn();
       const clearSpeech = vi.fn();
       const h = createHandler({
         storeManagerService: { updateActiveFeatures },
+        ttsService: { clearTalk },
         alertsService: { clearSpeech },
       });
-      return { h, updateActiveFeatures, clearSpeech };
+      return { h, updateActiveFeatures, clearTalk, clearSpeech };
     };
 
     it("saves the features without a notice", async () => {
-      const { h, updateActiveFeatures, clearSpeech } = setup();
+      const { h, updateActiveFeatures, clearTalk, clearSpeech } = setup();
 
       await h.invoke(home, APP_EVENTS.ACTIVE_FEATURES, { tts: true });
 
       expect(updateActiveFeatures).toHaveBeenCalledWith({ tts: true });
+      expect(clearTalk).not.toHaveBeenCalled();
       expect(clearSpeech).not.toHaveBeenCalled();
+      expect(h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toEqual([]);
       expect(h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([]);
       expect(h.notices).toEqual([]);
+    });
+
+    it("stops TTS when it's turned off", async () => {
+      const { h, clearTalk, clearSpeech } = setup();
+
+      await h.invoke(home, APP_EVENTS.ACTIVE_FEATURES, { tts: false });
+
+      expect(clearTalk).toHaveBeenCalledOnce();
+      expect(h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toEqual([undefined]);
+      expect(clearSpeech).not.toHaveBeenCalled();
+      expect(h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([]);
     });
 
     it("stops the alerts when they're turned off", async () => {

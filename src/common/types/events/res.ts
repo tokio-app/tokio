@@ -29,6 +29,7 @@ export enum APP_EVENTS_RESPONSE {
   // GLOBAL
   NOTIFY = "app:notify",
   TTS_AUDIO = "app:tts:audio",
+  TTS_CLEAR = "app:tts:clear",
 
   // WINDOW
   RESIZE_WINDOW = "app:window:res:resize",
@@ -120,6 +121,8 @@ export interface AppEventsResponseMap {
       maxQueueLength: number;
     };
   };
+  // Drops queued and playing chat TTS
+  [APP_EVENTS_RESPONSE.TTS_CLEAR]: void;
 
   // WINDOW
   [APP_EVENTS_RESPONSE.RESIZE_WINDOW]: WindowState;

@@ -81,6 +81,14 @@ describe("AppProvider", () => {
     });
   });
 
+  it("stops the TTS queue when main clears it", async () => {
+    const audio = setup();
+
+    await send(APP_EVENTS_RESPONSE.TTS_CLEAR);
+
+    expect(audio.value.stopQueues).toHaveBeenCalledExactlyOnceWith("tts_data");
+  });
+
   it("stops every alert queue when main clears them", async () => {
     const audio = setup();
 

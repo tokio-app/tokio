@@ -695,6 +695,7 @@ describe("init events", () => {
       expect(s.musicService.clearHandler).toHaveBeenCalledOnce();
       expect(s.ttsService.clearTalk).toHaveBeenCalledOnce();
       expect(s.alertsService.clearSpeech).toHaveBeenCalledOnce();
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toEqual([undefined]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([undefined]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
         { success: false, stats: noStats },

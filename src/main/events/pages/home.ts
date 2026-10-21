@@ -184,10 +184,14 @@ events.push(
 events.push(
   APP_EVENTS.ACTIVE_FEATURES,
   // No notice on success, the switches already show the new state.
-  async ({ storeManagerService, alertsService, win }, _, data) => {
+  async ({ storeManagerService, ttsService, alertsService, win }, _, data) => {
     storeManagerService.updateActiveFeatures({
       ...data,
     });
+    if (data.tts === false) {
+      ttsService.clearTalk();
+      win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
+    }
     if (data.alerts === false) {
       alertsService.clearSpeech();
       win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
