@@ -83,10 +83,35 @@ describe("MusicQueue", () => {
       throw error;
     });
     queue.enqueue("b", song("b"), b);
-    await vi.advanceTimersByTimeAsync(1000);
 
+    // Right away, without waiting out the song that failed
     expect(b).toHaveBeenCalledOnce();
     expect(onError).toHaveBeenCalledExactlyOnceWith(expect.any(String), error);
+  });
+
+  it("keeps one song playing when a skip comes while a song loads", async () => {
+    const queue = new MusicQueue();
+    const started: [string, number][] = [];
+    const t0 = Date.now();
+    // Starting a song takes 3 seconds, like YouTube's search and click
+    const load = (title: string) => async () => {
+      started.push([title, (Date.now() - t0) / 1000]);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    };
+    for (const title of ["a", "b", "c", "d"]) {
+      queue.enqueue(title, song(title, 60_000), load(title));
+    }
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await queue.triggerNext();
+    await vi.advanceTimersByTimeAsync(130_000);
+
+    expect(started).toEqual([
+      ["a", 0],
+      ["b", 1],
+      ["c", 64],
+      ["d", 127],
+    ]);
   });
 
   it("only waits the remaining time of a song that was already playing", async () => {

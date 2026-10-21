@@ -217,35 +217,38 @@ export class MusicQueue {
 
   private async processQueue() {
     this._isPlaying = true;
-    this._abortController = new AbortController();
+    // A loop stopped while awaiting can wake up after a new one started.
+    const controller = (this._abortController = new AbortController());
+    const active = () => !controller.signal.aborted;
 
-    while (this._currentIndex < this._queue.length && this._isPlaying) {
+    while (this._currentIndex < this._queue.length && active()) {
       const item = this._queue[this._currentIndex];
 
       this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
 
+      // A song that fails to start is skipped right away.
+      let waitTime = 0;
       try {
         await item.action();
+        waitTime =
+          item.startTimeMs !== undefined
+            ? Math.max(0, item.song.duration - item.startTimeMs)
+            : item.song.duration;
       } catch (error) {
         this._onError?.(item.id, error);
       }
 
-      const waitTime =
-        item.startTimeMs !== undefined
-          ? Math.max(0, item.song.duration - item.startTimeMs)
-          : item.song.duration;
-
       item.startTimeMs = undefined;
 
-      if (this._isPlaying && waitTime > 0) {
-        await delayWithAbort(waitTime, this._abortController.signal);
+      if (active() && waitTime > 0) {
+        await delayWithAbort(waitTime, controller.signal);
       }
 
-      if (!this._isPlaying) break;
+      if (!active()) break;
 
       this._currentIndex++;
     }
 
-    this._isPlaying = false;
+    if (this._abortController === controller) this._isPlaying = false;
   }
 }
