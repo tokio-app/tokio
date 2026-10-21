@@ -1,6 +1,6 @@
 import { cx } from "@/helper/cx";
 import { usePopover } from "@/hooks/usePopover";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { HexAlphaColorPicker, HexColorInput } from "react-colorful";
 import { createPortal } from "react-dom";
 import styles from "./elements.module.css";
@@ -11,10 +11,17 @@ type Props = {
   onChange: (color: string) => void;
 };
 
+// The field also takes #rgb and #rgba, the settings want 6 or 8 digits
+const fullHex = (color: string) =>
+  color.length > 5 ? color : color.replace(/\w/g, "$&$&");
+
 export function Color({ value, onChange }: Props) {
   const { open, toggle, close, position, anchorRef, popoverRef } =
     usePopover(8);
   const swatchRef = useRef<HTMLButtonElement>(null);
+  // The color as typed, while the field has the focus
+  const [typed, setTyped] = useState<string | null>(null);
+  if (!open && typed !== null) setTyped(null);
 
   return (
     // The picker is portaled, but its keys still bubble up here
@@ -53,8 +60,13 @@ export function Color({ value, onChange }: Props) {
             />
             <HexColorInput
               className={styles.color_input}
-              color={value}
-              onChange={onChange}
+              // The full value would rewrite a short color as it's typed
+              color={typed ?? value}
+              onChange={(color) => {
+                setTyped(color);
+                onChange(fullHex(color));
+              }}
+              onBlur={() => setTyped(null)}
               placeholder="Type a color"
               prefixed
               alpha

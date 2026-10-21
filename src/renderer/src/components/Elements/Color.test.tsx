@@ -1,8 +1,34 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Modal } from "../Modal";
 import { Color } from "./Color";
+
+// Holds the color, as a settings form does
+function Form({ onChange }: { onChange: (color: string) => void }) {
+  const [color, setColor] = useState("#ff0000");
+  return (
+    <Color
+      value={color}
+      onChange={(next) => {
+        setColor(next);
+        onChange(next);
+      }}
+    />
+  );
+}
+
+async function typeColor(text: string) {
+  const user = userEvent.setup();
+  const onChange = vi.fn();
+  render(<Form onChange={onChange} />);
+  await user.click(screen.getByRole("button", { name: "Choose color" }));
+  const input = screen.getByPlaceholderText("Type a color");
+  await user.clear(input);
+  await user.type(input, text);
+  return { user, onChange, input };
+}
 
 describe("Color", () => {
   it("shows the color on its swatch", () => {
@@ -26,6 +52,37 @@ describe("Color", () => {
     await user.type(input, "00ff0080");
 
     expect(onChange).toHaveBeenLastCalledWith("#00ff0080");
+  });
+
+  it("sends a short color in full, and the typing goes on", async () => {
+    const { user, onChange, input } = await typeColor("fff");
+
+    expect(onChange).toHaveBeenLastCalledWith("#ffffff");
+    expect(input).toHaveValue("#fff");
+
+    await user.type(input, "000");
+
+    expect(onChange).toHaveBeenLastCalledWith("#fff000");
+    expect(input).toHaveValue("#fff000");
+  });
+
+  it("shows a short color in full once the field is left", async () => {
+    const { user, onChange, input } = await typeColor("fff8");
+    expect(onChange).toHaveBeenLastCalledWith("#ffffff88");
+
+    await user.tab();
+
+    expect(input).toHaveValue("#ffffff88");
+  });
+
+  it("shows a short color in full when it opens again", async () => {
+    const { user } = await typeColor("0f0");
+    const swatch = screen.getByRole("button", { name: "Choose color" });
+
+    await user.click(document.body);
+    await user.click(swatch);
+
+    expect(screen.getByPlaceholderText("Type a color")).toHaveValue("#00ff00");
   });
 
   it("closes on Escape, not the modal it's in", async () => {
