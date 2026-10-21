@@ -64,7 +64,7 @@ describe("TTSService", () => {
     return spoken;
   };
 
-  const engine = (name: string) => service["_providerPool"]!.get(name)!;
+  const engine = (name: string) => service["_providerPool"].get(name)!;
 
   describe("engines", () => {
     it("lists every engine, Default first", () => {
