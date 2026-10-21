@@ -451,17 +451,20 @@ describe("overlays events", () => {
   });
 
   describe("SAVE_OVERLAY_CONFIG", () => {
-    const request = { id: "gift-jar", config, gifts };
+    const request = { id: "gift-jar", config };
     const failure = {
       code: FEEDBACK_CODES.OVERLAY_SAVE_FAILED,
       message: "Unable to save the overlay's settings.",
     };
     const failing = () =>
       createHandler({
-        overlayService: { saveConfig: async () => ({ success: false }) },
+        overlayService: {
+          getGifts: async () => gifts,
+          saveConfig: async () => ({ success: false }),
+        },
       });
 
-    it("saves the settings and answers with them", async () => {
+    it("saves the settings with main's gifts and answers with them", async () => {
       const saved = { title: "Gift Jar", goal: 100 };
       const saveConfig = vi.fn(
         async (_id: string, _config: OverlayConfig, _gifts: CustomGift[]) => ({
@@ -469,7 +472,9 @@ describe("overlays events", () => {
           data: saved,
         }),
       );
-      const h = createHandler({ overlayService: { saveConfig } });
+      const h = createHandler({
+        overlayService: { getGifts: async () => gifts, saveConfig },
+      });
 
       await h.invoke(overlays, APP_EVENTS.SAVE_OVERLAY_CONFIG, request);
 

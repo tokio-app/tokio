@@ -1,5 +1,4 @@
 import { AlertTrigger, TokioPayload } from "../connector";
-import { CustomGift } from "../overlay";
 import { ActivityFeed, AlertTts, OverlayConfig, Profile } from "../../schemas";
 import { VoiceData } from "../store";
 
@@ -215,7 +214,6 @@ export interface AppEventsMap {
   [APP_EVENTS.SAVE_OVERLAY_CONFIG]: {
     id: string;
     config: OverlayConfig;
-    gifts: CustomGift[];
   };
   [APP_EVENTS.SEND_OVERLAY_DATA]: {
     id: string;

@@ -75,7 +75,6 @@ export function Overlays() {
             setSaving(true);
             window.api.emit(APP_EVENTS.SAVE_OVERLAY_CONFIG, {
               config: saved,
-              gifts,
               id: editing.id,
             });
           }}

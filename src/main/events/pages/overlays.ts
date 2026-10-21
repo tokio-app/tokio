@@ -212,7 +212,8 @@ events.push(
 
 events.push(
   APP_EVENTS.SAVE_OVERLAY_CONFIG,
-  async ({ overlayService, notifier }, e, { config, gifts, id }) => {
+  async ({ overlayService, notifier }, e, { config, id }) => {
+    const gifts = await overlayService.getGifts();
     const res = await overlayService.saveConfig(id, config, gifts);
     if (!res.success) throw new Error(`Unable to save overlay ${id}.`);
     e.reply(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, {

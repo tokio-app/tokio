@@ -247,7 +247,7 @@ describe("Overlays", () => {
     expect(sent(APP_EVENTS.SAVE_OVERLAY_CONFIG)).toEqual([]);
   });
 
-  it("saves the settings with the gifts, then updates the overlay", async () => {
+  it("saves the settings, then updates the overlay", async () => {
     const { user } = await customize();
     await loadConfig();
     const title = dialog().getByPlaceholderText("Type a title");
@@ -271,7 +271,6 @@ describe("Overlays", () => {
             ...rest,
           ],
         },
-        gifts: GIFTS,
         id: "gift-jar",
       },
     ]);
