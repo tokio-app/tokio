@@ -1,4 +1,5 @@
 import { AxiosError, AxiosHeaders } from "axios";
+import { inspect } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { prepareText, VoicesData } from "./common";
 import config from "./config";
@@ -156,16 +157,28 @@ describe("TikTokTTS", () => {
       },
     );
 
-    it("returns an HTTP error without a status code as it is", async () => {
-      const error = httpError("Bad Gateway");
-      post.mockRejectedValue(error);
+    it("fails with its own error for an HTTP error without a status code", async () => {
+      post.mockRejectedValue(httpError("Bad Gateway"));
 
-      await expect(
-        tts.generateBuffer("Hello", "en", "Jessie"),
-      ).resolves.toEqual({
-        success: false,
-        error,
-      });
+      const res = await tts.generateBuffer("Hello", "en", "Jessie");
+
+      expect(res.success).toBe(false);
+      expect(res.error?.message).toBe(
+        "TikTok TTS request failed: Request failed",
+      );
+    });
+
+    it("keeps the session cookie out of a failed request's error", async () => {
+      post.mockRejectedValue(
+        new AxiosError("timeout of 10000ms exceeded", "ECONNABORTED", {
+          headers: new AxiosHeaders({ Cookie: "sessionid=session-123" }),
+        }),
+      );
+
+      const res = await tts.generateBuffer("Hello", "en", "Jessie");
+
+      expect(res.error?.message).toContain("timeout of 10000ms exceeded");
+      expect(inspect(res.error)).not.toContain("session-123");
     });
 
     it("speaks English when no language is given", async () => {

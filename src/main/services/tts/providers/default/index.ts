@@ -75,6 +75,9 @@ export class TikTokTTS extends TTSProvider {
     } catch (error) {
       if (isAxiosError(error)) {
         this.checkStatusCode(error.response?.data?.status_code);
+        // The AxiosError holds the session cookie, so it must not reach the logs.
+        // oxlint-disable-next-line preserve-caught-error
+        throw new Error(`TikTok TTS request failed: ${error.message}`);
       }
       throw error;
     }
