@@ -17,6 +17,8 @@ export class MusicService extends ProviderService<MusicProvider> {
   private _music_queue: MusicQueue;
   private _onPlaybackError?: (id: string, error: unknown) => void;
   private _onSongChange?: (songs: MusicInfo[]) => void;
+  // When the last command was taken, for the cooldown
+  private _lastCommand = -Infinity;
   constructor() {
     super();
     this._queue = new TaskQueue();
@@ -109,10 +111,13 @@ export class MusicService extends ProviderService<MusicProvider> {
   public handle(chat: ChatEvent, settings: Profile["music"]) {
     const match = this._match(settings, chat);
     if (!match) return;
+    // One command per cooldown, whoever sends it
+    const now = Date.now();
+    if (now - this._lastCommand < settings.protection.cooldown * 1000) return;
+    this._lastCommand = now;
     const { control, args } = match;
 
     this._queue.setQueueOptions({
-      gapTime: settings.protection.cooldown,
       maxQueueLength: settings.protection.queue_length,
     });
 

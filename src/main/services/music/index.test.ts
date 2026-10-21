@@ -196,28 +196,34 @@ describe("MusicService", () => {
   });
 
   describe("protection", () => {
-    it("waits for the cooldown before the next request", async () => {
-      const { service, searched } = setup();
+    it("ignores commands until the cooldown has passed since the last one taken", async () => {
+      const { service, request, searched } = setup();
       const music = settings((m) => {
         m.protection.cooldown = 2;
       });
 
-      service.handle(chat("!play A"), music);
-      service.handle(chat("!play B"), music);
+      await request("!play A", music);
+      await vi.advanceTimersByTimeAsync(500);
+      service.handle(chat("!play B", { handle: "other" }), music);
+      await vi.advanceTimersByTimeAsync(1500);
+      await request("!play C", music);
+
+      expect(searched()).toEqual(["A", "C"]);
+    });
+
+    it("takes every command without a cooldown", async () => {
+      const { service, searched } = setup();
+
+      service.handle(chat("!play A"), settings());
+      service.handle(chat("!play B"), settings());
       await vi.advanceTimersByTimeAsync(0);
-      expect(searched()).toEqual(["A"]);
 
-      await vi.advanceTimersByTimeAsync(1999);
-      expect(searched()).toEqual(["A"]);
-
-      await vi.advanceTimersByTimeAsync(1);
       expect(searched()).toEqual(["A", "B"]);
     });
 
     it("drops requests past the queue length while they wait", async () => {
       const { service, searched } = setup();
       const music = settings((m) => {
-        m.protection.cooldown = 2;
         m.protection.queue_length = 1;
       });
 
@@ -448,14 +454,12 @@ describe("MusicService", () => {
 
   describe("lifecycle", () => {
     it("clearHandler drops waiting requests and empties the queue", async () => {
-      const { service, request, searched, played } = setup();
-      const music = settings((m) => {
-        m.protection.cooldown = 1;
-      });
-      await request("!play A", music);
-      service.handle(chat("!play B"), music);
-      service.handle(chat("!play C"), music);
-      await vi.advanceTimersByTimeAsync(0);
+      const { service, provider, request, searched, played } = setup();
+      await request("!play A");
+      // B's search never ends, so C waits behind it
+      provider.searchSong.mockImplementationOnce(() => new Promise(() => {}));
+      await request("!play B");
+      await request("!play C");
       expect(searched()).toEqual(["A", "B"]);
 
       service.clearHandler();
