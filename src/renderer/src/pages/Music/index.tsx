@@ -24,7 +24,7 @@ export function Music() {
   });
 
   return (
-    <Page>
+    <Page width="wide" layout="aside">
       <ProviderSection
         provider={settings.provider}
         update={scopeUpdater(update, "provider")}

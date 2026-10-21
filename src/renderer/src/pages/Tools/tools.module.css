@@ -1,8 +1,9 @@
 .notice {
-  padding: var(--space-2) var(--space-3);
-  border: 1px dashed var(--accent-primary);
-  border-radius: var(--radius-sm);
-  color: var(--font-primary);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background-tertiary);
+  color: var(--font-secondary);
   font-size: var(--font-md);
 }
 
@@ -21,22 +22,23 @@
 .item {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--background-secondary);
+  background: var(--background-tertiary);
 }
 
 .item_header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .item_name {
-  font-size: 18px;
-  font-weight: 500;
+  font-size: var(--font-lg);
+  font-weight: 600;
   color: var(--font-primary);
 }
 

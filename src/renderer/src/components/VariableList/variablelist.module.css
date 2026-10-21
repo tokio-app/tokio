@@ -4,12 +4,12 @@
   align-items: baseline;
   gap: var(--space-1) var(--space-2);
   color: var(--font-secondary);
-  font-size: var(--font-sm);
+  font-size: var(--font-xs);
+  font-weight: 500;
 }
 
 .label {
-  color: var(--font-primary);
-  font-weight: 600;
+  color: var(--font-secondary);
 }
 
 .variable {
@@ -19,9 +19,10 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
+  transition: color var(--transition-fast);
 }
 
 .variable:hover,
 .variable:focus-visible {
-  color: var(--accent-primary);
+  color: var(--font-primary);
 }

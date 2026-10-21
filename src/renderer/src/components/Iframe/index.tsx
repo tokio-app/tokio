@@ -41,7 +41,7 @@ export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
     <>
       {loading && (
         <div className={styles.loading_container}>
-          <PropagateLoader color="var(--accent-primary)" />
+          <PropagateLoader color="var(--font-secondary)" />
         </div>
       )}
       <iframe

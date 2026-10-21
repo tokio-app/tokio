@@ -3,7 +3,7 @@
 .tester {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .tester_btn {
@@ -16,8 +16,8 @@
   width: 120px;
   height: 32px;
   padding: var(--space-1) var(--space-2);
-  font-size: var(--font-lg);
-  font-weight: 700;
+  font-size: var(--font-md);
+  font-weight: 500;
 }
 
 /* REPLACEMENTS */
@@ -25,13 +25,13 @@
 .replacements {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .replacement {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .replacement_arrow {

@@ -19,8 +19,8 @@
 }
 
 .app_name {
-  font-size: var(--font-xl);
-  font-weight: 700;
+  font-size: var(--font-2xl);
+  font-weight: 600;
   color: var(--font-primary);
 }
 
@@ -89,8 +89,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--background-secondary);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .row_info {
@@ -115,11 +115,8 @@
 }
 
 .badge {
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-full);
-  background-color: var(--background-secondary);
   font-size: var(--font-xs);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--font-secondary);
 }
 

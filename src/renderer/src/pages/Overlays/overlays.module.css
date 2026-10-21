@@ -15,7 +15,7 @@
 .gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: var(--space-8) var(--space-6);
+  gap: var(--space-6);
 }
 
 /* On Official Overlays while installed ones have updates */

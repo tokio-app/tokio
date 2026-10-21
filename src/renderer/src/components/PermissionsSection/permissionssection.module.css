@@ -10,6 +10,8 @@
   width: 80px;
   height: 32px;
   padding: var(--space-1) var(--space-2);
+  font-size: var(--font-md);
+  font-weight: 500;
   transition: opacity var(--transition-fast);
 }
 

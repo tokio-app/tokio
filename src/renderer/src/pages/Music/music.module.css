@@ -1,12 +1,16 @@
 /* PROVIDER */
 
 .status {
-  font-size: var(--font-md);
-  font-weight: 600;
+  font-size: var(--font-sm);
+  font-weight: 500;
   color: var(--font-secondary);
 }
 
-.status_connected {
+.status > span {
+  color: var(--font-primary);
+}
+
+.status > .status_connected {
   color: var(--success);
 }
 
@@ -50,7 +54,7 @@
 .controls {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-2);
 }
 
 .control {

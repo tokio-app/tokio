@@ -105,8 +105,10 @@
   display: flex;
   flex-direction: column;
   height: 360px;
-  padding-right: var(--space-2);
   overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background-tertiary);
 }
 
 /* A gift: a button that picks it, or a label that checks it */
@@ -116,9 +118,8 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-1) 0;
+  padding: var(--space-2) var(--space-3);
   border: none;
-  border-bottom: 1px solid var(--background-secondary);
   background: none;
   color: var(--font-primary);
   font-size: var(--font-md);
@@ -127,9 +128,16 @@
   cursor: pointer;
 }
 
-.row:hover .name,
-.current .name {
-  color: var(--accent-primary);
+.row + .row {
+  border-top: 1px solid var(--border);
+}
+
+.row:hover {
+  background: var(--border);
+}
+
+.row.current {
+  background: var(--accent-soft);
 }
 
 .img {
@@ -151,6 +159,6 @@
 .status {
   margin: var(--space-4) 0;
   color: var(--font-secondary);
-  font-size: var(--font-md);
+  font-size: var(--font-sm);
   text-align: center;
 }
