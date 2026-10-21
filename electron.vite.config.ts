@@ -3,6 +3,7 @@ import { defineConfig } from "electron-vite";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import type { Plugin } from "vite";
+import { CSP } from "./src/main/config/csp";
 
 // NOTE: The bundler drops file header comments, keep this notice in sync with THIRD_PARTY_NOTICES.md.
 const MAIN_LICENSE_BANNER = `/*!
@@ -25,6 +26,21 @@ function licenseBanner(banner: string): Plugin {
         }
       }
     },
+  };
+}
+
+// Packaged pages load from file://, which the header set in initSession can't reach.
+function cspMeta(policy: string): Plugin {
+  return {
+    name: "tokio:csp",
+    apply: "build",
+    transformIndexHtml: () => [
+      {
+        tag: "meta",
+        attrs: { "http-equiv": "Content-Security-Policy", content: policy },
+        injectTo: "head-prepend",
+      },
+    ],
   };
 }
 
@@ -61,6 +77,6 @@ export default defineConfig({
         },
       },
     },
-    plugins: [react()],
+    plugins: [react(), cspMeta(CSP.prod)],
   },
 });

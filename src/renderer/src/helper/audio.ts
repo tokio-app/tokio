@@ -87,7 +87,7 @@ export class AudioQueue {
   }
 
   async enqueue(
-    input: string | Uint8Array | ArrayBuffer,
+    input: Uint8Array | ArrayBuffer,
     autoplay: boolean = true,
     { gain = 1, key, onEnded, speed, pitch }: EnqueueOptions = {},
   ) {
@@ -101,10 +101,7 @@ export class AudioQueue {
     try {
       let audioData: ArrayBuffer;
 
-      if (typeof input === "string") {
-        const response = await fetch(input);
-        audioData = await response.arrayBuffer();
-      } else if (
+      if (
         input instanceof Uint8Array &&
         input.byteOffset === 0 &&
         input.byteLength === input.buffer.byteLength &&
@@ -113,10 +110,7 @@ export class AudioQueue {
         // IPC hands over a view of its own buffer, so it's decoded without a copy.
         audioData = input.buffer;
       } else if (input instanceof Uint8Array) {
-        audioData = input.buffer.slice(
-          input.byteOffset,
-          input.byteOffset + input.byteLength,
-        ) as ArrayBuffer;
+        audioData = input.slice().buffer;
       } else {
         audioData = input;
       }
@@ -128,7 +122,7 @@ export class AudioQueue {
 
       if (this.pending() >= this.maxQueueLength) {
         console.warn(
-          "AudioQueue: Queue filled up while downloading. Dropping audio.",
+          "AudioQueue: Queue filled up while decoding. Dropping audio.",
         );
         return false;
       }

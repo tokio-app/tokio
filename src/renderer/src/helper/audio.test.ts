@@ -235,17 +235,6 @@ describe("AudioQueue", () => {
     expect(copied.byteLength).toBe(3);
   });
 
-  it("downloads a URL before decoding it", async () => {
-    const buffer = new ArrayBuffer(8);
-    const fetch = vi.fn(async () => ({ arrayBuffer: async () => buffer }));
-    vi.stubGlobal("fetch", fetch);
-    const queue = new AudioQueue();
-
-    expect(await queue.enqueue("https://example.com/a.mp3")).toBe(true);
-    expect(fetch).toHaveBeenCalledWith("https://example.com/a.mp3");
-    expect(tone.decode).toHaveBeenCalledWith(buffer);
-  });
-
   it("resolves false when the audio can't be decoded", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     tone.decode.mockRejectedValueOnce(new Error("Unable to decode"));

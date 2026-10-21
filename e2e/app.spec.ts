@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { CSP } from "../src/main/config/csp";
 
 // The app runs once for the whole file, in a temporary home folder, and the
 // tests follow a user through it in order.
@@ -85,6 +86,24 @@ test("keeps Node out of the page", async () => {
   }));
 
   expect(globals).toEqual({ api: true, require: false, process: false });
+});
+
+test("sets the production CSP on the page loaded from disk", async () => {
+  const policy = await page
+    .locator('meta[http-equiv="Content-Security-Policy"]')
+    .getAttribute("content");
+  const evalBlocked = await page.evaluate(() => {
+    try {
+      // oxlint-disable-next-line no-eval -- the CSP must block it
+      eval("1");
+      return false;
+    } catch {
+      return true;
+    }
+  });
+
+  expect(policy).toBe(CSP.prod);
+  expect(evalBlocked).toBe(true);
 });
 
 test("opens every page from the sidebar", async () => {
