@@ -17,10 +17,10 @@
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
-  border: 1px solid var(--background-primary);
+  border: 1px solid var(--border);
   border-left: 3px solid var(--level-color);
   border-radius: var(--radius-lg);
-  background-color: var(--background-secondary);
+  background-color: var(--background-tertiary);
   box-shadow: var(--shadow-popover);
   color: var(--font-primary);
   pointer-events: auto;

@@ -35,7 +35,7 @@
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background-color: var(--offline);
+  background-color: var(--font-muted);
 }
 
 .dot_on {
@@ -154,7 +154,7 @@
   border-top: 1px solid var(--background-secondary);
 }
 
-/* The overlay server has a dot where the others have a toggle */
+/* The overlay server has a dot where the others have a toggle, as wide */
 .feature_name {
   display: flex;
   align-items: center;
@@ -166,7 +166,7 @@
 .feature_dot {
   display: flex;
   justify-content: center;
-  width: 40px;
+  width: 36px;
 }
 
 .feature_status {

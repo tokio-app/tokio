@@ -8,6 +8,7 @@
   position: relative;
 }
 
+/* Neutral: rose is for the LIVE state, red for unread errors */
 .badge {
   position: absolute;
   top: 0;
@@ -19,10 +20,11 @@
   height: 16px;
   padding: 0 var(--space-1);
   border-radius: var(--radius-full);
-  background-color: var(--accent-primary);
+  background-color: var(--background-secondary-hover);
   color: var(--font-primary);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
@@ -39,8 +41,8 @@
   flex-direction: column;
   width: 340px;
   max-height: 420px;
-  border: 1px solid var(--background-primary);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background-color: var(--background-secondary);
   box-shadow: var(--shadow-popover);
 }
@@ -50,7 +52,7 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  border-bottom: 1px solid var(--background-primary);
+  border-bottom: 1px solid var(--border);
 }
 
 .title {
@@ -84,7 +86,7 @@
 }
 
 .item:hover {
-  background-color: var(--background-secondary-hover);
+  background-color: var(--border);
 }
 
 .message {
@@ -99,5 +101,6 @@
   flex-shrink: 0;
   color: var(--font-secondary);
   font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
   line-height: 1.6;
 }

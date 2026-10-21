@@ -5,15 +5,28 @@ import styles from "./page.module.css";
 type PageProps = {
   // wide fits tables such as the alerts list
   width?: "default" | "wide";
+  // aside puts each section's header in a column left of its content, for
+  // pages of settings
+  layout?: "stack" | "aside";
   children: ReactNode;
 };
 
 /**
  * Centered page column. Sections inside are separated by a divider.
  */
-export function Page({ width = "default", children }: PageProps) {
+export function Page({
+  width = "default",
+  layout = "stack",
+  children,
+}: PageProps) {
   return (
-    <div className={cx(styles.page, width === "wide" && styles.page_wide)}>
+    <div
+      className={cx(
+        styles.page,
+        width === "wide" && styles.page_wide,
+        layout === "aside" && styles.page_aside,
+      )}
+    >
       {children}
     </div>
   );
@@ -63,7 +76,7 @@ export function Section({
           {actions && <div className={styles.section_actions}>{actions}</div>}
         </header>
       )}
-      {children}
+      <div className={styles.section_body}>{children}</div>
     </section>
   );
 }

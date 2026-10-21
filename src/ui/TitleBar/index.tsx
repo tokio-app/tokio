@@ -27,8 +27,10 @@ type Props = {
   // Which window the controls act on
   target: keyof typeof WINDOW_EVENTS;
   logo: string;
-  // 40px tall instead of 56px, for the music window's nav view
+  // 40px tall instead of 44px, for the music window's nav view
   compact?: boolean;
+  // Connected to a LIVE: the bar lights up like a camera's tally light
+  live?: boolean;
   // Rendered before the window controls
   children?: ReactNode;
 };
@@ -37,7 +39,7 @@ type Props = {
  * Draggable window header with the logo and the minimize, maximize and close
  * controls.
  */
-export function TitleBar({ target, logo, compact, children }: Props) {
+export function TitleBar({ target, logo, compact, live, children }: Props) {
   const events = WINDOW_EVENTS[target];
   const [maximized, setMaximized] = useState(false);
 
@@ -50,9 +52,19 @@ export function TitleBar({ target, logo, compact, children }: Props) {
   );
 
   return (
-    <header className={`${styles.bar} ${compact ? styles.compact : ""}`}>
-      <div className={styles.logo}>
-        <img src={logo} alt="都" />
+    <header
+      className={`${styles.bar} ${compact ? styles.compact : ""} ${
+        live ? styles.live : ""
+      }`}
+    >
+      <div className={styles.brand}>
+        <img className={styles.logo} src={logo} alt="都" />
+        {live && (
+          <span className={styles.tally}>
+            <span className={styles.tally_dot} aria-hidden="true" />
+            LIVE
+          </span>
+        )}
       </div>
       <div className={styles.items}>
         {children}

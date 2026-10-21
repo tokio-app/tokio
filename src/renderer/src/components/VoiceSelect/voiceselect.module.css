@@ -1,20 +1,9 @@
 /* FIELD (looks like a Select) */
 
 .field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  width: 100%;
+  composes: select_display from "../Elements/elements.module.css";
   height: var(--control-height);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--background-primary);
-  background-color: var(--background-secondary);
-  color: var(--font-primary);
-  font-size: var(--font-md);
   text-align: left;
-  cursor: pointer;
 }
 
 .field_label {
@@ -26,6 +15,7 @@
 
 .chevron {
   flex-shrink: 0;
+  color: var(--font-secondary);
 }
 
 /* Name and details, shared by the field and the rows. The details give way

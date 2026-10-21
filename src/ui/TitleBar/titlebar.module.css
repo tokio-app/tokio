@@ -1,31 +1,53 @@
 .bar {
   flex-shrink: 0;
-  height: 56px;
+  height: 44px;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: var(--background-secondary);
-  border-bottom: 1px solid var(--background-primary);
+  background-color: var(--background-primary);
+  border-bottom: 1px solid var(--border);
+  transition: box-shadow 0.3s ease-out;
   -webkit-app-region: drag;
 }
 
+/* TITLE_BAR_HEIGHT in src/main/services/music/common matches it */
 .compact {
   height: 40px;
 }
 
-.logo {
-  width: 32px;
-  height: 32px;
-  margin-left: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* On air: a steady rose line along the window's top edge */
+.live {
+  box-shadow: inset 0 2px 0 var(--accent-primary);
 }
 
-.logo img {
-  width: 28px;
-  height: 28px;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: var(--space-4);
+}
+
+.logo {
+  width: 24px;
+  height: 24px;
+}
+
+.tally {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--font-primary);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.tally_dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-primary);
 }
 
 .items {
@@ -48,14 +70,29 @@
   height: 100%;
   background-color: transparent;
   border: none;
-  color: var(--font-primary);
+  color: var(--font-secondary);
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .control:hover {
-  background-color: var(--background-secondary-hover);
+  background-color: var(--background-secondary);
+  color: var(--font-primary);
 }
 
 .close:hover {
   background-color: var(--danger);
+}
+
+/* Inside, since the controls touch the window's edges */
+.control:focus-visible {
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: none;
+  }
 }

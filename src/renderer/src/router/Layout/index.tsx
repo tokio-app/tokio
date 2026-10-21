@@ -20,16 +20,16 @@ import { VscTools } from "react-icons/vsc";
 import styles from "./layout.module.css";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Home", icon: <FiHome size={22} /> },
-  { to: "/overlays", label: "Overlays", icon: <LuMonitorCog size={22} /> },
-  { to: "/tts", label: "TTS", icon: <FiVolume2 size={22} /> },
-  { to: "/alerts", label: "Alerts", icon: <BsLightningCharge size={24} /> },
-  { to: "/music", label: "Music", icon: <FiMusic size={22} /> },
+  { to: "/", label: "Home", icon: <FiHome size={20} /> },
+  { to: "/overlays", label: "Overlays", icon: <LuMonitorCog size={20} /> },
+  { to: "/tts", label: "TTS", icon: <FiVolume2 size={20} /> },
+  { to: "/alerts", label: "Alerts", icon: <BsLightningCharge size={22} /> },
+  { to: "/music", label: "Music", icon: <FiMusic size={20} /> },
   // Pinned to the bottom of the sidebar from here on
-  { to: "/tools", label: "Tools", icon: <VscTools size={22} />, bottom: true },
+  { to: "/tools", label: "Tools", icon: <VscTools size={20} />, bottom: true },
   // Shows the license notices, keep it in the sidebar
-  { to: "/about", label: "About", icon: <FiInfo size={22} /> },
-  { to: "/settings", label: "Settings", icon: <FiSettings size={22} /> },
+  { to: "/about", label: "About", icon: <FiInfo size={20} /> },
+  { to: "/settings", label: "Settings", icon: <FiSettings size={20} /> },
 ] as const;
 
 export function Layout() {
@@ -62,7 +62,7 @@ export function Layout() {
 
   return (
     <div className={styles.container}>
-      <TitleBar target="main" logo={Logo}>
+      <TitleBar target="main" logo={Logo} live={isConnected}>
         <ProfileDropdown
           disabled={isConnected}
           profiles={profiles}
