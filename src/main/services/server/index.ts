@@ -19,10 +19,6 @@ export class ServerService extends Service {
   private _port: number;
   // Folders served under /<id>/, keyed by id.
   private _routes = new Map<string, string>();
-  private _boundEvents: {
-    event: TOKIO_EVENTS;
-    handler: BoundHandler;
-  }[] = [];
 
   // NOTE: Overlays connect to SERVER_PORT, other ports are for tests.
   constructor(port: number = SERVER_PORT) {
@@ -183,15 +179,7 @@ export class ServerService extends Service {
         const handler: BoundHandler = (data) => this.broadcast(event, data);
         connectorService.on(event, handler);
         musicService.on(event, handler);
-        this._boundEvents.push({ event, handler });
       });
-  }
-
-  public cleanupEvents(connectorService: TikTokConnectorService) {
-    this._boundEvents.forEach(({ event, handler }) => {
-      connectorService.off(event, handler);
-    });
-    this._boundEvents = [];
   }
 
   // Whether an overlay connected with the id got the payload.

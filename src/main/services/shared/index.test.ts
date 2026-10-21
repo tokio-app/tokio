@@ -54,7 +54,7 @@ describe("ProviderService", () => {
     service.setProvider("b", "secret");
 
     expect(b.key).toBe("secret");
-    expect(service.getActiveProvider()).toEqual({
+    expect(service.getProviders().find((p) => p.active)).toEqual({
       name: "b",
       active: true,
       key: "secret",
@@ -67,7 +67,7 @@ describe("ProviderService", () => {
 
     service.setProvider("missing", "secret");
 
-    expect(service.getActiveProvider()?.name).toBe("a");
+    expect(service.getProviders().find((p) => p.active)?.name).toBe("a");
   });
 
   it("setKey only reaches the active provider", () => {

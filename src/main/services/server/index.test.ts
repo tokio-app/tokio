@@ -276,20 +276,5 @@ describe("ServerService", () => {
     it("reports a send to an id with no overlay connected", () => {
       expect(server.sendToClient("missing", "ping")).toBe(false);
     });
-
-    it("stops forwarding after cleanupEvents", async () => {
-      const client = await connect("a");
-      const onMessage = vi.fn();
-      client.on("message", onMessage);
-
-      server.cleanupEvents(connector);
-      provider.emit(TOKIO_EVENTS.FOLLOW, follow);
-      // Anything sent before this arrives first.
-      const ping = nextMessage(client);
-      server.sendToClient("a", "ping");
-      await ping;
-
-      expect(onMessage).toHaveBeenCalledOnce();
-    });
   });
 });

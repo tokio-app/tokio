@@ -1,5 +1,4 @@
 import { APP_HOSTNAME, SERVER_PORT } from "@/common/util";
-import dns from "dns";
 import type { WebContents } from "electron";
 
 const OVERLAY_HOSTS = ["localhost", "127.0.0.1", "[::1]", APP_HOSTNAME];
@@ -33,17 +32,5 @@ export function stayOnPage(contents: WebContents) {
     if (withoutHash(event.url) !== withoutHash(contents.getURL())) {
       event.preventDefault();
     }
-  });
-}
-
-export async function checkInternetConnection() {
-  return new Promise<boolean>((res) => {
-    dns.lookup("google.com", { family: 4, hints: 0 }, (err, address) => {
-      if (err && !address) {
-        res(false);
-      } else {
-        res(true);
-      }
-    });
   });
 }

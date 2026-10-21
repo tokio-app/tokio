@@ -14,22 +14,14 @@ interface IProvider {
   setKey(key: string): void;
 }
 
-export abstract class ProviderServiceBase<T>
+export class ProviderService<T extends IProvider>
   extends Service
   implements IProvider
 {
   protected _current:
     { name: string; provider: T | null; key: string } | undefined;
   protected _providerPool: Map<string, T> | undefined;
-  abstract addProvider(name: string, provider: T, start?: boolean): void;
-  abstract setProvider(name: string, key?: string): void;
-  abstract getProviders(): Provider[];
-  abstract setKey(key: string): void;
-}
 
-export class ProviderService<
-  T extends IProvider,
-> extends ProviderServiceBase<T> {
   constructor() {
     super();
     this._current = {
@@ -70,15 +62,6 @@ export class ProviderService<
       active: s == this._current?.name,
       key: this._current?.key || "",
     }));
-  }
-
-  public getActiveProvider(): Provider | null {
-    if (!this._current) return null;
-    return {
-      name: this._current?.name,
-      active: true,
-      key: this._current?.key,
-    };
   }
 
   // NOTE: MUST Override this in the child class!
