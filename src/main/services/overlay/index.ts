@@ -340,6 +340,14 @@ export class OverlayService extends Service {
       const res = await processOverlay(dir, this._yaml, false);
       if (!res.success) return { success: false };
 
+      // First, so settings the schema refuses never reach the HTML.
+      const saved = await this._yaml.saveFile(
+        res.paths!.config,
+        OverlayConfigSchema,
+        config,
+      );
+      if (!saved) return { success: false };
+
       const html = await processHTML(
         id,
         res.data!.htmlContent,
@@ -349,13 +357,6 @@ export class OverlayService extends Service {
         gifts,
       );
       if (!html.success) return { success: false };
-
-      const saved = await this._yaml.saveFile(
-        res.paths!.config,
-        OverlayConfigSchema,
-        config,
-      );
-      if (!saved) return { success: false };
 
       return { success: true, data: html.parsed };
     } catch (error) {

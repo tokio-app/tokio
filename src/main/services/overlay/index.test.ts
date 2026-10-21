@@ -762,6 +762,29 @@ describe("OverlayService", () => {
     expect((await service.getConfig("title")).data).toEqual(res.data);
   });
 
+  it("saves nothing when the schema refuses the config", async () => {
+    const dir = join(folder, "title");
+    await configurable(dir);
+    const read = () =>
+      Promise.all(
+        ["index.html", "config.yaml"].map((f) =>
+          readFile(join(dir, f), "utf-8"),
+        ),
+      );
+    const before = await read();
+    const res = await service.getConfig("title");
+    const field = res.data!.fields[0];
+    if (field.type !== "input") throw new Error("Expected an input field");
+    field.attributes.value = "Changed";
+    // Two sections with the same id
+    res.data!.sections.push(res.data!.sections[0]);
+
+    expect(await service.saveConfig("title", res.data!, gifts)).toEqual({
+      success: false,
+    });
+    expect(await read()).toEqual(before);
+  });
+
   it("fails to get the config of a missing overlay", async () => {
     expect(await service.getConfig("missing")).toEqual({
       success: false,
