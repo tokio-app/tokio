@@ -706,6 +706,20 @@ describe("AlertsService", () => {
       expect(fetchMock).toHaveBeenCalledOnce();
     });
 
+    it("saves nothing when MyInstants doesn't send the sound", async () => {
+      const fetchMock = vi.fn(
+        async () => new Response("gone", { status: 404 }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const failed = await service.downloadSound(SOUND_URL, "BRUH");
+      await service.downloadSound(SOUND_URL, "BRUH");
+
+      expect(failed.success).toBe(false);
+      expect(await readdir(sounds)).toEqual(["ding.mp3"]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
     it("saves a sound whole or not at all", async () => {
       const fetchMock = vi.fn(async () => new Response(bytes(1, 1)));
       vi.stubGlobal("fetch", fetchMock);
