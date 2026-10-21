@@ -70,7 +70,8 @@ describe("Color", () => {
     const { user, onChange, input } = await typeColor("fff8");
     expect(onChange).toHaveBeenLastCalledWith("#ffffff88");
 
-    await user.tab();
+    // Back to the picker's alpha slider
+    await user.tab({ shift: true });
 
     expect(input).toHaveValue("#ffffff88");
   });
@@ -104,6 +105,35 @@ describe("Color", () => {
     ).not.toBeInTheDocument();
     expect(swatch).toHaveFocus();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("sends Tab out of the picker back to its swatch, inside the modal", async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal title="Settings" onClose={vi.fn()}>
+        <Color value="#ff0000" onChange={vi.fn()} />
+      </Modal>,
+    );
+    const swatch = screen.getByRole("button", { name: "Choose color" });
+
+    await user.click(swatch);
+    await user.click(screen.getByPlaceholderText("Type a color"));
+    await user.tab();
+
+    expect(
+      screen.queryByPlaceholderText("Type a color"),
+    ).not.toBeInTheDocument();
+    expect(swatch).toHaveFocus();
+
+    await user.click(swatch);
+    const [first] = screen.getAllByRole("slider");
+    first.focus();
+    await user.tab({ shift: true });
+
+    expect(
+      screen.queryByPlaceholderText("Type a color"),
+    ).not.toBeInTheDocument();
+    expect(swatch).toHaveFocus();
   });
 
   it("closes on a click outside", async () => {

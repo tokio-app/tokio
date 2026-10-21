@@ -29,9 +29,23 @@ export function Color({ value, onChange }: Props) {
       ref={anchorRef}
       className={styles.color_anchor}
       onKeyDown={(e) => {
-        if (e.key !== "Escape" || !open) return;
-        // Closes the picker, not a modal it's in
-        e.stopPropagation();
+        if (!open) return;
+        if (e.key === "Tab") {
+          // The picker is portaled after the page, so Tab out of it would
+          // leave a dialog it's in: it goes back to the swatch instead
+          const items =
+            popoverRef.current?.querySelectorAll<HTMLElement>(
+              "[tabindex], input",
+            ) ?? [];
+          const edge = e.shiftKey ? items[0] : items[items.length - 1];
+          if (!edge || document.activeElement !== edge) return;
+          e.preventDefault();
+        } else if (e.key === "Escape") {
+          // Closes the picker, not a modal it's in
+          e.stopPropagation();
+        } else {
+          return;
+        }
         close();
         swatchRef.current?.focus();
       }}
