@@ -115,6 +115,11 @@ export class FakeBrowserWindow extends EventEmitter {
     this.state = "normal";
     this.emit("unmaximize");
   });
+  readonly restore = vi.fn(() => {
+    this.state = "normal";
+    this.emit("restore");
+  });
+  readonly focus = vi.fn();
   // Listeners of "close" can cancel it, then "closed" follows
   readonly close = vi.fn(() => {
     if (this.closing || this.destroyed) return;
@@ -169,6 +174,10 @@ export class FakeBrowserWindow extends EventEmitter {
     return this.state === "normal";
   }
 
+  isMinimized() {
+    return this.state === "minimized";
+  }
+
   isDestroyed() {
     return this.destroyed;
   }
@@ -207,6 +216,9 @@ function createFakes() {
       getAppPath: vi.fn(() => "/fake/app"),
       whenReady: vi.fn(() => Promise.resolve()),
       quit: vi.fn(),
+      requestSingleInstanceLock: vi.fn(() => true),
+      getLocale: vi.fn(() => "en-US"),
+      getLocaleCountryCode: vi.fn(() => "US"),
     }),
     session: {
       defaultSession: {
