@@ -17,133 +17,111 @@
   }
 }
 
+/* The window's own corners: it's frameless and transparent around them */
 .container {
   -webkit-app-region: drag;
-  background: radial-gradient(circle at center, #111116 0%, #040404 100%);
-  height: 100vh;
-  width: 100vw;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
-  animation: fadeIn 0.5s ease-in-out;
-  font-family:
-    "Inter",
-    system-ui,
-    -apple-system,
-    sans-serif;
-
+  border: 1px solid var(--border);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* One of the brand's two warm spots: a rose wash behind the logo */
+  background:
+    radial-gradient(circle at 50% 36%, var(--accent-soft), transparent 55%),
+    var(--background-primary);
+  animation: fadeIn 0.5s ease-in-out;
 }
 
 .glow_wrapper {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.glow_wrapper::before {
-  content: "";
-  position: absolute;
-  top: 40%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 200px;
-  height: 80px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 51, 102, 0.15),
-    rgba(0, 212, 255, 0.15)
-  );
-  filter: blur(40px);
-  z-index: 0;
-  pointer-events: none;
 }
 
 .content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
-  position: relative;
-  z-index: 1;
-  padding: 30px;
-  border-radius: 10px;
+  gap: var(--space-5);
+  padding: var(--space-8);
 }
 
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo img {
+  width: 56px;
+  height: 56px;
+}
+
+/* The wordmark: "Tok" in Paper, "io" in rose */
 .app_name {
   display: flex;
-  flex-direction: row;
-  align-items: center;
+  align-items: baseline;
 }
 
 .app_name h1 {
+  margin: 0;
+  color: var(--font-primary);
   font-size: 56px;
   font-weight: 800;
-  margin: 0;
-  letter-spacing: -1px;
-  color: #ffffff;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .app_name .accent_red {
+  margin-left: 1px;
   color: var(--accent-primary);
-  margin-left: 2px;
-  text-shadow: 0 0 10px rgba(255, 51, 102, 0.4);
 }
 
 .loading {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .status_text {
-  font-size: 12px;
-  color: #888888;
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
   font-weight: 500;
-  letter-spacing: 0.5px;
   animation: pulse 2s infinite ease-in-out;
 }
 
 .footer {
   position: absolute;
-  bottom: 24px;
+  bottom: var(--space-6);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-1);
   width: 100%;
-  padding: 0 30px;
+  padding: 0 var(--space-8);
   text-align: center;
 }
 
 .version {
-  font-size: 12px;
-  color: #555555;
-  font-weight: 600;
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .disclaimer {
-  font-size: 10px;
-  color: #333333;
-  line-height: 1.5;
+  color: var(--font-secondary);
+  font-size: 11px;
 }
 
-.logo {
-  background-color: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: absolute;
-  right: 14px;
-  top: 38px;
-}
-
-.logo img {
-  width: 28px;
-  height: 28px;
+@media (prefers-reduced-motion: reduce) {
+  .container,
+  .status_text {
+    animation: none;
+  }
 }
