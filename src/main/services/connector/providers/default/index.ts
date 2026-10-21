@@ -18,6 +18,7 @@ import {
   type User,
   type UserIdentity,
 } from "@tokioapp/connector";
+import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { app } from "electron";
 import { EventEmitter } from "events";
@@ -95,7 +96,9 @@ export class TikTokLiveConnector extends ConnectorProvider {
         // rest is routine.
         logger: (level, message, data) => {
           if (level === "warn") {
-            Logger.warn(`<Connector> ${message}`, this._logFile);
+            // A drop's error holds the close code and reason
+            const why = data?.error ? ` -- ${formatError(data.error)}` : "";
+            Logger.warn(`<Connector> ${message}${why}`, this._logFile);
           } else if (level === "error") {
             const error = data?.error;
             const code = isConnectorError(error) ? error.code : message;

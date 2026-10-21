@@ -281,7 +281,7 @@ describe("TikTokLiveConnector", () => {
     });
   });
 
-  it("logs the connection's warnings and errors, not its routine lines", async () => {
+  it("logs the connection's warnings with their reason and errors, not routine lines", async () => {
     const warn = vi.spyOn(Logger, "warn");
     const error = vi.spyOn(Logger, "error");
     const info = vi.spyOn(Logger, "info");
@@ -289,18 +289,26 @@ describe("TikTokLiveConnector", () => {
     await connected();
     const log = connection().options.logger!;
     const cause = new Error("closed");
+    const kicked = new WebSocketError("Closed with code 4005 (kicked)");
 
     log("warn", "The connection dropped (wsClose): reconnecting", {
-      error: cause,
+      error: kicked,
     });
+    log("warn", "The signer named a room id that isn't one");
     log("error", "Gave up reconnecting after 10 attempts", { error: cause });
     log("info", "Connected to room 1");
     log("debug", "Opening the WebSocket");
 
-    expect(warn).toHaveBeenCalledExactlyOnceWith(
-      "<Connector> The connection dropped (wsClose): reconnecting",
-      "connector.log",
-    );
+    expect(warn.mock.calls).toEqual([
+      [
+        "<Connector> The connection dropped (wsClose): reconnecting -- Closed with code 4005 (kicked)",
+        "connector.log",
+      ],
+      [
+        "<Connector> The signer named a room id that isn't one",
+        "connector.log",
+      ],
+    ]);
     expect(error).toHaveBeenCalledExactlyOnceWith(
       "<Connector> Gave up reconnecting after 10 attempts",
       "connector.log",
