@@ -336,6 +336,28 @@ describe("Home", () => {
       );
     });
 
+    it("keeps an emoji initial whole", async () => {
+      await renderApp();
+
+      await session({
+        activity: [
+          {
+            id: 1,
+            type: "follow",
+            user: { handle: "sora", name: "🌸sora", picture: "" },
+          },
+          {
+            id: 2,
+            type: "follow",
+            user: { handle: "kai", name: "🇯🇵kai", picture: "" },
+          },
+        ],
+      });
+
+      expect(within(events()[0]).getByText("🌸")).toBeInTheDocument();
+      expect(within(events()[1]).getByText("🇯🇵")).toBeInTheDocument();
+    });
+
     it("says what it shows before connecting", async () => {
       await renderApp();
 

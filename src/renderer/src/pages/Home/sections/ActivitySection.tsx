@@ -17,15 +17,19 @@ interface Props {
   onFeedSettings: () => void;
 }
 
+// Splits a name into what shows as one character, a flag or emoji included
+const characters = new Intl.Segmenter();
+
 function Avatar({ user }: { user: ActivityUser }) {
   if (user.picture) {
     return (
       <img className={styles.avatar} src={user.picture} alt="" loading="lazy" />
     );
   }
+  const [initial] = characters.segment(user.name);
   return (
     <span className={styles.avatar} aria-hidden="true">
-      {user.name.charAt(0).toUpperCase()}
+      {initial?.segment.toUpperCase()}
     </span>
   );
 }
