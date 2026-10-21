@@ -82,12 +82,16 @@ export class ServerService extends Service {
           ),
         );
         this._wss.on("connection", (client, req) => {
-          const url = new URL(
-            req.url || "/",
-            `http://localhost:${SERVER_PORT}`,
+          // Unhandled, a bad frame would throw in main. ws closes the socket.
+          client.on("error", (err) =>
+            Logger.warn(
+              `<WebSocket> Client ${clientId} error -- ${formatError(err)}`,
+              this._logFile,
+            ),
           );
-
-          const clientId = url.searchParams.get("id") || randomUUID();
+          // URL.parse, as a request target like "http://[" makes new URL throw.
+          const url = URL.parse(req.url ?? "/", "http://localhost");
+          const clientId = url?.searchParams.get("id") || randomUUID();
 
           this._wss?.addClient(clientId, client);
           Logger.info(
@@ -102,13 +106,6 @@ export class ServerService extends Service {
               this._logFile,
             );
           });
-          // Unhandled, a bad frame would throw in main. ws closes the socket.
-          client.on("error", (err) =>
-            Logger.warn(
-              `<WebSocket> Client ${clientId} error -- ${formatError(err)}`,
-              this._logFile,
-            ),
-          );
         });
         Logger.success(
           `<Server> Server running on port ${this._port}`,
