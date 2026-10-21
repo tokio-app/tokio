@@ -75,11 +75,14 @@ export function ProviderSection({
           isSpotify && styles.expandable_open,
           connected && styles.locked,
         )}
+        // Only CSS collapses it
+        aria-hidden={!isSpotify || undefined}
       >
         <div className={styles.expandable_content}>
           <Field label="Spotify Client ID">
             <Input
               type="password"
+              tabIndex={isSpotify ? undefined : -1}
               className={styles.key_input}
               placeholder="Enter your Spotify Client ID..."
               value={provider.key}

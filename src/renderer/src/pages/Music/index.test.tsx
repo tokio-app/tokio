@@ -111,6 +111,21 @@ describe("Music", () => {
     });
   });
 
+  // Only CSS hides it while YouTube is selected
+  it("keeps the hidden Client ID out of the keyboard's reach", async () => {
+    const { user } = await setup(youtube);
+    const connect = connectButton();
+
+    const reached: Element[] = [];
+    while (document.activeElement !== connect && reached.length < 50) {
+      await user.tab();
+      reached.push(document.activeElement!);
+    }
+
+    expect(reached).toContain(connect);
+    expect(reached).not.toContain(clientId());
+  });
+
   it("connects with the provider shown, loading until main answers", async () => {
     const { user } = await setup(youtube);
     const connect = connectButton();
