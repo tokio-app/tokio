@@ -1,3 +1,4 @@
+import { ProfileSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -12,6 +13,19 @@ import { ReplyEvent } from "@/types";
 import { dialog } from "electron";
 
 const events = createStack("system");
+
+const MIN_NAME = ProfileSchema.shape.name.minLength ?? 1;
+
+// A shorter name would make the profile fail to load.
+const assertNameLong = (name: string) => {
+  if (name.length < MIN_NAME) {
+    throw new AppFailure(
+      FEEDBACK_CODES.PROFILE_NAME_INVALID,
+      `A profile name needs at least ${MIN_NAME} characters.`,
+      { level: "warning" },
+    );
+  }
+};
 
 // Two profiles can't share a name, whatever its case and surrounding spaces.
 const assertNameFree = (store: StoreManagerService, name: string) => {
@@ -54,6 +68,7 @@ events.push(
   APP_EVENTS.CREATE_PROFILE,
   async ({ storeManagerService, notifier }, e, { name: input }) => {
     const name = input.trim();
+    assertNameLong(name);
     assertNameFree(storeManagerService, name);
     const fileName = await storeManagerService.profileFileFor(name);
     const res = await storeManagerService.createNewProfile(fileName, name);
@@ -82,6 +97,7 @@ events.push(
   APP_EVENTS.CLONE_PROFILE,
   async ({ storeManagerService, notifier }, e, { name: input, ref }) => {
     const name = input.trim();
+    assertNameLong(name);
     assertNameFree(storeManagerService, name);
     const fileName = await storeManagerService.profileFileFor(name);
     const res = await storeManagerService.cloneProfile(ref, fileName, name);

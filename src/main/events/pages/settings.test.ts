@@ -171,6 +171,25 @@ describe("settings events", () => {
         ]);
       },
     );
+
+    it.each(["ab", "  a  "])('refuses "%s", a name too short', async (name) => {
+      const store = profileStore();
+      const h = createHandler({ storeManagerService: store });
+
+      await h.invoke(settings, APP_EVENTS.CREATE_PROFILE, { name });
+
+      const message = "A profile name needs at least 3 characters.";
+      expect(store.createNewProfile).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.CREATE_PROFILE)).toEqual([
+        {
+          success: false,
+          error: { code: FEEDBACK_CODES.PROFILE_NAME_INVALID, message },
+        },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "warning", message }),
+      ]);
+    });
   });
 
   describe("CLONE_PROFILE", () => {
@@ -256,6 +275,28 @@ describe("settings events", () => {
         ]);
       },
     );
+
+    it.each(["ab", "  a  "])('refuses "%s", a name too short', async (name) => {
+      const store = profileStore();
+      const h = createHandler({ storeManagerService: store });
+
+      await h.invoke(settings, APP_EVENTS.CLONE_PROFILE, {
+        name,
+        ref: "default.json",
+      });
+
+      const message = "A profile name needs at least 3 characters.";
+      expect(store.cloneProfile).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.CLONE_PROFILE)).toEqual([
+        {
+          success: false,
+          error: { code: FEEDBACK_CODES.PROFILE_NAME_INVALID, message },
+        },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "warning", message }),
+      ]);
+    });
   });
 
   describe("SET_PROFILE", () => {

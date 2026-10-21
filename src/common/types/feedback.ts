@@ -20,6 +20,7 @@ export enum FEEDBACK_CODES {
   PROFILE_CLONE_FAILED = "profile_clone_failed",
   PROFILE_LOCKED = "profile_locked",
   PROFILE_EXISTS = "profile_exists",
+  PROFILE_NAME_INVALID = "profile_name_invalid",
   PROFILE_IMPORT_FAILED = "profile_import_failed",
   PROFILE_EXPORT_FAILED = "profile_export_failed",
   PROVIDER_UPDATE_FAILED = "provider_update_failed",
