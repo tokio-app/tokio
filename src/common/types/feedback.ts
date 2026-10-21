@@ -4,7 +4,6 @@ export enum FEEDBACK_CODES {
   UNKNOWN = "unknown",
 
   // SYSTEM
-  APP_LOADED = "app_loaded",
   PROFILE_CREATED = "profile_created",
   PROFILE_CLONED = "profile_cloned",
   PROFILE_SWITCHED = "profile_switched",

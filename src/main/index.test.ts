@@ -202,14 +202,14 @@ describe("main process entry", () => {
     const { win } = await start();
     const notifier = mocks.deps!.notifier;
 
-    notifier.info("system", FEEDBACK_CODES.APP_LOADED, "Tokio is ready.");
+    notifier.info("system", FEEDBACK_CODES.UPDATE_READY, "Update ready.");
     win.close();
-    notifier.info("system", FEEDBACK_CODES.APP_LOADED, "Too late.");
+    notifier.info("system", FEEDBACK_CODES.UPDATE_READY, "Too late.");
 
     expect(win.webContents.send.mock.calls).toEqual([
       [
         APP_EVENTS_RESPONSE.NOTIFY,
-        expect.objectContaining({ message: "Tokio is ready." }),
+        expect.objectContaining({ message: "Update ready." }),
       ],
     ]);
   });
