@@ -125,10 +125,14 @@ export class TikTokLiveConnector extends ConnectorProvider {
     await this._connection?.disconnect();
   }
 
-  // Still connected while the connection tries to come back.
+  // Also while connecting and coming back, so a profile can't switch then.
   public isConnected(): boolean {
     const state = this._connection?.state;
-    return state === "connected" || state === "reconnecting";
+    return (
+      state === "connecting" ||
+      state === "connected" ||
+      state === "reconnecting"
+    );
   }
 
   public async fetchGifts(): Promise<GiftResponse> {

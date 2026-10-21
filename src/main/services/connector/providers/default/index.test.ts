@@ -211,6 +211,20 @@ describe("TikTokLiveConnector", () => {
       expect(connector.isConnected()).toBe(false);
     });
 
+    it("counts as connected while connecting", async () => {
+      connector.setKey("euler-key");
+      let open!: () => void;
+      live.connect.gate = new Promise((resolve) => (open = resolve));
+
+      const connecting = connector.connect("streamer");
+      const during = connector.isConnected();
+      open();
+      await connecting;
+
+      expect(during).toBe(true);
+      expect(connector.isConnected()).toBe(true);
+    });
+
     it("listens before connecting, and says it's connected first", async () => {
       const onConnected = capture(TOKIO_EVENTS.CONNECTED);
       const onChat = capture(TOKIO_EVENTS.CHAT);
