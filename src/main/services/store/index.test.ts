@@ -96,6 +96,21 @@ describe("StoreManagerService", () => {
       ]);
     });
 
+    it("changes no profile after a failed start", async () => {
+      await writeFile(defaultProfileFile, JSON.stringify(defaultProfile));
+      await mkdir(storeFile);
+      const store = new StoreManagerService();
+      await expect(
+        store.initialize("store", { tts, connector }, json, paths),
+      ).rejects.toThrow();
+
+      await expect(
+        store.updateProfileData({ connector: { username: "streamer" } }),
+      ).rejects.toThrow("not initialized");
+
+      expect(await readJSON(defaultProfileFile)).toEqual(defaultProfile);
+    });
+
     it("keeps the Default profile when the store is rebuilt", async () => {
       const custom = { ...defaultProfile, name: "My setup" };
       await writeFile(defaultProfileFile, JSON.stringify(custom));

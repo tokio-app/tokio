@@ -779,6 +779,7 @@ export class StoreManagerService extends Service {
   }
 
   public async updateProfileData(updates: Partial<Profile>): Promise<boolean> {
+    this._ensureInitialized();
     const file = this._activeProfileFile();
     const res = await this._jsonManagerService.updateFile(
       join(this._pathManagerService.folders.profilesFolder, file),
