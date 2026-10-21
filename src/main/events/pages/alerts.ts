@@ -96,7 +96,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_DOWNLOAD_FAILED,
-      message: "Unable to download the sound.",
+      message: "Unable to download the sound. Sounds can be up to 8 MB.",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {

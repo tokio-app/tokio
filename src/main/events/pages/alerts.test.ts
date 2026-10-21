@@ -245,7 +245,8 @@ describe("alerts events", () => {
             id: "alert-1",
             error: {
               code: FEEDBACK_CODES.SOUND_DOWNLOAD_FAILED,
-              message: "Unable to download the sound.",
+              message:
+                "Unable to download the sound. Sounds can be up to 8 MB.",
             },
           },
         ]);
