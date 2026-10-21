@@ -11,6 +11,7 @@ type Props = {
   // Shows the value above the right end of the track
   showValue?: boolean;
   className?: string;
+  "aria-label"?: string;
 };
 
 export function Slider({
@@ -22,11 +23,13 @@ export function Slider({
   disabled,
   showValue,
   className,
+  "aria-label": ariaLabel,
 }: Props) {
   return (
     <div className={cx(styles.slider_container, className)}>
       <input
         type="range"
+        aria-label={ariaLabel}
         className={styles.slider}
         min={min}
         max={max}

@@ -31,6 +31,7 @@ type CommonProps<V extends Value> = {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  "aria-label"?: string;
 };
 
 const OPTION_HEIGHT = 44;
@@ -181,6 +182,7 @@ function SelectBase<V extends Value>({
   isSelected,
   onPick,
   multiple,
+  "aria-label": ariaLabel,
 }: BaseProps<V>) {
   const { open, toggle, close, position, anchorRef, popoverRef } = usePopover();
   const displayRef = useRef<HTMLDivElement>(null);
@@ -272,6 +274,7 @@ function SelectBase<V extends Value>({
       <div
         ref={displayRef}
         role="combobox"
+        aria-label={ariaLabel}
         tabIndex={disabled ? -1 : 0}
         aria-haspopup="listbox"
         aria-expanded={open}

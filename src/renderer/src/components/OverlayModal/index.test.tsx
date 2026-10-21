@@ -80,7 +80,8 @@ describe("OverlayModal", () => {
 
     rerender({ config: overlayConfig() });
 
-    expect(screen.getAllByRole("group")).toHaveLength(2);
+    expect(screen.getByRole("group", { name: "General" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Style" })).toBeInTheDocument();
     expect(title()).toHaveValue("Goal");
   });
 

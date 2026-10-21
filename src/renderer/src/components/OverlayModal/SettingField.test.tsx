@@ -47,8 +47,9 @@ const text = (value: string): OverlayConfigField => ({
 describe("SettingField", () => {
   it("edits text", async () => {
     const { user, onChange } = setup(text("Goal"));
-    expect(screen.getByText("Title")).toBeInTheDocument();
-    const input = screen.getByPlaceholderText("Type a title");
+    const input = within(
+      screen.getByRole("group", { name: "Title" }),
+    ).getByPlaceholderText("Type a title");
     expect(input).toHaveValue("Goal");
 
     await user.type(input, "!");
@@ -218,10 +219,12 @@ describe("SettingField", () => {
       type: "color",
       attributes: { value: "ff0000", default: "ff0000" },
     });
-    expect(screen.getByText("Background")).toBeInTheDocument();
     expect(reset()).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Choose color" }));
+    const background = within(
+      screen.getByRole("group", { name: "Background" }),
+    );
+    await user.click(background.getByRole("button", { name: "Choose color" }));
     const input = screen.getByPlaceholderText("Type a color");
     expect(input).toHaveValue("#ff0000");
     await user.clear(input);

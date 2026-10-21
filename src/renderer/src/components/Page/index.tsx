@@ -1,5 +1,5 @@
 import { cx } from "@/helper/cx";
-import { ReactNode } from "react";
+import { ReactNode, useId } from "react";
 import styles from "./page.module.css";
 
 type PageProps = {
@@ -77,13 +77,18 @@ type FieldProps = {
 };
 
 /**
- * A labelled control.
+ * A labelled control. The label names the field as a group.
  */
 export function Field({ label, hint, className, children }: FieldProps) {
+  const id = useId();
   return (
-    <div className={cx(styles.field, className)}>
+    <div
+      className={cx(styles.field, className)}
+      role={label ? "group" : undefined}
+      aria-labelledby={label ? id : undefined}
+    >
       {label && (
-        <label className={styles.field_label}>
+        <label id={id} className={styles.field_label}>
           {label}
           {hint && <span className={styles.field_hint}>{hint}</span>}
         </label>

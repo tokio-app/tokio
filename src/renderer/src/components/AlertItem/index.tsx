@@ -130,6 +130,7 @@ export function AlertItem({
 
       <div className={styles.cell}>
         <Toggle
+          aria-label="Enabled"
           checked={alert.enabled}
           onChange={(e) => onChange({ ...alert, enabled: e.target.checked })}
         />
@@ -138,6 +139,7 @@ export function AlertItem({
       <div className={styles.cell}>
         <Select
           className={styles.fill}
+          aria-label="Trigger"
           placeholder="Select a trigger..."
           options={TRIGGER_OPTIONS}
           value={alert.trigger.type}
@@ -166,6 +168,7 @@ export function AlertItem({
 
       <div className={styles.cell}>
         <Slider
+          aria-label="Volume"
           min={0}
           max={100}
           value={alert.volume}

@@ -1,7 +1,7 @@
 import { OverlayConfigField } from "@/common/schemas";
 import { CustomGift } from "@/common/types";
 import { cx } from "@/helper/cx";
-import { ReactNode } from "react";
+import { ReactNode, useId } from "react";
 import { VscDiscard } from "react-icons/vsc";
 import {
   Btn,
@@ -45,6 +45,7 @@ interface Props {
 
 export function SettingField({ field, gifts, onChange, onReset }: Props) {
   const changed = !sameValue(field.attributes.value, field.attributes.default);
+  const labelId = useId();
 
   // Kept in place while hidden, so the values beside it don't move.
   const reset = (
@@ -61,9 +62,11 @@ export function SettingField({ field, gifts, onChange, onReset }: Props) {
 
   // A label over its control
   const stacked = (control: ReactNode, value?: ReactNode) => (
-    <div className={styles.field}>
+    <div className={styles.field} role="group" aria-labelledby={labelId}>
       <div className={styles.field_header}>
-        <label className={styles.label}>{field.name}</label>
+        <label id={labelId} className={styles.label}>
+          {field.name}
+        </label>
         {value !== undefined && <span className={styles.value}>{value}</span>}
         {reset}
       </div>
@@ -140,12 +143,14 @@ export function SettingField({ field, gifts, onChange, onReset }: Props) {
     // The swatch first, so its picker opens toward the middle of the window
     case "color":
       return (
-        <div className={styles.row}>
+        <div className={styles.row} role="group" aria-labelledby={labelId}>
           <Color
             value={`#${field.attributes.value}`}
             onChange={(color) => onChange(color.replace(/^#/, ""))}
           />
-          <span className={styles.label}>{field.name}</span>
+          <span id={labelId} className={styles.label}>
+            {field.name}
+          </span>
           {reset}
         </div>
       );

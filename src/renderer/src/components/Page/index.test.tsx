@@ -98,6 +98,17 @@ describe("Field", () => {
     expect(screen.getByRole("spinbutton")).toHaveValue(2);
   });
 
+  it("names its group after the label", () => {
+    render(
+      <Field label="Cooldown" hint="(seconds)">
+        <input type="number" />
+      </Field>,
+    );
+
+    const group = screen.getByRole("group", { name: /Cooldown/ });
+    expect(within(group).getByRole("spinbutton")).toBeInTheDocument();
+  });
+
   it("shows only the control without a label", () => {
     const { container } = render(
       <Field hint="(seconds)">
@@ -106,6 +117,7 @@ describe("Field", () => {
     );
 
     expect(screen.queryByText("(seconds)")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
     expect(container).toHaveTextContent("");
     expect(screen.getByRole("spinbutton")).toBeInTheDocument();
   });

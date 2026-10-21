@@ -138,7 +138,7 @@ describe("AlertItem", () => {
   it("turns itself off and on", async () => {
     const item = alert();
     const { user, onChange } = setup(item);
-    const toggle = screen.getByRole("checkbox");
+    const toggle = screen.getByRole("checkbox", { name: "Enabled" });
     expect(toggle).toBeChecked();
 
     await user.click(toggle);
@@ -149,7 +149,7 @@ describe("AlertItem", () => {
   it("changes its volume", () => {
     const item = alert();
     const { onChange } = setup(item);
-    const slider = screen.getByRole("slider");
+    const slider = screen.getByRole("slider", { name: "Volume" });
     expect(slider).toHaveValue("80");
 
     fireEvent.change(slider, { target: { value: "40" } });
@@ -160,7 +160,7 @@ describe("AlertItem", () => {
   it("lists every trigger, with Emote right after Chat", async () => {
     const { user, container } = setup(alert());
 
-    await user.click(within(container).getByText("Follow"));
+    await user.click(screen.getByRole("combobox", { name: "Trigger" }));
 
     const listed = ALERT_TRIGGERS.map((trigger) =>
       inList(container, ALERT_TRIGGER_LABELS[trigger]),
