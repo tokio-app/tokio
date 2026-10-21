@@ -99,8 +99,11 @@ export class AppHandler implements AppHandlerVariables {
 
   private initWindow() {
     stayOnPage(this.win.webContents);
-    this.win.webContents.setWindowOpenHandler((details) => {
-      this.shell.openExternal(details.url);
+    this.win.webContents.setWindowOpenHandler(({ url }) => {
+      // A Shift-click on a sidebar link opens the page's own file: URL.
+      if (/^(https?|mailto):/.test(url)) {
+        this.shell.openExternal(url).catch(() => {});
+      }
       return { action: "deny" };
     });
 

@@ -174,16 +174,19 @@ describe("AppHandler", () => {
       expect(navigate("http://localhost:5173/index.html#/")).toBe(true);
     });
 
-    it("opens links in the browser instead of a new window", () => {
+    it("opens web and mail links in the browser instead of a new window", () => {
       const { win } = start();
       const [handler] = win.webContents.setWindowOpenHandler.mock.calls[0];
 
       const result = handler({ url: "https://tokio.ialfaro.com" });
+      handler({ url: "mailto:me@example.com" });
+      handler({ url: "file:///C:/app/out/renderer/index.html#/about" });
 
       expect(result).toEqual({ action: "deny" });
-      expect(shell.openExternal).toHaveBeenCalledWith(
-        "https://tokio.ialfaro.com",
-      );
+      expect(shell.openExternal.mock.calls).toEqual([
+        ["https://tokio.ialfaro.com"],
+        ["mailto:me@example.com"],
+      ]);
     });
   });
 
