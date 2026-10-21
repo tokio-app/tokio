@@ -108,58 +108,19 @@ export abstract class BaseFileManagerService extends Service {
     schema: z.ZodType<T>,
     data: T,
   ): Promise<boolean> {
-    const tempPath = `${filePath}.tmp`;
-    try {
-      if (!this._validate(schema, data, filePath, "saving")) return false;
-
-      await fs.writeFile(tempPath, this.serialize(data), "utf-8");
-      await fs.rename(tempPath, filePath);
-
-      return true;
-    } catch (error) {
-      const isTypeError = error instanceof TypeError;
-      this._logError(
-        isTypeError
-          ? "Data serialization failed for"
-          : `Unable to save ${this.fileType} file`,
-        filePath,
-        formatError(error),
-        error,
-      );
-      await fs.unlink(tempPath).catch(() => {});
-      return false;
-    }
+    if (!this._validate(schema, data, filePath, "saving")) return false;
+    return this.saveArbitraryFile(filePath, data);
   }
 
   public async loadFile<T>(
     filePath: string,
     schema: z.ZodType<T>,
   ): Promise<T | null> {
-    try {
-      const fileContent = await fs.readFile(filePath, "utf-8");
-      return this._validate(
-        schema,
-        this.deserialize(fileContent),
-        filePath,
-        "loading",
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-
-      const isSyntax =
-        error instanceof SyntaxError ||
-        (error as Error).name === "YAMLParseError";
-      this._logError(
-        isSyntax
-          ? `Malformed ${this.fileType.toUpperCase()} in file`
-          : `Unable to load ${this.fileType} file`,
-        filePath,
-        formatError(error),
-        error,
-      );
-      return null;
-    }
+    const data = await this.loadArbitraryFile(filePath);
+    if (data === null) return null;
+    return this._validate(schema, data, filePath, "loading");
   }
+
   public async loadArbitraryFile<T>(filePath: string): Promise<T | null> {
     try {
       const fileContent = await fs.readFile(filePath, "utf-8");

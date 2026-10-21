@@ -132,6 +132,19 @@ describe.each([
     expect(await readdir(dir)).toEqual([]);
   });
 
+  it("returns false and logs when the file can't be written", async () => {
+    const error = vi.spyOn(Logger, "error");
+
+    expect(
+      await service.saveFile(join(dir, "missing", "data"), Schema, sample),
+    ).toBe(false);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining(`Unable to save ${type} file`),
+      undefined,
+      expect.any(Error),
+    );
+  });
+
   it("returns null for a missing file without logging", async () => {
     const error = vi.spyOn(Logger, "error");
 
