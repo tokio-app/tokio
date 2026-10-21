@@ -19,6 +19,13 @@ interface QueueItem {
   startTimeMs?: number;
 }
 
+interface QueueHooks {
+  // A song failed to start and was skipped.
+  onError?: (id: string, error: unknown) => void;
+  // A song started, with the songs as they are then.
+  onStart?: (songs: MusicInfo[]) => void;
+}
+
 const delayWithAbort = (ms: number, signal?: AbortSignal) => {
   return new Promise<void>((resolve) => {
     if (signal?.aborted) return resolve();
@@ -44,19 +51,16 @@ export class MusicQueue {
   private _abortController: AbortController | null;
   private _events: EventEmitter;
   private _maxSize: number;
-  private _onError?: (id: string, error: unknown) => void;
+  private _hooks: QueueHooks;
 
-  constructor(
-    maxSize: number = Infinity,
-    onError?: (id: string, error: unknown) => void,
-  ) {
+  constructor(hooks: QueueHooks = {}) {
     this._queue = [];
     this._currentIndex = 0;
     this._isPlaying = false;
     this._abortController = null;
     this._events = new EventEmitter();
-    this._maxSize = maxSize;
-    this._onError = onError;
+    this._maxSize = Infinity;
+    this._hooks = hooks;
   }
 
   /**
@@ -130,10 +134,12 @@ export class MusicQueue {
   }
 
   public play() {
+    // The loop emits when it starts a song.
     if (!this._isPlaying && this._currentIndex < this._queue.length) {
       this.processQueue();
+    } else {
+      this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
     }
-    this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
   }
 
   public pause() {
@@ -224,7 +230,9 @@ export class MusicQueue {
     while (this._currentIndex < this._queue.length && active()) {
       const item = this._queue[this._currentIndex];
 
-      this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
+      const songs = this.getSongs();
+      this.emit(TOKIO_EVENTS.MUSIC_CHANGE, songs);
+      this._hooks.onStart?.(songs);
 
       // A song that fails to start is skipped right away.
       let waitTime = 0;
@@ -235,7 +243,7 @@ export class MusicQueue {
             ? Math.max(0, item.song.duration - item.startTimeMs)
             : item.song.duration;
       } catch (error) {
-        this._onError?.(item.id, error);
+        this._hooks.onError?.(item.id, error);
       }
 
       item.startTimeMs = undefined;

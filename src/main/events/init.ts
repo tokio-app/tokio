@@ -157,9 +157,10 @@ const registerConnectorEvents = ({
         });
       });
     };
-    // MUSIC_CHANGE comes from the music service, the rest from the connector.
+    // Music Change alerts come once per song from the music service, whose
+    // MUSIC_CHANGE also fires on queue changes. The rest from the connector.
     if (trigger === TOKIO_EVENTS.MUSIC_CHANGE) {
-      music.on(trigger, listener);
+      music.onSongChange(listener);
     } else {
       conn.on(trigger, listener);
     }

@@ -14,6 +14,7 @@ import {
   Gift,
   GiftEvent,
   LikeEvent,
+  MusicInfo,
   RoomUserEvent,
   TOKIO_EVENTS,
   UserData,
@@ -206,6 +207,9 @@ function setup() {
     onPlaybackError: vi.fn(
       (..._args: Parameters<MusicService["onPlaybackError"]>) => {},
     ),
+    onSongChange: vi.fn(
+      (..._args: Parameters<MusicService["onSongChange"]>) => {},
+    ),
   };
   const serverService = {
     setLogFile: vi.fn(),
@@ -357,7 +361,13 @@ describe("init events", () => {
       const s = await live();
       const { data } = generateTikTokEventSample(trigger);
 
-      const source = trigger === TOKIO_EVENTS.MUSIC_CHANGE ? s.music : s.conn;
+      // Music Change comes once per song, through onSongChange
+      const songStarts = {
+        emit: (_event: TOKIO_EVENTS, songs: MusicInfo[]) =>
+          s.musicService.onSongChange.mock.calls[0][0](songs),
+      };
+      const source =
+        trigger === TOKIO_EVENTS.MUSIC_CHANGE ? songStarts : s.conn;
       emitLive(source, trigger, data);
 
       await vi.waitFor(() => {
@@ -371,12 +381,14 @@ describe("init events", () => {
       });
     });
 
-    it("takes Music Change from the music service and the rest from the connector", async () => {
+    it("takes Music Change from the song starts and the rest from the connector", async () => {
       const s = await live();
       const subscribed = (source: Setup["conn"]) =>
         source.on.mock.calls.map(([event]) => event);
 
-      expect(subscribed(s.music)).toEqual([TOKIO_EVENTS.MUSIC_CHANGE]);
+      // MUSIC_CHANGE also fires when a song is queued, so it's left out
+      expect(s.musicService.onSongChange).toHaveBeenCalledOnce();
+      expect(subscribed(s.music)).toEqual([]);
       expect(subscribed(s.conn)).not.toContain(TOKIO_EVENTS.MUSIC_CHANGE);
       for (const trigger of triggers) {
         if (trigger === TOKIO_EVENTS.MUSIC_CHANGE) continue;

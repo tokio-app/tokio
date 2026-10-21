@@ -73,9 +73,34 @@ describe("MusicQueue", () => {
     ]);
   });
 
+  it("emits MUSIC_CHANGE once per change, and calls onStart only when a song starts", async () => {
+    const onStart = vi.fn();
+    const queue = new MusicQueue({ onStart });
+    const listener = vi.fn();
+    queue.on(TOKIO_EVENTS.MUSIC_CHANGE, listener);
+
+    queue.enqueue("a", song("a"), () => {});
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(onStart).toHaveBeenCalledExactlyOnceWith([
+      { title: "a", thumbnail: "", playing: true, played: false },
+    ]);
+
+    queue.enqueue("b", song("b"), () => {});
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(onStart).toHaveBeenCalledOnce();
+
+    await queue.triggerNext();
+    expect(listener).toHaveBeenCalledTimes(3);
+    expect(onStart).toHaveBeenCalledTimes(2);
+    expect(onStart).toHaveBeenLastCalledWith([
+      { title: "a", thumbnail: "", playing: false, played: true },
+      { title: "b", thumbnail: "", playing: true, played: false },
+    ]);
+  });
+
   it("keeps playing when a song's action throws, and reports it", async () => {
     const onError = vi.fn();
-    const queue = new MusicQueue(Infinity, onError);
+    const queue = new MusicQueue({ onError });
     const b = vi.fn();
     const error = new Error("player crashed");
 
@@ -129,7 +154,8 @@ describe("MusicQueue", () => {
 
   describe("max size", () => {
     it("drops the newest song when there is no history", () => {
-      const queue = new MusicQueue(2);
+      const queue = new MusicQueue();
+      queue.setMaxSize(2);
       queue.enqueue("a", song("a"), () => {});
       queue.enqueue("b", song("b"), () => {});
       queue.enqueue("c", song("c"), () => {});
@@ -138,7 +164,8 @@ describe("MusicQueue", () => {
     });
 
     it("drops played songs before upcoming ones", async () => {
-      const queue = new MusicQueue(2);
+      const queue = new MusicQueue();
+      queue.setMaxSize(2);
       queue.enqueue("a", song("a"), () => {});
       queue.enqueue("b", song("b"), () => {});
       await vi.advanceTimersByTimeAsync(1000);

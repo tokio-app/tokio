@@ -1,5 +1,10 @@
 import { Profile } from "@/common/schemas";
-import { ChatEvent, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import {
+  ChatEvent,
+  MusicInfo,
+  TOKIO_EVENTS,
+  TokioEventMap,
+} from "@/common/types";
 import { formatError, TaskQueue } from "@/common/util";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
@@ -11,11 +16,13 @@ export class MusicService extends ProviderService<MusicProvider> {
   private _queue: TaskQueue;
   private _music_queue: MusicQueue;
   private _onPlaybackError?: (id: string, error: unknown) => void;
+  private _onSongChange?: (songs: MusicInfo[]) => void;
   constructor() {
     super();
     this._queue = new TaskQueue();
-    this._music_queue = new MusicQueue(Infinity, (id, error) => {
-      this._playbackFailed(id, error);
+    this._music_queue = new MusicQueue({
+      onError: (id, error) => this._playbackFailed(id, error),
+      onStart: (songs) => this._onSongChange?.(songs),
     });
     this.addProvider("YouTube", new YouTubeMusic(), true);
     this.addProvider("Spotify", new Spotify());
@@ -67,6 +74,12 @@ export class MusicService extends ProviderService<MusicProvider> {
   // Called when a requested track can't be played and is skipped.
   public onPlaybackError(listener: (id: string, error: unknown) => void) {
     this._onPlaybackError = listener;
+  }
+
+  // Called once when a song starts, unlike MUSIC_CHANGE, which also comes
+  // when the queue changes.
+  public onSongChange(listener: (songs: MusicInfo[]) => void) {
+    this._onSongChange = listener;
   }
 
   public clearHandler() {

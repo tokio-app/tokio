@@ -266,6 +266,25 @@ describe("MusicService", () => {
       expect(played()).toEqual(["A", "B"]);
     });
 
+    it("calls onSongChange when a song starts, not when one is queued", async () => {
+      const { service, request } = setup();
+      const onSongChange = vi.fn<(songs: MusicInfo[]) => void>();
+      service.onSongChange(onSongChange);
+
+      await request("!play A");
+      await request("!play B");
+      expect(onSongChange).toHaveBeenCalledExactlyOnceWith([
+        expect.objectContaining({ title: "A", playing: true }),
+      ]);
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(onSongChange).toHaveBeenCalledTimes(2);
+      expect(onSongChange).toHaveBeenLastCalledWith([
+        expect.objectContaining({ title: "A", playing: false }),
+        expect.objectContaining({ title: "B", playing: true }),
+      ]);
+    });
+
     it("keeps the track the provider is playing and plays the request after it", async () => {
       const { request, provider, played, queue } = setup();
       provider.playerStatus.mockResolvedValue({
