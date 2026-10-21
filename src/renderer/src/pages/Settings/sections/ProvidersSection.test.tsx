@@ -43,6 +43,14 @@ describe("ProvidersSection", () => {
     expect(providers().queryByText("Default")).not.toBeInTheDocument();
   });
 
+  it("comes first, since connecting needs the key", async () => {
+    await setup(settingsReply());
+
+    expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent(
+      "TikTok LIVE",
+    );
+  });
+
   it("credits Euler Stream and links its site, signup and plans", async () => {
     await setup(settingsReply());
 

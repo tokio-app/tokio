@@ -69,6 +69,9 @@ export function Settings() {
       )}
 
       <Page>
+        {/* First: connecting needs its key */}
+        <ProvidersSection settings={store.settings} />
+
         <ServerSection
           enabled={store.settings.server.enabled}
           onChange={(enabled) => {
@@ -92,8 +95,6 @@ export function Settings() {
         />
 
         <VoiceKeysSection />
-
-        <ProvidersSection settings={store.settings} />
 
         <ProfileSection
           profiles={store.profiles}
