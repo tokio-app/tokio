@@ -410,13 +410,23 @@ describe("StoreManagerService", () => {
     it("reads the active features without a copy", async () => {
       const store = await init();
 
-      store.updateActiveFeatures({ tts: true });
+      await store.updateActiveFeatures({ tts: true });
 
       expect(store.getActiveFeatures()).toEqual({
         tts: true,
         music: false,
         alerts: false,
       });
+    });
+
+    it("saves the active features at once", async () => {
+      const store = await init();
+
+      await store.updateActiveFeatures({ tts: true });
+
+      expect((await readJSON(storeFile)).settings.activeFeatures.tts).toBe(
+        true,
+      );
     });
 
     it("keeps live stats in memory only", async () => {

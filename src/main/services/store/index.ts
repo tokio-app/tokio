@@ -24,8 +24,6 @@ import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { TTSService } from "@/services/tts";
 import { safeStorage } from "electron";
-import { debounce } from "es-toolkit";
-import { EventEmitter } from "events";
 import { access, copyFile, readdir, readFile } from "fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, extname, join, resolve } from "path";
@@ -37,8 +35,6 @@ type Providers = {
 };
 
 export class StoreManagerService extends Service {
-  public readonly events = new EventEmitter();
-
   private _jsonManagerService!: JSONManagerService;
   private _pathManagerService!: PathManagerService;
   private _providers!: Providers;
@@ -151,10 +147,6 @@ export class StoreManagerService extends Service {
       ProfileSchema,
     );
   }
-
-  private _debouncedSave = debounce(() => {
-    this._queueSave();
-  }, 500);
 
   private async _generatePhysicalDefaults(): Promise<void> {
     const defaultProfilePath = join(
@@ -445,17 +437,17 @@ export class StoreManagerService extends Service {
     };
   }
 
-  public updateActiveFeatures(data: {
+  public async updateActiveFeatures(data: {
     tts?: boolean;
     music?: boolean;
     alerts?: boolean;
-  }) {
+  }): Promise<void> {
     this._ensureInitialized();
     this._storeData!.settings.activeFeatures = {
       ...this._storeData!.settings.activeFeatures,
       ...data,
     };
-    this._debouncedSave();
+    await this._queueSave();
   }
 
   /**

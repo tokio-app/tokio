@@ -185,7 +185,7 @@ events.push(
   APP_EVENTS.ACTIVE_FEATURES,
   // No notice on success, the switches already show the new state.
   async ({ storeManagerService, ttsService, alertsService, win }, _, data) => {
-    storeManagerService.updateActiveFeatures({
+    await storeManagerService.updateActiveFeatures({
       ...data,
     });
     if (data.tts === false) {
