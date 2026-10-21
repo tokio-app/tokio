@@ -57,5 +57,3 @@ export function buildHeaders(
     ...base,
   };
 }
-
-export default createConfig();

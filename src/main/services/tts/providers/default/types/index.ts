@@ -21,11 +21,6 @@ export type TTSResponseData = {
 
 export type SupportedLanguage = "en" | "es";
 
-export type Voice = {
-  name: string;
-  code: string;
-};
-
 export type EnglishVoiceName =
   | "Default"
   | "Game On"
@@ -79,13 +74,3 @@ export type EnglishVoiceName =
   | "Smooth";
 
 export type SpanishVoiceName = "Pedro" | "Juan";
-
-export type VoiceName = {
-  [key in SupportedLanguage]: key extends "en"
-    ? EnglishVoiceName
-    : key extends "es"
-      ? SpanishVoiceName
-      : never;
-};
-
-export type Voices = { [key in SupportedLanguage]: Voice[] };

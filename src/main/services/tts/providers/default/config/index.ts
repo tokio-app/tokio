@@ -7,7 +7,6 @@ export default {
   DEFAULT_VOICE: "en_us_001",
   // A slow endpoint would otherwise hold the TTS queue
   REQUEST_TIMEOUT_MS: 15_000,
-  USER_AGENT,
   HEADERS: {
     "User-Agent": USER_AGENT,
     "Accept-Encoding": "gzip,deflate,compress",

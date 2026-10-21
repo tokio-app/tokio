@@ -15,31 +15,20 @@ export function removeEmojis(text: string, by = ""): string {
   return text.replace(EMOJI_REGEX, by);
 }
 
+/**
+ * The text in lower case, without emojis and with its spaces collapsed.
+ * `asciiOnly` also drops accents and other marks.
+ */
 export function cleanText(
   input: string | undefined | null,
-  opts: { collapseWhitespace?: boolean; asciiOnly?: boolean } = {},
+  { asciiOnly = false }: { asciiOnly?: boolean } = {},
 ): string {
-  const { collapseWhitespace = true, asciiOnly = false } = opts;
   if (!input) return "";
 
-  let out = removeEmojis(input);
+  let out = removeEmojis(input).normalize("NFKC");
+  if (asciiOnly) out = out.normalize("NFKD").replace(/\p{M}+/gu, "");
 
-  try {
-    out = out.normalize("NFKC");
-  } catch {
-    // Next
-  }
-
-  if (asciiOnly) {
-    try {
-      out = out.normalize("NFKD").replace(/\p{M}+/gu, "");
-    } catch {
-      // Next
-    }
-  }
-
-  const final = collapseWhitespace ? out.replace(/\s+/g, " ").trim() : out;
-  return final.toLowerCase();
+  return out.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 /**

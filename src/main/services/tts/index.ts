@@ -9,6 +9,7 @@ import {
 import { removeEmojis } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
+import { escapeRegExp } from "es-toolkit";
 import { ProviderService } from "../shared";
 import { GenerationResponse, TTSProvider } from "./common";
 import { EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
@@ -167,17 +168,13 @@ export class TTSService extends ProviderService<TTSProvider> {
     return out.trim() === "" ? null : out;
   }
 
-  private _escapeRegExp(str: string) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
   // Matches whole words. Ends that are symbols (e.g. ":)") match anywhere,
   // because \b would need a word character there.
   private _replacementRegExp(old: string) {
     const isWord = (char: string) => /[\p{L}\p{N}_]/u.test(char);
     const start = isWord(old.at(0) ?? "") ? "(?<![\\p{L}\\p{N}_])" : "";
     const end = isWord(old.at(-1) ?? "") ? "(?![\\p{L}\\p{N}_])" : "";
-    return new RegExp(`${start}${this._escapeRegExp(old)}${end}`, "giu");
+    return new RegExp(`${start}${escapeRegExp(old)}${end}`, "giu");
   }
 
   // Filled in one pass, so a name or comment that looks like a variable is
