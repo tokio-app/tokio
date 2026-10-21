@@ -31,8 +31,10 @@
   background-color: var(--border);
 }
 
+/* A button that reads as a field, padded like one */
 .cell .sound {
   width: 100%;
+  padding: 0 var(--space-3);
   justify-content: flex-start;
   font-weight: 400;
   font-size: var(--font-md);
