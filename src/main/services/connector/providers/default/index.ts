@@ -340,14 +340,11 @@ function toFailure(error: unknown): ConnectorFailure {
     case "INVALID_USERNAME":
       return fail("notFound");
     case "RATE_LIMITED": {
-      const { retryAfterMs } =
-        error instanceof RateLimitError ? error : { retryAfterMs: undefined };
+      const ms =
+        error instanceof RateLimitError ? error.retryAfterMs : undefined;
       return connectFailure("rateLimited", error.message, {
         cause: error,
-        retryAfterSeconds:
-          retryAfterMs === undefined
-            ? undefined
-            : Math.ceil(retryAfterMs / 1000),
+        retryAfterSeconds: ms && Math.ceil(ms / 1000),
       });
     }
     case "SIGN_FAILED":
