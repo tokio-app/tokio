@@ -1,5 +1,6 @@
 import { Profile, ProfileSchema, StoreSchema } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
+import { safeStorage } from "@test/electron";
 import { defaultProfile } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { TikTokConnectorService } from "@/services/connector";
@@ -265,6 +266,16 @@ describe("StoreManagerService", () => {
         key: "",
         active: false,
       });
+    });
+
+    it("drops a key it can't decrypt, so it's asked for again", async () => {
+      const store = await init();
+      await store.updateProvider("Default", "euler-key");
+      vi.spyOn(safeStorage, "decryptString").mockImplementation(() => {
+        throw new Error("Decryption failed");
+      });
+
+      expect(store.getSettings().activeConnProvider.key).toBe("");
     });
   });
 

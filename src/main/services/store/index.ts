@@ -862,7 +862,9 @@ export class StoreManagerService extends Service {
       const buffer = Buffer.from(provider.key, "base64");
       return { ...provider, key: safeStorage.decryptString(buffer) };
     } catch {
-      return provider;
+      // Encrypted for another computer or account: asked for again instead
+      // of sending the encrypted text as the key.
+      return { ...provider, key: "" };
     }
   }
 }
