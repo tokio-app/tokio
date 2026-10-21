@@ -53,5 +53,3 @@ publish:
   provider: github
   owner: tokio-app
   repo: tokio
-electronDownload:
-  mirror: https://npmmirror.com/mirrors/electron/

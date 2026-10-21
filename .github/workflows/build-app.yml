@@ -22,6 +22,8 @@ jobs:
             flag: --linux
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
