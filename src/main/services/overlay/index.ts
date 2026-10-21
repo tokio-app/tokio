@@ -114,7 +114,8 @@ export class OverlayService extends Service {
 
   /**
    * Saves the gifts, then checks every installed overlay, writes its saved
-   * config into its HTML and serves it. Overlays that fail are forgotten.
+   * config into its HTML and serves it. Overlays that fail stay stored, so a
+   * fix keeps their ID and link, unless their folder is gone.
    */
   public async load(gifts: CustomGift[]): Promise<void> {
     await this._removeStaging();
@@ -132,11 +133,15 @@ export class OverlayService extends Service {
       const info = await this._writeHTML(overlay.id, overlay.external!, gifts);
 
       if (!info) {
+        const gone = await access(this._dir(overlay.id)).then(
+          () => false,
+          () => true,
+        );
         Logger.warn(
-          `<Overlays> Unable to load overlay ${overlay.id}, it has been removed.`,
+          `<Overlays> Unable to load overlay ${overlay.id}, ${gone ? "its folder is gone. It has been removed." : "it's kept for the next start."}`,
           this._logFile,
         );
-        await this._store.removeOverlayInfo(overlay.id);
+        if (gone) await this._store.removeOverlayInfo(overlay.id);
         continue;
       }
 

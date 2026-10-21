@@ -195,12 +195,13 @@ describe("OverlayService", () => {
   });
 
   describe("load", () => {
-    it("serves the overlays that load and forgets the rest", async () => {
+    it("serves the overlays that load and forgets the ones whose folder is gone", async () => {
       await configurable(join(folder, "title"));
       await overlay(join(folder, "broken"), { "info.yaml": info("Broken") });
       stored = [
         { id: "title", name: "Title", version: "1.0.0", config: true },
         { id: "broken", name: "Broken", version: "1.0.0", config: false },
+        { id: "gone", name: "Gone", version: "1.0.0", config: false },
       ];
 
       await service.load(gifts);
@@ -210,7 +211,8 @@ describe("OverlayService", () => {
         join(folder, "title"),
         false,
       );
-      expect(stored.map((o) => o.id)).toEqual(["title"]);
+      // Kept, so a fixed overlay comes back with its link.
+      expect(stored.map((o) => o.id)).toEqual(["title", "broken"]);
       expect(service.getOverlays()).toMatchObject([
         { id: "title", path: join(folder, "title", "index.html") },
       ]);
@@ -246,7 +248,7 @@ describe("OverlayService", () => {
       expect(processHTML).not.toHaveBeenCalled();
     });
 
-    it("doesn't serve an overlay whose HTML can't be written", async () => {
+    it("doesn't serve an overlay whose HTML can't be written, but keeps it", async () => {
       await configurable(join(folder, "title"));
       stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
       vi.mocked(processHTML).mockResolvedValueOnce({ success: false });
@@ -254,7 +256,7 @@ describe("OverlayService", () => {
       await service.load(gifts);
 
       expect(mount).not.toHaveBeenCalled();
-      expect(stored).toEqual([]);
+      expect(stored.map((o) => o.id)).toEqual(["title"]);
       expect(service.getOverlays()).toEqual([]);
     });
 
