@@ -1,51 +1,44 @@
 import {
   ChatEvent,
-  FollowEvent,
-  Gift,
   GiftEvent,
-  LikeEvent,
   RoomUserEvent,
-  ShareEvent,
   TOKIO_EVENTS,
   TokioEventMap,
   UserData,
 } from "@/common/types";
-import { delay } from "@/common/util";
-import { EventEmitter } from "events";
-import type {
-  TikTokLiveConnection,
-  User,
-  UserIdentity,
-} from "tiktok-live-connector";
 import {
+  EulerSigner,
+  isConnectorError,
+  isStreakEnd,
+  TikTokLiveConnection,
+  WebcastEvent,
+  RateLimitError,
+  SignError,
+  type Badge,
+  type User,
+  type UserIdentity,
+} from "@tokioapp/connector";
+import { EventEmitter } from "events";
+import {
+  ConnectErrorKind,
+  connectFailure,
+  ConnectorFailure,
   ConnectorProvider,
   ConnectorResponse,
   GiftResponse,
 } from "../../common";
 import config from "./config";
 
-type TikTokLive = typeof import("tiktok-live-connector");
-
 export class TikTokLiveConnector extends ConnectorProvider {
-  // Loaded on the first connect, startup doesn't need the library.
-  private _lib: TikTokLive | null = null;
-  private _connector: TikTokLiveConnection | null;
-  private _sessionID: string;
-  private _username: string;
-  private _events: EventEmitter;
-
-  constructor() {
-    super();
-    this._connector = null;
-    this._events = new EventEmitter();
-    this._username = "";
-    this._sessionID = "";
-  }
+  private _connection: TikTokLiveConnection | null = null;
+  // The user's Euler Stream API key, which signs the connection
+  private _key = "";
+  private _events = new EventEmitter();
 
   // --- PUBLIC API ---
 
-  public setKey(sessionID: string) {
-    this._sessionID = sessionID;
+  public setKey(key: string) {
+    this._key = key;
   }
 
   public on<K extends TOKIO_EVENTS>(
@@ -64,134 +57,69 @@ export class TikTokLiveConnector extends ConnectorProvider {
 
   public async connect(
     username: string,
-    sessionID?: string,
+    key?: string,
   ): Promise<ConnectorResponse> {
-    if (this.isConnected()) {
-      return {
-        success: true,
-      };
+    if (this.isConnected()) return { success: true };
+    this._key = key ?? this._key;
+    const name = username.replace("@", "");
+    if (!name) {
+      return this._failed(connectFailure("notFound", "No username was set."));
     }
-    this._username = username.replace("@", "") || "";
-    this._sessionID = sessionID || "";
-    if (!this._username) {
-      this.emit(TOKIO_EVENTS.CONNECTED, {
-        success: false,
-        error: new Error("No username was defined."),
-      });
-      return {
-        success: false,
-        error: new Error("No username was defined."),
-      };
+    if (!this._key) {
+      return this._failed(
+        connectFailure("noKey", "No Euler Stream API key was set."),
+      );
     }
-    const { TikTokLiveConnection, WebcastEvent } = await this._loadLib();
-    this._connector = new TikTokLiveConnection(this._username, {
-      processInitialData: false,
-      session: {
-        cookie: {
-          type: "cookie",
-          value: {
-            sessionId: this._sessionID,
-            ttTargetIdc: "alisg",
-          },
-        },
-      },
-    });
+
+    let connection: TikTokLiveConnection | undefined;
     try {
-      const state = await this._connector.connect();
-      if (state.isConnected) {
-        this.emit(TOKIO_EVENTS.CONNECTED, {
-          success: true,
-        });
-        await delay(1000);
-        this.registerEvents();
-        this._connector.on(WebcastEvent.STREAM_END, async () => {
-          await this._close();
-          this.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
-        });
-        return {
-          success: true,
-        };
-      }
-      this.emit(TOKIO_EVENTS.CONNECTED, {
-        success: false,
-        error: new Error("Unable to connect with unknown reason."),
+      connection = new TikTokLiveConnection(name, {
+        signer: new EulerSigner({ apiKey: this._key }),
       });
-      return {
-        success: false,
-        error: new Error("Unable to connect with unknown reason."),
-      };
+      // Before connecting, so no event of the LIVE is missed.
+      this._listen(connection);
+      this._connection = connection;
+      await connection.connect();
+      return { success: true };
     } catch (err) {
-      this.emit(TOKIO_EVENTS.CONNECTED, {
-        success: false,
-        error: err as Error,
-      });
-      return {
-        success: false,
-        error: err as Error,
-      };
+      // A first connect that fails never emits disconnected.
+      connection?.removeAllListeners();
+      if (this._connection === connection) this._connection = null;
+      return this._failed(toFailure(err));
     }
   }
 
   public async disconnect(): Promise<void> {
-    if (await this._close()) this.emit(TOKIO_EVENTS.DISCONNECTED);
+    // The connection then emits disconnected, with reason "user".
+    await this._connection?.disconnect();
   }
 
-  // Closes the connection, true when there was one.
-  private async _close(): Promise<boolean> {
-    if (!this.isConnected()) return false;
-    try {
-      await this._connector?.disconnect();
-    } catch {
-      // Next
-    }
-    return true;
-  }
-
+  // Still connected while the connection tries to come back.
   public isConnected(): boolean {
-    return this._connector?.isConnected || false;
-  }
-
-  private extractRawGifts(data: any): any[] {
-    if (!data?.data) return [];
-
-    const payload = data.data;
-    return payload.gifts || payload.giftList || payload.pages?.[0]?.gifts || [];
-  }
-
-  private formatGift(g: any): Gift {
-    return {
-      id: g.id,
-      name: g.name,
-      coins: g.diamond_count,
-      image: g.image?.url_list?.[0],
-    };
+    const state = this._connection?.state;
+    return state === "connected" || state === "reconnecting";
   }
 
   public async fetchGifts(): Promise<GiftResponse> {
     try {
       const region = await this.getUserRegionAndLanguage();
-      const url = this.getGiftURL(region.data.language, region.data.region);
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: config.HEADERS,
-        signal: AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
-      });
-
-      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-
-      const data = await response.json();
-
-      const rawGifts = this.extractRawGifts(data);
-      const mapper = (g: any) => this.formatGift(g);
-      const availableGifts: Gift[] = rawGifts.map(mapper);
-
-      const uniqueData = [
-        ...new Map(availableGifts.map((item) => [item.id, item])).values(),
-      ];
+      // Gifts are fetched at startup, before any connect. Without a room
+      // the connection only asks for the region's list, which needs neither
+      // a user nor the signer, so any username does.
+      const connection =
+        this._connection ??
+        new TikTokLiveConnection("tiktok", {
+          requestTimeoutMs: config.REQUEST_TIMEOUT_MS,
+        });
+      const { gifts } = await connection.fetchGifts(region.data);
 
       return {
-        data: uniqueData,
+        data: gifts.map((g) => ({
+          id: Number(g.id),
+          name: g.name,
+          coins: g.diamondCount,
+          image: g.image?.urlList[0] ?? "",
+        })),
         warn: region.error?.message,
         success: true,
       };
@@ -206,11 +134,6 @@ export class TikTokLiveConnector extends ConnectorProvider {
 
   // -- Private API --
 
-  private async _loadLib(): Promise<TikTokLive> {
-    this._lib ??= await import("tiktok-live-connector");
-    return this._lib;
-  }
-
   private emit<K extends TOKIO_EVENTS>(
     event: K,
     data?: TokioEventMap[K],
@@ -218,181 +141,127 @@ export class TikTokLiveConnector extends ConnectorProvider {
     this._events.emit(event, data);
   }
 
-  private registerEvents(): void {
-    if (!this._connector || !this._lib) return;
-    const { WebcastEvent } = this._lib;
+  private _failed(error: ConnectorFailure): ConnectorResponse {
+    const res = { success: false, error };
+    this.emit(TOKIO_EVENTS.CONNECTED, res);
+    return res;
+  }
 
-    this._connector.on(WebcastEvent.SHARE, (tdata) => {
-      const user = this.getUserData({
-        user: tdata.user,
-      });
-      const shareCount = tdata.shareCount || 0;
-      const data: ShareEvent = {
-        shareCount,
-        user,
-      };
-      this.emit(TOKIO_EVENTS.SHARE, data);
+  private _listen(connection: TikTokLiveConnection): void {
+    // Before the room's first messages, so the session starts before them.
+    connection.on(WebcastEvent.CONNECTED, ({ reconnected }) => {
+      if (reconnected) this._onReconnect?.("reconnected");
+      else this.emit(TOKIO_EVENTS.CONNECTED, { success: true });
     });
 
-    this._connector.on(WebcastEvent.FOLLOW, (tdata) => {
-      const user = this.getUserData({
-        user: tdata.user,
-      });
-      const data: FollowEvent = {
-        user,
-      };
-      this.emit(TOKIO_EVENTS.FOLLOW, data);
-    });
-
-    this._connector.on(WebcastEvent.CHAT, (tdata) => {
-      const user = this.getUserData({
-        user: tdata.user,
-        userIdentity: tdata.userIdentity,
-      });
-      const emotes: {
-        emoteID: string;
-        images: string[];
-        index: number;
-      }[] = [];
-      if (tdata.emotes.length > 0) {
-        for (const em of tdata.emotes) {
-          emotes.push({
-            emoteID: this.withDefault(em.emote?.emoteId, ""),
-            images: this.withDefault(em.emote?.image?.urlList, []),
-            index: em.index,
-          });
+    connection.on(
+      WebcastEvent.DISCONNECTED,
+      ({ reason: why, willReconnect }) => {
+        if (willReconnect) {
+          this._onReconnect?.("reconnecting");
+          return;
         }
-      }
-      const comment = {
-        content: tdata.content,
-        emotes: emotes,
-        lang: tdata.contentLanguage,
-      };
+        connection.removeAllListeners();
+        if (this._connection === connection) this._connection = null;
+        if (why === "user") {
+          this.emit(TOKIO_EVENTS.DISCONNECTED);
+        } else {
+          // streamEnd comes first when the LIVE ended
+          const reason = why === "streamEnd" ? "ended" : "lost";
+          this.emit(TOKIO_EVENTS.DISCONNECTED, { reason });
+        }
+      },
+    );
+
+    connection.on(WebcastEvent.SHARE, (tdata) => {
+      this.emit(TOKIO_EVENTS.SHARE, {
+        shareCount: tdata.shareCount,
+        user: getUserData(tdata.user),
+      });
+    });
+
+    connection.on(WebcastEvent.FOLLOW, (tdata) => {
+      this.emit(TOKIO_EVENTS.FOLLOW, { user: getUserData(tdata.user) });
+    });
+
+    connection.on(WebcastEvent.CHAT, (tdata) => {
       const data: ChatEvent = {
-        user,
-        comment,
+        user: getUserData(tdata.user, tdata.userIdentity),
+        comment: {
+          content: tdata.content,
+          emotes: tdata.emotes.map((em) => ({
+            emoteID: em.emote?.emoteId ?? "",
+            images: em.emote?.image?.urlList ?? [],
+            index: em.index,
+          })),
+          lang: tdata.contentLanguage,
+        },
       };
       this.emit(TOKIO_EVENTS.CHAT, data);
     });
 
-    this._connector.on(WebcastEvent.GIFT, (tdata) => {
-      const user = this.getUserData({
-        user: tdata.user,
-      });
-      const gift = {
-        id: this.withDefault(tdata.giftId, ""),
-        type: this.withDefault(tdata.gift?.type, 1),
-        name: this.withDefault(tdata.gift?.name, ""),
-        repeatEnd: this.withDefault(tdata.repeatEnd, 1) == 1,
-        coins: this.withDefault(tdata.gift?.diamondCount, 0),
-        comboCount: this.withDefault(tdata.repeatCount, 0),
-        image: this.withDefault(tdata.gift?.image?.urlList?.[0], ""),
-      };
+    connection.on(WebcastEvent.GIFT, (tdata) => {
       const data: GiftEvent = {
-        user,
-        gift,
+        user: getUserData(tdata.user),
+        gift: {
+          id: tdata.giftId,
+          type: tdata.gift?.type ?? 1,
+          name: tdata.gift?.name ?? "",
+          // The event to count: the end of a combo, or a gift without one
+          repeatEnd: isStreakEnd(tdata),
+          coins: tdata.gift?.diamondCount ?? 0,
+          comboCount: tdata.repeatCount,
+          image: tdata.gift?.image?.urlList[0] ?? "",
+        },
       };
       this.emit(TOKIO_EVENTS.GIFT, data);
     });
 
-    this._connector.on(WebcastEvent.LIKE, (tdata) => {
-      const user = this.getUserData({
-        user: tdata.user,
+    connection.on(WebcastEvent.LIKE, (tdata) => {
+      this.emit(TOKIO_EVENTS.LIKE, {
+        user: getUserData(tdata.user),
+        likeCount: tdata.count,
+        totalLikes: tdata.total,
       });
-      const data: LikeEvent = {
-        user,
-        likeCount: tdata.count ?? 0,
-        totalLikes: Number(tdata.total ?? "0"),
-      };
-      this.emit(TOKIO_EVENTS.LIKE, data);
     });
 
-    this._connector.on(WebcastEvent.ENVELOPE, () => {
+    connection.on(WebcastEvent.ENVELOPE, () => {
       this.emit(TOKIO_EVENTS.ENVELOPE);
     });
 
-    this._connector.on(WebcastEvent.SUPER_FAN_BOX, () => {
+    connection.on(WebcastEvent.SUPER_FAN_BOX, () => {
       this.emit(TOKIO_EVENTS.SUPER_FAN_BOX);
     });
 
-    this._connector.on(WebcastEvent.SUPER_FAN, (tdata) => {
-      const user = this.getUserData({ user: tdata.user });
-      this.emit(TOKIO_EVENTS.SUPER_FAN, {
-        user,
+    connection.on(WebcastEvent.SUPER_FAN, (tdata) => {
+      this.emit(TOKIO_EVENTS.SUPER_FAN, { user: getUserData(tdata.user) });
+    });
+
+    connection.on(WebcastEvent.MEMBER, (tdata) => {
+      this.emit(TOKIO_EVENTS.MEMBER_JOIN, { user: getUserData(tdata.user) });
+    });
+
+    connection.on(WebcastEvent.SUPER_FAN_JOIN, (tdata) => {
+      this.emit(TOKIO_EVENTS.SUPER_FAN_JOIN, {
+        user: getUserData(tdata.user),
       });
     });
 
-    this._connector.on(WebcastEvent.MEMBER, (tdata) => {
-      const user = this.getUserData({ user: tdata.user });
-      this.emit(TOKIO_EVENTS.MEMBER_JOIN, { user });
+    connection.on(WebcastEvent.ROOM_USER, (tdata) => {
+      const ranks: RoomUserEvent["ranks"] = tdata.ranks.map((rank) => ({
+        // Same as getUserData
+        username: rank.user?.nickname ?? "",
+        handle: rank.user?.displayId ?? "",
+        profilePictures: rank.user?.avatarThumb?.urlList ?? [],
+        score: rank.score,
+        position: rank.rank,
+      }));
+      this.emit(TOKIO_EVENTS.ROOM_USER, {
+        ranks,
+        viewers: tdata.total,
+        views: tdata.totalUser,
+      });
     });
-
-    this._connector.on(WebcastEvent.SUPER_FAN_JOIN, (tdata) => {
-      const user = this.getUserData({ user: tdata.user });
-      this.emit(TOKIO_EVENTS.SUPER_FAN_JOIN, { user });
-    });
-
-    this._connector.on(WebcastEvent.ROOM_USER, (tdata) => {
-      const ranks: RoomUserEvent["ranks"] = [];
-      for (const rank of tdata.ranks) {
-        const user = rank.user;
-        ranks.push({
-          // Same as getUserData
-          username: this.withDefault(user?.nickname, ""),
-          handle: this.withDefault(user?.displayId, ""),
-          profilePictures: this.withDefault(user?.avatarThumb?.urlList, []),
-          score: this.withDefault(Number(rank.score), 0),
-          position: this.withDefault(Number(rank.rank), 0),
-        });
-      }
-      const viewers = this.withDefault(Number(tdata.total), 0);
-      const views = this.withDefault(Number(tdata.totalUser), 0);
-      this.emit(TOKIO_EVENTS.ROOM_USER, { ranks, viewers, views });
-    });
-  }
-
-  // --- HELPER METHODS ---
-
-  private getFanLevel(badgeList?: any[]): number {
-    if (!badgeList || badgeList.length === 0) return 0;
-
-    const fanBadge = badgeList.find((b) =>
-      b.combine?.icon?.uri?.includes("fans_badge"),
-    );
-
-    return Number(fanBadge?.privilegeLogExtra?.level || 0);
-  }
-
-  private withDefault<T>(data: T | undefined | null, defaultValue: T): T {
-    if (data === undefined || data === null) {
-      return defaultValue;
-    }
-
-    if (typeof data === "number" && isNaN(data)) return defaultValue;
-
-    return data;
-  }
-
-  private getUserData({
-    user,
-    userIdentity,
-  }: {
-    user?: User;
-    userIdentity?: UserIdentity;
-  }): UserData {
-    return {
-      username: this.withDefault(user?.nickname, ""),
-      handle: this.withDefault(user?.displayId, ""),
-      profilePictures: this.withDefault(user?.avatarThumb?.urlList, []),
-      superfan: this.withDefault(userIdentity?.isSubscriberOfAnchor, false),
-      follower: this.withDefault(userIdentity?.isFollowerOfAnchor, false),
-      moderator: this.withDefault(userIdentity?.isModeratorOfAnchor, false),
-      fanLevel: this.getFanLevel(user?.badgeList),
-    };
-  }
-
-  private getGiftURL(lang: string, region: string) {
-    return `${config.GIFTS_URL}/?aid=1988&app_language=${lang}&region=${region}&sys_region=${region}`;
   }
 
   private async getUserRegionAndLanguage(): Promise<{
@@ -423,5 +292,64 @@ export class TikTokLiveConnector extends ConnectorProvider {
         error: new Error("Failed to fetch user region", { cause: err }),
       };
     }
+  }
+}
+
+// --- HELPERS ---
+
+function getFanLevel(badgeList: Badge[] = []): number {
+  const fanBadge = badgeList.find((b) =>
+    b.combine?.icon?.uri.includes("fans_badge"),
+  );
+  return Number(fanBadge?.privilegeLogExtra?.level || 0);
+}
+
+function getUserData(user?: User, userIdentity?: UserIdentity): UserData {
+  return {
+    username: user?.nickname ?? "",
+    handle: user?.displayId ?? "",
+    profilePictures: user?.avatarThumb?.urlList ?? [],
+    superfan: userIdentity?.isSubscriberOfAnchor ?? false,
+    follower: userIdentity?.isFollowerOfAnchor ?? false,
+    moderator: userIdentity?.isModeratorOfAnchor ?? false,
+    fanLevel: getFanLevel(user?.badgeList),
+  };
+}
+
+// The library's error codes are stable, its messages are for logs.
+function toFailure(error: unknown): ConnectorFailure {
+  if (!isConnectorError(error)) {
+    return connectFailure("unknown", String(error), { cause: error });
+  }
+  const fail = (kind: ConnectErrorKind) =>
+    connectFailure(kind, error.message, { cause: error });
+  switch (error.code) {
+    case "OFFLINE":
+      return fail("offline");
+    case "ROOM_NOT_FOUND":
+    case "INVALID_USERNAME":
+      return fail("notFound");
+    case "RATE_LIMITED": {
+      const { retryAfterMs } =
+        error instanceof RateLimitError ? error : { retryAfterMs: undefined };
+      return connectFailure("rateLimited", error.message, {
+        cause: error,
+        retryAfterSeconds:
+          retryAfterMs === undefined
+            ? undefined
+            : Math.ceil(retryAfterMs / 1000),
+      });
+    }
+    case "SIGN_FAILED":
+    case "PREMIUM_REQUIRED": {
+      const status = error instanceof SignError ? error.status : undefined;
+      return fail(status === 401 || status === 403 ? "badKey" : "sign");
+    }
+    case "NETWORK":
+    case "TIMEOUT":
+    case "WEBSOCKET":
+      return fail("network");
+    default:
+      return fail("unknown");
   }
 }

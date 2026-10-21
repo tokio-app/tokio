@@ -1,5 +1,7 @@
+import { EULER_SIGNUP_URL } from "@/common/util";
 import { Btn, Input, Section } from "@/components";
 import { cx } from "@/helper";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { FiPlay, FiSquare } from "react-icons/fi";
 import styles from "../home.module.css";
@@ -9,6 +11,8 @@ interface Props {
   username: string;
   connected: boolean;
   loading: boolean;
+  // No Euler Stream API key is saved, so connecting can't work
+  needsKey: boolean;
   // When the LIVE was connected, null until main says
   startedAt: number | null;
   // TikTok's numbers for the LIVE
@@ -34,6 +38,7 @@ export function DashboardSection({
   username,
   connected,
   loading,
+  needsKey,
   startedAt,
   stats,
   onUsernameChange,
@@ -86,6 +91,16 @@ export function DashboardSection({
           )}
         </Btn>
       </div>
+
+      {needsKey && !connected && (
+        <p className={styles.key_hint}>
+          Connecting needs your Euler Stream API key.{" "}
+          <a href={EULER_SIGNUP_URL} target="_blank" rel="noreferrer">
+            Get a free key
+          </a>{" "}
+          and add it in <Link to="/settings">Settings</Link>.
+        </p>
+      )}
 
       <div className={styles.stats}>
         {stats.map(({ label, value }) => {

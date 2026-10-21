@@ -93,9 +93,7 @@ export function Settings() {
 
         <VoiceKeysSection />
 
-        {store.settings.providers.connector.length > 1 && (
-          <ProvidersSection settings={store.settings} />
-        )}
+        <ProvidersSection settings={store.settings} />
 
         <ProfileSection
           profiles={store.profiles}

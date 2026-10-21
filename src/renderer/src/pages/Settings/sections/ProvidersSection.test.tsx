@@ -1,4 +1,9 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import {
+  EULER_PRICING_URL,
+  EULER_SIGNUP_URL,
+  EULER_STREAM_URL,
+} from "@/common/util";
 import { settingsReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { inList } from "@test/queries";
@@ -18,9 +23,9 @@ const twoConnectors = settingsReply((s) => {
 
 const providers = () =>
   within(
-    screen.getByRole("heading", { name: "Providers" }).closest("section")!,
+    screen.getByRole("heading", { name: "TikTok LIVE" }).closest("section")!,
   );
-const keyInput = () => screen.getByPlaceholderText("Provider key...");
+const keyInput = () => screen.getByPlaceholderText("Your API key...");
 
 // The section's visibility is up to the page, so it's tested through it
 async function setup(reply = twoConnectors) {
@@ -30,12 +35,22 @@ async function setup(reply = twoConnectors) {
 }
 
 describe("ProvidersSection", () => {
-  it("is hidden while there's a single connector", async () => {
+  it("asks for the Euler Stream API key, without a picker for one connector", async () => {
+    await setup(settingsReply());
+
+    expect(providers().getByText("Euler Stream API key")).toBeInTheDocument();
+    expect(keyInput()).toHaveValue("");
+    expect(providers().queryByText("Default")).not.toBeInTheDocument();
+  });
+
+  it("credits Euler Stream and links its site, signup and plans", async () => {
     await setup(settingsReply());
 
     expect(
-      screen.queryByRole("heading", { name: "Providers" }),
-    ).not.toBeInTheDocument();
+      providers()
+        .getAllByRole("link")
+        .map((a) => a.getAttribute("href")),
+    ).toEqual([EULER_STREAM_URL, EULER_SIGNUP_URL, EULER_PRICING_URL]);
   });
 
   it("shows the active connector and its key", async () => {

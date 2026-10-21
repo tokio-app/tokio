@@ -6,34 +6,11 @@
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Tokio's own source code in this repository              | MIT ([`LICENSE`](LICENSE)), except the file below                                                                                |
 | `src/main/services/tts/providers/edge/common/drm-v2.ts` | LGPL-3.0-only ([`LICENSES/LGPL-3.0.txt`](LICENSES/LGPL-3.0.txt), which builds on [`LICENSES/GPL-3.0.txt`](LICENSES/GPL-3.0.txt)) |
-| **The distributed application**                         | **AGPL-3.0-only** as a whole ([`LICENSES/AGPL-3.0.txt`](LICENSES/AGPL-3.0.txt)), because it includes the AGPL dependencies below |
+| **The distributed application**                         | MIT, with the LGPL-3.0-only file above and the third-party components below under their own licenses                             |
 
-Tokio's own files stay MIT and can be reused under MIT on their own. The application built from them includes `tiktok-live-connector` and `tiktok-live-proto`, which are licensed AGPL-3.0-only. So anyone who distributes the application, modified or not, must do so under the AGPL-3.0, including making the complete corresponding source available.
-
-**Corresponding source.** The complete source of Tokio is published at <https://github.com/tokio-app/tokio>, and every released version is built from it. The exact dependency versions are pinned in `yarn.lock`. See the README for build instructions (`yarn build:win`).
+**Source.** The complete source of Tokio is published at <https://github.com/tokio-app/tokio>, and every released version is built from it. The exact dependency versions are pinned in `yarn.lock`. See the README for build instructions (`yarn build:win`).
 
 **Licenses in the app.** `LICENSE`, this notice and the `LICENSES/` folder are installed with the application, in its `resources/licenses` folder. Every npm dependency ships with its own license file inside `resources/app.asar`, under `node_modules/<package>/`. The About page of the app shows these notices, the license texts and the license of every npm package it ships.
-
-## AGPL-3.0-only dependencies
-
-### tiktok-live-connector
-
-|             |                                                                                       |
-| ----------- | ------------------------------------------------------------------------------------- |
-| **Version** | 2.4.3 (licensed AGPL-3.0-only since 2.4.1; 2.4.0 and earlier were MIT)                |
-| **Author**  | zerodytrash and contributors                                                          |
-| **Source**  | <https://github.com/zerodytrash/TikTok-Live-Connector>                                |
-| **Use**     | Unmodified npm dependency. It connects to TikTok LIVE and provides the stream events. |
-
-### tiktok-live-proto
-
-|             |                                                                                                   |
-| ----------- | ------------------------------------------------------------------------------------------------- |
-| **Version** | 0.2.4 (licensed AGPL-3.0-only since 0.2.4; 0.2.3 and earlier were MIT)                            |
-| **Source**  | <https://github.com/isaackogan/TikTok-Webcast-Protobuf>                                           |
-| **Use**     | Unmodified npm dependency of tiktok-live-connector. It contains the TikTok LIVE protocol schemas. |
-
-**Network use (AGPL §13).** Tokio uses these packages unmodified, and its overlay server only listens on the local machine. If you modify these packages and let users interact with your modified version over a network, §13 requires you to offer those users its source.
 
 ## LGPL-3.0-only code: edge-tts
 
@@ -48,9 +25,9 @@ This file generates the `Sec-MS-GEC` token required by Microsoft Edge's Read Alo
 
 ## Other dependencies
 
-All other npm dependencies are under permissive licenses. A scan of the 180 production packages on 2026-10-14 found MIT, BSD-2-Clause, BSD-3-Clause, ISC, Apache-2.0, 0BSD, Unlicense, CC0-1.0, BlueOak-1.0.0 and Python-2.0. Their license files are shipped with the application as described above, including those of libraries bundled into the user interface (such as React). That scan reads package-level licenses only. Content inside a package can carry its own license, as the icons below do.
+All other npm dependencies are under permissive licenses. A scan of the 152 production packages on 2026-10-20 found MIT, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, BlueOak-1.0.0 and Python-2.0. Among them, `@tokioapp/connector` (MIT, <https://github.com/tokio-app/connector>) connects to TikTok LIVE and provides the stream events. Their license files are shipped with the application as described above, including those of libraries bundled into the user interface (such as React). That scan reads package-level licenses only. Content inside a package can carry its own license, as the icons below do.
 
-Re-check when adding or upgrading dependencies, since licenses can change between versions, as tiktok-live-connector's did. Electron's and Chromium's licenses are included by Electron as `LICENSE.electron.txt` and `LICENSES.chromium.html` in the installation folder.
+Re-check when adding or upgrading dependencies, since licenses can change between versions. Electron's and Chromium's licenses are included by Electron as `LICENSE.electron.txt` and `LICENSES.chromium.html` in the installation folder.
 
 ## Icons
 
@@ -70,8 +47,8 @@ Check this table when adding an icon set: react-icons also contains sets under C
 
 Tokio talks to these online services. None of them is covered by Tokio's license or by the licenses above. Each one is subject to its operator's terms and can stop working at any time.
 
-- **TikTok:** TikTok LIVE, through tiktok-live-connector, and TikTok's text-to-speech (the TikTok voices). Neither is an official public API.
-- **Euler Stream** (`api.eulerstream.com`): request signing used by tiktok-live-connector.
+- **TikTok:** TikTok LIVE, through @tokioapp/connector, and TikTok's text-to-speech (the TikTok voices). Neither is an official public API.
+- **Euler Stream** (`tiktok.eulerstream.com`): signs the connection to TikTok LIVE, with each user's own API key.
 - **Microsoft:** Edge's Read Aloud service (the Edge voices), which isn't an official public API.
 - **Spotify and YouTube:** music requests.
 - **GitHub** (`github.com`, `api.github.com`): update checks and downloads, from Tokio's releases, and the official overlays (their list, previews and downloads), from the releases of `tokio-app/overlays`.

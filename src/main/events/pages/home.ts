@@ -7,8 +7,33 @@ import {
 } from "@/common/types";
 import { createStack } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
+import { ConnectorFailure } from "@/services/connector/common";
 
 const events = createStack("connector");
+
+// What to tell the user about a connect that failed, by what went wrong.
+const connectMessage = (handle: string, error?: ConnectorFailure) => {
+  switch (error?.kind) {
+    case "offline":
+      return `${handle} isn't LIVE right now. Connect once the LIVE has started.`;
+    case "notFound":
+      return `Couldn't find ${handle} on TikTok. Check the username.`;
+    case "rateLimited": {
+      const wait = error.retryAfterSeconds;
+      return `Your Euler Stream API key hit its rate limit. Try again in ${wait ? `${wait} seconds` : "a minute"}.`;
+    }
+    case "noKey":
+      return "Tokio needs your Euler Stream API key to connect. Add it in Settings.";
+    case "badKey":
+      return "Euler Stream didn't accept your API key. Check it in Settings.";
+    case "sign":
+      return "Euler Stream couldn't sign the connection. Try again in a moment.";
+    case "network":
+      return "Unable to reach TikTok. Check your internet connection.";
+    default:
+      return `Unable to connect to ${handle}. Try again in a moment.`;
+  }
+};
 
 const EMPTY_STATS = {
   likes: 0,
@@ -57,7 +82,7 @@ events.push(
       if (!res.success) {
         throw new AppFailure(
           FEEDBACK_CODES.CONNECT_FAILED,
-          `Unable to connect to ${handle}. Check the username and that they are LIVE.`,
+          connectMessage(handle, res.error),
           { logged: true },
         );
       }

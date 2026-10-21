@@ -63,11 +63,10 @@ export function AppSection({
 
       <div className={styles.notice}>
         <p>
-          Tokio is free software. The application includes components licensed
-          under the GNU Affero General Public License v3.0, so it&apos;s
-          distributed under that license (AGPL-3.0-only): you may redistribute
-          and modify it under its terms. Tokio&apos;s own source code is also
-          available under the MIT License.
+          Tokio is free software under the MIT License: you may use, copy,
+          modify and redistribute it under its terms. One file, derived from
+          edge-tts, is licensed under the GNU LGPL v3.0, and the third-party
+          components keep their own licenses.
         </p>
         <p>
           Tokio comes with <strong>absolutely no warranty</strong>, to the
@@ -85,9 +84,6 @@ export function AppSection({
       <div className={styles.buttons}>
         <Btn onClick={() => window.open(REPOSITORY_URL)}>
           <FiCode /> Source code
-        </Btn>
-        <Btn onClick={() => onView("AGPL-3.0")}>
-          <FiFileText /> AGPL-3.0 license
         </Btn>
         <Btn onClick={() => onView("tokio")}>
           <FiFileText /> MIT license

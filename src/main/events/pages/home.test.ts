@@ -5,6 +5,7 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import Logger from "@/logger";
+import { connectFailure, ConnectorFailure } from "@/services/connector/common";
 import { createHandler, eventSource } from "@test/handler";
 import { describe, expect, it, vi } from "vitest";
 import home from "./home";
@@ -18,7 +19,7 @@ describe("home events", () => {
     // connect() answers with `result` after running `during`, which can
     // emit live events, as the connector does before it resolves.
     const setup = (
-      result: { success: boolean; error?: Error },
+      result: { success: boolean; error?: ConnectorFailure },
       during = () => {},
     ) => {
       const live = eventSource();
@@ -85,15 +86,14 @@ describe("home events", () => {
       const error = vi.spyOn(Logger, "error");
       const { h, live } = setup({
         success: false,
-        error: new Error("offline"),
+        error: connectFailure("unknown", "Something broke"),
       });
 
       await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
 
       const failure = {
         code: FEEDBACK_CODES.CONNECT_FAILED,
-        message:
-          "Unable to connect to @streamer. Check the username and that they are LIVE.",
+        message: "Unable to connect to @streamer. Try again in a moment.",
       };
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
         { success: false, stats: noStats, error: failure },
@@ -104,6 +104,52 @@ describe("home events", () => {
       expect(live.listeners(TOKIO_EVENTS.CONNECTED)).toBe(0);
       // The connector service logs its own failures
       expect(error).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        connectFailure("offline", ""),
+        "@streamer isn't LIVE right now. Connect once the LIVE has started.",
+      ],
+      [
+        connectFailure("notFound", ""),
+        "Couldn't find @streamer on TikTok. Check the username.",
+      ],
+      [
+        connectFailure("rateLimited", "", { retryAfterSeconds: 42 }),
+        "Your Euler Stream API key hit its rate limit. Try again in 42 seconds.",
+      ],
+      [
+        connectFailure("rateLimited", ""),
+        "Your Euler Stream API key hit its rate limit. Try again in a minute.",
+      ],
+      [
+        connectFailure("noKey", ""),
+        "Tokio needs your Euler Stream API key to connect. Add it in Settings.",
+      ],
+      [
+        connectFailure("badKey", ""),
+        "Euler Stream didn't accept your API key. Check it in Settings.",
+      ],
+      [
+        connectFailure("sign", ""),
+        "Euler Stream couldn't sign the connection. Try again in a moment.",
+      ],
+      [
+        connectFailure("network", ""),
+        "Unable to reach TikTok. Check your internet connection.",
+      ],
+    ])("says what to do when it fails (%#)", async (error, message) => {
+      const { h } = setup({ success: false, error });
+
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          code: FEEDBACK_CODES.CONNECT_FAILED,
+          message,
+        }),
+      ]);
     });
 
     it("ignores a connected event that failed", async () => {

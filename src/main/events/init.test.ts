@@ -26,6 +26,7 @@ import {
 import config from "@/config";
 import Logger from "@/logger";
 import type { AlertsService } from "@/services/alerts";
+import type { ReconnectState } from "@/services/connector/common";
 import { LiveService } from "@/services/live";
 import type { MusicService } from "@/services/music";
 import type { OverlayService } from "@/services/overlay";
@@ -182,6 +183,7 @@ function setup() {
   const connectorService = {
     ...conn,
     setLogFile: vi.fn(),
+    onReconnect: vi.fn((_listener: (state: ReconnectState) => void) => {}),
     fetchGifts: vi.fn(
       async (): Promise<{ success: boolean; data: Gift[] }> => ({
         success: true,
@@ -712,6 +714,45 @@ describe("init events", () => {
           message: "The LIVE has ended.",
         }),
       ]);
+    });
+
+    it("says when the connection was lost", async () => {
+      const s = await live();
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "lost" });
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "connector",
+          code: FEEDBACK_CODES.CONNECTION_LOST,
+          message: "Unable to reconnect to the LIVE. Connect again from Home.",
+        }),
+      ]);
+    });
+
+    it("says while it reconnects, and once it's back, keeping the LIVE", async () => {
+      const s = await live();
+      const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
+
+      reconnect("reconnecting");
+      reconnect("reconnected");
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "connector",
+          code: FEEDBACK_CODES.RECONNECTING,
+          message: "The connection to the LIVE dropped. Reconnecting…",
+        }),
+        expect.objectContaining({
+          level: "info",
+          source: "connector",
+          code: FEEDBACK_CODES.RECONNECTED,
+          message: "Reconnected to the LIVE.",
+        }),
+      ]);
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([]);
     });
 
     it.each([undefined, {}])(

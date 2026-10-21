@@ -250,7 +250,7 @@ events.push(
     notifier.success(
       "system",
       FEEDBACK_CODES.PROVIDER_UPDATED,
-      `Connector provider set to ${name}.`,
+      "Euler Stream API key saved.",
     );
   },
   {

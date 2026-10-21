@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   { to: "/music", label: "Music", icon: <FiMusic size={22} /> },
   // Pinned to the bottom of the sidebar from here on
   { to: "/tools", label: "Tools", icon: <VscTools size={22} />, bottom: true },
-  // Shows the license notices the AGPL requires, keep it in the sidebar
+  // Shows the license notices, keep it in the sidebar
   { to: "/about", label: "About", icon: <FiInfo size={22} /> },
   { to: "/settings", label: "Settings", icon: <FiSettings size={22} /> },
 ] as const;

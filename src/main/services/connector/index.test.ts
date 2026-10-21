@@ -1,7 +1,7 @@
 import { TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import Logger from "@/logger";
 import { describe, expect, it, vi } from "vitest";
-import { ConnectorProvider, ConnectorResponse } from "./common";
+import { connectFailure, ConnectorProvider, ConnectorResponse } from "./common";
 import { TikTokConnectorService } from "./index";
 
 class FakeConnector extends ConnectorProvider {
@@ -45,7 +45,7 @@ describe("TikTokConnectorService", () => {
   it("logs and returns a failed connection", async () => {
     const error = vi.spyOn(Logger, "error");
     const { service, provider } = setup();
-    const cause = new Error("User is offline");
+    const cause = connectFailure("offline", "User is offline");
     provider.connect.mockResolvedValue({ success: false, error: cause });
 
     const res = await service.connect("streamer");
@@ -61,13 +61,17 @@ describe("TikTokConnectorService", () => {
   it("passes everything else to the active provider", async () => {
     const { service, provider } = setup();
     const listener = (_: TokioEventMap[TOKIO_EVENTS.CHAT]) => {};
+    const onReconnect = vi.fn();
+    const reconnect = vi.spyOn(provider, "onReconnect");
 
     service.on(TOKIO_EVENTS.CHAT, listener);
     service.off(TOKIO_EVENTS.CHAT, listener);
+    service.onReconnect(onReconnect);
     await service.disconnect();
 
     expect(provider.on).toHaveBeenCalledWith(TOKIO_EVENTS.CHAT, listener);
     expect(provider.off).toHaveBeenCalledWith(TOKIO_EVENTS.CHAT, listener);
+    expect(reconnect).toHaveBeenCalledWith(onReconnect);
     expect(provider.disconnect).toHaveBeenCalledOnce();
     expect(service.isConnected()).toBe(true);
     expect(await service.fetchGifts()).toEqual({ success: true, data: [] });

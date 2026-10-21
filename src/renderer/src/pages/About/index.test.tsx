@@ -16,13 +16,13 @@ import { About } from ".";
 import { COMPONENTS, SERVICES } from "./helper";
 
 const PACKAGES = [
-  packageLicense("tiktok-live-connector", {
-    id: "tiktok-live-connector@2.4.1",
+  packageLicense("gpl-tool", {
+    id: "gpl-tool@2.4.1",
     version: "2.4.1",
-    license: "AGPL-3.0-only",
+    license: "GPL-3.0-only",
     copyleft: true,
-    author: "zerodytrash",
-    url: "https://github.com/zerodytrash/TikTok-Live-Connector",
+    author: "Jane Doe",
+    url: "https://github.com/example/gpl-tool",
   }),
   packageLicense("react", { id: "react@19.2.1", version: "19.2.1" }),
   packageLicense("zod", { id: "zod@4.1.0", version: "4.1.0" }),
@@ -32,15 +32,21 @@ const ABOUT: AboutInfo = {
   versions: { electron: "39.2.0", chrome: "142.0.7444.59", node: "22.20.0" },
   packages: PACKAGES,
   documents: [
-    { id: "AGPL-3.0", title: "GNU Affero General Public License v3.0" },
+    { id: "LGPL-3.0", title: "GNU Lesser General Public License v3.0" },
     { id: "notices", title: "Third-party notices" },
   ],
 };
 
-const AGPL: LicenseText = {
-  id: "AGPL-3.0",
-  title: "GNU Affero General Public License v3.0",
-  text: "GNU AFFERO GENERAL PUBLIC LICENSE\n   Version 3, 19 November 2007\n\n# Not a heading",
+const MIT: LicenseText = {
+  id: "tokio",
+  title: "Tokio (MIT License)",
+  text: "MIT License\n\nCopyright (c) 2026\n\n# Not a heading",
+};
+
+const LGPL: LicenseText = {
+  id: "LGPL-3.0",
+  title: "GNU Lesser General Public License v3.0",
+  text: "GNU LESSER GENERAL PUBLIC LICENSE\n   Version 3, 29 June 2007",
 };
 
 const NOTICES: LicenseText = {
@@ -254,35 +260,31 @@ describe("About", () => {
   it("opens Tokio's licenses and the notices", async () => {
     const { user } = renderWithProviders(<About />);
 
-    for (const name of [
-      "AGPL-3.0 license",
-      "MIT license",
-      "Third-party notices",
-    ]) {
+    for (const name of ["MIT license", "Third-party notices"]) {
       await user.click(screen.getByRole("button", { name }));
       await user.click(dialog().getByRole("button", { name: "Close" }));
     }
 
-    expect(opened()).toEqual(["AGPL-3.0", "tokio", "notices"]);
+    expect(opened()).toEqual(["tokio", "notices"]);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("loads a license, then shows its plain text", async () => {
     const { user } = renderWithProviders(<About />);
 
-    await user.click(screen.getByRole("button", { name: "AGPL-3.0 license" }));
+    await user.click(screen.getByRole("button", { name: "MIT license" }));
 
     expect(dialog().getByRole("heading", { name: "License" })).toBeVisible();
     expect(loading(screen.getByRole("dialog"))).toBe(true);
 
-    await license(AGPL);
+    await license(MIT);
 
     expect(loading(screen.getByRole("dialog"))).toBe(false);
     expect(
-      dialog().getByRole("heading", { name: AGPL.title }),
+      dialog().getByRole("heading", { name: MIT.title }),
     ).toBeInTheDocument();
     const text = screen.getByRole("dialog").querySelector("pre");
-    expect(text?.textContent).toBe(AGPL.text);
+    expect(text?.textContent).toBe(MIT.text);
     expect(
       dialog().queryByRole("heading", { name: "Not a heading" }),
     ).not.toBeInTheDocument();
@@ -368,7 +370,7 @@ describe("About", () => {
 
     await send(APP_EVENTS_RESPONSE.GET_LICENSE_TEXT, {
       ...failure(),
-      id: "AGPL-3.0",
+      id: "LGPL-3.0",
     });
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -378,7 +380,7 @@ describe("About", () => {
     const { user } = renderWithProviders(<About />);
     await user.click(screen.getByRole("button", { name: "MIT license" }));
 
-    await license(AGPL);
+    await license(LGPL);
 
     expect(dialog().getByRole("heading", { name: "License" })).toBeVisible();
     expect(loading(screen.getByRole("dialog"))).toBe(true);
@@ -409,13 +411,10 @@ describe("About", () => {
       expect(packages().getByText(version)).toBeInTheDocument();
       expect(packages().getAllByText(spdx).length).toBeGreaterThan(0);
     }
-    expect(packages().getByText("zerodytrash")).toBeInTheDocument();
+    expect(packages().getByText("Jane Doe")).toBeInTheDocument();
     expect(
       packages().getByRole("link", { name: "Repository" }),
-    ).toHaveAttribute(
-      "href",
-      "https://github.com/zerodytrash/TikTok-Live-Connector",
-    );
+    ).toHaveAttribute("href", "https://github.com/example/gpl-tool");
   });
 
   it("says when the packages couldn't be loaded", async () => {
@@ -444,8 +443,8 @@ describe("About", () => {
     expect(shown()).toEqual(["react"]);
 
     await user.clear(search);
-    await user.type(search, " agpl ");
-    expect(shown()).toEqual(["tiktok-live-connector"]);
+    await user.type(search, " gpl ");
+    expect(shown()).toEqual(["gpl-tool"]);
 
     await user.clear(search);
     await user.type(search, "lodash ");

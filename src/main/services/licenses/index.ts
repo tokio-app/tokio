@@ -21,11 +21,6 @@ const DOCUMENTS: (LicenseDocument & { file: string })[] = [
     file: "THIRD_PARTY_NOTICES.md",
   },
   {
-    id: "AGPL-3.0",
-    title: "GNU Affero General Public License v3.0",
-    file: "LICENSES/AGPL-3.0.txt",
-  },
-  {
     id: "LGPL-3.0",
     title: "GNU Lesser General Public License v3.0",
     file: "LICENSES/LGPL-3.0.txt",

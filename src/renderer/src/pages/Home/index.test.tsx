@@ -1,4 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, LiveSession } from "@/common/types";
+import { EULER_SIGNUP_URL } from "@/common/util";
 import { createAlert } from "@/pages/Alerts/helper";
 import {
   liveSession,
@@ -105,6 +106,31 @@ describe("Home", () => {
 
     expect(sent(APP_EVENTS.CONNECT)).toEqual([]);
     expect(connect).not.toHaveAttribute("aria-busy");
+  });
+
+  it("says connecting needs an Euler Stream API key until one is saved", async () => {
+    await renderApp();
+    const hint = () => page().queryByText(/needs your Euler Stream API key/);
+
+    await send(APP_EVENTS_RESPONSE.GET_SETTINGS, settingsReply());
+
+    expect(hint()).toBeInTheDocument();
+    expect(
+      page().getByRole("link", { name: "Get a free key" }),
+    ).toHaveAttribute("href", EULER_SIGNUP_URL);
+    expect(page().getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_SETTINGS,
+      settingsReply((s) => {
+        s.settings.activeConnProvider.key = "euler-key";
+      }),
+    );
+
+    expect(hint()).not.toBeInTheDocument();
   });
 
   it("disconnects, loading until main answers", async () => {

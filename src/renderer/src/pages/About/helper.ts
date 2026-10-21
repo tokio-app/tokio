@@ -71,11 +71,11 @@ export const COMPONENTS: Component[] = [
 export const SERVICES: { name: string; note: string }[] = [
   {
     name: "TikTok",
-    note: "TikTok LIVE, through tiktok-live-connector, and TikTok's text-to-speech (the TikTok voices). Neither is an official public API.",
+    note: "TikTok LIVE, through @tokioapp/connector, and TikTok's text-to-speech (the TikTok voices). Neither is an official public API.",
   },
   {
     name: "Euler Stream",
-    note: "Request signing used by tiktok-live-connector.",
+    note: "Signs the connection to TikTok LIVE, with each user's own API key.",
   },
   {
     name: "Microsoft",

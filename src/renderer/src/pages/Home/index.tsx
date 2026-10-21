@@ -20,6 +20,8 @@ export function Home() {
   const [feed, setFeed] = useState(defaultStoreData.settings.activityFeed);
   const [editingFeed, setEditingFeed] = useState(false);
   const [musicConnected, setMusicConnected] = useState(false);
+  // Until settings load, so the hint doesn't flash
+  const [needsKey, setNeedsKey] = useState(false);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [likes, setLikes] = useState(0);
@@ -43,6 +45,7 @@ export function Home() {
     const settings = res.data!.settings;
     setFeatures(settings.activeFeatures);
     setFeed(settings.activityFeed);
+    setNeedsKey(!settings.activeConnProvider.key);
     setServer({
       enabled: settings.server.enabled,
       overlays: settings.overlays.length,
@@ -100,6 +103,7 @@ export function Home() {
               username={username}
               connected={connected}
               loading={loading}
+              needsKey={needsKey}
               startedAt={session.startedAt}
               stats={[
                 { label: "Viewers", value: views.current },

@@ -2,7 +2,13 @@ import { TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
-import { ConnectorProvider, ConnectorResponse, GiftResponse } from "./common";
+import {
+  connectFailure,
+  ConnectorProvider,
+  ConnectorResponse,
+  GiftResponse,
+  ReconnectState,
+} from "./common";
 import { TikTokLiveConnector } from "./providers";
 
 export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
@@ -29,6 +35,10 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
     if (this._current?.provider) this._current.provider.off(event, listener);
   }
 
+  public onReconnect(listener: (state: ReconnectState) => void) {
+    this._current?.provider?.onReconnect(listener);
+  }
+
   public async connect(
     username: string,
     key?: string,
@@ -38,7 +48,7 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
       Logger.error(`<Connector> No provider was defined.`, this._logFile);
       return {
         success: false,
-        error: new Error("No conector provider was defined."),
+        error: connectFailure("unknown", "No connector provider was defined."),
       };
     }
     const res = await this._current.provider.connect(username, key);

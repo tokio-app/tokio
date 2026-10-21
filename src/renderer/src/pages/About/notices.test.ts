@@ -80,14 +80,13 @@ describe("THIRD_PARTY_NOTICES.md", () => {
     }
   });
 
-  it("names the installed versions of the AGPL dependencies", () => {
-    for (const name of ["tiktok-live-connector", "tiktok-live-proto"]) {
-      const row = section(`### ${name}`).match(/\*\*Version\*\* \| (\S+)/);
-      const pkg = JSON.parse(read(join("node_modules", name, "package.json")));
+  it("ships no AGPL code", () => {
+    const { dependencies } = JSON.parse(read("package.json"));
 
-      // A new version can come with a new license, check it before updating
-      expect(row?.[1], name).toBe(pkg.version);
-    }
+    expect(notices).not.toMatch(/AGPL/);
+    expect(
+      Object.keys(dependencies).filter((d) => /tiktok-live/.test(d)),
+    ).toEqual([]);
   });
 });
 
@@ -105,14 +104,12 @@ describe("licenses in the code", () => {
     expect(existsSync(join(root, "LICENSES", "LGPL-3.0.txt"))).toBe(true);
   });
 
-  it("names the LGPL and AGPL parts in the bundle's banner", () => {
+  it("names the LGPL part in the bundle's banner, and no AGPL", () => {
     const banner = read("electron.vite.config.ts");
 
     expect(banner).toContain("drm-v2.ts");
     expect(banner).toContain("LGPL-3.0-only");
-    expect(banner).toContain(
-      "tiktok-live-connector and tiktok-live-proto (AGPL-3.0-only)",
-    );
+    expect(banner).not.toMatch(/AGPL/);
   });
 
   it("keeps the repository's own code MIT", () => {

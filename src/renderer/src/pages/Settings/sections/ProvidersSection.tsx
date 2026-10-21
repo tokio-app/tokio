@@ -1,5 +1,10 @@
 import { AppProvider, AppSettings } from "@/common/schemas";
 import { APP_EVENTS } from "@/common/types";
+import {
+  EULER_PRICING_URL,
+  EULER_SIGNUP_URL,
+  EULER_STREAM_URL,
+} from "@/common/util";
 import { Btn, Field, FormGrid, Input, Section, Select } from "@/components";
 import { useState } from "react";
 import { FiBox, FiSave } from "react-icons/fi";
@@ -9,13 +14,27 @@ interface Props {
   settings: AppSettings;
 }
 
-// Only shown when there's more than one connector to choose from.
+const link = (href: string, text: string) => (
+  <a className={styles.link} href={href} target="_blank" rel="noreferrer">
+    {text}
+  </a>
+);
+
 export function ProvidersSection({ settings }: Props) {
   return (
     <Section
       icon={<FiBox />}
-      title="Providers"
-      description="Configure the backend service used for TikTok events."
+      title="TikTok LIVE"
+      description={
+        <>
+          Tokio connects to TikTok LIVE through{" "}
+          {link(EULER_STREAM_URL, "Euler Stream")}, which signs each connection,
+          with your own API key: {link(EULER_SIGNUP_URL, "sign up")} for free
+          and paste your key here. Your{" "}
+          {link(EULER_PRICING_URL, "Euler Stream plan")} sets how often you can
+          connect.
+        </>
+      }
     >
       <FormGrid>
         <ProviderForm
@@ -50,17 +69,20 @@ function ProviderForm({ type, label, providers, active }: FormProps) {
 
   return (
     <div className={styles.provider}>
-      <Field label={label}>
-        <Select
-          options={providers.map((p) => ({ label: p.name, value: p.name }))}
-          value={name}
-          onChange={setName}
-        />
-      </Field>
-      <Field label="Key" hint="(Optional)">
+      {/* Nothing to pick from with a single connector */}
+      {providers.length > 1 && (
+        <Field label={label}>
+          <Select
+            options={providers.map((p) => ({ label: p.name, value: p.name }))}
+            value={name}
+            onChange={setName}
+          />
+        </Field>
+      )}
+      <Field label="Euler Stream API key">
         <Input
           type="password"
-          placeholder="Provider key..."
+          placeholder="Your API key..."
           value={key}
           onChange={(e) => setKey(e.target.value)}
         />

@@ -9,8 +9,6 @@ const MAIN_LICENSE_BANNER = `/*!
  * Tokio - source code under the MIT License, see resources/licenses/LICENSE.
  * Includes src/main/services/tts/providers/edge/common/drm-v2.ts, derived from
  * edge-tts (https://github.com/rany2/edge-tts) and licensed LGPL-3.0-only.
- * Uses tiktok-live-connector and tiktok-live-proto (AGPL-3.0-only), so the
- * application as distributed is licensed AGPL-3.0-only.
  * Source: https://github.com/tokio-app/tokio
  * See resources/licenses/THIRD_PARTY_NOTICES.md and resources/licenses/LICENSES.
  */`;

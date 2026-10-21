@@ -1,64 +1,90 @@
 import { TOKIO_EVENTS } from "@/common/types";
-import { WebcastEvent } from "tiktok-live-connector";
+import {
+  ConnectorError,
+  InvalidUsernameError,
+  OfflineError,
+  PremiumFeatureError,
+  RateLimitError,
+  RoomNotFoundError,
+  SignError,
+  TimeoutError,
+  WebSocketError,
+} from "@tokioapp/connector";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TikTokLiveConnector } from "./index";
 
-// Stands in for TikTok: tests emit raw webcast events on the last connection.
+type Connection = {
+  username: string;
+  options: { requestTimeoutMs?: number };
+  state: string;
+  emit: (event: string, data?: unknown) => boolean;
+  listenerCount: (event: string) => number;
+};
+
+// Stands in for TikTok: tests emit the library's events on the last connection.
 const live = vi.hoisted(() => ({
-  connections: [] as {
-    username: string;
-    options: any;
-    isConnected: boolean;
-    emit: (event: string, data?: unknown) => boolean;
-  }[],
-  connect: { fail: false },
+  connections: [] as Connection[],
+  signers: [] as unknown[],
+  // Thrown by connect(), or run before it resolves
+  connect: {
+    error: undefined as Error | undefined,
+    during: undefined as ((c: Connection) => void) | undefined,
+  },
+  // Listeners the connection had when connect() was called
+  listening: [] as number[],
+  // Every connection's fetchGifts, set in each test
+  fetchGifts: (_options: unknown): Promise<unknown> => Promise.resolve(),
 }));
 
-vi.mock("tiktok-live-connector", async () => {
+vi.mock("@tokioapp/connector", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tokioapp/connector")>();
   const { EventEmitter } = await import("node:events");
   class TikTokLiveConnection extends EventEmitter {
-    isConnected = false;
+    state = "idle";
     constructor(
       public username: string,
-      public options: unknown,
+      public options: Connection["options"],
     ) {
       super();
       live.connections.push(this);
     }
     async connect() {
-      if (live.connect.fail) throw new Error("LIVE has ended");
-      this.isConnected = true;
-      return { isConnected: true };
+      live.listening.push(this.listenerCount("chat"));
+      if (live.connect.error) {
+        this.state = "disconnected";
+        throw live.connect.error;
+      }
+      this.state = "connected";
+      this.emit("connected", { roomId: "1", reconnected: false, attempt: 0 });
+      live.connect.during?.(this);
+      return { roomId: "1" };
+    }
+    fetchGifts(options: unknown) {
+      return live.fetchGifts(options);
     }
     async disconnect() {
-      this.isConnected = false;
+      if (this.state === "disconnected") return;
+      this.state = "disconnected";
+      this.emit("disconnected", { reason: "user", willReconnect: false });
     }
   }
-  const names = [
-    "SHARE",
-    "FOLLOW",
-    "CHAT",
-    "GIFT",
-    "LIKE",
-    "ENVELOPE",
-    "SUPER_FAN_BOX",
-    "SUPER_FAN",
-    "MEMBER",
-    "SUPER_FAN_JOIN",
-    "ROOM_USER",
-    "STREAM_END",
-  ];
-  const WebcastEvent = Object.fromEntries(names.map((n) => [n, n]));
-  return { TikTokLiveConnection, WebcastEvent };
+  class EulerSigner {
+    constructor(options: unknown) {
+      live.signers.push(options);
+    }
+  }
+  return { ...actual, TikTokLiveConnection, EulerSigner };
 });
 
 const rawUser = {
+  userId: "1",
   nickname: "Viewer",
   displayId: "viewer",
-  avatarThumb: { urlList: ["https://img/1.png"] },
+  avatarThumb: { urlList: ["https://img/1.png"], uri: "" },
   badgeList: [
     {
-      combine: { icon: { uri: "webcast/fans_badge_12" } },
+      sceneType: 10,
+      combine: { icon: { uri: "webcast/fans_badge_12", urlList: [] } },
       privilegeLogExtra: { level: "12" },
     },
   ],
@@ -79,11 +105,9 @@ describe("TikTokLiveConnector", () => {
 
   const connection = () => live.connections[live.connections.length - 1];
 
-  // connect() waits a second before listening to events.
   const connected = async () => {
-    const res = connector.connect("@streamer", "session-id");
-    await vi.advanceTimersByTimeAsync(1000);
-    return res;
+    connector.setKey("euler-key");
+    return connector.connect("@streamer");
   };
 
   const capture = (event: TOKIO_EVENTS) => {
@@ -93,74 +117,194 @@ describe("TikTokLiveConnector", () => {
   };
 
   beforeEach(() => {
-    vi.useFakeTimers();
     live.connections.length = 0;
-    live.connect.fail = false;
+    live.signers.length = 0;
+    live.listening.length = 0;
+    live.connect.error = undefined;
+    live.connect.during = undefined;
     connector = new TikTokLiveConnector();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   describe("connect", () => {
     it("needs a username", async () => {
+      connector.setKey("euler-key");
       const onConnected = capture(TOKIO_EVENTS.CONNECTED);
 
       const res = await connector.connect("@");
 
-      expect(res.success).toBe(false);
-      expect(onConnected).toHaveBeenCalledWith(
-        expect.objectContaining({ success: false }),
-      );
+      expect(res.error?.kind).toBe("notFound");
+      expect(onConnected).toHaveBeenCalledWith(res);
       expect(live.connections).toEqual([]);
     });
 
-    it("connects without the @ and with the session cookie", async () => {
-      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
-
-      expect(await connected()).toEqual({ success: true });
-
-      expect(connection().username).toBe("streamer");
-      expect(connection().options.session.cookie.value.sessionId).toBe(
-        "session-id",
-      );
-      expect(onConnected).toHaveBeenCalledWith({ success: true });
-      expect(connector.isConnected()).toBe(true);
-    });
-
-    it("reports a failed connection", async () => {
-      live.connect.fail = true;
+    it("needs an Euler Stream API key", async () => {
       const onConnected = capture(TOKIO_EVENTS.CONNECTED);
 
       const res = await connector.connect("streamer");
 
-      expect(res.success).toBe(false);
-      expect(res.error?.message).toBe("LIVE has ended");
+      expect(res).toEqual({
+        success: false,
+        error: expect.objectContaining({ kind: "noKey" }),
+      });
       expect(onConnected).toHaveBeenCalledWith(res);
+      expect(live.connections).toEqual([]);
     });
 
-    it("disconnects when the stream ends", async () => {
+    it("signs with the saved key when connect gets none", async () => {
+      expect(await connected()).toEqual({ success: true });
+
+      expect(connection().username).toBe("streamer");
+      expect(live.signers).toEqual([{ apiKey: "euler-key" }]);
+      expect(connector.isConnected()).toBe(true);
+    });
+
+    it("signs with the key connect gets, and keeps it", async () => {
+      connector.setKey("old-key");
+
+      await connector.connect("streamer", "new-key");
+      await connector.disconnect();
+      await connector.connect("streamer");
+
+      expect(live.signers).toEqual([
+        { apiKey: "new-key" },
+        { apiKey: "new-key" },
+      ]);
+    });
+
+    it("listens before connecting, and says it's connected first", async () => {
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+      const onChat = capture(TOKIO_EVENTS.CHAT);
+      live.connect.during = (c) =>
+        c.emit("chat", { user: rawUser, content: "hi", emotes: [] });
+
       await connected();
-      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
 
-      connection().emit(WebcastEvent.STREAM_END);
-      await vi.advanceTimersByTimeAsync(0);
+      expect(live.listening).toEqual([1]);
+      expect(onConnected).toHaveBeenCalledExactlyOnceWith({ success: true });
+      expect(onChat).toHaveBeenCalledOnce();
+      expect(onConnected.mock.invocationCallOrder[0]).toBeLessThan(
+        onChat.mock.invocationCallOrder[0],
+      );
+    });
 
+    it.each([
+      [new OfflineError("Not LIVE"), "offline"],
+      [new RoomNotFoundError("No room"), "notFound"],
+      [new InvalidUsernameError("Bad username"), "notFound"],
+      [new SignError("Unauthorized", { status: 401 }), "badKey"],
+      [new SignError("Forbidden", { status: 403 }), "badKey"],
+      [new SignError("Bad gateway", { status: 502 }), "sign"],
+      [new PremiumFeatureError("Paid plan", { status: 402 }), "sign"],
+      [new TimeoutError("Slow", { phase: "connect" }), "network"],
+      [new WebSocketError("Closed"), "network"],
+      [new ConnectorError("NETWORK", "Offline"), "network"],
+      [new ConnectorError("PROTOCOL", "Garbled"), "unknown"],
+      [new Error("A bug"), "unknown"],
+    ])("reports %s as %s and stops listening", async (error, kind) => {
+      live.connect.error = error;
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+
+      const res = await connected();
+
+      expect(res.success).toBe(false);
+      expect(res.error).toMatchObject({ kind, cause: error });
+      expect(onConnected).toHaveBeenCalledWith(res);
+      expect(connection().listenerCount("chat")).toBe(0);
       expect(connector.isConnected()).toBe(false);
-      expect(onDisconnected).toHaveBeenCalledExactlyOnceWith({
-        reason: "ended",
+    });
+
+    it("says how long to wait when rate limited", async () => {
+      live.connect.error = new RateLimitError("Slow down", {
+        retryAfterMs: 12_300,
+      });
+
+      const res = await connected();
+
+      expect(res.error).toMatchObject({
+        kind: "rateLimited",
+        retryAfterSeconds: 13,
       });
     });
+  });
 
-    it("disconnects without a reason when asked to", async () => {
+  describe("disconnects", () => {
+    beforeEach(async () => {
       await connected();
+    });
+
+    it("says nothing about why when asked to, and stops listening", async () => {
       const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+      const closed = connection();
 
       await connector.disconnect();
       await connector.disconnect();
 
       expect(onDisconnected).toHaveBeenCalledExactlyOnceWith(undefined);
+      expect(closed.listenerCount("chat")).toBe(0);
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it("says the LIVE ended", () => {
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+
+      connection().state = "disconnected";
+      connection().emit("disconnected", {
+        reason: "streamEnd",
+        willReconnect: false,
+      });
+
+      expect(onDisconnected).toHaveBeenCalledExactlyOnceWith({
+        reason: "ended",
+      });
+      expect(connection().listenerCount("chat")).toBe(0);
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it.each(["giveUp", "signError", "wsClose"])(
+      "says the connection was lost (%s)",
+      (reason) => {
+        const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+
+        connection().state = "disconnected";
+        connection().emit("disconnected", { reason, willReconnect: false });
+
+        expect(onDisconnected).toHaveBeenCalledExactlyOnceWith({
+          reason: "lost",
+        });
+        expect(connection().listenerCount("chat")).toBe(0);
+      },
+    );
+
+    it("stays connected while it reconnects", () => {
+      const onReconnect = vi.fn();
+      connector.onReconnect(onReconnect);
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+      const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+
+      connection().state = "reconnecting";
+      connection().emit("disconnected", {
+        reason: "wsClose",
+        willReconnect: true,
+      });
+
+      expect(onReconnect).toHaveBeenCalledExactlyOnceWith("reconnecting");
+      expect(connector.isConnected()).toBe(true);
+
+      connection().state = "connected";
+      connection().emit("connected", {
+        roomId: "1",
+        reconnected: true,
+        attempt: 1,
+      });
+
+      expect(onReconnect).toHaveBeenLastCalledWith("reconnected");
+      expect(onConnected).not.toHaveBeenCalled();
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(connection().listenerCount("chat")).toBe(1);
     });
   });
 
@@ -172,13 +316,20 @@ describe("TikTokLiveConnector", () => {
     it("maps a chat message with the user's roles and emotes", () => {
       const onChat = capture(TOKIO_EVENTS.CHAT);
 
-      connection().emit(WebcastEvent.CHAT, {
+      connection().emit("chat", {
         user: rawUser,
-        userIdentity: { isFollowerOfAnchor: true, isModeratorOfAnchor: true },
+        userIdentity: {
+          isSubscriberOfAnchor: false,
+          isFollowerOfAnchor: true,
+          isModeratorOfAnchor: true,
+        },
         content: "hello",
         contentLanguage: "en",
         emotes: [
-          { index: 5, emote: { emoteId: "e1", image: { urlList: ["u"] } } },
+          {
+            index: 5,
+            emote: { emoteId: "e1", image: { urlList: ["u"], uri: "" } },
+          },
         ],
       });
 
@@ -196,18 +347,18 @@ describe("TikTokLiveConnector", () => {
       const onGift = capture(TOKIO_EVENTS.GIFT);
       const gift = {
         user: rawUser,
-        giftId: 5655,
+        giftId: "5655",
         gift: {
           type: 1,
           name: "Rose",
           diamondCount: 1,
-          image: { urlList: ["g"] },
+          image: { urlList: ["g"], uri: "" },
         },
         repeatCount: 3,
       };
 
-      connection().emit(WebcastEvent.GIFT, { ...gift, repeatEnd: 0 });
-      connection().emit(WebcastEvent.GIFT, { ...gift, repeatEnd: 1 });
+      connection().emit("gift", { ...gift, repeatEnd: false });
+      connection().emit("gift", { ...gift, repeatEnd: true });
 
       expect(onGift.mock.calls.map(([e]) => e.gift.repeatEnd)).toEqual([
         false,
@@ -216,7 +367,7 @@ describe("TikTokLiveConnector", () => {
       expect(onGift).toHaveBeenLastCalledWith({
         user: mappedUser,
         gift: {
-          id: 5655,
+          id: "5655",
           type: 1,
           name: "Rose",
           repeatEnd: true,
@@ -227,20 +378,33 @@ describe("TikTokLiveConnector", () => {
       });
     });
 
+    it("counts a gift that can't be sent in a combo when it arrives", () => {
+      const onGift = capture(TOKIO_EVENTS.GIFT);
+
+      connection().emit("gift", {
+        user: rawUser,
+        giftId: "1",
+        gift: { type: 2, name: "Lion", diamondCount: 29999 },
+        repeatCount: 1,
+        repeatEnd: false,
+      });
+
+      expect(onGift.mock.calls[0][0].gift).toMatchObject({
+        repeatEnd: true,
+        image: "",
+      });
+    });
+
     it("maps likes, follows, shares and members", () => {
       const onLike = capture(TOKIO_EVENTS.LIKE);
       const onFollow = capture(TOKIO_EVENTS.FOLLOW);
       const onShare = capture(TOKIO_EVENTS.SHARE);
       const onMember = capture(TOKIO_EVENTS.MEMBER_JOIN);
 
-      connection().emit(WebcastEvent.LIKE, {
-        user: rawUser,
-        count: 15,
-        total: "1200",
-      });
-      connection().emit(WebcastEvent.FOLLOW, { user: rawUser });
-      connection().emit(WebcastEvent.SHARE, { user: rawUser });
-      connection().emit(WebcastEvent.MEMBER, { user: rawUser });
+      connection().emit("like", { user: rawUser, count: 15, total: 1200 });
+      connection().emit("follow", { user: rawUser });
+      connection().emit("share", { user: rawUser, shareCount: 2 });
+      connection().emit("member", { user: rawUser });
 
       expect(onLike).toHaveBeenCalledWith({
         user: mappedUser,
@@ -248,14 +412,31 @@ describe("TikTokLiveConnector", () => {
         totalLikes: 1200,
       });
       expect(onFollow).toHaveBeenCalledWith({ user: mappedUser });
-      expect(onShare).toHaveBeenCalledWith({ user: mappedUser, shareCount: 0 });
+      expect(onShare).toHaveBeenCalledWith({ user: mappedUser, shareCount: 2 });
       expect(onMember).toHaveBeenCalledWith({ user: mappedUser });
+    });
+
+    it("maps envelopes and super fans", () => {
+      const onEnvelope = capture(TOKIO_EVENTS.ENVELOPE);
+      const onBox = capture(TOKIO_EVENTS.SUPER_FAN_BOX);
+      const onSuperFan = capture(TOKIO_EVENTS.SUPER_FAN);
+      const onJoin = capture(TOKIO_EVENTS.SUPER_FAN_JOIN);
+
+      connection().emit("envelope", {});
+      connection().emit("superFanBox", {});
+      connection().emit("superFan", { user: rawUser });
+      connection().emit("superFanJoin", { user: rawUser });
+
+      expect(onEnvelope).toHaveBeenCalledWith(undefined);
+      expect(onBox).toHaveBeenCalledWith(undefined);
+      expect(onSuperFan).toHaveBeenCalledWith({ user: mappedUser });
+      expect(onJoin).toHaveBeenCalledWith({ user: mappedUser });
     });
 
     it("fills in missing user data", () => {
       const onFollow = capture(TOKIO_EVENTS.FOLLOW);
 
-      connection().emit(WebcastEvent.FOLLOW, {});
+      connection().emit("follow", {});
 
       expect(onFollow).toHaveBeenCalledWith({
         user: {
@@ -273,10 +454,10 @@ describe("TikTokLiveConnector", () => {
     it("maps viewer ranks like other users", () => {
       const onRoom = capture(TOKIO_EVENTS.ROOM_USER);
 
-      connection().emit(WebcastEvent.ROOM_USER, {
-        total: "40",
-        totalUser: "900",
-        ranks: [{ user: rawUser, score: "300", rank: "1" }],
+      connection().emit("roomUser", {
+        total: 40,
+        totalUser: 900,
+        ranks: [{ user: rawUser, score: 300, rank: 1 }],
       });
 
       expect(onRoom).toHaveBeenCalledWith({
@@ -298,77 +479,85 @@ describe("TikTokLiveConnector", () => {
   describe("fetchGifts", () => {
     const geo = { country_code: "MX", languages: "es-MX,en" };
     const gifts = {
-      data: {
-        gifts: [
-          { id: 1, name: "Rose", diamond_count: 1, image: { url_list: ["r"] } },
-          { id: 1, name: "Rose", diamond_count: 1, image: { url_list: ["r"] } },
-          { id: 2, name: "Lion", diamond_count: 29999 },
-        ],
-      },
+      source: "region",
+      gifts: [
+        {
+          id: "1",
+          name: "Rose",
+          diamondCount: 1,
+          image: { urlList: ["r"], uri: "" },
+        },
+        { id: "2", name: "Lion", diamondCount: 29999 },
+      ],
     };
 
-    const stubFetch = (geoOk = true) => {
-      const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
-        url.includes("ipapi")
-          ? Response.json(geo, { status: geoOk ? 200 : 503 })
-          : Response.json(gifts),
+    const stubGeo = (ok = true) => {
+      const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+        Response.json(geo, { status: ok ? 200 : 503 }),
       );
       vi.stubGlobal("fetch", fetchMock);
       return fetchMock;
     };
 
-    it("lists each gift once", async () => {
-      stubFetch();
+    let fetchGifts: ReturnType<typeof vi.fn<(o: unknown) => Promise<unknown>>>;
+
+    beforeEach(() => {
+      fetchGifts = vi.fn(async () => gifts);
+      live.fetchGifts = fetchGifts;
+    });
+
+    it("lists the gifts of the viewer's region and language", async () => {
+      stubGeo();
 
       expect(await connector.fetchGifts()).toEqual({
         success: true,
         warn: undefined,
         data: [
           { id: 1, name: "Rose", coins: 1, image: "r" },
-          { id: 2, name: "Lion", coins: 29999, image: undefined },
+          { id: 2, name: "Lion", coins: 29999, image: "" },
         ],
+      });
+      expect(fetchGifts).toHaveBeenCalledWith({
+        region: "MX",
+        language: "es-MX",
       });
     });
 
     it("falls back to US English when the location lookup fails", async () => {
-      const fetchMock = stubFetch(false);
+      stubGeo(false);
 
       const res = await connector.fetchGifts();
 
       expect(res.success).toBe(true);
       expect(res.warn).toBe("Failed to fetch user region");
-      const url = new URL(fetchMock.mock.calls[1][0]);
-      expect([...url.searchParams.values()]).toEqual(
-        expect.arrayContaining(["US", "en-US"]),
-      );
+      expect(fetchGifts).toHaveBeenCalledWith({
+        region: "US",
+        language: "en-US",
+      });
     });
 
     it("gives up on requests that take too long", async () => {
-      const fetchMock = stubFetch();
+      const fetchMock = stubGeo();
 
       await connector.fetchGifts();
 
-      for (const [, init] of fetchMock.mock.calls) {
-        expect(init?.signal).toBeInstanceOf(AbortSignal);
-      }
+      expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+      expect(connection().options.requestTimeoutMs).toBeGreaterThan(0);
     });
 
-    it("asks for the gifts in the viewer's region and language", async () => {
-      const fetchMock = stubFetch();
+    it("asks the LIVE's connection while connected", async () => {
+      stubGeo();
+      await connected();
 
-      await connector.fetchGifts();
+      const res = await connector.fetchGifts();
 
-      const url = new URL(fetchMock.mock.calls[1][0]);
-      expect(url.searchParams.get("region")).toBe("MX");
-      expect(url.searchParams.get("app_language")).toBe("es-MX");
+      expect(res.success).toBe(true);
+      expect(live.connections).toHaveLength(1);
     });
 
     it("fails when TikTok does", async () => {
-      vi.stubGlobal("fetch", async (url: string) =>
-        url.includes("ipapi")
-          ? Response.json(geo)
-          : new Response("", { status: 500 }),
-      );
+      stubGeo();
+      fetchGifts.mockRejectedValue(new Error("Unavailable"));
 
       const res = await connector.fetchGifts();
 

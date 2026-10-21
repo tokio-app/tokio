@@ -74,7 +74,7 @@ beforeEach(async () => {
   await pkg(modules("dev"), { name: "dev", version: "1.0.0", license: "MIT" });
 
   await mkdir(join(root, "LICENSES"));
-  await writeFile(join(root, "LICENSES", "AGPL-3.0.txt"), "AGPL text");
+  await writeFile(join(root, "LICENSES", "LGPL-3.0.txt"), "LGPL text");
 });
 
 afterEach(async () => {
@@ -135,11 +135,11 @@ describe("LicensesService", () => {
   });
 
   it("reads the shipped documents", async () => {
-    const res = await service.getText("AGPL-3.0");
+    const res = await service.getText("LGPL-3.0");
 
     expect(res.data).toMatchObject({
-      id: "AGPL-3.0",
-      text: "AGPL text",
+      id: "LGPL-3.0",
+      text: "LGPL text",
       markdown: false,
     });
     expect(service.getDocuments().map((d) => d.id)).toContain("notices");

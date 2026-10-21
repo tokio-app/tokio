@@ -526,7 +526,7 @@ describe("settings events", () => {
         notice({
           level: "success",
           code: FEEDBACK_CODES.PROVIDER_UPDATED,
-          message: "Connector provider set to Default.",
+          message: "Euler Stream API key saved.",
         }),
       ]);
     });

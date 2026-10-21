@@ -11,6 +11,10 @@
   margin-top: var(--space-1);
 }
 
+.link {
+  color: var(--accent-primary);
+}
+
 /* PROFILES */
 
 .profiles {

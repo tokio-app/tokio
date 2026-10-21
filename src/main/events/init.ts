@@ -212,6 +212,12 @@ const registerConnectorEvents = ({
         FEEDBACK_CODES.LIVE_ENDED,
         "The LIVE has ended.",
       );
+    } else if (d?.reason === "lost") {
+      notifier.warn(
+        "connector",
+        FEEDBACK_CODES.CONNECTION_LOST,
+        "Unable to reconnect to the LIVE. Connect again from Home.",
+      );
     } else {
       notifier.info(
         "connector",
@@ -238,6 +244,24 @@ const registerConnectorEvents = ({
       },
     });
   });
+  // A drop the connector recovers from keeps the LIVE session going.
+  conn.onReconnect((state) => {
+    if (state === "reconnecting") {
+      notifier.warn(
+        "connector",
+        FEEDBACK_CODES.RECONNECTING,
+        "The connection to the LIVE dropped. Reconnecting…",
+        { key: "reconnect", windowMs: REPEAT_NOTICE_MS },
+      );
+    } else {
+      notifier.info(
+        "connector",
+        FEEDBACK_CODES.RECONNECTED,
+        "Reconnected to the LIVE.",
+      );
+    }
+  });
+
   const handleChat = async (d: ChatEvent) => {
     const features = store.getActiveFeatures();
     const profile = await store.getProfileData();

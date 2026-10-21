@@ -1,5 +1,4 @@
 export default {
-  GIFTS_URL: "https://webcast.tiktok.com/webcast/gift/list",
   GEO_API_URL: "https://ipapi.co/json/",
   // Each request, so a slow network can't hold up startup on a first run.
   REQUEST_TIMEOUT_MS: 8000,
