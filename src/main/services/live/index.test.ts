@@ -174,6 +174,13 @@ describe("LiveService", () => {
     ]);
   });
 
+  it("doesn't count a viewer who joins again after the names fill up", () => {
+    for (const handle of ["kai", "yui", "ren"]) join(live, handle);
+
+    expect(join(live, "ren")).toBe(false);
+    expect(live.getSession().activity[0]).toMatchObject({ count: 3 });
+  });
+
   it("counts viewers without a handle every time they join", () => {
     live.record(TOKIO_EVENTS.MEMBER_JOIN, { user: viewer("") });
 

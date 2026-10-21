@@ -61,6 +61,8 @@ export class LiveService extends Service {
   private _totals = noTotals();
   // Newest first
   private _activity: ActivityItem[] = [];
+  // Handles counted in the newest join item, named or not
+  private _joined = new Set<string>();
   // Never reset, so ids stay unique across LIVEs
   private _lastId = 0;
   // The kinds of events the feed keeps. Totals count all of them.
@@ -160,12 +162,12 @@ export class LiveService extends Service {
     const last = this._activity[0];
     if (last?.type !== "join") {
       this._add({ type: "join", users: [user], count: 1 });
+      this._joined = new Set([user.handle]);
       return true;
     }
     // TikTok sends the join again when a viewer comes back
-    if (user.handle && last.users.some((u) => u.handle === user.handle)) {
-      return false;
-    }
+    if (user.handle && this._joined.has(user.handle)) return false;
+    this._joined.add(user.handle);
     this._activity[0] = {
       ...last,
       users:
