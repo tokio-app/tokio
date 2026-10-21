@@ -33,11 +33,13 @@ export function cleanText(
 
 /**
  * Whether the chat has the keyword as a whole word or phrase, ignoring case,
- * accents and emojis. An empty keyword matches any chat.
+ * accents and emojis. An empty keyword matches any chat, and one of only
+ * emojis is looked for as written.
  */
 export function hasKeyword(content: string, keyword: string): boolean {
+  if (!keyword.trim()) return true;
   const needle = cleanText(keyword, { asciiOnly: true });
-  if (!needle) return true;
+  if (!needle) return content.includes(keyword.trim());
 
   // Letters and digits around it would make it part of another word.
   const pattern = new RegExp(

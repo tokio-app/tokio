@@ -49,6 +49,12 @@ describe("hasKeyword", () => {
     expect(hasKeyword("🔥hi🔥", "hi")).toBe(true);
   });
 
+  it("looks for a keyword of only emojis as written", () => {
+    expect(hasKeyword("a 🌹 for you", "🌹")).toBe(true);
+    expect(hasKeyword("hello", "🌹")).toBe(false);
+    expect(hasKeyword("hello 🔥", " 🌹 ")).toBe(false);
+  });
+
   it("takes symbols in the keyword literally", () => {
     expect(hasKeyword("!sound please", "!sound")).toBe(true);
     expect(hasKeyword("a+b", "a+b")).toBe(true);
