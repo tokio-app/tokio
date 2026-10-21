@@ -33,8 +33,10 @@ type Connection = {
 const live = vi.hoisted(() => ({
   connections: [] as Connection[],
   signers: [] as unknown[],
-  // Thrown by connect(), or run before it resolves
+  // connect() waits on the gate while connecting, then throws the error or
+  // runs `during` before it resolves
   connect: {
+    gate: Promise.resolve(),
     error: undefined as Error | undefined,
     during: undefined as ((c: Connection) => void) | undefined,
   },
@@ -58,6 +60,8 @@ vi.mock("@tokioapp/connector", async (importOriginal) => {
     }
     async connect() {
       live.listening.push(this.listenerCount("chat"));
+      this.state = "connecting";
+      await live.connect.gate;
       if (live.connect.error) {
         this.state = "disconnected";
         throw live.connect.error;
@@ -128,6 +132,7 @@ describe("TikTokLiveConnector", () => {
     live.connections.length = 0;
     live.signers.length = 0;
     live.listening.length = 0;
+    live.connect.gate = Promise.resolve();
     live.connect.error = undefined;
     live.connect.during = undefined;
     connector = new TikTokLiveConnector();
@@ -182,6 +187,27 @@ describe("TikTokLiveConnector", () => {
         { apiKey: "new-key" },
         { apiKey: "new-key" },
       ]);
+    });
+
+    it("opens one connection when connect comes again while connecting", async () => {
+      connector.setKey("euler-key");
+      let open!: () => void;
+      live.connect.gate = new Promise((resolve) => (open = resolve));
+
+      const first = connector.connect("streamer");
+      const second = connector.connect("streamer");
+      open();
+
+      expect(await Promise.all([first, second])).toEqual([
+        { success: true },
+        { success: true },
+      ]);
+      expect(live.connections).toHaveLength(1);
+
+      await connector.disconnect();
+
+      expect(connection().state).toBe("disconnected");
+      expect(connector.isConnected()).toBe(false);
     });
 
     it("listens before connecting, and says it's connected first", async () => {

@@ -41,6 +41,8 @@ export class TikTokLiveConnector extends ConnectorProvider {
   private _events = new EventEmitter();
   // When each error code was last logged
   private _logged = new Map<string, number>();
+  // A connect during a connect gets this one, so only one connection opens
+  private _connecting: Promise<ConnectorResponse> | null = null;
 
   // --- PUBLIC API ---
 
@@ -62,7 +64,13 @@ export class TikTokLiveConnector extends ConnectorProvider {
     this._events.off(event, listener);
   }
 
-  public async connect(
+  public connect(username: string, key?: string): Promise<ConnectorResponse> {
+    return (this._connecting ??= this._connect(username, key).finally(() => {
+      this._connecting = null;
+    }));
+  }
+
+  private async _connect(
     username: string,
     key?: string,
   ): Promise<ConnectorResponse> {
