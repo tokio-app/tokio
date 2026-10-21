@@ -33,6 +33,8 @@ export default {
       `wss://127.0.0.1:${SERVER_PORT}/*`,
       `ws://[::1]:${SERVER_PORT}/*`,
       `wss://[::1]:${SERVER_PORT}/*`,
+      `ws://${APP_HOSTNAME}:${SERVER_PORT}/*`,
+      `wss://${APP_HOSTNAME}:${SERVER_PORT}/*`,
     ],
   },
 };

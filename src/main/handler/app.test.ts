@@ -246,6 +246,13 @@ describe("AppHandler", () => {
       );
 
       expect(filter).toBe(config.URL_FILTER);
+      expect(filter.urls).toEqual(
+        expect.arrayContaining([
+          "ws://localhost:37891/*",
+          "ws://tokio-app.local:37891/*",
+          "wss://tokio-app.local:37891/*",
+        ]),
+      );
       expect(callback.mock.calls).toEqual([
         [{ cancel: true }],
         [{ cancel: false }],
