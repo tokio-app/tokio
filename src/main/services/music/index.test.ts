@@ -10,7 +10,6 @@ import {
 } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import Logger from "@/logger";
-import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectionResponse, MusicProvider } from "./common";
 import { MusicService } from "./index";
@@ -24,7 +23,6 @@ const song = (title: string, duration = 10_000): SongInfo => ({
 });
 
 class FakeProvider extends MusicProvider {
-  readonly events = new EventEmitter();
   setKey = vi.fn<(key: string) => void>();
   connect = vi.fn<() => Promise<ConnectionResponse>>(async () => ({
     success: true,
@@ -37,18 +35,12 @@ class FakeProvider extends MusicProvider {
   playerStatus = vi.fn<() => Promise<CurrentSongInfo | null>>(async () => null);
   isActive = vi.fn<() => boolean>(() => true);
 
-  on<K extends TOKIO_EVENTS>(
+  // Public, so tests can emit what a real provider would
+  public override emit<K extends TOKIO_EVENTS>(
     event: K,
-    listener: (data: TokioEventMap[K]) => void,
+    data?: TokioEventMap[K],
   ) {
-    this.events.on(event, listener);
-  }
-
-  off<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ) {
-    this.events.off(event, listener);
+    super.emit(event, data);
   }
 }
 
@@ -486,7 +478,7 @@ describe("MusicService", () => {
       const listener = vi.fn<(songs: MusicInfo[]) => void>();
 
       service.on(TOKIO_EVENTS.MUSIC_CHANGE, listener);
-      provider.events.emit(TOKIO_EVENTS.MUSIC_CHANGE, []);
+      provider.emit(TOKIO_EVENTS.MUSIC_CHANGE, []);
       await request("!play A");
 
       expect(listener).toHaveBeenCalledWith([]);
@@ -496,7 +488,7 @@ describe("MusicService", () => {
 
       listener.mockClear();
       service.off(TOKIO_EVENTS.MUSIC_CHANGE, listener);
-      provider.events.emit(TOKIO_EVENTS.MUSIC_CHANGE, []);
+      provider.emit(TOKIO_EVENTS.MUSIC_CHANGE, []);
       await request("!play B");
 
       expect(listener).not.toHaveBeenCalled();

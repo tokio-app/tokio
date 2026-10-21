@@ -3,6 +3,7 @@ import Handler from "@/handler";
 import { createWindow } from "@/services/music/common";
 import { ipcMain, views } from "@test/electron";
 import { createHandler } from "@test/handler";
+import { WebContentsView } from "electron";
 import { describe, expect, it } from "vitest";
 import events from "./index";
 
@@ -12,8 +13,8 @@ async function listeners() {
   const h = createHandler();
   const handler = new Handler(h.handler);
   await handler.init(events);
-  createWindow();
-  const nav = views()[0].webContents.ipc;
+  createWindow(new WebContentsView());
+  const nav = views().at(-1)!.webContents.ipc;
   return (channel: string) =>
     ipcMain.listenerCount(channel) + nav.listenerCount(channel);
 }

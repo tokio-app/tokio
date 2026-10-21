@@ -1,5 +1,6 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { cancelableEvent, ipcMain, views, windows } from "@test/electron";
+import { WebContentsView } from "electron";
 import { normalize, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createWindow } from "./index";
@@ -9,10 +10,10 @@ const tail = (file: unknown, count: number) =>
   typeof file === "string" ? normalize(file).split(sep).slice(-count) : [];
 
 const open = () => {
-  const win = createWindow();
+  const win = createWindow(new WebContentsView());
   const shell = windows().at(-1)!;
-  const nav = views().at(-1)!;
-  return { win, shell, nav };
+  const [content, nav] = views().slice(-2);
+  return { win, shell, nav, content };
 };
 
 const RESIZE: string = APP_EVENTS_RESPONSE.RESIZE_MUSIC_WINDOW;
@@ -32,9 +33,9 @@ describe("createWindow", () => {
   });
 
   it("adds a title bar view with the preload that loads the music UI", () => {
-    const { shell, nav } = open();
+    const { shell, nav, content } = open();
 
-    expect(shell.contentView.children).toEqual([nav]);
+    expect(shell.contentView.children).toEqual([nav, content]);
     expect(tail(nav.options.webPreferences?.preload, 2)).toEqual([
       "preload",
       "index.mjs",
@@ -46,14 +47,20 @@ describe("createWindow", () => {
     ]);
   });
 
-  it("keeps the title bar at the top, as wide as the window", () => {
-    const { shell, nav } = open();
+  it("keeps the title bar at the top and the content under it", () => {
+    const { shell, nav, content } = open();
 
     expect(nav.setBounds).toHaveBeenLastCalledWith({
       x: 0,
       y: 0,
       width: 1280,
       height: 40,
+    });
+    expect(content.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: 40,
+      width: 1280,
+      height: 800,
     });
 
     shell.resize(1600, 900);
@@ -63,6 +70,12 @@ describe("createWindow", () => {
       y: 0,
       width: 1600,
       height: 40,
+    });
+    expect(content.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: 40,
+      width: 1600,
+      height: 860,
     });
   });
 
@@ -171,7 +184,7 @@ describe("createWindow", () => {
     shell.close();
 
     expect(shell.contentView.removeChildView).toHaveBeenCalledWith(nav);
-    expect(shell.contentView.children).toEqual([]);
+    expect(shell.contentView.children).not.toContain(nav);
     expect(nav.webContents.close).toHaveBeenCalledOnce();
     expect(nav.webContents.isDestroyed()).toBe(true);
   });
