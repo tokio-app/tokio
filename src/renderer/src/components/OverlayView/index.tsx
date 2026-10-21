@@ -1,6 +1,5 @@
 import { OverlayApp } from "@/common/types";
 import { getOverlayURL } from "@/common/util";
-import copy from "copy-to-clipboard";
 import { useEffect, useState } from "react";
 import { FaRegCopy } from "react-icons/fa";
 import { FiCheck, FiMaximize2 } from "react-icons/fi";
@@ -106,7 +105,7 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
         title="Copy URL"
         className={styles.url}
         onClick={() => {
-          copy(url);
+          void navigator.clipboard.writeText(url);
           setCopied(true);
         }}
       >

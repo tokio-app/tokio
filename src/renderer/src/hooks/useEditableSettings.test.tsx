@@ -68,6 +68,19 @@ describe("useEditableSettings", () => {
     expect(onLoad).not.toHaveBeenCalled();
   });
 
+  // The defaults would be saved over the profile
+  it("doesn't save a change made before a profile loaded", async () => {
+    const { setPitch, unmount } = setup();
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, failure());
+
+    setPitch(2);
+    await wait(300);
+    act(() => flushSettings());
+    unmount();
+
+    expect(saves()).toEqual([]);
+  });
+
   it("doesn't save the profile it just loaded", async () => {
     const { unmount } = setup();
     await send(APP_EVENTS_RESPONSE.GET_PROFILE, loaded);

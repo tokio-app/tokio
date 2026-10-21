@@ -17,6 +17,8 @@ export class MusicService extends ProviderService<MusicProvider> {
   private _music_queue: MusicQueue;
   private _onPlaybackError?: (id: string, error: unknown) => void;
   private _onSongChange?: (songs: MusicInfo[]) => void;
+  // When the last command was taken, for the cooldown
+  private _lastCommand = -Infinity;
   constructor() {
     super();
     this._queue = new TaskQueue();
@@ -27,7 +29,7 @@ export class MusicService extends ProviderService<MusicProvider> {
       // too. Paused, it can't tell when the song ends. Times are in ms.
       remaining: async (song) => {
         const sent = Date.now();
-        const status = await this._current?.provider?.playerStatus();
+        const status = await this._current.provider.playerStatus();
         if (!status) return null;
         if (status.track !== song.track && status.title !== song.title) {
           return 0;
@@ -44,32 +46,19 @@ export class MusicService extends ProviderService<MusicProvider> {
 
   public override setLogFile(logFile: string): void {
     super.setLogFile(logFile);
-    this._providerPool?.forEach((provider) => provider.setLogFile(logFile));
-  }
-
-  protected override _validProvider(provider: MusicProvider): boolean {
-    return provider instanceof MusicProvider;
+    this._providerPool.forEach((provider) => provider.setLogFile(logFile));
   }
 
   public connect(): Promise<ConnectionResponse> {
-    if (!this._current?.provider)
-      return new Promise((r) =>
-        r({
-          success: false,
-          error: new Error("Music Provider not defined."),
-        }),
-      );
-
     return this._current.provider.connect();
   }
 
   public disconnect() {
-    if (!this._current?.provider) return;
+    this.clearHandler();
     this._current.provider.disconnect();
   }
 
   public isActive() {
-    if (!this._current?.provider) return false;
     return this._current.provider.isActive();
   }
 
@@ -77,7 +66,6 @@ export class MusicService extends ProviderService<MusicProvider> {
     event: K,
     listener: (data: TokioEventMap[K]) => void,
   ): void {
-    if (!this._current?.provider) return;
     this._current.provider.on(event, listener);
     this._music_queue.on(event, listener);
   }
@@ -86,11 +74,11 @@ export class MusicService extends ProviderService<MusicProvider> {
     event: K,
     listener: (data: TokioEventMap[K]) => void,
   ): void {
-    this._current?.provider?.off(event, listener);
+    this._current.provider.off(event, listener);
     this._music_queue.off(event, listener);
   }
 
-  // Called when a requested track can't be played and is skipped.
+  // Called when a requested track can't be played.
   public onPlaybackError(listener: (id: string, error: unknown) => void) {
     this._onPlaybackError = listener;
   }
@@ -109,10 +97,13 @@ export class MusicService extends ProviderService<MusicProvider> {
   public handle(chat: ChatEvent, settings: Profile["music"]) {
     const match = this._match(settings, chat);
     if (!match) return;
+    // One command per cooldown, whoever sends it
+    const now = Date.now();
+    if (now - this._lastCommand < settings.protection.cooldown * 1000) return;
+    this._lastCommand = now;
     const { control, args } = match;
 
     this._queue.setQueueOptions({
-      gapTime: settings.protection.cooldown,
       maxQueueLength: settings.protection.queue_length,
     });
 
@@ -150,8 +141,6 @@ export class MusicService extends ProviderService<MusicProvider> {
   }
 
   private async play(query: string) {
-    if (!this._current?.provider) return;
-
     if (!this._music_queue.getQueueState().isPlaying) {
       const current = await this._current.provider.playerStatus();
       if (current && current.playing) {
@@ -159,31 +148,29 @@ export class MusicService extends ProviderService<MusicProvider> {
           current.title,
           current,
           current.time,
+          () => this._current.provider.play(current),
         );
       }
     }
 
-    const info = await this._current?.provider.searchSong(query);
+    const info = await this._current.provider.searchSong(query);
 
     if (info === null) return;
 
     this._music_queue.enqueue(query, info, () =>
-      this._current?.provider?.play(info),
+      this._current.provider.play(info),
     );
   }
 
   private async next() {
-    if (!this._current?.provider) return;
     await this._music_queue.triggerNext();
   }
 
   private async previous() {
-    if (!this._current?.provider) return;
     await this._music_queue.triggerPrevious();
   }
 
   private async revoke(query: string) {
-    if (!this._current?.provider) return;
     this._music_queue.revoke(query);
   }
 

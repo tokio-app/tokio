@@ -1,4 +1,3 @@
-import { Provider } from "@/common/types";
 import { formatError } from "@/common/util";
 import { cleanText } from "@/helper/chat";
 import Logger from "@/logger";
@@ -18,23 +17,12 @@ export class ProviderService<T extends IProvider>
   extends Service
   implements IProvider
 {
-  protected _current:
-    { name: string; provider: T | null; key: string } | undefined;
-  protected _providerPool: Map<string, T> | undefined;
-
-  constructor() {
-    super();
-    this._current = {
-      name: "",
-      key: "",
-      provider: null,
-    };
-    this._providerPool = new Map();
-  }
+  // Set by the addProvider(…, true) each child's constructor starts with
+  protected _current: { name: string; provider: T; key: string };
+  protected _providerPool = new Map<string, T>();
 
   public addProvider(name: string, provider: T, start?: boolean) {
-    if (!this._validProvider(provider)) return;
-    this._providerPool?.set(name, provider);
+    this._providerPool.set(name, provider);
     if (start) {
       this.setProvider(name);
     }
@@ -45,28 +33,18 @@ export class ProviderService<T extends IProvider>
   }
 
   public setKey(key: string): void {
-    if (this._current?.provider) this._current.provider.setKey(key);
+    this._current.provider.setKey(key);
   }
 
   public setProvider(name: string, key?: string) {
-    const provider = this._providerPool?.get(name);
+    const provider = this._providerPool.get(name);
     if (!provider) return;
     this._current = { name, provider, key: key || "" };
     this.setKey(key || "");
   }
 
-  public getProviders(): Provider[] {
-    const providers = this._providerPool?.keys().toArray() || [];
-    return providers.map((s) => ({
-      name: s,
-      active: s == this._current?.name,
-      key: this._current?.key || "",
-    }));
-  }
-
-  // NOTE: MUST Override this in the child class!
-  protected _validProvider(_provider: T) {
-    return false;
+  public providerNames(): string[] {
+    return [...this._providerPool.keys()];
   }
 }
 
@@ -108,58 +86,19 @@ export abstract class BaseFileManagerService extends Service {
     schema: z.ZodType<T>,
     data: T,
   ): Promise<boolean> {
-    const tempPath = `${filePath}.tmp`;
-    try {
-      if (!this._validate(schema, data, filePath, "saving")) return false;
-
-      await fs.writeFile(tempPath, this.serialize(data), "utf-8");
-      await fs.rename(tempPath, filePath);
-
-      return true;
-    } catch (error) {
-      const isTypeError = error instanceof TypeError;
-      this._logError(
-        isTypeError
-          ? "Data serialization failed for"
-          : `Unable to save ${this.fileType} file`,
-        filePath,
-        formatError(error),
-        error,
-      );
-      await fs.unlink(tempPath).catch(() => {});
-      return false;
-    }
+    if (!this._validate(schema, data, filePath, "saving")) return false;
+    return this.saveArbitraryFile(filePath, data);
   }
 
   public async loadFile<T>(
     filePath: string,
     schema: z.ZodType<T>,
   ): Promise<T | null> {
-    try {
-      const fileContent = await fs.readFile(filePath, "utf-8");
-      return this._validate(
-        schema,
-        this.deserialize(fileContent),
-        filePath,
-        "loading",
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-
-      const isSyntax =
-        error instanceof SyntaxError ||
-        (error as Error).name === "YAMLParseError";
-      this._logError(
-        isSyntax
-          ? `Malformed ${this.fileType.toUpperCase()} in file`
-          : `Unable to load ${this.fileType} file`,
-        filePath,
-        formatError(error),
-        error,
-      );
-      return null;
-    }
+    const data = await this.loadArbitraryFile(filePath);
+    if (data === null) return null;
+    return this._validate(schema, data, filePath, "loading");
   }
+
   public async loadArbitraryFile<T>(filePath: string): Promise<T | null> {
     try {
       const fileContent = await fs.readFile(filePath, "utf-8");

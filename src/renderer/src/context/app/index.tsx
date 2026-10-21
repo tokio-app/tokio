@@ -1,7 +1,10 @@
+import Logo from "@/assets/logo.png";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
+import styles from "@/router/Layout/layout.module.css";
+import { TitleBar } from "@/ui/TitleBar";
 import React, { useEffect, useState } from "react";
 
 /**
@@ -10,17 +13,20 @@ import React, { useEffect, useState } from "react";
  * alerts on any page.
  */
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [appLoading, setAppLoading] = useState(true);
+  // Null until main has loaded
+  const [started, setStarted] = useState<boolean | null>(null);
 
   const { getQueue, stopQueues } = useAudio();
 
   useIpcRequest(APP_EVENTS.LOAD_APP);
 
-  useIpcListener(APP_EVENTS_RESPONSE.LOAD_APP, () => setAppLoading(false));
+  useIpcListener(APP_EVENTS_RESPONSE.LOAD_APP, (res) =>
+    setStarted(!!res?.success),
+  );
 
   useEffect(() => {
-    if (!appLoading) window.api.emit(APP_EVENTS.SHOW_WINDOW);
-  }, [appLoading]);
+    if (started !== null) window.api.emit(APP_EVENTS.SHOW_WINDOW);
+  }, [started]);
 
   useIpcListener(APP_EVENTS_RESPONSE.TTS_AUDIO, (res) => {
     if (!res) return;
@@ -57,5 +63,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useIpcListener(APP_EVENTS_RESPONSE.ALERT_CLEAR, () => stopQueues("alerts"));
 
-  return appLoading ? null : children;
+  if (started === null) return null;
+  // The pages can't load the profile, and would save its defaults over it
+  if (!started) {
+    return (
+      <div className={styles.container}>
+        <TitleBar target="main" logo={Logo} />
+        <main className={styles.content}>
+          <p>Tokio couldn't start. Check the logs folder for details.</p>
+        </main>
+      </div>
+    );
+  }
+  return children;
 }

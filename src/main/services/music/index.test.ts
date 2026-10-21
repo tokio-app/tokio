@@ -10,7 +10,6 @@ import {
 } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import Logger from "@/logger";
-import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectionResponse, MusicProvider } from "./common";
 import { MusicService } from "./index";
@@ -24,7 +23,6 @@ const song = (title: string, duration = 10_000): SongInfo => ({
 });
 
 class FakeProvider extends MusicProvider {
-  readonly events = new EventEmitter();
   setKey = vi.fn<(key: string) => void>();
   connect = vi.fn<() => Promise<ConnectionResponse>>(async () => ({
     success: true,
@@ -37,18 +35,12 @@ class FakeProvider extends MusicProvider {
   playerStatus = vi.fn<() => Promise<CurrentSongInfo | null>>(async () => null);
   isActive = vi.fn<() => boolean>(() => true);
 
-  on<K extends TOKIO_EVENTS>(
+  // Public, so tests can emit what a real provider would
+  public override emit<K extends TOKIO_EVENTS>(
     event: K,
-    listener: (data: TokioEventMap[K]) => void,
+    data?: TokioEventMap[K],
   ) {
-    this.events.on(event, listener);
-  }
-
-  off<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ) {
-    this.events.off(event, listener);
+    super.emit(event, data);
   }
 }
 
@@ -196,28 +188,34 @@ describe("MusicService", () => {
   });
 
   describe("protection", () => {
-    it("waits for the cooldown before the next request", async () => {
-      const { service, searched } = setup();
+    it("ignores commands until the cooldown has passed since the last one taken", async () => {
+      const { service, request, searched } = setup();
       const music = settings((m) => {
         m.protection.cooldown = 2;
       });
 
-      service.handle(chat("!play A"), music);
-      service.handle(chat("!play B"), music);
+      await request("!play A", music);
+      await vi.advanceTimersByTimeAsync(500);
+      service.handle(chat("!play B", { handle: "other" }), music);
+      await vi.advanceTimersByTimeAsync(1500);
+      await request("!play C", music);
+
+      expect(searched()).toEqual(["A", "C"]);
+    });
+
+    it("takes every command without a cooldown", async () => {
+      const { service, searched } = setup();
+
+      service.handle(chat("!play A"), settings());
+      service.handle(chat("!play B"), settings());
       await vi.advanceTimersByTimeAsync(0);
-      expect(searched()).toEqual(["A"]);
 
-      await vi.advanceTimersByTimeAsync(1999);
-      expect(searched()).toEqual(["A"]);
-
-      await vi.advanceTimersByTimeAsync(1);
       expect(searched()).toEqual(["A", "B"]);
     });
 
     it("drops requests past the queue length while they wait", async () => {
       const { service, searched } = setup();
       const music = settings((m) => {
-        m.protection.cooldown = 2;
         m.protection.queue_length = 1;
       });
 
@@ -303,6 +301,40 @@ describe("MusicService", () => {
 
       await vi.advanceTimersByTimeAsync(1);
       expect(played()).toEqual(["New"]);
+    });
+
+    it("doesn't call onSongChange for the track the provider was playing", async () => {
+      const { service, request, provider } = setup();
+      const onSongChange = vi.fn<(songs: MusicInfo[]) => void>();
+      service.onSongChange(onSongChange);
+      provider.playerStatus.mockResolvedValueOnce({
+        ...song("Current"),
+        playing: true,
+        time: 4_000,
+      });
+      provider.searchSong.mockResolvedValue(null);
+
+      await request("!play Nothing");
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(onSongChange).not.toHaveBeenCalled();
+    });
+
+    it("plays the track the provider was playing again on !last", async () => {
+      const { request, provider, played, queue } = setup();
+      provider.playerStatus.mockResolvedValueOnce({
+        ...song("Current", 10_000),
+        playing: true,
+        time: 4_000,
+      });
+      await request("!play New");
+      await vi.advanceTimersByTimeAsync(6_000);
+      expect(played()).toEqual(["New"]);
+
+      await request("!last");
+
+      expect(played()).toEqual(["New", "Current"]);
+      expect(queue()).toEqual(["Current (playing)", "New"]);
     });
 
     it("leaves out a track the provider has paused", async () => {
@@ -448,14 +480,12 @@ describe("MusicService", () => {
 
   describe("lifecycle", () => {
     it("clearHandler drops waiting requests and empties the queue", async () => {
-      const { service, request, searched, played } = setup();
-      const music = settings((m) => {
-        m.protection.cooldown = 1;
-      });
-      await request("!play A", music);
-      service.handle(chat("!play B"), music);
-      service.handle(chat("!play C"), music);
-      await vi.advanceTimersByTimeAsync(0);
+      const { service, provider, request, searched, played } = setup();
+      await request("!play A");
+      // B's search never ends, so C waits behind it
+      provider.searchSong.mockImplementationOnce(() => new Promise(() => {}));
+      await request("!play B");
+      await request("!play C");
       expect(searched()).toEqual(["A", "B"]);
 
       service.clearHandler();
@@ -463,6 +493,19 @@ describe("MusicService", () => {
 
       expect(searched()).toEqual(["A", "B"]);
       expect(played()).toEqual(["A"]);
+    });
+
+    it("empties the queue on disconnect", async () => {
+      const { service, request, played, queue } = setup();
+      await request("!play A");
+      await request("!play B");
+
+      service.disconnect();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(played()).toEqual(["A"]);
+
+      await request("!play C");
+      expect(queue()).toEqual(["C (playing)"]);
     });
 
     it("starts over after clearHandler", async () => {
@@ -482,7 +525,7 @@ describe("MusicService", () => {
       const listener = vi.fn<(songs: MusicInfo[]) => void>();
 
       service.on(TOKIO_EVENTS.MUSIC_CHANGE, listener);
-      provider.events.emit(TOKIO_EVENTS.MUSIC_CHANGE, []);
+      provider.emit(TOKIO_EVENTS.MUSIC_CHANGE, []);
       await request("!play A");
 
       expect(listener).toHaveBeenCalledWith([]);
@@ -492,7 +535,7 @@ describe("MusicService", () => {
 
       listener.mockClear();
       service.off(TOKIO_EVENTS.MUSIC_CHANGE, listener);
-      provider.events.emit(TOKIO_EVENTS.MUSIC_CHANGE, []);
+      provider.emit(TOKIO_EVENTS.MUSIC_CHANGE, []);
       await request("!play B");
 
       expect(listener).not.toHaveBeenCalled();

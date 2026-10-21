@@ -170,6 +170,16 @@ describe("Spotify", () => {
       );
     });
 
+    it("trims the Client ID, which a paste can pad with spaces", () => {
+      const spotify = new Spotify();
+      spotify.setKey(" client-id ");
+
+      spotify.connect();
+
+      const authorize = new URL(authView().webContents.getURL());
+      expect(authorize.searchParams.get("client_id")).toBe("client-id");
+    });
+
     it("shows the login in its own session under the title bar", () => {
       new Spotify("client-id").connect();
       const shell = windows()[0];
@@ -736,6 +746,21 @@ describe("Spotify", () => {
       await vi.advanceTimersByTimeAsync((3600 - 60) * 1000);
       expect(refreshes(fetch)).toHaveLength(2);
       expect(refreshes(fetch)[1].body.refresh_token).toBe("refresh");
+    });
+
+    it("sends the refresh token a refresh gave instead of the old one", async () => {
+      const fetch = stubFetch({
+        refresh: () => json({ ...REFRESHED, refresh_token: "r2" }),
+      });
+      await login();
+
+      await vi.advanceTimersByTimeAsync((3600 - 60) * 1000);
+      await vi.advanceTimersByTimeAsync((3600 - 60) * 1000);
+
+      expect(refreshes(fetch).map((r) => r.body.refresh_token)).toEqual([
+        "refresh",
+        "r2",
+      ]);
     });
 
     it("refreshes right away when the token expires within a minute", async () => {

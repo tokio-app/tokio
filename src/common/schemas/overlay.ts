@@ -218,12 +218,11 @@ function fits(field: OverlayConfigField, value: unknown): boolean {
 }
 
 /**
- * The settings an overlay reads, keyed by field id: each field's value (or
- * default), colors with their `#` and gift ids resolved to the gifts.
+ * The settings an overlay reads, keyed by field id: each field's value,
+ * colors with their `#` and gift ids resolved to the gifts.
  */
 export function getOverlayConfig(
   data: OverlayConfig,
-  mode: "value" | "default",
   gifts?: CustomGift[] | null,
 ): OverlayConfigRedux {
   const extracted: OverlayConfigRedux = {};
@@ -237,7 +236,7 @@ export function getOverlayConfig(
 
   for (const setting of data.fields) {
     if (setting.type === "gifts") {
-      const val = setting.attributes[mode];
+      const val = setting.attributes.value;
       if (!gifts || val == null) {
         extracted[setting.id] = [];
         continue;
@@ -251,9 +250,9 @@ export function getOverlayConfig(
 
       extracted[setting.id] = setting.attributes.multiple ? res : res[0];
     } else if (setting.type === "color") {
-      extracted[setting.id] = `#${setting.attributes[mode]}`;
+      extracted[setting.id] = `#${setting.attributes.value}`;
     } else {
-      extracted[setting.id] = setting.attributes[mode];
+      extracted[setting.id] = setting.attributes.value;
     }
   }
 

@@ -44,8 +44,8 @@ export class StoreManagerService extends Service {
   private _rebuilt = false;
   // Emote saves run one after another, so one doesn't drop another's emotes.
   private _emoteSave: Promise<unknown> = Promise.resolve();
-  // The store's own saves, chained by _queueSave. _save never rejects.
-  private _saving: Promise<void> = Promise.resolve();
+  // The store's own saves, chained by _queueSave. saveFile never rejects.
+  private _saving: Promise<boolean> = Promise.resolve(true);
   // Emotes whose image was already compared since the app started
   private _checkedEmotes = new Set<string>();
 
@@ -263,12 +263,12 @@ export class StoreManagerService extends Service {
   // Registered providers that were never saved still need to be selectable.
   private _withRegisteredProviders(
     saved: AppProvider[],
-    service: { getProviders(): { name: string }[] },
+    service: { providerNames(): string[] },
   ): AppProvider[] {
     const missing = service
-      .getProviders()
-      .filter(({ name }) => !saved.some((p) => p.name === name))
-      .map(({ name }) => ({ name, key: "", active: false }));
+      .providerNames()
+      .filter((name) => !saved.some((p) => p.name === name))
+      .map((name) => ({ name, key: "", active: false }));
     return [...saved, ...missing];
   }
 
@@ -286,60 +286,60 @@ export class StoreManagerService extends Service {
     return this._storeData!.profiles;
   }
 
-  public async updateServerSettings(enabled: boolean): Promise<void> {
+  public async updateServerSettings(enabled: boolean): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.server = { enabled };
-    await this._queueSave();
+    return this._queueSave();
   }
 
-  public async updateUpdatesSettings(auto: boolean): Promise<void> {
+  public async updateUpdatesSettings(auto: boolean): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.updates = { auto };
-    await this._queueSave();
+    return this._queueSave();
   }
 
-  public async updateActivityFeed(feed: ActivityFeed): Promise<void> {
+  public async updateActivityFeed(feed: ActivityFeed): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.activityFeed = { ...feed };
-    await this._queueSave();
+    return this._queueSave();
   }
 
   public async addOverlayInfo(
     info: OverlayMetadata & { id: string },
-  ): Promise<void> {
+  ): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.overlays.push(info);
-    await this._queueSave();
+    return this._queueSave();
   }
   // Replaces the stored overlay with the same id, keeping its place.
   public async updateOverlayInfo(
     info: OverlayMetadata & { id: string },
-  ): Promise<void> {
+  ): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.overlays = this._storeData!.settings.overlays.map(
       (o) => (o.id === info.id ? info : o),
     );
-    await this._queueSave();
+    return this._queueSave();
   }
 
-  public async removeOverlayInfo(id: string): Promise<void> {
+  public async removeOverlayInfo(id: string): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.overlays =
       this._storeData!.settings.overlays.filter((o) => o.id !== id);
-    await this._queueSave();
+    return this._queueSave();
   }
 
-  public async addTestOverlay(overlay: TestOverlay): Promise<void> {
+  public async addTestOverlay(overlay: TestOverlay): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.testOverlays.push(overlay);
-    await this._queueSave();
+    return this._queueSave();
   }
 
-  public async removeTestOverlay(id: string): Promise<void> {
+  public async removeTestOverlay(id: string): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.testOverlays =
       this._storeData!.settings.testOverlays.filter((o) => o.id !== id);
-    await this._queueSave();
+    return this._queueSave();
   }
 
   public getSounds(): AlertSound[] {
@@ -347,21 +347,21 @@ export class StoreManagerService extends Service {
     return this._storeData!.settings.sounds;
   }
 
-  public async addSound(sound: AlertSound): Promise<void> {
+  public async addSound(sound: AlertSound): Promise<boolean> {
     this._ensureInitialized();
     const sounds = this._storeData!.settings.sounds;
     // Files are named by content, so the same file means the same sound.
-    if (sounds.some((s) => s.file === sound.file)) return;
+    if (sounds.some((s) => s.file === sound.file)) return true;
     sounds.push(sound);
-    await this._queueSave();
+    return this._queueSave();
   }
 
-  public async removeSound(file: string): Promise<void> {
+  public async removeSound(file: string): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.sounds = this._storeData!.settings.sounds.filter(
       (s) => s.file !== file,
     );
-    await this._queueSave();
+    return this._queueSave();
   }
 
   /**
@@ -441,42 +441,46 @@ export class StoreManagerService extends Service {
     tts?: boolean;
     music?: boolean;
     alerts?: boolean;
-  }): Promise<void> {
+  }): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.activeFeatures = {
       ...this._storeData!.settings.activeFeatures,
       ...data,
     };
-    await this._queueSave();
+    return this._queueSave();
   }
 
   /**
-   * Makes a profile of the list the active one. False, and nothing changes,
-   * when it isn't listed or its file can't be loaded.
+   * Makes a profile of the list the active one. Nothing changes when it isn't
+   * listed or its file can't be loaded ("missing"), or the switch can't be
+   * saved ("unsaved").
    */
-  public async updateActiveProfile(file: string): Promise<boolean> {
+  public async updateActiveProfile(
+    file: string,
+  ): Promise<"switched" | "missing" | "unsaved"> {
     this._ensureInitialized();
     const entity = this._storeData!.profiles.find((p) => p.file === file);
-    if (!entity) return false;
+    if (!entity) return "missing";
     const profile = await this._jsonManagerService.loadFile(
       join(this._pathManagerService.folders.profilesFolder, file),
       ProfileSchema,
     );
-    if (!profile) return false;
+    if (!profile) return "missing";
 
+    const previous = this._storeData!.settings.activeProfile;
     this._storeData!.settings.activeProfile = entity;
-    await this._queueSave();
+    if (!(await this._queueSave())) {
+      this._storeData!.settings.activeProfile = previous;
+      return "unsaved";
+    }
     this._memoryProfile = profile;
-    return true;
+    return "switched";
   }
 
   // The connector provider. TTS engines aren't picked, every voice names one.
-  public async updateProvider(
-    name: string,
-    key?: string,
-  ): Promise<AppProvider | null> {
+  public async updateProvider(name: string, key?: string): Promise<boolean> {
     this._ensureInitialized();
-    if (!name) return null;
+    if (!name) return false;
 
     const provider = this._encryptProviderKey({
       name,
@@ -497,8 +501,7 @@ export class StoreManagerService extends Service {
     settings.activeConnProvider = provider;
     this._providers.connector.setProvider(name, key);
 
-    await this._queueSave();
-    return provider;
+    return this._queueSave();
   }
 
   public getVoiceKey(engine: string): string {
@@ -510,7 +513,7 @@ export class StoreManagerService extends Service {
   }
 
   // Keys are saved with the provider list, encrypted.
-  public async updateVoiceKey(engine: string, key: string): Promise<void> {
+  public async updateVoiceKey(engine: string, key: string): Promise<boolean> {
     this._ensureInitialized();
     const list = this._storeData!.settings.providers.tts;
     const index = list.findIndex((p) => p.name === engine);
@@ -526,7 +529,7 @@ export class StoreManagerService extends Service {
     }
 
     this._providers.tts.setEngineKey(engine, key);
-    await this._queueSave();
+    return this._queueSave();
   }
 
   public async createNewProfile(
@@ -634,7 +637,8 @@ export class StoreManagerService extends Service {
     );
   }
 
-  // Under the name of its file, or a free one when a profile has it.
+  // Copied to a free file named after its file, and listed under its own
+  // name, numbered when another profile has it.
   public async importProfile(ref: string): Promise<boolean> {
     this._ensureInitialized();
     if (!ref) return false;
@@ -647,8 +651,7 @@ export class StoreManagerService extends Service {
       "profile",
     );
     if (!result) return false;
-    await this.addProfile(result);
-    return true;
+    return (await this.addProfile(result)) !== null;
   }
 
   /**
@@ -733,7 +736,7 @@ export class StoreManagerService extends Service {
     ref: string,
     file: string,
     destFolder: string,
-    schema: any,
+    schema: typeof ProfileSchema,
     typeName: string,
   ): Promise<EntityMetadata | null> {
     if (!ref) return null;
@@ -753,11 +756,11 @@ export class StoreManagerService extends Service {
       return null;
     }
 
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      schema,
-      existingData,
-    );
+    const name = this._freeProfileName(existingData.name.trim());
+    const saved = await this._jsonManagerService.saveFile(newPath, schema, {
+      ...existingData,
+      name,
+    });
     if (!saved) {
       Logger.error(
         `<System> Failed to write imported ${typeName} file: ${newPath}`,
@@ -766,8 +769,18 @@ export class StoreManagerService extends Service {
       return null;
     }
 
-    const name = cleanText(file.split(".")[0]).replace(/[_.-]/g, " ");
     return { file, name };
+  }
+
+  // `name`, or `name 2` and on when a profile has it, compared as the
+  // settings events do: trimmed and in any case.
+  private _freeProfileName(name: string): string {
+    const taken = new Set(
+      this._storeData!.profiles.map((p) => p.name.trim().toLowerCase()),
+    );
+    let free = name;
+    for (let n = 2; taken.has(free.toLowerCase()); n++) free = `${name} ${n}`;
+    return free;
   }
 
   public async addProfile(
@@ -777,6 +790,7 @@ export class StoreManagerService extends Service {
   }
 
   public async updateProfileData(updates: Partial<Profile>): Promise<boolean> {
+    this._ensureInitialized();
     const file = this._activeProfileFile();
     const res = await this._jsonManagerService.updateFile(
       join(this._pathManagerService.folders.profilesFolder, file),
@@ -799,8 +813,10 @@ export class StoreManagerService extends Service {
     if (collection.some((e) => e.file === entity.file)) return entity;
 
     collection.push(entity);
-    await this._queueSave();
-    return entity;
+    if (await this._queueSave()) return entity;
+    // Unlisted again, so trying again isn't refused as a taken name.
+    collection.splice(collection.indexOf(entity), 1);
+    return null;
   }
 
   private _ensureInitialized() {
@@ -810,25 +826,15 @@ export class StoreManagerService extends Service {
 
   // Saves write the same temporary file, so they run one after another.
   private _queueSave() {
-    const save = this._saving.then(() => this._save());
-    this._saving = save;
-    return save;
-  }
-
-  private async _save() {
-    try {
-      await this._jsonManagerService.saveFile(
+    const save = this._saving.then(() =>
+      this._jsonManagerService.saveFile(
         this._storeFilePath,
         StoreZodSchema,
         this._storeData!,
-      );
-    } catch (e) {
-      Logger.error(
-        `<System> Background save failed -- ${formatError(e)}`,
-        this._logFile,
-        e,
-      );
-    }
+      ),
+    );
+    this._saving = save;
+    return save;
   }
 
   // Throws when the store can't be read or copied, so the defaults never

@@ -20,7 +20,7 @@ interface QueueItem {
 }
 
 interface QueueHooks {
-  // A song failed to start and was skipped.
+  // A song failed to start.
   onError?: (id: string, error: unknown) => void;
   // A song started, with the songs as they are then.
   onStart?: (songs: MusicInfo[]) => void;
@@ -124,17 +124,15 @@ export class MusicQueue {
     this.play();
   }
 
+  // The song the player is playing. Its action plays it when the queue
+  // comes back to it.
   public addCurrentlyPlaying(
     id: string,
     song: SongInfo,
     currentTimeMs: number,
+    action: PlayAction,
   ) {
-    this._queue.push({
-      id,
-      song,
-      action: () => {},
-      startTimeMs: currentTimeMs,
-    });
+    this._queue.push({ id, song, action, startTimeMs: currentTimeMs });
     this._trimQueue();
     this.play();
   }
@@ -194,9 +192,10 @@ export class MusicQueue {
     }
   }
 
+  // Playing, or stopped at a song the player couldn't start
   public getQueueState() {
     return {
-      isPlaying: this._isPlaying,
+      isPlaying: this._isPlaying || this._currentIndex < this._queue.length,
     };
   }
 
@@ -214,24 +213,36 @@ export class MusicQueue {
     // A loop stopped while awaiting can wake up after a new one started.
     const controller = (this._abortController = new AbortController());
     const active = () => !controller.signal.aborted;
+    let failures = 0;
 
     while (this._currentIndex < this._queue.length && active()) {
       const item = this._queue[this._currentIndex];
 
-      const songs = this.getSongs();
-      this.emit(TOKIO_EVENTS.MUSIC_CHANGE, songs);
-      this._hooks.onStart?.(songs);
+      this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
 
-      // A song that fails to start is skipped right away.
+      // A song that fails to start is skipped right away. Two in a row mean
+      // the player is gone: the loop goes back to the first and stops there,
+      // so a new request tries both again and no song is lost.
       let waitTime = 0;
       try {
-        await item.action();
+        // Playing the player's own song again would restart it
+        if (item.startTimeMs === undefined) {
+          await item.action();
+          // Not for a song skipped while it loaded
+          if (active()) this._hooks.onStart?.(this.getSongs());
+        }
+        failures = 0;
         waitTime =
           item.startTimeMs !== undefined
             ? Math.max(0, item.song.duration - item.startTimeMs)
             : item.song.duration;
       } catch (error) {
         this._hooks.onError?.(item.id, error);
+        if (++failures === 2 && active()) {
+          this._currentIndex--;
+          this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
+          break;
+        }
       }
 
       item.startTimeMs = undefined;

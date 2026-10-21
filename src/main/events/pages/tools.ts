@@ -48,10 +48,9 @@ events.push(
 events.push(
   APP_EVENTS.REMOVE_TEST_OVERLAY,
   async ({ overlayService, notifier }, e, { id }) => {
-    e.reply(
-      APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS,
-      await overlayService.removeTestOverlay(id),
-    );
+    const res = await overlayService.removeTestOverlay(id);
+    if (!res.success) throw new Error(`Test overlay ${id} was not removed.`);
+    e.reply(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS, res);
     notifier.success(
       "overlays",
       FEEDBACK_CODES.TEST_OVERLAY_REMOVED,

@@ -1,5 +1,3 @@
-export type Provider = { name: string; active: boolean; key: string };
-
 // engine is the id of the TTS engine (provider) that speaks the voice.
 export type VoiceData = {
   engine: string;

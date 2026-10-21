@@ -2,6 +2,7 @@ import { TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import Logger from "@/logger";
 import { EventEmitter } from "node:events";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createConnection } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -247,7 +248,7 @@ describe("ServerService", () => {
       const client = await connect("a");
       const message = nextMessage(client);
 
-      provider.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+      provider.emit(TOKIO_EVENTS.CONNECTED, undefined);
       provider.emit(TOKIO_EVENTS.FOLLOW, follow);
 
       expect(await message).toEqual({
@@ -271,6 +272,36 @@ describe("ServerService", () => {
         expect.stringMatching(/^<WebSocket> Client a error -- /),
         undefined,
       );
+    });
+
+    it("survives a malformed upgrade target and a bad frame", async () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const socket = createConnection(server.getPort(), "127.0.0.1");
+      const upgraded = new Promise((resolve) => socket.once("data", resolve));
+      const closed = new Promise((resolve) => socket.once("close", resolve));
+
+      socket.write(
+        [
+          "GET http://[ HTTP/1.1",
+          "Host: 127.0.0.1",
+          "Upgrade: websocket",
+          "Connection: Upgrade",
+          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+          "Sec-WebSocket-Version: 13",
+          "",
+          "",
+        ].join("\r\n"),
+      );
+      await upgraded;
+      // Clients must mask their frames, so ws refuses this one.
+      socket.write(Buffer.from([0x81, 0x02, 0x68, 0x69]));
+      await closed;
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(/^<WebSocket> Client .+ error -- /),
+        undefined,
+      );
+      await expect(connect("a")).resolves.toBeInstanceOf(WebSocket);
     });
 
     it("reports a send to an id with no overlay connected", () => {

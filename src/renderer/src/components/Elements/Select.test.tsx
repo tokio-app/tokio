@@ -301,6 +301,28 @@ describe("Select from the keyboard", () => {
     expect(screen.getByRole("button", { name: "Next" })).toHaveFocus();
   });
 
+  it("brings Tab from its search back to it, inside the modal", async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal title="Settings" onClose={vi.fn()} closeButton>
+        <Select
+          searchable
+          options={VOICES}
+          value={undefined}
+          onChange={vi.fn()}
+        />
+      </Modal>,
+    );
+    combobox().focus();
+
+    await user.keyboard("{Enter}");
+    expect(screen.getByPlaceholderText("Search...")).toHaveFocus();
+    await user.tab();
+
+    expect(combobox()).toHaveAttribute("aria-expanded", "false");
+    expect(combobox()).toHaveFocus();
+  });
+
   it("keeps the focus when an option is clicked", async () => {
     const user = userEvent.setup();
     const { container } = render(

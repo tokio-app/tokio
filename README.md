@@ -26,8 +26,8 @@ Chat messages are read aloud as they come in.
 - **Voices** from three engines, all in one list: TikTok's own voices, Microsoft Edge voices, and, on Windows, the voices installed on the system (SAPI and OneCore, including older 32-bit voices). Search the list, filter it by engine and language, and play any voice to hear a short line in its language before you pick it. Adjust speed, pitch and volume, and test a message to hear it the way chat is read.
 - **Format**: choose which messages get read and how, for example `{username} {comment}` or only messages that start with a command, which isn't read aloud. Turn on **Remove Emojis** so the voice doesn't read them out; messages that are only emojis are then skipped.
 - **Replacements**: teach the voice how to say acronyms, slang and names.
-- **Permissions**: let everyone talk, or only followers, superfans or moderators. You can also set a minimum fan level, and a whitelist and a blacklist of @handles.
-- **Protection**: a cooldown between messages and a maximum queue length keep the chat from flooding the voice. Messages over a maximum length are skipped, and so are messages with a banned word, in the comment or in the viewer's name.
+- **Permissions**: let everyone talk, or only followers, superfans or moderators. You can also set a minimum fan level, and a whitelist and a blacklist of @handles: blacklisted viewers are never read, even when everyone can talk, and a whitelist with names in it lets only those viewers talk.
+- **Protection**: a cooldown between messages and a maximum queue length keep the chat from flooding the voice. Messages over a maximum length are skipped, and so are messages with a banned word, in the comment or in the viewer's name. Banned words are caught even when they're written with capitals, accents, look-alike letters or hidden characters.
 
 ### Music requests
 
@@ -40,7 +40,9 @@ Viewers request songs from chat. **YouTube** songs play in Tokio's own player wi
 | `!last`   | Go back to the last song                 |
 | `!revoke` | Remove a song from the queue by its name |
 
-Music requests have their own permissions and protection settings, set the same way as text-to-speech's: who can request songs, a cooldown between requests and a maximum queue length.
+Music requests have their own permissions and protection settings, set the same way as text-to-speech's: who can use the commands, a cooldown and a maximum queue length. After a command, Tokio ignores every command until the cooldown has passed, whoever sends it.
+
+When songs keep failing to start, for example because the Spotify app is closed, the queue waits at the first of them and keeps the rest; the next request tries again. Disconnecting music, or connecting it again, empties the queue.
 
 Both services need a **Premium** account. On YouTube Music, a free account plays ads, which can delay songs or cut them short. On Spotify, only Premium accounts let apps control playback, and creating the Spotify app whose Client ID Tokio uses needs Premium too.
 
@@ -48,12 +50,12 @@ Both services need a **Premium** account. On YouTube Music, a free account plays
 
 Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gifts, envelopes, Super Fan events, new members and song changes.
 
-- Upload your own sounds or search [MyInstants](https://www.myinstants.com) from inside the app. Your sound library is shared by all your profiles.
+- Upload your own sounds or search [MyInstants](https://www.myinstants.com) from inside the app. Sounds can be up to 8 MB. Your sound library is shared by all your profiles.
 - Set each alert's volume. Gift alerts can react to any gift or only to the ones you pick, and fire once per combo. TikTok's gift list can miss some gifts, like ones from other regions, so Tokio also saves the ones viewers send that aren't on it, for all your profiles.
 - Pick gifts from a list: search it by name, filter it by price (exactly, more than, less than, at least, at most or between two amounts of coins) and sort it by price or name. The gifts already picked come first. **Select all shown** checks every gift the filters leave, such as all the gifts worth 1,000 coins or more.
-- Chat alerts can react to every message or only to messages with a keyword. Emote alerts can react to any emote or only to the ones you pick. TikTok doesn't list a LIVE's emotes, so each profile saves the ones viewers use.
+- Chat alerts can react to every message or only to messages with a keyword, which can be a word, a phrase or an emoji. Emote alerts can react to any emote or only to the ones you pick. TikTok doesn't list a LIVE's emotes, so each profile saves the ones viewers use.
 - Member Join and Super Fan Join alerts can react to anyone or only to the viewer you name, by @handle or name.
-- Instead of a sound, an alert can speak a message with text-to-speech, in its own voice, speed and pitch. Messages can include details of the event, such as `{username}`, `{gift}` or `{count}`, and the TTS page's banned words, replacements, emoji setting, cooldown and queue length apply.
+- Instead of a sound, an alert can speak a message with text-to-speech, in its own voice, speed and pitch. Messages can include details of the event, such as `{username}`, `{gift}` or `{count}`, and the TTS page's banned words, replacements, emoji setting, cooldown and queue length apply. Banned words are looked for in the event's details, such as the viewer's name, not in your own message.
 - Play alerts one after another in a queue, or let different events play at the same time.
 
 ### Overlays
@@ -69,7 +71,7 @@ Set them up from the gallery on the **Overlays** page: colors, text, the gifts t
 - **Voice engines**: optionally add your TikTok session ID, which the TikTok voices use when it's set.
 - **Overlay server**: turn the local server for overlays on or off.
 - **Updates**: Tokio checks GitHub for new releases on startup and every few hours, downloads them in the background and installs them when you restart from the title bar. On macOS, where the app isn't signed, the button opens the release page instead. Turn automatic checks off in Settings, or check any time from About.
-- **Notifications**: when something fails, such as a voice that can't be generated or a sound that's missing, Tokio tells you what went wrong. The bell in the title bar keeps the session's history.
+- **Notifications**: when something fails, such as a voice that can't be generated, a sound that's missing or a change that couldn't be saved, Tokio tells you what went wrong. The bell in the title bar keeps the session's history.
 
 ### Tools for overlay developers
 

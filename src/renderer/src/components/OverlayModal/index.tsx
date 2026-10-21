@@ -53,7 +53,7 @@ export function OverlayModal({
       action: "TOKIO_PREVIEW",
       payload: {
         type: "tokio:config",
-        data: getOverlayConfig(settings, "value", gifts),
+        data: getOverlayConfig(settings, gifts),
       },
     };
     preview.current?.contentWindow?.postMessage(message, "*");

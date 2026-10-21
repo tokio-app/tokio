@@ -18,6 +18,7 @@ import {
   type User,
   type UserIdentity,
 } from "@tokioapp/connector";
+import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { app } from "electron";
 import { EventEmitter } from "events";
@@ -79,12 +80,16 @@ export class TikTokLiveConnector extends ConnectorProvider {
     this._key = key ?? this._key;
     const name = username.replace("@", "");
     if (!name) {
-      return this._failed(connectFailure("notFound", "No username was set."));
+      return {
+        success: false,
+        error: connectFailure("notFound", "No username was set."),
+      };
     }
     if (!this._key) {
-      return this._failed(
-        connectFailure("noKey", "No Euler Stream API key was set."),
-      );
+      return {
+        success: false,
+        error: connectFailure("noKey", "No Euler Stream API key was set."),
+      };
     }
 
     let connection: TikTokLiveConnection | undefined;
@@ -95,7 +100,9 @@ export class TikTokLiveConnector extends ConnectorProvider {
         // rest is routine.
         logger: (level, message, data) => {
           if (level === "warn") {
-            Logger.warn(`<Connector> ${message}`, this._logFile);
+            // A drop's error holds the close code and reason
+            const why = data?.error ? ` -- ${formatError(data.error)}` : "";
+            Logger.warn(`<Connector> ${message}${why}`, this._logFile);
           } else if (level === "error") {
             const error = data?.error;
             const code = isConnectorError(error) ? error.code : message;
@@ -116,7 +123,7 @@ export class TikTokLiveConnector extends ConnectorProvider {
       // A first connect that fails never emits disconnected.
       connection?.removeAllListeners();
       if (this._connection === connection) this._connection = null;
-      return this._failed(toFailure(err));
+      return { success: false, error: toFailure(err) };
     }
   }
 
@@ -125,10 +132,14 @@ export class TikTokLiveConnector extends ConnectorProvider {
     await this._connection?.disconnect();
   }
 
-  // Still connected while the connection tries to come back.
+  // Also while connecting and coming back, so a profile can't switch then.
   public isConnected(): boolean {
     const state = this._connection?.state;
-    return state === "connected" || state === "reconnecting";
+    return (
+      state === "connecting" ||
+      state === "connected" ||
+      state === "reconnecting"
+    );
   }
 
   public async fetchGifts(): Promise<GiftResponse> {
@@ -173,17 +184,11 @@ export class TikTokLiveConnector extends ConnectorProvider {
     this._events.emit(event, data);
   }
 
-  private _failed(error: ConnectorFailure): ConnectorResponse {
-    const res = { success: false, error };
-    this.emit(TOKIO_EVENTS.CONNECTED, res);
-    return res;
-  }
-
   private _listen(connection: TikTokLiveConnection): void {
     // Before the room's first messages, so the session starts before them.
     connection.on(WebcastEvent.CONNECTED, ({ reconnected }) => {
       if (reconnected) this._onReconnect?.("reconnected");
-      else this.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+      else this.emit(TOKIO_EVENTS.CONNECTED);
     });
 
     connection.on(

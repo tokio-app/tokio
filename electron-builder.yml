@@ -8,6 +8,9 @@ files:
   - "out/**/*"
   - "music-out/**/*"
   - "resources/**/*"
+  # Only the windows load these, bundled by Vite. Their package.json and license files stay for
+  # About (LicensesService). node_modules only take "!" patterns, so a re-include wouldn't work.
+  - "!node_modules/{@tanstack/*,react,react-dom,scheduler,react-icons,react-colorful,react-spinners,tone,standardized-audio-context,automation-events,immer,marked,fast-deep-equal}/**/!(package.json|LICEN[CS]E*|[Ll]icen[cs]e*|NOTICE*|COPYING*)"
 asarUnpack:
   - resources/**
 # NOTE: Required by the MIT and LGPL-3.0 notices in THIRD_PARTY_NOTICES.md, keep these in the installed app.
@@ -53,5 +56,3 @@ publish:
   provider: github
   owner: tokio-app
   repo: tokio
-electronDownload:
-  mirror: https://npmmirror.com/mirrors/electron/

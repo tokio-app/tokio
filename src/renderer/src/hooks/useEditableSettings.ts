@@ -57,10 +57,13 @@ export function useEditableSettings<K extends Section>(
   const [saved, setSaved] = useState<Profile[K]>(defaultProfile[section]);
   // Settings changed but not sent to main yet
   const pending = useRef<Profile[K] | null>(null);
+  // Until then the settings are the defaults, which a save would write over
+  // the profile
+  const loaded = useRef(false);
 
   const flush = useCallback(() => {
     const waiting = pending.current;
-    if (!waiting) return;
+    if (!waiting || !loaded.current) return;
     pending.current = null;
     SAVE[section](waiting);
     setSaved(waiting);
@@ -74,6 +77,7 @@ export function useEditableSettings<K extends Section>(
     // A change still waiting was made to the profile shown before, sending
     // it on leaving would write it into this one.
     pending.current = null;
+    loaded.current = true;
     setSettings(res.profile![section]);
     setSaved(res.profile![section]);
     onLoad?.(res.profile!);

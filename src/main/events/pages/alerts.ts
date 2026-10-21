@@ -9,7 +9,7 @@ import {
 } from "@/common/types";
 import { generateTikTokEventSample } from "@/common/util";
 import { createStack, replyFailure } from "@/helper/events";
-import { AppFailure, LoggedError } from "@/helper/feedback";
+import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
 import { AUDIO_EXTENSIONS } from "@/services/alerts";
 import { AppHandlerVariables } from "@/types";
 import { dialog } from "electron";
@@ -80,7 +80,7 @@ events.push(
     const res = await alertsService.downloadSound(url, name);
     if (!res.success || !res.data) throw new LoggedError(res.error);
     // Downloads also go to the sound library.
-    await storeManagerService.addSound(res.data);
+    if (!(await storeManagerService.addSound(res.data))) throw saveFailure();
     e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
       id,
@@ -96,7 +96,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_DOWNLOAD_FAILED,
-      message: "Unable to download the sound.",
+      message: "Unable to download the sound. Sounds can be up to 8 MB.",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
@@ -120,7 +120,7 @@ events.push(
     const res = await alertsService.importSound(diagRes.filePaths[0]);
     if (!res.success || !res.data) throw new LoggedError(res.error);
     // Uploads also go to the sound library.
-    await storeManagerService.addSound(res.data);
+    if (!(await storeManagerService.addSound(res.data))) throw saveFailure();
     e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
       id,
@@ -136,7 +136,8 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-      message: "Unable to use the sound. Pick an mp3, wav or ogg file.",
+      message:
+        "Unable to use the sound. Pick an mp3, wav or ogg file up to 8 MB.",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
@@ -266,17 +267,19 @@ events.push(
 
     // One bad file doesn't stop the others. The service logs each failure.
     let failed = 0;
+    let saved = true;
     for (const path of diagRes.filePaths) {
       const res = await alertsService.importSound(path);
-      if (res.data) await storeManagerService.addSound(res.data);
-      else failed++;
+      if (!res.data) failed++;
+      else if (!(await storeManagerService.addSound(res.data))) saved = false;
     }
+    if (!saved) throw saveFailure();
 
     const error =
       failed > 0
         ? {
             code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-            message: `Unable to upload ${failed} of the sounds. Use mp3, wav or ogg files.`,
+            message: `Unable to upload ${failed} of the sounds. Use mp3, wav or ogg files up to 8 MB.`,
           }
         : undefined;
 
@@ -314,7 +317,7 @@ events.push(
 events.push(
   APP_EVENTS.REMOVE_SOUND,
   async ({ alertsService, storeManagerService, notifier }, e, { file }) => {
-    await storeManagerService.removeSound(file);
+    if (!(await storeManagerService.removeSound(file))) throw saveFailure();
     // Alerts that already use the sound keep working.
     if (!(await storeManagerService.isSoundInUse(file))) {
       const res = await alertsService.deleteSound(file);

@@ -1,6 +1,7 @@
 import { OverlayMetadata, TestOverlay } from "@/common/schemas";
 import { CustomGift, GiftEvent, TOKIO_EVENTS } from "@/common/types";
 import { defaultStoreData, generateTikTokEventSample } from "@/common/util";
+import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { ServerService } from "@/services/server";
 import { YAMLManagerService } from "@/services/yaml";
@@ -12,6 +13,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  rename,
   rm,
   symlink,
   writeFile,
@@ -34,6 +36,11 @@ import { CATALOG_TTL_MS, OverlayService } from "./index";
 vi.mock("./common", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./common")>();
   return { ...actual, processHTML: vi.fn(actual.processHTML) };
+});
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, rename: vi.fn(actual.rename) };
 });
 
 const SETUP = '<script id="tokio-setup"></script>';
@@ -124,18 +131,23 @@ describe("OverlayService", () => {
     }),
     addOverlayInfo: async (o: OverlayMetadata & { id: string }) => {
       stored.push(o);
+      return true;
     },
     updateOverlayInfo: async (o: OverlayMetadata & { id: string }) => {
       stored = stored.map((s) => (s.id === o.id ? o : s));
+      return true;
     },
     removeOverlayInfo: async (id: string) => {
       stored = stored.filter((o) => o.id !== id);
+      return true;
     },
     addTestOverlay: async (o: TestOverlay) => {
       testOverlays.push(o);
+      return true;
     },
     removeTestOverlay: async (id: string) => {
       testOverlays = testOverlays.filter((o) => o.id !== id);
+      return true;
     },
   };
 
@@ -190,12 +202,13 @@ describe("OverlayService", () => {
   });
 
   describe("load", () => {
-    it("serves the overlays that load and forgets the rest", async () => {
+    it("serves the overlays that load and forgets the ones whose folder is gone", async () => {
       await configurable(join(folder, "title"));
       await overlay(join(folder, "broken"), { "info.yaml": info("Broken") });
       stored = [
         { id: "title", name: "Title", version: "1.0.0", config: true },
         { id: "broken", name: "Broken", version: "1.0.0", config: false },
+        { id: "gone", name: "Gone", version: "1.0.0", config: false },
       ];
 
       await service.load(gifts);
@@ -205,7 +218,8 @@ describe("OverlayService", () => {
         join(folder, "title"),
         false,
       );
-      expect(stored.map((o) => o.id)).toEqual(["title"]);
+      // Kept, so a fixed overlay comes back with its link.
+      expect(stored.map((o) => o.id)).toEqual(["title", "broken"]);
       expect(service.getOverlays()).toMatchObject([
         { id: "title", path: join(folder, "title", "index.html") },
       ]);
@@ -225,7 +239,7 @@ describe("OverlayService", () => {
       await service.refreshGifts([...gifts, lion]);
 
       expect(processHTML).toHaveBeenCalledOnce();
-      expect(vi.mocked(processHTML).mock.calls[0][5]).toEqual([...gifts, lion]);
+      expect(vi.mocked(processHTML).mock.calls[0][4]).toEqual([...gifts, lion]);
       expect(await service.getGifts()).toEqual([...gifts, lion]);
       expect(await readJSON("gifts.json")).toEqual([...gifts, lion]);
     });
@@ -241,7 +255,7 @@ describe("OverlayService", () => {
       expect(processHTML).not.toHaveBeenCalled();
     });
 
-    it("doesn't serve an overlay whose HTML can't be written", async () => {
+    it("doesn't serve an overlay whose HTML can't be written, but keeps it", async () => {
       await configurable(join(folder, "title"));
       stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
       vi.mocked(processHTML).mockResolvedValueOnce({ success: false });
@@ -249,7 +263,7 @@ describe("OverlayService", () => {
       await service.load(gifts);
 
       expect(mount).not.toHaveBeenCalled();
-      expect(stored).toEqual([]);
+      expect(stored.map((o) => o.id)).toEqual(["title"]);
       expect(service.getOverlays()).toEqual([]);
     });
 
@@ -424,7 +438,7 @@ describe("OverlayService", () => {
   });
 
   describe("import", () => {
-    it("copies the overlay with its defaults and serves it", async () => {
+    it("copies the overlay with its saved settings and serves it", async () => {
       const source = join(root, "source");
       await configurable(source);
 
@@ -434,7 +448,8 @@ describe("OverlayService", () => {
       expect(stored).toMatchObject([{ id, name: "Title", external: true }]);
       expect(mount).toHaveBeenCalledWith(id, join(folder, id), true);
       const html = await readFile(join(folder, id, "index.html"), "utf-8");
-      expect(html).toContain(`window.__OVERLAY_CONFIG__ = {"title":"Hello"}`);
+      // What Customize shows, and what loads after a restart
+      expect(html).toContain(`window.__OVERLAY_CONFIG__ = {"title":"Saved"}`);
       expect(html).toContain(`window.__OVERLAY_ID__ = "${id}"`);
       // The source is left as it was.
       expect(await readFile(join(source, "index.html"), "utf-8")).toBe(
@@ -505,10 +520,7 @@ describe("OverlayService", () => {
       const source = join(root, "source");
       await overlay(source, {
         "info.yaml": info("Title", true),
-        "config.yaml": config("Saved").replace(
-          "default: Hello",
-          () => 'default: "Make $$$ now"',
-        ),
+        "config.yaml": config('"Make $$$ now"'),
         "index.html": `<body>${SETUP}</body>`,
       });
 
@@ -696,6 +708,56 @@ describe("OverlayService", () => {
       expect(await readFile(join(dir(), "index.html"), "utf-8")).toContain(
         `window.__OVERLAY_CONFIG__ = {"title":"Mine"}`,
       );
+    });
+
+    describe("when an update can't be moved in", () => {
+      beforeEach(async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        publish(release("1.0.0"));
+        await service.installFromCatalog("gift-jar", gifts);
+      });
+
+      // Updates to 1.0.1 while the renames after the first one fail
+      const updateFailing = async (...errors: Error[]) => {
+        vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+        publish(release("1.0.1", { "new.js": "2" }));
+        const fs =
+          await vi.importActual<typeof import("node:fs/promises")>(
+            "node:fs/promises",
+          );
+        const renames = vi.mocked(rename).mockImplementationOnce(fs.rename);
+        for (const error of errors) renames.mockRejectedValueOnce(error);
+        return service.installFromCatalog("gift-jar", gifts);
+      };
+
+      it("puts the installed version back", async () => {
+        const config = () => readFile(join(dir(), "config.yaml"), "utf-8");
+        const installed = await config();
+
+        expect(await updateFailing(new Error("EPERM"))).toEqual({
+          success: false,
+        });
+
+        expect(await readdir(folder)).toEqual(["gift-jar"]);
+        expect(await readdir(dir())).not.toContain("new.js");
+        expect(await config()).toBe(installed);
+        expect(stored).toMatchObject([{ id: "gift-jar", version: "1.0.0" }]);
+      });
+
+      it("logs where the installed version is when it can't be put back", async () => {
+        const error = vi.spyOn(Logger, "error");
+
+        await updateFailing(new Error("EPERM"), new Error("EBUSY"));
+
+        const [old] = (await readdir(folder)).filter((f) =>
+          f.startsWith(".old-"),
+        );
+        expect(error).toHaveBeenCalledWith(
+          expect.stringContaining(join(folder, old)),
+          undefined,
+          expect.objectContaining({ message: "EBUSY" }),
+        );
+      });
     });
 
     it("leaves nothing behind when the download doesn't match", async () => {

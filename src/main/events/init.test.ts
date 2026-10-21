@@ -240,7 +240,7 @@ function setup() {
     getProfileData: vi.fn(async (): Promise<Profile | null> => profile),
     getProfiles: vi.fn(() => profiles),
     updateLiveStats: vi.fn(),
-    updateServerSettings: vi.fn(async (_enabled: boolean) => {}),
+    updateServerSettings: vi.fn(async (_enabled: boolean) => true),
     recordEmotes: vi.fn(
       async (
         ..._args: Parameters<StoreManagerService["recordEmotes"]>
@@ -537,6 +537,29 @@ describe("init events", () => {
         FEEDBACK_CODES.ALERT_TTS_FAILED,
       ]);
     });
+
+    it("logs a missing sound once per notice, and not a TTS failure", async () => {
+      const { s, callback } = await onFailure();
+      vi.useFakeTimers();
+
+      callback(alert(), "ENOENT: no such file");
+      callback(alert(), "ENOENT: no such file");
+      callback(alert({ id: "speech", tts: speech }), "Engine down");
+      vi.advanceTimersByTime(30_000);
+      callback(alert(), "ENOENT: no such file");
+
+      expect(s.h.notices).toHaveLength(3);
+      expect(logWarn.mock.calls).toEqual([
+        [
+          "<Alerts> The sound of the Follow alert is missing -- ENOENT: no such file",
+          "alerts.log",
+        ],
+        [
+          "<Alerts> The sound of the Follow alert is missing -- ENOENT: no such file",
+          "alerts.log",
+        ],
+      ]);
+    });
   });
 
   describe("stats", () => {
@@ -590,7 +613,7 @@ describe("init events", () => {
     const sessions = (s: Setup) =>
       s.h.pushed(APP_EVENTS_RESPONSE.LIVE_SESSION).map(({ data }) => data);
     const connect = (s: Setup) =>
-      s.conn.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
 
     it("starts the session when the LIVE connects", async () => {
       vi.useFakeTimers({ now: 5000 });
@@ -601,14 +624,6 @@ describe("init events", () => {
       expect(sessions(s)).toEqual([
         { startedAt: 5000, totals: noTotals, activity: [] },
       ]);
-    });
-
-    it("doesn't start it when connecting fails", async () => {
-      const s = await live();
-
-      s.conn.emit(TOKIO_EVENTS.CONNECTED, { success: false });
-
-      expect(sessions(s)).toEqual([]);
     });
 
     it("pushes the LIVE's events at most every 250ms, with the latest session", async () => {
@@ -771,6 +786,21 @@ describe("init events", () => {
         }),
       ]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([]);
+    });
+
+    it("says it once while the connection keeps dropping", async () => {
+      const s = await live();
+      const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
+
+      for (let i = 0; i < 3; i++) {
+        reconnect("reconnecting");
+        reconnect("reconnected");
+      }
+
+      expect(s.h.notices.map((n) => n.code)).toEqual([
+        FEEDBACK_CODES.RECONNECTING,
+        FEEDBACK_CODES.RECONNECTED,
+      ]);
     });
 
     it.each([undefined, {}])(
@@ -1041,7 +1071,7 @@ describe("init events", () => {
           level: "warning",
           source: "music",
           code: FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED,
-          message: "A song request couldn't be played and was skipped.",
+          message: "A song request couldn't be played.",
         }),
       ]);
     });

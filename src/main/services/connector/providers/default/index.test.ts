@@ -152,7 +152,7 @@ describe("TikTokLiveConnector", () => {
       const res = await connector.connect("@");
 
       expect(res.error?.kind).toBe("notFound");
-      expect(onConnected).toHaveBeenCalledWith(res);
+      expect(onConnected).not.toHaveBeenCalled();
       expect(live.connections).toEqual([]);
     });
 
@@ -165,7 +165,7 @@ describe("TikTokLiveConnector", () => {
         success: false,
         error: expect.objectContaining({ kind: "noKey" }),
       });
-      expect(onConnected).toHaveBeenCalledWith(res);
+      expect(onConnected).not.toHaveBeenCalled();
       expect(live.connections).toEqual([]);
     });
 
@@ -211,6 +211,20 @@ describe("TikTokLiveConnector", () => {
       expect(connector.isConnected()).toBe(false);
     });
 
+    it("counts as connected while connecting", async () => {
+      connector.setKey("euler-key");
+      let open!: () => void;
+      live.connect.gate = new Promise((resolve) => (open = resolve));
+
+      const connecting = connector.connect("streamer");
+      const during = connector.isConnected();
+      open();
+      await connecting;
+
+      expect(during).toBe(true);
+      expect(connector.isConnected()).toBe(true);
+    });
+
     it("listens before connecting, and says it's connected first", async () => {
       const onConnected = capture(TOKIO_EVENTS.CONNECTED);
       const onChat = capture(TOKIO_EVENTS.CHAT);
@@ -220,7 +234,7 @@ describe("TikTokLiveConnector", () => {
       await connected();
 
       expect(live.listening).toEqual([1]);
-      expect(onConnected).toHaveBeenCalledExactlyOnceWith({ success: true });
+      expect(onConnected).toHaveBeenCalledOnce();
       expect(onChat).toHaveBeenCalledOnce();
       expect(onConnected.mock.invocationCallOrder[0]).toBeLessThan(
         onChat.mock.invocationCallOrder[0],
@@ -248,7 +262,7 @@ describe("TikTokLiveConnector", () => {
 
       expect(res.success).toBe(false);
       expect(res.error).toMatchObject({ kind, cause: error });
-      expect(onConnected).toHaveBeenCalledWith(res);
+      expect(onConnected).not.toHaveBeenCalled();
       expect(connection().listenerCount("chat")).toBe(0);
       expect(connector.isConnected()).toBe(false);
     });
@@ -267,7 +281,7 @@ describe("TikTokLiveConnector", () => {
     });
   });
 
-  it("logs the connection's warnings and errors, not its routine lines", async () => {
+  it("logs the connection's warnings with their reason and errors, not routine lines", async () => {
     const warn = vi.spyOn(Logger, "warn");
     const error = vi.spyOn(Logger, "error");
     const info = vi.spyOn(Logger, "info");
@@ -275,18 +289,26 @@ describe("TikTokLiveConnector", () => {
     await connected();
     const log = connection().options.logger!;
     const cause = new Error("closed");
+    const kicked = new WebSocketError("Closed with code 4005 (kicked)");
 
     log("warn", "The connection dropped (wsClose): reconnecting", {
-      error: cause,
+      error: kicked,
     });
+    log("warn", "The signer named a room id that isn't one");
     log("error", "Gave up reconnecting after 10 attempts", { error: cause });
     log("info", "Connected to room 1");
     log("debug", "Opening the WebSocket");
 
-    expect(warn).toHaveBeenCalledExactlyOnceWith(
-      "<Connector> The connection dropped (wsClose): reconnecting",
-      "connector.log",
-    );
+    expect(warn.mock.calls).toEqual([
+      [
+        "<Connector> The connection dropped (wsClose): reconnecting -- Closed with code 4005 (kicked)",
+        "connector.log",
+      ],
+      [
+        "<Connector> The signer named a room id that isn't one",
+        "connector.log",
+      ],
+    ]);
     expect(error).toHaveBeenCalledExactlyOnceWith(
       "<Connector> Gave up reconnecting after 10 attempts",
       "connector.log",

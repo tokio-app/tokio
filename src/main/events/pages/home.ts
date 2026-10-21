@@ -3,10 +3,9 @@ import {
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
   TOKIO_EVENTS,
-  TokioEventMap,
 } from "@/common/types";
 import { createStack } from "@/helper/events";
-import { AppFailure } from "@/helper/feedback";
+import { AppFailure, saveFailure } from "@/helper/feedback";
 import { ConnectorFailure } from "@/services/connector/common";
 
 const events = createStack("connector");
@@ -72,10 +71,7 @@ events.push(
       );
     };
     // Answers this connect only, so connects don't pile up listeners.
-    const onConnected = (d: TokioEventMap[TOKIO_EVENTS.CONNECTED]) => {
-      if (d.success) answer();
-    };
-    connectorService.on(TOKIO_EVENTS.CONNECTED, onConnected);
+    connectorService.on(TOKIO_EVENTS.CONNECTED, answer);
 
     try {
       const res = await connectorService.connect(username);
@@ -88,7 +84,7 @@ events.push(
       }
       answer();
     } finally {
-      connectorService.off(TOKIO_EVENTS.CONNECTED, onConnected);
+      connectorService.off(TOKIO_EVENTS.CONNECTED, answer);
     }
   },
   {
@@ -161,11 +157,12 @@ events.push(
 events.push(
   APP_EVENTS.SET_ACTIVITY_FEED,
   async ({ storeManagerService, liveService, notifier }, e, { feed }) => {
-    await storeManagerService.updateActivityFeed(feed);
+    const saved = await storeManagerService.updateActivityFeed(feed);
     liveService.setFeed(feed);
     e.reply(APP_EVENTS_RESPONSE.LIVE_SESSION, {
       data: liveService.getSession(),
     });
+    if (!saved) throw saveFailure();
     notifier.success(
       "system",
       FEEDBACK_CODES.ACTIVITY_FEED_UPDATED,
@@ -185,7 +182,7 @@ events.push(
   APP_EVENTS.ACTIVE_FEATURES,
   // No notice on success, the switches already show the new state.
   async ({ storeManagerService, ttsService, alertsService, win }, _, data) => {
-    await storeManagerService.updateActiveFeatures({
+    const saved = await storeManagerService.updateActiveFeatures({
       ...data,
     });
     if (data.tts === false) {
@@ -196,6 +193,7 @@ events.push(
       alertsService.clearSpeech();
       win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
     }
+    if (!saved) throw saveFailure();
   },
   {
     source: "system",

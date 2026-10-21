@@ -18,6 +18,14 @@ import { EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
 // after this long, like the ones it had when it reloaded or crashed.
 const HOLD_TIMEOUT_MS = 2 * 60_000;
 
+// Without accents, invisible characters or styled letters ("ｉｄｉｏｔ"), so a
+// banned word can't hide behind them.
+const fold = (text: string) =>
+  text
+    .normalize("NFKD")
+    .replace(/[\p{M}\p{Cf}]/gu, "")
+    .toLowerCase();
+
 // Every provider is an engine, and voices name the engine that speaks them.
 // The active provider only speaks voices with no engine, or an unknown one.
 export class TTSService extends ProviderService<TTSProvider> {
@@ -39,10 +47,6 @@ export class TTSService extends ProviderService<TTSProvider> {
     this.addProvider("Edge", new EdgeTTS());
   }
 
-  protected override _validProvider(provider: TTSProvider): boolean {
-    return provider instanceof TTSProvider;
-  }
-
   public getEngines(): VoiceEngine[] {
     return [...(this._providerPool?.entries() ?? [])].map(([id, provider]) => ({
       id,
@@ -52,7 +56,7 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   public setEngineKey(engine: string, key: string) {
-    this._providerPool?.get(engine)?.setKey(key);
+    this._providerPool?.get(engine)?.setKey(key.trim());
   }
 
   // The voices of every engine. An engine that fails is left out.
@@ -132,10 +136,11 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   private _hasBanned(text: string, settings: Profile["tts"]) {
-    const lower = text.toLowerCase();
-    return settings.protection.banned.some((b) =>
-      lower.includes(b.toLowerCase()),
-    );
+    const folded = fold(text);
+    return settings.protection.banned.some((b) => {
+      const word = fold(b);
+      return word !== "" && folded.includes(word);
+    });
   }
 
   private _replace(text: string, settings: Profile["tts"]) {
@@ -158,12 +163,16 @@ export class TTSService extends ProviderService<TTSProvider> {
 
   /**
    * Text from elsewhere than chat, such as an alert's message, with the
-   * same protection: null when it has a banned word or nothing to read,
-   * otherwise with the replacements applied and, when set, the emojis
-   * removed.
+   * same protection: null when `checked` (the whole text unless given) has a
+   * banned word or the text has nothing to read, otherwise with the
+   * replacements applied and, when set, the emojis removed.
    */
-  public prepareText(text: string, settings: Profile["tts"]): string | null {
-    if (this._hasBanned(text, settings)) return null;
+  public prepareText(
+    text: string,
+    settings: Profile["tts"],
+    checked = text,
+  ): string | null {
+    if (this._hasBanned(checked, settings)) return null;
     const out = this._clean(text, settings);
     return out.trim() === "" ? null : out;
   }

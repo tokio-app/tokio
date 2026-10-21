@@ -11,7 +11,14 @@ import { hasKeyword, isUser } from "@/helper/chat";
 import Logger from "@/logger";
 import type { TTSService } from "@/services/tts";
 import { createHash } from "node:crypto";
-import { access, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import {
+  access,
+  readFile,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { Service } from "../shared";
 
@@ -41,7 +48,8 @@ type Speaker = Pick<TTSService, "prepareText" | "generateBuffer">;
 
 export const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg"];
 
-// Bytes of sounds kept in memory. Bigger files are always read from disk.
+// Bytes of sounds kept in memory. Bigger sounds are refused, and ones saved
+// before that are read from disk.
 export const CACHE_MAX_BYTES = 32 * 1024 * 1024;
 export const CACHE_MAX_FILE_BYTES = 8 * 1024 * 1024;
 
@@ -57,6 +65,8 @@ export class AlertsService extends Service {
   // Keyed by sound file name, in least recently used order
   private _cache = new Map<string, Uint8Array>();
   private _cacheBytes = 0;
+  // Reads in flight by file name, shared by the events that need the sound
+  private _reading = new Map<string, Promise<Uint8Array>>();
   private _speaker: Speaker | null = null;
   // Alert messages waiting for the voice engine, see _queueSpeech
   private _speech = new TaskQueue();
@@ -118,6 +128,7 @@ export class AlertsService extends Service {
         throw new Error(`MyInstants responded with status: ${response.status}`);
       }
       const data = new Uint8Array(await response.arrayBuffer());
+      this._checkSize(data.byteLength);
       this._remember(file, data);
       return { success: true, data };
     } catch (error) {
@@ -160,6 +171,7 @@ export class AlertsService extends Service {
       if (!AUDIO_EXTENSIONS.includes(ext)) {
         throw new Error(`Unsupported audio format: ${ext}`);
       }
+      this._checkSize((await stat(srcPath)).size);
       // Named by content, so importing the same file twice reuses it.
       const data = new Uint8Array(await readFile(srcPath));
       const file = `${hash(data)}.${ext}`;
@@ -179,6 +191,7 @@ export class AlertsService extends Service {
   public async deleteSound(file: string): Promise<AlertsResult<void>> {
     const name = basename(file);
     this._forget(name);
+    this._reading.delete(name);
     try {
       await unlink(join(this._soundsFolder, name));
       return { success: true };
@@ -200,11 +213,7 @@ export class AlertsService extends Service {
     }
 
     try {
-      const data = new Uint8Array(
-        await readFile(join(this._soundsFolder, name)),
-      );
-      this._remember(name, data);
-      return { success: true, data };
+      return { success: true, data: await this._read(name) };
     } catch (error) {
       if (!logMissing) return { success: false, error: formatError(error) };
       return this._fail("Unable to read sound", error);
@@ -274,7 +283,8 @@ export class AlertsService extends Service {
       }
       if (!sound) continue;
 
-      const res = await this.readSound(sound.file);
+      // The caller reports it, once per notice
+      const res = await this.readSound(sound.file, false);
       if (!res.success || !res.data) {
         onError?.(alert, res.error);
         continue;
@@ -321,7 +331,11 @@ export class AlertsService extends Service {
     settings: Profile["tts"],
   ): string | null {
     const text = formatAlertMessage(tts.message, payload);
-    return this._speaker ? this._speaker.prepareText(text, settings) : text;
+    if (!this._speaker) return text;
+    // Like chat TTS, banned words are checked in the event's values only.
+    const variables = (tts.message.match(/\{\w+\}/g) ?? []).join("\n");
+    const values = formatAlertMessage(variables, payload);
+    return this._speaker.prepareText(text, settings, values);
   }
 
   private async _generate(
@@ -480,6 +494,29 @@ export class AlertsService extends Service {
     } catch (error) {
       await unlink(temp).catch(() => {});
       throw error;
+    }
+  }
+
+  private _read(name: string): Promise<Uint8Array> {
+    const pending = this._reading.get(name);
+    if (pending) return pending;
+    const read = readFile(join(this._soundsFolder, name))
+      .then((buf) => {
+        const data = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+        // Not when the sound was deleted while it was read
+        if (this._reading.get(name) === read) this._remember(name, data);
+        return data;
+      })
+      .finally(() => {
+        if (this._reading.get(name) === read) this._reading.delete(name);
+      });
+    this._reading.set(name, read);
+    return read;
+  }
+
+  private _checkSize(bytes: number) {
+    if (bytes > CACHE_MAX_FILE_BYTES) {
+      throw new Error(`The sound is over ${CACHE_MAX_FILE_BYTES} bytes.`);
     }
   }
 

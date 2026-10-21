@@ -102,9 +102,7 @@ describe("tools events", () => {
     it("replies and notifies when it can't be removed", async () => {
       const h = createHandler({
         overlayService: {
-          removeTestOverlay: async () => {
-            throw new Error("store not initialized");
-          },
+          removeTestOverlay: async () => ({ success: false, data: [scene] }),
         },
       });
 

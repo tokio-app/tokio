@@ -47,9 +47,9 @@ export function renderWithProviders(
 /** Renders the app's routes at `path`, with the layout and the sidebar. */
 export async function renderApp(path = "/", options?: Options) {
   // Loaded here, so tests that don't need the pages don't import them all
-  const { routeTree } = await import("@/router");
+  const { routerOptions } = await import("@/router");
   const router = createRouter({
-    routeTree,
+    ...routerOptions,
     history: createMemoryHistory({ initialEntries: [path] }),
   });
 

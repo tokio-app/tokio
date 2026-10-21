@@ -59,6 +59,14 @@ export class AppFailure extends Error {
   }
 }
 
+// A store write that failed. JSONManagerService logged why.
+export const saveFailure = () =>
+  new AppFailure(
+    FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+    "Tokio couldn't save the change. Check the logs folder for details.",
+    { logged: true },
+  );
+
 /**
  * A failure a service already logged with its details, such as the error of
  * a `{ success: false, error }` result. It's reported like any other error,

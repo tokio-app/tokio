@@ -1,14 +1,8 @@
-import {
-  CurrentSongInfo,
-  SongInfo,
-  TOKIO_EVENTS,
-  TokioEventMap,
-} from "@/common/types";
+import { CurrentSongInfo, SongInfo, TOKIO_EVENTS } from "@/common/types";
 import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import crypto from "crypto";
 import { BrowserWindow, WebContentsView } from "electron";
-import { EventEmitter } from "node:events";
 import { ConnectionResponse, createWindow, MusicProvider } from "../../common";
 import { CSSScrollBar } from "./common";
 import config from "./config";
@@ -30,18 +24,17 @@ export class Spotify extends MusicProvider {
   private _retryAt = 0;
   // The login window of the last connect
   private _authWindow: BrowserWindow | null = null;
-  private _events: EventEmitter;
 
   constructor(clientId?: string, redirectUri?: string) {
     super();
-    this._events = new EventEmitter();
     this._clientId = clientId ?? "";
     this._redirectUri = redirectUri ?? config.CALLBACK;
     this._scopes = config.SCOPES;
   }
 
+  // Trimmed, since a pasted Client ID with a space breaks the authorize URL
   public setKey(key: string): void {
-    this._clientId = key;
+    this._clientId = key.trim();
   }
 
   public isActive(): boolean {
@@ -63,33 +56,9 @@ export class Spotify extends MusicProvider {
         },
       });
 
-      const shellWindow = (this._authWindow = createWindow());
-
-      shellWindow.contentView.addChildView(authView);
-
-      const bounds = shellWindow.getContentBounds();
-      authView.setBounds({
-        x: 0,
-        y: 40,
-        width: bounds.width,
-        height: bounds.height - 40,
-      });
-
-      const resizeHandler = () => {
-        if (!shellWindow.isDestroyed()) {
-          const newBounds = shellWindow.getContentBounds();
-          authView.setBounds({
-            x: 0,
-            y: 40,
-            width: newBounds.width,
-            height: newBounds.height - 40,
-          });
-        }
-      };
-      shellWindow.on("resize", resizeHandler);
+      const shellWindow = (this._authWindow = createWindow(authView));
 
       const cleanupView = () => {
-        shellWindow.off("resize", resizeHandler);
         try {
           shellWindow.contentView.removeChildView(authView);
         } catch {
@@ -219,20 +188,6 @@ export class Spotify extends MusicProvider {
       },
     };
     await this.fetchApi(`/me/player/play?device_id=${deviceId}`, "PUT", body);
-  }
-
-  public on<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.on(event, listener);
-  }
-
-  public off<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.off(event, listener);
   }
 
   public async playerStatus(): Promise<CurrentSongInfo | null> {
@@ -440,13 +395,6 @@ export class Spotify extends MusicProvider {
     const activeDevice = devices.find((d: any) => d.is_active) || devices[0];
     this._cachedDeviceId = activeDevice.id;
     return this._cachedDeviceId!;
-  }
-
-  private emit<K extends TOKIO_EVENTS>(
-    event: K,
-    data?: TokioEventMap[K],
-  ): void {
-    this._events.emit(event, data);
   }
 
   private generateRandomString(length: number) {

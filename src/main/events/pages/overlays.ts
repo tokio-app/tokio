@@ -1,13 +1,28 @@
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
+  AppError,
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError } from "@/helper/feedback";
+import { AppHandlerVariables, ReplyEvent } from "@/types";
 import { dialog } from "electron";
 
 const events = createStack("overlays");
+
+// The overlay list's failure reply, with the overlays main serves.
+const replyOverlays = (
+  e: ReplyEvent,
+  error: AppError,
+  _: unknown,
+  { overlayService }: AppHandlerVariables,
+) =>
+  e.reply(APP_EVENTS_RESPONSE.GET_OVERLAYS, {
+    success: false,
+    data: overlayService.getOverlays(),
+    error,
+  });
 
 events.push(
   APP_EVENTS.IMPORT_OVERLAY,
@@ -40,12 +55,7 @@ events.push(
       message:
         'Unable to import the overlay. Check that the folder has an info.yaml and an index.html with a <script id="tokio-setup"> block.',
     },
-    onError: (e, error, _, { overlayService }) =>
-      e.reply(APP_EVENTS_RESPONSE.GET_OVERLAYS, {
-        success: false,
-        data: overlayService.getOverlays(),
-        error,
-      }),
+    onError: replyOverlays,
   },
 );
 
@@ -70,12 +80,7 @@ events.push(
       code: FEEDBACK_CODES.OVERLAY_REMOVE_FAILED,
       message: "Unable to remove the overlay.",
     },
-    onError: (e, error, _, { overlayService }) =>
-      e.reply(APP_EVENTS_RESPONSE.GET_OVERLAYS, {
-        success: false,
-        data: overlayService.getOverlays(),
-        error,
-      }),
+    onError: replyOverlays,
   },
 );
 

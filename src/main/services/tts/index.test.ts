@@ -64,7 +64,7 @@ describe("TTSService", () => {
     return spoken;
   };
 
-  const engine = (name: string) => service["_providerPool"]!.get(name)!;
+  const engine = (name: string) => service["_providerPool"].get(name)!;
 
   describe("engines", () => {
     it("lists every engine, Default first", () => {
@@ -157,6 +157,14 @@ describe("TTSService", () => {
       expect(tiktok).toHaveBeenCalledExactlyOnceWith("session");
       expect(edge).not.toHaveBeenCalled();
     });
+
+    it("gives a key without the spaces around it", () => {
+      const tiktok = vi.spyOn(engine("Default"), "setKey");
+
+      service.setEngineKey("Default", " session\n");
+
+      expect(tiktok).toHaveBeenCalledExactlyOnceWith("session");
+    });
   });
 
   it("passes the profile's filters and queue options along", async () => {
@@ -216,6 +224,28 @@ describe("TTSService", () => {
 
       expect(await say("big SPOILERS ahead", s)).toEqual([]);
       expect(await say("no secrets", s)).toHaveLength(1);
+    });
+
+    it("drops banned words in other letters, accents or hidden characters", async () => {
+      const s = settings((s) => {
+        s.protection.banned = ["idiot", "Ídolo"];
+      });
+
+      expect(await say("you ｉｄｉｏｔ", s)).toEqual([]);
+      expect(await say("you i\u200Bdiot", s)).toEqual([]);
+      expect(await say("you ídíot", s)).toEqual([]);
+      expect(await say("mi idolo", s)).toEqual([]);
+      expect(await say("you idol", s)).toHaveLength(1);
+    });
+
+    it("drops banned emojis, never matching an empty entry", async () => {
+      const s = settings((s) => {
+        s.protection.banned = ["🍆", "❤️", "", "\u0301"];
+      });
+
+      expect(await say("look 🍆", s)).toEqual([]);
+      expect(await say("I ❤️ you", s)).toEqual([]);
+      expect(await say("hello 🌸", s)).toHaveLength(1);
     });
 
     it("drops comments from names with banned words", async () => {
@@ -280,6 +310,19 @@ describe("TTSService", () => {
       expect(service.prepareText("  ", s)).toBeNull();
       expect(service.prepareText("Thanks SPOILER fan", s)).toBeNull();
       expect(service.prepareText("Thanks fan", s)).toBe("Thanks fan");
+    });
+
+    it("checks banned words only in the part given to check", () => {
+      const s = settings((s) => {
+        s.protection.banned = ["follow"];
+      });
+
+      expect(service.prepareText("Thanks for the follow", s, "Viewer")).toBe(
+        "Thanks for the follow",
+      );
+      expect(
+        service.prepareText("Thanks Follow Bot", s, "Follow Bot"),
+      ).toBeNull();
     });
 
     it("removes the emojis when set, refusing text with nothing else", () => {

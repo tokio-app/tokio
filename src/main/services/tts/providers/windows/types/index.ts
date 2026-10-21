@@ -26,9 +26,5 @@ export type SapiResponseMap = {
 export type SapiVoice = {
   name: string;
   lang: string;
-  gender: string;
-  age: string;
-  vendor: string;
-  default: boolean;
   engine: SapiEngine;
 };

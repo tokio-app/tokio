@@ -82,6 +82,8 @@ export function Color({ value, onChange }: Props) {
               }}
               onBlur={() => setTyped(null)}
               placeholder="Type a color"
+              // The picker is portaled out of the Tab order, so it takes the focus
+              autoFocus
               prefixed
               alpha
             />

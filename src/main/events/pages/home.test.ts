@@ -63,7 +63,7 @@ describe("home events", () => {
 
     it("answers once when the connected event comes before connect resolves", async () => {
       const { h, live } = setup({ success: true }, () => {
-        live.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+        live.emit(TOKIO_EVENTS.CONNECTED, undefined);
       });
 
       await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
@@ -76,7 +76,7 @@ describe("home events", () => {
       const { h, live } = setup({ success: true });
 
       await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
-      live.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+      live.emit(TOKIO_EVENTS.CONNECTED, undefined);
 
       expect(live.listeners(TOKIO_EVENTS.CONNECTED)).toBe(0);
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toHaveLength(1);
@@ -149,18 +149,6 @@ describe("home events", () => {
           code: FEEDBACK_CODES.CONNECT_FAILED,
           message,
         }),
-      ]);
-    });
-
-    it("ignores a connected event that failed", async () => {
-      const { h, live } = setup({ success: false }, () => {
-        live.emit(TOKIO_EVENTS.CONNECTED, { success: false });
-      });
-
-      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
-
-      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        expect.objectContaining({ success: false }),
       ]);
     });
   });
@@ -266,7 +254,7 @@ describe("home events", () => {
 
     it("saves the feed and replies with the events it still shows", async () => {
       const session = { startedAt: 1000, totals: noTotals, activity: [] };
-      const updateActivityFeed = vi.fn(async () => {});
+      const updateActivityFeed = vi.fn(async () => true);
       const setFeed = vi.fn();
       const h = createHandler({
         storeManagerService: { updateActivityFeed },
@@ -285,6 +273,29 @@ describe("home events", () => {
             level: "success",
             code: FEEDBACK_CODES.ACTIVITY_FEED_UPDATED,
             message: "Activity feed updated.",
+          }),
+        ],
+      ]);
+    });
+
+    it("shows the feed it changed, and says it wasn't saved", async () => {
+      const session = { startedAt: 1000, totals: noTotals, activity: [] };
+      const h = createHandler({
+        storeManagerService: { updateActivityFeed: async () => false },
+        liveService: { setFeed: vi.fn(), getSession: () => session },
+      });
+
+      await h.invoke(home, APP_EVENTS.SET_ACTIVITY_FEED, { feed });
+
+      expect(h.sent()).toEqual([
+        [APP_EVENTS_RESPONSE.LIVE_SESSION, { data: session }],
+        [
+          "notice",
+          expect.objectContaining({
+            level: "error",
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+            message:
+              "Tokio couldn't save the change. Check the logs folder for details.",
           }),
         ],
       ]);
@@ -318,7 +329,7 @@ describe("home events", () => {
 
   describe("ACTIVE_FEATURES", () => {
     const setup = () => {
-      const updateActiveFeatures = vi.fn();
+      const updateActiveFeatures = vi.fn(async () => true);
       const clearTalk = vi.fn();
       const clearSpeech = vi.fn();
       const h = createHandler({

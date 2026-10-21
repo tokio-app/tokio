@@ -1,11 +1,5 @@
-import {
-  CurrentSongInfo,
-  SongInfo,
-  TOKIO_EVENTS,
-  TokioEventMap,
-} from "@/common/types";
+import { CurrentSongInfo, SongInfo, TOKIO_EVENTS } from "@/common/types";
 import { BrowserWindow, WebContentsView } from "electron";
-import { EventEmitter } from "node:events";
 import { ConnectionResponse, createWindow, MusicProvider } from "../../common";
 import {
   confirmLoggedOut,
@@ -25,13 +19,7 @@ const isYouTubeOrLogin = (hostname: string) =>
 export class YouTubeMusic extends MusicProvider {
   private _ytView: WebContentsView | null = null;
   private _shellWindow: BrowserWindow | null = null;
-  private _events: EventEmitter;
   private _isActive: boolean = false;
-
-  constructor() {
-    super();
-    this._events = new EventEmitter();
-  }
 
   public setKey(_key: string): void {
     return;
@@ -46,8 +34,6 @@ export class YouTubeMusic extends MusicProvider {
     // A login still open from an earlier connect fails, so one window is left
     this.disconnect();
 
-    this._shellWindow = createWindow();
-
     this._ytView = new WebContentsView({
       webPreferences: {
         partition: "persist:music-youtube",
@@ -55,27 +41,7 @@ export class YouTubeMusic extends MusicProvider {
       },
     });
 
-    this._shellWindow.contentView.addChildView(this._ytView);
-
-    const bounds = this._shellWindow.getContentBounds();
-    this._ytView.setBounds({
-      x: 0,
-      y: 40,
-      width: bounds.width,
-      height: bounds.height - 40,
-    });
-
-    this._shellWindow.on("resize", () => {
-      if (this._shellWindow && this._ytView) {
-        const newBounds = this._shellWindow.getContentBounds();
-        this._ytView.setBounds({
-          x: 0,
-          y: 40,
-          width: newBounds.width,
-          height: newBounds.height - 40,
-        });
-      }
-    });
+    this._shellWindow = createWindow(this._ytView);
 
     this._ytView.webContents.on("will-prevent-unload", (event) => {
       event.preventDefault();
@@ -213,20 +179,6 @@ export class YouTubeMusic extends MusicProvider {
     }
   }
 
-  public on<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.on(event, listener);
-  }
-
-  public off<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.off(event, listener);
-  }
-
   public async playerStatus(): Promise<CurrentSongInfo | null> {
     if (!this._ytView) return null;
     try {
@@ -303,12 +255,5 @@ export class YouTubeMusic extends MusicProvider {
     } catch {
       return false;
     }
-  }
-
-  private emit<K extends TOKIO_EVENTS>(
-    event: K,
-    data?: TokioEventMap[K],
-  ): void {
-    this._events.emit(event, data);
   }
 }

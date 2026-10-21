@@ -31,7 +31,8 @@ export function NumberInput({
   const [prevValue, setPrevValue] = useState(value);
 
   // A value from outside replaces the text, the field's own doesn't
-  if (value !== prevValue) {
+  // Object.is, as NaN !== NaN would set the state on every render
+  if (!Object.is(value, prevValue)) {
     setPrevValue(value);
     if (text.trim() === "" || Number(text) !== value) setText(String(value));
   }

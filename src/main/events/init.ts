@@ -16,6 +16,7 @@ import { SERVER_PORT } from "@/common/util";
 import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
+import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { AppHandlerVariables } from "@/types";
@@ -100,6 +101,7 @@ const registerConnectorEvents = ({
   alertsService: alerts,
   overlayService: overlays,
   liveService: live,
+  pathManagerService: paths,
   notifier,
 }: AppHandlerVariables) => {
   const dispatchAlert = async <K extends AppEvents>(
@@ -116,7 +118,7 @@ const registerConnectorEvents = ({
       (audio) => {
         win.webContents.send(APP_EVENTS_RESPONSE.ALERT_AUDIO, audio);
       },
-      (alert) => {
+      (alert, error) => {
         const label = ALERT_TRIGGER_LABELS[alert.trigger.type];
         const options = {
           key: `alert:${alert.id}`,
@@ -129,12 +131,18 @@ const registerConnectorEvents = ({
             `Unable to speak the ${label} alert. Try another voice in Alerts.`,
             options,
           );
-        } else {
+        } else if (
           notifier.warn(
             "alerts",
             FEEDBACK_CODES.ALERT_SOUND_MISSING,
             `The sound of the ${label} alert is missing. Pick it again in Alerts.`,
             options,
+          )
+        ) {
+          // TTS failures are logged where they're made
+          Logger.warn(
+            `<Alerts> The sound of the ${label} alert is missing -- ${error}`,
+            paths.files.logs.alerts,
           );
         }
       },
@@ -199,8 +207,7 @@ const registerConnectorEvents = ({
   }
   // Added when the app loads, before any connect, so the session has started
   // by the time the connect is answered.
-  conn.on(TOKIO_EVENTS.CONNECTED, (d) => {
-    if (!d.success) return;
+  conn.on(TOKIO_EVENTS.CONNECTED, () => {
     live.start();
     sendSession.cancel();
     pushSession();
@@ -261,6 +268,7 @@ const registerConnectorEvents = ({
         "connector",
         FEEDBACK_CODES.RECONNECTED,
         "Reconnected to the LIVE.",
+        { key: "reconnected", windowMs: REPEAT_NOTICE_MS },
       );
     }
   });
@@ -358,7 +366,7 @@ const registerConnectorEvents = ({
     notifier.warn(
       "music",
       FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED,
-      "A song request couldn't be played and was skipped.",
+      "A song request couldn't be played.",
       { windowMs: REPEAT_NOTICE_MS },
     );
   });

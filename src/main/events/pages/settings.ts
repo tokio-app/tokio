@@ -6,7 +6,7 @@ import {
 } from "@/common/types";
 import { SERVER_PORT } from "@/common/util";
 import { createStack, replyFailure } from "@/helper/events";
-import { AppFailure } from "@/helper/feedback";
+import { AppFailure, saveFailure } from "@/helper/feedback";
 import { StoreManagerService } from "@/services/store";
 import { TTSService } from "@/services/tts";
 import { ReplyEvent } from "@/types";
@@ -132,7 +132,9 @@ events.push(
         { level: "warning" },
       );
     }
-    if (!(await storeManagerService.updateActiveProfile(file))) {
+    const res = await storeManagerService.updateActiveProfile(file);
+    if (res === "unsaved") throw saveFailure();
+    if (res === "missing") {
       throw new AppFailure(
         FEEDBACK_CODES.PROFILE_LOAD_FAILED,
         "Unable to switch to that profile. Its file is missing or damaged.",
@@ -256,9 +258,10 @@ events.push(
 events.push(
   APP_EVENTS.SET_PROVIDER,
   async ({ storeManagerService, notifier }, e, { name, key, type }) => {
-    await storeManagerService.updateProvider(name, key);
+    const saved = await storeManagerService.updateProvider(name, key);
 
     replySettings(e, storeManagerService);
+    if (!saved) throw saveFailure();
     e.reply(APP_EVENTS_RESPONSE.SET_PROVIDER, {
       type,
       success: true,
@@ -318,7 +321,10 @@ events.push(
     if (!target?.keyLabel) {
       throw new Error(`The voice engine ${engine} takes no key.`);
     }
-    await storeManagerService.updateVoiceKey(engine, key);
+    if (!(await storeManagerService.updateVoiceKey(engine, key))) {
+      replyVoiceKeys(e, ttsService, storeManagerService);
+      throw saveFailure();
+    }
 
     e.reply(APP_EVENTS_RESPONSE.SET_VOICE_KEY, {
       success: true,
@@ -346,7 +352,9 @@ events.push(
   async ({ storeManagerService, serverService, notifier }, e, { enabled }) => {
     // Save the state the server ended up in, so a taken port turns the toggle off.
     const res = await serverService.toggleServer(enabled);
-    await storeManagerService.updateServerSettings(enabled && res);
+    const saved = await storeManagerService.updateServerSettings(
+      enabled && res,
+    );
     replySettings(e, storeManagerService);
 
     if (!res) {
@@ -357,6 +365,7 @@ events.push(
           : "Unable to stop the overlay server.",
       );
     }
+    if (!saved) throw saveFailure();
     e.reply(APP_EVENTS_RESPONSE.SET_SERVER, {
       success: true,
     });
@@ -387,9 +396,10 @@ events.push(
 events.push(
   APP_EVENTS.SET_AUTO_UPDATES,
   async ({ storeManagerService, updaterService, notifier }, e, { enabled }) => {
-    await storeManagerService.updateUpdatesSettings(enabled);
+    const saved = await storeManagerService.updateUpdatesSettings(enabled);
     updaterService.setAuto(enabled);
     replySettings(e, storeManagerService);
+    if (!saved) throw saveFailure();
     e.reply(APP_EVENTS_RESPONSE.SET_AUTO_UPDATES, {
       success: true,
     });

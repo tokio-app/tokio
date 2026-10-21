@@ -8,6 +8,7 @@ import {
 } from "@/common/types";
 import { stayOnPage } from "@/helper/network";
 import { BrowserWindow, WebContentsView } from "electron";
+import { EventEmitter } from "node:events";
 import { join } from "node:path";
 
 export { MusicQueue } from "./queue";
@@ -15,6 +16,7 @@ export type ConnectionResponse = { success: boolean; error?: Error };
 
 export abstract class MusicProvider {
   protected _logFile = "";
+  private _events = new EventEmitter();
   public abstract setKey(key: string): void;
   public abstract connect(): Promise<ConnectionResponse>;
   public abstract disconnect(): void;
@@ -22,14 +24,27 @@ export abstract class MusicProvider {
   public abstract searchSong(query: string): Promise<SongInfo | null>;
   public abstract playerStatus(): Promise<CurrentSongInfo | null>;
   public abstract isActive(): boolean;
-  public abstract on<K extends TOKIO_EVENTS>(
+
+  public on<K extends TOKIO_EVENTS>(
     event: K,
     listener: (data: TokioEventMap[K]) => void,
-  ): void;
-  public abstract off<K extends TOKIO_EVENTS>(
+  ): void {
+    this._events.on(event, listener);
+  }
+
+  public off<K extends TOKIO_EVENTS>(
     event: K,
     listener: (data: TokioEventMap[K]) => void,
-  ): void;
+  ): void {
+    this._events.off(event, listener);
+  }
+
+  protected emit<K extends TOKIO_EVENTS>(
+    event: K,
+    data?: TokioEventMap[K],
+  ): void {
+    this._events.emit(event, data);
+  }
 
   // The service's log file, for what fails in the background.
   public setLogFile(logFile: string) {
@@ -37,7 +52,10 @@ export abstract class MusicProvider {
   }
 }
 
-export function createWindow() {
+const TITLE_BAR_HEIGHT = 40;
+
+// A window with the title bar on top and the content view under it
+export function createWindow(content: WebContentsView) {
   const APP_ICON = join(__dirname, "../../resources/icon.png");
   const APP_PRELOAD = join(__dirname, "../preload/index.mjs");
 
@@ -63,7 +81,6 @@ export function createWindow() {
   const _navView = new WebContentsView({
     webPreferences: {
       sandbox: false,
-      contextIsolation: false,
       preload: APP_PRELOAD,
     },
   });
@@ -71,10 +88,17 @@ export function createWindow() {
   _navView.webContents.loadFile(join(__dirname, "../../music-out/index.html"));
 
   _shellWindow.contentView.addChildView(_navView);
+  _shellWindow.contentView.addChildView(content);
 
   const updateNavBounds = () => {
-    const bounds = _shellWindow!.getContentBounds();
-    _navView.setBounds({ x: 0, y: 0, width: bounds.width, height: 40 });
+    const { width, height } = _shellWindow.getContentBounds();
+    _navView.setBounds({ x: 0, y: 0, width, height: TITLE_BAR_HEIGHT });
+    content.setBounds({
+      x: 0,
+      y: TITLE_BAR_HEIGHT,
+      width,
+      height: height - TITLE_BAR_HEIGHT,
+    });
   };
 
   // The title bar lives in the nav view, so it gets the window state.

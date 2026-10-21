@@ -1,5 +1,5 @@
 import { SongInfo, TOKIO_EVENTS } from "@/common/types";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from "vitest";
 import { MusicQueue } from "./queue";
 
 const song = (title: string, duration = 1000): SongInfo => ({
@@ -81,6 +81,7 @@ describe("MusicQueue", () => {
 
     queue.enqueue("a", song("a"), () => {});
     expect(listener).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(0);
     expect(onStart).toHaveBeenCalledExactlyOnceWith([
       { title: "a", thumbnail: "", playing: true, played: false },
     ]);
@@ -91,10 +92,35 @@ describe("MusicQueue", () => {
 
     await queue.triggerNext();
     expect(listener).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(0);
     expect(onStart).toHaveBeenCalledTimes(2);
     expect(onStart).toHaveBeenLastCalledWith([
       { title: "a", thumbnail: "", playing: false, played: true },
       { title: "b", thumbnail: "", playing: true, played: false },
+    ]);
+  });
+
+  it("calls onStart only for a song that started and still plays", async () => {
+    const onStart = vi.fn();
+    const queue = new MusicQueue({ onStart });
+    queue.enqueue("a", song("a"), () => {
+      throw new Error("player crashed");
+    });
+    // Skipped while it loads
+    queue.enqueue(
+      "b",
+      song("b", 60_000),
+      () => new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    );
+    queue.enqueue("c", song("c", 60_000), () => {});
+
+    await queue.triggerNext();
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(onStart).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ title: "a", played: true }),
+      expect.objectContaining({ title: "b", played: true }),
+      expect.objectContaining({ title: "c", playing: true }),
     ]);
   });
 
@@ -112,6 +138,118 @@ describe("MusicQueue", () => {
     // Right away, without waiting out the song that failed
     expect(b).toHaveBeenCalledOnce();
     expect(onError).toHaveBeenCalledExactlyOnceWith(expect.any(String), error);
+  });
+
+  describe("when the player is gone", () => {
+    const broken = (): void => {
+      throw new Error("Video unavailable.");
+    };
+
+    // A played, then the player went away with b, c and d queued
+    const outage = () => {
+      const onError = vi.fn();
+      const queue = new MusicQueue({ onError });
+      const changes = vi.fn();
+      queue.on(TOKIO_EVENTS.MUSIC_CHANGE, changes);
+      const player = { gone: true };
+      const actions: Record<string, Mock<() => void>> = {};
+      const request = (title: string) => {
+        actions[title] = vi.fn(() => {
+          if (player.gone) throw new Error("No active devices.");
+        });
+        queue.enqueue(title, song(title), actions[title]);
+      };
+      queue.enqueue("a", song("a"), () => {});
+      ["b", "c", "d"].forEach(request);
+      return { queue, onError, changes, player, actions, request };
+    };
+
+    it("stops at the first of two songs in a row that fail, keeping the rest", async () => {
+      const { queue, onError, changes, actions } = outage();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(onError).toHaveBeenCalledTimes(2);
+      expect(changes).toHaveBeenLastCalledWith([
+        expect.objectContaining({ title: "a", played: true }),
+        expect.objectContaining({ title: "b", playing: true }),
+        expect.objectContaining({ title: "c", playing: false }),
+        expect.objectContaining({ title: "d", playing: false }),
+      ]);
+      expect(actions.d).not.toHaveBeenCalled();
+      expect(titles(queue)).toEqual(["a", "b", "c", "d"]);
+      expect(playing(queue)).toBe("b");
+      expect(queue.getQueueState().isPlaying).toBe(true);
+    });
+
+    it("keeps every song while the player stays gone, and plays them once it's back", async () => {
+      const { queue, player, actions, request } = outage();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      request("e");
+      request("f");
+      expect(actions.b).toHaveBeenCalledTimes(3);
+      expect(actions.c).toHaveBeenCalledTimes(3);
+      expect(actions.d).not.toHaveBeenCalled();
+      expect(titles(queue)).toEqual(["a", "b", "c", "d", "e", "f"]);
+      expect(playing(queue)).toBe("b");
+
+      player.gone = false;
+      request("g");
+      expect(playing(queue)).toBe("b");
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(playing(queue)).toBe("c");
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(actions.d).toHaveBeenCalledOnce();
+    });
+
+    it("skips a single song that fails", async () => {
+      const queue = new MusicQueue();
+      const c = vi.fn();
+      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("b", song("b"), broken);
+      queue.enqueue("c", song("c"), c);
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(c).toHaveBeenCalledOnce();
+      expect(playing(queue)).toBe("c");
+    });
+
+    it("doesn't count a failure the queue ran out after", async () => {
+      const queue = new MusicQueue();
+      const c = vi.fn();
+      queue.enqueue("a", song("a"), broken);
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      queue.enqueue("b", song("b"), broken);
+      queue.enqueue("c", song("c"), c);
+
+      expect(c).toHaveBeenCalledOnce();
+      expect(playing(queue)).toBe("c");
+    });
+
+    it("stays at the song a skip moved to when the one it left fails", async () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("b", song("b"), broken);
+      // Fails 3 seconds in, like a request to Spotify
+      queue.enqueue(
+        "c",
+        song("c"),
+        () =>
+          new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error("No active devices.")), 3000),
+          ),
+      );
+      queue.enqueue("d", song("d", 60_000), () => {});
+      await vi.advanceTimersByTimeAsync(1000);
+
+      await queue.triggerNext();
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(playing(queue)).toBe("d");
+    });
   });
 
   it("keeps one song playing when a skip comes while a song loads", async () => {
@@ -143,7 +281,7 @@ describe("MusicQueue", () => {
     const queue = new MusicQueue();
     const b = vi.fn();
 
-    queue.addCurrentlyPlaying("a", song("a", 1000), 600);
+    queue.addCurrentlyPlaying("a", song("a", 1000), 600, () => {});
     queue.enqueue("b", song("b"), b);
 
     await vi.advanceTimersByTimeAsync(399);

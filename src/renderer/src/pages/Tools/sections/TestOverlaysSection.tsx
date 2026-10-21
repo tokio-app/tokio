@@ -1,7 +1,6 @@
 import { TestOverlay } from "@/common/schemas";
 import { getOverlaySocketURL } from "@/common/util";
 import { Btn, EmptyState, Input, Section } from "@/components";
-import copy from "copy-to-clipboard";
 import { useState } from "react";
 import { FaRegCopy } from "react-icons/fa";
 import { FiTrash2 } from "react-icons/fi";
@@ -79,12 +78,19 @@ export function TestOverlaysSection({
 
               <div className={styles.row}>
                 <Input readOnly value={overlay.id} />
-                <Btn title="Copy ID" onClick={() => copy(overlay.id)}>
+                <Btn
+                  title="Copy ID"
+                  onClick={() => void navigator.clipboard.writeText(overlay.id)}
+                >
                   <FaRegCopy size={18} />
                 </Btn>
                 <Btn
                   title="Copy WebSocket URL"
-                  onClick={() => copy(getOverlaySocketURL(overlay.id))}
+                  onClick={() =>
+                    void navigator.clipboard.writeText(
+                      getOverlaySocketURL(overlay.id),
+                    )
+                  }
                 >
                   <VscPlug size={18} />
                 </Btn>

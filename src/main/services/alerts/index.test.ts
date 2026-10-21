@@ -8,6 +8,8 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import { defaultProfile, delay } from "@/common/util";
+import Logger from "@/logger";
+import { TTSService } from "@/services/tts";
 import {
   mkdir,
   mkdtemp,
@@ -27,10 +29,14 @@ import {
   CACHE_MAX_FILE_BYTES,
 } from "./index";
 
-// A test can make a write fail partway
+// A test can make a write fail partway, or count and hold reads
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
-  return { ...actual, writeFile: vi.fn(actual.writeFile) };
+  return {
+    ...actual,
+    readFile: vi.fn(actual.readFile),
+    writeFile: vi.fn(actual.writeFile),
+  };
 });
 
 const FIXTURE = resolve("test/fixtures/myinstants-search.html");
@@ -179,7 +185,8 @@ describe("AlertsService", () => {
       );
     });
 
-    it("reports the alerts whose sound is missing", async () => {
+    it("reports the alerts whose sound is missing, for the caller to log", async () => {
+      const logError = vi.spyOn(Logger, "error");
       const gone = alert({
         id: "gone",
         sound: { name: "Gone", file: "gone.mp3" },
@@ -197,6 +204,30 @@ describe("AlertsService", () => {
 
       expect(onError).toHaveBeenCalledExactlyOnceWith(gone, expect.any(String));
       expect(sent.map((a) => a.id)).toEqual(["alert-1"]);
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    it("reads a sound too big to cache once for events at the same time", async () => {
+      const big = new Uint8Array(CACHE_MAX_FILE_BYTES + 1);
+      await writeFile(join(sounds, "long.mp3"), big);
+      const items = [alert({ sound: { name: "Long", file: "long.mp3" } })];
+      const sent: AlertAudio[] = [];
+
+      await Promise.all(
+        Array.from({ length: 50 }, () =>
+          service.handle(TOKIO_EVENTS.FOLLOW, { user }, settings(items), (a) =>
+            sent.push(a),
+          ),
+        ),
+      );
+
+      expect(sent).toHaveLength(50);
+      expect(new Set(sent.map((a) => a.data)).size).toBe(1);
+      expect(
+        vi
+          .mocked(readFile)
+          .mock.calls.filter(([path]) => path === join(sounds, "long.mp3")),
+      ).toHaveLength(1);
     });
 
     it("fires gift alerts once per combo, when it ends", async () => {
@@ -403,10 +434,33 @@ describe("AlertsService", () => {
 
         await speak(gift("5655", true), alerts);
 
-        expect(prepareText).toHaveBeenCalledWith("Thanks Viewer", alerts.tts);
+        expect(prepareText).toHaveBeenCalledWith(
+          "Thanks Viewer",
+          alerts.tts,
+          "Viewer",
+        );
         expect(generateBuffer).not.toHaveBeenCalled();
         expect(sent).toEqual([]);
         expect(onError).not.toHaveBeenCalled();
+      });
+
+      it("checks banned words in the event's values, not the message's own", async () => {
+        const tts = new TTSService();
+        service.setSpeaker({
+          prepareText: tts.prepareText.bind(tts),
+          generateBuffer,
+        });
+        const alerts = withTts(
+          [speaking("Thanks {username} for the follow")],
+          (p) => {
+            p.banned = ["follow"];
+          },
+        );
+
+        await speak(giftFrom("Viewer"), alerts);
+        await speak(giftFrom("Follow Bot"), alerts);
+
+        expect(sent.map(said)).toEqual(["Thanks Viewer for the follow"]);
       });
 
       it("reports a message that can't be spoken", async () => {
@@ -533,6 +587,27 @@ describe("AlertsService", () => {
       expect(await readdir(sounds)).toEqual([]);
       expect((await service.readSound("ding.mp3", false)).success).toBe(false);
     });
+
+    it("doesn't cache a sound deleted while it was read", async () => {
+      const actual =
+        await vi.importActual<typeof import("node:fs/promises")>(
+          "node:fs/promises",
+        );
+      let finish!: () => void;
+      const held = new Promise<void>((resolve) => (finish = resolve));
+      vi.mocked(readFile).mockImplementationOnce(async (path) => {
+        const data = await actual.readFile(path);
+        await held;
+        return data;
+      });
+
+      const reading = service.readSound("ding.mp3");
+      await service.deleteSound("ding.mp3");
+      finish();
+
+      expect((await reading).data).toEqual(bytes(1, 2, 3));
+      expect((await service.readSound("ding.mp3", false)).success).toBe(false);
+    });
   });
 
   describe("importSound", () => {
@@ -565,6 +640,15 @@ describe("AlertsService", () => {
 
       expect(a.data?.file).toBe(b.data?.file);
       expect(await readdir(sounds)).toHaveLength(2); // ding.mp3 + the import
+    });
+
+    it("refuses sounds too big to keep in memory", async () => {
+      await writeFile(join(src, "long.mp3"), new Uint8Array(9 * 1024 * 1024));
+
+      const res = await service.importSound(join(src, "long.mp3"));
+
+      expect(res.success).toBe(false);
+      expect(await readdir(sounds)).toEqual(["ding.mp3"]);
     });
 
     it("rejects formats that are not audio", async () => {
@@ -620,6 +704,20 @@ describe("AlertsService", () => {
       expect(first.data?.name).toBe("BRUH");
       expect(await readdir(sounds)).toContain(first.data?.file);
       expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it("saves nothing when MyInstants doesn't send the sound", async () => {
+      const fetchMock = vi.fn(
+        async () => new Response("gone", { status: 404 }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const failed = await service.downloadSound(SOUND_URL, "BRUH");
+      await service.downloadSound(SOUND_URL, "BRUH");
+
+      expect(failed.success).toBe(false);
+      expect(await readdir(sounds)).toEqual(["ding.mp3"]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
     it("saves a sound whole or not at all", async () => {
