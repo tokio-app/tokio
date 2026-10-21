@@ -461,6 +461,19 @@ describe("MusicService", () => {
       expect(played()).toEqual(["A"]);
     });
 
+    it("empties the queue on disconnect", async () => {
+      const { service, request, played, queue } = setup();
+      await request("!play A");
+      await request("!play B");
+
+      service.disconnect();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(played()).toEqual(["A"]);
+
+      await request("!play C");
+      expect(queue()).toEqual(["C (playing)"]);
+    });
+
     it("starts over after clearHandler", async () => {
       const { service, request, provider, played, queue } = setup();
       await request("!play A");

@@ -54,6 +54,7 @@ export class MusicService extends ProviderService<MusicProvider> {
   }
 
   public disconnect() {
+    this.clearHandler();
     this._current.provider.disconnect();
   }
 
@@ -77,7 +78,7 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue.off(event, listener);
   }
 
-  // Called when a requested track can't be played and is skipped.
+  // Called when a requested track can't be played.
   public onPlaybackError(listener: (id: string, error: unknown) => void) {
     this._onPlaybackError = listener;
   }

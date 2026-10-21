@@ -367,7 +367,7 @@ const registerConnectorEvents = ({
     notifier.warn(
       "music",
       FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED,
-      "A song request couldn't be played and was skipped.",
+      "A song request couldn't be played.",
       { windowMs: REPEAT_NOTICE_MS },
     );
   });

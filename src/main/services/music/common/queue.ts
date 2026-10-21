@@ -20,7 +20,7 @@ interface QueueItem {
 }
 
 interface QueueHooks {
-  // A song failed to start and was skipped.
+  // A song failed to start.
   onError?: (id: string, error: unknown) => void;
   // A song started, with the songs as they are then.
   onStart?: (songs: MusicInfo[]) => void;
@@ -194,9 +194,10 @@ export class MusicQueue {
     }
   }
 
+  // Playing, or stopped at a song the player couldn't start
   public getQueueState() {
     return {
-      isPlaying: this._isPlaying,
+      isPlaying: this._isPlaying || this._currentIndex < this._queue.length,
     };
   }
 
@@ -214,6 +215,7 @@ export class MusicQueue {
     // A loop stopped while awaiting can wake up after a new one started.
     const controller = (this._abortController = new AbortController());
     const active = () => !controller.signal.aborted;
+    let failures = 0;
 
     while (this._currentIndex < this._queue.length && active()) {
       const item = this._queue[this._currentIndex];
@@ -222,16 +224,19 @@ export class MusicQueue {
       this.emit(TOKIO_EVENTS.MUSIC_CHANGE, songs);
       this._hooks.onStart?.(songs);
 
-      // A song that fails to start is skipped right away.
+      // A song that fails to start is skipped right away. Two in a row mean
+      // the player is gone: the loop stops at the second until a new request.
       let waitTime = 0;
       try {
         await item.action();
+        failures = 0;
         waitTime =
           item.startTimeMs !== undefined
             ? Math.max(0, item.song.duration - item.startTimeMs)
             : item.song.duration;
       } catch (error) {
         this._hooks.onError?.(item.id, error);
+        if (++failures === 2) break;
       }
 
       item.startTimeMs = undefined;

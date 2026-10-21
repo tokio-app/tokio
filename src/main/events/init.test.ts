@@ -1079,7 +1079,7 @@ describe("init events", () => {
           level: "warning",
           source: "music",
           code: FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED,
-          message: "A song request couldn't be played and was skipped.",
+          message: "A song request couldn't be played.",
         }),
       ]);
     });

@@ -78,6 +78,7 @@ describe("music events", () => {
       const musicService = {
         ...events,
         disconnect: vi.fn(),
+        clearHandler: vi.fn(),
         setProvider: vi.fn((_name: string, _key?: string) => {}),
         connect: vi.fn(
           async (): Promise<{ success: boolean; error?: Error }> =>
@@ -200,6 +201,15 @@ describe("music events", () => {
           message: "Disconnected from Spotify.",
         }),
       ]);
+    });
+
+    it("empties the music queue when the provider ends", async () => {
+      const { musicService, connect, ended } = await setup();
+      await connect("YouTube");
+
+      ended();
+
+      expect(musicService.clearHandler).toHaveBeenCalledOnce();
     });
 
     it("only replies when a provider that never connected ends", async () => {

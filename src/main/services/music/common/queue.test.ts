@@ -114,6 +114,50 @@ describe("MusicQueue", () => {
     expect(onError).toHaveBeenCalledExactlyOnceWith(expect.any(String), error);
   });
 
+  describe("when the player is gone", () => {
+    // Songs queued behind one that plays, then every song fails to start
+    const outage = () => {
+      const onError = vi.fn();
+      const queue = new MusicQueue({ onError });
+      const gone = (): void => {
+        throw new Error("No active devices.");
+      };
+      const c = vi.fn(gone);
+      const d = vi.fn(gone);
+      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("b", song("b"), gone);
+      queue.enqueue("c", song("c"), c);
+      queue.enqueue("d", song("d"), d);
+      return { queue, onError, c, d };
+    };
+
+    it("stops at the second song that fails in a row, and keeps the rest", async () => {
+      const { queue, onError, d } = outage();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(onError).toHaveBeenCalledTimes(2);
+      expect(d).not.toHaveBeenCalled();
+      expect(titles(queue)).toEqual(["a", "b", "c", "d"]);
+      expect(playing(queue)).toBe("c");
+      expect(queue.getQueueState().isPlaying).toBe(true);
+    });
+
+    it("tries the song it stopped at again on a new request", async () => {
+      const { queue, c, d } = outage();
+      await vi.advanceTimersByTimeAsync(1000);
+      c.mockImplementation(() => {});
+      d.mockImplementation(() => {});
+
+      queue.enqueue("e", song("e"), () => {});
+
+      expect(c).toHaveBeenCalledTimes(2);
+      expect(playing(queue)).toBe("c");
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(d).toHaveBeenCalledOnce();
+    });
+  });
+
   it("keeps one song playing when a skip comes while a song loads", async () => {
     const queue = new MusicQueue();
     const started: [string, number][] = [];

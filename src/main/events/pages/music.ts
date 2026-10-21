@@ -51,6 +51,7 @@ events.push(
     // Ends on a disconnect and when the provider's window is closed.
     let connected = false;
     onMusicEnded = () => {
+      musicService.clearHandler();
       e.reply(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, {
         success: false,
       });
