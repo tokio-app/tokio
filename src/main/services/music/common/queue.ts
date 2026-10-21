@@ -24,9 +24,17 @@ interface QueueHooks {
   onError?: (id: string, error: unknown) => void;
   // A song started, with the songs as they are then.
   onStart?: (songs: MusicInfo[]) => void;
-  // The ms the player still has to play of a song, 0 when it's done.
-  remaining?: (song: SongInfo) => Promise<number>;
+  // The ms the player still has to play of a song: 0 once another song
+  // plays, null when it can't tell, like while the song is paused.
+  remaining?: (song: SongInfo) => Promise<number | null>;
 }
+
+// The player is asked what's left this long before a song's listed end,
+// which is rounded, and late after an ad.
+const END_CHECK_MS = 5000;
+// The next song starts this early, so a song's last moment, often silent,
+// covers part of the time the player takes to switch.
+const START_LEAD_MS = 300;
 
 const delayWithAbort = (ms: number, signal?: AbortSignal) => {
   return new Promise<void>((resolve) => {
@@ -229,16 +237,7 @@ export class MusicQueue {
       item.startTimeMs = undefined;
 
       if (active() && waitTime > 0) {
-        await delayWithAbort(waitTime, controller.signal);
-      }
-
-      // Ads and pauses make a song end later than its duration.
-      // shortcut: checked once, so a pause longer than the rest of the song
-      // still cuts it; poll if users ask
-      const { remaining } = this._hooks;
-      if (active() && waitTime > 0 && remaining) {
-        const left = await remaining(item.song).catch(() => 0);
-        if (active() && left > 0) await delayWithAbort(left, controller.signal);
+        await this._waitForEnd(item.song, waitTime, controller.signal);
       }
 
       if (!active()) break;
@@ -247,5 +246,40 @@ export class MusicQueue {
     }
 
     if (this._abortController === controller) this._isPlaying = false;
+  }
+
+  // Until the song ends, by what the player says is left near its listed
+  // end, and by the listed time when the player can't tell.
+  private async _waitForEnd(
+    song: SongInfo,
+    waitTime: number,
+    signal: AbortSignal,
+  ) {
+    const listedEnd = Date.now() + waitTime;
+    const { remaining } = this._hooks;
+    if (!remaining) return delayWithAbort(waitTime, signal);
+
+    await delayWithAbort(Math.max(0, waitTime - END_CHECK_MS), signal);
+    while (!signal.aborted) {
+      const left = await remaining(song).catch(() => null);
+      if (left === null) {
+        // shortcut: a song paused past its listed end is cut, which also
+        // restarts music after YouTube's "Continue watching?"; wait out
+        // pauses if streamers ask
+        await delayWithAbort(Math.max(0, listedEnd - Date.now()), signal);
+        return;
+      }
+      // Still far from the end, like after an ad: asked again near it
+      if (left > END_CHECK_MS) {
+        await delayWithAbort(left - END_CHECK_MS, signal);
+        continue;
+      }
+      // One timer from here: asked again this close to the end, a slow
+      // player like Spotify's API would answer after it
+      if (left > START_LEAD_MS) {
+        await delayWithAbort(left - START_LEAD_MS, signal);
+      }
+      return;
+    }
   }
 }

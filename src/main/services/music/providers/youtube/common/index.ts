@@ -2,14 +2,21 @@ import { SongInfo } from "@/common/types";
 import { delay } from "@/common/util";
 import config from "../config";
 
+// The song's own time and length come from the player: the media's turn
+// into the next song's once YouTube loads it ahead, about 10 s before the
+// end, to play it without a gap.
 export const PlayerStateJSCode = `
 (() => {
-  const video = document.querySelector("video");
-  if (!video) return null;
+  const player = document.querySelector("#movie_player");
+  if (!player?.getVideoData) return null;
 
-  const playing = !video.paused && !video.ended && video.readyState > 2;
-  const time = video.currentTime * 1000;
-  const duration = video.duration * 1000;
+  const state = player.getPlayerState();
+  // Buffering counts as playing
+  const playing = state === 1 || state === 3;
+  const time = player.getCurrentTime() * 1000;
+  const formats = player.getPlayerResponse?.()?.streamingData?.adaptiveFormats ?? [];
+  const audio = formats.find((f) => f.mimeType?.startsWith("audio/"));
+  const duration = Number(audio?.approxDurationMs) || player.getDuration() * 1000;
 
   const playerBar = document.querySelector("ytmusic-player-bar");
 
@@ -33,7 +40,7 @@ export const PlayerStateJSCode = `
 
   return {
     album: "Unknown",
-    track: "Unknown",
+    track: player.getVideoData().video_id || "Unknown",
     title,
     thumbnail,
     time,
@@ -43,42 +50,35 @@ export const PlayerStateJSCode = `
 })();
 `;
 
-export const SearchJSCode = (query: string) => `
-(() => {
-  const searchIcon = document.querySelector('ytmusic-search-box tp-yt-paper-icon-button');
-  if (searchIcon) searchIcon.click();
-
-  const searchInput = document.querySelector('ytmusic-search-box input');
-  if (searchInput) {
-    searchInput.focus();
-    searchInput.value = ${JSON.stringify(query)};
-    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-    searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-})();
-`;
-
-export const AfterSearchJSCode = `
+// Opens the song's page as the page's own links do, which starts it in under
+// a second, then waits for the player to have it. A page that hasn't
+// played anything yet opens it paused, and the same song again plays from
+// its start. True once it plays, or its page is open, like during an ad.
+export const PlayJSCode = (videoId: string) => `
 (async () => {
-  let firstResult = null;
-  await new Promise(r => setTimeout(r, 500));
-  for (let i = 0; i < 25; i++) {
-    await new Promise(r => setTimeout(r, 200));
-    const searchPage = document.querySelector('ytmusic-search-page:not([hidden])');
-    if (!searchPage) continue;
-    firstResult = searchPage.querySelector('ytmusic-card-shelf-renderer, ytmusic-responsive-list-item-renderer');
-    if (firstResult) break;
-  }
-
-  if (!firstResult) return null;
-
-  const playBtn = firstResult.querySelector('ytmusic-play-button-renderer, .play-button-container');
-  if (playBtn) {
-    playBtn.click();
-    await new Promise(r => setTimeout(r, 500));
+  const id = ${JSON.stringify(videoId)};
+  const player = () => document.querySelector("#movie_player");
+  if (player()?.getVideoData?.().video_id === id) {
+    player().seekTo(0, true);
+    player().playVideo();
     return true;
   }
-  return null;
+
+  document.querySelector("ytmusic-app").dispatchEvent(
+    new CustomEvent("yt-navigate", {
+      bubbles: true,
+      composed: true,
+      detail: { endpoint: { watchEndpoint: { videoId: id } } },
+    }),
+  );
+  for (let i = 0; i < 50; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    if (player()?.getVideoData?.().video_id !== id) continue;
+    const state = player().getPlayerState();
+    if (state === 1 || state === 3) return true;
+    player().playVideo();
+  }
+  return new URLSearchParams(location.search).get("v") === id;
 })();
 `;
 

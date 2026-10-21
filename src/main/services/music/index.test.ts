@@ -319,24 +319,45 @@ describe("MusicService", () => {
       expect(played()).toEqual(["New"]);
     });
 
-    it("waits for the rest of a song the player is still playing, like after an ad", async () => {
+    it("plays the next song as the player's ends, like after an ad", async () => {
       const { request, provider, played } = setup();
       await request("!play A");
       await request("!play B");
-      provider.playerStatus.mockResolvedValueOnce({
+      // A 10 s song that started 3 s late
+      const start = Date.now() + 3_000;
+      provider.playerStatus.mockImplementation(async () => ({
         ...song("A"),
         playing: true,
-        time: 7_000,
-      });
+        time: Date.now() - start,
+      }));
 
-      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(12_699);
       expect(played()).toEqual(["A"]);
 
-      await vi.advanceTimersByTimeAsync(3_000);
+      await vi.advanceTimersByTimeAsync(1);
       expect(played()).toEqual(["A", "B"]);
     });
 
-    it("plays the next song on time when the player moved on", async () => {
+    it("allows for the time the player takes to answer", async () => {
+      const { request, provider, played } = setup();
+      const start = Date.now();
+      await request("!play A");
+      await request("!play B");
+      // Answers in 400 ms, with the time it read halfway through
+      provider.playerStatus.mockImplementation(async () => {
+        const time = Date.now() - start + 200;
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        return { ...song("A"), playing: true, time };
+      });
+
+      // 300 ms before A's end, not 200 ms later
+      await vi.advanceTimersByTimeAsync(9_699);
+      expect(played()).toEqual(["A"]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(played()).toEqual(["A", "B"]);
+    });
+
+    it("plays the next song as soon as the player moved on", async () => {
       const { request, provider, played } = setup();
       await request("!play A");
       await request("!play B");
@@ -346,7 +367,25 @@ describe("MusicService", () => {
         time: 1_000,
       });
 
-      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(played()).toEqual(["A"]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(played()).toEqual(["A", "B"]);
+    });
+
+    it("plays the next song at the listed end while the song is paused", async () => {
+      const { request, provider, played } = setup();
+      await request("!play A");
+      await request("!play B");
+      provider.playerStatus.mockResolvedValue({
+        ...song("A"),
+        playing: false,
+        time: 2_000,
+      });
+
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(played()).toEqual(["A"]);
+      await vi.advanceTimersByTimeAsync(1);
       expect(played()).toEqual(["A", "B"]);
     });
 

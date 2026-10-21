@@ -6,7 +6,8 @@ import {
   getHighResThumbnailUrl,
   parseDurationToSeconds,
   parseSongRenderer,
-  SearchJSCode,
+  PlayerStateJSCode,
+  PlayJSCode,
 } from "./index";
 
 const INTERVAL = 1500;
@@ -209,17 +210,148 @@ describe("getHighResThumbnailUrl", () => {
   });
 });
 
-describe("SearchJSCode", () => {
-  it("types any title as it is, quotes and backslashes too", () => {
-    const title = String.raw`"Heroes" (2017 Remaster) \ "); alert(1); ("`;
-    const input = { value: "", focus() {}, dispatchEvent() {} };
+// YouTube Music's page as the scripts see it: its app, which opens a song's
+// page on "yt-navigate", and its player
+const page = (playing = "", state = 1) => {
+  const player = {
+    id: playing,
+    state,
+    getVideoData: () => ({ video_id: player.id }),
+    getPlayerState: () => player.state,
+    playVideo: vi.fn(() => {
+      player.state = 1;
+    }),
+    seekTo: vi.fn(),
+  };
+  const location = { search: "" };
+  const app = { dispatchEvent: vi.fn<(event: CustomEvent) => void>() };
+  const document = {
+    querySelector: (selector: string) =>
+      ({ "#movie_player": player, "ytmusic-app": app })[selector] ?? null,
+  };
+  const run = (code: string): Promise<boolean> =>
+    runInNewContext(code, {
+      document,
+      location,
+      CustomEvent,
+      URLSearchParams,
+      setTimeout,
+    });
+  // What a song's page does once opened
+  const opens = (id: string, state: number, search = `?v=${id}`) =>
+    app.dispatchEvent.mockImplementation(() => {
+      Object.assign(player, { id, state });
+      location.search = search;
+    });
+  return { player, app, run, opens };
+};
+
+describe("PlayJSCode", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("opens the song's page and answers once it plays", async () => {
+    const id = String.raw`a"b\c`;
+    const { app, run, opens } = page("other");
+    opens(id, 3);
+
+    const played = run(PlayJSCode(id));
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(await played).toBe(true);
+    const [event] = app.dispatchEvent.mock.lastCall!;
+    expect(event.type).toBe("yt-navigate");
+    expect(event.bubbles && event.composed).toBe(true);
+    expect(event.detail).toEqual({
+      endpoint: { watchEndpoint: { videoId: id } },
+    });
+  });
+
+  it("starts a song its page opened paused", async () => {
+    const { player, run, opens } = page();
+    opens("abc", -1);
+
+    const played = run(PlayJSCode("abc"));
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(await played).toBe(true);
+    expect(player.playVideo).toHaveBeenCalledOnce();
+  });
+
+  it("plays the same song again from its start", async () => {
+    const { player, app, run } = page("abc", 2);
+
+    expect(await run(PlayJSCode("abc"))).toBe(true);
+    expect(player.seekTo).toHaveBeenCalledWith(0, true);
+    expect(player.playVideo).toHaveBeenCalledOnce();
+    expect(app.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["its page is open, like during an ad", "?v=abc", true],
+    ["its page never opens", "", false],
+  ])(
+    "answers after 5 s without the player when %s",
+    async (_case, search, answer) => {
+      const { run, opens } = page("other");
+      opens("ad", 1, search);
+
+      const played = run(PlayJSCode("abc"));
+      await vi.advanceTimersByTimeAsync(4_900);
+      let done = false;
+      played.then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(done).toBe(false);
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(await played).toBe(answer);
+    },
+  );
+});
+
+describe("PlayerStateJSCode", () => {
+  it("reads the song's own time and length, not the next song's", () => {
+    const player = {
+      getVideoData: () => ({ video_id: "abc" }),
+      getPlayerState: () => 3,
+      getCurrentTime: () => 44.5,
+      // The next song's once YouTube loads it ahead
+      getDuration: () => 199,
+      getPlayerResponse: () => ({
+        streamingData: {
+          adaptiveFormats: [
+            { mimeType: 'video/mp4; codecs="avc1"', approxDurationMs: "45181" },
+            {
+              mimeType: 'audio/webm; codecs="opus"',
+              approxDurationMs: "45160",
+            },
+          ],
+        },
+      }),
+    };
     const document = {
       querySelector: (selector: string) =>
-        selector.endsWith("input") ? input : null,
+        selector === "#movie_player" ? player : null,
     };
 
-    runInNewContext(SearchJSCode(title), { document, Event });
+    const status = runInNewContext(PlayerStateJSCode, { document });
 
-    expect(input.value).toBe(title);
+    expect({ ...status }).toMatchObject({
+      track: "abc",
+      time: 44_500,
+      duration: 45_160,
+      playing: true,
+    });
+  });
+
+  it("answers null before the player exists", () => {
+    const document = { querySelector: () => null };
+
+    expect(runInNewContext(PlayerStateJSCode, { document })).toBeNull();
   });
 });

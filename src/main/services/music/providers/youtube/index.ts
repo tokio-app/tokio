@@ -4,17 +4,15 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { delay } from "@/common/util";
 import { BrowserWindow, WebContentsView } from "electron";
 import { EventEmitter } from "node:events";
 import { ConnectionResponse, createWindow, MusicProvider } from "../../common";
 import {
-  AfterSearchJSCode,
   confirmLoggedOut,
   LoginJSCode,
   parseSongRenderer,
   PlayerStateJSCode,
-  SearchJSCode,
+  PlayJSCode,
 } from "./common";
 import config from "./config";
 
@@ -206,23 +204,10 @@ export class YouTubeMusic extends MusicProvider {
   public async play(info: SongInfo) {
     if (!this._ytView) return;
 
-    await this._ytView.webContents.executeJavaScript(SearchJSCode(info.track));
-
-    await delay(250);
-
-    this._ytView.webContents.sendInputEvent({
-      type: "keyDown",
-      keyCode: "Enter",
-    });
-    this._ytView.webContents.sendInputEvent({ type: "char", keyCode: "Enter" });
-    this._ytView.webContents.sendInputEvent({
-      type: "keyUp",
-      keyCode: "Enter",
-    });
-
-    // True once it clicked play on the first result
-    const played =
-      await this._ytView.webContents.executeJavaScript(AfterSearchJSCode);
+    // True once the player has the song, the track being its video id
+    const played = await this._ytView.webContents.executeJavaScript(
+      PlayJSCode(info.track),
+    );
     if (!played) {
       throw new Error(`Nothing to play for ${info.track} on YouTube Music.`);
     }

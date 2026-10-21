@@ -7,12 +7,7 @@ import {
 } from "@test/electron";
 import { songRenderer } from "@test/fixtures";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  AfterSearchJSCode,
-  LoginJSCode,
-  PlayerStateJSCode,
-  SearchJSCode,
-} from "./common";
+import { LoginJSCode, PlayerStateJSCode, PlayJSCode } from "./common";
 import config from "./config";
 import { YouTubeMusic } from "./index";
 
@@ -491,44 +486,23 @@ describe("YouTubeMusic", () => {
   });
 
   describe("play", () => {
-    it("searches the track, presses Enter and plays the first result", async () => {
+    it("starts the song by its video id", async () => {
       const { provider, view } = await connected();
-      const { executeJavaScript, sendInputEvent } = view.webContents;
-      executeJavaScript.mockImplementation(
-        async (code) => code === AfterSearchJSCode,
-      );
+      const { executeJavaScript } = view.webContents;
+      executeJavaScript.mockResolvedValue(true);
 
-      const done = provider.play(song("abc123"));
-      await vi.advanceTimersByTimeAsync(0);
+      await provider.play(song("abc123"));
 
-      expect(executeJavaScript).toHaveBeenLastCalledWith(
-        SearchJSCode("abc123"),
-      );
-      expect(sendInputEvent).not.toHaveBeenCalled();
-
-      await vi.advanceTimersByTimeAsync(250);
-      await done;
-
-      expect(sendInputEvent.mock.calls).toEqual([
-        [{ type: "keyDown", keyCode: "Enter" }],
-        [{ type: "char", keyCode: "Enter" }],
-        [{ type: "keyUp", keyCode: "Enter" }],
-      ]);
-      expect(executeJavaScript).toHaveBeenLastCalledWith(AfterSearchJSCode);
+      expect(executeJavaScript).toHaveBeenLastCalledWith(PlayJSCode("abc123"));
     });
 
-    it("fails when the page found nothing to play", async () => {
+    it("fails when the player never got the song", async () => {
       const { provider, view } = await connected();
-      // The page's script answers null without a result or play button
-      view.webContents.executeJavaScript.mockResolvedValue(null);
+      view.webContents.executeJavaScript.mockResolvedValue(false);
 
-      const done = provider.play(song("abc123"));
-      const failed = expect(done).rejects.toThrow(
+      await expect(provider.play(song("abc123"))).rejects.toThrow(
         "Nothing to play for abc123 on YouTube Music.",
       );
-      await vi.advanceTimersByTimeAsync(250);
-
-      await failed;
     });
 
     it("does nothing without a page", async () => {

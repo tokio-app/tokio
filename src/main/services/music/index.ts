@@ -23,13 +23,19 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue = new MusicQueue({
       onError: (id, error) => this._playbackFailed(id, error),
       onStart: (songs) => this._onSongChange?.(songs),
-      // What's left while the player still plays the song, after an ad or
-      // a pause. Durations and times are in ms.
+      // What's left of the song while the player plays it, after an ad
+      // too. Paused, it can't tell when the song ends. Times are in ms.
       remaining: async (song) => {
+        const sent = Date.now();
         const status = await this._current?.provider?.playerStatus();
-        return status?.playing && status.title === song.title
-          ? Math.max(0, status.duration - status.time)
-          : 0;
+        if (!status) return null;
+        if (status.track !== song.track && status.title !== song.title) {
+          return 0;
+        }
+        if (!status.playing) return null;
+        // The player read its time about halfway through the request
+        const age = (Date.now() - sent) / 2;
+        return Math.max(0, status.duration - status.time - age);
       },
     });
     this.addProvider("YouTube", new YouTubeMusic(), true);

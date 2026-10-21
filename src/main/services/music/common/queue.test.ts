@@ -153,34 +153,82 @@ describe("MusicQueue", () => {
   });
 
   describe("remaining", () => {
-    const run = (remaining: (song: SongInfo) => Promise<number>) => {
+    // A player playing a song of `length` ms from now, after an ad
+    const player = (length: number, adMs = 0) => {
+      const end = Date.now() + adMs + length;
+      return vi.fn(async (_song: SongInfo) => Math.max(0, end - Date.now()));
+    };
+    const run = (
+      remaining: (song: SongInfo) => Promise<number | null>,
+      duration = 10_000,
+    ) => {
       const queue = new MusicQueue({ remaining });
       const b = vi.fn();
-      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("a", song("a", duration), () => {});
       queue.enqueue("b", song("b"), b);
       return b;
     };
 
-    it("waits what the player still has to play once the song's time is up", async () => {
-      const remaining = vi.fn(async (_song: SongInfo) => 0);
-      const b = run(remaining.mockResolvedValueOnce(500));
+    it("starts the next song as the player's ends, not at the listed time", async () => {
+      // Listed as 10 s, rounded up from 9.4 s
+      const remaining = player(9_400);
+      const b = run(remaining);
 
-      await vi.advanceTimersByTimeAsync(1499);
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(remaining).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(remaining).toHaveBeenCalledWith(song("a", 10_000));
+
+      // 300 ms early, the time the player takes to switch, on a timer set
+      // by that one answer
+      await vi.advanceTimersByTimeAsync(4_099);
       expect(b).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(1);
       expect(b).toHaveBeenCalledOnce();
-      expect(remaining).toHaveBeenCalledWith(song("a"));
+      expect(remaining).toHaveBeenCalledOnce();
+    });
+
+    it("waits for the player when an ad made the song late", async () => {
+      const b = run(player(10_000, 15_000));
+
+      await vi.advanceTimersByTimeAsync(24_699);
+      expect(b).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(b).toHaveBeenCalledOnce();
+    });
+
+    it("asks right away about a song shorter than the check", async () => {
+      const b = run(player(2_000), 2_000);
+
+      await vi.advanceTimersByTimeAsync(1_699);
+      expect(b).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(b).toHaveBeenCalledOnce();
+    });
+
+    it("starts the next song at once when the player moved on", async () => {
+      const b = run(async () => 0);
+
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(b).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(b).toHaveBeenCalledOnce();
     });
 
     it.each([
-      ["nothing is left", async () => 0],
+      ["it can't tell", async () => null],
       ["it fails", () => Promise.reject(new Error("player gone"))],
-    ])("plays the next song on time when %s", async (_case, remaining) => {
-      const b = run(remaining);
+    ])(
+      "plays the next song at the listed end when %s",
+      async (_case, remaining) => {
+        const b = run(remaining);
 
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(b).toHaveBeenCalledOnce();
-    });
+        await vi.advanceTimersByTimeAsync(9_999);
+        expect(b).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(b).toHaveBeenCalledOnce();
+      },
+    );
 
     it("isn't asked about a song that failed to start", async () => {
       const remaining = vi.fn(async () => 500);
