@@ -31,7 +31,7 @@ Chat messages are read aloud as they come in.
 
 ### Music requests
 
-Viewers request songs from chat, played from **YouTube** or **Spotify** in a separate player window. The chat commands can be renamed or turned off, and viewers can type them in any case:
+Viewers request songs from chat. **YouTube** songs play in Tokio's own player window, and **Spotify** songs in the Spotify app you have open, on your computer or your phone. The chat commands can be renamed or turned off, and viewers can type them in any case:
 
 | Command   | Action                                   |
 | --------- | ---------------------------------------- |
@@ -41,6 +41,8 @@ Viewers request songs from chat, played from **YouTube** or **Spotify** in a sep
 | `!revoke` | Remove a song from the queue by its name |
 
 Music requests have their own permissions and protection settings, set the same way as text-to-speech's: who can request songs, a cooldown between requests and a maximum queue length.
+
+Both services need a **Premium** account. On YouTube Music, a free account plays ads, which can delay songs or cut them short. On Spotify, only Premium accounts let apps control playback, and creating the Spotify app whose Client ID Tokio uses needs Premium too.
 
 ### Alerts
 
