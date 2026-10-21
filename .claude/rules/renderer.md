@@ -16,7 +16,7 @@ paths:
 - Style with CSS Modules and the tokens in `src/ui/styles/tokens.css` (colors, `--space-*`, `--font-*`, `--radius-*`, `--z-*`), not raw values.
 - The look follows the `frontend-design` skill:
   - **Surfaces:** one Ink surface (`--background-primary`). Panels (`--background-tertiary`) only for grouped content such as lists and cards. Controls on Field (`--background-secondary`), with `--border` for hairlines and Iron (`--background-secondary-hover`) for hover.
-  - **Rose** (`--accent-primary`) means LIVE or "do this": the tally, primary actions, selection and focus, never decoration. Text on it is `--accent-ink`.
+  - **Rose** (`--accent-primary`) means LIVE or "do this": the tally, primary actions, selection and focus, never decoration. Text on it is Paper (`--font-primary`), and checkboxes and radios keep the browser's light look.
   - **Radii:** `--radius-md` for controls, `--radius-lg` for panels, `--radius-xl` for dialogs.
   - **Never:** shadows on cards, pills, or uppercase labels.
 - Type is Archivo (`@fontsource-variable/archivo`, imported by `base.css`), at 400 for text, 500 for labels and controls, 600 for titles.

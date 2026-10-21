@@ -40,7 +40,6 @@
 .btn_accent {
   border-color: transparent;
   background-color: var(--accent-primary);
-  color: var(--accent-ink);
   font-weight: 600;
 }
 
@@ -155,13 +154,11 @@
   cursor: pointer;
 }
 
-/* Native, with the dark look so unchecked boxes aren't white */
 .check {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
   accent-color: var(--accent-primary);
-  color-scheme: dark;
   cursor: pointer;
 }
 
@@ -238,7 +235,6 @@
   height: 16px;
   margin-top: 3px;
   accent-color: var(--accent-primary);
-  color-scheme: dark;
   cursor: pointer;
 }
 

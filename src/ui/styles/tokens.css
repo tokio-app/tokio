@@ -11,8 +11,6 @@
   --accent-primary: #f43f5e;
   --accent-primary-hover: #fb7185;
   --accent-soft: rgba(244, 63, 94, 0.12);
-  /* Text on rose fills: 5.1:1, where white is 3.7:1 */
-  --accent-ink: #121212;
   --font-primary: #f1f5f9;
   --font-secondary: #a1a1aa;
   /* Disabled text and offline values only, too faint for anything else */
