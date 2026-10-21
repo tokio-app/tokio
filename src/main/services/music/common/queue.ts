@@ -221,7 +221,8 @@ export class MusicQueue {
       this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
 
       // A song that fails to start is skipped right away. Two in a row mean
-      // the player is gone: the loop stops at the second until a new request.
+      // the player is gone: the loop goes back to the first and stops there,
+      // so a new request tries both again and no song is lost.
       let waitTime = 0;
       try {
         // Playing the player's own song again would restart it
@@ -237,7 +238,11 @@ export class MusicQueue {
             : item.song.duration;
       } catch (error) {
         this._hooks.onError?.(item.id, error);
-        if (++failures === 2) break;
+        if (++failures === 2 && active()) {
+          this._currentIndex--;
+          this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
+          break;
+        }
       }
 
       item.startTimeMs = undefined;
