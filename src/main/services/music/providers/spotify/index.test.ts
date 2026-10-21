@@ -170,6 +170,16 @@ describe("Spotify", () => {
       );
     });
 
+    it("trims the Client ID, which a paste can pad with spaces", () => {
+      const spotify = new Spotify();
+      spotify.setKey(" client-id ");
+
+      spotify.connect();
+
+      const authorize = new URL(authView().webContents.getURL());
+      expect(authorize.searchParams.get("client_id")).toBe("client-id");
+    });
+
     it("shows the login in its own session under the title bar", () => {
       new Spotify("client-id").connect();
       const shell = windows()[0];

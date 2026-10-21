@@ -32,8 +32,9 @@ export class Spotify extends MusicProvider {
     this._scopes = config.SCOPES;
   }
 
+  // Trimmed, since a pasted Client ID with a space breaks the authorize URL
   public setKey(key: string): void {
-    this._clientId = key;
+    this._clientId = key.trim();
   }
 
   public isActive(): boolean {
