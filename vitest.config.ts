@@ -61,6 +61,8 @@ export default defineConfig({
           environment: "jsdom",
           include: ["src/{renderer,ui,music}/**/*.test.{ts,tsx}"],
           setupFiles: ["test/renderer/setup.ts"],
+          // Tests that render the whole app outlast the 5s default on a busy machine, like a CI runner
+          testTimeout: 15_000,
         },
       },
     ],

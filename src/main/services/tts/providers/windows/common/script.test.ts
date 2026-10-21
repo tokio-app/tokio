@@ -43,6 +43,6 @@ describe.runIf(process.platform === "win32")("the SAPI script", () => {
       // Still running
       await expect(host.request({ type: "voices" })).resolves.toEqual(voices);
     },
-    3 * config.REQUEST_TIMEOUT_MS + 5000,
+    config.START_TIMEOUT_MS + 2 * config.REQUEST_TIMEOUT_MS + 5000,
   );
 });

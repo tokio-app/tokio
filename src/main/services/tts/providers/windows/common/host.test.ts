@@ -80,7 +80,22 @@ describe("SapiHost", () => {
     expect(children).toHaveLength(1);
   });
 
+  it("waits longer for a new host, which has to start first", async () => {
+    answering = false;
+    const stuck = expect(host.request({ type: "voices" })).rejects.toThrow(
+      'SAPI request "voices" timed out',
+    );
+
+    await vi.advanceTimersByTimeAsync(config.START_TIMEOUT_MS - 1);
+    expect(child(0).kill).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    await stuck;
+    expect(child(0).kill).toHaveBeenCalledOnce();
+  });
+
   it("kills a host that doesn't answer, and respawns it for the next request", async () => {
+    await host.request({ type: "voices" });
     answering = false;
     const stuck = expect(host.request({ type: "voices" })).rejects.toThrow(
       'SAPI request "voices" timed out',

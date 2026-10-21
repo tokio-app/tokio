@@ -18,6 +18,8 @@ export class SapiHost {
   private _nextId = 1;
   private _stderr = "";
   private _idleTimer: NodeJS.Timeout | null = null;
+  // Whether the host has answered since it spawned, see START_TIMEOUT_MS
+  private _ready = false;
 
   private _resolvePowerShell() {
     return (
@@ -41,6 +43,7 @@ export class SapiHost {
     );
 
     this._stderr = "";
+    this._ready = false;
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => {
       this._stderr = (this._stderr + chunk).slice(-2000);
@@ -75,6 +78,7 @@ export class SapiHost {
     const pending = this._pending.get(res.id);
     if (!pending) return;
     this._pending.delete(res.id);
+    this._ready = true;
     clearTimeout(pending.timer);
     this._armIdle();
     if (res.ok) {
@@ -100,6 +104,9 @@ export class SapiHost {
   ): Promise<SapiResponseMap[K]> {
     const child = this._child ?? this._spawn();
     const id = this._nextId++;
+    const timeout = this._ready
+      ? config.REQUEST_TIMEOUT_MS
+      : config.START_TIMEOUT_MS;
     this._clearIdle();
 
     return new Promise((resolve, reject) => {
@@ -108,7 +115,7 @@ export class SapiHost {
         this._armIdle();
         reject(new Error(`SAPI request "${req.type}" timed out`));
         child.kill(); // Stuck host, the next request respawns it.
-      }, config.REQUEST_TIMEOUT_MS);
+      }, timeout);
 
       this._pending.set(id, { resolve, reject, timer });
       child.stdin.write(`${JSON.stringify({ ...req, id })}\n`, "utf8");

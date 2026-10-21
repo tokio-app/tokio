@@ -28,7 +28,7 @@ Run them from the repository root, the narrow ones first:
 
 - "Vitest failed to find the runner" in every suite means the shell's working directory has a lowercase drive letter (`c:\`). Run from `C:\…`; it isn't a real failure.
 - An `it.fails` test that passes now means its bug is fixed: turn it into `it`.
-- The renderer tests that render the whole app (App, Home, Overlays, Official Overlays, Layout) time out at 5s when other test runs share the machine. Rerun them alone before calling it a failure.
+- The renderer tests that render the whole app (App, Home, Overlays, Official Overlays, Layout) slow down when other test runs share the machine, which is why the renderer's timeout is 15s. If one still times out, rerun it alone before calling it a failure.
 
 ## Report
 

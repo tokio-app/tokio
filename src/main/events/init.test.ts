@@ -1351,7 +1351,7 @@ describe("init events", () => {
       ]);
     });
 
-    it("answers, says it's ready and starts the updater as saved", async () => {
+    it("answers quietly and starts the updater as saved", async () => {
       const s = setup();
 
       await load(s);
@@ -1359,14 +1359,7 @@ describe("init events", () => {
       expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
         { success: true },
       ]);
-      expect(s.h.notices).toEqual([
-        expect.objectContaining({
-          level: "info",
-          source: "system",
-          code: FEEDBACK_CODES.APP_LOADED,
-          message: "Tokio is ready.",
-        }),
-      ]);
+      expect(s.h.notices).toEqual([]);
       expect(s.updaterService.initialize).toHaveBeenCalledOnce();
       expect(s.updaterService.start).toHaveBeenCalledExactlyOnceWith(false);
       expect(
@@ -1512,7 +1505,6 @@ describe("init events", () => {
       expect(s.overlayService.load).toHaveBeenCalledOnce();
       expect(s.updaterService.initialize).toHaveBeenCalledOnce();
       expect(s.updaterService.start).toHaveBeenCalledOnce();
-      expect(noticesFor(s, FEEDBACK_CODES.APP_LOADED)).toHaveLength(1);
       expect(s.ttsService.talk).toHaveBeenCalledOnce();
       // The reloaded window plays none of the TTS it had
       expect(s.ttsService.releaseHeld).toHaveBeenCalledOnce();

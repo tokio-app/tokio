@@ -552,11 +552,6 @@ events.push(
       handler.ttsService.releaseHeld();
       return;
     }
-    handler.notifier.info(
-      "system",
-      FEEDBACK_CODES.APP_LOADED,
-      "Tokio is ready.",
-    );
 
     await initUpdater(handler);
     handler.updaterService.start(settings.updates.auto);
