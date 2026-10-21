@@ -589,16 +589,12 @@ describe("AlertsService", () => {
     });
 
     it("doesn't cache a sound deleted while it was read", async () => {
-      const actual =
-        await vi.importActual<typeof import("node:fs/promises")>(
-          "node:fs/promises",
-        );
       let finish!: () => void;
       const held = new Promise<void>((resolve) => (finish = resolve));
-      vi.mocked(readFile).mockImplementationOnce(async (path) => {
-        const data = await actual.readFile(path);
+      // Not from disk: the delete could get there before the read opens the file
+      vi.mocked(readFile).mockImplementationOnce(async () => {
         await held;
-        return data;
+        return Buffer.from([1, 2, 3]);
       });
 
       const reading = service.readSound("ding.mp3");
