@@ -454,6 +454,24 @@ describe("OverlayService", () => {
       expect(await readdir(join(folder, id))).not.toContain("data");
     });
 
+    it("writes settings with dollar signs as they are", async () => {
+      const source = join(root, "source");
+      await overlay(source, {
+        "info.yaml": info("Title", true),
+        "config.yaml": config("Saved").replace(
+          "default: Hello",
+          () => 'default: "Make $$$ now"',
+        ),
+        "index.html": `<body>${SETUP}</body>`,
+      });
+
+      expect(await service.import(source, gifts)).toEqual({ success: true });
+
+      const [id] = await readdir(folder);
+      const html = await readFile(join(folder, id, "index.html"), "utf-8");
+      expect(html).toContain('{"title":"Make $$$ now"}');
+    });
+
     it("gives an overlay without settings its ID", async () => {
       const source = join(root, "source");
       await overlay(source, {

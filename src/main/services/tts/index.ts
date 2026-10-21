@@ -165,7 +165,8 @@ export class TTSService extends ProviderService<TTSProvider> {
       ];
 
       for (const variable of variables) {
-        template = template.replaceAll(variable.label, variable.value);
+        // A function, so $& or $$ in a comment stay as typed.
+        template = template.replaceAll(variable.label, () => variable.value);
       }
 
       if (template === originalTemplate) {

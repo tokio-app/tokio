@@ -161,7 +161,8 @@ export async function processHTML(
     }
     const newScriptBlock = `<script id="tokio-setup"> ${setup} </script>`;
 
-    const finalHtml = html.replace(SCRIPT_REGEX, newScriptBlock);
+    // A function, so $& or $$ in a setting stay as typed.
+    const finalHtml = html.replace(SCRIPT_REGEX, () => newScriptBlock);
 
     await writeFile(htmlPath, finalHtml, "utf-8");
 

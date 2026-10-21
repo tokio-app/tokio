@@ -303,6 +303,16 @@ describe("TTSService", () => {
       expect(await say("hello", s)).toEqual(["Viewer (viewer) says hello"]);
     });
 
+    it("reads dollar signs in a comment as they are", async () => {
+      const s = settings((s) => {
+        s.format.template = "{username} says {comment}";
+      });
+
+      expect(await say("I paid $& and $$5", s)).toEqual([
+        "Viewer says I paid $& and $$5",
+      ]);
+    });
+
     it("reads the comment when the template has no variables", async () => {
       const s = settings((s) => {
         s.format.template = "static text";
