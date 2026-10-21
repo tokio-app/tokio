@@ -84,7 +84,7 @@ export function FormatSection({ format, update }: Props) {
               </>
             ),
             description:
-              "Only messages starting with this exact phrase will be read.",
+              "Only messages starting with this exact phrase will be read, without the phrase.",
           },
         ]}
       />

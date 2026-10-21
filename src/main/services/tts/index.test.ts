@@ -191,7 +191,18 @@ describe("TTSService", () => {
       });
 
       expect(await say("hello", s)).toEqual([]);
-      expect(await say("!tts hello", s)).toHaveLength(1);
+      expect(await say("!tts hello", s)).toEqual(["hello"]);
+    });
+
+    it("skips a comment with only the trigger", async () => {
+      const s = settings((s) => {
+        s.format.trigger = { mode: "custom", value: "!tts" };
+        s.format.template = "{username} says {comment}";
+        s.format.remove_emojis = true;
+      });
+
+      expect(await say("!tts", s)).toEqual([]);
+      expect(await say("!tts 🎉", s)).toEqual([]);
     });
 
     it("drops comments with banned words, ignoring case", async () => {
@@ -201,6 +212,29 @@ describe("TTSService", () => {
 
       expect(await say("big SPOILERS ahead", s)).toEqual([]);
       expect(await say("no secrets", s)).toHaveLength(1);
+    });
+
+    it("drops comments from names with banned words", async () => {
+      const s = settings((s) => {
+        s.protection.banned = ["slur"];
+        s.format.template = "{comment}";
+      });
+
+      expect(
+        await say(chat("hi", { ...viewer, username: "Slur Lord" }), s),
+      ).toEqual([]);
+      expect(
+        await say(chat("hi", { ...viewer, handle: "the_slur" }), s),
+      ).toEqual([]);
+    });
+
+    it("doesn't check the template's own words", async () => {
+      const s = settings((s) => {
+        s.protection.banned = ["says"];
+        s.format.template = "{username} says {comment}";
+      });
+
+      expect(await say("hi", s)).toEqual(["Viewer says hi"]);
     });
 
     it("drops comments over the length limit", async () => {
@@ -311,6 +345,16 @@ describe("TTSService", () => {
       expect(await say("I paid $& and $$5", s)).toEqual([
         "Viewer says I paid $& and $$5",
       ]);
+    });
+
+    it("reads variables in a comment or a name as written", async () => {
+      const s = settings((s) => {
+        s.format.template = "{username} says {comment}";
+      });
+      const named = { ...viewer, username: "{comment}" };
+
+      expect(await say("{handle}", s)).toEqual(["Viewer says {handle}"]);
+      expect(await say(chat("hi", named), s)).toEqual(["{comment} says hi"]);
     });
 
     it("reads the comment when the template has no variables", async () => {

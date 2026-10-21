@@ -1,6 +1,6 @@
 import { Profile } from "@/common/schemas";
 import { ChatEvent, VoiceData, VoiceEngine } from "@/common/types";
-import { formatError, TaskQueue } from "@/common/util";
+import { formatAlertMessage, formatError, TaskQueue } from "@/common/util";
 import { removeEmojis } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
@@ -83,18 +83,32 @@ export class TTSService extends ProviderService<TTSProvider> {
     return await engine.generateBuffer(text, voice?.lang, voice?.name);
   }
 
-  private _valid(settings: Profile["tts"], chat: ChatEvent) {
-    // Nothing to read, like a comment of only emojis when they're removed
-    if (this._clean(chat.comment.content, settings).trim() === "") {
-      return false;
-    }
+  // The comment without its trigger, which isn't read
+  private _comment(settings: Profile["tts"], chat: ChatEvent) {
+    const { trigger } = settings.format;
+    const content = chat.comment.content;
+    if (trigger.mode === "any") return content;
+    return content.slice(trigger.value.length).trim();
+  }
+
+  private _valid(settings: Profile["tts"], chat: ChatEvent, comment: string) {
     if (settings.format.trigger.mode !== "any") {
       if (!chat.comment.content.startsWith(settings.format.trigger.value)) {
         return false;
       }
     }
+    // Nothing to read, like only the trigger, or only emojis when they're
+    // removed
+    if (this._clean(comment, settings).trim() === "") {
+      return false;
+    }
 
-    const banned = this._hasBanned(chat.comment.content, settings);
+    // What the viewer wrote, their name included. Not the template's words.
+    const { username, handle } = chat.user;
+    const banned = this._hasBanned(
+      [username, handle, comment].join("\n"),
+      settings,
+    );
     const over_length =
       chat.comment.content.length > settings.protection.comment_length;
 
@@ -153,34 +167,20 @@ export class TTSService extends ProviderService<TTSProvider> {
     return new RegExp(`${start}${this._escapeRegExp(old)}${end}`, "giu");
   }
 
-  private _parseText(settings: Profile["tts"], chat: ChatEvent) {
-    let template = settings.format?.template;
-    const originalTemplate = template;
-
-    let isValidTemplate = template && template.trim() !== "";
-
-    if (isValidTemplate) {
-      const variables = [
-        { label: "{username}", value: chat.user.username },
-        { label: "{comment}", value: chat.comment.content },
-        { label: "{handle}", value: chat.user.handle },
-      ];
-
-      for (const variable of variables) {
-        // A function, so $& or $$ in a comment stay as typed.
-        template = template.replaceAll(variable.label, () => variable.value);
-      }
-
-      if (template === originalTemplate) {
-        isValidTemplate = false;
-      }
-    }
-
-    if (!isValidTemplate) {
-      template = chat.comment.content;
-    }
-
-    return this._clean(template, settings);
+  // Filled in one pass, so a name or comment that looks like a variable is
+  // read as written. A template without variables reads the comment.
+  private _parseText(
+    settings: Profile["tts"],
+    chat: ChatEvent,
+    comment: string,
+  ) {
+    const template = settings.format.template;
+    const text = formatAlertMessage(template, {
+      ...chat,
+      comment: { ...chat.comment, content: comment },
+    });
+    const filled = template.trim() !== "" && text !== template;
+    return this._clean(filled ? text : comment, settings);
   }
 
   /**
@@ -205,8 +205,9 @@ export class TTSService extends ProviderService<TTSProvider> {
     // Called when the audio can't be generated
     onError?: (error?: Error) => void,
   ) {
-    if (!this._valid(settings, chat)) return;
-    const text = this._parseText(settings, chat);
+    const comment = this._comment(settings, chat);
+    if (!this._valid(settings, chat, comment)) return;
+    const text = this._parseText(settings, chat, comment);
     this._queue.setQueueOptions({
       gapTime: settings.protection.cooldown,
       maxQueueLength: settings.protection.queue_length,
