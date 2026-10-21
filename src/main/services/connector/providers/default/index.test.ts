@@ -152,7 +152,7 @@ describe("TikTokLiveConnector", () => {
       const res = await connector.connect("@");
 
       expect(res.error?.kind).toBe("notFound");
-      expect(onConnected).toHaveBeenCalledWith(res);
+      expect(onConnected).not.toHaveBeenCalled();
       expect(live.connections).toEqual([]);
     });
 
@@ -165,7 +165,7 @@ describe("TikTokLiveConnector", () => {
         success: false,
         error: expect.objectContaining({ kind: "noKey" }),
       });
-      expect(onConnected).toHaveBeenCalledWith(res);
+      expect(onConnected).not.toHaveBeenCalled();
       expect(live.connections).toEqual([]);
     });
 
@@ -262,7 +262,7 @@ describe("TikTokLiveConnector", () => {
 
       expect(res.success).toBe(false);
       expect(res.error).toMatchObject({ kind, cause: error });
-      expect(onConnected).toHaveBeenCalledWith(res);
+      expect(onConnected).not.toHaveBeenCalled();
       expect(connection().listenerCount("chat")).toBe(0);
       expect(connector.isConnected()).toBe(false);
     });

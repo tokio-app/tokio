@@ -106,7 +106,7 @@ export type MusicInfo = {
 
 export interface TokioEventMap {
   // INTERNAL
-  [TOKIO_EVENTS.CONNECTED]: { success: boolean; error?: Error };
+  [TOKIO_EVENTS.CONNECTED]: { success: boolean };
   // reason is "ended" when the LIVE ended, "lost" when the connection dropped
   // and couldn't come back, not set when the user disconnected
   [TOKIO_EVENTS.DISCONNECTED]: { reason?: "ended" | "lost" } | undefined;

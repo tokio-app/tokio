@@ -80,12 +80,16 @@ export class TikTokLiveConnector extends ConnectorProvider {
     this._key = key ?? this._key;
     const name = username.replace("@", "");
     if (!name) {
-      return this._failed(connectFailure("notFound", "No username was set."));
+      return {
+        success: false,
+        error: connectFailure("notFound", "No username was set."),
+      };
     }
     if (!this._key) {
-      return this._failed(
-        connectFailure("noKey", "No Euler Stream API key was set."),
-      );
+      return {
+        success: false,
+        error: connectFailure("noKey", "No Euler Stream API key was set."),
+      };
     }
 
     let connection: TikTokLiveConnection | undefined;
@@ -119,7 +123,7 @@ export class TikTokLiveConnector extends ConnectorProvider {
       // A first connect that fails never emits disconnected.
       connection?.removeAllListeners();
       if (this._connection === connection) this._connection = null;
-      return this._failed(toFailure(err));
+      return { success: false, error: toFailure(err) };
     }
   }
 
@@ -178,12 +182,6 @@ export class TikTokLiveConnector extends ConnectorProvider {
     data?: TokioEventMap[K],
   ): void {
     this._events.emit(event, data);
-  }
-
-  private _failed(error: ConnectorFailure): ConnectorResponse {
-    const res = { success: false, error };
-    this.emit(TOKIO_EVENTS.CONNECTED, res);
-    return res;
   }
 
   private _listen(connection: TikTokLiveConnection): void {
