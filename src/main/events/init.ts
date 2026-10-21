@@ -359,6 +359,7 @@ const registerConnectorEvents = ({
       "music",
       FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED,
       "A song request couldn't be played and was skipped.",
+      { windowMs: REPEAT_NOTICE_MS },
     );
   });
 };

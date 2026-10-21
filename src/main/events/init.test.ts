@@ -1045,6 +1045,24 @@ describe("init events", () => {
         }),
       ]);
     });
+
+    it("warns at most once every 30 seconds", async () => {
+      const s = await live();
+      const [listener] = s.musicService.onPlaybackError.mock.calls[0];
+      vi.useFakeTimers();
+      const failed = () => listener("track-1", new Error("unavailable"));
+      const warned = () =>
+        noticesFor(s, FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED).length;
+
+      failed();
+      vi.advanceTimersByTime(29_999);
+      failed();
+      expect(warned()).toBe(1);
+
+      vi.advanceTimersByTime(1);
+      failed();
+      expect(warned()).toBe(2);
+    });
   });
 
   describe("GET_PROFILE", () => {
