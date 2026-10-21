@@ -304,6 +304,19 @@ describe("TTSService", () => {
       expect(service.prepareText("Thanks fan", s)).toBe("Thanks fan");
     });
 
+    it("checks banned words only in the part given to check", () => {
+      const s = settings((s) => {
+        s.protection.banned = ["follow"];
+      });
+
+      expect(service.prepareText("Thanks for the follow", s, "Viewer")).toBe(
+        "Thanks for the follow",
+      );
+      expect(
+        service.prepareText("Thanks Follow Bot", s, "Follow Bot"),
+      ).toBeNull();
+    });
+
     it("removes the emojis when set, refusing text with nothing else", () => {
       const s = settings((s) => {
         s.format.remove_emojis = true;

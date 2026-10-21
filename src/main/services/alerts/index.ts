@@ -321,7 +321,11 @@ export class AlertsService extends Service {
     settings: Profile["tts"],
   ): string | null {
     const text = formatAlertMessage(tts.message, payload);
-    return this._speaker ? this._speaker.prepareText(text, settings) : text;
+    if (!this._speaker) return text;
+    // Like chat TTS, banned words are checked in the event's values only.
+    const variables = (tts.message.match(/\{\w+\}/g) ?? []).join("\n");
+    const values = formatAlertMessage(variables, payload);
+    return this._speaker.prepareText(text, settings, values);
   }
 
   private async _generate(

@@ -8,6 +8,7 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import { defaultProfile, delay } from "@/common/util";
+import { TTSService } from "@/services/tts";
 import {
   mkdir,
   mkdtemp,
@@ -403,10 +404,33 @@ describe("AlertsService", () => {
 
         await speak(gift("5655", true), alerts);
 
-        expect(prepareText).toHaveBeenCalledWith("Thanks Viewer", alerts.tts);
+        expect(prepareText).toHaveBeenCalledWith(
+          "Thanks Viewer",
+          alerts.tts,
+          "Viewer",
+        );
         expect(generateBuffer).not.toHaveBeenCalled();
         expect(sent).toEqual([]);
         expect(onError).not.toHaveBeenCalled();
+      });
+
+      it("checks banned words in the event's values, not the message's own", async () => {
+        const tts = new TTSService();
+        service.setSpeaker({
+          prepareText: tts.prepareText.bind(tts),
+          generateBuffer,
+        });
+        const alerts = withTts(
+          [speaking("Thanks {username} for the follow")],
+          (p) => {
+            p.banned = ["follow"];
+          },
+        );
+
+        await speak(giftFrom("Viewer"), alerts);
+        await speak(giftFrom("Follow Bot"), alerts);
+
+        expect(sent.map(said)).toEqual(["Thanks Viewer for the follow"]);
       });
 
       it("reports a message that can't be spoken", async () => {

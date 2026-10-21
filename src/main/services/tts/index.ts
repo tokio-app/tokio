@@ -167,12 +167,16 @@ export class TTSService extends ProviderService<TTSProvider> {
 
   /**
    * Text from elsewhere than chat, such as an alert's message, with the
-   * same protection: null when it has a banned word or nothing to read,
-   * otherwise with the replacements applied and, when set, the emojis
-   * removed.
+   * same protection: null when `checked` (the whole text unless given) has a
+   * banned word or the text has nothing to read, otherwise with the
+   * replacements applied and, when set, the emojis removed.
    */
-  public prepareText(text: string, settings: Profile["tts"]): string | null {
-    if (this._hasBanned(text, settings)) return null;
+  public prepareText(
+    text: string,
+    settings: Profile["tts"],
+    checked = text,
+  ): string | null {
+    if (this._hasBanned(checked, settings)) return null;
     const out = this._clean(text, settings);
     return out.trim() === "" ? null : out;
   }
