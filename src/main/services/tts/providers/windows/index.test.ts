@@ -22,23 +22,9 @@ vi.mock("./common/host", () => ({
   },
 }));
 
-const sapiVoice = (
-  name: string,
-  lang: string,
-  engine: SapiVoice["engine"],
-): SapiVoice => ({
-  name,
-  lang,
-  gender: "Female",
-  age: "Adult",
-  vendor: "Microsoft",
-  default: false,
-  engine,
-});
-
-const VOICES = [
-  sapiVoice("Microsoft Sabina Desktop", "es-MX", "sapi"),
-  sapiVoice("Microsoft Aria", "en-US", "onecore"),
+const VOICES: SapiVoice[] = [
+  { name: "Microsoft Sabina Desktop", lang: "es-MX", engine: "sapi" },
+  { name: "Microsoft Aria", lang: "en-US", engine: "onecore" },
 ];
 
 const b64 = (text: string) => Buffer.from(text).toString("base64");

@@ -49,15 +49,9 @@ while ($null -ne ($line = $stdin.ReadLine())) {
       'voices' {
         $data = @($synth.GetInstalledVoices() | Where-Object { $_.Enabled } | ForEach-Object {
           $info = $_.VoiceInfo
-          $vendor = ''
-          if ($info.AdditionalInfo.ContainsKey('Vendor')) { $vendor = $info.AdditionalInfo['Vendor'] }
           @{
             name   = $info.Name
             lang   = $info.Culture.Name
-            gender = [string]$info.Gender
-            age    = [string]$info.Age
-            vendor = [string]$vendor
-            default = $info.Name -eq $defaultVoice
             engine = 'sapi'
           }
         })
@@ -69,13 +63,9 @@ while ($null -ne ($line = $stdin.ReadLine())) {
             -not $sapiKeys.ContainsKey("$($_.DisplayName) Desktop|$($_.Language)")
           } | ForEach-Object {
             @{
-              name    = $_.DisplayName
-              lang    = $_.Language
-              gender  = [string]$_.Gender
-              age     = ''
-              vendor  = 'Microsoft'
-              default = $false
-              engine  = 'onecore'
+              name   = $_.DisplayName
+              lang   = $_.Language
+              engine = 'onecore'
             }
           })
         }
