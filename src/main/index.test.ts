@@ -75,9 +75,8 @@ let fatal: {
   rejection?: NodeJS.UnhandledRejectionListener;
 } = {};
 
-// Runs the entry point as Electron does, until the app is ready and its
-// windows are open.
-async function start() {
+// Runs the entry point as Electron does
+async function load() {
   vi.resetModules();
   const exceptions = process.listeners("uncaughtExceptionMonitor");
   const rejections = process.listeners("unhandledRejection");
@@ -90,6 +89,11 @@ async function start() {
       .listeners("unhandledRejection")
       .find((listener) => !rejections.includes(listener)),
   };
+}
+
+// Runs the entry point until the app is ready and its windows are open
+async function start() {
+  await load();
   await vi.waitFor(() => expect(windows()).toHaveLength(2));
   const [splash, win] = windows();
   return { splash, win };
@@ -254,6 +258,27 @@ describe("main process entry", () => {
 
     expect(app.setPath).toHaveBeenCalledWith("home", "/tmp/tokio-e2e");
     expect(app.setPath).toHaveBeenCalledWith("userData", "/tmp/tokio-e2e");
+  });
+
+  it("takes the lock on its data folder once TOKIO_HOME has set it", async () => {
+    vi.stubEnv("TOKIO_HOME", "/tmp/tokio-e2e");
+    await start();
+
+    expect(
+      app.requestSingleInstanceLock.mock.invocationCallOrder[0],
+    ).toBeGreaterThan(app.setPath.mock.invocationCallOrder.at(-1)!);
+  });
+
+  it("quits without opening a window when another Tokio has the lock", async () => {
+    app.requestSingleInstanceLock.mockReturnValue(false);
+
+    await load();
+    // Past the point where the app is ready
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(app.quit).toHaveBeenCalledOnce();
+    expect(protocol.handle).not.toHaveBeenCalled();
+    expect(windows()).toEqual([]);
   });
 
   it("uses the usual folders otherwise", async () => {

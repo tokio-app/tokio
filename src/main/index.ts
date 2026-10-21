@@ -54,6 +54,10 @@ if (testHome) {
   app.setPath("userData", testHome);
 }
 
+// One Tokio per data folder, read here, so TOKIO_HOME runs get their own.
+const primary = app.requestSingleInstanceLock();
+if (!primary) app.quit();
+
 // Overlay previews load their files from local-resource:, which has no origin.
 // Without CORS on it, Chromium blocks module scripts, crossorigin styles, fonts
 // and fetch, so overlays built with Vite never run. See withPreviewCORS.
@@ -170,6 +174,7 @@ function createWindows(): void {
 }
 
 app.whenReady().then(async () => {
+  if (!primary) return;
   electronApp.setAppUserModelId("com.ialfaro.tokio");
 
   app.on("browser-window-created", (_, window) => {

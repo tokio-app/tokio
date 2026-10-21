@@ -5,6 +5,7 @@ import {
   type ElectronApplication,
   type Page,
 } from "@playwright/test";
+import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -30,25 +31,22 @@ async function windowWith(file: string) {
 
 const data = (...path: string[]) => join(home, ".tokio", ...path);
 
+// Set in VS Code's terminal, it would start Electron as plain Node
+const env = Object.fromEntries(
+  Object.entries(process.env).filter(
+    (entry): entry is [string, string] =>
+      entry[0] !== "ELECTRON_RUN_AS_NODE" && entry[1] !== undefined,
+  ),
+);
+const args = [
+  ".",
+  // GitHub's Ubuntu runners don't allow Chromium's sandbox
+  ...(process.env.CI && process.platform === "linux" ? ["--no-sandbox"] : []),
+];
+
 test.beforeAll(async () => {
   home = await mkdtemp(join(tmpdir(), "tokio-e2e-"));
-  // Set in VS Code's terminal, it would start Electron as plain Node
-  const env = Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] =>
-        entry[0] !== "ELECTRON_RUN_AS_NODE" && entry[1] !== undefined,
-    ),
-  );
-  app = await electron.launch({
-    args: [
-      ".",
-      // GitHub's Ubuntu runners don't allow Chromium's sandbox
-      ...(process.env.CI && process.platform === "linux"
-        ? ["--no-sandbox"]
-        : []),
-    ],
-    env: { ...env, TOKIO_HOME: home },
-  });
+  app = await electron.launch({ args, env: { ...env, TOKIO_HOME: home } });
 });
 
 test.afterAll(async () => {
@@ -184,6 +182,20 @@ test("serves the overlay once the server is on", async () => {
       return res?.ok ? await res.text() : "";
     })
     .toContain(`window.__OVERLAY_ID__ = "${id}"`);
+});
+
+test("leaves a second launch on the same folder to the running app", async () => {
+  const exe = await app.evaluate(() => process.execPath);
+  const second = spawn(exe, args, {
+    env: { ...env, TOKIO_HOME: home },
+    stdio: "ignore",
+  });
+
+  try {
+    await expect.poll(() => second.exitCode, { timeout: 10_000 }).toBe(0);
+  } finally {
+    second.kill();
+  }
 });
 
 test("quits when the title bar closes it", async () => {

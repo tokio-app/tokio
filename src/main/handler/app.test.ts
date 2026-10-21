@@ -92,6 +92,23 @@ describe("AppHandler", () => {
       expect(win.show).not.toHaveBeenCalled();
     });
 
+    it("brings the splash, then the app, to the front on a second launch", async () => {
+      const { splash, win } = start();
+      splash.emit("ready-to-show");
+
+      app.emit("second-instance");
+      expect(splash.focus).toHaveBeenCalledOnce();
+
+      send(APP_EVENTS.SHOW_WINDOW);
+      await vi.advanceTimersByTimeAsync(2000);
+      win.minimize();
+      app.emit("second-instance");
+
+      expect(win.restore).toHaveBeenCalledOnce();
+      expect(win.isMinimized()).toBe(false);
+      expect(win.focus).toHaveBeenCalledOnce();
+    });
+
     it("keeps the app open when the splash closes after showing it", async () => {
       const { splash, win } = start();
       splash.emit("ready-to-show");

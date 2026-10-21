@@ -137,6 +137,14 @@ export class AppHandler implements AppHandlerVariables {
     this.ipcMain.on(APP_EVENTS.CLOSE_WINDOW, () => {
       this.win.close();
     });
+
+    // A second launch quits (see main) and brings this one to the front
+    this.app.on("second-instance", () => {
+      const front = this.splash.isDestroyed() ? this.win : this.splash;
+      if (front.isDestroyed()) return;
+      if (front.isMinimized()) front.restore();
+      front.focus();
+    });
   }
 
   private initSession() {
