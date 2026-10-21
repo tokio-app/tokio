@@ -1,10 +1,12 @@
 import { songRenderer } from "@test/fixtures";
+import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   confirmLoggedOut,
   getHighResThumbnailUrl,
   parseDurationToSeconds,
   parseSongRenderer,
+  SearchJSCode,
 } from "./index";
 
 const INTERVAL = 1500;
@@ -204,5 +206,20 @@ describe("getHighResThumbnailUrl", () => {
 
   it("gives an empty string without a URL", () => {
     expect(getHighResThumbnailUrl(undefined)).toBe("");
+  });
+});
+
+describe("SearchJSCode", () => {
+  it("types any title as it is, quotes and backslashes too", () => {
+    const title = String.raw`"Heroes" (2017 Remaster) \ "); alert(1); ("`;
+    const input = { value: "", focus() {}, dispatchEvent() {} };
+    const document = {
+      querySelector: (selector: string) =>
+        selector.endsWith("input") ? input : null,
+    };
+
+    runInNewContext(SearchJSCode(title), { document, Event });
+
+    expect(input.value).toBe(title);
   });
 });

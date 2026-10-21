@@ -50,7 +50,7 @@ export const SearchJSCode = (query: string) => `
   const searchInput = document.querySelector('ytmusic-search-box input');
   if (searchInput) {
     searchInput.focus();
-    searchInput.value = "${query}";
+    searchInput.value = ${JSON.stringify(query)};
     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
     searchInput.dispatchEvent(new Event('change', { bubbles: true }));
   }
