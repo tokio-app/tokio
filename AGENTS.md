@@ -154,7 +154,7 @@ Only one Tokio runs per userData folder (`requestSingleInstanceLock` in `src/mai
 Tokio's source is MIT; treat license compliance as part of every change.
 
 - **LGPL code stays isolated.** `src/main/services/tts/providers/edge/common/drm-v2.ts` is LGPL-3.0-only (derived from edge-tts). Code ported from edge-tts goes only into its own LGPL file with the same header (SPDX line, upstream commit, authors, dated modification notice). Never copy upstream code into MIT files.
-- **The distributed app is MIT too**, with that one LGPL file. Keep it that way: no copyleft dependency, and no code from `tiktok-live-connector` 2.4.1 or later or `tiktok-live-proto` 0.2.4 or later (AGPL).
+- **The distributed app is MIT too**, with that one LGPL file and the Archivo font files (`@fontsource-variable/archivo`). The font stays under the SIL OFL 1.1, which the user approved: it allows bundling with any software. Keep it that way: no other copyleft dependency, and no code from `tiktok-live-connector` 2.4.1 or later or `tiktok-live-proto` 0.2.4 or later (AGPL).
 - **Check licenses when adding or upgrading a dependency**, even minor bumps (tiktok-live-connector went MIT → AGPL in 2.4.1). Ask before adding anything copyleft (GPL, AGPL, LGPL, MPL, CC BY-SA). The `add-dependency` skill has the steps.
 - **react-icons:** only use the sets listed under Icons in `THIRD_PARTY_NOTICES.md`, and add a row for any new set.
 - **Keep the notices in sync** when licensed components change:
