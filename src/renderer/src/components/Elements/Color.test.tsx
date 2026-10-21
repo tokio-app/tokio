@@ -107,7 +107,7 @@ describe("Color", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("sends Tab out of the picker back to its swatch, inside the modal", async () => {
+  it("takes the keyboard into the picker and back to its swatch, inside the modal", async () => {
     const user = userEvent.setup();
     render(
       <Modal title="Settings" onClose={vi.fn()}>
@@ -115,9 +115,10 @@ describe("Color", () => {
       </Modal>,
     );
     const swatch = screen.getByRole("button", { name: "Choose color" });
+    swatch.focus();
 
-    await user.click(swatch);
-    await user.click(screen.getByPlaceholderText("Type a color"));
+    await user.keyboard("{Enter}");
+    expect(screen.getByPlaceholderText("Type a color")).toHaveFocus();
     await user.tab();
 
     expect(
@@ -125,9 +126,10 @@ describe("Color", () => {
     ).not.toBeInTheDocument();
     expect(swatch).toHaveFocus();
 
-    await user.click(swatch);
-    const [first] = screen.getAllByRole("slider");
-    first.focus();
+    await user.keyboard("{Enter}");
+    const sliders = screen.getAllByRole("slider");
+    for (const _ of sliders) await user.tab({ shift: true });
+    expect(sliders[0]).toHaveFocus();
     await user.tab({ shift: true });
 
     expect(
