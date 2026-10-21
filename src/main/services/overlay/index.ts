@@ -19,7 +19,7 @@ import { formatError, generateTikTokEventSample } from "@/common/util";
 import Logger from "@/logger";
 import { isEqual } from "es-toolkit";
 import { randomUUID } from "node:crypto";
-import { access, cp, readdir, rename, rm } from "node:fs/promises";
+import { access, cp, lstat, readdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { JSONManagerService } from "../json";
 import { ServerService } from "../server";
@@ -179,7 +179,13 @@ export class OverlayService extends Service {
       // It gets its ID through the block, settings or not.
       if (!hasSetupBlock(htmlContent)) return { success: false };
 
-      await cp(basedir, dir, { recursive: true });
+      // A link could point anywhere on the computer, and the previews and
+      // the server would serve its target.
+      await cp(basedir, dir, {
+        recursive: true,
+        filter: async (src) =>
+          src === basedir || !(await lstat(src)).isSymbolicLink(),
+      });
 
       const html = await processHTML(
         id,

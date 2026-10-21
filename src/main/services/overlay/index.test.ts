@@ -12,6 +12,7 @@ import {
   readdir,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -437,6 +438,20 @@ describe("OverlayService", () => {
       expect(await readFile(join(source, "index.html"), "utf-8")).toBe(
         `<body>${SETUP}</body>`,
       );
+    });
+
+    it("leaves out links to files outside the overlay", async () => {
+      const source = join(root, "source");
+      await configurable(source);
+      const secret = join(root, "secret");
+      await overlay(secret, { "key.txt": "private" });
+      // A junction needs no admin rights on Windows, elsewhere it's a link.
+      await symlink(secret, join(source, "data"), "junction");
+
+      expect(await service.import(source, gifts)).toEqual({ success: true });
+
+      const [id] = await readdir(folder);
+      expect(await readdir(join(folder, id))).not.toContain("data");
     });
 
     it("gives an overlay without settings its ID", async () => {
