@@ -7,15 +7,15 @@ import { sameHandle } from "./chat";
  * permission settings.
  */
 export function hasPermission(permissions: Permissions, user: UserData) {
-  if (permissions.all) return true;
-
   const { list, level } = permissions;
   if (list.enabled) {
     const listed = (handles: string[]) =>
       handles.some((handle) => sameHandle(handle, user.handle));
-    const whitelisted = list.white.length === 0 || listed(list.white);
-    return whitelisted && !listed(list.black);
+    if (listed(list.black)) return false;
+    if (list.white.length > 0) return listed(list.white);
   }
+
+  if (permissions.all) return true;
 
   // [role required, user has it]
   const roles: [boolean, boolean][] = [

@@ -59,7 +59,19 @@ describe("hasPermission", () => {
       expect(hasPermission(list(["viewer"], ["viewer"]), user())).toBe(false);
     });
 
-    it("replaces the role checks", () => {
+    it("refuses a blacklisted viewer when all is on", () => {
+      const p = { ...list([], ["viewer"]), all: true };
+      expect(hasPermission(p, user())).toBe(false);
+      expect(hasPermission(p, user({ handle: "other" }))).toBe(true);
+    });
+
+    it("keeps the role checks with only a blacklist", () => {
+      const p = { ...list([], ["other"]), followers: true };
+      expect(hasPermission(p, user({ follower: true }))).toBe(true);
+      expect(hasPermission(p, user({ follower: false }))).toBe(false);
+    });
+
+    it("replaces the role checks with a whitelist", () => {
       const p = {
         ...list(["viewer"], []),
         followers: true,
