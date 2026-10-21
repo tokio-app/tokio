@@ -11,7 +11,7 @@ import { hasKeyword, isUser } from "@/helper/chat";
 import Logger from "@/logger";
 import type { TTSService } from "@/services/tts";
 import { createHash } from "node:crypto";
-import { access, readFile, unlink, writeFile } from "node:fs/promises";
+import { access, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { Service } from "../shared";
 
@@ -142,7 +142,7 @@ export class AlertsService extends Service {
     if (!res.success || !res.data) return { success: false, error: res.error };
 
     try {
-      await writeFile(join(this._soundsFolder, file), res.data);
+      await this._save(file, res.data);
       return { success: true, data: { name, file } };
     } catch (error) {
       return this._fail("Unable to save sound", error);
@@ -164,7 +164,7 @@ export class AlertsService extends Service {
       const data = new Uint8Array(await readFile(srcPath));
       const file = `${hash(data)}.${ext}`;
       if (!(await this._isSaved(file))) {
-        await writeFile(join(this._soundsFolder, file), data);
+        await this._save(file, data);
       }
       this._remember(file, data);
       return {
@@ -467,6 +467,20 @@ export class AlertsService extends Service {
 
   private _fileForUrl(url: string) {
     return `${hash(url)}.mp3`;
+  }
+
+  // Whole or not at all: names are hashes, so a half-written file would pass
+  // for the sound forever
+  private async _save(file: string, data: Uint8Array) {
+    const path = join(this._soundsFolder, file);
+    const temp = `${path}.tmp`;
+    try {
+      await writeFile(temp, data);
+      await rename(temp, path);
+    } catch (error) {
+      await unlink(temp).catch(() => {});
+      throw error;
+    }
   }
 
   private async _isSaved(file: string) {

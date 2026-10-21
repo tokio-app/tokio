@@ -27,6 +27,12 @@ import {
   CACHE_MAX_FILE_BYTES,
 } from "./index";
 
+// A test can make a write fail partway
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, writeFile: vi.fn(actual.writeFile) };
+});
+
 const FIXTURE = resolve("test/fixtures/myinstants-search.html");
 
 const bytes = (...values: number[]) => new Uint8Array(values);
@@ -614,6 +620,33 @@ describe("AlertsService", () => {
       expect(first.data?.name).toBe("BRUH");
       expect(await readdir(sounds)).toContain(first.data?.file);
       expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it("saves a sound whole or not at all", async () => {
+      const fetchMock = vi.fn(async () => new Response(bytes(1, 1)));
+      vi.stubGlobal("fetch", fetchMock);
+      const actual =
+        await vi.importActual<typeof import("node:fs/promises")>(
+          "node:fs/promises",
+        );
+      vi.mocked(writeFile).mockImplementationOnce(async (file) => {
+        await actual.writeFile(file, bytes(1));
+        throw new Error("Disk full");
+      });
+
+      const failed = await service.downloadSound(SOUND_URL, "BRUH");
+      const left = await readdir(sounds);
+      // A new instance has no memory cache, so only a file can stop a fetch.
+      const fresh = new AlertsService();
+      fresh.setSoundsFolder(sounds);
+      const saved = await fresh.downloadSound(SOUND_URL, "BRUH");
+
+      expect(failed.success).toBe(false);
+      expect(left).toEqual(["ding.mp3"]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(await readFile(join(sounds, saved.data!.file))).toEqual(
+        Buffer.from([1, 1]),
+      );
     });
 
     it("parses search results with the file each saves to", async () => {
