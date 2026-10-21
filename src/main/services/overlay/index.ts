@@ -175,8 +175,8 @@ export class OverlayService extends Service {
   }
 
   /**
-   * Copies the overlay in `basedir` into the overlays folder, with its config
-   * defaults written into its HTML.
+   * Copies the overlay in `basedir` into the overlays folder, with the
+   * settings its config.yaml holds written into its HTML.
    */
   public async import(
     basedir: string,
@@ -208,14 +208,7 @@ export class OverlayService extends Service {
       }
       const { config, htmlContent, info } = res.data!;
 
-      const html = await processHTML(
-        id,
-        htmlContent,
-        dir,
-        "default",
-        config,
-        gifts,
-      );
+      const html = await processHTML(id, htmlContent, dir, config, gifts);
       if (!html.success) {
         await rm(dir, { recursive: true, force: true });
         return { success: false };
@@ -354,7 +347,6 @@ export class OverlayService extends Service {
         id,
         res.data!.htmlContent,
         dir,
-        "value",
         config,
         gifts,
       );
@@ -518,7 +510,6 @@ export class OverlayService extends Service {
       id,
       res.data!.htmlContent,
       dir,
-      "value",
       res.data!.config,
       gifts,
     );
@@ -604,7 +595,6 @@ export class OverlayService extends Service {
       entry.id,
       res.data!.htmlContent,
       staging,
-      "value",
       config,
       gifts,
     );

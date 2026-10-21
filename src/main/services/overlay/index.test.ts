@@ -232,7 +232,7 @@ describe("OverlayService", () => {
       await service.refreshGifts([...gifts, lion]);
 
       expect(processHTML).toHaveBeenCalledOnce();
-      expect(vi.mocked(processHTML).mock.calls[0][5]).toEqual([...gifts, lion]);
+      expect(vi.mocked(processHTML).mock.calls[0][4]).toEqual([...gifts, lion]);
       expect(await service.getGifts()).toEqual([...gifts, lion]);
       expect(await readJSON("gifts.json")).toEqual([...gifts, lion]);
     });
@@ -431,7 +431,7 @@ describe("OverlayService", () => {
   });
 
   describe("import", () => {
-    it("copies the overlay with its defaults and serves it", async () => {
+    it("copies the overlay with its saved settings and serves it", async () => {
       const source = join(root, "source");
       await configurable(source);
 
@@ -441,7 +441,8 @@ describe("OverlayService", () => {
       expect(stored).toMatchObject([{ id, name: "Title", external: true }]);
       expect(mount).toHaveBeenCalledWith(id, join(folder, id), true);
       const html = await readFile(join(folder, id, "index.html"), "utf-8");
-      expect(html).toContain(`window.__OVERLAY_CONFIG__ = {"title":"Hello"}`);
+      // What Customize shows, and what loads after a restart
+      expect(html).toContain(`window.__OVERLAY_CONFIG__ = {"title":"Saved"}`);
       expect(html).toContain(`window.__OVERLAY_ID__ = "${id}"`);
       // The source is left as it was.
       expect(await readFile(join(source, "index.html"), "utf-8")).toBe(
@@ -512,10 +513,7 @@ describe("OverlayService", () => {
       const source = join(root, "source");
       await overlay(source, {
         "info.yaml": info("Title", true),
-        "config.yaml": config("Saved").replace(
-          "default: Hello",
-          () => 'default: "Make $$$ now"',
-        ),
+        "config.yaml": config('"Make $$$ now"'),
         "index.html": `<body>${SETUP}</body>`,
       });
 

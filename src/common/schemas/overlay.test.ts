@@ -127,7 +127,7 @@ describe("resetOverlayConfig", () => {
 
 describe("getOverlayConfig", () => {
   it("keys each field's value by id, with colors prefixed", () => {
-    expect(getOverlayConfig(makeConfig(), "value", GIFTS)).toEqual({
+    expect(getOverlayConfig(makeConfig(), GIFTS)).toEqual({
       title: "changed",
       mode: ["a"],
       tint: "#ff0000",
@@ -135,15 +135,6 @@ describe("getOverlayConfig", () => {
       sound: true,
       gifts: [GIFTS[0]],
       size: 80,
-    });
-  });
-
-  it("reads the defaults in default mode", () => {
-    expect(getOverlayConfig(makeConfig(), "default", GIFTS)).toMatchObject({
-      title: "initial",
-      tint: "#00ff00",
-      gifts: [GIFTS[1], GIFTS[2]],
-      size: 50,
     });
   });
 
@@ -157,15 +148,15 @@ describe("getOverlayConfig", () => {
       attributes: { multiple: false, value: 3, default: 1 },
     };
 
-    expect(getOverlayConfig(config, "value", GIFTS).gifts).toEqual(GIFTS[2]);
+    expect(getOverlayConfig(config, GIFTS).gifts).toEqual(GIFTS[2]);
   });
 
   it("drops unknown gifts, and gives none without the gift list", () => {
     const config = makeConfig();
     config.fields[5].attributes.value = [1, 99];
 
-    expect(getOverlayConfig(config, "value", GIFTS).gifts).toEqual([GIFTS[0]]);
-    expect(getOverlayConfig(config, "value", null).gifts).toEqual([]);
+    expect(getOverlayConfig(config, GIFTS).gifts).toEqual([GIFTS[0]]);
+    expect(getOverlayConfig(config, null).gifts).toEqual([]);
   });
 });
 

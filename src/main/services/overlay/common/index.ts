@@ -134,7 +134,6 @@ export async function processHTML(
   id: string,
   html: string,
   dir: string,
-  mode: "value" | "default",
   config?: OverlayConfig,
   gifts?: CustomGift[] | null,
 ): Promise<{
@@ -143,9 +142,7 @@ export async function processHTML(
 }> {
   try {
     const htmlPath = join(dir, "index.html");
-    const overlay_config = config
-      ? getOverlayConfig(config, mode, gifts)
-      : undefined;
+    const overlay_config = config ? getOverlayConfig(config, gifts) : undefined;
     // Overlays imported before the block was required may not have it.
     if (!hasSetupBlock(html)) {
       return {
