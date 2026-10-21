@@ -54,4 +54,10 @@ describe("formatAlertMessage", () => {
 
     expect(formatAlertMessage(message, data)).not.toMatch(/\{\w+\}/);
   });
+
+  it("fills a sample's handle without the @, like a live one", () => {
+    const { data } = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW);
+
+    expect(formatAlertMessage("{handle}", data)).not.toMatch(/^@/);
+  });
 });

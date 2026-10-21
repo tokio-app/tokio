@@ -44,9 +44,8 @@ const userFactory = (): UserData => {
   const noun = pickRandom(NOUNS);
   const numberSuffix = randomInt(10, 9999);
   const username = `${adjective} ${noun}`;
-  const handle = `@${adjective.toLowerCase()}${noun.toLowerCase()}${numberSuffix}`;
-  const seed = handle.replace("@", "");
-  const profilePictures = [`https://picsum.photos/seed/${seed}/200/200`];
+  const handle = `${adjective.toLowerCase()}${noun.toLowerCase()}${numberSuffix}`;
+  const profilePictures = [`https://picsum.photos/seed/${handle}/200/200`];
 
   return {
     username,
