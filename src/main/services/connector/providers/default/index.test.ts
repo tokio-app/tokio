@@ -10,12 +10,20 @@ import {
   TimeoutError,
   WebSocketError,
 } from "@tokioapp/connector";
+import Logger from "@/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TikTokLiveConnector } from "./index";
 
 type Connection = {
   username: string;
-  options: { requestTimeoutMs?: number };
+  options: {
+    requestTimeoutMs?: number;
+    logger?: (
+      level: string,
+      message: string,
+      data?: { error?: unknown },
+    ) => void;
+  };
   state: string;
   emit: (event: string, data?: unknown) => boolean;
   listenerCount: (event: string) => number;
@@ -229,6 +237,34 @@ describe("TikTokLiveConnector", () => {
         retryAfterSeconds: 13,
       });
     });
+  });
+
+  it("logs the connection's warnings and errors, not its routine lines", async () => {
+    const warn = vi.spyOn(Logger, "warn");
+    const error = vi.spyOn(Logger, "error");
+    const info = vi.spyOn(Logger, "info");
+    connector.setLogFile("connector.log");
+    await connected();
+    const log = connection().options.logger!;
+    const cause = new Error("closed");
+
+    log("warn", "The connection dropped (wsClose): reconnecting", {
+      error: cause,
+    });
+    log("error", "Gave up reconnecting after 10 attempts", { error: cause });
+    log("info", "Connected to room 1");
+    log("debug", "Opening the WebSocket");
+
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      "<Connector> The connection dropped (wsClose): reconnecting",
+      "connector.log",
+    );
+    expect(error).toHaveBeenCalledExactlyOnceWith(
+      "<Connector> Gave up reconnecting after 10 attempts",
+      "connector.log",
+      cause,
+    );
+    expect(info).not.toHaveBeenCalled();
   });
 
   describe("disconnects", () => {

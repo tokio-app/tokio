@@ -36,6 +36,7 @@ export const connectFailure = (
 
 export abstract class ConnectorProvider {
   protected _onReconnect?: (state: ReconnectState) => void;
+  protected _logFile = "";
   public abstract setKey(key: string): void;
   public abstract on<T extends TOKIO_EVENTS>(
     event: T,
@@ -52,6 +53,11 @@ export abstract class ConnectorProvider {
   public abstract disconnect(): Promise<void>;
   public abstract isConnected(): boolean;
   public abstract fetchGifts(): Promise<GiftResponse>;
+
+  // The service's log file, for what the connection reports while it's up.
+  public setLogFile(logFile: string) {
+    this._logFile = logFile;
+  }
 
   // Called when the connection drops and is tried again, and once it's back.
   public onReconnect(listener: (state: ReconnectState) => void) {

@@ -77,6 +77,15 @@ describe("TikTokConnectorService", () => {
     expect(await service.fetchGifts()).toEqual({ success: true, data: [] });
   });
 
+  it("gives its providers its log file", () => {
+    const { service, provider } = setup();
+    const setLogFile = vi.spyOn(provider, "setLogFile");
+
+    service.setLogFile("other.log");
+
+    expect(setLogFile).toHaveBeenCalledWith("other.log");
+  });
+
   it("starts with the default provider", () => {
     const service = new TikTokConnectorService();
 

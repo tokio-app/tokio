@@ -17,6 +17,11 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
     this.addProvider("Default", new TikTokLiveConnector(), true); // NOTE: DO NOT CHANGE, Add your providers below.
   }
 
+  public override setLogFile(logFile: string): void {
+    super.setLogFile(logFile);
+    this._providerPool?.forEach((provider) => provider.setLogFile(logFile));
+  }
+
   protected override _validProvider(provider: ConnectorProvider): boolean {
     return provider instanceof ConnectorProvider;
   }

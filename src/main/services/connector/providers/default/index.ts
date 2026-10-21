@@ -18,6 +18,7 @@ import {
   type User,
   type UserIdentity,
 } from "@tokioapp/connector";
+import Logger from "@/logger";
 import { EventEmitter } from "events";
 import {
   ConnectErrorKind,
@@ -75,6 +76,15 @@ export class TikTokLiveConnector extends ConnectorProvider {
     try {
       connection = new TikTokLiveConnection(name, {
         signer: new EulerSigner({ apiKey: this._key }),
+        // Its warnings and errors explain drops and failed reconnects, the
+        // rest is routine.
+        logger: (level, message, data) => {
+          if (level === "warn") {
+            Logger.warn(`<Connector> ${message}`, this._logFile);
+          } else if (level === "error") {
+            Logger.error(`<Connector> ${message}`, this._logFile, data?.error);
+          }
+        },
       });
       // Before connecting, so no event of the LIVE is missed.
       this._listen(connection);
