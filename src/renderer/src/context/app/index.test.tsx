@@ -34,7 +34,7 @@ describe("AppProvider", () => {
     expect(sent(APP_EVENTS.SHOW_WINDOW)).toHaveLength(1);
   });
 
-  it("plays TTS on its queue, with the volume as a fraction", async () => {
+  it("plays TTS on its queue, with the volume as a fraction and its own speed", async () => {
     const audio = setup();
 
     await send(APP_EVENTS_RESPONSE.TTS_AUDIO, {
@@ -48,12 +48,11 @@ describe("AppProvider", () => {
       gapTime: 1,
       maxQueueLength: 5,
     });
-    expect(queue.setFilters).toHaveBeenCalledWith({
+    expect(queue.setFilters).toHaveBeenCalledExactlyOnceWith({ volume: 0.5 });
+    expect(queue.enqueue).toHaveBeenCalledWith(data, true, {
       speed: 1.2,
       pitch: 0.9,
-      volume: 0.5,
     });
-    expect(queue.enqueue).toHaveBeenCalledWith(data, true);
   });
 
   it("plays alerts on their channel, with their own volume and filters", async () => {

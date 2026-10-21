@@ -26,8 +26,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!res) return;
     const queue = getQueue("tts_data");
     queue.setQueueOptions(res.queueOptions);
-    queue.setFilters({ ...res.filters, volume: res.filters.volume / 100 });
-    queue.enqueue(res.data, true);
+    queue.setFilters({ volume: res.filters.volume / 100 });
+    // Per message, so a change of speed or pitch spares the queued ones
+    queue.enqueue(res.data, true, {
+      speed: res.filters.speed,
+      pitch: res.filters.pitch,
+    });
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.TTS_CLEAR, () => stopQueues("tts_data"));
