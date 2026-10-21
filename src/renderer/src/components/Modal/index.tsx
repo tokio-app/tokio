@@ -1,7 +1,36 @@
-import { ReactNode, useEffect, useId, useRef, useState } from "react";
+import {
+  KeyboardEvent,
+  ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { VscClose } from "react-icons/vsc";
 import { Btn } from "../Elements";
 import styles from "./modal.module.css";
+
+const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]";
+
+// Wraps Tab between its first and last controls, so Escape still reaches it
+function keepTab(e: KeyboardEvent<HTMLDivElement>) {
+  const dialog = e.currentTarget;
+  const focused = document.activeElement;
+  // Select's search moves the focus itself, and portaled popovers are outside
+  if (e.defaultPrevented || !focused || !dialog.contains(focused)) return;
+
+  const items = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (el) => el.tabIndex >= 0 && !el.matches(":disabled"),
+  );
+  const first = items.at(0) ?? dialog;
+  const last = items.at(-1) ?? dialog;
+  const atEdge = e.shiftKey
+    ? focused === first || focused === dialog
+    : focused === last;
+  if (!atEdge) return;
+  e.preventDefault();
+  (e.shiftKey ? last : first).focus();
+}
 
 type Props = {
   title: string;
@@ -68,6 +97,7 @@ export function Modal({
         className={styles.card}
         style={{ maxWidth }}
         onKeyDown={(e) => {
+          if (e.key === "Tab") keepTab(e);
           if (e.key !== "Escape") return;
           // Only the innermost dialog closes, e.g. a picker over a modal
           e.stopPropagation();

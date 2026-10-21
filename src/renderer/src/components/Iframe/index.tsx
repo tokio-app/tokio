@@ -51,6 +51,8 @@ export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
         name={`TOKIO_APP-${name}`}
         // Off-screen previews don't load or run until scrolled to.
         loading="lazy"
+        // Previews ignore the pointer, Tab skips them too
+        tabIndex={-1}
         onLoad={() => {
           setLoading(false);
           onLoad?.();

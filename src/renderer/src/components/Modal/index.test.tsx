@@ -153,6 +153,46 @@ describe("Modal", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("keeps Tab inside, and still closes on Escape", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <>
+        <button>Behind</button>
+        <Modal title="Delete profile?" onClose={onClose} onConfirm={vi.fn()} />
+      </>,
+    );
+    const cancel = dialog().getByRole("button", { name: "Cancel" });
+    const confirm = dialog().getByRole("button", { name: "Confirm" });
+
+    await user.tab();
+    expect(cancel).toHaveFocus();
+    await user.tab();
+    expect(confirm).toHaveFocus();
+    await user.tab();
+    expect(cancel).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(confirm).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("goes from the dialog itself to its last control on Shift+Tab", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <button>Behind</button>
+        <Modal title="Delete profile?" onClose={vi.fn()} onConfirm={vi.fn()} />
+      </>,
+    );
+    expect(screen.getByRole("dialog")).toHaveFocus();
+
+    await user.tab({ shift: true });
+
+    expect(dialog().getByRole("button", { name: "Confirm" })).toHaveFocus();
+  });
+
   it("closes only the innermost dialog on Escape", async () => {
     const user = userEvent.setup();
     const closeSound = vi.fn();
