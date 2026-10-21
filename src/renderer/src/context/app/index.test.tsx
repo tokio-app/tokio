@@ -34,6 +34,23 @@ describe("AppProvider", () => {
     expect(sent(APP_EVENTS.SHOW_WINDOW)).toHaveLength(1);
   });
 
+  it("shows only the title bar and a message when main couldn't start", async () => {
+    setup();
+
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: false });
+
+    expect(screen.queryByText("Loaded")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Tokio couldn't start. Check the logs folder for details.",
+      ),
+    ).toBeInTheDocument();
+    for (const name of ["Minimize", "Maximize", "Close"]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+    expect(sent(APP_EVENTS.SHOW_WINDOW)).toHaveLength(1);
+  });
+
   it("plays TTS on its queue, with the volume as a fraction and its own speed", async () => {
     const audio = setup();
 
