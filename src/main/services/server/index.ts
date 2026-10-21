@@ -74,7 +74,17 @@ export class ServerService extends Service {
         // Port 0 picks a free port.
         const address = this._server!.address();
         if (address && typeof address === "object") this._port = address.port;
-        this._wss = new CustomWebSocketServer({ server: this._server! });
+        // Overlays only listen, so a big message is never one of theirs.
+        this._wss = new CustomWebSocketServer({
+          server: this._server!,
+          maxPayload: 64 * 1024,
+        });
+        this._wss.on("error", (err) =>
+          Logger.warn(
+            `<WebSocket> Server error -- ${formatError(err)}`,
+            this._logFile,
+          ),
+        );
         this._wss.on("connection", (client, req) => {
           const url = new URL(
             req.url || "/",
@@ -96,6 +106,13 @@ export class ServerService extends Service {
               this._logFile,
             );
           });
+          // Unhandled, a bad frame would throw in main. ws closes the socket.
+          client.on("error", (err) =>
+            Logger.warn(
+              `<WebSocket> Client ${clientId} error -- ${formatError(err)}`,
+              this._logFile,
+            ),
+          );
         });
         Logger.success(
           `<Server> Server running on port ${this._port}`,

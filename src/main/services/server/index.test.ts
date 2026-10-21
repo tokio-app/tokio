@@ -257,6 +257,22 @@ describe("ServerService", () => {
       expect(musicEvents.has(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED)).toBe(false);
     });
 
+    it("closes a client that sends too much, without crashing", async () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const client = await connect("a");
+      const closed = new Promise<number>((resolve) =>
+        client.once("close", resolve),
+      );
+
+      client.send("x".repeat(64 * 1024 + 1));
+
+      expect(await closed).toBe(1009);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(/^<WebSocket> Client a error -- /),
+        undefined,
+      );
+    });
+
     it("reports a send to an id with no overlay connected", () => {
       expect(server.sendToClient("missing", "ping")).toBe(false);
     });
