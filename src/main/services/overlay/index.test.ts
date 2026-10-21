@@ -7,6 +7,7 @@ import { YAMLManagerService } from "@/services/yaml";
 import { strToU8, zipSync } from "fflate";
 import { createHash } from "node:crypto";
 import {
+  lstat,
   mkdir,
   mkdtemp,
   readdir,
@@ -463,6 +464,42 @@ describe("OverlayService", () => {
         server.stop();
       }
     });
+
+    it("copies the folder a picked link points to, and leaves it as it was", async () => {
+      const real = join(root, "real");
+      await configurable(real);
+      const picked = join(root, "picked");
+      await symlink(real, picked, "junction");
+
+      expect(await service.import(picked, gifts)).toEqual({ success: true });
+
+      const [id] = await readdir(folder);
+      expect((await lstat(join(folder, id))).isSymbolicLink()).toBe(false);
+      expect(await readFile(join(real, "index.html"), "utf-8")).toBe(
+        `<body>${SETUP}</body>`,
+      );
+    });
+
+    // Linking a file needs admin rights on Windows, so this runs elsewhere.
+    it.skipIf(process.platform === "win32")(
+      "refuses an overlay whose settings are a linked file",
+      async () => {
+        const source = join(root, "source");
+        await overlay(source, {
+          "info.yaml": info("Title", true),
+          "index.html": `<body>${SETUP}</body>`,
+        });
+        const outside = join(root, "config.yaml");
+        await writeFile(outside, config("Saved"));
+        await symlink(outside, join(source, "config.yaml"));
+
+        expect(await service.import(source, gifts)).toEqual({
+          success: false,
+        });
+        expect(await readdir(folder)).toEqual([]);
+        expect(stored).toEqual([]);
+      },
+    );
 
     it("writes settings with dollar signs as they are", async () => {
       const source = join(root, "source");

@@ -19,7 +19,15 @@ import { formatError, generateTikTokEventSample } from "@/common/util";
 import Logger from "@/logger";
 import { isEqual } from "es-toolkit";
 import { randomUUID } from "node:crypto";
-import { access, cp, lstat, readdir, rename, rm } from "node:fs/promises";
+import {
+  access,
+  cp,
+  lstat,
+  readdir,
+  realpath,
+  rename,
+  rm,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { JSONManagerService } from "../json";
 import { ServerService } from "../server";
@@ -172,20 +180,28 @@ export class OverlayService extends Service {
     const id = randomUUID();
     const dir = this._dir(id);
     try {
-      const res = await processOverlay(basedir, this._yaml, true);
-      if (!res.success) return { success: false };
-
-      const { config, htmlContent, info } = res.data!;
-      // It gets its ID through the block, settings or not.
-      if (!hasSetupBlock(htmlContent)) return { success: false };
+      // A link picked as the folder is copied as the folder it points to.
+      const source = await realpath(basedir);
+      if (!(await processOverlay(source, this._yaml, true)).success) {
+        return { success: false };
+      }
 
       // A link could point anywhere on the computer, and the previews and
       // the server would serve its target.
-      await cp(basedir, dir, {
+      await cp(source, dir, {
         recursive: true,
-        filter: async (src) =>
-          src === basedir || !(await lstat(src)).isSymbolicLink(),
+        filter: async (src) => !(await lstat(src)).isSymbolicLink(),
       });
+
+      // Checked on the copy, without its links: an overlay that needs a
+      // linked file is refused. It gets its ID through the block, settings
+      // or not.
+      const res = await processOverlay(dir, this._yaml, true);
+      if (!res.success || !hasSetupBlock(res.data!.htmlContent)) {
+        await rm(dir, { recursive: true, force: true });
+        return { success: false };
+      }
+      const { config, htmlContent, info } = res.data!;
 
       const html = await processHTML(
         id,
