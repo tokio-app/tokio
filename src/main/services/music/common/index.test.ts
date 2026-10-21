@@ -40,6 +40,8 @@ describe("createWindow", () => {
       "preload",
       "index.mjs",
     ]);
+    // Isolated, as Electron's default, like the main window
+    expect(nav.options.webPreferences).not.toHaveProperty("contextIsolation");
     expect(nav.webContents.loadFile).toHaveBeenCalledOnce();
     expect(tail(nav.webContents.loadFile.mock.calls[0][0], 2)).toEqual([
       "music-out",

@@ -81,7 +81,6 @@ export function createWindow(content: WebContentsView) {
   const _navView = new WebContentsView({
     webPreferences: {
       sandbox: false,
-      contextIsolation: false,
       preload: APP_PRELOAD,
     },
   });

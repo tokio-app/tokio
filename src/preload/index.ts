@@ -23,14 +23,8 @@ const api = {
     ipcRenderer.send(event, data),
 };
 
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld("api", api);
-  } catch (error) {
-    console.error(error);
-  }
-} else {
-  // The music title bar runs without context isolation
-  // @ts-ignore
-  window.api = api;
+try {
+  contextBridge.exposeInMainWorld("api", api);
+} catch (error) {
+  console.error(error);
 }

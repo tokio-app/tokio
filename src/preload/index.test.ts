@@ -5,7 +5,7 @@ import {
   AppEventsResponseMap,
 } from "@/common/types";
 import { contextBridge, ipcRenderer } from "@test/electron";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 type Api = {
   on: <T extends APP_EVENTS_RESPONSE>(
@@ -23,14 +23,10 @@ const isApi = (value: unknown): value is Api =>
   "emit" in value &&
   typeof value.emit === "function";
 
-// Runs the preload script as Electron does, in a page with or without
-// context isolation. Its window is returned for the second case.
-async function load(contextIsolated: boolean) {
+// Runs the preload script as Electron does, in an isolated page, and
+// returns the page's window.
+async function load() {
   vi.resetModules();
-  Object.defineProperty(process, "contextIsolated", {
-    value: contextIsolated,
-    configurable: true,
-  });
   const window: Record<string, unknown> = {};
   vi.stubGlobal("window", window);
   await import("./index");
@@ -47,12 +43,8 @@ function exposed(): Api {
 }
 
 describe("preload", () => {
-  afterEach(() => {
-    Reflect.deleteProperty(process, "contextIsolated");
-  });
-
   it("exposes only the api to an isolated page", async () => {
-    const window = await load(true);
+    const window = await load();
 
     expect(
       contextBridge.exposeInMainWorld.mock.calls.map(([key]) => key),
@@ -67,21 +59,13 @@ describe("preload", () => {
       throw failure;
     });
 
-    await expect(load(true)).resolves.toBeDefined();
+    await expect(load()).resolves.toBeDefined();
 
     expect(console.error).toHaveBeenCalledWith(failure);
   });
 
-  it("puts only the api on the window of a page without isolation", async () => {
-    const window = await load(false);
-
-    expect(Object.keys(window)).toEqual(["api"]);
-    expect(isApi(window.api)).toBe(true);
-    expect(contextBridge.exposeInMainWorld).not.toHaveBeenCalled();
-  });
-
   it("sends a request with its data", async () => {
-    await load(true);
+    await load();
 
     exposed().emit(APP_EVENTS.SET_PROFILE, { file: "stream.json" });
 
@@ -91,7 +75,7 @@ describe("preload", () => {
   });
 
   it("passes listeners only the data of a reply", async () => {
-    await load(true);
+    await load();
     const callback = vi.fn();
 
     exposed().on(APP_EVENTS_RESPONSE.LIKES, callback);
@@ -101,7 +85,7 @@ describe("preload", () => {
   });
 
   it("removes only the subscription it returned", async () => {
-    await load(true);
+    await load();
     const api = exposed();
     const callback = vi.fn();
 
