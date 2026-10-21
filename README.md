@@ -24,10 +24,10 @@ While you're LIVE, the dashboard shows how long you've been on, the viewers, lik
 Chat messages are read aloud as they come in.
 
 - **Voices** from three engines, all in one list: TikTok's own voices, Microsoft Edge voices, and, on Windows, the voices installed on the system (SAPI and OneCore, including older 32-bit voices). Search the list, filter it by engine and language, and play any voice to hear a short line in its language before you pick it. Adjust speed, pitch and volume, and test a message to hear it the way chat is read.
-- **Format**: choose which messages get read and how, for example `{username} {comment}` or only messages that start with a command. Turn on **Remove Emojis** so the voice doesn't read them out; messages that are only emojis are then skipped.
+- **Format**: choose which messages get read and how, for example `{username} {comment}` or only messages that start with a command, which isn't read aloud. Turn on **Remove Emojis** so the voice doesn't read them out; messages that are only emojis are then skipped.
 - **Replacements**: teach the voice how to say acronyms, slang and names.
-- **Permissions**: let everyone talk, or only followers, superfans or moderators. You can also set a minimum fan level, a whitelist and a blacklist.
-- **Protection**: a cooldown per viewer and a maximum queue length keep the chat from flooding the voice.
+- **Permissions**: let everyone talk, or only followers, superfans or moderators. You can also set a minimum fan level, and a whitelist and a blacklist of @handles.
+- **Protection**: a cooldown between messages and a maximum queue length keep the chat from flooding the voice. Messages over a maximum length are skipped, and so are messages with a banned word, in the comment or in the viewer's name.
 
 ### Music requests
 
@@ -40,7 +40,7 @@ Viewers request songs from chat, played from **YouTube** or **Spotify** in a sep
 | `!last`   | Go back to the last song                 |
 | `!revoke` | Remove a song from the queue by its name |
 
-Music requests use the same permissions and protection settings as text-to-speech.
+Music requests have their own permissions and protection settings, set the same way as text-to-speech's: who can request songs, a cooldown between requests and a maximum queue length.
 
 ### Alerts
 
@@ -128,7 +128,7 @@ Requires Node.js 24+ and Yarn 1.
 
 ```sh
 yarn install
-yarn dev          # run in development
+yarn dev          # run in development (close Tokio first)
 yarn test         # unit tests
 yarn typecheck    # type-check every process
 yarn lint         # lint

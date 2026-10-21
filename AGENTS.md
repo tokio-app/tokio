@@ -9,7 +9,7 @@ Stack: Electron 39, electron-vite, React 19, TypeScript, TanStack Router, Expres
 ## Commands
 
 ```sh
-yarn dev                  # build the music window UI, then electron-vite dev
+yarn dev                  # build the music window UI, then electron-vite dev (close Tokio first)
 yarn test                 # vitest (yarn test:watch to watch, --project main|renderer for one)
 yarn test:coverage        # vitest with a coverage report in coverage/
 yarn test:e2e             # build the app and drive it with Playwright (needs port 37891: close Tokio first)
@@ -101,7 +101,7 @@ When a procedure changes, update its skill with it.
 
 - Each service lives in `src/main/services/<name>/index.ts` and extends `Service` (or `ProviderService<T>`) from `src/main/services/shared`. It's instantiated once in `src/main/index.ts`, added to `AppServices` in `src/main/types`, and injected into `AppHandler` (`src/main/handler/app.ts`).
 - Swappable backends (connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)`. Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. TTS uses every provider at once, as engines (see `.claude/rules/tts.md`). The connector's provider key is the user's own Euler Stream API key, which signs the connection (`SET_PROVIDER`). Settings → TikTok LIVE always shows it; its provider picker only shows while more than one connector is registered. Never log the key or ship a shared one.
-- The default connector uses `@tokioapp/connector` (our MIT package, `../tokio-connector`), one `TikTokLiveConnection` per connect, with every listener added before `connect()`. It reconnects on its own: a drop it recovers from calls `onReconnect` and keeps the LIVE session, and `DISCONNECTED` only comes once the connection stops (`reason: "ended"`, `"lost"`, or none when the user disconnected). A failed connect's `error.kind` picks the message `home.ts` shows. The library's warnings and errors go to `connector.log` through its `logger` option; its info and debug lines are dropped.
+- The default connector uses `@tokioapp/connector` (our MIT package, `../tokio-connector`), one `TikTokLiveConnection` per connect, with every listener added before `connect()`; a connect that comes while one is connecting gets that one, so only one connection opens. It reconnects on its own: a drop it recovers from calls `onReconnect` and keeps the LIVE session, and `DISCONNECTED` only comes once the connection stops (`reason: "ended"`, `"lost"`, or none when the user disconnected). A failed connect's `error.kind` picks the message `home.ts` shows. The library's warnings and errors go to `connector.log` through its `logger` option; its info and debug lines are dropped.
 - Log through `Logger` (`@/logger`) with the service's `_logFile` and a `<ServiceName>` prefix, e.g. ``Logger.error(`<Connector> ...`, this._logFile)``. Format errors with `formatError` from `@/common/util`.
 - Fallible service methods return `{ success, error?, data? }` instead of throwing.
 
@@ -139,6 +139,10 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load.
 
 Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name.
+
+A store file that doesn't parse is copied to `tokio.corrupted-<time>.json` next to it and replaced by the defaults. One that can't be read (locked, no access) or copied stops startup ("Tokio couldn't start") and is left as it is.
+
+Only one Tokio runs per userData folder (`requestSingleInstanceLock` in `src/main/index.ts`, after `TOKIO_HOME` sets it): a second launch quits and brings the running one to the front. `yarn dev` and the installed app share that folder on Windows and macOS, so close Tokio before `yarn dev`.
 
 ## Licensing
 

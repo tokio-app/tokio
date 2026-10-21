@@ -17,7 +17,7 @@ paths:
 
 - Saved per profile in `Profile.alerts` (`simultaneous`, `queue_length`, `items`).
 - `AlertTriggerSchema` (`src/common/schemas/profile.ts`) derives the triggers from `TOKIO_EVENTS` (for a new event, see IPC events in `AGENTS.md`). `ROOM_USER` is excluded (it comes every few seconds and is meant for overlays), both there and in the `AlertTrigger` type. Saved Room Users alerts are dropped when a profile loads.
-- `registerConnectorEvents` (`src/main/events/init.ts`) passes every trigger to `AlertsService.handle` while `activeFeatures.alerts` is on. `MUSIC_CHANGE` comes from `MusicService`, the rest from the connector. Gift alerts fire once per combo, on `repeatEnd`.
+- `registerConnectorEvents` (`src/main/events/init.ts`) passes every trigger to `AlertsService.handle` while `activeFeatures.alerts` is on. Music Change alerts come from `MusicService.onSongChange`, once each time a song starts; the rest from the connector. `MUSIC_CHANGE` also fires when the queue changes, and overlays get every one through `ServerService.initEvents`. Gift alerts fire once per combo, on `repeatEnd`.
 - The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: the loop skips it and `AlertsService` matches it on `CHAT` (empty `trigger.emotes` means any emote). TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`, and main pushes the list with `EMOTES`.
 - Chat alerts filter on `trigger.keyword` through `hasKeyword` (`src/main/helper/chat.ts`, whole words), and Member Join and Super Fan Join alerts on `trigger.user` through `isUser` (handle or name).
 

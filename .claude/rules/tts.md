@@ -15,3 +15,11 @@ paths:
 - Engines with a `keyLabel` get a field in Settings → Voice Engines (`GET_VOICE_KEYS` / `SET_VOICE_KEY`). Their keys are saved encrypted in `settings.providers.tts` and applied to every engine at startup.
 - `windows` drives SAPI and OneCore voices through a long-lived 32-bit PowerShell helper, so 32-bit-only voices such as Loquendo are visible. Its script in `common/script.ts` must not contain backticks.
 - `edge` uses Microsoft's unofficial Read Aloud protocol. Read `providers/edge/README.md` before changing it. Volatile values live in its `config/index.ts`. Its `common/drm-v2.ts` is LGPL-3.0-only: see Licensing in `AGENTS.md`.
+
+## Chat TTS
+
+- `TTSService.talk` checks a chat message and makes its audio on a `TaskQueue` (cooldown and queue length from the TTS page). With a trigger other than "any", the trigger is cut off and isn't read; a message that's then empty is skipped. Banned words are checked in the comment, the name and the handle, not in the template's own words. The template is filled once with `formatAlertMessage`, so a comment or name that looks like a variable is read as written.
+- Main sends each message with `TTS_AUDIO { id, data, filters, queueOptions }` to the window's `tts_data` queue, with speed and pitch per message, so a change spares the queued ones.
+- The window answers `TTS_PLAYED { id }` when a message ends or is dropped. Main makes the next message only while fewer than min(2, queue length) are held, so the queue length bounds main's backlog and nothing is made just to be dropped. A hold ends after 2 minutes (`HOLD_TIMEOUT_MS`), and a repeat `LOAD_APP` (a reloaded window) calls `releaseHeld()`.
+- `TTS_CLEAR` (on disconnect, and when TTS is turned off, with `clearTalk()`) stops `tts_data`. `clearTalk()` drops the waiting messages, the one being made and the held ids.
+- The TTS page's tester (`GET_TTS_TEST`) runs `prepareText` only: it doesn't cut the trigger, fill the template or check permissions.

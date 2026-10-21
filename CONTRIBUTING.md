@@ -27,6 +27,8 @@ Start the application development server:
 
     yarn dev
 
+Close Tokio first if it's installed: only one copy runs per data folder, so `yarn dev` would quit and bring the open one to the front.
+
 Start making changes, commit and push to your fork and [submit a pull request][pr].
 
 [pr]: https://github.com/tokio-app/tokio/compare
