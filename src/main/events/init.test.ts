@@ -537,6 +537,29 @@ describe("init events", () => {
         FEEDBACK_CODES.ALERT_TTS_FAILED,
       ]);
     });
+
+    it("logs a missing sound once per notice, and not a TTS failure", async () => {
+      const { s, callback } = await onFailure();
+      vi.useFakeTimers();
+
+      callback(alert(), "ENOENT: no such file");
+      callback(alert(), "ENOENT: no such file");
+      callback(alert({ id: "speech", tts: speech }), "Engine down");
+      vi.advanceTimersByTime(30_000);
+      callback(alert(), "ENOENT: no such file");
+
+      expect(s.h.notices).toHaveLength(3);
+      expect(logWarn.mock.calls).toEqual([
+        [
+          "<Alerts> The sound of the Follow alert is missing -- ENOENT: no such file",
+          "alerts.log",
+        ],
+        [
+          "<Alerts> The sound of the Follow alert is missing -- ENOENT: no such file",
+          "alerts.log",
+        ],
+      ]);
+    });
   });
 
   describe("stats", () => {

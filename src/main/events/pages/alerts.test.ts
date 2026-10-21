@@ -328,7 +328,8 @@ describe("alerts events", () => {
           id: "alert-1",
           error: {
             code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-            message: "Unable to use the sound. Pick an mp3, wav or ogg file.",
+            message:
+              "Unable to use the sound. Pick an mp3, wav or ogg file up to 8 MB.",
           },
         },
       ]);
@@ -665,7 +666,7 @@ describe("alerts events", () => {
           error: {
             code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
             message:
-              "Unable to upload 2 of the sounds. Use mp3, wav or ogg files.",
+              "Unable to upload 2 of the sounds. Use mp3, wav or ogg files up to 8 MB.",
           },
         },
       ]);
@@ -689,7 +690,7 @@ describe("alerts events", () => {
           success: false,
           error: expect.objectContaining({
             message:
-              "Unable to upload 1 of the sounds. Use mp3, wav or ogg files.",
+              "Unable to upload 1 of the sounds. Use mp3, wav or ogg files up to 8 MB.",
           }),
         }),
       ]);

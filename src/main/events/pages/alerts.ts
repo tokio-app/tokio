@@ -136,7 +136,8 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-      message: "Unable to use the sound. Pick an mp3, wav or ogg file.",
+      message:
+        "Unable to use the sound. Pick an mp3, wav or ogg file up to 8 MB.",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
@@ -278,7 +279,7 @@ events.push(
       failed > 0
         ? {
             code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-            message: `Unable to upload ${failed} of the sounds. Use mp3, wav or ogg files.`,
+            message: `Unable to upload ${failed} of the sounds. Use mp3, wav or ogg files up to 8 MB.`,
           }
         : undefined;
 
