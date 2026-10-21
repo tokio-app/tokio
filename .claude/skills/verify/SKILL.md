@@ -21,6 +21,7 @@ Run them from the repository root, the narrow ones first:
    - `yarn build:unpack` for `electron-builder.yml`, or for files the app reads at runtime. `npx asar list dist/win-unpacked/resources/app.asar` should show, outside `node_modules`, only `out/`, `music-out/`, `resources/` and `package.json`, and the packaged app should start (the `drive-app` skill's `--exe`).
    - `yarn tts:edge:check` for `src/main/services/tts/providers/edge/`. It needs the network.
    - `npx fallow dead-code` after moving, renaming or deleting code.
+   - The tests in WSL, on Windows, for code that can behave differently on Linux or macOS: file links, paths, case-sensitive names, permissions. Commit first: the WSL copy runs committed code (Linux checks in `AGENTS.md`).
    - `git ls-files --eol | grep w/crlf` after a script wrote files: the repo uses LF. `.commitlintrc`, `.editorconfig`, `.gitattributes` and `LICENSE` always show up and are fine.
 
 ## Traps

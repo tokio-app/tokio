@@ -24,6 +24,17 @@ yarn release:notes [tag]  # print a release's notes (the next release's without 
 
 Verify changes with `yarn test`, `yarn typecheck` and `yarn lint`. For the Edge TTS provider, also run `yarn tts:edge:check`, and for window setup, the preload or startup, `yarn test:e2e`.
 
+### Linux checks from Windows (WSL)
+
+The maintainer's Windows machine keeps a Linux copy of the repo in WSL (Ubuntu 24.04) at `~/tokio-wsl`, cloned from the Windows checkout, with Node 24 in `~/.local/node24/bin`. Run the tests there when a change can behave differently on Linux or macOS: file links, paths, case-sensitive names, permissions. It only sees committed code:
+
+```sh
+wsl.exe -e bash -lc 'cd ~/tokio-wsl && export PATH=$HOME/.local/node24/bin:$PATH &&
+  git fetch -q origin && git checkout -q -B <branch> origin/<branch> && npx vitest run'
+```
+
+After `yarn.lock` changes, reinstall there first with `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npx yarn@1.22.22 install --frozen-lockfile --ignore-scripts`. Electron isn't installed, so `yarn dev` and `yarn test:e2e` don't run there.
+
 ## Agent models
 
 - **Planning:** Opus 5.5 at high effort. Be 90–95% confident in the plan before implementing or handing off; otherwise keep reading code or ask the user.
