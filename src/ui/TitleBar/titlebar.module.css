@@ -21,11 +21,12 @@
   box-shadow: inset 0 2px 0 var(--accent-primary);
 }
 
+/* The logo is centered over the main window's sidebar */
 .brand {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-left: var(--space-4);
+  margin-left: calc((var(--rail-width) - 24px) / 2);
 }
 
 .logo {
