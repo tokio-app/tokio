@@ -90,6 +90,10 @@ export const SERVICES: { name: string; note: string }[] = [
     name: "MyInstants",
     note: "Sound search and downloads for alerts, read from the public website. Its sounds are uploaded by its users and aren't covered by Tokio's license.",
   },
+  {
+    name: "Lorem Picsum",
+    note: "Sample pictures (profile pictures, emotes, song covers) in overlay tests and previews.",
+  },
 ];
 
 type LinkTarget = { doc: string } | { url: string };

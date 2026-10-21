@@ -19,6 +19,7 @@ import {
   type UserIdentity,
 } from "@tokioapp/connector";
 import Logger from "@/logger";
+import { app } from "electron";
 import { EventEmitter } from "events";
 import {
   ConnectErrorKind,
@@ -132,7 +133,6 @@ export class TikTokLiveConnector extends ConnectorProvider {
 
   public async fetchGifts(): Promise<GiftResponse> {
     try {
-      const region = await this.getUserRegionAndLanguage();
       // Gifts are fetched at startup, before any connect. Without a room
       // the connection only asks for the region's list, which needs neither
       // a user nor the signer, so any username does.
@@ -141,7 +141,10 @@ export class TikTokLiveConnector extends ConnectorProvider {
         new TikTokLiveConnection("tiktok", {
           requestTimeoutMs: config.REQUEST_TIMEOUT_MS,
         });
-      const { gifts } = await connection.fetchGifts(region.data);
+      const { gifts } = await connection.fetchGifts({
+        region: app.getLocaleCountryCode() || "US",
+        language: app.getLocale(),
+      });
 
       return {
         data: gifts.map((g) => ({
@@ -150,7 +153,6 @@ export class TikTokLiveConnector extends ConnectorProvider {
           coins: g.diamondCount,
           image: g.image?.urlList[0] ?? "",
         })),
-        warn: region.error?.message,
         success: true,
       };
     } catch (err) {
@@ -292,36 +294,6 @@ export class TikTokLiveConnector extends ConnectorProvider {
         views: tdata.totalUser,
       });
     });
-  }
-
-  private async getUserRegionAndLanguage(): Promise<{
-    data: { region: string; language: string };
-    error?: Error;
-  }> {
-    try {
-      const response = await fetch(config.GEO_API_URL, {
-        headers: config.HEADERS,
-        signal: AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(`GeoIP API failed with status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      const region = data.country_code || "US";
-
-      const firstLanguage = data.languages
-        ? data.languages.split(",")[0]
-        : "en-US";
-      return { data: { region, language: firstLanguage } };
-    } catch (err) {
-      return {
-        data: { region: "US", language: "en-US" },
-        error: new Error("Failed to fetch user region", { cause: err }),
-      };
-    }
   }
 }
 

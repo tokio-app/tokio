@@ -53,3 +53,4 @@ Tokio talks to these online services. None of them is covered by Tokio's license
 - **Spotify and YouTube:** music requests.
 - **GitHub** (`github.com`, `api.github.com`): update checks and downloads, from Tokio's releases, and the official overlays (their list, previews and downloads), from the releases of `tokio-app/overlays`.
 - **MyInstants** (`www.myinstants.com`): sound search and downloads for alerts, read from the public website rather than an official API. Its sounds are uploaded by its users and aren't covered by Tokio's license.
+- **Lorem Picsum** (`picsum.photos`): sample pictures (profile pictures, emotes, song covers) in overlay tests and previews.

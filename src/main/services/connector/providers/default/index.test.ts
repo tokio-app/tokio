@@ -11,6 +11,7 @@ import {
   WebSocketError,
 } from "@tokioapp/connector";
 import Logger from "@/logger";
+import { app } from "@test/electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TikTokLiveConnector } from "./index";
 
@@ -561,7 +562,6 @@ describe("TikTokLiveConnector", () => {
   });
 
   describe("fetchGifts", () => {
-    const geo = { country_code: "MX", languages: "es-MX,en" };
     const gifts = {
       source: "region",
       gifts: [
@@ -575,14 +575,6 @@ describe("TikTokLiveConnector", () => {
       ],
     };
 
-    const stubGeo = (ok = true) => {
-      const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
-        Response.json(geo, { status: ok ? 200 : 503 }),
-      );
-      vi.stubGlobal("fetch", fetchMock);
-      return fetchMock;
-    };
-
     let fetchGifts: ReturnType<typeof vi.fn<(o: unknown) => Promise<unknown>>>;
 
     beforeEach(() => {
@@ -590,12 +582,14 @@ describe("TikTokLiveConnector", () => {
       live.fetchGifts = fetchGifts;
     });
 
-    it("lists the gifts of the viewer's region and language", async () => {
-      stubGeo();
+    it("lists the gifts of the system's region and language", async () => {
+      app.getLocaleCountryCode.mockReturnValue("MX");
+      app.getLocale.mockReturnValue("es-MX");
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
 
       expect(await connector.fetchGifts()).toEqual({
         success: true,
-        warn: undefined,
         data: [
           { id: 1, name: "Rose", coins: 1, image: "r" },
           { id: 2, name: "Lion", coins: 29999, image: "" },
@@ -605,15 +599,14 @@ describe("TikTokLiveConnector", () => {
         region: "MX",
         language: "es-MX",
       });
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("falls back to US English when the location lookup fails", async () => {
-      stubGeo(false);
+    it("falls back to the US when the system has no country", async () => {
+      app.getLocaleCountryCode.mockReturnValue("");
 
-      const res = await connector.fetchGifts();
+      await connector.fetchGifts();
 
-      expect(res.success).toBe(true);
-      expect(res.warn).toBe("Failed to fetch user region");
       expect(fetchGifts).toHaveBeenCalledWith({
         region: "US",
         language: "en-US",
@@ -621,16 +614,12 @@ describe("TikTokLiveConnector", () => {
     });
 
     it("gives up on requests that take too long", async () => {
-      const fetchMock = stubGeo();
-
       await connector.fetchGifts();
 
-      expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
       expect(connection().options.requestTimeoutMs).toBeGreaterThan(0);
     });
 
     it("asks the LIVE's connection while connected", async () => {
-      stubGeo();
       await connected();
 
       const res = await connector.fetchGifts();
@@ -640,7 +629,6 @@ describe("TikTokLiveConnector", () => {
     });
 
     it("fails when TikTok does", async () => {
-      stubGeo();
       fetchGifts.mockRejectedValue(new Error("Unavailable"));
 
       const res = await connector.fetchGifts();
