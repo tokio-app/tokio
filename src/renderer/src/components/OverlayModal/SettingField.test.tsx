@@ -99,6 +99,17 @@ describe("SettingField", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("shows a number field empty when the value isn't a number", () => {
+    setup({
+      ...base,
+      name: "Size",
+      type: "input",
+      attributes: { mode: "number", value: "12px", default: 12 },
+    });
+
+    expect(screen.getByRole("spinbutton")).toHaveValue(null);
+  });
+
   it("picks one option of a dropdown", async () => {
     const { user, container, onChange } = setup({
       ...base,

@@ -3,6 +3,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  ErrorComponent,
 } from "@tanstack/react-router";
 import {
   About,
@@ -77,8 +78,7 @@ const aboutRoute = createRoute({
   component: About,
 });
 
-// Exported for tests, which render it in memory history
-export const routeTree = rootRoute.addChildren([
+const routeTree = rootRoute.addChildren([
   homeRoute,
   overlaysRoute,
   officialOverlaysRoute,
@@ -90,9 +90,14 @@ export const routeTree = rootRoute.addChildren([
   aboutRoute,
 ]);
 
-const hashHistory = createHashHistory();
+// Exported for tests, which render the routes in memory history
+export const routerOptions = {
+  routeTree,
+  // Keeps a page's error inside the page, with the title bar and sidebar
+  defaultErrorComponent: ErrorComponent,
+};
 
 export const router = createRouter({
-  routeTree,
-  history: hashHistory,
+  ...routerOptions,
+  history: createHashHistory(),
 });
