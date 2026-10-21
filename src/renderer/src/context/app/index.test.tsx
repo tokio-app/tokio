@@ -2,7 +2,7 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { createAudio } from "@test/audio";
 import { send, sent, sentEvents } from "@test/ipc";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AppProvider } from ".";
 import { AudioContext } from "../audio";
 
@@ -38,6 +38,7 @@ describe("AppProvider", () => {
     const audio = setup();
 
     await send(APP_EVENTS_RESPONSE.TTS_AUDIO, {
+      id: 1,
       data,
       filters: { speed: 1.2, pitch: 0.9, volume: 50 },
       queueOptions: { gapTime: 1, maxQueueLength: 5 },
@@ -52,6 +53,39 @@ describe("AppProvider", () => {
     expect(queue.enqueue).toHaveBeenCalledWith(data, true, {
       speed: 1.2,
       pitch: 0.9,
+      onEnded: expect.any(Function),
+    });
+  });
+
+  describe("tells main when a TTS message is done", () => {
+    const tts = {
+      id: 7,
+      data,
+      filters: { speed: 1, pitch: 1, volume: 100 },
+      queueOptions: { gapTime: 0, maxQueueLength: 5 },
+    };
+
+    it("once it has played", async () => {
+      const audio = setup();
+      await send(APP_EVENTS_RESPONSE.TTS_AUDIO, tts);
+
+      expect(sent(APP_EVENTS.TTS_PLAYED)).toEqual([]);
+
+      const [, , options] = audio.queue("tts_data").enqueue.mock.calls[0];
+      options?.onEnded?.();
+
+      expect(sent(APP_EVENTS.TTS_PLAYED)).toEqual([{ id: 7 }]);
+    });
+
+    it("when the queue drops it", async () => {
+      const audio = setup();
+      audio.queue("tts_data").enqueue.mockResolvedValue(false);
+
+      await send(APP_EVENTS_RESPONSE.TTS_AUDIO, tts);
+
+      await vi.waitFor(() =>
+        expect(sent(APP_EVENTS.TTS_PLAYED)).toEqual([{ id: 7 }]),
+      );
     });
   });
 

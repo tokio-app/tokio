@@ -114,7 +114,9 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.NOTIFY]: AppNotification;
 
   [APP_EVENTS_RESPONSE.TTS_AUDIO]: {
-    data: Uint8Array<ArrayBufferLike>;
+    // Sent back with TTS_PLAYED once it's played or dropped
+    id: number;
+    data: Uint8Array;
     filters: Profile["tts"]["filters"];
     queueOptions: {
       gapTime: number;

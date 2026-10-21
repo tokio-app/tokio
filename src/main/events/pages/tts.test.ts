@@ -194,4 +194,16 @@ describe("tts events", () => {
       });
     });
   });
+
+  describe("TTS_PLAYED", () => {
+    it("lets TTS make the next message, without a reply or notice", async () => {
+      const played = vi.fn();
+      const h = createHandler({ ttsService: { played } });
+
+      await h.invoke(tts, APP_EVENTS.TTS_PLAYED, { id: 3 });
+
+      expect(played).toHaveBeenCalledExactlyOnceWith(3);
+      expect(h.sent()).toEqual([]);
+    });
+  });
 });

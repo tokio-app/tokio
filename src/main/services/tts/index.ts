@@ -1,6 +1,11 @@
 import { Profile } from "@/common/schemas";
 import { ChatEvent, VoiceData, VoiceEngine } from "@/common/types";
-import { formatAlertMessage, formatError, TaskQueue } from "@/common/util";
+import {
+  delay,
+  formatAlertMessage,
+  formatError,
+  TaskQueue,
+} from "@/common/util";
 import { removeEmojis } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
@@ -8,12 +13,20 @@ import { ProviderService } from "../shared";
 import { GenerationResponse, TTSProvider } from "./common";
 import { EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
 
+// A message the window never says it played stops holding the next ones
+// after this long, like the ones it had when it reloaded or crashed.
+const HOLD_TIMEOUT_MS = 2 * 60_000;
+
 // Every provider is an engine, and voices name the engine that speaks them.
 // The active provider only speaks voices with no engine, or an unknown one.
 export class TTSService extends ProviderService<TTSProvider> {
   private _queue: TaskQueue;
   // Bumped by clearTalk, so a message made after it is dropped
   private _run = 0;
+  // The id of the last message sent, never reset so a late ack can't match
+  private _lastId = 0;
+  // Messages sent that the window hasn't finished playing
+  private _held = new Set<number>();
 
   constructor() {
     super();
@@ -188,13 +201,26 @@ export class TTSService extends ProviderService<TTSProvider> {
    */
   public clearTalk() {
     this._run++;
+    this._held.clear();
     this._queue.stop();
+  }
+
+  /** The window finished playing the message, or dropped it. */
+  public played(id: number) {
+    this._held.delete(id);
+  }
+
+  /** The window reloaded, so the messages it held are gone. */
+  public releaseHeld() {
+    this._held.clear();
   }
 
   public talk(
     chat: ChatEvent,
     settings: Profile["tts"],
     callback?: (res: {
+      // Sent back with played() once the window is done with it
+      id: number;
       data: GenerationResponse["buffer"];
       filters: Profile["tts"]["filters"];
       queueOptions: {
@@ -214,11 +240,28 @@ export class TTSService extends ProviderService<TTSProvider> {
     });
     const run = this._run;
     this._queue.enqueue(async () => {
+      // The window gets one message to play and the next one ready. The rest
+      // wait here, where the queue length drops what's too many.
+      const held = Math.min(2, settings.protection.queue_length);
+      const until = Date.now() + HOLD_TIMEOUT_MS;
+      // shortcut: polls every 250 ms, wake it from played() if the gap is heard
+      while (this._held.size >= held && run === this._run) {
+        if (Date.now() >= until) {
+          this._held.clear();
+          break;
+        }
+        await delay(250);
+      }
+      if (run !== this._run) return;
+
       const res = await this.generateBuffer(text, settings.voice);
       // Cleared while it was being made
       if (run !== this._run) return;
       if (res.success) {
+        const id = ++this._lastId;
+        this._held.add(id);
         callback?.({
+          id,
           data: res.buffer,
           filters: settings.filters,
           queueOptions: {

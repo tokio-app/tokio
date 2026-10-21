@@ -27,11 +27,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const queue = getQueue("tts_data");
     queue.setQueueOptions(res.queueOptions);
     queue.setFilters({ volume: res.filters.volume / 100 });
+    // Main makes the next message once this one is done. onEnded doesn't run
+    // when the queue is stopped, and main forgets the message then.
+    const done = () => window.api.emit(APP_EVENTS.TTS_PLAYED, { id: res.id });
     // Per message, so a change of speed or pitch spares the queued ones
-    queue.enqueue(res.data, true, {
-      speed: res.filters.speed,
-      pitch: res.filters.pitch,
-    });
+    queue
+      .enqueue(res.data, true, {
+        speed: res.filters.speed,
+        pitch: res.filters.pitch,
+        onEnded: done,
+      })
+      .then((queued) => {
+        if (!queued) done();
+      });
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.TTS_CLEAR, () => stopQueues("tts_data"));

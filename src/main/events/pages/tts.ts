@@ -84,4 +84,12 @@ events.push(
   },
 );
 
+events.push(
+  APP_EVENTS.TTS_PLAYED,
+  ({ ttsService }, _, { id }) => {
+    ttsService.played(id);
+  },
+  { notify: false },
+);
+
 export default events;

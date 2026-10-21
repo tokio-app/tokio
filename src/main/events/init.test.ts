@@ -195,6 +195,7 @@ function setup() {
     setLogFile: vi.fn(),
     talk: vi.fn((..._args: Parameters<TTSService["talk"]>) => {}),
     clearTalk: vi.fn(),
+    releaseHeld: vi.fn(),
   };
   const musicService = {
     ...music,
@@ -807,6 +808,7 @@ describe("init events", () => {
       s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
       const { onAudio } = await talked(s);
       const audio = {
+        id: 1,
         data: Buffer.from([7]),
         filters: profile.tts.filters,
         queueOptions: { gapTime: 2, maxQueueLength: 10 },
@@ -1448,6 +1450,8 @@ describe("init events", () => {
       expect(s.updaterService.start).toHaveBeenCalledOnce();
       expect(noticesFor(s, FEEDBACK_CODES.APP_LOADED)).toHaveLength(1);
       expect(s.ttsService.talk).toHaveBeenCalledOnce();
+      // The reloaded window plays none of the TTS it had
+      expect(s.ttsService.releaseHeld).toHaveBeenCalledOnce();
     });
 
     it("answers a load that comes while the app is starting once it's up", async () => {

@@ -2,7 +2,7 @@ import { Profile } from "@/common/schemas";
 import { ChatEvent, UserData } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import Logger from "@/logger";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TTSService } from "./index";
 
 // Real providers spawn PowerShell or call online services.
@@ -49,13 +49,16 @@ describe("TTSService", () => {
     service = new TTSService();
   });
 
-  // Resolves with what was sent to the speakers, if anything.
+  // Resolves with what was sent to the speakers, if anything, played at once.
   const say = async (comment: string | ChatEvent, s = settings()) => {
     const spoken: string[] = [];
     service.talk(
       typeof comment === "string" ? chat(comment) : comment,
       s,
-      (res) => spoken.push(res.data?.toString() ?? ""),
+      (res) => {
+        spoken.push(res.data?.toString() ?? "");
+        service.played(res.id);
+      },
     );
     await new Promise((r) => setTimeout(r));
     return spoken;
@@ -167,6 +170,7 @@ describe("TTSService", () => {
     await new Promise((r) => setTimeout(r));
 
     expect(callback).toHaveBeenCalledWith({
+      id: 1,
       data: Buffer.from("hi"),
       filters: s.filters,
       queueOptions: { gapTime: 0, maxQueueLength: 3 },
@@ -463,6 +467,82 @@ describe("TTSService", () => {
     await new Promise((r) => setTimeout(r, 1100));
 
     expect(spoken).toEqual(["first"]);
+  });
+
+  describe("waiting for the window", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    type Sent = { id: number; text: string }[];
+    // What was sent to the window, which never plays it on its own
+    const talkAll = (comments: string[], sent: Sent = []) => {
+      for (const comment of comments) {
+        service.talk(chat(comment), settings(), (res) =>
+          sent.push({ id: res.id, text: res.data?.toString() ?? "" }),
+        );
+      }
+      return sent;
+    };
+    const texts = (sent: { text: string }[]) => sent.map((m) => m.text);
+
+    it("makes the third message once the window played one", async () => {
+      const sent = talkAll(["one", "two", "three"]);
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(texts(sent)).toEqual(["one", "two"]);
+
+      service.played(sent[0].id);
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(texts(sent)).toEqual(["one", "two", "three"]);
+    });
+
+    it("stops waiting when cleared", async () => {
+      const sent = talkAll(["one", "two", "three"]);
+      await vi.advanceTimersByTimeAsync(1000);
+
+      service.clearTalk();
+      talkAll(["four"], sent);
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(texts(sent)).toEqual(["one", "two", "four"]);
+    });
+
+    it("stops waiting when the window reloads", async () => {
+      const sent = talkAll(["one", "two", "three"]);
+      await vi.advanceTimersByTimeAsync(1000);
+
+      service.releaseHeld();
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(texts(sent)).toEqual(["one", "two", "three"]);
+    });
+
+    it("gives up on the window after two minutes", async () => {
+      const sent = talkAll(["one", "two", "three", "four"]);
+      await vi.advanceTimersByTimeAsync(2 * 60_000 - 250);
+
+      expect(texts(sent)).toEqual(["one", "two"]);
+
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(texts(sent)).toEqual(["one", "two", "three", "four"]);
+    });
+
+    it("gives every message a new id", async () => {
+      const sent = talkAll(["one", "two"]);
+      await vi.advanceTimersByTimeAsync(0);
+      service.clearTalk();
+      talkAll(["three"], sent);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(sent.map((m) => m.id)).toEqual([1, 2, 3]);
+    });
   });
 
   it("clearTalk drops the message being made", async () => {

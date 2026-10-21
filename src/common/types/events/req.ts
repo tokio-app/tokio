@@ -29,6 +29,9 @@ export enum APP_EVENTS {
   // TTS PAGE TESTER
   GET_TTS_TEST = "app:tts:get:test",
 
+  // CHAT TTS
+  TTS_PLAYED = "app:tts:played",
+
   //MUSIC PAGE
   UPDATE_MUSIC_SETTINGS = "app:music:update:settings",
   CONNECT_MUSIC = "app:music:req:connect",
@@ -133,6 +136,10 @@ export interface AppEventsMap {
     // words, replacements and emoji setting. Previews say their line as is.
     settings?: Profile["tts"];
   };
+
+  // CHAT TTS
+  // The window is done with a TTS_AUDIO message, so main can make the next
+  [APP_EVENTS.TTS_PLAYED]: { id: number };
 
   //MUSIC PAGE
   [APP_EVENTS.UPDATE_MUSIC_SETTINGS]: {

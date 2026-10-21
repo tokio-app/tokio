@@ -273,6 +273,7 @@ const registerConnectorEvents = ({
         profile.tts,
         (res) => {
           win.webContents.send(APP_EVENTS_RESPONSE.TTS_AUDIO, {
+            id: res.id,
             data: res.data!,
             filters: res.filters,
             queueOptions: res.queueOptions,
@@ -535,7 +536,11 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.LOAD_APP, {
       success: true,
     });
-    if (!first) return;
+    if (!first) {
+      // The window reloaded, dropping the TTS it was playing
+      handler.ttsService.releaseHeld();
+      return;
+    }
     handler.notifier.info(
       "system",
       FEEDBACK_CODES.APP_LOADED,
