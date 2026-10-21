@@ -34,10 +34,7 @@ export function VoiceSection({
   const { filters } = settings;
 
   return (
-    <Section
-      title="Voice"
-      description="Configure the primary Text-to-Speech voice for your stream."
-    >
+    <Section title="Voice" description="The voice that reads chat aloud.">
       <FormGrid>
         <Field label="Voice Selection">
           <VoiceSelect

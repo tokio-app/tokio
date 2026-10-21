@@ -46,10 +46,7 @@ export function ProviderSection({
   const missingKey = isSpotify && provider.key === "";
 
   return (
-    <Section
-      title="Provider"
-      description="Select and connect to your preferred music source."
-    >
+    <Section title="Provider" description="Where requested songs play.">
       <div className={styles.status}>
         Status:{" "}
         <span className={cx(connected && styles.status_connected)}>

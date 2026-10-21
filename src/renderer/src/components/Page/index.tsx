@@ -62,7 +62,7 @@ export function Section({
             divider && styles.section_header_divider,
           )}
         >
-          <div>
+          <div className={styles.section_heading}>
             {title && (
               <h2 className={styles.section_title}>
                 {icon}

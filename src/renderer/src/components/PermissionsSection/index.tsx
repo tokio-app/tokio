@@ -20,10 +20,7 @@ const ROLES = [
 
 export function PermissionsSection({ permissions, update, feature }: Props) {
   return (
-    <Section
-      title="Permissions"
-      description={`Control exactly who has permission to use the ${feature} system.`}
-    >
+    <Section title="Permissions" description={`Who can use ${feature}.`}>
       <div className={styles.grid}>
         {ROLES.map(({ key, label }) => (
           <Check

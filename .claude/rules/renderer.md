@@ -22,7 +22,11 @@ paths:
 - Type is Archivo (`@fontsource-variable/archivo`, imported by `base.css`), at 400 for text, 500 for labels and controls, 600 for titles.
   - Live numbers (Home's stats and totals) use the readout: `font-stretch: var(--stretch-readout)`, 700, `tabular-nums`.
   - Both builds set `assetsInlineLimit: 0`, because the CSP blocks fonts inlined as `data:` URLs.
-- A page of settings uses `<Page width="wide" layout="aside">`. Each section's header sits in a 240px column beside its content, and `Section` wraps the content in `.section_body`, which is `display: contents` in the stacked layout.
+- A page of settings uses `<Page width="wide" layout="aside">`.
+  - Each section's header sits in a 240px column beside its content.
+  - The section's actions go on the title's row, as icon buttons with a `title`: text buttons don't fit there.
+  - Descriptions there are a few words, not explanations.
+  - `Section` wraps the content in `.section_body`, which is `display: contents` in the stacked layout.
 - `TitleBar`'s `live` prop (Layout passes the connection) draws the tally on every page: a rose line along the window's top, and "LIVE" next to the logo.
 
 ## Keyboard

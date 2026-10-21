@@ -24,7 +24,7 @@ export function ProfileSection({
     <Section
       icon={<FiUsers />}
       title="Live Profiles"
-      description="Manage settings for different lives."
+      description="Separate settings for different streams."
     >
       <div className={styles.profiles}>
         <Field

@@ -27,12 +27,9 @@ export function ProvidersSection({ settings }: Props) {
       title="TikTok LIVE"
       description={
         <>
-          Tokio connects to TikTok LIVE through{" "}
-          {link(EULER_STREAM_URL, "Euler Stream")}, which signs each connection,
-          with your own API key: {link(EULER_SIGNUP_URL, "sign up")} for free
-          and paste your key here. Your{" "}
-          {link(EULER_PRICING_URL, "Euler Stream plan")} sets how often you can
-          connect.
+          Your {link(EULER_STREAM_URL, "Euler Stream")} API key.{" "}
+          {link(EULER_SIGNUP_URL, "Get one free")}; your{" "}
+          {link(EULER_PRICING_URL, "plan")} sets how often you can connect.
         </>
       }
     >

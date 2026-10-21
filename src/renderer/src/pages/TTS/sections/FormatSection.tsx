@@ -35,10 +35,7 @@ export function FormatSection({ format, update }: Props) {
   const templateRef = useRef<HTMLInputElement>(null);
 
   return (
-    <Section
-      title="Format"
-      description="Determine which chat messages get read aloud."
-    >
+    <Section title="Format" description="Which chat messages get read.">
       <RadioGroup
         name="trigger"
         value={format.trigger.mode}

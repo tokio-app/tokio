@@ -23,7 +23,7 @@ export function VoiceKeysSection() {
     <Section
       icon={<FiKey />}
       title="Voice Engines"
-      description="Keys for the voice engines used by TTS."
+      description="Keys for the TTS voice engines."
     >
       <FormGrid>
         {engines.map((engine) => (

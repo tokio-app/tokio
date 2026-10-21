@@ -51,9 +51,7 @@ describe("ProtectionSection", () => {
       screen.getByRole("heading", { name: "Protection" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Set limits and word filters to prevent chat from abusing the Music system.",
-      ),
+      screen.getByText("Limits that keep chat from flooding Music."),
     ).toBeInTheDocument();
   });
 
