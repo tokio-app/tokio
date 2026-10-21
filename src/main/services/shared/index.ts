@@ -1,4 +1,3 @@
-import { Provider } from "@/common/types";
 import { formatError } from "@/common/util";
 import { cleanText } from "@/helper/chat";
 import Logger from "@/logger";
@@ -18,23 +17,12 @@ export class ProviderService<T extends IProvider>
   extends Service
   implements IProvider
 {
-  protected _current:
-    { name: string; provider: T | null; key: string } | undefined;
-  protected _providerPool: Map<string, T> | undefined;
-
-  constructor() {
-    super();
-    this._current = {
-      name: "",
-      key: "",
-      provider: null,
-    };
-    this._providerPool = new Map();
-  }
+  // Set by the addProvider(…, true) each child's constructor starts with
+  protected _current: { name: string; provider: T; key: string };
+  protected _providerPool = new Map<string, T>();
 
   public addProvider(name: string, provider: T, start?: boolean) {
-    if (!this._validProvider(provider)) return;
-    this._providerPool?.set(name, provider);
+    this._providerPool.set(name, provider);
     if (start) {
       this.setProvider(name);
     }
@@ -45,28 +33,18 @@ export class ProviderService<T extends IProvider>
   }
 
   public setKey(key: string): void {
-    if (this._current?.provider) this._current.provider.setKey(key);
+    this._current.provider.setKey(key);
   }
 
   public setProvider(name: string, key?: string) {
-    const provider = this._providerPool?.get(name);
+    const provider = this._providerPool.get(name);
     if (!provider) return;
     this._current = { name, provider, key: key || "" };
     this.setKey(key || "");
   }
 
-  public getProviders(): Provider[] {
-    const providers = this._providerPool?.keys().toArray() || [];
-    return providers.map((s) => ({
-      name: s,
-      active: s == this._current?.name,
-      key: this._current?.key || "",
-    }));
-  }
-
-  // NOTE: MUST Override this in the child class!
-  protected _validProvider(_provider: T) {
-    return false;
+  public providerNames(): string[] {
+    return [...this._providerPool.keys()];
   }
 }
 

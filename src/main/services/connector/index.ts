@@ -3,7 +3,6 @@ import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
 import {
-  connectFailure,
   ConnectorProvider,
   ConnectorResponse,
   GiftResponse,
@@ -19,29 +18,25 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
 
   public override setLogFile(logFile: string): void {
     super.setLogFile(logFile);
-    this._providerPool?.forEach((provider) => provider.setLogFile(logFile));
-  }
-
-  protected override _validProvider(provider: ConnectorProvider): boolean {
-    return provider instanceof ConnectorProvider;
+    this._providerPool.forEach((provider) => provider.setLogFile(logFile));
   }
 
   public on<T extends TOKIO_EVENTS>(
     event: T,
     listener: (data: TokioEventMap[T]) => void,
   ): void {
-    if (this._current?.provider) this._current.provider.on(event, listener);
+    this._current.provider.on(event, listener);
   }
 
   public off<T extends TOKIO_EVENTS>(
     event: T,
     listener: (data: TokioEventMap[T]) => void,
   ): void {
-    if (this._current?.provider) this._current.provider.off(event, listener);
+    this._current.provider.off(event, listener);
   }
 
   public onReconnect(listener: (state: ReconnectState) => void) {
-    this._current?.provider?.onReconnect(listener);
+    this._current.provider.onReconnect(listener);
   }
 
   public async connect(
@@ -49,13 +44,6 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
     key?: string,
   ): Promise<ConnectorResponse> {
     Logger.info(`<Connector> Connecting to: ${username}`, this._logFile);
-    if (!this._current?.provider) {
-      Logger.error(`<Connector> No provider was defined.`, this._logFile);
-      return {
-        success: false,
-        error: connectFailure("unknown", "No connector provider was defined."),
-      };
-    }
     const res = await this._current.provider.connect(username, key);
     if (!res.success) {
       Logger.error(
@@ -70,22 +58,14 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
   }
 
   public async disconnect(): Promise<void> {
-    if (this._current?.provider) await this._current.provider.disconnect();
+    await this._current.provider.disconnect();
   }
 
   public isConnected(): boolean {
-    if (!this._current?.provider) return false;
     return this._current.provider.isConnected();
   }
 
   public async fetchGifts(): Promise<GiftResponse> {
-    if (!this._current?.provider)
-      return {
-        success: false,
-        data: [],
-        warn: "No conector provider was defined.",
-      };
-    const res = await this._current.provider.fetchGifts();
-    return res;
+    return this._current.provider.fetchGifts();
   }
 }

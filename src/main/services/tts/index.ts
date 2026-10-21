@@ -47,10 +47,6 @@ export class TTSService extends ProviderService<TTSProvider> {
     this.addProvider("Edge", new EdgeTTS());
   }
 
-  protected override _validProvider(provider: TTSProvider): boolean {
-    return provider instanceof TTSProvider;
-  }
-
   public getEngines(): VoiceEngine[] {
     return [...(this._providerPool?.entries() ?? [])].map(([id, provider]) => ({
       id,

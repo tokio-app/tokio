@@ -15,22 +15,9 @@ class FakeProvider {
   }
 }
 
-class FakeService extends ProviderService<FakeProvider> {
-  protected override _validProvider(provider: FakeProvider) {
-    return provider instanceof FakeProvider;
-  }
-}
-
 describe("ProviderService", () => {
-  it("rejects every provider unless the child validates them", () => {
-    const service = new ProviderService<FakeProvider>();
-    service.addProvider("a", new FakeProvider(), true);
-
-    expect(service.getProviders()).toEqual([]);
-  });
-
   it("starts a provider when asked, with an empty key", () => {
-    const service = new FakeService();
+    const service = new ProviderService<FakeProvider>();
     const a = new FakeProvider();
     a.key = "stale";
 
@@ -38,40 +25,37 @@ describe("ProviderService", () => {
     service.addProvider("b", new FakeProvider());
 
     expect(a.key).toBe("");
-    expect(service.getProviders()).toEqual([
-      { name: "a", active: true, key: "" },
-      { name: "b", active: false, key: "" },
-    ]);
+    expect(service.providerNames()).toEqual(["a", "b"]);
   });
 
   it("switches provider and forwards the key", () => {
-    const service = new FakeService();
+    const service = new ProviderService<FakeProvider>();
     const a = new FakeProvider();
     const b = new FakeProvider();
     service.addProvider("a", a, true);
     service.addProvider("b", b);
 
     service.setProvider("b", "secret");
-
     expect(b.key).toBe("secret");
-    expect(service.getProviders().find((p) => p.active)).toEqual({
-      name: "b",
-      active: true,
-      key: "secret",
-    });
+
+    service.setKey("next");
+    expect(b.key).toBe("next");
+    expect(a.key).toBe("");
   });
 
   it("ignores unknown providers", () => {
-    const service = new FakeService();
-    service.addProvider("a", new FakeProvider(), true);
+    const service = new ProviderService<FakeProvider>();
+    const a = new FakeProvider();
+    service.addProvider("a", a, true);
 
     service.setProvider("missing", "secret");
+    service.setKey("next");
 
-    expect(service.getProviders().find((p) => p.active)?.name).toBe("a");
+    expect(a.key).toBe("next");
   });
 
   it("setKey only reaches the active provider", () => {
-    const service = new FakeService();
+    const service = new ProviderService<FakeProvider>();
     const a = new FakeProvider();
     const b = new FakeProvider();
     service.addProvider("a", a, true);

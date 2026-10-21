@@ -89,9 +89,7 @@ describe("TikTokConnectorService", () => {
   it("starts with the default provider", () => {
     const service = new TikTokConnectorService();
 
-    expect(service.getProviders()).toEqual([
-      expect.objectContaining({ name: "Default", active: true }),
-    ]);
+    expect(service.providerNames()).toEqual(["Default"]);
     expect(service.isConnected()).toBe(false);
   });
 });

@@ -263,12 +263,12 @@ export class StoreManagerService extends Service {
   // Registered providers that were never saved still need to be selectable.
   private _withRegisteredProviders(
     saved: AppProvider[],
-    service: { getProviders(): { name: string }[] },
+    service: { providerNames(): string[] },
   ): AppProvider[] {
     const missing = service
-      .getProviders()
-      .filter(({ name }) => !saved.some((p) => p.name === name))
-      .map(({ name }) => ({ name, key: "", active: false }));
+      .providerNames()
+      .filter((name) => !saved.some((p) => p.name === name))
+      .map((name) => ({ name, key: "", active: false }));
     return [...saved, ...missing];
   }
 

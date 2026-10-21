@@ -46,11 +46,7 @@ export class MusicService extends ProviderService<MusicProvider> {
 
   public override setLogFile(logFile: string): void {
     super.setLogFile(logFile);
-    this._providerPool?.forEach((provider) => provider.setLogFile(logFile));
-  }
-
-  protected override _validProvider(provider: MusicProvider): boolean {
-    return provider instanceof MusicProvider;
+    this._providerPool.forEach((provider) => provider.setLogFile(logFile));
   }
 
   public connect(): Promise<ConnectionResponse> {
