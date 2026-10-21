@@ -63,7 +63,7 @@ describe("home events", () => {
 
     it("answers once when the connected event comes before connect resolves", async () => {
       const { h, live } = setup({ success: true }, () => {
-        live.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+        live.emit(TOKIO_EVENTS.CONNECTED, undefined);
       });
 
       await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
@@ -76,7 +76,7 @@ describe("home events", () => {
       const { h, live } = setup({ success: true });
 
       await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
-      live.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+      live.emit(TOKIO_EVENTS.CONNECTED, undefined);
 
       expect(live.listeners(TOKIO_EVENTS.CONNECTED)).toBe(0);
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toHaveLength(1);
@@ -149,18 +149,6 @@ describe("home events", () => {
           code: FEEDBACK_CODES.CONNECT_FAILED,
           message,
         }),
-      ]);
-    });
-
-    it("ignores a connected event that failed", async () => {
-      const { h, live } = setup({ success: false }, () => {
-        live.emit(TOKIO_EVENTS.CONNECTED, { success: false });
-      });
-
-      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
-
-      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        expect.objectContaining({ success: false }),
       ]);
     });
   });

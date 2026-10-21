@@ -234,7 +234,7 @@ describe("TikTokLiveConnector", () => {
       await connected();
 
       expect(live.listening).toEqual([1]);
-      expect(onConnected).toHaveBeenCalledExactlyOnceWith({ success: true });
+      expect(onConnected).toHaveBeenCalledOnce();
       expect(onChat).toHaveBeenCalledOnce();
       expect(onConnected.mock.invocationCallOrder[0]).toBeLessThan(
         onChat.mock.invocationCallOrder[0],

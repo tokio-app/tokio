@@ -188,7 +188,7 @@ export class TikTokLiveConnector extends ConnectorProvider {
     // Before the room's first messages, so the session starts before them.
     connection.on(WebcastEvent.CONNECTED, ({ reconnected }) => {
       if (reconnected) this._onReconnect?.("reconnected");
-      else this.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+      else this.emit(TOKIO_EVENTS.CONNECTED);
     });
 
     connection.on(

@@ -613,7 +613,7 @@ describe("init events", () => {
     const sessions = (s: Setup) =>
       s.h.pushed(APP_EVENTS_RESPONSE.LIVE_SESSION).map(({ data }) => data);
     const connect = (s: Setup) =>
-      s.conn.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
 
     it("starts the session when the LIVE connects", async () => {
       vi.useFakeTimers({ now: 5000 });
@@ -624,14 +624,6 @@ describe("init events", () => {
       expect(sessions(s)).toEqual([
         { startedAt: 5000, totals: noTotals, activity: [] },
       ]);
-    });
-
-    it("doesn't start it when connecting fails", async () => {
-      const s = await live();
-
-      s.conn.emit(TOKIO_EVENTS.CONNECTED, { success: false });
-
-      expect(sessions(s)).toEqual([]);
     });
 
     it("pushes the LIVE's events at most every 250ms, with the latest session", async () => {

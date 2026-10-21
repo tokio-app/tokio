@@ -248,7 +248,7 @@ describe("ServerService", () => {
       const client = await connect("a");
       const message = nextMessage(client);
 
-      provider.emit(TOKIO_EVENTS.CONNECTED, { success: true });
+      provider.emit(TOKIO_EVENTS.CONNECTED, undefined);
       provider.emit(TOKIO_EVENTS.FOLLOW, follow);
 
       expect(await message).toEqual({

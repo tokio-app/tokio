@@ -207,8 +207,7 @@ const registerConnectorEvents = ({
   }
   // Added when the app loads, before any connect, so the session has started
   // by the time the connect is answered.
-  conn.on(TOKIO_EVENTS.CONNECTED, (d) => {
-    if (!d.success) return;
+  conn.on(TOKIO_EVENTS.CONNECTED, () => {
     live.start();
     sendSession.cancel();
     pushSession();

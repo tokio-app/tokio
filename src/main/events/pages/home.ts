@@ -3,7 +3,6 @@ import {
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
   TOKIO_EVENTS,
-  TokioEventMap,
 } from "@/common/types";
 import { createStack } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
@@ -72,10 +71,7 @@ events.push(
       );
     };
     // Answers this connect only, so connects don't pile up listeners.
-    const onConnected = (d: TokioEventMap[TOKIO_EVENTS.CONNECTED]) => {
-      if (d.success) answer();
-    };
-    connectorService.on(TOKIO_EVENTS.CONNECTED, onConnected);
+    connectorService.on(TOKIO_EVENTS.CONNECTED, answer);
 
     try {
       const res = await connectorService.connect(username);
@@ -88,7 +84,7 @@ events.push(
       }
       answer();
     } finally {
-      connectorService.off(TOKIO_EVENTS.CONNECTED, onConnected);
+      connectorService.off(TOKIO_EVENTS.CONNECTED, answer);
     }
   },
   {
