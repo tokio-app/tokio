@@ -4,7 +4,7 @@
 
 Tokio is an Electron desktop app for Windows, macOS and Linux that connects to a TikTok LIVE stream and reacts to its events with text-to-speech, music requests (Spotify/YouTube), sound alerts, and browser-source overlays served over a local HTTP/WebSocket server.
 
-Stack: Electron 39, electron-vite, React 19, TypeScript, TanStack Router, Express 5 + `ws`, Zod 4, Yarn 1, Node >= 24.
+Stack: Electron 45, electron-vite, React 19, TypeScript, TanStack Router, Express 5 + `ws`, Zod 4, Yarn 1, Node >= 24.
 
 ## Commands
 
@@ -117,6 +117,8 @@ All renderer ↔ main communication is typed. To add an event:
 
 To push from main without a request, use `win.webContents.send(APP_EVENTS_RESPONSE.Y, data)`; a `void` response still needs `undefined` as payload.
 
+Handlers open file dialogs with `showOpenDialog` / `showSaveDialog` from `@/helper/dialog`, which start in the last folder used. Electron's own start in Downloads.
+
 A request about one item (an overlay, a document, a test) gets its id back in the reply, failures included, so the renderer ignores a late reply for another one (see `GET_OVERLAY_CONFIG`).
 
 Live stream events (`TOKIO_EVENTS` / `TokioEventMap`) come from the connector. `ServerService` forwards them to overlays over WebSocket, and they drive TTS, music requests and alerts. A new live event needs a label in `ALERT_TRIGGER_LABELS` (`src/common/types/connector.ts`) or typecheck fails; a new internal event goes in the `exclude` list of `AlertTriggerSchema` (`src/common/schemas/profile.ts`).
@@ -138,7 +140,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 
 ### Persistence
 
-Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load. Store mutators return whether the store file was written. A profile switch that can't be saved keeps the old profile, and `updateProfileData` throws until the store has loaded.
+Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load. Store mutators return whether the store file was written. A profile switch that can't be saved keeps the old profile, and `updateProfileData` throws until the store has loaded. Provider keys (the Euler key, voice engine keys) are saved encrypted with `safeStorage`'s async calls. The store decrypts them once at startup and reads them from memory, so `getSettings` stays synchronous.
 
 Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name. An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case.
 

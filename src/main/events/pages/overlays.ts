@@ -4,10 +4,10 @@ import {
   AppError,
   FEEDBACK_CODES,
 } from "@/common/types";
+import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError } from "@/helper/feedback";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
-import { dialog } from "electron";
 
 const events = createStack("overlays");
 
@@ -27,7 +27,7 @@ const replyOverlays = (
 events.push(
   APP_EVENTS.IMPORT_OVERLAY,
   async ({ win, overlayService, notifier }, e) => {
-    const diagRes = await dialog.showOpenDialog(win, {
+    const diagRes = await showOpenDialog(win, {
       title: `Import Overlay`,
       properties: ["openDirectory"],
     });

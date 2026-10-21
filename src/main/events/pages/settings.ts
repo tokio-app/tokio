@@ -5,12 +5,12 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { SERVER_PORT } from "@/common/util";
+import { showOpenDialog, showSaveDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
 import { StoreManagerService } from "@/services/store";
 import { TTSService } from "@/services/tts";
 import { ReplyEvent } from "@/types";
-import { dialog } from "electron";
 
 const events = createStack("system");
 
@@ -167,7 +167,7 @@ events.push(
 events.push(
   APP_EVENTS.EXPORT_ENTITY,
   async ({ storeManagerService, win, notifier }, e, { type, file }) => {
-    const diagRes = await dialog.showSaveDialog(win, {
+    const diagRes = await showSaveDialog(win, {
       title: `Export ${type}`,
       defaultPath: file,
       filters: [
@@ -211,7 +211,7 @@ events.push(
 events.push(
   APP_EVENTS.IMPORT_ENTITY,
   async ({ storeManagerService, win, notifier }, e, { type }) => {
-    const diagRes = await dialog.showOpenDialog(win, {
+    const diagRes = await showOpenDialog(win, {
       title: `Import ${type}`,
       properties: ["openFile"],
       filters: [

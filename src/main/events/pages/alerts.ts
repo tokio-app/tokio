@@ -8,11 +8,11 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import { generateTikTokEventSample } from "@/common/util";
+import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
 import { AUDIO_EXTENSIONS } from "@/services/alerts";
 import { AppHandlerVariables } from "@/types";
-import { dialog } from "electron";
 
 const events = createStack("alerts");
 
@@ -110,7 +110,7 @@ events.push(
 events.push(
   APP_EVENTS.IMPORT_SOUND,
   async ({ win, alertsService, storeManagerService, notifier }, e, { id }) => {
-    const diagRes = await dialog.showOpenDialog(win, {
+    const diagRes = await showOpenDialog(win, {
       title: "Select a sound",
       properties: ["openFile"],
       filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS }],
@@ -258,7 +258,7 @@ events.push(
 events.push(
   APP_EVENTS.UPLOAD_SOUNDS,
   async ({ win, alertsService, storeManagerService, notifier }, e) => {
-    const diagRes = await dialog.showOpenDialog(win, {
+    const diagRes = await showOpenDialog(win, {
       title: "Upload sounds",
       properties: ["openFile", "multiSelections"],
       filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS }],

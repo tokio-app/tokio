@@ -266,10 +266,13 @@ function createFakes() {
     },
     // Round-trips text, with the "v10" prefix Chromium's encryption adds
     safeStorage: {
-      isEncryptionAvailable: () => true,
-      encryptString: (text: string) => Buffer.from(`v10${text}`, "utf-8"),
-      decryptString: (data: Buffer) =>
-        data.toString("utf-8").replace(/^v1[01]/, ""),
+      isAsyncEncryptionAvailable: async () => true,
+      encryptStringAsync: async (text: string) =>
+        Buffer.from(`v10${text}`, "utf-8"),
+      decryptStringAsync: async (data: Buffer) => ({
+        shouldReEncrypt: false,
+        result: data.toString("utf-8").replace(/^v\d\d/, ""),
+      }),
     },
   };
 }

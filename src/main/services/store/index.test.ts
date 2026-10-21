@@ -342,12 +342,50 @@ describe("StoreManagerService", () => {
       });
     });
 
-    it("drops a key it can't decrypt, so it's asked for again", async () => {
+    // What safeStorage saved in an earlier run, as the fake encrypts
+    const encrypted = (text: string, prefix = "v10") =>
+      Buffer.from(`${prefix}${text}`).toString("base64");
+    const saveEulerKey = async (key: string) => {
+      const data = structuredClone(defaultStoreData);
+      const euler = { name: "Default", key, active: true };
+      data.settings.activeConnProvider = euler;
+      data.settings.providers.connector = [euler];
+      await writeFile(storeFile, JSON.stringify(data));
+    };
+
+    it("decrypts the saved keys once, at startup", async () => {
+      const data = structuredClone(defaultStoreData);
+      const euler = {
+        name: "Default",
+        key: encrypted("euler-key"),
+        active: true,
+      };
+      data.settings.activeConnProvider = euler;
+      data.settings.providers.connector = [euler];
+      // A newer key provider writes its own prefix
+      data.settings.providers.tts = [
+        { name: "Default", key: encrypted("session", "v12"), active: true },
+      ];
+      await writeFile(storeFile, JSON.stringify(data));
+      const setProvider = vi.spyOn(connector, "setProvider");
+      const decrypt = vi.spyOn(safeStorage, "decryptStringAsync");
+
       const store = await init();
-      await store.updateProvider("Default", "euler-key");
-      vi.spyOn(safeStorage, "decryptString").mockImplementation(() => {
-        throw new Error("Decryption failed");
-      });
+      store.getSettings();
+
+      expect(setProvider).toHaveBeenCalledWith("Default", "euler-key");
+      expect(store.getSettings().activeConnProvider.key).toBe("euler-key");
+      expect(store.getVoiceKey("Default")).toBe("session");
+      expect(decrypt).toHaveBeenCalledTimes(2);
+    });
+
+    it("drops a key it can't decrypt, so it's asked for again", async () => {
+      await saveEulerKey(encrypted("euler-key"));
+      vi.spyOn(safeStorage, "decryptStringAsync").mockRejectedValue(
+        new Error("Decryption failed"),
+      );
+
+      const store = await init();
 
       expect(store.getSettings().activeConnProvider.key).toBe("");
     });
@@ -368,11 +406,24 @@ describe("StoreManagerService", () => {
     });
 
     it("drops an encrypted key while encryption is unavailable", async () => {
+      await saveEulerKey(encrypted("euler-key"));
+      vi.spyOn(safeStorage, "isAsyncEncryptionAvailable").mockResolvedValue(
+        false,
+      );
+
       const store = await init();
-      await store.updateProvider("Default", "euler-key");
-      vi.spyOn(safeStorage, "isEncryptionAvailable").mockReturnValue(false);
 
       expect(store.getSettings().activeConnProvider.key).toBe("");
+    });
+
+    // On macOS it can ask for the Keychain
+    it("leaves safeStorage alone without an encrypted key", async () => {
+      await saveEulerKey("");
+      const available = vi.spyOn(safeStorage, "isAsyncEncryptionAvailable");
+
+      await init();
+
+      expect(available).not.toHaveBeenCalled();
     });
   });
 

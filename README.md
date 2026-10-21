@@ -88,11 +88,11 @@ Download Tokio from the [latest release](https://github.com/tokio-app/tokio/rele
 
 ### Platforms
 
-| Platform | Status    |
-| -------- | --------- |
-| Windows  | Supported |
-| macOS    | Supported |
-| Linux    | Supported |
+| Platform | Status                        |
+| -------- | ----------------------------- |
+| Windows  | Supported                     |
+| macOS    | Supported (macOS 13 or later) |
+| Linux    | Supported                     |
 
 Every release has builds for Windows (x64), macOS (Apple Silicon and Intel) and Linux (x64). The voices installed on the system are only available on Windows; TikTok and Edge voices work everywhere.
 
