@@ -30,11 +30,17 @@ import {
 } from "../../common";
 import config from "./config";
 
+// A message type TikTok changed fails on every message, so an error code is
+// logged at most this often.
+const LOG_REPEAT_MS = 30_000;
+
 export class TikTokLiveConnector extends ConnectorProvider {
   private _connection: TikTokLiveConnection | null = null;
   // The user's Euler Stream API key, which signs the connection
   private _key = "";
   private _events = new EventEmitter();
+  // When each error code was last logged
+  private _logged = new Map<string, number>();
 
   // --- PUBLIC API ---
 
@@ -82,7 +88,13 @@ export class TikTokLiveConnector extends ConnectorProvider {
           if (level === "warn") {
             Logger.warn(`<Connector> ${message}`, this._logFile);
           } else if (level === "error") {
-            Logger.error(`<Connector> ${message}`, this._logFile, data?.error);
+            const error = data?.error;
+            const code = isConnectorError(error) ? error.code : message;
+            const now = Date.now();
+            const last = this._logged.get(code);
+            if (last !== undefined && now - last < LOG_REPEAT_MS) return;
+            this._logged.set(code, now);
+            Logger.error(`<Connector> ${message}`, this._logFile, error);
           }
         },
       });

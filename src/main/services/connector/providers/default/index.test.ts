@@ -135,6 +135,7 @@ describe("TikTokLiveConnector", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   describe("connect", () => {
@@ -265,6 +266,27 @@ describe("TikTokLiveConnector", () => {
       cause,
     );
     expect(info).not.toHaveBeenCalled();
+  });
+
+  it("logs an error that repeats at most every 30 seconds", async () => {
+    vi.useFakeTimers();
+    const error = vi.spyOn(Logger, "error");
+    await connected();
+    const log = connection().options.logger!;
+    const dropped = new ConnectorError("PROTOCOL", "Dropped message 1");
+    const gaveUp = new ConnectorError("RECONNECT_GAVE_UP", "Gave up");
+
+    log("error", dropped.message, { error: dropped });
+    log("error", "Dropped message 2", { error: dropped });
+    log("error", gaveUp.message, { error: gaveUp });
+    vi.advanceTimersByTime(30_000);
+    log("error", "Dropped message 3", { error: dropped });
+
+    expect(error.mock.calls.map(([message]) => message)).toEqual([
+      "<Connector> Dropped message 1",
+      "<Connector> Gave up",
+      "<Connector> Dropped message 3",
+    ]);
   });
 
   describe("disconnects", () => {
