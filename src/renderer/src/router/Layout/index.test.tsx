@@ -143,7 +143,8 @@ describe("Layout", () => {
     expect(titleBar().queryByText("Horror")).not.toBeInTheDocument();
   });
 
-  it("shows LIVE in the title bar while connected, on any page", async () => {
+  // On screen it's a line; screen readers get the word
+  it("marks the title bar LIVE while connected, on any page", async () => {
     await renderApp("/settings");
     expect(titleBar().queryByText("LIVE")).not.toBeInTheDocument();
 

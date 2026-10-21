@@ -29,7 +29,8 @@ type Props = {
   logo: string;
   // 40px tall instead of 44px, for the music window's nav view
   compact?: boolean;
-  // Connected to a LIVE: the bar lights up like a camera's tally light
+  // Connected to a LIVE: a rose line lights up at the top, like a camera's
+  // tally light
   live?: boolean;
   // Rendered before the window controls
   children?: ReactNode;
@@ -59,12 +60,8 @@ export function TitleBar({ target, logo, compact, live, children }: Props) {
     >
       <div className={styles.brand}>
         <img className={styles.logo} src={logo} alt="都" />
-        {live && (
-          <span className={styles.tally}>
-            <span className={styles.tally_dot} aria-hidden="true" />
-            LIVE
-          </span>
-        )}
+        {/* The line says it on screen, this says it to screen readers */}
+        {live && <span className={styles.live_label}>LIVE</span>}
       </div>
       <div className={styles.items}>
         {children}

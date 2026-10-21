@@ -27,7 +27,7 @@ paths:
   - The section's actions go on the title's row, as icon buttons with a `title`: text buttons don't fit there.
   - Descriptions there are a few words, not explanations.
   - `Section` wraps the content in `.section_body`, which is `display: contents` in the stacked layout.
-- `TitleBar`'s `live` prop (Layout passes the connection) draws the tally on every page: a rose line along the window's top, and "LIVE" next to the logo.
+- `TitleBar`'s `live` prop (Layout passes the connection) draws the tally on every page: a rose line at the top's center, fading out to both sides. "LIVE" is said only to screen readers.
 
 ## Keyboard
 
