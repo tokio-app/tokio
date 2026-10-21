@@ -92,6 +92,7 @@ Procedures live in `.claude/skills/<name>/SKILL.md`. Claude Code offers each one
 - `live-event`: add or change a TikTok LIVE event end to end
 - `ipc-event`: add an IPC request, reply or push, with its tests
 - `new-page`: add a page to the main window
+- `frontend-design`: the visual direction for new or reshaped UI (Anthropic's skill, Apache-2.0, vendored as published)
 
 When a procedure changes, update its skill with it.
 
