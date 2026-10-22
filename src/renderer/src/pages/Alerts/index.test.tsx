@@ -5,11 +5,19 @@ import {
   EMOTE_TRIGGER,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { alertSound, failure, gift, profileReply, voice } from "@test/fixtures";
+import {
+  alertSound,
+  failure,
+  gift,
+  instantSound,
+  profileReply,
+  voice,
+} from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { inList } from "@test/queries";
 import { renderWithProviders } from "@test/render";
 import { act, fireEvent, screen, within } from "@testing-library/react";
+import type { UserEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Alerts } from ".";
 
@@ -75,6 +83,26 @@ const rows = () =>
     .map((button) => within(button.parentElement!.parentElement!));
 
 const addAlert = () => screen.getByRole("button", { name: "Add alert" });
+// Asks main for a file's sound, which it answers with SET_ALERT_SOUND
+const browse = () =>
+  within(screen.getByRole("dialog")).getByRole("button", {
+    name: "Browse file...",
+  });
+// Starts downloading a MyInstants sound in the open picker
+async function download(user: UserEvent) {
+  const dialog = within(screen.getByRole("dialog"));
+  await user.click(dialog.getByRole("tab", { name: "MyInstants" }));
+  await send(APP_EVENTS_RESPONSE.SEARCH_SOUNDS, {
+    success: true,
+    query: "",
+    page: 1,
+    data: [instantSound("Bruh")],
+    hasNextPage: false,
+  });
+  await user.click(
+    dialog.getByRole("button", { name: "Download and use this sound" }),
+  );
+}
 const empty = "No alerts yet. Use the add button to create one.";
 
 beforeEach(() => {
@@ -511,6 +539,8 @@ describe("Alerts", () => {
       alert("alert-1", { sound: null, tts: speech("Welcome") }),
     ]);
     await user.click(rows()[0].getByRole("button", { name: "TTS: Welcome" }));
+    await user.click(screen.getByRole("tab", { name: "My sounds" }));
+    await user.click(browse());
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
@@ -542,8 +572,15 @@ describe("Alerts", () => {
   });
 
   // A download started from another alert's picker can finish meanwhile
-  it("keeps the picker open when another alert's sound is saved", async () => {
+  it("uses a sound saved after its picker closed, keeping another picker open", async () => {
     const { user } = await load([alert("alert-1"), alert("alert-2")]);
+    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await download(user);
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
     await user.click(rows()[1].getByRole("button", { name: "Airhorn" }));
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
@@ -553,6 +590,30 @@ describe("Alerts", () => {
     });
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(rows()[0].getByRole("button", { name: "Bell" })).toBeInTheDocument();
+  });
+
+  it("ignores a download that finishes after another sound was picked", async () => {
+    const { user } = await load([alert("alert-1")]);
+    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await send(APP_EVENTS_RESPONSE.GET_SOUNDS, {
+      success: true,
+      data: [airhorn, bell],
+    });
+    await download(user);
+    const dialog = within(screen.getByRole("dialog"));
+    await user.click(dialog.getByRole("tab", { name: "My sounds" }));
+    await user.click(dialog.getByRole("button", { name: "Bell" }));
+
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+      success: true,
+      id: "alert-1",
+      sound: alertSound("Bruh"),
+    });
+
+    expect(rows()[0].getByRole("button", { name: "Bell" })).toBeInTheDocument();
+    await wait(300);
+    expect(saves().at(-1)?.items[0]).toEqual(alert("alert-1", { sound: bell }));
   });
 
   it("tests an alert's sound or message", async () => {

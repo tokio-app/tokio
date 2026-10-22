@@ -66,7 +66,7 @@ export function useVoicePreview({
 
     queue.stop();
     void queue
-      .enqueue(res.data, true, { speed, pitch, onEnded: () => finish(key) })
+      .enqueue(res.data, { speed, pitch, onEnded: () => finish(key) })
       .then((queued) => {
         if (!queued) finish(key);
         else started(key);

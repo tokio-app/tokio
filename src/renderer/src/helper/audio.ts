@@ -8,18 +8,15 @@ interface AudioQueueOptions {
 interface EnqueueOptions {
   // Per item volume, applied on top of the queue volume
   gain?: number;
-  // Lets the volume of this item be changed while it waits or plays
+  // Lets the volume of this item be changed while it plays
   key?: string;
+  // Names the sound, so its copies are decoded once and share the buffer
+  cacheKey?: string;
   // Called when the item finishes playing, not when the queue is stopped
   onEnded?: () => void;
   // Per item speed and pitch, used instead of the queue's filters
   speed?: number;
   pitch?: number;
-}
-
-interface QueueItem extends EnqueueOptions {
-  buffer: Tone.ToneAudioBuffer;
-  gain: number;
 }
 
 interface ActiveItem {
@@ -30,15 +27,58 @@ interface ActiveItem {
   ownFilters: boolean;
 }
 
+// Bytes of decoded sounds kept for their next copies, by every queue
+export const DECODED_CACHE_BYTES = 200 * 1024 * 1024;
+
+// By cache key, least recently used first. A player keeps its own reference
+// to the buffer, so one dropped here still plays to its end.
+const decoded = new Map<
+  string,
+  { audio: Promise<AudioBuffer>; bytes: number }
+>();
+let decodedBytes = 0;
+
+function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
+  if (cacheKey === undefined) return Tone.getContext().decodeAudioData(data);
+
+  const cached = decoded.get(cacheKey);
+  if (cached) {
+    decoded.delete(cacheKey);
+    decoded.set(cacheKey, cached);
+    return cached.audio;
+  }
+
+  // Kept while decoding, so copies that come meanwhile wait for this one
+  const entry = { audio: Tone.getContext().decodeAudioData(data), bytes: 0 };
+  decoded.set(cacheKey, entry);
+  entry.audio.then(
+    (audio) => {
+      if (decoded.get(cacheKey) !== entry) return;
+      // 32-bit samples
+      entry.bytes = audio.length * audio.numberOfChannels * 4;
+      decodedBytes += entry.bytes;
+      for (const [key, oldest] of decoded) {
+        if (decodedBytes <= DECODED_CACHE_BYTES) break;
+        decoded.delete(key);
+        decodedBytes -= oldest.bytes;
+      }
+    },
+    () => {
+      if (decoded.get(cacheKey) === entry) decoded.delete(cacheKey);
+    },
+  );
+  return entry.audio;
+}
+
 export class AudioQueue {
   private gainNode: Tone.Gain;
-  private queue: QueueItem[] = [];
   // Scheduled or playing
   private active: ActiveItem[] = [];
+  // Sounds being decoded, which already hold their place
+  private decoding: number = 0;
   // Bumped by stop(), so audio still decoding from before is dropped
   private generation: number = 0;
   private nextPlayTime: number = 0;
-  public isPlaying: boolean = false;
   private maxQueueLength: number;
   private gapTime: number;
 
@@ -88,8 +128,7 @@ export class AudioQueue {
 
   async enqueue(
     input: Uint8Array | ArrayBuffer,
-    autoplay: boolean = true,
-    { gain = 1, key, onEnded, speed, pitch }: EnqueueOptions = {},
+    { cacheKey, ...item }: EnqueueOptions = {},
   ) {
     if (this.pending() >= this.maxQueueLength) {
       console.warn("AudioQueue: Max queue length reached. Ignoring input.");
@@ -97,6 +136,8 @@ export class AudioQueue {
     }
 
     const generation = this.generation;
+    // Held while decoding, so a full queue never decodes
+    this.decoding++;
 
     try {
       let audioData: ArrayBuffer;
@@ -115,45 +156,24 @@ export class AudioQueue {
         audioData = input;
       }
 
-      const rawBuffer = await Tone.getContext().decodeAudioData(audioData);
-      const toneBuffer = new Tone.ToneAudioBuffer(rawBuffer);
-
+      const buffer = await decode(audioData, cacheKey);
       if (generation !== this.generation) return false;
 
-      if (this.pending() >= this.maxQueueLength) {
-        console.warn(
-          "AudioQueue: Queue filled up while decoding. Dropping audio.",
-        );
-        return false;
-      }
-
-      this.queue.push({ buffer: toneBuffer, gain, key, onEnded, speed, pitch });
-
-      if (autoplay) {
-        this.start();
-      } else if (this.isPlaying) {
-        this.scheduleNext();
-      }
-
+      this.schedule(buffer, item);
       return true;
     } catch (error) {
       console.error("Failed to decode Tone audio:", error);
       return false;
+    } finally {
+      // stop() already gave the places back
+      if (generation === this.generation) this.decoding--;
     }
   }
 
-  start() {
-    this.isPlaying = true;
-    this.scheduleNext();
-  }
-
   /**
-   * Changes the volume of every waiting or playing item with this key.
+   * Changes the volume of every scheduled or playing item with this key.
    */
   setItemGain(key: string, gain: number) {
-    this.queue.forEach((item) => {
-      if (item.key === key) item.gain = gain;
-    });
     this.active.forEach((item) => {
       if (item.key === key) item.gainNode.gain.rampTo(gain, 0.05);
     });
@@ -161,8 +181,7 @@ export class AudioQueue {
 
   stop() {
     this.generation++;
-    this.isPlaying = false;
-    this.queue = [];
+    this.decoding = 0;
     this.nextPlayTime = 0;
 
     const active = this.active;
@@ -190,50 +209,45 @@ export class AudioQueue {
   }
 
   private pending() {
-    return this.queue.length + this.active.length;
+    return this.active.length + this.decoding;
   }
 
-  private scheduleNext() {
-    if (!this.isPlaying || this.queue.length === 0) return;
+  // Plays the sound after the ones already scheduled.
+  private schedule(buffer: AudioBuffer, next: EnqueueOptions) {
+    const { gain = 1, key, onEnded } = next;
+    const speed = next.speed ?? this.currentFilters.speed;
+    const pitch = next.pitch ?? this.currentFilters.pitch;
 
     if (this.nextPlayTime < Tone.now()) {
       this.nextPlayTime = Tone.now();
     }
 
-    while (this.queue.length > 0) {
-      const next = this.queue.shift()!;
-      const { buffer, gain, key, onEnded } = next;
-      const speed = next.speed ?? this.currentFilters.speed;
-      const pitch = next.pitch ?? this.currentFilters.pitch;
+    // Players only read the buffer, which the sound's copies share.
+    const player = new Tone.GrainPlayer({
+      url: buffer,
+      playbackRate: speed,
+      detune: Math.log2(pitch) * 1200,
+      grainSize: 0.1,
+      overlap: 0.05,
+    });
 
-      const player = new Tone.GrainPlayer({
-        url: buffer,
-        playbackRate: speed,
-        detune: Math.log2(pitch) * 1200,
-        grainSize: 0.1,
-        overlap: 0.05,
-      });
+    const gainNode = new Tone.Gain(gain).connect(this.gainNode);
+    player.connect(gainNode);
+    player.start(this.nextPlayTime);
+    this.active.push({
+      player,
+      gainNode,
+      key,
+      ownFilters: next.speed !== undefined || next.pitch !== undefined,
+    });
 
-      const gainNode = new Tone.Gain(gain).connect(this.gainNode);
-      player.connect(gainNode);
-      player.start(this.nextPlayTime);
-      this.active.push({
-        player,
-        gainNode,
-        key,
-        ownFilters: next.speed !== undefined || next.pitch !== undefined,
-      });
+    player.onstop = () => {
+      this.active = this.active.filter((item) => item.player !== player);
+      player.dispose();
+      gainNode.dispose();
+      onEnded?.();
+    };
 
-      player.onstop = () => {
-        this.active = this.active.filter((item) => item.player !== player);
-        player.dispose();
-        gainNode.dispose();
-        onEnded?.();
-      };
-
-      const actualDuration = buffer.duration / speed;
-
-      this.nextPlayTime += actualDuration + this.gapTime;
-    }
+    this.nextPlayTime += buffer.duration / speed + this.gapTime;
   }
 }

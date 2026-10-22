@@ -65,7 +65,7 @@ export function useAlertTest() {
 
         queue.stop();
         void queue
-          .enqueue(res.data, true, {
+          .enqueue(res.data, {
             gain: res.volume / 100,
             key: res.id,
             onEnded: () => finish(res.id),

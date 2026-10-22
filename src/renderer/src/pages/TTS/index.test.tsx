@@ -169,8 +169,39 @@ describe("TTS", () => {
       data,
     });
 
-    expect(queue.enqueue).toHaveBeenCalledWith(data, true);
+    expect(queue.enqueue).toHaveBeenCalledWith(data);
     expect(test).not.toHaveAttribute("aria-busy");
+  });
+
+  it("cuts the test playing when another one comes", async () => {
+    const { user, queue } = await setup();
+    await user.type(testMessage(), "Hello chat");
+    const reply = { success: true, id: "tts-test", data };
+
+    await user.click(testButton());
+    await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, reply);
+    await user.click(testButton());
+    await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, reply);
+
+    const [, second] = queue.enqueue.mock.invocationCallOrder;
+    expect(queue.stop).toHaveBeenCalledTimes(2);
+    expect(queue.stop.mock.invocationCallOrder[1]).toBeLessThan(second);
+  });
+
+  it("stops the test when the page closes", async () => {
+    const { user, queue, unmount } = await setup();
+    await user.type(testMessage(), "Hello chat");
+    await user.click(testButton());
+    await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
+      success: true,
+      id: "tts-test",
+      data,
+    });
+    queue.stop.mockClear();
+
+    unmount();
+
+    expect(queue.stop).toHaveBeenCalledOnce();
   });
 
   it("stops loading without playing when the test fails", async () => {

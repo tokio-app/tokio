@@ -76,7 +76,6 @@ describe("SoundsSection", () => {
 
     expect(queue.enqueue).toHaveBeenCalledWith(
       data,
-      true,
       expect.objectContaining({ gain: 1, key: "airhorn.mp3" }),
     );
     expect(

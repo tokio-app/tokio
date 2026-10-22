@@ -46,6 +46,7 @@ function setup(
 ) {
   const handlers = {
     onTest: vi.fn(),
+    onRequest: vi.fn(),
     onSelect: vi.fn(),
     onSelectTts: vi.fn(),
     onClose: vi.fn(),
@@ -147,11 +148,24 @@ describe("SoundPicker", () => {
   });
 
   it("browses for a file for the alert", async () => {
-    const { user } = setup();
+    const { user, onRequest } = setup();
 
     await user.click(screen.getByRole("button", { name: "Browse file..." }));
 
     expect(sent(APP_EVENTS.IMPORT_SOUND)).toEqual([{ id: "alert-1" }]);
+    expect(onRequest).toHaveBeenCalledOnce();
+  });
+
+  it("loads MyInstants only once its tab is first shown", async () => {
+    const { user } = setup();
+    await sounds(LIBRARY);
+    expect(sent(APP_EVENTS.SEARCH_SOUNDS)).toEqual([]);
+
+    await user.click(screen.getByRole("tab", { name: "MyInstants" }));
+    await user.click(screen.getByRole("tab", { name: "My sounds" }));
+    await user.click(screen.getByRole("tab", { name: "MyInstants" }));
+
+    expect(sent(APP_EVENTS.SEARCH_SOUNDS)).toEqual([{ query: "", page: 1 }]);
   });
 
   it("closes with Cancel, on any tab", async () => {

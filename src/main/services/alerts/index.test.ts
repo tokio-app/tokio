@@ -146,6 +146,7 @@ describe("AlertsService", () => {
           channel: "alerts",
           maxQueueLength: 100,
           id: "alert-1",
+          key: "ding.mp3",
         },
       ]);
     });
@@ -415,6 +416,7 @@ describe("AlertsService", () => {
           volume: 80,
           channel: "alerts",
           id: "alert-1",
+          key: expect.stringMatching(/^tts:/),
           filters: { speed: 1.5, pitch: 0.8 },
         });
       });
@@ -486,6 +488,8 @@ describe("AlertsService", () => {
           "Thanks for the Rose",
           "Thanks for the Rose",
         ]);
+        // So the window decodes it once too
+        expect(sent[1].key).toBe(sent[0].key);
       });
 
       it("makes one message at a time, with the TTS cooldown between them", async () => {
@@ -500,6 +504,7 @@ describe("AlertsService", () => {
 
         await vi.advanceTimersByTimeAsync(2000);
         expect(sent.map(said)).toEqual(["Thanks Ann", "Thanks Bob"]);
+        expect(sent[1].key).not.toBe(sent[0].key);
       });
 
       it("drops messages beyond the TTS queue length", async () => {

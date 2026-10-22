@@ -16,11 +16,11 @@ import { SERVER_PORT } from "@/common/util";
 import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
+import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { AppHandlerVariables } from "@/types";
-import { throttle } from "es-toolkit";
 
 const STATS_THROTTLE_MS = 250;
 

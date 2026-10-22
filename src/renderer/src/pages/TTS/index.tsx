@@ -6,7 +6,7 @@ import {
   useEditableSettings,
   useIpcListener,
 } from "@/hooks";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FormatSection } from "./sections/FormatSection";
 import { ProtectionFields } from "./sections/ProtectionFields";
 import { ReplacementsSection } from "./sections/ReplacementsSection";
@@ -31,8 +31,14 @@ export function TTS() {
   useIpcListener(APP_EVENTS_RESPONSE.GET_TTS_TEST, (res) => {
     if (res?.id !== TEST_ID) return;
     setTestLoading(false);
-    if (res.success) testQueue.enqueue(res.data!, true);
+    if (!res.success) return;
+    // A new test replaces the one playing
+    testQueue.stop();
+    testQueue.enqueue(res.data!);
   });
+
+  // Leaving the page cuts the test.
+  useEffect(() => () => testQueue.stop(), [testQueue]);
 
   return (
     <Page width="wide" layout="aside">

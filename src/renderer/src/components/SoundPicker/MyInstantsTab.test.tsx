@@ -27,6 +27,7 @@ function setup(props: Partial<Props> = {}) {
     library: [],
     testing: null,
     onTest: vi.fn(),
+    onRequest: vi.fn(),
     onSelect: vi.fn(),
     ...props,
   };
@@ -193,16 +194,24 @@ describe("MyInstantsTab", () => {
     expect(searches().at(-1)).toEqual({ query: "b", page: 3 });
   });
 
-  it("doesn't load the next page while hidden", async () => {
+  it("loads trending once first shown, and no next page while hidden", async () => {
     const { rerender } = setup({ hidden: true });
+    expect(searches()).toEqual([]);
+
+    rerender({ hidden: false });
+    expect(searches()).toEqual([{ query: "", page: 1 }]);
     await results([BRUH], { hasNextPage: true });
 
+    rerender({ hidden: true });
     intersect();
     expect(searches()).toHaveLength(1);
 
     rerender({ hidden: false });
     intersect();
-    expect(searches().at(-1)).toEqual({ query: "", page: 2 });
+    expect(searches()).toEqual([
+      { query: "", page: 1 },
+      { query: "", page: 2 },
+    ]);
   });
 
   it("doesn't load the next page while loading", async () => {
@@ -265,7 +274,7 @@ describe("MyInstantsTab", () => {
 
   it("downloads a sound for the alert, one at a time", async () => {
     const library: AlertSound[] = [alertSound("Airhorn")];
-    const { user } = setup({ library });
+    const { user, onRequest } = setup({ library });
     await results([BRUH, VINE_BOOM, AIRHORN]);
     const remove = screen.getByRole("button", {
       name: "Remove from your sounds",
@@ -276,6 +285,7 @@ describe("MyInstantsTab", () => {
     expect(sent(APP_EVENTS.DOWNLOAD_SOUND)).toEqual([
       { id: "alert-1", url: BRUH.url, name: "Bruh" },
     ]);
+    expect(onRequest).toHaveBeenCalledOnce();
     expect(downloads()).toHaveLength(2);
     for (const button of [...downloads(), remove]) {
       expect(button).toBeDisabled();

@@ -38,7 +38,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const done = () => window.api.emit(APP_EVENTS.TTS_PLAYED, { id: res.id });
     // Per message, so a change of speed or pitch spares the queued ones
     queue
-      .enqueue(res.data, true, {
+      .enqueue(res.data, {
         speed: res.filters.speed,
         pitch: res.filters.pitch,
         onEnded: done,
@@ -54,9 +54,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!res) return;
     const queue = getQueue(res.channel);
     queue.setQueueOptions({ maxQueueLength: res.maxQueueLength, gapTime: 0.2 });
-    queue.enqueue(res.data, true, {
+    queue.enqueue(res.data, {
       gain: res.volume / 100,
       key: res.id,
+      cacheKey: res.key,
       ...res.filters,
     });
   });

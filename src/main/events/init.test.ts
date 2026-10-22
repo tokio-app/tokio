@@ -429,6 +429,7 @@ describe("init events", () => {
         channel: "alerts",
         maxQueueLength: 100,
         id: "alert-1",
+        key: "ding.mp3",
       };
       s.alertsService.handle.mockImplementation(async (_t, _p, _prof, play) => {
         play(audio);

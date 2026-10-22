@@ -67,7 +67,7 @@ describe("AppProvider", () => {
       maxQueueLength: 5,
     });
     expect(queue.setFilters).toHaveBeenCalledExactlyOnceWith({ volume: 0.5 });
-    expect(queue.enqueue).toHaveBeenCalledWith(data, true, {
+    expect(queue.enqueue).toHaveBeenCalledWith(data, {
       speed: 1.2,
       pitch: 0.9,
       onEnded: expect.any(Function),
@@ -88,7 +88,7 @@ describe("AppProvider", () => {
 
       expect(sent(APP_EVENTS.TTS_PLAYED)).toEqual([]);
 
-      const [, , options] = audio.queue("tts_data").enqueue.mock.calls[0];
+      const [, options] = audio.queue("tts_data").enqueue.mock.calls[0];
       options?.onEnded?.();
 
       expect(sent(APP_EVENTS.TTS_PLAYED)).toEqual([{ id: 7 }]);
@@ -115,6 +115,7 @@ describe("AppProvider", () => {
       channel: "alerts:gift",
       maxQueueLength: 3,
       id: "alert-1",
+      key: "airhorn.mp3",
       filters: { speed: 1.5, pitch: 0.8 },
     });
 
@@ -123,9 +124,11 @@ describe("AppProvider", () => {
       maxQueueLength: 3,
       gapTime: 0.2,
     });
-    expect(queue.enqueue).toHaveBeenCalledWith(data, true, {
+    // Copies of the sound share one decoded buffer
+    expect(queue.enqueue).toHaveBeenCalledWith(data, {
       gain: 0.4,
       key: "alert-1",
+      cacheKey: "airhorn.mp3",
       speed: 1.5,
       pitch: 0.8,
     });

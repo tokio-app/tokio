@@ -9,7 +9,7 @@ import {
   useIpcListener,
   useIpcRequest,
 } from "@/hooks";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ttsDefaultsOf } from "./helper";
 import { HeaderSection } from "./sections/HeaderSection";
 import { ItemsSection } from "./sections/ItemsSection";
@@ -25,6 +25,9 @@ export function Alerts() {
   );
   // Id of the alert whose sound is being picked
   const [pickerFor, setPickerFor] = useState<string | null>(null);
+  // Alerts waiting for main to save a sound. A pick made since drops the
+  // alert, so a slow download can't replace it.
+  const asked = useRef(new Set<string>());
 
   const { settings, update } = useEditableSettings("alerts", (profile) => {
     setEmotes(profile.emotes);
@@ -61,8 +64,14 @@ export function Alerts() {
     setPickerFor((current) => (current === id ? null : current));
   };
 
+  const pick = (id: string, output: Pick<Alert, "sound" | "tts">) => {
+    asked.current.delete(id);
+    setOutput(id, output);
+  };
+
+  // A download still applies after its picker closed.
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, (res) => {
-    if (!res?.success || !res.sound) return;
+    if (!res?.success || !res.sound || !asked.current.has(res.id)) return;
     setOutput(res.id, { sound: res.sound, tts: null });
   });
 
@@ -102,8 +111,9 @@ export function Alerts() {
           ttsDefaults={ttsDefaults}
           testing={test.testing}
           onTest={test.toggle}
-          onSelect={(sound) => setOutput(pickerAlert.id, { sound, tts: null })}
-          onSelectTts={(tts) => setOutput(pickerAlert.id, { sound: null, tts })}
+          onRequest={() => asked.current.add(pickerAlert.id)}
+          onSelect={(sound) => pick(pickerAlert.id, { sound, tts: null })}
+          onSelectTts={(tts) => pick(pickerAlert.id, { sound: null, tts })}
           onClose={() => setPickerFor(null)}
         />
       )}

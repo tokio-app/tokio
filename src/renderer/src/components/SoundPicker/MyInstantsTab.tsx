@@ -24,6 +24,8 @@ type Props = {
   library: AlertSound[];
   testing: TestState;
   onTest: (req: AlertTestRequest) => void;
+  // Called when a download for the alert starts
+  onRequest: () => void;
   onSelect: (sound: AlertSound) => void;
 };
 
@@ -33,6 +35,7 @@ export function MyInstantsTab({
   library,
   testing,
   onTest,
+  onRequest,
   onSelect,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -112,6 +115,7 @@ export function MyInstantsTab({
                   disabled={downloading !== null}
                   onClick={() => {
                     setDownloading(sound.url);
+                    onRequest();
                     window.api.emit(APP_EVENTS.DOWNLOAD_SOUND, {
                       id,
                       url: sound.url,

@@ -34,7 +34,7 @@ describe("useAlertTest", () => {
       filters: { speed: 1.2, pitch: 0.9 },
     });
 
-    expect(queue.enqueue).toHaveBeenCalledWith(data, true, {
+    expect(queue.enqueue).toHaveBeenCalledWith(data, {
       gain: 0.8,
       key: "alert-1",
       onEnded: expect.any(Function),
@@ -49,7 +49,7 @@ describe("useAlertTest", () => {
     act(() => result.current.toggle(airhorn));
     await send(TEST_ALERT, { success: true, id: "alert-1", data, volume: 80 });
 
-    const [, , options] = queue.enqueue.mock.calls[0];
+    const [, options] = queue.enqueue.mock.calls[0];
     act(() => options?.onEnded?.());
 
     expect(result.current.testing).toBeNull();
