@@ -14,7 +14,7 @@ yarn test                 # vitest (yarn test:watch to watch, --project main|ren
 yarn test:coverage        # vitest with a coverage report in coverage/
 yarn test:e2e             # build the app and drive it with Playwright (needs port 37891: close Tokio first)
 yarn typecheck            # tsc for node (main/preload/common) and web (renderer/music)
-yarn lint                 # oxlint --type-aware
+yarn lint                 # oxlint --type-aware, fails on any warning
 yarn format               # prettier --write .
 yarn build                # typecheck + music UI + electron-vite build
 yarn build:win            # build + package (also build:mac, build:linux)
@@ -43,17 +43,17 @@ After `yarn.lock` changes, reinstall there first with `ELECTRON_SKIP_BINARY_DOWN
 ## Layout
 
 - `src/main/`: Electron main process (services, IPC event handlers, window setup)
-- `src/preload/`: exposes the typed `window.api.emit` / `window.api.on` bridge
+- `src/preload/`: exposes the typed `window.api.emit` / `window.api.on` bridge. The windows are sandboxed, so it builds as CommonJS (`out/preload/index.cjs`) and can load only `electron` at runtime; anything else it imports must be bundled, like `src/common`.
 - `src/renderer/`: main React UI (pages, components, contexts, router)
 - `src/music/`: separate music window UI, built as a single file into `music-out/`
 - `src/common/`: shared by both processes (Zod schemas, event types, constants, utils). It must not import from `src/main` or `src/renderer`, and must stay free of Node/Electron-only APIs if the renderer uses it.
 - `src/ui/`: web-only code shared by the main and music windows (design tokens, base CSS, `TitleBar`)
 - `test/`: Vitest setup, fakes, helpers and fixtures; `e2e/`: Playwright tests of the built app
-- `scripts/`: repo maintenance scripts (`clean`, `todos`, `edge-tts`, `release-notes`)
+- `scripts/`: repo maintenance scripts (`edge-tts`, `release-notes`); `yarn clean` and `yarn todos` are one-liners in `package.json`
 - `LICENSES/`, `THIRD_PARTY_NOTICES.md`: third-party license texts and notices, shipped to the app's `resources/licenses`
 - `build/`: the app icons electron-builder uses
 
-Generated, don't edit: `out/`, `music-out/`, `dist/`. The packaged app holds only `out/`, `music-out/`, `resources/` and the production dependencies (`files` in `electron-builder.yml`), so a file the app reads at runtime must live in one of them. Dependencies only the windows import are bundled by Vite, so they ship only their `package.json` and license files (for About), through the `!node_modules/{…}` pattern in `files`; take one out of it if main or the preload starts importing it.
+Generated, don't edit: `out/`, `music-out/`, `dist/`. The packaged app holds only `out/`, `music-out/`, `resources/` and the production dependencies (`files` in `electron-builder.yml`), so a file the app reads at runtime must live in one of them. Dependencies only the windows import are bundled by Vite, so they ship only their `package.json` and license files (for About), through the `!node_modules/{…}` pattern in `files`; take one out of it if main or the preload starts importing it. `src/main/packaging.test.ts` fails when code in `src/main` or `src/common` reaches one, directly or through a dependency.
 
 ## Path aliases
 
@@ -103,7 +103,7 @@ When a procedure changes, update its skill with it.
 - Each service lives in `src/main/services/<name>/index.ts` and extends `Service` (or `ProviderService<T>`) from `src/main/services/shared`. It's instantiated once in `src/main/index.ts`, added to `AppServices` in `src/main/types`, and injected into `AppHandler` (`src/main/handler/app.ts`).
 - Swappable backends (connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)`. Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. TTS uses every provider at once, as engines (see `.claude/rules/tts.md`). The connector's provider key is the user's own Euler Stream API key, which signs the connection (`SET_PROVIDER`). Settings → TikTok LIVE always shows it; its provider picker only shows while more than one connector is registered. Never log the key or ship a shared one. Each service starts a provider in its constructor, so `_current` is always set.
 - The default connector uses `@tokioapp/connector` (our MIT package, `../tokio-connector`), one `TikTokLiveConnection` per connect, with every listener added before `connect()`; a connect that comes while one is connecting gets that one, so only one connection opens. `isConnected()` is true from the start of a connect, so the profile can't be switched mid-connect, and `CONNECTED` comes only for a connect that worked. It reconnects on its own: a drop it recovers from calls `onReconnect` and keeps the LIVE session, and `DISCONNECTED` only comes once the connection stops (`reason: "ended"`, `"lost"`, or none when the user disconnected). A failed connect's `error.kind` picks the message `home.ts` shows. The library's warnings and errors go to `connector.log` through its `logger` option, with the error they carry; its info and debug lines are dropped.
-- Music providers extend `MusicProvider` (`services/music/common`), which implements `on`/`off`/`emit`. `createWindow(view)` places a provider's page under the music window's title bar.
+- Classes that send live events to listeners (`MusicProvider` in `services/music/common`, `MusicQueue`, `ConnectorProvider`) extend `TokioEmitter` (`services/shared/emitter`): a typed `on`/`off` and a protected `emit`. `createWindow(view)` places a provider's page under the music window's title bar.
 - Log through `Logger` (`@/logger`) with the service's `_logFile` and a `<ServiceName>` prefix, e.g. ``Logger.error(`<Connector> ...`, this._logFile)``. Format errors with `formatError` from `@/common/util`.
 - Fallible service methods return `{ success, error?, data? }` instead of throwing.
 
@@ -141,9 +141,9 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 
 ### Persistence
 
-Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load. Store mutators return whether the store file was written. A profile switch that can't be saved keeps the old profile, and `updateProfileData` throws until the store has loaded. Provider keys (the Euler key, voice engine keys) are saved encrypted with `safeStorage`'s async calls. The store decrypts them once at startup and reads them from memory, so `getSettings` stays synchronous.
+Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load. Store mutators return whether the store file was written. `createNewProfile`, `cloneProfile` and `importProfile` return `"unsaved"` when only the store save failed, after deleting the profile file they wrote, and `null` for other failures. A profile switch that can't be saved keeps the old profile, and `updateProfileData` throws until the store has loaded. Provider keys (the Euler key, voice engine keys) are saved encrypted with `safeStorage`'s async calls. The store decrypts them once at startup and reads them from memory, so `getSettings` stays synchronous.
 
-Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name. An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case.
+Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name. An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case. One whose trimmed name is too short is listed as "Imported profile".
 
 A store file that doesn't parse is copied to `tokio.corrupted-<time>.json` next to it and replaced by the defaults. One that can't be read (locked, no access) or copied stops startup ("Tokio couldn't start") and is left as it is.
 
@@ -167,7 +167,7 @@ Tokio's source is MIT; treat license compliance as part of every change.
 
 ## CI and releases
 
-- `ci.yml` (PRs and `main`): Prettier check, lint, typecheck and tests on Linux, Windows and macOS, and the `e2e` job (under xvfb on Linux). Non-draft PRs, `main`, and draft PRs whose latest commit contains `[ci]` also package the app via `build-app.yml`; `chore(release): ...` commits skip packaging.
+- `ci.yml` (PRs and `main`): Prettier check, lint, typecheck and tests on Linux, Windows and macOS, and the `e2e` job (under xvfb on Linux). Non-draft PRs, `main`, and draft PRs whose latest commit contains `[ci]` also package the app via `build-app.yml`; `chore(release): ...` commits skip packaging. On pull requests, a `commitlint` job checks every commit message against `.commitlintrc`.
 - `release.yml` runs on a `v<version>` tag matching `package.json` and publishes a GitHub release with the packages and update files. `gh release create` uploads them before publishing. `scripts/release-notes` writes its notes from the Conventional Commits since the previous `v*` tag (`chore(release)` commits are skipped); a rerun only replaces the files, so edited notes are kept. Only its `release` job can write to the repository; the packaging jobs only read it.
 - It then sends a `repository_dispatch` (`release`) to `tokio-app/website`, which rebuilds the download page. That needs the `WEBSITE_DISPATCH_TOKEN` secret (a fine-grained token with Contents read and write on `tokio-app/website`). Without it the step only warns.
 - Versions with a `-` (`0.1.0-alpha.5`) are published as regular releases, not prereleases: auto-updates and the website only read the latest release.
@@ -190,7 +190,7 @@ The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`)
 ## Conventions
 
 - Run `yarn format` on files you touch, and fix lint warnings in code you touch.
-- Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `feat!:`), enforced by a husky hook. Don't bypass hooks.
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `feat!:`), enforced by a husky hook and by CI on pull requests. Don't bypass hooks.
 - Keep the server port (`37891`) and existing event names stable; overlays and saved data depend on them.
 - Respect inline `NOTE: DO NOT CHANGE` markers.
 - Inside a folder with a barrel `index` (`common/types`, `common/schemas`, `components`, `context`, `hooks`), import sibling files directly, never through the barrel, to avoid import cycles.

@@ -36,7 +36,7 @@ Start making changes, commit and push to your fork and [submit a pull request][p
 At this point you're waiting on us. We may suggest
 some changes or improvements or alternatives.
 
-CI checks every pull request with Prettier, lint, typecheck and tests. Run `yarn format`, `yarn lint`, `yarn typecheck` and `yarn test` before pushing to catch failures early.
+CI checks every pull request with Prettier, lint, typecheck and tests, and checks its commit messages. Lint fails on warnings too. Run `yarn format`, `yarn lint`, `yarn typecheck` and `yarn test` before pushing to catch failures early.
 
 Some things that will increase the chance that your pull request is accepted:
 

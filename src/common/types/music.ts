@@ -1,4 +1,5 @@
 export type SongInfo = {
+  // Spotify: the album uri, or in playerStatus the playing context ("" if none)
   album: string;
   track: string;
   title: string;

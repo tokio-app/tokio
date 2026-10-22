@@ -19,7 +19,7 @@ paths:
 - `AlertTriggerSchema` (`src/common/schemas/profile.ts`) derives the triggers from `TOKIO_EVENTS` (for a new event, see IPC events in `AGENTS.md`). `ROOM_USER` is excluded (it comes every few seconds and is meant for overlays), both there and in the `AlertTrigger` type. Saved Room Users alerts are dropped when a profile loads.
 - `registerConnectorEvents` (`src/main/events/init.ts`) passes every trigger to `AlertsService.handle` while `activeFeatures.alerts` is on. Music Change alerts come from `MusicService.onSongChange`, once each time a song starts, not for one that fails to start, is skipped while it loads, or was already playing when a request came; the rest from the connector. `MUSIC_CHANGE` also fires when the queue changes, and overlays get every one through `ServerService.initEvents`. Gift alerts fire once per combo, on `repeatEnd`.
 - The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: the loop skips it and `AlertsService` matches it on `CHAT` (empty `trigger.emotes` means any emote). TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`, and main pushes the list with `EMOTES`.
-- Chat alerts filter on `trigger.keyword` through `hasKeyword` (`src/main/helper/chat.ts`, whole words; a keyword of only emojis is looked for as written), and Member Join and Super Fan Join alerts on `trigger.user` through `isUser` (handle or name).
+- Chat alerts filter on `trigger.keyword` through `hasKeyword` (`src/main/helper/chat.ts`, whole words through `wholeWord`, except next to letters of scripts written without spaces, such as Chinese, Japanese or Thai, where it matches anywhere; a keyword of only emojis is looked for as written), and Member Join and Super Fan Join alerts on `trigger.user` through `isUser` (handle or name).
 
 ## Gifts
 
@@ -30,9 +30,11 @@ paths:
 
 - Uploaded, browsed and downloaded sounds go to a library shared by all profiles, in `settings.sounds`. Files in the `sounds` folder are named by a hash of their content (uploads) or URL (MyInstants), and alerts store only the basename.
 - Read them through `AlertsService.readSound` (keeps paths inside the folder, caches). Check `StoreManagerService.isSoundInUse` before deleting one.
+- Upload counts only sounds new to the library: one already in `settings.sounds`, or picked twice, isn't counted. A removed sound whose file can't be deleted still leaves the library, with a warning (`SOUND_REMOVE_FAILED`).
 - Sounds are up to `CACHE_MAX_FILE_BYTES` (8 MB): `importSound` and `fetchSound` refuse bigger ones, so every sound added now is served from memory. A bigger one saved before is read from disk, with one read shared by the events that want it at once. `handle` doesn't log a missing sound; `init.ts` logs it to `alerts.log` only when its notice goes out (once per 30s per alert).
 - MyInstants has no API; `AlertsService` scrapes it with cheerio. Only fetch `www.myinstants.com` URLs.
-- Main sends sounds with `ALERT_AUDIO` on a queue (`channel`): one `alerts` queue, or `alerts:<trigger>` per trigger when `simultaneous` is on. `ALERT_CLEAR` (on disconnect and when the feature turns off) stops every `alerts*` queue. Tests and previews use `useAlertTest` on the `alert-test` queue, so clearing never cuts them.
+- Main sends sounds with `ALERT_AUDIO` on a queue (`channel`), each with a `key` (its file, or its `tts:` cache key) so the window decodes a sound's copies once: one `alerts` queue, or `alerts:<trigger>` per trigger when `simultaneous` is on. `ALERT_CLEAR` (on disconnect and when the feature turns off) stops every `alerts*` queue. Tests and previews use `useAlertTest` on the `alert-test` queue, so clearing never cuts them.
+- The Alerts page applies a `SET_ALERT_SOUND` reply only while it waits for one for that alert (`onRequest`, from a Browse or MyInstants download), even after the picker closed; a library or TTS pick made since wins over a late reply. MyInstants loads its trending sounds only when its tab is first shown.
 
 ## Text-to-speech
 
