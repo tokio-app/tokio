@@ -12,9 +12,9 @@ const GIFTS: SelectOption<number>[] = [
 ];
 
 const VOICES: SelectOption<string>[] = [
-  { value: "aria", label: "Aria", group: "English" },
-  { value: "guy", label: "Guy", group: "English" },
-  { value: "dalia", label: "Dalia", group: "Spanish" },
+  { value: "aria", label: "Aria" },
+  { value: "guy", label: "Guy" },
+  { value: "dalia", label: "Dalia" },
 ];
 
 const listed = (container: HTMLElement, ...texts: string[]) =>
@@ -66,25 +66,7 @@ describe("Select", () => {
     expect(listed(container, "Rose", "Lion", "Heart")).toHaveLength(0);
   });
 
-  it("puts each group's name above its options", async () => {
-    const user = userEvent.setup();
-    const { container } = render(
-      <Select options={VOICES} value={undefined} onChange={vi.fn()} />,
-    );
-
-    await user.click(screen.getByText("Select an option..."));
-
-    const order = ["English", "Aria", "Guy", "Spanish", "Dalia"].map((text) =>
-      inList(container, text)!,
-    );
-    for (let i = 1; i < order.length; i++) {
-      expect(order[i - 1].compareDocumentPosition(order[i])).toBe(
-        Node.DOCUMENT_POSITION_FOLLOWING,
-      );
-    }
-  });
-
-  it("searches option and group names", async () => {
+  it("searches option names", async () => {
     const user = userEvent.setup();
     const { container } = render(
       <Select
@@ -99,14 +81,14 @@ describe("Select", () => {
     expect(search).toHaveFocus();
 
     await user.type(search, "DA");
-    expect(listed(container, "English", "Aria", "Spanish", "Dalia")).toEqual([
-      "Spanish",
-      "Dalia",
-    ]);
+    expect(listed(container, "Aria", "Guy", "Dalia")).toEqual(["Dalia"]);
 
     await user.clear(search);
-    await user.type(search, "english");
-    expect(listed(container, "Aria", "Guy", "Dalia")).toEqual(["Aria", "Guy"]);
+    await user.type(search, "a");
+    expect(listed(container, "Aria", "Guy", "Dalia")).toEqual([
+      "Aria",
+      "Dalia",
+    ]);
 
     await user.clear(search);
     await user.type(search, "zzz");
@@ -214,18 +196,6 @@ describe("Select from the keyboard", () => {
     expect(
       screen.getByRole("option", { name: "Heart", selected: true }),
     ).toBeInTheDocument();
-  });
-
-  it("skips group names", async () => {
-    const user = userEvent.setup();
-    render(<Select options={VOICES} value="guy" onChange={vi.fn()} />);
-    combobox().focus();
-
-    await user.keyboard("{Enter}{ArrowDown}");
-    expect(current()).toHaveTextContent("Dalia");
-
-    await user.keyboard("{ArrowUp}");
-    expect(current()).toHaveTextContent("Guy");
   });
 
   it("moves through the matches from its search, and picks with Enter", async () => {

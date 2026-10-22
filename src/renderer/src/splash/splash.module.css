@@ -86,6 +86,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
+  color: var(--font-secondary);
 }
 
 .status_text {

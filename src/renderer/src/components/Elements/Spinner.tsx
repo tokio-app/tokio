@@ -1,9 +1,12 @@
-import { ClipLoader } from "react-spinners";
-
-const SPINNER_STYLE = { margin: 4, padding: 0 };
+import styles from "./elements.module.css";
 
 export function Spinner({ size = 16 }: { size?: number }) {
   return (
-    <ClipLoader size={size} color="currentColor" cssOverride={SPINNER_STYLE} />
+    <span
+      role="status"
+      aria-label="Loading"
+      className={styles.spinner}
+      style={{ width: size, height: size }}
+    />
   );
 }

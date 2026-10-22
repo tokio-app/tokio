@@ -19,22 +19,9 @@ describe("Slider", () => {
     expect(onChange).toHaveBeenCalledWith(1.5);
   });
 
-  it("steps by 1 and hides the value unless asked", () => {
-    const { rerender } = render(
-      <Slider min={0} max={100} value={40} onChange={vi.fn()} />,
-    );
+  it("steps by 1 unless told otherwise", () => {
+    render(<Slider min={0} max={100} value={40} onChange={vi.fn()} />);
+
     expect(screen.getByRole("slider")).toHaveAttribute("step", "1");
-    expect(screen.queryByText("40")).not.toBeInTheDocument();
-
-    rerender(
-      <Slider min={0} max={100} value={40} onChange={vi.fn()} showValue />,
-    );
-    expect(screen.getByText("40")).toBeInTheDocument();
-  });
-
-  it("can be disabled", () => {
-    render(<Slider min={0} max={100} value={40} onChange={vi.fn()} disabled />);
-
-    expect(screen.getByRole("slider")).toBeDisabled();
   });
 });

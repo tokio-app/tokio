@@ -7,9 +7,6 @@ type Props = {
   min: number;
   max: number;
   step?: number;
-  disabled?: boolean;
-  // Shows the value above the right end of the track
-  showValue?: boolean;
   className?: string;
   "aria-label"?: string;
 };
@@ -20,8 +17,6 @@ export function Slider({
   min,
   max,
   step = 1,
-  disabled,
-  showValue,
   className,
   "aria-label": ariaLabel,
 }: Props) {
@@ -35,10 +30,8 @@ export function Slider({
         max={max}
         step={step}
         value={value}
-        disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      {showValue && <span className={styles.slider_value}>{value}</span>}
     </div>
   );
 }

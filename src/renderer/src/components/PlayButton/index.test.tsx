@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { PlayButton, testProps } from ".";
@@ -21,10 +21,14 @@ describe("PlayButton", () => {
     const { rerender } = render(<PlayButton playing onClick={vi.fn()} />);
     expect(screen.getByRole("button").querySelector("svg")).not.toBeNull();
 
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
     rerender(<PlayButton playing loading onClick={vi.fn()} />);
     const button = screen.getByRole("button");
     expect(button.querySelector("svg")).toBeNull();
-    expect(button.firstElementChild?.tagName).toBe("SPAN");
+    expect(
+      within(button).getByRole("status", { name: "Loading" }),
+    ).toBeInTheDocument();
   });
 
   it("calls onClick in every state", async () => {

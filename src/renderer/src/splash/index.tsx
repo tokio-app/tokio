@@ -1,5 +1,5 @@
 import Logo from "@/assets/logo.png";
-import { BarLoader } from "react-spinners";
+import { Spinner } from "@/components/Elements/Spinner";
 import styles from "./splash.module.css";
 
 export function SplashScreen() {
@@ -8,7 +8,7 @@ export function SplashScreen() {
       <div className={styles.glow_wrapper}>
         <div className={styles.content}>
           <div className={styles.logo}>
-            <img src={Logo} alt="都" />
+            <img src={Logo} alt="Tokio" />
           </div>
           <div className={styles.app_name}>
             <h1>Tok</h1>
@@ -16,7 +16,7 @@ export function SplashScreen() {
           </div>
 
           <div className={styles.loading}>
-            <BarLoader color="var(--font-secondary)" width={150} height={3} />
+            <Spinner size={20} />
             <span className={styles.status_text}>Starting up...</span>
           </div>
         </div>

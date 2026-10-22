@@ -61,7 +61,10 @@ describe("TitleBar", () => {
       </TitleBar>,
     );
 
-    expect(screen.getByRole("img")).toHaveAttribute("src", "logo.png");
+    expect(screen.getByRole("img", { name: "Tokio" })).toHaveAttribute(
+      "src",
+      "logo.png",
+    );
     expect(
       screen
         .getByText("Profiles")
