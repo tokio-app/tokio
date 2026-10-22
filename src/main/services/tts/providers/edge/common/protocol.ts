@@ -1,4 +1,3 @@
-import axios, { isAxiosError } from "axios";
 import { randomUUID } from "crypto";
 import { RawData, WebSocket } from "ws";
 import { buildHeaders } from "../config";
@@ -12,30 +11,33 @@ import { EdgeAuth, EdgeTTSError } from "./errors";
 export async function listVoices(cfg: EdgeConfig): Promise<EdgeVoice[]> {
   return withAuthRetry(cfg, "voices", async (auth) => {
     try {
-      const res = await axios.get<EdgeVoice[]>(
-        `${cfg.VOICE_LIST_URL}${authQuery(cfg, auth)}`,
-        {
-          // axios can't decode zstd, so don't advertise it.
-          headers: {
-            ...withMuid(buildHeaders(cfg, "voices")),
-            "Accept-Encoding": "gzip, deflate, br",
-          },
-          timeout: cfg.REQUEST_TIMEOUT_MS,
+      const res = await fetch(`${cfg.VOICE_LIST_URL}${authQuery(cfg, auth)}`, {
+        // Not every Node's fetch decodes zstd, so don't advertise it.
+        headers: {
+          ...withMuid(buildHeaders(cfg, "voices")),
+          "Accept-Encoding": "gzip, deflate, br",
         },
-      );
-      if (!Array.isArray(res.data)) {
+        signal: AbortSignal.timeout(cfg.REQUEST_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        throw new EdgeTTSError("voices", "Voice list request rejected", {
+          auth,
+          status: res.status,
+          serverDate: res.headers.get("date") ?? undefined,
+        });
+      }
+      const data: unknown = await res.json();
+      if (!Array.isArray(data)) {
         throw new EdgeTTSError("voices", "Unexpected voice list response", {
           auth,
         });
       }
-      return res.data;
+      return data;
     } catch (error) {
       if (error instanceof EdgeTTSError) throw error;
-      if (isAxiosError(error) && error.response) {
-        throw new EdgeTTSError("voices", "Voice list request rejected", {
+      if (error instanceof SyntaxError) {
+        throw new EdgeTTSError("voices", "Unexpected voice list response", {
           auth,
-          status: error.response.status,
-          serverDate: error.response.headers["date"],
           cause: error,
         });
       }

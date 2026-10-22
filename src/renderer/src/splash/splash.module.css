@@ -28,6 +28,7 @@
   height: 100vh;
   overflow: hidden;
   border: 1px solid var(--border);
+  /* Off the radius scale: the window's corners, rounder than a dialog's */
   border-radius: 12px;
   /* One of the brand's two warm spots: a rose wash behind the logo */
   background:
@@ -70,6 +71,7 @@
 .app_name h1 {
   margin: 0;
   color: var(--font-primary);
+  /* Off the type scale: the wordmark is drawn as the logo, not as text */
   font-size: 56px;
   font-weight: 800;
   line-height: 1;
@@ -86,6 +88,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
+  color: var(--font-secondary);
 }
 
 .status_text {
@@ -116,6 +119,7 @@
 
 .disclaimer {
   color: var(--font-secondary);
+  /* Below the type scale: fine print, smaller than the version above it */
   font-size: 11px;
 }
 

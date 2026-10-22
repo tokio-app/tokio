@@ -59,7 +59,7 @@ export function TitleBar({ target, logo, compact, live, children }: Props) {
       }`}
     >
       <div className={styles.brand}>
-        <img className={styles.logo} src={logo} alt="都" />
+        <img className={styles.logo} src={logo} alt="Tokio" />
         {/* The line says it on screen, this says it to screen readers */}
         {live && <span className={styles.live_label}>LIVE</span>}
       </div>

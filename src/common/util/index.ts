@@ -64,7 +64,6 @@ export class TaskQueue {
 
   public enqueue(task: Task): boolean {
     if (this.queue.length >= this.maxQueueLength) {
-      console.warn("TaskQueue: Max queue length reached. Dropping task.");
       return false;
     }
 

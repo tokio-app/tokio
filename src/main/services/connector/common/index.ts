@@ -1,4 +1,5 @@
-import { Gift, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import { Gift } from "@/common/types";
+import { TokioEmitter } from "../../shared/emitter";
 
 // What stopped a connect, so the page can say what to do about it.
 export type ConnectErrorKind =
@@ -34,18 +35,10 @@ export const connectFailure = (
     retryAfterSeconds: options?.retryAfterSeconds,
   });
 
-export abstract class ConnectorProvider {
+export abstract class ConnectorProvider extends TokioEmitter {
   protected _onReconnect?: (state: ReconnectState) => void;
   protected _logFile = "";
   public abstract setKey(key: string): void;
-  public abstract on<T extends TOKIO_EVENTS>(
-    event: T,
-    listener: (data: TokioEventMap[T]) => void,
-  ): void;
-  public abstract off<T extends TOKIO_EVENTS>(
-    event: T,
-    listener: (data: TokioEventMap[T]) => void,
-  ): void;
   public abstract connect(
     username: string,
     key?: string,

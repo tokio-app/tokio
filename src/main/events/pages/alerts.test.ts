@@ -679,6 +679,26 @@ describe("alerts events", () => {
       ]);
     });
 
+    it("counts only the sounds new to the library", async () => {
+      const { h, storeManagerService } = setup();
+      const sounds = [{ name: "old", file: "old.mp3.hash" }];
+      storeManagerService.getSounds = () => sounds;
+      storeManagerService.addSound.mockImplementation(async (sound) => {
+        sounds.push(sound);
+        return true;
+      });
+      pickFiles("old.mp3", "a.mp3", "a.mp3");
+
+      await h.invoke(alerts, APP_EVENTS.UPLOAD_SOUNDS);
+
+      expect(storeManagerService.addSound.mock.calls).toEqual([
+        [{ name: "a.mp3", file: "a.mp3.hash" }],
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ message: "1 sound added to the library." }),
+      ]);
+    });
+
     it("sends no notice when nothing was added", async () => {
       const { h, storeManagerService } = setup();
       pickFiles("a.flac");
@@ -753,22 +773,23 @@ describe("alerts events", () => {
       ]);
     });
 
-    it("replies the library when the file can't be deleted", async () => {
+    // The sound is out of the library, only its file is left over.
+    it("replies the library and warns when the file can't be deleted", async () => {
       const { h } = setup(false, { success: false, error: "EBUSY" });
 
       await h.invoke(alerts, APP_EVENTS.REMOVE_SOUND, { file: airhorn.file });
 
       expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
-        {
-          success: false,
-          data: [ding],
-          error: {
-            code: FEEDBACK_CODES.SOUND_REMOVE_FAILED,
-            message: "Unable to remove the sound.",
-          },
-        },
+        { success: true, data: [ding] },
       ]);
-      expect(h.notices).toEqual([]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.SOUND_REMOVE_FAILED,
+          message:
+            "Sound removed from the library, but its file couldn't be deleted.",
+        }),
+      ]);
       expect(logError).not.toHaveBeenCalled();
     });
 

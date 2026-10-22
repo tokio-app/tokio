@@ -37,7 +37,8 @@ function setup(recipe?: (p: Permissions) => void) {
 }
 
 const box = (name: string) => screen.getByRole("checkbox", { name });
-const level = () => screen.getByRole("spinbutton");
+// Hidden from screen readers while Minimum Fan Level is off
+const level = () => screen.getByRole("spinbutton", { hidden: true });
 // The control under a field's label
 const field = (label: string) =>
   within(screen.getByText(label).parentElement!).getByRole("textbox");
@@ -105,6 +106,18 @@ describe("PermissionsSection", () => {
     await user.click(box("Minimum Fan Level"));
     expect(level()).toBeDisabled();
     expect(current().level).toEqual({ enabled: false, value: 12 });
+  });
+
+  it("keeps the fan level from the keyboard and screen readers while it's hidden", async () => {
+    const user = setup();
+    expect(level()).toHaveAttribute("aria-hidden", "true");
+    expect(level()).toHaveAttribute("tabindex", "-1");
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+
+    await user.click(box("Minimum Fan Level"));
+
+    expect(screen.getByRole("spinbutton")).not.toHaveAttribute("aria-hidden");
+    expect(level()).not.toHaveAttribute("tabindex");
   });
 
   it("shows the lists only while the whitelist and blacklist are on", async () => {

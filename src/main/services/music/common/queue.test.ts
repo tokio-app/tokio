@@ -368,6 +368,31 @@ describe("MusicQueue", () => {
       },
     );
 
+    it("asks the player about a song whose length didn't parse", async () => {
+      // Plays 30 s, its listed length unknown
+      const remaining = player(30_000);
+      const b = run(remaining, 0);
+
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(remaining).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(remaining).toHaveBeenCalledOnce();
+
+      await vi.advanceTimersByTimeAsync(19_699);
+      expect(b).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(b).toHaveBeenCalledOnce();
+    });
+
+    it("plays a song of unknown length 15 s when the player can't tell", async () => {
+      const b = run(async () => null, 0);
+
+      await vi.advanceTimersByTimeAsync(14_999);
+      expect(b).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(b).toHaveBeenCalledOnce();
+    });
+
     it("isn't asked about a song that failed to start", async () => {
       const remaining = vi.fn(async () => 500);
       const queue = new MusicQueue({ remaining });

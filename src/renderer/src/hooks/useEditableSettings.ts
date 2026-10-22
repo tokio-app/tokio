@@ -29,7 +29,7 @@ const SAVE_REPLY = {
   alerts: APP_EVENTS_RESPONSE.UPDATE_ALERTS_SETTINGS,
 } as const satisfies Record<Section, APP_EVENTS_RESPONSE>;
 
-// Of every mounted page, see flushSettings
+// Of every mounted page and autosaved field, see flushSettings
 const flushes = new Set<() => void>();
 
 /**
@@ -40,10 +40,25 @@ export function flushSettings() {
   flushes.forEach((flush) => flush());
 }
 
+// Closing the window doesn't unmount the pages. Not beforeunload, which can
+// keep the window open.
+window.addEventListener("pagehide", flushSettings);
+
+/** Runs `flush` with flushSettings, and when the component unmounts. */
+export function useFlush(flush: () => void) {
+  useEffect(() => {
+    flushes.add(flush);
+    return () => {
+      flushes.delete(flush);
+      flush();
+    };
+  }, [flush]);
+}
+
 /**
  * A section of the active profile, saved shortly after each change. A change
- * still waiting is sent when the page closes or flushSettings is called, and
- * dropped when another profile loads.
+ * still waiting is sent when the page or the window closes or flushSettings
+ * is called, and dropped when another profile loads.
  */
 export function useEditableSettings<K extends Section>(
   section: K,
@@ -103,13 +118,7 @@ export function useEditableSettings<K extends Section>(
 
   // Sent right away by flushSettings, and when the page closes so a change
   // made right before leaving isn't lost.
-  useEffect(() => {
-    flushes.add(flush);
-    return () => {
-      flushes.delete(flush);
-      flush();
-    };
-  }, [flush]);
+  useFlush(flush);
 
   return { settings, update };
 }

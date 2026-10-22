@@ -218,6 +218,8 @@ describe("AppHandler", () => {
       expect(
         headersFor("file:///app/out/renderer/index.html").responseHeaders,
       ).toMatchObject({ "Content-Security-Policy": [config.CSP.prod] });
+      // The pages only run their bundled scripts.
+      expect(config.CSP.prod).toContain("script-src 'self';");
     });
 
     it("leaves overlays without a CSP, as in OBS", () => {

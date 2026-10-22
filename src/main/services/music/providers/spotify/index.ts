@@ -139,7 +139,7 @@ export class Spotify extends MusicProvider {
             this._isActive = false;
             res({
               success: false,
-              error: err as Error,
+              error: err instanceof Error ? err : new Error(String(err)),
             });
           }
         }
@@ -181,12 +181,11 @@ export class Spotify extends MusicProvider {
   public async play(info: SongInfo): Promise<void> {
     if (!this._isActive) return;
     const deviceId = await this.getTargetDevice();
-    const body = {
-      context_uri: info.album,
-      offset: {
-        uri: info.track,
-      },
-    };
+    // An offset only works in an album or playlist. A song played from
+    // elsewhere (an artist, Liked Songs, a local file) plays alone.
+    const body = /^spotify:(album|playlist):/.test(info.album)
+      ? { context_uri: info.album, offset: { uri: info.track } }
+      : { uris: [info.track] };
     await this.fetchApi(`/me/player/play?device_id=${deviceId}`, "PUT", body);
   }
 
@@ -197,6 +196,8 @@ export class Spotify extends MusicProvider {
     if (!song) return null;
     return {
       ...song,
+      // What it plays from, so the song plays there again after requests
+      album: searchRes.context?.uri ?? "",
       playing: searchRes.is_playing ?? false,
       time: searchRes.progress_ms ?? 0,
     };

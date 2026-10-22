@@ -28,6 +28,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--font-secondary);
 }
 
 /* Only the settings scroll */

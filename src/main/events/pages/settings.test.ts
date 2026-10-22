@@ -8,6 +8,7 @@ import { SERVER_PORT } from "@/common/util";
 import { TikTokConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
+import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { TTSService } from "@/services/tts";
 import { dialog } from "@test/electron";
@@ -35,11 +36,12 @@ const streamProfile = { name: "Stream", file: "stream.json" };
 const appSettings = { activeProfile: defaultProfile };
 
 // A store with the Default and Stream profiles. The profiles it creates or
-// clones join the list, unless it's told to fail.
-function profileStore({ fail = false } = {}) {
+// clones join the list, unless it's told to answer `fail`: null when it
+// can't write the profile, "unsaved" when it can't save the list.
+function profileStore({ fail }: { fail?: null | "unsaved" } = {}) {
   const profiles = [defaultProfile, streamProfile];
   const add = (file: string, name: string) => {
-    if (fail) return null;
+    if (fail !== undefined) return fail;
     const profile = { file, name };
     profiles.push(profile);
     return profile;
@@ -141,7 +143,7 @@ describe("settings events", () => {
 
     it("replies and notifies when the store doesn't create it", async () => {
       const h = createHandler({
-        storeManagerService: profileStore({ fail: true }),
+        storeManagerService: profileStore({ fail: null }),
       });
 
       await h.invoke(settings, APP_EVENTS.CREATE_PROFILE, { name: "Chill" });
@@ -198,6 +200,44 @@ describe("settings events", () => {
     });
   });
 
+  describe.each([
+    {
+      event: APP_EVENTS.CREATE_PROFILE,
+      response: APP_EVENTS_RESPONSE.CREATE_PROFILE,
+    },
+    {
+      event: APP_EVENTS.CLONE_PROFILE,
+      response: APP_EVENTS_RESPONSE.CLONE_PROFILE,
+    },
+  ] as const)("$event", ({ event, response }) => {
+    it("sends the profiles main holds when the list can't be saved", async () => {
+      const h = createHandler({
+        storeManagerService: profileStore({ fail: "unsaved" }),
+      });
+
+      await h.invoke(settings, event, { name: "Chill", ref: "stream.json" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
+        {
+          success: true,
+          data: {
+            settings: appSettings,
+            profiles: [defaultProfile, streamProfile],
+          },
+        },
+      ]);
+      expect(h.replies(response)).toEqual([
+        expect.objectContaining({ success: false }),
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        }),
+      ]);
+    });
+  });
+
   describe("CLONE_PROFILE", () => {
     it("clones the profile, then sends the new settings and a notice", async () => {
       const store = profileStore();
@@ -239,7 +279,7 @@ describe("settings events", () => {
 
     it("replies and notifies when the store doesn't clone it", async () => {
       const h = createHandler({
-        storeManagerService: profileStore({ fail: true }),
+        storeManagerService: profileStore({ fail: null }),
       });
 
       await h.invoke(settings, APP_EVENTS.CLONE_PROFILE, {
@@ -450,7 +490,10 @@ describe("settings events", () => {
 
       expect(dialog.showSaveDialog).toHaveBeenCalledWith(
         h.win,
-        expect.objectContaining({ defaultPath: "stream.json" }),
+        // In the last folder used, which earlier tests may have set
+        expect.objectContaining({
+          defaultPath: expect.stringMatching(/(^|[\\/])stream\.json$/),
+        }),
       );
       expect(exportProfile).not.toHaveBeenCalled();
       expect(h.replies(APP_EVENTS_RESPONSE.EXPORT_ENTITY)).toEqual([]);
@@ -506,7 +549,7 @@ describe("settings events", () => {
     const filePath = join(tmpdir(), "downloads", "stream.json");
 
     it("does nothing when the dialog is canceled", async () => {
-      const importProfile = vi.fn(async () => true);
+      const importProfile = vi.fn(async () => streamProfile);
       const h = createHandler({ storeManagerService: { importProfile } });
 
       await h.invoke(settings, APP_EVENTS.IMPORT_ENTITY, { type: "profile" });
@@ -522,7 +565,7 @@ describe("settings events", () => {
         canceled: false,
         filePaths: [filePath],
       });
-      const importProfile = vi.fn(async () => true);
+      const importProfile = vi.fn(async () => streamProfile);
       const h = createHandler({
         storeManagerService: { ...profileStore(), importProfile },
       });
@@ -551,7 +594,7 @@ describe("settings events", () => {
         filePaths: [filePath],
       });
       const h = createHandler({
-        storeManagerService: { importProfile: async () => false },
+        storeManagerService: { importProfile: async () => null },
       });
 
       await h.invoke(settings, APP_EVENTS.IMPORT_ENTITY, { type: "profile" });
@@ -565,6 +608,31 @@ describe("settings events", () => {
         { success: false, type: "profile", error: failure },
       ]);
       expect(h.notices).toEqual([expect.objectContaining(failure)]);
+    });
+
+    it("sends the profiles main holds when the list can't be saved", async () => {
+      dialog.showOpenDialog.mockResolvedValue({
+        canceled: false,
+        filePaths: [filePath],
+      });
+      const h = createHandler({
+        storeManagerService: {
+          ...profileStore(),
+          importProfile: async () => "unsaved" as const,
+        },
+      });
+
+      await h.invoke(settings, APP_EVENTS.IMPORT_ENTITY, { type: "profile" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
+        expect.objectContaining({ success: true }),
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.IMPORT_ENTITY)).toEqual([
+        expect.objectContaining({ success: false, type: "profile" }),
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED }),
+      ]);
     });
   });
 
@@ -851,6 +919,27 @@ describe("settings events", () => {
           message: "The overlay server is off.",
         }),
       ]);
+    });
+
+    it("keeps a running server on and saves it on", async () => {
+      const serverService = new ServerService(0);
+      const updateServerSettings = vi.fn(async () => true);
+      const h = createHandler({
+        serverService,
+        storeManagerService: { ...profileStore(), updateServerSettings },
+      });
+      try {
+        await serverService.start();
+
+        await h.invoke(settings, APP_EVENTS.SET_SERVER, { enabled: true });
+
+        expect(updateServerSettings).toHaveBeenCalledWith(true);
+        expect(h.replies(APP_EVENTS_RESPONSE.SET_SERVER)).toEqual([
+          { success: true },
+        ]);
+      } finally {
+        serverService.stop();
+      }
     });
 
     it.each([

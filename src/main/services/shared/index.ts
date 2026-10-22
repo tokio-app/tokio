@@ -1,5 +1,7 @@
 import { formatError } from "@/common/util";
 import { cleanText } from "@/helper/chat";
+import { writeFileAtomic } from "@/helper/fs";
+import { track } from "@/helper/quit";
 import Logger from "@/logger";
 import { promises as fs } from "fs";
 import { z } from "zod";
@@ -59,15 +61,12 @@ export abstract class BaseFileManagerService extends Service {
     this._logFile = logFile;
   }
 
-  public async saveArbitraryFile<T>(
+  public async saveArbitraryFile(
     filePath: string,
-    data: T,
+    data: unknown,
   ): Promise<boolean> {
-    const tempPath = `${filePath}.tmp`;
     try {
-      await fs.writeFile(tempPath, this.serialize(data), "utf-8");
-      await fs.rename(tempPath, filePath);
-
+      await writeFileAtomic(filePath, this.serialize(data));
       return true;
     } catch (error) {
       this._logError(
@@ -76,7 +75,6 @@ export abstract class BaseFileManagerService extends Service {
         formatError(error),
         error,
       );
-      await fs.unlink(tempPath).catch(() => {});
       return false;
     }
   }
@@ -102,13 +100,16 @@ export abstract class BaseFileManagerService extends Service {
   public async loadArbitraryFile<T>(filePath: string): Promise<T | null> {
     try {
       const fileContent = await fs.readFile(filePath, "utf-8");
+      // Unchecked: callers that need the content checked use loadFile.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       return this.deserialize(fileContent) as T;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      if (error instanceof Error && "code" in error && error.code === "ENOENT")
+        return null;
 
       const isSyntax =
         error instanceof SyntaxError ||
-        (error as Error).name === "YAMLParseError";
+        (error instanceof Error && error.name === "YAMLParseError");
       this._logError(
         isSyntax
           ? `Malformed ${this.fileType.toUpperCase()} in file`
@@ -141,13 +142,20 @@ export abstract class BaseFileManagerService extends Service {
           return { success: false, data: null };
         }
 
-        const mergedData = this._deepMerge(existingData, updates);
-        const saveSuccess = await this.saveFile(filePath, schema, mergedData);
+        const mergedData = this._validate(
+          schema,
+          this._deepMerge(existingData, updates),
+          filePath,
+          "saving",
+        );
+        if (mergedData === null) return { success: false, data: null };
+        const saveSuccess = await this.saveArbitraryFile(filePath, mergedData);
 
         return { success: saveSuccess, data: saveSuccess ? mergedData : null };
       });
 
-    this._writeLocks.set(filePath, updatePromise);
+    // A quit waits for it from the start, the write only comes after the read.
+    this._writeLocks.set(filePath, track(updatePromise));
 
     try {
       return await updatePromise;
@@ -189,21 +197,20 @@ export abstract class BaseFileManagerService extends Service {
     return validation.data;
   }
 
-  private _deepMerge<T>(target: T, source?: Partial<T>): T {
+  private _deepMerge(target: unknown, source: unknown): unknown {
     if (target === source) return target;
     const isObject = (item: unknown): item is Record<string, unknown> =>
       Boolean(item && typeof item === "object" && !Array.isArray(item));
 
     if (!isObject(target) || !isObject(source)) {
-      return (source !== undefined ? source : target) as T;
+      return source !== undefined ? source : target;
     }
 
-    const output = { ...target } as Record<string, unknown>;
-    const sourceObj = source as Record<string, unknown>;
+    const output = { ...target };
 
-    for (const key of Object.keys(sourceObj)) {
+    for (const key of Object.keys(source)) {
       const targetVal = output[key];
-      const sourceVal = sourceObj[key];
+      const sourceVal = source[key];
 
       if (sourceVal === undefined || sourceVal === targetVal) {
         continue;
@@ -216,6 +223,6 @@ export abstract class BaseFileManagerService extends Service {
       }
     }
 
-    return output as T;
+    return output;
   }
 }

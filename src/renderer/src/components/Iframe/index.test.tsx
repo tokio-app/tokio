@@ -3,8 +3,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Iframe } from ".";
 
-const frame = (name = "gift-jar") => screen.getByTitle(`Viewer for ${name}`);
-const src = (name?: string) => frame(name).getAttribute("src");
+const frame = () => screen.getByTitle("Viewer for gift-jar");
+const src = () => frame().getAttribute("src");
 
 describe("Iframe", () => {
   it("loads a Windows path through local-resource:", () => {
@@ -31,18 +31,6 @@ describe("Iframe", () => {
     expect(src()).toBe(
       "local-resource:///home/my%20user/.tokio/overlays/gift-jar/index.html",
     );
-  });
-
-  it("loads http and https URLs as they are", () => {
-    render(
-      <>
-        <Iframe name="local" source="http://tokio-app.local:37891/gift-jar/" />
-        <Iframe name="remote" source="https://example.com/overlay?x=1" />
-      </>,
-    );
-
-    expect(src("local")).toBe("http://tokio-app.local:37891/gift-jar/");
-    expect(src("remote")).toBe("https://example.com/overlay?x=1");
   });
 
   // Windows allows # in user names
@@ -85,14 +73,13 @@ describe("Iframe", () => {
         onLoad={onLoad}
       />,
     );
-    // The loader sits before the frame
     expect(frame()).not.toBeVisible();
-    expect(frame().previousElementSibling).not.toBeNull();
+    expect(screen.getByRole("status", { name: "Loading" })).toBeVisible();
 
     fireEvent.load(frame());
 
     expect(frame()).toBeVisible();
-    expect(frame().previousElementSibling).toBeNull();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(onLoad).toHaveBeenCalledOnce();
   });
 
@@ -103,12 +90,5 @@ describe("Iframe", () => {
     );
 
     expect(ref.current).toBe(frame());
-  });
-
-  it("says when there's no source", () => {
-    render(<Iframe name="gift-jar" source="" />);
-
-    expect(screen.getByText("No source provided")).toBeInTheDocument();
-    expect(screen.queryByTitle("Viewer for gift-jar")).not.toBeInTheDocument();
   });
 });

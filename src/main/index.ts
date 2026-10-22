@@ -6,6 +6,7 @@ import {
   withPreviewCORS,
   withPreviewStyles,
 } from "@/helper/preview";
+import { hasPending, settle } from "@/helper/quit";
 import Logger from "@/logger";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
@@ -106,7 +107,7 @@ process.on("uncaughtExceptionMonitor", logFatal("Uncaught exception"));
 process.on("unhandledRejection", logFatal("Unhandled rejection"));
 
 const APP_ICON = join(__dirname, "../../resources/icon.png");
-const APP_PRELOAD = join(__dirname, "../preload/index.mjs");
+const APP_PRELOAD = join(__dirname, "../preload/index.cjs");
 
 let win: BrowserWindow | null = null;
 
@@ -145,10 +146,7 @@ function createWindows(): void {
     center: true,
     autoHideMenuBar: true,
     icon: APP_ICON,
-    webPreferences: {
-      preload: APP_PRELOAD,
-      sandbox: false,
-    },
+    webPreferences: { preload: APP_PRELOAD },
   });
 
   // Notices go to the main window only.
@@ -201,7 +199,16 @@ app.on("window-all-closed", () => {
   app.quit();
 });
 
-app.on("will-quit", () => {
+// Not before-quit: on Cmd+Q it comes before the windows send their last saves.
+let settling = false;
+app.on("will-quit", (event) => {
+  // Saves still running would be cut off, so quit again once they're done.
+  if (!settling && hasPending()) {
+    settling = true;
+    event.preventDefault();
+    void settle(3000).then(() => app.quit());
+    return;
+  }
   services.ttsService.dispose();
   services.updaterService.dispose();
 });

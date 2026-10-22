@@ -11,7 +11,24 @@ body:
       label: What happened?
       description: Also tell us, what did you expect to happen?
       placeholder: Tell us what you see!
-      value: "A bug happened!"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Tokio version
+      description: Shown on the About page.
+      placeholder: e.g. 0.1.0-alpha.8
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
     validations:
       required: true
   - type: upload
@@ -25,6 +42,6 @@ body:
     id: logs
     attributes:
       label: Upload relevant logs
-      description: Please generate logs from the app and upload them here.
+      description: Attach the files from the `logs` folder in `.tokio` in your home folder (e.g. `C:\Users\<you>\.tokio\logs`). They include your TikTok username.
     validations:
       required: false

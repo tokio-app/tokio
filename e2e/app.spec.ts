@@ -222,14 +222,37 @@ test("leaves a second launch on the same folder to the running app", async () =>
   }
 });
 
-test("quits when the title bar closes it", async () => {
-  const closed = app.waitForEvent("close");
-
+test("quits when the title bar closes it, keeping a change made just before", async () => {
+  // The TTS settings of the active profile, as saved
+  const savedBanned = async () => {
+    const store = JSON.parse(
+      await readFile(data("settings", "tokio.json"), "utf8"),
+    );
+    const file = data("profiles", store.settings.activeProfile.file);
+    return JSON.parse(await readFile(file, "utf8")).tts.protection.banned;
+  };
   await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "TTS", exact: true })
+    .click();
+  const banned = page.getByPlaceholder("word1, word2, word3...");
+  const close = page
     .getByRole("banner")
     .first()
-    .getByTitle("Close", { exact: true })
-    .click();
+    .getByTitle("Close", { exact: true });
+  // Saved as usual first, once the profile has loaded (a change made before
+  // is undone by the load)
+  await expect(async () => {
+    await banned.fill("first");
+    expect(await savedBanned()).toEqual(["first"]);
+  }).toPass({ timeout: 10_000 });
+  await expect(close).toBeVisible();
+  const closed = app.waitForEvent("close");
 
+  // Closed before the 300ms autosave
+  await banned.fill("second");
+  await close.click();
   await closed;
+
+  expect(await savedBanned()).toEqual(["second"]);
 });

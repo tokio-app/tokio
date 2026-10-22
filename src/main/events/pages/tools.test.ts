@@ -10,6 +10,12 @@ import tools from "./tools";
 const scene = { id: "a1", name: "Scene" };
 const browser = { id: "b2", name: "Browser" };
 
+// The change is made, but the store file wasn't written.
+const saveError = {
+  code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+  message: "Tokio couldn't save the change. Check the logs folder for details.",
+};
+
 describe("tools events", () => {
   describe("GET_TEST_OVERLAYS", () => {
     it("replies the test overlays", async () => {
@@ -30,6 +36,7 @@ describe("tools events", () => {
     it("replies the updated list and notifies with the trimmed name", async () => {
       const createTestOverlay = vi.fn(async () => ({
         success: true,
+        saved: true,
         data: [scene, browser],
       }));
       const h = createHandler({ overlayService: { createTestOverlay } });
@@ -74,12 +81,36 @@ describe("tools events", () => {
         }),
       ]);
     });
+
+    it("replies main's list, then reports a store that can't be saved", async () => {
+      const h = createHandler({
+        overlayService: {
+          createTestOverlay: async () => ({
+            success: true,
+            saved: false,
+            data: [scene, browser],
+          }),
+        },
+      });
+
+      await h.invoke(tools, APP_EVENTS.ADD_TEST_OVERLAY, { name: "Browser" });
+
+      // The page ignores the failure reply and keeps the list.
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS)).toEqual([
+        { success: true, data: [scene, browser] },
+        { success: false, error: saveError },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", ...saveError }),
+      ]);
+    });
   });
 
   describe("REMOVE_TEST_OVERLAY", () => {
     it("replies the updated list and notifies", async () => {
       const removeTestOverlay = vi.fn(async () => ({
         success: true,
+        saved: true,
         data: [browser],
       }));
       const h = createHandler({ overlayService: { removeTestOverlay } });
@@ -99,10 +130,34 @@ describe("tools events", () => {
       ]);
     });
 
+    it("replies main's list, then reports a store that can't be saved", async () => {
+      const h = createHandler({
+        overlayService: {
+          removeTestOverlay: async () => ({
+            success: true,
+            saved: false,
+            data: [browser],
+          }),
+        },
+      });
+
+      await h.invoke(tools, APP_EVENTS.REMOVE_TEST_OVERLAY, { id: "a1" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS)).toEqual([
+        { success: true, data: [browser] },
+        { success: false, error: saveError },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", ...saveError }),
+      ]);
+    });
+
     it("replies and notifies when it can't be removed", async () => {
       const h = createHandler({
         overlayService: {
-          removeTestOverlay: async () => ({ success: false, data: [scene] }),
+          removeTestOverlay: async () => {
+            throw new Error("Store not loaded");
+          },
         },
       });
 

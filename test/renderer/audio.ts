@@ -5,9 +5,7 @@ import { vi } from "vitest";
 /** An AudioQueue that records its calls. `enqueue` resolves true. */
 function fakeQueue() {
   return {
-    isPlaying: false,
     enqueue: vi.fn<AudioQueue["enqueue"]>(async () => true),
-    start: vi.fn<AudioQueue["start"]>(),
     stop: vi.fn<AudioQueue["stop"]>(),
     setFilters: vi.fn<AudioQueue["setFilters"]>(),
     setQueueOptions: vi.fn<AudioQueue["setQueueOptions"]>(),

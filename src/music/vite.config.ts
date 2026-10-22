@@ -21,7 +21,4 @@ export default defineConfig({
     // Vite inlines small files as data: URLs, which the CSP blocks for fonts
     assetsInlineLimit: 0,
   },
-  server: {
-    port: 8989,
-  },
 });

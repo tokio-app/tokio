@@ -9,7 +9,6 @@ import {
   ShareEvent,
   TOKIO_EVENTS,
   TokioEventMap,
-  TokioPayload,
   UserData,
 } from "@/common/types";
 import { ADJECTIVES, CHAT_MESSAGES, GIFTS, LANGUAGES, NOUNS } from "./data";
@@ -155,12 +154,10 @@ const TIKTOK_EVENT_SAMPLES: {
   [TOKIO_EVENTS.MUSIC_CHANGE]: musicFactory,
 };
 
+// One payload type per event, so a union of events gives a union of payloads.
 export const generateTikTokEventSample = <K extends AppEvents>(
   type: K,
-): Extract<TokioPayload, { type: K }> => {
-  const data = TIKTOK_EVENT_SAMPLES[type]();
-  return {
-    type,
-    data,
-  } as Extract<TokioPayload, { type: K }>;
-};
+): { [P in K]: { type: P; data: TokioEventMap[P] } }[K] => ({
+  type,
+  data: TIKTOK_EVENT_SAMPLES[type](),
+});

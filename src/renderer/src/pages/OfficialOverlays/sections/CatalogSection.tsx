@@ -1,13 +1,12 @@
 import { CatalogOverlay } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
 import { catalogState, CatalogState } from "@/common/util";
-import { Btn, EmptyState, Modal, Section } from "@/components";
+import { Btn, EmptyState, Modal, Section, Spinner } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { FiCheck, FiTrash2 } from "react-icons/fi";
 import { LuArrowLeft, LuDownload, LuRefreshCw } from "react-icons/lu";
-import { MoonLoader } from "react-spinners";
 import { VscPackage } from "react-icons/vsc";
 import styles from "../officialoverlays.module.css";
 
@@ -121,7 +120,7 @@ function CatalogList({
   if (!catalog) {
     return (
       <div className={styles.loading}>
-        <MoonLoader color="var(--font-secondary)" size={40} />
+        <Spinner size={32} />
       </div>
     );
   }

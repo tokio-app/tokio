@@ -4,6 +4,7 @@ import {
   getOverlayConfig,
   mergeOverlayConfig,
   OverlayConfig,
+  OverlayConfigSchema,
   resetOverlayConfig,
 } from "./overlay";
 
@@ -87,6 +88,29 @@ function makeConfig(): OverlayConfig {
   };
 }
 
+describe("OverlayConfigSchema", () => {
+  const issues = (config: OverlayConfig) =>
+    OverlayConfigSchema.safeParse(config).error?.issues.map((i) => i.path);
+
+  it("accepts a valid config", () => {
+    expect(issues(makeConfig())).toBeUndefined();
+  });
+
+  it("points at the field whose section doesn't exist", () => {
+    const config = makeConfig();
+    config.fields[2].section = "missing";
+
+    expect(issues(config)).toEqual([["fields", 2, "section"]]);
+  });
+
+  it("points at a field with the id of another", () => {
+    const config = makeConfig();
+    config.fields[3].id = "title";
+
+    expect(issues(config)).toEqual([["fields", 3, "id"]]);
+  });
+});
+
 describe("resetOverlayConfig", () => {
   it("sets every value back to its default and keeps the rest", () => {
     const config = makeConfig();
@@ -138,7 +162,7 @@ describe("getOverlayConfig", () => {
     });
   });
 
-  it("gives one gift for a single gift field", () => {
+  it("gives one gift for a single gift field, or none without the list", () => {
     const config = makeConfig();
     config.fields[5] = {
       id: "gifts",
@@ -149,6 +173,7 @@ describe("getOverlayConfig", () => {
     };
 
     expect(getOverlayConfig(config, GIFTS).gifts).toEqual(GIFTS[2]);
+    expect(getOverlayConfig(config, null).gifts).toBeUndefined();
   });
 
   it("drops unknown gifts, and gives none without the gift list", () => {

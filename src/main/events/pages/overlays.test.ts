@@ -56,6 +56,12 @@ const catalogEntry: CatalogOverlay = {
 
 const config: OverlayConfig = { sections: [], fields: [] };
 
+// The change is made, but the store file wasn't written.
+const saveError = {
+  code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+  message: "Tokio couldn't save the change. Check the logs folder for details.",
+};
+
 const pickFolder = (path: string) => {
   dialog.showOpenDialog.mockResolvedValue({
     canceled: false,
@@ -72,11 +78,12 @@ describe("overlays events", () => {
   });
 
   describe("IMPORT_OVERLAY", () => {
-    const setup = (success = true) => {
+    const setup = (success = true, saved = true) => {
       const overlayService = {
         getGifts: vi.fn(async () => gifts),
         import: vi.fn(async (_path: string, _gifts: CustomGift[]) => ({
           success,
+          saved,
         })),
         getOverlays: vi.fn(() => [imported]),
       };
@@ -143,12 +150,28 @@ describe("overlays events", () => {
         expect.any(Error),
       );
     });
+
+    it("reports a store that can't be saved, with the overlays main has", async () => {
+      const { h } = setup(true, false);
+      pickFolder("/streams/chat-box");
+
+      await h.invoke(overlays, APP_EVENTS.IMPORT_OVERLAY);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([
+        { success: true, data: [imported] },
+        { success: false, data: [imported], error: saveError },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", ...saveError }),
+      ]);
+      expect(logError).not.toHaveBeenCalled();
+    });
   });
 
   describe("REMOVE_OVERLAY", () => {
-    const setup = (success: boolean) => {
+    const setup = (success: boolean, saved = true) => {
       const overlayService = {
-        remove: vi.fn(async (_id: string) => ({ success })),
+        remove: vi.fn(async (_id: string) => ({ success, saved })),
         getOverlays: vi.fn(() => [imported]),
       };
       return { h: createHandler({ overlayService }), overlayService };
@@ -186,6 +209,20 @@ describe("overlays events", () => {
       ]);
       expect(h.notices).toEqual([expect.objectContaining(failure)]);
       expect(logError).not.toHaveBeenCalled();
+    });
+
+    it("reports a store that can't be saved, with the overlays main has", async () => {
+      const { h } = setup(true, false);
+
+      await h.invoke(overlays, APP_EVENTS.REMOVE_OVERLAY, { id: "gift-jar" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([
+        { success: true, data: [imported] },
+        { success: false, data: [imported], error: saveError },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", ...saveError }),
+      ]);
     });
   });
 
@@ -227,14 +264,14 @@ describe("overlays events", () => {
   });
 
   describe("INSTALL_OVERLAY", () => {
-    const setup = (installed: OverlayApp[], success = true) => {
+    const setup = (installed: OverlayApp[], success = true, saved = true) => {
       const after = [overlay({ version: "1.1.0" }), imported];
       const overlayService = {
         getOverlays: vi.fn(() => installed),
         getGifts: vi.fn(async () => gifts),
         installFromCatalog: vi.fn(async (_id: string, _gifts: CustomGift[]) => {
           if (success) overlayService.getOverlays.mockReturnValue(after);
-          return { success };
+          return { success, saved };
         }),
       };
       return { h: createHandler({ overlayService }), overlayService, after };
@@ -339,6 +376,22 @@ describe("overlays events", () => {
         expect(logError).not.toHaveBeenCalled();
       },
     );
+
+    it("reports a store that can't be saved, with the overlays main has", async () => {
+      const { h, after } = setup([imported], true, false);
+
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([
+        { success: true, data: after },
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.INSTALL_OVERLAY)).toEqual([
+        { success: false, error: saveError, id: "gift-jar" },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", ...saveError }),
+      ]);
+    });
   });
 
   describe("GET_OVERLAYS", () => {

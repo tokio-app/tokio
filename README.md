@@ -23,7 +23,7 @@ While you're LIVE, a rose line at the top of the window shows it on every page, 
 
 Chat messages are read aloud as they come in.
 
-- **Voices** from three engines, all in one list: TikTok's own voices, Microsoft Edge voices, and, on Windows, the voices installed on the system (SAPI and OneCore, including older 32-bit voices). Search the list, filter it by engine and language, and play any voice to hear a short line in its language before you pick it. Adjust speed, pitch and volume, and test a message to hear it the way chat is read.
+- **Voices** from three engines, all in one list: TikTok's voices (see **Voice engines** under [Profiles and settings](#profiles-and-settings)), Microsoft Edge voices, and, on Windows, the voices installed on the system (SAPI and OneCore, including older 32-bit voices). Search the list, filter it by engine and language, and play any voice to hear a short line in its language before you pick it. Adjust speed, pitch and volume, and test a message to hear it the way chat is read.
 - **Format**: choose which messages get read and how, for example `{username} {comment}` or only messages that start with a command, which isn't read aloud. Turn on **Remove Emojis** so the voice doesn't read them out; messages that are only emojis are then skipped.
 - **Replacements**: teach the voice how to say acronyms, slang and names.
 - **Permissions**: let everyone talk, or only followers, superfans or moderators. You can also set a minimum fan level, and a whitelist and a blacklist of @handles: blacklisted viewers are never read, even when everyone can talk, and a whitelist with names in it lets only those viewers talk.
@@ -68,7 +68,7 @@ Set them up from the gallery on the **Overlays** page: colors, text, the gifts t
 
 - **Profiles**: keep separate settings for different streams. Create a blank profile or clone an existing one, and switch between them from the title bar.
 - **TikTok LIVE**: your [Euler Stream](https://www.eulerstream.com) API key. Euler Stream signs Tokio's connection to TikTok LIVE, and each user brings their own key: [sign up](https://www.eulerstream.com/register) for free and paste it here. Your [plan](https://www.eulerstream.com/pricing) sets how often you can connect.
-- **Voice engines**: optionally add your TikTok session ID, which the TikTok voices use when it's set.
+- **Voice engines**: optionally add your TikTok session ID. With it, the TikTok voices come straight from TikTok. Without it, they go through `tiktok-tts.weilnet.workers.dev`, a proxy run by a third party, which gets the text of every message they read.
 - **Overlay server**: turn the local server for overlays on or off.
 - **Updates**: Tokio checks GitHub for new releases on startup and every few hours, downloads them in the background and installs them when you restart from the title bar. On macOS, where the app isn't signed, the button opens the release page instead. Turn automatic checks off in Settings, or check any time from About.
 - **Notifications**: when something fails, such as a voice that can't be generated, a sound that's missing or a change that couldn't be saved, Tokio tells you what went wrong. The bell in the title bar keeps the session's history.

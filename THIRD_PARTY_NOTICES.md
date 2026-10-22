@@ -25,7 +25,7 @@ This file generates the `Sec-MS-GEC` token required by Microsoft Edge's Read Alo
 
 ## Other dependencies
 
-All other npm dependencies are under permissive licenses, except the font files of the Archivo typeface (`@fontsource-variable/archivo`), which are under the SIL Open Font License 1.1: it allows bundling them with any software, and only modified versions of the fonts must stay under the OFL. A scan of the 150 production packages on 2026-10-21 found MIT, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, BlueOak-1.0.0, Python-2.0 and OFL-1.1. Among them, `@tokioapp/connector` (MIT, <https://github.com/tokio-app/connector>) connects to TikTok LIVE and provides the stream events. Their license files are shipped with the application as described above, including those of libraries bundled into the user interface (such as React). That scan reads package-level licenses only. Content inside a package can carry its own license, as the icons below do.
+All other npm dependencies are under permissive licenses, except the font files of the Archivo typeface (`@fontsource-variable/archivo`), which are under the SIL Open Font License 1.1: it allows bundling them with any software, and only modified versions of the fonts must stay under the OFL. A scan of the 135 production packages on 2026-10-22 found MIT, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, BlueOak-1.0.0, Python-2.0 and OFL-1.1. Among them, `@tokioapp/connector` (MIT, <https://github.com/tokio-app/connector>) connects to TikTok LIVE and provides the stream events. Their license files are shipped with the application as described above, including those of libraries bundled into the user interface (such as React). That scan reads package-level licenses only. Content inside a package can carry its own license, as the icons below do.
 
 Re-check when adding or upgrading dependencies, since licenses can change between versions. Electron's and Chromium's licenses are included by Electron as `LICENSE.electron.txt` and `LICENSES.chromium.html` in the installation folder.
 
@@ -47,7 +47,8 @@ Check this table when adding an icon set: react-icons also contains sets under C
 
 Tokio talks to these online services. None of them is covered by Tokio's license or by the licenses above. Each one is subject to its operator's terms and can stop working at any time.
 
-- **TikTok:** TikTok LIVE, through @tokioapp/connector, and TikTok's text-to-speech (the TikTok voices). Neither is an official public API.
+- **TikTok:** TikTok LIVE, through @tokioapp/connector, and TikTok's text-to-speech (the TikTok voices), when the user has added a TikTok session ID. Neither is an official public API.
+- **TikTok TTS proxy** (`tiktok-tts.weilnet.workers.dev`): the TikTok voices when no session ID is set. It gets the text of each message to read and its voice. It's run by a third party, not by TikTok or Tokio.
 - **Euler Stream** (`tiktok.eulerstream.com`): signs the connection to TikTok LIVE, with each user's own API key.
 - **Microsoft:** Edge's Read Aloud service (the Edge voices), which isn't an official public API.
 - **Spotify and YouTube:** music requests.

@@ -50,14 +50,23 @@ const INSPECTED = new Set(["then", "toJSON", "asymmetricMatch", "$$typeof"]);
 class UnexpectedUse extends Error {}
 
 // A service that fails the test when the handler reaches for something the
-// test didn't stub, instead of turning it into a failure reply.
-function strict(name: string, stub: object = {}): object {
+// test didn't stub, instead of turning it into a failure reply. `onUse` gets
+// the error too, for uses inside onError, whose throws are only logged.
+function strict(
+  name: string,
+  stub: object = {},
+  onUse: (error: UnexpectedUse) => void = () => {},
+): object {
   return new Proxy(stub, {
     get(target, prop, receiver) {
       if (typeof prop === "symbol" || INSPECTED.has(prop) || prop in target) {
         return Reflect.get(target, prop, receiver);
       }
-      throw new UnexpectedUse(`The handler used ${name}.${prop}, stub it.`);
+      const error = new UnexpectedUse(
+        `The handler used ${name}.${prop}, stub it.`,
+      );
+      onUse(error);
+      throw error;
     },
   });
 }
@@ -92,6 +101,8 @@ export function createHandler(services: ServiceStubs = {}) {
     sent.push([channel, data]);
   });
 
+  // The first unstubbed use during an invoke, rethrown once it's done
+  let unexpected: UnexpectedUse | undefined;
   const stubs: Record<string, object> = {
     pathManagerService: { files: { logs: { system: "system.log" } } },
     ...services,
@@ -105,7 +116,12 @@ export function createHandler(services: ServiceStubs = {}) {
     session,
     notifier,
     ...Object.fromEntries(
-      SERVICES.map((name) => [name, strict(name, stubs[name])]),
+      SERVICES.map((name) => [
+        name,
+        strict(name, stubs[name], (error) => {
+          unexpected ??= error;
+        }),
+      ]),
     ),
   });
 
@@ -123,7 +139,9 @@ export function createHandler(services: ServiceStubs = {}) {
     ) {
       const item = stack.getEvents().find((ev) => ev.event === event);
       if (!item) throw new Error(`The stack doesn't handle ${event}.`);
+      unexpected = undefined;
       await runEvent(item, handler, asReplyEvent({ reply }), data);
+      if (unexpected) throw unexpected;
     },
 
     /** What the handlers replied on a channel, oldest first. */

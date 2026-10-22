@@ -22,6 +22,7 @@
   border-radius: var(--radius-full);
   background-color: var(--background-secondary-hover);
   color: var(--font-primary);
+  /* Below the type scale, to fit two digits in the 16px badge */
   font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;

@@ -199,7 +199,7 @@ describe("VoiceSelect", () => {
 
       await previewed(bob);
 
-      expect(queue.enqueue).toHaveBeenCalledWith(data, true, {
+      expect(queue.enqueue).toHaveBeenCalledWith(data, {
         speed: 1.2,
         pitch: 0.8,
         onEnded: expect.any(Function),
@@ -212,7 +212,7 @@ describe("VoiceSelect", () => {
       await user.click(row("Bob").getByRole("button", { name: "Play" }));
       await previewed(voice("Bob", "en-US"));
 
-      const [, , options] = queue.enqueue.mock.calls[0];
+      const [, options] = queue.enqueue.mock.calls[0];
       act(() => options?.onEnded?.());
 
       expect(row("Bob").getByRole("button", { name: "Play" })).toBeVisible();

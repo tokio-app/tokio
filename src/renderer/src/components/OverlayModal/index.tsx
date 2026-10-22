@@ -6,8 +6,7 @@ import {
 import { CustomGift, OverlayApp, TokioPreviewMessage } from "@/common/types";
 import { useEffect, useRef, useState } from "react";
 import { PiShootingStarThin } from "react-icons/pi";
-import { MoonLoader } from "react-spinners";
-import { Btn } from "../Elements";
+import { Btn, Spinner } from "../Elements";
 import { Modal } from "../Modal";
 import { OverlayPreview } from "../OverlayPreview";
 import styles from "./overlaymodal.module.css";
@@ -140,7 +139,7 @@ export function OverlayModal({
 
         {settings == null ? (
           <div className={styles.loading}>
-            <MoonLoader color="var(--font-secondary)" size={60} />
+            <Spinner size={32} />
           </div>
         ) : (
           <div className={styles.settings}>

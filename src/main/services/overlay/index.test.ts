@@ -62,6 +62,9 @@ const config = (value: string) =>
 
 const gifts: CustomGift[] = [{ value: 1, label: "Rose", img: "", coins: 1 }];
 
+// A change that was made and saved in the store
+const done = { success: true, saved: true };
+
 // A release of an official overlay's zip, as tokio-overlays builds it, with
 // its settings at their defaults.
 const release = (version: string, files: Record<string, string> = {}) => {
@@ -117,6 +120,8 @@ describe("OverlayService", () => {
   let stored: (OverlayMetadata & { id: string })[];
   let testOverlays: TestOverlay[];
   let rebuilt: boolean;
+  // What the store's mutators return: false when its file couldn't be written
+  let writes: boolean;
   let mount: MockInstance<ServerService["mount"]>;
   let unmount: MockInstance<ServerService["unmount"]>;
   let sendToClient: MockInstance<ServerService["sendToClient"]>;
@@ -131,23 +136,23 @@ describe("OverlayService", () => {
     }),
     addOverlayInfo: async (o: OverlayMetadata & { id: string }) => {
       stored.push(o);
-      return true;
+      return writes;
     },
     updateOverlayInfo: async (o: OverlayMetadata & { id: string }) => {
       stored = stored.map((s) => (s.id === o.id ? o : s));
-      return true;
+      return writes;
     },
     removeOverlayInfo: async (id: string) => {
       stored = stored.filter((o) => o.id !== id);
-      return true;
+      return writes;
     },
     addTestOverlay: async (o: TestOverlay) => {
       testOverlays.push(o);
-      return true;
+      return writes;
     },
     removeTestOverlay: async (id: string) => {
       testOverlays = testOverlays.filter((o) => o.id !== id);
-      return true;
+      return writes;
     },
   };
 
@@ -175,6 +180,7 @@ describe("OverlayService", () => {
     stored = [];
     testOverlays = [];
     rebuilt = false;
+    writes = true;
     // Not started, it only keeps the routes.
     server = new ServerService(0);
     mount = vi.spyOn(server, "mount");
@@ -421,6 +427,17 @@ describe("OverlayService", () => {
         expect(again).toEqual({ success: true });
       });
 
+      it("leaves a saved gift alone when its details are the same", async () => {
+        await writeFile(
+          join(root, "custom-gifts.json"),
+          JSON.stringify([saved(9)]),
+        );
+
+        expect(await service.recordGift(sent("9"))).toEqual({
+          success: true,
+        });
+      });
+
       it("tries a gift again after a failed save", async () => {
         // A folder where the file goes
         await mkdir(join(root, "custom-gifts.json"));
@@ -442,7 +459,7 @@ describe("OverlayService", () => {
       const source = join(root, "source");
       await configurable(source);
 
-      expect(await service.import(source, gifts)).toEqual({ success: true });
+      expect(await service.import(source, gifts)).toEqual(done);
 
       const [id] = await readdir(folder);
       expect(stored).toMatchObject([{ id, name: "Title", external: true }]);
@@ -466,7 +483,7 @@ describe("OverlayService", () => {
       // junction needs no admin rights on Windows, elsewhere it's a link.
       await symlink(secret, join(source, "data"), "junction");
 
-      expect(await service.import(source, gifts)).toEqual({ success: true });
+      expect(await service.import(source, gifts)).toEqual(done);
 
       const [id] = await readdir(folder);
       expect(await readdir(join(folder, id))).not.toContain("data");
@@ -486,7 +503,7 @@ describe("OverlayService", () => {
       const picked = join(root, "picked");
       await symlink(real, picked, "junction");
 
-      expect(await service.import(picked, gifts)).toEqual({ success: true });
+      expect(await service.import(picked, gifts)).toEqual(done);
 
       const [id] = await readdir(folder);
       expect((await lstat(join(folder, id))).isSymbolicLink()).toBe(false);
@@ -524,7 +541,7 @@ describe("OverlayService", () => {
         "index.html": `<body>${SETUP}</body>`,
       });
 
-      expect(await service.import(source, gifts)).toEqual({ success: true });
+      expect(await service.import(source, gifts)).toEqual(done);
 
       const [id] = await readdir(folder);
       const html = await readFile(join(folder, id, "index.html"), "utf-8");
@@ -538,7 +555,7 @@ describe("OverlayService", () => {
         "index.html": `<body>${SETUP}</body>`,
       });
 
-      expect(await service.import(source, gifts)).toEqual({ success: true });
+      expect(await service.import(source, gifts)).toEqual(done);
 
       const [id] = await readdir(folder);
       const html = await readFile(join(folder, id, "index.html"), "utf-8");
@@ -568,6 +585,21 @@ describe("OverlayService", () => {
       expect(stored).toEqual([]);
     });
 
+    it("keeps and serves the overlay when the store can't be saved", async () => {
+      const source = join(root, "source");
+      await configurable(source);
+      writes = false;
+
+      expect(await service.import(source, gifts)).toEqual({
+        success: true,
+        saved: false,
+      });
+
+      const [id] = await readdir(folder);
+      expect(stored).toMatchObject([{ id }]);
+      expect(service.getOverlays()).toMatchObject([{ id }]);
+    });
+
     it("removes the copy when its HTML can't be written", async () => {
       const source = join(root, "source");
       await configurable(source);
@@ -586,7 +618,7 @@ describe("OverlayService", () => {
       await service.import(source, gifts);
       const [id] = await readdir(folder);
 
-      expect(await service.remove(id)).toEqual({ success: true });
+      expect(await service.remove(id)).toEqual(done);
 
       expect(await readdir(folder)).toEqual([]);
       expect(stored).toEqual([]);
@@ -605,11 +637,24 @@ describe("OverlayService", () => {
       expect(unmount).not.toHaveBeenCalled();
     });
 
+    it("deletes it even when the store can't be saved", async () => {
+      await configurable(join(folder, "title"));
+      stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
+      writes = false;
+
+      expect(await service.remove("title")).toEqual({
+        success: true,
+        saved: false,
+      });
+      expect(await readdir(folder)).toEqual([]);
+      expect(stored).toEqual([]);
+    });
+
     it("deletes an official overlay", async () => {
       await configurable(join(folder, "title"));
       stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
 
-      expect(await service.remove("title")).toEqual({ success: true });
+      expect(await service.remove("title")).toEqual(done);
 
       expect(await readdir(folder)).toEqual([]);
       expect(stored).toEqual([]);
@@ -652,9 +697,7 @@ describe("OverlayService", () => {
     it("serves an official overlay under its catalog id", async () => {
       publish(release("1.0.0"));
 
-      expect(await service.installFromCatalog("gift-jar", gifts)).toEqual({
-        success: true,
-      });
+      expect(await service.installFromCatalog("gift-jar", gifts)).toEqual(done);
 
       expect(await readdir(folder)).toEqual(["gift-jar"]);
       expect(stored).toEqual([
@@ -685,9 +728,7 @@ describe("OverlayService", () => {
 
       vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
       publish(release("1.0.1", { "new.js": "2" }));
-      expect(await service.installFromCatalog("gift-jar", gifts)).toEqual({
-        success: true,
-      });
+      expect(await service.installFromCatalog("gift-jar", gifts)).toEqual(done);
 
       // No staging folder or old copy is left.
       expect(await readdir(folder)).toEqual(["gift-jar"]);
@@ -717,7 +758,8 @@ describe("OverlayService", () => {
         await service.installFromCatalog("gift-jar", gifts);
       });
 
-      // Updates to 1.0.1 while the renames after the first one fail
+      // Updates to 1.0.1 while the renames after the kept settings', the new
+      // HTML's and the installed version's fail
       const updateFailing = async (...errors: Error[]) => {
         vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
         publish(release("1.0.1", { "new.js": "2" }));
@@ -725,7 +767,11 @@ describe("OverlayService", () => {
           await vi.importActual<typeof import("node:fs/promises")>(
             "node:fs/promises",
           );
-        const renames = vi.mocked(rename).mockImplementationOnce(fs.rename);
+        const renames = vi
+          .mocked(rename)
+          .mockImplementationOnce(fs.rename)
+          .mockImplementationOnce(fs.rename)
+          .mockImplementationOnce(fs.rename);
         for (const error of errors) renames.mockRejectedValueOnce(error);
         return service.installFromCatalog("gift-jar", gifts);
       };
@@ -742,6 +788,14 @@ describe("OverlayService", () => {
         expect(await readdir(dir())).not.toContain("new.js");
         expect(await config()).toBe(installed);
         expect(stored).toMatchObject([{ id: "gift-jar", version: "1.0.0" }]);
+      });
+
+      it("tries again while the folder is held", async () => {
+        const busy = Object.assign(new Error("EBUSY"), { code: "EBUSY" });
+
+        expect(await updateFailing(busy)).toEqual(done);
+        expect(await readdir(folder)).toEqual(["gift-jar"]);
+        expect(await readdir(dir())).toContain("new.js");
       });
 
       it("logs where the installed version is when it can't be put back", async () => {
@@ -792,6 +846,18 @@ describe("OverlayService", () => {
       expect(await readdir(folder)).toEqual([]);
     });
 
+    it("serves the install when the store can't be saved", async () => {
+      publish(release("1.0.0"));
+      writes = false;
+
+      expect(await service.installFromCatalog("gift-jar", gifts)).toEqual({
+        success: true,
+        saved: false,
+      });
+      expect(stored).toMatchObject([{ id: "gift-jar" }]);
+      expect(mount).toHaveBeenCalledOnce();
+    });
+
     it("installs once when asked twice at the same time", async () => {
       const fetchMock = publish(release("1.0.0"));
 
@@ -800,7 +866,7 @@ describe("OverlayService", () => {
         service.installFromCatalog("gift-jar", gifts),
       ]);
 
-      expect(results).toEqual([{ success: true }, { success: true }]);
+      expect(results).toEqual([done, done]);
       expect(stored).toHaveLength(1);
       // The catalog, then the zip
       expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -883,7 +949,24 @@ describe("OverlayService", () => {
 
       const removed = await service.removeTestOverlay(created.data![0].id);
 
-      expect(removed).toEqual({ success: true, data: [] });
+      expect(removed).toEqual({ ...done, data: [] });
+    });
+
+    it("keeps the change when the store can't be saved", async () => {
+      writes = false;
+
+      const created = await service.createTestOverlay("Gift goal");
+      expect(created).toEqual({
+        success: true,
+        saved: false,
+        data: [{ id: expect.any(String), name: "Gift goal" }],
+      });
+
+      expect(await service.removeTestOverlay(created.data![0].id)).toEqual({
+        success: true,
+        saved: false,
+        data: [],
+      });
     });
 
     it("rejects an empty name", async () => {

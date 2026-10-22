@@ -1,5 +1,6 @@
 import { UpdateStatus } from "@/common/types";
 import { REPOSITORY_URL } from "@/common/util";
+import { track } from "@/helper/quit";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -58,11 +59,17 @@ describe("UpdaterService", () => {
   };
 
   it("follows GitHub's latest release, not prereleases", async () => {
+    // The opposite of what the service sets, so each check can fail
+    updater.allowDowngrade = true;
+    updater.autoDownload = false;
+    updater.autoInstallOnAppQuit = false;
+
     await create();
 
     expect(updater.allowPrerelease).toBe(false);
     expect(updater.allowDowngrade).toBe(false);
     expect(updater.autoDownload).toBe(true);
+    expect(updater.autoInstallOnAppQuit).toBe(true);
     expect(updater.logger).not.toBeNull();
   });
 
@@ -222,6 +229,27 @@ describe("UpdaterService", () => {
     updater.emit("update-downloaded", { version: "0.2.0" });
 
     expect(service.install()).toEqual({ success: true });
-    expect(updater.quitAndInstall).toHaveBeenCalledWith(true, true);
+    await vi.waitFor(() =>
+      expect(updater.quitAndInstall).toHaveBeenCalledWith(true, true),
+    );
+  });
+
+  // The installer starts first, and the app quits after it.
+  it("waits for the saves still running before it installs, once", async () => {
+    const service = await create();
+    updater.emit("update-downloaded", { version: "0.2.0" });
+    let finish!: () => void;
+    void track(new Promise<void>((resolve) => (finish = resolve)));
+
+    expect(service.install()).toEqual({ success: true });
+    expect(service.install()).toEqual({ success: true });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+
+    finish();
+    await vi.waitFor(() =>
+      expect(updater.quitAndInstall).toHaveBeenCalledWith(true, true),
+    );
+    expect(updater.quitAndInstall).toHaveBeenCalledOnce();
   });
 });

@@ -51,6 +51,8 @@ export function PlayButton({
       active={playing}
       pulse={!loading}
       title={title}
+      // Or the spinner's "Loading" would name it
+      aria-label={title}
       disabled={disabled}
       onClick={onClick}
     >

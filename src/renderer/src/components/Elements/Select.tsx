@@ -21,8 +21,6 @@ export type SelectOption<V extends Value = Value> = {
   label: string | number;
   value: V;
   img?: string;
-  // Options with a group are listed under its name. Keep them sorted by group.
-  group?: string;
 };
 
 type CommonProps<V extends Value> = {
@@ -36,7 +34,6 @@ type CommonProps<V extends Value> = {
 
 // The item's --control-height plus .select_row's 2px padding on each side
 const OPTION_HEIGHT = 40;
-const GROUP_HEIGHT = 28;
 
 export function Select<V extends Value>({
   value,
@@ -133,36 +130,15 @@ type BaseProps<V extends Value> = CommonProps<V> & {
   multiple?: boolean;
 };
 
-type Row<V extends Value> =
-  | { kind: "group"; label: string }
-  | { kind: "option"; option: SelectOption<V> };
-
-function buildRows<V extends Value>(
+function filterOptions<V extends Value>(
   options: SelectOption<V>[],
   search: string,
-): Row<V>[] {
+): SelectOption<V>[] {
   const needle = search.trim().toLowerCase();
-  const rows: Row<V>[] = [];
-  let group: string | undefined;
-
-  for (const option of options) {
-    const matches =
-      String(option.label).toLowerCase().includes(needle) ||
-      (option.group?.toLowerCase().includes(needle) ?? false);
-    if (!matches) continue;
-
-    if (option.group !== undefined && option.group !== group) {
-      group = option.group;
-      rows.push({ kind: "group", label: group });
-    }
-    rows.push({ kind: "option", option });
-  }
-
-  return rows;
+  return options.filter((option) =>
+    String(option.label).toLowerCase().includes(needle),
+  );
 }
-
-const firstOption = <V extends Value>(rows: Row<V>[]) =>
-  rows.findIndex((row) => row.kind === "option");
 
 type Move = "next" | "previous" | "first" | "last";
 
@@ -189,22 +165,18 @@ function SelectBase<V extends Value>({
   const displayRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const [search, setSearch] = useState("");
-  // Row the keyboard is on, -1 for none
+  // Option the keyboard is on, -1 for none
   const [active, setActive] = useState(-1);
 
-  const rows = useMemo(() => buildRows(options, search), [options, search]);
+  const rows = useMemo(() => filterOptions(options, search), [options, search]);
   const optionId = (index: number) => `${listId}-${index}`;
-  const activeId =
-    open && rows[active]?.kind === "option" ? optionId(active) : undefined;
+  const activeId = open && rows[active] ? optionId(active) : undefined;
 
-  // Opens on the selected option, with an empty search
+  // Opens on the selected option, or the first, with an empty search
   const openList = () => {
-    const all = buildRows(options, "");
-    const selected = all.findIndex(
-      (row) => row.kind === "option" && isSelected(row.option.value),
-    );
+    const selected = options.findIndex((option) => isSelected(option.value));
     setSearch("");
-    setActive(selected !== -1 ? selected : firstOption(all));
+    setActive(Math.max(selected, 0));
     toggle();
   };
 
@@ -219,19 +191,17 @@ function SelectBase<V extends Value>({
   };
 
   const move = (to: Move) => {
-    const indexes = rows.flatMap((row, i) =>
-      row.kind === "option" ? [i] : [],
+    if (rows.length === 0) return;
+    const at = rows[active] ? active : -1;
+    const last = rows.length - 1;
+    setActive(
+      {
+        first: 0,
+        last,
+        next: at === -1 ? 0 : Math.min(at + 1, last),
+        previous: at === -1 ? last : Math.max(at - 1, 0),
+      }[to],
     );
-    if (indexes.length === 0) return;
-    const at = indexes.indexOf(active);
-    const last = indexes.length - 1;
-    const target = {
-      first: 0,
-      last,
-      next: at === -1 ? 0 : Math.min(at + 1, last),
-      previous: at === -1 ? last : Math.max(at - 1, 0),
-    }[to];
-    setActive(indexes[target]);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>, fromSearch = false) => {
@@ -252,8 +222,8 @@ function SelectBase<V extends Value>({
       move(to);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      const row = rows[active];
-      if (row?.kind === "option") pick(row.option.value);
+      const option = rows[active];
+      if (option) pick(option.value);
     } else if (e.key === "Escape") {
       // Closes the list, not a modal it's in
       e.preventDefault();
@@ -327,7 +297,7 @@ function SelectBase<V extends Value>({
               isSelected={isSelected}
               onSearch={(text) => {
                 setSearch(text);
-                setActive(firstOption(buildRows(options, text)));
+                setActive(0);
               }}
               onActive={setActive}
               onPick={pick}
@@ -356,7 +326,7 @@ function SelectMenu<V extends Value>({
   onPick,
   onKeyDown,
 }: {
-  rows: Row<V>[];
+  rows: SelectOption<V>[];
   listId: string;
   optionId: (index: number) => string;
   active: number;
@@ -375,8 +345,7 @@ function SelectMenu<V extends Value>({
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => listRef.current,
-    estimateSize: (index) =>
-      rows[index].kind === "group" ? GROUP_HEIGHT : OPTION_HEIGHT,
+    estimateSize: () => OPTION_HEIGHT,
     overscan: 5,
   });
 
@@ -421,9 +390,8 @@ function SelectMenu<V extends Value>({
             style={{ height: virtualizer.getTotalSize() }}
           >
             {virtualizer.getVirtualItems().map((item) => {
-              const row = rows[item.index];
-              const selected =
-                row.kind === "option" && isSelected(row.option.value);
+              const option = rows[item.index];
+              const selected = isSelected(option.value);
               return (
                 <div
                   key={item.key}
@@ -434,32 +402,25 @@ function SelectMenu<V extends Value>({
                     transform: `translateY(${item.start}px)`,
                   }}
                 >
-                  {row.kind === "group" ? (
-                    <div className={styles.select_group}>{row.label}</div>
-                  ) : (
-                    <div
-                      id={optionId(item.index)}
-                      role="option"
-                      aria-selected={selected}
-                      className={cx(
-                        styles.select_item,
-                        selected && styles.select_item_active,
-                        item.index === active && styles.select_item_focused,
-                      )}
-                      // Keeps the focus on the select or its search
-                      onMouseDown={(e) => e.preventDefault()}
-                      onMouseMove={() => onActive(item.index)}
-                      onClick={() => onPick(row.option.value)}
-                    >
-                      {row.option.img && (
-                        <img
-                          src={row.option.img}
-                          className={styles.select_img}
-                        />
-                      )}
-                      {row.option.label}
-                    </div>
-                  )}
+                  <div
+                    id={optionId(item.index)}
+                    role="option"
+                    aria-selected={selected}
+                    className={cx(
+                      styles.select_item,
+                      selected && styles.select_item_active,
+                      item.index === active && styles.select_item_focused,
+                    )}
+                    // Keeps the focus on the select or its search
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseMove={() => onActive(item.index)}
+                    onClick={() => onPick(option.value)}
+                  >
+                    {option.img && (
+                      <img src={option.img} className={styles.select_img} />
+                    )}
+                    {option.label}
+                  </div>
                 </div>
               );
             })}

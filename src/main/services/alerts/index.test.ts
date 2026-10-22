@@ -15,6 +15,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  rename,
   rm,
   unlink,
   writeFile,
@@ -29,12 +30,13 @@ import {
   CACHE_MAX_FILE_BYTES,
 } from "./index";
 
-// A test can make a write fail partway, or count and hold reads
+// A test can make a write or rename fail, or count and hold reads
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...actual,
     readFile: vi.fn(actual.readFile),
+    rename: vi.fn(actual.rename),
     writeFile: vi.fn(actual.writeFile),
   };
 });
@@ -146,6 +148,7 @@ describe("AlertsService", () => {
           channel: "alerts",
           maxQueueLength: 100,
           id: "alert-1",
+          key: "ding.mp3",
         },
       ]);
     });
@@ -415,6 +418,7 @@ describe("AlertsService", () => {
           volume: 80,
           channel: "alerts",
           id: "alert-1",
+          key: expect.stringMatching(/^tts:/),
           filters: { speed: 1.5, pitch: 0.8 },
         });
       });
@@ -486,6 +490,8 @@ describe("AlertsService", () => {
           "Thanks for the Rose",
           "Thanks for the Rose",
         ]);
+        // So the window decodes it once too
+        expect(sent[1].key).toBe(sent[0].key);
       });
 
       it("makes one message at a time, with the TTS cooldown between them", async () => {
@@ -500,6 +506,7 @@ describe("AlertsService", () => {
 
         await vi.advanceTimersByTimeAsync(2000);
         expect(sent.map(said)).toEqual(["Thanks Ann", "Thanks Bob"]);
+        expect(sent[1].key).not.toBe(sent[0].key);
       });
 
       it("drops messages beyond the TTS queue length", async () => {
@@ -625,6 +632,19 @@ describe("AlertsService", () => {
       expect(await readFile(join(sounds, res.data!.file))).toEqual(
         Buffer.from([4, 5]),
       );
+    });
+
+    // Windows antivirus and indexers hold a file they just saw for a moment.
+    it("waits out a file another program holds", async () => {
+      await writeFile(join(src, "a.wav"), bytes(4, 5));
+      vi.mocked(rename).mockRejectedValueOnce(
+        Object.assign(new Error("EBUSY: rename"), { code: "EBUSY" }),
+      );
+
+      const res = await service.importSound(join(src, "a.wav"));
+
+      expect(res.success).toBe(true);
+      expect(await readdir(sounds)).toContain(res.data!.file);
     });
 
     it("stores the same audio once", async () => {

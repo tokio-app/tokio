@@ -3,6 +3,7 @@ import { TOKIO_EVENTS } from "@/common/types";
 import { safeStorage } from "@test/electron";
 import { defaultProfile } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
+import { hasPending, settle } from "@/helper/quit";
 import { TikTokConnectorService } from "@/services/connector";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
@@ -319,8 +320,30 @@ describe("StoreManagerService", () => {
       await mkdir(`${storeFile}.tmp`);
 
       expect(await store.updateServerSettings(true)).toBe(false);
-      expect(await store.createNewProfile("stream.json", "Stream")).toBeNull();
+      expect(await store.createNewProfile("stream.json", "Stream")).toBe(
+        "unsaved",
+      );
+      expect(
+        await store.cloneProfile("default.json", "copy.json", "Copy"),
+      ).toBe("unsaved");
       expect(store.getProfiles()).toEqual(defaultStoreData.profiles);
+      // Their files go too, so a new try can have the same file name.
+      expect(await readdir(paths.folders.profilesFolder)).toEqual([
+        "default.json",
+      ]);
+    });
+
+    it("holds a quit while saves wait in line", async () => {
+      const store = await init();
+      await settle(1000);
+
+      const first = store.updateServerSettings(true);
+      const second = store.updateUpdatesSettings(false);
+      expect(hasPending()).toBe(true);
+
+      await Promise.all([first, second]);
+      await settle(1000);
+      expect(hasPending()).toBe(false);
     });
   });
 
@@ -789,9 +812,9 @@ describe("StoreManagerService", () => {
       const store = await init();
       const profile = { ...defaultProfile, name: "  Night Stream " };
 
-      expect(await store.importProfile(await shared("ab.json", profile))).toBe(
-        true,
-      );
+      expect(
+        await store.importProfile(await shared("ab.json", profile)),
+      ).toEqual({ file: "ab.json", name: "Night Stream" });
 
       expect(store.getProfiles()).toContainEqual({
         file: "ab.json",
@@ -807,7 +830,7 @@ describe("StoreManagerService", () => {
 
       expect(
         await store.importProfile(await shared("notes.json", { hello: "x" })),
-      ).toBe(false);
+      ).toBeNull();
       expect(store.getProfiles()).toHaveLength(1);
     });
 
@@ -819,8 +842,8 @@ describe("StoreManagerService", () => {
         name: "default",
       });
 
-      expect(await store.importProfile(copy)).toBe(true);
-      expect(await store.importProfile(copy)).toBe(true);
+      expect(await store.importProfile(copy)).toBeTruthy();
+      expect(await store.importProfile(copy)).toBeTruthy();
 
       expect((await readJSON(defaultProfileFile)).connector.username).toBe(
         "streamer",
@@ -832,6 +855,32 @@ describe("StoreManagerService", () => {
       ]);
       const third = join(paths.folders.profilesFolder, "default-3.json");
       expect((await readJSON(third)).name).toBe("default 3");
+    });
+
+    it("names a profile whose trimmed name is too short", async () => {
+      const store = await init();
+      const copy = await shared("ab.json", { ...defaultProfile, name: " ab " });
+
+      expect(await store.importProfile(copy)).toEqual({
+        file: "ab.json",
+        name: "Imported profile",
+      });
+      expect(await store.importProfile(copy)).toEqual({
+        file: "ab-2.json",
+        name: "Imported profile 2",
+      });
+    });
+
+    it("deletes an import it couldn't list", async () => {
+      const store = await init();
+      await mkdir(`${storeFile}.tmp`);
+
+      expect(await store.importProfile(await shared("ab.json"))).toBe(
+        "unsaved",
+      );
+      expect(await readdir(paths.folders.profilesFolder)).toEqual([
+        "default.json",
+      ]);
     });
   });
 

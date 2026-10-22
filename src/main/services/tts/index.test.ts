@@ -2,7 +2,15 @@ import { Profile } from "@/common/schemas";
 import { ChatEvent, UserData } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import Logger from "@/logger";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
 import { TTSService } from "./index";
 
 // Real providers spawn PowerShell or call online services.
@@ -204,6 +212,7 @@ describe("TTSService", () => {
 
       expect(await say("hello", s)).toEqual([]);
       expect(await say("!tts hello", s)).toEqual(["hello"]);
+      expect(await say("!Tts hi", s)).toEqual(["hi"]);
     });
 
     it("skips a comment with only the trigger", async () => {
@@ -451,6 +460,14 @@ describe("TTSService", () => {
       expect(await say("qué quéso", s)).toEqual(["what quéso"]);
     });
 
+    it("replaces words inside scripts written without spaces", async () => {
+      const s = settings((s) => {
+        s.replacements = [{ old: "草", new: "笑" }];
+      });
+
+      expect(await say("それは草", s)).toEqual(["それは笑"]);
+    });
+
     it("inserts the new text literally and skips empty words", async () => {
       const s = settings((s) => {
         s.replacements = [
@@ -496,6 +513,10 @@ describe("TTSService", () => {
   });
 
   it("clearTalk drops the waiting messages", async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const s = settings((s) => {
       s.protection.cooldown = 1;
     });
@@ -505,9 +526,10 @@ describe("TTSService", () => {
 
     service.talk(chat("first"), s, record);
     service.talk(chat("second"), s, record);
-    await new Promise((r) => setTimeout(r));
+    await vi.advanceTimersByTimeAsync(0);
     service.clearTalk();
-    await new Promise((r) => setTimeout(r, 1100));
+    // Well past the 1 second gap the second message waited for
+    await vi.advanceTimersByTimeAsync(5000);
 
     expect(spoken).toEqual(["first"]);
   });

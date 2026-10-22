@@ -16,18 +16,10 @@ import {
   TokioPayload,
 } from "@/common/types";
 import { formatError, generateTikTokEventSample } from "@/common/util";
+import { renameWithRetry } from "@/helper/fs";
 import Logger from "@/logger";
-import { isEqual } from "es-toolkit";
 import { randomUUID } from "node:crypto";
-import {
-  access,
-  cp,
-  lstat,
-  readdir,
-  realpath,
-  rename,
-  rm,
-} from "node:fs/promises";
+import { access, cp, lstat, readdir, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { JSONManagerService } from "../json";
 import { ServerService } from "../server";
@@ -64,8 +56,16 @@ const STAGING_FOLDER = /^\.(install|old)-/;
 
 export interface OverlayResult<T = undefined> {
   success: boolean;
+  // false when the change was made but the store file wasn't written
+  saved?: boolean;
   data?: T;
 }
+
+const sameGift = (a: CustomGift, b: CustomGift) =>
+  a.value === b.value &&
+  a.label === b.label &&
+  a.img === b.img &&
+  a.coins === b.coins;
 
 export class OverlayService extends Service {
   private _folder = "";
@@ -215,7 +215,8 @@ export class OverlayService extends Service {
       }
 
       this._register({ ...info, id, path: dir }, true);
-      return { success: await this._store.addOverlayInfo({ ...info, id }) };
+      const saved = await this._store.addOverlayInfo({ ...info, id });
+      return { success: true, saved };
     } catch (error) {
       Logger.error(
         `<Overlays> Unable to import overlay from ${basedir} -- ${formatError(error)}`,
@@ -304,7 +305,7 @@ export class OverlayService extends Service {
 
     this._server.unmount(id);
     this._overlays = this._overlays.filter((o) => o.id !== id);
-    return { success: await this._store.removeOverlayInfo(id) };
+    return { success: true, saved: await this._store.removeOverlayInfo(id) };
   }
 
   // Paths point at the overlay's HTML file.
@@ -426,7 +427,7 @@ export class OverlayService extends Service {
       changed = true;
     } else if (
       !this._checkedGifts.has(value) &&
-      !isEqual(saved[index], entry)
+      !sameGift(saved[index], entry)
     ) {
       // Once per run, in case TikTok renames it or moves its image.
       saved[index] = entry;
@@ -468,14 +469,14 @@ export class OverlayService extends Service {
       id: randomUUID(),
       name: trimmed,
     });
-    return { success: saved, data: this.getTestOverlays() };
+    return { success: true, saved, data: this.getTestOverlays() };
   }
 
   public async removeTestOverlay(
     id: string,
   ): Promise<OverlayResult<TestOverlay[]>> {
     const saved = await this._store.removeTestOverlay(id);
-    return { success: saved, data: this.getTestOverlays() };
+    return { success: true, saved, data: this.getTestOverlays() };
   }
 
   /**
@@ -549,7 +550,10 @@ export class OverlayService extends Service {
     try {
       const info = await this._prepare(entry, staging, update, gifts);
       await this._swap(staging, this._dir(id));
-      return { success: await this._track({ ...info, id }, update) };
+      return {
+        success: true,
+        saved: await this._track({ ...info, id }, update),
+      };
     } catch (error) {
       Logger.error(
         `<Overlays> Unable to install overlay ${id} -- ${formatError(error)}`,
@@ -629,14 +633,14 @@ export class OverlayService extends Service {
       () => true,
       () => false,
     );
-    if (replacing) await rename(dir, old);
+    if (replacing) await renameWithRetry(dir, old);
 
     try {
-      await rename(staging, dir);
+      await renameWithRetry(staging, dir);
     } catch (error) {
       if (replacing) {
         // The next start deletes .old-* folders, so say where it was left.
-        await rename(old, dir).catch((undo) =>
+        await renameWithRetry(old, dir).catch((undo) =>
           Logger.error(
             `<Overlays> Unable to put back ${dir}, the installed version is in ${old} -- ${formatError(undo)}`,
             this._logFile,

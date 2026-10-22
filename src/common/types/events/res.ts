@@ -262,6 +262,8 @@ export interface AppEventsResponseMap {
     maxQueueLength: number;
     // Alert the sound belongs to, so volume changes reach it while playing
     id?: string;
+    // The same for every copy of the sound, so the window decodes it once
+    key: string;
     // A TTS alert's speed and pitch, for this sound only
     filters?: AlertFilters;
   };

@@ -38,8 +38,11 @@ describe("createWindow", () => {
     expect(shell.contentView.children).toEqual([nav, content]);
     expect(tail(nav.options.webPreferences?.preload, 2)).toEqual([
       "preload",
-      "index.mjs",
+      "index.cjs",
     ]);
+    // Sandboxed, as Electron's default, which the CommonJS preload allows
+    expect(nav.options.webPreferences).not.toHaveProperty("sandbox");
+    expect(shell.options.webPreferences).not.toHaveProperty("sandbox");
     // Isolated, as Electron's default, like the main window
     expect(nav.options.webPreferences).not.toHaveProperty("contextIsolation");
     expect(nav.webContents.loadFile).toHaveBeenCalledOnce();

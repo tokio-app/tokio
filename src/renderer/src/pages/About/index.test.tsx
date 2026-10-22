@@ -80,9 +80,8 @@ const dialog = () => within(screen.getByRole("dialog"));
 
 const packages = () => section("Open-source packages");
 
-// react-spinners animates its loaders with keyframes named after it
 const loading = (el: HTMLElement) =>
-  el.querySelector('[style*="react-spinners"]') !== null;
+  within(el).queryByRole("status", { name: "Loading" }) !== null;
 
 const opened = () => sent(APP_EVENTS.GET_LICENSE_TEXT).map(({ id }) => id);
 

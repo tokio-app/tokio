@@ -1,3 +1,4 @@
+import { track } from "@/helper/quit";
 import { appendFile } from "node:fs/promises";
 import { inspect } from "node:util";
 
@@ -39,7 +40,8 @@ export default class Logger {
         console.error(`Logger: unable to write to ${logFile}`, error);
       }
     });
-    Logger._writes.set(logFile, next);
+    // A quit waits for it too.
+    Logger._writes.set(logFile, track(next));
     void next.then(() => {
       if (Logger._writes.get(logFile) === next) Logger._writes.delete(logFile);
     });

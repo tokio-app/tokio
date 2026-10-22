@@ -6,8 +6,6 @@ import { TikTokConnectorService } from "./index";
 
 class FakeConnector extends ConnectorProvider {
   setKey = vi.fn();
-  on = vi.fn();
-  off = vi.fn();
   connect = vi.fn(async (): Promise<ConnectorResponse> => ({ success: true }));
   disconnect = vi.fn(async () => {});
   isConnected = vi.fn(() => true);
@@ -63,14 +61,16 @@ describe("TikTokConnectorService", () => {
     const listener = (_: TokioEventMap[TOKIO_EVENTS.CHAT]) => {};
     const onReconnect = vi.fn();
     const reconnect = vi.spyOn(provider, "onReconnect");
+    const on = vi.spyOn(provider, "on");
+    const off = vi.spyOn(provider, "off");
 
     service.on(TOKIO_EVENTS.CHAT, listener);
     service.off(TOKIO_EVENTS.CHAT, listener);
     service.onReconnect(onReconnect);
     await service.disconnect();
 
-    expect(provider.on).toHaveBeenCalledWith(TOKIO_EVENTS.CHAT, listener);
-    expect(provider.off).toHaveBeenCalledWith(TOKIO_EVENTS.CHAT, listener);
+    expect(on).toHaveBeenCalledWith(TOKIO_EVENTS.CHAT, listener);
+    expect(off).toHaveBeenCalledWith(TOKIO_EVENTS.CHAT, listener);
     expect(reconnect).toHaveBeenCalledWith(onReconnect);
     expect(provider.disconnect).toHaveBeenCalledOnce();
     expect(service.isConnected()).toBe(true);

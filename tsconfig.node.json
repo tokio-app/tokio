@@ -5,8 +5,6 @@
   "exclude": ["test/renderer/**"],
   "compilerOptions": {
     "composite": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "strictPropertyInitialization": false,
     "paths": {
       "@/*":["./src/main/*"],

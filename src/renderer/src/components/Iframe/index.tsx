@@ -1,5 +1,5 @@
 import { Ref, useMemo, useState } from "react";
-import { PropagateLoader } from "react-spinners";
+import { Spinner } from "../Elements";
 import styles from "./iframe.module.css";
 
 interface IframeProps {
@@ -13,12 +13,6 @@ export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
   const [loading, setLoading] = useState(true);
 
   const iframeSrc = useMemo(() => {
-    if (!source) return "";
-
-    if (source.startsWith("http://") || source.startsWith("https://")) {
-      return source;
-    }
-
     const normalizedPath = source.replace(/\\/g, "/");
 
     const pathWithSlash = normalizedPath.startsWith("/")
@@ -33,15 +27,11 @@ export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
     return `local-resource://${encoded}`;
   }, [source]);
 
-  if (!source) {
-    return <div>No source provided</div>;
-  }
-
   return (
     <>
       {loading && (
         <div className={styles.loading_container}>
-          <PropagateLoader color="var(--font-secondary)" />
+          <Spinner size={24} />
         </div>
       )}
       <iframe

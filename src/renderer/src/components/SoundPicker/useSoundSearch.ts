@@ -6,9 +6,9 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * MyInstants search with infinite scroll. Starts with trending sounds, and
- * loads the next page when `sentinelRef` scrolls into view inside `listRef`
- * while `active`.
+ * MyInstants search with infinite scroll. Starts with trending sounds once
+ * first `active`, and loads the next page when `sentinelRef` scrolls into view
+ * inside `listRef` while `active`.
  */
 export function useSoundSearch(active: boolean) {
   // Query of the results being shown
@@ -22,6 +22,7 @@ export function useSoundSearch(active: boolean) {
 
   // Latest request, so responses to older ones are ignored
   const request = useRef({ query: "", page: 1 });
+  const started = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -67,12 +68,17 @@ export function useSoundSearch(active: boolean) {
       },
     );
 
-    load("", 1);
-
     return () => {
       removeSearchSounds();
     };
-  }, [load]);
+  }, []);
+
+  // Not when the picker opens on another tab
+  useEffect(() => {
+    if (!active || started.current) return;
+    started.current = true;
+    load("", 1);
+  }, [active, load]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;

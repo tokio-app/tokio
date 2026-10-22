@@ -1,6 +1,12 @@
 import { cx } from "@/helper/cx";
-import { CSSProperties, ReactNode } from "react";
+import { ReactNode } from "react";
 import styles from "./elements.module.css";
+
+declare module "react" {
+  interface CSSProperties {
+    "--tab-accent"?: string;
+  }
+}
 
 type Tab<T> = {
   value: T;
@@ -43,7 +49,7 @@ export function Tabs<T extends string>({
           aria-selected={tab.value === value}
           disabled={disabled}
           className={cx(styles.tab, tab.value === value && styles.tab_active)}
-          style={{ "--tab-accent": tab.accent } as CSSProperties}
+          style={{ "--tab-accent": tab.accent }}
           onClick={() => onChange(tab.value)}
         >
           {tab.icon}

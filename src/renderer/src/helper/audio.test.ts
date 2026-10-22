@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AudioQueue } from "./audio";
+import { AudioQueue, DECODED_CACHE_BYTES } from "./audio";
+
+type FakeAudio = { duration: number; length: number; numberOfChannels: number };
 
 // A Tone.js stand-in that records what the queue builds and schedules
 const tone = vi.hoisted(() => {
@@ -28,21 +30,20 @@ const tone = vi.hoisted(() => {
     }
   }
 
-  class FakeBuffer {
-    constructor(readonly raw: { duration: number }) {}
-    get duration() {
-      return this.raw.duration;
-    }
-  }
-
   class FakePlayer {
+    url: unknown;
     playbackRate: number;
     detune: number;
     startedAt: number | null = null;
     stopped = false;
     disposed = false;
     onstop = () => {};
-    constructor(options: { playbackRate: number; detune: number }) {
+    constructor(options: {
+      url: unknown;
+      playbackRate: number;
+      detune: number;
+    }) {
+      this.url = options.url;
       this.playbackRate = options.playbackRate;
       this.detune = options.detune;
       players.push(this);
@@ -68,28 +69,45 @@ const tone = vi.hoisted(() => {
   const players: FakePlayer[] = [];
   const gains: FakeGain[] = [];
   const clock = { now: 10 };
-  const decode = vi.fn<(data: ArrayBuffer) => Promise<{ duration: number }>>();
+  const decode = vi.fn<(data: ArrayBuffer) => Promise<FakeAudio>>();
 
-  return { FakeGain, FakeBuffer, FakePlayer, players, gains, clock, decode };
+  return { FakeGain, FakePlayer, players, gains, clock, decode };
 });
 
 vi.mock("tone", () => ({
   Gain: tone.FakeGain,
   GrainPlayer: tone.FakePlayer,
-  ToneAudioBuffer: tone.FakeBuffer,
   getContext: () => ({ decodeAudioData: tone.decode }),
   now: () => tone.clock.now,
 }));
 
 const bytes = () => new Uint8Array([1, 2, 3, 4]);
 
-// Each sound lasts 2 seconds
+// A sound of 2 seconds that takes this many bytes decoded
+const audio = (size = 4): FakeAudio => ({
+  duration: 2,
+  length: size / 4,
+  numberOfChannels: 1,
+});
+
+// The next decode finishes when the test calls what this returns.
+const held = () => {
+  let done!: () => void;
+  tone.decode.mockReturnValueOnce(
+    new Promise((resolve) => {
+      done = () => resolve(audio());
+    }),
+  );
+  return () => done();
+};
+
+// Each decode makes a new buffer
 beforeEach(() => {
   tone.players.length = 0;
   tone.gains.length = 0;
   tone.clock.now = 10;
   tone.decode.mockReset();
-  tone.decode.mockResolvedValue({ duration: 2 });
+  tone.decode.mockImplementation(async () => audio());
 });
 
 describe("AudioQueue", () => {
@@ -98,30 +116,19 @@ describe("AudioQueue", () => {
     queue.setQueueOptions({ gapTime: 0.5 });
 
     await queue.enqueue(bytes());
-    await queue.enqueue(bytes(), true, { speed: 2 });
+    await queue.enqueue(bytes(), { speed: 2 });
     await queue.enqueue(bytes());
 
     expect(tone.players.map((p) => p.startedAt)).toEqual([10, 12.5, 14]);
-    expect(queue.isPlaying).toBe(true);
   });
 
-  it("waits for start() when autoplay is off", async () => {
-    const queue = new AudioQueue();
-
-    expect(await queue.enqueue(bytes(), false)).toBe(true);
-    expect(tone.players).toHaveLength(0);
-
-    queue.start();
-    expect(tone.players).toHaveLength(1);
-  });
-
-  it("ignores sounds once waiting and playing ones reach the limit", async () => {
+  it("ignores sounds once playing ones reach the limit", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const queue = new AudioQueue();
     queue.setQueueOptions({ maxQueueLength: 2 });
 
     expect(await queue.enqueue(bytes())).toBe(true);
-    expect(await queue.enqueue(bytes(), false)).toBe(true);
+    expect(await queue.enqueue(bytes())).toBe(true);
     expect(await queue.enqueue(bytes())).toBe(false);
     expect(tone.decode).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalled();
@@ -131,21 +138,43 @@ describe("AudioQueue", () => {
     expect(await queue.enqueue(bytes())).toBe(true);
   });
 
-  it("drops sounds still decoding when it's stopped", async () => {
-    let decoded!: (buffer: { duration: number }) => void;
-    tone.decode.mockReturnValueOnce(
-      new Promise((resolve) => {
-        decoded = resolve;
-      }),
-    );
+  it("counts sounds still decoding, so it never decodes one that doesn't fit", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const queue = new AudioQueue();
+    queue.setQueueOptions({ maxQueueLength: 1 });
+    const decoded = held();
+
+    const first = queue.enqueue(bytes());
+    expect(await queue.enqueue(bytes())).toBe(false);
+    expect(tone.decode).toHaveBeenCalledOnce();
+
+    decoded();
+    expect(await first).toBe(true);
+    expect(tone.players).toHaveLength(1);
+  });
+
+  it("gives the place back when a sound can't be decoded", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    tone.decode.mockRejectedValueOnce(new Error("Unable to decode"));
+    const queue = new AudioQueue();
+    queue.setQueueOptions({ maxQueueLength: 1 });
+
+    expect(await queue.enqueue(bytes())).toBe(false);
+    expect(await queue.enqueue(bytes())).toBe(true);
+  });
+
+  it("drops sounds still decoding when it's stopped, and their places", async () => {
+    const queue = new AudioQueue();
+    queue.setQueueOptions({ maxQueueLength: 1 });
+    const decoded = held();
 
     const pending = queue.enqueue(bytes());
     queue.stop();
-    decoded({ duration: 2 });
+    decoded();
 
     expect(await pending).toBe(false);
     expect(tone.players).toHaveLength(0);
+    expect(await queue.enqueue(bytes())).toBe(true);
   });
 
   it("calls onEnded when a sound ends, not when it's stopped", async () => {
@@ -153,11 +182,11 @@ describe("AudioQueue", () => {
     const cut = vi.fn();
     const queue = new AudioQueue();
 
-    await queue.enqueue(bytes(), true, { onEnded: ended });
+    await queue.enqueue(bytes(), { onEnded: ended });
     tone.players[0].finish();
     expect(ended).toHaveBeenCalledOnce();
 
-    await queue.enqueue(bytes(), true, { onEnded: cut });
+    await queue.enqueue(bytes(), { onEnded: cut });
     const player = tone.players[1];
     queue.stop();
     player.finish();
@@ -195,7 +224,7 @@ describe("AudioQueue", () => {
   it("changes playing sounds, except the ones with their own speed and pitch", async () => {
     const queue = new AudioQueue();
     await queue.enqueue(bytes());
-    await queue.enqueue(bytes(), true, { speed: 1.5 });
+    await queue.enqueue(bytes(), { speed: 1.5 });
     const [shared, own] = tone.players;
 
     queue.setFilters({ speed: 0.8, pitch: 2 });
@@ -206,19 +235,73 @@ describe("AudioQueue", () => {
     expect(own.detune).toBe(0);
   });
 
-  it("sets the volume of waiting and playing sounds by key", async () => {
+  it("sets the volume of playing sounds by key", async () => {
     const queue = new AudioQueue();
-    await queue.enqueue(bytes(), true, { key: "playing" });
-    const playingGain = tone.gains.at(-1)!;
-    await queue.enqueue(bytes(), false, { key: "waiting", gain: 1 });
+    await queue.enqueue(bytes(), { key: "one" });
+    const one = tone.gains.at(-1)!;
+    await queue.enqueue(bytes(), { key: "two", gain: 0.5 });
+    const two = tone.gains.at(-1)!;
 
-    queue.setItemGain("playing", 0.2);
-    queue.setItemGain("waiting", 0.3);
+    queue.setItemGain("one", 0.2);
     queue.setItemGain("other", 0.9);
-    queue.start();
 
-    expect(playingGain.gain.value).toBe(0.2);
-    expect(tone.gains.at(-1)?.gain.value).toBe(0.3);
+    expect(one.gain.value).toBe(0.2);
+    expect(two.gain.value).toBe(0.5);
+  });
+
+  it("decodes a sound once for all its copies, on every queue", async () => {
+    const alerts = new AudioQueue();
+    const other = new AudioQueue();
+    const decoded = held();
+
+    const copies = [
+      alerts.enqueue(bytes(), { cacheKey: "once.mp3" }),
+      alerts.enqueue(bytes(), { cacheKey: "once.mp3" }),
+    ];
+    decoded();
+    await Promise.all(copies);
+    await other.enqueue(bytes(), { cacheKey: "once.mp3" });
+
+    expect(tone.decode).toHaveBeenCalledOnce();
+    expect(tone.players).toHaveLength(3);
+    expect(new Set(tone.players.map((p) => p.url)).size).toBe(1);
+
+    // Another sound, or one without a key, is decoded
+    await alerts.enqueue(bytes(), { cacheKey: "twice.mp3" });
+    await alerts.enqueue(bytes());
+    await alerts.enqueue(bytes());
+    expect(tone.decode).toHaveBeenCalledTimes(4);
+  });
+
+  it("decodes a sound again after a failed decode", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    tone.decode.mockRejectedValueOnce(new Error("Unable to decode"));
+    const queue = new AudioQueue();
+
+    expect(await queue.enqueue(bytes(), { cacheKey: "retry.mp3" })).toBe(false);
+    expect(await queue.enqueue(bytes(), { cacheKey: "retry.mp3" })).toBe(true);
+    expect(tone.decode).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the most recently used decoded sounds that fit", async () => {
+    // Two fit, so a third pushes out the least recently used one.
+    tone.decode.mockImplementation(async () =>
+      audio(DECODED_CACHE_BYTES * 0.4),
+    );
+    const queue = new AudioQueue();
+    const play = (cacheKey: string) => queue.enqueue(bytes(), { cacheKey });
+
+    await play("lru-a");
+    await play("lru-b");
+    await play("lru-a");
+    await play("lru-c");
+    expect(tone.decode).toHaveBeenCalledTimes(3);
+
+    await play("lru-a");
+    await play("lru-c");
+    expect(tone.decode).toHaveBeenCalledTimes(3);
+    await play("lru-b");
+    expect(tone.decode).toHaveBeenCalledTimes(4);
   });
 
   it("decodes IPC bytes without copying them, and copies a view", async () => {

@@ -26,9 +26,8 @@ const page = () => within(screen.getByRole("main"));
 const card = (entry: CatalogOverlay) =>
   within(page().getByText(entry.description).parentElement!);
 
-// react-spinners animates its loaders with keyframes named after it
 const loading = () =>
-  screen.getByRole("main").querySelector('[style*="react-spinners"]') !== null;
+  page().queryByRole("status", { name: "Loading" }) !== null;
 
 describe("OfficialOverlays", () => {
   it("asks main for the installed overlays and the catalog", async () => {

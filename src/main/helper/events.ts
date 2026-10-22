@@ -16,10 +16,11 @@ import {
   ReplyEvent,
 } from "@/types";
 
-export type Stack = EventStack<APP_EVENTS>;
+export type Stack = EventStack;
 
-class EventStack<K extends APP_EVENTS> {
-  private evs: EventItem<K>[];
+class EventStack {
+  // Handlers of different events, each checked against its event by push
+  private evs: EventItem<any>[];
   private source: FeedbackSource;
 
   constructor(source: FeedbackSource) {
@@ -37,16 +38,14 @@ class EventStack<K extends APP_EVENTS> {
       event,
       callback,
       options: { source: this.source, ...options },
-    } as unknown as {
-      [P in K]: EventItem<P>;
-    }[K]);
+    });
   }
 
   public getEvents() {
     return this.evs;
   }
 
-  public merge(events: EventStack<K>) {
+  public merge(events: EventStack) {
     this.evs.push(...events.getEvents());
   }
 }

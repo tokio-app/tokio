@@ -118,17 +118,22 @@ describe("music events", () => {
     });
 
     it("disconnects the last provider first, without hearing it end", async () => {
-      const { musicService, connect, ended, connected } = await setup();
+      const { h, musicService, connect, ended, connected } = await setup();
+      await connect("Spotify");
       // Like closing a session, or a login still open
       musicService.disconnect.mockImplementation(ended);
 
       await connect("YouTube");
 
-      expect(musicService.disconnect).toHaveBeenCalledOnce();
-      expect(musicService.disconnect.mock.invocationCallOrder[0]).toBeLessThan(
-        musicService.setProvider.mock.invocationCallOrder[0],
+      expect(musicService.disconnect).toHaveBeenCalledTimes(2);
+      expect(musicService.disconnect.mock.invocationCallOrder[1]).toBeLessThan(
+        musicService.setProvider.mock.invocationCallOrder[1],
       );
-      expect(connected()).toEqual([{ success: true }]);
+      // Spotify's listener was gone before its session ended
+      expect(connected()).toEqual([{ success: true }, { success: true }]);
+      expect(h.notices.map((n) => n.code)).not.toContain(
+        FEEDBACK_CODES.MUSIC_DISCONNECTED,
+      );
     });
 
     it("drops the result of a connect a newer one replaced", async () => {

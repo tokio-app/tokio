@@ -34,43 +34,47 @@ export class YouTubeMusic extends MusicProvider {
     // A login still open from an earlier connect fails, so one window is left
     this.disconnect();
 
-    this._ytView = new WebContentsView({
+    // This connect's own, for listeners that outlive it
+    const view = (this._ytView = new WebContentsView({
       webPreferences: {
         partition: "persist:music-youtube",
         backgroundThrottling: false,
       },
-    });
+    }));
 
-    this._shellWindow = createWindow(this._ytView);
+    const shell = (this._shellWindow = createWindow(view));
 
-    this._ytView.webContents.on("will-prevent-unload", (event) => {
+    view.webContents.on("will-prevent-unload", (event) => {
       event.preventDefault();
     });
 
-    this._ytView.webContents.on("will-navigate", (event) => {
+    view.webContents.on("will-navigate", (event) => {
       if (!isYouTubeOrLogin(new URL(event.url).hostname)) {
         event.preventDefault();
       }
     });
 
-    this._shellWindow.on("close", () => {
-      if (this._ytView && !this._ytView.webContents.isDestroyed()) {
-        this._ytView.webContents.setAudioMuted(true);
-        this._ytView.webContents.loadURL("about:blank");
+    // "close" fires again for each close() before the window is gone
+    shell.on("close", () => {
+      if (!view.webContents.isDestroyed()) {
+        view.webContents.setAudioMuted(true);
+        view.webContents.loadURL("about:blank");
 
         try {
-          this._shellWindow?.contentView.removeChildView(this._ytView);
+          shell.contentView.removeChildView(view);
         } catch {
           // View already removed
         }
-        this._isActive = false;
-        this._ytView.webContents.close();
-        this.emit(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED);
+        view.webContents.close();
       }
+      // A late close of an older window leaves the session that replaced it
+      if (this._ytView !== view) return;
       this._ytView = null;
+      this._isActive = false;
+      this.emit(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED);
     });
 
-    this._shellWindow.show();
+    shell.show();
 
     return new Promise((res) => {
       let isInitializing = true;
@@ -83,8 +87,8 @@ export class YouTubeMusic extends MusicProvider {
         });
       };
 
-      this._shellWindow!.once("close", handleAuthAbort);
-      this._ytView!.webContents.loadURL(config.YTM_URL);
+      shell.once("close", handleAuthAbort);
+      view.webContents.loadURL(config.YTM_URL);
 
       let hasAttemptedLoginRedirect = false;
       let checkGeneration = 0;
@@ -92,7 +96,7 @@ export class YouTubeMusic extends MusicProvider {
       const markReady = () => {
         if (!isInitializing) return;
         isInitializing = false;
-        this._shellWindow!.off("close", handleAuthAbort);
+        shell.off("close", handleAuthAbort);
         this._isActive = true;
         res({ success: true });
       };
@@ -132,7 +136,7 @@ export class YouTubeMusic extends MusicProvider {
           } else {
             if (hasAttemptedLoginRedirect) {
               isInitializing = false;
-              this._shellWindow!.off("close", handleAuthAbort);
+              shell.off("close", handleAuthAbort);
               this._isActive = false;
               res({
                 success: false,
@@ -147,13 +151,13 @@ export class YouTubeMusic extends MusicProvider {
         } catch (err) {
           isInitializing = false;
           this._isActive = false;
-          this._shellWindow!.off("close", handleAuthAbort);
+          shell.off("close", handleAuthAbort);
           const error = err instanceof Error ? err : new Error(String(err));
           res({ success: false, error });
         }
       };
 
-      this._ytView!.webContents.on("did-finish-load", async () => {
+      view.webContents.on("did-finish-load", async () => {
         await handleNavigation();
       });
     });

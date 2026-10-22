@@ -85,4 +85,18 @@ describe("useAutosave", () => {
 
     expect(save.mock.calls).toEqual([["pasted-key"]]);
   });
+
+  // Closing the window doesn't unmount it
+  it("sends a change still waiting when the window closes, once", async () => {
+    const { save, type } = setup();
+    type("pasted-key");
+
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    expect(save.mock.calls).toEqual([["pasted-key"]]);
+
+    await wait(300);
+    expect(save).toHaveBeenCalledOnce();
+  });
 });

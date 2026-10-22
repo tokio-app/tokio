@@ -1,11 +1,6 @@
-import {
-  MusicInfo,
-  SongInfo,
-  TOKIO_EVENTS,
-  TokioEventMap,
-} from "@/common/types";
+import { MusicInfo, SongInfo, TOKIO_EVENTS } from "@/common/types";
 import { cleanText } from "@/helper/chat";
-import EventEmitter from "node:events";
+import { TokioEmitter } from "../../shared/emitter";
 
 type PlayAction = () => void | Promise<void>;
 
@@ -35,6 +30,11 @@ const END_CHECK_MS = 5000;
 // The next song starts this early, so a song's last moment, often silent,
 // covers part of the time the player takes to switch.
 const START_LEAD_MS = 300;
+// Taken as the length of a song whose length didn't parse, so the player is
+// first asked once it has loaded the song.
+// shortcut: when the player can't tell either, such a song plays 15 s, or
+// 10 s when it reports no length; parse more formats if songs get cut.
+const UNKNOWN_LENGTH_MS = 3 * END_CHECK_MS;
 
 const delayWithAbort = (ms: number, signal?: AbortSignal) => {
   return new Promise<void>((resolve) => {
@@ -54,21 +54,20 @@ const delayWithAbort = (ms: number, signal?: AbortSignal) => {
   });
 };
 
-export class MusicQueue {
+export class MusicQueue extends TokioEmitter {
   private _queue: QueueItem[];
   private _currentIndex: number;
   private _isPlaying: boolean;
   private _abortController: AbortController | null;
-  private _events: EventEmitter;
   private _maxSize: number;
   private _hooks: QueueHooks;
 
   constructor(hooks: QueueHooks = {}) {
+    super();
     this._queue = [];
     this._currentIndex = 0;
     this._isPlaying = false;
     this._abortController = null;
-    this._events = new EventEmitter();
     this._maxSize = Infinity;
     this._hooks = hooks;
   }
@@ -80,27 +79,6 @@ export class MusicQueue {
   public setMaxSize(size: number) {
     this._maxSize = Math.max(1, size); // Ensure size is at least 1
     this._trimQueue();
-  }
-
-  public on<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.on(event, listener);
-  }
-
-  public off<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.off(event, listener);
-  }
-
-  private emit<K extends TOKIO_EVENTS>(
-    event: K,
-    data?: TokioEventMap[K],
-  ): void {
-    this._events.emit(event, data);
   }
 
   /**
@@ -236,6 +214,7 @@ export class MusicQueue {
           item.startTimeMs !== undefined
             ? Math.max(0, item.song.duration - item.startTimeMs)
             : item.song.duration;
+        if (item.song.duration <= 0) waitTime = UNKNOWN_LENGTH_MS;
       } catch (error) {
         this._hooks.onError?.(item.id, error);
         if (++failures === 2 && active()) {

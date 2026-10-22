@@ -3,7 +3,6 @@ import {
   GiftEvent,
   RoomUserEvent,
   TOKIO_EVENTS,
-  TokioEventMap,
   UserData,
 } from "@/common/types";
 import {
@@ -21,7 +20,6 @@ import {
 import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { app } from "electron";
-import { EventEmitter } from "events";
 import {
   ConnectErrorKind,
   connectFailure,
@@ -40,7 +38,6 @@ export class TikTokLiveConnector extends ConnectorProvider {
   private _connection: TikTokLiveConnection | null = null;
   // The user's Euler Stream API key, which signs the connection
   private _key = "";
-  private _events = new EventEmitter();
   // When each error code was last logged
   private _logged = new Map<string, number>();
   // A connect during a connect gets this one, so only one connection opens
@@ -50,20 +47,6 @@ export class TikTokLiveConnector extends ConnectorProvider {
 
   public setKey(key: string) {
     this._key = key;
-  }
-
-  public on<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.on(event, listener);
-  }
-
-  public off<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.off(event, listener);
   }
 
   public connect(username: string, key?: string): Promise<ConnectorResponse> {
@@ -176,13 +159,6 @@ export class TikTokLiveConnector extends ConnectorProvider {
   }
 
   // -- Private API --
-
-  private emit<K extends TOKIO_EVENTS>(
-    event: K,
-    data?: TokioEventMap[K],
-  ): void {
-    this._events.emit(event, data);
-  }
 
   private _listen(connection: TikTokLiveConnection): void {
     // Before the room's first messages, so the session starts before them.

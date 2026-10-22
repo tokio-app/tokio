@@ -423,14 +423,21 @@ describe("Spotify", () => {
   });
 
   describe("playerStatus", () => {
-    it("adds whether it's playing and the time", async () => {
+    it("adds whether it's playing, the time and what it plays from", async () => {
       const fetch = stubFetch({
-        api: () => json({ item: track, is_playing: true, progress_ms: 42_000 }),
+        api: () =>
+          json({
+            item: track,
+            context: { uri: "spotify:playlist:9" },
+            is_playing: true,
+            progress_ms: 42_000,
+          }),
       });
       const spotify = await login();
 
       expect(await spotify.playerStatus()).toEqual({
         ...parsed,
+        album: "spotify:playlist:9",
         playing: true,
         time: 42_000,
       });
@@ -440,12 +447,13 @@ describe("Spotify", () => {
       });
     });
 
-    it("defaults to paused at the start", async () => {
+    it("defaults to paused at the start, played from nowhere", async () => {
       stubFetch({ api: () => json({ item: track }) });
       const spotify = await login();
 
       expect(await spotify.playerStatus()).toEqual({
         ...parsed,
+        album: "",
         playing: false,
         time: 0,
       });
@@ -643,6 +651,33 @@ describe("Spotify", () => {
       expect(JSON.parse(play?.body ?? "")).toEqual({
         context_uri: "spotify:album:1",
         offset: { uri: "spotify:track:1" },
+      });
+    });
+
+    it("plays the track in the playlist it played from", async () => {
+      const fetch = stubFetch({ api: devicesAnd() });
+      const spotify = await login();
+
+      await spotify.play({ ...parsed, album: "spotify:playlist:9" });
+
+      expect(JSON.parse(apiRequests(fetch).at(-1)?.body ?? "")).toEqual({
+        context_uri: "spotify:playlist:9",
+        offset: { uri: "spotify:track:1" },
+      });
+    });
+
+    it.each([
+      ["no context", ""],
+      ["a local file's album", "Unknown"],
+      ["an artist", "spotify:artist:1"],
+    ])("plays the track alone from %s", async (_case, album) => {
+      const fetch = stubFetch({ api: devicesAnd() });
+      const spotify = await login();
+
+      await spotify.play({ ...parsed, album });
+
+      expect(JSON.parse(apiRequests(fetch).at(-1)?.body ?? "")).toEqual({
+        uris: ["spotify:track:1"],
       });
     });
 

@@ -112,7 +112,8 @@ describe("tts events", () => {
       expect(replies).toEqual([
         { success: true, id: "preview-1", data: new Uint8Array([1, 2, 3]) },
       ]);
-      expect(replies[0].data).toBeInstanceOf(Uint8Array);
+      // A Buffer is a Uint8Array too, so check it was converted
+      expect(Buffer.isBuffer(replies[0].data)).toBe(false);
       expect(h.notices).toEqual([]);
     });
 

@@ -28,6 +28,8 @@ type Props = {
   // The sound test loading or playing
   testing: TestState;
   onTest: (req: AlertTestRequest) => void;
+  // Asks main to save a sound for the alert, which replies SET_ALERT_SOUND
+  onRequest: () => void;
   // Picks a sound from the library, which is already saved
   onSelect: (sound: AlertSound) => void;
   // Speaks a message instead of a sound
@@ -40,6 +42,7 @@ export function SoundPicker({
   ttsDefaults,
   testing,
   onTest,
+  onRequest,
   onSelect,
   onSelectTts,
   onClose,
@@ -80,7 +83,10 @@ export function SoundPicker({
       confirmText="Browse file..."
       maxWidth="640px"
       onClose={onClose}
-      onConfirm={() => window.api.emit(APP_EVENTS.IMPORT_SOUND, { id })}
+      onConfirm={() => {
+        onRequest();
+        window.api.emit(APP_EVENTS.IMPORT_SOUND, { id });
+      }}
       footer={
         speaking ? (
           <>
@@ -113,6 +119,7 @@ export function SoundPicker({
         library={library}
         testing={testing}
         onTest={onTest}
+        onRequest={onRequest}
         onSelect={onSelect}
       />
 

@@ -462,6 +462,25 @@ describe("YouTubeMusic", () => {
       });
     });
 
+    it("leaves the next session alone when an older window closes late", async () => {
+      const first = open(() => false);
+      // Its "close" comes only when the test emits it
+      first.shell.close.mockImplementation(() => {});
+      const second = open(undefined, first.provider);
+      second.finishLoad();
+      await expect(second.pending).resolves.toEqual({ success: true });
+      const ended = vi.fn();
+      first.provider.on(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, ended);
+
+      first.shell.emit("close", cancelableEvent({}));
+
+      expect(first.view.webContents.close).toHaveBeenCalledOnce();
+      expect(second.view.webContents.close).not.toHaveBeenCalled();
+      expect(second.view.webContents.setAudioMuted).not.toHaveBeenCalled();
+      expect(first.provider.isActive()).toBe(true);
+      expect(ended).not.toHaveBeenCalled();
+    });
+
     it("does nothing while inactive", () => {
       const provider = new YouTubeMusic();
       const ended = vi.fn();

@@ -8,17 +8,11 @@ import {
 } from "@/common/types";
 import { formatAlertMessage, formatError, TaskQueue } from "@/common/util";
 import { hasKeyword, isUser } from "@/helper/chat";
+import { writeFileAtomic } from "@/helper/fs";
 import Logger from "@/logger";
 import type { TTSService } from "@/services/tts";
 import { createHash } from "node:crypto";
-import {
-  access,
-  readFile,
-  rename,
-  stat,
-  unlink,
-  writeFile,
-} from "node:fs/promises";
+import { access, readFile, stat, unlink } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { Service } from "../shared";
 
@@ -39,6 +33,8 @@ export interface AlertAudio {
   channel: string;
   maxQueueLength: number;
   id?: string;
+  // The sound's file or its TTS cache key, the same for every copy
+  key: string;
   // A TTS alert's speed and pitch, for this sound only
   filters?: { speed: number; pitch: number };
 }
@@ -264,13 +260,14 @@ export class AlertsService extends Service {
         ? `alerts:${alert.trigger.type}`
         : "alerts";
       const { tts, sound } = alert;
-      const play = (data: Uint8Array) =>
+      const play = (data: Uint8Array, key: string) =>
         send({
           data,
           volume: alert.volume,
           channel,
           maxQueueLength: settings.queue_length,
           id: alert.id,
+          key,
           filters: tts ? { speed: tts.speed, pitch: tts.pitch } : undefined,
         });
 
@@ -289,7 +286,7 @@ export class AlertsService extends Service {
         onError?.(alert, res.error);
         continue;
       }
-      play(res.data);
+      play(res.data, basename(sound.file));
     }
   }
 
@@ -302,7 +299,7 @@ export class AlertsService extends Service {
     tts: AlertTts,
     payload: TokioEventMap[AppEvents],
     settings: Profile["tts"],
-    play: (data: Uint8Array) => void,
+    play: (data: Uint8Array, key: string) => void,
     onError: (error?: string) => void,
   ) {
     // Checked before queueing, so blocked messages don't take a place.
@@ -319,7 +316,7 @@ export class AlertsService extends Service {
       const res = await this._generate(tts, text);
       // Cleared while it was being made
       if (run !== this._speechRun) return;
-      if (res.success && res.data) play(res.data);
+      if (res.success && res.data) play(res.data, this._ttsKey(tts, text));
       else onError(res.error);
     });
   }
@@ -346,8 +343,7 @@ export class AlertsService extends Service {
       if (!this._speaker) throw new Error("No TTS to speak with.");
 
       // Fixed messages, like a thanks for following, are only made once.
-      const { engine, lang, name } = tts.voice;
-      const key = `tts:${hash(`${engine}|${lang}|${name}|${text}`)}`;
+      const key = this._ttsKey(tts, text);
       const cached = this._cache.get(key);
       if (cached) {
         this._remember(key, cached);
@@ -364,6 +360,10 @@ export class AlertsService extends Service {
     } catch (error) {
       return this._fail("Unable to speak alert", error);
     }
+  }
+
+  private _ttsKey({ voice }: AlertTts, text: string) {
+    return `tts:${hash(`${voice.engine}|${voice.lang}|${voice.name}|${text}`)}`;
   }
 
   private _matches(
@@ -485,16 +485,8 @@ export class AlertsService extends Service {
 
   // Whole or not at all: names are hashes, so a half-written file would pass
   // for the sound forever
-  private async _save(file: string, data: Uint8Array) {
-    const path = join(this._soundsFolder, file);
-    const temp = `${path}.tmp`;
-    try {
-      await writeFile(temp, data);
-      await rename(temp, path);
-    } catch (error) {
-      await unlink(temp).catch(() => {});
-      throw error;
-    }
+  private _save(file: string, data: Uint8Array) {
+    return writeFileAtomic(join(this._soundsFolder, file), data);
   }
 
   private _read(name: string): Promise<Uint8Array> {

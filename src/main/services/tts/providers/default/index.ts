@@ -1,4 +1,4 @@
-import axios, { isAxiosError } from "axios";
+import { formatError } from "@/common/util";
 import { Buffer } from "node:buffer";
 import { GenerationResponse, ProviderVoice, TTSProvider } from "../../common";
 import { handleStatusError, prepareText, Voices, VoicesData } from "./common";
@@ -21,31 +21,26 @@ export class TikTokTTS extends TTSProvider {
     text: string,
     voice: string,
   ): Promise<string> {
-    try {
-      const response = await axios.post<TTSResponseALT>(
-        config.API_URL_ALT,
-        {
-          text,
-          voice,
-        },
-        {
-          headers: config.HEADERS,
-          timeout: config.REQUEST_TIMEOUT_MS,
-        },
+    const res = await fetch(config.API_URL_ALT, {
+      method: "POST",
+      headers: config.HEADERS,
+      body: JSON.stringify({ text, voice }),
+      signal: AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      // The body of an error status may still name the reason.
+      const body: Partial<TTSResponseALT> | undefined = await res
+        .json()
+        .catch(() => undefined);
+      throw new Error(
+        `TTS generation failed: ${body?.error ?? `HTTP ${res.status}`}`,
       );
-      if (!response.data.success) {
-        throw new Error(`TTS generation failed: ${response.data.error}`);
-      }
-      return response.data.data;
-    } catch (error) {
-      if (isAxiosError(error) && error.response?.data) {
-        const errorData = error.response.data;
-        throw new Error(`TTS generation failed: ${errorData.error}`, {
-          cause: error,
-        });
-      }
-      throw error;
     }
+    const data: TTSResponseALT = await res.json();
+    if (!data.success) {
+      throw new Error(`TTS generation failed: ${data.error}`);
+    }
+    return data.data;
   }
 
   private checkStatusCode(statusCode?: number) {
@@ -59,28 +54,30 @@ export class TikTokTTS extends TTSProvider {
     lang: string,
     voice: string,
   ): Promise<string> {
+    let res: Response;
+    let data: Partial<TTSResponse> | undefined;
     try {
-      const requestUrl = this.getURL(text, voice, lang);
-      const response = await axios.post<TTSResponse>(requestUrl, null, {
-        headers: {
-          ...config.HEADERS,
-          Cookie: `sessionid=${this.sessionId}`,
-        },
-        timeout: config.REQUEST_TIMEOUT_MS,
+      res = await fetch(this.getURL(text, voice, lang), {
+        method: "POST",
+        headers: { ...config.HEADERS, Cookie: `sessionid=${this.sessionId}` },
+        signal: AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
       });
-
-      this.checkStatusCode(response.data?.status_code);
-
-      return response.data.data.v_str;
+      // An error status may still name the reason in status_code.
+      data = await res.json().catch((error: unknown) => {
+        if (res.ok) throw error;
+        return undefined;
+      });
     } catch (error) {
-      if (isAxiosError(error)) {
-        this.checkStatusCode(error.response?.data?.status_code);
-        // The AxiosError holds the session cookie, so it must not reach the logs.
-        // oxlint-disable-next-line preserve-caught-error
-        throw new Error(`TikTok TTS request failed: ${error.message}`);
-      }
-      throw error;
+      // A failed request's error could hold the session cookie, so it must not reach the logs.
+      // oxlint-disable-next-line preserve-caught-error
+      throw new Error(`TikTok TTS request failed: ${formatError(error)}`);
     }
+
+    this.checkStatusCode(data?.status_code);
+    if (!res.ok || !data?.data) {
+      throw new Error(`TikTok TTS request failed: HTTP ${res.status}`);
+    }
+    return data.data.v_str;
   }
 
   public setKey(session: string) {
@@ -110,7 +107,10 @@ export class TikTokTTS extends TTSProvider {
       const audioBuffer = Buffer.from(base64Audio, "base64");
       return { buffer: audioBuffer, success: true };
     } catch (e) {
-      return { success: false, error: e as Error };
+      return {
+        success: false,
+        error: e instanceof Error ? e : new Error(formatError(e)),
+      };
     }
   }
 

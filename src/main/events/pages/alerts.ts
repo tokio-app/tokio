@@ -1,6 +1,7 @@
-import { AlertTts } from "@/common/schemas";
+import { Alert, AlertTts } from "@/common/schemas";
 import {
   AlertTrigger,
+  AppError,
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   EMOTE_TRIGGER,
@@ -11,8 +12,8 @@ import { generateTikTokEventSample } from "@/common/util";
 import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
-import { AUDIO_EXTENSIONS } from "@/services/alerts";
-import { AppHandlerVariables } from "@/types";
+import { AlertsResult, AUDIO_EXTENSIONS } from "@/services/alerts";
+import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("alerts");
 
@@ -70,27 +71,43 @@ events.push(
   },
 );
 
+// Downloaded and uploaded sounds also go to the sound library.
+const addPickedSound = async (
+  { storeManagerService, notifier }: AppHandlerVariables,
+  e: ReplyEvent,
+  id: string,
+  res: AlertsResult<NonNullable<Alert["sound"]>>,
+) => {
+  if (!res.success || !res.data) throw new LoggedError(res.error);
+  if (!(await storeManagerService.addSound(res.data))) throw saveFailure();
+  e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+    success: true,
+    id,
+    sound: res.data,
+  });
+  notifier.success(
+    "alerts",
+    FEEDBACK_CODES.SOUND_ADDED,
+    `Sound "${res.data.name}" added.`,
+  );
+};
+
+const replySoundFailure = (
+  e: ReplyEvent,
+  error: AppError,
+  { id }: { id: string },
+) =>
+  e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+    success: false,
+    id,
+    error,
+  });
+
 events.push(
   APP_EVENTS.DOWNLOAD_SOUND,
-  async (
-    { alertsService, storeManagerService, notifier },
-    e,
-    { id, url, name },
-  ) => {
-    const res = await alertsService.downloadSound(url, name);
-    if (!res.success || !res.data) throw new LoggedError(res.error);
-    // Downloads also go to the sound library.
-    if (!(await storeManagerService.addSound(res.data))) throw saveFailure();
-    e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
-      success: true,
-      id,
-      sound: res.data,
-    });
-    notifier.success(
-      "alerts",
-      FEEDBACK_CODES.SOUND_ADDED,
-      `Sound "${name}" added.`,
-    );
+  async (services, e, { id, url, name }) => {
+    const res = await services.alertsService.downloadSound(url, name);
+    await addPickedSound(services, e, id, res);
   },
   {
     notify: false,
@@ -98,39 +115,22 @@ events.push(
       code: FEEDBACK_CODES.SOUND_DOWNLOAD_FAILED,
       message: "Unable to download the sound. Sounds can be up to 8 MB.",
     },
-    onError: (e, error, { id }) =>
-      e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
-        success: false,
-        id,
-        error,
-      }),
+    onError: replySoundFailure,
   },
 );
 
 events.push(
   APP_EVENTS.IMPORT_SOUND,
-  async ({ win, alertsService, storeManagerService, notifier }, e, { id }) => {
-    const diagRes = await showOpenDialog(win, {
+  async (services, e, { id }) => {
+    const diagRes = await showOpenDialog(services.win, {
       title: "Select a sound",
       properties: ["openFile"],
       filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS }],
     });
     if (diagRes.canceled || !diagRes.filePaths[0]) return;
 
-    const res = await alertsService.importSound(diagRes.filePaths[0]);
-    if (!res.success || !res.data) throw new LoggedError(res.error);
-    // Uploads also go to the sound library.
-    if (!(await storeManagerService.addSound(res.data))) throw saveFailure();
-    e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
-      success: true,
-      id,
-      sound: res.data,
-    });
-    notifier.success(
-      "alerts",
-      FEEDBACK_CODES.SOUND_ADDED,
-      `Sound "${res.data.name}" added.`,
-    );
+    const res = await services.alertsService.importSound(diagRes.filePaths[0]);
+    await addPickedSound(services, e, id, res);
   },
   {
     notify: false,
@@ -139,12 +139,7 @@ events.push(
       message:
         "Unable to use the sound. Pick an mp3, wav or ogg file up to 8 MB.",
     },
-    onError: (e, error, { id }) =>
-      e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
-        success: false,
-        id,
-        error,
-      }),
+    onError: replySoundFailure,
   },
 );
 
@@ -267,11 +262,19 @@ events.push(
 
     // One bad file doesn't stop the others. The service logs each failure.
     let failed = 0;
+    let added = 0;
     let saved = true;
     for (const path of diagRes.filePaths) {
-      const res = await alertsService.importSound(path);
-      if (!res.data) failed++;
-      else if (!(await storeManagerService.addSound(res.data))) saved = false;
+      const sound = (await alertsService.importSound(path)).data;
+      if (!sound) {
+        failed++;
+        continue;
+      }
+      // Files are named by content: one in the library, or picked twice, isn't new.
+      const listed = storeManagerService.getSounds();
+      if (listed.some((s) => s.file === sound.file)) continue;
+      if (await storeManagerService.addSound(sound)) added++;
+      else saved = false;
     }
     if (!saved) throw saveFailure();
 
@@ -288,7 +291,6 @@ events.push(
       data: storeManagerService.getSounds(),
       error,
     });
-    const added = diagRes.filePaths.length - failed;
     if (added > 0) {
       notifier.success(
         "alerts",
@@ -318,17 +320,29 @@ events.push(
   APP_EVENTS.REMOVE_SOUND,
   async ({ alertsService, storeManagerService, notifier }, e, { file }) => {
     if (!(await storeManagerService.removeSound(file))) throw saveFailure();
-    // Alerts that already use the sound keep working.
-    if (!(await storeManagerService.isSoundInUse(file))) {
-      const res = await alertsService.deleteSound(file);
-      if (!res.success) throw new LoggedError(res.error);
-    }
+    // Alerts that already use the sound keep working. The service logs a
+    // failed delete.
+    const deleted =
+      (await storeManagerService.isSoundInUse(file)) ||
+      (await alertsService.deleteSound(file)).success;
 
     e.reply(APP_EVENTS_RESPONSE.GET_SOUNDS, {
       success: true,
       data: storeManagerService.getSounds(),
     });
-    notifier.success("alerts", FEEDBACK_CODES.SOUND_REMOVED, "Sound removed.");
+    if (deleted) {
+      notifier.success(
+        "alerts",
+        FEEDBACK_CODES.SOUND_REMOVED,
+        "Sound removed.",
+      );
+    } else {
+      notifier.warn(
+        "alerts",
+        FEEDBACK_CODES.SOUND_REMOVE_FAILED,
+        "Sound removed from the library, but its file couldn't be deleted.",
+      );
+    }
   },
   {
     notify: false,

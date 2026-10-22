@@ -49,6 +49,9 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
           className={styles.level}
           value={permissions.level.value}
           disabled={!permissions.level.enabled}
+          // Only CSS hides it while off, so keep it from screen readers too
+          tabIndex={permissions.level.enabled ? undefined : -1}
+          aria-hidden={!permissions.level.enabled || undefined}
           onChange={(level) =>
             update((p) => {
               p.level.value = level;

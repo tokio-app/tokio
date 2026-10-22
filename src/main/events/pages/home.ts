@@ -47,12 +47,21 @@ events.push(
     e,
     { username },
   ) => {
-    const handle = `@${username.replace("@", "")}`;
-    await storeManagerService.updateProfileData({
+    const name = username.trim().replace(/^@/, "");
+    const handle = `@${name}`;
+    const saved = await storeManagerService.updateProfileData({
       connector: {
-        username,
+        username: name,
       },
     });
+    // The LIVE matters more than remembering the username: connect anyway.
+    if (!saved) {
+      notifier.warn(
+        "connector",
+        FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        "Tokio couldn't save the username. Check the logs folder for details.",
+      );
+    }
     const stats = storeManagerService.getSettings().liveStats;
 
     // The connected event comes before connect() resolves, answer on the first.
@@ -74,7 +83,7 @@ events.push(
     connectorService.on(TOKIO_EVENTS.CONNECTED, answer);
 
     try {
-      const res = await connectorService.connect(username);
+      const res = await connectorService.connect(name);
       if (!res.success) {
         throw new AppFailure(
           FEEDBACK_CODES.CONNECT_FAILED,
