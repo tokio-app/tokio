@@ -60,6 +60,8 @@ describe("TaskQueue", () => {
     expect(queue.enqueue(() => running.promise)).toBe(true);
     expect(queue.enqueue(() => {})).toBe(true);
     expect(queue.enqueue(() => {})).toBe(false);
+    // Callers get false; a warning per drop is noise on a busy LIVE.
+    expect(console.warn).not.toHaveBeenCalled();
   });
 
   it("keeps going after a task throws", async () => {

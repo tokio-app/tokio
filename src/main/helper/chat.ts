@@ -1,5 +1,4 @@
 import { UserData } from "@/common/types";
-import { escapeRegExp } from "es-toolkit";
 
 // A pictograph or skin tone with what modifies it (skin tone, text or emoji
 // style, the tags of flags like England's), joined to others by ZWJ.
@@ -9,6 +8,26 @@ const EMOJI_REGEX = new RegExp(
   String.raw`${EMOJI_PART}(?:\u200D${EMOJI_PART})*|[#*0-9]\uFE0F?\u20E3|\p{Regional_Indicator}+`,
   "gu",
 );
+
+/** The text with its regex syntax characters escaped. */
+export const escapeRegExp = (text: string) =>
+  text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+
+// Letters of scripts written without spaces don't make a word longer, so
+// words are found inside them (おめでとう in 誕生日おめでとう).
+const WORD_CHAR = String.raw`[[\p{L}\p{N}_]--[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Thai}\p{sc=Lao}\p{sc=Khmer}\p{sc=Myanmar}]]`;
+const STARTS_WITH_WORD = new RegExp(`^${WORD_CHAR}`, "v");
+const ENDS_WITH_WORD = new RegExp(`${WORD_CHAR}$`, "v");
+
+/**
+ * The regex source (for the `v` flag) of the text as a whole word. Ends that
+ * aren't word letters (":)", "加油") match anywhere.
+ */
+export function wholeWord(text: string): string {
+  const start = STARTS_WITH_WORD.test(text) ? `(?<!${WORD_CHAR})` : "";
+  const end = ENDS_WITH_WORD.test(text) ? `(?!${WORD_CHAR})` : "";
+  return `${start}${escapeRegExp(text)}${end}`;
+}
 
 /** The text without emojis, each one replaced with `by`. */
 export function removeEmojis(text: string, by = ""): string {
@@ -41,11 +60,7 @@ export function hasKeyword(content: string, keyword: string): boolean {
   const needle = cleanText(keyword, { asciiOnly: true });
   if (!needle) return content.includes(keyword.trim());
 
-  // Letters and digits around it would make it part of another word.
-  const pattern = new RegExp(
-    String.raw`(?<![\p{L}\p{N}])${escapeRegExp(needle)}(?![\p{L}\p{N}])`,
-    "u",
-  );
+  const pattern = new RegExp(wholeWord(needle), "v");
   return pattern.test(cleanText(content, { asciiOnly: true }));
 }
 

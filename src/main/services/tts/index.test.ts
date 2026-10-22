@@ -204,6 +204,7 @@ describe("TTSService", () => {
 
       expect(await say("hello", s)).toEqual([]);
       expect(await say("!tts hello", s)).toEqual(["hello"]);
+      expect(await say("!Tts hi", s)).toEqual(["hi"]);
     });
 
     it("skips a comment with only the trigger", async () => {
@@ -449,6 +450,14 @@ describe("TTSService", () => {
       });
 
       expect(await say("qué quéso", s)).toEqual(["what quéso"]);
+    });
+
+    it("replaces words inside scripts written without spaces", async () => {
+      const s = settings((s) => {
+        s.replacements = [{ old: "草", new: "笑" }];
+      });
+
+      expect(await say("それは草", s)).toEqual(["それは笑"]);
     });
 
     it("inserts the new text literally and skips empty words", async () => {

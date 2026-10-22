@@ -60,6 +60,15 @@ describe("hasKeyword", () => {
     expect(hasKeyword("a+b", "a+b")).toBe(true);
     expect(hasKeyword("aab", "a+b")).toBe(false);
   });
+
+  it("finds keywords inside scripts written without spaces", () => {
+    expect(hasKeyword("誕生日おめでとう", "おめでとう")).toBe(true);
+    expect(hasKeyword("主播加油啊", "加油")).toBe(true);
+    expect(hasKeyword("ขอบคุณมากครับ", "ขอบคุณ")).toBe(true);
+    expect(hasKeyword("日本語hello", "hello")).toBe(true);
+    expect(hasKeyword("concat", "cat")).toBe(false);
+    expect(hasKeyword("snake_case", "case")).toBe(false);
+  });
 });
 
 describe("sameHandle", () => {
