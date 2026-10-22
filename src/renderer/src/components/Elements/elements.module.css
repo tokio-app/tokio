@@ -326,7 +326,7 @@
 
 /* SELECT START */
 
-/* GiftSelect and VoiceSelect compose this, so their fields look the same */
+/* GiftSelect and VoiceSelect put it on their fields too */
 .select_display {
   display: flex;
   align-items: center;

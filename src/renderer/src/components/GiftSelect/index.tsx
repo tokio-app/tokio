@@ -1,9 +1,11 @@
 import { CustomGift } from "@/common/types";
+import { cx } from "@/helper/cx";
 import { formatList } from "@/helper/format";
 import { coinsLabel, giftsLabel } from "@/helper/gifts";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { FiChevronDown } from "react-icons/fi";
+import elements from "../Elements/elements.module.css";
 import { GiftPicker } from "./GiftPicker";
 import styles from "./giftselect.module.css";
 
@@ -93,7 +95,7 @@ function GiftField({
       <button
         type="button"
         aria-haspopup="dialog"
-        className={styles.field}
+        className={cx(elements.select_display, styles.field)}
         title={
           known.length > 0
             ? formatList(known.map((gift) => gift.label))

@@ -14,6 +14,9 @@ paths:
 - Components are folders with `index.tsx` and `<name>.module.css`, re-exported from `components/index.tsx`. Use the primitives in `components/Elements` before creating new ones; they take colors from the tokens, not props. `Modal` is the only modal shell.
 - The CSP is `config.CSP` (`src/main/config/csp.ts`, which has no imports so `electron.vite.config.ts` can read it). In dev pages get it as a header from `initSession`; built pages load from `file://`, which headers don't reach, so the `tokio:csp` build plugin adds the production policy as a meta tag. That policy has no `connect-src`: pages can't fetch, and audio reaches `AudioQueue` as bytes over IPC. Anything new the renderer loads must fit it.
 - Style with CSS Modules and the tokens in `src/ui/styles/tokens.css` (colors, `--space-*`, `--font-*`, `--radius-*`, `--z-*`), not raw values.
+- To reuse another module's class, import that module in the TSX and add its class, as `GiftSelect` does with `select_display`. Don't use `composes: … from` another file.
+  - Vite bundles that file again for every `composes`.
+  - A later copy then overrides the page styles that come before it, such as a field's fixed width.
 - The look follows the `frontend-design` skill:
   - **Surfaces:** one Ink surface (`--background-primary`). Panels (`--background-tertiary`) only for grouped content such as lists and cards. Controls on Field (`--background-secondary`), with `--border` for hairlines and Iron (`--background-secondary-hover`) for hover.
   - **Rose** (`--accent-primary`) means LIVE or "do this": the tally, primary actions, selection and focus, never decoration. Text on it is Paper (`--font-primary`), and checkboxes and radios keep the browser's light look.
