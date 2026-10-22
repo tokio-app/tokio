@@ -4,6 +4,7 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
+import { saveFailure } from "@/helper/feedback";
 
 const events = createStack("overlays");
 
@@ -29,7 +30,12 @@ events.push(
   async ({ overlayService, notifier }, e, { name }) => {
     const res = await overlayService.createTestOverlay(name);
     if (!res.success) throw new Error(`Test overlay "${name}" was not added.`);
-    e.reply(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS, res);
+    e.reply(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS, {
+      success: true,
+      data: res.data,
+    });
+    // The page ignores the failure reply, so it keeps the list sent above.
+    if (res.saved === false) throw saveFailure();
     notifier.success(
       "overlays",
       FEEDBACK_CODES.TEST_OVERLAY_ADDED,
@@ -49,8 +55,11 @@ events.push(
   APP_EVENTS.REMOVE_TEST_OVERLAY,
   async ({ overlayService, notifier }, e, { id }) => {
     const res = await overlayService.removeTestOverlay(id);
-    if (!res.success) throw new Error(`Test overlay ${id} was not removed.`);
-    e.reply(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS, res);
+    e.reply(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS, {
+      success: true,
+      data: res.data,
+    });
+    if (res.saved === false) throw saveFailure();
     notifier.success(
       "overlays",
       FEEDBACK_CODES.TEST_OVERLAY_REMOVED,

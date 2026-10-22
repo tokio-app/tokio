@@ -6,8 +6,9 @@ import {
   OverlayMetaSchema,
 } from "@/common/schemas";
 import { CustomGift, OverlayConfigRedux } from "@/common/types";
+import { writeFileAtomic } from "@/helper/fs";
 import { YAMLManagerService } from "@/services/yaml";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const SCRIPT_REGEX = /<script id="tokio-setup">[\s\S]*?<\/script>/i;
@@ -161,7 +162,8 @@ export async function processHTML(
     // A function, so $& or $$ in a setting stay as typed.
     const finalHtml = html.replace(SCRIPT_REGEX, () => newScriptBlock);
 
-    await writeFile(htmlPath, finalHtml, "utf-8");
+    // `html` is the file as read, so most starts write nothing.
+    if (finalHtml !== html) await writeFileAtomic(htmlPath, finalHtml);
 
     return {
       success: true,

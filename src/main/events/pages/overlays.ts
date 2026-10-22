@@ -6,7 +6,7 @@ import {
 } from "@/common/types";
 import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
-import { AppFailure, LoggedError } from "@/helper/feedback";
+import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("overlays");
@@ -43,6 +43,7 @@ events.push(
       success: true,
       data: overlayService.getOverlays(),
     });
+    if (res.saved === false) throw saveFailure();
     notifier.success(
       "overlays",
       FEEDBACK_CODES.OVERLAY_IMPORTED,
@@ -69,6 +70,7 @@ events.push(
       success: true,
       data: overlayService.getOverlays(),
     });
+    if (res.saved === false) throw saveFailure();
     notifier.success(
       "overlays",
       FEEDBACK_CODES.OVERLAY_REMOVED,
@@ -128,6 +130,7 @@ events.push(
       success: true,
       data: overlayService.getOverlays(),
     });
+    if (res.saved === false) throw saveFailure();
     e.reply(APP_EVENTS_RESPONSE.INSTALL_OVERLAY, { success: true, id });
     if (updating) {
       notifier.success(

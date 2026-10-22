@@ -1,9 +1,26 @@
 import { YAMLManagerService } from "@/services/yaml";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { findOverlays } from "./index";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { findOverlays, processHTML } from "./index";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    rename: vi.fn(actual.rename),
+    writeFile: vi.fn(actual.writeFile),
+  };
+});
 
 describe("findOverlays", () => {
   let folder: string;
@@ -76,5 +93,52 @@ describe("findOverlays", () => {
     expect(
       await findOverlays(join(folder, "missing"), new YAMLManagerService()),
     ).toEqual([]);
+  });
+});
+
+describe("processHTML", () => {
+  let dir: string;
+  const html = () => readFile(join(dir, "index.html"), "utf-8");
+  const written =
+    '<script id="tokio-setup"> window.__OVERLAY_ID__ = "a"; </script>';
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "tokio-test-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("writes the ID into the setup block", async () => {
+    await writeFile(
+      join(dir, "index.html"),
+      '<script id="tokio-setup"></script>',
+    );
+
+    expect(
+      await processHTML("a", '<script id="tokio-setup"></script>', dir),
+    ).toEqual({ success: true });
+    expect(await html()).toBe(written);
+  });
+
+  it("leaves an HTML that already has its settings alone", async () => {
+    await writeFile(join(dir, "index.html"), written);
+    vi.mocked(writeFile).mockClear();
+
+    expect(await processHTML("a", written, dir)).toEqual({ success: true });
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  it("keeps the old HTML whole when the new one can't be written", async () => {
+    const old = '<script id="tokio-setup"></script>';
+    await writeFile(join(dir, "index.html"), old);
+    vi.mocked(rename).mockRejectedValueOnce(
+      Object.assign(new Error("ENOSPC: no space left"), { code: "ENOSPC" }),
+    );
+
+    expect(await processHTML("a", old, dir)).toEqual({ success: false });
+    expect(await html()).toBe(old);
+    expect(await readdir(dir)).toEqual(["index.html"]);
   });
 });
