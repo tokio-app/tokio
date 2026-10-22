@@ -38,7 +38,6 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
-  --space-16: 64px;
 
   /* Typography */
   --font-family:
@@ -65,7 +64,6 @@
   --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.45);
   --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.6);
   --z-sidebar: 10;
-  --z-sticky: 100;
   --z-modal: 1000;
   --z-popover: 1100;
   --z-toast: 1200;

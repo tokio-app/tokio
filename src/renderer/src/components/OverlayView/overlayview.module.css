@@ -31,7 +31,6 @@
   font-size: var(--font-lg);
   font-weight: 600;
   color: var(--font-primary);
-  text-transform: capitalize;
 }
 
 .tags {

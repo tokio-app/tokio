@@ -448,7 +448,8 @@ describe("TTS", () => {
   it("changes who may use TTS", async () => {
     const { user } = await setup();
     const permissions = section("Permissions");
-    const level = permissions.getByRole("spinbutton");
+    // Hidden from screen readers until Minimum Fan Level is on
+    const level = permissions.getByRole("spinbutton", { hidden: true });
     expect(level).toBeDisabled();
 
     await user.click(screen.getByRole("checkbox", { name: "Allow Everyone" }));
