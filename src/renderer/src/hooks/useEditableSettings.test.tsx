@@ -132,6 +132,19 @@ describe("useEditableSettings", () => {
     expect(saves().map((s) => s.filters.pitch)).toEqual([2]);
   });
 
+  // Closing the window doesn't unmount the page
+  it("sends a change still waiting when the window closes", async () => {
+    const { setPitch } = setup();
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, loaded);
+    setPitch(2);
+
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+
+    expect(saves().map((s) => s.filters.pitch)).toEqual([2]);
+  });
+
   it("doesn't send a change twice when the page closes", async () => {
     const { setPitch, unmount } = setup();
     await send(APP_EVENTS_RESPONSE.GET_PROFILE, loaded);

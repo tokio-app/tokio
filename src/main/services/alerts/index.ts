@@ -8,17 +8,11 @@ import {
 } from "@/common/types";
 import { formatAlertMessage, formatError, TaskQueue } from "@/common/util";
 import { hasKeyword, isUser } from "@/helper/chat";
+import { writeFileAtomic } from "@/helper/fs";
 import Logger from "@/logger";
 import type { TTSService } from "@/services/tts";
 import { createHash } from "node:crypto";
-import {
-  access,
-  readFile,
-  rename,
-  stat,
-  unlink,
-  writeFile,
-} from "node:fs/promises";
+import { access, readFile, stat, unlink } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { Service } from "../shared";
 
@@ -491,16 +485,8 @@ export class AlertsService extends Service {
 
   // Whole or not at all: names are hashes, so a half-written file would pass
   // for the sound forever
-  private async _save(file: string, data: Uint8Array) {
-    const path = join(this._soundsFolder, file);
-    const temp = `${path}.tmp`;
-    try {
-      await writeFile(temp, data);
-      await rename(temp, path);
-    } catch (error) {
-      await unlink(temp).catch(() => {});
-      throw error;
-    }
+  private _save(file: string, data: Uint8Array) {
+    return writeFileAtomic(join(this._soundsFolder, file), data);
   }
 
   private _read(name: string): Promise<Uint8Array> {

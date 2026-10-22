@@ -4,6 +4,7 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack } from "@/helper/events";
+import { settle } from "@/helper/quit";
 import Logger from "@/logger";
 import { ipcMain } from "@test/electron";
 import { createHandler } from "@test/handler";
@@ -76,5 +77,25 @@ describe("Handler", () => {
     expect(h.notices).toEqual([
       expect.objectContaining({ code: FEEDBACK_CODES.SETTINGS_LOAD_FAILED }),
     ]);
+  });
+
+  it("keeps a quit waiting until the handler finishes", async () => {
+    const h = createHandler();
+    let finish!: () => void;
+    const stack = createStack();
+    stack.push(
+      APP_EVENTS.UPDATE_TTS_SETTINGS,
+      () => new Promise<void>((resolve) => (finish = resolve)),
+    );
+    await new Handler(h.handler).init(stack);
+    let settled = false;
+
+    ipcMain.emit(APP_EVENTS.UPDATE_TTS_SETTINGS, { reply: vi.fn() }, {});
+    const quit = settle(1000).then(() => (settled = true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(settled).toBe(false);
+
+    finish();
+    await quit;
   });
 });

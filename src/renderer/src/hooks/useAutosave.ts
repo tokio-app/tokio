@@ -1,5 +1,6 @@
 import isEqual from "fast-deep-equal";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFlush } from "./useEditableSettings";
 
 // Groups typing into one save, as useEditableSettings does
 const SAVE_DELAY = 300;
@@ -9,7 +10,8 @@ const SAVE_DELAY = 300;
  * fields without a Save button. `saved` is what main holds: the value starts
  * over from it when it changes, but not for main's echo of the value's own
  * save, which would undo what was typed since. A change still waiting is sent
- * when the component unmounts, so one made right before leaving isn't lost.
+ * when the component unmounts, the window closes or flushSettings is called,
+ * so one made right before leaving isn't lost.
  */
 export function useAutosave<T>(saved: T, save: (value: T) => void) {
   const [value, setValue] = useState(saved);
@@ -50,7 +52,7 @@ export function useAutosave<T>(saved: T, save: (value: T) => void) {
     return () => clearTimeout(timer);
   }, [value, saved, flush]);
 
-  useEffect(() => flush, [flush]);
+  useFlush(flush);
 
   return [value, setValue] as const;
 }

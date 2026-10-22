@@ -1,5 +1,7 @@
 import { formatError } from "@/common/util";
 import { cleanText } from "@/helper/chat";
+import { writeFileAtomic } from "@/helper/fs";
+import { track } from "@/helper/quit";
 import Logger from "@/logger";
 import { promises as fs } from "fs";
 import { z } from "zod";
@@ -63,11 +65,8 @@ export abstract class BaseFileManagerService extends Service {
     filePath: string,
     data: unknown,
   ): Promise<boolean> {
-    const tempPath = `${filePath}.tmp`;
     try {
-      await fs.writeFile(tempPath, this.serialize(data), "utf-8");
-      await fs.rename(tempPath, filePath);
-
+      await writeFileAtomic(filePath, this.serialize(data));
       return true;
     } catch (error) {
       this._logError(
@@ -76,7 +75,6 @@ export abstract class BaseFileManagerService extends Service {
         formatError(error),
         error,
       );
-      await fs.unlink(tempPath).catch(() => {});
       return false;
     }
   }
@@ -156,7 +154,8 @@ export abstract class BaseFileManagerService extends Service {
         return { success: saveSuccess, data: saveSuccess ? mergedData : null };
       });
 
-    this._writeLocks.set(filePath, updatePromise);
+    // A quit waits for it from the start, the write only comes after the read.
+    this._writeLocks.set(filePath, track(updatePromise));
 
     try {
       return await updatePromise;

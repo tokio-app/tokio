@@ -758,8 +758,8 @@ describe("OverlayService", () => {
         await service.installFromCatalog("gift-jar", gifts);
       });
 
-      // Updates to 1.0.1 while the renames after the new HTML's and the
-      // installed version's fail
+      // Updates to 1.0.1 while the renames after the kept settings', the new
+      // HTML's and the installed version's fail
       const updateFailing = async (...errors: Error[]) => {
         vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
         publish(release("1.0.1", { "new.js": "2" }));
@@ -769,6 +769,7 @@ describe("OverlayService", () => {
           );
         const renames = vi
           .mocked(rename)
+          .mockImplementationOnce(fs.rename)
           .mockImplementationOnce(fs.rename)
           .mockImplementationOnce(fs.rename);
         for (const error of errors) renames.mockRejectedValueOnce(error);

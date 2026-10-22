@@ -225,9 +225,36 @@ describe("main process entry", () => {
 
   it("stops the TTS engines and the updater when quitting", async () => {
     await start();
+    const preventDefault = vi.fn();
 
-    app.emit("will-quit");
+    app.emit("will-quit", { preventDefault });
 
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(mocks.services.tts.dispose).toHaveBeenCalledOnce();
+    expect(mocks.services.updater.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("finishes the saves still running before it quits", async () => {
+    await start();
+    // The entry point got its own copy
+    const { track } = await import("@/helper/quit");
+    let finish!: () => void;
+    void track(new Promise<void>((resolve) => (finish = resolve)));
+    const preventDefault = vi.fn();
+
+    app.emit("will-quit", { preventDefault });
+
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(mocks.services.tts.dispose).not.toHaveBeenCalled();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(app.quit).not.toHaveBeenCalled();
+
+    finish();
+    await vi.waitFor(() => expect(app.quit).toHaveBeenCalledOnce());
+    // Electron quits again, this time for good
+    app.emit("will-quit", { preventDefault });
+
+    expect(preventDefault).toHaveBeenCalledOnce();
     expect(mocks.services.tts.dispose).toHaveBeenCalledOnce();
     expect(mocks.services.updater.dispose).toHaveBeenCalledOnce();
   });

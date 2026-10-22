@@ -145,6 +145,8 @@ Settings and profiles are validated with the Zod schemas in `src/common/schemas`
 
 Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name. An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case. One whose trimmed name is too short is listed as "Imported profile".
 
+Quitting waits up to 3s for IPC handlers and file writes still running (`track`/`settle`, `src/main/helper/quit.ts`): `Handler` tracks every handler run, and `writeFileAtomic` (`src/main/helper/fs.ts`), `updateFile`, the store's save queue and `Logger` track their writes. The first `will-quit` with work pending is held; `before-quit` isn't used because on Cmd+Q it comes before the windows send their last saves on `pagehide`. Write files through `writeFileAtomic` or the file managers, so a quit waits for them and a quit or crash midway leaves the old file whole.
+
 A store file that doesn't parse is copied to `tokio.corrupted-<time>.json` next to it and replaced by the defaults. One that can't be read (locked, no access) or copied stops startup ("Tokio couldn't start") and is left as it is.
 
 Only one Tokio runs per userData folder (`requestSingleInstanceLock` in `src/main/index.ts`, after `TOKIO_HOME` sets it): a second launch quits and brings the running one to the front. `yarn dev` and the installed app share that folder on Windows and macOS, so close Tokio before `yarn dev`.

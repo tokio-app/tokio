@@ -15,6 +15,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  rename,
   rm,
   unlink,
   writeFile,
@@ -29,12 +30,13 @@ import {
   CACHE_MAX_FILE_BYTES,
 } from "./index";
 
-// A test can make a write fail partway, or count and hold reads
+// A test can make a write or rename fail, or count and hold reads
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...actual,
     readFile: vi.fn(actual.readFile),
+    rename: vi.fn(actual.rename),
     writeFile: vi.fn(actual.writeFile),
   };
 });
@@ -630,6 +632,19 @@ describe("AlertsService", () => {
       expect(await readFile(join(sounds, res.data!.file))).toEqual(
         Buffer.from([4, 5]),
       );
+    });
+
+    // Windows antivirus and indexers hold a file they just saw for a moment.
+    it("waits out a file another program holds", async () => {
+      await writeFile(join(src, "a.wav"), bytes(4, 5));
+      vi.mocked(rename).mockRejectedValueOnce(
+        Object.assign(new Error("EBUSY: rename"), { code: "EBUSY" }),
+      );
+
+      const res = await service.importSound(join(src, "a.wav"));
+
+      expect(res.success).toBe(true);
+      expect(await readdir(sounds)).toContain(res.data!.file);
     });
 
     it("stores the same audio once", async () => {

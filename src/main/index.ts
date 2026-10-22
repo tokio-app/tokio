@@ -6,6 +6,7 @@ import {
   withPreviewCORS,
   withPreviewStyles,
 } from "@/helper/preview";
+import { hasPending, settle } from "@/helper/quit";
 import Logger from "@/logger";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
@@ -198,7 +199,16 @@ app.on("window-all-closed", () => {
   app.quit();
 });
 
-app.on("will-quit", () => {
+// Not before-quit: on Cmd+Q it comes before the windows send their last saves.
+let settling = false;
+app.on("will-quit", (event) => {
+  // Saves still running would be cut off, so quit again once they're done.
+  if (!settling && hasPending()) {
+    settling = true;
+    event.preventDefault();
+    void settle(3000).then(() => app.quit());
+    return;
+  }
   services.ttsService.dispose();
   services.updaterService.dispose();
 });

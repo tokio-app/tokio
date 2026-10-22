@@ -1,5 +1,6 @@
 import { UpdateStatus } from "@/common/types";
 import { formatError, REPOSITORY_URL } from "@/common/util";
+import { settle } from "@/helper/quit";
 import Logger from "@/logger";
 import type {
   Logger as UpdaterLogger,
@@ -64,6 +65,7 @@ export class UpdaterService extends Service {
   private _callbacks: UpdaterCallbacks = {};
   private _status: UpdateStatus = { state: "idle" };
   private _checking?: Promise<UpdaterResult>;
+  private _installing?: Promise<void>;
   private _startup?: NodeJS.Timeout;
   private _interval?: NodeJS.Timeout;
 
@@ -172,8 +174,8 @@ export class UpdaterService extends Service {
   }
 
   /**
-   * Restarts into the downloaded update. On macOS, returns the release page
-   * to open instead.
+   * Restarts into the downloaded update once the saves still running are
+   * done. On macOS, returns the release page to open instead.
    */
   public install(): UpdaterResult<{ url: string }> {
     const status = this._status;
@@ -187,7 +189,13 @@ export class UpdaterService extends Service {
       `<Updater> Restarting to install version ${status.version}.`,
       this._logFile,
     );
-    this._updater.quitAndInstall(true, true);
+    const updater = this._updater;
+    // The installer starts before the app quits, so a quit held for saves
+    // would race it. Not awaited: the request that asked is one of them.
+    this._installing ??= settle(3000).then(() => {
+      this._installing = undefined;
+      updater.quitAndInstall(true, true);
+    });
     return { success: true };
   }
 

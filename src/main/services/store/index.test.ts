@@ -3,6 +3,7 @@ import { TOKIO_EVENTS } from "@/common/types";
 import { safeStorage } from "@test/electron";
 import { defaultProfile } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
+import { hasPending, settle } from "@/helper/quit";
 import { TikTokConnectorService } from "@/services/connector";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
@@ -330,6 +331,19 @@ describe("StoreManagerService", () => {
       expect(await readdir(paths.folders.profilesFolder)).toEqual([
         "default.json",
       ]);
+    });
+
+    it("holds a quit while saves wait in line", async () => {
+      const store = await init();
+      await settle(1000);
+
+      const first = store.updateServerSettings(true);
+      const second = store.updateUpdatesSettings(false);
+      expect(hasPending()).toBe(true);
+
+      await Promise.all([first, second]);
+      await settle(1000);
+      expect(hasPending()).toBe(false);
     });
   });
 

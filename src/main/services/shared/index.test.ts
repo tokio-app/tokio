@@ -1,3 +1,4 @@
+import { hasPending } from "@/helper/quit";
 import Logger from "@/logger";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -129,6 +130,14 @@ describe.each([
     );
   });
 
+  it("keeps a quit waiting until a save is written", async () => {
+    const saved = service.saveFile(file, Schema, sample);
+
+    expect(hasPending()).toBe(true);
+    expect(await saved).toBe(true);
+    expect(hasPending()).toBe(false);
+  });
+
   it("returns null for a missing file without logging", async () => {
     const error = vi.spyOn(Logger, "error");
 
@@ -173,6 +182,17 @@ describe.each([
     const expected = { name: "tokio", tags: ["z"], nested: { a: 1, b: 3 } };
     expect(res).toEqual({ success: true, data: expected });
     expect(await service.loadFile(file, Schema)).toEqual(expected);
+  });
+
+  // The write only starts once the file is read.
+  it("keeps a quit waiting for an update from the start", async () => {
+    await service.saveFile(file, Schema, sample);
+
+    const update = service.updateFile(file, Schema, { name: "x" });
+
+    expect(hasPending()).toBe(true);
+    await update;
+    expect(hasPending()).toBe(false);
   });
 
   it("fails to update a missing file", async () => {

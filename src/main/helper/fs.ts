@@ -1,4 +1,5 @@
 import { rename, rm, writeFile } from "node:fs/promises";
+import { track } from "./quit";
 
 // Windows antivirus and indexers hold a file they just saw for a moment.
 const BUSY = new Set(["EPERM", "EBUSY", "EACCES"]);
@@ -24,13 +25,17 @@ export async function renameWithRetry(from: string, to: string): Promise<void> {
 }
 
 /**
- * Writes the file whole or not at all: a quit, crash or full disk midway
- * leaves the old file as it was.
+ * Writes the file whole or not at all: a crash or full disk midway leaves the
+ * old file as it was, and a quit waits for it.
  */
-export async function writeFileAtomic(
+export function writeFileAtomic(
   path: string,
   data: string | Uint8Array,
 ): Promise<void> {
+  return track(write(path, data));
+}
+
+async function write(path: string, data: string | Uint8Array) {
   const temp = `${path}.tmp`;
   try {
     await writeFile(temp, data);

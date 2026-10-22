@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renameWithRetry, writeFileAtomic } from "./fs";
+import { hasPending } from "./quit";
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
@@ -52,6 +53,14 @@ describe("fs helpers", () => {
 
       expect(await readFile(file, "utf-8")).toBe("old");
       expect(await readdir(folder)).toEqual(["index.html"]);
+    });
+
+    it("keeps a quit waiting until the file is written", async () => {
+      const written = writeFileAtomic(join(folder, "index.html"), "new");
+
+      expect(hasPending()).toBe(true);
+      await written;
+      expect(hasPending()).toBe(false);
     });
   });
 

@@ -17,6 +17,7 @@ import { defaultProfile, formatError } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
 import { isInside } from "@/helper/path";
+import { track } from "@/helper/quit";
 import Logger from "@/logger";
 import { AUDIO_EXTENSIONS } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
@@ -863,12 +864,15 @@ export class StoreManagerService extends Service {
   }
 
   // Saves write the same temporary file, so they run one after another.
+  // Tracked while queued too, so a quit doesn't end between two of them.
   private _queueSave() {
-    const save = this._saving.then(() =>
-      this._jsonManagerService.saveFile(
-        this._storeFilePath,
-        StoreZodSchema,
-        this._storeData!,
+    const save = track(
+      this._saving.then(() =>
+        this._jsonManagerService.saveFile(
+          this._storeFilePath,
+          StoreZodSchema,
+          this._storeData!,
+        ),
       ),
     );
     this._saving = save;
