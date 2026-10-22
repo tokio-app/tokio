@@ -108,6 +108,7 @@ describe("useAlertTest", () => {
   it("stops its sound and stops listening when it unmounts", () => {
     const { unmount, queue } = setup();
     queue.stop.mockClear();
+    expect(listeners(TEST_ALERT)).toBe(1);
 
     unmount();
 

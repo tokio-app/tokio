@@ -14,6 +14,7 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { SoundPicker } from ".";
+import styles from "./soundpicker.module.css";
 
 const DEFAULTS = { voice: voice("Aria"), speed: 1, pitch: 1 };
 
@@ -109,9 +110,11 @@ describe("SoundPicker", () => {
     await sounds([]);
 
     expect(selectedTab()).toEqual(["MyInstants"]);
-    expect(
-      screen.getByPlaceholderText("Search sounds... (Enter)"),
-    ).toBeInTheDocument();
+    // The tab stays mounted, hidden only by its class
+    const search = screen.getByPlaceholderText("Search sounds... (Enter)");
+    expect(search.closest("form")?.parentElement).not.toHaveClass(
+      styles.hidden,
+    );
   });
 
   it("opens on the message of an alert that speaks", async () => {

@@ -490,7 +490,10 @@ describe("settings events", () => {
 
       expect(dialog.showSaveDialog).toHaveBeenCalledWith(
         h.win,
-        expect.objectContaining({ defaultPath: "stream.json" }),
+        // In the last folder used, which earlier tests may have set
+        expect.objectContaining({
+          defaultPath: expect.stringMatching(/(^|[\\/])stream\.json$/),
+        }),
       );
       expect(exportProfile).not.toHaveBeenCalled();
       expect(h.replies(APP_EVENTS_RESPONSE.EXPORT_ENTITY)).toEqual([]);

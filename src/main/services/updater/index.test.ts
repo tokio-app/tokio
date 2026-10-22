@@ -58,11 +58,17 @@ describe("UpdaterService", () => {
   };
 
   it("follows GitHub's latest release, not prereleases", async () => {
+    // The opposite of what the service sets, so each check can fail
+    updater.allowDowngrade = true;
+    updater.autoDownload = false;
+    updater.autoInstallOnAppQuit = false;
+
     await create();
 
     expect(updater.allowPrerelease).toBe(false);
     expect(updater.allowDowngrade).toBe(false);
     expect(updater.autoDownload).toBe(true);
+    expect(updater.autoInstallOnAppQuit).toBe(true);
     expect(updater.logger).not.toBeNull();
   });
 

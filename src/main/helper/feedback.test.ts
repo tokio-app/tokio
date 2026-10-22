@@ -203,7 +203,7 @@ describe("Notifier", () => {
     });
 
     it("only logs when notify is off, by option or by the failure", () => {
-      vi.spyOn(Logger, "error");
+      const error = vi.spyOn(Logger, "error");
 
       notifier.report({
         source: "system",
@@ -218,6 +218,7 @@ describe("Notifier", () => {
       });
 
       expect(sent).toEqual([]);
+      expect(error).toHaveBeenCalledTimes(2);
     });
   });
 });

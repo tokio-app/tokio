@@ -17,7 +17,8 @@ function keepLogsInTempFolders(logger: any) {
   });
 }
 
-// Logger and the queues write to the console, keep the test output readable.
+// Logger, TaskQueue's failed tasks and the preload write to the console, keep
+// the test output readable.
 beforeEach(() => {
   resetElectron();
   keepLogsInTempFolders(Logger);
