@@ -1,4 +1,3 @@
-import { AxiosError, AxiosHeaders } from "axios";
 import { once } from "node:events";
 import { IncomingMessage } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,20 +10,6 @@ import {
 } from "ws";
 import { createConfig } from "../config";
 import type { EdgeConfig, EdgeVoice } from "../types";
-
-const { get } = vi.hoisted(() => ({
-  get: vi.fn<
-    (
-      url: string,
-      options: { headers: Record<string, string>; timeout: number },
-    ) => Promise<{ data: unknown }>
-  >(),
-}));
-
-vi.mock("axios", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("axios")>()),
-  default: { get },
-}));
 
 // drm.ts keeps the clock skew between calls, so every test gets a fresh copy.
 let protocol: typeof import("./protocol");
@@ -486,45 +471,53 @@ describe("listVoices", () => {
   };
   const cfg = createConfig();
 
-  const httpError = (status: number, headers: Record<string, string> = {}) =>
-    new AxiosError("Request failed", "ERR_BAD_RESPONSE", undefined, null, {
-      status,
-      statusText: "",
-      data: "",
-      headers,
-      config: { headers: new AxiosHeaders() },
-    });
+  let get: ReturnType<
+    typeof vi.fn<(url: string, init?: RequestInit) => Promise<Response>>
+  >;
+  const json = (data: unknown) => new Response(JSON.stringify(data));
 
   beforeEach(async () => {
     vi.resetModules();
-    get.mockReset();
+    get = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>();
+    vi.stubGlobal("fetch", get);
     protocol = await import("./protocol");
     ({ EdgeTTSError } = await import("./errors"));
   });
 
   it("returns the voice list", async () => {
-    get.mockResolvedValue({ data: [voice] });
+    get.mockResolvedValue(json([voice]));
 
     await expect(protocol.listVoices(cfg)).resolves.toEqual([voice]);
   });
 
-  it("asks without zstd, with a muid cookie and the auth query", async () => {
-    get.mockResolvedValue({ data: [] });
+  it("asks without zstd, with a muid cookie, the auth query and a timeout", async () => {
+    get.mockResolvedValue(json([]));
 
     await protocol.listVoices(cfg);
 
-    const [url, options] = get.mock.calls[0];
+    const [url, init] = get.mock.calls[0];
     expect(url.startsWith(cfg.VOICE_LIST_URL)).toBe(true);
     expect(new URL(url).searchParams.get("Sec-MS-GEC-Version")).toBe(
       `2-${cfg.CHROMIUM_FULL_VERSION}`,
     );
-    expect(options.headers["Accept-Encoding"]).toBe("gzip, deflate, br");
-    expect(options.headers.Cookie).toMatch(/^muid=[0-9A-F]{32};$/);
-    expect(options.timeout).toBe(cfg.REQUEST_TIMEOUT_MS);
+    expect(init?.headers).toMatchObject({
+      "Accept-Encoding": "gzip, deflate, br",
+      Cookie: expect.stringMatching(/^muid=[0-9A-F]{32};$/),
+    });
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("fails with voices on a response that isn't a list", async () => {
-    get.mockResolvedValue({ data: "<html>" });
+    get.mockResolvedValue(json({ voices: [] }));
+
+    const error = await failure(protocol.listVoices(cfg));
+
+    expect(error.stage).toBe("voices");
+    expect(error.message).toContain("Unexpected voice list response");
+  });
+
+  it("fails with voices on a response that isn't JSON", async () => {
+    get.mockResolvedValue(new Response("<html>"));
 
     const error = await failure(protocol.listVoices(cfg));
 
@@ -533,20 +526,21 @@ describe("listVoices", () => {
   });
 
   it("fails with voices, the status and the server date on an HTTP error", async () => {
-    get.mockRejectedValue(httpError(500, { date: SERVER_DATE }));
+    get.mockResolvedValue(
+      new Response("", { status: 500, headers: { date: SERVER_DATE } }),
+    );
 
     const error = await failure(protocol.listVoices(cfg));
 
     expect(error.stage).toBe("voices");
     expect(error.status).toBe(500);
     expect(error.serverDate).toBe(SERVER_DATE);
-    expect(error.cause).toBeInstanceOf(AxiosError);
   });
 
   it("tries the next token version on a 403", async () => {
     get
-      .mockRejectedValueOnce(httpError(403))
-      .mockResolvedValueOnce({ data: [voice] });
+      .mockResolvedValueOnce(new Response("", { status: 403 }))
+      .mockResolvedValueOnce(json([voice]));
 
     await expect(protocol.listVoices(cfg)).resolves.toEqual([voice]);
     expect(
@@ -555,9 +549,7 @@ describe("listVoices", () => {
   });
 
   it("fails with network when the service can't be reached", async () => {
-    get.mockRejectedValue(
-      new AxiosError("connect ECONNREFUSED", "ECONNREFUSED"),
-    );
+    get.mockRejectedValue(new TypeError("fetch failed"));
 
     const error = await failure(protocol.listVoices(cfg));
 
