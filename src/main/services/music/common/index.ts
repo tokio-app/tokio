@@ -3,20 +3,17 @@ import {
   APP_EVENTS_RESPONSE,
   CurrentSongInfo,
   SongInfo,
-  TOKIO_EVENTS,
-  TokioEventMap,
 } from "@/common/types";
 import { stayOnPage } from "@/helper/network";
 import { BrowserWindow, WebContentsView } from "electron";
-import { EventEmitter } from "node:events";
 import { join } from "node:path";
+import { TokioEmitter } from "../../shared/emitter";
 
 export { MusicQueue } from "./queue";
 export type ConnectionResponse = { success: boolean; error?: Error };
 
-export abstract class MusicProvider {
+export abstract class MusicProvider extends TokioEmitter {
   protected _logFile = "";
-  private _events = new EventEmitter();
   public abstract setKey(key: string): void;
   public abstract connect(): Promise<ConnectionResponse>;
   public abstract disconnect(): void;
@@ -24,27 +21,6 @@ export abstract class MusicProvider {
   public abstract searchSong(query: string): Promise<SongInfo | null>;
   public abstract playerStatus(): Promise<CurrentSongInfo | null>;
   public abstract isActive(): boolean;
-
-  public on<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.on(event, listener);
-  }
-
-  public off<K extends TOKIO_EVENTS>(
-    event: K,
-    listener: (data: TokioEventMap[K]) => void,
-  ): void {
-    this._events.off(event, listener);
-  }
-
-  protected emit<K extends TOKIO_EVENTS>(
-    event: K,
-    data?: TokioEventMap[K],
-  ): void {
-    this._events.emit(event, data);
-  }
 
   // The service's log file, for what fails in the background.
   public setLogFile(logFile: string) {
@@ -57,7 +33,7 @@ const TITLE_BAR_HEIGHT = 40;
 // A window with the title bar on top and the content view under it
 export function createWindow(content: WebContentsView) {
   const APP_ICON = join(__dirname, "../../resources/icon.png");
-  const APP_PRELOAD = join(__dirname, "../preload/index.mjs");
+  const APP_PRELOAD = join(__dirname, "../preload/index.cjs");
 
   const _shellWindow = new BrowserWindow({
     width: 1280,
@@ -72,7 +48,6 @@ export function createWindow(content: WebContentsView) {
     autoHideMenuBar: true,
     icon: APP_ICON,
     webPreferences: {
-      sandbox: false,
       contextIsolation: true,
       backgroundThrottling: false,
     },
@@ -80,7 +55,6 @@ export function createWindow(content: WebContentsView) {
 
   const _navView = new WebContentsView({
     webPreferences: {
-      sandbox: false,
       preload: APP_PRELOAD,
     },
   });
