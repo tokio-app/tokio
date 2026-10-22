@@ -1,4 +1,4 @@
-import { Draft, produce } from "immer";
+import { produce } from "immer";
 import { useCallback, useState } from "react";
 
 // Mutates a draft of the value. Settings types have no readonly fields, so the
@@ -16,10 +16,7 @@ export function useImmerState<T>(initial: T | (() => T)) {
   const [state, setState] = useState(initial);
 
   const update: Updater<T> = useCallback(
-    (recipe) =>
-      setState((current) =>
-        produce(current, recipe as unknown as Recipe<Draft<T>>),
-      ),
+    (recipe) => setState((current) => produce<T, T>(current, recipe)),
     [],
   );
 

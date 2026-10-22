@@ -5,16 +5,9 @@
     "correctness": "error",
     "suspicious": "warn"
   },
-  "ignorePatterns": [
-    "**/coverage/**",
-    "**/build/**",
-    "**/dist/**",
-    "**/release/**",
-    "**/lib/**"
-  ],
+  "ignorePatterns": ["**/coverage/**", "**/build/**", "**/dist/**"],
   "rules": {
     "typescript/no-explicit-any": "off",
-    "typescript/no-unused-vars": "warn",
     "typescript/no-extraneous-class": "allow",
     "curly": "off",
     "no-shadow": "off",

@@ -3,12 +3,12 @@
 <!--
 Before submitting a PR, please read https://github.com/tokio-app/tokio/blob/main/CONTRIBUTING.md
 
-1. Give the PR a descriptive title.
+1. Give the PR a descriptive title in the Conventional Commits format, like the commits.
 
   Examples of good title:
-    - [FR]: Add support for report exports
-    - [Bug]: Fix input validation color change
-    - [Doc]: Update documentation
+    - feat: add support for report exports
+    - fix(ui): keep the input's color after validation
+    - docs: explain the overlay setup block
 
   Examples of bad title:
     - fix #7123

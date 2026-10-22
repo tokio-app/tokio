@@ -15,6 +15,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createStack, replyFailure, runEvent } from "./events";
 import { AppFailure, Notifier } from "./feedback";
 
+// Stand-ins with only what runEvent reads
+const asHandler = (value: any): AppHandlerVariables => value;
+const asReplyEvent = (value: any): ReplyEvent => value;
+
 const failure = {
   code: FEEDBACK_CODES.PROFILE_CREATE_FAILED,
   message: "Unable to create the profile.",
@@ -30,12 +34,12 @@ describe("runEvent", () => {
     sent = [];
     const notifier = new Notifier((n) => sent.push(n));
     notifier.setLogFiles({ system: "system.log", alerts: "alerts.log" });
-    handler = {
+    handler = asHandler({
       notifier,
       pathManagerService: { files: { logs: { system: "system.log" } } },
-    } as unknown as AppHandlerVariables;
+    });
     reply = vi.fn();
-    e = { reply } as unknown as ReplyEvent;
+    e = asReplyEvent({ reply });
   });
 
   // Runs the only handler of a stack, the way the Handler does.

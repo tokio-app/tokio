@@ -45,6 +45,29 @@ jobs:
       - name: Test
         run: yarn test
 
+  # Checks the PR's commit messages against .commitlintrc, as the husky hook does locally.
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Install packages
+        run: yarn install --frozen-lockfile --ignore-scripts
+
+      - name: Commit messages
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: npx commitlint --from "$BASE" --to "$HEAD" --verbose
+
   # Builds the app and runs it with Playwright, see e2e/.
   e2e:
     strategy:
