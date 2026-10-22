@@ -9,8 +9,6 @@ import { MusicService } from "../music";
 import { Service } from "../shared";
 import { CustomWebSocketServer } from "./websocket";
 
-type BoundHandler = <K extends TOKIO_EVENTS>(data: TokioEventMap[K]) => void;
-
 export class ServerService extends Service {
   private _app: Express;
   private _server: HttpServer | null = null;
@@ -144,13 +142,10 @@ export class ServerService extends Service {
   }
 
   public async toggleServer(value: boolean): Promise<boolean> {
-    if (value) {
-      const result = await this.start();
-      return result.success;
-    } else {
-      this.stop();
-      return true;
-    }
+    // A running server already is what was asked for, not a failed start.
+    if (value) return this._server !== null || (await this.start()).success;
+    this.stop();
+    return true;
   }
 
   public mount(id: string, path: string, rebuild: boolean = true): void {
@@ -173,7 +168,8 @@ export class ServerService extends Service {
     Object.values(TOKIO_EVENTS)
       .filter(isLiveEvent)
       .forEach((event: TOKIO_EVENTS) => {
-        const handler: BoundHandler = (data) => this.broadcast(event, data);
+        const handler = (data: TokioEventMap[TOKIO_EVENTS]) =>
+          this.broadcast(event, data);
         connectorService.on(event, handler);
         musicService.on(event, handler);
       });

@@ -43,12 +43,12 @@ describe("home events", () => {
         success: true,
       });
 
-      await h.invoke(home, APP_EVENTS.CONNECT, { username: "@streamer" });
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: " @streamer " });
 
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
-        connector: { username: "@streamer" },
+        connector: { username: "streamer" },
       });
-      expect(connectorService.connect).toHaveBeenCalledWith("@streamer");
+      expect(connectorService.connect).toHaveBeenCalledWith("streamer");
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
         { success: true, stats },
       ]);
@@ -58,6 +58,27 @@ describe("home events", () => {
           code: FEEDBACK_CODES.CONNECTED,
           message: "Connected to @streamer.",
         }),
+      ]);
+    });
+
+    it("connects but warns when the username can't be saved", async () => {
+      const { h, connectorService, storeManagerService } = setup({
+        success: true,
+      });
+      storeManagerService.updateProfileData.mockResolvedValue(false);
+
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      expect(connectorService.connect).toHaveBeenCalledWith("streamer");
+      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
+        { success: true, stats },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        }),
+        expect.objectContaining({ code: FEEDBACK_CODES.CONNECTED }),
       ]);
     });
 

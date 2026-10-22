@@ -24,7 +24,7 @@ import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { TTSService } from "@/services/tts";
 import { safeStorage } from "electron";
-import { access, copyFile, readdir, readFile } from "fs/promises";
+import { access, copyFile, readdir, readFile, unlink } from "fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, extname, join, resolve } from "path";
 import { Service } from "../shared";
@@ -538,10 +538,14 @@ export class StoreManagerService extends Service {
     return this._queueSave();
   }
 
+  /**
+   * Writes a new profile's file and lists it. "unsaved" when only the store
+   * couldn't be saved, null for any other failure.
+   */
   public async createNewProfile(
     fileName: string,
     profileName: string,
-  ): Promise<EntityMetadata | null> {
+  ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
     if (!fileName || !profileName) return null;
 
@@ -573,14 +577,15 @@ export class StoreManagerService extends Service {
       return null;
     }
 
-    return await this.addProfile({ file: fileName, name: profileName });
+    return this._listNewProfile({ file: fileName, name: profileName });
   }
 
+  // As createNewProfile, with a copy of another profile's file.
   public async cloneProfile(
     referenceFileName: string,
     newFileName: string,
     newProfileName: string,
-  ): Promise<EntityMetadata | null> {
+  ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
     if (!referenceFileName || !newFileName || !newProfileName) return null;
     if (!(await this._isFreeProfileFile(newFileName))) {
@@ -630,7 +635,7 @@ export class StoreManagerService extends Service {
       return null;
     }
 
-    return await this.addProfile({ file: newFileName, name: newProfileName });
+    return this._listNewProfile({ file: newFileName, name: newProfileName });
   }
 
   public async exportProfile(ref: string, path: string): Promise<boolean> {
@@ -644,10 +649,12 @@ export class StoreManagerService extends Service {
   }
 
   // Copied to a free file named after its file, and listed under its own
-  // name, numbered when another profile has it.
-  public async importProfile(ref: string): Promise<boolean> {
+  // name, numbered when another profile has it. Fails as createNewProfile.
+  public async importProfile(
+    ref: string,
+  ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
-    if (!ref) return false;
+    if (!ref) return null;
     const file = await this._freeProfileFile(basename(ref, extname(ref)));
     const result = await this._importEntity(
       ref,
@@ -656,8 +663,27 @@ export class StoreManagerService extends Service {
       ProfileSchema,
       "profile",
     );
-    if (!result) return false;
-    return (await this.addProfile(result)) !== null;
+    if (!result) return null;
+    return this._listNewProfile(result);
+  }
+
+  // A profile whose file the store can't list is deleted, so it doesn't take
+  // the name's file or come back when the store is rebuilt.
+  private async _listNewProfile(
+    profile: EntityMetadata,
+  ): Promise<EntityMetadata | "unsaved"> {
+    if (await this.addProfile(profile)) return profile;
+    const path = join(
+      this._pathManagerService.folders.profilesFolder,
+      profile.file,
+    );
+    await unlink(path).catch((err) =>
+      Logger.warn(
+        `<System> Unable to delete the unlisted profile file ${path} -- ${formatError(err)}`,
+        this._logFile,
+      ),
+    );
+    return "unsaved";
   }
 
   /**
@@ -762,7 +788,13 @@ export class StoreManagerService extends Service {
       return null;
     }
 
-    const name = this._freeProfileName(existingData.name.trim());
+    // A name the trim made too short would fail the save's validation.
+    const trimmed = existingData.name.trim();
+    const name = this._freeProfileName(
+      trimmed.length < (schema.shape.name.minLength ?? 1)
+        ? "Imported profile"
+        : trimmed,
+    );
     const saved = await this._jsonManagerService.saveFile(newPath, schema, {
       ...existingData,
       name,

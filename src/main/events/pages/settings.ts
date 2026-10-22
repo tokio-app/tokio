@@ -64,20 +64,62 @@ events.push(
   },
 );
 
+// A profile the store wrote but couldn't list: the page gets the profiles
+// main still holds.
+const assertListed = (
+  e: ReplyEvent,
+  store: StoreManagerService,
+  res: Awaited<ReturnType<StoreManagerService["importProfile"]>>,
+  what: string,
+) => {
+  if (res === "unsaved") {
+    replySettings(e, store);
+    throw saveFailure();
+  }
+  if (!res) throw new Error(`${what} failed.`);
+};
+
+// Creating and cloning differ only in what writes the new profile's file.
+// Answers with the trimmed name.
+const addProfile = async (
+  e: ReplyEvent,
+  store: StoreManagerService,
+  input: string,
+  response:
+    APP_EVENTS_RESPONSE.CREATE_PROFILE | APP_EVENTS_RESPONSE.CLONE_PROFILE,
+  write: (
+    file: string,
+    name: string,
+  ) => ReturnType<StoreManagerService["createNewProfile"]>,
+) => {
+  const name = input.trim();
+  assertNameLong(name);
+  assertNameFree(store, name);
+  const file = await store.profileFileFor(name);
+  assertListed(
+    e,
+    store,
+    await write(file, name),
+    `Writing the profile ${file}`,
+  );
+
+  e.reply(response, {
+    success: true,
+  });
+  replySettings(e, store);
+  return name;
+};
+
 events.push(
   APP_EVENTS.CREATE_PROFILE,
-  async ({ storeManagerService, notifier }, e, { name: input }) => {
-    const name = input.trim();
-    assertNameLong(name);
-    assertNameFree(storeManagerService, name);
-    const fileName = await storeManagerService.profileFileFor(name);
-    const res = await storeManagerService.createNewProfile(fileName, name);
-    if (!res) throw new Error(`The profile ${fileName} was not created.`);
-
-    e.reply(APP_EVENTS_RESPONSE.CREATE_PROFILE, {
-      success: true,
-    });
-    replySettings(e, storeManagerService);
+  async ({ storeManagerService: store, notifier }, e, { name: input }) => {
+    const name = await addProfile(
+      e,
+      store,
+      input,
+      APP_EVENTS_RESPONSE.CREATE_PROFILE,
+      (file, name) => store.createNewProfile(file, name),
+    );
     notifier.success(
       "system",
       FEEDBACK_CODES.PROFILE_CREATED,
@@ -95,18 +137,14 @@ events.push(
 
 events.push(
   APP_EVENTS.CLONE_PROFILE,
-  async ({ storeManagerService, notifier }, e, { name: input, ref }) => {
-    const name = input.trim();
-    assertNameLong(name);
-    assertNameFree(storeManagerService, name);
-    const fileName = await storeManagerService.profileFileFor(name);
-    const res = await storeManagerService.cloneProfile(ref, fileName, name);
-    if (!res) throw new Error(`The profile ${ref} was not cloned.`);
-
-    e.reply(APP_EVENTS_RESPONSE.CLONE_PROFILE, {
-      success: true,
-    });
-    replySettings(e, storeManagerService);
+  async ({ storeManagerService: store, notifier }, e, { name: input, ref }) => {
+    const name = await addProfile(
+      e,
+      store,
+      input,
+      APP_EVENTS_RESPONSE.CLONE_PROFILE,
+      (file, name) => store.cloneProfile(ref, file, name),
+    );
     notifier.success(
       "system",
       FEEDBACK_CODES.PROFILE_CLONED,
@@ -224,11 +262,15 @@ events.push(
     if (diagRes.canceled) return;
 
     const res =
-      type === "profile" &&
-      (await storeManagerService.importProfile(diagRes.filePaths[0]));
-    if (!res) {
-      throw new Error(`The ${type} ${diagRes.filePaths[0]} was not imported.`);
-    }
+      type === "profile"
+        ? await storeManagerService.importProfile(diagRes.filePaths[0])
+        : null;
+    assertListed(
+      e,
+      storeManagerService,
+      res,
+      `Importing the ${type} ${diagRes.filePaths[0]}`,
+    );
 
     replySettings(e, storeManagerService);
     e.reply(APP_EVENTS_RESPONSE.IMPORT_ENTITY, {

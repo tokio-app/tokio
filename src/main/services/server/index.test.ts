@@ -107,6 +107,11 @@ describe("ServerService", () => {
       success: false,
       message: "Server already running.",
     });
+    // Turning it on while it runs keeps it running.
+    expect(await server.toggleServer(true)).toBe(true);
+    expect((await fetch(`http://127.0.0.1:${server.getPort()}/`)).status).toBe(
+      404,
+    );
 
     expect(await server.toggleServer(false)).toBe(true);
     expect(await server.toggleServer(true)).toBe(true);
