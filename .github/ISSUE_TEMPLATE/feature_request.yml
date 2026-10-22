@@ -18,7 +18,7 @@ body:
     attributes:
       label: Describe the solution you'd like
       description: A clear and concise description of what you want to happen.
-      placeholder: Ex. I'm want to [...]
+      placeholder: Ex. I want to [...]
     validations:
       required: true
   - type: textarea
