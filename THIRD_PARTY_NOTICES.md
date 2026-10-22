@@ -47,7 +47,8 @@ Check this table when adding an icon set: react-icons also contains sets under C
 
 Tokio talks to these online services. None of them is covered by Tokio's license or by the licenses above. Each one is subject to its operator's terms and can stop working at any time.
 
-- **TikTok:** TikTok LIVE, through @tokioapp/connector, and TikTok's text-to-speech (the TikTok voices). Neither is an official public API.
+- **TikTok:** TikTok LIVE, through @tokioapp/connector, and TikTok's text-to-speech (the TikTok voices), when the user has added a TikTok session ID. Neither is an official public API.
+- **TikTok TTS proxy** (`tiktok-tts.weilnet.workers.dev`): the TikTok voices when no session ID is set. It gets the text of each message to read and its voice. It's run by a third party, not by TikTok or Tokio.
 - **Euler Stream** (`tiktok.eulerstream.com`): signs the connection to TikTok LIVE, with each user's own API key.
 - **Microsoft:** Edge's Read Aloud service (the Edge voices), which isn't an official public API.
 - **Spotify and YouTube:** music requests.

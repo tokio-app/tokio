@@ -71,7 +71,11 @@ export const COMPONENTS: Component[] = [
 export const SERVICES: { name: string; note: string }[] = [
   {
     name: "TikTok",
-    note: "TikTok LIVE, through @tokioapp/connector, and TikTok's text-to-speech (the TikTok voices). Neither is an official public API.",
+    note: "TikTok LIVE, through @tokioapp/connector, and TikTok's text-to-speech (the TikTok voices), when the user has added a TikTok session ID. Neither is an official public API.",
+  },
+  {
+    name: "TikTok TTS proxy",
+    note: "The TikTok voices when no session ID is set (tiktok-tts.weilnet.workers.dev). It gets the text of each message to read and its voice. It's run by a third party, not by TikTok or Tokio.",
   },
   {
     name: "Euler Stream",
@@ -88,7 +92,7 @@ export const SERVICES: { name: string; note: string }[] = [
   },
   {
     name: "MyInstants",
-    note: "Sound search and downloads for alerts, read from the public website. Its sounds are uploaded by its users and aren't covered by Tokio's license.",
+    note: "Sound search and downloads for alerts, read from the public website rather than an official API. Its sounds are uploaded by its users and aren't covered by Tokio's license.",
   },
   {
     name: "Lorem Picsum",
