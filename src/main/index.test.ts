@@ -135,10 +135,11 @@ describe("main process entry", () => {
       height: 800,
       show: false,
       webPreferences: {
-        sandbox: false,
-        preload: expect.stringMatching(/preload[\\/]index\.mjs$/),
+        preload: expect.stringMatching(/preload[\\/]index\.cjs$/),
       },
     });
+    // Electron sandboxes the page unless told not to.
+    expect(win.options.webPreferences).not.toHaveProperty("sandbox");
     expect(splash.loadFile).toHaveBeenCalledWith(
       expect.stringMatching(/renderer[\\/]splash\.html$/),
     );

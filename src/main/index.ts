@@ -106,7 +106,7 @@ process.on("uncaughtExceptionMonitor", logFatal("Uncaught exception"));
 process.on("unhandledRejection", logFatal("Unhandled rejection"));
 
 const APP_ICON = join(__dirname, "../../resources/icon.png");
-const APP_PRELOAD = join(__dirname, "../preload/index.mjs");
+const APP_PRELOAD = join(__dirname, "../preload/index.cjs");
 
 let win: BrowserWindow | null = null;
 
@@ -145,10 +145,7 @@ function createWindows(): void {
     center: true,
     autoHideMenuBar: true,
     icon: APP_ICON,
-    webPreferences: {
-      preload: APP_PRELOAD,
-      sandbox: false,
-    },
+    webPreferences: { preload: APP_PRELOAD },
   });
 
   // Notices go to the main window only.

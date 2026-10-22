@@ -56,7 +56,10 @@ export default defineConfig({
     },
     plugins: [licenseBanner(MAIN_LICENSE_BANNER)],
   },
-  preload: {},
+  preload: {
+    // A sandboxed preload can't load ES modules.
+    build: { rollupOptions: { output: { format: "cjs" } } },
+  },
   renderer: {
     resolve: {
       alias: {
