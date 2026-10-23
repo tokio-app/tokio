@@ -1,4 +1,6 @@
+/* Above the sections, for the timer and the test overlays */
 .notice {
+  margin-bottom: var(--space-8);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -45,4 +47,168 @@
 .status {
   color: var(--font-secondary);
   font-size: var(--font-sm);
+}
+
+/* COUNTDOWN TIMER */
+
+/* The overlay as it shows on stream, over a soft rose wash */
+.preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4) var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(
+      ellipse at 50% 0,
+      color-mix(in srgb, var(--accent-primary) 8%, transparent),
+      transparent 70%
+    ),
+    var(--background-tertiary);
+  line-height: 1;
+  text-align: center;
+  /* The overlay's halo, which keeps it legible over bright video */
+  text-shadow: 0 0 12px
+    color-mix(in srgb, var(--background-primary) 55%, transparent);
+}
+
+.preview_title {
+  max-width: 100%;
+  font-size: var(--font-2xl);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.clock {
+  font-size: calc(var(--font-3xl) * 2);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Not running: a fade works over any video, unlike a gray */
+.clock_dim {
+  opacity: 0.55;
+}
+
+/* Always as tall, so nothing moves when it fills */
+.slot {
+  display: flex;
+  align-items: center;
+  height: calc(var(--font-3xl) * 0.8);
+  font-size: calc(var(--font-3xl) * 0.8);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.slot_added {
+  animation: slot-rise 1.5s ease-out forwards;
+}
+
+@keyframes slot-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0.3em);
+  }
+  15%,
+  70% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.4em);
+  }
+}
+
+@keyframes slot-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  15%,
+  70% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot_added {
+    animation-name: slot-fade;
+  }
+}
+
+.timer_bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.minutes {
+  width: 80px;
+}
+
+.unit {
+  margin-right: var(--space-2);
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+}
+
+/* TIME ADDED: rows that read as sentences, like Home's features */
+
+.triggers {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
+  list-style: none;
+}
+
+.trigger {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.trigger + .trigger {
+  border-top: 1px solid var(--border);
+}
+
+.trigger_label {
+  font-size: var(--font-md);
+  color: var(--font-primary);
+}
+
+.trigger_rule {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+}
+
+.seconds {
+  width: 88px;
+}
+
+/* TIMER LOOK */
+
+.note {
+  grid-column: 1 / -1;
+  margin-top: calc(-1 * var(--space-3));
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.colors {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-6);
 }

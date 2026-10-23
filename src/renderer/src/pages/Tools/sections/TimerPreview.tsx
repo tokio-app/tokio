@@ -1,0 +1,117 @@
+import { TimerSettings } from "@/common/schemas";
+import { cx, formatDuration } from "@/helper";
+import { useEffect, useState } from "react";
+import { shortDuration, TimerPush } from "../helper";
+import styles from "../tools.module.css";
+
+// How long added time shows under the clock, as the overlay's animation
+const SLOT_MS = 1500;
+
+// A font named by the streamer, with the app's as the fallback. One CSSOM
+// property, so a name can't add any other style.
+const fontFamily = (font: string) =>
+  font.trim()
+    ? `${JSON.stringify(font.trim())}, "Archivo Variable", sans-serif`
+    : undefined;
+
+interface Props {
+  timer: TimerPush;
+  // As edited, so the preview follows them before they're saved
+  settings: TimerSettings;
+}
+
+/**
+ * The timer as the overlay shows it on stream. It counts down on its own
+ * between main's pushes, ticking only while the timer runs.
+ */
+export function TimerPreview({ timer, settings }: Props) {
+  const { state, added } = timer.data;
+  const { look } = settings;
+  const running = state.status === "running";
+  const [now, setNow] = useState(timer.at);
+  // The time added or removed while it shows, summed like the overlay's
+  const [slot, setSlot] = useState<{ ms: number; key: number } | null>(null);
+  const [prevTimer, setPrevTimer] = useState(timer);
+
+  if (timer !== prevTimer) {
+    setPrevTimer(timer);
+    if (added !== 0) {
+      setSlot((s) => ({ ms: (s?.ms ?? 0) + added, key: (s?.key ?? 0) + 1 }));
+    }
+  }
+
+  useEffect(() => {
+    if (!running) return undefined;
+    const tick = setInterval(() => setNow(performance.now()), 250);
+    return () => clearInterval(tick);
+  }, [running]);
+
+  // Each change shows it again for the whole animation
+  useEffect(() => {
+    if (!slot) return undefined;
+    const hide = setTimeout(() => setSlot(null), SLOT_MS);
+    return () => clearTimeout(hide);
+  }, [slot]);
+
+  // Idle follows the starting time being typed, before main's echo
+  const remaining =
+    state.status === "idle"
+      ? settings.start * 60_000
+      : running
+        ? Math.max(0, state.remaining - Math.max(0, now - timer.at))
+        : state.remaining;
+  const warning =
+    running && look.warn_at > 0 && remaining <= look.warn_at * 60_000;
+  const title = look.title.trim();
+  // Under a second rounds to nothing, as on the overlay
+  const shown = slot && Math.round(Math.abs(slot.ms) / 1000) >= 1 ? slot : null;
+  const clockFont = fontFamily(look.clock_font);
+
+  return (
+    <div className={styles.preview}>
+      {title && (
+        <p
+          className={styles.preview_title}
+          style={{
+            color: look.title_color,
+            fontFamily: fontFamily(look.title_font),
+          }}
+        >
+          {title}
+        </p>
+      )}
+      <span
+        role="timer"
+        className={cx(styles.clock, !running && styles.clock_dim)}
+        style={{
+          color: warning ? look.warning_color : look.clock_color,
+          fontFamily: clockFont,
+        }}
+      >
+        {/* Rounded up, so 00:00:00 shows only at the end */}
+        {formatDuration(Math.ceil(remaining / 1000) * 1000)}
+      </span>
+      <span className={styles.slot} style={{ fontFamily: clockFont }}>
+        {shown ? (
+          <span
+            key={shown.key}
+            className={styles.slot_added}
+            style={{
+              color: shown.ms > 0 ? look.accent_color : look.clock_color,
+            }}
+          >
+            {shown.ms > 0 ? "+" : "−"}
+            {shortDuration(shown.ms)}
+          </span>
+        ) : (
+          look.show_multiplier &&
+          settings.multiplier !== 1 && (
+            <span style={{ color: look.accent_color }}>
+              ×{settings.multiplier}
+            </span>
+          )
+        )}
+      </span>
+    </div>
+  );
+}
