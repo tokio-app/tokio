@@ -167,6 +167,19 @@
   resize: vertical;
 }
 
+/* SearchToggle's field, hidden until its button is pressed */
+.search {
+  width: 220px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+
+.search_open {
+  opacity: 1;
+  pointer-events: all;
+}
+
 /* INPUT END */
 
 /* CHECK & TOGGLE START */

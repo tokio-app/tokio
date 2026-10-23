@@ -6,7 +6,7 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import { createAlert } from "@/pages/Alerts/helper";
-import { alertSound, gift, voice } from "@test/fixtures";
+import { alertMedia, alertSound, gift, voice } from "@test/fixtures";
 import { inList } from "@test/queries";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -53,6 +53,7 @@ function setup(item: Alert, props: Partial<Props> = {}) {
     onChange: vi.fn(),
     onRemove: vi.fn(),
     onPickSound: vi.fn(),
+    onPickMedia: vi.fn(),
     ...props,
   };
   const view = render(<AlertItem {...all} />);
@@ -74,7 +75,7 @@ const filters = () =>
   );
 
 describe("AlertItem", () => {
-  it("can't play an alert with neither a sound nor a message", async () => {
+  it("can't play an alert with no sound, message or media", async () => {
     const { user, onTest } = setup(alert());
 
     const play = screen.getByRole("button", { name: "Play" });
@@ -111,6 +112,30 @@ describe("AlertItem", () => {
       tts: TTS,
       trigger: TOKIO_EVENTS.GIFT,
       volume: 80,
+    });
+  });
+
+  it("shows its media with its sound, or alone", async () => {
+    const media = alertMedia("Party");
+    const { user, onTest, unmount } = setup(
+      alert({ sound: alertSound("Airhorn"), media }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Play" }));
+    expect(onTest).toHaveBeenLastCalledWith({
+      id: "alert-1",
+      file: "airhorn.mp3",
+      volume: 80,
+      media,
+    });
+    unmount();
+
+    const alone = setup(alert({ media }));
+    await user.click(screen.getByRole("button", { name: "Play" }));
+    expect(alone.onTest).toHaveBeenCalledWith({
+      id: "alert-1",
+      volume: 80,
+      media,
     });
   });
 
@@ -290,6 +315,20 @@ describe("AlertItem", () => {
     expect(screen.getByRole("button", { name: "Airhorn" })).toHaveAttribute(
       "title",
       "Airhorn",
+    );
+  });
+
+  it("names its media, or asks for some", async () => {
+    const { user, onPickMedia, unmount } = setup(alert());
+
+    await user.click(screen.getByRole("button", { name: "Select media..." }));
+    expect(onPickMedia).toHaveBeenCalledOnce();
+    unmount();
+
+    setup(alert({ media: alertMedia("Party") }));
+    expect(screen.getByRole("button", { name: "Party" })).toHaveAttribute(
+      "title",
+      "Party",
     );
   });
 

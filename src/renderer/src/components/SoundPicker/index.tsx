@@ -6,7 +6,7 @@ import { useIpcRequest } from "@/hooks/useIpcRequest";
 import { useState } from "react";
 import { Btn, Tabs } from "../Elements";
 import { Modal } from "../Modal";
-import type { TestState } from "../PlayButton";
+import { PREVIEW_VOLUME, type TestState } from "../PlayButton";
 import { LibraryTab } from "./LibraryTab";
 import { MyInstantsTab } from "./MyInstantsTab";
 import styles from "./soundpicker.module.css";
@@ -34,6 +34,8 @@ type Props = {
   onSelect: (sound: AlertSound) => void;
   // Speaks a message instead of a sound
   onSelectTts: (tts: AlertTts) => void;
+  // Takes the sound or message off the alert, the sound stays in the library
+  onClear: () => void;
   onClose: () => void;
 };
 
@@ -45,6 +47,7 @@ export function SoundPicker({
   onRequest,
   onSelect,
   onSelectTts,
+  onClear,
   onClose,
 }: Props) {
   const { id } = alert;
@@ -56,6 +59,8 @@ export function SoundPicker({
   const [tts, setTts] = useState<AlertTts>(
     () => alert.tts ?? { ...ttsDefaults, message: "" },
   );
+  // Sound waiting for the user to confirm it's deleted
+  const [removing, setRemoving] = useState<AlertSound | null>(null);
 
   useIpcRequest(APP_EVENTS.GET_SOUNDS);
 
@@ -73,68 +78,101 @@ export function SoundPicker({
   const speaking = tab === "tts";
 
   return (
-    <Modal
-      title={speaking ? "Speak a message" : "Select a sound"}
-      description={
-        speaking
-          ? "The alert says this with text-to-speech instead of playing a sound."
-          : "Pick one of your sounds, search MyInstants, or use a file from your computer."
-      }
-      confirmText="Browse file..."
-      maxWidth="640px"
-      onClose={onClose}
-      onConfirm={() => {
-        onRequest();
-        window.api.emit(APP_EVENTS.IMPORT_SOUND, { id });
-      }}
-      footer={
-        speaking ? (
+    <>
+      <Modal
+        title={speaking ? "Speak a message" : "Select a sound"}
+        description={
+          speaking
+            ? "The alert says this with text-to-speech instead of playing a sound."
+            : "Pick one of your sounds, search MyInstants, or use a file from your computer."
+        }
+        maxWidth="640px"
+        onClose={onClose}
+        footer={
           <>
-            <Btn onClick={onClose}>Cancel</Btn>
-            <Btn
-              variant="accent"
-              disabled={tts.message.trim() === ""}
-              onClick={() => onSelectTts(tts)}
-            >
-              Use text-to-speech
+            <Btn disabled={!alert.sound && !alert.tts} onClick={onClear}>
+              Clear
             </Btn>
+            <Btn onClick={onClose}>Cancel</Btn>
+            {speaking ? (
+              <Btn
+                variant="accent"
+                disabled={tts.message.trim() === ""}
+                onClick={() => onSelectTts(tts)}
+              >
+                Use text-to-speech
+              </Btn>
+            ) : (
+              <Btn
+                variant="accent"
+                onClick={() => {
+                  onRequest();
+                  window.api.emit(APP_EVENTS.IMPORT_SOUND, { id });
+                }}
+              >
+                Browse file...
+              </Btn>
+            )}
           </>
-        ) : undefined
-      }
-    >
-      <Tabs tabs={TABS} value={tab} onChange={setTab} />
+        }
+      >
+        <Tabs tabs={TABS} value={tab} onChange={setTab} />
 
-      {tab === "library" && (
-        <LibraryTab
+        {tab === "library" && (
+          <LibraryTab
+            library={library}
+            current={alert.tts ? undefined : alert.sound?.file}
+            testing={testing}
+            onTest={onTest}
+            onSelect={onSelect}
+            onRemove={setRemoving}
+          />
+        )}
+
+        <MyInstantsTab
+          id={id}
+          hidden={tab !== "myinstants"}
           library={library}
           testing={testing}
           onTest={onTest}
+          onRequest={onRequest}
           onSelect={onSelect}
+          onRemove={setRemoving}
+        />
+
+        {speaking && (
+          <TtsTab
+            alertId={id}
+            trigger={alert.trigger.type}
+            value={tts}
+            onChange={setTts}
+            testing={testing}
+            onTest={onTest}
+          />
+        )}
+
+        {saveFailed && (
+          <p className={styles.error}>Couldn't save that sound.</p>
+        )}
+      </Modal>
+
+      {removing && (
+        <Modal
+          title="Delete sound?"
+          description={`"${removing.name}" will be deleted from your computer and from every alert that plays it, in all your profiles.`}
+          confirmText="Delete"
+          onClose={() => setRemoving(null)}
+          onConfirm={() => {
+            const { file } = removing;
+            // Testing the same sound again stops it.
+            if (testing?.id === file) {
+              onTest({ id: file, file, volume: PREVIEW_VOLUME });
+            }
+            window.api.emit(APP_EVENTS.REMOVE_SOUND, { file });
+            setRemoving(null);
+          }}
         />
       )}
-
-      <MyInstantsTab
-        id={id}
-        hidden={tab !== "myinstants"}
-        library={library}
-        testing={testing}
-        onTest={onTest}
-        onRequest={onRequest}
-        onSelect={onSelect}
-      />
-
-      {speaking && (
-        <TtsTab
-          alertId={id}
-          trigger={alert.trigger.type}
-          value={tts}
-          onChange={setTts}
-          testing={testing}
-          onTest={onTest}
-        />
-      )}
-
-      {saveFailed && <p className={styles.error}>Couldn't save that sound.</p>}
-    </Modal>
+    </>
   );
 }

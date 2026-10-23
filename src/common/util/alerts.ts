@@ -9,6 +9,26 @@ import {
 const USER = ["username", "handle"];
 const CHAT = [...USER, "comment"];
 
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp"];
+const VIDEO_EXTENSIONS = ["mp4", "webm"];
+// No SVG: opened from the overlay server, its scripts would run there.
+export const MEDIA_EXTENSIONS = [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS];
+
+// Whether a media library file is an image or a video, by its extension
+export function mediaKind(file: string): "image" | "video" | null {
+  const dot = file.lastIndexOf(".");
+  const ext = dot === -1 ? "" : file.slice(dot + 1).toLowerCase();
+  if (VIDEO_EXTENSIONS.includes(ext)) return "video";
+  return IMAGE_EXTENSIONS.includes(ext) ? "image" : null;
+}
+
+// The window loads media library files through this scheme, for thumbnails.
+// main serves it in src/main/index.ts, and the CSP allows it.
+export const MEDIA_SCHEME = "tokio-media";
+
+export const getMediaPreviewURL = (file: string) =>
+  `${MEDIA_SCHEME}:///${encodeURIComponent(file)}`;
+
 // What a TTS alert's message can say, by trigger. Typed as a Record so a new
 // trigger can't be left out.
 export const ALERT_MESSAGE_VARIABLES: Record<AlertTrigger, string[]> = {

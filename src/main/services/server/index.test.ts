@@ -1,5 +1,6 @@
 import { TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import Logger from "@/logger";
+import { JSDOM } from "jsdom";
 import { EventEmitter } from "node:events";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
@@ -166,6 +167,84 @@ describe("ServerService", () => {
       server.unmount("clock");
 
       expect((await fetch(url("/clock/"))).status).toBe(404);
+    });
+  });
+
+  describe("alert overlays", () => {
+    beforeEach(async () => {
+      const media = join(dir, "media");
+      await mkdir(media);
+      await writeFile(join(media, "a.webm"), "0123456789");
+      server.mount("alerts/media", media);
+      await server.start();
+    });
+
+    it("serves the alert page at any alert's id", async () => {
+      for (const path of ["/alerts/abc/", "/alerts/abc"]) {
+        const res = await fetch(url(path));
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toMatch(/^text\/html/);
+        expect(await res.text()).toContain("tokio:alert:media");
+      }
+    });
+
+    it("serves the alerts' media in parts, as videos ask", async () => {
+      const res = await fetch(url("/alerts/media/a.webm"), {
+        headers: { Range: "bytes=2-4" },
+      });
+
+      expect(res.status).toBe(206);
+      expect(await res.text()).toBe("234");
+    });
+
+    it("shows the media sent to its alert, one at a time, until cleared", async () => {
+      const page = url("/alerts/abc/");
+      const dom = new JSDOM(await (await fetch(page)).text(), {
+        url: page,
+        runScripts: "dangerously",
+        beforeParse(window) {
+          // jsdom doesn't play media.
+          window.HTMLMediaElement.prototype.play = () => Promise.resolve();
+        },
+      });
+      const { document } = dom.window;
+      const shown = () =>
+        [...document.querySelectorAll("img, video")].map((el) => el.src);
+      const show = (file: string, kind: string) =>
+        server.sendToClient("abc", {
+          type: "tokio:alert:media",
+          data: {
+            src: `/alerts/media/${file}`,
+            kind,
+            duration: 60,
+            volume: 50,
+          },
+        });
+
+      try {
+        // Its socket connects with the alert's id from its URL.
+        await vi.waitFor(() =>
+          expect(server.sendToClient("abc", {})).toBe(true),
+        );
+
+        show("a.png", "image");
+        await vi.waitFor(() =>
+          expect(shown()).toEqual([url("/alerts/media/a.png")]),
+        );
+
+        server.sendToClient("abc", { type: TOKIO_EVENTS.FOLLOW, data: follow });
+        show("a.webm", "video");
+        await vi.waitFor(() =>
+          expect(shown()).toEqual([url("/alerts/media/a.webm")]),
+        );
+        expect(document.querySelector("video").volume).toBe(0.5);
+
+        server.sendToClient("abc", { type: "tokio:alert:clear" });
+        await vi.waitFor(() => expect(shown()).toEqual([]));
+      } finally {
+        dom.window.close();
+      }
     });
   });
 

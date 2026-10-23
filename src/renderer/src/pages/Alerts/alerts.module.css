@@ -24,7 +24,7 @@
 
 .items {
   /* Shared with AlertItem rows: 1040px page - 34px panel padding and border */
-  --alerts-columns: 88px 44px repeat(4, minmax(0, 1fr));
+  --alerts-columns: 88px 44px repeat(5, minmax(0, 1fr));
   display: flex;
   flex-direction: column;
   overflow: hidden;

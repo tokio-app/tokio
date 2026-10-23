@@ -1,7 +1,8 @@
 import { APP_EVENTS_RESPONSE } from "@/common/types";
-import { formatError } from "@/common/util";
+import { formatError, MEDIA_SCHEME } from "@/common/util";
 import { Notifier } from "@/helper/feedback";
 import {
+  mediaFile,
   previewFile,
   withPreviewCORS,
   withPreviewStyles,
@@ -68,6 +69,8 @@ protocol.registerSchemesAsPrivileged([
     scheme: "local-resource",
     privileges: { corsEnabled: true, supportFetchAPI: true },
   },
+  // The media library's thumbnails, see mediaFile. Videos need streaming.
+  { scheme: MEDIA_SCHEME, privileges: { stream: true } },
 ]);
 
 const services: AppServices = {
@@ -190,6 +193,17 @@ app.whenReady().then(async () => {
 
     const res = await net.fetch(pathToFileURL(file).href);
     return withPreviewCORS(await withPreviewStyles(res, file));
+  });
+
+  // The media library, for the alerts' thumbnails. The Range header lets
+  // videos read only what they show.
+  protocol.handle(MEDIA_SCHEME, (request) => {
+    const file = mediaFile(
+      request.url,
+      services.pathManagerService.folders?.mediaFolder,
+    );
+    if (!file) return new Response(null, { status: 404 });
+    return net.fetch(pathToFileURL(file).href, { headers: request.headers });
   });
 
   createWindows();

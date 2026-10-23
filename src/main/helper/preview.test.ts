@@ -1,7 +1,13 @@
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { previewFile, withPreviewCORS, withPreviewStyles } from "./preview";
+import { getMediaPreviewURL } from "@/common/util";
+import {
+  mediaFile,
+  previewFile,
+  withPreviewCORS,
+  withPreviewStyles,
+} from "./preview";
 
 const page = "<!doctype html><html><body>Overlay</body></html>";
 
@@ -35,6 +41,31 @@ describe("previewFile", () => {
   it("refuses everything before the folders are known", () => {
     const file = join(folder, "a", "index.html");
     expect(previewFile(previewURL(file), undefined)).toBeNull();
+  });
+});
+
+describe("mediaFile", () => {
+  const folder = resolve("tokio-data", "media");
+
+  it("serves the images and videos in the media folder", () => {
+    for (const file of ["c0ffee.png", "My clip.webm"]) {
+      expect(mediaFile(getMediaPreviewURL(file), folder)).toBe(
+        join(folder, file),
+      );
+    }
+  });
+
+  it("refuses other files, and anything outside the folder", () => {
+    const refused = [
+      getMediaPreviewURL("notes.txt"),
+      getMediaPreviewURL("icon.svg"),
+      getMediaPreviewURL("../settings/store.png"),
+      getMediaPreviewURL(".."),
+      "tokio-media:///sub/a.png",
+      "tokio-media:///%E0%A4%A",
+    ];
+    for (const url of refused) expect(mediaFile(url, folder)).toBeNull();
+    expect(mediaFile(getMediaPreviewURL("a.png"), undefined)).toBeNull();
   });
 });
 

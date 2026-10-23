@@ -3,6 +3,7 @@ import { defaultStoreData } from "@/common/util";
 import { Modal, Page } from "@/components";
 import { useImmerState, useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
+import { MediaSection } from "./sections/MediaSection";
 import { OverlaysSection } from "./sections/OverlaysSection";
 import { CloneProfileModal, NewProfileModal } from "./sections/ProfileModals";
 import { ProfileSection } from "./sections/ProfileSection";
@@ -105,6 +106,8 @@ export function Settings() {
         />
 
         <SoundsSection />
+
+        <MediaSection />
 
         <OverlaysSection />
       </Page>

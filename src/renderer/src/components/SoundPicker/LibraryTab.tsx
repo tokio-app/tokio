@@ -1,5 +1,4 @@
 import { AlertSound } from "@/common/schemas";
-import { APP_EVENTS } from "@/common/types";
 import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useState } from "react";
@@ -15,12 +14,23 @@ import styles from "./soundpicker.module.css";
 
 type Props = {
   library: AlertSound[];
+  // The alert's sound
+  current?: string;
   testing: TestState;
   onTest: (req: AlertTestRequest) => void;
   onSelect: (sound: AlertSound) => void;
+  // Asks before deleting it
+  onRemove: (sound: AlertSound) => void;
 };
 
-export function LibraryTab({ library, testing, onTest, onSelect }: Props) {
+export function LibraryTab({
+  library,
+  current,
+  testing,
+  onTest,
+  onSelect,
+  onRemove,
+}: Props) {
   const [filter, setFilter] = useState("");
 
   const needle = filter.trim().toLowerCase();
@@ -50,7 +60,12 @@ export function LibraryTab({ library, testing, onTest, onSelect }: Props) {
             <div key={sound.file} className={styles.row}>
               <button
                 type="button"
-                className={cx(styles.name, styles.pick)}
+                className={cx(
+                  styles.name,
+                  styles.pick,
+                  sound.file === current && styles.current,
+                )}
+                aria-current={sound.file === current || undefined}
                 title={sound.name}
                 onClick={() => onSelect(sound)}
               >
@@ -62,14 +77,8 @@ export function LibraryTab({ library, testing, onTest, onSelect }: Props) {
               />
               <Btn
                 variant="icon"
-                title="Remove"
-                onClick={() => {
-                  // Testing the same sound again stops it.
-                  if (testing?.id === sound.file) onTest(test);
-                  window.api.emit(APP_EVENTS.REMOVE_SOUND, {
-                    file: sound.file,
-                  });
-                }}
+                title="Delete"
+                onClick={() => onRemove(sound)}
               >
                 <FiTrash2 size={20} />
               </Btn>

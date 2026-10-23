@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { mediaKind } from "@/common/util";
+import { basename, join, resolve } from "node:path";
 import { isInside } from "./path";
 
 // --background-primary in src/ui/styles/tokens.css, what previews sit on
@@ -28,6 +29,28 @@ export function previewFile(
 
   const file = resolve(path);
   return isInside(overlaysFolder, file) ? file : null;
+}
+
+/**
+ * The media library file a thumbnail URL (`tokio-media:///<file>`, see
+ * getMediaPreviewURL) names, or null. Only images and videos right in the
+ * media folder are served.
+ */
+export function mediaFile(
+  url: string,
+  mediaFolder: string | undefined,
+): string | null {
+  if (!mediaFolder) return null;
+
+  let name: string;
+  try {
+    name = decodeURIComponent(new URL(url).pathname).replace(/^\/+/, "");
+  } catch {
+    return null;
+  }
+  return basename(name) === name && mediaKind(name)
+    ? join(mediaFolder, name)
+    : null;
 }
 
 /**

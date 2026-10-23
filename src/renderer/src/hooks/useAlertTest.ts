@@ -1,9 +1,15 @@
+import { AlertMedia } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, AppEventsMap } from "@/common/types";
 import type { TestState } from "@/components/PlayButton";
+import { queueAlert } from "@/helper/alerts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAudio } from "./useAudio";
 
-export type AlertTestRequest = AppEventsMap[APP_EVENTS.TEST_ALERT];
+// A sound or message, which main reads or speaks, or an alert that only
+// shows media. An alert's media shows on its overlay.
+export type AlertTestRequest =
+  | (AppEventsMap[APP_EVENTS.TEST_ALERT] & { media?: AlertMedia })
+  | { id: string; volume: number; media: AlertMedia };
 
 /**
  * Plays one alert sound test at a time. Starting a test cancels the one
@@ -15,10 +21,10 @@ export function useAlertTest() {
 
   const [testing, setTesting] = useState<TestState>(null);
   // Read by IPC callbacks, which would otherwise see a stale `testing`
-  const current = useRef<string | null>(null);
+  const current = useRef<AlertTestRequest | null>(null);
 
   const finish = useCallback((id: string) => {
-    if (current.current !== id) return;
+    if (current.current?.id !== id) return;
     current.current = null;
     setTesting(null);
   }, []);
@@ -34,19 +40,40 @@ export function useAlertTest() {
     queue.stop();
   }, [queue]);
 
+  const queueTest = useCallback(
+    (
+      { id, volume, media }: AlertTestRequest,
+      data?: Uint8Array,
+      filters?: { speed: number; pitch: number },
+    ) => {
+      queue.stop();
+      void queueAlert(
+        queue,
+        { id, volume, data, media },
+        { gain: volume / 100, key: id, onEnded: () => finish(id), ...filters },
+      ).then((queued) => (queued ? started(id) : finish(id)));
+    },
+    [queue, finish, started],
+  );
+
   const play = useCallback(
     (req: AlertTestRequest) => {
       queue.stop();
-      current.current = req.id;
+      current.current = req;
       setTesting({ id: req.id, loading: true });
-      window.api.emit(APP_EVENTS.TEST_ALERT, req);
+      // Media alone needs nothing from main.
+      if ("file" in req || "url" in req || "tts" in req) {
+        window.api.emit(APP_EVENTS.TEST_ALERT, req);
+      } else {
+        queueTest(req);
+      }
     },
-    [queue],
+    [queue, queueTest],
   );
 
   const toggle = useCallback(
     (req: AlertTestRequest) => {
-      if (current.current === req.id) stop();
+      if (current.current?.id === req.id) stop();
       else play(req);
     },
     [play, stop],
@@ -56,25 +83,14 @@ export function useAlertTest() {
     const removeTestAlert = window.api.on(
       APP_EVENTS_RESPONSE.TEST_ALERT,
       (res) => {
+        const req = current.current;
         // Ignore tests that were replaced or stopped while loading.
-        if (!res || res.id !== current.current) return;
+        if (!res || res.id !== req?.id) return;
         if (!res.success || !res.data) {
           finish(res.id);
           return;
         }
-
-        queue.stop();
-        void queue
-          .enqueue(res.data, {
-            gain: res.volume / 100,
-            key: res.id,
-            onEnded: () => finish(res.id),
-            ...res.filters,
-          })
-          .then((queued) => {
-            if (!queued) finish(res.id);
-            else started(res.id);
-          });
+        queueTest(req, res.data, res.filters);
       },
     );
 
@@ -82,7 +98,7 @@ export function useAlertTest() {
       removeTestAlert();
       queue.stop();
     };
-  }, [queue, finish, started]);
+  }, [queue, finish, queueTest]);
 
   return { testing, toggle, stop };
 }

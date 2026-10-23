@@ -134,6 +134,60 @@ describe("AppProvider", () => {
     });
   });
 
+  it("shows an alert's media on its overlay when the alert's turn comes", async () => {
+    const audio = setup();
+    const media = {
+      name: "Party",
+      file: "party.gif",
+      duration: 5,
+      match_video: false,
+    };
+
+    await send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
+      data,
+      volume: 40,
+      channel: "alerts",
+      maxQueueLength: 3,
+      id: "alert-1",
+      key: "ding.mp3",
+      media,
+    });
+
+    // The sound holds its place for the media's duration at least.
+    const [, options] = audio.queue("alerts").enqueue.mock.calls[0];
+    expect(options).toMatchObject({ key: "alert-1", minDuration: 5 });
+    expect(sent(APP_EVENTS.SHOW_ALERT_MEDIA)).toEqual([]);
+
+    options?.onScheduled?.(1.5, 6);
+    expect(sent(APP_EVENTS.SHOW_ALERT_MEDIA)).toEqual([
+      { id: "alert-1", file: "party.gif", delay: 1.5, duration: 6, volume: 40 },
+    ]);
+  });
+
+  it("holds a silent place for an alert that only shows media", async () => {
+    const audio = setup();
+
+    await send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
+      volume: 40,
+      channel: "alerts",
+      maxQueueLength: 3,
+      id: "alert-1",
+      media: {
+        name: "Party",
+        file: "party.gif",
+        duration: 5,
+        match_video: false,
+      },
+    });
+
+    const queue = audio.queue("alerts");
+    expect(queue.enqueue).not.toHaveBeenCalled();
+    expect(queue.wait).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ key: "alert-1", minDuration: 5 }),
+    );
+  });
+
   it("stops the TTS queue when main clears it", async () => {
     const audio = setup();
 

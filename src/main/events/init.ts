@@ -12,7 +12,7 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { SERVER_PORT } from "@/common/util";
+import { ALERTS_PATH, SERVER_PORT } from "@/common/util";
 import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
@@ -242,7 +242,7 @@ const registerConnectorEvents = ({
     pushSession();
     music.clearHandler();
     tts.clearTalk();
-    alerts.clearSpeech();
+    alerts.clear();
     win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
     win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
     win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
@@ -441,7 +441,11 @@ const startApp = async (handler: AppHandlerVariables) => {
       liveService.setLogFile(files.logs.connector);
       notifier.setLogFiles(files.logs);
       alertsService.setSoundsFolder(folders.soundsFolder);
+      alertsService.setMediaFolder(folders.mediaFolder);
       alertsService.setSpeaker(ttsService);
+      alertsService.setServer(serverService);
+      // Not an overlay: the alerts' images and videos, for their overlay pages
+      serverService.mount(`${ALERTS_PATH}/media`, folders.mediaFolder);
     },
   );
   await storeManagerService.initialize(

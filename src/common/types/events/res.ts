@@ -4,8 +4,10 @@ import { TokioPayload } from "../connector";
 import { CustomGift, OverlayConfigRedux } from "../overlay";
 import {
   Alert,
+  AlertMedia,
   AlertSound,
   CatalogOverlay,
+  MediaFile,
   OverlayConfig,
   Profile,
   SavedEmote,
@@ -90,11 +92,16 @@ export enum APP_EVENTS_RESPONSE {
   UPDATE_ALERTS_SETTINGS = "app:alerts:res:update:settings",
   SEARCH_SOUNDS = "app:alerts:res:search:sounds",
   SET_ALERT_SOUND = "app:alerts:res:set:sound",
+  SET_ALERT_MEDIA = "app:alerts:res:set:media",
+  ALERT_FILE_REMOVED = "app:alerts:res:file:removed",
   EMOTES = "app:alerts:res:emotes",
   CUSTOM_GIFTS = "app:alerts:res:gifts",
 
   // SOUND LIBRARY
   GET_SOUNDS = "app:sounds:res",
+
+  // MEDIA LIBRARY
+  GET_MEDIA = "app:media:res",
 
   // ABOUT
   GET_ABOUT = "app:about:res:get",
@@ -255,17 +262,21 @@ export interface AppEventsResponseMap {
 
   // ALERTS
   [APP_EVENTS_RESPONSE.ALERT_AUDIO]: {
-    data: Uint8Array;
+    // None when the alert only shows media
+    data?: Uint8Array;
     volume: number;
     // Name of the renderer audio queue to play on
     channel: string;
     maxQueueLength: number;
-    // Alert the sound belongs to, so volume changes reach it while playing
-    id?: string;
+    // Alert the sound belongs to, so volume changes reach it while playing,
+    // and its media reaches its overlay
+    id: string;
     // The same for every copy of the sound, so the window decodes it once
-    key: string;
+    key?: string;
     // A TTS alert's speed and pitch, for this sound only
     filters?: AlertFilters;
+    // Shown on the alert's overlay when its turn comes
+    media?: AlertMedia;
   };
   // Drops queued and playing alert sounds
   [APP_EVENTS_RESPONSE.ALERT_CLEAR]: void;
@@ -287,6 +298,16 @@ export interface AppEventsResponseMap {
     id: string;
     sound?: Alert["sound"];
   }>;
+  [APP_EVENTS_RESPONSE.SET_ALERT_MEDIA]: Reply<{
+    id: string;
+    media?: MediaFile;
+  }>;
+  // A sound or media file deleted from its library, which main took off
+  // every alert that had it
+  [APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED]: {
+    field: "sound" | "media";
+    file: string;
+  };
   // Pushed when a chat brings a new emote to the active profile
   [APP_EVENTS_RESPONSE.EMOTES]: {
     data: SavedEmote[];
@@ -301,6 +322,12 @@ export interface AppEventsResponseMap {
   // success is false when the last upload or removal failed
   [APP_EVENTS_RESPONSE.GET_SOUNDS]: Reply<{
     data: AlertSound[];
+  }>;
+
+  // MEDIA LIBRARY
+  // success is false when the last change failed
+  [APP_EVENTS_RESPONSE.GET_MEDIA]: Reply<{
+    data: MediaFile[];
   }>;
 
   // ABOUT

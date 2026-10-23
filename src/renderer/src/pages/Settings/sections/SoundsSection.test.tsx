@@ -19,6 +19,13 @@ const sounds = (...list: AlertSound[]) =>
 const row = (name: string) =>
   within(screen.getByTitle(name, { exact: true }).parentElement!);
 
+// Answers the confirmation of a deletion
+const confirmDelete = () =>
+  within(screen.getByRole("dialog", { name: "Delete sound?" })).getByRole(
+    "button",
+    { name: "Delete" },
+  );
+
 async function setup() {
   const app = renderWithProviders(<SoundsSection />);
   await sounds(airhorn, bell);
@@ -46,12 +53,15 @@ describe("SoundsSection", () => {
     expect(sent(APP_EVENTS.UPLOAD_SOUNDS)).toHaveLength(1);
   });
 
-  it("removes a sound", async () => {
+  it("deletes a sound once you confirm", async () => {
     const { user, queue } = await setup();
 
-    await user.click(row("Bell").getByRole("button", { name: "Remove" }));
+    await user.click(row("Bell").getByRole("button", { name: "Delete" }));
+    expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([]);
+    await user.click(confirmDelete());
 
     expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([{ file: "bell.mp3" }]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     // Nothing was playing
     expect(queue.stop).not.toHaveBeenCalled();
   });
@@ -94,7 +104,9 @@ describe("SoundsSection", () => {
     });
     queue.stop.mockClear();
 
-    await user.click(row("Airhorn").getByRole("button", { name: "Remove" }));
+    await user.click(row("Airhorn").getByRole("button", { name: "Delete" }));
+    expect(queue.stop).not.toHaveBeenCalled();
+    await user.click(confirmDelete());
 
     expect(queue.stop).toHaveBeenCalled();
     expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([{ file: "airhorn.mp3" }]);
@@ -108,7 +120,8 @@ describe("SoundsSection", () => {
     await user.click(row("Airhorn").getByRole("button", { name: "Play" }));
     queue.stop.mockClear();
 
-    await user.click(row("Bell").getByRole("button", { name: "Remove" }));
+    await user.click(row("Bell").getByRole("button", { name: "Delete" }));
+    await user.click(confirmDelete());
 
     expect(queue.stop).not.toHaveBeenCalled();
     expect(

@@ -1,15 +1,31 @@
-import { Alert, AlertTts, Profile } from "@/common/schemas";
 import {
+  Alert,
+  AlertMedia,
+  AlertTts,
+  MediaFile,
+  Profile,
+} from "@/common/schemas";
+import {
+  APP_EVENTS,
   AppEvents,
+  AppEventsMap,
   EMOTE_TRIGGER,
   MyInstantsSound,
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { formatAlertMessage, formatError, TaskQueue } from "@/common/util";
+import {
+  ALERTS_PATH,
+  formatAlertMessage,
+  formatError,
+  MEDIA_EXTENSIONS,
+  mediaKind,
+  TaskQueue,
+} from "@/common/util";
 import { hasKeyword, isUser } from "@/helper/chat";
 import { writeFileAtomic } from "@/helper/fs";
 import Logger from "@/logger";
+import type { ServerService } from "@/services/server";
 import type { TTSService } from "@/services/tts";
 import { createHash } from "node:crypto";
 import { access, readFile, stat, unlink } from "node:fs/promises";
@@ -28,21 +44,38 @@ export interface MyInstantsPage {
 }
 
 export interface AlertAudio {
-  data: Uint8Array;
+  // None when the alert only shows media
+  data?: Uint8Array;
   volume: number;
   channel: string;
   maxQueueLength: number;
-  id?: string;
+  id: string;
   // The sound's file or its TTS cache key, the same for every copy
-  key: string;
+  key?: string;
   // A TTS alert's speed and pitch, for this sound only
   filters?: { speed: number; pitch: number };
+  // Shown on the alert's overlay when its turn comes
+  media?: AlertMedia;
 }
 
 // What TTS alerts speak with, the TTS service.
 type Speaker = Pick<TTSService, "prepareText" | "generateBuffer">;
 
+// Sends alert media to the overlays connected with the alert's id.
+type Server = Pick<ServerService, "sendToClient">;
+
 export const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg"];
+
+// Media is streamed from disk to the overlays, never kept in memory.
+export const MEDIA_MAX_BYTES = 50 * 1024 * 1024;
+
+// What the alert overlay page (services/server/alert.html) reads
+const SHOW_MEDIA = "tokio:alert:media";
+const CLEAR_MEDIA = "tokio:alert:clear";
+
+// Node fires timeouts longer than 2^31 ms at once.
+const MAX_SECONDS = 24 * 60 * 60;
+const clamp = (value: number, max: number) => Math.min(Math.max(value, 0), max);
 
 // Bytes of sounds kept in memory. Bigger sounds are refused, and ones saved
 // before that are read from disk.
@@ -58,6 +91,12 @@ export class AlertsService extends Service {
   // A slow MyInstants would otherwise keep the picker loading for minutes
   private readonly REQUEST_TIMEOUT_MS = 15_000;
   private _soundsFolder = "";
+  private _mediaFolder = "";
+  private _server: Server | null = null;
+  // Media waiting for its turn, see showMedia
+  private _shows = new Set<NodeJS.Timeout>();
+  // Alerts whose overlay showed media since the last clear
+  private _shown = new Set<string>();
   // Keyed by sound file name, in least recently used order
   private _cache = new Map<string, Uint8Array>();
   private _cacheBytes = 0;
@@ -77,8 +116,16 @@ export class AlertsService extends Service {
     this._soundsFolder = folder;
   }
 
+  public setMediaFolder(folder: string): void {
+    this._mediaFolder = folder;
+  }
+
   public setSpeaker(speaker: Speaker): void {
     this._speaker = speaker;
+  }
+
+  public setServer(server: Server): void {
+    this._server = server;
   }
 
   /**
@@ -163,24 +210,42 @@ export class AlertsService extends Service {
     srcPath: string,
   ): Promise<AlertsResult<NonNullable<Alert["sound"]>>> {
     try {
-      const ext = extname(srcPath).slice(1).toLowerCase();
-      if (!AUDIO_EXTENSIONS.includes(ext)) {
-        throw new Error(`Unsupported audio format: ${ext}`);
-      }
-      this._checkSize((await stat(srcPath)).size);
-      // Named by content, so importing the same file twice reuses it.
-      const data = new Uint8Array(await readFile(srcPath));
-      const file = `${hash(data)}.${ext}`;
-      if (!(await this._isSaved(file))) {
-        await this._save(file, data);
-      }
-      this._remember(file, data);
-      return {
-        success: true,
-        data: { name: basename(srcPath, extname(srcPath)), file },
-      };
+      const { data, entry } = await this._import(
+        srcPath,
+        this._soundsFolder,
+        AUDIO_EXTENSIONS,
+        CACHE_MAX_FILE_BYTES,
+      );
+      this._remember(entry.file, data);
+      return { success: true, data: entry };
     } catch (error) {
       return this._fail("Unable to import sound", error);
+    }
+  }
+
+  /**
+   * Copies a local image or video into the media folder.
+   */
+  public async importMedia(srcPath: string): Promise<AlertsResult<MediaFile>> {
+    try {
+      const { entry } = await this._import(
+        srcPath,
+        this._mediaFolder,
+        MEDIA_EXTENSIONS,
+        MEDIA_MAX_BYTES,
+      );
+      return { success: true, data: entry };
+    } catch (error) {
+      return this._fail("Unable to import media", error);
+    }
+  }
+
+  public async deleteMedia(file: string): Promise<AlertsResult<void>> {
+    try {
+      await unlink(join(this._mediaFolder, basename(file)));
+      return { success: true };
+    } catch (error) {
+      return this._fail("Unable to delete media", error);
     }
   }
 
@@ -232,12 +297,62 @@ export class AlertsService extends Service {
   }
 
   /**
-   * Stops the alert messages waiting to be spoken, and drops the one being
-   * made.
+   * Shows an alert's media on the alert's overlay in `delay` seconds, when its
+   * turn in the window's queue comes. The window times the queue, main sends,
+   * so clear() can drop the media still waiting.
    */
-  public clearSpeech() {
+  public showMedia({
+    id,
+    file,
+    delay,
+    duration,
+    volume,
+  }: AppEventsMap[APP_EVENTS.SHOW_ALERT_MEDIA]) {
+    const kind = mediaKind(file);
+    if (
+      basename(file) !== file ||
+      !kind ||
+      ![delay, duration, volume].every(Number.isFinite)
+    ) {
+      Logger.warn(
+        `<Alerts> Refused to show "${file}" on the overlay of alert ${id}.`,
+        this._logFile,
+      );
+      return;
+    }
+
+    const timer = setTimeout(
+      () => {
+        this._shows.delete(timer);
+        const sent = this._server?.sendToClient(id, {
+          type: SHOW_MEDIA,
+          data: {
+            src: `/${ALERTS_PATH}/media/${file}`,
+            kind,
+            duration: clamp(duration, MAX_SECONDS),
+            volume: clamp(volume, 100),
+          },
+        });
+        if (sent) this._shown.add(id);
+      },
+      clamp(delay, MAX_SECONDS) * 1000,
+    );
+    this._shows.add(timer);
+  }
+
+  /**
+   * Stops the alert messages waiting to be spoken, drops the one being made
+   * and the media waiting for its turn, and hides the media on the overlays.
+   */
+  public clear() {
     this._speechRun++;
     this._speech.stop();
+    for (const timer of this._shows) clearTimeout(timer);
+    this._shows.clear();
+    for (const id of this._shown) {
+      this._server?.sendToClient(id, { type: CLEAR_MEDIA });
+    }
+    this._shown.clear();
   }
 
   /**
@@ -259,8 +374,8 @@ export class AlertsService extends Service {
       const channel = settings.simultaneous
         ? `alerts:${alert.trigger.type}`
         : "alerts";
-      const { tts, sound } = alert;
-      const play = (data: Uint8Array, key: string) =>
+      const { tts, sound, media } = alert;
+      const play = (data?: Uint8Array, key?: string) =>
         send({
           data,
           volume: alert.volume,
@@ -269,6 +384,7 @@ export class AlertsService extends Service {
           id: alert.id,
           key,
           filters: tts ? { speed: tts.speed, pitch: tts.pitch } : undefined,
+          media: media ?? undefined,
         });
 
       // A message is spoken instead of the sound.
@@ -278,7 +394,11 @@ export class AlertsService extends Service {
         );
         continue;
       }
-      if (!sound) continue;
+      // Media alone still takes its turn in the window's queue.
+      if (!sound) {
+        play();
+        continue;
+      }
 
       // The caller reports it, once per notice
       const res = await this.readSound(sound.file, false);
@@ -371,7 +491,9 @@ export class AlertsService extends Service {
     type: AppEvents,
     payload: TokioEventMap[AppEvents],
   ) {
-    if (!alert.enabled || (!alert.sound && !alert.tts)) return false;
+    if (!alert.enabled || (!alert.sound && !alert.tts && !alert.media)) {
+      return false;
+    }
 
     const chat =
       type === TOKIO_EVENTS.CHAT &&
@@ -512,9 +634,33 @@ export class AlertsService extends Service {
     }
   }
 
-  private async _isSaved(file: string) {
+  // Copies a file into the folder, named by its content, so importing the
+  // same file twice reuses it.
+  private async _import(
+    srcPath: string,
+    folder: string,
+    extensions: string[],
+    maxBytes: number,
+  ) {
+    const ext = extname(srcPath).slice(1).toLowerCase();
+    if (!extensions.includes(ext)) {
+      throw new Error(`Unsupported format: ${ext}`);
+    }
+    if ((await stat(srcPath)).size > maxBytes) {
+      throw new Error(`The file is over ${maxBytes} bytes.`);
+    }
+    const data = new Uint8Array(await readFile(srcPath));
+    const file = `${hash(data)}.${ext}`;
+    // Whole or not at all, like _save
+    if (!(await this._isSaved(file, folder))) {
+      await writeFileAtomic(join(folder, file), data);
+    }
+    return { data, entry: { name: basename(srcPath, extname(srcPath)), file } };
+  }
+
+  private async _isSaved(file: string, folder = this._soundsFolder) {
     try {
-      await access(join(this._soundsFolder, file));
+      await access(join(folder, file));
       return true;
     } catch {
       return false;

@@ -15,6 +15,7 @@ export function createAlert(): Alert {
     },
     sound: null,
     tts: null,
+    media: null,
     volume: 100,
   };
 }

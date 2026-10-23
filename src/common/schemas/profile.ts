@@ -44,6 +44,19 @@ export const AlertSoundSchema = z.object({
   file: z.string(),
 });
 
+// Seconds an alert's image or video shows at least, until changed, and the
+// most it can be set to
+export const MEDIA_DURATION = 5;
+export const MEDIA_MAX_DURATION = 60;
+
+// An image or video, file a basename inside the media folder. It stays on
+// screen for duration seconds, or while the alert's sound plays if longer.
+const AlertMediaSchema = AlertSoundSchema.extend({
+  duration: z.number().min(1).max(MEDIA_MAX_DURATION),
+  // The duration follows the video's length, also when another is picked
+  match_video: z.boolean().default(false),
+});
+
 const VoiceSchema = z.object({
   // Empty for voices saved before the engines were combined, they keep
   // the provider that was selected in Settings then.
@@ -78,6 +91,8 @@ const AlertSchema = z.object({
   sound: AlertSoundSchema.nullable(),
   // Spoken instead of the sound when set
   tts: AlertTtsSchema.nullable().default(null),
+  // Shown on the alert's overlay, with the sound or message or alone
+  media: AlertMediaSchema.nullable().default(null),
   volume: z.number().min(0).max(100),
 });
 
@@ -157,7 +172,7 @@ export const ProfileSchema = z.object({
   alerts: z
     .object({
       simultaneous: z.boolean().default(false),
-      // Max sounds waiting per queue
+      // Max alerts waiting per queue
       queue_length: z.number().min(1).default(100),
       items: AlertItemsSchema.default([]),
     })
@@ -171,5 +186,8 @@ export type Profile = z.infer<typeof ProfileSchema>;
 export type Permissions = z.infer<typeof PermissionsSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
 export type AlertSound = z.infer<typeof AlertSoundSchema>;
+export type AlertMedia = z.infer<typeof AlertMediaSchema>;
+// An image or video in the media library
+export type MediaFile = Pick<AlertMedia, "name" | "file">;
 export type SavedEmote = z.infer<typeof SavedEmoteSchema>;
 export type AlertTts = z.infer<typeof AlertTtsSchema>;

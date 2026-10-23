@@ -4,6 +4,7 @@ import {
   AppProvider,
   AppSettings,
   EntityMetadata,
+  MediaFile,
   OverlayMetadata,
   Profile,
   ProfileSchema,
@@ -13,7 +14,7 @@ import {
   TestOverlay,
 } from "@/common/schemas";
 import { Emotes } from "@/common/types";
-import { defaultProfile, formatError } from "@/common/util";
+import { defaultProfile, formatError, MEDIA_EXTENSIONS } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
 import { isInside } from "@/helper/path";
@@ -111,8 +112,19 @@ export class StoreManagerService extends Service {
           file,
           name: profile.name,
         }));
-        data.settings.sounds = await this._findSounds(
-          profiles.map(({ profile }) => profile),
+        const { soundsFolder, mediaFolder } = this._pathManagerService.folders;
+        const alerts = profiles.flatMap(({ profile }) => profile.alerts.items);
+        data.settings.sounds = await this._findFiles(
+          soundsFolder,
+          AUDIO_EXTENSIONS,
+          alerts.map((alert) => alert.sound),
+          "Recovered sound",
+        );
+        data.settings.media = await this._findFiles(
+          mediaFolder,
+          MEDIA_EXTENSIONS,
+          alerts.map((alert) => alert.media),
+          "Recovered media",
         );
         this._rebuilt = true;
         await this._jsonManagerService.saveFile(
@@ -212,33 +224,36 @@ export class StoreManagerService extends Service {
     ];
   }
 
-  // Alerts keep the names of the sounds they use. Files no alert uses lost
-  // their name, they're listed anyway so they can be played or deleted.
-  private async _findSounds(profiles: Profile[]): Promise<AlertSound[]> {
-    const folder = this._pathManagerService.folders.soundsFolder;
+  // Alerts keep the names of the sounds and media they use. Files no alert
+  // uses lost their name, they're listed anyway so they can be deleted.
+  private async _findFiles(
+    folder: string,
+    extensions: string[],
+    used: (AlertSound | null)[],
+    label: string,
+  ): Promise<AlertSound[]> {
     const files = new Set(
       (await readdir(folder).catch(() => []))
-        .filter((file) => AUDIO_EXTENSIONS.includes(extname(file).slice(1)))
+        .filter((file) => extensions.includes(extname(file).slice(1)))
         .sort(),
     );
 
-    const sounds = new Map<string, AlertSound>();
-    for (const profile of profiles) {
-      for (const { sound } of profile.alerts.items) {
-        if (sound && files.has(sound.file) && !sounds.has(sound.file)) {
-          sounds.set(sound.file, sound);
-        }
+    const found = new Map<string, AlertSound>();
+    for (const entry of used) {
+      if (entry && files.has(entry.file) && !found.has(entry.file)) {
+        // Without the duration media alerts also keep
+        found.set(entry.file, { name: entry.name, file: entry.file });
       }
     }
 
     let unnamed = 0;
     for (const file of files) {
-      if (!sounds.has(file)) {
-        sounds.set(file, { name: `Recovered sound ${++unnamed}`, file });
+      if (!found.has(file)) {
+        found.set(file, { name: `${label} ${++unnamed}`, file });
       }
     }
 
-    return [...sounds.values()];
+    return [...found.values()];
   }
 
   public getSettings(): AppSettings {
@@ -354,38 +369,87 @@ export class StoreManagerService extends Service {
     return this._storeData!.settings.sounds;
   }
 
-  public async addSound(sound: AlertSound): Promise<boolean> {
-    this._ensureInitialized();
-    const sounds = this._storeData!.settings.sounds;
-    // Files are named by content, so the same file means the same sound.
-    if (sounds.some((s) => s.file === sound.file)) return true;
-    sounds.push(sound);
-    return this._queueSave();
+  public addSound(sound: AlertSound): Promise<boolean> {
+    return this._addFile("sounds", sound);
   }
 
-  public async removeSound(file: string): Promise<boolean> {
+  public removeSound(file: string): Promise<boolean> {
+    return this._removeFile("sounds", file);
+  }
+
+  public getMedia(): MediaFile[] {
     this._ensureInitialized();
-    this._storeData!.settings.sounds = this._storeData!.settings.sounds.filter(
-      (s) => s.file !== file,
-    );
-    return this._queueSave();
+    return this._storeData!.settings.media;
+  }
+
+  public addMedia(media: MediaFile): Promise<boolean> {
+    return this._addFile("media", media);
+  }
+
+  public removeMedia(file: string): Promise<boolean> {
+    return this._removeFile("media", file);
   }
 
   /**
-   * Whether an alert in any profile plays this sound file.
+   * Takes a deleted sound or media file off every alert that has it, in
+   * every profile. False when a profile that had it couldn't be saved.
    */
-  public async isSoundInUse(file: string): Promise<boolean> {
+  public async removeFromAlerts(
+    field: "sound" | "media",
+    file: string,
+  ): Promise<boolean> {
     this._ensureInitialized();
+    let saved = true;
     for (const { file: profileFile } of this.getProfiles()) {
-      const profile = await this._jsonManagerService.loadFile(
-        join(this._pathManagerService.folders.profilesFolder, profileFile),
-        ProfileSchema,
+      const active = profileFile === this._activeProfileFile();
+      const path = join(
+        this._pathManagerService.folders.profilesFolder,
+        profileFile,
       );
-      if (profile?.alerts.items.some((a) => a.sound?.file === file)) {
-        return true;
+      const profile = active
+        ? await this.getProfileData()
+        : await this._jsonManagerService.loadFile(path, ProfileSchema);
+      if (!profile?.alerts.items.some((a) => a[field]?.file === file)) {
+        continue;
       }
+
+      const items = profile.alerts.items.map((a) =>
+        a[field]?.file === file ? { ...a, [field]: null } : a,
+      );
+      const alerts = { ...profile.alerts, items };
+      // The active one through updateProfileData, which keeps it in memory
+      const done = active
+        ? await this.updateProfileData({ alerts })
+        : (
+            await this._jsonManagerService.updateFile(path, ProfileSchema, {
+              alerts,
+            })
+          ).success;
+      saved &&= done;
     }
-    return false;
+    return saved;
+  }
+
+  private async _addFile(
+    library: "sounds" | "media",
+    entry: AlertSound,
+  ): Promise<boolean> {
+    this._ensureInitialized();
+    const files = this._storeData!.settings[library];
+    // Files are named by content, so the same file means the same entry.
+    if (files.some((f) => f.file === entry.file)) return true;
+    files.push(entry);
+    return this._queueSave();
+  }
+
+  private async _removeFile(
+    library: "sounds" | "media",
+    file: string,
+  ): Promise<boolean> {
+    this._ensureInitialized();
+    const settings = this._storeData!.settings;
+    settings[library] = settings[library].filter((f) => f.file !== file);
+    return this._queueSave();
   }
 
   /**

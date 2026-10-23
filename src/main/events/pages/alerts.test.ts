@@ -1,4 +1,4 @@
-import { AlertSound, AlertTts, Profile } from "@/common/schemas";
+import { AlertSound, AlertTts, MediaFile, Profile } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -7,7 +7,7 @@ import {
   MyInstantsSound,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { defaultProfile } from "@/common/util";
+import { defaultProfile, MEDIA_EXTENSIONS } from "@/common/util";
 import Logger from "@/logger";
 import {
   AUDIO_EXTENSIONS,
@@ -34,6 +34,7 @@ const airhornUrl = "https://www.myinstants.com/media/sounds/airhorn.mp3";
 const airhorn: AlertSound = { name: "Airhorn", file: "5f2b9c.mp3" };
 const ding: AlertSound = { name: "ding", file: "a71e04.mp3" };
 const library: AlertSound[] = [airhorn, ding];
+const party: MediaFile = { name: "party", file: "c0ffee.gif" };
 
 const speech: AlertTts = {
   voice: { engine: "edge", name: "Aria", lang: "en-US" },
@@ -719,98 +720,378 @@ describe("alerts events", () => {
     });
   });
 
-  describe("REMOVE_SOUND", () => {
+  describe.each([
+    {
+      event: APP_EVENTS.REMOVE_SOUND,
+      field: "sound",
+      file: airhorn.file,
+      list: APP_EVENTS_RESPONSE.GET_SOUNDS,
+      removed: FEEDBACK_CODES.SOUND_REMOVED,
+      failed: FEEDBACK_CODES.SOUND_REMOVE_FAILED,
+      notice: "Sound removed.",
+      warning:
+        "Sound removed from the library, but its file couldn't be deleted.",
+    },
+    {
+      event: APP_EVENTS.REMOVE_MEDIA,
+      field: "media",
+      file: party.file,
+      list: APP_EVENTS_RESPONSE.GET_MEDIA,
+      removed: FEEDBACK_CODES.MEDIA_REMOVED,
+      failed: FEEDBACK_CODES.MEDIA_REMOVE_FAILED,
+      notice: "Media removed.",
+      warning:
+        "Media removed from the library, but its file couldn't be deleted.",
+    },
+  ] as const)("$event", (c) => {
     const setup = (
-      inUse: boolean,
+      cleared = true,
       deleted: AlertsResult<void> = { success: true },
     ) => {
-      const alertsService = {
-        deleteSound: vi.fn(async (_file: string) => deleted),
-      };
+      const remove = vi.fn(async (_file: string) => deleted);
+      const alertsService = { deleteSound: remove, deleteMedia: remove };
       const storeManagerService = {
         removeSound: vi.fn(async (_file: string) => true),
-        isSoundInUse: vi.fn(async (_file: string) => inUse),
+        removeMedia: vi.fn(async (_file: string) => true),
+        removeFromAlerts: vi.fn(
+          async (_field: "sound" | "media", _file: string) => cleared,
+        ),
         getSounds: () => [ding],
+        getMedia: () => [],
       };
       const h = createHandler({ alertsService, storeManagerService });
-      return { h, alertsService, storeManagerService };
+      return { h, remove, storeManagerService };
     };
+    const left = (s: ReturnType<typeof setup>["storeManagerService"]) =>
+      c.field === "sound" ? s.getSounds() : s.getMedia();
+    const library = (s: ReturnType<typeof setup>["storeManagerService"]) =>
+      c.field === "sound" ? s.removeSound : s.removeMedia;
 
-    it("removes the sound from the library and deletes its file", async () => {
-      const { h, alertsService, storeManagerService } = setup(false);
+    it("takes the file off every alert, then deletes it", async () => {
+      const { h, remove, storeManagerService } = setup();
 
-      await h.invoke(alerts, APP_EVENTS.REMOVE_SOUND, { file: airhorn.file });
+      await h.invoke(alerts, c.event, { file: c.file });
 
-      expect(storeManagerService.removeSound).toHaveBeenCalledExactlyOnceWith(
-        airhorn.file,
+      expect(library(storeManagerService)).toHaveBeenCalledExactlyOnceWith(
+        c.file,
       );
-      expect(storeManagerService.isSoundInUse).toHaveBeenCalledWith(
-        airhorn.file,
-      );
-      expect(alertsService.deleteSound).toHaveBeenCalledExactlyOnceWith(
-        airhorn.file,
-      );
-      expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
-        { success: true, data: [ding] },
+      expect(
+        storeManagerService.removeFromAlerts,
+      ).toHaveBeenCalledExactlyOnceWith(c.field, c.file);
+      expect(remove).toHaveBeenCalledExactlyOnceWith(c.file);
+      // The Alerts page takes it off the alerts it shows
+      expect(h.replies(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED)).toEqual([
+        { field: c.field, file: c.file },
+      ]);
+      expect(h.replies(c.list)).toEqual([
+        { success: true, data: left(storeManagerService) },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({
           level: "success",
-          code: FEEDBACK_CODES.SOUND_REMOVED,
-          message: "Sound removed.",
+          code: c.removed,
+          message: c.notice,
         }),
       ]);
     });
 
-    it("keeps the file of a sound an alert still uses", async () => {
-      const { h, alertsService } = setup(true);
+    // The library and the alerts are without it, only its file is left over.
+    it("warns when the file can't be deleted", async () => {
+      const { h } = setup(true, { success: false, error: "EBUSY" });
 
-      await h.invoke(alerts, APP_EVENTS.REMOVE_SOUND, { file: airhorn.file });
+      await h.invoke(alerts, c.event, { file: c.file });
 
-      expect(alertsService.deleteSound).not.toHaveBeenCalled();
-      expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
-        { success: true, data: [ding] },
-      ]);
-    });
-
-    // The sound is out of the library, only its file is left over.
-    it("replies the library and warns when the file can't be deleted", async () => {
-      const { h } = setup(false, { success: false, error: "EBUSY" });
-
-      await h.invoke(alerts, APP_EVENTS.REMOVE_SOUND, { file: airhorn.file });
-
-      expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
-        { success: true, data: [ding] },
-      ]);
       expect(h.notices).toEqual([
         expect.objectContaining({
           level: "warning",
-          code: FEEDBACK_CODES.SOUND_REMOVE_FAILED,
-          message:
-            "Sound removed from the library, but its file couldn't be deleted.",
+          code: c.failed,
+          message: c.warning,
         }),
       ]);
       expect(logError).not.toHaveBeenCalled();
     });
 
-    it("keeps the file when the library can't be saved", async () => {
-      const { h, alertsService, storeManagerService } = setup(false);
-      storeManagerService.removeSound.mockResolvedValue(false);
+    it("keeps the file while a profile that has it couldn't be saved", async () => {
+      const { h, remove, storeManagerService } = setup(false);
 
-      await h.invoke(alerts, APP_EVENTS.REMOVE_SOUND, { file: airhorn.file });
+      await h.invoke(alerts, c.event, { file: c.file });
 
-      expect(alertsService.deleteSound).not.toHaveBeenCalled();
-      expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
+      expect(remove).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED)).toHaveLength(1);
+      expect(h.replies(c.list)).toEqual([
         {
           success: false,
-          data: [ding],
-          error: {
+          data: left(storeManagerService),
+          error: expect.objectContaining({
             code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+    });
+
+    it("changes nothing when the library can't be saved", async () => {
+      const { h, remove, storeManagerService } = setup();
+      library(storeManagerService).mockResolvedValue(false);
+
+      await h.invoke(alerts, c.event, { file: c.file });
+
+      expect(storeManagerService.removeFromAlerts).not.toHaveBeenCalled();
+      expect(remove).not.toHaveBeenCalled();
+      expect(h.replies(c.list)).toEqual([
+        {
+          success: false,
+          data: left(storeManagerService),
+          error: expect.objectContaining({
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+    });
+  });
+
+  describe("IMPORT_MEDIA", () => {
+    const setup = (
+      res: AlertsResult<MediaFile> = { success: true, data: party },
+    ) => {
+      const alertsService = {
+        importMedia: vi.fn(async (_path: string) => res),
+      };
+      const storeManagerService = {
+        addMedia: vi.fn(async (_media: MediaFile) => true),
+        getMedia: () => [party],
+      };
+      const h = createHandler({ alertsService, storeManagerService });
+      return { h, alertsService, storeManagerService };
+    };
+
+    it("does nothing when no file is picked", async () => {
+      const { h, alertsService } = setup();
+      dialog.showOpenDialog.mockResolvedValue({
+        canceled: true,
+        filePaths: [],
+      });
+
+      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, { id: "alert-1" });
+
+      expect(alertsService.importMedia).not.toHaveBeenCalled();
+      expect(h.sent()).toEqual([]);
+    });
+
+    it("imports the file into the library and gives it to the alert", async () => {
+      const { h, alertsService, storeManagerService } = setup();
+      pickFiles("/pictures/party.gif");
+
+      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, { id: "alert-1" });
+
+      expect(dialog.showOpenDialog.mock.calls[0][1]).toMatchObject({
+        properties: ["openFile"],
+        filters: [{ name: "Images and videos", extensions: MEDIA_EXTENSIONS }],
+      });
+      expect(alertsService.importMedia).toHaveBeenCalledExactlyOnceWith(
+        "/pictures/party.gif",
+      );
+      expect(storeManagerService.addMedia).toHaveBeenCalledExactlyOnceWith(
+        party,
+      );
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA)).toEqual([
+        { success: true, id: "alert-1", media: party },
+      ]);
+      // The picker stays open, its list gets the file too.
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
+        { success: true, data: [party] },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "success",
+          code: FEEDBACK_CODES.MEDIA_ADDED,
+          message: 'Media "party" added.',
+        }),
+      ]);
+    });
+
+    it("replies the alert's id without a notice when the file can't be used", async () => {
+      const { h, storeManagerService } = setup({
+        success: false,
+        error: "Unsupported format: svg",
+      });
+      pickFiles("/pictures/icon.svg");
+
+      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, { id: "alert-1" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA)).toEqual([
+        {
+          success: false,
+          id: "alert-1",
+          error: {
+            code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
             message:
-              "Tokio couldn't save the change. Check the logs folder for details.",
+              "Unable to use the file. Pick a png, jpg, gif, webp, mp4 or webm file up to 50 MB.",
           },
         },
       ]);
+      expect(storeManagerService.addMedia).not.toHaveBeenCalled();
+      expect(h.notices).toEqual([]);
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    it("gives the alert nothing when the library can't be saved", async () => {
+      const { h, storeManagerService } = setup();
+      storeManagerService.addMedia.mockResolvedValue(false);
+      pickFiles("/pictures/party.gif");
+
+      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, { id: "alert-1" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA)).toEqual([
+        {
+          success: false,
+          id: "alert-1",
+          error: expect.objectContaining({
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([]);
+    });
+  });
+
+  describe("SHOW_ALERT_MEDIA", () => {
+    it("has the service show the media on time, with no reply", async () => {
+      const showMedia = vi.fn();
+      const h = createHandler({ alertsService: { showMedia } });
+      const show = {
+        id: "alert-1",
+        file: party.file,
+        delay: 0.1,
+        duration: 5,
+        volume: 80,
+      };
+
+      await h.invoke(alerts, APP_EVENTS.SHOW_ALERT_MEDIA, show);
+
+      expect(showMedia).toHaveBeenCalledExactlyOnceWith(show);
+      expect(h.sent()).toEqual([]);
+    });
+  });
+
+  describe("UPLOAD_MEDIA", () => {
+    // Imports the png files, refuses the rest
+    const setup = (media: MediaFile[] = []) => {
+      const alertsService = {
+        importMedia: vi.fn(
+          async (path: string): Promise<AlertsResult<MediaFile>> =>
+            path.endsWith(".png")
+              ? { success: true, data: { name: path, file: `${path}.hash` } }
+              : { success: false, error: "Unsupported format" },
+        ),
+      };
+      const storeManagerService = {
+        addMedia: vi.fn(async (file: MediaFile) => {
+          media.push(file);
+          return true;
+        }),
+        getMedia: () => media,
+      };
+      const h = createHandler({ alertsService, storeManagerService });
+      return { h, alertsService, storeManagerService };
+    };
+
+    it("does nothing when the dialog is canceled", async () => {
+      const { h, alertsService } = setup();
+
+      await h.invoke(alerts, APP_EVENTS.UPLOAD_MEDIA);
+
+      expect(dialog.showOpenDialog.mock.calls[0][1]).toMatchObject({
+        properties: ["openFile", "multiSelections"],
+        filters: [{ name: "Images and videos", extensions: MEDIA_EXTENSIONS }],
+      });
+      expect(alertsService.importMedia).not.toHaveBeenCalled();
+      expect(h.sent()).toEqual([]);
+    });
+
+    it("adds the new files and counts the ones it couldn't use", async () => {
+      const { h, storeManagerService } = setup([
+        { name: "old", file: "old.png.hash" },
+      ]);
+      pickFiles("old.png", "a.png", "b.png", "a.png", "c.svg");
+
+      await h.invoke(alerts, APP_EVENTS.UPLOAD_MEDIA);
+
+      expect(storeManagerService.addMedia.mock.calls).toEqual([
+        [{ name: "a.png", file: "a.png.hash" }],
+        [{ name: "b.png", file: "b.png.hash" }],
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
+        {
+          success: false,
+          data: storeManagerService.getMedia(),
+          error: {
+            code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
+            message:
+              "Unable to upload 1 of the files. Use png, jpg, gif, webp, mp4 or webm files up to 50 MB.",
+          },
+        },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "success",
+          code: FEEDBACK_CODES.MEDIA_UPLOADED,
+          message: "2 files added to the media library.",
+        }),
+      ]);
+    });
+
+    it("says when the library couldn't be saved", async () => {
+      const { h, storeManagerService } = setup();
+      storeManagerService.addMedia.mockResolvedValue(false);
+      pickFiles("a.png");
+
+      await h.invoke(alerts, APP_EVENTS.UPLOAD_MEDIA);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
+        {
+          success: false,
+          data: [],
+          error: expect.objectContaining({
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+  });
+
+  describe("GET_MEDIA", () => {
+    it("answers with the media library", async () => {
+      const h = createHandler({
+        storeManagerService: { getMedia: () => [party] },
+      });
+
+      await h.invoke(alerts, APP_EVENTS.GET_MEDIA);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
+        { success: true, data: [party] },
+      ]);
+    });
+
+    it("answers with an empty library when it can't be read", async () => {
+      const h = createHandler({
+        storeManagerService: {
+          getMedia: () => {
+            throw new Error("Store not initialized");
+          },
+        },
+      });
+
+      await h.invoke(alerts, APP_EVENTS.GET_MEDIA);
+
+      const failure = {
+        code: FEEDBACK_CODES.MEDIA_LOAD_FAILED,
+        message: "Unable to load the media library.",
+      };
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
+        { success: false, data: [], error: failure },
+      ]);
+      expect(h.notices).toEqual([expect.objectContaining(failure)]);
     });
   });
 });

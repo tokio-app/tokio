@@ -10,6 +10,8 @@ import {
   failure,
   gift,
   instantSound,
+  alertMedia,
+  mediaFile,
   profileReply,
   voice,
 } from "@test/fixtures";
@@ -37,6 +39,7 @@ const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({
   },
   sound: airhorn,
   tts: null,
+  media: null,
   volume: 80,
   ...patch,
 });
@@ -180,6 +183,7 @@ describe("Alerts", () => {
             trigger: trigger(TOKIO_EVENTS.FOLLOW),
             sound: null,
             tts: null,
+            media: null,
             volume: 100,
           },
         ],
@@ -519,6 +523,23 @@ describe("Alerts", () => {
     );
   });
 
+  it("clears an alert's sound, keeping it in the library", async () => {
+    const { user } = await load([alert("alert-1")]);
+
+    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Clear" }),
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      rows()[0].getByRole("button", { name: "Select a sound..." }),
+    ).toBeInTheDocument();
+    expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([]);
+    await wait(300);
+    expect(saves()[0].items[0]).toEqual(alert("alert-1", { sound: null }));
+  });
+
   it("closes the picker without changing the alert", async () => {
     const { user } = await load([alert("alert-1")]);
 
@@ -637,6 +658,166 @@ describe("Alerts", () => {
       tts: message,
       trigger: TOKIO_EVENTS.FOLLOW,
       volume: 50,
+    });
+  });
+
+  describe("media", () => {
+    const party = mediaFile("Party");
+    const confetti = mediaFile("Confetti");
+    const shown = (file = party, duration = 5) =>
+      alertMedia(file, { duration });
+
+    // Opens the media picker of the alert in the row, with the library listed
+    async function openMedia(user: UserEvent, row: number, name: string) {
+      await user.click(rows()[row].getByRole("button", { name }));
+      await send(APP_EVENTS_RESPONSE.GET_MEDIA, {
+        success: true,
+        data: [party, confetti],
+      });
+      return within(screen.getByRole("dialog"));
+    }
+
+    it("picks media for an alert from the library, for 5 seconds", async () => {
+      const { user } = await load([alert("alert-1")]);
+
+      const dialog = await openMedia(user, 0, "Select media...");
+      await user.click(dialog.getByRole("button", { name: "Party" }));
+
+      // It stays open for the duration and the URL.
+      expect(dialog.getByRole("spinbutton")).toHaveValue(5);
+      expect(
+        rows()[0].getByRole("button", { name: "Party" }),
+      ).toBeInTheDocument();
+      await wait(300);
+      expect(saves()[0].items[0]).toEqual(alert("alert-1", { media: shown() }));
+    });
+
+    it("keeps the duration when the media changes, and drops it", async () => {
+      const { user } = await load([
+        alert("alert-1", { media: shown(party, 9) }),
+      ]);
+
+      const dialog = await openMedia(user, 0, "Party");
+      await user.click(dialog.getByRole("button", { name: "Confetti" }));
+      await wait(300);
+      expect(saves().at(-1)?.items[0].media).toEqual(shown(confetti, 9));
+
+      fireEvent.change(dialog.getByRole("spinbutton"), {
+        target: { value: "12" },
+      });
+      await wait(300);
+      expect(saves().at(-1)?.items[0].media).toEqual(shown(confetti, 12));
+
+      await user.click(dialog.getByRole("button", { name: "Clear" }));
+      await wait(300);
+      expect(saves().at(-1)?.items[0].media).toBeNull();
+    });
+
+    it("uses a browsed file only for the alert waiting for one", async () => {
+      const { user } = await load([alert("alert-1"), alert("alert-2")]);
+      const dialog = await openMedia(user, 0, "Select media...");
+      await user.click(dialog.getByRole("button", { name: "Browse file..." }));
+
+      await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+        success: true,
+        id: "alert-2",
+        media: confetti,
+      });
+      await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+        success: true,
+        id: "alert-1",
+        media: party,
+      });
+
+      expect(
+        rows()[0].getByRole("button", { name: "Party" }),
+      ).toBeInTheDocument();
+      expect(
+        rows()[1].getByRole("button", { name: "Select media..." }),
+      ).toBeInTheDocument();
+    });
+
+    it("takes a deleted file off the alerts it shows", async () => {
+      await load([
+        alert("alert-1", { media: shown() }),
+        alert("alert-2", { sound: bell, media: shown(confetti) }),
+      ]);
+
+      await send(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, {
+        field: "sound",
+        file: airhorn.file,
+      });
+      await send(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, {
+        field: "media",
+        file: party.file,
+      });
+
+      expect(
+        rows()[0].getByRole("button", { name: "Select a sound..." }),
+      ).toBeInTheDocument();
+      expect(
+        rows()[0].getByRole("button", { name: "Select media..." }),
+      ).toBeInTheDocument();
+      await wait(300);
+      expect(saves().at(-1)?.items).toEqual([
+        alert("alert-1", { sound: null }),
+        alert("alert-2", { sound: bell, media: shown(confetti) }),
+      ]);
+    });
+
+    it("keeps Match video when another file is picked", async () => {
+      const { user } = await load([
+        alert("alert-1", {
+          media: alertMedia(party, { duration: 9, match_video: true }),
+        }),
+      ]);
+
+      const dialog = await openMedia(user, 0, "Party");
+      await user.click(dialog.getByRole("button", { name: "Confetti" }));
+
+      await wait(300);
+      expect(saves().at(-1)?.items[0].media).toEqual(
+        alertMedia(confetti, { duration: 9, match_video: true }),
+      );
+    });
+
+    it("matches a video's length, and saves it", async () => {
+      const clip = { name: "Clip", file: "clip.webm" };
+      const { user } = await load([
+        alert("alert-1", { media: alertMedia(clip) }),
+      ]);
+      await user.click(rows()[0].getByRole("button", { name: "Clip" }));
+      await send(APP_EVENTS_RESPONSE.GET_MEDIA, {
+        success: true,
+        data: [clip],
+      });
+      const video = screen.getByRole("dialog").querySelector("video")!;
+      Object.defineProperty(video, "duration", { value: 7.4 });
+      fireEvent.loadedMetadata(video);
+
+      await user.click(screen.getByRole("checkbox", { name: "Match video" }));
+
+      await wait(300);
+      expect(saves().at(-1)?.items[0].media).toEqual(
+        alertMedia(clip, { duration: 8, match_video: true }),
+      );
+    });
+
+    it("ignores a browsed file that comes after a pick", async () => {
+      const { user } = await load([alert("alert-1")]);
+      const dialog = await openMedia(user, 0, "Select media...");
+      await user.click(dialog.getByRole("button", { name: "Browse file..." }));
+      await user.click(dialog.getByRole("button", { name: "Confetti" }));
+
+      await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+        success: true,
+        id: "alert-1",
+        media: party,
+      });
+
+      expect(
+        rows()[0].getByRole("button", { name: "Confetti" }),
+      ).toBeInTheDocument();
     });
   });
 });

@@ -5,7 +5,7 @@ interface AudioQueueOptions {
   gapTime?: number;
 }
 
-interface EnqueueOptions {
+export interface EnqueueOptions {
   // Per item volume, applied on top of the queue volume
   gain?: number;
   // Lets the volume of this item be changed while it plays
@@ -17,6 +17,11 @@ interface EnqueueOptions {
   // Per item speed and pitch, used instead of the queue's filters
   speed?: number;
   pitch?: number;
+  // Seconds the item holds its place at least, like an alert's image
+  minDuration?: number;
+  // Called once the item has its place: seconds until it starts, and how
+  // long its place lasts
+  onScheduled?: (delay: number, duration: number) => void;
 }
 
 interface ActiveItem {
@@ -68,6 +73,21 @@ function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
     },
   );
   return entry.audio;
+}
+
+// Silent places for wait(), by length, shared by every queue. 8 kHz, the
+// lowest rate browsers must take, keeps a minute under 2 MB.
+const SILENCE_RATE = 8000;
+const silences = new Map<number, AudioBuffer>();
+
+function silence(seconds: number): AudioBuffer {
+  const length = Math.max(1, Math.round(seconds * SILENCE_RATE));
+  let buffer = silences.get(length);
+  if (!buffer) {
+    buffer = Tone.getContext().createBuffer(1, length, SILENCE_RATE);
+    silences.set(length, buffer);
+  }
+  return buffer;
 }
 
 export class AudioQueue {
@@ -171,6 +191,19 @@ export class AudioQueue {
   }
 
   /**
+   * Holds a silent place in the queue, like an alert that only shows an
+   * image. Speed changes don't stretch it.
+   */
+  wait(seconds: number, options: EnqueueOptions = {}) {
+    if (this.pending() >= this.maxQueueLength) {
+      console.warn("AudioQueue: Max queue length reached. Ignoring input.");
+      return false;
+    }
+    this.schedule(silence(seconds), { ...options, speed: 1, pitch: 1 });
+    return true;
+  }
+
+  /**
    * Changes the volume of every scheduled or playing item with this key.
    */
   setItemGain(key: string, gain: number) {
@@ -214,7 +247,7 @@ export class AudioQueue {
 
   // Plays the sound after the ones already scheduled.
   private schedule(buffer: AudioBuffer, next: EnqueueOptions) {
-    const { gain = 1, key, onEnded } = next;
+    const { gain = 1, key, onEnded, minDuration = 0, onScheduled } = next;
     const speed = next.speed ?? this.currentFilters.speed;
     const pitch = next.pitch ?? this.currentFilters.pitch;
 
@@ -248,6 +281,12 @@ export class AudioQueue {
       onEnded?.();
     };
 
-    this.nextPlayTime += buffer.duration / speed + this.gapTime;
+    // shortcut: a place longer than its sound leaves `active` (and calls
+    // onEnded) when the sound ends, so the queue length counts it short; the
+    // next item still waits for the place. Upgrade if that undercount matters.
+    const place = Math.max(buffer.duration / speed, minDuration);
+    // Tone.now() is ahead of what's heard by the look ahead.
+    onScheduled?.(this.nextPlayTime - Tone.immediate(), place);
+    this.nextPlayTime += place + this.gapTime;
   }
 }

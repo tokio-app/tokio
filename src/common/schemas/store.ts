@@ -52,6 +52,8 @@ const AppSettingsSchema = z.object({
   testOverlays: z.array(TestOverlaySchema).default([]),
   // Uploaded sounds, available to alerts in every profile
   sounds: z.array(AlertSoundSchema).default([]),
+  // Uploaded images and videos, the same way: a name and a file
+  media: z.array(AlertSoundSchema).default([]),
   activeFeatures: z.object({
     tts: z.boolean(),
     music: z.boolean(),
