@@ -81,10 +81,11 @@
   overflow-wrap: anywhere;
 }
 
+/* 800 like the overlay's clock, heavier than the app's other readouts */
 .clock {
   font-size: calc(var(--font-3xl) * 2);
   font-stretch: var(--stretch-readout);
-  font-weight: 700;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
@@ -100,7 +101,7 @@
   height: calc(var(--font-3xl) * 0.8);
   font-size: calc(var(--font-3xl) * 0.8);
   font-stretch: var(--stretch-readout);
-  font-weight: 700;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 

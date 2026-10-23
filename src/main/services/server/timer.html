@@ -21,8 +21,9 @@
         --warning: #f43f5e;
         /* Keeps the text legible over bright video */
         --halo: rgb(18 18 18 / 55%);
-        /* The clock fills the browser source, the rest follows it */
-        --size: min(19vw, 36vh);
+        /* The clock fills the browser source, the rest follows it. --fit
+           shrinks it when a font is too wide for the source (fit below). */
+        --size: calc(min(26vw, 46vh) * var(--fit, 1));
       }
 
       html,
@@ -40,20 +41,28 @@
         justify-content: center;
         font-family: "Archivo Variable", sans-serif;
         line-height: 1.1;
-        text-shadow:
-          0 0 0.06em var(--halo),
-          0 0.03em 0.2em var(--halo);
       }
 
+      /* On each text: set on body, its em would be the body's 16px */
+      .title,
+      .clock,
+      .slot {
+        text-shadow:
+          0 0 0.05em var(--halo),
+          0 0.02em 0.12em var(--halo),
+          0 0 0.4em rgb(18 18 18 / 30%);
+      }
+
+      /* Wraps instead of clipping, which would cut its halo into a box */
       .title {
         max-width: 94vw;
         margin-bottom: 0.15em;
-        overflow: hidden;
         font-size: calc(var(--size) * 0.34);
         font-weight: 600;
         color: var(--title);
-        white-space: nowrap;
-        text-overflow: ellipsis;
+        text-align: center;
+        text-wrap: balance;
+        overflow-wrap: anywhere;
       }
 
       .clock,
@@ -146,9 +155,11 @@
       // The last state, its remaining as of `at`
       let state = null;
       let at = 0;
-      // Time added while the label shows, and its timeout
+      // Time changed in the last LABEL_MS, whether the slot shows it instead
+      // of ×N, and when it's forgotten
       let sum = 0;
-      let label = null;
+      let showing = false;
+      let forget = null;
 
       const pad = (n) => String(n).padStart(2, "0");
       const hms = (s) => [
@@ -208,21 +219,23 @@
             : "";
       };
 
-      // Changes while the label shows add up into it and restart it
+      // Changes while the label shows add up into it and restart it. A sum
+      // that rounds to under a second shows ×N meanwhile, as on Tools.
       const showChange = (ms) => {
         sum += ms;
-        if (Math.round(Math.abs(sum) / 1000) < 1) return;
+        clearTimeout(forget);
+        forget = setTimeout(() => {
+          sum = 0;
+          showing = false;
+          showMultiplier();
+        }, LABEL_MS);
+        showing = Math.round(Math.abs(sum) / 1000) >= 1;
+        if (!showing) return showMultiplier();
         slot.textContent = changeText(sum);
         slot.className = "slot";
         // Restarts the animation
         void slot.offsetWidth;
         slot.className = sum < 0 ? "slot change removed" : "slot change";
-        clearTimeout(label);
-        label = setTimeout(() => {
-          label = null;
-          sum = 0;
-          showMultiplier();
-        }, LABEL_MS);
       };
 
       const update = (data) => {
@@ -240,11 +253,35 @@
         setFont(title, look.title_font);
         setFont(clock, look.clock_font);
         setFont(slot, look.clock_font);
-        if (!label) showMultiplier();
+        if (!showing) showMultiplier();
         if (data.added) showChange(data.added);
         draw();
+        fit();
       };
       setInterval(draw, 250);
+
+      // A font too wide for the source, or a title on two lines, shrinks
+      // everything until it all fits
+      const fit = () => {
+        const root = document.documentElement.style;
+        root.setProperty("--fit", "1");
+        const width = clock.scrollWidth;
+        const height = [title, clock, slot].reduce(
+          (sum, el) => sum + el.offsetHeight,
+          0,
+        );
+        if (width && height) {
+          const scale = Math.min(
+            1,
+            (innerWidth * 0.94) / width,
+            (innerHeight * 0.94) / height,
+          );
+          root.setProperty("--fit", String(scale));
+        }
+      };
+      addEventListener("resize", fit);
+      // The fonts' widths are known once they've loaded
+      document.fonts?.ready.then(fit);
 
       const connect = () => {
         const socket = new WebSocket(`ws://${location.host}/?id=timer`);

@@ -459,6 +459,18 @@ describe("ServerService", () => {
         expect(el("slot").classList.contains("removed")).toBe(true);
       });
 
+      it("shows the multiplier again at once when what was added is taken back", async () => {
+        send(timerState({ multiplier: 2, added: 60_000 }));
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("+1:00"));
+
+        send(timerState({ multiplier: 2, added: -60_000 }));
+
+        // Well before the label's 1.5 s are over
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("×2"), {
+          timeout: 500,
+        });
+      });
+
       it("shows nothing under the clock without a multiplier, or when hidden", async () => {
         send(timerState({ multiplier: 1.5 }, { show_multiplier: false }));
         await vi.waitFor(() => expect(el("clock").textContent).not.toBe(""));

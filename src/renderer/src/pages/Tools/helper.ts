@@ -40,21 +40,21 @@ export function shortDuration(ms: number): string {
 
 type Seconds = TimerSettings["seconds"];
 
-// The triggers that add time, as rows that read "Follows [30] each". Likes
+// The triggers that add time, as rows that read "Follows [30] seconds each". Likes
 // have their own row, with the likes per cycle.
 export const TRIGGERS: {
   key: Exclude<keyof Seconds, "likes_every">;
   label: string;
   rule: string;
 }[] = [
-  { key: "coin", label: "Coins", rule: "per coin" },
-  { key: "likes", label: "Likes", rule: "every" },
-  { key: "superfan", label: "New Super Fans", rule: "each" },
-  { key: "superfan_box", label: "Super Fan boxes", rule: "each" },
-  { key: "envelope", label: "Envelopes", rule: "each" },
-  { key: "follow", label: "Follows", rule: "each" },
-  { key: "share", label: "Shares", rule: "each" },
-  { key: "chat", label: "Chat messages", rule: "each" },
-  { key: "join", label: "Viewers joining", rule: "each" },
-  { key: "superfan_join", label: "Super Fans joining", rule: "each" },
+  { key: "coin", label: "Coins", rule: "seconds per coin" },
+  { key: "likes", label: "Likes", rule: "seconds every" },
+  { key: "superfan", label: "New Super Fans", rule: "seconds each" },
+  { key: "superfan_box", label: "Super Fan boxes", rule: "seconds each" },
+  { key: "envelope", label: "Envelopes", rule: "seconds each" },
+  { key: "follow", label: "Follows", rule: "seconds each" },
+  { key: "share", label: "Shares", rule: "seconds each" },
+  { key: "chat", label: "Chat messages", rule: "seconds each" },
+  { key: "join", label: "Viewers joining", rule: "seconds each" },
+  { key: "superfan_join", label: "Super Fans joining", rule: "seconds each" },
 ];
