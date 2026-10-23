@@ -483,4 +483,19 @@ events.push(
   },
 );
 
+events.push(
+  APP_EVENTS.GET_NETWORK_ADDRESSES,
+  ({ serverService }, e) => {
+    e.reply(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, {
+      addresses: serverService.networkAddresses(),
+    });
+  },
+  {
+    // Settings shows that none was found.
+    notify: false,
+    onError: (e) =>
+      e.reply(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, { addresses: [] }),
+  },
+);
+
 export default events;

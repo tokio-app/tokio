@@ -1,4 +1,5 @@
 import { YAMLManagerService } from "@/services/yaml";
+import { JSDOM } from "jsdom";
 import {
   mkdir,
   mkdtemp,
@@ -11,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { findOverlays, processHTML } from "./index";
+import { findOverlays, processHTML, REMOTE_SOCKET } from "./index";
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
@@ -99,8 +100,7 @@ describe("findOverlays", () => {
 describe("processHTML", () => {
   let dir: string;
   const html = () => readFile(join(dir, "index.html"), "utf-8");
-  const written =
-    '<script id="tokio-setup"> window.__OVERLAY_ID__ = "a"; </script>';
+  const written = `<script id="tokio-setup"> window.__OVERLAY_ID__ = "a"; ${REMOTE_SOCKET} </script>`;
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "tokio-test-"));
@@ -140,5 +140,81 @@ describe("processHTML", () => {
     expect(await processHTML("a", old, dir)).toEqual({ success: false });
     expect(await html()).toBe(old);
     expect(await readdir(dir)).toEqual(["index.html"]);
+  });
+});
+
+describe("REMOTE_SOCKET", () => {
+  // Runs the script in a page opened at `page`, then opens a socket to each
+  // URL, with a stub for the browser's WebSocket.
+  const open = (page: string, urls: string[]) => {
+    class Native {
+      constructor(public url: string) {}
+    }
+    const dom = new JSDOM(
+      `<script>${REMOTE_SOCKET}
+        window.sockets = ${JSON.stringify(urls)}.map((u) => new WebSocket(u));
+      </script>`,
+      {
+        url: page,
+        runScripts: "dangerously",
+        beforeParse(window) {
+          Object.assign(window, { WebSocket: Native });
+        },
+      },
+    );
+    const sockets: Native[] = dom.window.sockets;
+    const WebSocket: typeof Native = dom.window.WebSocket;
+    dom.window.close();
+    return { got: sockets.map((s) => s.url), sockets, WebSocket, Native };
+  };
+
+  it("points sockets to this PC at the address the page came from", () => {
+    const { got, sockets, WebSocket, Native } = open(
+      "http://192.168.1.10:37891/gift-jar/",
+      [
+        "ws://localhost:37891/?id=gift-jar",
+        "ws://127.0.0.1:37891/",
+        "ws://[::1]:37891/",
+        "ws://localhost:1234/",
+        "ws://example.com:37891/",
+        "not a url",
+      ],
+    );
+
+    expect(got).toEqual([
+      "ws://192.168.1.10:37891/?id=gift-jar",
+      "ws://192.168.1.10:37891/",
+      "ws://192.168.1.10:37891/",
+      "ws://localhost:1234/",
+      "ws://example.com:37891/",
+      "not a url",
+    ]);
+    expect(WebSocket.name).toBe("WebSocket");
+    for (const socket of sockets) {
+      expect(socket).toBeInstanceOf(WebSocket);
+      expect(socket).toBeInstanceOf(Native);
+    }
+  });
+
+  it("also points them at tokio-app.local", () => {
+    expect(
+      open("http://tokio-app.local:37891/gift-jar/", [
+        "ws://localhost:37891/?id=gift-jar",
+      ]).got,
+    ).toEqual(["ws://tokio-app.local:37891/?id=gift-jar"]);
+  });
+
+  it.each([
+    "http://localhost:37891/gift-jar/",
+    "http://127.0.0.1:37891/gift-jar/",
+    "http://[::1]:37891/gift-jar/",
+    "http://192.168.1.10:8080/gift-jar/",
+  ])("leaves sockets alone at %s", (page) => {
+    const { got, WebSocket, Native } = open(page, [
+      "ws://localhost:37891/?id=gift-jar",
+    ]);
+
+    expect(got).toEqual(["ws://localhost:37891/?id=gift-jar"]);
+    expect(WebSocket).toBe(Native);
   });
 });

@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom";
 import { EventEmitter } from "node:events";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
-import { networkInterfaces, tmpdir } from "node:os";
+import { NetworkInterfaceInfo, networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
@@ -12,6 +12,11 @@ import { TikTokConnectorService } from "../connector";
 import { ConnectorProvider } from "../connector/common";
 import { MusicService } from "../music";
 import { ServerService } from "./index";
+
+vi.mock("node:os", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:os")>();
+  return { ...actual, networkInterfaces: vi.fn(actual.networkInterfaces) };
+});
 
 // The real music service drives BrowserWindows.
 const musicEvents = vi.hoisted(
@@ -62,6 +67,27 @@ const follow = {
 const hasIPv6Loopback = Object.values(networkInterfaces())
   .flat()
   .some((iface) => iface?.address === "::1");
+
+// An address of this PC another computer could reach, if it has one
+const lanAddress = Object.values(networkInterfaces())
+  .flat()
+  .find((iface) => iface?.family === "IPv4" && !iface.internal)?.address;
+
+const iface = (
+  address: string,
+  family: "IPv4" | "IPv6" = "IPv4",
+): NetworkInterfaceInfo => {
+  const info = {
+    address,
+    internal: address === "127.0.0.1" || address === "::1",
+    netmask: "255.255.255.0",
+    mac: "00:00:00:00:00:00",
+    cidr: null,
+  };
+  return family === "IPv4"
+    ? { ...info, family }
+    : { ...info, family, scopeid: 0 };
+};
 
 describe("ServerService", () => {
   let server: ServerService;
@@ -124,6 +150,48 @@ describe("ServerService", () => {
     const res = await fetch(`http://[::1]:${server.getPort()}/`);
 
     expect(res.status).toBe(404);
+  });
+
+  it("listens on every interface, for OBS on another computer", async () => {
+    await server.start();
+
+    const address = server["_server"]!.address();
+
+    expect(address).toMatchObject({
+      address: expect.stringMatching(/^(::|0\.0\.0\.0)$/),
+    });
+  });
+
+  it.skipIf(!lanAddress)(
+    "accepts connections to its network address",
+    async () => {
+      await server.start();
+
+      const res = await fetch(`http://${lanAddress}:${server.getPort()}/`);
+
+      expect(res.status).toBe(404);
+    },
+  );
+
+  it("lists this PC's network addresses, virtual adapters last", () => {
+    vi.mocked(networkInterfaces).mockReturnValueOnce({
+      "vEthernet (WSL)": [iface("172.20.0.1")],
+      lo: [iface("127.0.0.1"), iface("::1", "IPv6")],
+      "Wi-Fi": [
+        iface("fe80::1", "IPv6"),
+        iface("192.168.1.10"),
+        iface("169.254.3.4"),
+      ],
+      docker0: [iface("172.17.0.1")],
+      Ethernet: [iface("10.0.0.5")],
+    });
+
+    expect(server.networkAddresses()).toEqual([
+      "192.168.1.10",
+      "10.0.0.5",
+      "172.20.0.1",
+      "172.17.0.1",
+    ]);
   });
 
   it("sends nothing while stopped", () => {

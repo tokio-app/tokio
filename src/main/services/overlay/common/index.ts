@@ -6,6 +6,7 @@ import {
   OverlayMetaSchema,
 } from "@/common/schemas";
 import { CustomGift, OverlayConfigRedux } from "@/common/types";
+import { SERVER_PORT } from "@/common/util";
 import { writeFileAtomic } from "@/helper/fs";
 import { YAMLManagerService } from "@/services/yaml";
 import { readdir, readFile } from "node:fs/promises";
@@ -17,6 +18,32 @@ const SCRIPT_REGEX = /<script id="tokio-setup">[\s\S]*?<\/script>/i;
 // the catalog.
 const IMPORTED_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Part of the setup block. OBS on another computer opens overlays at this
+ * PC's address, where the overlay SDK's socket to localhost would reach the
+ * wrong computer, so sockets to localhost on the server port go to the
+ * address the page came from. Previews and pages opened on this PC are left
+ * alone.
+ */
+export const REMOTE_SOCKET = `(() => {
+  const loopback = ["localhost", "127.0.0.1", "[::1]"];
+  if (location.port !== "${SERVER_PORT}" || loopback.includes(location.hostname)) return;
+  const Native = window.WebSocket;
+  window.WebSocket = class WebSocket extends Native {
+    constructor(url, ...rest) {
+      let target = url;
+      try {
+        const parsed = new URL(url);
+        if (parsed.port === "${SERVER_PORT}" && loopback.includes(parsed.hostname)) {
+          parsed.host = location.host;
+          target = parsed.href;
+        }
+      } catch {}
+      super(target, ...rest);
+    }
+  };
+})();`;
 
 // Where Tokio writes the overlay's ID, and its settings when it has them.
 export const hasSetupBlock = (html: string) => SCRIPT_REGEX.test(html);
@@ -157,7 +184,7 @@ export async function processHTML(
       const safeJson = JSON.stringify(overlay_config).replace(/</g, "\\u003c");
       setup = `window.__OVERLAY_CONFIG__ = ${safeJson}; ${setup}`;
     }
-    const newScriptBlock = `<script id="tokio-setup"> ${setup} </script>`;
+    const newScriptBlock = `<script id="tokio-setup"> ${setup} ${REMOTE_SOCKET} </script>`;
 
     // A function, so $& or $$ in a setting stay as typed.
     const finalHtml = html.replace(SCRIPT_REGEX, () => newScriptBlock);

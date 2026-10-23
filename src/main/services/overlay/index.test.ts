@@ -29,7 +29,7 @@ import {
   MockInstance,
   vi,
 } from "vitest";
-import { processHTML } from "./common";
+import { processHTML, REMOTE_SOCKET } from "./common";
 import { CATALOG_URL, RELEASES_PREFIX } from "./common/catalog";
 import { CATALOG_TTL_MS, OverlayService } from "./index";
 
@@ -606,7 +606,7 @@ describe("OverlayService", () => {
       const [id] = await readdir(folder);
       const html = await readFile(join(folder, id, "index.html"), "utf-8");
       expect(html).toContain(
-        `<script id="tokio-setup"> window.__OVERLAY_ID__ = "${id}"; </script>`,
+        `<script id="tokio-setup"> window.__OVERLAY_ID__ = "${id}"; ${REMOTE_SOCKET} </script>`,
       );
     });
 

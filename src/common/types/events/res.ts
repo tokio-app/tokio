@@ -65,6 +65,7 @@ export enum APP_EVENTS_RESPONSE {
   SET_SERVER = "app:settings:res:set:server",
   SET_AUTO_UPDATES = "app:settings:res:set:updates",
   REQ_FQDN = "app:settings:res:fqdn",
+  GET_NETWORK_ADDRESSES = "app:settings:res:network",
 
   //HOME
   CONNECTED = "app:home:res:connect",
@@ -197,6 +198,8 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.SET_AUTO_UPDATES]: Reply;
 
   [APP_EVENTS_RESPONSE.REQ_FQDN]: Reply;
+  // This PC's IPv4 addresses, see ServerService.networkAddresses
+  [APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES]: { addresses: string[] };
 
   // HOME
   [APP_EVENTS_RESPONSE.CONNECTED]: Reply<{
