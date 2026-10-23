@@ -173,7 +173,7 @@ describe("ServerService", () => {
     },
   );
 
-  it("lists this PC's network addresses, virtual adapters last", () => {
+  it("lists this PC's network addresses, leaving out virtual adapters", () => {
     vi.mocked(networkInterfaces).mockReturnValueOnce({
       "vEthernet (WSL)": [iface("172.20.0.1")],
       lo: [iface("127.0.0.1"), iface("::1", "IPv6")],
@@ -183,15 +183,21 @@ describe("ServerService", () => {
         iface("169.254.3.4"),
       ],
       docker0: [iface("172.17.0.1")],
+      "VMware Network Adapter VMnet8": [iface("192.168.174.1")],
       Ethernet: [iface("10.0.0.5")],
     });
 
-    expect(server.networkAddresses()).toEqual([
-      "192.168.1.10",
-      "10.0.0.5",
-      "172.20.0.1",
-      "172.17.0.1",
-    ]);
+    expect(server.networkAddresses()).toEqual(["192.168.1.10", "10.0.0.5"]);
+  });
+
+  it("lists virtual adapters' addresses when there's no other, as with a Hyper-V switch", () => {
+    vi.mocked(networkInterfaces).mockReturnValueOnce({
+      lo: [iface("127.0.0.1")],
+      "vEthernet (External)": [iface("192.168.1.20")],
+      "vEthernet (WSL)": [iface("172.20.0.1")],
+    });
+
+    expect(server.networkAddresses()).toEqual(["192.168.1.20", "172.20.0.1"]);
   });
 
   it("sends nothing while stopped", () => {

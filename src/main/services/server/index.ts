@@ -164,11 +164,12 @@ export class ServerService extends Service {
 
   /**
    * This PC's IPv4 addresses on the network, where OBS on another computer
-   * reaches the server. The ones of virtual adapters come last.
+   * reaches the server. Virtual adapters' only when there's no other, as with
+   * a Hyper-V switch or a bridge on the network card.
    */
   public networkAddresses(): string[] {
-    return Object.entries(networkInterfaces())
-      .flatMap(([name, addresses]) =>
+    const found = Object.entries(networkInterfaces()).flatMap(
+      ([name, addresses]) =>
         (addresses ?? [])
           .filter(
             (a) =>
@@ -181,9 +182,9 @@ export class ServerService extends Service {
             address: a.address,
             virtual: VIRTUAL_ADAPTER.test(name),
           })),
-      )
-      .sort((a, b) => Number(a.virtual) - Number(b.virtual))
-      .map((a) => a.address);
+    );
+    const real = found.filter((a) => !a.virtual);
+    return (real.length > 0 ? real : found).map((a) => a.address);
   }
 
   public mount(id: string, path: string, rebuild: boolean = true): void {

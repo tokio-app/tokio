@@ -36,7 +36,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 
 - The server listens on every interface on purpose (see Conventions in `AGENTS.md`), so OBS on another computer opens overlays at `http://<this PC's address>:37891/<id>/`.
 - `processHTML` appends `REMOTE_SOCKET` (`services/overlay/common`) to every setup block. On a page opened on port 37891 from a host other than `localhost`, `127.0.0.1` or `[::1]`, it wraps `WebSocket` so sockets to a loopback host on that port go to `location.host`. Previews (`local-resource:`) and pages opened on this PC are left alone; a page Tokio doesn't serve gets no setup block, so it must connect to the Tokio PC's address itself.
-- **Settings → Overlay Server** (`ServerSection`) lists `ServerService.networkAddresses()` (`GET_NETWORK_ADDRESSES`, `notify: false`, `[]` on failure): non-internal IPv4 without `169.254.*`, virtual adapters (Hyper-V, WSL, VMs, Docker, bridges) last, each a `CopyUrl` of `http://<ip>:37891/`.
+- **Settings → Overlay Server** (`ServerSection`) lists `ServerService.networkAddresses()` (`GET_NETWORK_ADDRESSES`, `notify: false`, `[]` on failure): non-internal IPv4 without `169.254.*`, leaving out virtual adapters (Hyper-V, WSL, VMs, Docker, bridges) unless there's no other (a Hyper-V switch or a bridge on the network card), each a `CopyUrl` of `http://<ip>:37891/`.
 
 ## Official overlays
 
