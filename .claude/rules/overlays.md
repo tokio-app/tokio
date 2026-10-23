@@ -12,6 +12,7 @@ paths:
   - "src/renderer/src/components/OverlayPreview/**"
   - "src/renderer/src/components/OverlayView/**"
   - "src/renderer/src/pages/Settings/sections/OverlaysSection.tsx"
+  - "src/renderer/src/pages/Settings/sections/ServerSection.tsx"
 ---
 
 # Overlays
@@ -27,8 +28,15 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 - Overlay code can load any `local-resource:` URL, so the handler serves only files inside the overlays folder (`previewFile`). Don't widen it.
 - An import copies the folder a picked link points to (`realpath`), leaving out every link inside, then checks the copy (`processOverlay` and the setup block) and removes it if that fails. Like saves, updates and every start, it writes the settings `config.yaml` holds into the HTML.
 - At each start `load` checks every stored overlay and writes its settings into its HTML. One that fails isn't served but stays stored, so fixing it keeps its id and OBS link; only an overlay whose folder is gone is forgotten. `processHTML` writes only an HTML that changed, through `writeFileAtomic` (`src/main/helper/fs.ts`), so a crash or full disk midway leaves the old file whole, and a quit waits for it.
-- Saving settings writes `config.yaml` first, so settings the schema refuses change nothing, then the HTML with the gifts main keeps; the renderer doesn't send gifts. A save reply updates its overlay even after its settings closed, and only closes the dialog still open for it.
+- Saving settings writes `config.yaml` first, so settings the schema refuses change nothing, then the HTML with the gifts main keeps; the renderer doesn't send gifts. The `SAVE_OVERLAY_CONFIG` handler sends the saved settings (`tokio:config`) to the live overlays itself, so they get them even after the page closed; the page posts them only to its previews (`postToPreviews`). A save reply updates its overlay even after its settings closed, and only closes the dialog still open for it.
+- `OverlayService` runs each overlay's file work (`saveConfig`, `getConfig`, `remove`, `_writeHTML` for gift refreshes and starts, an install's extract and swap) one after another through `_lock(id)`, so a gift refresh can't write back settings read before a save. A task holding the lock must not call a method that takes it (`_prepare` uses `_readConfig`), or it waits on itself. An install downloads before taking it. `writeFileAtomic` also runs writes to one file in the order they came.
 - The `Iframe` ignores the pointer, so previews can't be scrolled or clicked. `withPreviewStyles` appends a style to the page giving it the app's background (for ClearType text) and hiding scrollbars, as OBS's default CSS does. The files on disk and what the overlay server sends stay unchanged.
+
+## Another computer
+
+- The server listens on every interface on purpose (see Conventions in `AGENTS.md`), so OBS on another computer opens overlays at `http://<this PC's address>:37891/<id>/`.
+- `processHTML` appends `REMOTE_SOCKET` (`services/overlay/common`) to every setup block. On a page opened on port 37891 from a host other than `localhost`, `127.0.0.1` or `[::1]`, it wraps `WebSocket` so sockets to a loopback host on that port go to `location.host`. Previews (`local-resource:`) and pages opened on this PC are left alone; a page Tokio doesn't serve gets no setup block, so it must connect to the Tokio PC's address itself.
+- **Settings → Overlay Server** (`ServerSection`) lists `ServerService.networkAddresses()` (`GET_NETWORK_ADDRESSES`, `notify: false`, `[]` on failure): non-internal IPv4 without `169.254.*`, virtual adapters (Hyper-V, WSL, VMs, Docker, bridges) last, each a `CopyUrl` of `http://<ip>:37891/`.
 
 ## Official overlays
 
