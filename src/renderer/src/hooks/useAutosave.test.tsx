@@ -66,6 +66,23 @@ describe("useAutosave", () => {
     expect(save.mock.calls).toEqual([["abc"], ["abcd"]]);
   });
 
+  it("keeps the newest typed value while two saves are echoed in order", async () => {
+    const { save, type, value, rerender } = setup();
+    type("a");
+    await wait(300);
+    type("ab");
+    await wait(300);
+    type("abc");
+
+    rerender({ saved: "a" });
+    expect(value()).toBe("abc");
+    rerender({ saved: "ab" });
+    expect(value()).toBe("abc");
+
+    await wait(300);
+    expect(save.mock.calls).toEqual([["a"], ["ab"], ["abc"]]);
+  });
+
   it("starts over from a value main changed, dropping the change waiting", async () => {
     const { save, type, value, rerender } = setup("old");
     type("typed");

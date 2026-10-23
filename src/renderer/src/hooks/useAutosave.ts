@@ -8,23 +8,30 @@ const SAVE_DELAY = 300;
 /**
  * A value edited on the page and saved shortly after its last change, for
  * fields without a Save button. `saved` is what main holds: the value starts
- * over from it when it changes, but not for main's echo of the value's own
- * save, which would undo what was typed since. A change still waiting is sent
+ * over from it when it changes, but not for main's echo of one of its own
+ * saves, which would undo what was typed since. A change still waiting is sent
  * when the component unmounts, the window closes or flushSettings is called,
  * so one made right before leaving isn't lost.
  */
 export function useAutosave<T>(saved: T, save: (value: T) => void) {
   const [value, setValue] = useState(saved);
   const [prevSaved, setPrevSaved] = useState(saved);
-  // The last value sent to main
-  const [sent, setSent] = useState<{ value: T } | null>(null);
+  // The values sent to main and not echoed yet, oldest first
+  const [sent, setSent] = useState<T[]>([]);
   // Changed, but not sent yet
   const pending = useRef<{ value: T } | null>(null);
   const saveRef = useRef(save);
 
   if (!isEqual(saved, prevSaved)) {
     setPrevSaved(saved);
-    if (!sent || !isEqual(saved, sent.value)) setValue(saved);
+    // Main answers saves in order, so an echo also settles the ones before it.
+    const echoed = sent.findIndex((v) => isEqual(v, saved));
+    if (echoed === -1) {
+      setValue(saved);
+      setSent([]);
+    } else {
+      setSent(sent.slice(echoed + 1));
+    }
   }
 
   useEffect(() => {
@@ -36,7 +43,7 @@ export function useAutosave<T>(saved: T, save: (value: T) => void) {
     if (!waiting) return;
     pending.current = null;
     saveRef.current(waiting.value);
-    setSent(waiting);
+    setSent((s) => [...s, waiting.value]);
   }, []);
 
   useEffect(() => {
