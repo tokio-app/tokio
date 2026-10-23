@@ -2,7 +2,7 @@
 
 ## Project
 
-Tokio is an Electron desktop app for Windows, macOS and Linux that connects to a TikTok LIVE stream and reacts to its events with text-to-speech, music requests (Spotify/YouTube), sound alerts, and browser-source overlays served over a local HTTP/WebSocket server.
+Tokio is an Electron desktop app for Windows, macOS and Linux that connects to a TikTok LIVE stream and reacts to its events with text-to-speech, music requests (Spotify/YouTube), alerts (sounds, images and videos), and browser-source overlays served over a local HTTP/WebSocket server.
 
 Stack: Electron 45, electron-vite, React 19, TypeScript, TanStack Router, Express 5 + `ws`, Zod 4, Yarn 1, Node >= 24.
 
@@ -181,19 +181,19 @@ To release, use the `release` skill (`/release`). The release goes out to auto-u
 The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../tokio-web`) has its own `AGENTS.md`. Update it when any of these change:
 
 - features, settings, chat commands or install steps in `README.md`
-- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, or `TOKIO_EVENTS` names and payloads
+- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, the alerts' overlay URL (`getAlertOverlayURL`), or `TOKIO_EVENTS` names and payloads
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
 ## Overlays repo
 
-The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`), which has its own `AGENTS.md`. Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change. Its releases publish a catalog of every overlay at `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`), which Tokio installs from (see `.claude/rules/overlays.md`). A new catalog schema (a renamed or removed field) needs `CatalogOverlaySchema` and `parseCatalog` to read both.
+The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`), which has its own `AGENTS.md`. Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change. Its releases publish a catalog of every overlay at `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`), which Tokio installs from (see `.claude/rules/overlays.md`). A new catalog schema (a renamed or removed field) needs `CatalogOverlaySchema` and `parseCatalog` to read both. No official overlay can have the id `alerts`: Tokio serves the alerts' overlays under `/alerts/` and drops a catalog entry with that id.
 
 ## Conventions
 
 - Run `yarn format` on files you touch, and fix lint warnings in code you touch.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `feat!:`), enforced by a husky hook and by CI on pull requests. Don't bypass hooks.
-- Keep the server port (`37891`) and existing event names stable; overlays and saved data depend on them.
+- Keep the server port (`37891`), the alerts' overlay path (`/alerts/<alert id>/`) and existing event names stable; overlays, browser sources and saved data depend on them.
 - Respect inline `NOTE: DO NOT CHANGE` markers.
 - Inside a folder with a barrel `index` (`common/types`, `common/schemas`, `components`, `context`, `hooks`), import sibling files directly, never through the barrel, to avoid import cycles.
 - `npx fallow health` (also `dead-code`, `dupes`) reports import cycles, dead code and duplication. It reads `.fallowrc.json`, where the music window UI is an entry point.

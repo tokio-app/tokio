@@ -25,6 +25,7 @@ paths:
   - `eventSource()` stands in for the live events of the connector and the music service.
 - Give services a temp folder (`mkdtemp(join(tmpdir(), "tokio-test-"))`) through their setters or `initialize`, stub `fetch` with `vi.stubGlobal`, and use fake timers for the queues.
 - The Windows TTS script runs for real, on Windows only (`describe.runIf`), in `src/main/services/tts/providers/windows/common/script.test.ts`.
+- Pages main serves, like the alert overlay page, run in `JSDOM` (`runScripts: "dangerously"`), loaded from a real `ServerService(0)` so their WebSocket connects (`src/main/services/server/index.test.ts`). jsdom doesn't play media: stub `HTMLMediaElement.prototype.play` in `beforeParse`. Close the window before the server stops, or the page keeps reconnecting.
 
 ## Renderer
 
