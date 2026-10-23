@@ -19,6 +19,8 @@ export class MusicService extends ProviderService<MusicProvider> {
   private _onSongChange?: (songs: MusicInfo[]) => void;
   // When the last command was taken, for the cooldown
   private _lastCommand = -Infinity;
+  // Bumped by clearHandler, so a request still searching then plays nothing
+  private _run = 0;
   constructor() {
     super();
     this._queue = new TaskQueue();
@@ -90,6 +92,7 @@ export class MusicService extends ProviderService<MusicProvider> {
   }
 
   public clearHandler() {
+    this._run++;
     this._queue.stop();
     this._music_queue.clear();
   }
@@ -97,11 +100,16 @@ export class MusicService extends ProviderService<MusicProvider> {
   public handle(chat: ChatEvent, settings: Profile["music"]) {
     const match = this._match(settings, chat);
     if (!match) return;
+    const { control, args } = match;
+    const { controls } = settings;
+    // Without a song they do nothing, so they don't take the cooldown
+    if ((control === controls.play || control === controls.revoke) && !args) {
+      return;
+    }
     // One command per cooldown, whoever sends it
     const now = Date.now();
     if (now - this._lastCommand < settings.protection.cooldown * 1000) return;
     this._lastCommand = now;
-    const { control, args } = match;
 
     this._queue.setQueueOptions({
       maxQueueLength: settings.protection.queue_length,
@@ -109,25 +117,24 @@ export class MusicService extends ProviderService<MusicProvider> {
 
     this._music_queue.setMaxSize(settings.protection.queue_length);
 
-    const { controls } = settings;
     if (control === controls.play) {
       this._queue.enqueue(() => this._request(args));
     } else if (control === controls.next) {
-      this._queue.enqueue(() => this.next());
+      this._queue.enqueue(() => this._music_queue.triggerNext());
     } else if (control === controls.last) {
-      this._queue.enqueue(() => this.previous());
+      this._queue.enqueue(() => this._music_queue.triggerPrevious());
     } else if (control === controls.revoke) {
-      this._queue.enqueue(() => this.revoke(args));
+      this._queue.enqueue(() => this._music_queue.revoke(args));
     }
   }
 
   // A song request that can't be found or started is reported like a song
-  // that couldn't be played.
-  private async _request(query: string) {
+  // that couldn't be played, unless clearHandler came meanwhile.
+  private async _request(query: string, run = this._run) {
     try {
-      await this.play(query);
+      await this.play(query, run);
     } catch (error) {
-      this._playbackFailed(query, error);
+      if (run === this._run) this._playbackFailed(query, error);
     }
   }
 
@@ -140,9 +147,14 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._onPlaybackError?.(id, error);
   }
 
-  private async play(query: string) {
+  // Searches first, so a request that finds nothing never reads the player
+  private async play(query: string, run: number) {
+    const info = await this._current.provider.searchSong(query);
+    if (info === null || run !== this._run) return;
+
     if (!this._music_queue.getQueueState().isPlaying) {
       const current = await this._current.provider.playerStatus();
+      if (run !== this._run) return;
       if (current && current.playing) {
         this._music_queue.addCurrentlyPlaying(
           current.title,
@@ -153,25 +165,9 @@ export class MusicService extends ProviderService<MusicProvider> {
       }
     }
 
-    const info = await this._current.provider.searchSong(query);
-
-    if (info === null) return;
-
     this._music_queue.enqueue(query, info, () =>
       this._current.provider.play(info),
     );
-  }
-
-  private async next() {
-    await this._music_queue.triggerNext();
-  }
-
-  private async previous() {
-    await this._music_queue.triggerPrevious();
-  }
-
-  private async revoke(query: string) {
-    this._music_queue.revoke(query);
   }
 
   // The control a chat calls, with its command in any case, alone or followed

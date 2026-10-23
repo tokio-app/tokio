@@ -140,6 +140,26 @@ describe("MusicQueue", () => {
     expect(onError).toHaveBeenCalledExactlyOnceWith(expect.any(String), error);
   });
 
+  it("doesn't report a song skipped while it loads that then fails", async () => {
+    const onError = vi.fn();
+    const queue = new MusicQueue({ onError });
+    queue.enqueue(
+      "a",
+      song("a", 60_000),
+      () =>
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error("No active devices.")), 3000),
+        ),
+    );
+    queue.enqueue("b", song("b", 60_000), () => {});
+
+    await queue.triggerNext();
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(playing(queue)).toBe("b");
+  });
+
   describe("when the player is gone", () => {
     const broken = (): void => {
       throw new Error("Video unavailable.");
@@ -287,6 +307,18 @@ describe("MusicQueue", () => {
     await vi.advanceTimersByTimeAsync(399);
     expect(b).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
+    expect(b).toHaveBeenCalledOnce();
+  });
+
+  it("leaves out the player's song when it would take the only place", () => {
+    const queue = new MusicQueue();
+    const b = vi.fn();
+    queue.setMaxSize(1);
+
+    queue.addCurrentlyPlaying("a", song("a", 1000), 600, () => {});
+    queue.enqueue("b", song("b"), b);
+
+    expect(titles(queue)).toEqual(["b"]);
     expect(b).toHaveBeenCalledOnce();
   });
 
@@ -493,6 +525,16 @@ describe("MusicQueue", () => {
       queue.enqueue("Café   Song", song("café"), () => {});
 
       queue.revoke(" cafe song ");
+
+      expect(titles(queue)).toEqual(["a"]);
+    });
+
+    it("matches the song's title too", () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("b", song("Song B - Artist"), () => {});
+
+      queue.revoke("song b - artist");
 
       expect(titles(queue)).toEqual(["a"]);
     });

@@ -190,7 +190,11 @@ events.push(
 events.push(
   APP_EVENTS.ACTIVE_FEATURES,
   // No notice on success, the switches already show the new state.
-  async ({ storeManagerService, ttsService, alertsService, win }, _, data) => {
+  async (
+    { storeManagerService, ttsService, alertsService, musicService, win },
+    _,
+    data,
+  ) => {
     const saved = await storeManagerService.updateActiveFeatures({
       ...data,
     });
@@ -202,6 +206,7 @@ events.push(
       alertsService.clear();
       win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
     }
+    if (data.music === false) musicService.clearHandler();
     if (!saved) throw saveFailure();
   },
   {

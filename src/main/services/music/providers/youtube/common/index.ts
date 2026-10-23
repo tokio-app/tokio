@@ -2,6 +2,9 @@ import { SongInfo } from "@/common/types";
 import { delay } from "@/common/util";
 import config from "../config";
 
+// The size part of a thumbnail URL, swapped for the size we want
+const THUMBNAIL_SIZE = /=w\d+-h\d+.*$/;
+
 // The song's own time and length come from the player: the media's turn
 // into the next song's once YouTube loads it ahead, about 10 s before the
 // end, to play it without a gap.
@@ -33,7 +36,7 @@ export const PlayerStateJSCode = `
     artist = artistNode?.textContent?.trim() ?? "";
 
     const rawImageSrc = imageNode?.src?.trim() ?? "";
-    thumbnail = rawImageSrc.replace(/=w\\d+-h\\d+.*$/, ${JSON.stringify(config.THUMBNAIL_SPEC)});
+    thumbnail = rawImageSrc.replace(${THUMBNAIL_SIZE}, ${JSON.stringify(config.THUMBNAIL_SPEC)});
   }
 
   const title = name && artist ? \`\${name} - \${artist}\` : name || artist;
@@ -146,7 +149,7 @@ export function parseDurationToSeconds(
 
 export function getHighResThumbnailUrl(url: string | undefined): string {
   if (!url) return "";
-  return url.replace(/=w\d+-h\d+.*$/, config.THUMBNAIL_SPEC);
+  return url.replace(THUMBNAIL_SIZE, config.THUMBNAIL_SPEC);
 }
 
 export function parseSongRenderer(itemRenderer: any): SongInfo | null {

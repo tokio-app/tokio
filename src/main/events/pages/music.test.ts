@@ -46,8 +46,8 @@ describe("music events", () => {
       expect(h.notices).toEqual([]);
     });
 
-    it("reports a failed save as the system's", async () => {
-      const { music, createHandler } = await load();
+    it("reports a failed save as the system's, logged once by the store", async () => {
+      const { music, createHandler, logError } = await load();
       const h = createHandler({
         storeManagerService: { updateProfileData: async () => false },
       });
@@ -68,6 +68,7 @@ describe("music events", () => {
           ...failure,
         }),
       ]);
+      expect(logError).not.toHaveBeenCalled();
     });
   });
 

@@ -110,6 +110,8 @@ export class MusicQueue extends TokioEmitter {
     currentTimeMs: number,
     action: PlayAction,
   ) {
+    // It would take the only place, and the request would be trimmed away
+    if (this._maxSize <= 1) return;
     this._queue.push({ id, song, action, startTimeMs: currentTimeMs });
     this._trimQueue();
     this.play();
@@ -135,14 +137,16 @@ export class MusicQueue extends TokioEmitter {
     this._currentIndex = 0;
   }
 
-  // Removes every request for the song that's still waiting, whatever its
-  // case, spaces and accents. Songs that played or are playing stay.
+  // Removes every request for the song that's still waiting, by its request
+  // or its title, whatever its case, spaces and accents. Songs that played
+  // or are playing stay.
   public revoke(id: string) {
     const key = requestKey(id);
     if (!key) return;
     const kept = this._queue.filter(
       (item, index) =>
-        index <= this._currentIndex || requestKey(item.id) !== key,
+        index <= this._currentIndex ||
+        (requestKey(item.id) !== key && requestKey(item.song.title) !== key),
     );
     if (kept.length === this._queue.length) return;
 
@@ -216,7 +220,8 @@ export class MusicQueue extends TokioEmitter {
             : item.song.duration;
         if (item.song.duration <= 0) waitTime = UNKNOWN_LENGTH_MS;
       } catch (error) {
-        this._hooks.onError?.(item.id, error);
+        // Not for a song skipped while it loaded
+        if (active()) this._hooks.onError?.(item.id, error);
         if (++failures === 2 && active()) {
           this._currentIndex--;
           this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
