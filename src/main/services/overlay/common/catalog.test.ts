@@ -64,6 +64,16 @@ describe("parseCatalog", () => {
     expect(dropped).toEqual(["alerts"]);
   });
 
+  it("drops an overlay named timer, whose path the countdown timer uses", () => {
+    const { overlays, dropped } = parseCatalog({
+      schema: 1,
+      overlays: [entry({ id: "timer" }), entry()],
+    });
+
+    expect(overlays.map((o) => o.id)).toEqual(["gift-jar"]);
+    expect(dropped).toEqual(["timer"]);
+  });
+
   it("drops previews from anywhere else", () => {
     const { overlays } = parseCatalog({
       schema: 1,

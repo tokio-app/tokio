@@ -8,4 +8,5 @@ export * from "./music";
 export * from "./overlay";
 export * from "./server";
 export * from "./store";
+export * from "./timer";
 export * from "./updates";

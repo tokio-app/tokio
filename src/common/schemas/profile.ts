@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AlertTrigger, EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
+import { TimerProfileSchema } from "./timer";
 
 const PermissionsSchema = z.object({
   all: z.boolean(),
@@ -185,6 +186,9 @@ export const ProfileSchema = z.object({
   // TikTok can't list a LIVE's emotes, so they're collected as viewers use
   // them, in the order they first appeared.
   emotes: z.array(SavedEmoteSchema).default([]),
+  // The countdown timer on Tools, its settings and clock. Profiles saved
+  // before it existed start from the defaults.
+  timer: TimerProfileSchema.prefault({}),
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;

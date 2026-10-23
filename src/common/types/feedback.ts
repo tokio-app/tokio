@@ -84,6 +84,10 @@ export enum FEEDBACK_CODES {
   GIFTS_FETCH_FAILED = "gifts_fetch_failed",
   TEST_OVERLAY_FAILED = "test_overlay_failed",
 
+  // TIMER
+  TIMER_PAUSED = "timer_paused",
+  TIMER_FAILED = "timer_failed",
+
   // ALERTS
   SOUND_ADDED = "sound_added",
   SOUNDS_UPLOADED = "sounds_uploaded",
