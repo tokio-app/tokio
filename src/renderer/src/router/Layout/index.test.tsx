@@ -64,6 +64,18 @@ describe("Layout", () => {
     );
   });
 
+  it("hides the sidebar's names on Escape until another link is hovered", async () => {
+    const { user } = await renderApp();
+    const nav = screen.getByRole("navigation");
+
+    await user.hover(sidebar().getByRole("link", { name: "TTS" }));
+    await user.keyboard("{Escape}");
+    expect(nav).toHaveAttribute("data-names", "hidden");
+
+    await user.hover(sidebar().getByRole("link", { name: "Music" }));
+    expect(nav).not.toHaveAttribute("data-names");
+  });
+
   it("moves between pages", async () => {
     const { user, router } = await renderApp();
     expect(

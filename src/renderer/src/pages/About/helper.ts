@@ -53,7 +53,7 @@ export const COMPONENTS: Component[] = [
     doc: "Apache-2.0",
   },
   {
-    name: "Feather, Octicons, Bootstrap Icons, Phosphor, Lucide",
+    name: "Feather, Octicons, Phosphor, Lucide",
     author: "Their respective authors",
     license: "MIT, ISC",
     url: "https://github.com/react-icons/react-icons",

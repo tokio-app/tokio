@@ -27,24 +27,20 @@
   z-index: var(--z-sidebar);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
   width: var(--rail-width);
   padding: var(--space-3) 0;
   border-right: 1px solid var(--border);
   background-color: var(--background-primary);
 }
 
+/* Square cells, with no gaps for the pointer to fall through */
 .sidebar_item {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-1);
+  height: var(--rail-width);
   color: var(--font-secondary);
-  font-size: var(--font-xs);
-  font-weight: 500;
   text-decoration: none;
   cursor: pointer;
   transition: color var(--transition-fast);
@@ -62,10 +58,6 @@
   margin-top: auto;
 }
 
-.sidebar_item.sidebar_item_active {
-  color: var(--font-primary);
-}
-
 .sidebar_item_active svg {
   color: var(--accent-primary);
 }
@@ -80,4 +72,49 @@
   width: 2px;
   border-radius: 0 2px 2px 0;
   background-color: var(--accent-primary);
+}
+
+/* The page's name beside its icon, on hover and keyboard focus. Opacity hides
+   it, not visibility, so it still names the link. */
+.sidebar_name {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + var(--space-2));
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--background-secondary);
+  box-shadow: var(--shadow-popover);
+  color: var(--font-primary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+/* Spans the gap back into the link, so the pointer can move onto the name */
+.sidebar_name::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 100%;
+  bottom: 0;
+  width: var(--space-3);
+}
+
+/* Layout sets data-names="hidden" on Escape */
+.sidebar:not([data-names="hidden"])
+  .sidebar_item:is(:hover, :focus-visible)
+  .sidebar_name {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar_name {
+    transition: none;
+  }
 }

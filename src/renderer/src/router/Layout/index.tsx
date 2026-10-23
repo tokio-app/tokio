@@ -13,23 +13,30 @@ import {
 import { TitleBar } from "@/ui/TitleBar";
 import { Link, Outlet } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BsLightningCharge } from "react-icons/bs";
-import { FiHome, FiInfo, FiMusic, FiSettings, FiVolume2 } from "react-icons/fi";
-import { LuMonitorCog } from "react-icons/lu";
-import { VscTools } from "react-icons/vsc";
+import {
+  LuFlaskConical,
+  LuInfo,
+  LuListMusic,
+  LuPartyPopper,
+  LuPictureInPicture2,
+  LuRadio,
+  LuSettings,
+  LuSpeech,
+} from "react-icons/lu";
 import styles from "./layout.module.css";
 
+// Lucide only, so the rail's strokes match
 const NAV_ITEMS = [
-  { to: "/", label: "Home", icon: <FiHome size={20} /> },
-  { to: "/overlays", label: "Overlays", icon: <LuMonitorCog size={20} /> },
-  { to: "/tts", label: "TTS", icon: <FiVolume2 size={20} /> },
-  { to: "/alerts", label: "Alerts", icon: <BsLightningCharge size={22} /> },
-  { to: "/music", label: "Music", icon: <FiMusic size={20} /> },
+  { to: "/", label: "Home", icon: LuRadio },
+  { to: "/overlays", label: "Overlays", icon: LuPictureInPicture2 },
+  { to: "/tts", label: "TTS", icon: LuSpeech },
+  { to: "/alerts", label: "Alerts", icon: LuPartyPopper },
+  { to: "/music", label: "Music", icon: LuListMusic },
   // Pinned to the bottom of the sidebar from here on
-  { to: "/tools", label: "Tools", icon: <VscTools size={20} />, bottom: true },
+  { to: "/tools", label: "Tools", icon: LuFlaskConical, bottom: true },
   // Shows the license notices, keep it in the sidebar
-  { to: "/about", label: "About", icon: <FiInfo size={20} /> },
-  { to: "/settings", label: "Settings", icon: <FiSettings size={20} /> },
+  { to: "/about", label: "About", icon: LuInfo },
+  { to: "/settings", label: "Settings", icon: LuSettings },
 ] as const;
 
 export function Layout() {
@@ -43,6 +50,7 @@ export function Layout() {
     file: "",
     name: "",
   });
+  const [namesHidden, setNamesHidden] = useState(false);
 
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
 
@@ -59,6 +67,16 @@ export function Layout() {
   useEffect(() => {
     resumeContext();
   }, [resumeContext]);
+
+  // The sidebar's names cover the page's edge, so Escape hides them until the
+  // pointer or focus moves to another link (WCAG 1.4.13)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNamesHidden(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <div className={styles.container}>
@@ -84,7 +102,10 @@ export function Layout() {
       </TitleBar>
 
       <div className={styles.main_area}>
-        <nav className={styles.sidebar}>
+        <nav
+          className={styles.sidebar}
+          data-names={namesHidden ? "hidden" : undefined}
+        >
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.to}
@@ -93,9 +114,11 @@ export function Layout() {
                 "bottom" in item ? styles.sidebar_item_bottom : ""
               }`}
               activeProps={{ className: styles.sidebar_item_active }}
+              onMouseEnter={() => setNamesHidden(false)}
+              onFocus={() => setNamesHidden(false)}
             >
-              {item.icon}
-              {item.label}
+              <item.icon size={20} />
+              <span className={styles.sidebar_name}>{item.label}</span>
             </Link>
           ))}
         </nav>
