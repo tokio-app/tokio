@@ -1,11 +1,11 @@
 import { EULER_SIGNUP_URL } from "@/common/util";
 import { Btn, Input, Section } from "@/components";
-import { cx } from "@/helper";
+import { cx, formatDuration } from "@/helper";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { FiPlay, FiSquare } from "react-icons/fi";
 import styles from "../home.module.css";
-import { formatDuration, Stat, statText } from "../helper";
+import { Stat, statText } from "../helper";
 
 interface Props {
   username: string;

@@ -892,9 +892,13 @@ export class StoreManagerService extends Service {
     return this._addEntity(profile, this._storeData!.profiles);
   }
 
-  public async updateProfileData(updates: Partial<Profile>): Promise<boolean> {
+  // `file` defaults to the active profile's. A service saving the profile it
+  // loaded from passes it, so a save racing a switch can't land in the new one.
+  public async updateProfileData(
+    updates: Partial<Profile>,
+    file = this._activeProfileFile(),
+  ): Promise<boolean> {
     this._ensureInitialized();
-    const file = this._activeProfileFile();
     const res = await this._jsonManagerService.updateFile(
       join(this._pathManagerService.folders.profilesFolder, file),
       ProfileSchema,

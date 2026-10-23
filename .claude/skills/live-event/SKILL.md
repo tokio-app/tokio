@@ -24,9 +24,16 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
    - `ACTIVITY_EVENTS` and its item in `src/main/services/live/index.ts`, and the `Activity` type in `src/common/types/live.ts`
    - its kind in `ActivityFeedSchema` (`src/common/schemas/store.ts`), with its default in `src/common/util/constants/store.ts`
    - `FeedModal` (`src/renderer/src/pages/Home/sections/`)
-6. Overlays get every live event on their own: `ServerService` broadcasts each one `isLiveEvent` lets through.
-7. Tests next to each file you changed: the connector mapping, alerts and the live session.
-8. The README, where its alerts and overlays parts list events.
+6. The countdown timer, when viewers doing it should add time:
+   - its trigger in `TIMER_EVENTS` (`src/main/services/timer/index.ts`)
+   - a field in the `seconds` and `names` groups of `TimerSettingsSchema` (`src/common/schemas/timer.ts`), and its carousel item in `timerTriggers` (`src/common/util/timer.ts`)
+   - its row in `TRIGGERS` (`src/renderer/src/pages/Tools/helper.ts`)
+
+   See `.claude/rules/timer.md`.
+
+7. Overlays get every live event on their own: `ServerService` broadcasts each one `isLiveEvent` lets through.
+8. Tests next to each file you changed: the connector mapping, alerts, the live session and the timer.
+9. The README, where its alerts, overlays and countdown timer parts list events.
 
 ## Other repos
 

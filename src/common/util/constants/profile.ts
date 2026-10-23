@@ -1,4 +1,4 @@
-import { Profile } from "../../schemas";
+import { Profile, TimerProfileSchema } from "../../schemas";
 
 export const defaultProfile: Profile = {
   name: "Default",
@@ -97,4 +97,5 @@ export const defaultProfile: Profile = {
     items: [],
   },
   emotes: [],
+  timer: TimerProfileSchema.parse({}),
 };

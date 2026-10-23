@@ -53,7 +53,7 @@ After `yarn.lock` changes, reinstall there first with `ELECTRON_SKIP_BINARY_DOWN
 - `LICENSES/`, `THIRD_PARTY_NOTICES.md`: third-party license texts and notices, shipped to the app's `resources/licenses`
 - `build/`: the app icons electron-builder uses
 
-Generated, don't edit: `out/`, `music-out/`, `dist/`. The packaged app holds only `out/`, `music-out/`, `resources/` and the production dependencies (`files` in `electron-builder.yml`), so a file the app reads at runtime must live in one of them. Dependencies only the windows import are bundled by Vite, so they ship only their `package.json` and license files (for About), through the `!node_modules/{…}` pattern in `files`; take one out of it if main or the preload starts importing it. `src/main/packaging.test.ts` fails when code in `src/main` or `src/common` reaches one, directly or through a dependency.
+Generated, don't edit: `out/`, `music-out/`, `dist/`. The packaged app holds only `out/`, `music-out/`, `resources/` and the production dependencies (`files` in `electron-builder.yml`), so a file the app reads at runtime must live in one of them. Dependencies only the windows import are bundled by Vite, so they ship only their `package.json` and license files (for About), through the `!node_modules/{…}` pattern in `files`; take one out of it if main or the preload starts importing it. `src/main/packaging.test.ts` fails when code in `src/main` or `src/common` reaches one, directly or through a dependency. A file main imports from one with a query, like the countdown timer's font (`?inline`), is bundled into `out/main` instead, once the package is in main's `externalizeDeps.exclude` (`electron.vite.config.ts`); the test skips those imports.
 
 ## Path aliases
 
@@ -75,6 +75,7 @@ Notes that only matter in one area live in `.claude/rules/`. Claude Code loads e
 - `live-session.md`: the LIVE session and activity feed on Home
 - `overlays.md`: overlay previews and official overlays
 - `updates.md`: the auto-updater
+- `timer.md`: the countdown timer, its overlay and the Tools page
 
 When a change alters what a rule says, update the rule with it. A new area gets its own rule with `paths`.
 
@@ -141,7 +142,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 
 ### Persistence
 
-Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load. Store mutators return whether the store file was written. `createNewProfile`, `cloneProfile` and `importProfile` return `"unsaved"` when only the store save failed, after deleting the profile file they wrote, and `null` for other failures. A profile switch that can't be saved keeps the old profile, and `updateProfileData` throws until the store has loaded. Provider keys (the Euler key, voice engine keys) are saved encrypted with `safeStorage`'s async calls. The store decrypts them once at startup and reads them from memory, so `getSettings` stays synchronous.
+Settings and profiles are validated with the Zod schemas in `src/common/schemas` and persisted by `StoreManagerService`. When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load. Store mutators return whether the store file was written. `createNewProfile`, `cloneProfile` and `importProfile` return `"unsaved"` when only the store save failed, after deleting the profile file they wrote, and `null` for other failures. A profile switch that can't be saved keeps the old profile, and `updateProfileData` throws until the store has loaded. It writes the active profile unless given a file: a service that keeps a profile's data in memory, like the countdown timer, passes the file it loaded from. Provider keys (the Euler key, voice engine keys) are saved encrypted with `safeStorage`'s async calls. The store decrypts them once at startup and reads them from memory, so `getSettings` stays synchronous.
 
 Profile files are named by `StoreManagerService.profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file: creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`), and an import gets a free file name. An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case. One whose trimmed name is too short is listed as "Imported profile".
 
@@ -181,19 +182,19 @@ To release, use the `release` skill (`/release`). The release goes out to auto-u
 The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../tokio-web`) has its own `AGENTS.md`. Update it when any of these change:
 
 - features, settings, chat commands or install steps in `README.md`
-- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, the alerts' overlay URL (`getAlertOverlayURL`), or `TOKIO_EVENTS` names and payloads
+- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, the alerts' overlay URL (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`) or what it does, or `TOKIO_EVENTS` names and payloads
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
 ## Overlays repo
 
-The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`), which has its own `AGENTS.md`. Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change. Its releases publish a catalog of every overlay at `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`), which Tokio installs from (see `.claude/rules/overlays.md`). A new catalog schema (a renamed or removed field) needs `CatalogOverlaySchema` and `parseCatalog` to read both. No official overlay can have the id `alerts`: Tokio serves the alerts' overlays under `/alerts/` and drops a catalog entry with that id.
+The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`), which has its own `AGENTS.md`. Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change. Its releases publish a catalog of every overlay at `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`), which Tokio installs from (see `.claude/rules/overlays.md`). A new catalog schema (a renamed or removed field) needs `CatalogOverlaySchema` and `parseCatalog` to read both. No official overlay can have the id `alerts` or `timer`: Tokio serves the alerts' overlays under `/alerts/` and the countdown timer's at `/timer/`, and drops a catalog entry with either id.
 
 ## Conventions
 
 - Run `yarn format` on files you touch, and fix lint warnings in code you touch.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `feat!:`), enforced by a husky hook and by CI on pull requests. Don't bypass hooks.
-- Keep the server port (`37891`), the alerts' overlay path (`/alerts/<alert id>/`) and existing event names stable; overlays, browser sources and saved data depend on them.
+- Keep the server port (`37891`), the alerts' overlay path (`/alerts/<alert id>/`), the countdown timer's (`/timer/`) and existing event names stable; overlays, browser sources and saved data depend on them.
 - The overlay server listens on every network interface on purpose: a streaming app on another computer opens overlays through `tokio-app.local` pointed at this PC's address (shown in Settings → Overlay Server, `ServerService.networkAddresses()`) in that computer's hosts file or a DNS entry, and the setup block's `REMOTE_SOCKET` points their socket back at this PC. Don't bind it to loopback or add Host/Origin checks.
 - Respect inline `NOTE: DO NOT CHANGE` markers.
 - Inside a folder with a barrel `index` (`common/types`, `common/schemas`, `components`, `context`, `hooks`), import sibling files directly, never through the barrel, to avoid import cycles.

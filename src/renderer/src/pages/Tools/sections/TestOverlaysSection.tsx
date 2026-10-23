@@ -13,7 +13,6 @@ import styles from "../tools.module.css";
 interface Props {
   overlays: TestOverlay[];
   statuses: Record<string, TestStatus>;
-  serverEnabled: boolean;
   onCreate: (name: string) => void;
   onRemove: (id: string) => void;
   onTest: (id: string) => void;
@@ -22,7 +21,6 @@ interface Props {
 export function TestOverlaysSection({
   overlays,
   statuses,
-  serverEnabled,
   onCreate,
   onRemove,
   onTest,
@@ -32,14 +30,8 @@ export function TestOverlaysSection({
   return (
     <Section
       title="Test Overlays"
-      description="Create an ID for an overlay you are developing and send it test events without importing it. The overlay connects to the WebSocket with its ID."
+      description="Send test events to an overlay you're building."
     >
-      {!serverEnabled && (
-        <p className={styles.notice}>
-          The overlay server is off. Enable it in Settings to send test events.
-        </p>
-      )}
-
       <form
         className={styles.row}
         onSubmit={(e) => {
@@ -97,7 +89,7 @@ export function TestOverlaysSection({
               </div>
 
               {statuses[overlay.id] && (
-                <p className={styles.status}>
+                <p className={styles.test_status}>
                   {STATUS_LABELS[statuses[overlay.id]]}
                 </p>
               )}

@@ -16,6 +16,7 @@ import {
   MyInstantsSound,
   OverlayApp,
   PackageLicense,
+  TimerData,
   VoiceData,
   VoiceEngine,
 } from "@/common/types";
@@ -195,6 +196,21 @@ export function profileReply(recipe?: (profile: Profile) => void) {
 /** The GET_SETTINGS reply with the default store, changed by `recipe`. */
 export function settingsReply(recipe?: (store: StoreSchema) => void) {
   const data = structuredClone(defaultStoreData);
+  recipe?.(data);
+  return { success: true, data };
+}
+
+/**
+ * A TIMER reply or push with the default timer, idle at its starting time,
+ * changed by `recipe`.
+ */
+export function timerReply(recipe?: (data: TimerData) => void) {
+  const settings = structuredClone(defaultProfile.timer.settings);
+  const data: TimerData = {
+    settings,
+    state: { status: "idle", remaining: settings.start * 60_000 },
+    added: 0,
+  };
   recipe?.(data);
   return { success: true, data };
 }

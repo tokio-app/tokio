@@ -12,6 +12,7 @@ import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
+import { TimerService } from "@/services/timer";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
 import { URLManagerService } from "@/services/url";
@@ -50,6 +51,7 @@ export class AppHandler implements AppHandlerVariables {
   public readonly licensesService: LicensesService;
   public readonly updaterService: UpdaterService;
   public readonly liveService: LiveService;
+  public readonly timerService: TimerService;
   public readonly notifier: Notifier;
 
   constructor(deps: AppHandlerVariables) {

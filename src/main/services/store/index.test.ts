@@ -755,6 +755,26 @@ describe("StoreManagerService", () => {
       );
     });
 
+    it("updates a profile other than the active one when given its file", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.updateActiveProfile("stream.json");
+
+      expect(
+        await store.updateProfileData(
+          { connector: { username: "streamer" } },
+          "default.json",
+        ),
+      ).toBe(true);
+
+      expect((await readJSON(defaultProfileFile)).connector.username).toBe(
+        "streamer",
+      );
+      const active = await store.getProfileData();
+      expect(active?.name).toBe("Stream");
+      expect(active?.connector.username).toBe("");
+    });
+
     it("loads profiles saved before emotes and alert filters", async () => {
       const old: Partial<Profile> = structuredClone(defaultProfile);
       delete old.emotes;

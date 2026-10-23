@@ -1,5 +1,11 @@
 import { isLiveEvent, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
-import { ALERTS_PATH, formatError, SERVER_PORT } from "@/common/util";
+import {
+  ALERTS_PATH,
+  formatError,
+  SERVER_PORT,
+  TIMER_PATH,
+} from "@/common/util";
+import ARCHIVO from "@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2?inline";
 import Logger from "@/logger";
 import express, { Express, Router } from "express";
 import { randomUUID } from "node:crypto";
@@ -9,7 +15,12 @@ import { TikTokConnectorService } from "../connector";
 import { MusicService } from "../music";
 import { Service } from "../shared";
 import ALERT_PAGE from "./alert.html?raw";
+import TIMER_HTML from "./timer.html?raw";
 import { CustomWebSocketServer } from "./websocket";
+
+// Inlined, so streaming apps on any computer get the app's typeface, without
+// a font route (res.sendFile refuses the Linux AppImage's /tmp/.mount_ folder)
+const TIMER_PAGE = TIMER_HTML.replace("__ARCHIVO__", () => ARCHIVO);
 
 // Adapter names that are usually virtual: Hyper-V, WSL, VMs, Docker, bridges.
 // A real network card can have them too, with Hyper-V or a bridge set up.
@@ -23,6 +34,7 @@ export class ServerService extends Service {
   private _port: number;
   // Folders served under /<id>/, keyed by id.
   private _routes = new Map<string, string>();
+  private _connectListeners: ((id: string) => void)[] = [];
 
   // NOTE: Overlays connect to SERVER_PORT, other ports are for tests.
   constructor(port: number = SERVER_PORT) {
@@ -35,6 +47,10 @@ export class ServerService extends Service {
     // path. Their media is mounted at /alerts/media/, a path one level deeper.
     this._app.get(`/${ALERTS_PATH}/:id`, (_req, res) => {
       res.type("html").send(ALERT_PAGE);
+    });
+    // The countdown timer's overlay. Express 5 matches /timer/ too.
+    this._app.get(`/${TIMER_PATH}`, (_req, res) => {
+      res.type("html").send(TIMER_PAGE);
     });
 
     this._app.use((req, res, next) => {
@@ -110,6 +126,7 @@ export class ServerService extends Service {
             `<WebSocket> New client connected: ${clientId}`,
             this._logFile,
           );
+          for (const listener of this._connectListeners) listener(clientId);
 
           client.on("close", () => {
             this._wss?.removeClient(clientId, client);
@@ -212,6 +229,11 @@ export class ServerService extends Service {
         connectorService.on(event, handler);
         musicService.on(event, handler);
       });
+  }
+
+  /** Calls the listener with each overlay's id as it connects. */
+  public onConnect(listener: (id: string) => void) {
+    this._connectListeners.push(listener);
   }
 
   // Whether an overlay connected with the id got the payload.

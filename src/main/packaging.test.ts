@@ -40,6 +40,10 @@ const IMPORT =
 // The package a specifier names, if it's one from node_modules
 function packageOf(specifier: string): string | undefined {
   if (/^(\.|@\/|node:)/.test(specifier)) return undefined;
+  // A file with a query (?inline) is bundled into out/main once the package
+  // is in externalizeDeps.exclude (electron.vite.config.ts). Without that,
+  // startup fails in yarn test:e2e.
+  if (specifier.includes("?")) return undefined;
   const [first, second] = specifier.split("/");
   if (builtinModules.includes(first)) return undefined;
   return first.startsWith("@") ? `${first}/${second}` : first;

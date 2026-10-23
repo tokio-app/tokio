@@ -1,5 +1,12 @@
 import { AlertTrigger, TokioPayload } from "../connector";
-import { ActivityFeed, AlertTts, OverlayConfig, Profile } from "../../schemas";
+import {
+  ActivityFeed,
+  AlertTts,
+  OverlayConfig,
+  Profile,
+  TimerAction,
+  TimerSettings,
+} from "../../schemas";
 import { VoiceData } from "../store";
 
 export enum APP_EVENTS {
@@ -77,6 +84,10 @@ export enum APP_EVENTS {
   ADD_TEST_OVERLAY = "app:tools:overlays:add",
   REMOVE_TEST_OVERLAY = "app:tools:overlays:remove",
   SEND_TEST_EVENTS = "app:tools:overlays:test",
+  GET_TIMER = "app:tools:timer:get",
+  SET_TIMER_SETTINGS = "app:tools:timer:set",
+  TIMER_CONTROL = "app:tools:timer:control",
+  ADJUST_TIMER = "app:tools:timer:adjust",
 
   // ALERTS
   UPDATE_ALERTS_SETTINGS = "app:alerts:update:settings",
@@ -249,6 +260,12 @@ export interface AppEventsMap {
   [APP_EVENTS.ADD_TEST_OVERLAY]: { name: string };
   [APP_EVENTS.REMOVE_TEST_OVERLAY]: { id: string };
   [APP_EVENTS.SEND_TEST_EVENTS]: { id: string };
+  // The countdown timer's requests are answered by its TIMER push
+  [APP_EVENTS.GET_TIMER]: void;
+  [APP_EVENTS.SET_TIMER_SETTINGS]: { settings: TimerSettings };
+  [APP_EVENTS.TIMER_CONTROL]: { action: TimerAction };
+  // Adds the seconds to the clock, or removes them when negative
+  [APP_EVENTS.ADJUST_TIMER]: { seconds: number };
 
   // ALERTS
   [APP_EVENTS.UPDATE_ALERTS_SETTINGS]: {

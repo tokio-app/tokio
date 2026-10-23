@@ -1,7 +1,7 @@
 <div align="center">
   <img src="resources/icon.png" alt="Tokio logo" width="96" />
   <h1>Tokio</h1>
-  <p>Make your TikTok LIVE react to chat, gifts, likes and more: text-to-speech, music requests, alerts and overlays.</p>
+  <p>Make your TikTok LIVE react to chat, gifts, likes and more: text-to-speech, music requests, alerts, a countdown timer and overlays.</p>
   <p>
     <a href="https://tokio.ialfaro.com">Website</a> ·
     <a href="https://github.com/tokio-app/tokio/releases">Download</a> ·
@@ -9,7 +9,7 @@
   </p>
 </div>
 
-Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok LIVE and reacts to what happens in it. It reads chat aloud, takes song requests, plays sounds and shows images or videos when someone follows or sends a gift, and drives overlays you add to **OBS**, **TikTok LIVE Studio** or any streaming app that can show a web page.
+Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok LIVE and reacts to what happens in it. It reads chat aloud, takes song requests, plays sounds and shows images or videos when someone follows or sends a gift, runs a countdown that viewers add time to, and drives overlays you add to **OBS**, **TikTok LIVE Studio** or any streaming app that can show a web page.
 
 ## Features
 
@@ -70,6 +70,16 @@ On the **Overlays** page, **Official Overlays** opens the overlays made for Toki
 
 Set them up from the gallery on the **Overlays** page: colors, text, the gifts they react to (picked from the same list as gift alerts), and anything else an overlay offers. Tokio gives each overlay its own URL on your computer, `http://tokio-app.local:37891/<overlay-id>/`. Copy it from the gallery and add it to your streaming app (see [Adding an overlay](#adding-an-overlay)).
 
+### Countdown timer
+
+Run a subathon-style countdown on your stream that viewers add time to. Set it up on the **Tools** page, and add its overlay, `http://tokio-app.local:37891/timer/`, to your streaming app like any overlay (see [Adding an overlay](#adding-an-overlay)).
+
+- **Start**, **Pause**, **Stop** and **Reset** the clock. While it's paused, LIVE events still add time; once it's stopped, they don't until you press **Start** again. **Reset** puts the starting time back after you confirm, since the time added so far is lost. **Add** and **Remove** change the clock by the minutes you enter.
+- Choose how many seconds each event adds: per coin of the gifts sent, every so many likes, and for each new Super Fan, follow, share or chat message. Set an event to 0 to leave it out. The **Multiplier** applies to all of them, for a double-time hour, and the overlay shows it, like ×2. **Maximum time** stops added time once the clock reaches it.
+- Chat messages can add time only when they have a keyword or phrase, matched like a chat alert's, and each viewer's messages add time at most once in the cooldown you set.
+- On stream, the overlay shows the clock, an optional title, and the time each event adds as it comes in. In **Timer Look**, right under the preview, pick its colors, fonts installed on the computer that runs your streaming app, and how many minutes before the end the clock turns to its warning color. Turn on **Show the triggers, one at a time** to show what each event adds, one after another under the clock, with names you can write in your audience's language.
+- Each profile has its own timer. The clock keeps running when you leave the **Tools** page, and pauses when the LIVE ends or Tokio disconnects from it, unless you turn that off. If Tokio closes while the clock runs, it comes back paused with about the time it had.
+
 ### Profiles and settings
 
 - **Profiles**: keep separate settings for different streams. Create a blank profile or clone an existing one, and switch between them from the title bar.
@@ -116,7 +126,7 @@ Set everything up before you go live: Tokio can only connect once your LIVE has 
 
 ### Adding an overlay
 
-Overlays are served by Tokio's overlay server. Turn it on first in **Settings → Overlay Server**, then copy the overlay's URL from the **Overlays** page, or an alert's from its media on the **Alerts** page.
+Overlays are served by Tokio's overlay server. Turn it on first in **Settings → Overlay Server**, then copy the overlay's URL from the **Overlays** page, an alert's from its media on the **Alerts** page, or the countdown timer's from **Tools**.
 
 TikTok LIVE Studio doesn't accept `localhost` links, so overlays use their own address, `tokio-app.local`. The first time you turn on the server, your system asks for administrator rights (your password on macOS and Linux) so Tokio can add this address to your hosts file, pointing to your own computer. Accept the prompt, or the server stays off. You won't be asked again while the entry is there.
 

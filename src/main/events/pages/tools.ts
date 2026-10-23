@@ -1,3 +1,4 @@
+import { TIMER_ACTIONS } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -5,6 +6,8 @@ import {
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
 import { saveFailure } from "@/helper/feedback";
+import type { TimerService } from "@/services/timer";
+import { z } from "zod";
 
 const events = createStack("overlays");
 
@@ -97,6 +100,71 @@ events.push(
         error,
       }),
   },
+);
+
+// The countdown timer's requests are answered by its TIMER push (see
+// registerTimer in init.ts). No success notices: the settings autosave, and
+// the page shows the state. The service logs to the system log.
+const timerOptions = {
+  source: "system",
+  failure: {
+    code: FEEDBACK_CODES.TIMER_FAILED,
+    message: "Unable to update the countdown timer.",
+  },
+  onError: replyFailure(APP_EVENTS_RESPONSE.TIMER),
+} as const;
+
+const saveTimer = async (timer: TimerService) => {
+  if (!(await timer.save())) throw saveFailure();
+};
+
+events.push(
+  APP_EVENTS.GET_TIMER,
+  async ({ timerService }, e) => {
+    e.reply(APP_EVENTS_RESPONSE.TIMER, {
+      success: true,
+      data: { ...timerService.get(), added: 0 },
+    });
+  },
+  {
+    ...timerOptions,
+    failure: {
+      code: FEEDBACK_CODES.TIMER_FAILED,
+      message: "Unable to load the countdown timer.",
+    },
+  },
+);
+
+events.push(
+  APP_EVENTS.SET_TIMER_SETTINGS,
+  async ({ timerService }, _e, { settings }) => {
+    timerService.setSettings(settings);
+    await saveTimer(timerService);
+  },
+  timerOptions,
+);
+
+events.push(
+  APP_EVENTS.TIMER_CONTROL,
+  async ({ timerService }, _e, data) => {
+    timerService.control(z.enum(TIMER_ACTIONS).parse(data.action));
+    await saveTimer(timerService);
+  },
+  timerOptions,
+);
+
+events.push(
+  APP_EVENTS.ADJUST_TIMER,
+  async ({ timerService }, _e, data) => {
+    // Zod's numbers are finite
+    const seconds = z
+      .number()
+      .refine((s) => s !== 0)
+      .parse(data.seconds);
+    timerService.adjust(seconds * 1000);
+    await saveTimer(timerService);
+  },
+  timerOptions,
 );
 
 export default events;

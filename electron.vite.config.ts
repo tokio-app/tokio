@@ -10,6 +10,8 @@ const MAIN_LICENSE_BANNER = `/*!
  * Tokio - source code under the MIT License, see resources/licenses/LICENSE.
  * Includes src/main/services/tts/providers/edge/common/drm-v2.ts, derived from
  * edge-tts (https://github.com/rany2/edge-tts) and licensed LGPL-3.0-only.
+ * Includes the Archivo font (@fontsource-variable/archivo), licensed under the
+ * SIL Open Font License 1.1.
  * Source: https://github.com/tokio-app/tokio
  * See resources/licenses/THIRD_PARTY_NOTICES.md and resources/licenses/LICENSES.
  */`;
@@ -53,6 +55,10 @@ export default defineConfig({
         "@/common": resolve("src/common"),
         "@": resolve("src/main"),
       },
+    },
+    build: {
+      // Bundled, so the timer overlay's ?inline font import becomes a data URL
+      externalizeDeps: { exclude: ["@fontsource-variable/archivo"] },
     },
     plugins: [licenseBanner(MAIN_LICENSE_BANNER)],
   },

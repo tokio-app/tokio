@@ -1,4 +1,6 @@
+import { TimerSettingsSchema } from "@/common/schemas";
 import { TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import { TIMER_PATH } from "@/common/util";
 import Logger from "@/logger";
 import { JSDOM } from "jsdom";
 import { EventEmitter } from "node:events";
@@ -319,6 +321,212 @@ describe("ServerService", () => {
       } finally {
         dom.window.close();
       }
+    });
+  });
+
+  describe("timer overlay", () => {
+    const look = TimerSettingsSchema.parse({}).look;
+    const timerState = (patch: object = {}, lookPatch: object = {}) => ({
+      status: "running",
+      remaining: 3_600_000,
+      added: 0,
+      multiplier: 1,
+      ...patch,
+      look: { ...look, ...lookPatch },
+    });
+
+    beforeEach(async () => {
+      await server.start();
+    });
+
+    it("serves the timer page with the font inlined", async () => {
+      for (const path of ["/timer/", "/timer"]) {
+        const res = await fetch(url(path));
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toMatch(/^text\/html/);
+        const html = await res.text();
+        expect(html).toContain("tokio:timer");
+        expect(html).toContain("url(data:font/woff2;base64,");
+        expect(html).not.toContain("__ARCHIVO__");
+      }
+    });
+
+    it("tells listeners which overlay connected", async () => {
+      const connected = vi.fn();
+      server.onConnect(connected);
+
+      await connect(TIMER_PATH);
+
+      expect(connected).toHaveBeenCalledExactlyOnceWith(TIMER_PATH);
+    });
+
+    describe("page", () => {
+      let dom: JSDOM;
+      const el = (id: string) => dom.window.document.getElementById(id)!;
+      const send = (data: object) =>
+        server.sendToClient(TIMER_PATH, { type: "tokio:timer", data });
+
+      beforeEach(async () => {
+        const page = url("/timer/");
+        dom = new JSDOM(await (await fetch(page)).text(), {
+          url: page,
+          runScripts: "dangerously",
+        });
+        await vi.waitFor(() => expect(send(timerState())).toBe(true));
+      });
+
+      afterEach(() => {
+        dom.window.close();
+      });
+
+      it("counts down from the time sent", async () => {
+        send(timerState({ remaining: 5000 }));
+        await vi.waitFor(() =>
+          expect(el("clock").textContent).toBe("00:00:05"),
+        );
+
+        await vi.waitFor(
+          () => expect(el("clock").textContent).toBe("00:00:04"),
+          { timeout: 2000 },
+        );
+        expect(el("clock").classList.contains("dim")).toBe(false);
+      });
+
+      it("dims and holds when it isn't running", async () => {
+        send(timerState({ status: "paused", remaining: 90_000 }));
+
+        await vi.waitFor(() =>
+          expect(el("clock").textContent).toBe("00:01:30"),
+        );
+        expect(el("clock").classList.contains("dim")).toBe(true);
+      });
+
+      it("shows the title only when it isn't blank", async () => {
+        send(timerState({}, { title: "  " }));
+        await vi.waitFor(() => expect(el("clock").textContent).not.toBe(""));
+        expect(el("title").hidden).toBe(true);
+
+        send(timerState({}, { title: " Subathon <b>" }));
+        await vi.waitFor(() => expect(el("title").hidden).toBe(false));
+        expect(el("title").textContent).toBe("Subathon <b>");
+        expect(el("title").children).toHaveLength(0);
+      });
+
+      it("applies the colors and fonts, without letting a name add styles", async () => {
+        send(
+          timerState(
+            {},
+            {
+              clock_color: "#112233",
+              accent_color: "#44556677",
+              clock_font: "Bebas Neue",
+              title_font: "x; color: red",
+            },
+          ),
+        );
+
+        const root = dom.window.document.documentElement.style;
+        await vi.waitFor(() =>
+          expect(root.getPropertyValue("--clock")).toBe("#112233"),
+        );
+        expect(root.getPropertyValue("--accent")).toBe("#44556677");
+        expect(el("clock").style.fontFamily).toMatch(
+          /^"Bebas Neue", "Archivo Variable", sans-serif$/,
+        );
+        expect(el("slot").style.fontFamily).toBe(el("clock").style.fontFamily);
+        expect(el("title").style.fontFamily).toContain("x; color: red");
+        expect(el("title").style.color).toBe("");
+      });
+
+      it("shows the multiplier, then sums a burst of added time in its place", async () => {
+        send(timerState({ multiplier: 2 }));
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("×2"));
+
+        send(timerState({ multiplier: 2, added: 400 }));
+        send(timerState({ multiplier: 2, added: 30_000 }));
+        send(timerState({ multiplier: 2, added: 59_600 }));
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("+1:30"));
+        expect(el("slot").classList.contains("removed")).toBe(false);
+
+        // Back to the multiplier once the label is done
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("×2"), {
+          timeout: 3000,
+        });
+
+        send(timerState({ multiplier: 2, added: -300_000 }));
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("−5:00"));
+        expect(el("slot").classList.contains("removed")).toBe(true);
+      });
+
+      it("shows tenths of a second under 10 s", async () => {
+        send(timerState({ added: 1500 }));
+
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("+1.5s"));
+      });
+
+      it("shows the triggers one at a time, as text", async () => {
+        const triggers = [
+          { label: "Follow", value: "+1:00" },
+          { label: "<b>Share</b>", value: "+20s" },
+        ];
+        send(timerState({ triggers }));
+        await vi.waitFor(() => expect(el("carousel").hidden).toBe(false));
+        expect(el("carousel").textContent).toBe("Follow+1:00");
+        expect(el("carousel").querySelector("b")!.textContent).toBe("+1:00");
+
+        // The next push with the same triggers doesn't start the turns over
+        send(timerState({ triggers, remaining: 3_500_000 }));
+        await vi.waitFor(
+          () => expect(el("carousel").textContent).toBe("<b>Share</b>+20s"),
+          { timeout: 4000 },
+        );
+
+        send(timerState({ triggers: [] }));
+        await vi.waitFor(() => expect(el("carousel").hidden).toBe(true));
+      });
+
+      it("shows the multiplier again at once when what was added is taken back", async () => {
+        send(timerState({ multiplier: 2, added: 60_000 }));
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("+1:00"));
+
+        send(timerState({ multiplier: 2, added: -60_000 }));
+
+        // Well before the label's 1.5 s are over
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("×2"), {
+          timeout: 500,
+        });
+      });
+
+      it("shows nothing under the clock without a multiplier, or when hidden", async () => {
+        send(timerState({ multiplier: 1.5 }, { show_multiplier: false }));
+        await vi.waitFor(() => expect(el("clock").textContent).not.toBe(""));
+        expect(el("slot").textContent).toBe("");
+
+        send(timerState({ multiplier: 1 }));
+        send(timerState({ multiplier: 1, added: 3_600_000 }));
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("+1:00:00"));
+      });
+
+      it("takes the warning color in the last minutes", async () => {
+        send(timerState({ remaining: 61_000 }, { warn_at: 1 }));
+        await vi.waitFor(() =>
+          expect(el("clock").textContent).toBe("00:01:01"),
+        );
+        expect(el("clock").classList.contains("warn")).toBe(false);
+
+        send(timerState({ remaining: 59_000 }, { warn_at: 1 }));
+        await vi.waitFor(() =>
+          expect(el("clock").classList.contains("warn")).toBe(true),
+        );
+
+        send(
+          timerState({ status: "paused", remaining: 59_000 }, { warn_at: 1 }),
+        );
+        await vi.waitFor(() =>
+          expect(el("clock").classList.contains("warn")).toBe(false),
+        );
+      });
     });
   });
 

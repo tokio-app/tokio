@@ -162,7 +162,11 @@ events.push(
 
 events.push(
   APP_EVENTS.SET_PROFILE,
-  async ({ storeManagerService, connectorService, notifier }, e, { file }) => {
+  async (
+    { storeManagerService, connectorService, timerService, notifier },
+    e,
+    { file },
+  ) => {
     if (connectorService.isConnected()) {
       throw new AppFailure(
         FEEDBACK_CODES.PROFILE_LOCKED,
@@ -170,6 +174,8 @@ events.push(
         { level: "warning" },
       );
     }
+    // Into the profile it came from, before it's replaced, so it's never lost
+    if (!(await timerService.save())) throw saveFailure();
     const res = await storeManagerService.updateActiveProfile(file);
     if (res === "unsaved") throw saveFailure();
     if (res === "missing") {
@@ -181,6 +187,7 @@ events.push(
     const profile = await storeManagerService.getProfileData();
     const profiles = storeManagerService.getProfiles();
     if (!profile || !profiles) throw new Error(`Unable to load ${file}.`);
+    timerService.load(profile.timer, file);
 
     e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
       success: true,

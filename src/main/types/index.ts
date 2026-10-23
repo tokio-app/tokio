@@ -17,6 +17,7 @@ import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
+import { TimerService } from "@/services/timer";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
 import { URLManagerService } from "@/services/url";
@@ -57,6 +58,7 @@ export interface AppServices {
   readonly licensesService: LicensesService;
   readonly updaterService: UpdaterService;
   readonly liveService: LiveService;
+  readonly timerService: TimerService;
 }
 
 export interface AppHandlerVariables extends AppServices {

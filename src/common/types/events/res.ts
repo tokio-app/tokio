@@ -18,6 +18,7 @@ import { AppNotification, Reply } from "../feedback";
 import { LiveSession } from "../live";
 import { OverlayApp } from "../server";
 import { VoiceData, VoiceEngine } from "../store";
+import { TimerData } from "../timer";
 import { UpdateStatus } from "../updates";
 
 type WindowState = { state: "normal" | "maximized" };
@@ -85,6 +86,7 @@ export enum APP_EVENTS_RESPONSE {
   // TOOLS
   GET_TEST_OVERLAYS = "app:tools:res:overlays:get",
   SEND_TEST_EVENTS = "app:tools:res:overlays:test",
+  TIMER = "app:tools:res:timer",
 
   // ALERTS
   ALERT_AUDIO = "app:alerts:audio",
@@ -261,6 +263,11 @@ export interface AppEventsResponseMap {
   // Fails when no overlay is connected with the id.
   [APP_EVENTS_RESPONSE.SEND_TEST_EVENTS]: Reply<{
     id: string;
+  }>;
+  // The active profile's countdown timer: GET_TIMER's reply, and pushed on
+  // every change
+  [APP_EVENTS_RESPONSE.TIMER]: Reply<{
+    data?: TimerData;
   }>;
 
   // ALERTS

@@ -2,6 +2,7 @@ export * from "./alerts";
 export * from "./catalog";
 export * from "./constants";
 export * from "./samples";
+export * from "./timer";
 
 export function formatError(error: unknown): string {
   return describeError(error, 0);
