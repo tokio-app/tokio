@@ -12,6 +12,16 @@ import { ProviderService } from "@/services/shared";
 import { ConnectionResponse, MusicProvider, MusicQueue } from "./common";
 import { Spotify, YouTubeMusic } from "./providers";
 
+interface SongRequest {
+  query: string;
+  // The viewer's handle
+  by: string;
+  // One request per viewer, and no song twice
+  unique: boolean;
+  // Gives the cooldown back
+  refund: () => void;
+}
+
 export class MusicService extends ProviderService<MusicProvider> {
   private _queue: TaskQueue;
   private _music_queue: MusicQueue;
@@ -19,6 +29,10 @@ export class MusicService extends ProviderService<MusicProvider> {
   private _onSongChange?: (songs: MusicInfo[]) => void;
   // When the last command was taken, for the cooldown
   private _lastCommand = -Infinity;
+  // Bumped by clearHandler, so a request still searching then plays nothing
+  private _run = 0;
+  // The viewers with a request waiting to be searched or searching
+  private _requesting = new Set<string>();
   constructor() {
     super();
     this._queue = new TaskQueue();
@@ -90,6 +104,8 @@ export class MusicService extends ProviderService<MusicProvider> {
   }
 
   public clearHandler() {
+    this._run++;
+    this._requesting.clear();
     this._queue.stop();
     this._music_queue.clear();
   }
@@ -97,11 +113,27 @@ export class MusicService extends ProviderService<MusicProvider> {
   public handle(chat: ChatEvent, settings: Profile["music"]) {
     const match = this._match(settings, chat);
     if (!match) return;
-    // One command per cooldown, whoever sends it
-    const now = Date.now();
-    if (now - this._lastCommand < settings.protection.cooldown * 1000) return;
-    this._lastCommand = now;
     const { control, args } = match;
+    const { controls } = settings;
+    // Without a song they do nothing, so they don't take the cooldown
+    if ((control === controls.play || control === controls.revoke) && !args) {
+      return;
+    }
+    const { handle } = chat.user;
+    const unique = settings.protection.one_per_viewer;
+    if (
+      control === controls.play &&
+      unique &&
+      handle &&
+      (this._requesting.has(handle) || this._music_queue.waits(handle))
+    ) {
+      return;
+    }
+    // One command per cooldown, whoever sends it
+    const previous = this._lastCommand;
+    const taken = Date.now();
+    if (taken - previous < settings.protection.cooldown * 1000) return;
+    this._lastCommand = taken;
 
     this._queue.setQueueOptions({
       maxQueueLength: settings.protection.queue_length,
@@ -109,25 +141,34 @@ export class MusicService extends ProviderService<MusicProvider> {
 
     this._music_queue.setMaxSize(settings.protection.queue_length);
 
-    const { controls } = settings;
     if (control === controls.play) {
-      this._queue.enqueue(() => this._request(args));
+      // A duplicate is dropped and gives the cooldown back, unless another
+      // command took it since
+      const refund = () => {
+        if (this._lastCommand === taken) this._lastCommand = previous;
+      };
+      const added = this._queue.enqueue(() =>
+        this._request({ query: args, by: handle, unique, refund }),
+      );
+      if (added && handle) this._requesting.add(handle);
     } else if (control === controls.next) {
-      this._queue.enqueue(() => this.next());
+      this._queue.enqueue(() => this._music_queue.triggerNext());
     } else if (control === controls.last) {
-      this._queue.enqueue(() => this.previous());
+      this._queue.enqueue(() => this._music_queue.triggerPrevious());
     } else if (control === controls.revoke) {
-      this._queue.enqueue(() => this.revoke(args));
+      this._queue.enqueue(() => this._music_queue.revoke(args));
     }
   }
 
   // A song request that can't be found or started is reported like a song
-  // that couldn't be played.
-  private async _request(query: string) {
+  // that couldn't be played, unless clearHandler came meanwhile.
+  private async _request(request: SongRequest, run = this._run) {
     try {
-      await this.play(query);
+      await this.play(request, run);
     } catch (error) {
-      this._playbackFailed(query, error);
+      if (run === this._run) this._playbackFailed(request.query, error);
+    } finally {
+      if (run === this._run) this._requesting.delete(request.by);
     }
   }
 
@@ -140,9 +181,18 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._onPlaybackError?.(id, error);
   }
 
-  private async play(query: string) {
+  // Searches first, so a request that finds nothing never reads the player
+  private async play({ query, by, unique, refund }: SongRequest, run: number) {
+    const info = await this._current.provider.searchSong(query);
+    if (info === null || run !== this._run) return;
+    if (unique && this._music_queue.has(info.track)) {
+      refund();
+      return;
+    }
+
     if (!this._music_queue.getQueueState().isPlaying) {
       const current = await this._current.provider.playerStatus();
+      if (run !== this._run) return;
       if (current && current.playing) {
         this._music_queue.addCurrentlyPlaying(
           current.title,
@@ -153,25 +203,12 @@ export class MusicService extends ProviderService<MusicProvider> {
       }
     }
 
-    const info = await this._current.provider.searchSong(query);
-
-    if (info === null) return;
-
-    this._music_queue.enqueue(query, info, () =>
-      this._current.provider.play(info),
+    this._music_queue.enqueue(
+      query,
+      info,
+      () => this._current.provider.play(info),
+      by,
     );
-  }
-
-  private async next() {
-    await this._music_queue.triggerNext();
-  }
-
-  private async previous() {
-    await this._music_queue.triggerPrevious();
-  }
-
-  private async revoke(query: string) {
-    this._music_queue.revoke(query);
   }
 
   // The control a chat calls, with its command in any case, alone or followed

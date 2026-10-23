@@ -1,5 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
-import { Btn, EmptyState, Modal, Section } from "@/components";
+import { Btn, EmptyState, RemoveOverlayModal, Section } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
@@ -25,16 +25,7 @@ export function OverlaysSection() {
   return (
     <>
       {removing && (
-        <Modal
-          title="Remove overlay?"
-          description={`${removing.name} and its settings will be deleted. Streaming apps using its URL will stop showing it.`}
-          confirmText="Remove"
-          onClose={() => setRemoving(null)}
-          onConfirm={() => {
-            window.api.emit(APP_EVENTS.REMOVE_OVERLAY, { id: removing.id });
-            setRemoving(null);
-          }}
-        />
+        <RemoveOverlayModal item={removing} onClose={() => setRemoving(null)} />
       )}
 
       <Section

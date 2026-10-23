@@ -55,6 +55,31 @@ describe("fs helpers", () => {
       expect(await readdir(folder)).toEqual(["index.html"]);
     });
 
+    it("writes one file in order, the last write winning", async () => {
+      const file = join(folder, "index.html");
+
+      await Promise.all([
+        writeFileAtomic(file, "first"),
+        writeFileAtomic(join(folder, ".", "index.html"), "second"),
+      ]);
+
+      expect(await readFile(file, "utf-8")).toBe("second");
+      expect(await readdir(folder)).toEqual(["index.html"]);
+    });
+
+    it("runs the next write after one that failed", async () => {
+      const file = join(folder, "index.html");
+      vi.mocked(rename).mockRejectedValueOnce(failure("ENOSPC"));
+
+      const results = await Promise.allSettled([
+        writeFileAtomic(file, "first"),
+        writeFileAtomic(file, "second"),
+      ]);
+
+      expect(results.map((r) => r.status)).toEqual(["rejected", "fulfilled"]);
+      expect(await readFile(file, "utf-8")).toBe("second");
+    });
+
     it("keeps a quit waiting until the file is written", async () => {
       const written = writeFileAtomic(join(folder, "index.html"), "new");
 

@@ -10,7 +10,11 @@ import { Music } from ".";
 const loaded = profileReply((p) => {
   p.music.provider = { name: "Spotify", key: "client-id" };
   p.music.controls.play = { enabled: false, command: "!song" };
-  p.music.protection = { cooldown: 4, queue_length: 15 };
+  p.music.protection = {
+    cooldown: 4,
+    queue_length: 15,
+    one_per_viewer: false,
+  };
   p.music.permissions.followers = true;
 });
 
@@ -210,10 +214,27 @@ describe("Music", () => {
 
     const settings = await saved();
     expect(settings.permissions.superfans).toBe(true);
-    expect(settings.protection).toEqual({ cooldown: 10, queue_length: 2 });
+    expect(settings.protection).toEqual({
+      cooldown: 10,
+      queue_length: 2,
+      one_per_viewer: false,
+    });
     expect(
       section("Protection").queryByText("Max Comment Length"),
     ).not.toBeInTheDocument();
+  });
+
+  it("saves the one request per viewer protection", async () => {
+    const { user } = await setup();
+    const check = screen.getByRole("checkbox", {
+      name: "One request per viewer",
+    });
+    expect(check).not.toBeChecked();
+
+    await user.click(check);
+
+    expect(check).toBeChecked();
+    expect((await saved()).protection.one_per_viewer).toBe(true);
   });
 
   it("saves a change 300ms later", async () => {

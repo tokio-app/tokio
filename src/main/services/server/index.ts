@@ -4,11 +4,16 @@ import Logger from "@/logger";
 import express, { Express, Router } from "express";
 import { randomUUID } from "node:crypto";
 import { Server as HttpServer } from "node:http";
+import { networkInterfaces } from "node:os";
 import { TikTokConnectorService } from "../connector";
 import { MusicService } from "../music";
 import { Service } from "../shared";
 import ALERT_PAGE from "./alert.html?raw";
 import { CustomWebSocketServer } from "./websocket";
+
+// Adapter names that are usually virtual: Hyper-V, WSL, VMs, Docker, bridges.
+// A real network card can have them too, with Hyper-V or a bridge set up.
+const VIRTUAL_ADAPTER = /vethernet|wsl|virtualbox|vmware|docker|^br|virbr/i;
 
 export class ServerService extends Service {
   private _app: Express;
@@ -69,6 +74,8 @@ export class ServerService extends Service {
 
     return new Promise((resolve) => {
       // Without a host Node listens on :: for IPv4 and IPv6, or 0.0.0.0 without IPv6.
+      // On every interface on purpose: a streaming app on another computer
+      // opens overlays from this PC, through its network address.
       // Express 5 calls this with the error too, the "error" handler reports it.
       this._server = this._app.listen(this._port, (error) => {
         if (error) return;
@@ -153,6 +160,31 @@ export class ServerService extends Service {
     if (value) return this._server !== null || (await this.start()).success;
     this.stop();
     return true;
+  }
+
+  /**
+   * This PC's IPv4 addresses on the network, where another computer reaches
+   * the server. Virtual adapters' only when there's no other, as with
+   * a Hyper-V switch or a bridge on the network card.
+   */
+  public networkAddresses(): string[] {
+    const found = Object.entries(networkInterfaces()).flatMap(
+      ([name, addresses]) =>
+        (addresses ?? [])
+          .filter(
+            (a) =>
+              a.family === "IPv4" &&
+              !a.internal &&
+              // Self-assigned, when the network gave none
+              !a.address.startsWith("169.254."),
+          )
+          .map((a) => ({
+            address: a.address,
+            virtual: VIRTUAL_ADAPTER.test(name),
+          })),
+    );
+    const real = found.filter((a) => !a.virtual);
+    return (real.length > 0 ? real : found).map((a) => a.address);
   }
 
   public mount(id: string, path: string, rebuild: boolean = true): void {

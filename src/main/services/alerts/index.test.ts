@@ -165,6 +165,7 @@ describe("AlertsService", () => {
           maxQueueLength: 100,
           id: "alert-1",
           key: "ding.mp3",
+          repeat: 1,
         },
       ]);
     });
@@ -205,6 +206,7 @@ describe("AlertsService", () => {
           maxQueueLength: 100,
           id: "alert-1",
           media: picture,
+          repeat: 1,
         },
       ]);
     });
@@ -314,7 +316,8 @@ describe("AlertsService", () => {
       const plays = async (events: GiftEvent[], alerts = everyGift) => {
         const counts: number[] = [];
         for (const event of events) {
-          counts.push((await run(TOKIO_EVENTS.GIFT, event, alerts)).length);
+          const sent = await run(TOKIO_EVENTS.GIFT, event, alerts);
+          counts.push(sent.reduce((sum, a) => sum + (a.repeat ?? 1), 0));
         }
         return counts;
       };
@@ -372,6 +375,12 @@ describe("AlertsService", () => {
         expect(await plays([update(3)])).toEqual([1]);
       });
 
+      it("starts the streaks over when cleared, as their ends may be missed", async () => {
+        expect(await plays([update(5)])).toEqual([5]);
+        service.clear();
+        expect(await plays([update(3)])).toEqual([3]);
+      });
+
       it("plays no more times than the queue takes", async () => {
         expect(await plays([update(250)])).toEqual([100]);
       });
@@ -393,6 +402,21 @@ describe("AlertsService", () => {
         expect(await ids(update(2))).toEqual(["every"]);
         expect(await ids(end(2))).toEqual(["end"]);
       });
+    });
+
+    it("sends no sound read while the alerts were cleared", async () => {
+      const sent: AlertAudio[] = [];
+
+      const handled = service.handle(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+        settings([alert(), alert({ id: "two" })]),
+        (audio) => sent.push(audio),
+      );
+      service.clear();
+      await handled;
+
+      expect(sent).toEqual([]);
     });
 
     it("fires chat alerts without a keyword on every message", async () => {
@@ -639,7 +663,7 @@ describe("AlertsService", () => {
           "Thanks for the Rose",
           "Thanks for the Rose",
         ]);
-        // So the window decodes it once too
+        // The window's copies of a sound share a decode by its key
         expect(sent[1].key).toBe(sent[0].key);
       });
 
@@ -655,11 +679,38 @@ describe("AlertsService", () => {
         );
 
         expect(generateBuffer).toHaveBeenCalledOnce();
-        expect(sent.map(said)).toEqual([
-          "Thanks Viewer",
-          "Thanks Viewer",
-          "Thanks Viewer",
+        // Sent once, for the window to play 3 times
+        expect(sent.map(said)).toEqual(["Thanks Viewer"]);
+        expect(sent[0].repeat).toBe(3);
+      });
+
+      it("says the streak's count so far, as the gift jar counts it", async () => {
+        const everyGift = {
+          ...speaking("{count} roses"),
+          trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
+        };
+        const alerts = withTts([everyGift]);
+
+        for (const comboCount of [1, 1, 3]) {
+          await speak(gift("5655", false, { comboCount }), alerts);
+        }
+
+        expect(sent.map((a) => [said(a), a.repeat])).toEqual([
+          ["1 roses", 1],
+          ["2 roses", 1],
+          ["4 roses", 2],
         ]);
+      });
+
+      it("says the whole streak's count when it ends", async () => {
+        const alerts = withTts([speaking("{count} roses")]);
+
+        for (const comboCount of [1, 1, 3]) {
+          await speak(gift("5655", false, { comboCount }), alerts);
+        }
+        await speak(gift("5655", true, { comboCount: 3 }), alerts);
+
+        expect(sent.map(said)).toEqual(["4 roses"]);
       });
 
       it("makes one message at a time, with the TTS cooldown between them", async () => {

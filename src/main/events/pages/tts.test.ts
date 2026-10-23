@@ -4,6 +4,7 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { defaultProfile } from "@/common/util";
+import Logger from "@/logger";
 import { createHandler } from "@test/handler";
 import { describe, expect, it, vi } from "vitest";
 import tts from "./tts";
@@ -71,7 +72,8 @@ describe("tts events", () => {
       expect(h.notices).toEqual([]);
     });
 
-    it("reports a failed save as the system's", async () => {
+    it("reports a failed save as the system's, logged by the store alone", async () => {
+      const log = vi.spyOn(Logger, "error");
       const h = createHandler({
         storeManagerService: { updateProfileData: async () => false },
       });
@@ -92,6 +94,7 @@ describe("tts events", () => {
           ...failure,
         }),
       ]);
+      expect(log).not.toHaveBeenCalled();
     });
   });
 

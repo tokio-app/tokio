@@ -4,7 +4,7 @@ import {
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
-import { AppFailure } from "@/helper/feedback";
+import { AppFailure, LoggedError } from "@/helper/feedback";
 
 const events = createStack("tts");
 
@@ -33,7 +33,8 @@ events.push(
     const res = await storeManagerService.updateProfileData({
       tts: settings,
     });
-    if (!res) throw new Error("The TTS settings were not saved.");
+    // The store logged why
+    if (!res) throw new LoggedError("The TTS settings were not saved.");
     e.reply(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS, {
       success: true,
     });

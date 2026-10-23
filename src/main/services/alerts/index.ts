@@ -1,15 +1,12 @@
-import {
-  Alert,
-  AlertMedia,
-  AlertTts,
-  MediaFile,
-  Profile,
-} from "@/common/schemas";
+import { Alert, AlertTts, MediaFile, Profile } from "@/common/schemas";
 import {
   APP_EVENTS,
+  APP_EVENTS_RESPONSE,
   AppEvents,
   AppEventsMap,
+  AppEventsResponseMap,
   EMOTE_TRIGGER,
+  GiftEvent,
   MyInstantsSound,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -24,6 +21,7 @@ import {
 } from "@/common/util";
 import { hasKeyword, isUser } from "@/helper/chat";
 import { writeFileAtomic } from "@/helper/fs";
+import { GiftStreaks } from "@/helper/streaks";
 import Logger from "@/logger";
 import type { ServerService } from "@/services/server";
 import type { TTSService } from "@/services/tts";
@@ -43,20 +41,7 @@ export interface MyInstantsPage {
   hasNextPage: boolean;
 }
 
-export interface AlertAudio {
-  // None when the alert only shows media
-  data?: Uint8Array;
-  volume: number;
-  channel: string;
-  maxQueueLength: number;
-  id: string;
-  // The sound's file or its TTS cache key, the same for every copy
-  key?: string;
-  // A TTS alert's speed and pitch, for this sound only
-  filters?: { speed: number; pitch: number };
-  // Shown on the alert's overlay when its turn comes
-  media?: AlertMedia;
-}
+export type AlertAudio = AppEventsResponseMap[APP_EVENTS_RESPONSE.ALERT_AUDIO];
 
 // What TTS alerts speak with, the TTS service.
 type Speaker = Pick<TTSService, "prepareText" | "generateBuffer">;
@@ -76,9 +61,6 @@ const CLEAR_MEDIA = "tokio:alert:clear";
 // Node fires timeouts longer than 2^31 ms at once.
 const MAX_SECONDS = 24 * 60 * 60;
 
-// A lower count this soon after a streak's last update is an update that came
-// late, not a new streak. TikTok ends a streak 3 to 4 s after its last gift.
-const LATE_MS = 2000;
 const clamp = (value: number, max: number) => Math.min(Math.max(value, 0), max);
 
 // Bytes of sounds kept in memory. Bigger sounds are refused, and ones saved
@@ -109,10 +91,10 @@ export class AlertsService extends Service {
   private _speaker: Speaker | null = null;
   // Alert messages waiting for the voice engine, see _queueSpeech
   private _speech = new TaskQueue();
-  // Bumped by clearSpeech, so a message made after it is dropped
-  private _speechRun = 0;
-  // Each viewer's streak of a gift: the last count TikTok sent, and when
-  private _streaks = new Map<string, { last: number; at: number }>();
+  // Bumped by clear, so a sound read or a message made after it is dropped
+  private _run = 0;
+  // Each viewer's streak of a gift, see GiftStreaks
+  private _streaks = new GiftStreaks();
 
   public setLogFile(logFile: string): void {
     this._logFile = logFile;
@@ -347,12 +329,14 @@ export class AlertsService extends Service {
   }
 
   /**
-   * Stops the alert messages waiting to be spoken, drops the one being made
-   * and the media waiting for its turn, and hides the media on the overlays.
+   * Stops the alert messages waiting to be spoken, drops the one being made,
+   * the sounds being read and the media waiting for its turn, hides the media
+   * on the overlays and forgets the gift streaks, as their ends may be missed.
    */
   public clear() {
-    this._speechRun++;
+    this._run++;
     this._speech.stop();
+    this._streaks.clear();
     for (const timer of this._shows) clearTimeout(timer);
     this._shows.clear();
     for (const id of this._shown) {
@@ -373,8 +357,16 @@ export class AlertsService extends Service {
     onError?: (alert: Alert, error?: string) => void,
   ) {
     const settings = profile.alerts;
+    const run = this._run;
     // Once per event, whichever alerts it plays
-    const added = this._countGifts(type, payload);
+    const gift = this._gift(type, payload);
+    const { added, total } = gift
+      ? this._streaks.add(gift)
+      : { added: 0, total: 0 };
+    // A message's {count} is the streak's count so far, not TikTok's
+    const speech = gift
+      ? { ...gift, gift: { ...gift.gift, comboCount: total } }
+      : payload;
     for (const alert of settings.items) {
       if (!this._matches(alert, type, payload, added)) continue;
 
@@ -388,8 +380,9 @@ export class AlertsService extends Service {
         ? `alerts:${alert.trigger.type}`
         : "alerts";
       const { tts, sound, media } = alert;
-      const play = (data?: Uint8Array, key?: string) => {
-        const audio: AlertAudio = {
+      // Sent once, and the window queues its copies
+      const play = (data?: Uint8Array, key?: string) =>
+        send({
           data,
           volume: alert.volume,
           channel,
@@ -398,13 +391,12 @@ export class AlertsService extends Service {
           key,
           filters: tts ? { speed: tts.speed, pitch: tts.pitch } : undefined,
           media: media ?? undefined,
-        };
-        for (let i = 0; i < times; i++) send(audio);
-      };
+          repeat: times,
+        });
 
       // A message is spoken instead of the sound.
       if (tts) {
-        this._queueSpeech(tts, payload, profile.tts, play, (error) =>
+        this._queueSpeech(tts, speech, profile.tts, play, (error) =>
           onError?.(alert, error),
         );
         continue;
@@ -417,6 +409,8 @@ export class AlertsService extends Service {
 
       // The caller reports it, once per notice
       const res = await this.readSound(sound.file, false);
+      // Cleared while it was read
+      if (run !== this._run) return;
       if (!res.success || !res.data) {
         onError?.(alert, res.error);
         continue;
@@ -446,11 +440,11 @@ export class AlertsService extends Service {
       gapTime: cooldown,
       maxQueueLength: queue_length,
     });
-    const run = this._speechRun;
+    const run = this._run;
     this._speech.enqueue(async () => {
       const res = await this._generate(tts, text);
       // Cleared while it was being made
-      if (run !== this._speechRun) return;
+      if (run !== this._run) return;
       if (res.success && res.data) play(res.data, this._ttsKey(tts, text));
       else onError(res.error);
     });
@@ -505,7 +499,7 @@ export class AlertsService extends Service {
     alert: Alert,
     type: AppEvents,
     payload: TokioEventMap[AppEvents],
-    // The gifts a gift event adds, see _countGifts
+    // The gifts a gift event adds, see GiftStreaks
     added: number,
   ) {
     if (!alert.enabled || (!alert.sound && !alert.tts && !alert.media)) {
@@ -559,37 +553,16 @@ export class AlertsService extends Service {
     return true;
   }
 
-  /**
-   * How many gifts a gift event adds to its sender's streak, counted like the
-   * gift jar overlay: TikTok sends a streak as events whose count grows, then
-   * one that ends it. A count that grows adds the growth, the same count again
-   * before the end is the gift sent again, and a lower one within LATE_MS is an
-   * update that came late. 0 for other events.
-   */
-  private _countGifts(type: AppEvents, payload: TokioEventMap[AppEvents]) {
-    if (
-      type !== TOKIO_EVENTS.GIFT ||
-      typeof payload !== "object" ||
-      payload === null ||
-      !("gift" in payload)
-    ) {
-      return 0;
-    }
-
-    const { user, gift } = payload;
-    const key = `${user.handle || user.username}:${gift.id}`;
-    const count = Math.max(1, gift.comboCount);
-    const streak = this._streaks.get(key);
-    const now = Date.now();
-    let added = count;
-    if (streak && (count >= streak.last || now - streak.at < LATE_MS)) {
-      if (count > streak.last) added = count - streak.last;
-      else if (count < streak.last || gift.repeatEnd) added = 0;
-    }
-
-    if (gift.repeatEnd) this._streaks.delete(key);
-    else if (added > 0) this._streaks.set(key, { last: count, at: now });
-    return added;
+  private _gift(
+    type: AppEvents,
+    payload: TokioEventMap[AppEvents],
+  ): GiftEvent | null {
+    return type === TOKIO_EVENTS.GIFT &&
+      typeof payload === "object" &&
+      payload !== null &&
+      "gift" in payload
+      ? payload
+      : null;
   }
 
   private async _fetchPage(

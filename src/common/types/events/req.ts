@@ -50,6 +50,7 @@ export enum APP_EVENTS {
   SET_SERVER = "app:settings:set:server",
   SET_AUTO_UPDATES = "app:settings:set:updates",
   REQ_FQDN = "app:settings:req:fqdn",
+  GET_NETWORK_ADDRESSES = "app:settings:get:network",
 
   // HOME
   CONNECT = "app:home:connect",
@@ -204,6 +205,7 @@ export interface AppEventsMap {
   };
 
   [APP_EVENTS.REQ_FQDN]: void;
+  [APP_EVENTS.GET_NETWORK_ADDRESSES]: void;
 
   // HOME
   [APP_EVENTS.CONNECT]: {
@@ -257,13 +259,16 @@ export interface AppEventsMap {
     query?: string;
     page: number;
   };
+  // `request` comes back on SET_ALERT_SOUND, so the page keeps the newest pick
   [APP_EVENTS.DOWNLOAD_SOUND]: {
     id: string;
+    request: number;
     url: string;
     name: string;
   };
   [APP_EVENTS.IMPORT_SOUND]: {
     id: string;
+    request: number;
   };
   [APP_EVENTS.IMPORT_MEDIA]: {
     id: string;

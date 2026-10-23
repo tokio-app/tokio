@@ -12,8 +12,9 @@ class FakeChild extends EventEmitter {
   stdin = new PassThrough();
   stdout = new PassThrough();
   stderr = new PassThrough();
+  // A real process exits a moment after it's killed
   kill = vi.fn(() => {
-    this.emit("exit", null);
+    setImmediate(() => this.emit("exit", null));
     return true;
   });
 
@@ -106,6 +107,25 @@ describe("SapiHost", () => {
     expect(child(0).kill).toHaveBeenCalledOnce();
 
     answering = true;
+    await host.request({ type: "voices" });
+    expect(children).toHaveLength(2);
+  });
+
+  it("spawns a new host for a request right after a timeout, before the old one exits", async () => {
+    answering = false;
+    const stuck = expect(host.request({ type: "voices" })).rejects.toThrow(
+      'SAPI request "voices" timed out',
+    );
+    await vi.advanceTimersByTimeAsync(config.START_TIMEOUT_MS);
+    await stuck;
+
+    answering = true;
+    const next = host.request({ type: "voices" });
+    expect(children).toHaveLength(2);
+    await next;
+
+    // The old host's exit fails nothing of the new one
+    await vi.advanceTimersByTimeAsync(0);
     await host.request({ type: "voices" });
     expect(children).toHaveLength(2);
   });

@@ -1,7 +1,6 @@
 import { EntityMetadata } from "@/common/schemas";
 import { cx } from "@/helper/cx";
-import { useClickOutside } from "@/hooks/useClickOutside";
-import { useRef, useState } from "react";
+import { useMenu } from "@/hooks/useMenu";
 import { FiCheck, FiChevronDown } from "react-icons/fi";
 import styles from "./profiledropdown.module.css";
 
@@ -18,33 +17,16 @@ export function ProfileDropdown({
   active,
   disabled,
 }: Props) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const toggleRef = useRef<HTMLButtonElement>(null);
-
-  useClickOutside([ref], () => setOpen(false), open);
-
-  const close = () => {
-    setOpen(false);
-    toggleRef.current?.focus();
-  };
+  const { open, ref, toggleRef, toggle, close, onKeyDown } = useMenu();
 
   return (
-    <div
-      className={styles.container}
-      ref={ref}
-      onKeyDown={(e) => {
-        if (e.key !== "Escape" || !open) return;
-        e.stopPropagation();
-        close();
-      }}
-    >
+    <div className={styles.container} ref={ref} onKeyDown={onKeyDown}>
       <button
         ref={toggleRef}
         type="button"
         aria-expanded={open}
         disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         className={cx(
           styles.toggle,
           open && styles.toggle_open,

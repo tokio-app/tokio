@@ -1113,4 +1113,36 @@ describe("settings events", () => {
       ]);
     });
   });
+
+  describe("GET_NETWORK_ADDRESSES", () => {
+    it("answers with this PC's network addresses", async () => {
+      const h = createHandler({
+        serverService: { networkAddresses: () => ["192.168.1.10"] },
+      });
+
+      await h.invoke(settings, APP_EVENTS.GET_NETWORK_ADDRESSES);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES)).toEqual([
+        { addresses: ["192.168.1.10"] },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("answers with none, without a notice, when they can't be read", async () => {
+      const h = createHandler({
+        serverService: {
+          networkAddresses: () => {
+            throw new Error("uv_interface_addresses failed");
+          },
+        },
+      });
+
+      await h.invoke(settings, APP_EVENTS.GET_NETWORK_ADDRESSES);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES)).toEqual([
+        { addresses: [] },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+  });
 });

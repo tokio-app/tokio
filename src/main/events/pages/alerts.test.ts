@@ -95,6 +95,8 @@ describe("alerts events", () => {
       expect(h.notices).toEqual([
         expect.objectContaining({ source: "system", ...failure }),
       ]);
+      // The store logged why
+      expect(logError).not.toHaveBeenCalled();
     });
   });
 
@@ -192,7 +194,12 @@ describe("alerts events", () => {
   });
 
   describe("DOWNLOAD_SOUND", () => {
-    const request = { id: "alert-1", url: airhornUrl, name: "Airhorn" };
+    const request = {
+      id: "alert-1",
+      request: 3,
+      url: airhornUrl,
+      name: "Airhorn",
+    };
 
     const setup = (res: AlertsResult<AlertSound>) => {
       const alertsService = {
@@ -221,7 +228,7 @@ describe("alerts events", () => {
         airhorn,
       );
       expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_SOUND)).toEqual([
-        { success: true, id: "alert-1", sound: airhorn },
+        { success: true, id: "alert-1", request: 3, sound: airhorn },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({
@@ -244,6 +251,7 @@ describe("alerts events", () => {
           {
             success: false,
             id: "alert-1",
+            request: 3,
             error: {
               code: FEEDBACK_CODES.SOUND_DOWNLOAD_FAILED,
               message:
@@ -279,7 +287,10 @@ describe("alerts events", () => {
       const { h, alertsService } = setup();
       dialog.showOpenDialog.mockResolvedValue(result);
 
-      await h.invoke(alerts, APP_EVENTS.IMPORT_SOUND, { id: "alert-1" });
+      await h.invoke(alerts, APP_EVENTS.IMPORT_SOUND, {
+        id: "alert-1",
+        request: 3,
+      });
 
       expect(alertsService.importSound).not.toHaveBeenCalled();
       expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_SOUND)).toEqual([]);
@@ -290,7 +301,10 @@ describe("alerts events", () => {
       const { h, alertsService, storeManagerService } = setup();
       pickFiles("/music/ding.wav");
 
-      await h.invoke(alerts, APP_EVENTS.IMPORT_SOUND, { id: "alert-1" });
+      await h.invoke(alerts, APP_EVENTS.IMPORT_SOUND, {
+        id: "alert-1",
+        request: 3,
+      });
 
       expect(dialog.showOpenDialog.mock.calls[0][0]).toBe(h.win);
       expect(dialog.showOpenDialog.mock.calls[0][1]).toMatchObject({
@@ -304,7 +318,7 @@ describe("alerts events", () => {
         ding,
       );
       expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_SOUND)).toEqual([
-        { success: true, id: "alert-1", sound: ding },
+        { success: true, id: "alert-1", request: 3, sound: ding },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({
@@ -322,12 +336,16 @@ describe("alerts events", () => {
       });
       pickFiles("/music/ding.flac");
 
-      await h.invoke(alerts, APP_EVENTS.IMPORT_SOUND, { id: "alert-1" });
+      await h.invoke(alerts, APP_EVENTS.IMPORT_SOUND, {
+        id: "alert-1",
+        request: 3,
+      });
 
       expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_SOUND)).toEqual([
         {
           success: false,
           id: "alert-1",
+          request: 3,
           error: {
             code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
             message:

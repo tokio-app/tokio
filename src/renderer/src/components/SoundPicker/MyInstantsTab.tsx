@@ -24,8 +24,8 @@ type Props = {
   library: AlertSound[];
   testing: TestState;
   onTest: (req: AlertTestRequest) => void;
-  // Called when a download for the alert starts
-  onRequest: () => void;
+  // Called when a download for the alert starts, returns its request number
+  onRequest: () => number;
   onSelect: (sound: AlertSound) => void;
   // Asks before deleting a downloaded sound
   onRemove: (sound: AlertSound) => void;
@@ -42,8 +42,11 @@ export function MyInstantsTab({
   onRemove,
 }: Props) {
   const [query, setQuery] = useState("");
-  // Url of the sound being downloaded
-  const [downloading, setDownloading] = useState<string | null>(null);
+  // The sound being downloaded, and the request its reply carries
+  const [downloading, setDownloading] = useState<{
+    url: string;
+    request: number;
+  } | null>(null);
 
   const { sounds, loading, error, search, retry, listRef, sentinelRef } =
     useSoundSearch(!hidden);
@@ -51,7 +54,9 @@ export function MyInstantsTab({
   const saved = new Map(library.map((s) => [s.file, s]));
 
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, (res) => {
-    if (res?.id === id) setDownloading(null);
+    if (res?.id === id && res.request === downloading?.request) {
+      setDownloading(null);
+    }
   });
 
   return (
@@ -113,10 +118,11 @@ export function MyInstantsTab({
                   title="Download and use this sound"
                   disabled={downloading !== null}
                   onClick={() => {
-                    setDownloading(sound.url);
-                    onRequest();
+                    const request = onRequest();
+                    setDownloading({ url: sound.url, request });
                     window.api.emit(APP_EVENTS.DOWNLOAD_SOUND, {
                       id,
+                      request,
                       url: sound.url,
                       name: sound.name,
                     });

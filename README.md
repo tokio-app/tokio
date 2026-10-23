@@ -33,14 +33,16 @@ Chat messages are read aloud as they come in.
 
 Viewers request songs from chat. **YouTube** songs play in Tokio's own player window, and **Spotify** songs in the Spotify app you have open, on your computer or your phone. The chat commands can be renamed or turned off, and viewers can type them in any case:
 
-| Command   | Action                                   |
-| --------- | ---------------------------------------- |
-| `!play`   | Request a song                           |
-| `!next`   | Skip to the next song                    |
-| `!last`   | Go back to the last song                 |
-| `!revoke` | Remove a song from the queue by its name |
+| Command   | Action                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------ |
+| `!play`   | Request a song                                                                             |
+| `!next`   | Skip to the next song                                                                      |
+| `!last`   | Go back to the last song                                                                   |
+| `!revoke` | Remove a song from the queue by its name, as typed in the request or as shown in the queue |
 
-Music requests have their own permissions and protection settings, set the same way as text-to-speech's: who can use the commands, a cooldown and a maximum queue length. After a command, Tokio ignores every command until the cooldown has passed, whoever sends it.
+Music requests have their own permissions and protection settings, set the same way as text-to-speech's: who can use the commands, a cooldown and a maximum queue length. After a command, Tokio ignores every command until the cooldown has passed, whoever sends it. `!play` or `!revoke` with nothing after it does nothing and doesn't start the cooldown.
+
+Turn on **One request per viewer** in **Music → Protection** to keep one viewer from filling the queue. While a viewer's song waits, Tokio ignores their next `!play`, and a song that's already playing or waiting isn't added again. Neither starts the cooldown. It's off by default.
 
 When songs keep failing to start, for example because the Spotify app is closed, the queue waits at the first of them and keeps the rest; the next request tries again. Disconnecting music, or connecting it again, empties the queue.
 
@@ -73,7 +75,7 @@ Set them up from the gallery on the **Overlays** page: colors, text, the gifts t
 - **Profiles**: keep separate settings for different streams. Create a blank profile or clone an existing one, and switch between them from the title bar.
 - **TikTok LIVE**: your [Euler Stream](https://www.eulerstream.com) API key. Euler Stream signs Tokio's connection to TikTok LIVE, and each user brings their own key: [sign up](https://www.eulerstream.com/register) for free and paste it here. Your [plan](https://www.eulerstream.com/pricing) sets how often you can connect.
 - **Voice engines**: optionally add your TikTok session ID. With it, the TikTok voices come straight from TikTok. Without it, they go through `tiktok-tts.weilnet.workers.dev`, a proxy run by a third party, which gets the text of every message they read.
-- **Overlay server**: turn the local server for overlays on or off.
+- **Overlay server**: turn the local server for overlays on or off. It also shows your computer's network address, for a streaming app on another computer (see [Adding an overlay](#adding-an-overlay)).
 - **Updates**: Tokio checks GitHub for new releases on startup and every few hours, downloads them in the background and installs them when you restart from the title bar. On macOS, where the app isn't signed, the button opens the release page instead. Turn automatic checks off in Settings, or check any time from About.
 - **Notifications**: when something fails, such as a voice that can't be generated, a sound that's missing or a change that couldn't be saved, Tokio tells you what went wrong. The bell in the title bar keeps the session's history.
 
@@ -127,6 +129,17 @@ TikTok LIVE Studio doesn't accept `localhost` links, so overlays use their own a
 
 1. Click **Add source** and choose **Link**.
 2. Paste the overlay URL and place the overlay on your scene.
+
+**On another computer**
+
+If your streaming app runs on another computer on your network, `tokio-app.local` there points to that computer. Point it to the one Tokio runs on instead, at the address shown in **Settings → Overlay Server**:
+
+- On the other computer, add a line with that address and `tokio-app.local` to its hosts file, for example `192.168.1.20 tokio-app.local`. The file is `C:\Windows\System32\drivers\etc\hosts` on Windows and `/etc/hosts` on macOS and Linux, and you edit it as administrator.
+- Or add a DNS entry for `tokio-app.local` with that address on your router.
+
+The overlay URLs then work there as they are, and the overlays get their events from Tokio.
+
+The first time the server starts, Windows may ask whether to allow Tokio through the firewall. Allow it, or the other computer can't connect.
 
 Tokio has to stay open while you stream so the overlays keep getting events.
 

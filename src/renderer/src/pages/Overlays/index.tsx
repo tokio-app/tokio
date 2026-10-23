@@ -47,8 +47,9 @@ export function Overlays() {
 
   useIpcListener(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, (res) => {
     if (!res) return;
+    // Main sends the saved settings to the live overlays.
     if (res.success) {
-      postToOverlay(res.id, { type: "tokio:config", data: res.data! });
+      postToPreviews(res.id, { type: "tokio:config", data: res.data! });
     }
     // A late reply still updates its overlay, but not the settings open now.
     if (res.id !== configId) return;

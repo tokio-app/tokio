@@ -205,6 +205,22 @@ describe("TTSService", () => {
       expect(await say("lol", s)).toEqual([]);
     });
 
+    it("ignores comments of only invisible characters", async () => {
+      const s = settings((s) => {
+        s.format.template = "{username} {comment}";
+      });
+
+      for (const blank of [
+        "\u200B\u200D",
+        "\u3164",
+        "\u115F\u1160",
+        "\uFFA0",
+        "\u2800 \u2800",
+      ]) {
+        expect(await say(blank, s)).toEqual([]);
+      }
+    });
+
     it("needs the trigger prefix unless the mode is any", async () => {
       const s = settings((s) => {
         s.format.trigger = { mode: "custom", value: "!tts" };
@@ -317,6 +333,7 @@ describe("TTSService", () => {
       });
 
       expect(service.prepareText("  ", s)).toBeNull();
+      expect(service.prepareText("\u3164\u200B", s)).toBeNull();
       expect(service.prepareText("Thanks SPOILER fan", s)).toBeNull();
       expect(service.prepareText("Thanks fan", s)).toBe("Thanks fan");
     });
@@ -480,7 +497,8 @@ describe("TTSService", () => {
     });
   });
 
-  it("logs and skips a failed generation", async () => {
+  // onError logs it, once per notice
+  it("skips a failed generation without logging it", async () => {
     vi.spyOn(service, "generateBuffer").mockResolvedValue({
       success: false,
       error: new Error("rate limited"),
@@ -488,15 +506,10 @@ describe("TTSService", () => {
     const error = vi.spyOn(Logger, "error");
 
     expect(await say("hi")).toEqual([]);
-    expect(error).toHaveBeenCalledWith(
-      expect.stringContaining("rate limited"),
-      undefined,
-      expect.objectContaining({ message: "rate limited" }),
-    );
+    expect(error).not.toHaveBeenCalled();
   });
 
   it("calls onError when the generation fails", async () => {
-    vi.spyOn(Logger, "error");
     const error = new Error("rate limited");
     vi.spyOn(service, "generateBuffer").mockResolvedValue({
       success: false,
@@ -545,9 +558,9 @@ describe("TTSService", () => {
 
     type Sent = { id: number; text: string }[];
     // What was sent to the window, which never plays it on its own
-    const talkAll = (comments: string[], sent: Sent = []) => {
+    const talkAll = (comments: string[], sent: Sent = [], s = settings()) => {
       for (const comment of comments) {
-        service.talk(chat(comment), settings(), (res) =>
+        service.talk(chat(comment), s, (res) =>
           sent.push({ id: res.id, text: res.data?.toString() ?? "" }),
         );
       }
@@ -565,6 +578,23 @@ describe("TTSService", () => {
       await vi.advanceTimersByTimeAsync(250);
 
       expect(texts(sent)).toEqual(["one", "two", "three"]);
+    });
+
+    it("holds one message with a queue length of 1", async () => {
+      const one = settings((s) => {
+        s.protection.queue_length = 1;
+      });
+      const sent = talkAll(["one"], [], one);
+      await vi.advanceTimersByTimeAsync(0);
+      talkAll(["two"], sent, one);
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(texts(sent)).toEqual(["one"]);
+
+      service.played(sent[0].id);
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(texts(sent)).toEqual(["one", "two"]);
     });
 
     it("stops waiting when cleared", async () => {

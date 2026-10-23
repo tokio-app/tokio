@@ -110,11 +110,11 @@ export class SapiHost {
     this._clearIdle();
 
     return new Promise((resolve, reject) => {
+      // A stuck host is dropped before it's killed, which exits later, so the
+      // next request spawns a new one. Its other requests fail with this one.
       const timer = setTimeout(() => {
-        this._pending.delete(id);
-        this._armIdle();
-        reject(new Error(`SAPI request "${req.type}" timed out`));
-        child.kill(); // Stuck host, the next request respawns it.
+        this._onExit(child, new Error(`SAPI request "${req.type}" timed out`));
+        child.kill();
       }, timeout);
 
       this._pending.set(id, { resolve, reject, timer });

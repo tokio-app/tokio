@@ -239,6 +239,92 @@ describe("MusicService", () => {
 
       expect(queue()).toEqual(["A (playing)", "B"]);
     });
+
+    describe("one request per viewer", () => {
+      const music = settings((m) => {
+        m.protection.one_per_viewer = true;
+        m.protection.cooldown = 2;
+      });
+      const from = (handle: string, content: string) =>
+        chat(content, { handle });
+
+      it("ignores a viewer's request while another of theirs waits, keeping the cooldown free", async () => {
+        const { service, request, searched, queue } = setup();
+        await request("!play A", music);
+        await vi.advanceTimersByTimeAsync(2_000);
+        // A plays, so the viewer may ask again
+        await request("!play B", music);
+        await vi.advanceTimersByTimeAsync(2_000);
+
+        await request("!play C", music);
+        service.handle(from("other", "!play D"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "B", "D"]);
+        expect(queue()).toEqual(["A (playing)", "B", "D"]);
+      });
+
+      it("ignores a viewer's request while theirs is searching", async () => {
+        const { service, provider, request, searched } = setup();
+        let found = (_song: SongInfo | null) => {};
+        provider.searchSong.mockImplementationOnce(
+          () => new Promise((resolve) => (found = resolve)),
+        );
+        await request("!play A", music);
+        await vi.advanceTimersByTimeAsync(2_000);
+
+        await request("!play B", music);
+        service.handle(from("other", "!play C"), music);
+        found(song("A"));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "C"]);
+      });
+
+      it("drops a song that's playing or waiting and gives the cooldown back", async () => {
+        const { service, searched, queue } = setup();
+        service.handle(from("a", "!play A"), music);
+        await vi.advanceTimersByTimeAsync(2_000);
+
+        service.handle(from("b", "!play A"), music);
+        await vi.advanceTimersByTimeAsync(0);
+        service.handle(from("c", "!play B"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "A", "B"]);
+        expect(queue()).toEqual(["A (playing)", "B"]);
+      });
+
+      it("keeps the cooldown of a command taken while the duplicate searched", async () => {
+        const { service, provider, searched } = setup();
+        service.handle(from("a", "!play A"), music);
+        await vi.advanceTimersByTimeAsync(2_000);
+        provider.searchSong.mockImplementationOnce(async (query) => {
+          await new Promise((resolve) => setTimeout(resolve, 3_000));
+          return song(query);
+        });
+        service.handle(from("b", "!play A"), music);
+        await vi.advanceTimersByTimeAsync(2_500);
+        service.handle(from("c", "!next"), music);
+        await vi.advanceTimersByTimeAsync(500);
+
+        // 1 s after !next took the cooldown
+        service.handle(from("d", "!play D"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "A"]);
+      });
+
+      it("changes nothing while it's off", async () => {
+        const { request, queue } = setup();
+
+        await request("!play A");
+        await request("!play A");
+        await request("!play B");
+
+        expect(queue()).toEqual(["A (playing)", "A", "B"]);
+      });
+    });
   });
 
   describe("play", () => {
@@ -312,12 +398,35 @@ describe("MusicService", () => {
         playing: true,
         time: 4_000,
       });
-      provider.searchSong.mockResolvedValue(null);
 
-      await request("!play Nothing");
-      await vi.advanceTimersByTimeAsync(10_000);
-
+      await request("!play New");
+      await vi.advanceTimersByTimeAsync(5_999);
       expect(onSongChange).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(onSongChange).toHaveBeenCalledExactlyOnceWith([
+        expect.objectContaining({ title: "Current", played: true }),
+        expect.objectContaining({ title: "New", playing: true }),
+      ]);
+    });
+
+    it("plays a request at once over the player's track with a queue length of 1", async () => {
+      const { request, provider, played, queue } = setup();
+      provider.playerStatus.mockResolvedValueOnce({
+        ...song("Current"),
+        playing: true,
+        time: 4_000,
+      });
+
+      await request(
+        "!play New",
+        settings((m) => {
+          m.protection.queue_length = 1;
+        }),
+      );
+
+      expect(played()).toEqual(["New"]);
+      expect(queue()).toEqual(["New (playing)"]);
     });
 
     it("plays the track the provider was playing again on !last", async () => {
@@ -436,8 +545,25 @@ describe("MusicService", () => {
 
       await request("!play Nothing");
 
+      expect(provider.playerStatus).not.toHaveBeenCalled();
       expect(provider.play).not.toHaveBeenCalled();
       expect(changes).not.toHaveBeenCalled();
+    });
+
+    it("ignores a !play or !revoke without a song, keeping the cooldown free", async () => {
+      const { request, provider, searched } = setup();
+      const music = settings((m) => {
+        m.protection.cooldown = 2;
+      });
+
+      await request("!play", music);
+      await request("!play   ", music);
+      await request("!revoke", music);
+      expect(provider.searchSong).not.toHaveBeenCalled();
+      expect(provider.playerStatus).not.toHaveBeenCalled();
+
+      await request("!play A", music);
+      expect(searched()).toEqual(["A"]);
     });
   });
 
@@ -476,6 +602,17 @@ describe("MusicService", () => {
       await vi.advanceTimersByTimeAsync(20_000);
       expect(played()).toEqual(["A"]);
     });
+
+    it("removes a request by the song's title", async () => {
+      const { request, provider, queue } = setup();
+      await request("!play A");
+      provider.searchSong.mockResolvedValueOnce(song("Song B - Artist"));
+      await request("!play b");
+
+      await request("!revoke song b - artist");
+
+      expect(queue()).toEqual(["A (playing)"]);
+    });
   });
 
   describe("lifecycle", () => {
@@ -493,6 +630,23 @@ describe("MusicService", () => {
 
       expect(searched()).toEqual(["A", "B"]);
       expect(played()).toEqual(["A"]);
+    });
+
+    it("plays nothing for a search that ends after clearHandler", async () => {
+      const { service, provider, request, played, changes } = setup();
+      let found = (_song: SongInfo | null) => {};
+      provider.searchSong.mockImplementationOnce(
+        () => new Promise((resolve) => (found = resolve)),
+      );
+      await request("!play A");
+
+      service.clearHandler();
+      found(song("A"));
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(provider.playerStatus).not.toHaveBeenCalled();
+      expect(played()).toEqual([]);
+      expect(changes).not.toHaveBeenCalled();
     });
 
     it("empties the queue on disconnect", async () => {
@@ -632,6 +786,23 @@ describe("MusicService", () => {
         "music.log",
         error,
       );
+    });
+
+    it("doesn't report a search that fails after clearHandler", async () => {
+      const { service, request, provider, onPlaybackError, logError } =
+        listen();
+      let fail = (_error: Error) => {};
+      provider.searchSong.mockImplementationOnce(
+        () => new Promise((_, reject) => (fail = reject)),
+      );
+      await request("!play Song");
+
+      service.clearHandler();
+      fail(new Error("search failed"));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(onPlaybackError).not.toHaveBeenCalled();
+      expect(logError).not.toHaveBeenCalled();
     });
 
     it("reports a failed player read and logs it", async () => {

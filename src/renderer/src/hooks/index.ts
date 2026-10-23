@@ -4,6 +4,7 @@ export * from "./useAutosave";
 export * from "./useClickOutside";
 export * from "./useEditableSettings";
 export * from "./useImmerState";
+export * from "./useMenu";
 export * from "./useIpcListener";
 export * from "./useIpcRequest";
 export * from "./useNotifications";

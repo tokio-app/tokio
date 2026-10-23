@@ -12,7 +12,7 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { ALERTS_PATH, SERVER_PORT } from "@/common/util";
+import { ALERTS_PATH, formatError, SERVER_PORT } from "@/common/util";
 import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
@@ -289,13 +289,22 @@ const registerConnectorEvents = ({
             queueOptions: res.queueOptions,
           });
         },
-        () => {
-          notifier.error(
-            "tts",
-            FEEDBACK_CODES.TTS_GENERATION_FAILED,
-            "Unable to generate TTS audio. Try another voice on the TTS page.",
-            { windowMs: REPEAT_NOTICE_MS },
-          );
+        (error) => {
+          // Logged once per notice, so a broken voice can't flood the log
+          if (
+            notifier.error(
+              "tts",
+              FEEDBACK_CODES.TTS_GENERATION_FAILED,
+              "Unable to generate TTS audio. Try another voice, or check its engine's key in Settings.",
+              { windowMs: REPEAT_NOTICE_MS },
+            )
+          ) {
+            Logger.error(
+              `<TTS> Unable to generate audio - ${formatError(error)}`,
+              paths.files.logs.tts,
+              error,
+            );
+          }
         },
       );
     } else {

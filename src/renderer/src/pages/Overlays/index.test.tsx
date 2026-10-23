@@ -247,7 +247,7 @@ describe("Overlays", () => {
     expect(sent(APP_EVENTS.SAVE_OVERLAY_CONFIG)).toEqual([]);
   });
 
-  it("saves the settings, then updates the overlay", async () => {
+  it("saves the settings, then updates the previews", async () => {
     const { user } = await customize();
     await loadConfig();
     const title = dialog().getByPlaceholderText("Type a title");
@@ -286,9 +286,8 @@ describe("Overlays", () => {
 
     const payload: TokioPayload = { type: "tokio:config", data };
     expect(cardPreview).toHaveBeenCalledWith(preview(payload), "*");
-    expect(sent(APP_EVENTS.SEND_OVERLAY_DATA)).toEqual([
-      { id: "gift-jar", payload },
-    ]);
+    // Main sends them to the live overlays.
+    expect(sent(APP_EVENTS.SEND_OVERLAY_DATA)).toEqual([]);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -346,6 +345,7 @@ describe("Overlays", () => {
       data: overlayConfig(),
     });
 
+    const cardPreview = spyPreview(cardOf("Gift Jar"));
     const data = { title: "Goal!", size: 50, show: true };
     await send(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, {
       success: true,
@@ -359,9 +359,10 @@ describe("Overlays", () => {
     expect(dialog().getByRole("button", { name: "Save" })).not.toHaveAttribute(
       "aria-busy",
     );
-    expect(sent(APP_EVENTS.SEND_OVERLAY_DATA)).toEqual([
-      { id: "gift-jar", payload: { type: "tokio:config", data } },
-    ]);
+    expect(cardPreview).toHaveBeenCalledWith(
+      preview({ type: "tokio:config", data }),
+      "*",
+    );
   });
 
   it("stops saving when the settings close", async () => {

@@ -1,7 +1,13 @@
 import { CatalogOverlay } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
 import { catalogState, CatalogState } from "@/common/util";
-import { Btn, EmptyState, Modal, Section, Spinner } from "@/components";
+import {
+  Btn,
+  EmptyState,
+  RemoveOverlayModal,
+  Section,
+  Spinner,
+} from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -57,16 +63,7 @@ export function CatalogSection({ overlays }: Props) {
   return (
     <>
       {removing && (
-        <Modal
-          title="Remove overlay?"
-          description={`${removing.name} and its settings will be deleted. Streaming apps using its URL will stop showing it.`}
-          confirmText="Remove"
-          onClose={() => setRemoving(null)}
-          onConfirm={() => {
-            window.api.emit(APP_EVENTS.REMOVE_OVERLAY, { id: removing.id });
-            setRemoving(null);
-          }}
-        />
+        <RemoveOverlayModal item={removing} onClose={() => setRemoving(null)} />
       )}
 
       <Section

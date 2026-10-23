@@ -5,7 +5,7 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
-import { AppFailure } from "@/helper/feedback";
+import { AppFailure, LoggedError } from "@/helper/feedback";
 
 const events = createStack("music");
 
@@ -20,7 +20,7 @@ events.push(
     const res = await storeManagerService.updateProfileData({
       music: settings,
     });
-    if (!res) throw new Error("The music settings were not saved.");
+    if (!res) throw new LoggedError("The music settings were not saved.");
     e.reply(APP_EVENTS_RESPONSE.UPDATE_MUSIC_SETTINGS, {
       success: true,
     });

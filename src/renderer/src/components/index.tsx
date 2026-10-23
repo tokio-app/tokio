@@ -1,4 +1,6 @@
 export * from "./AlertItem";
+export * from "./CopyField";
+export * from "./DeleteModals";
 export * from "./Elements";
 export * from "./EmoteSelect";
 export * from "./GiftSelect";

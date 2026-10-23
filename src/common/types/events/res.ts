@@ -65,6 +65,7 @@ export enum APP_EVENTS_RESPONSE {
   SET_SERVER = "app:settings:res:set:server",
   SET_AUTO_UPDATES = "app:settings:res:set:updates",
   REQ_FQDN = "app:settings:res:fqdn",
+  GET_NETWORK_ADDRESSES = "app:settings:res:network",
 
   //HOME
   CONNECTED = "app:home:res:connect",
@@ -197,6 +198,8 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.SET_AUTO_UPDATES]: Reply;
 
   [APP_EVENTS_RESPONSE.REQ_FQDN]: Reply;
+  // This PC's IPv4 addresses, see ServerService.networkAddresses
+  [APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES]: { addresses: string[] };
 
   // HOME
   [APP_EVENTS_RESPONSE.CONNECTED]: Reply<{
@@ -271,12 +274,15 @@ export interface AppEventsResponseMap {
     // Alert the sound belongs to, so volume changes reach it while playing,
     // and its media reaches its overlay
     id: string;
-    // The same for every copy of the sound, so the window decodes it once
+    // The same for every copy of the sound, so the window decodes it once.
+    // Main always sets it with data, as the repeat's copies share its decode.
     key?: string;
     // A TTS alert's speed and pitch, for this sound only
     filters?: AlertFilters;
     // Shown on the alert's overlay when its turn comes
     media?: AlertMedia;
+    // How many times it plays in a row, 1 when missing
+    repeat?: number;
   };
   // Drops queued and playing alert sounds
   [APP_EVENTS_RESPONSE.ALERT_CLEAR]: void;
@@ -296,6 +302,8 @@ export interface AppEventsResponseMap {
   }>;
   [APP_EVENTS_RESPONSE.SET_ALERT_SOUND]: Reply<{
     id: string;
+    // The DOWNLOAD_SOUND or IMPORT_SOUND request this answers
+    request: number;
     sound?: Alert["sound"];
   }>;
   [APP_EVENTS_RESPONSE.SET_ALERT_MEDIA]: Reply<{

@@ -1,34 +1,3 @@
-/* The whole field copies the URL. Two classes to win over Btn's styles */
-.overlay .url {
-  justify-content: space-between;
-  gap: var(--space-3);
-  width: 100%;
-  padding: 0 var(--space-3);
-  border-color: var(--border);
-  background-color: var(--background-secondary);
-  color: var(--font-secondary);
-  font-size: var(--font-sm);
-  font-weight: 400;
-}
-
-.overlay .url:hover:not(:disabled) {
-  border-color: var(--background-secondary-hover);
-  background-color: var(--background-secondary);
-  color: var(--font-secondary);
-}
-
-.url_text {
-  min-width: 0;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.copied {
-  color: var(--success);
-}
-
 /* LIBRARY */
 
 .grid {

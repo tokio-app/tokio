@@ -17,16 +17,30 @@ class FakeProvider {
 }
 
 describe("ProviderService", () => {
-  it("starts a provider when asked, with an empty key", () => {
+  it("starts a provider when asked, keeping its key", () => {
     const service = new ProviderService<FakeProvider>();
     const a = new FakeProvider();
-    a.key = "stale";
+    a.key = "own";
 
     service.addProvider("a", a, true);
     service.addProvider("b", new FakeProvider());
 
-    expect(a.key).toBe("");
+    expect(a.key).toBe("own");
     expect(service.providerNames()).toEqual(["a", "b"]);
+  });
+
+  it("keeps the provider's key when switching without one, and clears it with an empty one", () => {
+    const service = new ProviderService<FakeProvider>();
+    const b = new FakeProvider();
+    service.addProvider("a", new FakeProvider(), true);
+    service.addProvider("b", b);
+    b.key = "saved";
+
+    service.setProvider("b");
+    expect(b.key).toBe("saved");
+
+    service.setProvider("b", "");
+    expect(b.key).toBe("");
   });
 
   it("switches provider and forwards the key", () => {

@@ -87,6 +87,8 @@ export class OverlayService extends Service {
   private _catalog: { overlays: CatalogOverlay[]; time: number } | null = null;
   // Installs in progress, by overlay id
   private _installs = new Map<string, Promise<OverlayResult>>();
+  // The last task queued for each overlay's files, see _lock
+  private _locks = new Map<string, Promise<unknown>>();
 
   public setLogFile(logFile: string): void {
     this._logFile = logFile;
@@ -282,7 +284,11 @@ export class OverlayService extends Service {
    * Deletes an installed overlay, official or imported, with its settings and
    * stops serving it.
    */
-  public async remove(id: string): Promise<OverlayResult> {
+  public remove(id: string): Promise<OverlayResult> {
+    return this._lock(id, () => this._remove(id));
+  }
+
+  private async _remove(id: string): Promise<OverlayResult> {
     // Only stored ids, so the renderer's id can't point outside the folder
     if (!this._store.getSettings().overlays.some((o) => o.id === id)) {
       Logger.warn(
@@ -316,7 +322,13 @@ export class OverlayService extends Service {
     }));
   }
 
-  public async getConfig(
+  public getConfig(
+    id: string,
+  ): Promise<OverlayResult<OverlayConfig | undefined>> {
+    return this._lock(id, () => this._readConfig(id));
+  }
+
+  private async _readConfig(
     id: string,
   ): Promise<OverlayResult<OverlayConfig | undefined>> {
     const res = await processOverlay(this._dir(id), this._yaml, false);
@@ -326,7 +338,15 @@ export class OverlayService extends Service {
   /**
    * Writes the config values into the overlay's HTML and saves the config.
    */
-  public async saveConfig(
+  public saveConfig(
+    id: string,
+    config: OverlayConfig,
+    gifts: CustomGift[],
+  ): Promise<OverlayResult<OverlayConfigRedux>> {
+    return this._lock(id, () => this._saveConfig(id, config, gifts));
+  }
+
+  private async _saveConfig(
     id: string,
     config: OverlayConfig,
     gifts: CustomGift[],
@@ -497,24 +517,43 @@ export class OverlayService extends Service {
     return { success: sent };
   }
 
+  /**
+   * Runs the tasks on one overlay's files one after another, so a write never
+   * puts back settings read before another's save. A task must not call a
+   * method that takes the lock, or it waits on itself.
+   */
+  private _lock<T>(id: string, task: () => Promise<T>): Promise<T> {
+    const run = (this._locks.get(id) ?? Promise.resolve())
+      .catch(() => {})
+      .then(task);
+    this._locks.set(id, run);
+    const idle = () => {
+      if (this._locks.get(id) === run) this._locks.delete(id);
+    };
+    run.then(idle, idle);
+    return run;
+  }
+
   // Writes the overlay's saved config and the gifts into its HTML.
-  private async _writeHTML(
+  private _writeHTML(
     id: string,
     external: boolean,
     gifts: CustomGift[],
   ): Promise<OverlayMetadata | null> {
-    const dir = this._dir(id);
-    const res = await processOverlay(dir, this._yaml, external);
-    if (!res.success) return null;
+    return this._lock(id, async () => {
+      const dir = this._dir(id);
+      const res = await processOverlay(dir, this._yaml, external);
+      if (!res.success) return null;
 
-    const html = await processHTML(
-      id,
-      res.data!.htmlContent,
-      dir,
-      res.data!.config,
-      gifts,
-    );
-    return html.success ? res.data!.info : null;
+      const html = await processHTML(
+        id,
+        res.data!.htmlContent,
+        dir,
+        res.data!.config,
+        gifts,
+      );
+      return html.success ? res.data!.info : null;
+    });
   }
 
   private async _installFromCatalog(
@@ -534,26 +573,30 @@ export class OverlayService extends Service {
       return { success: false };
     }
 
-    const installed = this._store
-      .getSettings()
-      .overlays.find((o) => o.id === id);
-    if (installed?.external) {
-      Logger.warn(
-        `<Overlays> Unable to install overlay ${id}, an imported overlay has its id.`,
-        this._logFile,
-      );
-      return { success: false };
-    }
-
-    const update = installed !== undefined;
     const staging = join(this._folder, `.install-${randomUUID()}`);
     try {
-      const info = await this._prepare(entry, staging, update, gifts);
-      await this._swap(staging, this._dir(id));
-      return {
-        success: true,
-        saved: await this._track({ ...info, id }, update),
-      };
+      // Outside the lock, so a slow download doesn't hold up saves.
+      const zip = await downloadOverlay(entry);
+      return await this._lock(id, async () => {
+        const installed = this._store
+          .getSettings()
+          .overlays.find((o) => o.id === id);
+        if (installed?.external) {
+          Logger.warn(
+            `<Overlays> Unable to install overlay ${id}, an imported overlay has its id.`,
+            this._logFile,
+          );
+          return { success: false };
+        }
+
+        const update = installed !== undefined;
+        const info = await this._prepare(entry, zip, staging, update, gifts);
+        await this._swap(staging, this._dir(id));
+        return {
+          success: true,
+          saved: await this._track({ ...info, id }, update),
+        };
+      });
     } catch (error) {
       Logger.error(
         `<Overlays> Unable to install overlay ${id} -- ${formatError(error)}`,
@@ -566,17 +609,18 @@ export class OverlayService extends Service {
   }
 
   /**
-   * Downloads an official overlay into `staging` and makes it ready to serve:
-   * checked like an import, with the installed version's settings when it's
-   * an update. Throws when it can't.
+   * Extracts an official overlay's zip into `staging` and makes it ready to
+   * serve: checked like an import, with the installed version's settings when
+   * it's an update. Throws when it can't. Runs inside the overlay's lock.
    */
   private async _prepare(
     entry: CatalogOverlay,
+    zip: Uint8Array,
     staging: string,
     update: boolean,
     gifts: CustomGift[],
   ): Promise<OverlayMetadata> {
-    await extractZip(await downloadOverlay(entry), staging);
+    await extractZip(zip, staging);
 
     const res = await processOverlay(staging, this._yaml, false);
     if (!res.success || !hasSetupBlock(res.data!.htmlContent)) {
@@ -584,7 +628,7 @@ export class OverlayService extends Service {
     }
 
     let config = res.data!.config;
-    const saved = update && config && (await this.getConfig(entry.id)).data;
+    const saved = update && config && (await this._readConfig(entry.id)).data;
     if (config && saved) {
       config = mergeOverlayConfig(config, saved);
       const kept = await this._yaml.saveFile(

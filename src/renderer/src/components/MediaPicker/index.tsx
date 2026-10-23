@@ -14,8 +14,9 @@ import { cx } from "@/helper/cx";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
 import { useEffect, useState } from "react";
-import { FaRegCopy } from "react-icons/fa";
 import { FiCheck, FiFilm, FiTrash2 } from "react-icons/fi";
+import { CopyField } from "../CopyField";
+import { DeleteMediaModal } from "../DeleteModals";
 import { Btn, Check, NumberInput, SearchToggle } from "../Elements";
 import { Modal } from "../Modal";
 import list from "../SoundPicker/soundpicker.module.css";
@@ -72,22 +73,13 @@ export function MediaPicker({
   onClose,
 }: Props) {
   const { id, media } = alert;
-  const url = getAlertOverlayURL(id);
   const [library, setLibrary] = useState<MediaFile[]>([]);
   const [search, setSearch] = useState("");
   const [failed, setFailed] = useState(false);
-  // Shows a check on the URL for a moment after copying it
-  const [copied, setCopied] = useState(false);
   // File waiting for the user to confirm it's deleted
   const [removing, setRemoving] = useState<MediaFile | null>(null);
   // The videos' lengths in seconds, read by their thumbnails
   const [lengths, setLengths] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    if (!copied) return undefined;
-    const timer = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(timer);
-  }, [copied]);
 
   useIpcRequest(APP_EVENTS.GET_MEDIA);
 
@@ -179,23 +171,7 @@ export function MediaPicker({
           </>
         }
       >
-        <div className={styles.overlay}>
-          <Btn
-            title="Copy URL"
-            className={styles.url}
-            onClick={() => {
-              void navigator.clipboard.writeText(url);
-              setCopied(true);
-            }}
-          >
-            <span className={styles.url_text}>{url}</span>
-            {copied ? (
-              <FiCheck size={16} className={styles.copied} />
-            ) : (
-              <FaRegCopy size={16} />
-            )}
-          </Btn>
-        </div>
+        <CopyField value={getAlertOverlayURL(id)} title="Copy URL" />
 
         <div className={styles.grid}>
           {files.map((file) => {
@@ -255,16 +231,7 @@ export function MediaPicker({
       </Modal>
 
       {removing && (
-        <Modal
-          title="Delete media?"
-          description={`"${removing.name}" will be deleted from your computer and from every alert that shows it, in all your profiles.`}
-          confirmText="Delete"
-          onClose={() => setRemoving(null)}
-          onConfirm={() => {
-            window.api.emit(APP_EVENTS.REMOVE_MEDIA, { file: removing.file });
-            setRemoving(null);
-          }}
-        />
+        <DeleteMediaModal item={removing} onClose={() => setRemoving(null)} />
       )}
     </>
   );

@@ -20,9 +20,10 @@ function ProtectionForm({
   feature?: "TTS" | "Music";
   children?: ReactNode;
 }) {
-  const [protection, update] = useImmerState(() =>
-    structuredClone(defaultProfile.music.protection),
-  );
+  const [protection, update] = useImmerState<Protection>(() => {
+    const { cooldown, queue_length } = defaultProfile.music.protection;
+    return { cooldown, queue_length };
+  });
   states.push(protection);
   return (
     <ProtectionSection

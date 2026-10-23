@@ -153,6 +153,10 @@ describe("home events", () => {
         "Euler Stream didn't accept your API key. Check it in Settings.",
       ],
       [
+        connectFailure("premium", ""),
+        "Your Euler Stream plan doesn't include this connection. Check your plan on Euler Stream.",
+      ],
+      [
         connectFailure("sign", ""),
         "Euler Stream couldn't sign the connection. Try again in a moment.",
       ],
@@ -353,22 +357,32 @@ describe("home events", () => {
       const updateActiveFeatures = vi.fn(async () => true);
       const clearTalk = vi.fn();
       const clearAlerts = vi.fn();
+      const clearMusic = vi.fn();
       const h = createHandler({
         storeManagerService: { updateActiveFeatures },
         ttsService: { clearTalk },
         alertsService: { clear: clearAlerts },
+        musicService: { clearHandler: clearMusic },
       });
-      return { h, updateActiveFeatures, clearTalk, clearAlerts };
+      return { h, updateActiveFeatures, clearTalk, clearAlerts, clearMusic };
     };
 
     it("saves the features without a notice", async () => {
-      const { h, updateActiveFeatures, clearTalk, clearAlerts } = setup();
+      const { h, updateActiveFeatures, clearTalk, clearAlerts, clearMusic } =
+        setup();
 
-      await h.invoke(home, APP_EVENTS.ACTIVE_FEATURES, { tts: true });
+      await h.invoke(home, APP_EVENTS.ACTIVE_FEATURES, {
+        tts: true,
+        music: true,
+      });
 
-      expect(updateActiveFeatures).toHaveBeenCalledWith({ tts: true });
+      expect(updateActiveFeatures).toHaveBeenCalledWith({
+        tts: true,
+        music: true,
+      });
       expect(clearTalk).not.toHaveBeenCalled();
       expect(clearAlerts).not.toHaveBeenCalled();
+      expect(clearMusic).not.toHaveBeenCalled();
       expect(h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toEqual([]);
       expect(h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([]);
       expect(h.notices).toEqual([]);
@@ -392,6 +406,14 @@ describe("home events", () => {
 
       expect(clearAlerts).toHaveBeenCalledOnce();
       expect(h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([undefined]);
+    });
+
+    it("drops the song requests when music is turned off", async () => {
+      const { h, clearMusic } = setup();
+
+      await h.invoke(home, APP_EVENTS.ACTIVE_FEATURES, { music: false });
+
+      expect(clearMusic).toHaveBeenCalledOnce();
     });
 
     it("reports a failure as the system's", async () => {

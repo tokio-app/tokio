@@ -1,10 +1,16 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { forgetDecoded } from "@/helper/audio";
 import { createAudio } from "@test/audio";
 import { send, sent, sentEvents } from "@test/ipc";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AppProvider } from ".";
 import { AudioContext } from "../audio";
+
+vi.mock("@/helper/audio", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/helper/audio")>()),
+  forgetDecoded: vi.fn(),
+}));
 
 const data = new Uint8Array([1, 2, 3]);
 
@@ -132,6 +138,61 @@ describe("AppProvider", () => {
       speed: 1.5,
       pitch: 0.8,
     });
+  });
+
+  it("queues the copies main asks for, sharing one decode", async () => {
+    const audio = setup();
+    vi.mocked(forgetDecoded).mockClear();
+
+    await send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
+      data,
+      volume: 40,
+      channel: "alerts",
+      maxQueueLength: 5,
+      id: "alert-1",
+      key: "airhorn.mp3",
+      repeat: 3,
+    });
+
+    const { calls } = audio.queue("alerts").enqueue.mock;
+    expect(calls).toHaveLength(3);
+    for (const [bytes, options] of calls) {
+      expect(bytes).toBe(data);
+      expect(options).toMatchObject({ cacheKey: "airhorn.mp3" });
+    }
+    // Sounds stay decoded for their next alerts
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(forgetDecoded).not.toHaveBeenCalled();
+  });
+
+  it("forgets a message's decode once its copies have their places", async () => {
+    const audio = setup();
+    const queue = audio.queue("alerts");
+    let placed!: (queued: boolean) => void;
+    queue.enqueue.mockReturnValueOnce(
+      new Promise((resolve) => {
+        placed = resolve;
+      }),
+    );
+    vi.mocked(forgetDecoded).mockClear();
+
+    await send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
+      data,
+      volume: 40,
+      channel: "alerts",
+      maxQueueLength: 5,
+      id: "alert-1",
+      key: "tts:thanks",
+      repeat: 2,
+    });
+
+    expect(queue.enqueue).toHaveBeenCalledTimes(2);
+    expect(forgetDecoded).not.toHaveBeenCalled();
+
+    placed(true);
+    await vi.waitFor(() =>
+      expect(forgetDecoded).toHaveBeenCalledExactlyOnceWith("tts:thanks"),
+    );
   });
 
   it("shows an alert's media on its overlay when the alert's turn comes", async () => {

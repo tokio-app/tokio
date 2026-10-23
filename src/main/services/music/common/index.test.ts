@@ -1,5 +1,11 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { cancelableEvent, ipcMain, views, windows } from "@test/electron";
+import {
+  cancelableEvent,
+  ipcMain,
+  shell as electronShell,
+  views,
+  windows,
+} from "@test/electron";
 import { WebContentsView } from "electron";
 import { normalize, sep } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -111,6 +117,25 @@ describe("createWindow", () => {
     expect(navigate("https://example.com/")).toBe(false);
     expect(navigate("file:///C:/x.png")).toBe(false);
     expect(navigate(`${page}#/other`)).toBe(true);
+  });
+
+  it("opens the player's links in the browser and limits its permissions", () => {
+    const { content } = open();
+    const [handler] = content.webContents.setWindowOpenHandler.mock.calls[0];
+    const [check] =
+      content.webContents.session.setPermissionCheckHandler.mock.calls[0];
+
+    expect(handler({ url: "https://music.youtube.com/" })).toEqual({
+      action: "deny",
+    });
+    expect(electronShell.openExternal).toHaveBeenCalledWith(
+      "https://music.youtube.com/",
+    );
+    expect(
+      content.webContents.session.setPermissionRequestHandler,
+    ).toHaveBeenCalledOnce();
+    expect(check(null, "media")).toBe(false);
+    expect(check(null, "fullscreen")).toBe(true);
   });
 
   it("handles the title bar controls on the view, not ipcMain", () => {

@@ -28,6 +28,10 @@ export function Alerts() {
   // Alerts waiting for main to save a sound. A pick made since drops the
   // alert, so a slow download can't replace it.
   const asked = useRef(new Set<string>());
+  // Numbers the sound requests, and the newest one applied per alert, so a
+  // late reply to an older request can't replace a newer pick
+  const counter = useRef(0);
+  const applied = useRef(new Map<string, number>());
   // Id of the alert whose image or video is being picked
   const [mediaFor, setMediaFor] = useState<string | null>(null);
   // The same as asked, for browsed media
@@ -76,6 +80,8 @@ export function Alerts() {
   // A download still applies after its picker closed.
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, (res) => {
     if (!res?.success || !res.sound || !asked.current.has(res.id)) return;
+    if (res.request <= (applied.current.get(res.id) ?? 0)) return;
+    applied.current.set(res.id, res.request);
     setOutput(res.id, { sound: res.sound, tts: null });
   });
 
@@ -151,7 +157,10 @@ export function Alerts() {
           ttsDefaults={ttsDefaults}
           testing={test.testing}
           onTest={test.toggle}
-          onRequest={() => asked.current.add(pickerAlert.id)}
+          onRequest={() => {
+            asked.current.add(pickerAlert.id);
+            return ++counter.current;
+          }}
           onSelect={(sound) => pick(pickerAlert.id, { sound, tts: null })}
           onSelectTts={(tts) => pick(pickerAlert.id, { sound: null, tts })}
           onClear={() => pick(pickerAlert.id, { sound: null, tts: null })}
