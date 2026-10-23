@@ -1,6 +1,7 @@
 import Logo from "@/assets/logo.png";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { queueAlert } from "@/helper/alerts";
+import { forgetDecoded } from "@/helper/audio";
 import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
@@ -55,12 +56,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!res) return;
     const queue = getQueue(res.channel);
     queue.setQueueOptions({ maxQueueLength: res.maxQueueLength, gapTime: 0.2 });
-    void queueAlert(queue, res, {
-      gain: res.volume / 100,
-      key: res.id,
-      cacheKey: res.key,
-      ...res.filters,
-    });
+    // The copies share one decode by cacheKey: the first one starts it at once
+    const copies = Array.from({ length: res.repeat ?? 1 }, () =>
+      queueAlert(queue, res, {
+        gain: res.volume / 100,
+        key: res.id,
+        cacheKey: res.key,
+        ...res.filters,
+      }),
+    );
+    // Messages are mostly said once, so they aren't kept decoded
+    const { key } = res;
+    if (key?.startsWith("tts:")) {
+      void Promise.allSettled(copies).then(() => forgetDecoded(key));
+    }
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.ALERT_CLEAR, () => stopQueues("alerts"));

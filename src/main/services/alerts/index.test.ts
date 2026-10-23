@@ -165,6 +165,7 @@ describe("AlertsService", () => {
           maxQueueLength: 100,
           id: "alert-1",
           key: "ding.mp3",
+          repeat: 1,
         },
       ]);
     });
@@ -205,6 +206,7 @@ describe("AlertsService", () => {
           maxQueueLength: 100,
           id: "alert-1",
           media: picture,
+          repeat: 1,
         },
       ]);
     });
@@ -314,7 +316,8 @@ describe("AlertsService", () => {
       const plays = async (events: GiftEvent[], alerts = everyGift) => {
         const counts: number[] = [];
         for (const event of events) {
-          counts.push((await run(TOKIO_EVENTS.GIFT, event, alerts)).length);
+          const sent = await run(TOKIO_EVENTS.GIFT, event, alerts);
+          counts.push(sent.reduce((sum, a) => sum + (a.repeat ?? 1), 0));
         }
         return counts;
       };
@@ -660,7 +663,7 @@ describe("AlertsService", () => {
           "Thanks for the Rose",
           "Thanks for the Rose",
         ]);
-        // So the window decodes it once too
+        // The window's copies of a sound share a decode by its key
         expect(sent[1].key).toBe(sent[0].key);
       });
 
@@ -676,11 +679,9 @@ describe("AlertsService", () => {
         );
 
         expect(generateBuffer).toHaveBeenCalledOnce();
-        expect(sent.map(said)).toEqual([
-          "Thanks Viewer",
-          "Thanks Viewer",
-          "Thanks Viewer",
-        ]);
+        // Sent once, for the window to play 3 times
+        expect(sent.map(said)).toEqual(["Thanks Viewer"]);
+        expect(sent[0].repeat).toBe(3);
       });
 
       it("says the streak's count so far, as the gift jar counts it", async () => {
@@ -694,11 +695,10 @@ describe("AlertsService", () => {
           await speak(gift("5655", false, { comboCount }), alerts);
         }
 
-        expect(sent.map(said)).toEqual([
-          "1 roses",
-          "2 roses",
-          "4 roses",
-          "4 roses",
+        expect(sent.map((a) => [said(a), a.repeat])).toEqual([
+          ["1 roses", 1],
+          ["2 roses", 1],
+          ["4 roses", 2],
         ]);
       });
 

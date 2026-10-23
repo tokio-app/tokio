@@ -271,12 +271,15 @@ export interface AppEventsResponseMap {
     // Alert the sound belongs to, so volume changes reach it while playing,
     // and its media reaches its overlay
     id: string;
-    // The same for every copy of the sound, so the window decodes it once
+    // The same for every copy of the sound, so the window decodes it once.
+    // Main always sets it with data, as the repeat's copies share its decode.
     key?: string;
     // A TTS alert's speed and pitch, for this sound only
     filters?: AlertFilters;
     // Shown on the alert's overlay when its turn comes
     media?: AlertMedia;
+    // How many times it plays in a row, 1 when missing
+    repeat?: number;
   };
   // Drops queued and playing alert sounds
   [APP_EVENTS_RESPONSE.ALERT_CLEAR]: void;

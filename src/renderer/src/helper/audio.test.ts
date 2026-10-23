@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AudioQueue, DECODED_CACHE_BYTES } from "./audio";
+import { AudioQueue, DECODED_CACHE_BYTES, forgetDecoded } from "./audio";
 
 type FakeAudio = { duration: number; length: number; numberOfChannels: number };
 
@@ -326,6 +326,42 @@ describe("AudioQueue", () => {
     expect(await queue.enqueue(bytes(), { cacheKey: "retry.mp3" })).toBe(false);
     expect(await queue.enqueue(bytes(), { cacheKey: "retry.mp3" })).toBe(true);
     expect(tone.decode).toHaveBeenCalledTimes(2);
+  });
+
+  it("decodes a forgotten sound again, and plays the copies it gave", async () => {
+    const queue = new AudioQueue();
+
+    await queue.enqueue(bytes(), { cacheKey: "tts:forget" });
+    forgetDecoded("tts:forget");
+    forgetDecoded("tts:never-decoded");
+    await queue.enqueue(bytes(), { cacheKey: "tts:forget" });
+
+    expect(tone.decode).toHaveBeenCalledTimes(2);
+    expect(tone.players.every((p) => !p.disposed)).toBe(true);
+  });
+
+  it("forgets a sound still decoding, without counting its bytes", async () => {
+    // Two of them don't fit, so a forgotten one counted would push out the next
+    const big = () => audio(DECODED_CACHE_BYTES * 0.6);
+    tone.decode.mockImplementation(async () => big());
+    let decoded!: () => void;
+    tone.decode.mockReturnValueOnce(
+      new Promise((resolve) => {
+        decoded = () => resolve(big());
+      }),
+    );
+    const queue = new AudioQueue();
+
+    const pending = queue.enqueue(bytes(), { cacheKey: "tts:held" });
+    forgetDecoded("tts:held");
+    decoded();
+    await pending;
+    await queue.enqueue(bytes(), { cacheKey: "forget-a" });
+    await queue.enqueue(bytes(), { cacheKey: "forget-a" });
+
+    expect(tone.decode).toHaveBeenCalledTimes(2);
+    // Leaves the shared cache to the other tests
+    forgetDecoded("forget-a");
   });
 
   it("keeps the most recently used decoded sounds that fit", async () => {

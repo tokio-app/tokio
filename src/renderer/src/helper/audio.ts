@@ -75,6 +75,17 @@ function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
   return entry.audio;
 }
 
+/**
+ * Drops a sound's decoded copy, for one that won't come again soon, like an
+ * alert's message. Players that have it still play it to the end.
+ */
+export function forgetDecoded(cacheKey: string) {
+  const entry = decoded.get(cacheKey);
+  if (!entry) return;
+  decoded.delete(cacheKey);
+  decodedBytes -= entry.bytes;
+}
+
 // Silent places for wait(), by length, shared by every queue. 8 kHz, the
 // lowest rate browsers must take, keeps a minute under 2 MB.
 const SILENCE_RATE = 8000;

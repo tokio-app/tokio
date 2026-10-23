@@ -1,14 +1,10 @@
-import {
-  Alert,
-  AlertMedia,
-  AlertTts,
-  MediaFile,
-  Profile,
-} from "@/common/schemas";
+import { Alert, AlertTts, MediaFile, Profile } from "@/common/schemas";
 import {
   APP_EVENTS,
+  APP_EVENTS_RESPONSE,
   AppEvents,
   AppEventsMap,
+  AppEventsResponseMap,
   EMOTE_TRIGGER,
   GiftEvent,
   MyInstantsSound,
@@ -45,20 +41,7 @@ export interface MyInstantsPage {
   hasNextPage: boolean;
 }
 
-export interface AlertAudio {
-  // None when the alert only shows media
-  data?: Uint8Array;
-  volume: number;
-  channel: string;
-  maxQueueLength: number;
-  id: string;
-  // The sound's file or its TTS cache key, the same for every copy
-  key?: string;
-  // A TTS alert's speed and pitch, for this sound only
-  filters?: { speed: number; pitch: number };
-  // Shown on the alert's overlay when its turn comes
-  media?: AlertMedia;
-}
+export type AlertAudio = AppEventsResponseMap[APP_EVENTS_RESPONSE.ALERT_AUDIO];
 
 // What TTS alerts speak with, the TTS service.
 type Speaker = Pick<TTSService, "prepareText" | "generateBuffer">;
@@ -397,8 +380,9 @@ export class AlertsService extends Service {
         ? `alerts:${alert.trigger.type}`
         : "alerts";
       const { tts, sound, media } = alert;
-      const play = (data?: Uint8Array, key?: string) => {
-        const audio: AlertAudio = {
+      // Sent once, and the window queues its copies
+      const play = (data?: Uint8Array, key?: string) =>
+        send({
           data,
           volume: alert.volume,
           channel,
@@ -407,9 +391,8 @@ export class AlertsService extends Service {
           key,
           filters: tts ? { speed: tts.speed, pitch: tts.pitch } : undefined,
           media: media ?? undefined,
-        };
-        for (let i = 0; i < times; i++) send(audio);
-      };
+          repeat: times,
+        });
 
       // A message is spoken instead of the sound.
       if (tts) {
