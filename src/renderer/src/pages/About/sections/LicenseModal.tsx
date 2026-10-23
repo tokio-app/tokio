@@ -29,10 +29,13 @@ export function LicenseModal({ id, onClose, onView }: Props) {
     else setLicense(res.data ?? null);
   });
 
-  // Only the notices shipped with the app are rendered, never package files
+  // Only the notices shipped with the app are rendered, never package files.
+  // Their first heading is dropped: the modal's title already names them.
   const html = useMemo(
     () =>
-      license?.markdown ? marked.parse(license.text, { async: false }) : null,
+      license?.markdown
+        ? marked.parse(license.text.replace(/^# .*/, ""), { async: false })
+        : null,
     [license],
   );
 

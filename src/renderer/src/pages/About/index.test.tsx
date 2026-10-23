@@ -297,9 +297,10 @@ describe("About", () => {
 
     await license(NOTICES);
 
+    // Only the modal's title, not the notices' own
     expect(
-      dialog().getByRole("heading", { level: 1, name: "Third-party notices" }),
-    ).toBeInTheDocument();
+      dialog().getAllByRole("heading", { name: "Third-party notices" }),
+    ).toHaveLength(1);
     expect(dialog().getByRole("link", { name: "edge-tts" })).toHaveAttribute(
       "href",
       "https://github.com/rany2/edge-tts",

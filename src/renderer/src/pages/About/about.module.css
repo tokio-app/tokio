@@ -169,9 +169,8 @@
   font-weight: 700;
 }
 
-.markdown h1 {
+.markdown > :first-child {
   margin-top: 0;
-  font-size: var(--font-xl);
 }
 
 .markdown h2 {
