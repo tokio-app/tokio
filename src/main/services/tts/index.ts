@@ -6,7 +6,7 @@ import {
   formatError,
   TaskQueue,
 } from "@/common/util";
-import { removeEmojis, wholeWord } from "@/helper/chat";
+import { isBlank, removeEmojis, wholeWord } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
@@ -117,7 +117,7 @@ export class TTSService extends ProviderService<TTSProvider> {
     }
     // Nothing to read, like only the trigger, or only emojis when they're
     // removed
-    if (this._clean(comment, settings).trim() === "") {
+    if (isBlank(this._clean(comment, settings))) {
       return false;
     }
 
@@ -174,7 +174,7 @@ export class TTSService extends ProviderService<TTSProvider> {
   ): string | null {
     if (this._hasBanned(checked, settings)) return null;
     const out = this._clean(text, settings);
-    return out.trim() === "" ? null : out;
+    return isBlank(out) ? null : out;
   }
 
   private _replacementRegExp(old: string) {
@@ -271,11 +271,7 @@ export class TTSService extends ProviderService<TTSProvider> {
           },
         });
       } else {
-        Logger.error(
-          `<TTS> Unable to generate audio - ${formatError(res.error)}`,
-          this._logFile,
-          res.error,
-        );
+        // Logged by onError, once per notice, so a broken voice can't flood the log
         onError?.(res.error);
       }
     });

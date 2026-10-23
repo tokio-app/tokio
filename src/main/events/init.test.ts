@@ -879,7 +879,7 @@ describe("init events", () => {
         source: "tts",
         code: FEEDBACK_CODES.TTS_GENERATION_FAILED,
         message:
-          "Unable to generate TTS audio. Try another voice on the TTS page.",
+          "Unable to generate TTS audio. Try another voice, or check its engine's key in Settings.",
       });
 
       onFailure();
@@ -890,6 +890,27 @@ describe("init events", () => {
       vi.advanceTimersByTime(1);
       onFailure();
       expect(s.h.notices).toEqual([failure, failure]);
+    });
+
+    it("logs a TTS failure once per notice", async () => {
+      const s = await live({ tts: true });
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
+      const { onFailure } = await talked(s);
+      vi.useFakeTimers();
+      const error = new Error("Engine down");
+
+      onFailure(error);
+      onFailure(error);
+      vi.advanceTimersByTime(30_000);
+      onFailure(error);
+
+      expect(s.h.notices).toHaveLength(2);
+      const logged = [
+        "<TTS> Unable to generate audio - Engine down",
+        "tts.log",
+        error,
+      ];
+      expect(logError.mock.calls).toEqual([logged, logged]);
     });
 
     it("stops reading chats while TTS is off", async () => {

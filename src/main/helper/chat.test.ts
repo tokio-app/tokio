@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasKeyword, isUser, removeEmojis, sameHandle } from "./chat";
+import { hasKeyword, isBlank, isUser, removeEmojis, sameHandle } from "./chat";
 
 describe("removeEmojis", () => {
   it.each([
@@ -26,6 +26,25 @@ describe("removeEmojis", () => {
 
   it("replaces each emoji with the text given", () => {
     expect(removeEmojis("I❤️you", " ")).toBe("I you");
+  });
+});
+
+describe("isBlank", () => {
+  it.each([
+    ["nothing", ""],
+    ["spaces", " \t\n"],
+    ["zero-width characters", "\u200B\u200C\u200D\u2060\uFEFF"],
+    ["bidi marks", "\u200E\u202E"],
+    ["Hangul fillers", "\u115F\u1160\u3164\uFFA0"],
+    ["the empty Braille pattern", "\u2800 \u2800"],
+  ])("is true for %s", (_, text) => {
+    expect(isBlank(text)).toBe(true);
+  });
+
+  it("is false for text with something to read", () => {
+    expect(isBlank("\u200Bhi")).toBe(false);
+    expect(isBlank("🎉")).toBe(false);
+    expect(isBlank("\u2801")).toBe(false);
   });
 });
 

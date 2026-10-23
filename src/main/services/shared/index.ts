@@ -20,7 +20,7 @@ export class ProviderService<T extends IProvider>
   implements IProvider
 {
   // Set by the addProvider(…, true) each child's constructor starts with
-  protected _current: { name: string; provider: T; key: string };
+  protected _current: { name: string; provider: T };
   protected _providerPool = new Map<string, T>();
 
   public addProvider(name: string, provider: T, start?: boolean) {
@@ -38,11 +38,12 @@ export class ProviderService<T extends IProvider>
     this._current.provider.setKey(key);
   }
 
+  // Without a key the provider keeps its own; an empty one clears it.
   public setProvider(name: string, key?: string) {
     const provider = this._providerPool.get(name);
     if (!provider) return;
-    this._current = { name, provider, key: key || "" };
-    this.setKey(key || "");
+    this._current = { name, provider };
+    if (key !== undefined) this.setKey(key);
   }
 
   public providerNames(): string[] {
