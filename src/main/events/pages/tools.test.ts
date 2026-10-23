@@ -1,3 +1,4 @@
+import { TimerSettingsSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -213,6 +214,90 @@ describe("tools events", () => {
         },
       ]);
       expect(h.notices).toEqual([]);
+    });
+  });
+
+  describe("countdown timer", () => {
+    const state = { status: "running" as const, remaining: 90_000 };
+    const settings = TimerSettingsSchema.parse({});
+    const timerFailure = {
+      code: FEEDBACK_CODES.TIMER_FAILED,
+      message: "Unable to update the countdown timer.",
+    };
+
+    // The service's push answers the changes, they reply only failures
+    const setup = (saved = true) => {
+      const timerService = {
+        get: vi.fn(() => ({ settings, state })),
+        setSettings: vi.fn(),
+        control: vi.fn(),
+        adjust: vi.fn(),
+        save: vi.fn(async () => saved),
+      };
+      return { h: createHandler({ timerService }), timerService };
+    };
+
+    it("replies the timer with nothing added", async () => {
+      const { h } = setup();
+
+      await h.invoke(tools, APP_EVENTS.GET_TIMER);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.TIMER)).toEqual([
+        { success: true, data: { settings, state, added: 0 } },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("sets the settings, controls and adjusts the timer, saving each", async () => {
+      const { h, timerService } = setup();
+
+      await h.invoke(tools, APP_EVENTS.SET_TIMER_SETTINGS, { settings });
+      await h.invoke(tools, APP_EVENTS.TIMER_CONTROL, { action: "pause" });
+      await h.invoke(tools, APP_EVENTS.ADJUST_TIMER, { seconds: -300 });
+
+      expect(timerService.setSettings).toHaveBeenCalledWith(settings);
+      expect(timerService.control).toHaveBeenCalledWith("pause");
+      expect(timerService.adjust).toHaveBeenCalledWith(-300_000);
+      expect(timerService.save).toHaveBeenCalledTimes(3);
+      expect(h.sent()).toEqual([]);
+    });
+
+    // What a page could send, whatever the types say
+    const bad: [APP_EVENTS, any][] = [
+      [APP_EVENTS.TIMER_CONTROL, { action: "explode" }],
+      [APP_EVENTS.ADJUST_TIMER, { seconds: 0 }],
+      [APP_EVENTS.ADJUST_TIMER, { seconds: Infinity }],
+      [APP_EVENTS.ADJUST_TIMER, { seconds: "60" }],
+    ];
+
+    it.each(bad)("refuses %s with %o", async (event, data) => {
+      const { h, timerService } = setup();
+
+      await h.invoke(tools, event, data);
+
+      expect(timerService.control).not.toHaveBeenCalled();
+      expect(timerService.adjust).not.toHaveBeenCalled();
+      expect(timerService.save).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.TIMER)).toEqual([
+        { success: false, error: timerFailure },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", source: "system" }),
+      ]);
+    });
+
+    it("says so when the timer can't be saved", async () => {
+      const { h, timerService } = setup(false);
+
+      await h.invoke(tools, APP_EVENTS.TIMER_CONTROL, { action: "start" });
+
+      expect(timerService.control).toHaveBeenCalledWith("start");
+      expect(h.replies(APP_EVENTS_RESPONSE.TIMER)).toEqual([
+        { success: false, error: saveError },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", ...saveError }),
+      ]);
     });
   });
 });

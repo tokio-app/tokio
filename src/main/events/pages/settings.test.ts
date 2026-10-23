@@ -1,3 +1,4 @@
+import { TimerProfileSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -346,10 +347,15 @@ describe("settings events", () => {
   });
 
   describe("SET_PROFILE", () => {
+    const timer = TimerProfileSchema.parse({
+      status: "paused",
+      remaining: 90_000,
+    });
     const setup = ({
       connected = false,
       missing = false,
       unsaved = false,
+      timerSaved = true,
     } = {}) => {
       const profiles = [defaultProfile, streamProfile];
       let active = defaultProfile;
@@ -361,16 +367,21 @@ describe("settings events", () => {
           return profile ? "switched" : "missing";
         }),
         getProfileData: vi.fn(async () =>
-          missing ? null : { name: active.name },
+          missing ? null : { name: active.name, timer },
         ),
         getProfiles: () => profiles,
         getSettings: () => ({ activeProfile: active }),
       };
+      const timerService = {
+        save: vi.fn(async () => timerSaved),
+        load: vi.fn(),
+      };
       const h = createHandler({
         storeManagerService,
         connectorService: { isConnected: () => connected },
+        timerService,
       });
-      return { h, storeManagerService };
+      return { h, storeManagerService, timerService };
     };
 
     it("refuses to switch while a LIVE is connected", async () => {
@@ -390,13 +401,21 @@ describe("settings events", () => {
     });
 
     it("switches the profile, then sends it, the settings and a notice", async () => {
-      const { h, storeManagerService } = setup();
+      const { h, storeManagerService, timerService } = setup();
 
       const log = await run(h, APP_EVENTS.SET_PROFILE, {
         file: "stream.json",
       });
 
+      // The old profile's timer is saved before the switch, the new one's loaded
+      expect(timerService.save).toHaveBeenCalledBefore(
+        storeManagerService.updateActiveProfile,
+      );
       expect(storeManagerService.updateActiveProfile).toHaveBeenCalledWith(
+        "stream.json",
+      );
+      expect(timerService.load).toHaveBeenCalledExactlyOnceWith(
+        timer,
         "stream.json",
       );
       expect(log).toEqual([
@@ -404,7 +423,7 @@ describe("settings events", () => {
           APP_EVENTS_RESPONSE.GET_PROFILE,
           {
             success: true,
-            profile: { name: "Stream" },
+            profile: { name: "Stream", timer },
             profiles: [defaultProfile, streamProfile],
           },
         ],
@@ -455,6 +474,24 @@ describe("settings events", () => {
           code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
           message:
             "Tokio couldn't save the change. Check the logs folder for details.",
+        }),
+      ]);
+    });
+
+    it("refuses to switch when the timer can't be saved, so it isn't lost", async () => {
+      const { h, storeManagerService, timerService } = setup({
+        timerSaved: false,
+      });
+
+      await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
+
+      expect(storeManagerService.updateActiveProfile).not.toHaveBeenCalled();
+      expect(timerService.load).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
         }),
       ]);
     });

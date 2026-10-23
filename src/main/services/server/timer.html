@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tokio countdown</title>
+    <style>
+      /* Inlined by ServerService, so every streaming app gets it */
+      @font-face {
+        font-family: "Archivo Variable";
+        font-style: normal;
+        font-display: block;
+        font-weight: 100 900;
+        font-stretch: 62% 125%;
+        src: url(__ARCHIVO__) format("woff2-variations");
+      }
+
+      :root {
+        --clock: #f1f5f9;
+        --title: #f1f5f9;
+        --accent: #f43f5e;
+        --warning: #f43f5e;
+        /* Keeps the text legible over bright video */
+        --halo: rgb(18 18 18 / 55%);
+        /* The clock fills the browser source, the rest follows it */
+        --size: min(19vw, 36vh);
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: "Archivo Variable", sans-serif;
+        line-height: 1.1;
+        text-shadow:
+          0 0 0.06em var(--halo),
+          0 0.03em 0.2em var(--halo);
+      }
+
+      .title {
+        max-width: 94vw;
+        margin-bottom: 0.15em;
+        overflow: hidden;
+        font-size: calc(var(--size) * 0.34);
+        font-weight: 600;
+        color: var(--title);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .clock,
+      .slot {
+        font-weight: 800;
+        font-stretch: 75%;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .clock {
+        font-size: var(--size);
+        color: var(--clock);
+        transition:
+          opacity 0.3s,
+          color 0.3s;
+      }
+
+      .clock.dim {
+        opacity: 0.55;
+      }
+
+      .clock.warn {
+        color: var(--warning);
+      }
+
+      /* Always there, so nothing shifts when it fills */
+      .slot {
+        height: 1.1em;
+        font-size: calc(var(--size) * 0.4);
+        color: var(--accent);
+      }
+
+      .slot.removed {
+        color: var(--clock);
+      }
+
+      .slot.change {
+        animation: rise 1.5s ease-out forwards;
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(0.2em);
+        }
+        12% {
+          opacity: 1;
+          transform: none;
+        }
+        70% {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+          transform: translateY(-0.4em);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .slot.change {
+          animation-name: fade;
+        }
+      }
+
+      @keyframes fade {
+        from {
+          opacity: 0;
+        }
+        12%,
+        70% {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="title" id="title" hidden></div>
+    <div class="clock dim" id="clock" role="timer"></div>
+    <div class="slot" id="slot"></div>
+    <script>
+      // The countdown timer's overlay, at /timer/. Main sends its state on
+      // connect and on every change (registerTimer in init.ts).
+      const title = document.getElementById("title");
+      const clock = document.getElementById("clock");
+      const slot = document.getElementById("slot");
+      const LABEL_MS = 1500;
+      // The last state, its remaining as of `at`
+      let state = null;
+      let at = 0;
+      // Time added while the label shows, and its timeout
+      let sum = 0;
+      let label = null;
+
+      const pad = (n) => String(n).padStart(2, "0");
+      const hms = (s) => [
+        Math.floor(s / 3600),
+        Math.floor((s % 3600) / 60),
+        s % 60,
+      ];
+
+      // 01:59:42, rounded up so 0 shows only at the end
+      const clockText = (ms) =>
+        hms(Math.max(0, Math.ceil(ms / 1000)))
+          .map(pad)
+          .join(":");
+
+      // +5s, +1:30, +1:00:00, or −5:00 when removed
+      const changeText = (ms) => {
+        const s = Math.round(Math.abs(ms) / 1000);
+        const [h, m, sec] = hms(s);
+        const text =
+          s < 60
+            ? `${s}s`
+            : h > 0
+              ? `${h}:${pad(m)}:${pad(sec)}`
+              : `${m}:${pad(sec)}`;
+        return (ms < 0 ? "−" : "+") + text;
+      };
+
+      const left = () =>
+        state.status === "running"
+          ? state.remaining - (performance.now() - at)
+          : state.remaining;
+
+      const draw = () => {
+        if (!state) return;
+        const ms = left();
+        const running = state.status === "running";
+        const warnAt = state.look.warn_at * 60_000;
+        clock.textContent = clockText(ms);
+        clock.classList.toggle("dim", !running);
+        clock.classList.toggle("warn", running && warnAt > 0 && ms <= warnAt);
+      };
+
+      // One CSS property, so a font's name can't inject anything
+      const setFont = (el, font) => {
+        const name = font.trim();
+        el.style.fontFamily = name
+          ? `${JSON.stringify(name)}, "Archivo Variable", sans-serif`
+          : "";
+      };
+
+      const showMultiplier = () => {
+        const { multiplier, look } = state;
+        slot.className = "slot";
+        slot.textContent =
+          look.show_multiplier && multiplier !== 1
+            ? `×${+multiplier.toFixed(2)}`
+            : "";
+      };
+
+      // Changes while the label shows add up into it and restart it
+      const showChange = (ms) => {
+        sum += ms;
+        if (Math.round(Math.abs(sum) / 1000) < 1) return;
+        slot.textContent = changeText(sum);
+        slot.className = "slot";
+        // Restarts the animation
+        void slot.offsetWidth;
+        slot.className = sum < 0 ? "slot change removed" : "slot change";
+        clearTimeout(label);
+        label = setTimeout(() => {
+          label = null;
+          sum = 0;
+          showMultiplier();
+        }, LABEL_MS);
+      };
+
+      const update = (data) => {
+        state = data;
+        at = performance.now();
+        const { look } = data;
+        const root = document.documentElement.style;
+        root.setProperty("--clock", look.clock_color);
+        root.setProperty("--title", look.title_color);
+        root.setProperty("--accent", look.accent_color);
+        root.setProperty("--warning", look.warning_color);
+        const text = look.title.trim();
+        title.hidden = !text;
+        title.textContent = text;
+        setFont(title, look.title_font);
+        setFont(clock, look.clock_font);
+        setFont(slot, look.clock_font);
+        if (!label) showMultiplier();
+        if (data.added) showChange(data.added);
+        draw();
+      };
+      setInterval(draw, 250);
+
+      const connect = () => {
+        const socket = new WebSocket(`ws://${location.host}/?id=timer`);
+        // Every overlay gets the LIVE's events too, this one ignores them.
+        socket.onmessage = (event) => {
+          const { type, data } = JSON.parse(event.data);
+          if (type === "tokio:timer") update(data);
+        };
+        socket.onclose = () => setTimeout(connect, 2000);
+      };
+      connect();
+    </script>
+  </body>
+</html>

@@ -12,7 +12,12 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { ALERTS_PATH, formatError, SERVER_PORT } from "@/common/util";
+import {
+  ALERTS_PATH,
+  formatError,
+  SERVER_PORT,
+  TIMER_PATH,
+} from "@/common/util";
 import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
@@ -20,6 +25,7 @@ import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
 import { ACTIVITY_EVENTS } from "@/services/live";
+import { TIMER_EVENTS } from "@/services/timer";
 import { AppHandlerVariables } from "@/types";
 
 const STATS_THROTTLE_MS = 250;
@@ -381,6 +387,60 @@ const registerConnectorEvents = ({
   });
 };
 
+// The countdown timer takes time from live events whatever features are on.
+// The Tools page and the timer's overlay follow it.
+const registerTimer = ({
+  connectorService: conn,
+  timerService: timer,
+  serverService: server,
+  win,
+  notifier,
+}: AppHandlerVariables) => {
+  for (const type of TIMER_EVENTS) {
+    conn.on(type, (d) => timer.handle(type, d));
+  }
+  conn.on(TOKIO_EVENTS.DISCONNECTED, () => {
+    if (timer.disconnected()) {
+      notifier.info(
+        "system",
+        FEEDBACK_CODES.TIMER_PAUSED,
+        "The countdown timer paused, since Tokio is no longer connected to the LIVE.",
+      );
+    }
+  });
+
+  const overlayMessage = (added: number) => {
+    const { settings, state } = timer.get();
+    return {
+      type: "tokio:timer",
+      data: {
+        ...state,
+        added,
+        multiplier: settings.multiplier,
+        look: settings.look,
+      },
+    };
+  };
+  // Busy lives change it many times a second. The time added in between is
+  // summed, and the state read when the push goes, so it's never an old one.
+  let added = 0;
+  const push = throttle(() => {
+    const data = { ...timer.get(), added };
+    if (!win.isDestroyed()) {
+      win.webContents.send(APP_EVENTS_RESPONSE.TIMER, { success: true, data });
+    }
+    server.sendToClient(TIMER_PATH, overlayMessage(added));
+    added = 0;
+  }, STATS_THROTTLE_MS);
+  timer.onChange((ms) => {
+    added += ms;
+    push();
+  });
+  server.onConnect((id) => {
+    if (id === TIMER_PATH) server.sendToClient(TIMER_PATH, overlayMessage(0));
+  });
+};
+
 events.push(
   APP_EVENTS.GET_PROFILE,
   async ({ storeManagerService }, e) => {
@@ -429,6 +489,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     licensesService,
     updaterService,
     liveService,
+    timerService,
     notifier,
   } = handler;
 
@@ -448,6 +509,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       licensesService.setLogFile(files.logs.system);
       updaterService.setLogFile(files.logs.system);
       liveService.setLogFile(files.logs.connector);
+      timerService.setLogFile(files.logs.system);
       notifier.setLogFiles(files.logs);
       alertsService.setSoundsFolder(folders.soundsFolder);
       alertsService.setMediaFolder(folders.mediaFolder);
@@ -466,6 +528,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     jsonManagerService,
     pathManagerService,
   );
+  timerService.initialize({ store: storeManagerService });
   overlayService.initialize(
     {
       folder: pathManagerService.folders.overlaysFolder,
@@ -488,10 +551,13 @@ const startApp = async (handler: AppHandlerVariables) => {
     wired.add(handler);
     serverService.initEvents(connectorService, musicService);
     registerConnectorEvents(handler);
+    registerTimer(handler);
   }
 
   const settings = storeManagerService.getSettings();
   liveService.setFeed(settings.activityFeed);
+  const profile = await storeManagerService.getProfileData();
+  if (profile) timerService.load(profile.timer, settings.activeProfile.file);
 
   // Before the server starts, so it serves the overlays right away. The
   // gifts saved last time are used when there are any, so startup doesn't

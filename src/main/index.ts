@@ -19,6 +19,7 @@ import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
+import { TimerService } from "@/services/timer";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
 import { URLManagerService } from "@/services/url";
@@ -88,6 +89,7 @@ const services: AppServices = {
   licensesService: new LicensesService(),
   updaterService: new UpdaterService(),
   liveService: new LiveService(),
+  timerService: new TimerService(),
 };
 
 // Packaged, the notices are copied to resources/licenses (electron-builder.yml).

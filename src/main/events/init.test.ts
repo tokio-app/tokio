@@ -1,4 +1,10 @@
-import { Alert, ALERT_TRIGGERS, Profile, SavedEmote } from "@/common/schemas";
+import {
+  Alert,
+  ALERT_TRIGGERS,
+  Profile,
+  SavedEmote,
+  TimerSettingsSchema,
+} from "@/common/schemas";
 import {
   AlertTrigger,
   ALERT_TRIGGER_LABELS,
@@ -32,6 +38,8 @@ import { LiveService } from "@/services/live";
 import type { MusicService } from "@/services/music";
 import type { OverlayService } from "@/services/overlay";
 import type { StoreManagerService } from "@/services/store";
+import type { TimerService } from "@/services/timer";
+import { TIMER_EVENTS } from "@/services/timer";
 import type { TTSService } from "@/services/tts";
 import type { UpdaterService } from "@/services/updater";
 import { app } from "@test/electron";
@@ -168,6 +176,7 @@ function setup() {
   const music = eventSource();
   const features = { tts: false, music: false, alerts: true };
   const settings = {
+    activeProfile: profiles[0],
     server: { enabled: true },
     updates: { auto: false },
     activityFeed: { ...defaultStoreData.settings.activityFeed },
@@ -219,6 +228,8 @@ function setup() {
     mount: vi.fn(),
     initEvents: vi.fn(),
     toggleServer: vi.fn(async (_enabled: boolean) => true),
+    onConnect: vi.fn((_listener: (id: string) => void) => {}),
+    sendToClient: vi.fn((_id: string, _payload: unknown) => true),
   };
   const overlayService = {
     setLogFile: vi.fn(),
@@ -273,6 +284,19 @@ function setup() {
   const jsonManagerService = { setLogFile: vi.fn() };
   const licensesService = { setLogFile: vi.fn() };
   const liveService = new LiveService();
+  const timer: ReturnType<TimerService["get"]> = {
+    settings: TimerSettingsSchema.parse({}),
+    state: { status: "running", remaining: 60_000 },
+  };
+  const timerService = {
+    setLogFile: vi.fn(),
+    initialize: vi.fn((..._args: Parameters<TimerService["initialize"]>) => {}),
+    load: vi.fn((..._args: Parameters<TimerService["load"]>) => {}),
+    handle: vi.fn((..._args: Parameters<TimerService["handle"]>) => {}),
+    disconnected: vi.fn(() => false),
+    get: vi.fn(() => timer),
+    onChange: vi.fn((_listener: (deltaMs: number) => void) => {}),
+  };
 
   const h = createHandler({
     pathManagerService,
@@ -288,6 +312,7 @@ function setup() {
     jsonManagerService,
     licensesService,
     liveService,
+    timerService,
     yamlManagerService: {},
   });
 
@@ -310,6 +335,8 @@ function setup() {
     jsonManagerService,
     licensesService,
     liveService,
+    timer,
+    timerService,
   };
 }
 
@@ -700,6 +727,140 @@ describe("init events", () => {
           expect.objectContaining({ text: "bye" }),
         ],
       });
+    });
+  });
+
+  describe("countdown timer", () => {
+    // What the Tools page and the overlay got, oldest first
+    const windowPushes = (s: Setup) => s.h.pushed(APP_EVENTS_RESPONSE.TIMER);
+    const overlayPushes = (s: Setup) =>
+      s.serverService.sendToClient.mock.calls
+        .filter(([id]) => id === "timer")
+        .map(([, payload]) => payload);
+    const change = (s: Setup, deltaMs: number) =>
+      s.timerService.onChange.mock.calls[0][0](deltaMs);
+    const overlayState = (s: Setup, added: number) => ({
+      type: "tokio:timer",
+      data: {
+        ...s.timer.state,
+        added,
+        multiplier: s.timer.settings.multiplier,
+        look: s.timer.settings.look,
+      },
+    });
+
+    it.each(TIMER_EVENTS)("passes %s to the timer", async (event) => {
+      const s = await live();
+      const { data } = generateTikTokEventSample(event);
+
+      emitLive(s.conn, event, data);
+
+      expect(s.timerService.handle).toHaveBeenCalledExactlyOnceWith(
+        event,
+        data,
+      );
+    });
+
+    it("pushes its changes at most every 250ms, summing the time added", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      s.serverService.sendToClient.mockClear();
+      s.h.win.webContents.send.mockClear();
+
+      change(s, 30_000);
+      change(s, 10_000);
+      change(s, 0);
+      change(s, 5_000);
+      expect(windowPushes(s)).toHaveLength(1);
+
+      s.timer.state = { status: "stopped", remaining: 0 };
+      vi.advanceTimersByTime(250);
+
+      const data = (added: number) => ({ ...s.timer, added });
+      expect(windowPushes(s)).toEqual([
+        { success: true, data: { ...data(30_000), state: expect.anything() } },
+        { success: true, data: data(15_000) },
+      ]);
+      expect(overlayPushes(s)).toEqual([
+        expect.objectContaining({ type: "tokio:timer" }),
+        overlayState(s, 15_000),
+      ]);
+    });
+
+    it("doesn't push to a closed window, but still to the overlay", async () => {
+      const s = await live();
+      s.serverService.sendToClient.mockClear();
+      s.h.win.webContents.send.mockClear();
+      s.h.win.close();
+
+      change(s, 1000);
+
+      expect(windowPushes(s)).toEqual([]);
+      expect(overlayPushes(s)).toEqual([overlayState(s, 1000)]);
+    });
+
+    it("sends the timer to its overlay when it connects", async () => {
+      const s = await live();
+      const connected = s.serverService.onConnect.mock.calls[0][0];
+      s.serverService.sendToClient.mockClear();
+
+      connected("other");
+      connected("timer");
+
+      expect(s.serverService.sendToClient.mock.calls).toEqual([
+        ["timer", overlayState(s, 0)],
+      ]);
+    });
+
+    it.each([true, false])(
+      "tells the user when a disconnect paused it: %s",
+      async (paused) => {
+        const s = await live();
+        s.timerService.disconnected.mockReturnValue(paused);
+
+        s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+
+        expect(s.timerService.disconnected).toHaveBeenCalledOnce();
+        expect(noticesFor(s, FEEDBACK_CODES.TIMER_PAUSED)).toEqual(
+          paused
+            ? [
+                expect.objectContaining({
+                  level: "info",
+                  source: "system",
+                  message:
+                    "The countdown timer paused, since Tokio is no longer connected to the LIVE.",
+                }),
+              ]
+            : [],
+        );
+      },
+    );
+
+    it("loads the active profile's timer at startup, after the store", async () => {
+      const s = setup();
+
+      await load(s);
+
+      expect(s.timerService.setLogFile).toHaveBeenCalledWith("system.log");
+      expect(s.timerService.initialize).toHaveBeenCalledExactlyOnceWith({
+        store: s.h.handler.storeManagerService,
+      });
+      expect(
+        s.storeManagerService.initialize.mock.invocationCallOrder[0],
+      ).toBeLessThan(s.timerService.initialize.mock.invocationCallOrder[0]);
+      expect(s.timerService.load).toHaveBeenCalledExactlyOnceWith(
+        profile.timer,
+        "stream.json",
+      );
+    });
+
+    it("loads no timer when the profile didn't load", async () => {
+      const s = setup();
+      s.storeManagerService.getProfileData.mockResolvedValue(null);
+
+      await load(s);
+
+      expect(s.timerService.load).not.toHaveBeenCalled();
     });
   });
 
