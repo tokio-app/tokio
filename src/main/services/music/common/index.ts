@@ -4,7 +4,11 @@ import {
   CurrentSongInfo,
   SongInfo,
 } from "@/common/types";
-import { stayOnPage } from "@/helper/network";
+import {
+  limitPermissions,
+  openLinksOutside,
+  stayOnPage,
+} from "@/helper/network";
 import { BrowserWindow, WebContentsView } from "electron";
 import { join } from "node:path";
 import { TokioEmitter } from "../../shared/emitter";
@@ -52,6 +56,11 @@ export function createWindow(content: WebContentsView) {
       backgroundThrottling: false,
     },
   });
+
+  // The player's pages open links in the browser, and get no camera,
+  // microphone or other device
+  openLinksOutside(content.webContents);
+  limitPermissions(content.webContents.session);
 
   const _navView = new WebContentsView({
     webPreferences: {

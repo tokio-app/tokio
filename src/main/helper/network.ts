@@ -1,5 +1,5 @@
 import { APP_HOSTNAME, SERVER_PORT } from "@/common/util";
-import type { WebContents } from "electron";
+import { shell, type Session, type WebContents } from "electron";
 
 const OVERLAY_HOSTS = ["localhost", "127.0.0.1", "[::1]", APP_HOSTNAME];
 
@@ -33,4 +33,40 @@ export function stayOnPage(contents: WebContents) {
       event.preventDefault();
     }
   });
+}
+
+/**
+ * Opens the web and mail links a page would open in a new window in the
+ * browser instead, and denies every new window.
+ */
+export function openLinksOutside(contents: WebContents) {
+  contents.setWindowOpenHandler(({ url }) => {
+    // A Shift-click on a sidebar link opens the page's own file: URL.
+    if (/^(https?|mailto):/.test(url)) {
+      shell.openExternal(url).catch(() => {});
+    }
+    return { action: "deny" };
+  });
+}
+
+// What a music player's pages need: fullscreen videos, copying a link, and
+// the storage access logins ask for
+const ALLOWED_PERMISSIONS = new Set([
+  "fullscreen",
+  "clipboard-sanitized-write",
+  "storage-access",
+  "top-level-storage-access",
+]);
+
+/**
+ * Denies the session's pages every other permission, like the camera, the
+ * microphone, notifications or the location.
+ */
+export function limitPermissions(session: Session) {
+  session.setPermissionRequestHandler((_contents, permission, callback) =>
+    callback(ALLOWED_PERMISSIONS.has(permission)),
+  );
+  session.setPermissionCheckHandler((_contents, permission) =>
+    ALLOWED_PERMISSIONS.has(permission),
+  );
 }

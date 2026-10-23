@@ -1,7 +1,7 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import config from "@/config";
 import { Notifier } from "@/helper/feedback";
-import { isOverlayURL, stayOnPage } from "@/helper/network";
+import { isOverlayURL, openLinksOutside, stayOnPage } from "@/helper/network";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
@@ -99,13 +99,7 @@ export class AppHandler implements AppHandlerVariables {
 
   private initWindow() {
     stayOnPage(this.win.webContents);
-    this.win.webContents.setWindowOpenHandler(({ url }) => {
-      // A Shift-click on a sidebar link opens the page's own file: URL.
-      if (/^(https?|mailto):/.test(url)) {
-        this.shell.openExternal(url).catch(() => {});
-      }
-      return { action: "deny" };
-    });
+    openLinksOutside(this.win.webContents);
 
     this.ipcMain.on(APP_EVENTS.MINIMIZE_WINDOW, () => {
       this.win.minimize();

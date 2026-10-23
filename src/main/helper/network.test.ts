@@ -1,6 +1,67 @@
 import { APP_HOSTNAME, SERVER_PORT } from "@/common/util";
-import { describe, expect, it } from "vitest";
-import { isOverlayURL } from "./network";
+import { shell, views } from "@test/electron";
+import { WebContentsView } from "electron";
+import { describe, expect, it, vi } from "vitest";
+import { isOverlayURL, limitPermissions, openLinksOutside } from "./network";
+
+// A view's webContents, as the code gets it and as the fake records it
+const contents = () => {
+  const view = new WebContentsView();
+  return { real: view.webContents, fake: views().at(-1)!.webContents };
+};
+
+describe("openLinksOutside", () => {
+  it("opens web and mail links in the browser and denies every window", () => {
+    const { real, fake } = contents();
+    openLinksOutside(real);
+    const [handler] = fake.setWindowOpenHandler.mock.calls[0];
+
+    const results = [
+      "https://tokio.ialfaro.com",
+      "mailto:me@example.com",
+      "file:///C:/app/out/renderer/index.html#/about",
+      "javascript:alert(1)",
+    ].map((url) => handler({ url }));
+
+    expect(results.every(({ action }) => action === "deny")).toBe(true);
+    expect(shell.openExternal.mock.calls).toEqual([
+      ["https://tokio.ialfaro.com"],
+      ["mailto:me@example.com"],
+    ]);
+  });
+});
+
+describe("limitPermissions", () => {
+  const ALLOWED = [
+    "fullscreen",
+    "clipboard-sanitized-write",
+    "storage-access",
+    "top-level-storage-access",
+  ];
+  const DENIED = ["media", "geolocation", "notifications", "midi", "hid"];
+
+  it("grants only the permissions a player's pages need", () => {
+    const { real, fake } = contents();
+    limitPermissions(real.session);
+    const [request] = fake.session.setPermissionRequestHandler.mock.calls[0];
+    const [check] = fake.session.setPermissionCheckHandler.mock.calls[0];
+
+    const granted = (permission: string) => {
+      const callback = vi.fn<(granted: boolean) => void>();
+      request(null, permission, callback);
+      return callback.mock.calls[0][0];
+    };
+
+    for (const permission of ALLOWED) {
+      expect(granted(permission)).toBe(true);
+      expect(check(null, permission)).toBe(true);
+    }
+    for (const permission of DENIED) {
+      expect(granted(permission)).toBe(false);
+      expect(check(null, permission)).toBe(false);
+    }
+  });
+});
 
 describe("isOverlayURL", () => {
   it("matches previews loaded from disk", () => {

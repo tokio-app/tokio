@@ -23,7 +23,23 @@ export function cancelableEvent<T extends object>(props: T) {
 export class FakeWebContents extends EventEmitter {
   // Messages from this page only, which main can handle without ipcMain
   readonly ipc = new EventEmitter();
-  readonly session = { clearStorageData: vi.fn(async () => {}) };
+  readonly session = {
+    clearStorageData: vi.fn(async () => {}),
+    setPermissionRequestHandler:
+      vi.fn<
+        (
+          handler: (
+            contents: unknown,
+            permission: string,
+            callback: (granted: boolean) => void,
+          ) => void,
+        ) => void
+      >(),
+    setPermissionCheckHandler:
+      vi.fn<
+        (handler: (contents: unknown, permission: string) => boolean) => void
+      >(),
+  };
   readonly send = vi.fn<(channel: string, ...args: unknown[]) => void>();
   readonly setWindowOpenHandler =
     vi.fn<
