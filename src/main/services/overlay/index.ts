@@ -9,13 +9,11 @@ import {
 import {
   CustomGift,
   GiftEvent,
-  isLiveEvent,
   OverlayApp,
   OverlayConfigRedux,
-  TOKIO_EVENTS,
   TokioPayload,
 } from "@/common/types";
-import { formatError, generateTikTokEventSample } from "@/common/util";
+import { createTestLive, formatError } from "@/common/util";
 import { renameWithRetry } from "@/helper/fs";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
@@ -79,6 +77,8 @@ export class OverlayService extends Service {
   private _giftSave: Promise<unknown> = Promise.resolve();
   // Custom gifts whose details were already compared since the app started
   private _checkedGifts = new Set<number>();
+  // A test LIVE per overlay, so each Test carries on from that overlay's last
+  private _testLives = new Map<string, () => TokioPayload[]>();
   private _overlays: OverlayApp[] = [];
   private _yaml: YAMLManagerService;
   private _json: JSONManagerService;
@@ -447,11 +447,11 @@ export class OverlayService extends Service {
     this._server.sendToClient(id, payload);
   }
 
-  // A sample of every live event, for an overlay's test button. Internal events have no samples.
-  public getTestPayloads(): TokioPayload[] {
-    return Object.values(TOKIO_EVENTS)
-      .filter(isLiveEvent)
-      .map((key) => generateTikTokEventSample(key));
+  // Every live event, as the next moment of the overlay's test LIVE, for its test button.
+  public getTestPayloads(id: string): TokioPayload[] {
+    let live = this._testLives.get(id);
+    if (!live) this._testLives.set(id, (live = createTestLive()));
+    return live();
   }
 
   // IDs for overlays tested without importing them, see the Tools page.
@@ -484,7 +484,7 @@ export class OverlayService extends Service {
    * no overlay is connected with it.
    */
   public sendTestEvents(id: string): OverlayResult {
-    const payloads = this.getTestPayloads();
+    const payloads = this.getTestPayloads(id);
     const sent = payloads.every((payload) =>
       this._server.sendToClient(id, payload),
     );
