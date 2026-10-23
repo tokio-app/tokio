@@ -1,7 +1,7 @@
 import { AppNotification } from "@/common/types";
 import { cx } from "@/helper/cx";
-import { useClickOutside } from "@/hooks/useClickOutside";
-import { useEffect, useRef, useState } from "react";
+import { useMenu } from "@/hooks/useMenu";
+import { useEffect } from "react";
 import { FiBell } from "react-icons/fi";
 import { Btn } from "../Elements";
 import { LevelIcon } from "../Toasts";
@@ -31,11 +31,7 @@ export function NotificationBell({
   onSeen,
   onClear,
 }: Props) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const toggleRef = useRef<HTMLButtonElement>(null);
-
-  useClickOutside([ref], () => setOpen(false), open);
+  const { open, ref, toggleRef, toggle, onKeyDown } = useMenu();
 
   // Also marks the notices that arrive while the list is open.
   useEffect(() => {
@@ -43,16 +39,7 @@ export function NotificationBell({
   }, [open, history, onSeen]);
 
   return (
-    <div
-      className={styles.container}
-      ref={ref}
-      onKeyDown={(e) => {
-        if (e.key !== "Escape" || !open) return;
-        e.stopPropagation();
-        setOpen(false);
-        toggleRef.current?.focus();
-      }}
-    >
+    <div className={styles.container} ref={ref} onKeyDown={onKeyDown}>
       <Btn
         ref={toggleRef}
         variant="icon"
@@ -64,7 +51,7 @@ export function NotificationBell({
         aria-expanded={open}
         active={open}
         className={styles.toggle}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
       >
         <FiBell size={18} />
         {unread > 0 && (

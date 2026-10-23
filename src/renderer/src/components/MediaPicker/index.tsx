@@ -16,6 +16,7 @@ import { useIpcRequest } from "@/hooks/useIpcRequest";
 import { useEffect, useState } from "react";
 import { FaRegCopy } from "react-icons/fa";
 import { FiCheck, FiFilm, FiTrash2 } from "react-icons/fi";
+import { DeleteMediaModal } from "../DeleteModals";
 import { Btn, Check, NumberInput, SearchToggle } from "../Elements";
 import { Modal } from "../Modal";
 import list from "../SoundPicker/soundpicker.module.css";
@@ -255,16 +256,7 @@ export function MediaPicker({
       </Modal>
 
       {removing && (
-        <Modal
-          title="Delete media?"
-          description={`"${removing.name}" will be deleted from your computer and from every alert that shows it, in all your profiles.`}
-          confirmText="Delete"
-          onClose={() => setRemoving(null)}
-          onConfirm={() => {
-            window.api.emit(APP_EVENTS.REMOVE_MEDIA, { file: removing.file });
-            setRemoving(null);
-          }}
-        />
+        <DeleteMediaModal item={removing} onClose={() => setRemoving(null)} />
       )}
     </>
   );

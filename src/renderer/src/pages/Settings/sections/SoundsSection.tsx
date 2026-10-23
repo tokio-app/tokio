@@ -2,8 +2,8 @@ import { AlertSound } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import {
   Btn,
+  DeleteSoundModal,
   EmptyState,
-  Modal,
   PlayButton,
   PREVIEW_VOLUME,
   Section,
@@ -33,15 +33,11 @@ export function SoundsSection() {
   return (
     <>
       {removing && (
-        <Modal
-          title="Delete sound?"
-          description={`"${removing.name}" will be deleted from your computer and from every alert that plays it, in all your profiles.`}
-          confirmText="Delete"
+        <DeleteSoundModal
+          item={removing}
           onClose={() => setRemoving(null)}
-          onConfirm={() => {
-            if (test.testing?.id === removing.file) test.stop();
-            window.api.emit(APP_EVENTS.REMOVE_SOUND, { file: removing.file });
-            setRemoving(null);
+          onDelete={({ file }) => {
+            if (test.testing?.id === file) test.stop();
           }}
         />
       )}

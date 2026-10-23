@@ -4,6 +4,7 @@ import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
 import { useState } from "react";
+import { DeleteSoundModal } from "../DeleteModals";
 import { Btn, Tabs } from "../Elements";
 import { Modal } from "../Modal";
 import { PREVIEW_VOLUME, type TestState } from "../PlayButton";
@@ -157,19 +158,14 @@ export function SoundPicker({
       </Modal>
 
       {removing && (
-        <Modal
-          title="Delete sound?"
-          description={`"${removing.name}" will be deleted from your computer and from every alert that plays it, in all your profiles.`}
-          confirmText="Delete"
+        <DeleteSoundModal
+          item={removing}
           onClose={() => setRemoving(null)}
-          onConfirm={() => {
-            const { file } = removing;
+          onDelete={({ file }) => {
             // Testing the same sound again stops it.
             if (testing?.id === file) {
               onTest({ id: file, file, volume: PREVIEW_VOLUME });
             }
-            window.api.emit(APP_EVENTS.REMOVE_SOUND, { file });
-            setRemoving(null);
           }}
         />
       )}

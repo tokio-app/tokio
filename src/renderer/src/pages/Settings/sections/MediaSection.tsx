@@ -1,7 +1,14 @@
 import { MediaFile } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { getMediaPreviewURL, mediaKind } from "@/common/util";
-import { Btn, EmptyState, MediaThumbnail, Modal, Section } from "@/components";
+import {
+  Btn,
+  DeleteMediaModal,
+  EmptyState,
+  MediaThumbnail,
+  Modal,
+  Section,
+} from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
 import { FiImage, FiMaximize2, FiTrash2, FiUpload } from "react-icons/fi";
@@ -51,16 +58,7 @@ export function MediaSection() {
       )}
 
       {removing && (
-        <Modal
-          title="Delete media?"
-          description={`"${removing.name}" will be deleted from your computer and from every alert that shows it, in all your profiles.`}
-          confirmText="Delete"
-          onClose={() => setRemoving(null)}
-          onConfirm={() => {
-            window.api.emit(APP_EVENTS.REMOVE_MEDIA, { file: removing.file });
-            setRemoving(null);
-          }}
-        />
+        <DeleteMediaModal item={removing} onClose={() => setRemoving(null)} />
       )}
 
       <Section
