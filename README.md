@@ -112,6 +112,7 @@ Download Tokio from the [latest release](https://github.com/tokio-app/tokio/rele
 
 Every release has builds for Windows (x64), macOS (Apple Silicon and Intel) and Linux (x64). The voices installed on the system are only available on Windows; TikTok and Edge voices work everywhere.
 
+- **Windows**: Tokio isn't signed yet, so Windows may show **Windows protected your PC** when you run the setup. Choose **More info**, then **Run anyway**.
 - **macOS**: unzip the download and move **Tokio** to your Applications folder. Tokio isn't notarized yet, so macOS may block it the first time. Open it from Finder with right-click → **Open**, or allow it in **System Settings → Privacy & Security**.
 - **Linux**: make the AppImage executable with `chmod +x` (or in the file's properties) and run it. It needs FUSE.
 
