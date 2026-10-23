@@ -13,7 +13,10 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
 1. Types, in `src/common/types/connector.ts`: the `TOKIO_EVENTS` entry (`tokio:event:<name>`), the payload type next to the others, and its row in `TokioEventMap`. Typecheck then asks for:
    - its label in `ALERT_TRIGGER_LABELS` (same file)
    - its message variables in `ALERT_MESSAGE_VARIABLES` (`src/common/util/alerts.ts`)
-   - its sample in `src/common/util/samples/index.ts`, which previews and tests use
+   - its sample in `src/common/util/samples/index.ts`, which the alerts' TTS test and the unit tests use
+
+   Also give it a place in `createTestLive` (same file), the LIVE an overlay's Test button plays one press at a time. Its test fails until each press sends every live event.
+
 2. An internal event, one that doesn't come from the LIVE, goes instead in the `AppEvents` exclusions and in `INTERNAL_EVENTS` (same file; they mirror each other), and in the `exclude` list of `AlertTriggerSchema` (`src/common/schemas/profile.ts`). It then reaches neither overlays nor alerts.
 3. The connector: listen to the `@tokioapp/connector` event (`WebcastEvent.<NAME>`, payloads in its README) in `_listen` of `src/main/services/connector/providers/default/index.ts`, and `this.emit(TOKIO_EVENTS.<NAME>, data)` with only the fields of the payload type. Candidates it already decodes: `subNotify`, `emote`, `roomPin`, `imDelete`, `questionNew`, `goalUpdate`, `pollMessage`, `linkMicBattle` and `linkMicArmies`, `giftBroadcast`, `controlMessage`.
 4. Alerts: every live trigger reaches `AlertsService.handle` on its own (`registerConnectorEvents`, `src/main/events/init.ts`). If the trigger needs a filter or a picker, like gifts, keywords or users have, add it to `AlertsService` (`src/main/services/alerts/`) and to `AlertItem`'s switch (`src/renderer/src/components/AlertItem/`). An event that comes in combos fires once, on `repeatEnd`, like gifts.
