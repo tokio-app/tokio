@@ -25,6 +25,8 @@ const connectMessage = (handle: string, error?: ConnectorFailure) => {
       return "Tokio needs your Euler Stream API key to connect. Add it in Settings.";
     case "badKey":
       return "Euler Stream didn't accept your API key. Check it in Settings.";
+    case "premium":
+      return "Your Euler Stream plan doesn't include this connection. Check your plan on Euler Stream.";
     case "sign":
       return "Euler Stream couldn't sign the connection. Try again in a moment.";
     case "network":

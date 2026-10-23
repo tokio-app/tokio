@@ -153,6 +153,10 @@ describe("home events", () => {
         "Euler Stream didn't accept your API key. Check it in Settings.",
       ],
       [
+        connectFailure("premium", ""),
+        "Your Euler Stream plan doesn't include this connection. Check your plan on Euler Stream.",
+      ],
+      [
         connectFailure("sign", ""),
         "Euler Stream couldn't sign the connection. Try again in a moment.",
       ],

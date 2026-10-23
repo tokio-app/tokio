@@ -8,6 +8,8 @@ export type ConnectErrorKind =
   | "rateLimited"
   | "noKey"
   | "badKey"
+  // The Euler Stream plan doesn't include the connection
+  | "premium"
   | "sign"
   | "network"
   | "unknown";
@@ -21,7 +23,6 @@ export type GiftResponse = {
   success: boolean;
   data: Gift[];
   error?: Error;
-  warn?: string;
 };
 export type ReconnectState = "reconnecting" | "reconnected";
 
@@ -39,10 +40,7 @@ export abstract class ConnectorProvider extends TokioEmitter {
   protected _onReconnect?: (state: ReconnectState) => void;
   protected _logFile = "";
   public abstract setKey(key: string): void;
-  public abstract connect(
-    username: string,
-    key?: string,
-  ): Promise<ConnectorResponse>;
+  public abstract connect(username: string): Promise<ConnectorResponse>;
   public abstract disconnect(): Promise<void>;
   public abstract isConnected(): boolean;
   public abstract fetchGifts(): Promise<GiftResponse>;

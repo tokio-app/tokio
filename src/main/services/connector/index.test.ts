@@ -1,7 +1,12 @@
 import { TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import Logger from "@/logger";
 import { describe, expect, it, vi } from "vitest";
-import { connectFailure, ConnectorProvider, ConnectorResponse } from "./common";
+import {
+  connectFailure,
+  ConnectorProvider,
+  ConnectorResponse,
+  GiftResponse,
+} from "./common";
 import { TikTokConnectorService } from "./index";
 
 class FakeConnector extends ConnectorProvider {
@@ -9,7 +14,10 @@ class FakeConnector extends ConnectorProvider {
   connect = vi.fn(async (): Promise<ConnectorResponse> => ({ success: true }));
   disconnect = vi.fn(async () => {});
   isConnected = vi.fn(() => true);
-  fetchGifts = vi.fn(async () => ({ success: true, data: [] }));
+  fetchGifts = vi.fn(async (): Promise<GiftResponse> => ({
+    success: true,
+    data: [],
+  }));
 }
 
 const setup = () => {
@@ -26,10 +34,10 @@ describe("TikTokConnectorService", () => {
     const success = vi.spyOn(Logger, "success");
     const { service, provider } = setup();
 
-    const res = await service.connect("streamer", "session");
+    const res = await service.connect("streamer");
 
     expect(res).toEqual({ success: true });
-    expect(provider.connect).toHaveBeenCalledWith("streamer", "session");
+    expect(provider.connect).toHaveBeenCalledWith("streamer");
     expect(info).toHaveBeenCalledWith(
       "<Connector> Connecting to: streamer",
       "connector.log",
@@ -75,6 +83,19 @@ describe("TikTokConnectorService", () => {
     expect(provider.disconnect).toHaveBeenCalledOnce();
     expect(service.isConnected()).toBe(true);
     expect(await service.fetchGifts()).toEqual({ success: true, data: [] });
+  });
+
+  it("logs gifts it can't fetch", async () => {
+    const warn = vi.spyOn(Logger, "warn");
+    const { service, provider } = setup();
+    const failed = { success: false, data: [], error: new Error("Offline") };
+    provider.fetchGifts.mockResolvedValue(failed);
+
+    expect(await service.fetchGifts()).toEqual(failed);
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      "<Connector> Unable to fetch gifts -- Offline",
+      "connector.log",
+    );
   });
 
   it("gives its providers its log file", () => {

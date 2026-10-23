@@ -39,12 +39,9 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
     this._current.provider.onReconnect(listener);
   }
 
-  public async connect(
-    username: string,
-    key?: string,
-  ): Promise<ConnectorResponse> {
+  public async connect(username: string): Promise<ConnectorResponse> {
     Logger.info(`<Connector> Connecting to: ${username}`, this._logFile);
-    const res = await this._current.provider.connect(username, key);
+    const res = await this._current.provider.connect(username);
     if (!res.success) {
       Logger.error(
         `<Connector> Unable to connect to ${username} -- ${formatError(res.error)}`,
@@ -66,6 +63,13 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
   }
 
   public async fetchGifts(): Promise<GiftResponse> {
-    return this._current.provider.fetchGifts();
+    const res = await this._current.provider.fetchGifts();
+    if (!res.success) {
+      Logger.warn(
+        `<Connector> Unable to fetch gifts -- ${formatError(res.error)}`,
+        this._logFile,
+      );
+    }
+    return res;
   }
 }

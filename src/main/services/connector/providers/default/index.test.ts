@@ -169,25 +169,12 @@ describe("TikTokLiveConnector", () => {
       expect(live.connections).toEqual([]);
     });
 
-    it("signs with the saved key when connect gets none", async () => {
+    it("signs with the saved key", async () => {
       expect(await connected()).toEqual({ success: true });
 
       expect(connection().username).toBe("streamer");
       expect(live.signers).toEqual([{ apiKey: "euler-key" }]);
       expect(connector.isConnected()).toBe(true);
-    });
-
-    it("signs with the key connect gets, and keeps it", async () => {
-      connector.setKey("old-key");
-
-      await connector.connect("streamer", "new-key");
-      await connector.disconnect();
-      await connector.connect("streamer");
-
-      expect(live.signers).toEqual([
-        { apiKey: "new-key" },
-        { apiKey: "new-key" },
-      ]);
     });
 
     it("opens one connection when connect comes again while connecting", async () => {
@@ -248,7 +235,7 @@ describe("TikTokLiveConnector", () => {
       [new SignError("Unauthorized", { status: 401 }), "badKey"],
       [new SignError("Forbidden", { status: 403 }), "badKey"],
       [new SignError("Bad gateway", { status: 502 }), "sign"],
-      [new PremiumFeatureError("Paid plan", { status: 402 }), "sign"],
+      [new PremiumFeatureError("Paid plan", { status: 402 }), "premium"],
       [new TimeoutError("Slow", { phase: "connect" }), "network"],
       [new WebSocketError("Closed"), "network"],
       [new ConnectorError("NETWORK", "Offline"), "network"],

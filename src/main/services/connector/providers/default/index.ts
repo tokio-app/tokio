@@ -49,18 +49,14 @@ export class TikTokLiveConnector extends ConnectorProvider {
     this._key = key;
   }
 
-  public connect(username: string, key?: string): Promise<ConnectorResponse> {
-    return (this._connecting ??= this._connect(username, key).finally(() => {
+  public connect(username: string): Promise<ConnectorResponse> {
+    return (this._connecting ??= this._connect(username).finally(() => {
       this._connecting = null;
     }));
   }
 
-  private async _connect(
-    username: string,
-    key?: string,
-  ): Promise<ConnectorResponse> {
+  private async _connect(username: string): Promise<ConnectorResponse> {
     if (this.isConnected()) return { success: true };
-    this._key = key ?? this._key;
     const name = username.replace("@", "");
     if (!name) {
       return {
@@ -320,8 +316,9 @@ function toFailure(error: unknown): ConnectorFailure {
         retryAfterSeconds: ms && Math.ceil(ms / 1000),
       });
     }
-    case "SIGN_FAILED":
-    case "PREMIUM_REQUIRED": {
+    case "PREMIUM_REQUIRED":
+      return fail("premium");
+    case "SIGN_FAILED": {
       const status = error instanceof SignError ? error.status : undefined;
       return fail(status === 401 || status === 403 ? "badKey" : "sign");
     }
