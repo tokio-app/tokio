@@ -8,6 +8,7 @@ paths:
   - "src/renderer/src/components/SoundPicker/**"
   - "src/renderer/src/components/MediaPicker/**"
   - "src/renderer/src/components/GiftSelect/**"
+  - "src/renderer/src/components/EmoteSelect/**"
   - "src/renderer/src/hooks/useAlertTest.ts"
   - "src/renderer/src/helper/alerts.ts"
   - "src/main/services/server/alert.html"
@@ -22,7 +23,7 @@ paths:
 - Saved per profile in `Profile.alerts` (`simultaneous`, `queue_length`, `items`).
 - `AlertTriggerSchema` (`src/common/schemas/profile.ts`) derives the triggers from `TOKIO_EVENTS` (for a new event, see IPC events in `AGENTS.md`). `ROOM_USER` is excluded (it comes every few seconds and is meant for overlays), both there and in the `AlertTrigger` type. Saved Room Users alerts are dropped when a profile loads.
 - `registerConnectorEvents` (`src/main/events/init.ts`) passes every trigger to `AlertsService.handle` while `activeFeatures.alerts` is on. Music Change alerts come from `MusicService.onSongChange`, once each time a song starts, not for one that fails to start, is skipped while it loads, or was already playing when a request came; the rest from the connector. `MUSIC_CHANGE` also fires when the queue changes, and overlays get every one through `ServerService.initEvents`. Gift alerts fire once per combo, on `repeatEnd`, or with `trigger.every_gift` (**Every gift**) once per gift sent, at most `queue_length` times per event. `AlertsService._countGifts` counts what each gift event adds to its sender's streak (handle and gift) like the gift jar overlay's `Tally`: the count's growth, the same count again before the end as the gift sent again, and nothing for a lower count within `LATE_MS` (it came late). It runs once per event, also with no alert on every gift, but only while alerts are on: one turned on mid-streak plays the whole count so far.
-- The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: the loop skips it and `AlertsService` matches it on `CHAT` (empty `trigger.emotes` means any emote). TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`, and main pushes the list with `EMOTES`.
+- The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: the loop skips it and `AlertsService` matches it on `CHAT` (empty `trigger.emotes` means any emote). TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`, and main pushes the list with `EMOTES`. The Alerts page numbers them (`emoteOptions`) and picks them with `EmoteMultiSelect` (`components/EmoteSelect`): the gift picker's field and checked list, styled by `giftselect.module.css`, without the search, coins and sorting.
 - Chat alerts filter on `trigger.keyword` through `hasKeyword` (`src/main/helper/chat.ts`, whole words through `wholeWord`, except next to letters of scripts written without spaces, such as Chinese, Japanese or Thai, where it matches anywhere; a keyword of only emojis is looked for as written), and Member Join and Super Fan Join alerts on `trigger.user` through `isUser` (handle or name).
 
 ## Gifts
