@@ -5,7 +5,7 @@ import { FiMaximize2 } from "react-icons/fi";
 import { GoUnverified, GoVerified } from "react-icons/go";
 import { PiShootingStarThin } from "react-icons/pi";
 import { VscPackage, VscSettings } from "react-icons/vsc";
-import { CopyUrl } from "../CopyUrl";
+import { CopyField } from "../CopyField";
 import { Btn } from "../Elements";
 import { Iframe } from "../Iframe";
 import { Modal } from "../Modal";
@@ -92,7 +92,7 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
         </Btn>
       </OverlayPreview>
 
-      <CopyUrl url={getOverlayURL(overlay.id)} />
+      <CopyField value={getOverlayURL(overlay.id)} title="Copy URL" />
     </div>
   );
 }

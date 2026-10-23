@@ -15,7 +15,7 @@ import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
 import { useEffect, useState } from "react";
 import { FiCheck, FiFilm, FiTrash2 } from "react-icons/fi";
-import { CopyUrl } from "../CopyUrl";
+import { CopyField } from "../CopyField";
 import { DeleteMediaModal } from "../DeleteModals";
 import { Btn, Check, NumberInput, SearchToggle } from "../Elements";
 import { Modal } from "../Modal";
@@ -171,7 +171,7 @@ export function MediaPicker({
           </>
         }
       >
-        <CopyUrl url={getAlertOverlayURL(id)} />
+        <CopyField value={getAlertOverlayURL(id)} title="Copy URL" />
 
         <div className={styles.grid}>
           {files.map((file) => {

@@ -74,8 +74,8 @@ export class ServerService extends Service {
 
     return new Promise((resolve) => {
       // Without a host Node listens on :: for IPv4 and IPv6, or 0.0.0.0 without IPv6.
-      // On every interface on purpose: OBS on another computer opens overlays
-      // from this PC's network address.
+      // On every interface on purpose: a streaming app on another computer
+      // opens overlays from this PC, through its network address.
       // Express 5 calls this with the error too, the "error" handler reports it.
       this._server = this._app.listen(this._port, (error) => {
         if (error) return;
@@ -163,8 +163,8 @@ export class ServerService extends Service {
   }
 
   /**
-   * This PC's IPv4 addresses on the network, where OBS on another computer
-   * reaches the server. Virtual adapters' only when there's no other, as with
+   * This PC's IPv4 addresses on the network, where another computer reaches
+   * the server. Virtual adapters' only when there's no other, as with
    * a Hyper-V switch or a bridge on the network card.
    */
   public networkAddresses(): string[] {

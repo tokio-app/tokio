@@ -1,5 +1,5 @@
-/* The whole field copies the URL. Two classes to win over Btn's styles */
-.url.url {
+/* The whole field copies the value. Two classes to win over Btn's styles */
+.field.field {
   justify-content: space-between;
   gap: var(--space-3);
   width: 100%;
@@ -11,13 +11,13 @@
   font-weight: 400;
 }
 
-.url.url:hover:not(:disabled) {
+.field.field:hover:not(:disabled) {
   border-color: var(--background-secondary-hover);
   background-color: var(--background-secondary);
   color: var(--font-secondary);
 }
 
-.url_text {
+.value {
   min-width: 0;
   text-align: left;
   white-space: nowrap;

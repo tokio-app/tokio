@@ -1,6 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { SERVER_PORT } from "@/common/util";
-import { Check, CopyUrl, Field, Section } from "@/components";
+import { Check, CopyField, Field, FormGrid, Section } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
 import { FiMonitor } from "react-icons/fi";
@@ -31,16 +30,24 @@ export function ServerSection({ enabled, onChange }: Props) {
         checked={enabled}
         onChange={(e) => onChange(e.target.checked)}
       />
+      {/* Another computer points tokio-app.local at it, in its hosts file
+          or a DNS entry, so the field shows the IP alone. A grid column,
+          as wide as the Euler Stream key's field. */}
       {addresses && (
-        <Field label="Network address" hint="(for OBS on another computer)">
-          {addresses.length === 0 ? (
-            <p className={styles.library_meta}>No network address found.</p>
-          ) : (
-            addresses.map((ip) => (
-              <CopyUrl key={ip} url={`http://${ip}:${SERVER_PORT}/`} />
-            ))
-          )}
-        </Field>
+        <FormGrid>
+          <Field
+            label="Network address"
+            hint="(for tokio-app.local on another computer)"
+          >
+            {addresses.length === 0 ? (
+              <p className={styles.library_meta}>No network address found.</p>
+            ) : (
+              addresses.map((ip) => (
+                <CopyField key={ip} value={ip} title="Copy address" />
+              ))
+            )}
+          </Field>
+        </FormGrid>
       )}
     </Section>
   );

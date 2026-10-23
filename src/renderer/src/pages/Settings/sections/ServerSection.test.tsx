@@ -15,7 +15,7 @@ const field = () =>
   within(screen.getByRole("group", { name: /Network address/ }));
 
 describe("ServerSection", () => {
-  it("shows a link at each of this PC's network addresses, to copy", async () => {
+  it("shows each of this PC's network addresses, for tokio-app.local, to copy", async () => {
     const { user } = render();
     expect(sent(APP_EVENTS.GET_NETWORK_ADDRESSES)).toHaveLength(1);
     expect(
@@ -24,17 +24,18 @@ describe("ServerSection", () => {
 
     await addresses("192.168.1.10", "172.20.0.1");
 
-    expect(screen.getByText("(for OBS on another computer)")).toBeVisible();
-    const links = field().getAllByTitle("Copy URL");
-    expect(links.map((l) => l.textContent)).toEqual([
-      "http://192.168.1.10:37891/",
-      "http://172.20.0.1:37891/",
+    expect(
+      screen.getByText("(for tokio-app.local on another computer)"),
+    ).toBeVisible();
+    const copies = field().getAllByTitle("Copy address");
+    expect(copies.map((c) => c.textContent)).toEqual([
+      "192.168.1.10",
+      "172.20.0.1",
     ]);
 
-    await user.click(links[0]);
-    expect(await navigator.clipboard.readText()).toBe(
-      "http://192.168.1.10:37891/",
-    );
+    // The IP alone, for a hosts file or a DNS entry
+    await user.click(copies[0]);
+    expect(await navigator.clipboard.readText()).toBe("192.168.1.10");
   });
 
   it("says when the PC has no network address", async () => {
@@ -43,6 +44,6 @@ describe("ServerSection", () => {
     await addresses();
 
     expect(field().getByText("No network address found.")).toBeVisible();
-    expect(field().queryByTitle("Copy URL")).not.toBeInTheDocument();
+    expect(field().queryByTitle("Copy address")).not.toBeInTheDocument();
   });
 });

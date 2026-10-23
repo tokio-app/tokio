@@ -20,11 +20,11 @@ const IMPORTED_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Part of the setup block. OBS on another computer opens overlays at this
- * PC's address, where the overlay SDK's socket to localhost would reach the
- * wrong computer, so sockets to localhost on the server port go to the
- * address the page came from. Previews and pages opened on this PC are left
- * alone.
+ * Part of the setup block. A streaming app on another computer opens
+ * overlays through tokio-app.local pointed at this PC, or its address, where
+ * the overlay SDK's socket to localhost would reach the wrong computer, so
+ * sockets to localhost on the server port go to the host the page came from.
+ * Previews and pages opened at localhost are left alone.
  */
 export const REMOTE_SOCKET = `(() => {
   const loopback = ["localhost", "127.0.0.1", "[::1]"];

@@ -152,7 +152,7 @@ describe("ServerService", () => {
     expect(res.status).toBe(404);
   });
 
-  it("listens on every interface, for OBS on another computer", async () => {
+  it("listens on every interface, for streaming apps on another computer", async () => {
     await server.start();
 
     const address = server["_server"]!.address();
