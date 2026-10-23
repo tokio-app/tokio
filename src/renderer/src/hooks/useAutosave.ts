@@ -46,9 +46,11 @@ export function useAutosave<T>(saved: T, save: (value: T) => void) {
     setSent((s) => [...s, waiting.value]);
   }, []);
 
+  // prevSaved, not saved: a new but equal saved, like each of main's pushes,
+  // mustn't restart the delay
   useEffect(() => {
     // Also when a change is undone before it's sent
-    if (isEqual(value, saved)) {
+    if (isEqual(value, prevSaved)) {
       pending.current = null;
       return undefined;
     }
@@ -57,7 +59,7 @@ export function useAutosave<T>(saved: T, save: (value: T) => void) {
     const timer = setTimeout(flush, SAVE_DELAY);
 
     return () => clearTimeout(timer);
-  }, [value, saved, flush]);
+  }, [value, prevSaved, flush]);
 
   useFlush(flush);
 

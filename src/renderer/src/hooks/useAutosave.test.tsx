@@ -43,6 +43,24 @@ describe("useAutosave", () => {
     expect(save.mock.calls).toEqual([["ab"]]);
   });
 
+  // Like the timer's settings, which come with every push of its clock
+  it("doesn't restart the delay when main sends the same value again", async () => {
+    const save = vi.fn();
+    const { result, rerender } = renderHook(
+      (props) => useAutosave(props.saved, save),
+      { initialProps: { saved: { title: "" } } },
+    );
+    act(() => result.current[1]({ title: "Subathon" }));
+
+    for (let i = 0; i < 6; i++) {
+      await wait(100);
+      rerender({ saved: { title: "" } });
+    }
+
+    expect(save.mock.calls).toEqual([[{ title: "Subathon" }]]);
+    expect(result.current[0]).toEqual({ title: "Subathon" });
+  });
+
   it("doesn't save a change undone before it's sent", async () => {
     const { save, type } = setup("key");
 
