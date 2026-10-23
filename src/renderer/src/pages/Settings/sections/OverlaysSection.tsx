@@ -39,7 +39,7 @@ export function OverlaysSection() {
 
       <Section
         icon={<VscPackage />}
-        title="Imported Overlays"
+        title="Overlay Library"
         description="Removing one deletes its settings too."
         actions={
           <Btn
