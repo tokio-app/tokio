@@ -266,7 +266,7 @@ events.push(
   APP_EVENTS.TEST_OVERLAY,
   async ({ overlayService }, e, { id }) => {
     e.reply(APP_EVENTS_RESPONSE.TEST_OVERLAY, {
-      payloads: overlayService.getTestPayloads(),
+      payloads: overlayService.getTestPayloads(id),
       id,
     });
   },

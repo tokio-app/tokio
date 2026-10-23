@@ -929,12 +929,38 @@ describe("OverlayService", () => {
   });
 
   it("samples every live event for tests", () => {
-    const types = service.getTestPayloads().map((p) => p.type);
+    const types = service.getTestPayloads("a").map((p) => p.type);
 
     expect(types).toContain(TOKIO_EVENTS.CHAT);
     expect(types).not.toContain(TOKIO_EVENTS.CONNECTED);
     expect(types).not.toContain(TOKIO_EVENTS.DISCONNECTED);
     expect(types).not.toContain(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED);
+  });
+
+  it("carries each overlay's test LIVE on from its last test", () => {
+    // Who joined at a test, and every viewer its events come from
+    const test = (id: string) => {
+      const payloads = service.getTestPayloads(id);
+      const join = payloads.find((p) => p.type === TOKIO_EVENTS.MEMBER_JOIN);
+      const viewers = payloads.flatMap((p) =>
+        p.type !== "tokio:config" && p.data && "user" in p.data
+          ? [p.data.user.handle]
+          : [],
+      );
+      return { joined: join!.data.user.handle, viewers: new Set(viewers) };
+    };
+
+    const first = test("a");
+    const second = test("a");
+    const other = test("b");
+
+    // A new viewer joins the one already there.
+    expect(second.joined).not.toBe(first.joined);
+    expect([first.joined, second.joined]).toEqual(
+      expect.arrayContaining([...second.viewers]),
+    );
+    // Another overlay's test LIVE starts with its own first viewer.
+    expect([...other.viewers]).toEqual([other.joined]);
   });
 
   describe("test overlays", () => {
@@ -984,7 +1010,7 @@ describe("OverlayService", () => {
       const sent = sendToClient.mock.calls;
       expect(sent.every(([id]) => id === "dev")).toBe(true);
       expect(sent.map(([, p]) => p.type)).toEqual(
-        service.getTestPayloads().map((p) => p.type),
+        service.getTestPayloads("dev").map((p) => p.type),
       );
     });
 
