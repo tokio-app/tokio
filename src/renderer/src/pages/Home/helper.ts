@@ -31,17 +31,6 @@ export function statText(value: number, connected: boolean) {
   return { text: short, title: full };
 }
 
-// "00:42:13". Hours keep counting past a day.
-export function formatDuration(ms: number): string {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  const parts = [
-    Math.floor(seconds / 3600),
-    Math.floor((seconds % 3600) / 60),
-    seconds % 60,
-  ];
-  return parts.map((n) => String(n).padStart(2, "0")).join(":");
-}
-
 // "kai joined", "kai and yui joined", "kai, yui and 3 others joined"
 export function joinedText(users: ActivityUser[], count: number): string {
   const names = users.map((user) => user.name);
