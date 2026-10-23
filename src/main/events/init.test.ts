@@ -29,6 +29,7 @@ import {
   defaultProfile,
   defaultStoreData,
   generateTikTokEventSample,
+  timerTriggers,
 } from "@/common/util";
 import config from "@/config";
 import Logger from "@/logger";
@@ -746,6 +747,7 @@ describe("init events", () => {
         added,
         multiplier: s.timer.settings.multiplier,
         look: s.timer.settings.look,
+        triggers: [],
       },
     });
 
@@ -797,6 +799,22 @@ describe("init events", () => {
 
       expect(windowPushes(s)).toEqual([]);
       expect(overlayPushes(s)).toEqual([overlayState(s, 1000)]);
+    });
+
+    it("sends the carousel's triggers to the overlay while it's on", async () => {
+      const s = await live();
+      s.timer.settings.look.show_triggers = true;
+      s.serverService.sendToClient.mockClear();
+
+      change(s, 0);
+
+      const triggers = timerTriggers(s.timer.settings);
+      expect(triggers).toContainEqual({ label: "Follow", value: "+30s" });
+      expect(overlayPushes(s)).toEqual([
+        expect.objectContaining({
+          data: expect.objectContaining({ triggers }),
+        }),
+      ]);
     });
 
     it("sends the timer to its overlay when it connects", async () => {

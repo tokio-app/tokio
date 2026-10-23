@@ -44,7 +44,8 @@
   color: var(--font-primary);
 }
 
-.status {
+/* Under a test overlay: whether its events reached it */
+.test_status {
   color: var(--font-secondary);
   font-size: var(--font-sm);
 }
@@ -136,9 +137,43 @@
   }
 }
 
+/* The overlay's carousel: one trigger at a time, its time in the accent color */
+.carousel {
+  font-size: calc(var(--font-3xl) * 0.6);
+  font-weight: 600;
+}
+
+.carousel b {
+  margin-left: var(--space-2);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.carousel_item {
+  display: inline-block;
+  animation: carousel-turn 0.5s ease-out;
+}
+
+@keyframes carousel-turn {
+  from {
+    opacity: 0;
+    transform: translateY(0.4em);
+  }
+}
+
+@keyframes carousel-fade {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .slot_added {
     animation-name: slot-fade;
+  }
+
+  .carousel_item {
+    animation-name: carousel-fade;
   }
 }
 
@@ -169,10 +204,11 @@
   list-style: none;
 }
 
+/* Baseline, so a name stays on its first line in chat's taller row */
 .trigger {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-4);
   min-height: 52px;
   padding: var(--space-2) var(--space-4);
@@ -187,6 +223,14 @@
   color: var(--font-primary);
 }
 
+/* Chat's has its keyword and cooldown under the seconds */
+.trigger_rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+}
+
 .trigger_rule {
   display: flex;
   align-items: center;
@@ -199,11 +243,26 @@
   width: 88px;
 }
 
+.name {
+  width: 240px;
+}
+
+.count {
+  min-width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* TIMER LOOK */
 
 .note {
   grid-column: 1 / -1;
   margin-top: calc(-1 * var(--space-3));
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.note_plain {
   color: var(--font-secondary);
   font-size: var(--font-sm);
 }

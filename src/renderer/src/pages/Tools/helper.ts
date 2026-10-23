@@ -25,36 +25,18 @@ export function timerStatusText({ status, remaining }: TimerState): string {
   return TIMER_LABELS[status];
 }
 
-// "5s", "1:30", "1:00:00", as the overlay shows added time
-export function shortDuration(ms: number): string {
-  const total = Math.round(Math.abs(ms) / 1000);
-  if (total < 60) return `${total}s`;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = pad(total % 60);
-  return hours > 0
-    ? `${hours}:${pad(minutes)}:${seconds}`
-    : `${minutes}:${seconds}`;
-}
-
-type Seconds = TimerSettings["seconds"];
-
-// The triggers that add time, as rows that read "Follows [30] seconds each". Likes
-// have their own row, with the likes per cycle.
+// The triggers that add time, as rows that read "Follows [30] seconds each".
+// Likes have the likes per cycle in theirs, and chat its keyword and cooldown.
+// Their keys name their names in the carousel too.
 export const TRIGGERS: {
-  key: Exclude<keyof Seconds, "likes_every">;
+  key: keyof TimerSettings["look"]["names"];
   label: string;
   rule: string;
 }[] = [
   { key: "coin", label: "Coins", rule: "seconds per coin" },
   { key: "likes", label: "Likes", rule: "seconds every" },
   { key: "superfan", label: "New Super Fans", rule: "seconds each" },
-  { key: "superfan_box", label: "Super Fan boxes", rule: "seconds each" },
-  { key: "envelope", label: "Envelopes", rule: "seconds each" },
   { key: "follow", label: "Follows", rule: "seconds each" },
   { key: "share", label: "Shares", rule: "seconds each" },
   { key: "chat", label: "Chat messages", rule: "seconds each" },
-  { key: "join", label: "Viewers joining", rule: "seconds each" },
-  { key: "superfan_join", label: "Super Fans joining", rule: "seconds each" },
 ];

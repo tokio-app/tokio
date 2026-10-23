@@ -328,6 +328,91 @@ describe("Tools' countdown timer", () => {
     expect(saves[0].settings.seconds.follow).toBe(31);
   });
 
+  it("puts Timer Look right after the countdown, where the preview shows", async () => {
+    renderWithProviders(<Tools />);
+    await timer();
+
+    expect(
+      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+    ).toEqual(["Countdown Timer", "Timer Look", "Time Added", "Test Overlays"]);
+  });
+
+  it("gives chat a keyword and a cooldown, and no boxes, joins or envelopes", async () => {
+    vi.useFakeTimers();
+    const { user } = renderWithProviders(<Tools />, fakeTimers());
+    await timer();
+    const added = section("Time Added");
+    for (const gone of [
+      "Super Fan boxes",
+      "Envelopes",
+      "Viewers joining",
+      "Super Fans joining",
+    ]) {
+      expect(added.queryByText(gone)).toBeNull();
+    }
+
+    const keyword = added.getByRole("textbox", { name: "Keyword or phrase" });
+    expect(keyword).toHaveAttribute("placeholder", "Any message");
+    await user.type(keyword, "!time");
+    const cooldown = added.getByRole("spinbutton", {
+      name: "Seconds between a viewer's messages",
+    });
+    await user.clear(cooldown);
+    await user.type(cooldown, "10");
+    await wait(300);
+
+    expect(sent(APP_EVENTS.SET_TIMER_SETTINGS).at(-1)!.settings.chat).toEqual({
+      keyword: "!time",
+      cooldown: 10,
+    });
+  });
+
+  it("shows the triggers in turn, with the names given them", async () => {
+    vi.useFakeTimers();
+    const { user } = renderWithProviders(<Tools />, fakeTimers());
+    await timer((t) => {
+      // Follows and shares add time
+      t.settings.seconds = {
+        ...t.settings.seconds,
+        coin: 0,
+        likes: 0,
+        superfan: 0,
+      };
+    });
+    const look = section("Timer Look");
+    const names = () =>
+      within(look.getByRole("list", { name: "Names on stream" }));
+    expect(look.queryByRole("list", { name: "Names on stream" })).toBeNull();
+    expect(screen.queryByText("+30s")).toBeNull();
+
+    await user.click(
+      look.getByRole("checkbox", { name: "Show the triggers, one at a time" }),
+    );
+    expect(
+      names()
+        .getAllByRole("textbox")
+        .map((input) => input.getAttribute("aria-label")),
+    ).toEqual(["Follows on stream", "Shares on stream"]);
+    expect(screen.getByText("+30s").parentElement).toHaveTextContent(
+      "Follow+30s",
+    );
+
+    const follow = names().getByRole("textbox", { name: "Follows on stream" });
+    await user.clear(follow);
+    await user.type(follow, "Seguir");
+    expect(screen.getByText("+30s").parentElement).toHaveTextContent(
+      "Seguir+30s",
+    );
+    await wait(3000);
+    expect(screen.getByText("+10s").parentElement).toHaveTextContent(
+      "Share+10s",
+    );
+
+    const saved = sent(APP_EVENTS.SET_TIMER_SETTINGS).at(-1)!.settings.look;
+    expect(saved).toMatchObject({ show_triggers: true });
+    expect(saved.names.follow).toBe("Seguir");
+  });
+
   it("adds a trigger's seconds and the likes per cycle", async () => {
     vi.useFakeTimers();
     const { user } = renderWithProviders(<Tools />, fakeTimers());

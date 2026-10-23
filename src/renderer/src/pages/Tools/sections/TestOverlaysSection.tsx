@@ -89,7 +89,7 @@ export function TestOverlaysSection({
               </div>
 
               {statuses[overlay.id] && (
-                <p className={styles.status}>
+                <p className={styles.test_status}>
                   {STATUS_LABELS[statuses[overlay.id]]}
                 </p>
               )}

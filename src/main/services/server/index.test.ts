@@ -459,6 +459,33 @@ describe("ServerService", () => {
         expect(el("slot").classList.contains("removed")).toBe(true);
       });
 
+      it("shows tenths of a second under 10 s", async () => {
+        send(timerState({ added: 1500 }));
+
+        await vi.waitFor(() => expect(el("slot").textContent).toBe("+1.5s"));
+      });
+
+      it("shows the triggers one at a time, as text", async () => {
+        const triggers = [
+          { label: "Follow", value: "+1:00" },
+          { label: "<b>Share</b>", value: "+20s" },
+        ];
+        send(timerState({ triggers }));
+        await vi.waitFor(() => expect(el("carousel").hidden).toBe(false));
+        expect(el("carousel").textContent).toBe("Follow+1:00");
+        expect(el("carousel").querySelector("b")!.textContent).toBe("+1:00");
+
+        // The next push with the same triggers doesn't start the turns over
+        send(timerState({ triggers, remaining: 3_500_000 }));
+        await vi.waitFor(
+          () => expect(el("carousel").textContent).toBe("<b>Share</b>+20s"),
+          { timeout: 4000 },
+        );
+
+        send(timerState({ triggers: [] }));
+        await vi.waitFor(() => expect(el("carousel").hidden).toBe(true));
+      });
+
       it("shows the multiplier again at once when what was added is taken back", async () => {
         send(timerState({ multiplier: 2, added: 60_000 }));
         await vi.waitFor(() => expect(el("slot").textContent).toBe("+1:00"));

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // What the countdown timer is doing, see TimerService
-export const TIMER_STATUSES = ["idle", "running", "paused", "stopped"] as const;
+const TIMER_STATUSES = ["idle", "running", "paused", "stopped"] as const;
 
 // Its buttons on Tools
 export const TIMER_ACTIONS = ["start", "pause", "stop", "reset"] as const;
@@ -19,13 +19,31 @@ const TimerSecondsSchema = z.object({
   likes: addedSeconds(10),
   likes_every: z.number().int().min(1).default(100),
   superfan: addedSeconds(300),
-  superfan_box: addedSeconds(0),
-  envelope: addedSeconds(0),
   follow: addedSeconds(30),
   share: addedSeconds(10),
   chat: addedSeconds(0),
-  join: addedSeconds(0),
-  superfan_join: addedSeconds(0),
+});
+
+// Which chat messages add time
+const TimerChatSchema = z.object({
+  // A word or phrase the message must have, matched like chat alerts'.
+  // Empty means any message.
+  keyword: z.string().default(""),
+  // Seconds before one viewer's messages add time again
+  cooldown: z.number().min(0).default(30),
+});
+
+const name = (value: string) => z.string().max(40).default(value);
+
+// The triggers' names in the carousel, in the streamer's language. Coins and
+// likes show after their count: "1 coin", "100 likes".
+const TimerNamesSchema = z.object({
+  coin: name("coin"),
+  likes: name("likes"),
+  superfan: name("New Super Fan"),
+  follow: name("Follow"),
+  share: name("Share"),
+  chat: name("Chat"),
 });
 
 // How the overlay shows the timer
@@ -45,6 +63,9 @@ const TimerLookSchema = z.object({
   // Added time and the multiplier
   accent_color: ColorSchema.default("#f43f5e"),
   warning_color: ColorSchema.default("#f43f5e"),
+  // A carousel under the clock: each trigger and the time it adds, in turn
+  show_triggers: z.boolean().default(false),
+  names: TimerNamesSchema.prefault({}),
 });
 
 export const TimerSettingsSchema = z.object({
@@ -54,11 +75,10 @@ export const TimerSettingsSchema = z.object({
   cap: z.number().min(0).default(0),
   // Multiplies the seconds every trigger adds, e.g. 2 for double time
   multiplier: z.number().min(0).default(1),
-  // Seconds before one viewer's chat, follows, shares or joins add time again
-  cooldown: z.number().min(0).default(30),
   // Pauses a running timer when Tokio disconnects from the LIVE
   pause_on_end: z.boolean().default(true),
   seconds: TimerSecondsSchema.prefault({}),
+  chat: TimerChatSchema.prefault({}),
   look: TimerLookSchema.prefault({}),
 });
 

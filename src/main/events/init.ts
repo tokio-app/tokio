@@ -17,6 +17,7 @@ import {
   formatError,
   SERVER_PORT,
   TIMER_PATH,
+  timerTriggers,
 } from "@/common/util";
 import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
@@ -418,6 +419,8 @@ const registerTimer = ({
         added,
         multiplier: settings.multiplier,
         look: settings.look,
+        // The carousel's items, none while it's off
+        triggers: settings.look.show_triggers ? timerTriggers(settings) : [],
       },
     };
   };

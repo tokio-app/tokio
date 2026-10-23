@@ -1,6 +1,6 @@
 import { TimerAction, TimerSettings } from "@/common/schemas";
 import { APP_EVENTS } from "@/common/types";
-import { getOverlayURL, TIMER_PATH } from "@/common/util";
+import { formatAdded, getOverlayURL, TIMER_PATH } from "@/common/util";
 import {
   Btn,
   Check,
@@ -26,7 +26,7 @@ import {
   FiRotateCcw,
   FiSquare,
 } from "react-icons/fi";
-import { shortDuration, timerStatusText, TimerPush, TRIGGERS } from "../helper";
+import { timerStatusText, TimerPush, TRIGGERS } from "../helper";
 import styles from "../tools.module.css";
 import { TimerPreview } from "./TimerPreview";
 
@@ -37,7 +37,8 @@ interface SectionProps {
 
 /**
  * The countdown timer's sections. Its settings save as they change, while
- * main keeps pushing the clock.
+ * main keeps pushing the clock. The look comes right after the preview, so
+ * its changes show while they're made.
  */
 export function TimerSections({ timer }: { timer: TimerPush }) {
   const [settings, setSettings] = useAutosave(timer.data.settings, (value) =>
@@ -49,8 +50,8 @@ export function TimerSections({ timer }: { timer: TimerPush }) {
   return (
     <>
       <CountdownSection timer={timer} settings={settings} update={update} />
-      <TimeAddedSection settings={settings} update={update} />
       <TimerLookSection settings={settings} update={update} />
+      <TimeAddedSection settings={settings} update={update} />
     </>
   );
 }
@@ -163,7 +164,7 @@ function CountdownSection({
       {resetting && (
         <Modal
           title="Reset the timer?"
-          description={`It goes back to the starting time, ${shortDuration(settings.start * 60_000)}. The time added so far is lost.`}
+          description={`It goes back to the starting time, ${formatAdded(settings.start * 60_000)}. The time added so far is lost.`}
           confirmText="Reset"
           onClose={() => setResetting(false)}
           onConfirm={() => {
@@ -172,92 +173,6 @@ function CountdownSection({
           }}
         />
       )}
-    </Section>
-  );
-}
-
-function TimeAddedSection({ settings, update }: SectionProps) {
-  const id = useId();
-  const seconds = scopeUpdater(update, "seconds");
-
-  return (
-    <Section title="Time Added" description="Seconds per trigger.">
-      <FormGrid>
-        <Field label="Multiplier" hint="(×)">
-          <NumberInput
-            min={0}
-            value={settings.multiplier}
-            onChange={(multiplier) =>
-              update((s) => {
-                s.multiplier = multiplier;
-              })
-            }
-          />
-        </Field>
-        <Field label="Per-viewer cooldown" hint="(seconds)">
-          <NumberInput
-            min={0}
-            value={settings.cooldown}
-            onChange={(cooldown) =>
-              update((s) => {
-                s.cooldown = cooldown;
-              })
-            }
-          />
-        </Field>
-        <Field label="Maximum time" hint="(minutes, 0 = no limit)">
-          <NumberInput
-            min={0}
-            value={settings.cap}
-            onChange={(cap) =>
-              update((s) => {
-                s.cap = cap;
-              })
-            }
-          />
-        </Field>
-      </FormGrid>
-
-      <ul className={styles.triggers}>
-        {TRIGGERS.map(({ key, label, rule }) => (
-          <li key={key} className={styles.trigger}>
-            <label htmlFor={`${id}-${key}`} className={styles.trigger_label}>
-              {label}
-            </label>
-            <span className={styles.trigger_rule}>
-              <NumberInput
-                id={`${id}-${key}`}
-                className={styles.seconds}
-                min={0}
-                value={settings.seconds[key]}
-                onChange={(value) =>
-                  seconds((s) => {
-                    s[key] = value;
-                  })
-                }
-              />
-              {rule}
-              {key === "likes" && (
-                <>
-                  <NumberInput
-                    className={styles.seconds}
-                    aria-label="Likes per cycle"
-                    integer
-                    min={1}
-                    value={settings.seconds.likes_every}
-                    onChange={(value) =>
-                      seconds((s) => {
-                        s.likes_every = value;
-                      })
-                    }
-                  />
-                  likes
-                </>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
     </Section>
   );
 }
@@ -275,6 +190,22 @@ function TimerLookSection({ settings, update }: SectionProps) {
 
   return (
     <Section title="Timer Look" description="How it shows on stream.">
+      {/* First, as they show the most in the preview above */}
+      <div className={styles.colors}>
+        {COLORS.map(({ key, label }) => (
+          <Field key={key} label={label}>
+            <Color
+              value={look[key]}
+              onChange={(color) =>
+                set((l) => {
+                  l[key] = color;
+                })
+              }
+            />
+          </Field>
+        ))}
+      </div>
+
       <FormGrid>
         <Field label="Title" hint="(optional)">
           <Input
@@ -330,21 +261,6 @@ function TimerLookSection({ settings, update }: SectionProps) {
         </p>
       </FormGrid>
 
-      <div className={styles.colors}>
-        {COLORS.map(({ key, label }) => (
-          <Field key={key} label={label}>
-            <Color
-              value={look[key]}
-              onChange={(color) =>
-                set((l) => {
-                  l[key] = color;
-                })
-              }
-            />
-          </Field>
-        ))}
-      </div>
-
       <Check
         label="Show the multiplier"
         checked={look.show_multiplier}
@@ -354,6 +270,176 @@ function TimerLookSection({ settings, update }: SectionProps) {
           })
         }
       />
+      <Check
+        label="Show the triggers, one at a time"
+        checked={look.show_triggers}
+        onChange={(e) =>
+          set((l) => {
+            l.show_triggers = e.target.checked;
+          })
+        }
+      />
+      {look.show_triggers && (
+        <TriggerNames settings={settings} update={update} />
+      )}
+    </Section>
+  );
+}
+
+// The names the carousel shows, for the triggers that add time, so they can
+// be in the audience's language
+function TriggerNames({ settings, update }: SectionProps) {
+  const { seconds, look } = settings;
+  const id = useId();
+  const shown = TRIGGERS.filter(({ key }) => seconds[key] > 0);
+
+  if (shown.length === 0) {
+    return (
+      <p className={styles.note_plain}>
+        No trigger adds time yet. Set their seconds in Time Added.
+      </p>
+    );
+  }
+  return (
+    <ul className={styles.triggers} aria-label="Names on stream">
+      {shown.map(({ key, label }) => (
+        <li key={key} className={styles.trigger}>
+          <label htmlFor={`${id}-${key}`} className={styles.trigger_label}>
+            {label}
+          </label>
+          <span className={styles.trigger_rule}>
+            {/* Coins and likes show after their count. A column for every
+                row, so the fields line up, never empty so the row has a
+                baseline for its label. */}
+            <span className={styles.count}>
+              {key === "coin" ? 1 : key === "likes" ? seconds.likes_every : " "}
+            </span>
+            <Input
+              id={`${id}-${key}`}
+              // Apart from the seconds field with the same label
+              aria-label={`${label} on stream`}
+              className={styles.name}
+              maxLength={40}
+              value={look.names[key]}
+              onChange={(e) => {
+                const name = e.target.value;
+                update((s) => {
+                  s.look.names[key] = name;
+                });
+              }}
+            />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function TimeAddedSection({ settings, update }: SectionProps) {
+  const id = useId();
+  const seconds = scopeUpdater(update, "seconds");
+  const chat = scopeUpdater(update, "chat");
+
+  return (
+    <Section title="Time Added" description="Seconds per trigger.">
+      <FormGrid>
+        <Field label="Multiplier" hint="(×)">
+          <NumberInput
+            min={0}
+            value={settings.multiplier}
+            onChange={(multiplier) =>
+              update((s) => {
+                s.multiplier = multiplier;
+              })
+            }
+          />
+        </Field>
+        <Field label="Maximum time" hint="(minutes, 0 = no limit)">
+          <NumberInput
+            min={0}
+            value={settings.cap}
+            onChange={(cap) =>
+              update((s) => {
+                s.cap = cap;
+              })
+            }
+          />
+        </Field>
+      </FormGrid>
+
+      <ul className={styles.triggers}>
+        {TRIGGERS.map(({ key, label, rule }) => (
+          <li key={key} className={styles.trigger}>
+            <label htmlFor={`${id}-${key}`} className={styles.trigger_label}>
+              {label}
+            </label>
+            <div className={styles.trigger_rules}>
+              <span className={styles.trigger_rule}>
+                <NumberInput
+                  id={`${id}-${key}`}
+                  className={styles.seconds}
+                  min={0}
+                  value={settings.seconds[key]}
+                  onChange={(value) =>
+                    seconds((s) => {
+                      s[key] = value;
+                    })
+                  }
+                />
+                {rule}
+                {key === "likes" && (
+                  <>
+                    <NumberInput
+                      className={styles.seconds}
+                      aria-label="Likes per cycle"
+                      integer
+                      min={1}
+                      value={settings.seconds.likes_every}
+                      onChange={(value) =>
+                        seconds((s) => {
+                          s.likes_every = value;
+                        })
+                      }
+                    />
+                    likes
+                  </>
+                )}
+              </span>
+              {key === "chat" && (
+                <>
+                  {/* Matched like chat alerts' keywords */}
+                  <Input
+                    aria-label="Keyword or phrase"
+                    placeholder="Any message"
+                    value={settings.chat.keyword}
+                    onChange={(e) => {
+                      const keyword = e.target.value;
+                      chat((c) => {
+                        c.keyword = keyword;
+                      });
+                    }}
+                  />
+                  <span className={styles.trigger_rule}>
+                    once per viewer every
+                    <NumberInput
+                      className={styles.seconds}
+                      aria-label="Seconds between a viewer's messages"
+                      min={0}
+                      value={settings.chat.cooldown}
+                      onChange={(cooldown) =>
+                        chat((c) => {
+                          c.cooldown = cooldown;
+                        })
+                      }
+                    />
+                    seconds
+                  </span>
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
     </Section>
   );
 }

@@ -1,11 +1,14 @@
 import { TimerSettings } from "@/common/schemas";
+import { formatAdded, timerTriggers } from "@/common/util";
 import { cx, formatDuration } from "@/helper";
 import { useEffect, useState } from "react";
-import { shortDuration, TimerPush } from "../helper";
+import { TimerPush } from "../helper";
 import styles from "../tools.module.css";
 
 // How long added time shows under the clock, as the overlay's animation
 const SLOT_MS = 1500;
+// How long the carousel shows each trigger, as the overlay's TURN_MS
+const TURN_MS = 3000;
 
 // A font named by the streamer, with the app's as the fallback. One CSSOM
 // property, so a name can't add any other style.
@@ -52,6 +55,17 @@ export function TimerPreview({ timer, settings }: Props) {
     const hide = setTimeout(() => setSlot(null), SLOT_MS);
     return () => clearTimeout(hide);
   }, [slot]);
+
+  // The carousel turns while it has more than one trigger
+  const triggers = look.show_triggers ? timerTriggers(settings) : [];
+  const [turn, setTurn] = useState(0);
+  useEffect(() => {
+    if (triggers.length < 2) return undefined;
+    const next = setInterval(() => setTurn((t) => t + 1), TURN_MS);
+    return () => clearInterval(next);
+  }, [triggers.length]);
+  const index = triggers.length > 0 ? turn % triggers.length : 0;
+  const trigger = triggers[index];
 
   // Idle follows the starting time being typed, before main's echo
   const remaining =
@@ -101,7 +115,7 @@ export function TimerPreview({ timer, settings }: Props) {
             }}
           >
             {shown.ms > 0 ? "+" : "−"}
-            {shortDuration(shown.ms)}
+            {formatAdded(shown.ms)}
           </span>
         ) : (
           look.show_multiplier &&
@@ -112,6 +126,21 @@ export function TimerPreview({ timer, settings }: Props) {
           )
         )}
       </span>
+      {trigger && (
+        <p
+          className={styles.carousel}
+          style={{
+            color: look.title_color,
+            fontFamily: fontFamily(look.title_font),
+          }}
+        >
+          {/* A new key per turn replays the overlay's entrance */}
+          <span key={index} className={styles.carousel_item}>
+            {trigger.label}
+            <b style={{ color: look.accent_color }}>{trigger.value}</b>
+          </span>
+        </p>
+      )}
     </div>
   );
 }

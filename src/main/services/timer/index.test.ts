@@ -51,9 +51,14 @@ const like = (likeCount: number) => ({
   totalLikes: likeCount,
 });
 
-const chat = (handle: string) => ({
+const chat = (handle: string, content = "hi") => ({
   user: viewer(handle),
-  comment: { content: "hi", emotes: [], lang: "en" },
+  comment: { content, emotes: [], lang: "en" },
+});
+
+// The chat settings: a keyword and a cooldown in seconds
+const chatRule = (cooldown: number, keyword = "") => ({
+  chat: { keyword, cooldown },
 });
 
 // Settings with their defaults, and only the triggers asked for adding time
@@ -241,13 +246,9 @@ describe("TimerService", () => {
 
     it.each([
       [TOKIO_EVENTS.SUPER_FAN, "superfan", { user: viewer("a") }],
-      [TOKIO_EVENTS.SUPER_FAN_BOX, "superfan_box", undefined],
-      [TOKIO_EVENTS.ENVELOPE, "envelope", undefined],
       [TOKIO_EVENTS.FOLLOW, "follow", { user: viewer("a") }],
       [TOKIO_EVENTS.SHARE, "share", { user: viewer("a"), shareCount: 1 }],
       [TOKIO_EVENTS.CHAT, "chat", chat("a")],
-      [TOKIO_EVENTS.MEMBER_JOIN, "join", { user: viewer("a") }],
-      [TOKIO_EVENTS.SUPER_FAN_JOIN, "superfan_join", { user: viewer("a") }],
     ] as const)("adds the seconds of %s", (event, key, data) => {
       ready(settings({}, { [key]: 7 }));
 
@@ -298,22 +299,46 @@ describe("TimerService", () => {
       expect(changes).toEqual([10_000, 30_000]);
     });
 
-    it("adds a viewer's chat once per cooldown, per kind", () => {
-      ready(settings({ cooldown: 30 }, { chat: 1, follow: 5 }));
+    it("adds a viewer's chat once per cooldown, and every follow and share", () => {
+      ready(settings(chatRule(30), { chat: 1, follow: 5, share: 2 }));
+      const share = { user: viewer("a"), shareCount: 1 };
 
       timer.handle(TOKIO_EVENTS.CHAT, chat("a"));
       timer.handle(TOKIO_EVENTS.CHAT, chat("a"));
       timer.handle(TOKIO_EVENTS.CHAT, chat("b"));
       timer.handle(TOKIO_EVENTS.FOLLOW, { user: viewer("a") });
-      expect(changes).toEqual([1000, 1000, 5000]);
+      timer.handle(TOKIO_EVENTS.FOLLOW, { user: viewer("a") });
+      timer.handle(TOKIO_EVENTS.SHARE, share);
+      timer.handle(TOKIO_EVENTS.SHARE, share);
+      expect(changes).toEqual([1000, 1000, 5000, 5000, 2000, 2000]);
 
       vi.advanceTimersByTime(30_000);
       timer.handle(TOKIO_EVENTS.CHAT, chat("a"));
-      expect(changes).toEqual([1000, 1000, 5000, 1000]);
+      expect(changes.at(-1)).toBe(1000);
+    });
+
+    it("adds only the chat that has the keyword, matched like chat alerts", () => {
+      ready(settings(chatRule(0, "!time"), { chat: 3 }));
+
+      timer.handle(TOKIO_EVENTS.CHAT, chat("a", "hi"));
+      timer.handle(TOKIO_EVENTS.CHAT, chat("a", "go !time"));
+      timer.handle(TOKIO_EVENTS.CHAT, chat("b", "!TIME please"));
+      timer.handle(TOKIO_EVENTS.CHAT, chat("c", "!timeout"));
+
+      expect(changes).toEqual([3000, 3000]);
+    });
+
+    it("doesn't start a viewer's cooldown with a message that adds nothing", () => {
+      ready(settings(chatRule(30, "!time"), { chat: 3 }));
+
+      timer.handle(TOKIO_EVENTS.CHAT, chat("a", "hi"));
+      timer.handle(TOKIO_EVENTS.CHAT, chat("a", "!time"));
+
+      expect(changes).toEqual([3000]);
     });
 
     it("forgets the cooldowns on Reset and on a disconnect", () => {
-      ready(settings({ cooldown: 30 }, { chat: 1 }));
+      ready(settings(chatRule(30), { chat: 1 }));
       timer.handle(TOKIO_EVENTS.CHAT, chat("a"));
 
       timer.disconnected();
@@ -328,7 +353,7 @@ describe("TimerService", () => {
     });
 
     it("counts every chat without a cooldown", () => {
-      ready(settings({ cooldown: 0 }, { chat: 1 }));
+      ready(settings(chatRule(0), { chat: 1 }));
 
       timer.handle(TOKIO_EVENTS.CHAT, chat("a"));
       timer.handle(TOKIO_EVENTS.CHAT, chat("a"));
@@ -496,7 +521,7 @@ describe("TimerService", () => {
     });
 
     it("prunes the cooldowns that ended", async () => {
-      ready(settings({ cooldown: 1 }, { chat: 1 }));
+      ready(settings(chatRule(1), { chat: 1 }));
       timer.handle(TOKIO_EVENTS.CHAT, chat("a"));
 
       await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);

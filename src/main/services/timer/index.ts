@@ -12,6 +12,7 @@ import {
   UserData,
 } from "@/common/types";
 import { formatError } from "@/common/util";
+import { hasKeyword } from "@/helper/chat";
 import { GiftStreaks } from "@/helper/streaks";
 import Logger from "@/logger";
 import type { StoreManagerService } from "../store";
@@ -22,13 +23,9 @@ export const TIMER_EVENTS = [
   TOKIO_EVENTS.GIFT,
   TOKIO_EVENTS.LIKE,
   TOKIO_EVENTS.SUPER_FAN,
-  TOKIO_EVENTS.SUPER_FAN_BOX,
-  TOKIO_EVENTS.ENVELOPE,
   TOKIO_EVENTS.FOLLOW,
   TOKIO_EVENTS.SHARE,
   TOKIO_EVENTS.CHAT,
-  TOKIO_EVENTS.MEMBER_JOIN,
-  TOKIO_EVENTS.SUPER_FAN_JOIN,
 ] as const;
 
 type TimerEvent = (typeof TIMER_EVENTS)[number];
@@ -62,8 +59,7 @@ export class TimerService extends Service {
   private _timeout: ReturnType<typeof setTimeout> | null = null;
   // Likes toward the next cycle
   private _likes = 0;
-  // When each viewer's chat, follow, share or join adds time again, by kind
-  // and handle
+  // When each viewer's chat adds time again, by handle
   private _cooldowns = new Map<string, number>();
   private _streaks = new GiftStreaks();
   // Changed since the last save by something no request saves: added time,
@@ -84,18 +80,13 @@ export class TimerService extends Service {
       return cycles * likes;
     },
     [TOKIO_EVENTS.SUPER_FAN]: () => this._seconds().superfan,
-    [TOKIO_EVENTS.SUPER_FAN_BOX]: () => this._seconds().superfan_box,
-    [TOKIO_EVENTS.ENVELOPE]: () => this._seconds().envelope,
-    [TOKIO_EVENTS.FOLLOW]: ({ user }) =>
-      this._once("follow", user, this._seconds().follow),
-    [TOKIO_EVENTS.SHARE]: ({ user }) =>
-      this._once("share", user, this._seconds().share),
-    [TOKIO_EVENTS.CHAT]: ({ user }) =>
-      this._once("chat", user, this._seconds().chat),
-    [TOKIO_EVENTS.MEMBER_JOIN]: ({ user }) =>
-      this._once("join", user, this._seconds().join),
-    [TOKIO_EVENTS.SUPER_FAN_JOIN]: ({ user }) =>
-      this._once("superfan_join", user, this._seconds().superfan_join),
+    [TOKIO_EVENTS.FOLLOW]: () => this._seconds().follow,
+    [TOKIO_EVENTS.SHARE]: () => this._seconds().share,
+    // Only messages with the keyword, once per viewer in the cooldown
+    [TOKIO_EVENTS.CHAT]: ({ user, comment }) =>
+      hasKeyword(comment.content, this._settings.chat.keyword)
+        ? this._once(user, this._seconds().chat)
+        : 0,
   };
 
   public setLogFile(logFile: string) {
@@ -259,11 +250,11 @@ export class TimerService extends Service {
     return Math.max(0, Math.round(this._endsAt - performance.now()));
   }
 
-  // The seconds, at most once per cooldown for each viewer and kind
-  private _once(kind: string, user: UserData, seconds: number): number {
-    const cooldown = this._settings.cooldown * 1000;
+  // The seconds, at most once per chat cooldown for each viewer
+  private _once(user: UserData, seconds: number): number {
+    const cooldown = this._settings.chat.cooldown * 1000;
     if (seconds <= 0 || cooldown <= 0) return seconds;
-    const key = `${kind}:${user.handle || user.username}`;
+    const key = user.handle || user.username;
     const now = performance.now();
     const until = this._cooldowns.get(key);
     if (until !== undefined && until > now) return 0;
