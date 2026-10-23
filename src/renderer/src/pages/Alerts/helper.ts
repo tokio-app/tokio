@@ -1,6 +1,6 @@
 import { Alert, AlertTts, Profile, SavedEmote } from "@/common/schemas";
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
-import { SelectOption } from "@/components";
+import { EmoteOption } from "@/components";
 
 export function createAlert(): Alert {
   return {
@@ -31,7 +31,7 @@ export function ttsDefaultsOf(tts: Profile["tts"]): Omit<AlertTts, "message"> {
 }
 
 // TikTok doesn't name emotes, they're numbered in the order they appeared.
-export function emoteOptions(emotes: SavedEmote[]): SelectOption<string>[] {
+export function emoteOptions(emotes: SavedEmote[]): EmoteOption[] {
   return emotes.map((emote, index) => ({
     value: emote.id,
     label: `Emote ${index + 1}`,

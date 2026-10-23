@@ -1,5 +1,6 @@
 export * from "./AlertItem";
 export * from "./Elements";
+export * from "./EmoteSelect";
 export * from "./GiftSelect";
 export * from "./Iframe";
 export * from "./MediaPicker";

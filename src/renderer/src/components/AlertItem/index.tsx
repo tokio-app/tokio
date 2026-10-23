@@ -7,15 +7,8 @@ import {
 } from "@/common/types";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { FiTrash2 } from "react-icons/fi";
-import {
-  Btn,
-  Input,
-  MultiSelect,
-  Select,
-  SelectOption,
-  Slider,
-  Toggle,
-} from "../Elements";
+import { Btn, Input, Select, SelectOption, Slider, Toggle } from "../Elements";
+import { EmoteMultiSelect, EmoteOption } from "../EmoteSelect";
 import { GiftMultiSelect } from "../GiftSelect";
 import { PlayButton, TestState, testProps } from "../PlayButton";
 import styles from "./alertitem.module.css";
@@ -37,7 +30,7 @@ const GIFT_PLAYS: SelectOption<"streak" | "gift">[] = [
 type FilterProps = {
   alert: Alert;
   gifts: CustomGift[];
-  emotes: SelectOption<string>[];
+  emotes: EmoteOption[];
   onChange: (trigger: Alert["trigger"]) => void;
 };
 
@@ -68,10 +61,9 @@ function TriggerFilter({ alert, gifts, emotes, onChange }: FilterProps) {
       );
     case EMOTE_TRIGGER:
       return (
-        <MultiSelect
-          className={styles.fill}
+        <EmoteMultiSelect
           placeholder="Any emote"
-          options={emotes}
+          emotes={emotes}
           value={trigger.emotes}
           onChange={(ids) => onChange({ ...trigger, emotes: ids })}
         />
@@ -104,7 +96,7 @@ function TriggerFilter({ alert, gifts, emotes, onChange }: FilterProps) {
 type Props = {
   alert: Alert;
   gifts: CustomGift[];
-  emotes: SelectOption<string>[];
+  emotes: EmoteOption[];
   // The sound test loading or playing, maybe this alert's
   testing: TestState;
   onTest: (req: AlertTestRequest) => void;
