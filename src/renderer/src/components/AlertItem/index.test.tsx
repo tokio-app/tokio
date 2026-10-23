@@ -256,11 +256,12 @@ describe("AlertItem", () => {
 
   it("narrows an emote alert to the emotes picked", async () => {
     const item = alert({}, { type: EMOTE_TRIGGER, emotes: ["emote-1"] });
-    const { user, container, onChange } = setup(item);
-    expect(within(container).getByText("Emote 1")).toBeInTheDocument();
+    const { user, onChange } = setup(item);
 
-    await user.click(within(container).getByText("Emote 1"));
-    await user.click(inList(container, "Emote 2")!);
+    await user.click(screen.getByRole("button", { name: "Emote 1" }));
+    const picker = within(screen.getByRole("dialog"));
+    await user.click(picker.getByTitle("Emote 2"));
+    await user.click(picker.getByRole("button", { name: "Done" }));
 
     expect(onChange).toHaveBeenCalledWith({
       ...item,

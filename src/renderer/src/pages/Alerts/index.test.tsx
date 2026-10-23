@@ -435,7 +435,7 @@ describe("Alerts", () => {
   });
 
   it("offers the emotes seen in chat, numbered, as they arrive", async () => {
-    const { user, container } = await load(
+    const { user } = await load(
       [alert("alert-1", { trigger: trigger(EMOTE_TRIGGER) })],
       (p) => {
         p.emotes = [{ id: "e1", image: "e1.png" }];
@@ -443,16 +443,19 @@ describe("Alerts", () => {
     );
 
     await user.click(rows()[0].getByText("Any emote"));
-    expect(inList(container, "Emote 1")).not.toBeNull();
-    expect(inList(container, "Emote 2")).toBeNull();
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.queryByTitle("Emote 1")).not.toBeNull();
+    expect(dialog.queryByTitle("Emote 2")).toBeNull();
 
+    // While the picker is open
     await send(APP_EVENTS_RESPONSE.EMOTES, {
       data: [
         { id: "e1", image: "e1.png" },
         { id: "e2", image: "e2.png" },
       ],
     });
-    await user.click(inList(container, "Emote 2")!);
+    await user.click(dialog.getByTitle("Emote 2"));
+    await user.click(dialog.getByRole("button", { name: "Done" }));
 
     expect(rows()[0].getByText("Emote 2")).toBeInTheDocument();
     await wait(300);
