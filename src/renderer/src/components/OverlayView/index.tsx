@@ -1,11 +1,11 @@
 import { OverlayApp } from "@/common/types";
 import { getOverlayURL } from "@/common/util";
-import { useEffect, useState } from "react";
-import { FaRegCopy } from "react-icons/fa";
-import { FiCheck, FiMaximize2 } from "react-icons/fi";
+import { useState } from "react";
+import { FiMaximize2 } from "react-icons/fi";
 import { GoUnverified, GoVerified } from "react-icons/go";
 import { PiShootingStarThin } from "react-icons/pi";
 import { VscPackage, VscSettings } from "react-icons/vsc";
+import { CopyUrl } from "../CopyUrl";
 import { Btn } from "../Elements";
 import { Iframe } from "../Iframe";
 import { Modal } from "../Modal";
@@ -19,16 +19,7 @@ interface Props {
 }
 
 export function OverlayView({ onTest, onCustomize, overlay }: Props) {
-  const url = getOverlayURL(overlay.id);
   const [expanded, setExpanded] = useState(false);
-  // Shows a check on the URL for a moment after copying it
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!copied) return undefined;
-    const timer = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(timer);
-  }, [copied]);
 
   return (
     <div className={styles.container}>
@@ -101,21 +92,7 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
         </Btn>
       </OverlayPreview>
 
-      <Btn
-        title="Copy URL"
-        className={styles.url}
-        onClick={() => {
-          void navigator.clipboard.writeText(url);
-          setCopied(true);
-        }}
-      >
-        <span className={styles.url_text}>{url}</span>
-        {copied ? (
-          <FiCheck size={16} className={styles.copied} />
-        ) : (
-          <FaRegCopy size={16} />
-        )}
-      </Btn>
+      <CopyUrl url={getOverlayURL(overlay.id)} />
     </div>
   );
 }
