@@ -108,7 +108,7 @@ describe("main process entry", () => {
     vi.unstubAllEnvs();
   });
 
-  it("registers local-resource with CORS and fetch before the app is ready", async () => {
+  it("registers its schemes before the app is ready", async () => {
     await start();
 
     expect(protocol.registerSchemesAsPrivileged).toHaveBeenCalledWith([
@@ -116,6 +116,8 @@ describe("main process entry", () => {
         scheme: "local-resource",
         privileges: { corsEnabled: true, supportFetchAPI: true },
       },
+      // Videos play from it
+      { scheme: "tokio-media", privileges: { stream: true } },
     ]);
     expect(
       protocol.registerSchemesAsPrivileged.mock.invocationCallOrder[0],
@@ -193,6 +195,40 @@ describe("main process entry", () => {
       const [, handle] = protocol.handle.mock.calls[0];
 
       const res = await handle(request(join(folder, "secret.txt")));
+
+      expect(res.status).toBe(404);
+      expect(net.fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("media thumbnails", () => {
+    const media = join("tokio-data", "media");
+
+    it("serves the media library, with the request's range", async () => {
+      await start();
+      mocks.services.path.folders = { mediaFolder: media };
+      net.fetch.mockResolvedValue(new Response("png"));
+      const [scheme, handle] = protocol.handle.mock.calls[1];
+      const req = new Request("tokio-media:///c0ffee.png", {
+        headers: { Range: "bytes=0-" },
+      });
+
+      const res = await handle(req);
+
+      expect(scheme).toBe("tokio-media");
+      expect(net.fetch).toHaveBeenCalledWith(
+        pathToFileURL(join(media, "c0ffee.png")).href,
+        { headers: req.headers },
+      );
+      expect(await res.text()).toBe("png");
+    });
+
+    it("refuses anything else", async () => {
+      await start();
+      mocks.services.path.folders = { mediaFolder: media };
+      const [, handle] = protocol.handle.mock.calls[1];
+
+      const res = await handle(new Request("tokio-media:///..%2Fstore.json"));
 
       expect(res.status).toBe(404);
       expect(net.fetch).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { Alert, AlertTts } from "@/common/schemas";
+import { Alert, AlertTts, MediaFile } from "@/common/schemas";
 import {
   AlertTrigger,
   AppError,
@@ -8,7 +8,7 @@ import {
   FEEDBACK_CODES,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { generateTikTokEventSample } from "@/common/util";
+import { generateTikTokEventSample, MEDIA_EXTENSIONS } from "@/common/util";
 import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
@@ -143,6 +143,60 @@ events.push(
   },
 );
 
+// The picker stays open after a pick, so its list gets the new file too.
+events.push(
+  APP_EVENTS.IMPORT_MEDIA,
+  async ({ win, alertsService, storeManagerService, notifier }, e, { id }) => {
+    const diagRes = await showOpenDialog(win, {
+      title: "Select an image or video",
+      properties: ["openFile"],
+      filters: [{ name: "Images and videos", extensions: MEDIA_EXTENSIONS }],
+    });
+    if (diagRes.canceled || !diagRes.filePaths[0]) return;
+
+    const res = await alertsService.importMedia(diagRes.filePaths[0]);
+    if (!res.success || !res.data) throw new LoggedError(res.error);
+    if (!(await storeManagerService.addMedia(res.data))) throw saveFailure();
+    e.reply(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+      success: true,
+      id,
+      media: res.data,
+    });
+    e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
+      success: true,
+      data: storeManagerService.getMedia(),
+    });
+    notifier.success(
+      "alerts",
+      FEEDBACK_CODES.MEDIA_ADDED,
+      `Media "${res.data.name}" added.`,
+    );
+  },
+  {
+    notify: false,
+    failure: {
+      code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
+      message:
+        "Unable to use the file. Pick a png, jpg, gif, webp, mp4 or webm file up to 50 MB.",
+    },
+    onError: (e, error, { id }) =>
+      e.reply(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+        success: false,
+        id,
+        error,
+      }),
+  },
+);
+
+// The window's queue reached an alert with media: main shows it on time.
+events.push(
+  APP_EVENTS.SHOW_ALERT_MEDIA,
+  ({ alertsService }, _, data) => {
+    alertsService.showMedia(data);
+  },
+  { notify: false },
+);
+
 // A TTS test speaks the message filled with sample values for its trigger.
 const speakTest = async (
   { alertsService, storeManagerService }: AppHandlerVariables,
@@ -249,6 +303,34 @@ events.push(
   },
 );
 
+// Copies the files into a library. One bad file doesn't stop the others,
+// the service logs each failure. Throws when the library couldn't be saved.
+const upload = async (
+  paths: string[],
+  importFile: (path: string) => Promise<AlertsResult<MediaFile>>,
+  library: {
+    list: () => MediaFile[];
+    add: (file: MediaFile) => Promise<boolean>;
+  },
+) => {
+  let failed = 0;
+  let added = 0;
+  let saved = true;
+  for (const path of paths) {
+    const entry = (await importFile(path)).data;
+    if (!entry) {
+      failed++;
+      continue;
+    }
+    // Files are named by content: one in the library, or picked twice, isn't new.
+    if (library.list().some((f) => f.file === entry.file)) continue;
+    if (await library.add(entry)) added++;
+    else saved = false;
+  }
+  if (!saved) throw saveFailure();
+  return { failed, added };
+};
+
 // The sound library shows its failures itself.
 events.push(
   APP_EVENTS.UPLOAD_SOUNDS,
@@ -260,23 +342,14 @@ events.push(
     });
     if (diagRes.canceled) return;
 
-    // One bad file doesn't stop the others. The service logs each failure.
-    let failed = 0;
-    let added = 0;
-    let saved = true;
-    for (const path of diagRes.filePaths) {
-      const sound = (await alertsService.importSound(path)).data;
-      if (!sound) {
-        failed++;
-        continue;
-      }
-      // Files are named by content: one in the library, or picked twice, isn't new.
-      const listed = storeManagerService.getSounds();
-      if (listed.some((s) => s.file === sound.file)) continue;
-      if (await storeManagerService.addSound(sound)) added++;
-      else saved = false;
-    }
-    if (!saved) throw saveFailure();
+    const { failed, added } = await upload(
+      diagRes.filePaths,
+      (path) => alertsService.importSound(path),
+      {
+        list: () => storeManagerService.getSounds(),
+        add: (sound) => storeManagerService.addSound(sound),
+      },
+    );
 
     const error =
       failed > 0
@@ -316,15 +389,31 @@ events.push(
   },
 );
 
+// A file taken out of its library leaves every alert that had it, in every
+// profile, and the Alerts page drops it too. Then it's deleted, unless a
+// profile couldn't be saved: its alerts still need the file. The service logs
+// a failed delete.
+const deleteFile = async (
+  { storeManagerService }: AppHandlerVariables,
+  e: ReplyEvent,
+  field: "sound" | "media",
+  file: string,
+  remove: (file: string) => Promise<AlertsResult<void>>,
+) => {
+  const cleared = await storeManagerService.removeFromAlerts(field, file);
+  e.reply(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, { field, file });
+  if (!cleared) throw saveFailure();
+  return (await remove(file)).success;
+};
+
 events.push(
   APP_EVENTS.REMOVE_SOUND,
-  async ({ alertsService, storeManagerService, notifier }, e, { file }) => {
+  async (services, e, { file }) => {
+    const { alertsService, storeManagerService, notifier } = services;
     if (!(await storeManagerService.removeSound(file))) throw saveFailure();
-    // Alerts that already use the sound keep working. The service logs a
-    // failed delete.
-    const deleted =
-      (await storeManagerService.isSoundInUse(file)) ||
-      (await alertsService.deleteSound(file)).success;
+    const deleted = await deleteFile(services, e, "sound", file, (f) =>
+      alertsService.deleteSound(f),
+    );
 
     e.reply(APP_EVENTS_RESPONSE.GET_SOUNDS, {
       success: true,
@@ -354,6 +443,128 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.GET_SOUNDS, {
         success: false,
         data: storeManagerService.getSounds(),
+        error,
+      }),
+  },
+);
+
+// The media library shows its failures itself.
+events.push(
+  APP_EVENTS.UPLOAD_MEDIA,
+  async ({ win, alertsService, storeManagerService, notifier }, e) => {
+    const diagRes = await showOpenDialog(win, {
+      title: "Upload images and videos",
+      properties: ["openFile", "multiSelections"],
+      filters: [{ name: "Images and videos", extensions: MEDIA_EXTENSIONS }],
+    });
+    if (diagRes.canceled) return;
+
+    const { failed, added } = await upload(
+      diagRes.filePaths,
+      (path) => alertsService.importMedia(path),
+      {
+        list: () => storeManagerService.getMedia(),
+        add: (media) => storeManagerService.addMedia(media),
+      },
+    );
+    const error =
+      failed > 0
+        ? {
+            code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
+            message: `Unable to upload ${failed} of the files. Use png, jpg, gif, webp, mp4 or webm files up to 50 MB.`,
+          }
+        : undefined;
+
+    e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
+      success: !error,
+      data: storeManagerService.getMedia(),
+      error,
+    });
+    if (added > 0) {
+      notifier.success(
+        "alerts",
+        FEEDBACK_CODES.MEDIA_UPLOADED,
+        added === 1
+          ? "1 file added to the media library."
+          : `${added} files added to the media library.`,
+      );
+    }
+  },
+  {
+    notify: false,
+    failure: {
+      code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
+      message: "Unable to upload the files.",
+    },
+    onError: (e, error, _, { storeManagerService }) =>
+      e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
+        success: false,
+        data: storeManagerService.getMedia(),
+        error,
+      }),
+  },
+);
+
+events.push(
+  APP_EVENTS.GET_MEDIA,
+  ({ storeManagerService }, e) => {
+    e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
+      success: true,
+      data: storeManagerService.getMedia(),
+    });
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.MEDIA_LOAD_FAILED,
+      message: "Unable to load the media library.",
+    },
+    onError: (e, error) =>
+      e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
+        success: false,
+        data: [],
+        error,
+      }),
+  },
+);
+
+// The media picker shows its failures itself.
+events.push(
+  APP_EVENTS.REMOVE_MEDIA,
+  async (services, e, { file }) => {
+    const { alertsService, storeManagerService, notifier } = services;
+    if (!(await storeManagerService.removeMedia(file))) throw saveFailure();
+    const deleted = await deleteFile(services, e, "media", file, (f) =>
+      alertsService.deleteMedia(f),
+    );
+
+    e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
+      success: true,
+      data: storeManagerService.getMedia(),
+    });
+    if (deleted) {
+      notifier.success(
+        "alerts",
+        FEEDBACK_CODES.MEDIA_REMOVED,
+        "Media removed.",
+      );
+    } else {
+      notifier.warn(
+        "alerts",
+        FEEDBACK_CODES.MEDIA_REMOVE_FAILED,
+        "Media removed from the library, but its file couldn't be deleted.",
+      );
+    }
+  },
+  {
+    notify: false,
+    failure: {
+      code: FEEDBACK_CODES.MEDIA_REMOVE_FAILED,
+      message: "Unable to remove the media.",
+    },
+    onError: (e, error, _, { storeManagerService }) =>
+      e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
+        success: false,
+        data: storeManagerService.getMedia(),
         error,
       }),
   },

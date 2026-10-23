@@ -1,7 +1,7 @@
 <div align="center">
   <img src="resources/icon.png" alt="Tokio logo" width="96" />
   <h1>Tokio</h1>
-  <p>Make your TikTok LIVE react to chat, gifts, likes and more: text-to-speech, music requests, sound alerts and overlays.</p>
+  <p>Make your TikTok LIVE react to chat, gifts, likes and more: text-to-speech, music requests, alerts and overlays.</p>
   <p>
     <a href="https://tokio.ialfaro.com">Website</a> ·
     <a href="https://github.com/tokio-app/tokio/releases">Download</a> ·
@@ -9,7 +9,7 @@
   </p>
 </div>
 
-Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok LIVE and reacts to what happens in it. It reads chat aloud, takes song requests, plays sounds when someone follows or sends a gift, and drives overlays you add to **OBS**, **TikTok LIVE Studio** or any streaming app that can show a web page.
+Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok LIVE and reacts to what happens in it. It reads chat aloud, takes song requests, plays sounds and shows images or videos when someone follows or sends a gift, and drives overlays you add to **OBS**, **TikTok LIVE Studio** or any streaming app that can show a web page.
 
 ## Features
 
@@ -48,9 +48,13 @@ Both services need a **Premium** account. On YouTube Music, a free account plays
 
 ### Alerts
 
-Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gifts, envelopes, Super Fan events, new members and song changes.
+Play a sound, show an image or a video, or both, for LIVE events: chat messages, emotes, follows, shares, likes, gifts, envelopes, Super Fan events, new members and song changes.
 
 - Upload your own sounds or search [MyInstants](https://www.myinstants.com) from inside the app. Sounds can be up to 8 MB. Your sound library is shared by all your profiles.
+- **Clear** takes a sound, message, image or video off an alert and keeps it in your library. Deleting one from the library removes it from your computer and from every alert that uses it, in all your profiles, after you confirm.
+- Pick an image or a video under the alert's **Media**, from thumbnails of your media library with the alert's own marked: png, jpg, gif, webp, mp4 or webm, up to 50 MB. It shows with the alert's sound or message, or on its own, and a video plays with its own sound at the alert's volume. Your media library is shared by all your profiles too: upload, preview and delete files in **Settings → Media Library**.
+- Each alert shows its image or video on its own overlay, at `http://tokio-app.local:37891/alerts/<alert-id>/`. Copy the URL from the alert's media and add it to your streaming app like any overlay (see [Adding an overlay](#adding-an-overlay)), so you can place each alert where you want.
+- An image or video stays on screen for the alert's **Duration** (5 seconds unless you change it), or while its sound plays if that's longer. With **Match video** on, it follows the video's length, up to 60 seconds, also after you pick another video. A longer video is cut. The next alert in the queue waits for it, so for events that come often, like likes, keep the duration short or let alerts play at the same time.
 - Set each alert's volume. Gift alerts can react to any gift or only to the ones you pick, and fire once per combo. TikTok's gift list can miss some gifts, like ones from other regions, so Tokio also saves the ones viewers send that aren't on it, for all your profiles.
 - Pick gifts from a list: search it by name, filter it by price (exactly, more than, less than, at least, at most or between two amounts of coins) and sort it by price or name. The gifts already picked come first. **Select all shown** checks every gift the filters leave, such as all the gifts worth 1,000 coins or more.
 - Chat alerts can react to every message or only to messages with a keyword, which can be a word, a phrase or an emoji. Emote alerts can react to any emote or only to the ones you pick. TikTok doesn't list a LIVE's emotes, so each profile saves the ones viewers use.
@@ -60,7 +64,7 @@ Play a sound for LIVE events: chat messages, emotes, follows, shares, likes, gif
 
 ### Overlays
 
-On the **Overlays** page, **Official Overlays** opens the overlays made for Tokio, with a preview of each. Install the ones you want, or remove them there. A dot on the button means a new version is out, and **Update** installs it and keeps your settings. To use your own overlays, import them in **Settings → Imported Overlays**, where you can also remove them.
+On the **Overlays** page, **Official Overlays** opens the overlays made for Tokio, with a preview of each. Install the ones you want, or remove them there. A dot on the button means a new version is out, and **Update** installs it and keeps your settings. To use your own overlays, import them in **Settings → Overlay Library**, where you can also remove them.
 
 Set them up from the gallery on the **Overlays** page: colors, text, the gifts they react to (picked from the same list as gift alerts), and anything else an overlay offers. Tokio gives each overlay its own URL on your computer, `http://tokio-app.local:37891/<overlay-id>/`. Copy it from the gallery and add it to your streaming app (see [Adding an overlay](#adding-an-overlay)).
 
@@ -110,7 +114,7 @@ Set everything up before you go live: Tokio can only connect once your LIVE has 
 
 ### Adding an overlay
 
-Overlays are served by Tokio's overlay server. Turn it on first in **Settings → Overlay Server**, then copy the overlay's URL from the **Overlays** page.
+Overlays are served by Tokio's overlay server. Turn it on first in **Settings → Overlay Server**, then copy the overlay's URL from the **Overlays** page, or an alert's from its media on the **Alerts** page.
 
 TikTok LIVE Studio doesn't accept `localhost` links, so overlays use their own address, `tokio-app.local`. The first time you turn on the server, your system asks for administrator rights (your password on macOS and Linux) so Tokio can add this address to your hosts file, pointing to your own computer. Accept the prompt, or the server stays off. You won't be asked again while the entry is there.
 

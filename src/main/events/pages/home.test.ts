@@ -352,45 +352,45 @@ describe("home events", () => {
     const setup = () => {
       const updateActiveFeatures = vi.fn(async () => true);
       const clearTalk = vi.fn();
-      const clearSpeech = vi.fn();
+      const clearAlerts = vi.fn();
       const h = createHandler({
         storeManagerService: { updateActiveFeatures },
         ttsService: { clearTalk },
-        alertsService: { clearSpeech },
+        alertsService: { clear: clearAlerts },
       });
-      return { h, updateActiveFeatures, clearTalk, clearSpeech };
+      return { h, updateActiveFeatures, clearTalk, clearAlerts };
     };
 
     it("saves the features without a notice", async () => {
-      const { h, updateActiveFeatures, clearTalk, clearSpeech } = setup();
+      const { h, updateActiveFeatures, clearTalk, clearAlerts } = setup();
 
       await h.invoke(home, APP_EVENTS.ACTIVE_FEATURES, { tts: true });
 
       expect(updateActiveFeatures).toHaveBeenCalledWith({ tts: true });
       expect(clearTalk).not.toHaveBeenCalled();
-      expect(clearSpeech).not.toHaveBeenCalled();
+      expect(clearAlerts).not.toHaveBeenCalled();
       expect(h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toEqual([]);
       expect(h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([]);
       expect(h.notices).toEqual([]);
     });
 
     it("stops TTS when it's turned off", async () => {
-      const { h, clearTalk, clearSpeech } = setup();
+      const { h, clearTalk, clearAlerts } = setup();
 
       await h.invoke(home, APP_EVENTS.ACTIVE_FEATURES, { tts: false });
 
       expect(clearTalk).toHaveBeenCalledOnce();
       expect(h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toEqual([undefined]);
-      expect(clearSpeech).not.toHaveBeenCalled();
+      expect(clearAlerts).not.toHaveBeenCalled();
       expect(h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([]);
     });
 
     it("stops the alerts when they're turned off", async () => {
-      const { h, clearSpeech } = setup();
+      const { h, clearAlerts } = setup();
 
       await h.invoke(home, APP_EVENTS.ACTIVE_FEATURES, { alerts: false });
 
-      expect(clearSpeech).toHaveBeenCalledOnce();
+      expect(clearAlerts).toHaveBeenCalledOnce();
       expect(h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([undefined]);
     });
 

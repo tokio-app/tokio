@@ -1,0 +1,152 @@
+/* The whole field copies the URL. Two classes to win over Btn's styles */
+.overlay .url {
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 0 var(--space-3);
+  border-color: var(--border);
+  background-color: var(--background-secondary);
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-weight: 400;
+}
+
+.overlay .url:hover:not(:disabled) {
+  border-color: var(--background-secondary-hover);
+  background-color: var(--background-secondary);
+  color: var(--font-secondary);
+}
+
+.url_text {
+  min-width: 0;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.copied {
+  color: var(--success);
+}
+
+/* LIBRARY */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  align-content: start;
+  gap: var(--space-3);
+  height: 320px;
+  overflow-y: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background-tertiary);
+}
+
+.empty {
+  grid-column: 1 / -1;
+}
+
+/* Places its delete button over the thumbnail */
+.tile {
+  position: relative;
+  min-width: 0;
+}
+
+/* The thumbnail and the name pick the file */
+.choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--background-secondary);
+  color: var(--font-primary);
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice:hover {
+  background: var(--background-secondary-hover);
+}
+
+/* The alert's media */
+.chosen {
+  border-color: var(--accent-primary);
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--background-primary);
+}
+
+/* The name, after a film mark on videos */
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.video {
+  flex-shrink: 0;
+  color: var(--font-secondary);
+}
+
+.file_name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Over the thumbnail's corners: the check on the left, the delete button on
+   the right */
+.check {
+  position: absolute;
+  top: calc(var(--space-2) + var(--space-1));
+  left: calc(var(--space-2) + var(--space-1));
+  box-sizing: content-box;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
+  color: var(--font-primary);
+}
+
+/* Two classes to win over Btn's styles */
+.tile .delete {
+  position: absolute;
+  top: calc(var(--space-2) + var(--space-1));
+  right: calc(var(--space-2) + var(--space-1));
+  padding: 4px;
+  background-color: var(--background-primary);
+}
+
+/* How long the alert's media shows, at the start of the buttons' row */
+.timing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-right: auto;
+}
+
+.duration {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--font-primary);
+}
+
+.number {
+  width: 72px;
+}

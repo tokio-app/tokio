@@ -1,5 +1,6 @@
 import Logo from "@/assets/logo.png";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { queueAlert } from "@/helper/alerts";
 import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
@@ -54,7 +55,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!res) return;
     const queue = getQueue(res.channel);
     queue.setQueueOptions({ maxQueueLength: res.maxQueueLength, gapTime: 0.2 });
-    queue.enqueue(res.data, {
+    void queueAlert(queue, res, {
       gain: res.volume / 100,
       key: res.id,
       cacheKey: res.key,

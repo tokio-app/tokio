@@ -41,6 +41,11 @@
   white-space: nowrap;
 }
 
+/* The alert's sound */
+.current {
+  color: var(--accent-primary);
+}
+
 /* A name that picks the sound */
 .pick {
   border: none;

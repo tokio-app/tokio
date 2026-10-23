@@ -42,6 +42,8 @@ type Props = {
   confirmText?: string;
   // Replaces the default footer
   footer?: ReactNode;
+  // At the end of the title's row, such as a search
+  actions?: ReactNode;
   // Adds a close button to the header
   closeButton?: boolean;
   maxWidth?: string;
@@ -55,6 +57,7 @@ export function Modal({
   onConfirm,
   confirmText = "Confirm",
   footer,
+  actions,
   closeButton,
   maxWidth = "400px",
   children,
@@ -74,7 +77,7 @@ export function Modal({
     };
   }, [opener]);
 
-  const actions =
+  const buttons =
     footer ??
     (onConfirm && (
       <>
@@ -108,6 +111,7 @@ export function Modal({
           <h3 id={titleId} className={styles.title}>
             {title}
           </h3>
+          {actions && <div className={styles.actions}>{actions}</div>}
           {closeButton && (
             <Btn variant="icon" title="Close" onClick={onClose}>
               <VscClose size={24} />
@@ -123,7 +127,7 @@ export function Modal({
 
         {children && <div className={styles.body}>{children}</div>}
 
-        {actions && <div className={styles.footer}>{actions}</div>}
+        {buttons && <div className={styles.footer}>{buttons}</div>}
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ export interface Folders {
   profilesFolder: string;
   extraFolder: string;
   soundsFolder: string;
+  mediaFolder: string;
 }
 
 export interface Files {

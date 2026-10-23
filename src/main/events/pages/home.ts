@@ -199,7 +199,7 @@ events.push(
       win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
     }
     if (data.alerts === false) {
-      alertsService.clearSpeech();
+      alertsService.clear();
       win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
     }
     if (!saved) throw saveFailure();

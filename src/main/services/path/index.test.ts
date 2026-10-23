@@ -36,6 +36,7 @@ describe("PathManagerService", () => {
       await expect(access(path)).resolves.toBeUndefined();
     }
     expect(service.folders.soundsFolder).toBe(join(home, ".tokio", "sounds"));
+    expect(service.folders.mediaFolder).toBe(join(home, ".tokio", "media"));
     expect(callback).toHaveBeenCalledWith({
       files: service.files,
       folders: service.folders,

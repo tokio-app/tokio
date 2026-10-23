@@ -1,5 +1,5 @@
 import { isLiveEvent, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
-import { formatError, SERVER_PORT } from "@/common/util";
+import { ALERTS_PATH, formatError, SERVER_PORT } from "@/common/util";
 import Logger from "@/logger";
 import express, { Express, Router } from "express";
 import { randomUUID } from "node:crypto";
@@ -7,6 +7,7 @@ import { Server as HttpServer } from "node:http";
 import { TikTokConnectorService } from "../connector";
 import { MusicService } from "../music";
 import { Service } from "../shared";
+import ALERT_PAGE from "./alert.html?raw";
 import { CustomWebSocketServer } from "./websocket";
 
 export class ServerService extends Service {
@@ -24,6 +25,12 @@ export class ServerService extends Service {
     this._app = express();
     this._dynamicRouter = express.Router();
     this._port = port;
+
+    // Each alert's overlay, the same page: it reads the alert's id from its
+    // path. Their media is mounted at /alerts/media/, a path one level deeper.
+    this._app.get(`/${ALERTS_PATH}/:id`, (_req, res) => {
+      res.type("html").send(ALERT_PAGE);
+    });
 
     this._app.use((req, res, next) => {
       this._dynamicRouter(req, res, next);

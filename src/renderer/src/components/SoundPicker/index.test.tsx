@@ -50,6 +50,7 @@ function setup(
     onRequest: vi.fn(),
     onSelect: vi.fn(),
     onSelectTts: vi.fn(),
+    onClear: vi.fn(),
     onClose: vi.fn(),
   };
   const view = renderWithProviders(
@@ -148,6 +149,27 @@ describe("SoundPicker", () => {
     expect(
       screen.queryByRole("button", { name: "Browse file..." }),
     ).not.toBeInTheDocument();
+  });
+
+  it("clears the alert's sound or message, when it has one", async () => {
+    const { user, onClear, unmount } = setup();
+    expect(screen.getByRole("button", { name: "Clear" })).toBeDisabled();
+    unmount();
+
+    const withSound = setup(alert({ sound: LIBRARY[0] }));
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    expect(withSound.onClear).toHaveBeenCalledOnce();
+    expect(onClear).not.toHaveBeenCalled();
+    expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([]);
+  });
+
+  it("marks the alert's sound in your sounds", async () => {
+    setup(alert({ sound: LIBRARY[1] }));
+    await sounds(LIBRARY);
+
+    expect(screen.getByRole("button", { current: true })).toHaveTextContent(
+      "Bell",
+    );
   });
 
   it("browses for a file for the alert", async () => {
@@ -322,14 +344,38 @@ describe("SoundPicker", () => {
       ).toBeVisible();
     });
 
-    it("removes one from the library", async () => {
+    it("deletes one once you confirm", async () => {
       const { user, onTest } = setup();
       await sounds(LIBRARY);
 
-      await user.click(row("Bell").getByRole("button", { name: "Remove" }));
+      await user.click(row("Bell").getByRole("button", { name: "Delete" }));
+      const confirm = screen.getByRole("dialog", { name: "Delete sound?" });
+      expect(confirm).toHaveTextContent(
+        '"Bell" will be deleted from your computer and from every alert that plays it, in all your profiles.',
+      );
+      expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([]);
+
+      await user.click(within(confirm).getByRole("button", { name: "Delete" }));
 
       expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([{ file: "bell.mp3" }]);
       expect(onTest).not.toHaveBeenCalled();
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    });
+
+    it("keeps one when you cancel", async () => {
+      const { user } = setup();
+      await sounds(LIBRARY);
+
+      await user.click(row("Bell").getByRole("button", { name: "Delete" }));
+      await user.click(
+        within(screen.getByRole("dialog", { name: "Delete sound?" })).getByRole(
+          "button",
+          { name: "Cancel" },
+        ),
+      );
+
+      expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([]);
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
     });
 
     it("stops the test of a sound before removing it", async () => {
@@ -338,7 +384,13 @@ describe("SoundPicker", () => {
       });
       await sounds(LIBRARY);
 
-      await user.click(row("Bell").getByRole("button", { name: "Remove" }));
+      await user.click(row("Bell").getByRole("button", { name: "Delete" }));
+      await user.click(
+        within(screen.getByRole("dialog", { name: "Delete sound?" })).getByRole(
+          "button",
+          { name: "Delete" },
+        ),
+      );
 
       expect(onTest).toHaveBeenCalledWith({
         id: "bell.mp3",

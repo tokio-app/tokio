@@ -94,6 +94,7 @@ type Props = {
   onChange: (alert: Alert) => void;
   onRemove: () => void;
   onPickSound: () => void;
+  onPickMedia: () => void;
 };
 
 export function AlertItem({
@@ -105,8 +106,10 @@ export function AlertItem({
   onChange,
   onRemove,
   onPickSound,
+  onPickMedia,
 }: Props) {
   const { sound, tts } = alert;
+  const media = alert.media ?? undefined;
   // A message is spoken instead of the sound.
   const output = tts ? `TTS: ${tts.message}` : sound?.name;
 
@@ -116,11 +119,13 @@ export function AlertItem({
         <PlayButton
           {...testProps(testing, alert.id)}
           size={24}
-          disabled={!sound && !tts}
+          disabled={!sound && !tts && !media}
           onClick={() => {
             const { id, volume } = alert;
-            if (tts) onTest({ id, tts, trigger: alert.trigger.type, volume });
-            else if (sound) onTest({ id, file: sound.file, volume });
+            const trigger = alert.trigger.type;
+            if (tts) onTest({ id, tts, trigger, volume, media });
+            else if (sound) onTest({ id, file: sound.file, volume, media });
+            else if (media) onTest({ id, volume, media });
           }}
         />
         <Btn variant="icon" title="Remove" onClick={onRemove}>
@@ -162,6 +167,14 @@ export function AlertItem({
         <Btn className={styles.sound} title={output} onClick={onPickSound}>
           <span className={styles.sound_name}>
             {output ?? "Select a sound..."}
+          </span>
+        </Btn>
+      </div>
+
+      <div className={styles.cell}>
+        <Btn className={styles.sound} title={media?.name} onClick={onPickMedia}>
+          <span className={styles.sound_name}>
+            {media?.name ?? "Select media..."}
           </span>
         </Btn>
       </div>

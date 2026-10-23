@@ -1,13 +1,17 @@
 import { CatalogOverlay } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
 import { countUpdates } from "@/common/util";
-import { Btn, EmptyState, Input, OverlayView, Section } from "@/components";
-import { cx } from "@/helper";
+import {
+  Btn,
+  EmptyState,
+  OverlayView,
+  SearchToggle,
+  Section,
+} from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useNavigate } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { LuPackageSearch } from "react-icons/lu";
-import { MdOutlineSearch, MdOutlineSearchOff } from "react-icons/md";
 import { updatesHint } from "../helper";
 import styles from "../overlays.module.css";
 
@@ -18,9 +22,7 @@ interface Props {
 }
 
 export function GallerySection({ overlays, onTest, onCustomize }: Props) {
-  const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
 
   const shown = useMemo(() => {
     const needle = search.toLowerCase();
@@ -34,30 +36,11 @@ export function GallerySection({ overlays, onTest, onCustomize }: Props) {
       divider
       actions={
         <>
-          <Input
-            ref={searchRef}
-            className={cx(styles.search, showSearch && styles.search_open)}
+          <SearchToggle
             placeholder="Search overlays..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            // Only CSS hides it, so keep it out of the keyboard's reach too
-            tabIndex={showSearch ? undefined : -1}
-            aria-hidden={!showSearch || undefined}
+            onChange={setSearch}
           />
-          <Btn
-            title={showSearch ? "Close search" : "Search"}
-            onClick={() => {
-              if (showSearch) setSearch("");
-              else searchRef.current?.focus();
-              setShowSearch(!showSearch);
-            }}
-          >
-            {showSearch ? (
-              <MdOutlineSearchOff size={24} />
-            ) : (
-              <MdOutlineSearch size={24} />
-            )}
-          </Btn>
           <OfficialButton overlays={overlays} />
         </>
       }

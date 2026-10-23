@@ -82,13 +82,20 @@ export enum APP_EVENTS {
   SEARCH_SOUNDS = "app:alerts:search:sounds",
   DOWNLOAD_SOUND = "app:alerts:download:sound",
   IMPORT_SOUND = "app:alerts:import:sound",
+  IMPORT_MEDIA = "app:alerts:import:media",
   TEST_ALERT = "app:alerts:test",
+  SHOW_ALERT_MEDIA = "app:alerts:show:media",
   GET_CUSTOM_GIFTS = "app:alerts:get:gifts",
 
   // SOUND LIBRARY
   GET_SOUNDS = "app:sounds:get",
   UPLOAD_SOUNDS = "app:sounds:upload",
   REMOVE_SOUND = "app:sounds:remove",
+
+  // MEDIA LIBRARY
+  GET_MEDIA = "app:media:get",
+  UPLOAD_MEDIA = "app:media:upload",
+  REMOVE_MEDIA = "app:media:remove",
 
   // ABOUT
   GET_ABOUT = "app:about:get",
@@ -258,6 +265,9 @@ export interface AppEventsMap {
   [APP_EVENTS.IMPORT_SOUND]: {
     id: string;
   };
+  [APP_EVENTS.IMPORT_MEDIA]: {
+    id: string;
+  };
   // A TTS test speaks the message filled with a sample of the trigger
   [APP_EVENTS.TEST_ALERT]: (
     | { file: string }
@@ -268,12 +278,30 @@ export interface AppEventsMap {
     // Identifies the test: the alert id, or the url for previews
     id: string;
   };
+  // An alert's media got its place in the window's queue: main shows it on
+  // the alert's overlay when its turn comes.
+  [APP_EVENTS.SHOW_ALERT_MEDIA]: {
+    // The alert, whose overlay connects with its id
+    id: string;
+    file: string;
+    // Seconds until its turn, and how long the turn lasts
+    delay: number;
+    duration: number;
+    volume: number;
+  };
   [APP_EVENTS.GET_CUSTOM_GIFTS]: void;
 
   // SOUND LIBRARY
   [APP_EVENTS.GET_SOUNDS]: void;
   [APP_EVENTS.UPLOAD_SOUNDS]: void;
   [APP_EVENTS.REMOVE_SOUND]: {
+    file: string;
+  };
+
+  // MEDIA LIBRARY
+  [APP_EVENTS.GET_MEDIA]: void;
+  [APP_EVENTS.UPLOAD_MEDIA]: void;
+  [APP_EVENTS.REMOVE_MEDIA]: {
     file: string;
   };
 

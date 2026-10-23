@@ -3,8 +3,8 @@ import { Section, Toggle } from "@/components";
 import { cx } from "@/helper";
 import { Link } from "@tanstack/react-router";
 import { FiChevronRight } from "react-icons/fi";
-import styles from "../home.module.css";
 import { alertsStatus, serverStatus } from "../helper";
+import styles from "../home.module.css";
 
 type Features = AppSettings["activeFeatures"];
 
@@ -80,7 +80,7 @@ export function FeaturesSection({
                 className={cx(styles.dot, server.enabled && styles.dot_on)}
               />
             </span>
-            Overlay server
+            Overlays
           </span>
           <span className={styles.feature_status}>
             {serverStatus(server.enabled, server.overlays)}

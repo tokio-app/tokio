@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ALERTS_PATH } from "../util/constants/server";
 
 /**
  * An official overlay in the catalog that tokio-app/overlays publishes with
@@ -7,7 +8,11 @@ import { z } from "zod";
  */
 export const CatalogOverlaySchema = z.object({
   // Its folder name there, and its folder and URL path here. Never changes.
-  id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  // The alerts' overlays are served under /alerts/.
+  id: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .refine((id) => id !== ALERTS_PATH),
   name: z.string(),
   version: z.string(),
   description: z.string(),

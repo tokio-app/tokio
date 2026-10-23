@@ -69,6 +69,7 @@ const folders: Folders = {
   profilesFolder: "app/profiles",
   extraFolder: "app/extra",
   soundsFolder: "app/sounds",
+  mediaFolder: "app/media",
 };
 
 const noStats = { likes: 0, viewers: 0, views: 0 };
@@ -147,6 +148,7 @@ const alert = (overrides: Partial<Alert> = {}): Alert => ({
   },
   sound: { name: "Ding", file: "ding.mp3" },
   tts: null,
+  media: null,
   volume: 80,
   ...overrides,
 });
@@ -213,6 +215,7 @@ function setup() {
   };
   const serverService = {
     setLogFile: vi.fn(),
+    mount: vi.fn(),
     initEvents: vi.fn(),
     toggleServer: vi.fn(async (_enabled: boolean) => true),
   };
@@ -252,9 +255,11 @@ function setup() {
   const alertsService = {
     setLogFile: vi.fn(),
     setSoundsFolder: vi.fn(),
+    setMediaFolder: vi.fn(),
     setSpeaker: vi.fn(),
+    setServer: vi.fn(),
     handle: vi.fn(async (..._args: Parameters<AlertsService["handle"]>) => {}),
-    clearSpeech: vi.fn(),
+    clear: vi.fn(),
   };
   const updaterService = {
     setLogFile: vi.fn(),
@@ -724,7 +729,7 @@ describe("init events", () => {
 
       expect(s.musicService.clearHandler).toHaveBeenCalledOnce();
       expect(s.ttsService.clearTalk).toHaveBeenCalledOnce();
-      expect(s.alertsService.clearSpeech).toHaveBeenCalledOnce();
+      expect(s.alertsService.clear).toHaveBeenCalledOnce();
       expect(s.h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toEqual([undefined]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([undefined]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
@@ -1173,6 +1178,15 @@ describe("init events", () => {
       );
       expect(s.alertsService.setSpeaker.mock.calls[0][0]).toBe(
         s.h.handler.ttsService,
+      );
+      // Each alert's overlay shows its media from the media folder.
+      expect(s.alertsService.setMediaFolder).toHaveBeenCalledWith("app/media");
+      expect(s.alertsService.setServer.mock.calls[0][0]).toBe(
+        s.h.handler.serverService,
+      );
+      expect(s.serverService.mount).toHaveBeenCalledWith(
+        "alerts/media",
+        "app/media",
       );
     });
 

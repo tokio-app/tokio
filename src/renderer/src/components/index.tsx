@@ -2,6 +2,7 @@ export * from "./AlertItem";
 export * from "./Elements";
 export * from "./GiftSelect";
 export * from "./Iframe";
+export * from "./MediaPicker";
 export * from "./Modal";
 export * from "./NotificationBell";
 export * from "./OverlayModal";

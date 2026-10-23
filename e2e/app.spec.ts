@@ -166,7 +166,7 @@ test("imports an overlay and runs its preview from disk", async () => {
     .click();
   await page
     .locator("section", {
-      has: page.getByRole("heading", { name: "Imported Overlays" }),
+      has: page.getByRole("heading", { name: "Overlay Library" }),
     })
     .getByRole("button", { name: "Import" })
     .click();

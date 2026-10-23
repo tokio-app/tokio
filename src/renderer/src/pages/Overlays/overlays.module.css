@@ -1,16 +1,3 @@
-/* Hidden until the search button is pressed */
-.search {
-  width: 220px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.4s;
-}
-
-.search_open {
-  opacity: 1;
-  pointer-events: all;
-}
-
 /* Two overlays per row, one when there's no room */
 .gallery {
   display: grid;

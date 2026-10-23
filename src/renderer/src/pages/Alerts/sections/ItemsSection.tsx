@@ -6,7 +6,15 @@ import { useMemo } from "react";
 import styles from "../alerts.module.css";
 import { emoteOptions, giftOptions } from "../helper";
 
-const COLUMNS = ["Actions", "Enabled", "Trigger", "", "Sound", "Volume"];
+const COLUMNS = [
+  "Actions",
+  "Enabled",
+  "Trigger",
+  "",
+  "Sound",
+  "Media",
+  "Volume",
+];
 
 type Props = {
   items: Alert[];
@@ -19,6 +27,7 @@ type Props = {
   onTest: (req: AlertTestRequest) => void;
   update: Updater<Profile["alerts"]>;
   onPickSound: (id: string) => void;
+  onPickMedia: (id: string) => void;
 };
 
 export function ItemsSection({
@@ -30,6 +39,7 @@ export function ItemsSection({
   onTest,
   update,
   onPickSound,
+  onPickMedia,
 }: Props) {
   const giftChoices = useMemo(
     () => giftOptions(gifts, customGifts),
@@ -72,6 +82,7 @@ export function ItemsSection({
               })
             }
             onPickSound={() => onPickSound(alert.id)}
+            onPickMedia={() => onPickMedia(alert.id)}
           />
         ))
       )}

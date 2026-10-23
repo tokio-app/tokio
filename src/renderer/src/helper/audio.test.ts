@@ -77,8 +77,17 @@ const tone = vi.hoisted(() => {
 vi.mock("tone", () => ({
   Gain: tone.FakeGain,
   GrainPlayer: tone.FakePlayer,
-  getContext: () => ({ decodeAudioData: tone.decode }),
+  getContext: () => ({
+    decodeAudioData: tone.decode,
+    createBuffer: (channels: number, length: number, rate: number) => ({
+      duration: length / rate,
+      length,
+      numberOfChannels: channels,
+    }),
+  }),
   now: () => tone.clock.now,
+  // What's heard, behind now() by Tone's look ahead
+  immediate: () => tone.clock.now - 0.25,
 }));
 
 const bytes = () => new Uint8Array([1, 2, 3, 4]);
@@ -136,6 +145,42 @@ describe("AudioQueue", () => {
     // One finished, so there's room again
     tone.players[0].finish();
     expect(await queue.enqueue(bytes())).toBe(true);
+  });
+
+  it("holds a sound's place at least minDuration, and says when it's heard", async () => {
+    const queue = new AudioQueue();
+    queue.setQueueOptions({ gapTime: 0.5 });
+    const onScheduled = vi.fn();
+
+    await queue.enqueue(bytes(), { minDuration: 5, onScheduled });
+    await queue.enqueue(bytes(), { minDuration: 1, onScheduled });
+
+    expect(tone.players.map((p) => p.startedAt)).toEqual([10, 15.5]);
+    expect(onScheduled.mock.calls).toEqual([
+      [0.25, 5],
+      [5.75, 2],
+    ]);
+  });
+
+  it("holds silent places, which count toward the limit", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const queue = new AudioQueue();
+    queue.setQueueOptions({ maxQueueLength: 2, gapTime: 0.5 });
+    queue.setFilters({ speed: 2 });
+
+    expect(queue.wait(3)).toBe(true);
+    expect(await queue.enqueue(bytes())).toBe(true);
+    expect(queue.wait(3)).toBe(false);
+    expect(warn).toHaveBeenCalled();
+
+    // The queue's speed doesn't shorten a wait.
+    expect(tone.players.map((p) => p.startedAt)).toEqual([10, 13.5]);
+    expect(tone.players[0].playbackRate).toBe(1);
+
+    // Silent places of the same length share one buffer.
+    tone.players[0].finish();
+    expect(queue.wait(3)).toBe(true);
+    expect(tone.players[2].url).toBe(tone.players[0].url);
   });
 
   it("counts sounds still decoding, so it never decodes one that doesn't fit", async () => {

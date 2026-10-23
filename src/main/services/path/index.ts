@@ -25,6 +25,7 @@ export class PathManagerService {
       profilesFolder: join(appFolder, "profiles"),
       extraFolder: join(appFolder, "extra"),
       soundsFolder: join(appFolder, "sounds"),
+      mediaFolder: join(appFolder, "media"),
     };
 
     this.files = {

@@ -17,6 +17,7 @@ import {
   readFile,
   rename,
   rm,
+  truncate,
   unlink,
   writeFile,
 } from "node:fs/promises";
@@ -28,6 +29,7 @@ import {
   AlertsService,
   CACHE_MAX_BYTES,
   CACHE_MAX_FILE_BYTES,
+  MEDIA_MAX_BYTES,
 } from "./index";
 
 // A test can make a write or rename fail, or count and hold reads
@@ -63,9 +65,17 @@ const alert = (overrides: Partial<Alert> = {}): Alert => ({
   trigger: trigger(TOKIO_EVENTS.FOLLOW),
   sound: { name: "Ding", file: "ding.mp3" },
   tts: null,
+  media: null,
   volume: 80,
   ...overrides,
 });
+
+const picture = {
+  name: "Confetti",
+  file: "confetti.gif",
+  duration: 5,
+  match_video: false,
+};
 
 type AlertProfile = Pick<Profile, "alerts" | "tts">;
 
@@ -161,6 +171,36 @@ describe("AlertsService", () => {
       );
 
       expect(sent[0].channel).toBe(`alerts:${TOKIO_EVENTS.FOLLOW}`);
+    });
+
+    it("sends an alert's media with its sound", async () => {
+      const sent = await run(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+        settings([alert({ media: picture })]),
+      );
+
+      expect(sent).toEqual([
+        expect.objectContaining({ data: bytes(1, 2, 3), media: picture }),
+      ]);
+    });
+
+    it("sends an alert with only media, to hold its turn in the queue", async () => {
+      const sent = await run(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+        settings([alert({ sound: null, media: picture })]),
+      );
+
+      expect(sent).toEqual([
+        {
+          volume: 80,
+          channel: "alerts",
+          maxQueueLength: 100,
+          id: "alert-1",
+          media: picture,
+        },
+      ]);
     });
 
     it("sends every matching alert in order", async () => {
@@ -342,7 +382,7 @@ describe("AlertsService", () => {
           sound,
           tts: tts(message),
         });
-      const said = (audio: AlertAudio) => Buffer.from(audio.data).toString();
+      const said = (audio: AlertAudio) => Buffer.from(audio.data!).toString();
       const giftFrom = (username: string): GiftEvent => ({
         ...gift("5655", true),
         user: { ...user, username },
@@ -421,6 +461,15 @@ describe("AlertsService", () => {
           key: expect.stringMatching(/^tts:/),
           filters: { speed: 1.5, pitch: 0.8 },
         });
+      });
+
+      it("speaks with the alert's media", async () => {
+        await speak(
+          gift("5655", true),
+          withTts([{ ...speaking("Thanks"), media: picture }]),
+        );
+
+        expect(sent).toEqual([expect.objectContaining({ media: picture })]);
       });
 
       it("speaks instead of playing the sound", async () => {
@@ -531,7 +580,7 @@ describe("AlertsService", () => {
 
         await handle(giftFrom("Ann"), alerts);
         await handle(giftFrom("Bob"), alerts);
-        service.clearSpeech();
+        service.clear();
         await vi.advanceTimersByTimeAsync(3000);
 
         expect(generateBuffer).toHaveBeenCalledOnce();
@@ -673,7 +722,145 @@ describe("AlertsService", () => {
       const res = await service.importSound(join(src, "notes.txt"));
 
       expect(res.success).toBe(false);
-      expect(res.error).toContain("Unsupported audio format");
+      expect(res.error).toContain("Unsupported format");
+    });
+  });
+
+  describe("media", () => {
+    let src: string;
+    let media: string;
+
+    beforeEach(async () => {
+      src = join(root, "src");
+      media = join(root, "media");
+      await mkdir(src);
+      await mkdir(media);
+      service.setMediaFolder(media);
+    });
+
+    it("names an imported image or video by its content", async () => {
+      await writeFile(join(src, "Party.GIF"), bytes(4, 5));
+
+      const res = await service.importMedia(join(src, "Party.GIF"));
+
+      expect(res.data?.name).toBe("Party");
+      expect(res.data?.file).toMatch(/^[0-9a-f]{32}\.gif$/);
+      expect(await readdir(media)).toEqual([res.data!.file]);
+    });
+
+    it("refuses files that are too big, or not images or videos", async () => {
+      await writeFile(join(src, "icon.svg"), "<svg/>");
+      await writeFile(join(src, "song.mp3"), bytes(1));
+      // Sparse, so nothing big is written
+      await writeFile(join(src, "long.mp4"), "");
+      await truncate(join(src, "long.mp4"), MEDIA_MAX_BYTES + 1);
+
+      for (const name of ["icon.svg", "song.mp3", "long.mp4"]) {
+        expect((await service.importMedia(join(src, name))).success).toBe(
+          false,
+        );
+      }
+      expect(await readdir(media)).toEqual([]);
+    });
+
+    it("deletes a file", async () => {
+      await writeFile(join(media, "a.png"), bytes(1));
+
+      expect((await service.deleteMedia("a.png")).success).toBe(true);
+      expect(await readdir(media)).toEqual([]);
+    });
+  });
+
+  describe("showMedia", () => {
+    const show = {
+      id: "alert-1",
+      file: "a.png",
+      delay: 2,
+      duration: 6.5,
+      volume: 80,
+    };
+    let sendToClient: Mock;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      sendToClient = vi.fn(() => true);
+      service.setServer({ sendToClient });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("sends the media to the alert's overlay when its turn comes", () => {
+      service.showMedia(show);
+      service.showMedia({ ...show, id: "alert-2", file: "b.WEBM" });
+
+      vi.advanceTimersByTime(1999);
+      expect(sendToClient).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1);
+      expect(sendToClient.mock.calls).toEqual([
+        [
+          "alert-1",
+          {
+            type: "tokio:alert:media",
+            data: {
+              src: "/alerts/media/a.png",
+              kind: "image",
+              duration: 6.5,
+              volume: 80,
+            },
+          },
+        ],
+        [
+          "alert-2",
+          expect.objectContaining({
+            data: expect.objectContaining({ kind: "video" }),
+          }),
+        ],
+      ]);
+    });
+
+    it("keeps the numbers in range", () => {
+      service.showMedia({ ...show, delay: -1, duration: 1e12, volume: 150 });
+      vi.advanceTimersByTime(0);
+
+      expect(sendToClient.mock.calls[0][1].data).toMatchObject({
+        duration: 24 * 60 * 60,
+        volume: 100,
+      });
+    });
+
+    it("refuses paths, other files and numbers that aren't", () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const refused = [
+        { file: "../a.png" },
+        { file: "dir/a.png" },
+        { file: "a.svg" },
+        { delay: NaN },
+        { volume: Infinity },
+      ];
+
+      for (const change of refused) service.showMedia({ ...show, ...change });
+      vi.runAllTimers();
+
+      expect(sendToClient).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(refused.length);
+    });
+
+    it("drops the media waiting on clear, and hides what overlays show", () => {
+      service.showMedia({ ...show, delay: 0 });
+      vi.advanceTimersByTime(0);
+      service.showMedia({ ...show, id: "alert-2" });
+
+      service.clear();
+      vi.runAllTimers();
+      service.clear();
+
+      expect(sendToClient.mock.calls.map(([id, p]) => [id, p.type])).toEqual([
+        ["alert-1", "tokio:alert:media"],
+        ["alert-1", "tokio:alert:clear"],
+      ]);
     });
   });
 

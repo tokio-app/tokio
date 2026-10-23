@@ -97,6 +97,12 @@ export enum FEEDBACK_CODES {
   SOUND_IMPORT_FAILED = "sound_import_failed",
   SOUND_READ_FAILED = "sound_read_failed",
   SOUND_REMOVE_FAILED = "sound_remove_failed",
+  MEDIA_ADDED = "media_added",
+  MEDIA_UPLOADED = "media_uploaded",
+  MEDIA_REMOVED = "media_removed",
+  MEDIA_LOAD_FAILED = "media_load_failed",
+  MEDIA_IMPORT_FAILED = "media_import_failed",
+  MEDIA_REMOVE_FAILED = "media_remove_failed",
   EMOTES_SAVE_FAILED = "emotes_save_failed",
   GIFTS_SAVE_FAILED = "gifts_save_failed",
 }

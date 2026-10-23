@@ -29,6 +29,7 @@ function setup(props: Partial<Props> = {}) {
     onTest: vi.fn(),
     onRequest: vi.fn(),
     onSelect: vi.fn(),
+    onRemove: vi.fn(),
     ...props,
   };
   const view = render(<MyInstantsTab {...all} />);
@@ -277,7 +278,7 @@ describe("MyInstantsTab", () => {
     const { user, onRequest } = setup({ library });
     await results([BRUH, VINE_BOOM, AIRHORN]);
     const remove = screen.getByRole("button", {
-      name: "Remove from your sounds",
+      name: "Delete from your sounds",
     });
 
     await user.click(row("Bruh").getByRole("button", { name: /Download/ }));
@@ -324,14 +325,16 @@ describe("MyInstantsTab", () => {
     expect(onSelect).toHaveBeenCalledWith(saved);
   });
 
-  it("removes a sound from your sounds", async () => {
-    const { user } = setup({ library: [alertSound("Bruh")] });
+  it("asks to delete a sound from your sounds", async () => {
+    const saved = alertSound("Bruh");
+    const { user, onRemove } = setup({ library: [saved] });
     await results([BRUH]);
 
     await user.click(
-      screen.getByRole("button", { name: "Remove from your sounds" }),
+      screen.getByRole("button", { name: "Delete from your sounds" }),
     );
 
-    expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([{ file: BRUH.file }]);
+    expect(onRemove).toHaveBeenCalledExactlyOnceWith(saved);
+    expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([]);
   });
 });

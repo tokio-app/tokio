@@ -1,7 +1,11 @@
 import { ALERT_TRIGGERS } from "@/common/schemas";
 import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import { describe, expect, it } from "vitest";
-import { ALERT_MESSAGE_VARIABLES, formatAlertMessage } from "./alerts";
+import {
+  ALERT_MESSAGE_VARIABLES,
+  formatAlertMessage,
+  mediaKind,
+} from "./alerts";
 import { generateTikTokEventSample } from "./samples";
 
 const user = { username: "Viewer", handle: "viewer", profilePictures: [] };
@@ -59,5 +63,20 @@ describe("formatAlertMessage", () => {
     const { data } = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW);
 
     expect(formatAlertMessage("{handle}", data)).not.toMatch(/^@/);
+  });
+});
+
+describe("mediaKind", () => {
+  it("tells images from videos by their extension, in any case", () => {
+    expect(mediaKind("a.PNG")).toBe("image");
+    expect(mediaKind("a.gif")).toBe("image");
+    expect(mediaKind("clip.WebM")).toBe("video");
+    expect(mediaKind("clip.mp4")).toBe("video");
+  });
+
+  it("knows nothing else", () => {
+    for (const file of ["icon.svg", "ding.mp3", "mp4", "", "."]) {
+      expect(mediaKind(file)).toBeNull();
+    }
   });
 });

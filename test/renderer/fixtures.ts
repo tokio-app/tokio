@@ -1,6 +1,8 @@
 import type {
+  AlertMedia,
   AlertSound,
   CatalogOverlay,
+  MediaFile,
   OverlayConfig,
   Profile,
   StoreSchema,
@@ -65,6 +67,23 @@ export const engine = (
 export const alertSound = (name: string): AlertSound => ({
   name,
   file: `${slug(name)}.mp3`,
+});
+
+// An image in the media library
+export const mediaFile = (name: string): MediaFile => ({
+  name,
+  file: `${slug(name)}.png`,
+});
+
+// An alert's image, or a library file as an alert's media
+export const alertMedia = (
+  file: MediaFile | string,
+  patch: Partial<AlertMedia> = {},
+): AlertMedia => ({
+  ...(typeof file === "string" ? mediaFile(file) : file),
+  duration: 5,
+  match_video: false,
+  ...patch,
 });
 
 export const instantSound = (name: string): MyInstantsSound => ({

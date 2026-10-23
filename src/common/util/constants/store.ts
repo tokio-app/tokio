@@ -18,6 +18,7 @@ export const defaultStoreData: StoreSchema = {
     overlays: [],
     testOverlays: [],
     sounds: [],
+    media: [],
     activeFeatures: {
       tts: false,
       music: false,

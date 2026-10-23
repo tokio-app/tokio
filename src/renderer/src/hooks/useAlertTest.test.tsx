@@ -11,6 +11,12 @@ const { TEST_ALERT } = APP_EVENTS_RESPONSE;
 const airhorn = { id: "alert-1", file: "airhorn.mp3", volume: 80 };
 const bell = { id: "alert-2", file: "bell.mp3", volume: 100 };
 const data = new Uint8Array([1, 2, 3]);
+const party = {
+  name: "Party",
+  file: "party.gif",
+  duration: 5,
+  match_video: false,
+};
 
 function setup() {
   const { wrapper, audio } = providers();
@@ -93,6 +99,51 @@ describe("useAlertTest", () => {
     act(() => result.current.toggle(bell));
     await send(TEST_ALERT, { success: true, id: "alert-2", data, volume: 100 });
     expect(result.current.testing).toBeNull();
+  });
+
+  it("tests media alone without main, showing it on the alert's overlay", async () => {
+    const { result, queue } = setup();
+
+    await act(async () =>
+      result.current.toggle({ id: "alert-1", volume: 80, media: party }),
+    );
+
+    expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([]);
+    expect(queue.wait).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ gain: 0.8, key: "alert-1", minDuration: 5 }),
+    );
+    expect(result.current.testing).toEqual({ id: "alert-1", loading: false });
+
+    const [, options] = queue.wait.mock.calls[0];
+    options?.onScheduled?.(0.25, 5);
+    expect(sent(APP_EVENTS.SHOW_ALERT_MEDIA)).toEqual([
+      {
+        id: "alert-1",
+        file: "party.gif",
+        delay: 0.25,
+        duration: 5,
+        volume: 80,
+      },
+    ]);
+
+    act(() => options?.onEnded?.());
+    expect(result.current.testing).toBeNull();
+  });
+
+  it("shows a test's media with its sound", async () => {
+    const { result, queue } = setup();
+
+    act(() => result.current.toggle({ ...airhorn, media: party }));
+    await send(TEST_ALERT, { success: true, id: "alert-1", data, volume: 80 });
+
+    expect(queue.enqueue).toHaveBeenCalledWith(
+      data,
+      expect.objectContaining({
+        minDuration: 5,
+        onScheduled: expect.any(Function),
+      }),
+    );
   });
 
   it("stop() cuts the test", () => {

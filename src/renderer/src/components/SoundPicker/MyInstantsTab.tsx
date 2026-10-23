@@ -27,6 +27,8 @@ type Props = {
   // Called when a download for the alert starts
   onRequest: () => void;
   onSelect: (sound: AlertSound) => void;
+  // Asks before deleting a downloaded sound
+  onRemove: (sound: AlertSound) => void;
 };
 
 export function MyInstantsTab({
@@ -37,6 +39,7 @@ export function MyInstantsTab({
   onTest,
   onRequest,
   onSelect,
+  onRemove,
 }: Props) {
   const [query, setQuery] = useState("");
   // Url of the sound being downloaded
@@ -98,13 +101,9 @@ export function MyInstantsTab({
               {entry ? (
                 <Btn
                   variant="icon"
-                  title="Remove from your sounds"
+                  title="Delete from your sounds"
                   disabled={downloading !== null}
-                  onClick={() =>
-                    window.api.emit(APP_EVENTS.REMOVE_SOUND, {
-                      file: sound.file,
-                    })
-                  }
+                  onClick={() => onRemove(entry)}
                 >
                   <FiTrash2 size={20} />
                 </Btn>

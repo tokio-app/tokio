@@ -1,4 +1,4 @@
-import { Profile, ProfileSchema, StoreSchema } from "@/common/schemas";
+import { Alert, Profile, ProfileSchema, StoreSchema } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
 import { safeStorage } from "@test/electron";
 import { defaultProfile } from "@/common/util";
@@ -194,6 +194,42 @@ describe("StoreManagerService", () => {
       ]);
     });
 
+    it("recovers the media library when the store is rebuilt", async () => {
+      const folder = paths.folders.mediaFolder;
+      for (const file of ["used.png", "clip.webm"]) {
+        await writeFile(join(folder, file), "media");
+      }
+      await writeFile(join(folder, "notes.txt"), "not media");
+      await writeFile(
+        defaultProfileFile,
+        JSON.stringify({
+          ...defaultProfile,
+          alerts: {
+            ...defaultProfile.alerts,
+            items: [
+              {
+                id: "a",
+                enabled: true,
+                trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+                sound: null,
+                media: { name: "Party", file: "used.png", duration: 5 },
+                volume: 100,
+              },
+            ],
+          },
+        }),
+      );
+      await writeFile(storeFile, "{ oops");
+
+      const store = await init();
+
+      // The library keeps a name and a file, not the alert's duration.
+      expect(store.getMedia()).toEqual([
+        { name: "Party", file: "used.png" },
+        { name: "Recovered media 1", file: "clip.webm" },
+      ]);
+    });
+
     it("is not rebuilt when the store loads", async () => {
       await init();
 
@@ -205,6 +241,7 @@ describe("StoreManagerService", () => {
         defaultStoreData.settings,
       );
       delete old.sounds;
+      delete old.media;
       delete old.testOverlays;
       const oldProfile: Partial<Profile> = structuredClone(defaultProfile);
       delete oldProfile.alerts;
@@ -217,6 +254,7 @@ describe("StoreManagerService", () => {
       const store = await init();
 
       expect(store.getSounds()).toEqual([]);
+      expect(store.getMedia()).toEqual([]);
       expect(store.getSettings().testOverlays).toEqual([]);
       expect((await store.getProfileData())?.alerts).toEqual(
         defaultProfile.alerts,
@@ -954,8 +992,9 @@ describe("StoreManagerService", () => {
     });
   });
 
-  describe("sounds", () => {
+  describe("sounds and media", () => {
     const sound = { name: "Ding", file: "ding.mp3" };
+    const picture = { name: "Party", file: "party.png" };
 
     it("adds a sound file once and removes it", async () => {
       const store = await init();
@@ -968,34 +1007,73 @@ describe("StoreManagerService", () => {
       expect(store.getSounds()).toEqual([]);
     });
 
-    it("knows when an alert in any profile uses a sound", async () => {
+    it("takes a deleted file off the alerts of every profile", async () => {
       const store = await init();
+      const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({
+        id,
+        enabled: true,
+        trigger: {
+          type: TOKIO_EVENTS.FOLLOW,
+          gifts: [],
+          emotes: [],
+          keyword: "",
+          user: "",
+        },
+        sound,
+        tts: null,
+        media: { ...picture, duration: 5, match_video: false },
+        volume: 100,
+        ...patch,
+      });
+      const withAlerts = (...items: Alert[]) => ({
+        alerts: { ...defaultProfile.alerts, items },
+      });
+      await store.updateProfileData(withAlerts(alert("a")));
       await store.createNewProfile("stream.json", "Stream");
       await store.updateActiveProfile("stream.json");
-      await store.updateProfileData({
-        alerts: {
-          ...defaultProfile.alerts,
-          items: [
-            {
-              id: "a",
-              enabled: false,
-              trigger: {
-                type: TOKIO_EVENTS.FOLLOW,
-                gifts: [],
-                emotes: [],
-                keyword: "",
-                user: "",
-              },
-              sound,
-              tts: null,
-              volume: 100,
-            },
-          ],
-        },
+      await store.updateProfileData(
+        withAlerts(alert("b"), alert("c", { sound: null })),
+      );
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+
+      expect(await store.removeFromAlerts("sound", "ding.mp3")).toBe(true);
+
+      // The active profile, in memory and on disk, and another one
+      const sounds = (items: { sound: unknown }[]) => items.map((a) => a.sound);
+      expect(sounds((await store.getProfileData())!.alerts.items)).toEqual([
+        null,
+        null,
+      ]);
+      expect(sounds((await readJSON(stream)).alerts.items)).toEqual([
+        null,
+        null,
+      ]);
+      const other = (await readJSON(defaultProfileFile)).alerts.items[0];
+      expect(other.sound).toBeNull();
+      expect(other.media).toEqual({
+        ...picture,
+        duration: 5,
+        match_video: false,
       });
 
-      expect(await store.isSoundInUse("ding.mp3")).toBe(true);
-      expect(await store.isSoundInUse("other.mp3")).toBe(false);
+      expect(await store.removeFromAlerts("media", "party.png")).toBe(true);
+      expect(
+        (await store.getProfileData())!.alerts.items.map((a) => a.media),
+      ).toEqual([null, null]);
+      expect(
+        (await readJSON(defaultProfileFile)).alerts.items[0].media,
+      ).toBeNull();
+    });
+
+    it("adds a media file once and removes it", async () => {
+      const store = await init();
+
+      await store.addMedia(picture);
+      await store.addMedia({ ...picture, name: "Other name" });
+      expect((await init()).getMedia()).toEqual([picture]);
+
+      await store.removeMedia("party.png");
+      expect(store.getMedia()).toEqual([]);
     });
   });
 

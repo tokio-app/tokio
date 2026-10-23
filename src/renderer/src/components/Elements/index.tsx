@@ -5,6 +5,7 @@ export * from "./Input";
 export * from "./ListTextarea";
 export * from "./NumberInput";
 export * from "./RadioGroup";
+export * from "./SearchToggle";
 export * from "./Select";
 export * from "./Slider";
 export * from "./Spinner";

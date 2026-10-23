@@ -1,7 +1,7 @@
-import { Alert, SavedEmote } from "@/common/schemas";
+import { Alert, MEDIA_DURATION, MediaFile, SavedEmote } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, CustomGift } from "@/common/types";
 import { defaultProfile } from "@/common/util";
-import { Page, SoundPicker } from "@/components";
+import { MediaPicker, Page, SoundPicker } from "@/components";
 import {
   useAlertTest,
   useAudio,
@@ -28,6 +28,10 @@ export function Alerts() {
   // Alerts waiting for main to save a sound. A pick made since drops the
   // alert, so a slow download can't replace it.
   const asked = useRef(new Set<string>());
+  // Id of the alert whose image or video is being picked
+  const [mediaFor, setMediaFor] = useState<string | null>(null);
+  // The same as asked, for browsed media
+  const askedMedia = useRef(new Set<string>());
 
   const { settings, update } = useEditableSettings("alerts", (profile) => {
     setEmotes(profile.emotes);
@@ -75,6 +79,40 @@ export function Alerts() {
     setOutput(res.id, { sound: res.sound, tts: null });
   });
 
+  // Another file keeps the alert's duration.
+  const setMedia = (id: string, file: MediaFile | null) => {
+    update((s) => {
+      const alert = s.items.find((a) => a.id === id);
+      if (!alert) return;
+      alert.media = file && {
+        ...file,
+        duration: alert.media?.duration ?? MEDIA_DURATION,
+        match_video: alert.media?.match_video ?? false,
+      };
+    });
+  };
+
+  const pickMedia = (id: string, file: MediaFile | null) => {
+    askedMedia.current.delete(id);
+    setMedia(id, file);
+  };
+
+  useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, (res) => {
+    if (!res?.success || !res.media || !askedMedia.current.has(res.id)) return;
+    setMedia(res.id, res.media);
+  });
+
+  // A deleted sound or media file leaves the alerts shown, as main took it
+  // off every profile's.
+  useIpcListener(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, (res) => {
+    if (!res) return;
+    update((s) => {
+      for (const alert of s.items) {
+        if (alert[res.field]?.file === res.file) alert[res.field] = null;
+      }
+    });
+  });
+
   // Apply volume changes to sounds that are already waiting or playing.
   useEffect(() => {
     settings.items.forEach((alert) => {
@@ -83,6 +121,7 @@ export function Alerts() {
   }, [settings.items, setItemGain]);
 
   const pickerAlert = settings.items.find((a) => a.id === pickerFor);
+  const mediaAlert = settings.items.find((a) => a.id === mediaFor);
 
   return (
     <>
@@ -102,6 +141,7 @@ export function Alerts() {
           onTest={test.toggle}
           update={update}
           onPickSound={setPickerFor}
+          onPickMedia={setMediaFor}
         />
       </Page>
 
@@ -114,7 +154,29 @@ export function Alerts() {
           onRequest={() => asked.current.add(pickerAlert.id)}
           onSelect={(sound) => pick(pickerAlert.id, { sound, tts: null })}
           onSelectTts={(tts) => pick(pickerAlert.id, { sound: null, tts })}
+          onClear={() => pick(pickerAlert.id, { sound: null, tts: null })}
           onClose={() => setPickerFor(null)}
+        />
+      )}
+
+      {mediaAlert && (
+        <MediaPicker
+          alert={mediaAlert}
+          onRequest={() => askedMedia.current.add(mediaAlert.id)}
+          onSelect={(file) => pickMedia(mediaAlert.id, file)}
+          onDuration={(duration) =>
+            update((s) => {
+              const media = s.items.find((a) => a.id === mediaAlert.id)?.media;
+              if (media) media.duration = duration;
+            })
+          }
+          onMatch={(match) =>
+            update((s) => {
+              const media = s.items.find((a) => a.id === mediaAlert.id)?.media;
+              if (media) media.match_video = match;
+            })
+          }
+          onClose={() => setMediaFor(null)}
         />
       )}
     </>

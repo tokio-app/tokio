@@ -91,6 +91,21 @@ describe("Modal", () => {
     expect(dialog().queryAllByRole("button")).toHaveLength(0);
   });
 
+  it("puts actions at the end of the title's row", () => {
+    render(
+      <Modal
+        title="Media"
+        onClose={vi.fn()}
+        actions={<button>Search</button>}
+      />,
+    );
+
+    const search = dialog().getByRole("button", { name: "Search" });
+    expect(
+      dialog().getByRole("heading", { name: "Media" }).parentElement,
+    ).toContainElement(search);
+  });
+
   it("renders its children in the body", () => {
     render(
       <Modal title="Rename" onClose={vi.fn()} onConfirm={vi.fn()}>
