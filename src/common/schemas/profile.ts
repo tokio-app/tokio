@@ -129,6 +129,8 @@ export const ProfileSchema = z.object({
     protection: z.object({
       cooldown: z.number(),
       queue_length: z.number(),
+      // One waiting request per viewer, and no song twice in the queue
+      one_per_viewer: z.boolean().default(false),
     }),
     controls: z.object({
       play: MusicControl,

@@ -1,5 +1,10 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { Page, PermissionsSection, ProtectionSection } from "@/components";
+import {
+  Check,
+  Page,
+  PermissionsSection,
+  ProtectionSection,
+} from "@/components";
 import {
   scopeUpdater,
   useEditableSettings,
@@ -55,7 +60,18 @@ export function Music() {
         feature="Music"
         protection={settings.protection}
         update={scopeUpdater(update, "protection")}
-      />
+      >
+        <Check
+          label="One request per viewer"
+          title="A viewer can request another song once theirs plays, and a song already playing or waiting isn't added again."
+          checked={settings.protection.one_per_viewer}
+          onChange={(e) =>
+            update((s) => {
+              s.protection.one_per_viewer = e.target.checked;
+            })
+          }
+        />
+      </ProtectionSection>
     </Page>
   );
 }

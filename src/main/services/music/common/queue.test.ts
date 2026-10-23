@@ -563,6 +563,36 @@ describe("MusicQueue", () => {
     });
   });
 
+  describe("has and waits", () => {
+    const track = (title: string): SongInfo => ({
+      ...song(title),
+      track: `track:${title}`,
+    });
+
+    it("finds a track that's playing or waiting, not one that played", async () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", track("a"), () => {});
+      queue.enqueue("b", track("b"), () => {});
+      queue.enqueue("c", track("c"), () => {});
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(queue.has("track:a")).toBe(false);
+      expect(queue.has("track:b")).toBe(true);
+      expect(queue.has("track:c")).toBe(true);
+      expect(queue.has("track:d")).toBe(false);
+    });
+
+    it("tells whether one of a viewer's requests waits", () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a"), () => {}, "ana");
+      queue.enqueue("b", song("b"), () => {}, "ben");
+
+      expect(queue.waits("ana")).toBe(false);
+      expect(queue.waits("ben")).toBe(true);
+      expect(queue.waits("cat")).toBe(false);
+    });
+  });
+
   describe("navigation", () => {
     it("skips to the next song without waiting, and plays each once", async () => {
       const queue = new MusicQueue();

@@ -239,6 +239,92 @@ describe("MusicService", () => {
 
       expect(queue()).toEqual(["A (playing)", "B"]);
     });
+
+    describe("one request per viewer", () => {
+      const music = settings((m) => {
+        m.protection.one_per_viewer = true;
+        m.protection.cooldown = 2;
+      });
+      const from = (handle: string, content: string) =>
+        chat(content, { handle });
+
+      it("ignores a viewer's request while another of theirs waits, keeping the cooldown free", async () => {
+        const { service, request, searched, queue } = setup();
+        await request("!play A", music);
+        await vi.advanceTimersByTimeAsync(2_000);
+        // A plays, so the viewer may ask again
+        await request("!play B", music);
+        await vi.advanceTimersByTimeAsync(2_000);
+
+        await request("!play C", music);
+        service.handle(from("other", "!play D"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "B", "D"]);
+        expect(queue()).toEqual(["A (playing)", "B", "D"]);
+      });
+
+      it("ignores a viewer's request while theirs is searching", async () => {
+        const { service, provider, request, searched } = setup();
+        let found = (_song: SongInfo | null) => {};
+        provider.searchSong.mockImplementationOnce(
+          () => new Promise((resolve) => (found = resolve)),
+        );
+        await request("!play A", music);
+        await vi.advanceTimersByTimeAsync(2_000);
+
+        await request("!play B", music);
+        service.handle(from("other", "!play C"), music);
+        found(song("A"));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "C"]);
+      });
+
+      it("drops a song that's playing or waiting and gives the cooldown back", async () => {
+        const { service, searched, queue } = setup();
+        service.handle(from("a", "!play A"), music);
+        await vi.advanceTimersByTimeAsync(2_000);
+
+        service.handle(from("b", "!play A"), music);
+        await vi.advanceTimersByTimeAsync(0);
+        service.handle(from("c", "!play B"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "A", "B"]);
+        expect(queue()).toEqual(["A (playing)", "B"]);
+      });
+
+      it("keeps the cooldown of a command taken while the duplicate searched", async () => {
+        const { service, provider, searched } = setup();
+        service.handle(from("a", "!play A"), music);
+        await vi.advanceTimersByTimeAsync(2_000);
+        provider.searchSong.mockImplementationOnce(async (query) => {
+          await new Promise((resolve) => setTimeout(resolve, 3_000));
+          return song(query);
+        });
+        service.handle(from("b", "!play A"), music);
+        await vi.advanceTimersByTimeAsync(2_500);
+        service.handle(from("c", "!next"), music);
+        await vi.advanceTimersByTimeAsync(500);
+
+        // 1 s after !next took the cooldown
+        service.handle(from("d", "!play D"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "A"]);
+      });
+
+      it("changes nothing while it's off", async () => {
+        const { request, queue } = setup();
+
+        await request("!play A");
+        await request("!play A");
+        await request("!play B");
+
+        expect(queue()).toEqual(["A (playing)", "A", "B"]);
+      });
+    });
   });
 
   describe("play", () => {

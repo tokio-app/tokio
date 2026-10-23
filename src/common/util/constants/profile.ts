@@ -24,6 +24,7 @@ export const defaultProfile: Profile = {
     protection: {
       cooldown: 2,
       queue_length: 10,
+      one_per_viewer: false,
     },
     controls: {
       play: {

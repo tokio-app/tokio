@@ -12,6 +12,8 @@ interface QueueItem {
   song: SongInfo;
   action: PlayAction;
   startTimeMs?: number;
+  // The handle of the viewer who asked for it
+  by?: string;
 }
 
 interface QueueHooks {
@@ -96,8 +98,8 @@ export class MusicQueue extends TokioEmitter {
     }
   }
 
-  public enqueue(id: string, song: SongInfo, action: PlayAction) {
-    this._queue.push({ id, song, action });
+  public enqueue(id: string, song: SongInfo, action: PlayAction, by?: string) {
+    this._queue.push({ id, song, action, by });
     this._trimQueue();
     this.play();
   }
@@ -152,6 +154,20 @@ export class MusicQueue extends TokioEmitter {
 
     this._queue = kept;
     this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
+  }
+
+  // The track is playing or waiting
+  public has(track: string) {
+    return this._queue.some(
+      (item, index) => index >= this._currentIndex && item.song.track === track,
+    );
+  }
+
+  // One of the viewer's requests is waiting
+  public waits(by: string) {
+    return this._queue.some(
+      (item, index) => index > this._currentIndex && item.by === by,
+    );
   }
 
   public async triggerNext() {
