@@ -75,7 +75,7 @@ Set them up from the gallery on the **Overlays** page: colors, text, the gifts t
 - **Profiles**: keep separate settings for different streams. Create a blank profile or clone an existing one, and switch between them from the title bar.
 - **TikTok LIVE**: your [Euler Stream](https://www.eulerstream.com) API key. Euler Stream signs Tokio's connection to TikTok LIVE, and each user brings their own key: [sign up](https://www.eulerstream.com/register) for free and paste it here. Your [plan](https://www.eulerstream.com/pricing) sets how often you can connect.
 - **Voice engines**: optionally add your TikTok session ID. With it, the TikTok voices come straight from TikTok. Without it, they go through `tiktok-tts.weilnet.workers.dev`, a proxy run by a third party, which gets the text of every message they read.
-- **Overlay server**: turn the local server for overlays on or off. It also shows your computer's network address, for OBS on another computer (see [Adding an overlay](#adding-an-overlay)).
+- **Overlay server**: turn the local server for overlays on or off. It also shows your computer's network address, for a streaming app on another computer (see [Adding an overlay](#adding-an-overlay)).
 - **Updates**: Tokio checks GitHub for new releases on startup and every few hours, downloads them in the background and installs them when you restart from the title bar. On macOS, where the app isn't signed, the button opens the release page instead. Turn automatic checks off in Settings, or check any time from About.
 - **Notifications**: when something fails, such as a voice that can't be generated, a sound that's missing or a change that couldn't be saved, Tokio tells you what went wrong. The bell in the title bar keeps the session's history.
 
@@ -132,7 +132,12 @@ TikTok LIVE Studio doesn't accept `localhost` links, so overlays use their own a
 
 **On another computer**
 
-If OBS runs on another computer on your network, it can't use `tokio-app.local`, which points to the computer it's on. Use the address shown in **Settings → Overlay Server** instead, for example `http://192.168.1.20:37891/<overlay-id>/` in place of `http://tokio-app.local:37891/<overlay-id>/`. The overlay gets its events from Tokio on your computer.
+If your streaming app runs on another computer on your network, `tokio-app.local` there points to that computer. Point it to the one Tokio runs on instead, at the address shown in **Settings → Overlay Server**:
+
+- On the other computer, add a line with that address and `tokio-app.local` to its hosts file, for example `192.168.1.20 tokio-app.local`. The file is `C:\Windows\System32\drivers\etc\hosts` on Windows and `/etc/hosts` on macOS and Linux, and you edit it as administrator.
+- Or add a DNS entry for `tokio-app.local` with that address on your router.
+
+The overlay URLs then work there as they are, and the overlays get their events from Tokio.
 
 The first time the server starts, Windows may ask whether to allow Tokio through the firewall. Allow it, or the other computer can't connect.
 

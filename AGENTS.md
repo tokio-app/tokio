@@ -194,7 +194,7 @@ The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`)
 - Run `yarn format` on files you touch, and fix lint warnings in code you touch.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `feat!:`), enforced by a husky hook and by CI on pull requests. Don't bypass hooks.
 - Keep the server port (`37891`), the alerts' overlay path (`/alerts/<alert id>/`) and existing event names stable; overlays, browser sources and saved data depend on them.
-- The overlay server listens on every network interface on purpose: OBS on another computer opens overlays at this PC's address (Settings → Overlay Server, `ServerService.networkAddresses()`), and the setup block's `REMOTE_SOCKET` points their socket back at it. Don't bind it to loopback or add Host/Origin checks.
+- The overlay server listens on every network interface on purpose: a streaming app on another computer opens overlays through `tokio-app.local` pointed at this PC's address (shown in Settings → Overlay Server, `ServerService.networkAddresses()`) in that computer's hosts file or a DNS entry, and the setup block's `REMOTE_SOCKET` points their socket back at this PC. Don't bind it to loopback or add Host/Origin checks.
 - Respect inline `NOTE: DO NOT CHANGE` markers.
 - Inside a folder with a barrel `index` (`common/types`, `common/schemas`, `components`, `context`, `hooks`), import sibling files directly, never through the barrel, to avoid import cycles.
 - `npx fallow health` (also `dead-code`, `dupes`) reports import cycles, dead code and duplication. It reads `.fallowrc.json`, where the music window UI is an entry point.
