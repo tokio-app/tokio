@@ -517,7 +517,7 @@ describe("overlays events", () => {
         },
       });
 
-    it("saves the settings with main's gifts and answers with them", async () => {
+    it("saves the settings with main's gifts, answers with them and sends them to the overlay", async () => {
       const saved = { title: "Gift Jar", goal: 100 };
       const saveConfig = vi.fn(
         async (_id: string, _config: OverlayConfig, _gifts: CustomGift[]) => ({
@@ -525,8 +525,9 @@ describe("overlays events", () => {
           data: saved,
         }),
       );
+      const send = vi.fn((_id: string, _payload: TokioPayload) => {});
       const h = createHandler({
-        overlayService: { getGifts: async () => gifts, saveConfig },
+        overlayService: { getGifts: async () => gifts, saveConfig, send },
       });
 
       await h.invoke(overlays, APP_EVENTS.SAVE_OVERLAY_CONFIG, request);
@@ -539,6 +540,10 @@ describe("overlays events", () => {
       expect(h.replies(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG)).toEqual([
         { success: true, data: saved, id: "gift-jar" },
       ]);
+      expect(send).toHaveBeenCalledExactlyOnceWith("gift-jar", {
+        type: "tokio:config",
+        data: saved,
+      });
       expect(h.notices).toEqual([
         expect.objectContaining({
           level: "success",

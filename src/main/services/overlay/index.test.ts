@@ -250,6 +250,52 @@ describe("OverlayService", () => {
       expect(await readJSON("gifts.json")).toEqual([...gifts, lion]);
     });
 
+    it("doesn't write back the settings a gift refresh read before a save", async () => {
+      // With a gift setting, so new gift details change the HTML.
+      await overlay(join(folder, "title"), {
+        "info.yaml": info("Title", true),
+        "config.yaml": [
+          config("Saved"),
+          "  - name: Gift",
+          "    id: gift",
+          "    section: main",
+          "    type: gifts",
+          "    attributes: { value: 1, default: 1 }",
+        ].join("\n"),
+        "index.html": `<body>${SETUP}</body>`,
+      });
+      stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
+      await service.load(gifts);
+      const changed = (await service.getConfig("title")).data!;
+      const field = changed.fields[0];
+      if (field.type !== "input") throw new Error("Expected an input field");
+      field.attributes.value = "Changed";
+      // The refresh holds its write, with the settings it read, until the
+      // save had time to finish.
+      const write = vi.mocked(processHTML).getMockImplementation()!;
+      let resume!: () => void;
+      const held = new Promise<void>((resolve) => (resume = resolve));
+      vi.mocked(processHTML).mockClear();
+      vi.mocked(processHTML).mockImplementationOnce(async (...args) => {
+        await held;
+        return write(...args);
+      });
+
+      const moved = [{ ...gifts[0], img: "rose.png" }];
+      const refresh = service.refreshGifts(moved);
+      await vi.waitFor(() => expect(processHTML).toHaveBeenCalled());
+      const save = service.saveConfig("title", changed, moved);
+      await Promise.race([save, new Promise((r) => setTimeout(r, 100))]);
+      resume();
+      await Promise.all([refresh, save]);
+
+      expect(
+        await readFile(join(folder, "title", "index.html"), "utf-8"),
+      ).toContain(
+        `window.__OVERLAY_CONFIG__ = {"title":"Changed","gift":{"value":1,"label":"Rose","img":"rose.png","coins":1}}`,
+      );
+    });
+
     it("leaves the overlays alone when the gifts didn't change", async () => {
       await configurable(join(folder, "title"));
       stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
@@ -728,6 +774,8 @@ describe("OverlayService", () => {
 
       vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
       publish(release("1.0.1", { "new.js": "2" }));
+      // It reads the saved settings inside the overlay's lock, so it finishes
+      // only when that read doesn't wait on the lock.
       expect(await service.installFromCatalog("gift-jar", gifts)).toEqual(done);
 
       // No staging folder or old copy is left.

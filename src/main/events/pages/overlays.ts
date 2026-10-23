@@ -229,6 +229,8 @@ events.push(
       data: res.data,
       id,
     });
+    // From here, so the live overlays get it even when the page has closed.
+    overlayService.send(id, { type: "tokio:config", data: res.data! });
     notifier.success(
       "overlays",
       FEEDBACK_CODES.OVERLAY_SAVED,
