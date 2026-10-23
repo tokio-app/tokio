@@ -80,6 +80,9 @@ const AlertSchema = z.object({
     type: AlertTriggerSchema,
     // Only used by gift alerts. Empty means any gift.
     gifts: z.array(z.number()),
+    // Only used by gift alerts. Plays once for each gift sent, instead of once
+    // when the viewer's streak ends.
+    every_gift: z.boolean().default(false),
     // Only used by emote alerts. Empty means any emote.
     emotes: z.array(z.string()).default([]),
     // Only used by chat alerts. Empty means any message.

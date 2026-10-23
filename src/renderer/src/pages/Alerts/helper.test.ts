@@ -17,6 +17,7 @@ describe("createAlert", () => {
       trigger: {
         type: TOKIO_EVENTS.FOLLOW,
         gifts: [],
+        every_gift: false,
         emotes: [],
         keyword: "",
         user: "",

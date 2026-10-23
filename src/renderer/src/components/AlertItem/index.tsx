@@ -28,6 +28,12 @@ const TRIGGER_OPTIONS = ALERT_TRIGGERS.map((value) => ({
   label: ALERT_TRIGGER_LABELS[value],
 })) as SelectOption<Trigger>[];
 
+// When a gift alert plays, see every_gift
+const GIFT_PLAYS: SelectOption<"streak" | "gift">[] = [
+  { value: "streak", label: "When streak ends" },
+  { value: "gift", label: "Every gift" },
+];
+
 type FilterProps = {
   alert: Alert;
   gifts: CustomGift[];
@@ -42,12 +48,23 @@ function TriggerFilter({ alert, gifts, emotes, onChange }: FilterProps) {
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
       return (
-        <GiftMultiSelect
-          placeholder="Any gift"
-          gifts={gifts}
-          value={trigger.gifts}
-          onChange={(ids) => onChange({ ...trigger, gifts: ids })}
-        />
+        <div className={styles.stack}>
+          <GiftMultiSelect
+            placeholder="Any gift"
+            gifts={gifts}
+            value={trigger.gifts}
+            onChange={(ids) => onChange({ ...trigger, gifts: ids })}
+          />
+          <Select
+            className={styles.fill}
+            aria-label="When it plays"
+            options={GIFT_PLAYS}
+            value={trigger.every_gift ? "gift" : "streak"}
+            onChange={(plays) =>
+              onChange({ ...trigger, every_gift: plays === "gift" })
+            }
+          />
+        </div>
       );
     case EMOTE_TRIGGER:
       return (

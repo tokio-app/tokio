@@ -53,6 +53,7 @@ const trigger = (
 ): Alert["trigger"] => ({
   type,
   gifts: [],
+  every_gift: false,
   emotes: [],
   keyword: "",
   user: "",
@@ -86,7 +87,11 @@ const settings = (items: Alert[], simultaneous = false): AlertProfile => ({
 
 const user = { username: "Viewer", handle: "viewer", profilePictures: [] };
 
-const gift = (id: string, repeatEnd: boolean): GiftEvent => ({
+const gift = (
+  id: string,
+  repeatEnd: boolean,
+  patch: Partial<GiftEvent["gift"]> = {},
+): GiftEvent => ({
   user,
   gift: {
     id,
@@ -96,6 +101,7 @@ const gift = (id: string, repeatEnd: boolean): GiftEvent => ({
     name: "Rose",
     comboCount: 1,
     image: "",
+    ...patch,
   },
 });
 
@@ -293,6 +299,100 @@ describe("AlertsService", () => {
         await run(TOKIO_EVENTS.GIFT, gift("5655", true), alerts),
       ).toHaveLength(1);
       expect(await run(TOKIO_EVENTS.GIFT, gift("1", true), alerts)).toEqual([]);
+    });
+
+    describe("on every gift", () => {
+      const everyGift = settings([
+        alert({ trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }) }),
+      ]);
+      // A streak's update, and the event that ends it
+      const update = (comboCount: number) =>
+        gift("5655", false, { comboCount });
+      const end = (comboCount: number) => gift("5655", true, { comboCount });
+
+      // How many times the alerts play for each event, in order
+      const plays = async (events: GiftEvent[], alerts = everyGift) => {
+        const counts: number[] = [];
+        for (const event of events) {
+          counts.push((await run(TOKIO_EVENTS.GIFT, event, alerts)).length);
+        }
+        return counts;
+      };
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("plays once for each gift sent, as the gift jar counts them", async () => {
+        // The same count again is the gift sent again, a count that grows adds
+        // the growth, and the end adds nothing
+        expect(await plays([update(1), update(1), update(3), end(3)])).toEqual([
+          1, 1, 2, 0,
+        ]);
+      });
+
+      it("plays for gifts only the streak's end has", async () => {
+        expect(await plays([update(1), end(2)])).toEqual([1, 1]);
+      });
+
+      it("skips an update that came late, not a new streak", async () => {
+        expect(await plays([update(5), update(4)])).toEqual([5, 0]);
+
+        vi.advanceTimersByTime(2000);
+        expect(await plays([update(2)])).toEqual([2]);
+      });
+
+      it("plays once for a gift that can't be sent in a streak", async () => {
+        const galaxy = gift("11046", true, { type: 2 });
+
+        expect(await plays([galaxy, galaxy])).toEqual([1, 1]);
+      });
+
+      it("counts each viewer's streak apart", async () => {
+        const other = (comboCount: number): GiftEvent => ({
+          ...update(comboCount),
+          user: { ...user, username: "Other", handle: "other" },
+        });
+
+        expect(await plays([update(1), other(1), update(2), other(3)])).toEqual(
+          [1, 1, 1, 2],
+        );
+      });
+
+      it("keeps counting while no alert plays on every gift", async () => {
+        const atEnd = settings([
+          alert({ trigger: trigger(TOKIO_EVENTS.GIFT) }),
+        ]);
+
+        expect(await plays([update(1), update(2)], atEnd)).toEqual([0, 0]);
+        expect(await plays([update(3)])).toEqual([1]);
+      });
+
+      it("plays no more times than the queue takes", async () => {
+        expect(await plays([update(250)])).toEqual([100]);
+      });
+
+      it("leaves alerts on the streak's end playing once, when it ends", async () => {
+        const items = [
+          alert({
+            id: "every",
+            trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
+          }),
+          alert({ id: "end", trigger: trigger(TOKIO_EVENTS.GIFT) }),
+        ];
+        const ids = async (event: GiftEvent) =>
+          (await run(TOKIO_EVENTS.GIFT, event, settings(items))).map(
+            (a) => a.id,
+          );
+
+        expect(await ids(update(1))).toEqual(["every"]);
+        expect(await ids(update(2))).toEqual(["every"]);
+        expect(await ids(end(2))).toEqual(["end"]);
+      });
     });
 
     it("fires chat alerts without a keyword on every message", async () => {
@@ -541,6 +641,25 @@ describe("AlertsService", () => {
         ]);
         // So the window decodes it once too
         expect(sent[1].key).toBe(sent[0].key);
+      });
+
+      it("makes one message for the gifts an update adds, on every gift", async () => {
+        const everyGift = {
+          ...speaking("Thanks {username}"),
+          trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
+        };
+
+        await speak(
+          gift("5655", false, { comboCount: 3 }),
+          withTts([everyGift]),
+        );
+
+        expect(generateBuffer).toHaveBeenCalledOnce();
+        expect(sent.map(said)).toEqual([
+          "Thanks Viewer",
+          "Thanks Viewer",
+          "Thanks Viewer",
+        ]);
       });
 
       it("makes one message at a time, with the TTS cooldown between them", async () => {
