@@ -8,7 +8,7 @@ import {
 } from "@/common/types";
 import { defaultStoreData } from "@/common/util";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ACTIVITY_LIMIT, LiveService } from "./index";
+import { ACTIVITY_LIMIT, JOIN_LIMIT, LiveService } from "./index";
 
 const viewer = (handle: string, patch: Partial<UserData> = {}): UserData => ({
   username: `${handle} name`,
@@ -96,10 +96,11 @@ describe("LiveService", () => {
     });
   });
 
-  it("counts a gift once per combo, when the combo ends", () => {
+  it("counts a combo's gifts as they come, and lists it when it ends", () => {
     expect(
       live.record(TOKIO_EVENTS.GIFT, gift({ comboCount: 3, repeatEnd: false })),
-    ).toBe(false);
+    ).toBe(true);
+    expect(live.getSession().totals).toMatchObject({ gifts: 3, coins: 3 });
     expect(live.getSession().activity).toEqual([]);
 
     expect(
@@ -107,7 +108,7 @@ describe("LiveService", () => {
     ).toBe(true);
 
     const session = live.getSession();
-    expect(session.totals).toMatchObject({ gifts: 5, coins: 10 });
+    expect(session.totals).toMatchObject({ gifts: 5, coins: 7 });
     expect(session.activity).toEqual([
       {
         id: 1,
@@ -116,6 +117,37 @@ describe("LiveService", () => {
         gift: { name: "Rose", image: "rose.png", count: 5, coins: 10 },
       },
     ]);
+  });
+
+  it("counts a gift sent again at the same count, like the gift jar", () => {
+    for (const comboCount of [1, 1, 3]) {
+      live.record(TOKIO_EVENTS.GIFT, gift({ comboCount, repeatEnd: false }));
+    }
+    // The closing event adds nothing, but lists the combo
+    expect(live.record(TOKIO_EVENTS.GIFT, gift({ comboCount: 3 }))).toBe(true);
+
+    const session = live.getSession();
+    expect(session.totals).toMatchObject({ gifts: 4, coins: 4 });
+    expect(session.activity).toEqual([
+      expect.objectContaining({ gift: expect.objectContaining({ count: 4 }) }),
+    ]);
+  });
+
+  it("changes nothing for a combo's late update", () => {
+    live.record(TOKIO_EVENTS.GIFT, gift({ comboCount: 5, repeatEnd: false }));
+
+    expect(
+      live.record(TOKIO_EVENTS.GIFT, gift({ comboCount: 3, repeatEnd: false })),
+    ).toBe(false);
+    expect(live.getSession().totals).toMatchObject({ gifts: 5 });
+  });
+
+  it("starts the combos over with the next LIVE", () => {
+    live.record(TOKIO_EVENTS.GIFT, gift({ comboCount: 5, repeatEnd: false }));
+    live.start();
+    live.record(TOKIO_EVENTS.GIFT, gift({ comboCount: 5 }));
+
+    expect(live.getSession().totals).toMatchObject({ gifts: 5 });
   });
 
   it("counts a gift without a combo count as one", () => {
@@ -179,6 +211,16 @@ describe("LiveService", () => {
 
     expect(join(live, "ren")).toBe(false);
     expect(live.getSession().activity[0]).toMatchObject({ count: 3 });
+  });
+
+  it(`starts another join item after ${JOIN_LIMIT} viewers`, () => {
+    for (let n = 0; n < JOIN_LIMIT; n++) join(live, `viewer${n}`);
+
+    expect(join(live, "viewer0")).toBe(true);
+    expect(live.getSession().activity).toEqual([
+      { id: 2, type: "join", users: [shown("viewer0")], count: 1 },
+      expect.objectContaining({ id: 1, count: JOIN_LIMIT }),
+    ]);
   });
 
   it("counts viewers without a handle every time they join", () => {

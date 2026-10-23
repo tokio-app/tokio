@@ -659,12 +659,9 @@ describe("init events", () => {
       vi.useFakeTimers();
       const s = await live();
       connect(s);
-      const combo = giftEvent("5655", "Rose");
-      combo.gift.repeatEnd = false;
 
       s.conn.emit(TOKIO_EVENTS.LIKE, like(5));
       s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(10, 1));
-      s.conn.emit(TOKIO_EVENTS.GIFT, combo);
       vi.advanceTimersByTime(1000);
 
       expect(sessions(s)).toHaveLength(1);
