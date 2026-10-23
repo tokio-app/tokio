@@ -75,6 +75,10 @@ const CLEAR_MEDIA = "tokio:alert:clear";
 
 // Node fires timeouts longer than 2^31 ms at once.
 const MAX_SECONDS = 24 * 60 * 60;
+
+// A lower count this soon after a streak's last update is an update that came
+// late, not a new streak. TikTok ends a streak 3 to 4 s after its last gift.
+const LATE_MS = 2000;
 const clamp = (value: number, max: number) => Math.min(Math.max(value, 0), max);
 
 // Bytes of sounds kept in memory. Bigger sounds are refused, and ones saved
@@ -107,6 +111,8 @@ export class AlertsService extends Service {
   private _speech = new TaskQueue();
   // Bumped by clearSpeech, so a message made after it is dropped
   private _speechRun = 0;
+  // Each viewer's streak of a gift: the last count TikTok sent, and when
+  private _streaks = new Map<string, { last: number; at: number }>();
 
   public setLogFile(logFile: string): void {
     this._logFile = logFile;
@@ -367,16 +373,23 @@ export class AlertsService extends Service {
     onError?: (alert: Alert, error?: string) => void,
   ) {
     const settings = profile.alerts;
+    // Once per event, whichever alerts it plays
+    const added = this._countGifts(type, payload);
     for (const alert of settings.items) {
-      if (!this._matches(alert, type, payload)) continue;
+      if (!this._matches(alert, type, payload, added)) continue;
 
+      // An alert on every gift plays once for each, as many as the queue takes
+      const times =
+        alert.trigger.type === TOKIO_EVENTS.GIFT && alert.trigger.every_gift
+          ? Math.min(added, settings.queue_length)
+          : 1;
       // By the alert's trigger, emote alerts come with chat events.
       const channel = settings.simultaneous
         ? `alerts:${alert.trigger.type}`
         : "alerts";
       const { tts, sound, media } = alert;
-      const play = (data?: Uint8Array, key?: string) =>
-        send({
+      const play = (data?: Uint8Array, key?: string) => {
+        const audio: AlertAudio = {
           data,
           volume: alert.volume,
           channel,
@@ -385,7 +398,9 @@ export class AlertsService extends Service {
           key,
           filters: tts ? { speed: tts.speed, pitch: tts.pitch } : undefined,
           media: media ?? undefined,
-        });
+        };
+        for (let i = 0; i < times; i++) send(audio);
+      };
 
       // A message is spoken instead of the sound.
       if (tts) {
@@ -490,6 +505,8 @@ export class AlertsService extends Service {
     alert: Alert,
     type: AppEvents,
     payload: TokioEventMap[AppEvents],
+    // The gifts a gift event adds, see _countGifts
+    added: number,
   ) {
     if (!alert.enabled || (!alert.sound && !alert.tts && !alert.media)) {
       return false;
@@ -533,13 +550,46 @@ export class AlertsService extends Service {
       "gift" in payload
     ) {
       const { gift } = payload;
-      // Fire once per combo, not on every combo tick.
-      if (!gift.repeatEnd) return false;
-      const gifts = alert.trigger.gifts;
-      return gifts.length === 0 || gifts.includes(Number(gift.id));
+      const { gifts, every_gift } = alert.trigger;
+      if (gifts.length > 0 && !gifts.includes(Number(gift.id))) return false;
+      // Once when the streak ends, or once for each gift sent
+      return every_gift ? added > 0 : gift.repeatEnd;
     }
 
     return true;
+  }
+
+  /**
+   * How many gifts a gift event adds to its sender's streak, counted like the
+   * gift jar overlay: TikTok sends a streak as events whose count grows, then
+   * one that ends it. A count that grows adds the growth, the same count again
+   * before the end is the gift sent again, and a lower one within LATE_MS is an
+   * update that came late. 0 for other events.
+   */
+  private _countGifts(type: AppEvents, payload: TokioEventMap[AppEvents]) {
+    if (
+      type !== TOKIO_EVENTS.GIFT ||
+      typeof payload !== "object" ||
+      payload === null ||
+      !("gift" in payload)
+    ) {
+      return 0;
+    }
+
+    const { user, gift } = payload;
+    const key = `${user.handle || user.username}:${gift.id}`;
+    const count = Math.max(1, gift.comboCount);
+    const streak = this._streaks.get(key);
+    const now = Date.now();
+    let added = count;
+    if (streak && (count >= streak.last || now - streak.at < LATE_MS)) {
+      if (count > streak.last) added = count - streak.last;
+      else if (count < streak.last || gift.repeatEnd) added = 0;
+    }
+
+    if (gift.repeatEnd) this._streaks.delete(key);
+    else if (added > 0) this._streaks.set(key, { last: count, at: now });
+    return added;
   }
 
   private async _fetchPage(

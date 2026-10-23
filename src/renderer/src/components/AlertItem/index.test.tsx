@@ -239,6 +239,21 @@ describe("AlertItem", () => {
     expect(within(container).queryByText("GG")).not.toBeInTheDocument();
   });
 
+  it("plays a gift alert when the streak ends, or on every gift", async () => {
+    const item = alert({}, { type: TOKIO_EVENTS.GIFT });
+    const { user, container, onChange } = setup(item);
+    const plays = screen.getByRole("combobox", { name: "When it plays" });
+    expect(plays).toHaveTextContent("When streak ends");
+
+    await user.click(plays);
+    await user.click(inList(container, "Every gift")!);
+
+    expect(onChange).toHaveBeenCalledWith({
+      ...item,
+      trigger: { ...item.trigger, every_gift: true },
+    });
+  });
+
   it("narrows an emote alert to the emotes picked", async () => {
     const item = alert({}, { type: EMOTE_TRIGGER, emotes: ["emote-1"] });
     const { user, container, onChange } = setup(item);
@@ -302,6 +317,9 @@ describe("AlertItem", () => {
 
     expect(filters()).toEqual([]);
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "When it plays" }),
+    ).not.toBeInTheDocument();
   });
 
   it("names its sound, or asks for one", async () => {

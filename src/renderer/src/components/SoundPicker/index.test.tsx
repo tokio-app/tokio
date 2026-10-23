@@ -456,6 +456,23 @@ describe("SoundPicker", () => {
       expect(message()).toHaveValue("Thanks {username}");
     });
 
+    it("has no count for a gift alert on every gift", async () => {
+      const base = alert({}, TOKIO_EVENTS.GIFT);
+      await openTts({
+        ...base,
+        trigger: { ...base.trigger, every_gift: true },
+      });
+
+      for (const name of ["username", "handle", "gift"]) {
+        expect(
+          screen.getByRole("button", { name: `{${name}}` }),
+        ).toBeInTheDocument();
+      }
+      expect(
+        screen.queryByRole("button", { name: "{count}" }),
+      ).not.toBeInTheDocument();
+    });
+
     it("says when the trigger has no variables", async () => {
       await openTts(alert({}, TOKIO_EVENTS.ENVELOPE));
 

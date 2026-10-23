@@ -143,7 +143,7 @@ export function SoundPicker({
         {speaking && (
           <TtsTab
             alertId={id}
-            trigger={alert.trigger.type}
+            trigger={alert.trigger}
             value={tts}
             onChange={setTts}
             testing={testing}

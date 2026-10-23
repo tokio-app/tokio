@@ -1,5 +1,5 @@
-import { AlertTts } from "@/common/schemas";
-import { AlertTrigger } from "@/common/types";
+import { Alert, AlertTts } from "@/common/schemas";
+import { TOKIO_EVENTS } from "@/common/types";
 import { ALERT_MESSAGE_VARIABLES } from "@/common/util";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useRef } from "react";
@@ -18,7 +18,7 @@ import styles from "./soundpicker.module.css";
 type Props = {
   // Id of the alert, the test is named after it
   alertId: string;
-  trigger: AlertTrigger;
+  trigger: Alert["trigger"];
   value: AlertTts;
   onChange: (tts: AlertTts) => void;
   testing: TestState;
@@ -35,6 +35,11 @@ export function TtsTab({
 }: Props) {
   const messageRef = useRef<HTMLInputElement>(null);
   const testId = `${alertId}:tts`;
+  // An alert on every gift speaks for each one, it has no count to say.
+  const variables =
+    trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
+      ? ALERT_MESSAGE_VARIABLES[trigger.type].filter((name) => name !== "count")
+      : ALERT_MESSAGE_VARIABLES[trigger.type];
 
   return (
     <div className={styles.tts}>
@@ -53,14 +58,14 @@ export function TtsTab({
               onTest({
                 id: testId,
                 tts: value,
-                trigger,
+                trigger: trigger.type,
                 volume: PREVIEW_VOLUME,
               })
             }
           />
         </div>
         <VariableList
-          variables={ALERT_MESSAGE_VARIABLES[trigger]}
+          variables={variables}
           inputRef={messageRef}
           value={value.message}
           onChange={(message) => onChange({ ...value, message })}

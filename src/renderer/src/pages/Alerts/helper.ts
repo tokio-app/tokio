@@ -9,6 +9,7 @@ export function createAlert(): Alert {
     trigger: {
       type: TOKIO_EVENTS.FOLLOW,
       gifts: [],
+      every_gift: false,
       emotes: [],
       keyword: "",
       user: "",
