@@ -27,7 +27,7 @@ function setup(props: Partial<Props> = {}) {
     library: [],
     testing: null,
     onTest: vi.fn(),
-    onRequest: vi.fn(),
+    onRequest: vi.fn(() => 4),
     onSelect: vi.fn(),
     onRemove: vi.fn(),
     ...props,
@@ -284,7 +284,7 @@ describe("MyInstantsTab", () => {
     await user.click(row("Bruh").getByRole("button", { name: /Download/ }));
 
     expect(sent(APP_EVENTS.DOWNLOAD_SOUND)).toEqual([
-      { id: "alert-1", url: BRUH.url, name: "Bruh" },
+      { id: "alert-1", request: 4, url: BRUH.url, name: "Bruh" },
     ]);
     expect(onRequest).toHaveBeenCalledOnce();
     expect(downloads()).toHaveLength(2);
@@ -295,6 +295,14 @@ describe("MyInstantsTab", () => {
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
       id: "alert-2",
+      request: 4,
+      sound: alertSound("Bell"),
+    });
+    // A browsed file's reply for the alert
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+      success: true,
+      id: "alert-1",
+      request: 3,
       sound: alertSound("Bell"),
     });
     expect(remove).toBeDisabled();
@@ -302,6 +310,7 @@ describe("MyInstantsTab", () => {
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       ...failure(),
       id: "alert-1",
+      request: 4,
     });
     for (const button of [...downloads(), remove]) {
       expect(button).toBeEnabled();

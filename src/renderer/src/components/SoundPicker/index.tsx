@@ -3,7 +3,7 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { DeleteSoundModal } from "../DeleteModals";
 import { Btn, Tabs } from "../Elements";
 import { Modal } from "../Modal";
@@ -30,7 +30,8 @@ type Props = {
   testing: TestState;
   onTest: (req: AlertTestRequest) => void;
   // Asks main to save a sound for the alert, which replies SET_ALERT_SOUND
-  onRequest: () => void;
+  // with the request number this returns
+  onRequest: () => number;
   // Picks a sound from the library, which is already saved
   onSelect: (sound: AlertSound) => void;
   // Speaks a message instead of a sound
@@ -57,6 +58,9 @@ export function SoundPicker({
   const [tab, setTab] = useState<Tab | null>(alert.tts ? "tts" : null);
   const [library, setLibrary] = useState<AlertSound[]>([]);
   const [saveFailed, setSaveFailed] = useState(false);
+  // The newest request sent, the only one whose failure is shown
+  const latest = useRef(0);
+  const request = () => (latest.current = onRequest());
   const [tts, setTts] = useState<AlertTts>(
     () => alert.tts ?? { ...ttsDefaults, message: "" },
   );
@@ -73,7 +77,9 @@ export function SoundPicker({
 
   // Downloads and browsed files both report here.
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, (res) => {
-    if (res?.id === id) setSaveFailed(!res.success);
+    if (res?.id === id && res.request === latest.current) {
+      setSaveFailed(!res.success);
+    }
   });
 
   const speaking = tab === "tts";
@@ -107,8 +113,10 @@ export function SoundPicker({
               <Btn
                 variant="accent"
                 onClick={() => {
-                  onRequest();
-                  window.api.emit(APP_EVENTS.IMPORT_SOUND, { id });
+                  window.api.emit(APP_EVENTS.IMPORT_SOUND, {
+                    id,
+                    request: request(),
+                  });
                 }}
               >
                 Browse file...
@@ -136,7 +144,7 @@ export function SoundPicker({
           library={library}
           testing={testing}
           onTest={onTest}
-          onRequest={onRequest}
+          onRequest={request}
           onSelect={onSelect}
           onRemove={setRemoving}
         />

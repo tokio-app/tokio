@@ -257,13 +257,16 @@ export interface AppEventsMap {
     query?: string;
     page: number;
   };
+  // `request` comes back on SET_ALERT_SOUND, so the page keeps the newest pick
   [APP_EVENTS.DOWNLOAD_SOUND]: {
     id: string;
+    request: number;
     url: string;
     name: string;
   };
   [APP_EVENTS.IMPORT_SOUND]: {
     id: string;
+    request: number;
   };
   [APP_EVENTS.IMPORT_MEDIA]: {
     id: string;

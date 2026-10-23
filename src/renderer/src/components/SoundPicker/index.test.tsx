@@ -45,9 +45,10 @@ function setup(
   item = alert(),
   props: Partial<ComponentProps<typeof SoundPicker>> = {},
 ) {
+  let requests = 0;
   const handlers = {
     onTest: vi.fn(),
-    onRequest: vi.fn(),
+    onRequest: vi.fn(() => ++requests),
     onSelect: vi.fn(),
     onSelectTts: vi.fn(),
     onClear: vi.fn(),
@@ -177,7 +178,9 @@ describe("SoundPicker", () => {
 
     await user.click(screen.getByRole("button", { name: "Browse file..." }));
 
-    expect(sent(APP_EVENTS.IMPORT_SOUND)).toEqual([{ id: "alert-1" }]);
+    expect(sent(APP_EVENTS.IMPORT_SOUND)).toEqual([
+      { id: "alert-1", request: 1 },
+    ]);
     expect(onRequest).toHaveBeenCalledOnce();
   });
 
@@ -253,11 +256,13 @@ describe("SoundPicker", () => {
   });
 
   it("says when a sound for this alert couldn't be saved", async () => {
-    setup();
+    const { user } = setup();
+    await user.click(screen.getByRole("button", { name: "Browse file..." }));
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       ...failure(),
       id: "alert-2",
+      request: 1,
     });
     expect(
       screen.queryByText("Couldn't save that sound."),
@@ -266,17 +271,42 @@ describe("SoundPicker", () => {
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       ...failure(),
       id: "alert-1",
+      request: 1,
     });
     expect(screen.getByText("Couldn't save that sound.")).toBeInTheDocument();
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
       id: "alert-1",
+      request: 1,
       sound: alertSound("Airhorn"),
     });
     expect(
       screen.queryByText("Couldn't save that sound."),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows only the failure of the newest request", async () => {
+    const { user } = setup();
+    const browse = screen.getByRole("button", { name: "Browse file..." });
+    await user.click(browse);
+    await user.click(browse);
+
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+      ...failure(),
+      id: "alert-1",
+      request: 1,
+    });
+    expect(
+      screen.queryByText("Couldn't save that sound."),
+    ).not.toBeInTheDocument();
+
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+      ...failure(),
+      id: "alert-1",
+      request: 2,
+    });
+    expect(screen.getByText("Couldn't save that sound.")).toBeInTheDocument();
   });
 
   describe("your sounds", () => {

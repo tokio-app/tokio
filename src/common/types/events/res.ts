@@ -299,6 +299,8 @@ export interface AppEventsResponseMap {
   }>;
   [APP_EVENTS_RESPONSE.SET_ALERT_SOUND]: Reply<{
     id: string;
+    // The DOWNLOAD_SOUND or IMPORT_SOUND request this answers
+    request: number;
     sound?: Alert["sound"];
   }>;
   [APP_EVENTS_RESPONSE.SET_ALERT_MEDIA]: Reply<{

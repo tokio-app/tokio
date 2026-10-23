@@ -23,7 +23,7 @@ events.push(
     const res = await storeManagerService.updateProfileData({
       alerts: settings,
     });
-    if (!res) throw new Error("The alerts settings were not saved.");
+    if (!res) throw new LoggedError("The alerts settings were not saved.");
     e.reply(APP_EVENTS_RESPONSE.UPDATE_ALERTS_SETTINGS, { success: true });
   },
   {
@@ -75,7 +75,7 @@ events.push(
 const addPickedSound = async (
   { storeManagerService, notifier }: AppHandlerVariables,
   e: ReplyEvent,
-  id: string,
+  { id, request }: { id: string; request: number },
   res: AlertsResult<NonNullable<Alert["sound"]>>,
 ) => {
   if (!res.success || !res.data) throw new LoggedError(res.error);
@@ -83,6 +83,7 @@ const addPickedSound = async (
   e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
     success: true,
     id,
+    request,
     sound: res.data,
   });
   notifier.success(
@@ -95,19 +96,20 @@ const addPickedSound = async (
 const replySoundFailure = (
   e: ReplyEvent,
   error: AppError,
-  { id }: { id: string },
+  { id, request }: { id: string; request: number },
 ) =>
   e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
     success: false,
     id,
+    request,
     error,
   });
 
 events.push(
   APP_EVENTS.DOWNLOAD_SOUND,
-  async (services, e, { id, url, name }) => {
+  async (services, e, { id, request, url, name }) => {
     const res = await services.alertsService.downloadSound(url, name);
-    await addPickedSound(services, e, id, res);
+    await addPickedSound(services, e, { id, request }, res);
   },
   {
     notify: false,
@@ -121,7 +123,7 @@ events.push(
 
 events.push(
   APP_EVENTS.IMPORT_SOUND,
-  async (services, e, { id }) => {
+  async (services, e, data) => {
     const diagRes = await showOpenDialog(services.win, {
       title: "Select a sound",
       properties: ["openFile"],
@@ -130,7 +132,7 @@ events.push(
     if (diagRes.canceled || !diagRes.filePaths[0]) return;
 
     const res = await services.alertsService.importSound(diagRes.filePaths[0]);
-    await addPickedSound(services, e, id, res);
+    await addPickedSound(services, e, data, res);
   },
   {
     notify: false,

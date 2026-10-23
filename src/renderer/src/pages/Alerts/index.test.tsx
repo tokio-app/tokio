@@ -570,6 +570,7 @@ describe("Alerts", () => {
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
       id: "alert-1",
+      request: 1,
       sound: bell,
     });
 
@@ -583,10 +584,12 @@ describe("Alerts", () => {
   it("keeps the picker open when main couldn't save the sound", async () => {
     const { user } = await load([alert("alert-1")]);
     await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await user.click(browse());
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       ...failure(),
       id: "alert-1",
+      request: 1,
     });
 
     expect(screen.getByRole("dialog")).toHaveTextContent(
@@ -611,6 +614,7 @@ describe("Alerts", () => {
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
       id: "alert-1",
+      request: 1,
       sound: bell,
     });
 
@@ -633,12 +637,56 @@ describe("Alerts", () => {
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
       id: "alert-1",
+      request: 1,
       sound: alertSound("Bruh"),
     });
 
     expect(rows()[0].getByRole("button", { name: "Bell" })).toBeInTheDocument();
     await wait(300);
     expect(saves().at(-1)?.items[0]).toEqual(alert("alert-1", { sound: bell }));
+  });
+
+  it.each([
+    ["in order", [1, 2]],
+    ["the later one first", [2, 1]],
+  ])("uses the later of two picks whose replies come %s", async (_, order) => {
+    const { user } = await load([alert("alert-1")]);
+    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await user.click(browse());
+    await download(user);
+    const sounds = [bell, alertSound("Bruh")];
+
+    for (const request of order) {
+      await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+        success: true,
+        id: "alert-1",
+        request,
+        sound: sounds[request - 1],
+      });
+    }
+
+    expect(rows()[0].getByRole("button", { name: "Bruh" })).toBeInTheDocument();
+    await wait(300);
+    expect(saves().at(-1)?.items[0]).toEqual(
+      alert("alert-1", { sound: alertSound("Bruh") }),
+    );
+  });
+
+  it("still uses a download after a browse was cancelled", async () => {
+    const { user } = await load([alert("alert-1")]);
+    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await download(user);
+    // Main sends no reply for a cancelled dialog
+    await user.click(browse());
+
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+      success: true,
+      id: "alert-1",
+      request: 1,
+      sound: alertSound("Bruh"),
+    });
+
+    expect(rows()[0].getByRole("button", { name: "Bruh" })).toBeInTheDocument();
   });
 
   it("tests an alert's sound or message", async () => {
