@@ -168,9 +168,9 @@ describe("AudioQueue", () => {
     queue.setQueueOptions({ maxQueueLength: 2, gapTime: 0.5 });
     queue.setFilters({ speed: 2 });
 
-    expect(queue.wait(3)).toBe(true);
+    expect(await queue.wait(3)).toBe(true);
     expect(await queue.enqueue(bytes())).toBe(true);
-    expect(queue.wait(3)).toBe(false);
+    expect(await queue.wait(3)).toBe(false);
     expect(warn).toHaveBeenCalled();
 
     // The queue's speed doesn't shorten a wait.
@@ -179,8 +179,80 @@ describe("AudioQueue", () => {
 
     // Silent places of the same length share one buffer.
     tone.players[0].finish();
-    expect(queue.wait(3)).toBe(true);
+    expect(await queue.wait(3)).toBe(true);
     expect(tone.players[2].url).toBe(tone.players[0].url);
+  });
+
+  it("keeps a silent place behind a sound still decoding", async () => {
+    const queue = new AudioQueue();
+    queue.setQueueOptions({ gapTime: 0.5 });
+    const decoded = held();
+
+    const sound = queue.enqueue(bytes());
+    const silent = queue.wait(3);
+    await Promise.resolve();
+    expect(tone.players).toHaveLength(0);
+
+    decoded();
+    expect(await Promise.all([sound, silent])).toEqual([true, true]);
+    // The sound, then the silence
+    expect(tone.players.map((p) => p.startedAt)).toEqual([10, 12.5]);
+    expect(tone.players[1].playbackRate).toBe(1);
+  });
+
+  it("plays sounds in the order they came, however long each decodes", async () => {
+    const queue = new AudioQueue();
+    const first = audio();
+    let decoded!: () => void;
+    tone.decode.mockReturnValueOnce(
+      new Promise((resolve) => {
+        decoded = () => resolve(first);
+      }),
+    );
+
+    const slow = queue.enqueue(bytes());
+    const quick = queue.enqueue(bytes());
+    // The quick one waits for its turn
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(tone.players).toHaveLength(0);
+
+    decoded();
+    await Promise.all([slow, quick]);
+    expect(tone.players.map((p) => [p.url === first, p.startedAt])).toEqual([
+      [true, 10],
+      [false, 12],
+    ]);
+  });
+
+  it("handles a failed decode behind one still decoding", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const queue = new AudioQueue();
+    const decoded = held();
+    tone.decode.mockRejectedValueOnce(new Error("Unable to decode"));
+
+    const first = queue.enqueue(bytes());
+    const failed = queue.enqueue(bytes());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    decoded();
+
+    expect(await failed).toBe(false);
+    expect(await first).toBe(true);
+    expect(error).toHaveBeenCalledOnce();
+    // The chain goes on
+    expect(await queue.enqueue(bytes())).toBe(true);
+    expect(tone.players).toHaveLength(2);
+  });
+
+  it("doesn't keep later sounds waiting for ones dropped on stop", async () => {
+    const queue = new AudioQueue();
+    held();
+
+    // Its decode never finishes
+    void queue.enqueue(bytes());
+    queue.stop();
+
+    expect(await queue.enqueue(bytes())).toBe(true);
+    expect(tone.players).toHaveLength(1);
   });
 
   it("counts sounds still decoding, so it never decodes one that doesn't fit", async () => {
@@ -264,6 +336,19 @@ describe("AudioQueue", () => {
 
     queue.setFilters({ volume: -1 });
     expect(tone.gains[0].gain.value).toBe(0);
+  });
+
+  it("keeps a sound's own speed and pitch in range", async () => {
+    const queue = new AudioQueue();
+    queue.setQueueOptions({ gapTime: 0 });
+
+    await queue.enqueue(bytes(), { speed: 0, pitch: 9 });
+    await queue.enqueue(bytes());
+
+    expect(tone.players[0].playbackRate).toBe(0.5);
+    expect(tone.players[0].detune).toBe(1200);
+    // Its place lasts the slowed down sound
+    expect(tone.players[1].startedAt).toBe(14);
   });
 
   it("changes playing sounds, except the ones with their own speed and pitch", async () => {

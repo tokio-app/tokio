@@ -86,6 +86,9 @@ export function forgetDecoded(cacheKey: string) {
   decodedBytes -= entry.bytes;
 }
 
+// Speed and pitch, as rates of the sound's own
+const clampRate = (value: number) => Math.max(0.5, Math.min(value, 2));
+
 // Silent places for wait(), by length, shared by every queue. 8 kHz, the
 // lowest rate browsers must take, keeps a minute under 2 MB.
 const SILENCE_RATE = 8000;
@@ -105,8 +108,11 @@ export class AudioQueue {
   private gainNode: Tone.Gain;
   // Scheduled or playing
   private active: ActiveItem[] = [];
-  // Sounds being decoded, which already hold their place
+  // Items waiting for their place, while decoding or behind one that is
   private decoding: number = 0;
+  // The last item to get its place: each one waits for the one before, so
+  // they play in the order they came, however long each takes to decode
+  private tail: Promise<unknown> = Promise.resolve();
   // Bumped by stop(), so audio still decoding from before is dropped
   private generation: number = 0;
   private nextPlayTime: number = 0;
@@ -134,11 +140,11 @@ export class AudioQueue {
     }
 
     if (filters.speed !== undefined) {
-      this.currentFilters.speed = Math.max(0.5, Math.min(filters.speed, 2.0));
+      this.currentFilters.speed = clampRate(filters.speed);
     }
 
     if (filters.pitch !== undefined) {
-      this.currentFilters.pitch = Math.max(0.5, Math.min(filters.pitch, 2.0));
+      this.currentFilters.pitch = clampRate(filters.pitch);
     }
 
     this.active.forEach(({ player, ownFilters }) => {
@@ -157,61 +163,84 @@ export class AudioQueue {
     this.gapTime = options.gapTime ?? 0;
   }
 
-  async enqueue(
+  enqueue(
     input: Uint8Array | ArrayBuffer,
     { cacheKey, ...item }: EnqueueOptions = {},
-  ) {
+  ): Promise<boolean> {
     if (this.pending() >= this.maxQueueLength) {
       console.warn("AudioQueue: Max queue length reached. Ignoring input.");
-      return false;
+      return Promise.resolve(false);
     }
 
-    const generation = this.generation;
-    // Held while decoding, so a full queue never decodes
-    this.decoding++;
+    let audioData: ArrayBuffer;
+    if (
+      input instanceof Uint8Array &&
+      input.byteOffset === 0 &&
+      input.byteLength === input.buffer.byteLength &&
+      input.buffer instanceof ArrayBuffer
+    ) {
+      // IPC hands over a view of its own buffer, so it's decoded without a copy.
+      audioData = input.buffer;
+    } else if (input instanceof Uint8Array) {
+      audioData = input.slice().buffer;
+    } else {
+      audioData = input;
+    }
 
+    // Started at once, so copies that come next share the cache entry, and
+    // while earlier items still wait for theirs
+    let decoding: Promise<AudioBuffer>;
     try {
-      let audioData: ArrayBuffer;
-
-      if (
-        input instanceof Uint8Array &&
-        input.byteOffset === 0 &&
-        input.byteLength === input.buffer.byteLength &&
-        input.buffer instanceof ArrayBuffer
-      ) {
-        // IPC hands over a view of its own buffer, so it's decoded without a copy.
-        audioData = input.buffer;
-      } else if (input instanceof Uint8Array) {
-        audioData = input.slice().buffer;
-      } else {
-        audioData = input;
-      }
-
-      const buffer = await decode(audioData, cacheKey);
-      if (generation !== this.generation) return false;
-
-      this.schedule(buffer, item);
-      return true;
+      decoding = decode(audioData, cacheKey);
     } catch (error) {
-      console.error("Failed to decode Tone audio:", error);
-      return false;
-    } finally {
-      // stop() already gave the places back
-      if (generation === this.generation) this.decoding--;
+      decoding = Promise.reject(error);
     }
+    // Reported when its turn comes, not as unhandled while it waits
+    decoding.catch(() => {});
+    return this.place(() => decoding, item);
   }
 
   /**
    * Holds a silent place in the queue, like an alert that only shows an
    * image. Speed changes don't stretch it.
    */
-  wait(seconds: number, options: EnqueueOptions = {}) {
+  wait(seconds: number, options: EnqueueOptions = {}): Promise<boolean> {
     if (this.pending() >= this.maxQueueLength) {
       console.warn("AudioQueue: Max queue length reached. Ignoring input.");
-      return false;
+      return Promise.resolve(false);
     }
-    this.schedule(silence(seconds), { ...options, speed: 1, pitch: 1 });
-    return true;
+    return this.place(() => silence(seconds), {
+      ...options,
+      speed: 1,
+      pitch: 1,
+    });
+  }
+
+  // Gives the item its place after the items that came before it. Never
+  // rejects, so the chain goes on.
+  private place(
+    audio: () => AudioBuffer | Promise<AudioBuffer>,
+    item: EnqueueOptions,
+  ): Promise<boolean> {
+    const generation = this.generation;
+    // Held while waiting, so a full queue never decodes
+    this.decoding++;
+    const placed = this.tail.then(async () => {
+      try {
+        const buffer = await audio();
+        if (generation !== this.generation) return false;
+        this.schedule(buffer, item);
+        return true;
+      } catch (error) {
+        console.error("Failed to decode Tone audio:", error);
+        return false;
+      } finally {
+        // stop() already gave the places back
+        if (generation === this.generation) this.decoding--;
+      }
+    });
+    this.tail = placed;
+    return placed;
   }
 
   /**
@@ -226,6 +255,8 @@ export class AudioQueue {
   stop() {
     this.generation++;
     this.decoding = 0;
+    // Later items don't wait for the dropped ones
+    this.tail = Promise.resolve();
     this.nextPlayTime = 0;
 
     const active = this.active;
@@ -259,8 +290,8 @@ export class AudioQueue {
   // Plays the sound after the ones already scheduled.
   private schedule(buffer: AudioBuffer, next: EnqueueOptions) {
     const { gain = 1, key, onEnded, minDuration = 0, onScheduled } = next;
-    const speed = next.speed ?? this.currentFilters.speed;
-    const pitch = next.pitch ?? this.currentFilters.pitch;
+    const speed = clampRate(next.speed ?? this.currentFilters.speed);
+    const pitch = clampRate(next.pitch ?? this.currentFilters.pitch);
 
     if (this.nextPlayTime < Tone.now()) {
       this.nextPlayTime = Tone.now();

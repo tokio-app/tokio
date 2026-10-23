@@ -37,7 +37,5 @@ export function queueAlert(
         volume,
       }),
   };
-  return data
-    ? queue.enqueue(data, item)
-    : Promise.resolve(queue.wait(media.duration, item));
+  return data ? queue.enqueue(data, item) : queue.wait(media.duration, item);
 }
