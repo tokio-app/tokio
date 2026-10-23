@@ -5,6 +5,10 @@ import { SapiHost } from "./host";
 // The real script in PowerShell, which host.test.ts mocks away. Machines like
 // CI's may have few voices, so no voice in particular is needed.
 describe.runIf(process.platform === "win32")("the SAPI script", () => {
+  // A CI runner busy with the other test files can take longer than the app
+  // allows to load PowerShell and the speech engines. Only this file's copy of
+  // the config changes.
+  config.START_TIMEOUT_MS = 90_000;
   const host = new SapiHost();
 
   afterAll(() => host.dispose());
