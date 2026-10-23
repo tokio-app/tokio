@@ -32,6 +32,7 @@ paths:
   - Descriptions there are a few words, not explanations.
   - `Section` wraps the content in `.section_body`, which is `display: contents` in the stacked layout.
 - `TitleBar`'s `live` prop (Layout passes the connection) draws the tally on every page: a rose line at the top's center, fading out to both sides. "LIVE" is said only to screen readers.
+- The sidebar shows icons only. Each page's name is a span in its link, shown beside the icon on hover and keyboard focus. Opacity hides it, not `visibility`, so it still names the link. Escape hides it until the pointer or focus moves to another link (WCAG 1.4.13).
 
 ## Keyboard
 

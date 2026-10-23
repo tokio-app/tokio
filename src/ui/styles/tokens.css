@@ -58,7 +58,7 @@
   --control-height-lg: 44px;
 
   /* The main window's sidebar; the title bar centers the logo over it */
-  --rail-width: 60px;
+  --rail-width: 48px;
 
   /* Elevation */
   --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.45);
