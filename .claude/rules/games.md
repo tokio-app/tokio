@@ -52,7 +52,14 @@ The **Games** page (`/games`, after Music) connects Minecraft Bedrock to Tokio. 
 ## Renderer
 
 - `pages/Games`: `MinecraftSection` (toggle, status, the setup steps, then a `/connect` command per address of this PC, the first with a caret that blinks while waiting; the setup hides once connected) and `ActionsSection`. `TriggerFilter` and `TRIGGER_OPTIONS` come from `components/AlertItem`; gifts and emotes load as on Alerts.
-- `MOBS` and `ITEMS` (`helper.ts`) are Bedrock ids checked in the game; add one only after trying it there (`testfor @e[type=<id>]` and `clear @p <id> 0 0` count without changing the world, and an unknown id is a syntax error). Some differ from Java's: Bedrock has `web` (Cobweb), `evocation_illager` (Evoker) and `zombie_pigman` (Zombified Piglin), which the Java mod will need mapped.
+- `MOBS` and `ITEMS` (`helper.ts`) come from `pages/Games/minecraft.json`, id → English name, sorted by name. To regenerate it after a game update:
+  - **Ids:** Mojang's `bedrock-samples` metadata: `metadata/vanilladata_modules/mojang-entities.json` and `mojang-items.json`, kept to the values of the `EntityType` and `Item` enums in `metadata/command_modules/mojang-commands.json` (what `summon` and `give` take).
+  - **Left out:**
+    - mobs: projectiles, boats and minecarts, the armor stand, `npc` and `cushion`;
+    - items: command, structure, barrier, jigsaw and light blocks, and Education's `allow`, `deny` and `border_block`.
+  - **Names:** the game's `en_US.lang`: `entity.<id>.name`, the item's `serialization_id`, `item.<id>.name` or `tile.<id>.name`, otherwise the id in title case. `tnt` is "Primed TNT".
+  - **Check:** run every id in the game, with `testfor @e[type=<id>]` and `clear @p <id> 0 0`, which count without changing the world. An unknown id is a syntax error. The current list is 1.26.50, all 1,689 known.
+  - **Java's ids differ for some:** Bedrock has `web` (Cobweb), `evocation_illager` (Evoker) and `zombie_pigman` (Zombified Piglin), which the Java mod will need mapped.
 - Actions save through `useEditableSettings("games")`; the toggle emits `SET_GAMES_SETTINGS` at once.
 
 ## Tests
