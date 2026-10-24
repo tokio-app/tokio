@@ -15,6 +15,7 @@ import {
 import {
   ALERTS_PATH,
   formatError,
+  MINECRAFT_PORT,
   SERVER_PORT,
   TIMER_PATH,
   timerTriggers,
@@ -106,6 +107,7 @@ const registerConnectorEvents = ({
   ttsService: tts,
   musicService: music,
   alertsService: alerts,
+  gamesService: games,
   overlayService: overlays,
   liveService: live,
   pathManagerService: paths,
@@ -156,17 +158,39 @@ const registerConnectorEvents = ({
     );
   };
 
+  // Whatever features are on: games run while their connection is on.
+  const dispatchGames = async <K extends AppEvents>(
+    type: K,
+    payload: TokioEventMap[K],
+  ) => {
+    const profile = await store.getProfileData();
+    if (!profile) return;
+    await games.handle(type, payload, profile.games);
+  };
+
   for (const trigger of ALERT_TRIGGERS) {
-    // Not a live event, AlertsService matches emote alerts on chat events.
+    // Not a live event, the services match emote triggers on chat events.
     if (trigger === EMOTE_TRIGGER) continue;
     const listener = (d: TokioEventMap[typeof trigger]) => {
+      const label = ALERT_TRIGGER_LABELS[trigger];
       dispatchAlert(trigger, d).catch((error) => {
         notifier.report({
           source: "alerts",
           error,
           fallback: {
             code: FEEDBACK_CODES.ALERT_FAILED,
-            message: `Unable to play the ${ALERT_TRIGGER_LABELS[trigger]} alert.`,
+            message: `Unable to play the ${label} alert.`,
+          },
+          context: trigger,
+        });
+      });
+      dispatchGames(trigger, d).catch((error) => {
+        notifier.report({
+          source: "games",
+          error,
+          fallback: {
+            code: FEEDBACK_CODES.GAME_ACTION_FAILED,
+            message: `Unable to run the ${label} game action.`,
           },
           context: trigger,
         });
@@ -388,6 +412,57 @@ const registerConnectorEvents = ({
   });
 };
 
+// The Games page follows the connections, and their failures become notices.
+const registerGames = ({
+  connectorService: conn,
+  gamesService: games,
+  storeManagerService: store,
+  pathManagerService: paths,
+  win,
+  notifier,
+}: AppHandlerVariables) => {
+  games.onStatus((status) => {
+    if (win.isDestroyed()) return;
+    win.webContents.send(APP_EVENTS_RESPONSE.GAMES, {
+      success: true,
+      data: { settings: store.getSettings().games, status },
+    });
+  });
+  // Logged once per notice, as they can repeat on every event
+  games.onError((action, { offline, message }) => {
+    const label = ALERT_TRIGGER_LABELS[action.trigger.type];
+    if (offline) {
+      if (
+        notifier.warn(
+          "games",
+          FEEDBACK_CODES.GAME_NOT_CONNECTED,
+          `Minecraft isn't connected, so the ${label} action didn't run. Type /connect localhost:${MINECRAFT_PORT} in the game's chat.`,
+          { key: "game:minecraft:offline", windowMs: 60_000 },
+        )
+      ) {
+        Logger.warn(
+          `<Games> The ${label} action didn't run, Minecraft isn't connected.`,
+          paths.files.logs.games,
+        );
+      }
+    } else if (
+      notifier.warn(
+        "games",
+        FEEDBACK_CODES.GAME_COMMAND_FAILED,
+        `A command of the ${label} action failed in Minecraft: ${message}`,
+        { key: `game:${action.id}`, windowMs: REPEAT_NOTICE_MS },
+      )
+    ) {
+      Logger.warn(
+        `<Games> A command of the ${label} action failed -- ${message}`,
+        paths.files.logs.games,
+      );
+    }
+  });
+  // Gift streaks' ends may be missed
+  conn.on(TOKIO_EVENTS.DISCONNECTED, () => games.clear());
+};
+
 // The countdown timer takes time from live events whatever features are on.
 // The Tools page and the timer's overlay follow it.
 const registerTimer = ({
@@ -493,6 +568,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     updaterService,
     liveService,
     timerService,
+    gamesService,
     notifier,
   } = handler;
 
@@ -513,6 +589,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       updaterService.setLogFile(files.logs.system);
       liveService.setLogFile(files.logs.connector);
       timerService.setLogFile(files.logs.system);
+      gamesService.setLogFile(files.logs.games);
       notifier.setLogFiles(files.logs);
       alertsService.setSoundsFolder(folders.soundsFolder);
       alertsService.setMediaFolder(folders.mediaFolder);
@@ -555,6 +632,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     serverService.initEvents(connectorService, musicService);
     registerConnectorEvents(handler);
     registerTimer(handler);
+    registerGames(handler);
   }
 
   const settings = storeManagerService.getSettings();
@@ -605,6 +683,18 @@ const startApp = async (handler: AppHandlerVariables) => {
       ),
     });
     await storeManagerService.updateServerSettings(false);
+  }
+
+  // Unlike the server, the setting stays on: the page shows the status.
+  if (!(await gamesService.configure(settings.games))) {
+    notifier.report({
+      source: "games",
+      error: new AppFailure(
+        FEEDBACK_CODES.GAME_LISTEN_FAILED,
+        `Tokio couldn't listen for Minecraft, port ${MINECRAFT_PORT} may be in use.`,
+        { level: "warning" },
+      ),
+    });
   }
 
   return settings;
