@@ -1,4 +1,5 @@
 import { CommandResult, GameStatus } from "@/common/types";
+import { MINECRAFT_JAVA_PROTOCOL } from "@/common/util";
 import {
   Cipheriv,
   createCipheriv,
@@ -48,17 +49,18 @@ async function listen(options?: { timeoutMs?: number; handshakeMs?: number }) {
 
 /**
  * Plays the game: answers the encryption request with its three frames, then
- * answers each command with `reply` (null holds the answer).
+ * answers each command with `reply` (null holds the answer). With
+ * `protocols`, it offers those instead, like the Java mod.
  */
 async function game(
   port: number,
-  { encrypt = true }: { encrypt?: boolean } = {},
+  {
+    encrypt = true,
+    // The game offers wsencrypt when it requires encryption
+    protocols = encrypt ? [WSENCRYPT] : [],
+  }: { encrypt?: boolean; protocols?: string[] } = {},
 ) {
-  // The game offers this subprotocol when it requires encryption
-  const socket = new WebSocket(
-    `ws://127.0.0.1:${port}//`,
-    encrypt ? [WSENCRYPT] : [],
-  );
+  const socket = new WebSocket(`ws://127.0.0.1:${port}//`, protocols);
   sockets.push(socket);
   let cipher: Cipheriv | undefined;
   let decipher: Decipheriv | undefined;
@@ -67,6 +69,7 @@ async function game(
   const fake = {
     socket,
     requests,
+    handshakes: 0,
     reply: (request: Request): Body | null => ({
       statusCode: 0,
       statusMessage: `Ran ${request.commandLine}`,
@@ -90,6 +93,7 @@ async function game(
       body.commandLine,
     );
     if (handshake) {
+      fake.handshakes++;
       if (encrypt)
         answerHandshake(header.requestId, handshake[1], handshake[2]);
       return;
@@ -167,6 +171,10 @@ describe("MinecraftConnection", () => {
     const fake = await game(connection.port);
     await connected(connection);
     expect(fake.socket.protocol).toBe(WSENCRYPT);
+    expect(connection.status).toEqual({
+      state: "connected",
+      edition: "bedrock",
+    });
 
     // A missed third frame would desync the stream and garble this answer
     expect(await connection.send("execute as @p at @s run say hi")).toEqual({
@@ -186,6 +194,44 @@ describe("MinecraftConnection", () => {
 
     expect((await connection.send("time set day")).ok).toBe(true);
     expect(fake.requests[0].binary).toBe(false);
+  });
+
+  it("connects Java Edition at once, with no handshake, and runs commands as plain text", async () => {
+    const { connection, statuses } = await listen();
+    const fake = await game(connection.port, {
+      protocols: [MINECRAFT_JAVA_PROTOCOL],
+    });
+    expect(fake.socket.protocol).toBe(MINECRAFT_JAVA_PROTOCOL);
+    await connected(connection);
+    expect(connection.status).toEqual({ state: "connected", edition: "java" });
+
+    expect(await connection.send("give @s minecraft:diamond 1")).toEqual({
+      command: "give @s minecraft:diamond 1",
+      ok: true,
+      message: "Ran give @s minecraft:diamond 1",
+    });
+    expect(fake.handshakes).toBe(0);
+    expect(fake.requests).toEqual([
+      expect.objectContaining({ version: 42, binary: false }),
+    ]);
+    expect(statuses).toEqual([
+      { state: "waiting" },
+      { state: "connected", edition: "java" },
+    ]);
+  });
+
+  it("picks Java Edition's protocol when offered with others", async () => {
+    const { connection } = await listen();
+    const fake = await game(connection.port, {
+      protocols: [WSENCRYPT, MINECRAFT_JAVA_PROTOCOL],
+    });
+    expect(fake.socket.protocol).toBe(MINECRAFT_JAVA_PROTOCOL);
+    await vi.waitFor(() =>
+      expect(connection.status).toEqual({
+        state: "connected",
+        edition: "java",
+      }),
+    );
   });
 
   it("maps the game's answers", async () => {
@@ -296,18 +342,40 @@ describe("MinecraftConnection", () => {
     });
   });
 
-  it("replaces the game with a new connection", async () => {
+  it("replaces the game with a new connection, telling the old one why", async () => {
     const { connection } = await listen();
     const first = await game(connection.port);
     await connected(connection);
+    first.reply = () => null;
+    const pending = connection.send("say lost");
+    await vi.waitFor(() => expect(first.requests).toHaveLength(1));
     const closed = once(first.socket, "close");
 
     const second = await game(connection.port);
-    await closed;
+    const [code, reason] = await closed;
+    expect(code).toBe(4000);
+    expect(String(reason)).toBe("Another game connected to Tokio.");
+    expect(await pending).toMatchObject({
+      ok: false,
+      message: "Minecraft disconnected.",
+    });
     await connected(connection);
     expect((await connection.send("say hi")).ok).toBe(true);
-    expect(first.requests).toEqual([]);
     expect(second.requests).toHaveLength(1);
+  });
+
+  it("goes from one edition to the other when Java replaces Bedrock", async () => {
+    const { connection, statuses } = await listen();
+    await game(connection.port);
+    await connected(connection);
+    await game(connection.port, { protocols: [MINECRAFT_JAVA_PROTOCOL] });
+    await vi.waitFor(() => expect(connection.status.edition).toBe("java"));
+
+    expect(statuses).toEqual([
+      { state: "waiting" },
+      { state: "connected", edition: "bedrock" },
+      { state: "connected", edition: "java" },
+    ]);
   });
 
   it("refuses connections that carry an Origin, as browsers send", async () => {
@@ -342,7 +410,7 @@ describe("MinecraftConnection", () => {
     });
   });
 
-  it("drops the game and its commands when turned off", async () => {
+  it("drops the game and its commands when turned off, telling the game why", async () => {
     const { connection } = await listen();
     const fake = await game(connection.port);
     await connected(connection);
@@ -354,8 +422,13 @@ describe("MinecraftConnection", () => {
     const closed = once(fake.socket, "close");
     expect(await connection.setEnabled(false)).toBe(true);
 
-    await closed;
-    expect(await result).toMatchObject({ ok: false });
+    const [code, reason] = await closed;
+    expect(code).toBe(1001);
+    expect(String(reason)).toBe("Minecraft was turned off in Tokio.");
+    expect(await result).toMatchObject({
+      ok: false,
+      message: "Minecraft disconnected.",
+    });
     expect(connection.status).toEqual({ state: "off" });
     // The port is free again
     const server = createServer().listen(port);

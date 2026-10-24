@@ -1,5 +1,6 @@
+import { MinecraftEdition } from "@/common/schemas";
 import { CommandResult, GameStatus } from "@/common/types";
-import { MINECRAFT_PORT } from "@/common/util";
+import { MINECRAFT_JAVA_PROTOCOL, MINECRAFT_PORT } from "@/common/util";
 import {
   Cipheriv,
   createCipheriv,
@@ -21,6 +22,7 @@ type Options = {
 
 type Game = {
   socket: WebSocket;
+  edition: MinecraftEdition;
   // Handshake done (or skipped): commands can be sent
   ready: boolean;
   handshake?: NodeJS.Timeout;
@@ -33,6 +35,9 @@ type Command = {
   resolve: (result: CommandResult) => void;
   timer?: NodeJS.Timeout;
 };
+
+// Why Tokio closed a game's socket, so the Java mod can tell the player
+type Close = { code: number; reason: string };
 
 type Frame = {
   header?: { requestId?: string; messagePurpose?: string };
@@ -55,6 +60,14 @@ const MAX_IN_FLIGHT = 50;
 const MAX_WAITING = 500;
 // Body version 42 parses today's syntax (execute … run); 1 doesn't
 const COMMAND_VERSION = 42;
+const REPLACED: Close = {
+  code: 4000,
+  reason: "Another game connected to Tokio.",
+};
+const TURNED_OFF: Close = {
+  code: 1001,
+  reason: "Minecraft was turned off in Tokio.",
+};
 
 const request = (requestId: string, commandLine: string, version: number) =>
   JSON.stringify({
@@ -75,12 +88,15 @@ const failed = (command: string, message: string): CommandResult => ({
 
 /**
  * Minecraft connects to Tokio, not the other way round: while enabled,
- * Tokio listens on `port`, and the game joins with `/connect <address>:<port>`
- * from its chat. Commands run as the player who connected.
+ * Tokio listens on `port`. Bedrock joins with `/connect <address>:<port>`
+ * from its chat; Java Edition through the Tokio mod, which offers the
+ * `MINECRAFT_JAVA_PROTOCOL` subprotocol. Commands run as the player who
+ * connected.
  *
  * Statuses: off while disabled; waiting while listening with no game;
- * connected once the game's handshake is done; waiting again when it leaves.
- * When the port is taken: error "Port <port> is in use."
+ * connected, with the game's edition, once Bedrock's handshake is done or as
+ * soon as Java joins; waiting again when it leaves. When the port is taken:
+ * error "Port <port> is in use."
  */
 export class MinecraftConnection {
   private _status: GameStatus = { state: "off" };
@@ -155,6 +171,11 @@ export class MinecraftConnection {
         // Browsers always send an Origin and the game never does, so no web
         // page can take the socket.
         verifyClient: ({ req }) => req.headers.origin === undefined,
+        // Otherwise the first offered, as ws does: Bedrock's wsencrypt
+        handleProtocols: (protocols) =>
+          protocols.has(MINECRAFT_JAVA_PROTOCOL)
+            ? MINECRAFT_JAVA_PROTOCOL
+            : (protocols.values().next().value ?? false),
       });
       this._wss = wss;
 
@@ -190,7 +211,7 @@ export class MinecraftConnection {
     const wss = this._wss;
     this._wss = null;
     this._listening = null;
-    this._drop();
+    this._drop(TURNED_OFF);
     this._set({ state: "off" });
     return new Promise((resolve) =>
       wss ? wss.close(() => resolve()) : resolve(),
@@ -201,11 +222,24 @@ export class MinecraftConnection {
     // A bad frame would otherwise throw in main; "close" follows it.
     socket.on("error", () => {});
     // A new game replaces the old one
-    this._drop();
-    this._set({ state: "waiting" });
-
-    const game: Game = { socket, ready: false };
+    this._drop(REPLACED);
+    const edition =
+      socket.protocol === MINECRAFT_JAVA_PROTOCOL ? "java" : "bedrock";
+    const game: Game = { socket, edition, ready: false };
     this._game = game;
+    socket.on("close", () => {
+      if (this._game !== game) return;
+      this._drop();
+      if (this._wss) this._set({ state: "waiting" });
+    });
+
+    // The Tokio mod doesn't encrypt: frames are plain text both ways
+    if (edition === "java") {
+      socket.on("message", (data: Buffer) => this._answer(this._parse(data)));
+      return this._ready(game);
+    }
+
+    this._set({ state: "waiting" });
 
     const ecdh = createECDH("secp384r1");
     const publicKey = Buffer.concat([SPKI_PREFIX, ecdh.generateKeys()]);
@@ -235,11 +269,6 @@ export class MinecraftConnection {
       }
       this._ready(game);
     });
-    socket.on("close", () => {
-      if (this._game !== game) return;
-      this._drop();
-      if (this._wss) this._set({ state: "waiting" });
-    });
 
     const key = JSON.stringify(publicKey.toString("base64"));
     const saltText = JSON.stringify(salt.toString("base64"));
@@ -254,16 +283,18 @@ export class MinecraftConnection {
     clearTimeout(game.handshake);
     if (this._game !== game || game.ready) return;
     game.ready = true;
-    this._set({ state: "connected" });
+    this._set({ state: "connected", edition: game.edition });
   }
 
-  // Forgets the game, failing the commands it had
-  private _drop() {
+  // Forgets the game, failing the commands it had. With `close`, the game
+  // hears why (ws terminates the socket if the game never answers it).
+  private _drop(close?: Close) {
     const game = this._game;
     if (!game) return;
     this._game = null;
     clearTimeout(game.handshake);
-    game.socket.terminate();
+    if (close) game.socket.close(close.code, close.reason);
+    else game.socket.terminate();
     const commands = [...this._inFlight.values(), ...this._waiting];
     this._inFlight.clear();
     this._waiting.length = 0;
@@ -334,7 +365,8 @@ export class MinecraftConnection {
   private _set(status: GameStatus) {
     if (
       this._status.state === status.state &&
-      this._status.error === status.error
+      this._status.error === status.error &&
+      this._status.edition === status.edition
     ) {
       return;
     }
