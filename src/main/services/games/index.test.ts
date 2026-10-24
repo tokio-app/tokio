@@ -1,4 +1,9 @@
-import { GameAction, GameStep, Trigger } from "@/common/schemas";
+import {
+  GameAction,
+  GameStep,
+  MinecraftEdition,
+  Trigger,
+} from "@/common/schemas";
 import {
   ChatEvent,
   CommandResult,
@@ -12,11 +17,16 @@ import { describe, expect, it, vi } from "vitest";
 import { GamesService, MAX_COMMANDS } from "./index";
 
 // Stands in for the game's WebSocket: records the commands, answers each
-// with `answer`
-const fakeMinecraft = (state: GameStatus["state"] = "connected") => {
+// with `answer`. Connected, it's the edition's game.
+const fakeMinecraft = (
+  state: GameStatus["state"] = "connected",
+  edition: MinecraftEdition = "bedrock",
+) => {
   let listener: ((status: GameStatus) => void) | undefined;
   const fake = {
-    status: { state } as GameStatus,
+    status: (state === "connected"
+      ? { state, edition }
+      : { state }) as GameStatus,
     sent: [] as string[],
     answer: (command: string): CommandResult => ({
       command,
@@ -106,15 +116,21 @@ describe("GamesService", () => {
 
     minecraft.set({ state: "waiting" });
     minecraft.set({ state: "waiting" });
+    minecraft.set({ state: "connected", edition: "bedrock" });
+    minecraft.set({ state: "connected", edition: "java" });
     minecraft.set({ state: "error", error: "Port 37892 is in use." });
 
     expect(listener.mock.calls).toEqual([
       [{ minecraft: { state: "waiting" } }],
       [{ minecraft: { state: "waiting" } }],
+      [{ minecraft: { state: "connected", edition: "bedrock" } }],
+      [{ minecraft: { state: "connected", edition: "java" } }],
       [{ minecraft: { state: "error", error: "Port 37892 is in use." } }],
     ]);
     expect(info.mock.calls).toEqual([
       ["<Games> Minecraft is waiting for the game.", "games.log"],
+      ["<Games> Minecraft is connected (Bedrock Edition).", "games.log"],
+      ["<Games> Minecraft is connected (Java Edition).", "games.log"],
       ["<Games> Minecraft can't work: Port 37892 is in use.", "games.log"],
     ]);
     expect(games.status()).toEqual({
@@ -168,6 +184,41 @@ describe("GamesService", () => {
         offline: true,
         message: "Turn on Minecraft and connect the game first.",
       });
+    });
+
+    it("runs only the actions of the connected game's edition", async () => {
+      const minecraft = fakeMinecraft("connected", "java");
+      const games = service(minecraft);
+      const onError = vi.fn();
+      games.onError(onError);
+      const bedrock = action({
+        id: "bedrock",
+        steps: [{ type: "give", item: "diamond", amount: 1 }],
+      });
+      await games.handle(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+        {
+          actions: [
+            bedrock,
+            action({
+              id: "java",
+              edition: "java",
+              steps: [{ type: "give", item: "diamond", amount: 1 }],
+            }),
+          ],
+        },
+      );
+      expect(minecraft.sent).toEqual(["give @s minecraft:diamond 1"]);
+      expect(onError.mock.calls).toEqual([
+        [
+          bedrock,
+          {
+            offline: true,
+            message: "Connect Minecraft Bedrock Edition first.",
+          },
+        ],
+      ]);
     });
 
     it("reports a command the game refused, once per action", async () => {
@@ -313,6 +364,7 @@ describe("GamesService", () => {
     it("runs the steps once with a sample of the event", async () => {
       const minecraft = fakeMinecraft();
       const res = await service(minecraft).test({
+        edition: "bedrock",
         trigger: EMOTE_TRIGGER,
         steps: [say("say {comment}"), { type: "weather", weather: "rain" }],
       });
@@ -326,6 +378,7 @@ describe("GamesService", () => {
       const minecraft = fakeMinecraft("waiting");
       expect(
         await service(minecraft).test({
+          edition: "bedrock",
           trigger: TOKIO_EVENTS.FOLLOW,
           steps: [say("say hi")],
         }),
@@ -334,6 +387,32 @@ describe("GamesService", () => {
         error: "Turn on Minecraft and connect the game first.",
       });
       expect(minecraft.send).not.toHaveBeenCalled();
+    });
+
+    it("fails with the other edition connected", async () => {
+      const minecraft = fakeMinecraft("connected", "bedrock");
+      expect(
+        await service(minecraft).test({
+          edition: "java",
+          trigger: TOKIO_EVENTS.FOLLOW,
+          steps: [say("say hi")],
+        }),
+      ).toEqual({
+        success: false,
+        error: "Connect Minecraft Java Edition first.",
+      });
+      expect(minecraft.send).not.toHaveBeenCalled();
+    });
+
+    it("runs Java Edition's commands in Java", async () => {
+      const minecraft = fakeMinecraft("connected", "java");
+      const res = await service(minecraft).test({
+        edition: "java",
+        trigger: TOKIO_EVENTS.FOLLOW,
+        steps: [{ type: "spawn", mob: "pig", amount: 1, name: "" }],
+      });
+      expect(res.success).toBe(true);
+      expect(minecraft.sent).toEqual(["summon minecraft:pig ~ ~ ~"]);
     });
   });
 });

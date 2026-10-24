@@ -1,4 +1,10 @@
-import { GameAction, GamesSettings, GameStep, Profile } from "@/common/schemas";
+import {
+  GameAction,
+  GamesSettings,
+  GameStep,
+  MinecraftEdition,
+  Profile,
+} from "@/common/schemas";
 import {
   AlertTrigger,
   AppEvents,
@@ -6,6 +12,7 @@ import {
   EMOTE_TRIGGER,
   GamesStatus,
   GameStatus,
+  MINECRAFT_EDITION_NAMES,
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
@@ -24,8 +31,9 @@ export interface GamesResult<T> {
 }
 
 /**
- * Why an action's commands didn't all run: offline when no game was
- * connected, otherwise the game refused one, with its reply in message.
+ * Why an action's commands didn't all run: offline when no game of the
+ * action's edition was connected, otherwise the game refused one, with its
+ * reply in message.
  */
 export type GameError = { offline: boolean; message: string };
 
@@ -51,7 +59,7 @@ const STATES: Record<GameStatus["state"], string> = {
 
 /**
  * Runs the game actions of the active profile when their trigger fires, in
- * the connected game.
+ * the connected game when it's the action's edition.
  */
 export class GamesService extends Service {
   // Each viewer's streak of a gift, see GiftStreaks
@@ -69,9 +77,14 @@ export class GamesService extends Service {
     _minecraft.onStatus((status) => {
       if (
         status.state !== this._last.state ||
-        status.error !== this._last.error
+        status.error !== this._last.error ||
+        status.edition !== this._last.edition
       ) {
-        const why = status.error ? `: ${status.error}` : ".";
+        const why = status.error
+          ? `: ${status.error}`
+          : status.edition
+            ? ` (${MINECRAFT_EDITION_NAMES[status.edition]}).`
+            : ".";
         Logger.info(
           `<Games> Minecraft ${STATES[status.state]}${why}`,
           this._logFile,
@@ -138,27 +151,34 @@ export class GamesService extends Service {
         action.trigger.type === TOKIO_EVENTS.GIFT && action.trigger.every_gift
           ? Math.min(added, MAX_REPEATS)
           : 1;
-      runs.push(this._run(action, this._commands(action.steps, values, times)));
+      runs.push(
+        this._run(
+          action,
+          this._commands(action.steps, values, times, action.edition),
+        ),
+      );
     }
     await Promise.all(runs);
   }
 
   /** Runs the steps once with a sample of the trigger's event. */
   public async test({
+    edition,
     trigger,
     steps,
   }: {
+    edition: MinecraftEdition;
     trigger: AlertTrigger;
     steps: GameStep[];
   }): Promise<GamesResult<CommandResult[]>> {
-    if (this._minecraft.status.state !== "connected") {
-      return { success: false, error: NOT_CONNECTED };
-    }
+    const unreachable = this._unreachable(edition);
+    if (unreachable) return { success: false, error: unreachable };
     const event = trigger === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : trigger;
     const commands = this._commands(
       steps,
       generateTikTokEventSample(event).data,
       1,
+      edition,
     );
     return { success: true, data: await this._send(commands) };
   }
@@ -168,15 +188,26 @@ export class GamesService extends Service {
     this._streaks.clear();
   }
 
+  // Why the edition's commands can't run: no game, or the other edition's
+  private _unreachable(edition: MinecraftEdition): string | undefined {
+    const status = this._minecraft.status;
+    if (status.state !== "connected") return NOT_CONNECTED;
+    if (status.edition !== edition) {
+      return `Connect Minecraft ${MINECRAFT_EDITION_NAMES[edition]} first.`;
+    }
+    return undefined;
+  }
+
   // The steps' commands, `times` over, at most MAX_COMMANDS
   private _commands(
     steps: GameStep[],
     payload: TokioEventMap[AppEvents],
     times: number,
+    edition: MinecraftEdition,
   ) {
     const fill = (text: string) =>
       formatAlertMessage(text, payload, commandValue);
-    const once = steps.flatMap((step) => gameCommands(step, fill, "bedrock"));
+    const once = steps.flatMap((step) => gameCommands(step, fill, edition));
     const commands: string[] = [];
     for (let i = 0; i < times && commands.length < MAX_COMMANDS; i++) {
       commands.push(...once);
@@ -193,14 +224,16 @@ export class GamesService extends Service {
 
   private async _run(action: GameAction, commands: string[]) {
     if (commands.length === 0) return;
-    if (this._minecraft.status.state !== "connected") {
-      this._onError?.(action, { offline: true, message: NOT_CONNECTED });
+    const unreachable = this._unreachable(action.edition);
+    if (unreachable) {
+      this._onError?.(action, { offline: true, message: unreachable });
       return;
     }
     const failed = (await this._send(commands)).find((result) => !result.ok);
     if (!failed) return;
-    // A game that left midway fails the commands it hadn't answered
-    const offline = this._minecraft.status.state !== "connected";
+    // A game that left or was replaced midway fails the commands it hadn't
+    // answered
+    const offline = this._unreachable(action.edition) !== undefined;
     this._onError?.(action, { offline, message: failed.message });
   }
 }

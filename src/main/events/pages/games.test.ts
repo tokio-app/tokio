@@ -158,14 +158,18 @@ describe("games events", () => {
       steps: [{ type: "command", command: "say hi" }],
     };
 
-    it("replies each command with the game's answer", async () => {
+    it("runs the steps in the action's edition and replies each command with the game's answer", async () => {
       const results = [{ command: "say hi", ok: true, message: "" }];
       const test = vi.fn(async () => ({ success: true, data: results }));
       const h = createHandler({ gamesService: { test } });
 
-      await h.invoke(games, APP_EVENTS.TEST_GAME_ACTION, request);
+      await h.invoke(games, APP_EVENTS.TEST_GAME_ACTION, {
+        ...request,
+        edition: "java",
+      });
 
       expect(test).toHaveBeenCalledWith({
+        edition: "java",
         trigger: request.trigger,
         steps: request.steps,
       });

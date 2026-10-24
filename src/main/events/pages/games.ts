@@ -96,8 +96,8 @@ events.push(
 events.push(
   APP_EVENTS.TEST_GAME_ACTION,
   async ({ gamesService }, e, data) => {
-    const { id, trigger, steps } = TestSchema.parse(data);
-    const res = await gamesService.test({ trigger, steps });
+    const { id, edition, trigger, steps } = TestSchema.parse(data);
+    const res = await gamesService.test({ edition, trigger, steps });
     if (!res.success) {
       throw new AppFailure(
         FEEDBACK_CODES.GAME_TEST_FAILED,
