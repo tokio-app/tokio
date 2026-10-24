@@ -717,14 +717,14 @@ describe("init events", () => {
           source: "games",
           code: FEEDBACK_CODES.GAME_NOT_CONNECTED,
           message:
-            "Minecraft isn't connected, so the Follow action didn't run. Type the /connect command from Games in the game's chat.",
+            "Minecraft Bedrock Edition isn't connected, so the Follow action didn't run. Type the /connect command from Games in the game's chat.",
         }),
       ]);
       vi.advanceTimersByTime(1);
       fail(action, offline);
       expect(s.h.notices).toHaveLength(2);
       const logged = [
-        "<Games> The Follow action didn't run, Minecraft isn't connected.",
+        "<Games> The Follow action didn't run, Minecraft Bedrock Edition isn't connected.",
         "games.log",
       ];
       expect(logWarn.mock.calls).toEqual([logged, logged]);

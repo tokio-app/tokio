@@ -9,6 +9,7 @@ import {
   EMOTE_TRIGGER,
   FEEDBACK_CODES,
   GiftEvent,
+  MINECRAFT_EDITION_NAMES,
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
@@ -432,10 +433,10 @@ const registerGames = ({
   games.onError((action, { offline, message }) => {
     const label = ALERT_TRIGGER_LABELS[action.trigger.type];
     if (offline) {
-      // Java Edition joins through the Tokio mod's command
-      const java = action.edition === "java";
-      const game = java ? "Minecraft Java Edition" : "Minecraft";
-      const connect = java ? "/tokio connect" : "/connect";
+      // Named by edition: the other one may be connected. Java Edition joins
+      // through the Tokio mod's command.
+      const game = `Minecraft ${MINECRAFT_EDITION_NAMES[action.edition]}`;
+      const connect = action.edition === "java" ? "/tokio connect" : "/connect";
       if (
         notifier.warn(
           "games",
