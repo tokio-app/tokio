@@ -25,13 +25,31 @@
   background-color: var(--danger);
 }
 
-/* What to type in the game, until it connects */
+/* What to do in each edition, until a game connects: side by side, stacked
+   when narrow */
 .setup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-6);
   padding-top: var(--space-4);
   border-top: 1px solid var(--border);
+}
+
+.edition {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.edition_name {
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-weight: 600;
+}
+
+.link {
+  color: var(--accent-primary);
 }
 
 /* The chat's cursor, while Tokio waits for the game: the page's one motion */
@@ -81,11 +99,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The /connect commands, one per address of this PC */
+/* The connect commands, one per address of this PC. At the foot of each
+   edition, so both editions' commands line up. */
 .commands {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  margin-top: auto;
 }
 
 /* ACTIONS */

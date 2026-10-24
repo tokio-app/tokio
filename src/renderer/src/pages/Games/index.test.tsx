@@ -5,6 +5,7 @@ import {
   GameStatus,
   TOKIO_EVENTS,
 } from "@/common/types";
+import { MINECRAFT_MOD_DOCS_URL } from "@/common/util";
 import { failure, gift, profileReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { inList, section } from "@test/queries";
@@ -15,7 +16,7 @@ import { Games } from ".";
 import { createAction } from "./helper";
 
 const action = (id: string, patch: Partial<GameAction> = {}): GameAction => ({
-  ...createAction(),
+  ...createAction("bedrock"),
   id,
   ...patch,
 });
@@ -140,56 +141,91 @@ describe("Games", () => {
     ]);
   });
 
-  it("shows how to connect until the game connects", async () => {
+  it("says which edition connected", async () => {
+    setup();
+
+    await status({ state: "connected", edition: "java" });
+    expect(screen.getByText("Connected to Java Edition")).toBeInTheDocument();
+
+    await status({ state: "connected", edition: "bedrock" });
+    expect(
+      screen.getByText("Connected to Bedrock Edition"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows how each edition connects until a game connects", async () => {
     setup();
     await status({ state: "waiting" });
     await send(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, {
       addresses: ["192.168.1.20"],
     });
 
-    const steps = within(screen.getByRole("list")).getAllByRole("listitem");
-    expect(steps.map((step) => step.textContent)).toEqual([
+    const stepsOf = (edition: string) =>
+      within(screen.getByRole("heading", { name: edition }).parentElement!)
+        .getAllByRole("listitem")
+        .map((step) => step.textContent);
+    expect(stepsOf("Bedrock Edition")).toEqual([
       "In Settings → General → Network settings, turn on Enable WebSockets.",
       "Open a world with cheats on.",
       "Paste the command in the chat.",
     ]);
-    const copies = screen.getAllByTitle("Copy the command");
-    expect(copies.map((copy) => copy.textContent)).toEqual([
-      "/connect 192.168.1.20:37892",
+    expect(stepsOf("Java Edition")).toEqual([
+      "Install Fabric Loader and Fabric API for Minecraft 26.3, then the Tokio mod. See how",
+      "Open a world. Cheats can stay off.",
+      "Paste the command in the chat.",
     ]);
+    expect(screen.getByRole("link", { name: "See how" })).toHaveAttribute(
+      "href",
+      MINECRAFT_MOD_DOCS_URL,
+    );
+    expect(
+      screen
+        .getAllByTitle("Copy the Bedrock command")
+        .map((c) => c.textContent),
+    ).toEqual(["/connect 192.168.1.20:37892"]);
+    expect(
+      screen.getAllByTitle("Copy the Java command").map((c) => c.textContent),
+    ).toEqual(["/tokio connect 192.168.1.20:37892"]);
 
-    await status({ state: "connected" });
+    await status({ state: "connected", edition: "java" });
     expect(setupSteps()).not.toBeInTheDocument();
-    expect(screen.queryByTitle("Copy the command")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Java Edition" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/^Copy the/)).not.toBeInTheDocument();
   });
 
   it("falls back to localhost when this PC has no network address", async () => {
     setup();
     await status({ state: "waiting" });
-    expect(screen.queryByTitle("Copy the command")).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/^Copy the/)).not.toBeInTheDocument();
 
     await send(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, { addresses: [] });
 
-    expect(screen.getByTitle("Copy the command")).toHaveTextContent(
+    expect(screen.getByTitle("Copy the Bedrock command")).toHaveTextContent(
       "/connect localhost:37892",
+    );
+    expect(screen.getByTitle("Copy the Java command")).toHaveTextContent(
+      "/tokio connect localhost:37892",
     );
   });
 
-  it("copies the command of each address", async () => {
+  it("copies each edition's command of each address", async () => {
     const { user } = setup();
     const writeText = vi.spyOn(navigator.clipboard, "writeText");
     await status({ state: "waiting" });
     await send(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, {
       addresses: ["192.168.1.20", "10.0.0.5"],
     });
-    const [first, second] = screen.getAllByTitle("Copy the command");
 
-    await user.click(first);
-    await user.click(second);
+    for (const copy of screen.getAllByTitle(/^Copy the/))
+      await user.click(copy);
 
     expect(writeText.mock.calls).toEqual([
       ["/connect 192.168.1.20:37892"],
       ["/connect 10.0.0.5:37892"],
+      ["/tokio connect 192.168.1.20:37892"],
+      ["/tokio connect 10.0.0.5:37892"],
     ]);
   });
 
@@ -283,7 +319,7 @@ describe("Games", () => {
     await load([
       action("a1", {
         trigger: {
-          ...createAction().trigger,
+          ...createAction("bedrock").trigger,
           type: TOKIO_EVENTS.GIFT,
           every_gift: true,
         },

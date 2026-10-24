@@ -1,17 +1,43 @@
-import { APP_EVENTS, APP_EVENTS_RESPONSE, GamesData } from "@/common/types";
+import { MinecraftEdition } from "@/common/schemas";
+import {
+  APP_EVENTS,
+  APP_EVENTS_RESPONSE,
+  GamesData,
+  MINECRAFT_EDITION_NAMES,
+} from "@/common/types";
+import { MINECRAFT_MOD_DOCS_URL } from "@/common/util";
 import { CopyField, Section, Toggle } from "@/components";
 import { cx } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import homeStyles from "@/pages/Home/home.module.css";
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import styles from "../games.module.css";
-import { connectCommand, statusText } from "../helper";
+import { connectCommand, EDITIONS, statusText } from "../helper";
 
-const SETUP = [
-  "In Settings → General → Network settings, turn on Enable WebSockets.",
-  "Open a world with cheats on.",
-  "Paste the command in the chat.",
-];
+// Each edition's way in, side by side until a game connects
+const SETUP: Record<MinecraftEdition, ReactNode[]> = {
+  bedrock: [
+    "In Settings → General → Network settings, turn on Enable WebSockets.",
+    "Open a world with cheats on.",
+    "Paste the command in the chat.",
+  ],
+  java: [
+    <>
+      Install Fabric Loader and Fabric API for Minecraft 26.3, then the Tokio
+      mod.{" "}
+      <a
+        className={styles.link}
+        href={MINECRAFT_MOD_DOCS_URL}
+        target="_blank"
+        rel="noreferrer"
+      >
+        See how
+      </a>
+    </>,
+    "Open a world. Cheats can stay off.",
+    "Paste the command in the chat.",
+  ],
+};
 
 type Props = {
   games: GamesData;
@@ -35,7 +61,7 @@ export function MinecraftSection({ games, onToggle }: Props) {
   return (
     <Section
       title="Minecraft"
-      description="Bedrock Edition connects from its chat."
+      description="Bedrock and Java connect from their chat."
     >
       <div className={styles.panel}>
         <div className={styles.status_row}>
@@ -64,31 +90,40 @@ export function MinecraftSection({ games, onToggle }: Props) {
 
         {state !== "connected" && (
           <div className={styles.setup}>
-            <ol className={styles.setup_steps}>
-              {SETUP.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-            {addresses && (
-              <div className={styles.commands}>
-                {hosts.map((host, i) => (
-                  <CopyField
-                    key={host}
-                    code
-                    value={connectCommand(host)}
-                    title="Copy the command"
-                    display={
-                      <>
-                        {connectCommand(host)}
-                        {i === 0 && state === "waiting" && (
-                          <span className={styles.caret} aria-hidden />
-                        )}
-                      </>
-                    }
-                  />
-                ))}
+            {EDITIONS.map(({ value: edition, label }) => (
+              <div key={edition} className={styles.edition}>
+                <h3 className={styles.edition_name}>
+                  {MINECRAFT_EDITION_NAMES[edition]}
+                </h3>
+                <ol className={styles.setup_steps}>
+                  {SETUP[edition].map((step, i) => (
+                    <li key={i}>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+                {addresses && (
+                  <div className={styles.commands}>
+                    {hosts.map((host, i) => (
+                      <CopyField
+                        key={host}
+                        code
+                        value={connectCommand(host, edition)}
+                        title={`Copy the ${label} command`}
+                        display={
+                          <>
+                            {connectCommand(host, edition)}
+                            {i === 0 && state === "waiting" && (
+                              <span className={styles.caret} aria-hidden />
+                            )}
+                          </>
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>

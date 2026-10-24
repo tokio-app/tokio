@@ -66,7 +66,7 @@ export function ActionsSection({ actions, gifts, emotes, update }: Props) {
           title="Add action"
           onClick={() =>
             update((s) => {
-              s.actions.push(createAction());
+              s.actions.push(createAction("bedrock"));
             })
           }
         >
@@ -302,7 +302,7 @@ function StepFields({ step, textRef, onFocusText, onChange }: FieldsProps) {
             searchable
             className={styles.thing}
             aria-label="Mob"
-            options={MOBS}
+            options={MOBS.bedrock}
             value={step.mob}
             onChange={(mob) => onChange({ ...step, mob })}
           />
@@ -329,7 +329,7 @@ function StepFields({ step, textRef, onFocusText, onChange }: FieldsProps) {
             searchable
             className={styles.thing}
             aria-label="Item"
-            options={ITEMS}
+            options={ITEMS.bedrock}
             value={step.item}
             onChange={(item) => onChange({ ...step, item })}
           />

@@ -1,24 +1,41 @@
-import { GameAction, GameStep } from "@/common/schemas";
-import { CommandResult, GameStatus, TOKIO_EVENTS } from "@/common/types";
+import { GameAction, GameStep, MinecraftEdition } from "@/common/schemas";
+import {
+  CommandResult,
+  GameStatus,
+  MINECRAFT_EDITION_NAMES,
+  TOKIO_EVENTS,
+} from "@/common/types";
 import { MINECRAFT_PORT } from "@/common/util";
 import { SelectOption } from "@/components";
-import minecraft from "./minecraft-bedrock.json";
+import bedrock from "./minecraft-bedrock.json";
+import java from "./minecraft-java.json";
 
 export type StepKind = GameStep["type"];
 type Step<K extends StepKind> = Extract<GameStep, { type: K }>;
 
-// What Minecraft's chat takes to join Tokio, from this PC or another device
-export const connectCommand = (host: string) =>
-  `/connect ${host}:${MINECRAFT_PORT}`;
+export const EDITIONS: SelectOption<MinecraftEdition>[] = [
+  { value: "bedrock", label: "Bedrock" },
+  { value: "java", label: "Java" },
+];
 
-// Every mob and item the game's summon and give take, named as the game
-// names them in English: Mojang's bedrock-samples metadata, each id checked
-// in the game (see .claude/rules/games.md)
+// What each edition's chat takes to join Tokio, from this PC or another
+// device. Java's command comes from the Tokio mod.
+export const connectCommand = (host: string, edition: MinecraftEdition) =>
+  `${edition === "java" ? "/tokio connect" : "/connect"} ${host}:${MINECRAFT_PORT}`;
+
+// Every mob and item each edition's summon and give take, named as the game
+// names them in English (see .claude/rules/games.md)
 const options = (names: Record<string, string>): SelectOption<string>[] =>
   Object.entries(names).map(([value, label]) => ({ value, label }));
 
-export const MOBS = options(minecraft.mobs);
-export const ITEMS = options(minecraft.items);
+export const MOBS: Record<MinecraftEdition, SelectOption<string>[]> = {
+  bedrock: options(bedrock.mobs),
+  java: options(java.mobs),
+};
+export const ITEMS: Record<MinecraftEdition, SelectOption<string>[]> = {
+  bedrock: options(bedrock.items),
+  java: options(java.items),
+};
 
 // The first words of each step's sentence
 export const STEP_KINDS: SelectOption<StepKind>[] = [
@@ -54,11 +71,11 @@ export const createStep = (kind: StepKind): GameStep => ({
   ...NEW_STEPS[kind],
 });
 
-export function createAction(): GameAction {
+export function createAction(edition: MinecraftEdition): GameAction {
   return {
     id: crypto.randomUUID(),
     enabled: true,
-    edition: "bedrock",
+    edition,
     trigger: {
       type: TOKIO_EVENTS.FOLLOW,
       gifts: [],
@@ -69,6 +86,47 @@ export function createAction(): GameAction {
     },
     steps: [createStep("spawn")],
   };
+}
+
+// Bedrock's ids that Java names differently
+const JAVA_IDS: Record<string, string> = {
+  web: "cobweb",
+  evocation_illager: "evoker",
+  zombie_pigman: "zombified_piglin",
+};
+const BEDROCK_IDS = Object.fromEntries(
+  Object.entries(JAVA_IDS).map(([bedrock, java]) => [java, bedrock]),
+);
+
+// The same mob or item in the other edition, or the fallback when it has none
+function idIn(
+  edition: MinecraftEdition,
+  list: SelectOption<string>[],
+  id: string,
+  fallback: string,
+) {
+  const renamed = (edition === "java" ? JAVA_IDS : BEDROCK_IDS)[id];
+  if (renamed) return renamed;
+  return list.some((option) => option.value === id) ? id : fallback;
+}
+
+// The action for another edition, with its mobs and items moved over
+export function withEdition(
+  action: GameAction,
+  edition: MinecraftEdition,
+): GameAction {
+  if (action.edition === edition) return action;
+  const steps = action.steps.map((step): GameStep => {
+    if (step.type === "spawn")
+      return { ...step, mob: idIn(edition, MOBS[edition], step.mob, "zombie") };
+    if (step.type === "give")
+      return {
+        ...step,
+        item: idIn(edition, ITEMS[edition], step.item, "diamond"),
+      };
+    return step;
+  });
+  return { ...action, edition, steps };
 }
 
 // The text a step's variables go into, if it has one
@@ -100,6 +158,11 @@ const STATUS_TEXT: Record<GameStatus["state"], string> = {
   error: "Minecraft can't connect.",
 };
 
-// An error says why
-export const statusText = (status: GameStatus) =>
-  (status.state === "error" && status.error) || STATUS_TEXT[status.state];
+// An error says why, a connection which edition
+export function statusText(status: GameStatus) {
+  if (status.state === "connected" && status.edition)
+    return `Connected to ${MINECRAFT_EDITION_NAMES[status.edition]}`;
+  return (
+    (status.state === "error" && status.error) || STATUS_TEXT[status.state]
+  );
+}
