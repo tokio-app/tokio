@@ -19,7 +19,7 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
 
 2. An internal event, one that doesn't come from the LIVE, goes instead in the `AppEvents` exclusions and in `INTERNAL_EVENTS` (same file; they mirror each other), and in the `exclude` list of `AlertTriggerSchema` (`src/common/schemas/profile.ts`). It then reaches neither overlays nor alerts.
 3. The connector: listen to the `@tokioapp/connector` event (`WebcastEvent.<NAME>`, payloads in its README) in `_listen` of `src/main/services/connector/providers/default/index.ts`, and `this.emit(TOKIO_EVENTS.<NAME>, data)` with only the fields of the payload type. Candidates it already decodes: `subNotify`, `emote`, `roomPin`, `imDelete`, `questionNew`, `goalUpdate`, `pollMessage`, `linkMicBattle` and `linkMicArmies`, `giftBroadcast`, `controlMessage`.
-4. Alerts: every live trigger reaches `AlertsService.handle` on its own (`registerConnectorEvents`, `src/main/events/init.ts`). If the trigger needs a filter or a picker, like gifts, keywords or users have, add it to `AlertsService` (`src/main/services/alerts/`) and to `AlertItem`'s switch (`src/renderer/src/components/AlertItem/`). An event that comes in combos fires once, on `repeatEnd`, like gifts.
+4. Alerts and game actions: every live trigger reaches `AlertsService.handle` and `GamesService.handle` on its own (`registerConnectorEvents`, `src/main/events/init.ts`). If the trigger needs a filter or a picker, like gifts, keywords or users have, add it to `matchesTrigger` (`src/main/helper/triggers.ts`, shared by both) and to `TriggerFilter` (`src/renderer/src/components/AlertItem/`, which the Games page uses too). An event that comes in combos fires once, on `repeatEnd`, like gifts.
 5. The Home feed, when the event belongs in Activity:
    - `ACTIVITY_EVENTS` and its item in `src/main/services/live/index.ts`, and the `Activity` type in `src/common/types/live.ts`
    - its kind in `ActivityFeedSchema` (`src/common/schemas/store.ts`), with its default in `src/common/util/constants/store.ts`
@@ -40,7 +40,7 @@ Tell the user which of these need a change and a release:
 
 - The overlay SDK, `../tokio-event-loader` (`@tokioapp/overlay`): `src/types/index.ts` copies `TOKIO_EVENTS` and the payload types. Overlays get the new type once a new version is published; ask before publishing.
 - The overlays repo, `../tokio-overlays`: the event list in `.github/ISSUE_TEMPLATE/overlay_request.yml`.
-- The website, `../tokio-web`: `src/content/docs/docs/developers/events.md`, in its LIVE events and Data sections, and the events `features/alerts.md` and `features/countdown-timer.md` list.
+- The website, `../tokio-web`: `src/content/docs/docs/developers/events.md`, in its LIVE events and Data sections, and the events `features/alerts.md`, `features/games.md` and `features/countdown-timer.md` list.
 
 ## Done when
 
