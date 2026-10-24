@@ -635,6 +635,7 @@ events.push(
       return;
     }
 
+    handler.trayService.setEnabled(settings.tray.enabled);
     await initUpdater(handler);
     handler.updaterService.start(settings.updates.auto);
   },

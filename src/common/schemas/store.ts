@@ -48,6 +48,12 @@ const AppSettingsSchema = z.object({
       auto: z.boolean(),
     })
     .default({ auto: true }),
+  tray: z
+    .object({
+      // Closing the window keeps Tokio running, with an icon in the tray
+      enabled: z.boolean(),
+    })
+    .default({ enabled: true }),
   overlays: z.array(z.object({ ...OverlayMeta, id: z.string() })),
   testOverlays: z.array(TestOverlaySchema).default([]),
   // Uploaded sounds, available to alerts in every profile

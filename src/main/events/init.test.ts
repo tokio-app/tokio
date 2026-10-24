@@ -180,6 +180,7 @@ function setup() {
     activeProfile: profiles[0],
     server: { enabled: true },
     updates: { auto: false },
+    tray: { enabled: true },
     activityFeed: { ...defaultStoreData.settings.activityFeed },
   };
 
@@ -281,6 +282,7 @@ function setup() {
     ),
     start: vi.fn(),
   };
+  const trayService = { setEnabled: vi.fn() };
   const urlManagerService = { setLogFile: vi.fn() };
   const jsonManagerService = { setLogFile: vi.fn() };
   const licensesService = { setLogFile: vi.fn() };
@@ -314,6 +316,7 @@ function setup() {
     licensesService,
     liveService,
     timerService,
+    trayService,
     yamlManagerService: {},
   });
 
@@ -338,6 +341,7 @@ function setup() {
     liveService,
     timer,
     timerService,
+    trayService,
   };
 }
 
@@ -1564,7 +1568,7 @@ describe("init events", () => {
       ]);
     });
 
-    it("answers quietly and starts the updater as saved", async () => {
+    it("answers quietly, shows the tray and starts the updater as saved", async () => {
       const s = setup();
 
       await load(s);
@@ -1574,6 +1578,7 @@ describe("init events", () => {
       ]);
       expect(s.h.notices).toEqual([]);
       expect(s.updaterService.initialize).toHaveBeenCalledOnce();
+      expect(s.trayService.setEnabled).toHaveBeenCalledExactlyOnceWith(true);
       expect(s.updaterService.start).toHaveBeenCalledExactlyOnceWith(false);
       expect(
         s.updaterService.initialize.mock.invocationCallOrder[0],
@@ -1691,6 +1696,8 @@ describe("init events", () => {
         expect.any(Error),
       );
       expect(s.updaterService.start).not.toHaveBeenCalled();
+      // So closing the window quits
+      expect(s.trayService.setEnabled).not.toHaveBeenCalled();
     });
 
     // A chat read aloud, to count the listeners LOAD_APP added

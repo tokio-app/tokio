@@ -43,6 +43,7 @@ const SERVICES: (keyof AppServices)[] = [
   "updaterService",
   "liveService",
   "timerService",
+  "trayService",
 ];
 
 // Read by Vitest and Node when they print or await a value
@@ -106,6 +107,8 @@ export function createHandler(services: ServiceStubs = {}) {
   let unexpected: UnexpectedUse | undefined;
   const stubs: Record<string, object> = {
     pathManagerService: { files: { logs: { system: "system.log" } } },
+    // AppHandler tells it what opening Tokio from the tray does
+    trayService: { onOpen: () => {} },
     ...services,
   };
   const handler = asHandler({

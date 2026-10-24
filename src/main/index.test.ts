@@ -138,6 +138,8 @@ describe("main process entry", () => {
       show: false,
       webPreferences: {
         preload: expect.stringMatching(/preload[\\/]index\.cjs$/),
+        // Never a background page, minimized or in the tray
+        backgroundThrottling: false,
       },
     });
     // Electron sandboxes the page unless told not to.

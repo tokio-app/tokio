@@ -513,6 +513,31 @@ describe("StoreManagerService", () => {
     });
   });
 
+  describe("tray", () => {
+    it("turns it on for stores saved before the setting", async () => {
+      const { tray: _tray, ...settings } = defaultStoreData.settings;
+      await writeFile(
+        storeFile,
+        JSON.stringify({ ...defaultStoreData, settings }),
+      );
+
+      const store = await init();
+
+      expect(store.getSettings().tray).toEqual({ enabled: true });
+    });
+
+    it("saves the setting", async () => {
+      const store = await init();
+
+      await store.updateTraySettings(false);
+
+      expect((await readJSON(storeFile)).settings.tray).toEqual({
+        enabled: false,
+      });
+      expect((await init()).getSettings().tray).toEqual({ enabled: false });
+    });
+  });
+
   describe("activity feed", () => {
     it("shows every event for stores saved before the setting", async () => {
       const { activityFeed: _feed, ...settings } = defaultStoreData.settings;

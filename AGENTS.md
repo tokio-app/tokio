@@ -9,10 +9,10 @@ Stack: Electron 45, electron-vite, React 19, TypeScript, TanStack Router, Expres
 ## Commands
 
 ```sh
-yarn dev                  # build the music window UI, then electron-vite dev (close Tokio first)
+yarn dev                  # build the music window UI, then electron-vite dev (quit Tokio first)
 yarn test                 # vitest (yarn test:watch to watch, --project main|renderer for one)
 yarn test:coverage        # vitest with a coverage report in coverage/
-yarn test:e2e             # build the app and drive it with Playwright (needs port 37891: close Tokio first)
+yarn test:e2e             # build the app and drive it with Playwright (needs port 37891: quit Tokio first)
 yarn typecheck            # tsc for node (main/preload/common) and web (renderer/music)
 yarn lint                 # oxlint --type-aware, fails on any warning
 yarn format               # prettier --write .
@@ -150,7 +150,9 @@ Quitting waits up to 3s for IPC handlers and file writes still running (`track`/
 
 A store file that doesn't parse is copied to `tokio.corrupted-<time>.json` next to it and replaced by the defaults. One that can't be read (locked, no access) or copied stops startup ("Tokio couldn't start") and is left as it is.
 
-Only one Tokio runs per userData folder (`requestSingleInstanceLock` in `src/main/index.ts`, after `TOKIO_HOME` sets it): a second launch quits and brings the running one to the front. `yarn dev` and the installed app share that folder on Windows and macOS, so close Tokio before `yarn dev`.
+Only one Tokio runs per userData folder (`requestSingleInstanceLock` in `src/main/index.ts`, after `TOKIO_HOME` sets it): a second launch quits and brings the running one to the front, out of the tray too. `yarn dev` and the installed app share that folder on Windows and macOS, so quit Tokio before `yarn dev`.
+
+While **Settings → Tray** is on (the default, `settings.tray`), closing the main window only hides it: `TrayService` shows the icon once `LOAD_APP` has run and on `SET_TRAY`, and `AppHandler` (`src/main/handler/app.ts`) hides the window on `close` until a quit. Every quit (the tray's menu, Cmd+Q, an update, Playwright's `close()`) goes through `app.quit()`, whose `before-quit` lets the window close. The main window plays every sound, so it has `backgroundThrottling: false` like the music windows: Chromium never treats it as a background page, minimized or in the tray. Playwright's focus emulation keeps pages visible, so `drive-app` and `e2e/` can't show how a hidden page behaves.
 
 ## Licensing
 

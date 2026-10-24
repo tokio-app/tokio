@@ -119,6 +119,10 @@ export class FakeBrowserWindow extends EventEmitter {
     this.visible = true;
     this.emit("show");
   });
+  readonly hide = vi.fn(() => {
+    this.visible = false;
+    this.emit("hide");
+  });
   readonly minimize = vi.fn(() => {
     this.state = "minimized";
     this.emit("minimize");
@@ -199,6 +203,20 @@ export class FakeBrowserWindow extends EventEmitter {
   }
 }
 
+export type FakeMenuItem = { label?: string; click?: () => void };
+
+/** A tray icon: tests click it with emit("click") and read its menu. */
+export class FakeTray extends EventEmitter {
+  readonly setToolTip = vi.fn<(tooltip: string) => void>();
+  readonly setContextMenu = vi.fn<(menu: { items: FakeMenuItem[] }) => void>();
+  readonly destroy = vi.fn();
+
+  constructor(readonly image: unknown) {
+    super();
+    fakes.created.trays.push(this);
+  }
+}
+
 type RequestListener = (
   details: { url: string; resourceType: string },
   callback: (response: { cancel: boolean }) => void,
@@ -214,6 +232,7 @@ function createFakes() {
     created: {
       windows: [] as FakeBrowserWindow[],
       views: [] as FakeWebContentsView[],
+      trays: [] as FakeTray[],
     },
     ipcMain: new EventEmitter(),
     ipcRenderer: Object.assign(new EventEmitter(), {
@@ -265,6 +284,18 @@ function createFakes() {
     shell: {
       openExternal: vi.fn<(url: string) => Promise<void>>(async () => {}),
     },
+    Menu: {
+      buildFromTemplate: vi.fn((items: FakeMenuItem[]) => ({ items })),
+    },
+    // Images only say what they were made from
+    nativeImage: {
+      createFromPath: vi.fn((path: string) => ({
+        resize: (size: { width?: number; height?: number }) => ({
+          path,
+          ...size,
+        }),
+      })),
+    },
     dialog: {
       showOpenDialog: vi.fn(async (..._args: unknown[]) => ({
         canceled: true,
@@ -312,11 +343,14 @@ export const {
   dialog,
   net,
   safeStorage,
+  Menu,
+  nativeImage,
 } = fakes;
 
 export {
   FakeBrowserWindow as BrowserWindow,
   FakeWebContentsView as WebContentsView,
+  FakeTray as Tray,
 };
 
 /** The windows created in this test, oldest first. */
@@ -324,6 +358,9 @@ export const windows = () => [...fakes.created.windows];
 
 /** The views created in this test, oldest first. */
 export const views = () => [...fakes.created.views];
+
+/** The tray icons created in this test, oldest first. */
+export const trays = () => [...fakes.created.trays];
 
 // restoreMocks only restores spies, so the fakes' calls and implementations
 // would carry over to the next test.
@@ -341,6 +378,7 @@ function resetMocks(value: unknown, seen = new Set<unknown>()) {
 export function resetElectron() {
   fakes.created.windows.length = 0;
   fakes.created.views.length = 0;
+  fakes.created.trays.length = 0;
   ipcMain.removeAllListeners();
   ipcRenderer.removeAllListeners();
   app.removeAllListeners();

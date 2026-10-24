@@ -1,7 +1,7 @@
 import { Alert, MEDIA_DURATION, MediaFile, SavedEmote } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, CustomGift } from "@/common/types";
 import { defaultProfile } from "@/common/util";
-import { MediaPicker, Page, SoundPicker } from "@/components";
+import { Btn, MediaPicker, Page, SoundPicker } from "@/components";
 import {
   useAlertTest,
   useAudio,
@@ -10,7 +10,9 @@ import {
   useIpcRequest,
 } from "@/hooks";
 import { useEffect, useRef, useState } from "react";
-import { ttsDefaultsOf } from "./helper";
+import { MdOutlineAddAlert } from "react-icons/md";
+import styles from "./alerts.module.css";
+import { createAlert, ttsDefaultsOf } from "./helper";
 import { HeaderSection } from "./sections/HeaderSection";
 import { ItemsSection } from "./sections/ItemsSection";
 
@@ -36,6 +38,10 @@ export function Alerts() {
   const [mediaFor, setMediaFor] = useState<string | null>(null);
   // The same as asked, for browsed media
   const askedMedia = useRef(new Set<string>());
+  // The header's add button, and whether it's in view. Out of it, another
+  // shows under the alerts.
+  const headerAdd = useRef<HTMLButtonElement>(null);
+  const [headerAddShown, setHeaderAddShown] = useState(true);
 
   const { settings, update } = useEditableSettings("alerts", (profile) => {
     setEmotes(profile.emotes);
@@ -47,6 +53,20 @@ export function Alerts() {
 
   useIpcRequest(APP_EVENTS.GET_GIFTS);
   useIpcRequest(APP_EVENTS.GET_CUSTOM_GIFTS);
+
+  useEffect(() => {
+    if (!headerAdd.current) return undefined;
+    const observer = new IntersectionObserver(([entry]) =>
+      setHeaderAddShown(entry.isIntersecting),
+    );
+    observer.observe(headerAdd.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const addAlert = () =>
+    update((s) => {
+      s.items.push(createAlert());
+    });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_GIFTS, (res) => {
     if (res) setGifts(res.data);
@@ -135,6 +155,8 @@ export function Alerts() {
         <HeaderSection
           simultaneous={settings.simultaneous}
           queueLength={settings.queue_length}
+          addRef={headerAdd}
+          onAdd={addAlert}
           update={update}
         />
 
@@ -149,6 +171,13 @@ export function Alerts() {
           onPickSound={setPickerFor}
           onPickMedia={setMediaFor}
         />
+
+        {!headerAddShown && (
+          <Btn className={styles.add} onClick={addAlert}>
+            <MdOutlineAddAlert size={20} />
+            Add alert
+          </Btn>
+        )}
       </Page>
 
       {pickerAlert && (

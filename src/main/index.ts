@@ -20,6 +20,7 @@ import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { TimerService } from "@/services/timer";
+import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
 import { URLManagerService } from "@/services/url";
@@ -90,6 +91,7 @@ const services: AppServices = {
   updaterService: new UpdaterService(),
   liveService: new LiveService(),
   timerService: new TimerService(),
+  trayService: new TrayService(),
 };
 
 // Packaged, the notices are copied to resources/licenses (electron-builder.yml).
@@ -151,7 +153,9 @@ function createWindows(): void {
     center: true,
     autoHideMenuBar: true,
     icon: APP_ICON,
-    webPreferences: { preload: APP_PRELOAD },
+    // It plays every sound, so Chromium never treats it as a background page,
+    // minimized or in the tray
+    webPreferences: { preload: APP_PRELOAD, backgroundThrottling: false },
   });
 
   // Notices go to the main window only.

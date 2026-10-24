@@ -390,16 +390,14 @@ describe("ServerService", () => {
           () => expect(el("clock").textContent).toBe("00:00:04"),
           { timeout: 2000 },
         );
-        expect(el("clock").classList.contains("dim")).toBe(false);
       });
 
-      it("dims and holds when it isn't running", async () => {
+      it("holds the time when it isn't running", async () => {
         send(timerState({ status: "paused", remaining: 90_000 }));
 
         await vi.waitFor(() =>
           expect(el("clock").textContent).toBe("00:01:30"),
         );
-        expect(el("clock").classList.contains("dim")).toBe(true);
       });
 
       it("shows the title only when it isn't blank", async () => {

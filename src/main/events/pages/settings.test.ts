@@ -1116,6 +1116,102 @@ describe("settings events", () => {
     });
   });
 
+  describe("SET_TRAY", () => {
+    const setup = () => {
+      const updateTraySettings = vi.fn(async () => true);
+      const setEnabled = vi.fn();
+      const h = createHandler({
+        storeManagerService: { ...profileStore(), updateTraySettings },
+        trayService: { setEnabled },
+      });
+      return { h, updateTraySettings, setEnabled };
+    };
+
+    it.each([
+      {
+        enabled: true,
+        level: "success",
+        code: FEEDBACK_CODES.TRAY_ENABLED,
+        message: "Tokio keeps running in the tray when you close it.",
+      },
+      {
+        enabled: false,
+        level: "info",
+        code: FEEDBACK_CODES.TRAY_DISABLED,
+        message: "Closing Tokio's window quits it.",
+      },
+    ])(
+      "saves enabled: $enabled, shows or hides the icon and notifies",
+      async ({ enabled, ...expected }) => {
+        const { h, updateTraySettings, setEnabled } = setup();
+
+        await h.invoke(settings, APP_EVENTS.SET_TRAY, { enabled });
+
+        expect(updateTraySettings).toHaveBeenCalledWith(enabled);
+        expect(setEnabled).toHaveBeenCalledWith(enabled);
+        expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+        expect(h.replies(APP_EVENTS_RESPONSE.SET_TRAY)).toEqual([
+          { success: true },
+        ]);
+        expect(h.notices).toEqual([expect.objectContaining(expected)]);
+      },
+    );
+
+    it("replies and notifies when the setting can't be saved", async () => {
+      const setEnabled = vi.fn();
+      const h = createHandler({
+        storeManagerService: {
+          updateTraySettings: async () => {
+            throw new Error("disk full");
+          },
+        },
+        trayService: { setEnabled },
+      });
+
+      await h.invoke(settings, APP_EVENTS.SET_TRAY, { enabled: false });
+
+      const failure = {
+        code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        message: "Unable to save the tray setting.",
+      };
+      expect(setEnabled).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_TRAY)).toEqual([
+        { success: false, error: failure },
+      ]);
+      expect(h.notices).toEqual([expect.objectContaining(failure)]);
+    });
+
+    it("reports a change the store couldn't write, without a success notice", async () => {
+      const setEnabled = vi.fn();
+      const h = createHandler({
+        storeManagerService: {
+          ...profileStore(),
+          updateTraySettings: async () => false,
+        },
+        trayService: { setEnabled },
+      });
+
+      await h.invoke(settings, APP_EVENTS.SET_TRAY, { enabled: false });
+
+      // Main holds it, so the icon follows it
+      expect(setEnabled).toHaveBeenCalledWith(false);
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_TRAY)).toEqual([
+        {
+          success: false,
+          error: expect.objectContaining({
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        }),
+      ]);
+    });
+  });
+
   describe("REQ_FQDN", () => {
     it("replies once the overlay address is set up", async () => {
       const h = createHandler({

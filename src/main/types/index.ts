@@ -18,6 +18,7 @@ import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { TimerService } from "@/services/timer";
+import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
 import { URLManagerService } from "@/services/url";
@@ -59,6 +60,7 @@ export interface AppServices {
   readonly updaterService: UpdaterService;
   readonly liveService: LiveService;
   readonly timerService: TimerService;
+  readonly trayService: TrayService;
 }
 
 export interface AppHandlerVariables extends AppServices {

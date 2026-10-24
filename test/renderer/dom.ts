@@ -52,9 +52,9 @@ globalThis.IntersectionObserver = FakeIntersectionObserver;
 
 /**
  * Scrolls every observed element into view, e.g. the sentinel at the end of
- * an infinite list.
+ * an infinite list, or out of it.
  */
-export function intersect() {
+export function intersect(isIntersecting = true) {
   act(() => {
     for (const observer of [...observers]) {
       const entries = [...observer.targets].map(
@@ -62,10 +62,10 @@ export function intersect() {
           const rect = target.getBoundingClientRect();
           return {
             target,
-            isIntersecting: true,
-            intersectionRatio: 1,
+            isIntersecting,
+            intersectionRatio: isIntersecting ? 1 : 0,
             boundingClientRect: rect,
-            intersectionRect: rect,
+            intersectionRect: isIntersecting ? rect : new DOMRect(),
             rootBounds: null,
             time: performance.now(),
           };

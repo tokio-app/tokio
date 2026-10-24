@@ -63,3 +63,10 @@
 .column:nth-child(n + 3):not(:last-child) {
   padding-left: var(--space-3);
 }
+
+/* Under the alerts while the header's add button is out of view. The page
+   is a flex column, which would stretch it. */
+.add {
+  align-self: flex-start;
+  margin-top: var(--space-4);
+}

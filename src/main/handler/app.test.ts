@@ -17,10 +17,14 @@ vi.mock("node:timers/promises", () => ({
   setTimeout: (ms: number) => new Promise((done) => setTimeout(done, ms)),
 }));
 
-const start = () => {
-  const h = createHandler();
+// With Settings → Tray on unless told otherwise
+const start = ({ tray = true } = {}) => {
+  const onOpen = vi.fn<(listener: () => void) => void>();
+  const h = createHandler({ trayService: { onOpen, isEnabled: () => tray } });
   void new AppHandler(h.handler).initApp();
-  return h;
+  // What opening Tokio from the tray icon does
+  const open = () => onOpen.mock.calls[0][0]();
+  return { ...h, open };
 };
 
 const send = (event: APP_EVENTS) => ipcMain.emit(event, {});
@@ -88,7 +92,7 @@ describe("AppHandler", () => {
       splash.close();
       await vi.advanceTimersByTimeAsync(2000);
 
-      expect(win.isDestroyed()).toBe(true);
+      expect(app.quit).toHaveBeenCalledOnce();
       expect(win.show).not.toHaveBeenCalled();
     });
 
@@ -134,7 +138,8 @@ describe("AppHandler", () => {
       expect(win.minimize).toHaveBeenCalledOnce();
       expect(win.maximize).toHaveBeenCalledOnce();
       expect(win.unmaximize).toHaveBeenCalledOnce();
-      expect(win.isDestroyed()).toBe(true);
+      // Into the tray
+      expect(win.isVisible()).toBe(false);
     });
 
     it("tells the title bar whether it's maximized when it resizes", () => {
@@ -148,15 +153,6 @@ describe("AppHandler", () => {
         { state: "normal" },
         { state: "maximized" },
       ]);
-    });
-
-    it("closes every other window with it", () => {
-      const { win } = start();
-      const music = new FakeBrowserWindow();
-
-      win.close();
-
-      expect(music.isDestroyed()).toBe(true);
     });
 
     it("stays on its page, but lets it reload", () => {
@@ -187,6 +183,71 @@ describe("AppHandler", () => {
         ["https://tokio.ialfaro.com"],
         ["mailto:me@example.com"],
       ]);
+    });
+  });
+
+  describe("tray", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // Once the splash has given way to the app
+    const reveal = async () => {
+      const h = start();
+      h.splash.emit("ready-to-show");
+      send(APP_EVENTS.SHOW_WINDOW);
+      await vi.advanceTimersByTimeAsync(2000);
+      return h;
+    };
+
+    it("hides the window when it's closed, leaving the others open", () => {
+      const { win } = start();
+      const music = new FakeBrowserWindow();
+
+      win.close();
+
+      expect(win.isVisible()).toBe(false);
+      expect(win.isDestroyed()).toBe(false);
+      expect(music.isDestroyed()).toBe(false);
+    });
+
+    it("closes it and every other window when the tray is off", () => {
+      const { win } = start({ tray: false });
+      const music = new FakeBrowserWindow();
+
+      win.close();
+
+      expect(win.isDestroyed()).toBe(true);
+      expect(music.isDestroyed()).toBe(true);
+    });
+
+    it("lets it close when the app quits", () => {
+      const { win } = start();
+
+      app.emit("before-quit");
+      win.close();
+
+      expect(win.isDestroyed()).toBe(true);
+    });
+
+    it("shows it again from the tray, a second launch and the Dock", async () => {
+      const { win, open } = await reveal();
+      const reopen = [
+        open,
+        () => app.emit("second-instance"),
+        () => app.emit("activate"),
+      ];
+
+      for (const show of reopen) {
+        win.close();
+        expect(win.isVisible()).toBe(false);
+        show();
+        expect(win.isVisible()).toBe(true);
+      }
     });
   });
 

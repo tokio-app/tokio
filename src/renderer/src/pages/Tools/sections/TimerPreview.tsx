@@ -1,6 +1,6 @@
 import { TimerSettings } from "@/common/schemas";
 import { formatAdded, timerTriggers } from "@/common/util";
-import { cx, formatDuration } from "@/helper";
+import { formatDuration } from "@/helper";
 import { useEffect, useState } from "react";
 import { TimerPush } from "../helper";
 import styles from "../tools.module.css";
@@ -96,7 +96,7 @@ export function TimerPreview({ timer, settings }: Props) {
       )}
       <span
         role="timer"
-        className={cx(styles.clock, !running && styles.clock_dim)}
+        className={styles.clock}
         style={{
           color: warning ? look.warning_color : look.clock_color,
           fontFamily: clockFont,

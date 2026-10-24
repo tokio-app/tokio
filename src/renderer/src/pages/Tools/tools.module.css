@@ -90,11 +90,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Not running: a fade works over any video, unlike a gray */
-.clock_dim {
-  opacity: 0.55;
-}
-
 /* Always as tall, so nothing moves when it fills */
 .slot {
   display: flex;

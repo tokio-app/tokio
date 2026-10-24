@@ -466,6 +466,39 @@ events.push(
 );
 
 events.push(
+  APP_EVENTS.SET_TRAY,
+  async ({ storeManagerService, trayService, notifier }, e, { enabled }) => {
+    const saved = await storeManagerService.updateTraySettings(enabled);
+    trayService.setEnabled(enabled);
+    replySettings(e, storeManagerService);
+    if (!saved) throw saveFailure();
+    e.reply(APP_EVENTS_RESPONSE.SET_TRAY, {
+      success: true,
+    });
+    if (enabled) {
+      notifier.success(
+        "system",
+        FEEDBACK_CODES.TRAY_ENABLED,
+        "Tokio keeps running in the tray when you close it.",
+      );
+    } else {
+      notifier.info(
+        "system",
+        FEEDBACK_CODES.TRAY_DISABLED,
+        "Closing Tokio's window quits it.",
+      );
+    }
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "Unable to save the tray setting.",
+    },
+    onError: replyFailure(APP_EVENTS_RESPONSE.SET_TRAY),
+  },
+);
+
+events.push(
   APP_EVENTS.REQ_FQDN,
   async ({ urlManagerService }, e) => {
     const res = await urlManagerService.installAppFQDN();
