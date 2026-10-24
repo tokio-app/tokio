@@ -2,6 +2,8 @@ import { AlertTrigger, TokioPayload } from "../connector";
 import {
   ActivityFeed,
   AlertTts,
+  GameStep,
+  GamesSettings,
   OverlayConfig,
   Profile,
   TimerAction,
@@ -99,6 +101,12 @@ export enum APP_EVENTS {
   TEST_ALERT = "app:alerts:test",
   SHOW_ALERT_MEDIA = "app:alerts:show:media",
   GET_CUSTOM_GIFTS = "app:alerts:get:gifts",
+
+  // GAMES
+  GET_GAMES = "app:games:get",
+  SET_GAMES_SETTINGS = "app:games:set",
+  UPDATE_GAMES_SETTINGS = "app:games:update:settings",
+  TEST_GAME_ACTION = "app:games:test",
 
   // SOUND LIBRARY
   GET_SOUNDS = "app:sounds:get",
@@ -316,6 +324,21 @@ export interface AppEventsMap {
     volume: number;
   };
   [APP_EVENTS.GET_CUSTOM_GIFTS]: void;
+
+  // GAMES
+  // The connections' requests are answered by the GAMES push
+  [APP_EVENTS.GET_GAMES]: void;
+  [APP_EVENTS.SET_GAMES_SETTINGS]: { settings: GamesSettings };
+  [APP_EVENTS.UPDATE_GAMES_SETTINGS]: {
+    settings: Profile["games"];
+  };
+  // Runs the steps with a sample of the trigger in the connected game
+  [APP_EVENTS.TEST_GAME_ACTION]: {
+    // The action, which the reply names
+    id: string;
+    trigger: AlertTrigger;
+    steps: GameStep[];
+  };
 
   // SOUND LIBRARY
   [APP_EVENTS.GET_SOUNDS]: void;

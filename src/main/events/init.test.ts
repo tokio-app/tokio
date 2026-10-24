@@ -65,6 +65,7 @@ const files: Files = {
     alerts: "alerts.log",
     music: "music.log",
     overlays: "overlays.log",
+    games: "games.log",
   },
   gifts: "extra/gifts.json",
   customGifts: "extra/custom-gifts.json",

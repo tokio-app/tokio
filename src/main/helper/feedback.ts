@@ -25,6 +25,7 @@ const LABELS: Record<FeedbackSource, string> = {
   alerts: "Alerts",
   music: "Music",
   overlays: "Overlays",
+  games: "Games",
 };
 
 type FailureLevel = Extract<FeedbackLevel, "warning" | "error">;

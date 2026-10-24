@@ -2,6 +2,7 @@ import { mergeStacks } from "@/helper/events";
 import init from "./init";
 import about from "./pages/about";
 import alerts from "./pages/alerts";
+import games from "./pages/games";
 import home from "./pages/home";
 import music from "./pages/music";
 import overlays from "./pages/overlays";
@@ -18,6 +19,7 @@ export default mergeStacks(
   music,
   overlays,
   alerts,
+  games,
   tools,
   about,
   updates,

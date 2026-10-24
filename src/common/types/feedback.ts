@@ -111,13 +111,27 @@ export enum FEEDBACK_CODES {
   MEDIA_REMOVE_FAILED = "media_remove_failed",
   EMOTES_SAVE_FAILED = "emotes_save_failed",
   GIFTS_SAVE_FAILED = "gifts_save_failed",
+
+  // GAMES
+  GAME_NOT_CONNECTED = "game_not_connected",
+  GAME_COMMAND_FAILED = "game_command_failed",
+  GAME_LISTEN_FAILED = "game_listen_failed",
+  GAME_TEST_FAILED = "game_test_failed",
+  GAME_ACTION_FAILED = "game_action_failed",
 }
 
 export type FeedbackLevel = "success" | "info" | "warning" | "error";
 
 // Same keys as the log files, so a source also picks where it's logged.
 export type FeedbackSource =
-  "system" | "connector" | "server" | "tts" | "alerts" | "music" | "overlays";
+  | "system"
+  | "connector"
+  | "server"
+  | "tts"
+  | "alerts"
+  | "music"
+  | "overlays"
+  | "games";
 
 export interface AppError {
   code: FEEDBACK_CODES;

@@ -98,4 +98,7 @@ export const defaultProfile: Profile = {
   },
   emotes: [],
   timer: TimerProfileSchema.parse({}),
+  games: {
+    actions: [],
+  },
 };

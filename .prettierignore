@@ -5,3 +5,5 @@ tsconfig.*.json
 test/fixtures
 # Vendored from anthropics/skills, kept as published
 .claude/skills/frontend-design
+# Agents' git worktrees
+.claude/worktrees/

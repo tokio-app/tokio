@@ -38,6 +38,16 @@ const ActivityFeedSchema = z.object({
   join: z.boolean().default(true),
 });
 
+// Game connections, the same for every profile. Keyed by game, each off
+// until turned on, so stores saved before games load.
+export const GamesSettingsSchema = z
+  .object({
+    // Tokio listens for Minecraft on MINECRAFT_PORT, the game joins with
+    // /connect from its chat
+    minecraft: z.object({ enabled: z.boolean().default(false) }).prefault({}),
+  })
+  .prefault({});
+
 const AppSettingsSchema = z.object({
   server: z.object({
     enabled: z.boolean(),
@@ -73,6 +83,7 @@ const AppSettingsSchema = z.object({
     superfan: true,
     join: true,
   }),
+  games: GamesSettingsSchema,
   liveStats: z.object({
     likes: z.number(),
     views: z.number(),
@@ -97,5 +108,6 @@ export type EntityMetadata = z.infer<typeof EntityMetadataSchema>;
 export type OverlayMetadata = z.infer<typeof OverlayMetaSchema>;
 export type TestOverlay = z.infer<typeof TestOverlaySchema>;
 export type ActivityFeed = z.infer<typeof ActivityFeedSchema>;
+export type GamesSettings = z.infer<typeof GamesSettingsSchema>;
 export type AppSettings = z.infer<typeof AppSettingsSchema>;
 export type StoreSchema = z.infer<typeof StoreZodSchema>;

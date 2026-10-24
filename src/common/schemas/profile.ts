@@ -74,24 +74,27 @@ const AlertTtsSchema = z.object({
   pitch: z.number().min(0.5).max(2),
 });
 
+// What an alert or a game action reacts to
+export const TriggerSchema = z.object({
+  type: AlertTriggerSchema,
+  // Only used by gift triggers. Empty means any gift.
+  gifts: z.array(z.number()),
+  // Only used by gift triggers. Fires once for each gift sent, instead of
+  // once when the viewer's streak ends.
+  every_gift: z.boolean().default(false),
+  // Only used by emote triggers. Empty means any emote.
+  emotes: z.array(z.string()).default([]),
+  // Only used by chat triggers. Empty means any message.
+  keyword: z.string().default(""),
+  // Only used by member and super fan join triggers. A handle or name, empty
+  // means anyone.
+  user: z.string().default(""),
+});
+
 const AlertSchema = z.object({
   id: z.string(),
   enabled: z.boolean(),
-  trigger: z.object({
-    type: AlertTriggerSchema,
-    // Only used by gift alerts. Empty means any gift.
-    gifts: z.array(z.number()),
-    // Only used by gift alerts. Plays once for each gift sent, instead of once
-    // when the viewer's streak ends.
-    every_gift: z.boolean().default(false),
-    // Only used by emote alerts. Empty means any emote.
-    emotes: z.array(z.string()).default([]),
-    // Only used by chat alerts. Empty means any message.
-    keyword: z.string().default(""),
-    // Only used by member and super fan join alerts. A handle or name, empty
-    // means anyone.
-    user: z.string().default(""),
-  }),
+  trigger: TriggerSchema,
   sound: AlertSoundSchema.nullable(),
   // Spoken instead of the sound when set
   tts: AlertTtsSchema.nullable().default(null),
@@ -113,6 +116,52 @@ const AlertItemsSchema = z.preprocess(
       : items,
   z.array(AlertSchema),
 );
+
+// The most mobs a spawn step summons, or items a give step gives, at once
+export const GAME_STEP_MAX_AMOUNT = 100;
+
+const GameAmountSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(GAME_STEP_MAX_AMOUNT)
+  .default(1);
+
+// One thing a game action does in Minecraft. Mob and item ids are the
+// game's, like "zombie". Text can hold the trigger's variables, see
+// ALERT_MESSAGE_VARIABLES.
+export const GameStepSchema = z.discriminatedUnion("type", [
+  // Typed as in the game's chat, with or without the slash
+  z.object({ type: z.literal("command"), command: z.string() }),
+  // Where the player stands, named when name isn't empty
+  z.object({
+    type: z.literal("spawn"),
+    mob: z.string(),
+    amount: GameAmountSchema,
+    name: z.string().default(""),
+  }),
+  z.object({
+    type: z.literal("give"),
+    item: z.string(),
+    amount: GameAmountSchema,
+  }),
+  z.object({
+    type: z.literal("weather"),
+    weather: z.enum(["clear", "rain", "thunder"]),
+  }),
+  z.object({
+    type: z.literal("time"),
+    time: z.enum(["day", "noon", "night", "midnight"]),
+  }),
+]);
+
+// Runs its steps, in order, each time its trigger fires
+export const GameActionSchema = z.object({
+  id: z.string(),
+  enabled: z.boolean(),
+  trigger: TriggerSchema,
+  steps: z.array(GameStepSchema),
+});
 
 const SavedEmoteSchema = z.object({
   id: z.string(),
@@ -189,11 +238,19 @@ export const ProfileSchema = z.object({
   // The countdown timer on Tools, its settings and clock. Profiles saved
   // before it existed start from the defaults.
   timer: TimerProfileSchema.prefault({}),
+  // What LIVE events do in Minecraft, on Games. Profiles saved before it
+  // existed have no actions.
+  games: z
+    .object({ actions: z.array(GameActionSchema).default([]) })
+    .prefault({}),
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;
 export type Permissions = z.infer<typeof PermissionsSchema>;
+export type Trigger = z.infer<typeof TriggerSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
+export type GameStep = z.infer<typeof GameStepSchema>;
+export type GameAction = z.infer<typeof GameActionSchema>;
 export type AlertSound = z.infer<typeof AlertSoundSchema>;
 export type AlertMedia = z.infer<typeof AlertMediaSchema>;
 // An image or video in the media library
