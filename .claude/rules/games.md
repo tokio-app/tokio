@@ -52,7 +52,7 @@ The **Games** page (`/games`, after Music) connects Minecraft Bedrock to Tokio. 
 ## Renderer
 
 - `pages/Games`: `MinecraftSection` (toggle, status, the `/connect` line with a caret that blinks while waiting, the setup steps, the other devices' commands; the setup hides once connected) and `ActionsSection`. `TriggerFilter` and `TRIGGER_OPTIONS` come from `components/AlertItem`; gifts and emotes load as on Alerts.
-- `MOBS` and `ITEMS` (`helper.ts`) are Bedrock ids checked in the game; add one only after trying it there.
+- `MOBS` and `ITEMS` (`helper.ts`) are Bedrock ids checked in the game; add one only after trying it there (`testfor @e[type=<id>]` and `clear @p <id> 0 0` count without changing the world, and an unknown id is a syntax error). Some differ from Java's: Bedrock has `web` (Cobweb), `evocation_illager` (Evoker) and `zombie_pigman` (Zombified Piglin), which the Java mod will need mapped.
 - Actions save through `useEditableSettings("games")`; the toggle emits `SET_GAMES_SETTINGS` at once.
 
 ## Tests
