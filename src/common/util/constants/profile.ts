@@ -1,4 +1,4 @@
-import { Profile, TimerProfileSchema } from "../../schemas";
+import { GamesOverlaySchema, Profile, TimerProfileSchema } from "../../schemas";
 
 export const defaultProfile: Profile = {
   name: "Default",
@@ -100,5 +100,6 @@ export const defaultProfile: Profile = {
   timer: TimerProfileSchema.parse({}),
   games: {
     actions: [],
+    overlay: GamesOverlaySchema.parse({}),
   },
 };

@@ -1,4 +1,9 @@
-import { GamesSettings, GamesSettingsSchema, Profile } from "@/common/schemas";
+import {
+  GamesOverlaySchema,
+  GamesSettings,
+  GamesSettingsSchema,
+  Profile,
+} from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -113,7 +118,10 @@ describe("games events", () => {
   });
 
   describe("UPDATE_GAMES_SETTINGS", () => {
-    const settings: Profile["games"] = { actions: [] };
+    const settings: Profile["games"] = {
+      actions: [],
+      overlay: GamesOverlaySchema.parse({}),
+    };
 
     it("saves the actions without a notice, since it's an autosave", async () => {
       const updateProfileData = vi.fn(async (_data: Partial<Profile>) => true);

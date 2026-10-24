@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { AlertTrigger, EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
-import { TimerProfileSchema } from "./timer";
+import { ColorSchema, TimerProfileSchema } from "./timer";
 
 const PermissionsSchema = z.object({
   all: z.boolean(),
@@ -158,6 +158,22 @@ export const GameStepSchema = z.discriminatedUnion("type", [
 // Bedrock connects by itself; Java through the Tokio mod
 export const MINECRAFT_EDITIONS = ["bedrock", "java"] as const;
 
+// Not trimmed, like the timer's title: main's echo of a save would drop a
+// space being typed
+const overlayText = () => z.string().max(40).default("");
+
+// How an action shows on the games overlay (/games/): the event, an arrow,
+// then its picture and name
+const GameOverlayItemSchema = z.object({
+  show: z.boolean().default(true),
+  // file is a basename inside the Minecraft pictures folder
+  image: AlertSoundSchema.nullable().default(null),
+  // The event's text, empty for its own: the gifts' names, "100 likes"
+  event: overlayText(),
+  // What it does, as the streamer calls it, none when empty
+  name: overlayText(),
+});
+
 // Runs its steps, in order, each time its trigger fires, in the edition it's
 // made for. Actions saved before Java existed are Bedrock's.
 export const GameActionSchema = z.object({
@@ -169,6 +185,22 @@ export const GameActionSchema = z.object({
   // countdown timer counts them
   likes_every: z.number().int().min(1).default(100),
   steps: z.array(GameStepSchema),
+  overlay: GameOverlayItemSchema.prefault({}),
+});
+
+// Every shown action at once, or one at a time in turn
+export const GAMES_OVERLAY_LAYOUTS = ["list", "carousel"] as const;
+
+// How the games overlay looks
+export const GamesOverlaySchema = z.object({
+  layout: z.enum(GAMES_OVERLAY_LAYOUTS).default("list"),
+  // Hides the texts next to pictures; a side without one keeps its text
+  pictures_only: z.boolean().default(false),
+  // A font installed where the streaming app runs, Archivo when empty
+  font: z.string().max(60).default(""),
+  text_color: ColorSchema.default("#f1f5f9"),
+  // The arrows, and the glint of an action that runs
+  accent_color: ColorSchema.default("#f43f5e"),
 });
 
 const SavedEmoteSchema = z.object({
@@ -246,10 +278,13 @@ export const ProfileSchema = z.object({
   // The countdown timer on Tools, its settings and clock. Profiles saved
   // before it existed start from the defaults.
   timer: TimerProfileSchema.prefault({}),
-  // What LIVE events do in Minecraft, on Games. Profiles saved before it
-  // existed have no actions.
+  // What LIVE events do in Minecraft, on Games, and their overlay's look.
+  // Profiles saved before it existed have no actions.
   games: z
-    .object({ actions: z.array(GameActionSchema).default([]) })
+    .object({
+      actions: z.array(GameActionSchema).default([]),
+      overlay: GamesOverlaySchema.prefault({}),
+    })
     .prefault({}),
 });
 
@@ -260,6 +295,9 @@ export type Alert = z.infer<typeof AlertSchema>;
 export type GameStep = z.infer<typeof GameStepSchema>;
 export type GameAction = z.infer<typeof GameActionSchema>;
 export type MinecraftEdition = GameAction["edition"];
+export type GameOverlayItem = GameAction["overlay"];
+export type GamesOverlay = Profile["games"]["overlay"];
+export type GamesOverlayLayout = GamesOverlay["layout"];
 export type AlertSound = z.infer<typeof AlertSoundSchema>;
 export type AlertMedia = z.infer<typeof AlertMediaSchema>;
 // An image or video in the media library

@@ -17,6 +17,8 @@ export interface Folders {
   extraFolder: string;
   soundsFolder: string;
   mediaFolder: string;
+  // Each game's own folder sits in games/
+  minecraftFolder: string;
 }
 
 export interface Files {

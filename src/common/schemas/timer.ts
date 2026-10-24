@@ -7,7 +7,7 @@ const TIMER_STATUSES = ["idle", "running", "paused", "stopped"] as const;
 export const TIMER_ACTIONS = ["start", "pause", "stop", "reset"] as const;
 
 // What Color gives: #rrggbb, or #rrggbbaa with alpha
-const ColorSchema = z.string().regex(/^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i);
+export const ColorSchema = z.string().regex(/^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i);
 
 const addedSeconds = (value: number) => z.number().min(0).default(value);
 

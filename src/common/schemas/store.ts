@@ -70,6 +70,9 @@ const AppSettingsSchema = z.object({
   sounds: z.array(AlertSoundSchema).default([]),
   // Uploaded images and videos, the same way: a name and a file
   media: z.array(AlertSoundSchema).default([]),
+  // Pictures of what game actions make, for the games overlay, in their own
+  // library: a name and a file in the Minecraft pictures folder
+  minecraftPictures: z.array(AlertSoundSchema).default([]),
   activeFeatures: z.object({
     tts: z.boolean(),
     music: z.boolean(),

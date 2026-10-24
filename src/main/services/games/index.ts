@@ -76,7 +76,7 @@ export class GamesService extends Service {
   // Each action's runs still to send, by action id, see _pump
   private _backlogs = new Map<string, Batch[]>();
   // The latest profile's actions, which can stop a backlog
-  private _games: Profile["games"] = { actions: [] };
+  private _games: Pick<Profile["games"], "actions"> = { actions: [] };
   private _last: GameStatus;
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
@@ -139,7 +139,7 @@ export class GamesService extends Service {
   public async handle<K extends AppEvents>(
     type: K,
     payload: TokioEventMap[K],
-    games: Profile["games"],
+    games: Pick<Profile["games"], "actions">,
   ) {
     this._games = games;
     // Nothing could reach the game: off, or the port is taken

@@ -108,6 +108,12 @@ export enum APP_EVENTS {
   SET_GAMES_SETTINGS = "app:games:set",
   UPDATE_GAMES_SETTINGS = "app:games:update:settings",
   TEST_GAME_ACTION = "app:games:test",
+  TEST_GAMES_OVERLAY = "app:games:test:overlay",
+
+  // MINECRAFT PICTURES
+  GET_MINECRAFT_PICTURES = "app:games:pictures:get",
+  IMPORT_MINECRAFT_PICTURE = "app:games:pictures:import",
+  REMOVE_MINECRAFT_PICTURE = "app:games:pictures:remove",
 
   // SOUND LIBRARY
   GET_SOUNDS = "app:sounds:get",
@@ -340,6 +346,21 @@ export interface AppEventsMap {
     edition: MinecraftEdition;
     trigger: AlertTrigger;
     steps: GameStep[];
+  };
+  // Lights up the action's row on the games overlay, as a run does
+  [APP_EVENTS.TEST_GAMES_OVERLAY]: {
+    id: string;
+  };
+
+  // MINECRAFT PICTURES
+  [APP_EVENTS.GET_MINECRAFT_PICTURES]: void;
+  // Browses for pictures to add, the first going on the action, which
+  // SET_MINECRAFT_PICTURE names
+  [APP_EVENTS.IMPORT_MINECRAFT_PICTURE]: {
+    id: string;
+  };
+  [APP_EVENTS.REMOVE_MINECRAFT_PICTURE]: {
+    file: string;
   };
 
   // SOUND LIBRARY

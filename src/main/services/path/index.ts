@@ -26,6 +26,8 @@ export class PathManagerService {
       extraFolder: join(appFolder, "extra"),
       soundsFolder: join(appFolder, "sounds"),
       mediaFolder: join(appFolder, "media"),
+      // Later games get their folders next to it
+      minecraftFolder: join(appFolder, "games", "minecraft"),
     };
 
     this.files = {

@@ -1,0 +1,9 @@
+/*
+ * The games overlay's look (/games/), shared by its page and the Games
+ * page's preview so the two can't drift: ServerService inlines it into
+ * src/main/services/server/games.html, and the preview imports it as a
+ * plain stylesheet. Keep both pages' markup the same.
+ *
+ * It must work in OBS 30's browser (Chromium 103): no :has(), nesting,
+ * subgrid or container queries.
+ */

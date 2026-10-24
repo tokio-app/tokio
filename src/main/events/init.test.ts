@@ -83,6 +83,7 @@ const folders: Folders = {
   extraFolder: "app/extra",
   soundsFolder: "app/sounds",
   mediaFolder: "app/media",
+  minecraftFolder: "app/games/minecraft",
 };
 
 const noStats = { likes: 0, viewers: 0, views: 0 };
@@ -631,6 +632,7 @@ describe("init events", () => {
       trigger: alert().trigger,
       likes_every: 100,
       steps: [{ type: "command", command: "say hi" }],
+      overlay: { show: true, image: null, event: "", name: "" },
     };
 
     it.each(triggers)("passes %s to the games", async (trigger) => {

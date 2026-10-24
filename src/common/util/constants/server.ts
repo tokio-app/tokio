@@ -16,6 +16,11 @@ export const getAlertOverlayURL = (id: string) =>
 // connects with this id, and browser sources point at it.
 export const TIMER_PATH = "timer";
 
+// NOTE: DO NOT CHANGE. The games overlay is served at /games/, connects with
+// this id, and browser sources point at it. Minecraft's pictures are under
+// /games/minecraft/.
+export const GAMES_PATH = "games";
+
 // NOTE: DO NOT CHANGE. Minecraft connects to Tokio on this port: players
 // type /connect <this PC's address>:37892 in the game's chat, and the docs
 // show it.

@@ -75,6 +75,7 @@ const action = (overrides: Partial<GameAction> = {}): GameAction => ({
   trigger: trigger(TOKIO_EVENTS.FOLLOW),
   likes_every: 100,
   steps: [say("say Thanks {username}")],
+  overlay: { show: true, image: null, event: "", name: "" },
   ...overrides,
 });
 

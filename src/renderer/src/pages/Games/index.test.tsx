@@ -5,7 +5,7 @@ import {
   GameStatus,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { MINECRAFT_MOD_DOCS_URL } from "@/common/util";
+import { defaultProfile, MINECRAFT_MOD_DOCS_URL } from "@/common/util";
 import { failure, gift, profileReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { inList, section } from "@test/queries";
@@ -257,8 +257,10 @@ describe("Games", () => {
             trigger: expect.objectContaining({ type: TOKIO_EVENTS.FOLLOW }),
             likes_every: 100,
             steps: [{ type: "spawn", mob: "zombie", amount: 1, name: "" }],
+            overlay: { show: true, image: null, event: "", name: "" },
           },
         ],
+        overlay: defaultProfile.games.overlay,
       },
     ]);
 
@@ -267,7 +269,10 @@ describe("Games", () => {
     );
     await wait(300);
     expect(panels()).toHaveLength(0);
-    expect(saves().at(-1)).toEqual({ actions: [] });
+    expect(saves().at(-1)).toEqual({
+      actions: [],
+      overlay: defaultProfile.games.overlay,
+    });
   });
 
   it("adds, changes and removes steps", async () => {
