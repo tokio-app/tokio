@@ -75,6 +75,28 @@ describe("Games helper", () => {
     expect(withEdition(java, "bedrock").steps).toEqual(action.steps);
   });
 
+  it("finds the other edition's id by the game's English name", () => {
+    const action = {
+      ...createAction("bedrock"),
+      steps: [
+        spawn("xp_orb"),
+        spawn("ender_crystal"),
+        give("brick_block"),
+        give("zombie_pigman_spawn_egg"),
+      ],
+    };
+
+    const java = withEdition(action, "java");
+
+    expect(java.steps).toEqual([
+      spawn("experience_orb"),
+      spawn("end_crystal"),
+      give("bricks"),
+      give("zombified_piglin_spawn_egg"),
+    ]);
+    expect(withEdition(java, "bedrock").steps).toEqual(action.steps);
+  });
+
   it("falls back to a zombie and a diamond for what the edition lacks", () => {
     const action = {
       ...createAction("bedrock"),

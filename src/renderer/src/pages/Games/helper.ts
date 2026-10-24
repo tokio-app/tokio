@@ -88,26 +88,47 @@ export function createAction(edition: MinecraftEdition): GameAction {
   };
 }
 
-// Bedrock's ids that Java names differently
-const JAVA_IDS: Record<string, string> = {
-  web: "cobweb",
-  evocation_illager: "evoker",
-  zombie_pigman: "zombified_piglin",
+type Names = Record<string, string>;
+const NAMES: Record<MinecraftEdition, { mobs: Names; items: Names }> = {
+  bedrock,
+  java,
 };
-const BEDROCK_IDS = Object.fromEntries(
-  Object.entries(JAVA_IDS).map(([bedrock, java]) => [java, bedrock]),
+
+// Bedrock and Java ids for the same thing whose English names differ too
+const PAIRS = [
+  ["ender_crystal", "end_crystal"],
+  ["zombie_pigman_spawn_egg", "zombified_piglin_spawn_egg"],
+  ["silver_glazed_terracotta", "light_gray_glazed_terracotta"],
+  ["undyed_shulker_box", "shulker_box"],
+];
+const RENAMED = new Map(
+  PAIRS.flatMap(
+    ([a, b]) =>
+      [
+        [a, b],
+        [b, a],
+      ] as const,
+  ),
 );
 
-// The same mob or item in the other edition, or the fallback when it has none
+// The same mob or item in the other edition: the same id, or the one with the
+// same English name (Bedrock's "web" is Java's "cobweb"), or the fallback
 function idIn(
-  edition: MinecraftEdition,
-  list: SelectOption<string>[],
+  from: MinecraftEdition,
+  to: MinecraftEdition,
+  kind: "mobs" | "items",
   id: string,
   fallback: string,
 ) {
-  const renamed = (edition === "java" ? JAVA_IDS : BEDROCK_IDS)[id];
-  if (renamed) return renamed;
-  return list.some((option) => option.value === id) ? id : fallback;
+  const names = NAMES[to][kind];
+  if (Object.hasOwn(names, id)) return id;
+  const renamed = RENAMED.get(id);
+  if (renamed && Object.hasOwn(names, renamed)) return renamed;
+  const name = NAMES[from][kind][id]?.toLowerCase();
+  const same = Object.keys(names).find(
+    (other) => names[other].toLowerCase() === name,
+  );
+  return same ?? fallback;
 }
 
 // The action for another edition, with its mobs and items moved over
@@ -115,14 +136,15 @@ export function withEdition(
   action: GameAction,
   edition: MinecraftEdition,
 ): GameAction {
-  if (action.edition === edition) return action;
+  const from = action.edition;
+  if (from === edition) return action;
   const steps = action.steps.map((step): GameStep => {
     if (step.type === "spawn")
-      return { ...step, mob: idIn(edition, MOBS[edition], step.mob, "zombie") };
+      return { ...step, mob: idIn(from, edition, "mobs", step.mob, "zombie") };
     if (step.type === "give")
       return {
         ...step,
-        item: idIn(edition, ITEMS[edition], step.item, "diamond"),
+        item: idIn(from, edition, "items", step.item, "diamond"),
       };
     return step;
   });
