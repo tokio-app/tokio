@@ -8,6 +8,7 @@ import {
 import {
   About,
   Alerts,
+  Games,
   Home,
   Music,
   OfficialOverlays,
@@ -60,6 +61,12 @@ const musicRoute = createRoute({
   component: Music,
 });
 
+const gamesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/games",
+  component: Games,
+});
+
 const toolsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tools",
@@ -85,6 +92,7 @@ const routeTree = rootRoute.addChildren([
   ttsRoute,
   alertsRoute,
   musicRoute,
+  gamesRoute,
   toolsRoute,
   settingsRoute,
   aboutRoute,

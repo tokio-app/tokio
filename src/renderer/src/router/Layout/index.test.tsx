@@ -34,6 +34,7 @@ describe("Layout", () => {
       ["TTS", "/tts"],
       ["Alerts", "/alerts"],
       ["Music", "/music"],
+      ["Games", "/games"],
       ["Tools", "/tools"],
       ["About", "/about"],
       ["Settings", "/settings"],
