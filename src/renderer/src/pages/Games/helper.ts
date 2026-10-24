@@ -1,5 +1,5 @@
 import { GameAction, GameStep } from "@/common/schemas";
-import { GameStatus, TOKIO_EVENTS } from "@/common/types";
+import { CommandResult, GameStatus, TOKIO_EVENTS } from "@/common/types";
 import { MINECRAFT_PORT } from "@/common/util";
 import { SelectOption } from "@/components";
 import minecraft from "./minecraft.json";
@@ -81,6 +81,15 @@ export function withText(step: GameStep, text: string): GameStep {
   if (step.type === "spawn") return { ...step, name: text };
   if (step.type === "command") return { ...step, command: text };
   return step;
+}
+
+// How a test went, in a few words
+export function testSummary(results: CommandResult[]) {
+  const failed = results.filter((result) => !result.ok).length;
+  const commands = `${results.length} ${results.length === 1 ? "command" : "commands"}`;
+  if (failed === 0) return `${commands} ran`;
+  if (failed === results.length) return `${commands} failed`;
+  return `${failed} of ${commands} failed`;
 }
 
 const STATUS_TEXT: Record<GameStatus["state"], string> = {

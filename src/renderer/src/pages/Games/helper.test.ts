@@ -10,6 +10,7 @@ import {
   STEP_KINDS,
   statusText,
   stepText,
+  testSummary,
   withText,
 } from "./helper";
 
@@ -63,5 +64,17 @@ describe("Games helper", () => {
 
   it("writes the chat's connect command", () => {
     expect(connectCommand("localhost")).toBe("/connect localhost:37892");
+  });
+
+  it("sums up a test by the commands that failed", () => {
+    const result = (ok: boolean) => ({ command: "say hi", ok, message: "" });
+
+    expect(testSummary([result(true)])).toBe("1 command ran");
+    expect(testSummary([result(true), result(false)])).toBe(
+      "1 of 2 commands failed",
+    );
+    expect(testSummary([result(false), result(false)])).toBe(
+      "2 commands failed",
+    );
   });
 });

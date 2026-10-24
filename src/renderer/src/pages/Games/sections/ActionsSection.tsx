@@ -27,7 +27,14 @@ import {
 } from "@/components";
 import { Updater, useIpcListener } from "@/hooks";
 import { Ref, useRef, useState } from "react";
-import { FiCheck, FiPlay, FiPlus, FiTrash2, FiX } from "react-icons/fi";
+import {
+  FiCheck,
+  FiChevronRight,
+  FiPlay,
+  FiPlus,
+  FiTrash2,
+  FiX,
+} from "react-icons/fi";
 import styles from "../games.module.css";
 import {
   createAction,
@@ -36,6 +43,7 @@ import {
   MOBS,
   STEP_KINDS,
   stepText,
+  testSummary,
   TIMES,
   WEATHERS,
   withText,
@@ -106,6 +114,9 @@ type ItemProps = {
 };
 
 type TestResult = { results: CommandResult[]; error?: string };
+
+// A test sends up to 100 commands; the last ones are enough to read
+const RESULTS_SHOWN = 25;
 
 function ActionItem({ action, gifts, emotes, onChange, onRemove }: ItemProps) {
   const { trigger, steps } = action;
@@ -237,22 +248,34 @@ function ActionItem({ action, gifts, emotes, onChange, onRemove }: ItemProps) {
             <p className={styles.result_error}>{result.error}</p>
           )}
           {result.results.length > 0 && (
-            <ul className={styles.result_list}>
-              {result.results.map((r, index) => (
-                <li
-                  key={index}
-                  className={r.ok ? styles.result : styles.result_failed}
-                >
-                  {r.ok ? (
-                    <FiCheck role="img" aria-label="Ran" size={16} />
-                  ) : (
-                    <FiX role="img" aria-label="Failed" size={16} />
-                  )}
-                  <code className={styles.result_command}>{r.command}</code>
-                  <span className={styles.result_message}>{r.message}</span>
-                </li>
-              ))}
-            </ul>
+            // Opens with the first results; once folded, later tests keep it
+            <details open className={styles.result_log}>
+              <summary className={styles.result_summary}>
+                <FiChevronRight size={16} />
+                {testSummary(result.results)}
+              </summary>
+              {result.results.length > RESULTS_SHOWN && (
+                <p className={styles.result_note}>
+                  Showing the last {RESULTS_SHOWN}.
+                </p>
+              )}
+              <ul className={styles.result_list}>
+                {result.results.slice(-RESULTS_SHOWN).map((r, index) => (
+                  <li
+                    key={index}
+                    className={r.ok ? styles.result : styles.result_failed}
+                  >
+                    {r.ok ? (
+                      <FiCheck role="img" aria-label="Ran" size={16} />
+                    ) : (
+                      <FiX role="img" aria-label="Failed" size={16} />
+                    )}
+                    <code className={styles.result_command}>{r.command}</code>
+                    <span className={styles.result_message}>{r.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </div>
       )}

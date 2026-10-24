@@ -61,6 +61,7 @@ The **Games** page (`/games`, after Music) connects Minecraft Bedrock to Tokio. 
   - **Check:** run every id in the game, with `testfor @e[type=<id>]` and `clear @p <id> 0 0`, which count without changing the world. An unknown id is a syntax error. The current list is 1.26.50, all 1,689 known.
   - **Java's ids differ for some:** Bedrock has `web` (Cobweb), `evocation_illager` (Evoker) and `zombie_pigman` (Zombified Piglin), which the Java mod will need mapped.
 - Actions save through `useEditableSettings("games")`; the toggle emits `SET_GAMES_SETTINGS` at once.
+- An action's **Test** results fold in a `<details>` under `testSummary` (how many commands ran or failed). It opens with the first results, and later tests keep a fold. The list shows the last 25 (`RESULTS_SHOWN`) of up to 100, so an earlier failure shows only in the summary.
 
 ## Tests
 

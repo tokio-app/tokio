@@ -324,10 +324,36 @@ describe("Games", () => {
         { command: "bad", ok: false, message: "Syntax error" },
       ],
     });
+    expect(first.getByText("1 of 2 commands failed")).toBeInTheDocument();
     expect(first.getByText("[Aku] hi")).toBeInTheDocument();
     expect(first.getByRole("img", { name: "Ran" })).toBeInTheDocument();
     expect(first.getByText("Syntax error")).toBeInTheDocument();
     expect(first.getByRole("img", { name: "Failed" })).toBeInTheDocument();
+  });
+
+  it("shows a test's last 25 commands, folded under how many ran", async () => {
+    const { user } = await load([action("a1")]);
+
+    await user.click(screen.getByRole("button", { name: "Test" }));
+    await send(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
+      success: true,
+      id: "a1",
+      results: Array.from({ length: 30 }, (_, i) => ({
+        command: `say ${i + 1}`,
+        ok: true,
+        message: "",
+      })),
+    });
+
+    expect(screen.getByText("Showing the last 25.")).toBeInTheDocument();
+    expect(screen.queryByText("say 5")).not.toBeInTheDocument();
+    expect(screen.getByText("say 6")).toBeInTheDocument();
+    expect(screen.getByText("say 30")).toBeInTheDocument();
+
+    const summary = screen.getByText("30 commands ran");
+    expect(summary.closest("details")).toHaveAttribute("open");
+    await user.click(summary);
+    expect(summary.closest("details")).not.toHaveAttribute("open");
   });
 
   it("shows why a test failed", async () => {
