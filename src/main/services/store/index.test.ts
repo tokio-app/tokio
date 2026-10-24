@@ -564,6 +564,52 @@ describe("StoreManagerService", () => {
     });
   });
 
+  describe("games", () => {
+    it("turns them off for stores saved before the setting", async () => {
+      const { games: _games, ...settings } = defaultStoreData.settings;
+      await writeFile(
+        storeFile,
+        JSON.stringify({ ...defaultStoreData, settings }),
+      );
+
+      const store = await init();
+
+      expect(store.wasRebuilt()).toBe(false);
+      expect(store.getSettings().games).toEqual({
+        minecraft: { enabled: false },
+      });
+    });
+
+    it("saves the setting", async () => {
+      const store = await init();
+
+      expect(
+        await store.updateGamesSettings({ minecraft: { enabled: true } }),
+      ).toBe(true);
+
+      expect((await readJSON(storeFile)).settings.games).toEqual({
+        minecraft: { enabled: true },
+      });
+      expect((await init()).getSettings().games).toEqual({
+        minecraft: { enabled: true },
+      });
+    });
+
+    it("refuses bad settings without changing the store", async () => {
+      const store = await init();
+
+      await expect(
+        store.updateGamesSettings({ minecraft: { enabled: "yes" } }),
+      ).rejects.toThrow();
+
+      expect(store.getSettings().games).toEqual({
+        minecraft: { enabled: false },
+      });
+      // Later saves still pass the store's schema
+      expect(await store.updateTraySettings(false)).toBe(true);
+    });
+  });
+
   describe("live state", () => {
     afterEach(() => {
       vi.useRealTimers();
