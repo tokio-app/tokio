@@ -176,7 +176,7 @@ export class GamesService extends Service {
   ) {
     const fill = (text: string) =>
       formatAlertMessage(text, payload, commandValue);
-    const once = steps.flatMap((step) => gameCommands(step, fill));
+    const once = steps.flatMap((step) => gameCommands(step, fill, "bedrock"));
     const commands: string[] = [];
     for (let i = 0; i < times && commands.length < MAX_COMMANDS; i++) {
       commands.push(...once);
