@@ -25,6 +25,21 @@
   text-overflow: ellipsis;
 }
 
+/* Btn's fixed height and no-wrap would cut a long command */
+.code.code {
+  height: auto;
+  min-height: var(--control-height);
+  padding-block: var(--space-2);
+  color: var(--font-primary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-md);
+}
+
+.code .value {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .copied {
   color: var(--success);
 }
