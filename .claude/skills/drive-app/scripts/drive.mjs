@@ -1,10 +1,11 @@
 // Launches the built app for a one-off check, the way e2e/app.spec.ts does,
 // and runs a steps file against it. See ../SKILL.md.
 //
-//   node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>]
+//   node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>]
 //
 // With --exe it starts a packaged build instead (yarn build:unpack), such as
-// dist/win-unpacked/tokio.exe.
+// dist/win-unpacked/tokio.exe. With --scale it renders at that device scale,
+// 2 for sharp screenshots, whatever the display's.
 import { _electron as electron } from "@playwright/test";
 import {
   copyFileSync,
@@ -24,11 +25,15 @@ const repo = resolve(import.meta.dirname, "../../../..");
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { home: { type: "string" }, exe: { type: "string" } },
+  options: {
+    home: { type: "string" },
+    exe: { type: "string" },
+    scale: { type: "string" },
+  },
 });
 if (positionals.length !== 1) {
   console.error(
-    "Usage: node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>]",
+    "Usage: node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>]",
   );
   process.exit(2);
 }
@@ -91,8 +96,13 @@ const env = Object.fromEntries(
 let app;
 let failed = false;
 try {
+  const args = values.scale
+    ? [`--force-device-scale-factor=${values.scale}`]
+    : [];
   app = await electron.launch({
-    ...(exe ? { executablePath: exe } : { args: ["."], cwd: repo }),
+    ...(exe
+      ? { executablePath: exe, args }
+      : { args: [...args, "."], cwd: repo }),
     env: { ...env, TOKIO_HOME: home },
   });
 

@@ -18,9 +18,11 @@ argument-hint: "[what to check]"
    };
    ```
 
-3. Run it from the repository root: `node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs>`. With `--home <dir>` it uses that data folder and keeps it, to look at what the app saved or to start the next run from there. One Tokio runs per data folder, so runs on the same `--home` go one after the other: a second one quits at once. With `--exe <app>` it starts a packaged build instead, made with `yarn build:unpack`: `dist/win-unpacked/tokio.exe`, or `dist/linux-unpacked/tokio` on Linux.
+3. Run it from the repository root: `node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs>`. With `--home <dir>` it uses that data folder and keeps it, to look at what the app saved or to start the next run from there. One Tokio runs per data folder, so runs on the same `--home` go one after the other: a second one quits at once. With `--exe <app>` it starts a packaged build instead, made with `yarn build:unpack`: `dist/win-unpacked/tokio.exe`, or `dist/linux-unpacked/tokio` on Linux. With `--scale 2` it renders at twice the device scale, for sharp screenshots on any display.
 4. It refuses to start while port 37891 is in use. Ask the user to quit Tokio or stop `yarn dev`; don't stop them yourself.
 5. Look at the screenshots, and at what the script printed: renderer errors come out as `[page]` and `[console]` lines, and it exits with 1 when a step throws.
+
+`scripts/screenshots.mjs` is a steps file that retakes the README's screenshots into `.github/screenshots/` (the whole window, 1200×800) and the website docs' into `../tokio-web/src/assets/screenshots/` (crops of what each docs section describes), with made-up viewers: `node .claude/skills/drive-app/scripts/drive.mjs --scale 2 .claude/skills/drive-app/scripts/screenshots.mjs`. It needs the network for the official overlays. A docs crop is named after its file, which the docs reference; a new one needs a line in the docs page that shows it.
 
 ## Helpers
 
