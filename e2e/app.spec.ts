@@ -117,6 +117,7 @@ test("opens every page from the sidebar", async () => {
     ["TTS", "Voice"],
     ["Alerts", "Alerts"],
     ["Music", "Controls"],
+    ["Games", "Actions"],
     ["Tools", "Test Overlays"],
     ["About", "Online services"],
     ["Settings", "Live Profiles"],

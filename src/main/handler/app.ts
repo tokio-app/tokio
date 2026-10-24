@@ -4,6 +4,7 @@ import { Notifier } from "@/helper/feedback";
 import { isOverlayURL, openLinksOutside, stayOnPage } from "@/helper/network";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
+import { GamesService } from "@/services/games";
 import { JSONManagerService } from "@/services/json";
 import { LicensesService } from "@/services/licenses";
 import { LiveService } from "@/services/live";
@@ -53,6 +54,7 @@ export class AppHandler implements AppHandlerVariables {
   public readonly updaterService: UpdaterService;
   public readonly liveService: LiveService;
   public readonly timerService: TimerService;
+  public readonly gamesService: GamesService;
   public readonly trayService: TrayService;
   public readonly notifier: Notifier;
 

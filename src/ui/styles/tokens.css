@@ -43,6 +43,9 @@
   --font-family:
     "Archivo Variable", system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, Ubuntu, sans-serif;
+  /* Only for literal text typed in a game, like a command */
+  --font-family-mono:
+    ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
   /* Live numbers are set condensed, with tabular figures */
   --stretch-readout: 75%;
   --font-xs: 12px;

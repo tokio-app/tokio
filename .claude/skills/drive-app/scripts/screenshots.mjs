@@ -321,6 +321,48 @@ export default async ({ app, page, home, push, toggle }) => {
     .check();
   await crop("music-protection", body("Protection"));
 
+  // Games: no Minecraft to join, so push what main would. Waiting shows the
+  // setup, connected the actions.
+  await open("Games", "Minecraft");
+  const games = (state) => ({
+    success: true,
+    data: {
+      settings: { minecraft: { enabled: true } },
+      status: { minecraft: { state } },
+    },
+  });
+  await push("app:games:res:games", games("waiting"));
+  // One made-up network address per edition, as in Settings, keeping each
+  // first command's caret
+  for (const [edition, command] of [
+    ["Bedrock", "/connect 192.168.1.20:37892"],
+    ["Java", "/tokio connect 192.168.1.20:37892"],
+  ]) {
+    const copies = section("Minecraft").getByTitle(
+      `Copy the ${edition} command`,
+    );
+    await copies.first().waitFor();
+    await copies.evaluateAll((buttons, command) => {
+      buttons.slice(1).forEach((button) => button.remove());
+      buttons[0].querySelector("span").firstChild.nodeValue = command;
+    }, command);
+  }
+  await crop("games-connect", section("Minecraft"));
+
+  await push("app:games:res:games", games("connected"));
+  const actions = section("Actions");
+  await actions.getByRole("button", { name: "Add action" }).click();
+  await page.getByRole("textbox", { name: "Name" }).fill("{username}");
+  await actions.getByRole("button", { name: "Add action" }).click();
+  await page.getByRole("combobox", { name: "Trigger" }).last().click();
+  await page.getByRole("option", { name: "Gift", exact: true }).click();
+  await page.getByRole("combobox", { name: "Step" }).last().click();
+  await page.getByRole("option", { name: "Command", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Command" })
+    .fill("say {username} sent {count} {gift}");
+  await crop("games-actions", actions);
+
   // Countdown timer
   await open("Tools", "Countdown Timer");
   await page

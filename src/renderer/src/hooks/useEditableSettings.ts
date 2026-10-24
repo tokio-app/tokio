@@ -10,7 +10,7 @@ import { useIpcRequest } from "./useIpcRequest";
 // Groups quick changes, like dragging a slider or typing, into one save.
 const SAVE_DELAY = 300;
 
-type Section = "tts" | "music" | "alerts";
+type Section = "tts" | "music" | "alerts" | "games";
 
 // Sends a section's settings to main, which saves them in the profile
 const SAVE: { [K in Section]: (settings: Profile[K]) => void } = {
@@ -20,6 +20,8 @@ const SAVE: { [K in Section]: (settings: Profile[K]) => void } = {
     window.api.emit(APP_EVENTS.UPDATE_MUSIC_SETTINGS, { settings }),
   alerts: (settings) =>
     window.api.emit(APP_EVENTS.UPDATE_ALERTS_SETTINGS, { settings }),
+  games: (settings) =>
+    window.api.emit(APP_EVENTS.UPDATE_GAMES_SETTINGS, { settings }),
 };
 
 // Main's reply to each save
@@ -27,6 +29,7 @@ const SAVE_REPLY = {
   tts: APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS,
   music: APP_EVENTS_RESPONSE.UPDATE_MUSIC_SETTINGS,
   alerts: APP_EVENTS_RESPONSE.UPDATE_ALERTS_SETTINGS,
+  games: APP_EVENTS_RESPONSE.UPDATE_GAMES_SETTINGS,
 } as const satisfies Record<Section, APP_EVENTS_RESPONSE>;
 
 // Of every mounted page and autosaved field, see flushSettings

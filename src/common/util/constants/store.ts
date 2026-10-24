@@ -35,6 +35,9 @@ export const defaultStoreData: StoreSchema = {
       superfan: true,
       join: true,
     },
+    games: {
+      minecraft: { enabled: false },
+    },
     liveStats: {
       likes: 0,
       viewers: 0,

@@ -28,6 +28,7 @@ export interface Files {
     alerts: string;
     music: string;
     overlays: string;
+    games: string;
   };
   gifts: string;
   customGifts: string;

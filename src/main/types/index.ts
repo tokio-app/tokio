@@ -9,6 +9,7 @@ import {
 import type { Notifier } from "@/helper/feedback";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
+import { GamesService } from "@/services/games";
 import { JSONManagerService } from "@/services/json";
 import { LicensesService } from "@/services/licenses";
 import { LiveService } from "@/services/live";
@@ -60,6 +61,7 @@ export interface AppServices {
   readonly updaterService: UpdaterService;
   readonly liveService: LiveService;
   readonly timerService: TimerService;
+  readonly gamesService: GamesService;
   readonly trayService: TrayService;
 }
 

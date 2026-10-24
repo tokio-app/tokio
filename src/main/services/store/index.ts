@@ -4,6 +4,7 @@ import {
   AppProvider,
   AppSettings,
   EntityMetadata,
+  GamesSettingsSchema,
   MediaFile,
   OverlayMetadata,
   Profile,
@@ -333,6 +334,15 @@ export class StoreManagerService extends Service {
   public async updateActivityFeed(feed: ActivityFeed): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.activityFeed = { ...feed };
+    return this._queueSave();
+  }
+
+  // Throws on settings the schema refuses, before they reach the store: one
+  // bad value would make every later save fail.
+  public async updateGamesSettings(settings: unknown): Promise<boolean> {
+    this._ensureInitialized();
+    const games = GamesSettingsSchema.parse(settings);
+    this._storeData!.settings.games = games;
     return this._queueSave();
   }
 

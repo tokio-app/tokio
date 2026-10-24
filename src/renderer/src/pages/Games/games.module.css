@@ -1,0 +1,316 @@
+/* MINECRAFT */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
+}
+
+.status_row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Two classes to win over Home's status and dot, whichever loads last */
+.status_error.status_error {
+  color: var(--danger);
+}
+
+.dot_error.dot_error {
+  background-color: var(--danger);
+}
+
+/* What to do in each edition, until a game connects: side by side, stacked
+   when narrow */
+.setup {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.edition {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.edition_name {
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-weight: 600;
+}
+
+.link {
+  color: var(--accent-primary);
+}
+
+/* The chat's cursor, while Tokio waits for the game: the page's one motion */
+.caret {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background-color: currentColor;
+  animation: caret-blink 1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}
+
+/* A real sequence, numbered by the list */
+.setup_steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  counter-reset: setup;
+  list-style: none;
+  color: var(--font-primary);
+  font-size: var(--font-md);
+}
+
+.setup_steps li {
+  display: grid;
+  grid-template-columns: var(--space-6) minmax(0, 1fr);
+  counter-increment: setup;
+}
+
+.setup_steps li::before {
+  content: counter(setup);
+  color: var(--font-secondary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The connect commands, one per address of this PC. At the foot of each
+   edition, so both editions' commands line up. */
+.commands {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+/* ACTIONS */
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  list-style: none;
+}
+
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
+}
+
+.action_header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.edition_select {
+  width: 120px;
+}
+
+.trigger {
+  width: 200px;
+}
+
+/* The trigger's filter, beside it. A gift's gifts and when it runs sit in a
+   row here, not stacked as in the alerts' table. */
+.filter {
+  display: flex;
+  flex: 1 1 280px;
+  min-width: 0;
+  max-width: 520px;
+}
+
+.filter > * {
+  flex-direction: row;
+}
+
+/* The alerts' table draws a line for triggers without a filter. A div, as an
+   input is :empty too (Chat's keyword, a join's viewer). */
+.filter > div:empty {
+  display: none;
+}
+
+/* Like's "every 100 likes" */
+.likes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.action_buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+/* Each step reads as a sentence */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.kind {
+  width: 160px;
+}
+
+.thing {
+  width: 200px;
+}
+
+.amount {
+  width: 72px;
+}
+
+.name {
+  width: 200px;
+}
+
+.command {
+  flex: 1 1 280px;
+  font-family: var(--font-family-mono);
+}
+
+.word {
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+}
+
+.remove_step {
+  margin-left: auto;
+}
+
+.action_footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* What the game answered to the test */
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  font-size: var(--font-sm);
+}
+
+.result_error {
+  color: var(--danger);
+}
+
+/* Folds the commands under how many ran. Its text lines up with theirs. */
+.result_summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: fit-content;
+  color: var(--font-secondary);
+  cursor: pointer;
+}
+
+.result_summary:hover {
+  color: var(--font-primary);
+}
+
+.result_summary svg {
+  transition: transform var(--transition-fast);
+}
+
+.result_log[open] .result_summary {
+  margin-bottom: var(--space-2);
+}
+
+.result_log[open] .result_summary svg {
+  transform: rotate(90deg);
+}
+
+.result_note {
+  margin-bottom: var(--space-2);
+  padding-left: calc(16px + var(--space-3));
+  color: var(--font-secondary);
+}
+
+.result_list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+}
+
+.result,
+.result_failed {
+  display: grid;
+  grid-template-columns: 16px minmax(0, max-content) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.result svg,
+.result_failed svg {
+  align-self: center;
+}
+
+.result svg {
+  color: var(--success);
+}
+
+.result_failed,
+.result_failed .result_message {
+  color: var(--danger);
+}
+
+.result_command {
+  color: var(--font-primary);
+  font-family: var(--font-family-mono);
+  overflow-wrap: anywhere;
+}
+
+.result_message {
+  color: var(--font-secondary);
+  overflow-wrap: anywhere;
+}

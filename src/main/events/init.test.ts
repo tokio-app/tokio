@@ -1,6 +1,7 @@
 import {
   Alert,
   ALERT_TRIGGERS,
+  GameAction,
   Profile,
   SavedEmote,
   TimerSettingsSchema,
@@ -17,6 +18,7 @@ import {
   FEEDBACK_CODES,
   Files,
   Folders,
+  GamesStatus,
   Gift,
   GiftEvent,
   LikeEvent,
@@ -35,6 +37,7 @@ import config from "@/config";
 import Logger from "@/logger";
 import type { AlertsService } from "@/services/alerts";
 import type { ReconnectState } from "@/services/connector/common";
+import type { GamesService } from "@/services/games";
 import { LiveService } from "@/services/live";
 import type { MusicService } from "@/services/music";
 import type { OverlayService } from "@/services/overlay";
@@ -65,6 +68,7 @@ const files: Files = {
     alerts: "alerts.log",
     music: "music.log",
     overlays: "overlays.log",
+    games: "games.log",
   },
   gifts: "extra/gifts.json",
   customGifts: "extra/custom-gifts.json",
@@ -182,6 +186,7 @@ function setup() {
     updates: { auto: false },
     tray: { enabled: true },
     activityFeed: { ...defaultStoreData.settings.activityFeed },
+    games: { minecraft: { enabled: true } },
   };
 
   const pathManagerService = {
@@ -300,6 +305,16 @@ function setup() {
     get: vi.fn(() => timer),
     onChange: vi.fn((_listener: (deltaMs: number) => void) => {}),
   };
+  const gamesService = {
+    setLogFile: vi.fn(),
+    configure: vi.fn(
+      async (..._args: Parameters<GamesService["configure"]>) => true,
+    ),
+    onStatus: vi.fn((..._args: Parameters<GamesService["onStatus"]>) => {}),
+    onError: vi.fn((..._args: Parameters<GamesService["onError"]>) => {}),
+    handle: vi.fn(async (..._args: Parameters<GamesService["handle"]>) => {}),
+    clear: vi.fn(),
+  };
 
   const h = createHandler({
     pathManagerService,
@@ -316,6 +331,7 @@ function setup() {
     licensesService,
     liveService,
     timerService,
+    gamesService,
     trayService,
     yamlManagerService: {},
   });
@@ -341,6 +357,7 @@ function setup() {
     liveService,
     timer,
     timerService,
+    gamesService,
     trayService,
   };
 }
@@ -598,6 +615,171 @@ describe("init events", () => {
           "alerts.log",
         ],
       ]);
+    });
+  });
+
+  describe("games", () => {
+    const triggers = ALERT_TRIGGERS.filter(
+      (t): t is Exclude<AlertTrigger, typeof EMOTE_TRIGGER> =>
+        t !== EMOTE_TRIGGER,
+    );
+
+    const action: GameAction = {
+      id: "action-1",
+      enabled: true,
+      edition: "bedrock",
+      trigger: alert().trigger,
+      likes_every: 100,
+      steps: [{ type: "command", command: "say hi" }],
+    };
+
+    it.each(triggers)("passes %s to the games", async (trigger) => {
+      // Whatever features are on
+      const s = await live({ alerts: false });
+      const { data } = generateTikTokEventSample(trigger);
+
+      // Music Change comes once per song, through the alerts' onSongChange
+      const songStarts = {
+        emit: (_event: TOKIO_EVENTS, songs: MusicInfo[]) =>
+          s.musicService.onSongChange.mock.calls[0][0](songs),
+      };
+      const source =
+        trigger === TOKIO_EVENTS.MUSIC_CHANGE ? songStarts : s.conn;
+      emitLive(source, trigger, data);
+
+      await vi.waitFor(() => {
+        expect(s.gamesService.handle).toHaveBeenCalledExactlyOnceWith(
+          trigger,
+          data,
+          profile.games,
+        );
+      });
+      expect(s.musicService.onSongChange).toHaveBeenCalledOnce();
+    });
+
+    it("reports an action that fails to run with its trigger's label", async () => {
+      const s = await live();
+      s.gamesService.handle.mockRejectedValue(new Error("boom"));
+
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+
+      await vi.waitFor(() => {
+        expect(s.h.notices).toEqual([
+          expect.objectContaining({
+            level: "error",
+            source: "games",
+            code: FEEDBACK_CODES.GAME_ACTION_FAILED,
+            message: "Unable to run the Follow game action.",
+          }),
+        ]);
+      });
+      expect(logError).toHaveBeenCalledWith(
+        expect.stringContaining(TOKIO_EVENTS.FOLLOW),
+        "games.log",
+        expect.any(Error),
+      );
+    });
+
+    it("forgets the gift streaks when the LIVE disconnects", async () => {
+      const s = await live();
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+
+      expect(s.gamesService.clear).toHaveBeenCalledOnce();
+    });
+
+    it("pushes each status change with the settings, while the window is open", async () => {
+      const s = await live();
+      const status: GamesStatus = { minecraft: { state: "connected" } };
+
+      s.gamesService.onStatus.mock.calls[0][0](status);
+      s.h.win.close();
+      s.gamesService.onStatus.mock.calls[0][0](status);
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.GAMES)).toEqual([
+        { success: true, data: { settings: s.settings.games, status } },
+      ]);
+    });
+
+    it("warns at most once a minute that Minecraft isn't connected, logging each notice", async () => {
+      const s = await live();
+      const fail = s.gamesService.onError.mock.calls[0][0];
+      vi.useFakeTimers();
+      const offline = { offline: true, message: "Not connected." };
+
+      fail(action, offline);
+      fail({ ...action, id: "action-2" }, offline);
+      vi.advanceTimersByTime(59_999);
+      fail(action, offline);
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "games",
+          code: FEEDBACK_CODES.GAME_NOT_CONNECTED,
+          message:
+            "Minecraft Bedrock Edition isn't connected, so the Follow action didn't run. Type the /connect command from Games in the game's chat.",
+        }),
+      ]);
+      vi.advanceTimersByTime(1);
+      fail(action, offline);
+      expect(s.h.notices).toHaveLength(2);
+      const logged = [
+        "<Games> The Follow action didn't run, Minecraft Bedrock Edition isn't connected.",
+        "games.log",
+      ];
+      expect(logWarn.mock.calls).toEqual([logged, logged]);
+    });
+
+    it("tells how Java Edition connects when its action didn't run", async () => {
+      const s = await live();
+      const fail = s.gamesService.onError.mock.calls[0][0];
+
+      fail(
+        { ...action, edition: "java" },
+        { offline: true, message: "Connect Minecraft Java Edition first." },
+      );
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          code: FEEDBACK_CODES.GAME_NOT_CONNECTED,
+          message:
+            "Minecraft Java Edition isn't connected, so the Follow action didn't run. Type the /tokio connect command from Games in the game's chat.",
+        }),
+      ]);
+      expect(logWarn.mock.calls).toEqual([
+        [
+          "<Games> The Follow action didn't run, Minecraft Java Edition isn't connected.",
+          "games.log",
+        ],
+      ]);
+    });
+
+    it("warns about each action's refused command at most once every 30 seconds", async () => {
+      const s = await live();
+      const fail = s.gamesService.onError.mock.calls[0][0];
+      vi.useFakeTimers();
+      const refused = { offline: false, message: "Syntax error" };
+
+      fail(action, refused);
+      fail(action, refused);
+      fail({ ...action, id: "action-2" }, refused);
+      vi.advanceTimersByTime(30_000);
+      fail(action, refused);
+
+      const notice = expect.objectContaining({
+        level: "warning",
+        source: "games",
+        code: FEEDBACK_CODES.GAME_COMMAND_FAILED,
+        message:
+          "A command of the Follow action failed in Minecraft: Syntax error",
+      });
+      expect(s.h.notices).toEqual([notice, notice, notice]);
+      const logged = [
+        "<Games> A command of the Follow action failed -- Syntax error",
+        "games.log",
+      ];
+      expect(logWarn.mock.calls).toEqual([logged, logged, logged]);
     });
   });
 
@@ -1366,6 +1548,7 @@ describe("init events", () => {
       expect(s.overlayService.setLogFile).toHaveBeenCalledWith("overlays.log");
       expect(s.alertsService.setLogFile).toHaveBeenCalledWith("alerts.log");
       expect(s.musicService.setLogFile).toHaveBeenCalledWith("music.log");
+      expect(s.gamesService.setLogFile).toHaveBeenCalledWith("games.log");
       for (const service of [
         s.urlManagerService,
         s.storeManagerService,
@@ -1539,6 +1722,41 @@ describe("init events", () => {
       );
       expect(s.storeManagerService.updateServerSettings).not.toHaveBeenCalled();
       expect(noticesFor(s, FEEDBACK_CODES.SERVER_START_FAILED)).toEqual([]);
+    });
+
+    it("turns Minecraft on as saved, after the store loads", async () => {
+      const s = setup();
+
+      await load(s);
+
+      expect(s.gamesService.configure).toHaveBeenCalledExactlyOnceWith(
+        s.settings.games,
+      );
+      expect(
+        s.storeManagerService.initialize.mock.invocationCallOrder[0],
+      ).toBeLessThan(s.gamesService.configure.mock.invocationCallOrder[0]);
+      expect(noticesFor(s, FEEDBACK_CODES.GAME_LISTEN_FAILED)).toEqual([]);
+    });
+
+    it("warns when it can't listen for Minecraft, keeping the setting", async () => {
+      const s = setup();
+      s.gamesService.configure.mockResolvedValue(false);
+
+      await load(s);
+
+      const message =
+        "Tokio couldn't listen for Minecraft, port 37892 may be in use.";
+      expect(noticesFor(s, FEEDBACK_CODES.GAME_LISTEN_FAILED)).toEqual([
+        expect.objectContaining({ level: "warning", source: "games", message }),
+      ]);
+      expect(logWarn).toHaveBeenCalledWith(
+        expect.stringContaining(message),
+        "games.log",
+      );
+      expect(s.settings.games.minecraft.enabled).toBe(true);
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        { success: true },
+      ]);
     });
 
     it("turns the server off when it can't start", async () => {

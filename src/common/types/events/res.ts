@@ -15,6 +15,7 @@ import {
   TestOverlay,
 } from "../../schemas";
 import { AppNotification, Reply } from "../feedback";
+import { CommandResult, GamesData } from "../games";
 import { LiveSession } from "../live";
 import { OverlayApp } from "../server";
 import { VoiceData, VoiceEngine } from "../store";
@@ -100,6 +101,11 @@ export enum APP_EVENTS_RESPONSE {
   ALERT_FILE_REMOVED = "app:alerts:res:file:removed",
   EMOTES = "app:alerts:res:emotes",
   CUSTOM_GIFTS = "app:alerts:res:gifts",
+
+  // GAMES
+  GAMES = "app:games:res:games",
+  UPDATE_GAMES_SETTINGS = "app:games:res:update:settings",
+  TEST_GAME_ACTION = "app:games:res:test",
 
   // SOUND LIBRARY
   GET_SOUNDS = "app:sounds:res",
@@ -334,6 +340,19 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.CUSTOM_GIFTS]: {
     data: CustomGift[];
   };
+
+  // GAMES
+  // The game connections: GET_GAMES' and SET_GAMES_SETTINGS' reply, and
+  // pushed whenever a connection changes
+  [APP_EVENTS_RESPONSE.GAMES]: Reply<{
+    data?: GamesData;
+  }>;
+  [APP_EVENTS_RESPONSE.UPDATE_GAMES_SETTINGS]: Reply;
+  // Each command the test ran, with the game's reply
+  [APP_EVENTS_RESPONSE.TEST_GAME_ACTION]: Reply<{
+    id: string;
+    results: CommandResult[];
+  }>;
 
   // SOUND LIBRARY
   // success is false when the last upload or removal failed

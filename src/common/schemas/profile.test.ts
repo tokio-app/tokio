@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
 import { defaultProfile } from "../util/constants/profile";
-import { ALERT_TRIGGERS, Profile, ProfileSchema } from "./profile";
+import {
+  ALERT_TRIGGERS,
+  GameActionSchema,
+  GameStepSchema,
+  Profile,
+  ProfileSchema,
+} from "./profile";
 
 describe("ProfileSchema", () => {
   it("gives a profile saved before the countdown timer the timer's defaults", () => {
@@ -22,6 +28,43 @@ describe("ProfileSchema", () => {
       },
     });
     expect(timer).toEqual(defaultProfile.timer);
+  });
+
+  it("gives a profile saved before games no game actions", () => {
+    const saved: Partial<Profile> = structuredClone(defaultProfile);
+    delete saved.games;
+
+    expect(ProfileSchema.parse(saved).games).toEqual({ actions: [] });
+  });
+
+  it("makes a game action saved before Java a Bedrock one", () => {
+    const saved = {
+      id: "action-1",
+      enabled: true,
+      trigger: {
+        type: TOKIO_EVENTS.FOLLOW,
+        gifts: [],
+        every_gift: false,
+        emotes: [],
+        keyword: "",
+        user: "",
+      },
+      steps: [],
+    };
+
+    expect(GameActionSchema.parse(saved).edition).toBe("bedrock");
+  });
+
+  it("fills a spawn step's amount and name", () => {
+    const step = GameStepSchema.parse({ type: "spawn", mob: "zombie" });
+
+    expect(step).toEqual({ type: "spawn", mob: "zombie", amount: 1, name: "" });
+  });
+
+  it("refuses a step that spawns more than the most at once", () => {
+    const step = { type: "spawn", mob: "zombie", amount: 101 };
+
+    expect(GameStepSchema.safeParse(step).success).toBe(false);
   });
 
   it("refuses a timer color that isn't a hex color", () => {

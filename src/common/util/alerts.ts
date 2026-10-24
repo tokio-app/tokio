@@ -76,16 +76,18 @@ function messageValues(payload: TokioEventMap[AppEvents]) {
 }
 
 /**
- * Fills a TTS alert's message with the live event's values. Variables the
- * event doesn't have stay as written.
+ * Fills a TTS alert's message, or a game action's text, with the live
+ * event's values. Variables the event doesn't have stay as written.
  */
 export function formatAlertMessage(
   message: string,
   payload: TokioEventMap[AppEvents],
+  // Applied to each value, so viewer text can't break a game command
+  escape: (value: string) => string = (value) => value,
 ): string {
   const values = messageValues(payload);
-  return message.replace(
-    /\{(\w+)\}/g,
-    (match, name: string) => values.get(name) ?? match,
-  );
+  return message.replace(/\{(\w+)\}/g, (match, name: string) => {
+    const value = values.get(name);
+    return value === undefined ? match : escape(value);
+  });
 }

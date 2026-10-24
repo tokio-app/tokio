@@ -1,4 +1,4 @@
-import { Alert, ALERT_TRIGGERS } from "@/common/schemas";
+import { Alert, ALERT_TRIGGERS, Trigger } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
   CustomGift,
@@ -13,13 +13,11 @@ import { GiftMultiSelect } from "../GiftSelect";
 import { PlayButton, TestState, testProps } from "../PlayButton";
 import styles from "./alertitem.module.css";
 
-type Trigger = Alert["trigger"]["type"];
-
 // zod types the options as any live event, but they are the triggers.
-const TRIGGER_OPTIONS = ALERT_TRIGGERS.map((value) => ({
+export const TRIGGER_OPTIONS = ALERT_TRIGGERS.map((value) => ({
   value,
   label: ALERT_TRIGGER_LABELS[value],
-})) as SelectOption<Trigger>[];
+})) as SelectOption<Trigger["type"]>[];
 
 // When a gift alert plays, see every_gift
 const GIFT_PLAYS: SelectOption<"streak" | "gift">[] = [
@@ -28,16 +26,20 @@ const GIFT_PLAYS: SelectOption<"streak" | "gift">[] = [
 ];
 
 type FilterProps = {
-  alert: Alert;
+  trigger: Trigger;
   gifts: CustomGift[];
   emotes: EmoteOption[];
-  onChange: (trigger: Alert["trigger"]) => void;
+  onChange: (trigger: Trigger) => void;
 };
 
-// Narrows the trigger: the gifts, emotes, chat keyword or viewer it reacts to.
-function TriggerFilter({ alert, gifts, emotes, onChange }: FilterProps) {
-  const { trigger } = alert;
-
+// Narrows the trigger: the gifts, emotes, chat keyword or viewer it reacts
+// to. Alerts and game actions share it.
+export function TriggerFilter({
+  trigger,
+  gifts,
+  emotes,
+  onChange,
+}: FilterProps) {
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
       return (
@@ -165,7 +167,7 @@ export function AlertItem({
 
       <div className={styles.cell}>
         <TriggerFilter
-          alert={alert}
+          trigger={alert.trigger}
           gifts={gifts}
           emotes={emotes}
           onChange={(trigger) => onChange({ ...alert, trigger })}

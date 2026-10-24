@@ -5,8 +5,6 @@ import {
   AppEvents,
   AppEventsMap,
   AppEventsResponseMap,
-  EMOTE_TRIGGER,
-  GiftEvent,
   MyInstantsSound,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -20,9 +18,9 @@ import {
   mediaKind,
   TaskQueue,
 } from "@/common/util";
-import { hasKeyword, isUser } from "@/helper/chat";
 import { writeFileAtomic } from "@/helper/fs";
 import { GiftStreaks } from "@/helper/streaks";
+import { giftOf, matchesTrigger } from "@/helper/triggers";
 import Logger from "@/logger";
 import type { ServerService } from "@/services/server";
 import type { TTSService } from "@/services/tts";
@@ -358,7 +356,7 @@ export class AlertsService extends Service {
     const settings = profile.alerts;
     const run = this._run;
     // Once per event, whichever alerts it plays
-    const gift = this._gift(type, payload);
+    const gift = giftOf(type, payload);
     const { added, total } = gift
       ? this._streaks.add(gift)
       : { added: 0, total: 0 };
@@ -367,7 +365,10 @@ export class AlertsService extends Service {
       ? { ...gift, gift: { ...gift.gift, comboCount: total } }
       : payload;
     for (const alert of settings.items) {
-      if (!this._matches(alert, type, payload, added)) continue;
+      if (!alert.enabled || (!alert.sound && !alert.tts && !alert.media)) {
+        continue;
+      }
+      if (!matchesTrigger(alert.trigger, type, payload, added)) continue;
 
       // An alert on every gift plays once for each, as many as the queue takes
       const times =
@@ -492,76 +493,6 @@ export class AlertsService extends Service {
 
   private _ttsKey({ voice }: AlertTts, text: string) {
     return `tts:${hash(`${voice.engine}|${voice.lang}|${voice.name}|${text}`)}`;
-  }
-
-  private _matches(
-    alert: Alert,
-    type: AppEvents,
-    payload: TokioEventMap[AppEvents],
-    // The gifts a gift event adds, see GiftStreaks
-    added: number,
-  ) {
-    if (!alert.enabled || (!alert.sound && !alert.tts && !alert.media)) {
-      return false;
-    }
-
-    const chat =
-      type === TOKIO_EVENTS.CHAT &&
-      typeof payload === "object" &&
-      payload !== null &&
-      "comment" in payload
-        ? payload.comment
-        : null;
-
-    // Emote alerts aren't a live event of their own, they match chats.
-    if (alert.trigger.type === EMOTE_TRIGGER) {
-      if (!chat) return false;
-      const { emotes } = alert.trigger;
-      return emotes.length === 0
-        ? chat.emotes.length > 0
-        : chat.emotes.some((emote) => emotes.includes(emote.emoteID));
-    }
-
-    if (alert.trigger.type !== type) return false;
-
-    if (chat) return hasKeyword(chat.content, alert.trigger.keyword);
-
-    if (
-      (type === TOKIO_EVENTS.MEMBER_JOIN ||
-        type === TOKIO_EVENTS.SUPER_FAN_JOIN) &&
-      typeof payload === "object" &&
-      payload !== null &&
-      "user" in payload
-    ) {
-      return isUser(payload.user, alert.trigger.user);
-    }
-
-    if (
-      type === TOKIO_EVENTS.GIFT &&
-      typeof payload === "object" &&
-      payload !== null &&
-      "gift" in payload
-    ) {
-      const { gift } = payload;
-      const { gifts, every_gift } = alert.trigger;
-      if (gifts.length > 0 && !gifts.includes(Number(gift.id))) return false;
-      // Once when the streak ends, or once for each gift sent
-      return every_gift ? added > 0 : gift.repeatEnd;
-    }
-
-    return true;
-  }
-
-  private _gift(
-    type: AppEvents,
-    payload: TokioEventMap[AppEvents],
-  ): GiftEvent | null {
-    return type === TOKIO_EVENTS.GIFT &&
-      typeof payload === "object" &&
-      payload !== null &&
-      "gift" in payload
-      ? payload
-      : null;
   }
 
   private async _fetchPage(
