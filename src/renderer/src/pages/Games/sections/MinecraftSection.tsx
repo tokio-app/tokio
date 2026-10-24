@@ -63,27 +63,30 @@ export function MinecraftSection({ games, onToggle }: Props) {
 
         {state !== "connected" && (
           <div className={styles.setup}>
-            <CopyField
-              code
-              value={command}
-              title="Copy the command"
-              display={
-                <>
-                  {command}
-                  {state === "waiting" && (
-                    <span className={styles.caret} aria-hidden />
-                  )}
-                </>
-              }
-            />
             <ol className={styles.setup_steps}>
               {SETUP.map((step) => (
                 <li key={step}>{step}</li>
               ))}
             </ol>
+            <div className={styles.device}>
+              <span className={styles.device_label}>From this device</span>
+              <CopyField
+                code
+                value={command}
+                title="Copy the command"
+                display={
+                  <>
+                    {command}
+                    {state === "waiting" && (
+                      <span className={styles.caret} aria-hidden />
+                    )}
+                  </>
+                }
+              />
+            </div>
             {addresses.length > 0 && (
-              <div className={styles.remote}>
-                <span className={styles.remote_label}>From another device</span>
+              <div className={styles.device}>
+                <span className={styles.device_label}>From another device</span>
                 {addresses.map((ip) => (
                   <CopyField
                     key={ip}
