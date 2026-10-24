@@ -82,13 +82,7 @@
       .clock {
         font-size: var(--size);
         color: var(--clock);
-        transition:
-          opacity 0.3s,
-          color 0.3s;
-      }
-
-      .clock.dim {
-        opacity: 0.55;
+        transition: color 0.3s;
       }
 
       .clock.warn {
@@ -193,7 +187,7 @@
   <body>
     <main class="stack" id="stack">
       <div class="title" id="title" hidden></div>
-      <div class="clock dim" id="clock" role="timer"></div>
+      <div class="clock" id="clock" role="timer"></div>
       <div class="slot" id="slot"></div>
       <div class="carousel" id="carousel" hidden></div>
     </main>
@@ -261,7 +255,6 @@
         const running = state.status === "running";
         const warnAt = state.look.warn_at * 60_000;
         clock.textContent = clockText(ms);
-        clock.classList.toggle("dim", !running);
         clock.classList.toggle("warn", running && warnAt > 0 && ms <= warnAt);
       };
 

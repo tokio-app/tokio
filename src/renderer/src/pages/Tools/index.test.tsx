@@ -8,7 +8,6 @@ import { renderWithProviders } from "@test/render";
 import { act, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Tools } from ".";
-import styles from "./tools.module.css";
 
 const CLOCK: TestOverlay = { id: "4f9c2a", name: "Clock" };
 const GOAL: TestOverlay = { id: "8b1d7e", name: "Goal" };
@@ -455,8 +454,6 @@ describe("Tools' countdown timer", () => {
       '"Bebas Neue", "Archivo Variable", sans-serif',
     );
     expect(screen.queryByText("×2")).toBeNull();
-    // Not running
-    expect(clock()).toHaveClass(styles.clock_dim);
   });
 
   it("starts from the starting time being typed while idle", async () => {
@@ -484,7 +481,6 @@ describe("Tools' countdown timer", () => {
       t.state = { status: "running", remaining: 3 * 60_000 };
     });
     expect(clock()).toHaveStyle({ color: "#f1f5f9" });
-    expect(clock()).not.toHaveClass(styles.clock_dim);
 
     await timer((t) => {
       warn(t);
