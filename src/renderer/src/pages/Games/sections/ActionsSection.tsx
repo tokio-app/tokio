@@ -201,12 +201,28 @@ function ActionItem({
         />
         {/* Its line for triggers without a filter isn't needed here */}
         <div className={styles.filter}>
-          <TriggerFilter
-            trigger={trigger}
-            gifts={gifts}
-            emotes={emotes}
-            onChange={(changed) => onChange({ ...action, trigger: changed })}
-          />
+          {trigger.type === TOKIO_EVENTS.LIKE ? (
+            // Counted as the countdown timer counts them, from all viewers
+            <span className={styles.likes}>
+              <span className={styles.word}>every</span>
+              <NumberInput
+                className={styles.amount}
+                aria-label="Likes per run"
+                integer
+                min={1}
+                value={action.likes_every}
+                onChange={(likes_every) => onChange({ ...action, likes_every })}
+              />
+              <span className={styles.word}>likes</span>
+            </span>
+          ) : (
+            <TriggerFilter
+              trigger={trigger}
+              gifts={gifts}
+              emotes={emotes}
+              onChange={(changed) => onChange({ ...action, trigger: changed })}
+            />
+          )}
         </div>
         <div className={styles.action_buttons}>
           <Btn

@@ -84,6 +84,7 @@ export function createAction(edition: MinecraftEdition): GameAction {
       keyword: "",
       user: "",
     },
+    likes_every: 100,
     steps: [createStep("spawn")],
   };
 }

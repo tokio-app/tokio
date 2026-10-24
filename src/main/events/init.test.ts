@@ -629,6 +629,7 @@ describe("init events", () => {
       enabled: true,
       edition: "bedrock",
       trigger: alert().trigger,
+      likes_every: 100,
       steps: [{ type: "command", command: "say hi" }],
     };
 

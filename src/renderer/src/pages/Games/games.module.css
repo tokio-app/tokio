@@ -155,9 +155,17 @@
   flex-direction: row;
 }
 
-/* The alerts' table draws a line for triggers without a filter */
-.filter > :empty {
+/* The alerts' table draws a line for triggers without a filter. A div, as an
+   input is :empty too (Chat's keyword, a join's viewer). */
+.filter > div:empty {
   display: none;
+}
+
+/* Like's "every 100 likes" */
+.likes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .action_buttons {

@@ -255,6 +255,7 @@ describe("Games", () => {
             enabled: true,
             edition: "bedrock",
             trigger: expect.objectContaining({ type: TOKIO_EVENTS.FOLLOW }),
+            likes_every: 100,
             steps: [{ type: "spawn", mob: "zombie", amount: 1, name: "" }],
           },
         ],
@@ -332,6 +333,29 @@ describe("Games", () => {
     expect(
       panel.queryByRole("button", { name: "{count}" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("filters chat by keyword, joins by viewer, and counts likes", async () => {
+    const { trigger } = createAction("bedrock");
+    const { user } = await load([
+      action("a1", { trigger: { ...trigger, type: TOKIO_EVENTS.CHAT } }),
+      action("a2", { trigger: { ...trigger, type: TOKIO_EVENTS.MEMBER_JOIN } }),
+      action("a3", { trigger: { ...trigger, type: TOKIO_EVENTS.LIKE } }),
+    ]);
+    const [chat, join, likes] = panels();
+
+    await user.type(chat.getByPlaceholderText("Any message"), "tnt please");
+    await user.type(join.getByPlaceholderText("Anyone"), "@aku");
+    const every = likes.getByRole("spinbutton", { name: "Likes per run" });
+    expect(every).toHaveValue(100);
+    await user.clear(every);
+    await user.type(every, "50");
+
+    await wait(300);
+    const [keyword, joined, liked] = saves().at(-1)!.actions;
+    expect(keyword.trigger.keyword).toBe("tnt please");
+    expect(joined.trigger.user).toBe("@aku");
+    expect(liked.likes_every).toBe(50);
   });
 
   it("tests an action and shows what the game answered", async () => {

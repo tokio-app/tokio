@@ -165,6 +165,9 @@ export const GameActionSchema = z.object({
   enabled: z.boolean(),
   edition: z.enum(MINECRAFT_EDITIONS).default("bedrock"),
   trigger: TriggerSchema,
+  // On Like, it runs once every likes_every likes from all viewers, as the
+  // countdown timer counts them
+  likes_every: z.number().int().min(1).default(100),
   steps: z.array(GameStepSchema),
 });
 

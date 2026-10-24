@@ -37,7 +37,7 @@ export interface GamesResult<T> {
  */
 export type GameError = { offline: boolean; message: string };
 
-// The most times an action on every gift runs for one event
+// The most times an action on every gift or on likes runs for one event
 export const MAX_REPEATS = 100;
 // The most commands one action sends for one event
 export const MAX_COMMANDS = 100;
@@ -64,6 +64,8 @@ const STATES: Record<GameStatus["state"], string> = {
 export class GamesService extends Service {
   // Each viewer's streak of a gift, see GiftStreaks
   private _streaks = new GiftStreaks();
+  // Likes toward each Like action's next run, by action id
+  private _likes = new Map<string, number>();
   private _last: GameStatus;
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
@@ -146,11 +148,8 @@ export class GamesService extends Service {
       if (!action.enabled || action.steps.length === 0) continue;
       if (!matchesTrigger(action.trigger, type, payload, added)) continue;
 
-      // An action on every gift runs once for each
-      const times =
-        action.trigger.type === TOKIO_EVENTS.GIFT && action.trigger.every_gift
-          ? Math.min(added, MAX_REPEATS)
-          : 1;
+      const times = this._times(action, payload, added);
+      if (times === 0) continue;
       runs.push(
         this._run(
           action,
@@ -183,9 +182,39 @@ export class GamesService extends Service {
     return { success: true, data: await this._send(commands) };
   }
 
-  /** Forgets the gift streaks, as their ends may be missed. */
+  /**
+   * Forgets the gift streaks, as their ends may be missed, and the likes
+   * counted toward each Like action.
+   */
   public clear() {
     this._streaks.clear();
+    this._likes.clear();
+  }
+
+  // How many times a matching action runs for the event: once for each gift
+  // on every gift, once for every likes_every likes on Like (the rest count
+  // toward its next run), otherwise once
+  private _times(
+    action: GameAction,
+    payload: TokioEventMap[AppEvents],
+    added: number,
+  ) {
+    const { trigger, likes_every } = action;
+    if (trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift) {
+      return Math.min(added, MAX_REPEATS);
+    }
+    if (
+      trigger.type === TOKIO_EVENTS.LIKE &&
+      typeof payload === "object" &&
+      payload !== null &&
+      "likeCount" in payload
+    ) {
+      const likes =
+        (this._likes.get(action.id) ?? 0) + Math.max(0, payload.likeCount);
+      this._likes.set(action.id, likes % likes_every);
+      return Math.min(Math.floor(likes / likes_every), MAX_REPEATS);
+    }
+    return 1;
   }
 
   // Why the edition's commands can't run: no game, or the other edition's

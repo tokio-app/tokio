@@ -73,6 +73,7 @@ const action = (overrides: Partial<GameAction> = {}): GameAction => ({
   enabled: true,
   edition: "bedrock",
   trigger: trigger(TOKIO_EVENTS.FOLLOW),
+  likes_every: 100,
   steps: [say("say Thanks {username}")],
   ...overrides,
 });
@@ -339,6 +340,37 @@ describe("GamesService", () => {
       await service(minecraft).handle(TOKIO_EVENTS.GIFT, gift(500), actions);
       expect(minecraft.sent).toHaveLength(MAX_COMMANDS);
       expect(minecraft.sent.slice(0, 4)).toEqual(["a", "b", "c", "a"]);
+    });
+
+    it("runs like actions once every so many likes, keeping the rest", async () => {
+      const minecraft = fakeMinecraft();
+      const games = service(minecraft);
+      const actions = profileGames({
+        likes: action({
+          trigger: trigger(TOKIO_EVENTS.LIKE),
+          likes_every: 100,
+          steps: [say("likes")],
+        }),
+      });
+      const likes = (likeCount: number) =>
+        games.handle(
+          TOKIO_EVENTS.LIKE,
+          { user, likeCount, totalLikes: 0 },
+          actions,
+        );
+
+      await likes(60);
+      expect(minecraft.sent).toEqual([]);
+      await likes(60);
+      expect(minecraft.sent).toEqual(["likes"]);
+      // 20 left over, then 210 likes: two runs, 10 toward the next
+      await likes(190);
+      expect(minecraft.sent).toHaveLength(3);
+      await likes(89);
+      expect(minecraft.sent).toHaveLength(3);
+      games.clear();
+      await likes(99);
+      expect(minecraft.sent).toHaveLength(3);
     });
 
     it("matches chat keywords and emotes", async () => {
