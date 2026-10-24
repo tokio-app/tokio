@@ -11,6 +11,7 @@ import { hasPending, settle } from "@/helper/quit";
 import Logger from "@/logger";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
+import { GamesService } from "@/services/games";
 import { JSONManagerService } from "@/services/json";
 import { LicensesService } from "@/services/licenses";
 import { LiveService } from "@/services/live";
@@ -92,6 +93,7 @@ const services: AppServices = {
   updaterService: new UpdaterService(),
   liveService: new LiveService(),
   timerService: new TimerService(),
+  gamesService: new GamesService(),
   trayService: new TrayService(),
 };
 

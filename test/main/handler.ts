@@ -43,6 +43,7 @@ const SERVICES: (keyof AppServices)[] = [
   "updaterService",
   "liveService",
   "timerService",
+  "gamesService",
   "trayService",
 ];
 
