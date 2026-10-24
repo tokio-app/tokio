@@ -15,6 +15,7 @@ import {
   profileReply,
   voice,
 } from "@test/fixtures";
+import { intersect } from "@test/dom";
 import { send, sent } from "@test/ipc";
 import { inList } from "@test/queries";
 import { renderWithProviders } from "@test/render";
@@ -190,6 +191,20 @@ describe("Alerts", () => {
         ],
       },
     ]);
+  });
+
+  it("shows another add button under the alerts while the header's is out of view", async () => {
+    const { user } = await load([alert("alert-1")]);
+    const adds = () => screen.getAllByRole("button", { name: "Add alert" });
+    expect(adds()).toHaveLength(1);
+
+    intersect(false);
+    expect(adds()).toHaveLength(2);
+    await user.click(adds()[1]);
+    expect(rows()).toHaveLength(2);
+
+    intersect();
+    expect(adds()).toHaveLength(1);
   });
 
   it("saves 300ms after a change", async () => {

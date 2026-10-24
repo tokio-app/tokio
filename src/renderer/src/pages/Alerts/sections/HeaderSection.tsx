@@ -1,30 +1,33 @@
 import { Profile } from "@/common/schemas";
 import { Btn, NumberInput, Section, Toggle } from "@/components";
 import { Updater } from "@/hooks";
+import { Ref } from "react";
 import { MdOutlineAddAlert } from "react-icons/md";
 import styles from "../alerts.module.css";
-import { createAlert } from "../helper";
 
 type Props = {
   simultaneous: boolean;
   queueLength: number;
+  // The page shows another add button under the alerts while this one is
+  // scrolled out of view
+  addRef: Ref<HTMLButtonElement>;
+  onAdd: () => void;
   update: Updater<Profile["alerts"]>;
 };
 
-export function HeaderSection({ simultaneous, queueLength, update }: Props) {
+export function HeaderSection({
+  simultaneous,
+  queueLength,
+  addRef,
+  onAdd,
+  update,
+}: Props) {
   return (
     <Section
       title="Alerts"
       description="Enhance your stream with custom alerts."
       actions={
-        <Btn
-          title="Add alert"
-          onClick={() =>
-            update((s) => {
-              s.items.push(createAlert());
-            })
-          }
-        >
+        <Btn ref={addRef} title="Add alert" onClick={onAdd}>
           <MdOutlineAddAlert size={20} />
         </Btn>
       }
