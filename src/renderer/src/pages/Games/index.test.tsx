@@ -413,4 +413,106 @@ describe("Games", () => {
 
     expect(screen.getByRole("button", { name: "Test" })).toBeDisabled();
   });
+
+  it("switches an action's edition, moving its mobs over, and tests it there", async () => {
+    const { user } = await load([
+      action("a1", {
+        steps: [
+          { type: "spawn", mob: "evocation_illager", amount: 1, name: "" },
+        ],
+      }),
+    ]);
+    const panel = panels()[0];
+
+    await user.click(panel.getByText("Bedrock"));
+    await user.click(inList(panelElements()[0], "Java")!);
+    await wait(300);
+
+    const saved = saves().at(-1)!.actions[0];
+    expect(saved.edition).toBe("java");
+    expect(saved.steps).toEqual([
+      { type: "spawn", mob: "evoker", amount: 1, name: "" },
+    ]);
+    expect(panel.getByText("Java")).toBeInTheDocument();
+
+    await user.click(panel.getByRole("button", { name: "Test" }));
+    expect(sent(APP_EVENTS.TEST_GAME_ACTION)[0].edition).toBe("java");
+  });
+
+  it("lists the mobs and items of the action's edition", async () => {
+    const { user } = await load([
+      action("b1", { steps: [{ type: "give", item: "diamond", amount: 1 }] }),
+      action("j1", {
+        edition: "java",
+        steps: [
+          { type: "spawn", mob: "zombie", amount: 1, name: "" },
+          { type: "give", item: "diamond", amount: 1 },
+        ],
+      }),
+    ]);
+    const [bedrock, java] = panels();
+    const [bedrockPanel, javaPanel] = panelElements();
+    const search = (text: string) =>
+      user.type(screen.getByPlaceholderText("Search..."), text);
+
+    // Bedrock names the spawn egg after the old mob, Java doesn't
+    await user.click(bedrock.getByText("Diamond"));
+    await search("Zombie Pigman");
+    expect(inList(bedrockPanel, "Zombie Pigman Spawn Egg")).not.toBeNull();
+    await user.keyboard("{Escape}");
+
+    await user.click(java.getByText("Diamond"));
+    await search("Zombie Pigman");
+    expect(inList(javaPanel, "Zombie Pigman Spawn Egg")).toBeNull();
+    await user.clear(screen.getByPlaceholderText("Search..."));
+    await search("Totem");
+    await user.click(inList(javaPanel, "Totem of Undying")!);
+
+    await user.click(java.getByText("Zombie"));
+    await search("Creeper");
+    await user.click(inList(javaPanel, "Creeper")!);
+    await wait(300);
+
+    expect(saves().at(-1)!.actions[1].steps).toEqual([
+      { type: "spawn", mob: "creeper", amount: 1, name: "" },
+      { type: "give", item: "totem_of_undying", amount: 1 },
+    ]);
+  });
+
+  it("duplicates an action right after it, with a new id", async () => {
+    const steps = [command("say hi")];
+    const { user } = await load([
+      action("a1", { edition: "java", steps }),
+      action("a2"),
+    ]);
+
+    await user.click(
+      panels()[0].getByRole("button", { name: "Duplicate action" }),
+    );
+    await wait(300);
+
+    const saved = saves().at(-1)!.actions;
+    expect(panels()).toHaveLength(3);
+    expect(saved.map((a) => a.id)).toEqual(["a1", expect.any(String), "a2"]);
+    expect(saved[1].id).not.toBe("a1");
+    expect(saved[1]).toEqual({ ...saved[0], id: saved[1].id });
+  });
+
+  it("gives new actions the connected game's edition, else Bedrock", async () => {
+    const { user } = await load([]);
+    const add = () =>
+      user.click(screen.getByRole("button", { name: "Add action" }));
+
+    await status({ state: "connected", edition: "java" });
+    await add();
+    await status({ state: "waiting" });
+    await add();
+    await wait(300);
+
+    expect(
+      saves()
+        .at(-1)!
+        .actions.map((a) => a.edition),
+    ).toEqual(["java", "bedrock"]);
+  });
 });

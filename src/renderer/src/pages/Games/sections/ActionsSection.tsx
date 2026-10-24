@@ -2,6 +2,7 @@ import {
   GAME_STEP_MAX_AMOUNT,
   GameAction,
   GameStep,
+  MinecraftEdition,
   Profile,
 } from "@/common/schemas";
 import {
@@ -30,6 +31,7 @@ import { Ref, useRef, useState } from "react";
 import {
   FiCheck,
   FiChevronRight,
+  FiCopy,
   FiPlay,
   FiPlus,
   FiTrash2,
@@ -39,6 +41,7 @@ import styles from "../games.module.css";
 import {
   createAction,
   createStep,
+  EDITIONS,
   ITEMS,
   MOBS,
   STEP_KINDS,
@@ -46,17 +49,26 @@ import {
   testSummary,
   TIMES,
   WEATHERS,
+  withEdition,
   withText,
 } from "../helper";
 
 type Props = {
   actions: GameAction[];
+  // New actions' edition: the connected game's, else Bedrock
+  edition: MinecraftEdition;
   gifts: CustomGift[];
   emotes: EmoteOption[];
   update: Updater<Profile["games"]>;
 };
 
-export function ActionsSection({ actions, gifts, emotes, update }: Props) {
+export function ActionsSection({
+  actions,
+  edition,
+  gifts,
+  emotes,
+  update,
+}: Props) {
   return (
     <Section
       title="Actions"
@@ -66,7 +78,7 @@ export function ActionsSection({ actions, gifts, emotes, update }: Props) {
           title="Add action"
           onClick={() =>
             update((s) => {
-              s.actions.push(createAction("bedrock"));
+              s.actions.push(createAction(edition));
             })
           }
         >
@@ -92,6 +104,16 @@ export function ActionsSection({ actions, gifts, emotes, update }: Props) {
                   if (index !== -1) s.actions[index] = changed;
                 })
               }
+              onDuplicate={() =>
+                update((s) => {
+                  const index = s.actions.findIndex((a) => a.id === action.id);
+                  const copy = structuredClone(action);
+                  s.actions.splice(index + 1, 0, {
+                    ...copy,
+                    id: crypto.randomUUID(),
+                  });
+                })
+              }
               onRemove={() =>
                 update((s) => {
                   s.actions = s.actions.filter((a) => a.id !== action.id);
@@ -110,6 +132,7 @@ type ItemProps = {
   gifts: CustomGift[];
   emotes: EmoteOption[];
   onChange: (action: GameAction) => void;
+  onDuplicate: () => void;
   onRemove: () => void;
 };
 
@@ -118,7 +141,14 @@ type TestResult = { results: CommandResult[]; error?: string };
 // A test sends up to 100 commands; the last ones are enough to read
 const RESULTS_SHOWN = 25;
 
-function ActionItem({ action, gifts, emotes, onChange, onRemove }: ItemProps) {
+function ActionItem({
+  action,
+  gifts,
+  emotes,
+  onChange,
+  onDuplicate,
+  onRemove,
+}: ItemProps) {
   const { trigger, steps } = action;
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
@@ -152,6 +182,13 @@ function ActionItem({ action, gifts, emotes, onChange, onRemove }: ItemProps) {
           aria-label="Enabled"
           checked={action.enabled}
           onChange={(e) => onChange({ ...action, enabled: e.target.checked })}
+        />
+        <Select
+          className={styles.edition_select}
+          aria-label="Edition"
+          options={EDITIONS}
+          value={action.edition}
+          onChange={(edition) => onChange(withEdition(action, edition))}
         />
         <Select
           className={styles.trigger}
@@ -190,6 +227,9 @@ function ActionItem({ action, gifts, emotes, onChange, onRemove }: ItemProps) {
           >
             <FiPlay size={20} />
           </Btn>
+          <Btn variant="icon" title="Duplicate action" onClick={onDuplicate}>
+            <FiCopy size={20} />
+          </Btn>
           <Btn variant="icon" title="Remove action" onClick={onRemove}>
             <FiTrash2 size={20} />
           </Btn>
@@ -211,6 +251,7 @@ function ActionItem({ action, gifts, emotes, onChange, onRemove }: ItemProps) {
               />
               <StepFields
                 step={step}
+                edition={action.edition}
                 textRef={index === target ? textRef : undefined}
                 onFocusText={() => setFocused(index)}
                 onChange={(changed) => setStep(index, changed)}
@@ -286,6 +327,8 @@ function ActionItem({ action, gifts, emotes, onChange, onRemove }: ItemProps) {
 
 type FieldsProps = {
   step: GameStep;
+  // Whose mobs and items to list
+  edition: MinecraftEdition;
   // On the text field the variables go into
   textRef?: Ref<HTMLInputElement>;
   onFocusText: () => void;
@@ -293,7 +336,13 @@ type FieldsProps = {
 };
 
 // The rest of the step's sentence, after its kind
-function StepFields({ step, textRef, onFocusText, onChange }: FieldsProps) {
+function StepFields({
+  step,
+  edition,
+  textRef,
+  onFocusText,
+  onChange,
+}: FieldsProps) {
   switch (step.type) {
     case "spawn":
       return (
@@ -302,7 +351,7 @@ function StepFields({ step, textRef, onFocusText, onChange }: FieldsProps) {
             searchable
             className={styles.thing}
             aria-label="Mob"
-            options={MOBS.bedrock}
+            options={MOBS[edition]}
             value={step.mob}
             onChange={(mob) => onChange({ ...step, mob })}
           />
@@ -329,7 +378,7 @@ function StepFields({ step, textRef, onFocusText, onChange }: FieldsProps) {
             searchable
             className={styles.thing}
             aria-label="Item"
-            options={ITEMS.bedrock}
+            options={ITEMS[edition]}
             value={step.item}
             onChange={(item) => onChange({ ...step, item })}
           />

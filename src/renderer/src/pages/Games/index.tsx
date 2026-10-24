@@ -70,6 +70,11 @@ export function Games() {
 
       <ActionsSection
         actions={settings.actions}
+        edition={
+          (games?.status.minecraft.state === "connected" &&
+            games.status.minecraft.edition) ||
+          "bedrock"
+        }
         gifts={giftChoices}
         emotes={emoteChoices}
         update={update}

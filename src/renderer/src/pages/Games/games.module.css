@@ -134,6 +134,10 @@
   gap: var(--space-3);
 }
 
+.edition_select {
+  width: 120px;
+}
+
 .trigger {
   width: 200px;
 }
