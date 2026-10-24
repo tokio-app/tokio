@@ -183,7 +183,7 @@ To release, use the `release` skill (`/release`). The release goes out to auto-u
 
 The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../tokio-web`) has its own `AGENTS.md`. Update it when any of these change:
 
-- features, settings, chat commands or install steps in `README.md`
+- features, settings, chat commands or install steps (its docs describe them in full; the README only sums them up)
 - the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, the alerts' overlay URL (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`) or what it does, or `TOKIO_EVENTS` names and payloads
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing

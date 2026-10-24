@@ -33,7 +33,6 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
 
 7. Overlays get every live event on their own: `ServerService` broadcasts each one `isLiveEvent` lets through.
 8. Tests next to each file you changed: the connector mapping, alerts, the live session and the timer.
-9. The README, where its alerts, overlays and countdown timer parts list events.
 
 ## Other repos
 
@@ -41,7 +40,7 @@ Tell the user which of these need a change and a release:
 
 - The overlay SDK, `../tokio-event-loader` (`@tokioapp/overlay`): `src/types/index.ts` copies `TOKIO_EVENTS` and the payload types. Overlays get the new type once a new version is published; ask before publishing.
 - The overlays repo, `../tokio-overlays`: the event list in `.github/ISSUE_TEMPLATE/overlay_request.yml`.
-- The website, `../tokio-web`: `src/content/docs/docs/developers/events.md`, in its LIVE events and Data sections.
+- The website, `../tokio-web`: `src/content/docs/docs/developers/events.md`, in its LIVE events and Data sections, and the events `features/alerts.md` and `features/countdown-timer.md` list.
 
 ## Done when
 

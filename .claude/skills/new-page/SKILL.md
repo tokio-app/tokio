@@ -14,7 +14,7 @@ Follow `.claude/rules/renderer.md`; it loads with the renderer files. Tools (`sr
 4. Link it in the sidebar with an entry in `NAV_ITEMS` (`src/renderer/src/router/Layout/index.tsx`), and a Lucide icon (`react-icons/lu`, like the rest of the rail) that shows what the page does. A page opened from another page gets no entry: its path goes under its parent's (`/overlays/official`), and its header gets a back button (`Section`'s `icon`).
 5. Get data from main with `useIpcRequest` and `useIpcListener`, and use the `ipc-event` skill for new events. A profile section that saves as it changes uses `useEditableSettings`.
 6. Test it in `index.test.tsx`: `renderWithProviders(<Page />)` from `@test/render`, with main's replies sent through `send` (`@test/ipc`). Test the route and the sidebar link with `renderApp("/<path>")`.
-7. If users see it, describe it in the README's Features section (the `sync-docs` skill).
+7. If users see it, describe it in the website's docs, and give a new feature a line in the README (the `sync-docs` skill).
 
 ## Done when
 
