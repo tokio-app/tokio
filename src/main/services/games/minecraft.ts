@@ -56,8 +56,10 @@ const SPKI_PREFIX = Buffer.from(
   "hex",
 );
 // The game refuses more than 100 commands in flight
-const MAX_IN_FLIGHT = 50;
-const MAX_WAITING = 500;
+export const MAX_IN_FLIGHT = 50;
+// Only a safety net: GamesService spaces out each action's runs, so this
+// fills only with many actions firing at once on a game that stopped answering
+export const MAX_WAITING = 10_000;
 // Body version 42 parses today's syntax (execute … run); 1 doesn't
 const COMMAND_VERSION = 42;
 const REPLACED: Close = {

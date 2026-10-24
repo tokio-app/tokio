@@ -12,7 +12,7 @@ import { once } from "node:events";
 import { createServer, Server, Socket } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
-import { MinecraftConnection } from "./minecraft";
+import { MAX_IN_FLIGHT, MAX_WAITING, MinecraftConnection } from "./minecraft";
 
 const SPKI_PREFIX = Buffer.from(
   "3076301006072a8648ce3d020106052b81040022036200",
@@ -267,20 +267,23 @@ describe("MinecraftConnection", () => {
     ]);
   });
 
-  it("keeps 50 commands in flight, sends the rest in order, and refuses past 500 waiting", async () => {
+  it("keeps 50 commands in flight, sends the rest in order, and refuses past MAX_WAITING", async () => {
     const { connection } = await listen();
     const fake = await game(connection.port);
     await connected(connection);
     fake.reply = () => null;
 
-    const commands = Array.from({ length: 550 }, (_, i) => `say ${i}`);
+    const commands = Array.from(
+      { length: MAX_IN_FLIGHT + MAX_WAITING },
+      (_, i) => `say ${i}`,
+    );
     const results = commands.map((c) => connection.send(c));
     expect(await connection.send("say late")).toEqual({
       command: "say late",
       ok: false,
       message: "Too many commands are waiting.",
     });
-    await vi.waitFor(() => expect(fake.requests).toHaveLength(50));
+    await vi.waitFor(() => expect(fake.requests).toHaveLength(MAX_IN_FLIGHT));
 
     fake.reply = (request) => ({
       statusCode: 0,

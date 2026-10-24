@@ -37,10 +37,17 @@ export interface GamesResult<T> {
  */
 export type GameError = { offline: boolean; message: string };
 
-// The most times an action on every gift or on likes runs for one event
-export const MAX_REPEATS = 100;
-// The most commands one action sends for one event
-export const MAX_COMMANDS = 100;
+// The wait between two runs of an action, so a burst doesn't flood the game
+export const RUN_GAP_MS = 100;
+
+// Runs of one action for one event, filled with its values, waiting their turn
+type Batch = {
+  edition: MinecraftEdition;
+  commands: string[];
+  times: number;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+};
 
 // What the service uses of the game's connection
 type Connection = Pick<
@@ -66,6 +73,10 @@ export class GamesService extends Service {
   private _streaks = new GiftStreaks();
   // Likes toward each Like action's next run, by action id
   private _likes = new Map<string, number>();
+  // Each action's runs still to send, by action id, see _pump
+  private _backlogs = new Map<string, Batch[]>();
+  // The latest profile's actions, which can stop a backlog
+  private _games: Profile["games"] = { actions: [] };
   private _last: GameStatus;
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
@@ -121,14 +132,16 @@ export class GamesService extends Service {
   }
 
   /**
-   * Runs every enabled action that matches the live event. Resolves once the
-   * game answered their commands.
+   * Runs every enabled action that matches the live event, after the runs
+   * each action already has waiting. Resolves once the game answered this
+   * event's commands, or they were dropped.
    */
   public async handle<K extends AppEvents>(
     type: K,
     payload: TokioEventMap[K],
     games: Profile["games"],
   ) {
+    this._games = games;
     // Nothing could reach the game: off, or the port is taken
     const { state } = this._minecraft.status;
     if (state === "off" || state === "error") return;
@@ -151,9 +164,10 @@ export class GamesService extends Service {
       const times = this._times(action, payload, added);
       if (times === 0) continue;
       runs.push(
-        this._run(
+        this._queue(
           action,
-          this._commands(action.steps, values, times, action.edition),
+          this._commands(action.steps, values, action.edition),
+          times,
         ),
       );
     }
@@ -176,7 +190,6 @@ export class GamesService extends Service {
     const commands = this._commands(
       steps,
       generateTikTokEventSample(event).data,
-      1,
       edition,
     );
     return { success: true, data: await this._send(commands) };
@@ -184,7 +197,7 @@ export class GamesService extends Service {
 
   /**
    * Forgets the gift streaks, as their ends may be missed, and the likes
-   * counted toward each Like action.
+   * counted toward each Like action. Runs already waiting still go out.
    */
   public clear() {
     this._streaks.clear();
@@ -201,7 +214,7 @@ export class GamesService extends Service {
   ) {
     const { trigger, likes_every } = action;
     if (trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift) {
-      return Math.min(added, MAX_REPEATS);
+      return added;
     }
     if (
       trigger.type === TOKIO_EVENTS.LIKE &&
@@ -212,7 +225,7 @@ export class GamesService extends Service {
       const likes =
         (this._likes.get(action.id) ?? 0) + Math.max(0, payload.likeCount);
       this._likes.set(action.id, likes % likes_every);
-      return Math.min(Math.floor(likes / likes_every), MAX_REPEATS);
+      return Math.floor(likes / likes_every);
     }
     return 1;
   }
@@ -227,21 +240,15 @@ export class GamesService extends Service {
     return undefined;
   }
 
-  // The steps' commands, `times` over, at most MAX_COMMANDS
+  // One run's commands
   private _commands(
     steps: GameStep[],
     payload: TokioEventMap[AppEvents],
-    times: number,
     edition: MinecraftEdition,
   ) {
     const fill = (text: string) =>
       formatAlertMessage(text, payload, commandValue);
-    const once = steps.flatMap((step) => gameCommands(step, fill, edition));
-    const commands: string[] = [];
-    for (let i = 0; i < times && commands.length < MAX_COMMANDS; i++) {
-      commands.push(...once);
-    }
-    return commands.slice(0, MAX_COMMANDS);
+    return steps.flatMap((step) => gameCommands(step, fill, edition));
   }
 
   // All sent at once, in order: the connection queues them
@@ -251,18 +258,58 @@ export class GamesService extends Service {
     );
   }
 
-  private async _run(action: GameAction, commands: string[]) {
-    if (commands.length === 0) return;
-    const unreachable = this._unreachable(action.edition);
-    if (unreachable) {
-      this._onError?.(action, { offline: true, message: unreachable });
-      return;
+  // Adds the runs to the action's backlog, and starts its pump if it's idle
+  private _queue(action: GameAction, commands: string[], times: number) {
+    if (commands.length === 0) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const batch = {
+        edition: action.edition,
+        commands,
+        times,
+        resolve,
+        reject,
+      };
+      const backlog = this._backlogs.get(action.id);
+      if (backlog) backlog.push(batch);
+      else void this._pump(action.id, [batch]);
+    });
+  }
+
+  // Sends one run at a time, RUN_GAP_MS after the last one was answered,
+  // until the backlog is empty. Each action has its own, side by side.
+  private async _pump(id: string, backlog: Batch[]) {
+    this._backlogs.set(id, backlog);
+    try {
+      for (let first = true; backlog.length > 0; first = false) {
+        if (!first) await new Promise((r) => setTimeout(r, RUN_GAP_MS));
+        const batch = backlog[0];
+        // Stopped when the latest profile removed, disabled or moved the
+        // action; runs it accepted keep their commands if only steps changed
+        const action = this._games.actions.find((a) => a.id === id);
+        if (!action?.enabled || action.edition !== batch.edition) break;
+        // Turned off: dropped quietly, as handle skips everything then
+        const { state } = this._minecraft.status;
+        if (state === "off" || state === "error") break;
+        const unreachable = this._unreachable(action.edition);
+        if (unreachable) {
+          this._onError?.(action, { offline: true, message: unreachable });
+          break;
+        }
+        const failed = (await this._send(batch.commands)).find((r) => !r.ok);
+        if (failed) {
+          // A game that left or was replaced midway fails the commands it
+          // hadn't answered, and drops the rest
+          const offline = this._unreachable(action.edition) !== undefined;
+          this._onError?.(action, { offline, message: failed.message });
+          if (offline) break;
+        }
+        if (--batch.times === 0) backlog.shift()?.resolve();
+      }
+      for (const batch of backlog) batch.resolve();
+    } catch (error) {
+      for (const batch of backlog) batch.reject(error);
+    } finally {
+      this._backlogs.delete(id);
     }
-    const failed = (await this._send(commands)).find((result) => !result.ok);
-    if (!failed) return;
-    // A game that left or was replaced midway fails the commands it hadn't
-    // answered
-    const offline = this._unreachable(action.edition) !== undefined;
-    this._onError?.(action, { offline, message: failed.message });
   }
 }

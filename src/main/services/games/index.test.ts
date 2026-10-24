@@ -13,8 +13,8 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import Logger from "@/logger";
-import { describe, expect, it, vi } from "vitest";
-import { GamesService, MAX_COMMANDS } from "./index";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { GamesService, RUN_GAP_MS } from "./index";
 
 // Stands in for the game's WebSocket: records the commands, answers each
 // with `answer`. Connected, it's the edition's game.
@@ -329,17 +329,167 @@ describe("GamesService", () => {
       expect(minecraft.sent).toEqual(["2", "2", "3", "3", "3"]);
     });
 
-    it("caps repeats and commands per action", async () => {
-      const minecraft = fakeMinecraft();
-      const actions = profileGames({
-        every: action({
+    describe("backlogs", () => {
+      afterEach(() => vi.useRealTimers());
+
+      const everyGift = (steps = [say("each {count}")]) =>
+        action({
+          id: "every",
           trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
-          steps: [say("a"), say("b"), say("c")],
-        }),
+          steps,
+        });
+
+      it("serves every gift, one run every RUN_GAP_MS", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const at: number[] = [];
+        minecraft.send.mockImplementation(async (command) => {
+          minecraft.sent.push(command);
+          at.push(Date.now());
+          return { command, ok: true, message: "" };
+        });
+        const actions = { actions: [everyGift([say("a"), say("b")])] };
+        const run = service(minecraft).handle(
+          TOKIO_EVENTS.GIFT,
+          gift(300),
+          actions,
+        );
+
+        await vi.advanceTimersByTimeAsync(0);
+        expect(minecraft.sent).toEqual(["a", "b"]);
+        await vi.advanceTimersByTimeAsync(RUN_GAP_MS - 1);
+        expect(minecraft.sent).toHaveLength(2);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(minecraft.sent).toHaveLength(4);
+        await vi.runAllTimersAsync();
+        await run;
+
+        expect(minecraft.sent).toHaveLength(600);
+        const runs = at.filter((_, i) => i % 2 === 0);
+        expect(runs.slice(1).map((t, i) => t - runs[i])).toEqual(
+          Array(299).fill(RUN_GAP_MS),
+        );
       });
-      await service(minecraft).handle(TOKIO_EVENTS.GIFT, gift(500), actions);
-      expect(minecraft.sent).toHaveLength(MAX_COMMANDS);
-      expect(minecraft.sent.slice(0, 4)).toEqual(["a", "b", "c", "a"]);
+
+      it("runs a Like action for every likes_every likes, however many", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const run = service(minecraft).handle(
+          TOKIO_EVENTS.LIKE,
+          { user, likeCount: 250, totalLikes: 0 },
+          {
+            actions: [
+              action({
+                trigger: trigger(TOKIO_EVENTS.LIKE),
+                likes_every: 1,
+                steps: [say("like")],
+              }),
+            ],
+          },
+        );
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toHaveLength(250);
+      });
+
+      it("runs other actions at once while one has a backlog", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const actions = profileGames({
+          every: everyGift(),
+          follow: action({ steps: [say("follow")] }),
+        });
+        const gifts = games.handle(TOKIO_EVENTS.GIFT, gift(300), actions);
+        await vi.advanceTimersByTimeAsync(RUN_GAP_MS);
+        await games.handle(TOKIO_EVENTS.FOLLOW, { user }, actions);
+        expect(minecraft.sent).toEqual(["each 300", "each 300", "follow"]);
+        await vi.runAllTimersAsync();
+        await gifts;
+        expect(minecraft.sent).toHaveLength(301);
+      });
+
+      it("serves an action's events in order", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const actions = { actions: [everyGift()] };
+        const runs = [
+          games.handle(TOKIO_EVENTS.GIFT, gift(2), actions),
+          games.handle(TOKIO_EVENTS.GIFT, gift(4), actions),
+        ];
+        await vi.runAllTimersAsync();
+        await Promise.all(runs);
+        expect(minecraft.sent).toEqual([
+          "each 2",
+          "each 2",
+          "each 4",
+          "each 4",
+        ]);
+      });
+
+      it("stops when a later profile disables, removes or moves the action", async () => {
+        vi.useFakeTimers();
+        for (const later of [
+          { ...everyGift(), enabled: false },
+          undefined,
+          { ...everyGift(), edition: "java" as const },
+        ]) {
+          const minecraft = fakeMinecraft();
+          const games = service(minecraft);
+          const run = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+            actions: [everyGift()],
+          });
+          await vi.advanceTimersByTimeAsync(RUN_GAP_MS);
+          await games.handle(
+            TOKIO_EVENTS.FOLLOW,
+            { user },
+            { actions: later ? [later] : [] },
+          );
+          await vi.runAllTimersAsync();
+          await run;
+          expect(minecraft.sent).toEqual(["each 300", "each 300"]);
+        }
+      });
+
+      it("drops the backlog when the game leaves, reporting it once", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const every = everyGift();
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [every],
+        });
+        await vi.advanceTimersByTimeAsync(RUN_GAP_MS);
+        minecraft.set({ state: "waiting" });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toHaveLength(2);
+        expect(onError.mock.calls).toEqual([
+          [
+            every,
+            {
+              offline: true,
+              message: "Turn on Minecraft and connect the game first.",
+            },
+          ],
+        ]);
+      });
+
+      it("keeps serving the backlogs on clear", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(5), {
+          actions: [everyGift()],
+        });
+        games.clear();
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toHaveLength(5);
+      });
     });
 
     it("runs like actions once every so many likes, keeping the rest", async () => {
