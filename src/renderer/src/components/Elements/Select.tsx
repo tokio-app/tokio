@@ -276,15 +276,7 @@ function SelectBase<V extends Value>({
 
       {open &&
         createPortal(
-          <div
-            ref={popoverRef}
-            className={styles.popover}
-            style={{
-              top: position.top,
-              left: position.left,
-              width: position.width,
-            }}
-          >
+          <div ref={popoverRef} className={styles.popover} style={position}>
             <SelectMenu
               rows={rows}
               listId={listId}

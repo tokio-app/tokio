@@ -41,6 +41,22 @@ describe("usePopover", () => {
     });
   });
 
+  // jsdom's window is 768px tall, and test/renderer/dom.ts makes the menu 600px
+  it("opens above its anchor when it doesn't fit below", async () => {
+    const user = userEvent.setup();
+    render(<Popover />);
+    vi.spyOn(
+      screen.getByTestId("anchor"),
+      "getBoundingClientRect",
+    ).mockReturnValue(new DOMRect(12, 700, 200, 20));
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+
+    const menu = screen.getByRole("menu");
+    expect(menu).toHaveStyle({ bottom: "76px", left: "12px", width: "200px" });
+    expect(menu.style.top).toBe("");
+  });
+
   it("closes when toggled again", async () => {
     const user = userEvent.setup();
     render(<Popover />);

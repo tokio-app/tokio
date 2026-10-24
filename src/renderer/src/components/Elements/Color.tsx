@@ -65,7 +65,11 @@ export function Color({ value, onChange }: Props) {
           <div
             ref={popoverRef}
             className={cx(styles.popover, styles.color_popover)}
-            style={{ top: position.top, left: position.left }}
+            style={{
+              top: position.top,
+              bottom: position.bottom,
+              left: position.left,
+            }}
           >
             <HexAlphaColorPicker
               className={styles.picker}
