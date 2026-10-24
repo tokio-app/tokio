@@ -38,7 +38,7 @@ Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok
   </tr>
 </table>
 
-Viewers can also [request songs](https://tokio.ialfaro.com/docs/features/music-requests/) from chat on YouTube Music or Spotify, [spawn mobs and run commands in Minecraft](https://tokio.ialfaro.com/docs/features/games/) with gifts and chat, and [profiles](https://tokio.ialfaro.com/docs/features/profiles-and-settings/) keep separate settings for different streams.
+Viewers can also [request songs](https://tokio.ialfaro.com/docs/features/music-requests/) from chat on YouTube Music or Spotify, [spawn mobs and run commands in Minecraft](https://tokio.ialfaro.com/docs/features/games/) (Bedrock, or Java with the Tokio mod) with gifts and chat, and [profiles](https://tokio.ialfaro.com/docs/features/profiles-and-settings/) keep separate settings for different streams.
 
 ## Getting started
 
