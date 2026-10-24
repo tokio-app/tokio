@@ -432,16 +432,20 @@ const registerGames = ({
   games.onError((action, { offline, message }) => {
     const label = ALERT_TRIGGER_LABELS[action.trigger.type];
     if (offline) {
+      // Java Edition joins through the Tokio mod's command
+      const java = action.edition === "java";
+      const game = java ? "Minecraft Java Edition" : "Minecraft";
+      const connect = java ? "/tokio connect" : "/connect";
       if (
         notifier.warn(
           "games",
           FEEDBACK_CODES.GAME_NOT_CONNECTED,
-          `Minecraft isn't connected, so the ${label} action didn't run. Type the /connect command from Games in the game's chat.`,
+          `${game} isn't connected, so the ${label} action didn't run. Type the ${connect} command from Games in the game's chat.`,
           { key: "game:minecraft:offline", windowMs: 60_000 },
         )
       ) {
         Logger.warn(
-          `<Games> The ${label} action didn't run, Minecraft isn't connected.`,
+          `<Games> The ${label} action didn't run, ${game} isn't connected.`,
           paths.files.logs.games,
         );
       }

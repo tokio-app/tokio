@@ -730,6 +730,30 @@ describe("init events", () => {
       expect(logWarn.mock.calls).toEqual([logged, logged]);
     });
 
+    it("tells how Java Edition connects when its action didn't run", async () => {
+      const s = await live();
+      const fail = s.gamesService.onError.mock.calls[0][0];
+
+      fail(
+        { ...action, edition: "java" },
+        { offline: true, message: "Connect Minecraft Java Edition first." },
+      );
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          code: FEEDBACK_CODES.GAME_NOT_CONNECTED,
+          message:
+            "Minecraft Java Edition isn't connected, so the Follow action didn't run. Type the /tokio connect command from Games in the game's chat.",
+        }),
+      ]);
+      expect(logWarn.mock.calls).toEqual([
+        [
+          "<Games> The Follow action didn't run, Minecraft Java Edition isn't connected.",
+          "games.log",
+        ],
+      ]);
+    });
+
     it("warns about each action's refused command at most once every 30 seconds", async () => {
       const s = await live();
       const fail = s.gamesService.onError.mock.calls[0][0];
