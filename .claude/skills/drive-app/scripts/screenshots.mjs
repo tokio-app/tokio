@@ -332,14 +332,21 @@ export default async ({ app, page, home, push, toggle }) => {
     },
   });
   await push("app:games:res:games", games("waiting"));
-  const copies = section("Minecraft").getByTitle("Copy the command");
-  await copies.first().waitFor();
-  // One made-up network address, as in Settings, keeping the caret
-  await copies.evaluateAll((buttons) => {
-    buttons.slice(1).forEach((button) => button.remove());
-    buttons[0].querySelector("span").firstChild.nodeValue =
-      "/connect 192.168.1.20:37892";
-  });
+  // One made-up network address per edition, as in Settings, keeping each
+  // first command's caret
+  for (const [edition, command] of [
+    ["Bedrock", "/connect 192.168.1.20:37892"],
+    ["Java", "/tokio connect 192.168.1.20:37892"],
+  ]) {
+    const copies = section("Minecraft").getByTitle(
+      `Copy the ${edition} command`,
+    );
+    await copies.first().waitFor();
+    await copies.evaluateAll((buttons, command) => {
+      buttons.slice(1).forEach((button) => button.remove());
+      buttons[0].querySelector("span").firstChild.nodeValue = command;
+    }, command);
+  }
   await crop("games-connect", section("Minecraft"));
 
   await push("app:games:res:games", games("connected"));
