@@ -436,7 +436,7 @@ const registerGames = ({
         notifier.warn(
           "games",
           FEEDBACK_CODES.GAME_NOT_CONNECTED,
-          `Minecraft isn't connected, so the ${label} action didn't run. Type /connect localhost:${MINECRAFT_PORT} in the game's chat.`,
+          `Minecraft isn't connected, so the ${label} action didn't run. Type the /connect command from Games in the game's chat.`,
           { key: "game:minecraft:offline", windowMs: 60_000 },
         )
       ) {

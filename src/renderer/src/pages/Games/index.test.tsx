@@ -59,7 +59,6 @@ const panelElements = () =>
     .map((button) => button.closest("li")!);
 const panels = () => panelElements().map((panel) => within(panel));
 
-const CONNECT = "/connect localhost:37892";
 const setupSteps = () => screen.queryByText("Open a world with cheats on.");
 
 beforeEach(() => {
@@ -156,7 +155,6 @@ describe("Games", () => {
     ]);
     const copies = screen.getAllByTitle("Copy the command");
     expect(copies.map((copy) => copy.textContent)).toEqual([
-      CONNECT,
       "/connect 192.168.1.20:37892",
     ]);
 
@@ -165,21 +163,33 @@ describe("Games", () => {
     expect(screen.queryByTitle("Copy the command")).not.toBeInTheDocument();
   });
 
-  it("copies the commands", async () => {
+  it("falls back to localhost when this PC has no network address", async () => {
+    setup();
+    await status({ state: "waiting" });
+    expect(screen.queryByTitle("Copy the command")).not.toBeInTheDocument();
+
+    await send(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, { addresses: [] });
+
+    expect(screen.getByTitle("Copy the command")).toHaveTextContent(
+      "/connect localhost:37892",
+    );
+  });
+
+  it("copies the command of each address", async () => {
     const { user } = setup();
     const writeText = vi.spyOn(navigator.clipboard, "writeText");
     await status({ state: "waiting" });
     await send(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, {
-      addresses: ["192.168.1.20"],
+      addresses: ["192.168.1.20", "10.0.0.5"],
     });
-    const [local, remote] = screen.getAllByTitle("Copy the command");
+    const [first, second] = screen.getAllByTitle("Copy the command");
 
-    await user.click(local);
-    await user.click(remote);
+    await user.click(first);
+    await user.click(second);
 
     expect(writeText.mock.calls).toEqual([
-      [CONNECT],
       ["/connect 192.168.1.20:37892"],
+      ["/connect 10.0.0.5:37892"],
     ]);
   });
 

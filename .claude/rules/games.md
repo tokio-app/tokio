@@ -13,7 +13,7 @@ The **Games** page (`/games`, after Music) connects Minecraft Bedrock to Tokio. 
 
 ## Connection
 
-- `MinecraftConnection` (`services/games/minecraft.ts`) is a `ws` server on `MINECRAFT_PORT` (37892, `NOTE: DO NOT CHANGE`, players type it). The game connects to Tokio with `/connect localhost:37892` from its chat, in a world with cheats on, after **Settings → General → Network settings → Enable WebSockets**. Other devices use the PC's address (the server has no host; `GET_NETWORK_ADDRESSES` lists the addresses).
+- `MinecraftConnection` (`services/games/minecraft.ts`) is a `ws` server on `MINECRAFT_PORT` (37892, `NOTE: DO NOT CHANGE`, players type it). The game connects to Tokio with `/connect <this PC's address>:37892` from its chat, in a world with cheats on, after **Settings → General → Network settings → Enable WebSockets**. The server has no host, so one command per address (`GET_NETWORK_ADDRESSES`) works from this PC and from another device; the page shows `localhost` only when the PC has no address.
 - It listens only while `settings.games.minecraft.enabled` is on (off by default). `GamesService`'s constructor opens nothing; `configure` (startup and `SET_GAMES_SETTINGS`) turns it on or off.
 - `verifyClient` refuses any upgrade with an `Origin` header: browsers always send one, the game never does, so web pages can't take the socket. This is the exception to "no Origin checks" on the overlay server.
 - With **Require Encrypted WebSockets** on (the game's default) the game offers the subprotocol `com.microsoft.minecraft.wsencrypt`. `ws` echoes it back; keep that.
@@ -51,7 +51,7 @@ The **Games** page (`/games`, after Music) connects Minecraft Bedrock to Tokio. 
 
 ## Renderer
 
-- `pages/Games`: `MinecraftSection` (toggle, status, the setup steps, then the `/connect` commands under **From this device**, with a caret that blinks while waiting, and **From another device**; the setup hides once connected) and `ActionsSection`. `TriggerFilter` and `TRIGGER_OPTIONS` come from `components/AlertItem`; gifts and emotes load as on Alerts.
+- `pages/Games`: `MinecraftSection` (toggle, status, the setup steps, then a `/connect` command per address of this PC, the first with a caret that blinks while waiting; the setup hides once connected) and `ActionsSection`. `TriggerFilter` and `TRIGGER_OPTIONS` come from `components/AlertItem`; gifts and emotes load as on Alerts.
 - `MOBS` and `ITEMS` (`helper.ts`) are Bedrock ids checked in the game; add one only after trying it there (`testfor @e[type=<id>]` and `clear @p <id> 0 0` count without changing the world, and an unknown id is a syntax error). Some differ from Java's: Bedrock has `web` (Cobweb), `evocation_illager` (Evoker) and `zombie_pigman` (Zombified Piglin), which the Java mod will need mapped.
 - Actions save through `useEditableSettings("games")`; the toggle emits `SET_GAMES_SETTINGS` at once.
 

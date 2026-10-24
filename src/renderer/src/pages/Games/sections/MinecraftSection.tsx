@@ -22,9 +22,10 @@ export function MinecraftSection({ games, onToggle }: Props) {
   const { settings } = games;
   const status = games.status.minecraft;
   const { state } = status;
-  // This PC's addresses, for a game on another device
-  const [addresses, setAddresses] = useState<string[]>([]);
-  const command = connectCommand("localhost");
+  // This PC's addresses, null until main answers. Tokio listens on all of
+  // them, so one command works from this PC and from another device.
+  const [addresses, setAddresses] = useState<string[] | null>(null);
+  const hosts = addresses?.length ? addresses : ["localhost"];
 
   useIpcRequest(APP_EVENTS.GET_NETWORK_ADDRESSES);
   useIpcListener(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, (res) => {
@@ -68,31 +69,22 @@ export function MinecraftSection({ games, onToggle }: Props) {
                 <li key={step}>{step}</li>
               ))}
             </ol>
-            <div className={styles.device}>
-              <span className={styles.device_label}>From this device</span>
-              <CopyField
-                code
-                value={command}
-                title="Copy the command"
-                display={
-                  <>
-                    {command}
-                    {state === "waiting" && (
-                      <span className={styles.caret} aria-hidden />
-                    )}
-                  </>
-                }
-              />
-            </div>
-            {addresses.length > 0 && (
-              <div className={styles.device}>
-                <span className={styles.device_label}>From another device</span>
-                {addresses.map((ip) => (
+            {addresses && (
+              <div className={styles.commands}>
+                {hosts.map((host, i) => (
                   <CopyField
-                    key={ip}
+                    key={host}
                     code
-                    value={connectCommand(ip)}
+                    value={connectCommand(host)}
                     title="Copy the command"
+                    display={
+                      <>
+                        {connectCommand(host)}
+                        {i === 0 && state === "waiting" && (
+                          <span className={styles.caret} aria-hidden />
+                        )}
+                      </>
+                    }
                   />
                 ))}
               </div>

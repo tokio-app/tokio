@@ -75,7 +75,7 @@ const failed = (command: string, message: string): CommandResult => ({
 
 /**
  * Minecraft connects to Tokio, not the other way round: while enabled,
- * Tokio listens on `port`, and the game joins with `/connect localhost:<port>`
+ * Tokio listens on `port`, and the game joins with `/connect <address>:<port>`
  * from its chat. Commands run as the player who connected.
  *
  * Statuses: off while disabled; waiting while listening with no game;

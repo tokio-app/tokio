@@ -17,7 +17,8 @@ export const getAlertOverlayURL = (id: string) =>
 export const TIMER_PATH = "timer";
 
 // NOTE: DO NOT CHANGE. Minecraft connects to Tokio on this port: players
-// type /connect localhost:37892 in the game's chat, and the docs show it.
+// type /connect <this PC's address>:37892 in the game's chat, and the docs
+// show it.
 export const MINECRAFT_PORT = 37892;
 
 // Overlays connect here with their id to get the events meant for them.

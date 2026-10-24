@@ -716,7 +716,7 @@ describe("init events", () => {
           source: "games",
           code: FEEDBACK_CODES.GAME_NOT_CONNECTED,
           message:
-            "Minecraft isn't connected, so the Follow action didn't run. Type /connect localhost:37892 in the game's chat.",
+            "Minecraft isn't connected, so the Follow action didn't run. Type the /connect command from Games in the game's chat.",
         }),
       ]);
       vi.advanceTimersByTime(1);
