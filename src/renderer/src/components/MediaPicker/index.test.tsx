@@ -200,6 +200,17 @@ describe("MediaPicker", () => {
     const seconds = () =>
       screen.getByRole("spinbutton", { name: "Duration (seconds)" });
 
+    it("shows each video's length", async () => {
+      setup();
+      await library();
+
+      measure(CLIP.file, 12.3);
+
+      expect(
+        screen.getByRole("button", { name: "Clip 12s" }),
+      ).toBeInTheDocument();
+    });
+
     it("turns on and off", async () => {
       const { user, onMatch } = setup(alert({ media: alertMedia(CLIP) }));
       await library();

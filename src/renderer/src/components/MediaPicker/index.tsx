@@ -19,6 +19,7 @@ import { CopyField } from "../CopyField";
 import { DeleteMediaModal } from "../DeleteModals";
 import { Btn, Check, NumberInput, SearchToggle } from "../Elements";
 import { Modal } from "../Modal";
+import { SoundLength } from "../SoundPicker/SoundLength";
 import list from "../SoundPicker/soundpicker.module.css";
 import styles from "./mediapicker.module.css";
 
@@ -199,6 +200,8 @@ export function MediaPicker({
                       <FiFilm size={14} className={styles.video} aria-hidden />
                     )}
                     <span className={styles.file_name}>{file.name}</span>
+                    {/* The button's name reads "Clip 12s", not "Clip12s" */}{" "}
+                    <SoundLength seconds={lengths[file.file]} />
                   </span>
                   {current && (
                     <FiCheck size={14} className={styles.check} aria-hidden />

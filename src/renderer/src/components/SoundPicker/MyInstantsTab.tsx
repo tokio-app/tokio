@@ -12,6 +12,7 @@ import {
   TestState,
   testProps,
 } from "../PlayButton";
+import { SoundLength } from "./SoundLength";
 import styles from "./soundpicker.module.css";
 import { useSoundSearch } from "./useSoundSearch";
 
@@ -23,6 +24,8 @@ type Props = {
   // Downloaded sounds are in the library
   library: AlertSound[];
   testing: TestState;
+  // Seconds each sound previewed lasts, by URL
+  lengths: Record<string, number>;
   onTest: (req: AlertTestRequest) => void;
   // Called when a download for the alert starts, returns its request number
   onRequest: () => number;
@@ -36,6 +39,7 @@ export function MyInstantsTab({
   hidden,
   library,
   testing,
+  lengths,
   onTest,
   onRequest,
   onSelect,
@@ -93,6 +97,8 @@ export function MyInstantsTab({
                   {sound.name}
                 </span>
               )}
+              {/* Known once previewed or downloaded */}
+              <SoundLength file={entry?.file} seconds={lengths[sound.url]} />
               <PlayButton
                 {...testProps(testing, sound.url)}
                 onClick={() =>

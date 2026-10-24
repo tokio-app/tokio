@@ -3,7 +3,7 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { alertSound, failure } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SoundsSection } from "./SoundsSection";
 
@@ -43,6 +43,18 @@ describe("SoundsSection", () => {
     expect(screen.getByText("Airhorn")).toBeInTheDocument();
     expect(screen.getByText("Bell")).toBeInTheDocument();
     expect(screen.queryByText("No sounds yet.")).not.toBeInTheDocument();
+  });
+
+  it("shows each sound's length", async () => {
+    const { container } = await setup();
+
+    const audio = container.querySelector(
+      `audio[src="tokio-media:///sounds/${bell.file}"]`,
+    )!;
+    Object.defineProperty(audio, "duration", { value: 12 });
+    fireEvent.loadedMetadata(audio);
+
+    expect(row("Bell").getByText("12s")).toBeInTheDocument();
   });
 
   it("uploads sounds", async () => {

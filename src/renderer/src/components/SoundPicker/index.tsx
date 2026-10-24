@@ -13,6 +13,8 @@ import { MyInstantsTab } from "./MyInstantsTab";
 import styles from "./soundpicker.module.css";
 import { TtsTab } from "./TtsTab";
 
+export { SoundLength } from "./SoundLength";
+
 type Tab = "library" | "myinstants" | "tts";
 
 const TABS: { value: Tab; label: string }[] = [
@@ -28,6 +30,8 @@ type Props = {
   ttsDefaults: Omit<AlertTts, "message">;
   // The sound test loading or playing
   testing: TestState;
+  // Seconds each sound tested lasts, by test id
+  lengths: Record<string, number>;
   onTest: (req: AlertTestRequest) => void;
   // Asks main to save a sound for the alert, which replies SET_ALERT_SOUND
   // with the request number this returns
@@ -45,6 +49,7 @@ export function SoundPicker({
   alert,
   ttsDefaults,
   testing,
+  lengths,
   onTest,
   onRequest,
   onSelect,
@@ -143,6 +148,7 @@ export function SoundPicker({
           hidden={tab !== "myinstants"}
           library={library}
           testing={testing}
+          lengths={lengths}
           onTest={onTest}
           onRequest={request}
           onSelect={onSelect}

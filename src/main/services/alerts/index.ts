@@ -13,6 +13,7 @@ import {
 } from "@/common/types";
 import {
   ALERTS_PATH,
+  AUDIO_EXTENSIONS,
   formatAlertMessage,
   formatError,
   MEDIA_EXTENSIONS,
@@ -48,8 +49,6 @@ type Speaker = Pick<TTSService, "prepareText" | "generateBuffer">;
 
 // Sends alert media to the overlays connected with the alert's id.
 type Server = Pick<ServerService, "sendToClient">;
-
-export const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg"];
 
 // Media is streamed from disk to the overlays, never kept in memory.
 export const MEDIA_MAX_BYTES = 50 * 1024 * 1024;
