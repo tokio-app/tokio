@@ -16,11 +16,12 @@
   gap: var(--space-3);
 }
 
-.status_error {
+/* Two classes to win over Home's status and dot, whichever loads last */
+.status_error.status_error {
   color: var(--danger);
 }
 
-.dot_error {
+.dot_error.dot_error {
   background-color: var(--danger);
 }
 
