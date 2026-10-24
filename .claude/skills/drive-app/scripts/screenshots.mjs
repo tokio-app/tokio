@@ -332,14 +332,14 @@ export default async ({ app, page, home, push, toggle }) => {
     },
   });
   await push("app:games:res:games", games("waiting"));
-  const copy = section("Minecraft").getByTitle("Copy the command");
-  await copy.nth(1).waitFor();
-  // A made-up network address, as in Settings
-  await copy
-    .nth(1)
-    .locator("span")
-    .first()
-    .evaluate((el) => (el.textContent = "/connect 192.168.1.20:37892"));
+  const copies = section("Minecraft").getByTitle("Copy the command");
+  await copies.first().waitFor();
+  // One made-up network address, as in Settings, keeping the caret
+  await copies.evaluateAll((buttons) => {
+    buttons.slice(1).forEach((button) => button.remove());
+    buttons[0].querySelector("span").firstChild.nodeValue =
+      "/connect 192.168.1.20:37892";
+  });
   await crop("games-connect", section("Minecraft"));
 
   await push("app:games:res:games", games("connected"));
