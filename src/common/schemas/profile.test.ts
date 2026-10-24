@@ -3,6 +3,7 @@ import { EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
 import { defaultProfile } from "../util/constants/profile";
 import {
   ALERT_TRIGGERS,
+  GameActionSchema,
   GameStepSchema,
   Profile,
   ProfileSchema,
@@ -34,6 +35,24 @@ describe("ProfileSchema", () => {
     delete saved.games;
 
     expect(ProfileSchema.parse(saved).games).toEqual({ actions: [] });
+  });
+
+  it("makes a game action saved before Java a Bedrock one", () => {
+    const saved = {
+      id: "action-1",
+      enabled: true,
+      trigger: {
+        type: TOKIO_EVENTS.FOLLOW,
+        gifts: [],
+        every_gift: false,
+        emotes: [],
+        keyword: "",
+        user: "",
+      },
+      steps: [],
+    };
+
+    expect(GameActionSchema.parse(saved).edition).toBe("bedrock");
   });
 
   it("fills a spawn step's amount and name", () => {

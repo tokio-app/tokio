@@ -217,6 +217,7 @@ describe("Games", () => {
           {
             id: expect.any(String),
             enabled: true,
+            edition: "bedrock",
             trigger: expect.objectContaining({ type: TOKIO_EVENTS.FOLLOW }),
             steps: [{ type: "spawn", mob: "zombie", amount: 1, name: "" }],
           },
@@ -304,7 +305,7 @@ describe("Games", () => {
 
     await user.click(first.getByRole("button", { name: "Test" }));
     expect(sent(APP_EVENTS.TEST_GAME_ACTION)).toEqual([
-      { id: "a1", trigger: TOKIO_EVENTS.FOLLOW, steps },
+      { id: "a1", edition: "bedrock", trigger: TOKIO_EVENTS.FOLLOW, steps },
     ]);
 
     // Another action's reply

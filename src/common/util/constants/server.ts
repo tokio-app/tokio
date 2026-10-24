@@ -21,6 +21,10 @@ export const TIMER_PATH = "timer";
 // show it.
 export const MINECRAFT_PORT = 37892;
 
+// NOTE: DO NOT CHANGE. The Tokio mod for Java Edition offers this WebSocket
+// subprotocol, which tells Tokio the game is Java (see the mod's PROTOCOL.md).
+export const MINECRAFT_JAVA_PROTOCOL = "tokio.java.v1";
+
 // Overlays connect here with their id to get the events meant for them.
 export const getOverlaySocketURL = (id: string) =>
   `ws://localhost:${SERVER_PORT}/?id=${encodeURIComponent(id)}`;

@@ -1,0 +1,11 @@
+{
+  "mobs": {
+    "cow": "Cow",
+    "creeper": "Creeper",
+    "zombie": "Zombie"
+  },
+  "items": {
+    "diamond": "Diamond",
+    "totem_of_undying": "Totem of Undying"
+  }
+}

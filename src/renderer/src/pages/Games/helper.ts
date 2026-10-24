@@ -2,7 +2,7 @@ import { GameAction, GameStep } from "@/common/schemas";
 import { CommandResult, GameStatus, TOKIO_EVENTS } from "@/common/types";
 import { MINECRAFT_PORT } from "@/common/util";
 import { SelectOption } from "@/components";
-import minecraft from "./minecraft.json";
+import minecraft from "./minecraft-bedrock.json";
 
 export type StepKind = GameStep["type"];
 type Step<K extends StepKind> = Extract<GameStep, { type: K }>;
@@ -58,6 +58,7 @@ export function createAction(): GameAction {
   return {
     id: crypto.randomUUID(),
     enabled: true,
+    edition: "bedrock",
     trigger: {
       type: TOKIO_EVENTS.FOLLOW,
       gifts: [],

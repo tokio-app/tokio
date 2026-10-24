@@ -61,6 +61,7 @@ const say = (text: string): GameStep => ({ type: "command", command: text });
 const action = (overrides: Partial<GameAction> = {}): GameAction => ({
   id: "action-1",
   enabled: true,
+  edition: "bedrock",
   trigger: trigger(TOKIO_EVENTS.FOLLOW),
   steps: [say("say Thanks {username}")],
   ...overrides,

@@ -1,10 +1,17 @@
-import { GamesSettings } from "../schemas";
+import { GamesSettings, MinecraftEdition } from "../schemas";
 
 // A game's connection: off, waiting for the game to connect, connected, or
 // unable to work, with why in error, for the user.
 export type GameStatus = {
   state: "off" | "waiting" | "connected" | "error";
   error?: string;
+  // The connected game's edition, only while connected
+  edition?: MinecraftEdition;
+};
+
+export const MINECRAFT_EDITION_NAMES: Record<MinecraftEdition, string> = {
+  bedrock: "Bedrock Edition",
+  java: "Java Edition",
 };
 
 // Keyed by game, like the settings

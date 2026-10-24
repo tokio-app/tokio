@@ -155,10 +155,15 @@ export const GameStepSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-// Runs its steps, in order, each time its trigger fires
+// Bedrock connects by itself; Java through the Tokio mod
+export const MINECRAFT_EDITIONS = ["bedrock", "java"] as const;
+
+// Runs its steps, in order, each time its trigger fires, in the edition it's
+// made for. Actions saved before Java existed are Bedrock's.
 export const GameActionSchema = z.object({
   id: z.string(),
   enabled: z.boolean(),
+  edition: z.enum(MINECRAFT_EDITIONS).default("bedrock"),
   trigger: TriggerSchema,
   steps: z.array(GameStepSchema),
 });
@@ -251,6 +256,7 @@ export type Trigger = z.infer<typeof TriggerSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
 export type GameStep = z.infer<typeof GameStepSchema>;
 export type GameAction = z.infer<typeof GameActionSchema>;
+export type MinecraftEdition = GameAction["edition"];
 export type AlertSound = z.infer<typeof AlertSoundSchema>;
 export type AlertMedia = z.infer<typeof AlertMediaSchema>;
 // An image or video in the media library

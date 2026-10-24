@@ -182,6 +182,7 @@ function ActionItem({ action, gifts, emotes, onChange, onRemove }: ItemProps) {
               setTesting(true);
               window.api.emit(APP_EVENTS.TEST_GAME_ACTION, {
                 id: action.id,
+                edition: action.edition,
                 trigger: trigger.type,
                 steps,
               });

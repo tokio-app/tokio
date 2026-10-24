@@ -627,6 +627,7 @@ describe("init events", () => {
     const action: GameAction = {
       id: "action-1",
       enabled: true,
+      edition: "bedrock",
       trigger: alert().trigger,
       steps: [{ type: "command", command: "say hi" }],
     };

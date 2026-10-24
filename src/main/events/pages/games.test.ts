@@ -153,6 +153,7 @@ describe("games events", () => {
   describe("TEST_GAME_ACTION", () => {
     const request: AppEventsMap[APP_EVENTS.TEST_GAME_ACTION] = {
       id: "action-1",
+      edition: "bedrock",
       trigger: TOKIO_EVENTS.FOLLOW,
       steps: [{ type: "command", command: "say hi" }],
     };

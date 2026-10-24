@@ -1,4 +1,8 @@
-import { GameStepSchema, TriggerSchema } from "@/common/schemas";
+import {
+  GameActionSchema,
+  GameStepSchema,
+  TriggerSchema,
+} from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -15,6 +19,7 @@ const events = createStack("games");
 
 const TestSchema = z.object({
   id: z.string(),
+  edition: GameActionSchema.shape.edition,
   trigger: TriggerSchema.shape.type,
   steps: z.array(GameStepSchema),
 });

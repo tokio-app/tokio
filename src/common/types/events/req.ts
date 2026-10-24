@@ -4,6 +4,7 @@ import {
   AlertTts,
   GameStep,
   GamesSettings,
+  MinecraftEdition,
   OverlayConfig,
   Profile,
   TimerAction,
@@ -336,6 +337,7 @@ export interface AppEventsMap {
   [APP_EVENTS.TEST_GAME_ACTION]: {
     // The action, which the reply names
     id: string;
+    edition: MinecraftEdition;
     trigger: AlertTrigger;
     steps: GameStep[];
   };
