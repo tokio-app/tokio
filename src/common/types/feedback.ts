@@ -31,6 +31,8 @@ export enum FEEDBACK_CODES {
   UPDATE_READY = "update_ready",
   UPDATES_ENABLED = "updates_enabled",
   UPDATES_DISABLED = "updates_disabled",
+  TRAY_ENABLED = "tray_enabled",
+  TRAY_DISABLED = "tray_disabled",
   UPDATE_CHECK_FAILED = "update_check_failed",
   UPDATE_DOWNLOAD_FAILED = "update_download_failed",
   UPDATE_INSTALL_FAILED = "update_install_failed",

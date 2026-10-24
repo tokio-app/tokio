@@ -10,6 +10,7 @@ import { ProfileSection } from "./sections/ProfileSection";
 import { ProvidersSection } from "./sections/ProvidersSection";
 import { ServerSection } from "./sections/ServerSection";
 import { SoundsSection } from "./sections/SoundsSection";
+import { TraySection } from "./sections/TraySection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { VoiceKeysSection } from "./sections/VoiceKeysSection";
 
@@ -92,6 +93,16 @@ export function Settings() {
               s.settings.updates.auto = enabled;
             });
             window.api.emit(APP_EVENTS.SET_AUTO_UPDATES, { enabled });
+          }}
+        />
+
+        <TraySection
+          enabled={store.settings.tray.enabled}
+          onChange={(enabled) => {
+            updateStore((s) => {
+              s.settings.tray.enabled = enabled;
+            });
+            window.api.emit(APP_EVENTS.SET_TRAY, { enabled });
           }}
         />
 

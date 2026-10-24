@@ -320,6 +320,12 @@ export class StoreManagerService extends Service {
     return this._queueSave();
   }
 
+  public async updateTraySettings(enabled: boolean): Promise<boolean> {
+    this._ensureInitialized();
+    this._storeData!.settings.tray = { enabled };
+    return this._queueSave();
+  }
+
   public async updateActivityFeed(feed: ActivityFeed): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.activityFeed = { ...feed };

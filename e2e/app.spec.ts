@@ -208,7 +208,23 @@ test("serves the overlay once the server is on", async () => {
     .toContain(`window.__OVERLAY_ID__ = "${id}"`);
 });
 
-test("leaves a second launch on the same folder to the running app", async () => {
+// Whether each of the app's windows is on screen
+const shown = () =>
+  app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().map((w) => w.isVisible()),
+  );
+
+const closeButton = () =>
+  page.getByRole("banner").first().getByTitle("Close", { exact: true });
+
+test("hides in the tray when the title bar closes it", async () => {
+  await closeButton().click();
+
+  // Still running, with its window hidden
+  await expect.poll(shown).toEqual([false]);
+});
+
+test("leaves a second launch on the same folder to the running app, which shows its window", async () => {
   const exe = await app.evaluate(() => process.execPath);
   const second = spawn(exe, args, {
     env: { ...env, TOKIO_HOME: home },
@@ -220,15 +236,28 @@ test("leaves a second launch on the same folder to the running app", async () =>
   } finally {
     second.kill();
   }
+  await expect.poll(shown).toEqual([true]);
 });
 
-test("quits when the title bar closes it, keeping a change made just before", async () => {
+test("quits when the title bar closes it with the tray off, keeping a change made just before", async () => {
+  const savedSettings = async () =>
+    JSON.parse(await readFile(data("settings", "tokio.json"), "utf8")).settings;
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Settings" })
+    .click();
+  await page
+    .getByRole("checkbox", {
+      name: "Keep Tokio running in the tray when you close it",
+    })
+    .uncheck();
+  await expect
+    .poll(async () => (await savedSettings()).tray)
+    .toEqual({ enabled: false });
+
   // The TTS settings of the active profile, as saved
   const savedBanned = async () => {
-    const store = JSON.parse(
-      await readFile(data("settings", "tokio.json"), "utf8"),
-    );
-    const file = data("profiles", store.settings.activeProfile.file);
+    const file = data("profiles", (await savedSettings()).activeProfile.file);
     return JSON.parse(await readFile(file, "utf8")).tts.protection.banned;
   };
   await page
@@ -236,10 +265,7 @@ test("quits when the title bar closes it, keeping a change made just before", as
     .getByRole("link", { name: "TTS", exact: true })
     .click();
   const banned = page.getByPlaceholder("word1, word2, word3...");
-  const close = page
-    .getByRole("banner")
-    .first()
-    .getByTitle("Close", { exact: true });
+  const close = closeButton();
   // Saved as usual first, once the profile has loaded (a change made before
   // is undone by the load)
   await expect(async () => {

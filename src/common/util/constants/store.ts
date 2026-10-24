@@ -15,6 +15,9 @@ export const defaultStoreData: StoreSchema = {
     updates: {
       auto: true,
     },
+    tray: {
+      enabled: true,
+    },
     overlays: [],
     testOverlays: [],
     sounds: [],

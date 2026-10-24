@@ -65,6 +65,7 @@ export enum APP_EVENTS_RESPONSE {
   SET_VOICE_KEY = "app:settings:res:set:voice-key",
   SET_SERVER = "app:settings:res:set:server",
   SET_AUTO_UPDATES = "app:settings:res:set:updates",
+  SET_TRAY = "app:settings:res:set:tray",
   REQ_FQDN = "app:settings:res:fqdn",
   GET_NETWORK_ADDRESSES = "app:settings:res:network",
 
@@ -198,6 +199,7 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.SET_SERVER]: Reply;
 
   [APP_EVENTS_RESPONSE.SET_AUTO_UPDATES]: Reply;
+  [APP_EVENTS_RESPONSE.SET_TRAY]: Reply;
 
   [APP_EVENTS_RESPONSE.REQ_FQDN]: Reply;
   // This PC's IPv4 addresses, see ServerService.networkAddresses

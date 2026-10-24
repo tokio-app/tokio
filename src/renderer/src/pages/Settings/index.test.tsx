@@ -123,6 +123,27 @@ describe("Settings", () => {
     });
   });
 
+  describe("Tray", () => {
+    it("keeps Tokio in the tray unless it's turned off", async () => {
+      const { user } = await setup();
+      const tray = screen.getByRole("checkbox", {
+        name: "Keep Tokio running in the tray when you close it",
+      });
+      expect(tray).toBeChecked();
+
+      await user.click(tray);
+      expect(tray).not.toBeChecked();
+
+      await user.click(tray);
+      expect(tray).toBeChecked();
+
+      expect(sent(APP_EVENTS.SET_TRAY)).toEqual([
+        { enabled: false },
+        { enabled: true },
+      ]);
+    });
+  });
+
   describe("Live Profiles", () => {
     it("switches to the profile picked", async () => {
       const { user, container } = await setup();

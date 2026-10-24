@@ -13,6 +13,7 @@ import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { TimerService } from "@/services/timer";
+import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
 import { URLManagerService } from "@/services/url";
@@ -52,6 +53,7 @@ export class AppHandler implements AppHandlerVariables {
   public readonly updaterService: UpdaterService;
   public readonly liveService: LiveService;
   public readonly timerService: TimerService;
+  public readonly trayService: TrayService;
   public readonly notifier: Notifier;
 
   constructor(deps: AppHandlerVariables) {
@@ -79,9 +81,10 @@ export class AppHandler implements AppHandlerVariables {
       this.splash.show();
     });
 
-    // Closing the splash quits, as the app hasn't shown yet
+    // Closing the splash quits, as the app hasn't shown yet. Closing the
+    // window would only hide it once LOAD_APP turned the tray on.
     this.splash.on("closed", () => {
-      if (!revealed) this.win.close();
+      if (!revealed) this.app.quit();
     });
 
     this.ipcMain.on(APP_EVENTS.SHOW_WINDOW, async () => {
@@ -127,7 +130,21 @@ export class AppHandler implements AppHandlerVariables {
       }
     });
 
-    this.win.on("close", () => {
+    // Every quit (the tray, Cmd+Q, an update) goes through app.quit, which
+    // lets the window close
+    let quitting = false;
+    this.app.on("before-quit", () => {
+      quitting = true;
+    });
+
+    // With the tray on, closing hides it, and the LIVE, sounds and overlays
+    // carry on
+    this.win.on("close", (event) => {
+      if (!quitting && this.trayService.isEnabled()) {
+        event.preventDefault();
+        this.win.hide();
+        return;
+      }
       BrowserWindow.getAllWindows().forEach((window) => {
         window.close();
       });
@@ -137,13 +154,20 @@ export class AppHandler implements AppHandlerVariables {
       this.win.close();
     });
 
-    // A second launch quits (see main) and brings this one to the front
-    this.app.on("second-instance", () => {
-      const front = this.splash.isDestroyed() ? this.win : this.splash;
-      if (front.isDestroyed()) return;
-      if (front.isMinimized()) front.restore();
-      front.focus();
-    });
+    // A second launch quits (see main) and brings this one to the front, as
+    // do the tray and, on macOS, the Dock
+    this.trayService.onOpen(() => this.bringToFront());
+    this.app.on("second-instance", () => this.bringToFront());
+    this.app.on("activate", () => this.bringToFront());
+  }
+
+  // The splash while the app loads, then the app, also out of the tray
+  private bringToFront() {
+    const front = this.splash.isDestroyed() ? this.win : this.splash;
+    if (front.isDestroyed()) return;
+    if (front.isMinimized()) front.restore();
+    front.show();
+    front.focus();
   }
 
   private initSession() {
