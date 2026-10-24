@@ -3,7 +3,7 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { failure, mediaFile } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { MediaSection } from "./MediaSection";
 
@@ -41,6 +41,16 @@ describe("MediaSection", () => {
       "src",
       "tokio-media:///clip.webm#t=0.1",
     );
+  });
+
+  it("shows each video's length", async () => {
+    const { container } = await setup();
+
+    const video = container.querySelector("video")!;
+    Object.defineProperty(video, "duration", { value: 75 });
+    fireEvent.loadedMetadata(video);
+
+    expect(row("Clip").getByText("1:15")).toBeInTheDocument();
   });
 
   it("uploads images and videos", async () => {

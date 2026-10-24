@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { getMediaPreviewURL } from "@/common/util";
+import { getMediaPreviewURL, getSoundPreviewURL } from "@/common/util";
 import {
   mediaFile,
   previewFile,
@@ -45,26 +45,42 @@ describe("previewFile", () => {
 });
 
 describe("mediaFile", () => {
-  const folder = resolve("tokio-data", "media");
+  const folders = {
+    mediaFolder: resolve("tokio-data", "media"),
+    soundsFolder: resolve("tokio-data", "sounds"),
+  };
 
   it("serves the images and videos in the media folder", () => {
     for (const file of ["c0ffee.png", "My clip.webm"]) {
-      expect(mediaFile(getMediaPreviewURL(file), folder)).toBe(
-        join(folder, file),
+      expect(mediaFile(getMediaPreviewURL(file), folders)).toBe(
+        join(folders.mediaFolder, file),
       );
     }
   });
 
-  it("refuses other files, and anything outside the folder", () => {
+  it("serves the audio in the sounds folder", () => {
+    for (const file of ["c0ffee.mp3", "My horn.OGG"]) {
+      expect(mediaFile(getSoundPreviewURL(file), folders)).toBe(
+        join(folders.soundsFolder, file),
+      );
+    }
+  });
+
+  it("refuses other files, and anything outside the folders", () => {
     const refused = [
       getMediaPreviewURL("notes.txt"),
       getMediaPreviewURL("icon.svg"),
       getMediaPreviewURL("../settings/store.png"),
       getMediaPreviewURL(".."),
+      getMediaPreviewURL("horn.mp3"),
+      getSoundPreviewURL("party.png"),
+      getSoundPreviewURL("../settings/store.mp3"),
       "tokio-media:///sub/a.png",
+      "tokio-media:///sounds/sub/a.mp3",
+      "tokio-media:///sounds/../a.mp3",
       "tokio-media:///%E0%A4%A",
     ];
-    for (const url of refused) expect(mediaFile(url, folder)).toBeNull();
+    for (const url of refused) expect(mediaFile(url, folders)).toBeNull();
     expect(mediaFile(getMediaPreviewURL("a.png"), undefined)).toBeNull();
   });
 });

@@ -13,13 +13,15 @@ export type AlertTestRequest =
 
 /**
  * Plays one alert sound test at a time. Starting a test cancels the one
- * playing, and `testing` holds the test loading or playing.
+ * playing, and `testing` holds the test loading or playing. `lengths` has the
+ * seconds each sound or message tested lasts, by test id.
  */
 export function useAlertTest() {
   const { getQueue } = useAudio();
   const queue = getQueue("alert-test");
 
   const [testing, setTesting] = useState<TestState>(null);
+  const [lengths, setLengths] = useState<Record<string, number>>({});
   // Read by IPC callbacks, which would otherwise see a stale `testing`
   const current = useRef<AlertTestRequest | null>(null);
 
@@ -50,7 +52,15 @@ export function useAlertTest() {
       void queueAlert(
         queue,
         { id, volume, data, media },
-        { gain: volume / 100, key: id, onEnded: () => finish(id), ...filters },
+        {
+          gain: volume / 100,
+          key: id,
+          onEnded: () => finish(id),
+          // Media replaces it, its place isn't the sound's length.
+          onScheduled: (_, seconds) =>
+            setLengths((l) => ({ ...l, [id]: seconds })),
+          ...filters,
+        },
       ).then((queued) => (queued ? started(id) : finish(id)));
     },
     [queue, finish, started],
@@ -100,5 +110,5 @@ export function useAlertTest() {
     };
   }, [queue, finish, queueTest]);
 
-  return { testing, toggle, stop };
+  return { testing, lengths, toggle, stop };
 }

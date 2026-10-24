@@ -185,6 +185,7 @@ export function Alerts() {
           alert={pickerAlert}
           ttsDefaults={ttsDefaults}
           testing={test.testing}
+          lengths={test.lengths}
           onTest={test.toggle}
           onRequest={() => {
             asked.current.add(pickerAlert.id);

@@ -8,6 +8,7 @@ import {
   MediaThumbnail,
   Modal,
   Section,
+  SoundLength,
 } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
@@ -21,6 +22,8 @@ export function MediaSection() {
   const [showing, setShowing] = useState<MediaFile | null>(null);
   // File waiting for the user to confirm it's deleted
   const [removing, setRemoving] = useState<MediaFile | null>(null);
+  // The videos' lengths in seconds, read by their thumbnails
+  const [lengths, setLengths] = useState<Record<string, number>>({});
 
   useIpcRequest(APP_EVENTS.GET_MEDIA);
 
@@ -82,11 +85,20 @@ export function MediaSection() {
             {media.map((file) => (
               <div key={file.file} className={styles.library_item}>
                 <div className={styles.library_thumb}>
-                  <MediaThumbnail file={file.file} />
+                  <MediaThumbnail
+                    file={file.file}
+                    onLength={(seconds) =>
+                      setLengths((known) => ({
+                        ...known,
+                        [file.file]: seconds,
+                      }))
+                    }
+                  />
                 </div>
                 <span className={styles.library_name} title={file.name}>
                   {file.name}
                 </span>
+                <SoundLength seconds={lengths[file.file]} />
                 <Btn
                   variant="icon"
                   title="Full size"

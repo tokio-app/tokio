@@ -10,6 +10,7 @@ import {
   TestState,
   testProps,
 } from "../PlayButton";
+import { SoundLength } from "./SoundLength";
 import styles from "./soundpicker.module.css";
 
 type Props = {
@@ -71,6 +72,7 @@ export function LibraryTab({
               >
                 {sound.name}
               </button>
+              <SoundLength file={sound.file} />
               <PlayButton
                 {...testProps(testing, sound.file)}
                 onClick={() => onTest(test)}

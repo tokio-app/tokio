@@ -8,11 +8,15 @@ import {
   FEEDBACK_CODES,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { generateTikTokEventSample, MEDIA_EXTENSIONS } from "@/common/util";
+import {
+  AUDIO_EXTENSIONS,
+  generateTikTokEventSample,
+  MEDIA_EXTENSIONS,
+} from "@/common/util";
 import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
-import { AlertsResult, AUDIO_EXTENSIONS } from "@/services/alerts";
+import { AlertsResult } from "@/services/alerts";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("alerts");

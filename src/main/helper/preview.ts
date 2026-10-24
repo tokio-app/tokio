@@ -1,5 +1,6 @@
-import { mediaKind } from "@/common/util";
-import { basename, join, resolve } from "node:path";
+import type { Folders } from "@/common/types";
+import { AUDIO_EXTENSIONS, mediaKind } from "@/common/util";
+import { basename, extname, join, resolve } from "node:path";
 import { isInside } from "./path";
 
 // --background-primary in src/ui/styles/tokens.css, what previews sit on
@@ -32,15 +33,17 @@ export function previewFile(
 }
 
 /**
- * The media library file a thumbnail URL (`tokio-media:///<file>`, see
- * getMediaPreviewURL) names, or null. Only images and videos right in the
- * media folder are served.
+ * The library file a `tokio-media:` URL names, or null: a thumbnail's
+ * (`tokio-media:///<file>`, see getMediaPreviewURL) or a sound's
+ * (`tokio-media:///sounds/<file>`, see getSoundPreviewURL). Only images and
+ * videos right in the media folder, and audio right in the sounds folder, are
+ * served.
  */
 export function mediaFile(
   url: string,
-  mediaFolder: string | undefined,
+  folders: Pick<Folders, "mediaFolder" | "soundsFolder"> | undefined,
 ): string | null {
-  if (!mediaFolder) return null;
+  if (!folders) return null;
 
   let name: string;
   try {
@@ -48,8 +51,15 @@ export function mediaFile(
   } catch {
     return null;
   }
+  if (name.startsWith("sounds/")) {
+    const sound = name.slice("sounds/".length);
+    const ext = extname(sound).slice(1).toLowerCase();
+    return basename(sound) === sound && AUDIO_EXTENSIONS.includes(ext)
+      ? join(folders.soundsFolder, sound)
+      : null;
+  }
   return basename(name) === name && mediaKind(name)
-    ? join(mediaFolder, name)
+    ? join(folders.mediaFolder, name)
     : null;
 }
 

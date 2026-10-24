@@ -8,7 +8,7 @@ import {
 import { intersect } from "@test/dom";
 import { alertSound, failure, instantSound } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -26,6 +26,7 @@ function setup(props: Partial<Props> = {}) {
     hidden: false,
     library: [],
     testing: null,
+    lengths: {},
     onTest: vi.fn(),
     onRequest: vi.fn(() => 4),
     onSelect: vi.fn(),
@@ -271,6 +272,29 @@ describe("MyInstantsTab", () => {
     expect(
       row("Vine Boom").getByRole("button", { name: "Play" }),
     ).toBeVisible();
+  });
+
+  it("shows a sound's length once previewed or downloaded", async () => {
+    const { container } = setup({
+      library: [alertSound("Airhorn")],
+      lengths: { [BRUH.url]: 2.5 },
+    });
+    await results([BRUH, VINE_BOOM, AIRHORN]);
+
+    expect(row("Bruh").getByText("2.5s")).toBeInTheDocument();
+    expect(row("Vine Boom").queryByText(/\ds$/)).not.toBeInTheDocument();
+    // Only the downloaded one reads its file.
+    const audio = container.querySelectorAll("audio");
+    expect(audio).toHaveLength(1);
+    expect(audio[0]).toHaveAttribute(
+      "src",
+      `tokio-media:///sounds/${AIRHORN.file}`,
+    );
+
+    Object.defineProperty(audio[0], "duration", { value: 4 });
+    fireEvent.loadedMetadata(audio[0]);
+
+    expect(row("Airhorn").getByText("4s")).toBeInTheDocument();
   });
 
   it("downloads a sound for the alert, one at a time", async () => {

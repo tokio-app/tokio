@@ -14,13 +14,17 @@ import {
   TestOverlay,
 } from "@/common/schemas";
 import { Emotes } from "@/common/types";
-import { defaultProfile, formatError, MEDIA_EXTENSIONS } from "@/common/util";
+import {
+  AUDIO_EXTENSIONS,
+  defaultProfile,
+  formatError,
+  MEDIA_EXTENSIONS,
+} from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
 import { isInside } from "@/helper/path";
 import { track } from "@/helper/quit";
 import Logger from "@/logger";
-import { AUDIO_EXTENSIONS } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";

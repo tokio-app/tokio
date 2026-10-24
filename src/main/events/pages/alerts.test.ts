@@ -7,13 +7,13 @@ import {
   MyInstantsSound,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { defaultProfile, MEDIA_EXTENSIONS } from "@/common/util";
-import Logger from "@/logger";
 import {
   AUDIO_EXTENSIONS,
-  type AlertsResult,
-  type AlertsService,
-} from "@/services/alerts";
+  defaultProfile,
+  MEDIA_EXTENSIONS,
+} from "@/common/util";
+import Logger from "@/logger";
+import { type AlertsResult, type AlertsService } from "@/services/alerts";
 import { dialog } from "@test/electron";
 import { createHandler } from "@test/handler";
 import {

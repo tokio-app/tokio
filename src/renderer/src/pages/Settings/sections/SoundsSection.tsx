@@ -7,6 +7,7 @@ import {
   PlayButton,
   PREVIEW_VOLUME,
   Section,
+  SoundLength,
   testProps,
 } from "@/components";
 import { useAlertTest, useIpcListener, useIpcRequest } from "@/hooks";
@@ -76,6 +77,7 @@ export function SoundsSection() {
                   <span className={styles.library_name} title={sound.name}>
                     {sound.name}
                   </span>
+                  <SoundLength file={sound.file} />
                   <Btn
                     variant="icon"
                     title="Delete"

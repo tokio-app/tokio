@@ -44,6 +44,7 @@ describe("useAlertTest", () => {
       gain: 0.8,
       key: "alert-1",
       onEnded: expect.any(Function),
+      onScheduled: expect.any(Function),
       speed: 1.2,
       pitch: 0.9,
     });
@@ -59,6 +60,18 @@ describe("useAlertTest", () => {
     act(() => options?.onEnded?.());
 
     expect(result.current.testing).toBeNull();
+  });
+
+  it("keeps each tested sound's length", async () => {
+    const { result, queue } = setup();
+    act(() => result.current.toggle(airhorn));
+    await send(TEST_ALERT, { success: true, id: "alert-1", data, volume: 80 });
+    expect(result.current.lengths).toEqual({});
+
+    const [, options] = queue.enqueue.mock.calls[0];
+    act(() => options?.onScheduled?.(0.1, 2.5));
+
+    expect(result.current.lengths).toEqual({ "alert-1": 2.5 });
   });
 
   it("stops the test when it's toggled again", async () => {
@@ -126,6 +139,8 @@ describe("useAlertTest", () => {
         volume: 80,
       },
     ]);
+    // The media's place isn't a sound's length.
+    expect(result.current.lengths).toEqual({});
 
     act(() => options?.onEnded?.());
     expect(result.current.testing).toBeNull();

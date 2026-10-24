@@ -59,6 +59,7 @@ function setup(
       alert={item}
       ttsDefaults={DEFAULTS}
       testing={null}
+      lengths={{}}
       {...handlers}
       {...props}
     />,
@@ -362,6 +363,19 @@ describe("SoundPicker", () => {
         file: "bell.mp3",
         volume: 100,
       });
+    });
+
+    it("shows each one's length", async () => {
+      setup();
+      await sounds(LIBRARY);
+
+      const audio = screen
+        .getByRole("dialog")
+        .querySelector('audio[src="tokio-media:///sounds/bell.mp3"]')!;
+      Object.defineProperty(audio, "duration", { value: 0.84 });
+      fireEvent.loadedMetadata(audio);
+
+      expect(row("Bell").getByText("0.8s")).toBeInTheDocument();
     });
 
     it("shows the one being tested", async () => {

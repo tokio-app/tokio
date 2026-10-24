@@ -41,6 +41,13 @@
   white-space: nowrap;
 }
 
+.length {
+  flex-shrink: 0;
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+}
+
 /* The alert's sound */
 .current {
   color: var(--accent-primary);
