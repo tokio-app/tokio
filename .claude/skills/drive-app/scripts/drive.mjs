@@ -62,7 +62,7 @@ const portTaken = await new Promise((done) => {
 });
 if (portTaken) {
   console.error(
-    `Port ${PORT} is in use (by Tokio or yarn dev): close it and try again.`,
+    `Port ${PORT} is in use (by Tokio or yarn dev): quit it and try again.`,
   );
   process.exit(1);
 }

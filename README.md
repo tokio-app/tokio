@@ -87,6 +87,7 @@ Run a subathon-style countdown on your stream that viewers add time to. Set it u
 - **Voice engines**: optionally add your TikTok session ID. With it, the TikTok voices come straight from TikTok. Without it, they go through `tiktok-tts.weilnet.workers.dev`, a proxy run by a third party, which gets the text of every message they read.
 - **Overlay server**: turn the local server for overlays on or off. It also shows your computer's network address, for a streaming app on another computer (see [Adding an overlay](#adding-an-overlay)).
 - **Updates**: Tokio checks GitHub for new releases on startup and every few hours, downloads them in the background and installs them when you restart from the title bar. On macOS, where the app isn't signed, the button opens the release page instead. Turn automatic checks off in Settings, or check any time from About.
+- **Tray**: Tokio keeps running in the tray (the menu bar on macOS) when you close its window, so the voices, sounds and overlays carry on. Click the icon, or choose **Open Tokio** in its menu, to bring the window back, and **Quit Tokio** to quit. Turn it off to quit when you close the window.
 - **Notifications**: when something fails, such as a voice that can't be generated, a sound that's missing or a change that couldn't be saved, Tokio tells you what went wrong. The bell in the title bar keeps the session's history.
 
 ### Tools for overlay developers
@@ -160,7 +161,7 @@ Requires Node.js 24+ and Yarn 1.
 
 ```sh
 yarn install
-yarn dev          # run in development (close Tokio first)
+yarn dev          # run in development (quit Tokio first)
 yarn test         # unit tests
 yarn typecheck    # type-check every process
 yarn lint         # lint

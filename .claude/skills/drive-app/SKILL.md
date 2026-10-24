@@ -19,7 +19,7 @@ argument-hint: "[what to check]"
    ```
 
 3. Run it from the repository root: `node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs>`. With `--home <dir>` it uses that data folder and keeps it, to look at what the app saved or to start the next run from there. One Tokio runs per data folder, so runs on the same `--home` go one after the other: a second one quits at once. With `--exe <app>` it starts a packaged build instead, made with `yarn build:unpack`: `dist/win-unpacked/tokio.exe`, or `dist/linux-unpacked/tokio` on Linux.
-4. It refuses to start while port 37891 is in use. Ask the user to close Tokio or `yarn dev`; don't stop them yourself.
+4. It refuses to start while port 37891 is in use. Ask the user to quit Tokio or stop `yarn dev`; don't stop them yourself.
 5. Look at the screenshots, and at what the script printed: renderer errors come out as `[page]` and `[console]` lines, and it exits with 1 when a step throws.
 
 ## Helpers
