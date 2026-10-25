@@ -274,9 +274,10 @@ describe("ServerService", () => {
       expect(await res.text()).toBe("234");
     });
 
-    it("shows the media sent to its alert, one at a time, until cleared", async () => {
+    // Alert abc's page
+    async function open() {
       const page = url("/alerts/abc/");
-      const dom = new JSDOM(await (await fetch(page)).text(), {
+      return new JSDOM(await (await fetch(page)).text(), {
         url: page,
         runScripts: "dangerously",
         beforeParse(window) {
@@ -284,25 +285,39 @@ describe("ServerService", () => {
           window.HTMLMediaElement.prototype.play = () => Promise.resolve();
         },
       });
+    }
+    // Its socket connects with the alert's id from its URL.
+    const connected = () =>
+      vi.waitFor(() => expect(server.sendToClient("abc", {})).toBe(true));
+    const show = (file: string, kind: string, patch: object = {}) =>
+      server.sendToClient("abc", {
+        type: "tokio:alert:media",
+        data: {
+          src: `/alerts/media/${file}`,
+          kind,
+          duration: 60,
+          volume: 50,
+          start: 0,
+          end: null,
+          ...patch,
+        },
+      });
+    // jsdom doesn't play: the video plays from `time` on.
+    const play = (dom: JSDOM, video: HTMLVideoElement, time: () => number) => {
+      Object.defineProperty(video, "currentTime", { get: time });
+      Object.defineProperty(video, "paused", { value: false });
+      video.dispatchEvent(new dom.window.Event("playing"));
+    };
+    const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
+
+    it("shows the media sent to its alert, one at a time, until cleared", async () => {
+      const dom = await open();
       const { document } = dom.window;
       const shown = () =>
         [...document.querySelectorAll("img, video")].map((el) => el.src);
-      const show = (file: string, kind: string) =>
-        server.sendToClient("abc", {
-          type: "tokio:alert:media",
-          data: {
-            src: `/alerts/media/${file}`,
-            kind,
-            duration: 60,
-            volume: 50,
-          },
-        });
 
       try {
-        // Its socket connects with the alert's id from its URL.
-        await vi.waitFor(() =>
-          expect(server.sendToClient("abc", {})).toBe(true),
-        );
+        await connected();
 
         show("a.png", "image");
         await vi.waitFor(() =>
@@ -318,6 +333,54 @@ describe("ServerService", () => {
 
         server.sendToClient("abc", { type: "tokio:alert:clear" });
         await vi.waitFor(() => expect(shown()).toEqual([]));
+      } finally {
+        dom.window.close();
+      }
+    });
+
+    it("plays a video's cut, and hides it at the cut's end", async () => {
+      const dom = await open();
+      const { document } = dom.window;
+      const video = () => document.querySelector("video");
+
+      try {
+        await connected();
+        show("a.webm", "video", { start: 2, end: 2.05 });
+
+        // The browser seeks to the cut's start.
+        await vi.waitFor(() =>
+          expect(video()?.src).toBe(url("/alerts/media/a.webm#t=2")),
+        );
+        let time = 2;
+        play(dom, video(), () => time);
+
+        // Its clock lags behind the timer, so it plays on.
+        await wait(150);
+        expect(video()).not.toBeNull();
+        time = 2.05;
+        await vi.waitFor(() => expect(video()).toBeNull());
+      } finally {
+        dom.window.close();
+      }
+    });
+
+    // It loads and starts after its turn, which could end it early.
+    it("times a playing video's duration by its own clock", async () => {
+      const dom = await open();
+      const { document } = dom.window;
+      const video = () => document.querySelector("video");
+
+      try {
+        await connected();
+        show("a.webm", "video", { duration: 0.3 });
+        await vi.waitFor(() => expect(video()).not.toBeNull());
+        let time = 0;
+        play(dom, video(), () => time);
+
+        await wait(450);
+        expect(video()).not.toBeNull();
+        time = 0.3;
+        await vi.waitFor(() => expect(video()).toBeNull());
       } finally {
         dom.window.close();
       }

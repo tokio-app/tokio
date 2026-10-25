@@ -334,6 +334,9 @@ export interface AppEventsMap {
     delay: number;
     duration: number;
     volume: number;
+    // A video's cut, see AlertMedia
+    start: number;
+    end: number | null;
   };
   [APP_EVENTS.GET_CUSTOM_GIFTS]: void;
 

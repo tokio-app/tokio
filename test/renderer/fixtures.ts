@@ -95,8 +95,9 @@ export const alertMedia = (
 ): AlertMedia => ({
   ...(typeof file === "string" ? mediaFile(file) : file),
   duration: 5,
-  match_video: false,
   volume: 100,
+  start: 0,
+  end: null,
   ...patch,
 });
 

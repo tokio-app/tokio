@@ -34,6 +34,8 @@ export function queueAlert(
         delay,
         duration,
         volume: media.volume,
+        start: media.start,
+        end: media.end,
       }),
   };
   return data ? queue.enqueue(data, item) : queue.wait(media.duration, item);

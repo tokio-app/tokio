@@ -1124,7 +1124,13 @@ describe("StoreManagerService", () => {
         },
         sound: { ...sound, start: 0, end: null },
         tts: null,
-        media: { ...picture, duration: 5, match_video: false, volume: 100 },
+        media: {
+          ...picture,
+          duration: 5,
+          volume: 100,
+          start: 0,
+          end: null,
+        },
         volume: 100,
         ...patch,
       });
@@ -1156,8 +1162,9 @@ describe("StoreManagerService", () => {
       expect(other.media).toEqual({
         ...picture,
         duration: 5,
-        match_video: false,
         volume: 100,
+        start: 0,
+        end: null,
       });
 
       expect(await store.removeFromAlerts("media", "party.png")).toBe(true);

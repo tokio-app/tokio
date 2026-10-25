@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AlertTrigger, EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
+import { mediaKind } from "../util/alerts";
 import { ColorSchema, TimerProfileSchema } from "./timer";
 
 const PermissionsSchema = z.object({
@@ -45,12 +46,15 @@ export const AlertSoundSchema = z.object({
   file: z.string(),
 });
 
-// An alert's sound, cut to the seconds from start to end. A null end plays
-// to the sound's end.
-const AlertClipSchema = AlertSoundSchema.extend({
+// The part of a sound or video that plays, from start to end seconds. A null
+// end plays to its end.
+const CUT = {
   start: z.number().min(0).default(0),
   end: z.number().min(0).nullable().default(null),
-});
+};
+
+// An alert's sound, cut
+const AlertClipSchema = AlertSoundSchema.extend(CUT);
 
 // Seconds an alert's image or video shows at least, until changed, and the
 // most it can be set to
@@ -59,10 +63,10 @@ export const MEDIA_MAX_DURATION = 60;
 
 // An image or video, file a basename inside the media folder. It stays on
 // screen for duration seconds, or while the alert's sound plays if longer.
+// A video plays its cut, images ignore it.
 const AlertMediaSchema = AlertSoundSchema.extend({
+  ...CUT,
   duration: z.number().min(1).max(MEDIA_MAX_DURATION),
-  // The duration follows the video's length, also when another is picked
-  match_video: z.boolean().default(false),
   // A video's, apart from the alert's sound
   volume: z.number().min(0).max(100).default(100),
 });
@@ -113,13 +117,27 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 // Media saved before it had its own volume plays at the alert's, as it did.
-const withMediaVolume = (alert: unknown) =>
-  isRecord(alert) && isRecord(alert.media) && !("volume" in alert.media)
-    ? { ...alert, media: { ...alert.media, volume: alert.volume } }
-    : alert;
+// A video saved before cuts stops where its duration ended it, unless it
+// matched the video's length (match_video, no longer saved).
+const withSavedMedia = (alert: unknown) => {
+  if (!isRecord(alert) || !isRecord(alert.media)) return alert;
+  const { media } = alert;
+  const video =
+    typeof media.file === "string" && mediaKind(media.file) === "video";
+  return {
+    ...alert,
+    media: {
+      ...media,
+      ...(!("volume" in media) && { volume: alert.volume }),
+      ...(video &&
+        !("start" in media) &&
+        !media.match_video && { end: media.duration }),
+    },
+  };
+};
 
 const AlertSchema = z.preprocess(
-  withMediaVolume,
+  withSavedMedia,
   z.object({
     id: z.string(),
     enabled: z.boolean(),

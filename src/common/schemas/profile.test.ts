@@ -97,6 +97,7 @@ describe("ProfileSchema", () => {
             enabled: true,
             trigger: { ...oldAction.trigger, type: TOKIO_EVENTS.GIFT },
             sound: { name: "Ding", file: "ding.mp3" },
+            media: { name: "Party", file: "party.png", duration: 5 },
             volume: 80,
           },
         ],
@@ -111,12 +112,13 @@ describe("ProfileSchema", () => {
       start: 0,
       end: null,
     });
+    expect(alert.media).toMatchObject({ start: 0, end: null });
     expect(alert.trigger).toMatchObject({ min_coins: 0, roles: [] });
   });
 
-  it("plays media saved before it had a volume at the alert's", () => {
-    const media = { name: "Clip", file: "clip.webm", duration: 5 };
-    const alert = (volume: number, saved: object) => ({
+  describe("media saved before", () => {
+    const clip = { name: "Clip", file: "clip.webm", duration: 5 };
+    const alert = (saved: object, volume = 80) => ({
       id: "alert-1",
       enabled: true,
       trigger: { ...oldAction.trigger, type: TOKIO_EVENTS.FOLLOW },
@@ -128,11 +130,30 @@ describe("ProfileSchema", () => {
       ProfileSchema.parse({
         ...defaultProfile,
         alerts: { ...defaultProfile.alerts, items },
-      }).alerts.items.map((item) => item.media?.volume);
+      }).alerts.items.map((item) => item.media);
 
-    expect(
-      parse(alert(40, media), alert(40, { ...media, volume: 90 })),
-    ).toEqual([40, 90]);
+    it("its own volume plays at the alert's", () => {
+      const media = parse(alert(clip, 40), alert({ ...clip, volume: 90 }, 40));
+
+      expect(media.map((m) => m?.volume)).toEqual([40, 90]);
+    });
+
+    it("cuts stops where its duration did, unless it matched the video", () => {
+      const media = parse(
+        alert(clip),
+        alert({ ...clip, match_video: true }),
+        alert({ ...clip, file: "party.png" }),
+        alert({ ...clip, start: 1, end: null }),
+      );
+
+      expect(media.map((m) => [m?.start, m?.end])).toEqual([
+        [0, 5],
+        [0, null],
+        [0, null],
+        [1, null],
+      ]);
+      expect(media[1]).not.toHaveProperty("match_video");
+    });
   });
 
   it("makes a game action saved before Java a Bedrock one", () => {

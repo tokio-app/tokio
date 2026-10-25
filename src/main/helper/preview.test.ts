@@ -1,6 +1,8 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   getMediaPreviewURL,
   getPicturePreviewURL,
@@ -9,6 +11,7 @@ import {
 import {
   mediaFile,
   previewFile,
+  videoResponse,
   withPreviewCORS,
   withPreviewStyles,
 } from "./preview";
@@ -109,6 +112,45 @@ describe("mediaFile", () => {
     ];
     for (const url of refused) expect(mediaFile(url, folders)).toBeNull();
     expect(mediaFile(getMediaPreviewURL("a.png"), undefined)).toBeNull();
+  });
+});
+
+describe("videoResponse", () => {
+  let dir: string;
+  let video: string;
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "tokio-test-"));
+    video = join(dir, "clip.webm");
+    await writeFile(video, "0123456789");
+  });
+
+  afterAll(() => rm(dir, { recursive: true, force: true }));
+
+  it("serves the whole video, saying it comes in parts", async () => {
+    const res = await videoResponse(video, null);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("accept-ranges")).toBe("bytes");
+    expect(res.headers.get("content-type")).toBe("video/webm");
+    expect(await res.text()).toBe("0123456789");
+  });
+
+  it("serves the part a player asks for, so it can seek", async () => {
+    const part = async (range: string) => {
+      const res = await videoResponse(video, range);
+      return [res.status, res.headers.get("content-range"), await res.text()];
+    };
+
+    expect(await part("bytes=2-4")).toEqual([206, "bytes 2-4/10", "234"]);
+    expect(await part("bytes=7-")).toEqual([206, "bytes 7-9/10", "789"]);
+    expect(await part("bytes=-3")).toEqual([206, "bytes 7-9/10", "789"]);
+    expect(await part("bytes=8-99")).toEqual([206, "bytes 8-9/10", "89"]);
+    expect(await part("bytes=10-")).toEqual([416, "bytes */10", ""]);
+  });
+
+  it("can't serve a video that's gone", async () => {
+    expect((await videoResponse(join(dir, "gone.mp4"), null)).status).toBe(404);
   });
 });
 

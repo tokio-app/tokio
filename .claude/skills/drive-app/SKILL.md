@@ -46,6 +46,7 @@ argument-hint: "[what to check]"
 ## Notes
 
 - Query by role and visible text, as the tests do (`.claude/rules/testing.md`).
+- To watch an overlay page (an alert's `/alerts/<id>/`, the timer's), turn the server on first: `toggle` **Enable Server** in Settings, then click the confirm dialog's **Enable Server**. Open the page in `app.evaluate` with `new BrowserWindow({ webPreferences: { partition: "obs", backgroundThrottling: false } })`: the app's own session cancels WebSockets, so the page couldn't connect there. Then find it with `windowWith("alerts/")`.
 - A real connector check needs a username that's LIVE right now: ask the user for one.
 
 ## Done when

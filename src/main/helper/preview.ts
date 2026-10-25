@@ -1,5 +1,6 @@
 import type { Folders } from "@/common/types";
 import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, mediaKind } from "@/common/util";
+import { openAsBlob } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { isInside } from "./path";
 
@@ -75,6 +76,53 @@ export function mediaFile(
   return basename(name) === name && mediaKind(name)
     ? join(folders.mediaFolder, name)
     : null;
+}
+
+/**
+ * A video's bytes, or the part its player asks for (`Range: bytes=…`), so the
+ * player can seek: Chromium only seeks in media served in parts, and net.fetch
+ * of a `file:` URL answers a Range with the whole file.
+ */
+export async function videoResponse(
+  file: string,
+  range: string | null,
+): Promise<Response> {
+  // Read from disk as the parts are sent
+  let video: Blob;
+  try {
+    video = await openAsBlob(file);
+  } catch {
+    return new Response(null, { status: 404 });
+  }
+  const { size } = video;
+  const headers = {
+    "Accept-Ranges": "bytes",
+    "Content-Type": `video/${extname(file).slice(1).toLowerCase()}`,
+  };
+
+  const [, from = "", to = ""] = /^bytes=(\d*)-(\d*)$/.exec(range ?? "") ?? [];
+  if (!from && !to) {
+    return new Response(video, {
+      headers: { ...headers, "Content-Length": String(size) },
+    });
+  }
+  // bytes=-n is the last n bytes.
+  const start = from ? Number(from) : Math.max(size - Number(to), 0);
+  const end = from && to ? Math.min(Number(to), size - 1) : size - 1;
+  if (start > end) {
+    return new Response(null, {
+      status: 416,
+      headers: { ...headers, "Content-Range": `bytes */${size}` },
+    });
+  }
+  return new Response(video.slice(start, end + 1), {
+    status: 206,
+    headers: {
+      ...headers,
+      "Content-Length": String(end - start + 1),
+      "Content-Range": `bytes ${start}-${end}/${size}`,
+    },
+  });
 }
 
 /**

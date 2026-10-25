@@ -156,6 +156,11 @@
   color: var(--font-secondary);
 }
 
+/* A video's, without a waveform: the part and its handles */
+.track {
+  height: 48px;
+}
+
 /* The part that plays */
 .region {
   position: absolute;

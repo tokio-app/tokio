@@ -77,8 +77,9 @@ const picture = {
   name: "Confetti",
   file: "confetti.gif",
   duration: 5,
-  match_video: false,
   volume: 100,
+  start: 0,
+  end: null,
 };
 
 type AlertProfile = Pick<Profile, "alerts" | "tts">;
@@ -1069,6 +1070,8 @@ describe("AlertsService", () => {
       delay: 2,
       duration: 6.5,
       volume: 80,
+      start: 0,
+      end: null as number | null,
     };
     let sendToClient: Mock;
 
@@ -1084,7 +1087,13 @@ describe("AlertsService", () => {
 
     it("sends the media to the alert's overlay when its turn comes", () => {
       service.showMedia(show);
-      service.showMedia({ ...show, id: "alert-2", file: "b.WEBM" });
+      service.showMedia({
+        ...show,
+        id: "alert-2",
+        file: "b.WEBM",
+        start: 1.5,
+        end: 4,
+      });
 
       vi.advanceTimersByTime(1999);
       expect(sendToClient).not.toHaveBeenCalled();
@@ -1100,25 +1109,40 @@ describe("AlertsService", () => {
               kind: "image",
               duration: 6.5,
               volume: 80,
+              start: 0,
+              end: null,
             },
           },
         ],
         [
           "alert-2",
           expect.objectContaining({
-            data: expect.objectContaining({ kind: "video" }),
+            data: expect.objectContaining({
+              kind: "video",
+              start: 1.5,
+              end: 4,
+            }),
           }),
         ],
       ]);
     });
 
     it("keeps the numbers in range", () => {
-      service.showMedia({ ...show, delay: -1, duration: 1e12, volume: 150 });
+      service.showMedia({
+        ...show,
+        delay: -1,
+        duration: 1e12,
+        volume: 150,
+        start: -1,
+        end: 1e12,
+      });
       vi.advanceTimersByTime(0);
 
       expect(sendToClient.mock.calls[0][1].data).toMatchObject({
         duration: 24 * 60 * 60,
         volume: 100,
+        start: 0,
+        end: 24 * 60 * 60,
       });
     });
 
@@ -1130,6 +1154,8 @@ describe("AlertsService", () => {
         { file: "a.svg" },
         { delay: NaN },
         { volume: Infinity },
+        { start: NaN },
+        { end: Infinity },
       ];
 
       for (const change of refused) service.showMedia({ ...show, ...change });

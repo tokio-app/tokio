@@ -35,16 +35,16 @@ async function setup(item: Alert) {
   return { ...view, ...props, rerender };
 }
 
+const preview = () => screen.getByRole("dialog").querySelector("video")!;
 // The media's thumbnail read the video's length
 const measure = (seconds: number) => {
-  const video = screen.getByRole("dialog").querySelector("video")!;
+  const video = preview();
   Object.defineProperty(video, "duration", {
     value: seconds,
     configurable: true,
   });
   fireEvent.loadedMetadata(video);
 };
-const matched = () => screen.getByRole("checkbox", { name: "Match video" });
 const seconds = () =>
   screen.getByRole("spinbutton", { name: "Duration in seconds" });
 // The media the editor last set on the alert
@@ -73,30 +73,21 @@ describe("AlertEditor's media", () => {
     expect(lastMedia(onChange)).toEqual({ ...media, duration: 12 });
   });
 
-  it("turns Match video on", async () => {
-    const { user, onChange } = await setup(alert({ media: alertMedia(CLIP) }));
-    measure(12.3);
+  it("shows a video while it plays, without a duration to type", async () => {
+    const { onChange } = await setup(alert({ media: alertMedia(CLIP) }));
+    // Nothing to type while the preview reads its length
+    expect(screen.queryByRole("spinbutton")).toBeNull();
 
-    expect(matched()).not.toBeChecked();
-    await user.click(matched());
+    measure(12.34);
 
-    expect(lastMedia(onChange)?.match_video).toBe(true);
+    expect(lastMedia(onChange)?.duration).toBe(12.34);
+    expect(
+      screen.queryByRole("spinbutton", { name: "Duration in seconds" }),
+    ).toBeNull();
   });
 
-  it("follows the video's length, rounded up", async () => {
-    const { onChange } = await setup(
-      alert({ media: alertMedia(CLIP, { match_video: true }) }),
-    );
-
-    measure(12.3);
-
-    expect(lastMedia(onChange)?.duration).toBe(13);
-    // The video sets it
-    expect(seconds()).toBeDisabled();
-  });
-
-  it("follows another video picked after it was matched", async () => {
-    const media = alertMedia(CLIP, { duration: 13, match_video: true });
+  it("follows another video picked", async () => {
+    const media = alertMedia(CLIP, { duration: 12.3 });
     const { onChange, rerender } = await setup(alert({ media }));
     measure(12.3);
     expect(onChange).not.toHaveBeenCalled();
@@ -104,44 +95,29 @@ describe("AlertEditor's media", () => {
     rerender(alert({ media: { ...media, ...REEL } }));
     measure(7.2);
 
-    expect(lastMedia(onChange)?.duration).toBe(8);
+    expect(lastMedia(onChange)?.duration).toBe(7.2);
   });
 
-  it("rounds from the length's tenths, as the preview shows it", async () => {
-    const { onChange } = await setup(
-      alert({ media: alertMedia(CLIP, { match_video: true }) }),
-    );
-
-    measure(6.02);
-
-    expect(screen.getByText("6s")).toBeInTheDocument();
-    expect(lastMedia(onChange)?.duration).toBe(6);
-  });
-
-  it("stops at the longest duration", async () => {
-    const { onChange } = await setup(
-      alert({ media: alertMedia(CLIP, { match_video: true }) }),
+  it("shows a video at least a second, and at most the longest duration", async () => {
+    const { onChange, rerender } = await setup(
+      alert({ media: alertMedia(CLIP) }),
     );
 
     measure(95);
-
     expect(lastMedia(onChange)?.duration).toBe(60);
+
+    rerender(alert({ media: alertMedia(CLIP, { start: 2, end: 2.4 }) }));
+    expect(lastMedia(onChange)?.duration).toBe(1);
   });
 
   // Some recordings don't say how long they are.
-  it("can't follow a video of unknown length", async () => {
-    const { onChange, unmount } = await setup(
-      alert({ media: alertMedia(CLIP) }),
-    );
-    measure(Infinity);
-    expect(matched()).toBeDisabled();
-    unmount();
+  it("takes a typed duration for a video of unknown length", async () => {
+    const { onChange } = await setup(alert({ media: alertMedia(CLIP) }));
 
-    // Turned on for another video, it can still be turned off.
-    await setup(alert({ media: alertMedia(CLIP, { match_video: true }) }));
     measure(Infinity);
-    expect(matched()).toBeEnabled();
+
     expect(seconds()).toBeEnabled();
+    expect(screen.queryByRole("slider", { name: "Start" })).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -169,7 +145,7 @@ describe("AlertEditor's media", () => {
     const { user } = await setup(
       alert({ media: alertMedia(CLIP, { volume: 40 }) }),
     );
-    const video = screen.getByRole("dialog").querySelector("video")!;
+    const video = preview();
     measure(12.3);
     expect(screen.getByText("12s")).toBeInTheDocument();
 
@@ -177,7 +153,7 @@ describe("AlertEditor's media", () => {
     expect(play).toHaveBeenCalledOnce();
     expect(video.volume).toBe(0.4);
 
-    fireEvent.play(video);
+    fireEvent.playing(video);
     const pause = vi
       .spyOn(HTMLMediaElement.prototype, "pause")
       .mockImplementation(() => {});
@@ -189,12 +165,101 @@ describe("AlertEditor's media", () => {
     expect(pause).toHaveBeenCalledOnce();
   });
 
-  it("isn't offered for an image", async () => {
-    await setup(
-      alert({ media: alertMedia(mediaFile("Party"), { match_video: true }) }),
+  it("doesn't cut an image", async () => {
+    await setup(alert({ media: alertMedia(mediaFile("Party")) }));
+
+    expect(seconds()).toBeEnabled();
+    expect(screen.queryByRole("slider", { name: "Start" })).toBeNull();
+  });
+});
+
+describe("AlertEditor's video cut", () => {
+  it("cuts the video, and shows the frame where it changed", async () => {
+    const pause = vi
+      .spyOn(HTMLMediaElement.prototype, "pause")
+      .mockImplementation(() => {});
+    const { onChange, rerender } = await setup(
+      alert({ media: alertMedia(CLIP) }),
+    );
+    measure(12);
+
+    // Shift moves a handle by a second
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Start" }), {
+      key: "ArrowRight",
+      shiftKey: true,
+    });
+    expect(lastMedia(onChange)).toMatchObject({ start: 1, end: null });
+    expect(pause).toHaveBeenCalled();
+    expect(preview().currentTime).toBe(1);
+
+    rerender(alert({ media: alertMedia(CLIP, { start: 1 }) }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "End" }), {
+      target: { value: "4.5" },
+    });
+    expect(lastMedia(onChange)).toMatchObject({ start: 1, end: 4.5 });
+    expect(preview().currentTime).toBe(4.5);
+
+    rerender(alert({ media: alertMedia(CLIP, { start: 1, end: 4.5 }) }));
+    expect(screen.getByText("Plays 3.5s of 12s")).toBeInTheDocument();
+    // In the preview's corner, and how long it shows
+    expect(screen.getByText("3.5s")).toBeInTheDocument();
+    expect(lastMedia(onChange)?.duration).toBe(3.5);
+  });
+
+  it("starts the preview at the cut, and Reset cut plays it whole", async () => {
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    const { user, onChange } = await setup(
+      alert({ media: alertMedia(CLIP, { start: 1, end: 4 }) }),
+    );
+    measure(12);
+    expect(preview().currentTime).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: "Reset cut" }));
+
+    expect(lastMedia(onChange)).toMatchObject({ start: 0, end: null });
+    expect(preview().currentTime).toBe(0);
+  });
+
+  it("shows the video while its cut plays", async () => {
+    const { onChange } = await setup(
+      alert({ media: alertMedia(CLIP, { start: 2, end: 8.3 }) }),
     );
 
-    expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(seconds()).toBeEnabled();
+    measure(12.3);
+
+    expect(lastMedia(onChange)?.duration).toBe(6.3);
+  });
+
+  it("plays the cut in its preview, and pauses at its end", async () => {
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const pause = vi
+      .spyOn(HTMLMediaElement.prototype, "pause")
+      .mockImplementation(() => {});
+    await setup(alert({ media: alertMedia(CLIP, { start: 2, end: 4 }) }));
+    measure(12);
+    const video = preview();
+    video.currentTime = 7;
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "Play video" }));
+      expect(video.currentTime).toBe(2);
+
+      Object.defineProperty(video, "paused", {
+        value: false,
+        configurable: true,
+      });
+      fireEvent.playing(video);
+      expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
+
+      vi.advanceTimersByTime(2000);
+      // Its clock lags behind the timer, so it plays on.
+      expect(pause).not.toHaveBeenCalled();
+      video.currentTime = 4;
+      vi.advanceTimersByTime(2000);
+      expect(pause).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
