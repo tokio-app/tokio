@@ -1,0 +1,179 @@
+// The overlay's own stylesheet, global like on its page: the one deliberate
+// exception to CSS Modules, so the preview can't drift from what's on stream
+import "@/common/games/overlay.css";
+import { GamesOverlay } from "@/common/schemas";
+import { GameOverlayRow } from "@/common/types";
+import { EmptyState } from "@/components";
+import { cx } from "@/helper/cx";
+import { CSSProperties, useEffect, useRef, useState } from "react";
+import styles from "../games.module.css";
+
+// How long a row stays lit after its last run, as the overlay's LIT_MS
+const LIT_MS = 1500;
+// How long one at a time shows each row, as the overlay's TURN_MS
+const TURN_MS = 3000;
+
+// A font named by the streamer, with the overlay's as the fallback. One
+// CSSOM property, so a name can't add any other style.
+const fontFamily = (font: string) =>
+  font.trim()
+    ? `${JSON.stringify(font.trim())}, "Archivo Variable", sans-serif`
+    : undefined;
+
+/** The overlay's pixel arrow, also the builder's rows' */
+export function PixelArrow({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 11 9" aria-hidden="true">
+      <path d="M6 0H7V1H8V2H9V3H10V4H11V5H10V6H9V7H8V8H7V9H6V6H0V3H6Z" />
+    </svg>
+  );
+}
+
+type Props = {
+  look: GamesOverlay;
+  rows: GameOverlayRow[];
+  // The last row Test lit; a new object each press
+  run: { id: string } | null;
+};
+
+/**
+ * The games overlay as it shows on stream, in the markup of its page
+ * (src/main/services/server/games.html): keep the two in step.
+ */
+export function OverlayPreview({ look, rows, run }: Props) {
+  const carousel = look.layout === "carousel";
+  const [lit, setLit] = useState<string[]>([]);
+  const [turn, setTurn] = useState(0);
+  // Pictures that didn't load, hidden as on the overlay
+  const [broken, setBroken] = useState<string[]>([]);
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const [prevRun, setPrevRun] = useState(run);
+
+  // One at a time turns to the row Test lit
+  if (run !== prevRun) {
+    setPrevRun(run);
+    if (run) {
+      setLit((ids) => (ids.includes(run.id) ? ids : [...ids, run.id]));
+      const index = rows.findIndex((row) => row.id === run.id);
+      if (index !== -1) setTurn(index);
+    }
+  }
+
+  // Presses in a row keep it lit, 1.5 s after the last
+  useEffect(() => {
+    if (!run) return;
+    const all = timers.current;
+    clearTimeout(all.get(run.id));
+    all.set(
+      run.id,
+      setTimeout(() => {
+        all.delete(run.id);
+        setLit((ids) => ids.filter((id) => id !== run.id));
+      }, LIT_MS),
+    );
+  }, [run]);
+
+  useEffect(() => {
+    const all = timers.current;
+    return () => all.forEach((timer) => clearTimeout(timer));
+  }, []);
+
+  // The lit rows as the turn's timeout finds them
+  const litNow = useRef(lit);
+  useEffect(() => {
+    litNow.current = lit;
+  }, [lit]);
+  // Bumped to wait another turn
+  const [wait, setWait] = useState(0);
+
+  const current = rows.length > 0 ? turn % rows.length : 0;
+  const currentId = rows.length > 0 ? rows[current].id : "";
+  // A lit row holds its turn until it goes out, as on the overlay. Keyed by
+  // the row's id, as the rows are a new array on every render.
+  useEffect(() => {
+    if (!carousel || rows.length < 2) return undefined;
+    const next = setTimeout(() => {
+      if (litNow.current.includes(currentId)) setWait((w) => w + 1);
+      else setTurn(current + 1);
+    }, TURN_MS);
+    return () => clearTimeout(next);
+  }, [carousel, rows.length, current, currentId, wait]);
+
+  if (rows.length === 0) {
+    return (
+      <EmptyState>Pick a picture or name an action to show it here.</EmptyState>
+    );
+  }
+
+  const style = {
+    "--games-text": look.text_color,
+    "--games-accent": look.accent_color,
+    fontFamily: fontFamily(look.font),
+  } as CSSProperties;
+
+  return (
+    <div className={styles.preview}>
+      <div
+        className={cx(
+          "games",
+          carousel && "games-carousel",
+          look.pictures_only && "games-pictures-only",
+        )}
+        style={style}
+      >
+        <ol className="games-rows" aria-label="Overlay preview">
+          {rows.map((row, index) => {
+            const pictures = row.pictures.filter(
+              (src) => !broken.includes(src),
+            );
+            const image =
+              row.image && !broken.includes(row.image) ? row.image : null;
+            const onError = (src: string) => () =>
+              setBroken((all) => (all.includes(src) ? all : [...all, src]));
+            return (
+              <li
+                key={row.id}
+                className={cx(
+                  "games-row",
+                  lit.includes(row.id) && "games-lit",
+                  index === current && "games-current",
+                )}
+              >
+                <span
+                  className={cx(
+                    "games-side games-event",
+                    pictures.length > 0 && "has-picture",
+                  )}
+                >
+                  <span className="games-text">{row.event}</span>
+                  {pictures.map((src, i) => (
+                    // Two gifts can share a picture
+                    <span key={i} className="games-slot">
+                      <img src={src} alt="" onError={onError(src)} />
+                    </span>
+                  ))}
+                </span>
+                <PixelArrow className="games-arrow" />
+                <span
+                  className={cx(
+                    "games-side games-result",
+                    image && "has-picture",
+                  )}
+                >
+                  {image && (
+                    <span className="games-slot games-slot-result">
+                      <img src={image} alt="" onError={onError(image)} />
+                    </span>
+                  )}
+                  {row.name && (
+                    <span className="games-text games-name">{row.name}</span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </div>
+  );
+}

@@ -314,3 +314,173 @@
   color: var(--font-secondary);
   overflow-wrap: anywhere;
 }
+
+/* OVERLAY */
+
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background-tertiary);
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+}
+
+/* The rows on the left, the preview and the look on the right. Stacked on
+   narrow windows, the preview first. */
+.overlay {
+  display: grid;
+  grid-template-areas: "rows side";
+  grid-template-columns: minmax(0, 1fr) 360px;
+  align-items: start;
+  gap: var(--space-6);
+}
+
+@media (max-width: 1100px) {
+  .overlay {
+    grid-template-areas: "side" "rows";
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.overlay_rows {
+  grid-area: rows;
+  min-width: 0;
+}
+
+.overlay_side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* One row per action, each read like the overlay's: the event, an arrow,
+   then the picture and name. The same columns in every row line the arrows
+   up. */
+.recipes {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
+  list-style: none;
+}
+
+.recipe {
+  display: grid;
+  grid-template-columns:
+    16px 80px minmax(0, 1fr) 14px var(--control-height)
+    minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.recipe + .recipe {
+  border-top: 1px solid var(--border);
+}
+
+/* A disabled action doesn't run, so it never lights up */
+.recipe_off {
+  opacity: 0.5;
+}
+
+/* The gifts' or emotes' pictures, by the event's field */
+.recipe_pictures {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.recipe_picture {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.recipe_arrow {
+  width: 14px;
+  height: 12px;
+  fill: var(--font-secondary);
+  shape-rendering: crispEdges;
+}
+
+/* The action's picture, in a slot recessed like the overlay's */
+.slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--background-primary);
+  box-shadow:
+    inset 2px 2px 0 rgb(0 0 0 / 45%),
+    inset -2px -2px 0 rgb(255 255 255 / 6%);
+  color: var(--font-secondary);
+  cursor: pointer;
+}
+
+.slot:hover {
+  background-color: var(--background-secondary-hover);
+  color: var(--font-primary);
+}
+
+.slot img {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+}
+
+/* The overlay over a muted world, a sky above the ground, so its dark slots
+   and haloed text read as they would on stream. --games-size is the
+   overlay's em, which overlay.css sizes everything from. */
+.preview {
+  --games-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: var(--space-6) var(--space-4);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    180deg,
+    #5d7d99 0%,
+    #7d9cb4 58%,
+    #5b7a45 58%,
+    #5b7a45 64%,
+    #5e4a36 64%,
+    #4a3a2b 100%
+  );
+}
+
+/* As wide as the preview, so long texts are cut short inside it */
+.preview > * {
+  width: 100%;
+}
+
+/* The two layouts side by side */
+.layouts > div {
+  flex-direction: row;
+  gap: var(--space-6);
+}
+
+.look_fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: var(--space-4);
+}
+
+.note {
+  margin-top: calc(-1 * var(--space-2));
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
