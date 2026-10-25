@@ -136,10 +136,28 @@ export default async ({ app, page, home, push, toggle }) => {
       view[1],
       Math.max(...boxes.map((b) => b.y + b.height)) + pad,
     );
+    // Only the top dialog on its backdrop, without the page or the dialog
+    // under it peeking out at the edges. Visibility is inherited, so the
+    // backdrop can show while the rest is hidden, wherever it renders.
+    const hid = await page.evaluate(() => {
+      const top = [...document.querySelectorAll('[role="dialog"]')].at(-1);
+      if (!top) return false;
+      document.body.style.visibility = "hidden";
+      top.parentElement.style.visibility = "visible";
+      return true;
+    });
     await page.screenshot({
       path: join(docs, `${name}.png`),
       clip: { x, y, width: right - x, height: bottom - y },
     });
+    if (hid) {
+      await page.evaluate(() => {
+        document.body.style.visibility = "";
+        for (const el of document.querySelectorAll('[role="dialog"]')) {
+          el.parentElement.style.visibility = "";
+        }
+      });
+    }
   };
   // Answers the next file picker with this file
   const pick = (file) =>
