@@ -379,6 +379,13 @@
   padding: var(--space-2) 0;
 }
 
+/* With columns, the row's column picker comes last */
+.recipe_columns {
+  grid-template-columns:
+    16px 80px minmax(0, 1fr) 14px var(--control-height)
+    minmax(0, 1fr) 120px;
+}
+
 .recipe + .recipe {
   border-top: 1px solid var(--border);
 }
@@ -439,6 +446,7 @@
    overlay's em, which overlay.css sizes everything from. */
 .preview {
   --games-size: 15px;
+  gap: var(--space-5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -480,4 +488,18 @@
   margin-top: calc(-1 * var(--space-2));
   color: var(--font-secondary);
   font-size: var(--font-sm);
+}
+
+/* Each column a little overlay, side by side: an equal share of the width,
+   which its overlay shrinks to fit (OverlayPreview) */
+.preview_column {
+  display: flex;
+  flex: 1 1 0;
+  justify-content: center;
+  min-width: 0;
+}
+
+.preview_column > :global(.games) {
+  flex-shrink: 0;
+  width: max-content;
 }

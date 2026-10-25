@@ -80,6 +80,7 @@ export function gameOverlayRows(
         event: overlay.event.trim() || gameEventText(action, gifts),
         image: overlay.image ? mediaURL(overlay.image.file) : null,
         name,
+        column: Math.min(overlay.column, games.overlay.columns),
       },
     ];
   });

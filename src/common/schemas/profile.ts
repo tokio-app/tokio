@@ -162,8 +162,18 @@ export const MINECRAFT_EDITIONS = ["bedrock", "java"] as const;
 // space being typed
 const overlayText = () => z.string().max(40).default("");
 
-// How an action shows on the games overlay (/games/): the event, an arrow,
-// then its picture and name
+// The most columns the games overlay splits into, each its own overlay
+export const GAMES_OVERLAY_MAX_COLUMNS = 4;
+
+const ColumnSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(GAMES_OVERLAY_MAX_COLUMNS)
+  .default(1);
+
+// How an action shows on the games overlay (/games/minecraft/): the event, an
+// arrow, then its picture and name
 const GameOverlayItemSchema = z.object({
   show: z.boolean().default(true),
   // file is a basename inside the Minecraft pictures folder
@@ -172,6 +182,8 @@ const GameOverlayItemSchema = z.object({
   event: overlayText(),
   // What it does, as the streamer calls it, none when empty
   name: overlayText(),
+  // The column whose overlay shows it, the last one when there are fewer
+  column: ColumnSchema,
 });
 
 // Runs its steps, in order, each time its trigger fires, in the edition it's
@@ -194,6 +206,8 @@ export const GAMES_OVERLAY_LAYOUTS = ["list", "carousel"] as const;
 // How the games overlay looks
 export const GamesOverlaySchema = z.object({
   layout: z.enum(GAMES_OVERLAY_LAYOUTS).default("list"),
+  // Each column is its own overlay, at /games/minecraft/<column>/
+  columns: ColumnSchema,
   // Hides the texts next to pictures; a side without one keeps its text
   pictures_only: z.boolean().default(false),
   // A font installed where the streaming app runs, Archivo when empty

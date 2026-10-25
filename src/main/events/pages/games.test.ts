@@ -64,7 +64,7 @@ const roseAction: GameAction = {
   },
   likes_every: 100,
   steps: [{ type: "command", command: "say hi" }],
-  overlay: { show: true, image: tnt, event: "", name: "Boom" },
+  overlay: { show: true, image: tnt, event: "", name: "Boom", column: 1 },
 };
 
 const rose: CustomGift = {
@@ -96,8 +96,9 @@ const overlayData: GamesOverlayData = {
       id: "action-1",
       pictures: ["rose.png"],
       event: "Rose",
-      image: "/games/minecraft/c0ffee.png",
+      image: "/games/minecraft/pictures/c0ffee.png",
       name: "Boom",
+      column: 1,
     },
   ],
 };

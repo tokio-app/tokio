@@ -1,17 +1,17 @@
 import {
   GameAction,
   GameOverlayItem,
+  GAMES_OVERLAY_MAX_COLUMNS,
   GamesOverlayLayout,
   Profile,
   SavedEmote,
 } from "@/common/schemas";
 import { APP_EVENTS, CustomGift } from "@/common/types";
 import {
-  GAMES_PATH,
   gameEventPictures,
   gameEventText,
   gameOverlayRows,
-  getOverlayURL,
+  getMinecraftOverlayURL,
   getPicturePreviewURL,
 } from "@/common/util";
 import {
@@ -24,6 +24,7 @@ import {
   Input,
   RadioGroup,
   Section,
+  Select,
 } from "@/components";
 import { cx } from "@/helper/cx";
 import { scopeUpdater, Updater } from "@/hooks";
@@ -36,6 +37,12 @@ const LAYOUTS: { value: GamesOverlayLayout; label: string }[] = [
   { value: "list", label: "List" },
   { value: "carousel", label: "One at a time" },
 ];
+
+// 1 to the most, as RadioGroup takes text
+const COLUMNS = Array.from({ length: GAMES_OVERLAY_MAX_COLUMNS }, (_, i) => ({
+  value: String(i + 1),
+  label: String(i + 1),
+}));
 
 const COLORS = [
   { key: "text_color", label: "Text" },
@@ -110,11 +117,22 @@ export function OverlaySection({
         </p>
       )}
 
-      <Field label="Overlay URL">
-        <CopyField
-          value={getOverlayURL(GAMES_PATH)}
-          title="Copy the overlay's URL"
-        />
+      {/* Each column is its own overlay, with its own URL */}
+      <Field label={look.columns > 1 ? "Overlay URLs" : "Overlay URL"}>
+        {look.columns > 1 ? (
+          Array.from({ length: look.columns }, (_, i) => (
+            <CopyField
+              key={i}
+              value={getMinecraftOverlayURL(i + 1)}
+              title={`Copy column ${i + 1}'s URL`}
+            />
+          ))
+        ) : (
+          <CopyField
+            value={getMinecraftOverlayURL()}
+            title="Copy the overlay's URL"
+          />
+        )}
       </Field>
 
       <div className={styles.overlay}>
@@ -127,6 +145,7 @@ export function OverlaySection({
                 <RecipeRow
                   key={action.id}
                   action={action}
+                  columns={look.columns}
                   gifts={gifts}
                   emotes={emotes}
                   onChange={(patch) => setItem(action.id, patch)}
@@ -148,6 +167,18 @@ export function OverlaySection({
               onChange={(layout) =>
                 setLook((l) => {
                   l.layout = layout;
+                })
+              }
+            />
+          </Field>
+          <Field label="Columns" className={styles.layouts}>
+            <RadioGroup
+              name="games-overlay-columns"
+              value={String(look.columns)}
+              options={COLUMNS}
+              onChange={(columns) =>
+                setLook((l) => {
+                  l.columns = Number(columns);
                 })
               }
             />
@@ -200,6 +231,8 @@ export function OverlaySection({
 
 type RowProps = {
   action: GameAction;
+  // With more than one, the row picks its column
+  columns: number;
   gifts: CustomGift[];
   emotes: SavedEmote[];
   onChange: (patch: Partial<GameOverlayItem>) => void;
@@ -210,6 +243,7 @@ type RowProps = {
 // picture and name. A disabled action's is dimmed, since it doesn't run.
 function RecipeRow({
   action,
+  columns,
   gifts,
   emotes,
   onChange,
@@ -220,7 +254,13 @@ function RecipeRow({
   const pick = overlay.image ? "Change the picture" : "Pick a picture";
 
   return (
-    <li className={cx(styles.recipe, !action.enabled && styles.recipe_off)}>
+    <li
+      className={cx(
+        styles.recipe,
+        columns > 1 && styles.recipe_columns,
+        !action.enabled && styles.recipe_off,
+      )}
+    >
       <Check
         aria-label="Show on the overlay"
         checked={overlay.show}
@@ -261,6 +301,18 @@ function RecipeRow({
         value={overlay.name}
         onChange={(e) => onChange({ name: e.target.value })}
       />
+      {columns > 1 && (
+        <Select
+          aria-label="Column"
+          options={Array.from({ length: columns }, (_, i) => ({
+            value: i + 1,
+            label: `Column ${i + 1}`,
+          }))}
+          // One past the columns shows in the last, as on stream
+          value={Math.min(overlay.column, columns)}
+          onChange={(column) => onChange({ column })}
+        />
+      )}
     </li>
   );
 }

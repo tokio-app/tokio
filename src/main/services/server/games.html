@@ -56,11 +56,15 @@
       </svg>
     </template>
     <script>
-      // The games overlay, at /games/. Main sends the shown actions' rows
-      // and their look on connect and on every change, and each action's id
-      // as it runs (registerGames in init.ts). The Games page's preview
-      // (OverlayPreview) draws the same markup, so keep the two in step.
+      // Minecraft's overlay, at /games/minecraft/ with every column, or at
+      // /games/minecraft/<column>/ with one. Main sends the shown actions'
+      // rows and their look on connect and on every change, and each
+      // action's id as it runs (registerGames in init.ts). The Games page's
+      // preview (OverlayPreview) draws the same markup, so keep the two in
+      // step.
       const games = document.getElementById("games");
+      // 0 for every column
+      const column = Number(location.pathname.split("/")[3]) || 0;
       const list = document.getElementById("rows");
       const arrow = document.getElementById("arrow");
       // How long a row stays lit after its last run
@@ -179,7 +183,10 @@
           : "";
       };
 
-      const update = ({ look, rows: changed }) => {
+      const update = ({ look, rows: all }) => {
+        const changed = column
+          ? all.filter((row) => row.column === column)
+          : all;
         games.style.setProperty("--games-text", look.text_color);
         games.style.setProperty("--games-accent", look.accent_color);
         setFont(look.font);

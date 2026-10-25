@@ -17,6 +17,7 @@ import {
   ALERTS_PATH,
   formatError,
   GAMES_PATH,
+  MINECRAFT_PICTURES_PATH,
   MINECRAFT_PORT,
   SERVER_PORT,
   TIMER_PATH,
@@ -621,7 +622,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       serverService.mount(`${ALERTS_PATH}/media`, folders.mediaFolder);
       gamesService.setPicturesFolder(folders.minecraftFolder);
       // The games overlay's pictures
-      serverService.mount(`${GAMES_PATH}/minecraft`, folders.minecraftFolder);
+      serverService.mount(MINECRAFT_PICTURES_PATH, folders.minecraftFolder);
     },
   );
   await storeManagerService.initialize(

@@ -268,7 +268,13 @@ describe("Games", () => {
             trigger: expect.objectContaining({ type: TOKIO_EVENTS.FOLLOW }),
             likes_every: 100,
             steps: [{ type: "spawn", mob: "zombie", amount: 1, name: "" }],
-            overlay: { show: true, image: null, event: "", name: "" },
+            overlay: {
+              show: true,
+              image: null,
+              event: "",
+              name: "",
+              column: 1,
+            },
           },
         ],
         overlay: defaultProfile.games.overlay,
@@ -614,8 +620,48 @@ describe("Games overlay", () => {
     await load([]);
 
     expect(screen.getByTitle("Copy the overlay's URL")).toHaveTextContent(
-      "http://tokio-app.local:37891/games/",
+      /^http:\/\/tokio-app\.local:37891\/games\/minecraft\/$/,
     );
+  });
+
+  it("splits the overlay into columns, each with its URL and its preview", async () => {
+    const { user } = await load([
+      giftAction("a1", { overlay: { ...overlay, name: "TNT" } }),
+      likeAction("a2", { overlay: { ...overlay, name: "Creeper" } }),
+    ]);
+    await rose();
+
+    await user.click(
+      within(screen.getByRole("group", { name: "Columns" })).getByRole(
+        "radio",
+        { name: "2" },
+      ),
+    );
+    // The second action goes in the second column
+    await user.click(recipes()[1].getByRole("combobox", { name: "Column" }));
+    await user.click(inList(recipeElements()[1], "Column 2")!);
+    await wait(300);
+
+    expect(saves().at(-1)!.overlay.columns).toBe(2);
+    expect(savedOverlays().map((o) => o.column)).toEqual([1, 2]);
+    expect(screen.queryByTitle("Copy the overlay's URL")).toBeNull();
+    for (const column of [1, 2]) {
+      expect(
+        screen.getByTitle(`Copy column ${column}'s URL`),
+      ).toHaveTextContent(
+        `http://tokio-app.local:37891/games/minecraft/${column}/`,
+      );
+    }
+    const names = (column: number) =>
+      [
+        ...screen
+          .getByRole("list", {
+            name: `Column ${column} of the overlay preview`,
+          })
+          .querySelectorAll(".games-name"),
+      ].map((name) => name.textContent);
+    expect(names(1)).toEqual(["TNT"]);
+    expect(names(2)).toEqual(["Creeper"]);
   });
 
   it("lists a row per action: the event's pictures and text, then its picture", async () => {
@@ -681,8 +727,8 @@ describe("Games overlay", () => {
     await wait(300);
 
     expect(savedOverlays()).toEqual([
-      { show: true, image: null, event: "A rose", name: "TNT" },
-      { show: false, image: null, event: "", name: "" },
+      { show: true, image: null, event: "A rose", name: "TNT", column: 1 },
+      { show: false, image: null, event: "", name: "", column: 1 },
     ]);
   });
 

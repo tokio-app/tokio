@@ -1193,7 +1193,7 @@ describe("StoreManagerService", () => {
       },
       likes_every: 100,
       steps: [],
-      overlay: { show: true, image, event: "", name: "Boom" },
+      overlay: { show: true, image, event: "", name: "Boom", column: 1 },
     });
     const withActions = (...actions: GameAction[]) => ({
       games: { ...defaultProfile.games, actions },

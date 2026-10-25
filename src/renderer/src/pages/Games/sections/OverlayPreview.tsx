@@ -5,8 +5,22 @@ import { GamesOverlay } from "@/common/schemas";
 import { GameOverlayRow } from "@/common/types";
 import { EmptyState } from "@/components";
 import { cx } from "@/helper/cx";
-import { CSSProperties, useEffect, useRef, useState } from "react";
+import {
+  CSSProperties,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import styles from "../games.module.css";
+
+// The overlay's variables, which overlay.css reads
+declare module "react" {
+  interface CSSProperties {
+    "--games-text"?: string;
+    "--games-accent"?: string;
+  }
+}
 
 // How long a row stays lit after its last run, as the overlay's LIT_MS
 const LIT_MS = 1500;
@@ -37,10 +51,37 @@ type Props = {
 };
 
 /**
- * The games overlay as it shows on stream, in the markup of its page
- * (src/main/services/server/games.html): keep the two in step.
+ * The games overlay as it shows on stream, each column side by side, in the
+ * markup of its page (src/main/services/server/games.html): keep the two in
+ * step.
  */
 export function OverlayPreview({ look, rows, run }: Props) {
+  if (rows.length === 0) {
+    return (
+      <EmptyState>Pick a picture or name an action to show it here.</EmptyState>
+    );
+  }
+  return (
+    <div className={styles.preview}>
+      {Array.from({ length: look.columns }, (_, i) => (
+        <PreviewColumn
+          key={i}
+          label={
+            look.columns > 1
+              ? `Column ${i + 1} of the overlay preview`
+              : "Overlay preview"
+          }
+          look={look}
+          rows={rows.filter((row) => row.column === i + 1)}
+          run={run}
+        />
+      ))}
+    </div>
+  );
+}
+
+// One column's overlay, at /games/minecraft/<column>/
+function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
   const carousel = look.layout === "carousel";
   const [lit, setLit] = useState<string[]>([]);
   const [turn, setTurn] = useState(0);
@@ -99,21 +140,34 @@ export function OverlayPreview({ look, rows, run }: Props) {
     return () => clearTimeout(next);
   }, [carousel, rows.length, current, currentId, wait]);
 
-  if (rows.length === 0) {
-    return (
-      <EmptyState>Pick a picture or name an action to show it here.</EmptyState>
-    );
-  }
+  // Shrinks to fit its share of the preview, as the overlay fits its source.
+  // Written to the style, so measuring doesn't render again.
+  const box = useRef<HTMLDivElement>(null);
+  const games = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const fit = () => {
+      const room = box.current?.clientWidth;
+      const content = games.current;
+      if (!room || !content) return;
+      content.style.setProperty("--fit", "1");
+      const scale = Math.min(1, room / content.offsetWidth);
+      content.style.setProperty("--fit", String(scale));
+    };
+    fit();
+    addEventListener("resize", fit);
+    return () => removeEventListener("resize", fit);
+  });
 
   const style = {
     "--games-text": look.text_color,
     "--games-accent": look.accent_color,
     fontFamily: fontFamily(look.font),
-  } as CSSProperties;
+  } satisfies CSSProperties;
 
   return (
-    <div className={styles.preview}>
+    <div ref={box} className={styles.preview_column}>
       <div
+        ref={games}
         className={cx(
           "games",
           carousel && "games-carousel",
@@ -121,7 +175,7 @@ export function OverlayPreview({ look, rows, run }: Props) {
         )}
         style={style}
       >
-        <ol className="games-rows" aria-label="Overlay preview">
+        <ol className="games-rows" aria-label={label}>
           {rows.map((row, index) => {
             const pictures = row.pictures.filter(
               (src) => !broken.includes(src),

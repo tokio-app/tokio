@@ -43,6 +43,8 @@ export type GameOverlayRow = {
   image: string | null;
   // Empty for none
   name: string;
+  // The column whose overlay shows it
+  column: number;
 };
 
 // What the games overlay gets (tokio:games), and its preview draws

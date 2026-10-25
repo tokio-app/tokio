@@ -86,7 +86,7 @@ export function createAction(edition: MinecraftEdition): GameAction {
     },
     likes_every: 100,
     steps: [createStep("spawn")],
-    overlay: { show: true, image: null, event: "", name: "" },
+    overlay: { show: true, image: null, event: "", name: "", column: 1 },
   };
 }
 

@@ -3,7 +3,7 @@ import { isLiveEvent, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import {
   ALERTS_PATH,
   formatError,
-  GAMES_PATH,
+  MINECRAFT_OVERLAY_PATH,
   SERVER_PORT,
   TIMER_PATH,
 } from "@/common/util";
@@ -60,8 +60,11 @@ export class ServerService extends Service {
     this._app.get(`/${TIMER_PATH}`, (_req, res) => {
       res.type("html").send(TIMER_PAGE);
     });
-    // The games overlay. Its pictures are mounted at /games/minecraft/.
-    this._app.get(`/${GAMES_PATH}`, (_req, res) => {
+    // Minecraft's overlay, every column or one: the page reads its column
+    // from its path. Other names there, like its pictures' folder, pass on.
+    this._app.get(`/${MINECRAFT_OVERLAY_PATH}{/:column}`, (req, res, next) => {
+      const { column } = req.params;
+      if (column !== undefined && !/^\d+$/.test(column)) return next();
       res.type("html").send(GAMES_PAGE);
     });
 

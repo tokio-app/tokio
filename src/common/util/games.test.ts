@@ -32,17 +32,19 @@ const action = (
   return a;
 };
 
-const games = (...actions: GameAction[]): Profile["games"] => ({
+const games = (actions: GameAction[], columns = 1): Profile["games"] => ({
   actions,
-  overlay: GamesOverlaySchema.parse({}),
+  overlay: GamesOverlaySchema.parse({ columns }),
 });
 
+const sources = {
+  gifts,
+  emotes,
+  mediaURL: (file: string) => `/games/minecraft/pictures/${file}`,
+};
+
 const rows = (...actions: GameAction[]) =>
-  gameOverlayRows(games(...actions), {
-    gifts,
-    emotes,
-    mediaURL: (file) => `/games/minecraft/${file}`,
-  });
+  gameOverlayRows(games(actions), sources);
 
 describe("gameOverlayRows", () => {
   it("gives each shown action its event, picture and name, in order", () => {
@@ -53,7 +55,13 @@ describe("gameOverlayRows", () => {
     }, TOKIO_EVENTS.GIFT);
     const zombie = action((a) => {
       a.id = "zombie";
-      a.overlay = { show: true, image: null, event: "", name: "Zombie" };
+      a.overlay = {
+        show: true,
+        image: null,
+        event: "",
+        name: "Zombie",
+        column: 1,
+      };
     });
 
     expect(rows(tnt, zombie)).toEqual([
@@ -61,8 +69,9 @@ describe("gameOverlayRows", () => {
         id: "tnt",
         pictures: ["Rose.png"],
         event: "Rose",
-        image: "/games/minecraft/abc.png",
+        image: "/games/minecraft/pictures/abc.png",
         name: "TNT",
+        column: 1,
       },
       {
         id: "zombie",
@@ -70,6 +79,7 @@ describe("gameOverlayRows", () => {
         event: "Follow",
         image: null,
         name: "Zombie",
+        column: 1,
       },
     ]);
   });
@@ -83,6 +93,23 @@ describe("gameOverlayRows", () => {
     });
 
     expect(rows(off, hidden, empty)).toEqual([]);
+  });
+
+  it("puts each action in its column, the last one when there are fewer", () => {
+    const first = action((a) => (a.id = "first"));
+    const third = action((a) => {
+      a.id = "third";
+      a.overlay.column = 3;
+    });
+
+    const columns = (count: number) =>
+      gameOverlayRows(games([first, third], count), sources).map(
+        (row) => row.column,
+      );
+
+    expect(columns(4)).toEqual([1, 3]);
+    expect(columns(2)).toEqual([1, 2]);
+    expect(columns(1)).toEqual([1, 1]);
   });
 
   it("uses the streamer's event text, trimmed, over the gift's name", () => {

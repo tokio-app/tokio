@@ -1,8 +1,11 @@
 import STYLES from "@/common/games/overlay.css?raw";
 import { GamesOverlaySchema } from "@/common/schemas";
 import { GameOverlayRow, TOKIO_EVENTS } from "@/common/types";
-import { GAMES_PATH } from "@/common/util";
+import { GAMES_PATH, MINECRAFT_PICTURES_PATH } from "@/common/util";
 import { JSDOM } from "jsdom";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ServerService } from "./index";
 
@@ -15,8 +18,9 @@ const row = (
   id,
   pictures: [],
   event: "Follow",
-  image: `/games/minecraft/${id}.png`,
+  image: `/games/minecraft/pictures/${id}.png`,
   name: id.toUpperCase(),
+  column: 1,
   ...patch,
 });
 
@@ -35,8 +39,13 @@ describe("games overlay", () => {
     server.stop();
   });
 
-  it("serves the games page with the font and its look inlined", async () => {
-    for (const path of ["/games/", "/games"]) {
+  it("serves Minecraft's page, every column or one, with the font and its look inlined", async () => {
+    for (const path of [
+      "/games/minecraft/",
+      "/games/minecraft",
+      "/games/minecraft/2/",
+      "/games/minecraft/2",
+    ]) {
       const res = await fetch(url(path));
 
       expect(res.status).toBe(200);
@@ -48,6 +57,23 @@ describe("games overlay", () => {
       expect(html).toContain(".games-slot");
       expect(html).not.toContain("__ARCHIVO__");
       expect(html).not.toContain("__STYLES__");
+    }
+  });
+
+  it("leaves other paths under /games/ to the overlays and the pictures", async () => {
+    const folder = await mkdtemp(join(tmpdir(), "tokio-test-"));
+    try {
+      await writeFile(join(folder, "tnt.png"), "png");
+      server.mount(MINECRAFT_PICTURES_PATH, folder);
+
+      const picture = await fetch(url("/games/minecraft/pictures/tnt.png"));
+      expect(picture.status).toBe(200);
+      expect(await picture.text()).toBe("png");
+      for (const path of ["/games/", "/games/minecraft/two/"]) {
+        expect((await fetch(url(path))).status).toBe(404);
+      }
+    } finally {
+      await rm(folder, { recursive: true, force: true });
     }
   });
 
@@ -77,7 +103,7 @@ describe("games overlay", () => {
       document().querySelector(".games-current .games-name")?.textContent;
 
     beforeEach(async () => {
-      const page = url("/games/");
+      const page = url("/games/minecraft/");
       dom = new JSDOM(await (await fetch(page)).text(), {
         url: page,
         runScripts: "dangerously",
@@ -109,10 +135,10 @@ describe("games overlay", () => {
       ).toEqual([
         "https://cdn/rose.png",
         "https://cdn/lion.png",
-        "/games/minecraft/tnt.png",
+        "/games/minecraft/pictures/tnt.png",
       ]);
       expect(tnt.querySelector(".games-slot-result img")!.src).toBe(
-        url("/games/minecraft/tnt.png"),
+        url("/games/minecraft/pictures/tnt.png"),
       );
       expect(tnt.querySelector(".games-arrow")).not.toBeNull();
       expect(creeper.querySelectorAll("img")).toHaveLength(0);
@@ -235,6 +261,30 @@ describe("games overlay", () => {
 
       expect(rowElements()).toEqual([li]);
       expect(lit()).toEqual(["A"]);
+    });
+
+    it("shows every column's rows, and one column's at its own path", async () => {
+      const rows = [row("a"), row("b", { column: 2 }), row("c", { column: 2 })];
+      send(rows);
+      await vi.waitFor(() => expect(rowElements()).toHaveLength(3));
+
+      const page = url("/games/minecraft/2/");
+      const second = new JSDOM(await (await fetch(page)).text(), {
+        url: page,
+        runScripts: "dangerously",
+      });
+      try {
+        const names = () =>
+          [...second.window.document.querySelectorAll(".games-name")].map(
+            (name) => name.textContent,
+          );
+        await vi.waitFor(() => {
+          send(rows);
+          expect(names()).toEqual(["B", "C"]);
+        });
+      } finally {
+        second.window.close();
+      }
     });
 
     it("shows one row at a time, turning every 3 s", async () => {

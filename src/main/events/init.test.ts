@@ -643,7 +643,7 @@ describe("init events", () => {
       trigger: alert().trigger,
       likes_every: 100,
       steps: [{ type: "command", command: "say hi" }],
-      overlay: { show: true, image: null, event: "", name: "" },
+      overlay: { show: true, image: null, event: "", name: "", column: 1 },
     };
 
     it.each(triggers)("passes %s to the games", async (trigger) => {
@@ -805,6 +805,7 @@ describe("init events", () => {
           image: { name: "TNT", file: "my tnt.png" },
           event: "",
           name: "Boom",
+          column: 1,
         },
       };
       const withRose = (s: Setup) => {
@@ -843,8 +844,9 @@ describe("init events", () => {
                       id: "action-1",
                       pictures: ["rose.png"],
                       event: "Rose",
-                      image: "/games/minecraft/my%20tnt.png",
+                      image: "/games/minecraft/pictures/my%20tnt.png",
                       name: "Boom",
+                      column: 1,
                     },
                   ],
                 },
@@ -1684,7 +1686,7 @@ describe("init events", () => {
         "app/games/minecraft",
       );
       expect(s.serverService.mount).toHaveBeenCalledWith(
-        "games/minecraft",
+        "games/minecraft/pictures",
         "app/games/minecraft",
       );
     });

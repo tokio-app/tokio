@@ -1,5 +1,10 @@
 import { GamesOverlayData } from "@/common/types";
-import { formatError, GAMES_PATH, gameOverlayRows } from "@/common/util";
+import {
+  formatError,
+  GAMES_PATH,
+  gameOverlayRows,
+  MINECRAFT_PICTURES_PATH,
+} from "@/common/util";
 import Logger from "@/logger";
 import { AppHandlerVariables } from "@/types";
 
@@ -14,7 +19,7 @@ export const sendGamesRun = (
 ) => serverService.sendToClient(GAMES_PATH, { type: GAMES_RUN, data: { id } });
 
 const mediaURL = (file: string) =>
-  `/${GAMES_PATH}/minecraft/${encodeURIComponent(file)}`;
+  `/${MINECRAFT_PICTURES_PATH}/${encodeURIComponent(file)}`;
 
 /**
  * Sends the active profile's game actions and look to the games overlays.

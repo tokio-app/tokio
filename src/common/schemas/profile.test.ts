@@ -47,6 +47,7 @@ describe("ProfileSchema", () => {
 
     expect(ProfileSchema.parse(saved).games.overlay).toEqual({
       layout: "list",
+      columns: 1,
       pictures_only: false,
       font: "",
       text_color: "#f1f5f9",
@@ -79,7 +80,14 @@ describe("ProfileSchema", () => {
       image: null,
       event: "",
       name: "",
+      column: 1,
     });
+  });
+
+  it("refuses more columns than the games overlay splits into", () => {
+    const action = { ...oldAction, overlay: { column: 5 } };
+
+    expect(GameActionSchema.safeParse(action).success).toBe(false);
   });
 
   it("refuses an overlay name longer than 40 characters", () => {
