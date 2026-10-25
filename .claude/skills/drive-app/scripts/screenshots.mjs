@@ -352,7 +352,9 @@ export default async ({ app, page, home, push, toggle }) => {
   await push("app:games:res:games", games("connected"));
   const actions = section("Actions");
   await actions.getByRole("button", { name: "Add action" }).click();
-  await page.getByRole("textbox", { name: "Name" }).fill("{username}");
+  await page
+    .getByRole("textbox", { name: "Name", exact: true })
+    .fill("{username}");
   await actions.getByRole("button", { name: "Add action" }).click();
   await page.getByRole("combobox", { name: "Trigger" }).last().click();
   await page.getByRole("option", { name: "Gift", exact: true }).click();
@@ -362,6 +364,33 @@ export default async ({ app, page, home, push, toggle }) => {
     .getByRole("textbox", { name: "Command" })
     .fill("say {username} sent {count} {gift}");
   await crop("games-actions", actions);
+
+  // The overlay: the gift action on a Rose, and each action with a picture
+  // browsed into the Minecraft library (pixel art drawn for these shots)
+  await actions.getByRole("button", { name: "Any gift" }).click();
+  await dialog.getByTitle("Rose", { exact: true }).click();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await dialog.waitFor({ state: "detached" });
+  const overlay = section("Overlay");
+  const pictures = join(import.meta.dirname, "pictures");
+  for (const [index, [file, name]] of [
+    ["zombie.png", "Zombie"],
+    ["tnt.png", "TNT"],
+  ].entries()) {
+    await overlay
+      .getByRole("button", { name: "Pick a picture" })
+      .first()
+      .click();
+    await pick(join(pictures, file));
+    await dialog.getByRole("button", { name: "Browse files..." }).click();
+    await dialog.getByRole("button", { name: "Done" }).click();
+    await dialog.waitFor({ state: "detached" });
+    await overlay
+      .getByRole("textbox", { name: "Name on the overlay" })
+      .nth(index)
+      .fill(name);
+  }
+  await crop("games-overlay", overlay);
 
   // Countdown timer
   await open("Tools", "Countdown Timer");
