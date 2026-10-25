@@ -654,7 +654,9 @@ describe("Games overlay", () => {
       "src",
       "tokio-media:///games/minecraft/tnt.png",
     );
-    expect(followed.getByRole("textbox", { name: "Name" })).toHaveValue("TNT");
+    expect(
+      followed.getByRole("textbox", { name: "Name on the overlay" }),
+    ).toHaveValue("TNT");
     // A disabled action never runs
     expect(recipeElements()[2]).toHaveClass(styles.recipe_off);
     expect(giftedRow).not.toHaveClass(styles.recipe_off);
@@ -669,7 +671,10 @@ describe("Games overlay", () => {
       gifted.getByRole("textbox", { name: "Event text" }),
       "A rose",
     );
-    await user.type(gifted.getByRole("textbox", { name: "Name" }), "TNT");
+    await user.type(
+      gifted.getByRole("textbox", { name: "Name on the overlay" }),
+      "TNT",
+    );
     await user.click(
       liked.getByRole("checkbox", { name: "Show on the overlay" }),
     );

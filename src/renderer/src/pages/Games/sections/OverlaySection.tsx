@@ -255,7 +255,7 @@ function RecipeRow({
         )}
       </button>
       <Input
-        aria-label="Name"
+        aria-label="Name on the overlay"
         maxLength={40}
         placeholder="No name"
         value={overlay.name}
