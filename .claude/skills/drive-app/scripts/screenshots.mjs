@@ -14,6 +14,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
@@ -106,7 +107,21 @@ export default async ({ app, page, home, push, toggle }) => {
     const all = [targets].flat();
     await all[0].evaluate((el) => el.scrollIntoView({ block: "center" }));
     await settle();
-    const boxes = await Promise.all(all.map((t) => t.boundingBox()));
+    // A section ends at its content, without the room and hairline under it
+    const boxes = await Promise.all(
+      all.map((t) =>
+        t.evaluate((el) => {
+          const { x, y, width, height } = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
+          const under =
+            el.tagName === "SECTION"
+              ? parseFloat(style.paddingBottom) +
+                parseFloat(style.borderBottomWidth)
+              : 0;
+          return { x, y, width, height: height - under };
+        }),
+      ),
+    );
     const view = await page.evaluate(() => [innerWidth, innerHeight]);
     top ??= (await titleBar.boundingBox()).height;
     const x = Math.max(0, left ?? Math.min(...boxes.map((b) => b.x)) - pad);
@@ -160,6 +175,7 @@ export default async ({ app, page, home, push, toggle }) => {
   await page.getByRole("heading", { name: "Overlay Gallery" }).waitFor();
   await page.waitForTimeout(8000);
   await shoot("overlays");
+  await crop("overlays-gallery", [card("Gift Jar"), card("Top Likes")]);
   await crop("overlays-card", card("Gift Jar"));
   await card("Gift Jar").getByRole("button", { name: "Customize" }).click();
   await dialog.waitFor();
@@ -393,6 +409,16 @@ export default async ({ app, page, home, push, toggle }) => {
     }, command);
   }
   await crop("games-connect", section("Minecraft"));
+  // Each edition's column, short of the gap between them
+  for (const edition of ["Bedrock", "Java"]) {
+    await crop(
+      `games-connect-${edition.toLowerCase()}`,
+      section("Minecraft")
+        .getByRole("heading", { name: `${edition} Edition` })
+        .locator(".."),
+      { pad: 16 },
+    );
+  }
 
   await push("app:games:res:games", games("connected"));
   const actions = section("Actions");
@@ -436,6 +462,55 @@ export default async ({ app, page, home, push, toggle }) => {
       .fill(name);
   }
   await crop("games-overlay", overlay);
+  const preview = overlay.locator('[class*="_preview_"]').first();
+  await crop("games-preview", preview, { pad: 12 });
+  // Sticker, then back to Arrow so the later shots are as before
+  await overlay.getByRole("radio", { name: "Sticker" }).check();
+  await crop("games-preview-sticker", preview, { pad: 12 });
+  await overlay.getByRole("radio", { name: "Arrow" }).check();
+
+  // A test of the follow action, once it has three steps: no game answers,
+  // so push the replies Bedrock gives. Its anvil can't drop under a roof.
+  const follow = actions.getByRole("listitem").first();
+  for (const [index, kind] of [
+    [1, "Give item"],
+    [2, "Hazard"],
+  ]) {
+    await follow.getByRole("button", { name: "Add step" }).click();
+    await follow.getByRole("combobox", { name: "Step" }).nth(index).click();
+    await page.getByRole("option", { name: kind, exact: true }).click();
+  }
+  await follow.getByRole("spinbutton", { name: "Amount" }).nth(1).fill("3");
+  await follow.getByRole("combobox", { name: "Hazard" }).click();
+  await page.getByRole("option", { name: "Anvil drop", exact: true }).click();
+  // The page autosaves 300 ms after a change; the reply needs the action's id
+  await page.waitForTimeout(1000);
+  const saved = join(home, ".tokio", "profiles");
+  const [{ id }] = JSON.parse(
+    readFileSync(join(saved, readdirSync(saved)[0]), "utf8"),
+  ).games.actions;
+  await push("app:games:res:test", {
+    success: true,
+    id,
+    results: [
+      {
+        command: 'summon zombie "Cosmic Gamer" ~ ~ ~',
+        ok: true,
+        message: "Object successfully summoned",
+      },
+      {
+        command: "give @p diamond 3",
+        ok: true,
+        message: "Gave Diamond * 3 to Steve",
+      },
+      {
+        command: "setblock ~ ~20 ~ anvil keep",
+        ok: false,
+        message: "The block couldn't be placed",
+      },
+    ],
+  });
+  await crop("games-test", follow, { pad: 12 });
 
   // Countdown timer
   await open("Tools", "Countdown Timer");
@@ -450,6 +525,7 @@ export default async ({ app, page, home, push, toggle }) => {
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await page.waitForTimeout(1500);
   await shoot("countdown-timer");
+  await crop("timer-preview", page.getByRole("timer").locator(".."));
   await crop("timer-controls", body("Countdown Timer"));
   await crop("timer-time-added", body("Time Added"));
   await toggle(
@@ -515,6 +591,14 @@ export default async ({ app, page, home, push, toggle }) => {
   await crop("home-feed-settings", dialog);
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await page.getByPlaceholder("@username").fill("@tokio.demo");
+  // The box alone: with no Euler key saved, a hint shows under it
+  await crop("home-connect", page.getByPlaceholder("@username").locator(".."), {
+    pad: 16,
+  });
+  // A downloaded update, then a state that shows no button
+  await push("app:updates:res:status", { state: "ready", version: "1.5.0" });
+  await crop("update-button", titleBar, { left: 600, top: 0 });
+  await push("app:updates:res:status", { state: "unsupported" });
   const gifts = JSON.parse(
     readFileSync(join(home, ".tokio", "extra", "gifts.json"), "utf8"),
   );
