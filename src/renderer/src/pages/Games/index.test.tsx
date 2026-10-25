@@ -965,6 +965,41 @@ describe("Games overlay", () => {
     );
   });
 
+  it("waits for a row's gifts to turn before the next row, one at a time", async () => {
+    const { user } = await load([
+      giftAction("a1", {
+        trigger: { ...trigger, type: TOKIO_EVENTS.GIFT, gifts: [5655, 6369] },
+        overlay: { ...overlay, name: "TNT" },
+      }),
+      action("a2", { overlay: { ...overlay, name: "Zombie" } }),
+    ]);
+    const lion = gift(6369, "Lion");
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
+      data: [gift(5655, "Rose"), lion],
+    });
+    await user.click(
+      within(screen.getByRole("group", { name: "Layout" })).getByRole("radio", {
+        name: "One at a time",
+      }),
+    );
+    const current = () =>
+      preview()!.querySelector(".games-current .games-name")?.textContent;
+    const shownGift = () =>
+      [...preview()!.querySelectorAll(".games-current .games-event img")]
+        .filter((img) => !img.classList.contains("games-away"))
+        .map((img) => img.getAttribute("src"));
+
+    expect(current()).toBe("TNT");
+    expect(shownGift()).toEqual(["https://example.com/rose.png"]);
+    await wait(2000);
+    expect(shownGift()).toEqual([lion.img]);
+    // Past the 3 s a row with one gift gets
+    await wait(1500);
+    expect(current()).toBe("TNT");
+    await wait(600);
+    expect(current()).toBe("Zombie");
+  });
+
   it("shows the count on the picture, in the row and the preview", async () => {
     await load([
       action("a1", {

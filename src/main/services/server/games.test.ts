@@ -353,6 +353,25 @@ describe("games overlay", () => {
       await vi.waitFor(() => expect(current()).toBe("A"), { timeout: 3500 });
     }, 10_000);
 
+    it("waits for a row's gifts to take their turns before the next row", async () => {
+      const gifts = ["https://cdn/rose.png", "https://cdn/lion.png"];
+      send([row("a", { pictures: gifts }), row("b")], { layout: "carousel" });
+      await vi.waitFor(() => expect(current()).toBe("A"));
+      const shown = () =>
+        [...document().querySelectorAll(".games-current .games-event img")]
+          .filter((img) => !img.classList.contains("games-away"))
+          .map((img) => img.getAttribute("src"));
+
+      // From its first gift
+      expect(shown()).toEqual([gifts[0]]);
+      await sleep(2300);
+      expect(shown()).toEqual([gifts[1]]);
+      // Past the 3 s a row with one gift gets
+      await sleep(1000);
+      expect(current()).toBe("A");
+      await vi.waitFor(() => expect(current()).toBe("B"), { timeout: 1500 });
+    }, 10_000);
+
     it("turns to a row that runs, and holds it while it's lit", async () => {
       send([row("a"), row("b"), row("c")], { layout: "carousel" });
       await vi.waitFor(() => expect(current()).toBe("A"));

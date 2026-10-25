@@ -100,10 +100,18 @@
         [...box.querySelectorAll("img")].forEach((img, index, all) =>
           img.classList.toggle("games-away", index !== tick % all.length),
         );
-      setInterval(() => {
-        tick++;
+      // From the first picture, then the next every ROTATE_MS
+      let rotating = null;
+      const rotate = () => {
+        clearInterval(rotating);
+        tick = 0;
         list.querySelectorAll(".games-slot").forEach(show);
-      }, ROTATE_MS);
+        rotating = setInterval(() => {
+          tick++;
+          list.querySelectorAll(".games-slot").forEach(show);
+        }, ROTATE_MS);
+      };
+      rotate();
 
       // The pictures of one side, taking turns in one slot. One that doesn't
       // load goes, and with none left the side shows its text again.
@@ -177,17 +185,26 @@
       };
 
       // A lit row holds its turn until it goes out
+      // A row's turn lasts until each of its gifts has shown, from the
+      // first, and at least TURN_MS
+      const turnMs = () => {
+        const gifts =
+          list.children[turn]?.querySelectorAll(".games-event img").length ?? 0;
+        return Math.max(TURN_MS, gifts * ROTATE_MS);
+      };
       const next = () => {
         const held = lit.has(rows[turn]?.id);
         if (carousel && rows.length > 1 && !held) {
           turn = (turn + 1) % rows.length;
           mark();
+          rotate();
         }
-        turning = setTimeout(next, TURN_MS);
+        turning = setTimeout(next, turnMs());
       };
       const turnAgain = () => {
         clearTimeout(turning);
-        turning = setTimeout(next, TURN_MS);
+        if (carousel) rotate();
+        turning = setTimeout(next, turnMs());
       };
       turnAgain();
 
@@ -225,6 +242,8 @@
         games.style.setProperty("--games-text", look.text_color);
         games.style.setProperty("--games-accent", look.accent_color);
         setFont(look.font);
+        // One at a time just turned on or off
+        const switched = carousel !== (look.layout === "carousel");
         carousel = look.layout === "carousel";
         games.classList.toggle("games-carousel", carousel);
         games.classList.toggle("games-pictures-only", look.pictures_only);
@@ -239,6 +258,9 @@
           );
           list.replaceChildren(...rows.map(rowElement));
           mark();
+          turnAgain();
+        } else if (switched) {
+          turnAgain();
         }
         fit();
       };

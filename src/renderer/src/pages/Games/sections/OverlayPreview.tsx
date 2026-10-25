@@ -47,14 +47,20 @@ const sharpen = (img: HTMLImageElement) =>
 /**
  * The turn of pictures that share one place, a gift's and the next's, as
  * the overlay counts them. Each picture shows while `turn % count` is its
- * index.
+ * index. A new `restart` starts them over from the first, as one at a time
+ * does with each row's turn.
  */
-export function usePictureTurn() {
+export function usePictureTurn(restart?: string) {
   const [turn, setTurn] = useState(0);
+  const [started, setStarted] = useState(restart);
+  if (restart !== started) {
+    setStarted(restart);
+    setTurn(0);
+  }
   useEffect(() => {
     const timer = setInterval(() => setTurn((n) => n + 1), ROTATE_MS);
     return () => clearInterval(timer);
-  }, []);
+  }, [restart]);
   return turn;
 }
 
@@ -109,8 +115,6 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
   const carousel = look.layout === "carousel";
   const [lit, setLit] = useState<string[]>([]);
   const [turn, setTurn] = useState(0);
-  // Which of an event's gifts shows
-  const pictureTurn = usePictureTurn();
   // Pictures that didn't load, hidden as on the overlay
   const [broken, setBroken] = useState<string[]>([]);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -155,6 +159,14 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
 
   const current = rows.length > 0 ? turn % rows.length : 0;
   const currentId = rows.length > 0 ? rows[current].id : "";
+  // Which of an event's gifts shows: one at a time starts the row's from the
+  // first as its turn begins
+  const pictureTurn = usePictureTurn(carousel ? currentId : undefined);
+  // The row's turn lasts until each of its gifts has shown, as on the
+  // overlay
+  const gifts =
+    rows[current]?.pictures.filter((src) => !broken.includes(src)).length ?? 0;
+  const turnMs = Math.max(TURN_MS, gifts * ROTATE_MS);
   // A lit row holds its turn until it goes out, as on the overlay. Keyed by
   // the row's id, as the rows are a new array on every render.
   useEffect(() => {
@@ -162,9 +174,9 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
     const next = setTimeout(() => {
       if (litNow.current.includes(currentId)) setWait((w) => w + 1);
       else setTurn(current + 1);
-    }, TURN_MS);
+    }, turnMs);
     return () => clearTimeout(next);
-  }, [carousel, rows.length, current, currentId, wait]);
+  }, [carousel, rows.length, current, currentId, wait, turnMs]);
 
   // Shrinks to fit its share of the preview, as the overlay fits its source.
   // Written to the style, so measuring doesn't render again.
