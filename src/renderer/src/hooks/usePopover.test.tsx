@@ -57,6 +57,24 @@ describe("usePopover", () => {
     expect(menu.style.top).toBe("");
   });
 
+  // jsdom's window is 1024px wide, and the menu 600px
+  it("moves left when it doesn't fit on the right, the gap from the edge", async () => {
+    const user = userEvent.setup();
+    render(<Popover />);
+    vi.spyOn(
+      screen.getByTestId("anchor"),
+      "getBoundingClientRect",
+    ).mockReturnValue(new DOMRect(900, 20, 32, 32));
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+
+    expect(screen.getByRole("menu")).toHaveStyle({
+      top: "60px",
+      left: "416px",
+      width: "32px",
+    });
+  });
+
   it("closes when toggled again", async () => {
     const user = userEvent.setup();
     render(<Popover />);
