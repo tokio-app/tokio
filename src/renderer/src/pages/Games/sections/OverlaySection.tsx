@@ -144,7 +144,13 @@ export function OverlaySection({
           {actions.length === 0 ? (
             <EmptyState>Add an action to put it on the overlay.</EmptyState>
           ) : (
-            <ul className={styles.recipes} aria-label="Actions on the overlay">
+            <ul
+              className={cx(
+                styles.recipes,
+                look.columns > 1 && styles.recipes_columns,
+              )}
+              aria-label="Actions on the overlay"
+            >
               {actions.map((action) => (
                 <RecipeRow
                   key={action.id}
@@ -164,30 +170,32 @@ export function OverlaySection({
         <div className={styles.overlay_side}>
           <OverlayPreview look={look} rows={rows} run={run} />
 
-          <Field label="Layout" className={styles.layouts}>
-            <RadioGroup
-              name="games-overlay-layout"
-              value={look.layout}
-              options={LAYOUTS}
-              onChange={(layout) =>
-                setLook((l) => {
-                  l.layout = layout;
-                })
-              }
-            />
-          </Field>
-          <Field label="Columns" className={styles.layouts}>
-            <RadioGroup
-              name="games-overlay-columns"
-              value={String(look.columns)}
-              options={COLUMNS}
-              onChange={(columns) =>
-                setLook((l) => {
-                  l.columns = Number(columns);
-                })
-              }
-            />
-          </Field>
+          <div className={styles.look_choices}>
+            <Field label="Layout" className={styles.layouts}>
+              <RadioGroup
+                name="games-overlay-layout"
+                value={look.layout}
+                options={LAYOUTS}
+                onChange={(layout) =>
+                  setLook((l) => {
+                    l.layout = layout;
+                  })
+                }
+              />
+            </Field>
+            <Field label="Columns" className={styles.layouts}>
+              <RadioGroup
+                name="games-overlay-columns"
+                value={String(look.columns)}
+                options={COLUMNS}
+                onChange={(columns) =>
+                  setLook((l) => {
+                    l.columns = Number(columns);
+                  })
+                }
+              />
+            </Field>
+          </div>
           <Check
             label="Pictures only"
             checked={look.pictures_only}
@@ -263,13 +271,7 @@ function RecipeRow({
   const count = overlay.image ? gameCount(action) : 0;
 
   return (
-    <li
-      className={cx(
-        styles.recipe,
-        columns > 1 && styles.recipe_columns,
-        !action.enabled && styles.recipe_off,
-      )}
-    >
+    <li className={cx(styles.recipe, !action.enabled && styles.recipe_off)}>
       <Check
         aria-label="Show on the overlay"
         checked={overlay.show}

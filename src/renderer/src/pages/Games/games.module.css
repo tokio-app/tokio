@@ -326,12 +326,12 @@
   font-size: var(--font-md);
 }
 
-/* The rows on the left, the preview and the look on the right. Stacked on
-   narrow windows, the preview first. */
+/* The rows on the left, as wide as they need, and the preview and the look
+   in the rest. Stacked on narrow windows, the preview first. */
 .overlay {
   display: grid;
   grid-template-areas: "rows side";
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: auto minmax(360px, 1fr);
   align-items: start;
   gap: var(--space-6);
 }
@@ -357,11 +357,15 @@
 }
 
 /* One row per action, each read like the overlay's: the event, an arrow,
-   then the picture and name. The same columns in every row line the arrows
-   up. */
+   then the picture and name. The rows share these columns, so the arrows
+   line up, and the event's is as wide as its widest: one picture when every
+   event is a gift, a text field when one isn't. */
 .recipes {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns:
+    16px auto 14px var(--control-height)
+    minmax(10rem, 1fr);
+  column-gap: var(--space-3);
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -369,21 +373,19 @@
   list-style: none;
 }
 
-.recipe {
-  display: grid;
+/* With columns, each row's column picker comes last */
+.recipes_columns {
   grid-template-columns:
-    16px minmax(0, 1fr) 14px var(--control-height)
-    minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
+    16px auto 14px var(--control-height)
+    minmax(10rem, 1fr) 120px;
 }
 
-/* With columns, the row's column picker comes last */
-.recipe_columns {
-  grid-template-columns:
-    16px minmax(0, 1fr) 14px var(--control-height)
-    minmax(0, 1fr) 120px;
+.recipe {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  padding: var(--space-2) 0;
 }
 
 .recipe + .recipe {
@@ -395,7 +397,6 @@
   opacity: 0.5;
 }
 
-/* The gifts' or emotes' pictures, by the event's field */
 /* The gifts' or emotes' pictures, right by the check, as big as the
    action's picture button and taking turns in it */
 .recipe_gift {
@@ -467,7 +468,7 @@
    and haloed texts read as they would on stream. --games-size is the
    overlay's em, which overlay.css sizes everything from. */
 .preview {
-  --games-size: 15px;
+  --games-size: 18px;
   gap: var(--space-5);
   display: flex;
   align-items: center;
@@ -494,6 +495,13 @@
 }
 
 /* The two layouts side by side */
+/* Layout and Columns, side by side when there's room */
+.look_choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-8);
+}
+
 .layouts > div {
   flex-direction: row;
   gap: var(--space-6);
