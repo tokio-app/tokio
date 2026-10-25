@@ -1017,6 +1017,10 @@ describe("Games overlay", () => {
 
     await user.click(screen.getByRole("radio", { name: "One at a time" }));
     await user.click(screen.getByRole("checkbox", { name: "Pictures only" }));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Text below pictures" }),
+    );
+    await user.click(screen.getByRole("radio", { name: "Large" }));
     await user.type(screen.getByPlaceholderText("Archivo"), "Minecrafter");
     await wait(300);
 
@@ -1024,10 +1028,18 @@ describe("Games overlay", () => {
       ...defaultProfile.games.overlay,
       layout: "carousel",
       pictures_only: true,
+      text_below: true,
+      event_size: "large",
       font: "Minecrafter",
     });
     const games = preview()!.parentElement!;
-    expect(games).toHaveClass("games", "games-carousel", "games-pictures-only");
+    expect(games).toHaveClass(
+      "games",
+      "games-carousel",
+      "games-pictures-only",
+      "games-text-below",
+      "games-event-large",
+    );
     expect(games.style.fontFamily).toBe(
       '"Minecrafter", "Archivo Variable", sans-serif',
     );

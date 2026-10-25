@@ -26,6 +26,16 @@
   font-size: calc(var(--games-size, 16px) * var(--fit, 1));
   line-height: 1.15;
   color: var(--games-text);
+  /* The event's pictures, Small's size times this */
+  --games-event-scale: 1;
+}
+
+.games.games-event-medium {
+  --games-event-scale: 1.25;
+}
+
+.games.games-event-large {
+  --games-event-scale: 1.5;
 }
 
 /* The spine: events right-aligned on the arrows' left, results left-aligned
@@ -108,8 +118,8 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 2em;
-  height: 2em;
+  width: calc(2em * var(--games-event-scale));
+  height: calc(2em * var(--games-event-scale));
 }
 
 /* Stacked, so an event's gifts take turns in one place, crossfading */
@@ -201,11 +211,61 @@
   display: none;
 }
 
+/* TEXT BELOW, with the arrow: each side its picture over its text, the
+   arrows on the pictures' line. The pictures keep to the arrow and the
+   texts run out from it, so a long name doesn't push its picture away. A
+   text without a picture beside it (the event's comes before its
+   pictures, the name after them) keeps the pictures' line. Rows lean on
+   the arrows, so sides align to the top. */
+.games-text-below:not(.games-sticker) {
+  /* The action's picture, or a larger event's */
+  --games-line: max(2.5em, 2em * var(--games-event-scale));
+}
+
+.games-text-below:not(.games-sticker) .games-side {
+  display: grid;
+  grid-template-rows: var(--games-line);
+  grid-template-columns: minmax(0, auto);
+  align-items: center;
+  align-self: start;
+}
+
+.games-text-below:not(.games-sticker) .games-event {
+  justify-items: end;
+  justify-self: end;
+}
+
+.games-text-below:not(.games-sticker) .games-result {
+  justify-items: start;
+  justify-self: start;
+}
+
+.games-text-below:not(.games-sticker) .games-text {
+  grid-row: 2;
+}
+
+.games-text-below:not(.games-sticker) .games-event > .games-text:last-child,
+.games-text-below:not(.games-sticker) .games-result > .games-text:first-child {
+  grid-row: 1;
+}
+
+.games-text-below:not(.games-sticker) .games-arrow {
+  align-self: start;
+  margin-top: calc((var(--games-line) - 0.9em) / 2);
+}
+
 /* STICKER: no arrow. The action's picture large, with the event's stuck
    on its bottom left corner, half its size and over it, and the texts
    beside them: the name over the event's text, centered together. Each row
    is its own grid, which the sides give their pieces to. The square holds
-   the sticker's overhang, so measuring to fit counts it. */
+   the sticker's overhang, so measuring to fit counts it. A larger sticker
+   hangs further off. */
+.games-sticker {
+  --games-sticker: calc(1.6em * var(--games-event-scale));
+  --games-overhang: calc(0.5em * var(--games-event-scale));
+  --games-square: calc(3.2em + var(--games-overhang));
+}
+
 .games-sticker .games-rows {
   grid-template-columns: max-content;
   gap: 0.6em;
@@ -219,12 +279,14 @@
     "stack event"
     "stack ."
     "stack .";
-  grid-template-columns: 3.7em minmax(0, auto);
+  grid-template-columns: var(--games-square) minmax(0, auto);
   /* Centered on the action's picture, above the sticker's overhang. No
      minimum: the pictures across them would size them, on top of the
      texts'. */
-  grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr) 0.5em;
-  height: 3.7em;
+  grid-template-rows:
+    minmax(0, 1fr) auto auto minmax(0, 1fr)
+    var(--games-overhang);
+  height: var(--games-square);
 }
 
 .games-sticker .games-side {
@@ -248,8 +310,8 @@
   grid-area: stack;
   justify-self: start;
   align-self: end;
-  width: 1.6em;
-  height: 1.6em;
+  width: var(--games-sticker);
+  height: var(--games-sticker);
 }
 
 /* Without the action's picture, the event's takes its place (the page and
@@ -273,6 +335,57 @@
 
 .games-sticker .games-event .games-text {
   grid-area: event;
+}
+
+/* STICKER, TEXT BELOW: the action's picture centered over the texts, the sticker
+   hanging off its left. The column is wide enough for the overhang on both
+   sides, so measuring to fit counts it, and the sticker's margin puts it in
+   the corner while centered. The rows share one center line. */
+.games-sticker.games-text-below .games-rows {
+  justify-items: center;
+}
+
+.games-sticker.games-text-below .games-row {
+  grid-template-areas:
+    "stack"
+    "name"
+    "event";
+  grid-template-columns: minmax(
+    calc(3.2em + 2 * var(--games-overhang)),
+    max-content
+  );
+  grid-template-rows: var(--games-square) auto auto;
+  height: auto;
+}
+
+.games-sticker.games-text-below .games-slot-result,
+.games-sticker.games-text-below
+  .games-row:not(.has-result-picture)
+  .games-event
+  .games-slot {
+  justify-self: center;
+}
+
+.games-sticker.games-text-below .games-event .games-slot {
+  justify-self: center;
+  margin-right: calc(3.2em + 2 * var(--games-overhang) - var(--games-sticker));
+}
+
+.games-sticker.games-text-below
+  .games-row:not(.has-result-picture)
+  .games-event
+  .games-slot {
+  margin-right: 0;
+}
+
+/* The halo's padding is the gap under the square */
+.games-sticker.games-text-below .games-text {
+  justify-self: center;
+  margin-left: -0.4em;
+}
+
+.games-sticker.games-text-below .games-name {
+  margin-top: 0;
 }
 
 /* ONE AT A TIME: every row in the same place, the current one shown. The

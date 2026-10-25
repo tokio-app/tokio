@@ -216,6 +216,8 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
           carousel && "games-carousel",
           look.pictures_only && "games-pictures-only",
           look.format === "sticker" && "games-sticker",
+          look.text_below && "games-text-below",
+          look.event_size !== "small" && `games-event-${look.event_size}`,
         )}
         style={style}
       >

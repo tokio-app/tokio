@@ -50,6 +50,8 @@ describe("ProfileSchema", () => {
       format: "arrow",
       columns: 1,
       pictures_only: false,
+      text_below: false,
+      event_size: "small",
       font: "",
       text_color: "#f1f5f9",
       accent_color: "#f43f5e",

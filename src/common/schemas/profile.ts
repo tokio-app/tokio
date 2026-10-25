@@ -329,6 +329,9 @@ export const GAMES_OVERLAY_LAYOUTS = ["list", "carousel"] as const;
 // the corner of the action's, like a sticker
 export const GAMES_OVERLAY_FORMATS = ["arrow", "sticker"] as const;
 
+// How large the event's pictures (gifts, emotes, Tokio's own) show
+export const GAMES_OVERLAY_SIZES = ["small", "medium", "large"] as const;
+
 // How the games overlay looks
 export const GamesOverlaySchema = z.object({
   layout: z.enum(GAMES_OVERLAY_LAYOUTS).default("list"),
@@ -337,6 +340,9 @@ export const GamesOverlaySchema = z.object({
   columns: ColumnSchema,
   // Hides the texts next to pictures; a side without one keeps its text
   pictures_only: z.boolean().default(false),
+  // The texts under the pictures instead of beside them
+  text_below: z.boolean().default(false),
+  event_size: z.enum(GAMES_OVERLAY_SIZES).default("small"),
   // A font installed where the streaming app runs, Archivo when empty
   font: z.string().max(60).default(""),
   text_color: ColorSchema.default("#f1f5f9"),
@@ -442,6 +448,7 @@ export type GameOverlayItem = GameAction["overlay"];
 export type GamesOverlay = Profile["games"]["overlay"];
 export type GamesOverlayLayout = GamesOverlay["layout"];
 export type GamesOverlayFormat = GamesOverlay["format"];
+export type GamesOverlaySize = GamesOverlay["event_size"];
 export type AlertSound = z.infer<typeof AlertSoundSchema>;
 export type AlertMedia = z.infer<typeof AlertMediaSchema>;
 // An image or video in the media library

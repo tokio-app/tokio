@@ -256,6 +256,40 @@ describe("games overlay", () => {
       expect(document().querySelector(".games-event.has-picture")).toBe(null);
     });
 
+    it("puts the texts below the pictures in either format", async () => {
+      send([row("a")], { format: "arrow", text_below: true });
+      const games = document().getElementById("games")!;
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-text-below")).toBe(true),
+      );
+
+      send([row("a")], { format: "sticker", text_below: false });
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-sticker")).toBe(true),
+      );
+      expect(games.classList.contains("games-text-below")).toBe(false);
+    });
+
+    it("sizes the event's pictures", async () => {
+      send([row("a")], { event_size: "large" });
+      const games = document().getElementById("games")!;
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-event-large")).toBe(true),
+      );
+
+      send([row("a")], { event_size: "medium" });
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-event-medium")).toBe(true),
+      );
+      expect(games.classList.contains("games-event-large")).toBe(false);
+
+      // Small is the stylesheet's own
+      send([row("a")], { event_size: "small" });
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-event-medium")).toBe(false),
+      );
+    });
+
     it("hides a picture that doesn't load, and shows its side's text", async () => {
       send([row("a", { pictures: ["https://cdn/rose.png"] })]);
       await vi.waitFor(() => expect(rowElements()).toHaveLength(1));
