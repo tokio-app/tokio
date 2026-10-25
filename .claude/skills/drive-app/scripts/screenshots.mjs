@@ -408,7 +408,6 @@ export default async ({ app, page, home, push, toggle }) => {
       buttons[0].querySelector("span").firstChild.nodeValue = command;
     }, command);
   }
-  await crop("games-connect", section("Minecraft"));
   // Each edition's column, short of the gap between them
   for (const edition of ["Bedrock", "Java"]) {
     await crop(
@@ -526,7 +525,16 @@ export default async ({ app, page, home, push, toggle }) => {
   await page.waitForTimeout(1500);
   await shoot("countdown-timer");
   await crop("timer-preview", page.getByRole("timer").locator(".."));
-  await crop("timer-controls", body("Countdown Timer"));
+  // The controls, under the preview timer-preview shows
+  const timer = body("Countdown Timer");
+  await crop(
+    "timer-controls",
+    [
+      timer.locator('[class*="timer_bar"]'),
+      timer.getByText("Pause when the LIVE ends or disconnects"),
+    ],
+    { pad: 16 },
+  );
   await crop("timer-time-added", body("Time Added"));
   await toggle(
     page.getByRole("checkbox", { name: "Show the triggers, one at a time" }),
