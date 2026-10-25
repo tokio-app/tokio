@@ -571,14 +571,22 @@ export default async ({ app, page, home, push, toggle }) => {
   await page.getByRole("button", { name: "Create Profile" }).click();
   await dialog.waitFor({ state: "detached" });
 
-  // The title bar's menus, with the window's right half around them. Closing
+  // The title bar's menus, each with its button and little else. Closing
   // a toast is a click outside, which closes a menu, so they go first. The
   // profiles can't be switched while connected, so before the LIVE.
   const menu = titleBar.locator('[class*="menu"]');
+  // The page under a menu, hidden so nothing shows around it. By tag, as a
+  // hidden element has no role.
+  const behind = (visibility) =>
+    page
+      .locator("main")
+      .evaluate((el, value) => (el.style.visibility = value), visibility);
   await settle();
   const profiles = titleBar.getByRole("button", { name: "Default" }).first();
   await profiles.click();
-  await crop("profiles-menu", [profiles, menu], { left: 600, top: 0 });
+  await behind("hidden");
+  await crop("profiles-menu", [profiles, menu], { pad: 8, top: 0 });
+  await behind("");
   await profiles.click();
 
   // Home, LIVE, last: what main would push while connected
@@ -662,5 +670,6 @@ export default async ({ app, page, home, push, toggle }) => {
   await settle();
   const bell = titleBar.getByTitle("Notifications");
   await bell.click();
-  await crop("notifications", [bell, menu], { left: 600, top: 0 });
+  await behind("hidden");
+  await crop("notifications", [bell, menu], { pad: 8, top: 0 });
 };
