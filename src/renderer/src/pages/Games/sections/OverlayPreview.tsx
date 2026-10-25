@@ -19,6 +19,7 @@ declare module "react" {
   interface CSSProperties {
     "--games-text"?: string;
     "--games-accent"?: string;
+    "--games-arrow"?: string;
   }
 }
 
@@ -202,6 +203,7 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
   const style = {
     "--games-text": look.text_color,
     "--games-accent": look.accent_color,
+    "--games-arrow": look.arrow_color,
     fontFamily: fontFamily(look.font),
   } satisfies CSSProperties;
 
@@ -213,6 +215,7 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
           "games",
           carousel && "games-carousel",
           look.pictures_only && "games-pictures-only",
+          look.format === "sticker" && "games-sticker",
         )}
         style={style}
       >
@@ -232,6 +235,7 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
                   "games-row",
                   lit.includes(row.id) && "games-lit",
                   index === current && "games-current",
+                  image && "has-result-picture",
                 )}
               >
                 <span

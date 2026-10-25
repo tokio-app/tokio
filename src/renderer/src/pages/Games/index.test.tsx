@@ -963,6 +963,30 @@ describe("Games overlay", () => {
     );
   });
 
+  it("puts the event's picture on the action's with Sticker, which has no arrow", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, image: TNT } }),
+      action("a2", { overlay: { ...overlay, name: "Zombie" } }),
+    ]);
+    const games = () => preview()!.parentElement!;
+    const arrowColor = () => screen.queryByRole("group", { name: "Arrow" });
+    expect(arrowColor()).toBeInTheDocument();
+    expect(games().style.getPropertyValue("--games-arrow")).toBe(
+      defaultProfile.games.overlay.arrow_color,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "Sticker" }));
+    await wait(300);
+
+    expect(saves().at(-1)!.overlay.format).toBe("sticker");
+    expect(games()).toHaveClass("games-sticker");
+    // Without the action's picture, the event's takes its place
+    expect(
+      previewRows().map((li) => li.classList.contains("has-result-picture")),
+    ).toEqual([true, false]);
+    expect(arrowColor()).toBeNull();
+  });
+
   it("previews the shown actions, named after their steps until named", async () => {
     const { user } = await load([
       giftAction("a1", { overlay: { ...overlay, image: TNT, name: "TNT" } }),

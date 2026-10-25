@@ -79,8 +79,6 @@
       // The lit rows' ids, each with the timeout that puts it out
       const lit = new Map();
 
-      // A picture in its box. One that doesn't load goes, and its side
-      // shows its text again if that was its only picture.
       // A Minecraft picture drawn at twice its size or more, like a 16×16
       // icon, keeps its pixels sharp. Smaller scales stay smooth: Chromium's
       // pixelated is nearest-neighbor shrinking too, which makes renders
@@ -123,12 +121,17 @@
           img.alt = "";
           img.addEventListener("error", () => {
             const side = box.parentElement;
+            const li = side?.parentElement;
             img.remove();
             if (!box.querySelector("img")) box.remove();
             else show(box);
             side?.classList.toggle(
               "has-picture",
               !!side.querySelector(".games-slot"),
+            );
+            li?.classList.toggle(
+              "has-result-picture",
+              !!li.querySelector(".games-slot-result"),
             );
             fit();
           });
@@ -176,6 +179,8 @@
         result.classList.toggle("has-picture", !!row.image);
         const li = document.createElement("li");
         li.className = "games-row";
+        // The sticker format puts the event's picture on its corner
+        li.classList.toggle("has-result-picture", !!row.image);
         li.append(
           event,
           arrow.content.firstElementChild.cloneNode(true),
@@ -249,12 +254,14 @@
           : all;
         games.style.setProperty("--games-text", look.text_color);
         games.style.setProperty("--games-accent", look.accent_color);
+        games.style.setProperty("--games-arrow", look.arrow_color);
         setFont(look.font);
         // One at a time just turned on or off
         const switched = carousel !== (look.layout === "carousel");
         carousel = look.layout === "carousel";
         games.classList.toggle("games-carousel", carousel);
         games.classList.toggle("games-pictures-only", look.pictures_only);
+        games.classList.toggle("games-sticker", look.format === "sticker");
         // Only when they changed, so a lit row keeps its flash going
         if (JSON.stringify(changed) !== JSON.stringify(rows)) {
           // One at a time stays on the row it shows, if it's still there

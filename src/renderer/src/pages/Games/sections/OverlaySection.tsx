@@ -2,6 +2,7 @@ import {
   GameAction,
   GameOverlayItem,
   GAMES_OVERLAY_MAX_COLUMNS,
+  GamesOverlayFormat,
   GamesOverlayLayout,
   Profile,
   SavedEmote,
@@ -46,6 +47,11 @@ const LAYOUTS: { value: GamesOverlayLayout; label: string }[] = [
   { value: "carousel", label: "One at a time" },
 ];
 
+const FORMATS: { value: GamesOverlayFormat; label: string }[] = [
+  { value: "arrow", label: "Arrow" },
+  { value: "sticker", label: "Sticker" },
+];
+
 // 1 to the most, as RadioGroup takes text
 const COLUMNS = Array.from({ length: GAMES_OVERLAY_MAX_COLUMNS }, (_, i) => ({
   value: String(i + 1),
@@ -55,6 +61,7 @@ const COLUMNS = Array.from({ length: GAMES_OVERLAY_MAX_COLUMNS }, (_, i) => ({
 const COLORS = [
   { key: "text_color", label: "Text" },
   { key: "accent_color", label: "Accent" },
+  { key: "arrow_color", label: "Arrow" },
 ] as const;
 
 type Props = {
@@ -189,6 +196,18 @@ export function OverlaySection({
                 }
               />
             </Field>
+            <Field label="Format" className={styles.layouts}>
+              <RadioGroup
+                name="games-overlay-format"
+                value={look.format}
+                options={FORMATS}
+                onChange={(format) =>
+                  setLook((l) => {
+                    l.format = format;
+                  })
+                }
+              />
+            </Field>
             <Field label="Columns" className={styles.layouts}>
               <RadioGroup
                 name="games-overlay-columns"
@@ -226,7 +245,10 @@ export function OverlaySection({
                 }}
               />
             </Field>
-            {COLORS.map(({ key, label }) => (
+            {/* Stickers have no arrow */}
+            {COLORS.filter(
+              ({ key }) => key !== "arrow_color" || look.format === "arrow",
+            ).map(({ key, label }) => (
               <Field key={key} label={label}>
                 <Color
                   value={look[key]}

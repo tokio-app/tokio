@@ -266,6 +266,9 @@ describe("games overlay", () => {
       const result = document().querySelector(".games-result")!;
       expect(result.querySelector(".games-slot")).toBeNull();
       expect(result.classList.contains("has-picture")).toBe(false);
+      expect(rowElements()[0].classList.contains("has-result-picture")).toBe(
+        false,
+      );
       expect(rose.isConnected).toBe(true);
     });
 
@@ -291,10 +294,30 @@ describe("games overlay", () => {
       expect(big.classList.contains("games-pixelated")).toBe(false);
     });
 
+    it("puts the event's picture on the action's with stickers", async () => {
+      const rows = [row("a"), row("b", { image: null })];
+      send(rows, { format: "sticker" });
+      const games = document().getElementById("games")!;
+
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-sticker")).toBe(true),
+      );
+      // Without the action's picture, the event's takes its place
+      expect(
+        rowElements().map((li) => li.classList.contains("has-result-picture")),
+      ).toEqual([true, false]);
+
+      send(rows, { format: "arrow" });
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-sticker")).toBe(false),
+      );
+    });
+
     it("applies the colors and font, without letting a name add styles", async () => {
       send([row("a")], {
         text_color: "#112233",
         accent_color: "#44556677",
+        arrow_color: "#abcdef",
         font: ' x"; color: red ',
       });
 
@@ -303,6 +326,7 @@ describe("games overlay", () => {
         expect(games.style.getPropertyValue("--games-text")).toBe("#112233"),
       );
       expect(games.style.getPropertyValue("--games-accent")).toBe("#44556677");
+      expect(games.style.getPropertyValue("--games-arrow")).toBe("#abcdef");
       expect(games.style.fontFamily).toContain('x\\"; color: red');
       expect(games.style.fontFamily).toMatch(
         /, "Archivo Variable", sans-serif$/,

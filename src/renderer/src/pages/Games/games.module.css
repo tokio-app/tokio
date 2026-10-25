@@ -515,9 +515,12 @@
   gap: var(--space-6);
 }
 
+/* The font's field, then a color each */
 .look_fields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
+  grid-template-columns: minmax(0, 1fr);
   align-items: end;
   gap: var(--space-4);
 }

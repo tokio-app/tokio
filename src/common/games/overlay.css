@@ -15,8 +15,9 @@
 
 .games {
   --games-text: #f1f5f9;
-  /* The arrows, and the glint of an action that runs */
+  /* The glint of an action that runs */
   --games-accent: #f43f5e;
+  --games-arrow: #f43f5e;
   /* Keeps the text legible over bright gameplay */
   --games-halo: rgb(0 0 0 / 85%);
   font-family: "Archivo Variable", sans-serif;
@@ -167,7 +168,7 @@
 .games-arrow {
   width: 1.1em;
   height: 0.9em;
-  fill: var(--games-accent);
+  fill: var(--games-arrow);
   shape-rendering: crispEdges;
   filter: drop-shadow(0.08em 0.08em 0 rgb(0 0 0 / 60%));
 }
@@ -200,6 +201,80 @@
   display: none;
 }
 
+/* STICKER: no arrow. The action's picture large, with the event's stuck
+   on its bottom left corner, half its size and over it, and the texts
+   beside them: the name over the event's text, centered together. Each row
+   is its own grid, which the sides give their pieces to. The square holds
+   the sticker's overhang, so measuring to fit counts it. */
+.games-sticker .games-rows {
+  grid-template-columns: max-content;
+  gap: 0.6em;
+}
+
+.games-sticker .games-row {
+  display: grid;
+  grid-template-areas:
+    "stack ."
+    "stack name"
+    "stack event"
+    "stack ."
+    "stack .";
+  grid-template-columns: 3.7em minmax(0, auto);
+  /* Centered on the action's picture, above the sticker's overhang. No
+     minimum: the pictures across them would size them, on top of the
+     texts'. */
+  grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr) 0.5em;
+  height: 3.7em;
+}
+
+.games-sticker .games-side {
+  display: contents;
+}
+
+.games-sticker .games-arrow {
+  display: none;
+}
+
+.games-sticker .games-slot-result {
+  grid-area: stack;
+  justify-self: end;
+  align-self: start;
+  width: 3.2em;
+  height: 3.2em;
+}
+
+.games-sticker .games-event .games-slot {
+  z-index: 1;
+  grid-area: stack;
+  justify-self: start;
+  align-self: end;
+  width: 1.6em;
+  height: 1.6em;
+}
+
+/* Without the action's picture, the event's takes its place (the page and
+   the preview set has-result-picture) */
+.games-sticker .games-row:not(.has-result-picture) .games-event .games-slot {
+  justify-self: end;
+  align-self: start;
+  width: 3.2em;
+  height: 3.2em;
+}
+
+/* The texts' halo padding is the gap, so a row without texts has none */
+.games-sticker .games-text {
+  justify-self: start;
+  margin-left: 0;
+}
+
+.games-sticker .games-name {
+  grid-area: name;
+}
+
+.games-sticker .games-event .games-text {
+  grid-area: event;
+}
+
 /* ONE AT A TIME: every row in the same place, the current one shown. The
    columns fit the widest row, so nothing moves between turns. */
 .games-carousel .games-row > * {
@@ -209,6 +284,22 @@
 }
 
 .games-carousel .games-current > * {
+  opacity: 1;
+}
+
+/* A sticker row is one box, its sides only give it their pieces, so the
+   row fades. Each centered, as only one shows. */
+.games-sticker.games-carousel .games-rows {
+  justify-items: center;
+}
+
+.games-sticker.games-carousel .games-row {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.games-sticker.games-carousel .games-current {
   opacity: 1;
 }
 

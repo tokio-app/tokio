@@ -203,9 +203,14 @@ export const GameActionSchema = z.object({
 // Every shown action at once, or one at a time in turn
 export const GAMES_OVERLAY_LAYOUTS = ["list", "carousel"] as const;
 
+// The event, an arrow, then the action's picture; or the event's picture on
+// the corner of the action's, like a sticker
+export const GAMES_OVERLAY_FORMATS = ["arrow", "sticker"] as const;
+
 // How the games overlay looks
 export const GamesOverlaySchema = z.object({
   layout: z.enum(GAMES_OVERLAY_LAYOUTS).default("list"),
+  format: z.enum(GAMES_OVERLAY_FORMATS).default("arrow"),
   // Each column is its own overlay, at /games/minecraft/<column>/
   columns: ColumnSchema,
   // Hides the texts next to pictures; a side without one keeps its text
@@ -213,8 +218,9 @@ export const GamesOverlaySchema = z.object({
   // A font installed where the streaming app runs, Archivo when empty
   font: z.string().max(60).default(""),
   text_color: ColorSchema.default("#f1f5f9"),
-  // The arrows, and the glint of an action that runs
+  // The glint of an action that runs
   accent_color: ColorSchema.default("#f43f5e"),
+  arrow_color: ColorSchema.default("#f43f5e"),
 });
 
 const SavedEmoteSchema = z.object({
@@ -312,6 +318,7 @@ export type MinecraftEdition = GameAction["edition"];
 export type GameOverlayItem = GameAction["overlay"];
 export type GamesOverlay = Profile["games"]["overlay"];
 export type GamesOverlayLayout = GamesOverlay["layout"];
+export type GamesOverlayFormat = GamesOverlay["format"];
 export type AlertSound = z.infer<typeof AlertSoundSchema>;
 export type AlertMedia = z.infer<typeof AlertMediaSchema>;
 // An image or video in the media library

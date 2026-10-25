@@ -47,11 +47,25 @@ describe("ProfileSchema", () => {
 
     expect(ProfileSchema.parse(saved).games.overlay).toEqual({
       layout: "list",
+      format: "arrow",
       columns: 1,
       pictures_only: false,
       font: "",
       text_color: "#f1f5f9",
       accent_color: "#f43f5e",
+      arrow_color: "#f43f5e",
+    });
+  });
+
+  it("gives a look saved before the formats the arrow, in Tokio's rose", () => {
+    const saved = structuredClone(defaultProfile);
+    const look: Partial<Profile["games"]["overlay"]> = saved.games.overlay;
+    delete look.format;
+    delete look.arrow_color;
+
+    expect(ProfileSchema.parse(saved).games.overlay).toMatchObject({
+      format: "arrow",
+      arrow_color: "#f43f5e",
     });
   });
 
@@ -119,6 +133,9 @@ describe("ProfileSchema", () => {
     const saved = structuredClone(defaultProfile);
     saved.games.overlay.accent_color = "red; background: url(x)";
 
+    expect(ProfileSchema.safeParse(saved).success).toBe(false);
+    saved.games.overlay.accent_color = "#f43f5e";
+    saved.games.overlay.arrow_color = "red; background: url(x)";
     expect(ProfileSchema.safeParse(saved).success).toBe(false);
   });
 });
