@@ -96,6 +96,8 @@ const overlayData: GamesOverlayData = {
       id: "action-1",
       pictures: ["rose.png"],
       event: "Rose",
+      withText: false,
+      eventCount: 0,
       image: "/games/minecraft/pictures/c0ffee.png",
       name: "Boom",
       count: 0,

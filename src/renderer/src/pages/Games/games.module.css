@@ -401,8 +401,16 @@
    action's picture button and taking turns in it */
 .recipe_gift {
   position: relative;
+  flex-shrink: 0;
   width: var(--control-height);
   height: var(--control-height);
+}
+
+/* A chat's bubble, then its message */
+.recipe_chat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .recipe_picture {

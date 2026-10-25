@@ -36,9 +36,13 @@ export type CommandResult = {
 export type GameOverlayRow = {
   // The action's, which tokio:games:run names
   id: string;
-  // The event's pictures, its gifts' or emotes', and its text
+  // The event's pictures, its gifts' or emotes' or Tokio's own, and its
+  // text, which shows only without them, or with withText ("" for none)
   pictures: string[];
   event: string;
+  withText: boolean;
+  // How many likes it takes, in the picture's corner; 0 for none
+  eventCount: number;
   // Where the action's picture loads from, null for none
   image: string | null;
   // Empty for none

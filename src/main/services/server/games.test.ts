@@ -17,7 +17,9 @@ const row = (
 ): GameOverlayRow => ({
   id,
   pictures: [],
-  event: "Follow",
+  event: "Super Fan",
+  withText: false,
+  eventCount: 0,
   image: `/games/minecraft/pictures/${id}.png`,
   name: id.toUpperCase(),
   count: 0,
@@ -183,6 +185,43 @@ describe("games overlay", () => {
       expect(one.querySelector(".games-count")).toBeNull();
     });
 
+    it("counts the likes on the heart, and shows a chat's message by its bubble", async () => {
+      send(
+        [
+          row("a", {
+            pictures: ["https://cdn/heart.svg"],
+            event: "100 likes",
+            eventCount: 100,
+          }),
+          row("b", {
+            pictures: ["https://cdn/chat.svg"],
+            event: "“tnt”",
+            withText: true,
+          }),
+          row("c", {
+            pictures: ["https://cdn/chat.svg"],
+            event: "",
+            withText: true,
+          }),
+        ],
+        { pictures_only: true },
+      );
+      await vi.waitFor(() => expect(rowElements()).toHaveLength(3));
+      const [likes, chat, anyChat] = rowElements().map((li) =>
+        li.querySelector(".games-event")!,
+      );
+
+      expect(likes.querySelector(".games-slot .games-count")?.textContent).toBe(
+        "100",
+      );
+      expect(likes.classList.contains("has-picture")).toBe(true);
+      // Without has-picture, Pictures only keeps the message
+      expect(chat.classList.contains("has-picture")).toBe(false);
+      expect(chat.querySelector(".games-text")?.textContent).toBe("“tnt”");
+      expect(chat.querySelector(".games-slot img")).not.toBeNull();
+      expect(anyChat.querySelector(".games-text")).toBeNull();
+    });
+
     it("puts texts in as text, never markup", async () => {
       send([row("a", { event: "<b>Rose</b>", name: "<img src=x>" })]);
 
@@ -196,7 +235,7 @@ describe("games overlay", () => {
     it("leaves the name out when there is none", async () => {
       send([row("a", { name: "" })]);
 
-      await vi.waitFor(() => expect(texts()).toEqual([["Follow"]]));
+      await vi.waitFor(() => expect(texts()).toEqual([["Super Fan"]]));
       expect(document().querySelector(".games-result img")).not.toBeNull();
     });
 

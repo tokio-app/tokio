@@ -128,7 +128,8 @@
   opacity: 0;
 }
 
-/* An event with pictures shows only them: the gifts say what they are */
+/* An event with pictures shows only them: the gifts say what they are. A
+   chat's side never has has-picture, so its message shows by its bubble. */
 .games-event.has-picture .games-text {
   display: none;
 }
@@ -193,7 +194,8 @@
 }
 
 /* PICTURES ONLY: the texts next to pictures go. A side without a picture
-   keeps its text, so "100 likes ▸ [TNT]" still reads. */
+   keeps its text, so "Super Fan ▸ [TNT]" still reads, and so does a chat's
+   message, which its bubble can't say. */
 .games-pictures-only .has-picture .games-text {
   display: none;
 }

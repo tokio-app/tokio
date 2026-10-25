@@ -6,10 +6,16 @@ import {
   Profile,
   SavedEmote,
 } from "@/common/schemas";
-import { APP_EVENTS, CustomGift } from "@/common/types";
+import {
+  ALERT_TRIGGER_LABELS,
+  APP_EVENTS,
+  CustomGift,
+  TOKIO_EVENTS,
+} from "@/common/types";
 import {
   gameEventPictures,
   gameCount,
+  gameEventCount,
   gameEventText,
   gameOverlayRows,
   gameStepsText,
@@ -264,11 +270,53 @@ function RecipeRow({
   onChange,
   onPickPicture,
 }: RowProps) {
-  const { overlay } = action;
+  const { overlay, trigger } = action;
   const pictures = gameEventPictures(action, gifts, emotes);
+  const eventText = gameEventText(action, gifts);
+  // A chat's message shows by its bubble, so it keeps its text field
+  const chat = trigger.type === TOKIO_EVENTS.CHAT;
   const pick = overlay.image ? "Change the picture" : "Pick a picture";
-  // On the picture's corner, as on the overlay
+  // On the pictures' corners, as on the overlay
   const count = overlay.image ? gameCount(action) : 0;
+  const likes = gameEventCount(action);
+
+  // The gifts', emotes' or Tokio's pictures say what they are, as on the
+  // overlay, taking turns in one place
+  const eventPictures = pictures.length > 0 && (
+    <span
+      className={styles.recipe_gift}
+      role="img"
+      aria-label={chat ? ALERT_TRIGGER_LABELS[trigger.type] : eventText}
+      title={chat ? ALERT_TRIGGER_LABELS[trigger.type] : eventText}
+    >
+      {pictures.map((src, i) => (
+        <img
+          key={src}
+          className={cx(
+            styles.recipe_picture,
+            i !== pictureTurn % pictures.length && styles.recipe_away,
+          )}
+          src={src}
+          alt=""
+        />
+      ))}
+      {likes > 0 && (
+        <span className={styles.slot_count} aria-hidden>
+          {likes}
+        </span>
+      )}
+    </span>
+  );
+  // Empty, the event's own text shows, and goes on the overlay
+  const eventField = (
+    <Input
+      aria-label="Event text"
+      maxLength={40}
+      placeholder={eventText || "No text"}
+      value={overlay.event}
+      onChange={(e) => onChange({ event: e.target.value })}
+    />
+  );
 
   return (
     <li className={cx(styles.recipe, !action.enabled && styles.recipe_off)}>
@@ -277,36 +325,13 @@ function RecipeRow({
         checked={overlay.show}
         onChange={(e) => onChange({ show: e.target.checked })}
       />
-      {pictures.length > 0 ? (
-        // The gifts' or emotes' pictures say what they are, as on the
-        // overlay, taking turns in one place
-        <span
-          className={styles.recipe_gift}
-          role="img"
-          aria-label={gameEventText(action, gifts)}
-          title={gameEventText(action, gifts)}
-        >
-          {pictures.map((src, i) => (
-            <img
-              key={src}
-              className={cx(
-                styles.recipe_picture,
-                i !== pictureTurn % pictures.length && styles.recipe_away,
-              )}
-              src={src}
-              alt=""
-            />
-          ))}
+      {chat ? (
+        <span className={styles.recipe_chat}>
+          {eventPictures}
+          {eventField}
         </span>
       ) : (
-        // Empty, the event's own text shows, and goes on the overlay
-        <Input
-          aria-label="Event text"
-          maxLength={40}
-          placeholder={gameEventText(action, gifts)}
-          value={overlay.event}
-          onChange={(e) => onChange({ event: e.target.value })}
-        />
+        eventPictures || eventField
       )}
       <PixelArrow className={styles.recipe_arrow} />
       <button

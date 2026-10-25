@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EVENT_SPRITES } from "../games/sprites";
 import {
   GameAction,
   GameActionSchema,
@@ -9,6 +10,7 @@ import { EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
 import { CustomGift } from "../types/overlay";
 import {
   gameCount,
+  gameEventCount,
   gameEventPictures,
   gameEventText,
   gameOverlayRows,
@@ -75,6 +77,8 @@ describe("gameOverlayRows", () => {
         id: "tnt",
         pictures: ["Rose.png"],
         event: "Rose",
+        withText: false,
+        eventCount: 0,
         image: "/games/minecraft/pictures/abc.png",
         name: "TNT",
         count: 0,
@@ -82,8 +86,10 @@ describe("gameOverlayRows", () => {
       },
       {
         id: "zombie",
-        pictures: [],
+        pictures: [EVENT_SPRITES[TOKIO_EVENTS.FOLLOW]],
         event: "Follow",
+        withText: false,
+        eventCount: 0,
         image: null,
         name: "Zombie",
         count: 0,
@@ -129,6 +135,24 @@ describe("gameOverlayRows", () => {
     expect(rows(rose)[0]).toMatchObject({
       event: "Rosa",
       pictures: ["Rose.png"],
+    });
+  });
+
+  it("shows a chat's message by its bubble, and the likes on the heart", () => {
+    const chat = action((a) => (a.trigger.keyword = "tnt"), TOKIO_EVENTS.CHAT);
+    const likes = action((a) => (a.likes_every = 100), TOKIO_EVENTS.LIKE);
+
+    expect(rows(chat)[0]).toMatchObject({
+      pictures: [EVENT_SPRITES[TOKIO_EVENTS.CHAT]],
+      event: "“tnt”",
+      withText: true,
+      eventCount: 0,
+    });
+    expect(rows(likes)[0]).toMatchObject({
+      pictures: [EVENT_SPRITES[TOKIO_EVENTS.LIKE]],
+      event: "100 likes",
+      withText: false,
+      eventCount: 100,
     });
   });
 });
@@ -240,8 +264,9 @@ describe("gameEventText", () => {
     const chat = (keyword: string) =>
       action((a) => (a.trigger.keyword = keyword), TOKIO_EVENTS.CHAT);
 
-    expect(text(chat(" tnt "))).toBe("Chat “tnt”");
-    expect(text(chat(""))).toBe("Chat");
+    // Its bubble says chat
+    expect(text(chat(" tnt "))).toBe("“tnt”");
+    expect(text(chat(""))).toBe("");
   });
 
   it("gives other events their trigger's label", () => {
@@ -278,8 +303,45 @@ describe("gameEventPictures", () => {
       (a) => (a.trigger.emotes = ["e1", "gone"]),
       EMOTE_TRIGGER,
     );
+    const superFan = action(() => {}, TOKIO_EVENTS.SUPER_FAN);
 
     expect(gameEventPictures(emote, gifts, emotes)).toEqual(["e1.png"]);
-    expect(gameEventPictures(action(), gifts, emotes)).toEqual([]);
+    expect(gameEventPictures(superFan, gifts, emotes)).toEqual([]);
+  });
+
+  it("draws Tokio's own for follows, shares, likes and chat", () => {
+    const events: GameAction["trigger"]["type"][] = [
+      TOKIO_EVENTS.FOLLOW,
+      TOKIO_EVENTS.SHARE,
+      TOKIO_EVENTS.LIKE,
+      TOKIO_EVENTS.CHAT,
+    ];
+    const pictures = events.map((type) =>
+      gameEventPictures(
+        action(() => {}, type),
+        gifts,
+        emotes,
+      ),
+    );
+
+    expect(new Set(pictures.flat()).size).toBe(4);
+    for (const [src] of pictures) {
+      expect(src).toMatch(/^data:image\/svg\+xml,/);
+    }
+    // A rectangle per run of pixels of one color, on a 13×13 grid
+    const heart = decodeURIComponent(EVENT_SPRITES[TOKIO_EVENTS.LIKE]!);
+    expect(heart).toContain('viewBox="0 0 13 13"');
+    expect(heart).toMatch(/<path fill="#000000" d="M2 1h3v1H2zM8 1h3v1H8z/);
+  });
+});
+
+describe("gameEventCount", () => {
+  it("counts a Like action's likes, none for one or other events", () => {
+    const likes = (n: number) =>
+      action((a) => (a.likes_every = n), TOKIO_EVENTS.LIKE);
+
+    expect(gameEventCount(likes(100))).toBe(100);
+    expect(gameEventCount(likes(1))).toBe(0);
+    expect(gameEventCount(action((a) => (a.likes_every = 100)))).toBe(0);
   });
 });

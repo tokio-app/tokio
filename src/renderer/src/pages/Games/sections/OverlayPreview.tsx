@@ -237,10 +237,10 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
                 <span
                   className={cx(
                     "games-side games-event",
-                    pictures.length > 0 && "has-picture",
+                    pictures.length > 0 && !row.withText && "has-picture",
                   )}
                 >
-                  <span className="games-text">{row.event}</span>
+                  {row.event && <span className="games-text">{row.event}</span>}
                   {pictures.length > 0 && (
                     <span className="games-slot">
                       {pictures.map((src, i) => (
@@ -254,6 +254,9 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
                           onError={onError(src)}
                         />
                       ))}
+                      {row.eventCount > 0 && (
+                        <span className="games-count">{row.eventCount}</span>
+                      )}
                     </span>
                   )}
                 </span>

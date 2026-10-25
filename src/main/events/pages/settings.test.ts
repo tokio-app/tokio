@@ -1,3 +1,4 @@
+import { EVENT_SPRITES } from "@/common/games/sprites";
 import { Profile, TimerProfileSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
@@ -508,8 +509,10 @@ describe("settings events", () => {
             rows: [
               {
                 id: "Stream",
-                pictures: [],
+                pictures: [EVENT_SPRITES[TOKIO_EVENTS.FOLLOW]],
                 event: "Follow",
+                withText: false,
+                eventCount: 0,
                 image: null,
                 name: "Stream's action",
                 count: 0,

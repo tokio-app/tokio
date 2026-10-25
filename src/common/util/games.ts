@@ -14,6 +14,7 @@ import {
 } from "@/common/types";
 import bedrock from "../games/minecraft-bedrock.json";
 import java from "../games/minecraft-java.json";
+import { EVENT_SPRITES } from "../games/sprites";
 
 type Names = Record<string, string>;
 type Weather = Extract<GameStep, { type: "weather" }>["weather"];
@@ -41,7 +42,8 @@ export const TIME_NAMES: Record<Time, string> = {
 
 /**
  * The event's own text on the games overlay: the gifts' names, "100 likes",
- * Chat “tnt” (quoted like the timer's carousel), or the trigger's label.
+ * chat's keyword quoted like the timer's carousel (“tnt”, none without one,
+ * as its bubble says chat), or the trigger's label.
  * For an id in gifts twice, the first entry wins, so TikTok's list goes first.
  */
 export function gameEventText(action: GameAction, gifts: CustomGift[]) {
@@ -58,9 +60,21 @@ export function gameEventText(action: GameAction, gifts: CustomGift[]) {
   if (trigger.type === TOKIO_EVENTS.LIKE) {
     return `${likes_every} ${likes_every === 1 ? "like" : "likes"}`;
   }
-  const keyword =
-    trigger.type === TOKIO_EVENTS.CHAT ? trigger.keyword.trim() : "";
-  return keyword ? `${label} “${keyword}”` : label;
+  if (trigger.type === TOKIO_EVENTS.CHAT) {
+    const keyword = trigger.keyword.trim();
+    return keyword ? `“${keyword}”` : "";
+  }
+  return label;
+}
+
+/**
+ * How many likes a Like action takes, shown in its heart's corner like the
+ * action's count. 0 for every like, and for other events.
+ */
+export function gameEventCount({ trigger, likes_every }: GameAction) {
+  return trigger.type === TOKIO_EVENTS.LIKE && likes_every > 1
+    ? likes_every
+    : 0;
 }
 
 // The first mob or item the action makes
@@ -105,13 +119,16 @@ export function gameStepsText({ edition, steps }: GameAction, counted = false) {
     .join(", ");
 }
 
-// The event's pictures: its gifts' or emotes', none for other events
+// The event's pictures: its gifts' or emotes', Tokio's own for follows,
+// shares, likes and chat, none for other events
 export function gameEventPictures(
   action: GameAction,
   gifts: CustomGift[],
   emotes: SavedEmote[],
 ): string[] {
   const { trigger } = action;
+  const sprite = EVENT_SPRITES[trigger.type];
+  if (sprite) return [sprite];
   const pictures =
     trigger.type === TOKIO_EVENTS.GIFT
       ? trigger.gifts.map((id) => gifts.find((g) => g.value === id)?.img)
@@ -152,6 +169,9 @@ export function gameOverlayRows(
         id: action.id,
         pictures: gameEventPictures(action, gifts, emotes),
         event: overlay.event.trim() || gameEventText(action, gifts),
+        // A chat's message shows beside its bubble
+        withText: action.trigger.type === TOKIO_EVENTS.CHAT,
+        eventCount: gameEventCount(action),
         image: overlay.image ? mediaURL(overlay.image.file) : null,
         name,
         count,

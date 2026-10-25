@@ -574,6 +574,11 @@ describe("Games overlay", () => {
     });
   const likeAction = (id: string, patch: Partial<GameAction> = {}) =>
     action(id, { trigger: { ...trigger, type: TOKIO_EVENTS.LIKE }, ...patch });
+  const chatAction = (id: string, patch: Partial<GameAction> = {}) =>
+    action(id, {
+      trigger: { ...trigger, type: TOKIO_EVENTS.CHAT, keyword: "tnt" },
+      ...patch,
+    });
   const rose = () =>
     send(APP_EVENTS_RESPONSE.GET_GIFTS, { data: [gift(5655, "Rose")] });
 
@@ -672,11 +677,13 @@ describe("Games overlay", () => {
         enabled: false,
         overlay: { ...overlay, image: TNT, name: "TNT" },
       }),
+      chatAction("a4"),
+      action("a5", { trigger: { ...trigger, type: TOKIO_EVENTS.SUPER_FAN } }),
     ]);
     await rose();
 
-    const [gifted, liked, followed] = recipes();
-    const [giftedRow, likedRow] = recipeElements();
+    const [gifted, liked, followed, chatted, superFan] = recipes();
+    const [giftedRow] = recipeElements();
     // A gift shows only its picture, named for screen readers
     const roseGift = gifted.getByRole("img", { name: "Rose" });
     expect(
@@ -685,12 +692,23 @@ describe("Games overlay", () => {
       ),
     ).toEqual(["https://example.com/rose.png"]);
     expect(gifted.queryByRole("textbox", { name: "Event text" })).toBeNull();
-    expect(likedRow.querySelector("img")).toBeNull();
-    // Empty, an event without pictures shows its own text
-    expect(liked.getByRole("textbox", { name: "Event text" })).toHaveAttribute(
-      "placeholder",
-      "100 likes",
+    // Likes, follows and chat get Tokio's own pictures, the likes counted
+    const heart = liked.getByRole("img", { name: "100 likes" });
+    expect(heart.querySelector("img")?.getAttribute("src")).toMatch(
+      /^data:image\/svg\+xml,/,
     );
+    expect(heart).toHaveTextContent("100");
+    expect(liked.queryByRole("textbox", { name: "Event text" })).toBeNull();
+    expect(followed.getByRole("img", { name: "Follow" })).toBeInTheDocument();
+    // A chat keeps its message's field by its bubble
+    expect(chatted.getByRole("img", { name: "Chat" })).toBeInTheDocument();
+    expect(
+      chatted.getByRole("textbox", { name: "Event text" }),
+    ).toHaveAttribute("placeholder", "“tnt”");
+    // Empty, an event without pictures shows its own text
+    expect(
+      superFan.getByRole("textbox", { name: "Event text" }),
+    ).toHaveAttribute("placeholder", "Super Fan");
     expect(
       gifted.getByRole("button", { name: "Pick a picture" }),
     ).toBeInTheDocument();
@@ -708,12 +726,12 @@ describe("Games overlay", () => {
   });
 
   it("saves the rows' edits", async () => {
-    const { user } = await load([giftAction("a1"), likeAction("a2")]);
+    const { user } = await load([giftAction("a1"), chatAction("a2")]);
     await rose();
-    const [gifted, liked] = recipes();
+    const [gifted, chatted] = recipes();
 
     await user.type(
-      liked.getByRole("textbox", { name: "Event text" }),
+      chatted.getByRole("textbox", { name: "Event text" }),
       "Tap tap",
     );
     await user.type(
@@ -721,7 +739,7 @@ describe("Games overlay", () => {
       "TNT",
     );
     await user.click(
-      liked.getByRole("checkbox", { name: "Show on the overlay" }),
+      chatted.getByRole("checkbox", { name: "Show on the overlay" }),
     );
     await wait(300);
 
@@ -914,7 +932,7 @@ describe("Games overlay", () => {
   it("previews the shown actions, named after their steps until named", async () => {
     const { user } = await load([
       giftAction("a1", { overlay: { ...overlay, image: TNT, name: "TNT" } }),
-      likeAction("a2", { overlay: { ...overlay, name: "Creeper" } }),
+      chatAction("a2", { overlay: { ...overlay, name: "Creeper" } }),
       action("a3", { overlay: { ...overlay, show: false, name: "Hidden" } }),
       action("a4", { enabled: false, overlay: { ...overlay, name: "Off" } }),
       // Its zombie names it
@@ -926,7 +944,7 @@ describe("Games overlay", () => {
 
     expect(previewTexts()).toEqual([
       ["Rose", "TNT"],
-      ["100 likes", "Creeper"],
+      ["“tnt”", "Creeper"],
       ["Follow", "Zombie"],
     ]);
     expect(
@@ -956,10 +974,12 @@ describe("Games overlay", () => {
     await load([action("a1", { overlay: { ...overlay, image: TNT } })]);
 
     act(() => {
-      previewRows()[0].querySelector("img")!.dispatchEvent(new Event("error"));
+      previewRows()[0]
+        .querySelector(".games-result img")!
+        .dispatchEvent(new Event("error"));
     });
 
-    expect(previewRows()[0].querySelector("img")).toBeNull();
+    expect(previewRows()[0].querySelector(".games-result img")).toBeNull();
     expect(previewRows()[0].querySelector(".games-result")).not.toHaveClass(
       "has-picture",
     );
@@ -1024,7 +1044,8 @@ describe("Games overlay", () => {
 
   it("keeps a small Minecraft picture drawn large sharp in the preview", async () => {
     await load([action("a1", { overlay: { ...overlay, image: TNT } })]);
-    const img = previewRows()[0].querySelector("img")!;
+    const img =
+      previewRows()[0].querySelector<HTMLImageElement>(".games-result img")!;
     // jsdom loads no pictures and lays nothing out
     Object.defineProperty(img, "naturalWidth", { value: 16 });
     Object.defineProperty(img, "clientWidth", { value: 40 });
