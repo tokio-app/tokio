@@ -63,23 +63,41 @@ export function gameEventText(action: GameAction, gifts: CustomGift[]) {
   return keyword ? `${label} “${keyword}”` : label;
 }
 
+// The first mob or item the action makes
+const firstCounted = (steps: GameStep[]) =>
+  steps.find((step) => step.type === "spawn" || step.type === "give");
+
+/**
+ * How many of its first mob or item the action makes, shown in its picture's
+ * corner like an inventory's stack. 0 for one, or none.
+ */
+export function gameCount({ steps }: GameAction) {
+  const amount = firstCounted(steps)?.amount ?? 0;
+  return amount > 1 ? amount : 0;
+}
+
 /**
  * What the action makes, as the game names it, the default of its name on
  * the games overlay: "Primed TNT", "Zombie ×5, Thunder". Commands have none.
+ * With `counted`, its picture shows the first mob's or item's count, so the
+ * name leaves it out: "Zombie, Thunder".
  */
-export function gameStepsText({ edition, steps }: GameAction) {
+export function gameStepsText({ edition, steps }: GameAction, counted = false) {
   const { mobs, items } = MINECRAFT_NAMES[edition];
+  const first = counted ? firstCounted(steps) : undefined;
   // An id the list doesn't have names nothing, "constructor" included
-  const named = (names: Names, id: string, amount: number) =>
+  const named = (step: GameStep, names: Names, id: string, amount: number) =>
     !Object.hasOwn(names, id)
       ? []
-      : amount > 1
+      : amount > 1 && step !== first
         ? `${names[id]} ×${amount}`
         : names[id];
   return steps
     .flatMap((step) => {
-      if (step.type === "spawn") return named(mobs, step.mob, step.amount);
-      if (step.type === "give") return named(items, step.item, step.amount);
+      if (step.type === "spawn")
+        return named(step, mobs, step.mob, step.amount);
+      if (step.type === "give")
+        return named(step, items, step.item, step.amount);
       if (step.type === "weather") return WEATHER_NAMES[step.weather];
       if (step.type === "time") return TIME_NAMES[step.time];
       return [];
@@ -123,7 +141,9 @@ export function gameOverlayRows(
 ): GameOverlayRow[] {
   return games.actions.flatMap((action) => {
     const { overlay } = action;
-    const name = overlay.name.trim() || gameStepsText(action);
+    // On its picture's corner
+    const count = overlay.image ? gameCount(action) : 0;
+    const name = overlay.name.trim() || gameStepsText(action, count > 0);
     if (!action.enabled || !overlay.show || (!overlay.image && !name)) {
       return [];
     }
@@ -134,6 +154,7 @@ export function gameOverlayRows(
         event: overlay.event.trim() || gameEventText(action, gifts),
         image: overlay.image ? mediaURL(overlay.image.file) : null,
         name,
+        count,
         column: Math.min(overlay.column, games.overlay.columns),
       },
     ];

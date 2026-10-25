@@ -43,6 +43,8 @@ export type GameOverlayRow = {
   image: string | null;
   // Empty for none
   name: string;
+  // How many of what it makes, in the picture's corner; 0 for none
+  count: number;
   // The column whose overlay shows it
   column: number;
 };

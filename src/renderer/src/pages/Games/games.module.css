@@ -426,6 +426,7 @@
 
 /* The action's picture, a square control like the row's fields */
 .slot {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -442,6 +443,18 @@
 .slot:hover {
   background-color: var(--background-secondary-hover);
   color: var(--font-primary);
+}
+
+/* Its count, in the corner as on the overlay */
+.slot_count {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--font-primary);
+  text-shadow: 1px 1px 0 rgb(0 0 0 / 80%);
 }
 
 .slot img {

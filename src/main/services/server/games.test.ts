@@ -20,6 +20,7 @@ const row = (
   event: "Follow",
   image: `/games/minecraft/pictures/${id}.png`,
   name: id.toUpperCase(),
+  count: 0,
   column: 1,
   ...patch,
 });
@@ -170,6 +171,17 @@ describe("games overlay", () => {
       });
       expect(shown()).toHaveLength(1);
     }, 6000);
+
+    it("shows the count on the picture's corner, none for one", async () => {
+      send([row("a", { count: 5 }), row("b")]);
+      await vi.waitFor(() => expect(rowElements()).toHaveLength(2));
+
+      const [five, one] = rowElements();
+      expect(
+        five.querySelector(".games-slot-result .games-count")?.textContent,
+      ).toBe("5");
+      expect(one.querySelector(".games-count")).toBeNull();
+    });
 
     it("puts texts in as text, never markup", async () => {
       send([row("a", { event: "<b>Rose</b>", name: "<img src=x>" })]);

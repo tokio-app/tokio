@@ -512,6 +512,7 @@ describe("settings events", () => {
                 event: "Follow",
                 image: null,
                 name: "Stream's action",
+                count: 0,
                 column: 1,
               },
             ],

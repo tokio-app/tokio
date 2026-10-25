@@ -846,6 +846,7 @@ describe("init events", () => {
                       event: "Rose",
                       image: "/games/minecraft/pictures/my%20tnt.png",
                       name: "Boom",
+                      count: 0,
                       column: 1,
                     },
                   ],

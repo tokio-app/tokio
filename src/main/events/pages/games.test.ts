@@ -98,6 +98,7 @@ const overlayData: GamesOverlayData = {
       event: "Rose",
       image: "/games/minecraft/pictures/c0ffee.png",
       name: "Boom",
+      count: 0,
       column: 1,
     },
   ],

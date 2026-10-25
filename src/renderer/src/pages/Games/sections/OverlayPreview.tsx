@@ -260,6 +260,9 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
                         onLoad={(e) => sharpen(e.currentTarget)}
                         onError={onError(image)}
                       />
+                      {row.count > 0 && (
+                        <span className="games-count">{row.count}</span>
+                      )}
                     </span>
                   )}
                   {row.name && (

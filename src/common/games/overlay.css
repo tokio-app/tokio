@@ -139,6 +139,23 @@
   image-rendering: pixelated;
 }
 
+/* How many the action makes, on its picture's bottom right corner, like an
+   inventory's stack: the bare number, with a hard shadow */
+.games-count {
+  position: absolute;
+  right: -0.15em;
+  bottom: -0.2em;
+  font-size: 0.8em;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--games-text);
+  text-shadow:
+    0.08em 0.08em 0 rgb(0 0 0 / 75%),
+    0 0 0.3em var(--games-halo);
+  pointer-events: none;
+}
+
 /* The result, larger, like a crafting table's */
 .games-slot-result {
   width: 2.5em;

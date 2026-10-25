@@ -97,7 +97,7 @@
       let tick = 0;
       // The turn's picture shows; a slot's only one always does
       const show = (box) =>
-        [...box.children].forEach((img, index, all) =>
+        [...box.querySelectorAll("img")].forEach((img, index, all) =>
           img.classList.toggle("games-away", index !== tick % all.length),
         );
       setInterval(() => {
@@ -116,7 +116,7 @@
           img.addEventListener("error", () => {
             const side = box.parentElement;
             img.remove();
-            if (box.children.length === 0) box.remove();
+            if (!box.querySelector("img")) box.remove();
             else show(box);
             side?.classList.toggle(
               "has-picture",
@@ -150,7 +150,12 @@
         event.classList.toggle("has-picture", row.pictures.length > 0);
         const result = document.createElement("span");
         result.className = "games-side games-result";
-        if (row.image) result.append(slot([row.image], true));
+        if (row.image) {
+          const box = slot([row.image], true);
+          // How many it makes, in the corner like an inventory's stack
+          if (row.count > 0) box.append(text(String(row.count), "games-count"));
+          result.append(box);
+        }
         if (row.name) result.append(text(row.name, "games-text games-name"));
         result.classList.toggle("has-picture", !!row.image);
         const li = document.createElement("li");

@@ -965,6 +965,28 @@ describe("Games overlay", () => {
     );
   });
 
+  it("shows the count on the picture, in the row and the preview", async () => {
+    await load([
+      action("a1", {
+        overlay: { ...overlay, image: TNT },
+        steps: [{ type: "spawn", mob: "zombie", amount: 5, name: "" }],
+      }),
+    ]);
+
+    const button = recipes()[0].getByRole("button", {
+      name: "Change the picture",
+    });
+    expect(button).toHaveTextContent("5");
+    // The picture says how many, so the name doesn't
+    expect(
+      recipes()[0].getByRole("textbox", { name: "Name on the overlay" }),
+    ).toHaveAttribute("placeholder", "Zombie");
+    expect(previewTexts()).toEqual([["Follow", "Zombie"]]);
+    expect(
+      previewRows()[0].querySelector(".games-slot-result .games-count"),
+    ).toHaveTextContent("5");
+  });
+
   it("keeps a small Minecraft picture drawn large sharp in the preview", async () => {
     await load([action("a1", { overlay: { ...overlay, image: TNT } })]);
     const img = previewRows()[0].querySelector("img")!;

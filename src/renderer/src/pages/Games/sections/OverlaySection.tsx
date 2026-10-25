@@ -9,6 +9,7 @@ import {
 import { APP_EVENTS, CustomGift } from "@/common/types";
 import {
   gameEventPictures,
+  gameCount,
   gameEventText,
   gameOverlayRows,
   gameStepsText,
@@ -258,6 +259,8 @@ function RecipeRow({
   const { overlay } = action;
   const pictures = gameEventPictures(action, gifts, emotes);
   const pick = overlay.image ? "Change the picture" : "Pick a picture";
+  // On the picture's corner, as on the overlay
+  const count = overlay.image ? gameCount(action) : 0;
 
   return (
     <li
@@ -316,12 +319,17 @@ function RecipeRow({
         ) : (
           <FiPlus size={18} />
         )}
+        {count > 0 && (
+          <span className={styles.slot_count} aria-hidden>
+            {count}
+          </span>
+        )}
       </button>
       {/* Empty, what the steps make shows, as the event's text does */}
       <Input
         aria-label="Name on the overlay"
         maxLength={40}
-        placeholder={gameStepsText(action) || "No name"}
+        placeholder={gameStepsText(action, count > 0) || "No name"}
         value={overlay.name}
         onChange={(e) => onChange({ name: e.target.value })}
       />

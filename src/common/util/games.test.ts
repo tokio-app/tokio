@@ -8,6 +8,7 @@ import {
 import { EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
 import { CustomGift } from "../types/overlay";
 import {
+  gameCount,
   gameEventPictures,
   gameEventText,
   gameOverlayRows,
@@ -76,6 +77,7 @@ describe("gameOverlayRows", () => {
         event: "Rose",
         image: "/games/minecraft/pictures/abc.png",
         name: "TNT",
+        count: 0,
         column: 1,
       },
       {
@@ -84,6 +86,7 @@ describe("gameOverlayRows", () => {
         event: "Follow",
         image: null,
         name: "Zombie",
+        count: 0,
         column: 1,
       },
     ]);
@@ -167,6 +170,39 @@ describe("gameStepsText", () => {
         { type: "give", item: "web", amount: 1 },
       ),
     ).toBe("");
+  });
+
+  it("leaves out the count its picture shows: the first mob's or item's", () => {
+    const zombies = action((a) => {
+      a.steps = [
+        { type: "weather", weather: "thunder" },
+        { type: "spawn", mob: "zombie", amount: 5, name: "" },
+        { type: "give", item: "diamond", amount: 3 },
+      ];
+    });
+
+    expect(gameCount(zombies)).toBe(5);
+    expect(gameStepsText(zombies, true)).toBe("Thunder, Zombie, Diamond ×3");
+    expect(gameStepsText(zombies)).toBe("Thunder, Zombie ×5, Diamond ×3");
+    expect(gameCount(action())).toBe(0);
+  });
+
+  it("counts a row on its picture, and in its name without one", () => {
+    const zombies = (image: typeof picture | null) =>
+      action((a) => {
+        a.overlay.image = image;
+        a.overlay.name = "";
+        a.steps = [{ type: "spawn", mob: "zombie", amount: 5, name: "" }];
+      });
+
+    expect(rows(zombies(picture))[0]).toMatchObject({
+      name: "Zombie",
+      count: 5,
+    });
+    expect(rows(zombies(null))[0]).toMatchObject({
+      name: "Zombie ×5",
+      count: 0,
+    });
   });
 
   it("names a row on the overlay until the streamer types one", () => {
