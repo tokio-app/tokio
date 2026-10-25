@@ -74,6 +74,16 @@ describe("parseCatalog", () => {
     expect(dropped).toEqual(["timer"]);
   });
 
+  it("drops an overlay named games, whose path the games overlay uses", () => {
+    const { overlays, dropped } = parseCatalog({
+      schema: 1,
+      overlays: [entry({ id: "games" }), entry()],
+    });
+
+    expect(overlays.map((o) => o.id)).toEqual(["gift-jar"]);
+    expect(dropped).toEqual(["games"]);
+  });
+
   it("drops previews from anywhere else", () => {
     const { overlays } = parseCatalog({
       schema: 1,

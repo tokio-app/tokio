@@ -16,6 +16,19 @@ export const getAlertOverlayURL = (id: string) =>
 // connects with this id, and browser sources point at it.
 export const TIMER_PATH = "timer";
 
+// NOTE: DO NOT CHANGE. Each game's overlay is served under /games/<game>/
+// and connects with this id.
+export const GAMES_PATH = "games";
+
+// NOTE: DO NOT CHANGE. Browser sources point at Minecraft's overlay: every
+// column at /games/minecraft/, one at /games/minecraft/<column>/. Its
+// pictures are under /games/minecraft/pictures/.
+export const MINECRAFT_OVERLAY_PATH = `${GAMES_PATH}/minecraft`;
+export const MINECRAFT_PICTURES_PATH = `${MINECRAFT_OVERLAY_PATH}/pictures`;
+
+export const getMinecraftOverlayURL = (column?: number) =>
+  `http://${APP_HOSTNAME}:${SERVER_PORT}/${MINECRAFT_OVERLAY_PATH}/${column ? `${column}/` : ""}`;
+
 // NOTE: DO NOT CHANGE. Minecraft connects to Tokio on this port: players
 // type /connect <this PC's address>:37892 in the game's chat, and the docs
 // show it.

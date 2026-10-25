@@ -2,6 +2,7 @@ import {
   GameAction,
   GamesSettings,
   GameStep,
+  MediaFile,
   MinecraftEdition,
   Profile,
 } from "@/common/schemas";
@@ -16,10 +17,19 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { formatAlertMessage, generateTikTokEventSample } from "@/common/util";
+import {
+  formatAlertMessage,
+  formatError,
+  generateTikTokEventSample,
+  IMAGE_EXTENSIONS,
+} from "@/common/util";
+import { importFile } from "@/helper/library";
 import { GiftStreaks } from "@/helper/streaks";
 import { giftOf, matchesTrigger } from "@/helper/triggers";
 import Logger from "@/logger";
+import { unlink } from "node:fs/promises";
+import { basename, join } from "node:path";
+import { MEDIA_MAX_BYTES } from "../alerts";
 import { Service } from "../shared";
 import { commandValue, gameCommands } from "./commands";
 import { MinecraftConnection } from "./minecraft";
@@ -76,10 +86,12 @@ export class GamesService extends Service {
   // Each action's runs still to send, by action id, see _pump
   private _backlogs = new Map<string, Batch[]>();
   // The latest profile's actions, which can stop a backlog
-  private _games: Profile["games"] = { actions: [] };
+  private _games: Pick<Profile["games"], "actions"> = { actions: [] };
   private _last: GameStatus;
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
+  private _onRun?: (action: GameAction) => void;
+  private _picturesFolder = "";
 
   // Opens nothing until configure turns Minecraft on
   constructor(
@@ -112,6 +124,10 @@ export class GamesService extends Service {
     this._logFile = logFile;
   }
 
+  public setPicturesFolder(folder: string): void {
+    this._picturesFolder = folder;
+  }
+
   /** Turns the connections on or off. False when one can't listen. */
   public configure(settings: GamesSettings): Promise<boolean> {
     return this._minecraft.setEnabled(settings.minecraft.enabled);
@@ -131,6 +147,35 @@ export class GamesService extends Service {
     this._onError = listener;
   }
 
+  // One listener, init.ts, which lights the action's row on the overlay
+  public onRun(listener: (action: GameAction) => void) {
+    this._onRun = listener;
+  }
+
+  /** Copies a local image into the Minecraft pictures folder. */
+  public async importPicture(srcPath: string): Promise<GamesResult<MediaFile>> {
+    try {
+      const { entry } = await importFile(
+        srcPath,
+        this._picturesFolder,
+        IMAGE_EXTENSIONS,
+        MEDIA_MAX_BYTES,
+      );
+      return { success: true, data: entry };
+    } catch (error) {
+      return this._fail("Unable to import picture", error);
+    }
+  }
+
+  public async deletePicture(file: string): Promise<GamesResult<void>> {
+    try {
+      await unlink(join(this._picturesFolder, basename(file)));
+      return { success: true };
+    } catch (error) {
+      return this._fail("Unable to delete picture", error);
+    }
+  }
+
   /**
    * Runs every enabled action that matches the live event, after the runs
    * each action already has waiting. Resolves once the game answered this
@@ -139,7 +184,7 @@ export class GamesService extends Service {
   public async handle<K extends AppEvents>(
     type: K,
     payload: TokioEventMap[K],
-    games: Profile["games"],
+    games: Pick<Profile["games"], "actions">,
   ) {
     this._games = games;
     // Nothing could reach the game: off, or the port is taken
@@ -295,6 +340,7 @@ export class GamesService extends Service {
           this._onError?.(action, { offline: true, message: unreachable });
           break;
         }
+        this._onRun?.(action);
         const failed = (await this._send(batch.commands)).find((r) => !r.ok);
         if (failed) {
           // A game that left or was replaced midway fails the commands it
@@ -311,5 +357,11 @@ export class GamesService extends Service {
     } finally {
       this._backlogs.delete(id);
     }
+  }
+
+  private _fail(action: string, error: unknown) {
+    const message = formatError(error);
+    Logger.error(`<Games> ${action} -- ${message}`, this._logFile, error);
+    return { success: false, error: message };
   }
 }

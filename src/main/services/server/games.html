@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tokio games</title>
+    <style>
+      /* Inlined by ServerService, so every streaming app gets it */
+      @font-face {
+        font-family: "Archivo Variable";
+        font-style: normal;
+        font-display: block;
+        font-weight: 100 900;
+        font-stretch: 62% 125%;
+        src: url(__ARCHIVO__) format("woff2-variations");
+      }
+
+      :root {
+        /* As large as the browser source's width allows, so a strip of one
+           row at a time fills it. --fit shrinks the rows until they all fit
+           (fit below). */
+        --games-size: min(8vw, 30vh);
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* As wide as its rows, measured to fit the source. Shrunk by the
+         body instead, it would cut every text short. */
+      .games {
+        flex-shrink: 0;
+        width: max-content;
+      }
+    </style>
+    <style>
+      /* __STYLES__ */
+    </style>
+  </head>
+  <body>
+    <main class="games" id="games">
+      <ol class="games-rows" id="rows"></ol>
+    </main>
+    <template id="arrow">
+      <svg class="games-arrow" viewBox="0 0 11 9" aria-hidden="true">
+        <path d="M6 0H7V1H8V2H9V3H10V4H11V5H10V6H9V7H8V8H7V9H6V6H0V3H6Z" />
+      </svg>
+    </template>
+    <script>
+      // Minecraft's overlay, at /games/minecraft/ with every column, or at
+      // /games/minecraft/<column>/ with one. Main sends the shown actions'
+      // rows and their look on connect and on every change, and each
+      // action's id as it runs (registerGames in init.ts). The Games page's
+      // preview (OverlayPreview) draws the same markup, so keep the two in
+      // step.
+      const games = document.getElementById("games");
+      // 0 for every column
+      const column = Number(location.pathname.split("/")[3]) || 0;
+      const list = document.getElementById("rows");
+      const arrow = document.getElementById("arrow");
+      // How long a row stays lit after its last run
+      const LIT_MS = 1500;
+      // How long one at a time shows each row
+      const TURN_MS = 3000;
+      let rows = [];
+      let carousel = false;
+      // The row one at a time shows, and its next turn
+      let turn = 0;
+      let turning = null;
+      // The lit rows' ids, each with the timeout that puts it out
+      const lit = new Map();
+
+      // A Minecraft picture drawn at twice its size or more, like a 16×16
+      // icon, keeps its pixels sharp. Smaller scales stay smooth: Chromium's
+      // pixelated is nearest-neighbor shrinking too, which makes renders
+      // jagged.
+      const sharpen = (img) =>
+        img.classList.toggle(
+          "games-pixelated",
+          img.naturalWidth > 0 && img.naturalWidth * 2 <= img.clientWidth,
+        );
+
+      // How long each of an event's gifts shows in their one slot
+      const ROTATE_MS = 2000;
+      // The turns so far, so every slot shows its pictures in step
+      let tick = 0;
+      // The turn's picture shows; a slot's only one always does
+      const show = (box) =>
+        [...box.querySelectorAll("img")].forEach((img, index, all) =>
+          img.classList.toggle("games-away", index !== tick % all.length),
+        );
+      // From the first picture, then the next every ROTATE_MS
+      let rotating = null;
+      const rotate = () => {
+        clearInterval(rotating);
+        tick = 0;
+        list.querySelectorAll(".games-slot").forEach(show);
+        rotating = setInterval(() => {
+          tick++;
+          list.querySelectorAll(".games-slot").forEach(show);
+        }, ROTATE_MS);
+      };
+      rotate();
+
+      // The pictures of one side, taking turns in one slot. One that doesn't
+      // load goes, and with none left the side shows its text again.
+      const slot = (sources, result) => {
+        const box = document.createElement("span");
+        box.className = result ? "games-slot games-slot-result" : "games-slot";
+        for (const src of sources) {
+          const img = document.createElement("img");
+          img.alt = "";
+          img.addEventListener("error", () => {
+            const side = box.parentElement;
+            const li = side?.parentElement;
+            img.remove();
+            if (!box.querySelector("img")) box.remove();
+            else show(box);
+            side?.classList.toggle(
+              "has-picture",
+              !!side.querySelector(".games-slot"),
+            );
+            li?.classList.toggle(
+              "has-result-picture",
+              !!li.querySelector(".games-slot-result"),
+            );
+            fit();
+          });
+          if (result) img.addEventListener("load", () => sharpen(img));
+          img.src = src;
+          box.append(img);
+        }
+        show(box);
+        return box;
+      };
+
+      // Text only, so a name can't add markup
+      const text = (value, className) => {
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = value;
+        return span;
+      };
+
+      // A side's pictures, with how many in the corner like an inventory's
+      // stack
+      const counted = (sources, result, count) => {
+        const box = slot(sources, result);
+        if (count > 0) box.append(text(String(count), "games-count"));
+        return box;
+      };
+
+      // The event's pictures, or its text without any (a chat's message
+      // with them too), by the arrow, then the action's picture and name
+      const rowElement = (row) => {
+        const event = document.createElement("span");
+        event.className = "games-side games-event";
+        if (row.event) event.append(text(row.event, "games-text"));
+        if (row.pictures.length > 0) {
+          event.append(counted(row.pictures, false, row.eventCount));
+        }
+        event.classList.toggle(
+          "has-picture",
+          row.pictures.length > 0 && !row.withText,
+        );
+        const result = document.createElement("span");
+        result.className = "games-side games-result";
+        if (row.image) result.append(counted([row.image], true, row.count));
+        if (row.name) result.append(text(row.name, "games-text games-name"));
+        result.classList.toggle("has-picture", !!row.image);
+        const li = document.createElement("li");
+        li.className = "games-row";
+        // The sticker format puts the event's picture on its corner
+        li.classList.toggle("has-result-picture", !!row.image);
+        li.append(
+          event,
+          arrow.content.firstElementChild.cloneNode(true),
+          result,
+        );
+        return li;
+      };
+
+      // Lit rows, and the one one at a time shows
+      const mark = () => {
+        [...list.children].forEach((li, index) => {
+          li.classList.toggle("games-lit", lit.has(rows[index].id));
+          li.classList.toggle("games-current", index === turn);
+        });
+      };
+
+      // A lit row holds its turn until it goes out
+      // A row's turn lasts until each of its gifts has shown, from the
+      // first, and at least TURN_MS
+      const turnMs = () => {
+        const gifts =
+          list.children[turn]?.querySelectorAll(".games-event img").length ?? 0;
+        return Math.max(TURN_MS, gifts * ROTATE_MS);
+      };
+      const next = () => {
+        const held = lit.has(rows[turn]?.id);
+        if (carousel && rows.length > 1 && !held) {
+          turn = (turn + 1) % rows.length;
+          mark();
+          rotate();
+        }
+        turning = setTimeout(next, turnMs());
+      };
+      const turnAgain = () => {
+        clearTimeout(turning);
+        if (carousel) rotate();
+        turning = setTimeout(next, turnMs());
+      };
+      turnAgain();
+
+      // Runs in a burst keep the row lit, 1.5 s after the last. One at a
+      // time turns to it.
+      const light = (id) => {
+        clearTimeout(lit.get(id));
+        lit.set(
+          id,
+          setTimeout(() => {
+            lit.delete(id);
+            mark();
+          }, LIT_MS),
+        );
+        const index = rows.findIndex((row) => row.id === id);
+        if (carousel && index !== -1 && index !== turn) {
+          turn = index;
+          turnAgain();
+        }
+        mark();
+      };
+
+      // One CSS property, so a font's name can't inject anything
+      const setFont = (font) => {
+        const name = font.trim();
+        games.style.fontFamily = name
+          ? `${JSON.stringify(name)}, "Archivo Variable", sans-serif`
+          : "";
+      };
+
+      const update = ({ look, rows: all }) => {
+        const changed = column
+          ? all.filter((row) => row.column === column)
+          : all;
+        games.style.setProperty("--games-text", look.text_color);
+        games.style.setProperty("--games-accent", look.accent_color);
+        games.style.setProperty("--games-arrow", look.arrow_color);
+        setFont(look.font);
+        // One at a time just turned on or off
+        const switched = carousel !== (look.layout === "carousel");
+        carousel = look.layout === "carousel";
+        games.classList.toggle("games-carousel", carousel);
+        games.classList.toggle("games-pictures-only", look.pictures_only);
+        games.classList.toggle("games-sticker", look.format === "sticker");
+        // Only when they changed, so a lit row keeps its flash going
+        if (JSON.stringify(changed) !== JSON.stringify(rows)) {
+          // One at a time stays on the row it shows, if it's still there
+          const shown = rows[turn]?.id;
+          rows = changed;
+          turn = Math.max(
+            0,
+            rows.findIndex((row) => row.id === shown),
+          );
+          list.replaceChildren(...rows.map(rowElement));
+          mark();
+          turnAgain();
+        } else if (switched) {
+          turnAgain();
+        }
+        fit();
+      };
+
+      // Wide fonts or many rows shrink everything until it all fits
+      const fit = () => {
+        const root = document.documentElement.style;
+        root.setProperty("--fit", "1");
+        const width = games.offsetWidth;
+        const height = games.offsetHeight;
+        if (width && height) {
+          const scale = Math.min(
+            1,
+            (innerWidth * 0.94) / width,
+            (innerHeight * 0.94) / height,
+          );
+          root.setProperty("--fit", String(scale));
+        }
+        list.querySelectorAll(".games-slot-result img").forEach(sharpen);
+      };
+      addEventListener("resize", fit);
+      // The fonts' widths are known once they've loaded
+      document.fonts?.ready.then(fit);
+
+      const connect = () => {
+        // The id is GAMES_PATH
+        const socket = new WebSocket(`ws://${location.host}/?id=games`);
+        // Every overlay gets the LIVE's events too, this one ignores them.
+        socket.onmessage = (event) => {
+          const { type, data } = JSON.parse(event.data);
+          if (type === "tokio:games") update(data);
+          else if (type === "tokio:games:run") light(data.id);
+        };
+        socket.onclose = () => setTimeout(connect, 2000);
+      };
+      connect();
+    </script>
+  </body>
+</html>

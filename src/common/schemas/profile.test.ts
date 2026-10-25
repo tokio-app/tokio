@@ -34,25 +34,80 @@ describe("ProfileSchema", () => {
     const saved: Partial<Profile> = structuredClone(defaultProfile);
     delete saved.games;
 
-    expect(ProfileSchema.parse(saved).games).toEqual({ actions: [] });
+    expect(ProfileSchema.parse(saved).games).toEqual({
+      actions: [],
+      overlay: defaultProfile.games.overlay,
+    });
   });
 
-  it("makes a game action saved before Java a Bedrock one", () => {
-    const saved = {
-      id: "action-1",
-      enabled: true,
-      trigger: {
-        type: TOKIO_EVENTS.FOLLOW,
-        gifts: [],
-        every_gift: false,
-        emotes: [],
-        keyword: "",
-        user: "",
-      },
-      steps: [],
-    };
+  it("gives games saved before the overlay its default look", () => {
+    const saved = structuredClone(defaultProfile);
+    const games: Partial<Profile["games"]> = saved.games;
+    delete games.overlay;
 
-    expect(GameActionSchema.parse(saved).edition).toBe("bedrock");
+    expect(ProfileSchema.parse(saved).games.overlay).toEqual({
+      layout: "list",
+      format: "arrow",
+      columns: 1,
+      pictures_only: false,
+      font: "",
+      text_color: "#f1f5f9",
+      accent_color: "#f43f5e",
+      arrow_color: "#f43f5e",
+    });
+  });
+
+  it("gives a look saved before the formats the arrow, in Tokio's rose", () => {
+    const saved = structuredClone(defaultProfile);
+    const look: Partial<Profile["games"]["overlay"]> = saved.games.overlay;
+    delete look.format;
+    delete look.arrow_color;
+
+    expect(ProfileSchema.parse(saved).games.overlay).toMatchObject({
+      format: "arrow",
+      arrow_color: "#f43f5e",
+    });
+  });
+
+  // As saved before Java and the overlay
+  const oldAction = {
+    id: "action-1",
+    enabled: true,
+    trigger: {
+      type: TOKIO_EVENTS.FOLLOW,
+      gifts: [],
+      every_gift: false,
+      emotes: [],
+      keyword: "",
+      user: "",
+    },
+    steps: [],
+  };
+
+  it("makes a game action saved before Java a Bedrock one", () => {
+    expect(GameActionSchema.parse(oldAction).edition).toBe("bedrock");
+  });
+
+  it("shows a game action saved before the overlay on it, without a picture", () => {
+    expect(GameActionSchema.parse(oldAction).overlay).toEqual({
+      show: true,
+      image: null,
+      event: "",
+      name: "",
+      column: 1,
+    });
+  });
+
+  it("refuses more columns than the games overlay splits into", () => {
+    const action = { ...oldAction, overlay: { column: 5 } };
+
+    expect(GameActionSchema.safeParse(action).success).toBe(false);
+  });
+
+  it("refuses an overlay name longer than 40 characters", () => {
+    const action = { ...oldAction, overlay: { name: "x".repeat(41) } };
+
+    expect(GameActionSchema.safeParse(action).success).toBe(false);
   });
 
   it("fills a spawn step's amount and name", () => {
@@ -71,6 +126,16 @@ describe("ProfileSchema", () => {
     const saved = structuredClone(defaultProfile);
     saved.timer.settings.look.clock_color = "red; background: url(x)";
 
+    expect(ProfileSchema.safeParse(saved).success).toBe(false);
+  });
+
+  it("refuses a games overlay color that isn't a hex color", () => {
+    const saved = structuredClone(defaultProfile);
+    saved.games.overlay.accent_color = "red; background: url(x)";
+
+    expect(ProfileSchema.safeParse(saved).success).toBe(false);
+    saved.games.overlay.accent_color = "#f43f5e";
+    saved.games.overlay.arrow_color = "red; background: url(x)";
     expect(ProfileSchema.safeParse(saved).success).toBe(false);
   });
 });

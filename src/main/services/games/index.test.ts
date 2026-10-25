@@ -13,7 +13,10 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import Logger from "@/logger";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GamesService, RUN_GAP_MS } from "./index";
 
 // Stands in for the game's WebSocket: records the commands, answers each
@@ -75,6 +78,7 @@ const action = (overrides: Partial<GameAction> = {}): GameAction => ({
   trigger: trigger(TOKIO_EVENTS.FOLLOW),
   likes_every: 100,
   steps: [say("say Thanks {username}")],
+  overlay: { show: true, image: null, event: "", name: "", column: 1 },
   ...overrides,
 });
 
@@ -595,6 +599,126 @@ describe("GamesService", () => {
       });
       expect(res.success).toBe(true);
       expect(minecraft.sent).toEqual(["summon minecraft:pig ~ ~ ~"]);
+    });
+
+    it("lights no row on the overlay", async () => {
+      const games = service();
+      const onRun = vi.fn();
+      games.onRun(onRun);
+      await games.test({
+        edition: "bedrock",
+        trigger: TOKIO_EVENTS.FOLLOW,
+        steps: [say("say hi")],
+      });
+      expect(onRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("onRun", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("tells each run as it goes out, every gift's too", async () => {
+      vi.useFakeTimers();
+      const minecraft = fakeMinecraft();
+      const games = service(minecraft);
+      const sentBefore: number[] = [];
+      const onRun = vi.fn((_action: GameAction) => {
+        sentBefore.push(minecraft.sent.length);
+      });
+      games.onRun(onRun);
+      const every = action({
+        trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
+        steps: [say("a"), say("b")],
+      });
+
+      const run = games.handle(TOKIO_EVENTS.GIFT, gift(3), {
+        actions: [every],
+      });
+      await vi.runAllTimersAsync();
+      await run;
+
+      expect(onRun.mock.calls).toEqual([[every], [every], [every]]);
+      // Right before each run's commands
+      expect(sentBefore).toEqual([0, 2, 4]);
+    });
+
+    it("tells no run that's dropped while the game is offline", async () => {
+      const games = service(fakeMinecraft("waiting"));
+      const onRun = vi.fn();
+      games.onRun(onRun);
+      await games.handle(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+        { actions: [action()] },
+      );
+      expect(onRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("pictures", () => {
+    let dir: string;
+
+    beforeEach(async () => {
+      dir = await mkdtemp(join(tmpdir(), "tokio-test-"));
+    });
+
+    afterEach(async () => {
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    const picturesIn = async (games: GamesService) => {
+      const folder = join(dir, "games", "minecraft");
+      await mkdir(folder, { recursive: true });
+      games.setPicturesFolder(folder);
+      return folder;
+    };
+
+    it("imports an image into the pictures folder, named by its content", async () => {
+      const games = service();
+      const folder = await picturesIn(games);
+      await writeFile(join(dir, "TNT.webp"), "tnt");
+
+      const res = await games.importPicture(join(dir, "TNT.webp"));
+
+      expect(res).toEqual({
+        success: true,
+        data: {
+          name: "TNT",
+          file: expect.stringMatching(/^[0-9a-f]{32}\.webp$/),
+        },
+      });
+      expect(await readdir(folder)).toEqual([res.data?.file]);
+    });
+
+    it("refuses anything but an image, logging why", async () => {
+      const error = vi.spyOn(Logger, "error").mockImplementation(() => {});
+      const games = service();
+      games.setLogFile("games.log");
+      const folder = await picturesIn(games);
+      await writeFile(join(dir, "clip.mp4"), "clip");
+
+      const res = await games.importPicture(join(dir, "clip.mp4"));
+
+      expect(res).toEqual({ success: false, error: "Unsupported format: mp4" });
+      expect(error).toHaveBeenCalledWith(
+        "<Games> Unable to import picture -- Unsupported format: mp4",
+        "games.log",
+        expect.any(Error),
+      );
+      expect(await readdir(folder)).toEqual([]);
+    });
+
+    it("deletes a picture only inside its folder", async () => {
+      vi.spyOn(Logger, "error").mockImplementation(() => {});
+      const games = service();
+      const folder = await picturesIn(games);
+      await writeFile(join(folder, "tnt.png"), "tnt");
+      await writeFile(join(dir, "games", "keep.png"), "keep");
+
+      expect(await games.deletePicture("tnt.png")).toEqual({ success: true });
+      expect((await games.deletePicture("../keep.png")).success).toBe(false);
+      expect(await readdir(folder)).toEqual([]);
+      expect(await readdir(join(dir, "games"))).toContain("keep.png");
     });
   });
 });

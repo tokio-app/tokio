@@ -19,14 +19,14 @@ import {
   TaskQueue,
 } from "@/common/util";
 import { writeFileAtomic } from "@/helper/fs";
+import { hash, importFile, isSaved } from "@/helper/library";
 import { GiftStreaks } from "@/helper/streaks";
 import { giftOf, matchesTrigger } from "@/helper/triggers";
 import Logger from "@/logger";
 import type { ServerService } from "@/services/server";
 import type { TTSService } from "@/services/tts";
-import { createHash } from "node:crypto";
-import { access, readFile, stat, unlink } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
+import { readFile, unlink } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { Service } from "../shared";
 
 export interface AlertsResult<T> {
@@ -64,9 +64,6 @@ const clamp = (value: number, max: number) => Math.min(Math.max(value, 0), max);
 // before that are read from disk.
 export const CACHE_MAX_BYTES = 32 * 1024 * 1024;
 export const CACHE_MAX_FILE_BYTES = 8 * 1024 * 1024;
-
-const hash = (data: string | Uint8Array) =>
-  createHash("sha256").update(data).digest("hex").slice(0, 32);
 
 export class AlertsService extends Service {
   private readonly BASE_URL = "https://www.myinstants.com";
@@ -173,7 +170,7 @@ export class AlertsService extends Service {
     name: string,
   ): Promise<AlertsResult<NonNullable<Alert["sound"]>>> {
     const file = this._fileForUrl(url);
-    if (await this._isSaved(file)) {
+    if (await isSaved(join(this._soundsFolder, file))) {
       return { success: true, data: { name, file } };
     }
 
@@ -195,7 +192,7 @@ export class AlertsService extends Service {
     srcPath: string,
   ): Promise<AlertsResult<NonNullable<Alert["sound"]>>> {
     try {
-      const { data, entry } = await this._import(
+      const { data, entry } = await importFile(
         srcPath,
         this._soundsFolder,
         AUDIO_EXTENSIONS,
@@ -213,7 +210,7 @@ export class AlertsService extends Service {
    */
   public async importMedia(srcPath: string): Promise<AlertsResult<MediaFile>> {
     try {
-      const { entry } = await this._import(
+      const { entry } = await importFile(
         srcPath,
         this._mediaFolder,
         MEDIA_EXTENSIONS,
@@ -584,39 +581,6 @@ export class AlertsService extends Service {
   private _checkSize(bytes: number) {
     if (bytes > CACHE_MAX_FILE_BYTES) {
       throw new Error(`The sound is over ${CACHE_MAX_FILE_BYTES} bytes.`);
-    }
-  }
-
-  // Copies a file into the folder, named by its content, so importing the
-  // same file twice reuses it.
-  private async _import(
-    srcPath: string,
-    folder: string,
-    extensions: string[],
-    maxBytes: number,
-  ) {
-    const ext = extname(srcPath).slice(1).toLowerCase();
-    if (!extensions.includes(ext)) {
-      throw new Error(`Unsupported format: ${ext}`);
-    }
-    if ((await stat(srcPath)).size > maxBytes) {
-      throw new Error(`The file is over ${maxBytes} bytes.`);
-    }
-    const data = new Uint8Array(await readFile(srcPath));
-    const file = `${hash(data)}.${ext}`;
-    // Whole or not at all, like _save
-    if (!(await this._isSaved(file, folder))) {
-      await writeFileAtomic(join(folder, file), data);
-    }
-    return { data, entry: { name: basename(srcPath, extname(srcPath)), file } };
-  }
-
-  private async _isSaved(file: string, folder = this._soundsFolder) {
-    try {
-      await access(join(folder, file));
-      return true;
-    } catch {
-      return false;
     }
   }
 

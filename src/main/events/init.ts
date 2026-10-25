@@ -16,6 +16,8 @@ import {
 import {
   ALERTS_PATH,
   formatError,
+  GAMES_PATH,
+  MINECRAFT_PICTURES_PATH,
   MINECRAFT_PORT,
   SERVER_PORT,
   TIMER_PATH,
@@ -24,6 +26,7 @@ import {
 import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
+import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
@@ -112,6 +115,7 @@ const registerConnectorEvents = ({
   overlayService: overlays,
   liveService: live,
   pathManagerService: paths,
+  serverService: server,
   notifier,
 }: AppHandlerVariables) => {
   const dispatchAlert = async <K extends AppEvents>(
@@ -395,6 +399,13 @@ const registerConnectorEvents = ({
       win.webContents.send(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, {
         data: res.data,
       });
+      // The games overlay's rows with that gift get its picture and name
+      await sendGamesOverlay({
+        storeManagerService: store,
+        overlayService: overlays,
+        serverService: server,
+        pathManagerService: paths,
+      });
     }
   };
   conn.on(TOKIO_EVENTS.GIFT, (d) => {
@@ -414,14 +425,16 @@ const registerConnectorEvents = ({
 };
 
 // The Games page follows the connections, and their failures become notices.
-const registerGames = ({
-  connectorService: conn,
-  gamesService: games,
-  storeManagerService: store,
-  pathManagerService: paths,
-  win,
-  notifier,
-}: AppHandlerVariables) => {
+// The games overlay lights an action's row on each run.
+const registerGames = (handler: AppHandlerVariables) => {
+  const {
+    connectorService: conn,
+    gamesService: games,
+    storeManagerService: store,
+    pathManagerService: paths,
+    win,
+    notifier,
+  } = handler;
   games.onStatus((status) => {
     if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.GAMES, {
@@ -466,6 +479,11 @@ const registerGames = ({
   });
   // Gift streaks' ends may be missed
   conn.on(TOKIO_EVENTS.DISCONNECTED, () => games.clear());
+
+  games.onRun((action) => sendGamesRun(handler, action.id));
+  handler.serverService.onConnect((id) => {
+    if (id === GAMES_PATH) void sendGamesOverlay(handler);
+  });
 };
 
 // The countdown timer takes time from live events whatever features are on.
@@ -602,6 +620,9 @@ const startApp = async (handler: AppHandlerVariables) => {
       alertsService.setServer(serverService);
       // Not an overlay: the alerts' images and videos, for their overlay pages
       serverService.mount(`${ALERTS_PATH}/media`, folders.mediaFolder);
+      gamesService.setPicturesFolder(folders.minecraftFolder);
+      // The games overlay's pictures
+      serverService.mount(MINECRAFT_PICTURES_PATH, folders.minecraftFolder);
     },
   );
   await storeManagerService.initialize(
@@ -653,7 +674,11 @@ const startApp = async (handler: AppHandlerVariables) => {
     await overlayService.load(cachedGifts);
     void fetchOverlayGifts(connectorService)
       .then(async (gifts) => {
-        if (gifts.length > 0) await overlayService.refreshGifts(gifts);
+        if (gifts.length === 0) return;
+        await overlayService.refreshGifts(gifts);
+        // Gift pictures may have changed. Before this, the games overlay
+        // gets the saved ones when it connects.
+        await sendGamesOverlay(handler);
       })
       .catch((error) => {
         notifier.report({

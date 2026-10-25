@@ -22,6 +22,7 @@ export const defaultStoreData: StoreSchema = {
     testOverlays: [],
     sounds: [],
     media: [],
+    minecraftPictures: [],
     activeFeatures: {
       tts: false,
       music: false,

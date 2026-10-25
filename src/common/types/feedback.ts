@@ -118,6 +118,11 @@ export enum FEEDBACK_CODES {
   GAME_LISTEN_FAILED = "game_listen_failed",
   GAME_TEST_FAILED = "game_test_failed",
   GAME_ACTION_FAILED = "game_action_failed",
+  GAME_PICTURES_ADDED = "game_pictures_added",
+  GAME_PICTURE_REMOVED = "game_picture_removed",
+  GAME_PICTURES_LOAD_FAILED = "game_pictures_load_failed",
+  GAME_PICTURE_IMPORT_FAILED = "game_picture_import_failed",
+  GAME_PICTURE_REMOVE_FAILED = "game_picture_remove_failed",
 }
 
 export type FeedbackLevel = "success" | "info" | "warning" | "error";

@@ -5,14 +5,21 @@ import {
   GameStatus,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { MINECRAFT_MOD_DOCS_URL } from "@/common/util";
-import { failure, gift, profileReply } from "@test/fixtures";
+import { defaultProfile, MINECRAFT_MOD_DOCS_URL } from "@/common/util";
+import {
+  failure,
+  gift,
+  mediaFile,
+  profileReply,
+  settingsReply,
+} from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { inList, section } from "@test/queries";
 import { renderWithProviders } from "@test/render";
 import { act, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Games } from ".";
+import styles from "./games.module.css";
 import { createAction } from "./helper";
 
 const action = (id: string, patch: Partial<GameAction> = {}): GameAction => ({
@@ -192,13 +199,17 @@ describe("Games", () => {
     expect(
       screen.queryByRole("heading", { name: "Java Edition" }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByTitle(/^Copy the/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTitle(/^Copy the .* command$/),
+    ).not.toBeInTheDocument();
   });
 
   it("falls back to localhost when this PC has no network address", async () => {
     setup();
     await status({ state: "waiting" });
-    expect(screen.queryByTitle(/^Copy the/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTitle(/^Copy the .* command$/),
+    ).not.toBeInTheDocument();
 
     await send(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, { addresses: [] });
 
@@ -218,7 +229,7 @@ describe("Games", () => {
       addresses: ["192.168.1.20", "10.0.0.5"],
     });
 
-    for (const copy of screen.getAllByTitle(/^Copy the/))
+    for (const copy of screen.getAllByTitle(/^Copy the .* command$/))
       await user.click(copy);
 
     expect(writeText.mock.calls).toEqual([
@@ -227,6 +238,32 @@ describe("Games", () => {
       ["/tokio connect 192.168.1.20:37892"],
       ["/tokio connect 10.0.0.5:37892"],
     ]);
+  });
+
+  it("runs on every event but the joins, envelopes, Super Fan Boxes and song changes", async () => {
+    const { user } = await load([action("a1")]);
+
+    await user.click(panels()[0].getByText("Follow"));
+
+    for (const left of [
+      "Super Fan Join",
+      "Member Join",
+      "Envelope",
+      "Super Fan Box",
+      "Music Change",
+    ]) {
+      expect(inList(panelElements()[0], left)).toBeNull();
+    }
+    for (const kept of [
+      "Chat",
+      "Emote",
+      "Share",
+      "Gift",
+      "Like",
+      "Super Fan",
+    ]) {
+      expect(inList(panelElements()[0], kept)).not.toBeNull();
+    }
   });
 
   it("says when there are no actions", async () => {
@@ -257,8 +294,16 @@ describe("Games", () => {
             trigger: expect.objectContaining({ type: TOKIO_EVENTS.FOLLOW }),
             likes_every: 100,
             steps: [{ type: "spawn", mob: "zombie", amount: 1, name: "" }],
+            overlay: {
+              show: true,
+              image: null,
+              event: "",
+              name: "",
+              column: 1,
+            },
           },
         ],
+        overlay: defaultProfile.games.overlay,
       },
     ]);
 
@@ -267,7 +312,10 @@ describe("Games", () => {
     );
     await wait(300);
     expect(panels()).toHaveLength(0);
-    expect(saves().at(-1)).toEqual({ actions: [] });
+    expect(saves().at(-1)).toEqual({
+      actions: [],
+      overlay: defaultProfile.games.overlay,
+    });
   });
 
   it("adds, changes and removes steps", async () => {
@@ -538,5 +586,578 @@ describe("Games", () => {
         .at(-1)!
         .actions.map((a) => a.edition),
     ).toEqual(["java", "bedrock"]);
+  });
+});
+
+describe("Games overlay", () => {
+  const TNT = mediaFile("TNT");
+  const CREEPER = mediaFile("Creeper");
+  const { trigger, overlay } = createAction("bedrock");
+  const giftAction = (id: string, patch: Partial<GameAction> = {}) =>
+    action(id, {
+      trigger: { ...trigger, type: TOKIO_EVENTS.GIFT, gifts: [5655] },
+      ...patch,
+    });
+  const likeAction = (id: string, patch: Partial<GameAction> = {}) =>
+    action(id, { trigger: { ...trigger, type: TOKIO_EVENTS.LIKE }, ...patch });
+  const chatAction = (id: string, patch: Partial<GameAction> = {}) =>
+    action(id, {
+      trigger: { ...trigger, type: TOKIO_EVENTS.CHAT, keyword: "tnt" },
+      ...patch,
+    });
+  const rose = () =>
+    send(APP_EVENTS_RESPONSE.GET_GIFTS, { data: [gift(5655, "Rose")] });
+
+  // The builder's rows, one per action
+  const recipeElements = () =>
+    within(
+      screen.getByRole("list", { name: "Actions on the overlay" }),
+    ).getAllByRole("listitem");
+  const recipes = () => recipeElements().map((li) => within(li));
+  const savedOverlays = () =>
+    saves()
+      .at(-1)!
+      .actions.map((a) => a.overlay);
+
+  // The preview's rows
+  const preview = () => screen.queryByRole("list", { name: "Overlay preview" });
+  const previewRows = () => [...preview()!.querySelectorAll(".games-row")];
+  const previewTexts = () =>
+    previewRows().map((li) =>
+      [...li.querySelectorAll(".games-text")].map((t) => t.textContent),
+    );
+  const litRows = () =>
+    previewRows()
+      .filter((li) => li.classList.contains("games-lit"))
+      .map((li) => li.querySelector(".games-name")?.textContent);
+  const testButton = () =>
+    screen.getByRole("button", { name: "Light up the next row" });
+
+  it("says when there are no actions, and has nothing to test", async () => {
+    await load([]);
+
+    expect(
+      section("Overlay").getByText("Add an action to put it on the overlay."),
+    ).toBeInTheDocument();
+    expect(
+      section("Overlay").getByText(
+        "Pick a picture or name an action to show it here.",
+      ),
+    ).toBeInTheDocument();
+    expect(testButton()).toBeDisabled();
+  });
+
+  it("gives the overlay's URL to copy", async () => {
+    await load([]);
+
+    expect(screen.getByTitle("Copy the overlay's URL")).toHaveTextContent(
+      /^http:\/\/tokio-app\.local:37891\/games\/minecraft\/$/,
+    );
+  });
+
+  it("splits the overlay into columns, each with its URL and its preview", async () => {
+    const { user } = await load([
+      giftAction("a1", { overlay: { ...overlay, name: "TNT" } }),
+      likeAction("a2", { overlay: { ...overlay, name: "Creeper" } }),
+    ]);
+    await rose();
+
+    await user.click(
+      within(screen.getByRole("group", { name: "Columns" })).getByRole(
+        "radio",
+        { name: "2" },
+      ),
+    );
+    // The second action goes in the second column
+    await user.click(recipes()[1].getByRole("combobox", { name: "Column" }));
+    await user.click(inList(recipeElements()[1], "Column 2")!);
+    await wait(300);
+
+    expect(saves().at(-1)!.overlay.columns).toBe(2);
+    expect(savedOverlays().map((o) => o.column)).toEqual([1, 2]);
+    expect(screen.queryByTitle("Copy the overlay's URL")).toBeNull();
+    for (const column of [1, 2]) {
+      expect(
+        screen.getByTitle(`Copy column ${column}'s URL`),
+      ).toHaveTextContent(
+        `http://tokio-app.local:37891/games/minecraft/${column}/`,
+      );
+    }
+    const names = (column: number) =>
+      [
+        ...screen
+          .getByRole("list", {
+            name: `Column ${column} of the overlay preview`,
+          })
+          .querySelectorAll(".games-name"),
+      ].map((name) => name.textContent);
+    expect(names(1)).toEqual(["TNT"]);
+    expect(names(2)).toEqual(["Creeper"]);
+  });
+
+  it("lists a row per action: the event's pictures or text, then its picture", async () => {
+    await load([
+      giftAction("a1"),
+      likeAction("a2"),
+      action("a3", {
+        enabled: false,
+        overlay: { ...overlay, image: TNT, name: "TNT" },
+      }),
+      chatAction("a4"),
+      action("a5", { trigger: { ...trigger, type: TOKIO_EVENTS.SUPER_FAN } }),
+      giftAction("a6", {
+        trigger: { ...trigger, type: TOKIO_EVENTS.GIFT, gifts: [] },
+      }),
+    ]);
+    await rose();
+
+    const [gifted, liked, followed, chatted, superFan, anyGift] = recipes();
+    const [giftedRow] = recipeElements();
+    // A gift shows only its picture, named for screen readers
+    const roseGift = gifted.getByRole("img", { name: "Rose" });
+    expect(
+      [...roseGift.querySelectorAll("img")].map((img) =>
+        img.getAttribute("src"),
+      ),
+    ).toEqual(["https://example.com/rose.png"]);
+    expect(gifted.queryByRole("textbox", { name: "Event text" })).toBeNull();
+    // Likes, follows, chat and Super Fans get Tokio's own pictures, the
+    // likes counted
+    const heart = liked.getByRole("img", { name: "100 likes" });
+    expect(heart.querySelector("img")?.getAttribute("src")).toMatch(
+      /^data:image\/svg\+xml,/,
+    );
+    expect(heart).toHaveTextContent("100");
+    expect(liked.queryByRole("textbox", { name: "Event text" })).toBeNull();
+    expect(followed.getByRole("img", { name: "Follow" })).toBeInTheDocument();
+    expect(
+      superFan.getByRole("img", { name: "Super Fan" }),
+    ).toBeInTheDocument();
+    expect(superFan.queryByRole("textbox", { name: "Event text" })).toBeNull();
+    // A chat keeps its message's field by its bubble
+    expect(chatted.getByRole("img", { name: "Chat" })).toBeInTheDocument();
+    expect(
+      chatted.getByRole("textbox", { name: "Event text" }),
+    ).toHaveAttribute("placeholder", "“tnt”");
+    // Empty, an event without pictures shows its own text
+    expect(
+      anyGift.getByRole("textbox", { name: "Event text" }),
+    ).toHaveAttribute("placeholder", "Any gift");
+    expect(
+      gifted.getByRole("button", { name: "Pick a picture" }),
+    ).toBeInTheDocument();
+    const change = followed.getByRole("button", { name: "Change the picture" });
+    expect(change.querySelector("img")).toHaveAttribute(
+      "src",
+      "tokio-media:///games/minecraft/tnt.png",
+    );
+    expect(
+      followed.getByRole("textbox", { name: "Name on the overlay" }),
+    ).toHaveValue("TNT");
+    // A disabled action never runs
+    expect(recipeElements()[2]).toHaveClass(styles.recipe_off);
+    expect(giftedRow).not.toHaveClass(styles.recipe_off);
+  });
+
+  it("saves the rows' edits", async () => {
+    const { user } = await load([giftAction("a1"), chatAction("a2")]);
+    await rose();
+    const [gifted, chatted] = recipes();
+
+    await user.type(
+      chatted.getByRole("textbox", { name: "Event text" }),
+      "Tap tap",
+    );
+    await user.type(
+      gifted.getByRole("textbox", { name: "Name on the overlay" }),
+      "TNT",
+    );
+    await user.click(
+      chatted.getByRole("checkbox", { name: "Show on the overlay" }),
+    );
+    await wait(300);
+
+    expect(savedOverlays()).toEqual([
+      { show: true, image: null, event: "", name: "TNT", column: 1 },
+      { show: false, image: null, event: "Tap tap", name: "", column: 1 },
+    ]);
+  });
+
+  it("turns an event's gifts in one place, every 2 s, in the row and the preview", async () => {
+    await load([
+      giftAction("a1", {
+        trigger: { ...trigger, type: TOKIO_EVENTS.GIFT, gifts: [5655, 6369] },
+        overlay: { ...overlay, name: "TNT" },
+      }),
+    ]);
+    const lion = gift(6369, "Lion");
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
+      data: [gift(5655, "Rose"), lion],
+    });
+    const shown = (pictures: Element) =>
+      [...pictures.querySelectorAll("img")]
+        .filter(
+          (img) =>
+            !img.classList.contains(styles.recipe_away) &&
+            !img.classList.contains("games-away"),
+        )
+        .map((img) => img.getAttribute("src"));
+    const row = recipes()[0].getByRole("img", { name: "Rose or Lion" });
+    const slots = previewRows()[0].querySelectorAll(".games-event .games-slot");
+    expect(slots).toHaveLength(1);
+    const [slot] = slots;
+
+    const first = shown(row);
+    expect(first).toHaveLength(1);
+    expect(shown(slot)).toEqual(first);
+    await wait(2000);
+
+    const next = shown(row);
+    expect(next).toHaveLength(1);
+    expect(next).not.toEqual(first);
+    expect(new Set([...first, ...next])).toEqual(
+      new Set(["https://example.com/rose.png", lion.img]),
+    );
+    expect(shown(slot)).toEqual(next);
+  });
+
+  it("picks a picture from the Minecraft library", async () => {
+    const { user } = await load([action("a1")]);
+
+    await user.click(screen.getByRole("button", { name: "Pick a picture" }));
+    const picker = screen.getByRole("dialog", { name: "Select picture" });
+    expect(sent(APP_EVENTS.GET_MINECRAFT_PICTURES)).toHaveLength(1);
+    await send(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES, {
+      success: true,
+      data: [TNT, CREEPER],
+    });
+    await user.click(within(picker).getByRole("button", { name: "Creeper" }));
+    await wait(300);
+
+    expect(savedOverlays()[0].image).toEqual(CREEPER);
+    // Marked, and still open
+    expect(
+      within(picker).getByRole("button", { current: true }),
+    ).toHaveAccessibleName("Creeper");
+
+    await user.click(within(picker).getByRole("button", { name: "Clear" }));
+    await wait(300);
+    expect(savedOverlays()[0].image).toBeNull();
+
+    await user.click(within(picker).getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("puts a browsed picture only on the action that asked, even after its picker closed", async () => {
+    const { user } = await load([action("a1"), action("a2")]);
+
+    await user.click(
+      recipes()[0].getByRole("button", { name: "Pick a picture" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Browse files..." }));
+    expect(sent(APP_EVENTS.IMPORT_MINECRAFT_PICTURE)).toEqual([{ id: "a1" }]);
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    // Another action's, which didn't ask
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a2",
+      picture: CREEPER,
+    });
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      picture: TNT,
+    });
+    await wait(300);
+
+    expect(savedOverlays().map((o) => o.image)).toEqual([TNT, null]);
+    expect(
+      recipes()[0].getByRole("button", { name: "Change the picture" }),
+    ).toBeInTheDocument();
+  });
+
+  it("drops a browse once a picture is picked for the action", async () => {
+    const { user } = await load([action("a1")]);
+
+    await user.click(screen.getByRole("button", { name: "Pick a picture" }));
+    await user.click(screen.getByRole("button", { name: "Browse files..." }));
+    await send(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES, {
+      success: true,
+      data: [CREEPER],
+    });
+    await user.click(screen.getByRole("button", { name: "Creeper" }));
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      picture: TNT,
+    });
+    await wait(300);
+
+    expect(savedOverlays()[0].image).toEqual(CREEPER);
+  });
+
+  it("clears a deleted picture from the actions, so a save can't bring it back", async () => {
+    await load([
+      action("a1", { overlay: { ...overlay, image: TNT } }),
+      action("a2", { overlay: { ...overlay, image: CREEPER } }),
+    ]);
+
+    await send(APP_EVENTS_RESPONSE.MINECRAFT_PICTURE_REMOVED, {
+      file: TNT.file,
+    });
+    await wait(300);
+
+    expect(savedOverlays().map((o) => o.image)).toEqual([null, CREEPER]);
+    expect(
+      recipes()[0].getByRole("button", { name: "Pick a picture" }),
+    ).toBeInTheDocument();
+  });
+
+  it("says when the overlay server is off", async () => {
+    setup();
+    const notice =
+      "The overlay server is off. Enable it in Settings to show this overlay on stream.";
+    expect(sent(APP_EVENTS.GET_SETTINGS)).toHaveLength(1);
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_SETTINGS,
+      settingsReply((s) => {
+        s.settings.server.enabled = false;
+      }),
+    );
+    expect(section("Overlay").getByText(notice)).toBeInTheDocument();
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_SETTINGS,
+      settingsReply((s) => {
+        s.settings.server.enabled = true;
+      }),
+    );
+    expect(screen.queryByText(notice)).not.toBeInTheDocument();
+  });
+
+  it("saves the look, and shows it in the preview", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, image: TNT } }),
+    ]);
+
+    await user.click(screen.getByRole("radio", { name: "One at a time" }));
+    await user.click(screen.getByRole("checkbox", { name: "Pictures only" }));
+    await user.type(screen.getByPlaceholderText("Archivo"), "Minecrafter");
+    await wait(300);
+
+    expect(saves().at(-1)!.overlay).toEqual({
+      ...defaultProfile.games.overlay,
+      layout: "carousel",
+      pictures_only: true,
+      font: "Minecrafter",
+    });
+    const games = preview()!.parentElement!;
+    expect(games).toHaveClass("games", "games-carousel", "games-pictures-only");
+    expect(games.style.fontFamily).toBe(
+      '"Minecrafter", "Archivo Variable", sans-serif',
+    );
+    expect(games.style.getPropertyValue("--games-accent")).toBe(
+      defaultProfile.games.overlay.accent_color,
+    );
+  });
+
+  it("puts the event's picture on the action's with Sticker, which has no arrow", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, image: TNT } }),
+      action("a2", { overlay: { ...overlay, name: "Zombie" } }),
+    ]);
+    const games = () => preview()!.parentElement!;
+    const arrowColor = () => screen.queryByRole("group", { name: "Arrow" });
+    expect(arrowColor()).toBeInTheDocument();
+    expect(games().style.getPropertyValue("--games-arrow")).toBe(
+      defaultProfile.games.overlay.arrow_color,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "Sticker" }));
+    await wait(300);
+
+    expect(saves().at(-1)!.overlay.format).toBe("sticker");
+    expect(games()).toHaveClass("games-sticker");
+    // Without the action's picture, the event's takes its place
+    expect(
+      previewRows().map((li) => li.classList.contains("has-result-picture")),
+    ).toEqual([true, false]);
+    expect(arrowColor()).toBeNull();
+  });
+
+  it("previews the shown actions, named after their steps until named", async () => {
+    const { user } = await load([
+      giftAction("a1", { overlay: { ...overlay, image: TNT, name: "TNT" } }),
+      chatAction("a2", { overlay: { ...overlay, name: "Creeper" } }),
+      action("a3", { overlay: { ...overlay, show: false, name: "Hidden" } }),
+      action("a4", { enabled: false, overlay: { ...overlay, name: "Off" } }),
+      // Its zombie names it
+      action("a5"),
+      // A command makes nothing to name
+      action("a6", { steps: [command("say hi")] }),
+    ]);
+    await rose();
+
+    expect(previewTexts()).toEqual([
+      ["Rose", "TNT"],
+      ["“tnt”", "Creeper"],
+      ["Follow", "Zombie"],
+    ]);
+    expect(
+      recipes()[4].getByRole("textbox", { name: "Name on the overlay" }),
+    ).toHaveAttribute("placeholder", "Zombie");
+    expect(
+      recipes()[5].getByRole("textbox", { name: "Name on the overlay" }),
+    ).toHaveAttribute("placeholder", "No name");
+    expect(
+      [...previewRows()[0].querySelectorAll("img")].map((img) =>
+        img.getAttribute("src"),
+      ),
+    ).toEqual([
+      "https://example.com/rose.png",
+      "tokio-media:///games/minecraft/tnt.png",
+    ]);
+
+    // The event's own text gives way to the one typed
+    await user.type(
+      recipes()[1].getByRole("textbox", { name: "Event text" }),
+      "Tap tap",
+    );
+    expect(previewTexts()[1]).toEqual(["Tap tap", "Creeper"]);
+  });
+
+  it("hides a picture that doesn't load in the preview", async () => {
+    await load([action("a1", { overlay: { ...overlay, image: TNT } })]);
+
+    act(() => {
+      previewRows()[0]
+        .querySelector(".games-result img")!
+        .dispatchEvent(new Event("error"));
+    });
+
+    expect(previewRows()[0].querySelector(".games-result img")).toBeNull();
+    expect(previewRows()[0].querySelector(".games-result")).not.toHaveClass(
+      "has-picture",
+    );
+  });
+
+  it("waits for a row's gifts to turn before the next row, one at a time", async () => {
+    const { user } = await load([
+      giftAction("a1", {
+        trigger: { ...trigger, type: TOKIO_EVENTS.GIFT, gifts: [5655, 6369] },
+        overlay: { ...overlay, name: "TNT" },
+      }),
+      action("a2", { overlay: { ...overlay, name: "Zombie" } }),
+    ]);
+    const lion = gift(6369, "Lion");
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
+      data: [gift(5655, "Rose"), lion],
+    });
+    await user.click(
+      within(screen.getByRole("group", { name: "Layout" })).getByRole("radio", {
+        name: "One at a time",
+      }),
+    );
+    const current = () =>
+      preview()!.querySelector(".games-current .games-name")?.textContent;
+    const shownGift = () =>
+      [...preview()!.querySelectorAll(".games-current .games-event img")]
+        .filter((img) => !img.classList.contains("games-away"))
+        .map((img) => img.getAttribute("src"));
+
+    expect(current()).toBe("TNT");
+    expect(shownGift()).toEqual(["https://example.com/rose.png"]);
+    await wait(2000);
+    expect(shownGift()).toEqual([lion.img]);
+    // Past the 3 s a row with one gift gets
+    await wait(1500);
+    expect(current()).toBe("TNT");
+    await wait(600);
+    expect(current()).toBe("Zombie");
+  });
+
+  it("shows the count on the picture, in the row and the preview", async () => {
+    await load([
+      action("a1", {
+        overlay: { ...overlay, image: TNT },
+        steps: [{ type: "spawn", mob: "zombie", amount: 5, name: "" }],
+      }),
+    ]);
+
+    const button = recipes()[0].getByRole("button", {
+      name: "Change the picture",
+    });
+    expect(button).toHaveTextContent("5");
+    // The picture says how many, so the name doesn't
+    expect(
+      recipes()[0].getByRole("textbox", { name: "Name on the overlay" }),
+    ).toHaveAttribute("placeholder", "Zombie");
+    expect(previewTexts()).toEqual([["Follow", "Zombie"]]);
+    expect(
+      previewRows()[0].querySelector(".games-slot-result .games-count"),
+    ).toHaveTextContent("5");
+  });
+
+  it("keeps a small Minecraft picture drawn large sharp in the preview", async () => {
+    await load([action("a1", { overlay: { ...overlay, image: TNT } })]);
+    const img =
+      previewRows()[0].querySelector<HTMLImageElement>(".games-result img")!;
+    // jsdom loads no pictures and lays nothing out
+    Object.defineProperty(img, "naturalWidth", { value: 16 });
+    Object.defineProperty(img, "clientWidth", { value: 40 });
+
+    act(() => {
+      img.dispatchEvent(new Event("load"));
+    });
+
+    expect(img).toHaveClass("games-pixelated");
+  });
+
+  it("lights the next shown row with Test, cycling, for 1.5 s", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, name: "TNT" } }),
+      action("a2", { overlay: { ...overlay, show: false, name: "Hidden" } }),
+      action("a3", { overlay: { ...overlay, name: "Creeper" } }),
+    ]);
+
+    await user.click(testButton());
+    expect(litRows()).toEqual(["TNT"]);
+    await user.click(testButton());
+    await user.click(testButton());
+
+    expect(sent(APP_EVENTS.TEST_GAMES_OVERLAY)).toEqual([
+      { id: "a1" },
+      { id: "a3" },
+      { id: "a1" },
+    ]);
+    expect(litRows()).toEqual(["TNT", "Creeper"]);
+
+    await wait(1500);
+    expect(litRows()).toEqual([]);
+  });
+
+  it("turns one row at a time, and turns to the row Test lights", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, name: "TNT" } }),
+      action("a2", { overlay: { ...overlay, name: "Creeper" } }),
+      action("a3", { overlay: { ...overlay, name: "Zombie" } }),
+    ]);
+    const current = () =>
+      preview()!.querySelector(".games-current .games-name")?.textContent;
+    await user.click(screen.getByRole("radio", { name: "One at a time" }));
+    expect(current()).toBe("TNT");
+
+    await wait(3000);
+    expect(current()).toBe("Creeper");
+
+    await user.click(testButton());
+    expect(current()).toBe("TNT");
+    // A whole turn from there
+    await wait(2900);
+    expect(current()).toBe("TNT");
+    await wait(100);
+    expect(current()).toBe("Creeper");
   });
 });

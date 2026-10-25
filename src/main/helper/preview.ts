@@ -1,5 +1,5 @@
 import type { Folders } from "@/common/types";
-import { AUDIO_EXTENSIONS, mediaKind } from "@/common/util";
+import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, mediaKind } from "@/common/util";
 import { basename, extname, join, resolve } from "node:path";
 import { isInside } from "./path";
 
@@ -34,14 +34,18 @@ export function previewFile(
 
 /**
  * The library file a `tokio-media:` URL names, or null: a thumbnail's
- * (`tokio-media:///<file>`, see getMediaPreviewURL) or a sound's
- * (`tokio-media:///sounds/<file>`, see getSoundPreviewURL). Only images and
- * videos right in the media folder, and audio right in the sounds folder, are
- * served.
+ * (`tokio-media:///<file>`, see getMediaPreviewURL), a sound's
+ * (`tokio-media:///sounds/<file>`, see getSoundPreviewURL) or a Minecraft
+ * picture's (`tokio-media:///games/minecraft/<file>`, see
+ * getPicturePreviewURL). Only images and videos right in the media folder,
+ * audio right in the sounds folder, and images right in the Minecraft
+ * pictures folder are served.
  */
 export function mediaFile(
   url: string,
-  folders: Pick<Folders, "mediaFolder" | "soundsFolder"> | undefined,
+  folders:
+    | Pick<Folders, "mediaFolder" | "soundsFolder" | "minecraftFolder">
+    | undefined,
 ): string | null {
   if (!folders) return null;
 
@@ -51,12 +55,22 @@ export function mediaFile(
   } catch {
     return null;
   }
-  if (name.startsWith("sounds/")) {
-    const sound = name.slice("sounds/".length);
-    const ext = extname(sound).slice(1).toLowerCase();
-    return basename(sound) === sound && AUDIO_EXTENSIONS.includes(ext)
-      ? join(folders.soundsFolder, sound)
+  const inFolder = (prefix: string, folder: string, extensions: string[]) => {
+    const file = name.slice(prefix.length);
+    const ext = extname(file).slice(1).toLowerCase();
+    return basename(file) === file && extensions.includes(ext)
+      ? join(folder, file)
       : null;
+  };
+  if (name.startsWith("sounds/")) {
+    return inFolder("sounds/", folders.soundsFolder, AUDIO_EXTENSIONS);
+  }
+  if (name.startsWith("games/minecraft/")) {
+    return inFolder(
+      "games/minecraft/",
+      folders.minecraftFolder,
+      IMAGE_EXTENSIONS,
+    );
   }
   return basename(name) === name && mediaKind(name)
     ? join(folders.mediaFolder, name)

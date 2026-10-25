@@ -107,6 +107,11 @@ export enum APP_EVENTS_RESPONSE {
   UPDATE_GAMES_SETTINGS = "app:games:res:update:settings",
   TEST_GAME_ACTION = "app:games:res:test",
 
+  // MINECRAFT PICTURES
+  MINECRAFT_PICTURES = "app:games:res:pictures",
+  SET_MINECRAFT_PICTURE = "app:games:res:pictures:set",
+  MINECRAFT_PICTURE_REMOVED = "app:games:res:pictures:removed",
+
   // SOUND LIBRARY
   GET_SOUNDS = "app:sounds:res",
 
@@ -353,6 +358,22 @@ export interface AppEventsResponseMap {
     id: string;
     results: CommandResult[];
   }>;
+
+  // MINECRAFT PICTURES
+  // The library; success is false when the last change failed
+  [APP_EVENTS_RESPONSE.MINECRAFT_PICTURES]: Reply<{
+    data: MediaFile[];
+  }>;
+  // The picture browsed for an action, the first when there were several
+  [APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE]: Reply<{
+    id: string;
+    picture?: MediaFile;
+  }>;
+  // A picture deleted from the library, which main took off every action
+  // that had it
+  [APP_EVENTS_RESPONSE.MINECRAFT_PICTURE_REMOVED]: {
+    file: string;
+  };
 
   // SOUND LIBRARY
   // success is false when the last upload or removal failed

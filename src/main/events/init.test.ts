@@ -83,6 +83,7 @@ const folders: Folders = {
   extraFolder: "app/extra",
   soundsFolder: "app/sounds",
   mediaFolder: "app/media",
+  minecraftFolder: "app/games/minecraft",
 };
 
 const noStats = { likes: 0, viewers: 0, views: 0 };
@@ -236,12 +237,15 @@ function setup() {
     initEvents: vi.fn(),
     toggleServer: vi.fn(async (_enabled: boolean) => true),
     onConnect: vi.fn((_listener: (id: string) => void) => {}),
-    sendToClient: vi.fn((_id: string, _payload: unknown) => true),
+    sendToClient: vi.fn(
+      (_id: string, _payload: { type: string; data?: unknown }) => true,
+    ),
   };
   const overlayService = {
     setLogFile: vi.fn(),
     initialize: vi.fn(),
     getGifts: vi.fn(async (): Promise<CustomGift[]> => []),
+    getCustomGifts: vi.fn(async (): Promise<CustomGift[]> => []),
     load: vi.fn(async (_gifts: CustomGift[]) => {}),
     refreshGifts: vi.fn(async (_gifts: CustomGift[]) => {}),
     recordGift: vi.fn(
@@ -312,6 +316,8 @@ function setup() {
     ),
     onStatus: vi.fn((..._args: Parameters<GamesService["onStatus"]>) => {}),
     onError: vi.fn((..._args: Parameters<GamesService["onError"]>) => {}),
+    onRun: vi.fn((..._args: Parameters<GamesService["onRun"]>) => {}),
+    setPicturesFolder: vi.fn(),
     handle: vi.fn(async (..._args: Parameters<GamesService["handle"]>) => {}),
     clear: vi.fn(),
   };
@@ -381,6 +387,12 @@ const noticesFor = (s: Setup, code: FEEDBACK_CODES) =>
 // Lets fire-and-forget work finish, before asserting it did nothing
 const flushPromises = () =>
   new Promise<void>((resolve) => setImmediate(resolve));
+
+// What the games overlay got of a kind of message, in order
+const gamesSent = (s: Setup, type: string) =>
+  s.serverService.sendToClient.mock.calls.flatMap(([id, message]) =>
+    id === "games" && message.type === type ? [message.data] : [],
+  );
 
 // Emits a live event whose type is only known at runtime
 const emitLive = (
@@ -631,6 +643,7 @@ describe("init events", () => {
       trigger: alert().trigger,
       likes_every: 100,
       steps: [{ type: "command", command: "say hi" }],
+      overlay: { show: true, image: null, event: "", name: "", column: 1 },
     };
 
     it.each(triggers)("passes %s to the games", async (trigger) => {
@@ -780,6 +793,97 @@ describe("init events", () => {
         "games.log",
       ];
       expect(logWarn.mock.calls).toEqual([logged, logged, logged]);
+    });
+
+    describe("overlay", () => {
+      // A Rose action, whose row shows TikTok's picture over the custom one
+      const roseAction: GameAction = {
+        ...action,
+        trigger: { ...action.trigger, type: TOKIO_EVENTS.GIFT, gifts: [5655] },
+        overlay: {
+          show: true,
+          image: { name: "TNT", file: "my tnt.png" },
+          event: "",
+          name: "Boom",
+          column: 1,
+        },
+      };
+      const withRose = (s: Setup) => {
+        s.storeManagerService.getProfileData.mockResolvedValue({
+          ...profile,
+          games: { ...profile.games, actions: [roseAction] },
+        });
+        s.overlayService.getGifts.mockResolvedValue([rose]);
+        s.overlayService.getCustomGifts.mockResolvedValue([
+          { ...rose, img: "custom-rose.png" },
+        ]);
+      };
+
+      it("sends the actions and look to the games overlay when it connects", async () => {
+        const s = await live();
+        withRose(s);
+        s.serverService.sendToClient.mockClear();
+        const connected = s.serverService.onConnect.mock.calls.map(
+          ([listener]) => listener,
+        );
+
+        for (const listener of connected) listener("timer");
+        s.serverService.sendToClient.mockClear();
+        for (const listener of connected) listener("games");
+
+        await vi.waitFor(() => {
+          expect(s.serverService.sendToClient.mock.calls).toEqual([
+            [
+              "games",
+              {
+                type: "tokio:games",
+                data: {
+                  look: profile.games.overlay,
+                  rows: [
+                    {
+                      id: "action-1",
+                      pictures: ["rose.png"],
+                      event: "Rose",
+                      withText: false,
+                      eventCount: 0,
+                      image: "/games/minecraft/pictures/my%20tnt.png",
+                      name: "Boom",
+                      count: 0,
+                      column: 1,
+                    },
+                  ],
+                },
+              },
+            ],
+          ]);
+        });
+      });
+
+      it("sends nothing to the timer's overlay", async () => {
+        const s = await live();
+        s.serverService.sendToClient.mockClear();
+        const connected = s.serverService.onConnect.mock.calls.map(
+          ([listener]) => listener,
+        );
+
+        for (const listener of connected) listener("timer");
+        await flushPromises();
+
+        expect(gamesSent(s, "tokio:games")).toEqual([]);
+      });
+
+      it("lights an action's row each time it runs", async () => {
+        const s = await live();
+        const run = s.gamesService.onRun.mock.calls[0][0];
+
+        run(action);
+        run(action);
+
+        expect(gamesSent(s, "tokio:games:run")).toEqual([
+          { id: "action-1" },
+          { id: "action-1" },
+        ]);
+      });
     });
   });
 
@@ -1393,6 +1497,7 @@ describe("init events", () => {
     it("records the gifts viewers send and pushes the new custom gifts", async () => {
       const s = await live({ alerts: false });
       const custom = [{ value: 9, label: "Galaxy", img: "9.png", coins: 1 }];
+      s.serverService.sendToClient.mockClear();
       s.overlayService.recordGift.mockResolvedValue({
         success: true,
         data: custom,
@@ -1409,16 +1514,22 @@ describe("init events", () => {
           { data: custom },
         ]);
       });
+      // Its picture, for the games overlay's rows
+      await vi.waitFor(() => {
+        expect(gamesSent(s, "tokio:games")).toHaveLength(1);
+      });
     });
 
     it("pushes nothing when a gift changed no custom gift", async () => {
       const s = await live({ alerts: false });
+      s.serverService.sendToClient.mockClear();
 
       s.conn.emit(TOKIO_EVENTS.GIFT, giftEvent("5655", "Rose"));
 
       expect(s.overlayService.recordGift).toHaveBeenCalledOnce();
       await flushPromises();
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CUSTOM_GIFTS)).toEqual([]);
+      expect(gamesSent(s, "tokio:games")).toEqual([]);
       expect(s.h.notices).toEqual([]);
     });
 
@@ -1573,6 +1684,14 @@ describe("init events", () => {
         "alerts/media",
         "app/media",
       );
+      // The games overlay shows the Minecraft pictures from their folder
+      expect(s.gamesService.setPicturesFolder).toHaveBeenCalledWith(
+        "app/games/minecraft",
+      );
+      expect(s.serverService.mount).toHaveBeenCalledWith(
+        "games/minecraft/pictures",
+        "app/games/minecraft",
+      );
     });
 
     it("initializes the store, the overlays and the server's events", async () => {
@@ -1624,6 +1743,28 @@ describe("init events", () => {
             [rose],
           );
         });
+      });
+
+      // Before, the server isn't listening yet: a games overlay gets the
+      // saved gifts when it connects
+      it("sends the games overlay again with the fresh gifts", async () => {
+        const s = setup();
+        s.overlayService.getGifts.mockResolvedValue([lion]);
+        let refreshed!: () => void;
+        s.overlayService.refreshGifts.mockReturnValue(
+          new Promise<void>((resolve) => (refreshed = resolve)),
+        );
+
+        await load(s);
+
+        expect(gamesSent(s, "tokio:games")).toEqual([]);
+        await vi.waitFor(() =>
+          expect(s.overlayService.refreshGifts).toHaveBeenCalled(),
+        );
+        refreshed();
+        await vi.waitFor(() =>
+          expect(gamesSent(s, "tokio:games")).toHaveLength(1),
+        );
       });
 
       it("doesn't wait for TikTok to answer", async () => {

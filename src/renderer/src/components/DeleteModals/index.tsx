@@ -50,6 +50,29 @@ export function DeleteMediaModal({
   );
 }
 
+// A picture in the Minecraft library, which the games overlay shows
+export function DeletePictureModal({
+  item,
+  onClose,
+  onDelete,
+}: Props<MediaFile>) {
+  return (
+    <Modal
+      title="Delete picture?"
+      description={`"${item.name}" will be deleted from your computer and from every game action that shows it, in all your profiles.`}
+      confirmText="Delete"
+      onClose={onClose}
+      onConfirm={() => {
+        onDelete?.(item);
+        window.api.emit(APP_EVENTS.REMOVE_MINECRAFT_PICTURE, {
+          file: item.file,
+        });
+        onClose();
+      }}
+    />
+  );
+}
+
 export function RemoveOverlayModal({
   item,
   onClose,

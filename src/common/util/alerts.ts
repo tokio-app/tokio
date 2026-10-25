@@ -11,7 +11,8 @@ const CHAT = [...USER, "comment"];
 
 export const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg"];
 
-const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp"];
+// Also the Minecraft pictures', which are images only
+export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp"];
 const VIDEO_EXTENSIONS = ["mp4", "webm"];
 // No SVG: opened from the overlay server, its scripts would run there.
 export const MEDIA_EXTENSIONS = [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS];
@@ -34,6 +35,10 @@ export const getMediaPreviewURL = (file: string) =>
 
 export const getSoundPreviewURL = (file: string) =>
   `${MEDIA_SCHEME}:///sounds/${encodeURIComponent(file)}`;
+
+// A Minecraft picture's, by its folder's path in the app folder
+export const getPicturePreviewURL = (file: string) =>
+  `${MEDIA_SCHEME}:///games/minecraft/${encodeURIComponent(file)}`;
 
 // What a TTS alert's message can say, by trigger. Typed as a Record so a new
 // trigger can't be left out.

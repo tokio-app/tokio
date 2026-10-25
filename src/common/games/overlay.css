@@ -1,0 +1,311 @@
+/*
+ * The games overlay's look (/games/), shared by its page and the Games
+ * page's preview so the two can't drift: ServerService inlines it into
+ * src/main/services/server/games.html, and the preview imports it as a
+ * plain stylesheet. Keep both pages' markup the same.
+ *
+ * It must work in OBS 30's browser (Chromium 103): no :has(), nesting,
+ * subgrid or container queries. The page's script sets classes like
+ * has-picture instead.
+ *
+ * Every class starts with games-, as the app loads this stylesheet globally.
+ * Each row reads like a crafting recipe: the event (TikTok's gift) is the
+ * ingredient, a pixel arrow, then the streamer's picture and name.
+ */
+
+.games {
+  --games-text: #f1f5f9;
+  /* The glint of an action that runs */
+  --games-accent: #f43f5e;
+  --games-arrow: #f43f5e;
+  /* Keeps the text legible over bright gameplay */
+  --games-halo: rgb(0 0 0 / 85%);
+  font-family: "Archivo Variable", sans-serif;
+  /* The page sets --games-size from the browser source's size; --fit
+     shrinks it when the rows wouldn't fit */
+  font-size: calc(var(--games-size, 16px) * var(--fit, 1));
+  line-height: 1.15;
+  color: var(--games-text);
+}
+
+/* The spine: events right-aligned on the arrows' left, results left-aligned
+   on their right. The rows' cells take part in this grid, so every arrow
+   lines up in one column. Each side is as wide as its widest, and shrinks
+   to cut texts short when the space is narrower. */
+.games-rows {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto minmax(0, auto);
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em 0.45em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.games-row {
+  display: contents;
+}
+
+/* Explicit columns, so one at a time can stack every row in one place */
+.games-event {
+  grid-column: 1;
+  justify-content: flex-end;
+}
+
+.games-arrow {
+  grid-column: 2;
+}
+
+.games-result {
+  grid-column: 3;
+  justify-content: flex-start;
+}
+
+.games-side {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  min-width: 0;
+}
+
+/* One line each, a long one cut short. The padding gives the halo room
+   inside the box that cuts it; the margins take it back. Set on each text:
+   on .games, the shadow's em would follow a font size it doesn't have. */
+.games-text {
+  min-width: 0;
+  max-width: 13em;
+  margin: -0.4em;
+  padding: 0.4em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 0 0.05em var(--games-halo),
+    0 0.02em 0.12em var(--games-halo),
+    0 0 0.4em rgb(0 0 0 / 30%);
+  transition: color 0.3s;
+}
+
+/* What it does, wide and heavy so it reads on a phone */
+.games-name {
+  font-weight: 800;
+  font-stretch: 112%;
+}
+
+/* The event's text, under the name's weight, its counts in even figures */
+.games-event .games-text {
+  font-size: 0.78em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The pictures float over the game, as TikTok shows its gifts, with a halo
+   like the texts' that follows their shape */
+.games-slot {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2em;
+  height: 2em;
+}
+
+/* Stacked, so an event's gifts take turns in one place, crossfading */
+.games-slot img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.03em 0.08em var(--games-halo))
+    drop-shadow(0 0 0 transparent) brightness(1);
+  transition: opacity 0.3s;
+}
+
+.games-slot .games-away {
+  opacity: 0;
+}
+
+/* An event with pictures shows only them: the gifts say what they are. A
+   chat's side never has has-picture, so its message shows by its bubble. */
+.games-event.has-picture .games-text {
+  display: none;
+}
+
+/* A small Minecraft picture drawn large keeps its pixels sharp (the page
+   and the preview set it, see sharpen) */
+.games-pixelated {
+  image-rendering: pixelated;
+}
+
+/* How many the action makes, on its picture's bottom right corner, like an
+   inventory's stack: the bare number, with a hard shadow */
+.games-count {
+  position: absolute;
+  right: -0.15em;
+  bottom: -0.2em;
+  font-size: 0.8em;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--games-text);
+  text-shadow:
+    0.08em 0.08em 0 rgb(0 0 0 / 75%),
+    0 0 0.3em var(--games-halo);
+  pointer-events: none;
+}
+
+/* The result, larger, like a crafting table's */
+.games-slot-result {
+  width: 2.5em;
+  height: 2.5em;
+}
+
+/* Our own pixel arrow, the crafting table's, with a hard shadow */
+.games-arrow {
+  width: 1.1em;
+  height: 0.9em;
+  fill: var(--games-arrow);
+  shape-rendering: crispEdges;
+  filter: drop-shadow(0.08em 0.08em 0 rgb(0 0 0 / 60%));
+}
+
+/* A RUN: the row lights up while it's lit. Its pictures glow in the accent
+   along their shape and flash like an enchanted item, and its texts take
+   the accent. The class stays on through a burst, so the flash never
+   restarts. The filters keep the same functions, so they animate. */
+.games-lit .games-slot img {
+  filter: drop-shadow(0 0 0.06em var(--games-accent))
+    drop-shadow(0 0 0.2em var(--games-accent)) brightness(1);
+  animation: games-glint 1.2s ease-in-out infinite;
+}
+
+.games-lit .games-text {
+  color: var(--games-accent);
+}
+
+@keyframes games-glint {
+  50% {
+    filter: drop-shadow(0 0 0.06em var(--games-accent))
+      drop-shadow(0 0 0.35em var(--games-accent)) brightness(1.3);
+  }
+}
+
+/* PICTURES ONLY: the texts next to pictures go. A side without a picture
+   keeps its text, so "Any gift ▸ [TNT]" still reads, and so does a chat's
+   message, which its bubble can't say. */
+.games-pictures-only .has-picture .games-text {
+  display: none;
+}
+
+/* STICKER: no arrow. The action's picture large, with the event's stuck
+   on its bottom left corner, half its size and over it, and the texts
+   beside them: the name over the event's text, centered together. Each row
+   is its own grid, which the sides give their pieces to. The square holds
+   the sticker's overhang, so measuring to fit counts it. */
+.games-sticker .games-rows {
+  grid-template-columns: max-content;
+  gap: 0.6em;
+}
+
+.games-sticker .games-row {
+  display: grid;
+  grid-template-areas:
+    "stack ."
+    "stack name"
+    "stack event"
+    "stack ."
+    "stack .";
+  grid-template-columns: 3.7em minmax(0, auto);
+  /* Centered on the action's picture, above the sticker's overhang. No
+     minimum: the pictures across them would size them, on top of the
+     texts'. */
+  grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr) 0.5em;
+  height: 3.7em;
+}
+
+.games-sticker .games-side {
+  display: contents;
+}
+
+.games-sticker .games-arrow {
+  display: none;
+}
+
+.games-sticker .games-slot-result {
+  grid-area: stack;
+  justify-self: end;
+  align-self: start;
+  width: 3.2em;
+  height: 3.2em;
+}
+
+.games-sticker .games-event .games-slot {
+  z-index: 1;
+  grid-area: stack;
+  justify-self: start;
+  align-self: end;
+  width: 1.6em;
+  height: 1.6em;
+}
+
+/* Without the action's picture, the event's takes its place (the page and
+   the preview set has-result-picture) */
+.games-sticker .games-row:not(.has-result-picture) .games-event .games-slot {
+  justify-self: end;
+  align-self: start;
+  width: 3.2em;
+  height: 3.2em;
+}
+
+/* The texts' halo padding is the gap, so a row without texts has none */
+.games-sticker .games-text {
+  justify-self: start;
+  margin-left: 0;
+}
+
+.games-sticker .games-name {
+  grid-area: name;
+}
+
+.games-sticker .games-event .games-text {
+  grid-area: event;
+}
+
+/* ONE AT A TIME: every row in the same place, the current one shown. The
+   columns fit the widest row, so nothing moves between turns. */
+.games-carousel .games-row > * {
+  grid-row: 1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.games-carousel .games-current > * {
+  opacity: 1;
+}
+
+/* A sticker row is one box, its sides only give it their pieces, so the
+   row fades. Each centered, as only one shows. */
+.games-sticker.games-carousel .games-rows {
+  justify-items: center;
+}
+
+.games-sticker.games-carousel .games-row {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.games-sticker.games-carousel .games-current {
+  opacity: 1;
+}
+
+/* The glow and the texts show a run, without the flash */
+@media (prefers-reduced-motion: reduce) {
+  .games-lit .games-slot img {
+    animation: none;
+  }
+}

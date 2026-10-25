@@ -5,10 +5,13 @@ import {
   MINECRAFT_EDITION_NAMES,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { MINECRAFT_PORT } from "@/common/util";
-import { SelectOption } from "@/components";
-import bedrock from "./minecraft-bedrock.json";
-import java from "./minecraft-java.json";
+import {
+  MINECRAFT_NAMES,
+  MINECRAFT_PORT,
+  TIME_NAMES,
+  WEATHER_NAMES,
+} from "@/common/util";
+import { SelectOption, TRIGGER_OPTIONS } from "@/components";
 
 export type StepKind = GameStep["type"];
 type Step<K extends StepKind> = Extract<GameStep, { type: K }>;
@@ -29,13 +32,26 @@ const options = (names: Record<string, string>): SelectOption<string>[] =>
   Object.entries(names).map(([value, label]) => ({ value, label }));
 
 export const MOBS: Record<MinecraftEdition, SelectOption<string>[]> = {
-  bedrock: options(bedrock.mobs),
-  java: options(java.mobs),
+  bedrock: options(MINECRAFT_NAMES.bedrock.mobs),
+  java: options(MINECRAFT_NAMES.java.mobs),
 };
 export const ITEMS: Record<MinecraftEdition, SelectOption<string>[]> = {
-  bedrock: options(bedrock.items),
-  java: options(java.items),
+  bedrock: options(MINECRAFT_NAMES.bedrock.items),
+  java: options(MINECRAFT_NAMES.java.items),
 };
+
+// The events an action can run on: the alerts' but the joins, envelopes,
+// Super Fan Boxes and song changes
+const LEFT_OUT: string[] = [
+  TOKIO_EVENTS.SUPER_FAN_JOIN,
+  TOKIO_EVENTS.MEMBER_JOIN,
+  TOKIO_EVENTS.ENVELOPE,
+  TOKIO_EVENTS.SUPER_FAN_BOX,
+  TOKIO_EVENTS.MUSIC_CHANGE,
+];
+export const GAME_TRIGGERS = TRIGGER_OPTIONS.filter(
+  ({ value }) => !LEFT_OUT.includes(value),
+);
 
 // The first words of each step's sentence
 export const STEP_KINDS: SelectOption<StepKind>[] = [
@@ -46,18 +62,13 @@ export const STEP_KINDS: SelectOption<StepKind>[] = [
   { value: "command", label: "Command" },
 ];
 
-export const WEATHERS: SelectOption<Step<"weather">["weather"]>[] = [
-  { value: "clear", label: "Clear" },
-  { value: "rain", label: "Rain" },
-  { value: "thunder", label: "Thunder" },
-];
+export const WEATHERS = (["clear", "rain", "thunder"] as const).map(
+  (value) => ({ value, label: WEATHER_NAMES[value] }),
+);
 
-export const TIMES: SelectOption<Step<"time">["time"]>[] = [
-  { value: "day", label: "Day" },
-  { value: "noon", label: "Noon" },
-  { value: "night", label: "Night" },
-  { value: "midnight", label: "Midnight" },
-];
+export const TIMES = (["day", "noon", "night", "midnight"] as const).map(
+  (value) => ({ value, label: TIME_NAMES[value] }),
+);
 
 const NEW_STEPS: { [K in StepKind]: Step<K> } = {
   spawn: { type: "spawn", mob: "zombie", amount: 1, name: "" },
@@ -86,14 +97,9 @@ export function createAction(edition: MinecraftEdition): GameAction {
     },
     likes_every: 100,
     steps: [createStep("spawn")],
+    overlay: { show: true, image: null, event: "", name: "", column: 1 },
   };
 }
-
-type Names = Record<string, string>;
-const NAMES: Record<MinecraftEdition, { mobs: Names; items: Names }> = {
-  bedrock,
-  java,
-};
 
 // Bedrock and Java ids for the same thing whose English names differ too
 const PAIRS = [
@@ -121,11 +127,11 @@ function idIn(
   id: string,
   fallback: string,
 ) {
-  const names = NAMES[to][kind];
+  const names = MINECRAFT_NAMES[to][kind];
   if (Object.hasOwn(names, id)) return id;
   const renamed = RENAMED.get(id);
   if (renamed && Object.hasOwn(names, renamed)) return renamed;
-  const name = NAMES[from][kind][id]?.toLowerCase();
+  const name = MINECRAFT_NAMES[from][kind][id]?.toLowerCase();
   const same = Object.keys(names).find(
     (other) => names[other].toLowerCase() === name,
   );
