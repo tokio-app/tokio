@@ -1,12 +1,14 @@
 import { TOKIO_EVENTS } from "@/common/types";
 import { defaultProfile } from "@/common/util";
-import { gift } from "@test/fixtures";
+import { alertClip, alertSound, gift } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   createAlert,
   emoteOptions,
   giftOptions,
+  soundClip,
   ttsDefaultsOf,
+  waveform,
 } from "./helper";
 
 describe("createAlert", () => {
@@ -21,6 +23,8 @@ describe("createAlert", () => {
         emotes: [],
         keyword: "",
         user: "",
+        min_coins: 0,
+        roles: [],
       },
       sound: null,
       tts: null,
@@ -84,5 +88,44 @@ describe("giftOptions", () => {
     expect(giftOptions([rose], [{ ...rose, label: "Old Rose" }])).toEqual([
       rose,
     ]);
+  });
+});
+
+describe("soundClip", () => {
+  it("plays a new sound whole, and keeps the cut of the alert's own", () => {
+    const cut = alertClip("Airhorn", { start: 0.5, end: 1 });
+
+    expect(soundClip(alertSound("Bell"), cut)).toEqual(alertClip("Bell"));
+    expect(soundClip(alertSound("Bell"), null)).toEqual(alertClip("Bell"));
+    expect(soundClip({ ...alertSound("Airhorn"), name: "Horn" }, cut)).toEqual({
+      ...cut,
+      name: "Horn",
+    });
+  });
+});
+
+describe("waveform", () => {
+  // Samples of two channels
+  const buffer = (...channels: number[][]) => ({
+    length: channels[0].length,
+    numberOfChannels: channels.length,
+    getChannelData: (channel: number) => Float32Array.from(channels[channel]),
+  });
+
+  it("gives each slice its loudest sample over the channels, the loudest 1", () => {
+    const peaks = waveform(
+      buffer([0, -0.5, 0.25, 0, 0.125, 0], [0, 0, 0, 0.25, 0, -0.0625]),
+      3,
+    );
+
+    expect(peaks).toEqual([1, 0.5, 0.25]);
+  });
+
+  it("covers every slice when there are more slices than samples", () => {
+    expect(waveform(buffer([0.5, 1]), 4)).toEqual([0.5, 0.5, 1, 1]);
+  });
+
+  it("stays flat for silence", () => {
+    expect(waveform(buffer([0, 0, 0]), 3)).toEqual([0, 0, 0]);
   });
 });

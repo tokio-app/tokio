@@ -1,4 +1,10 @@
-import { Alert, AlertTts, MediaFile, Profile } from "@/common/schemas";
+import {
+  Alert,
+  AlertSound,
+  AlertTts,
+  MediaFile,
+  Profile,
+} from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -168,7 +174,7 @@ export class AlertsService extends Service {
   public async downloadSound(
     url: string,
     name: string,
-  ): Promise<AlertsResult<NonNullable<Alert["sound"]>>> {
+  ): Promise<AlertsResult<AlertSound>> {
     const file = this._fileForUrl(url);
     if (await isSaved(join(this._soundsFolder, file))) {
       return { success: true, data: { name, file } };
@@ -188,9 +194,7 @@ export class AlertsService extends Service {
   /**
    * Copies a local audio file into the sounds folder.
    */
-  public async importSound(
-    srcPath: string,
-  ): Promise<AlertsResult<NonNullable<Alert["sound"]>>> {
+  public async importSound(srcPath: string): Promise<AlertsResult<AlertSound>> {
     try {
       const { data, entry } = await importFile(
         srcPath,
@@ -365,7 +369,7 @@ export class AlertsService extends Service {
       if (!alert.enabled || (!alert.sound && !alert.tts && !alert.media)) {
         continue;
       }
-      if (!matchesTrigger(alert.trigger, type, payload, added)) continue;
+      if (!matchesTrigger(alert.trigger, type, payload, added, total)) continue;
 
       // An alert on every gift plays once for each, as many as the queue takes
       const times =
@@ -378,7 +382,11 @@ export class AlertsService extends Service {
         : "alerts";
       const { tts, sound, media } = alert;
       // Sent once, and the window queues its copies
-      const play = (data?: Uint8Array, key?: string) =>
+      const play = (
+        data?: Uint8Array,
+        key?: string,
+        cut?: Pick<AlertAudio, "start" | "end">,
+      ) =>
         send({
           data,
           volume: alert.volume,
@@ -389,6 +397,7 @@ export class AlertsService extends Service {
           filters: tts ? { speed: tts.speed, pitch: tts.pitch } : undefined,
           media: media ?? undefined,
           repeat: times,
+          ...cut,
         });
 
       // A message is spoken instead of the sound.
@@ -412,7 +421,10 @@ export class AlertsService extends Service {
         onError?.(alert, res.error);
         continue;
       }
-      play(res.data, basename(sound.file));
+      play(res.data, basename(sound.file), {
+        start: sound.start,
+        end: sound.end ?? undefined,
+      });
     }
   }
 

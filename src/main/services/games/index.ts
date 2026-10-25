@@ -205,7 +205,9 @@ export class GamesService extends Service {
     const runs: Promise<void>[] = [];
     for (const action of games.actions) {
       if (!action.enabled || action.steps.length === 0) continue;
-      if (!matchesTrigger(action.trigger, type, payload, added)) continue;
+      if (!matchesTrigger(action.trigger, type, payload, added, total)) {
+        continue;
+      }
 
       const times = this._times(action, payload, added);
       if (times === 0) continue;

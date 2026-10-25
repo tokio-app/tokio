@@ -45,6 +45,13 @@ export const AlertSoundSchema = z.object({
   file: z.string(),
 });
 
+// An alert's sound, cut to the seconds from start to end. A null end plays
+// to the sound's end.
+const AlertClipSchema = AlertSoundSchema.extend({
+  start: z.number().min(0).default(0),
+  end: z.number().min(0).nullable().default(null),
+});
+
 // Seconds an alert's image or video shows at least, until changed, and the
 // most it can be set to
 export const MEDIA_DURATION = 5;
@@ -56,6 +63,8 @@ const AlertMediaSchema = AlertSoundSchema.extend({
   duration: z.number().min(1).max(MEDIA_MAX_DURATION),
   // The duration follows the video's length, also when another is picked
   match_video: z.boolean().default(false),
+  // A video's, apart from the alert's sound
+  volume: z.number().min(0).max(100).default(100),
 });
 
 const VoiceSchema = z.object({
@@ -74,6 +83,9 @@ const AlertTtsSchema = z.object({
   pitch: z.number().min(0.5).max(2),
 });
 
+// The flags a viewer has in UserData
+export const VIEWER_ROLES = ["follower", "moderator", "superfan"] as const;
+
 // What an alert or a game action reacts to
 export const TriggerSchema = z.object({
   type: AlertTriggerSchema,
@@ -89,19 +101,38 @@ export const TriggerSchema = z.object({
   // Only used by member and super fan join triggers. A handle or name, empty
   // means anyone.
   user: z.string().default(""),
+  // Only used by gift triggers. The coins the streak is worth when it ends,
+  // or each gift with every_gift, at least. 0 means any.
+  min_coins: z.number().int().min(0).default(0),
+  // The viewer has one of them. Empty means anyone, and events without a
+  // viewer ignore it.
+  roles: z.array(z.enum(VIEWER_ROLES)).default([]),
 });
 
-const AlertSchema = z.object({
-  id: z.string(),
-  enabled: z.boolean(),
-  trigger: TriggerSchema,
-  sound: AlertSoundSchema.nullable(),
-  // Spoken instead of the sound when set
-  tts: AlertTtsSchema.nullable().default(null),
-  // Shown on the alert's overlay, with the sound or message or alone
-  media: AlertMediaSchema.nullable().default(null),
-  volume: z.number().min(0).max(100),
-});
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+// Media saved before it had its own volume plays at the alert's, as it did.
+const withMediaVolume = (alert: unknown) =>
+  isRecord(alert) && isRecord(alert.media) && !("volume" in alert.media)
+    ? { ...alert, media: { ...alert.media, volume: alert.volume } }
+    : alert;
+
+const AlertSchema = z.preprocess(
+  withMediaVolume,
+  z.object({
+    id: z.string(),
+    enabled: z.boolean(),
+    trigger: TriggerSchema,
+    sound: AlertClipSchema.nullable(),
+    // Spoken instead of the sound when set
+    tts: AlertTtsSchema.nullable().default(null),
+    // Shown on the alert's overlay, with the sound or message or alone
+    media: AlertMediaSchema.nullable().default(null),
+    // The sound's or message's
+    volume: z.number().min(0).max(100),
+  }),
+);
 
 // Room Users alerts are no longer possible. Dropping the saved ones keeps
 // the profile loading.
@@ -402,6 +433,7 @@ export const ProfileSchema = z.object({
 export type Profile = z.infer<typeof ProfileSchema>;
 export type Permissions = z.infer<typeof PermissionsSchema>;
 export type Trigger = z.infer<typeof TriggerSchema>;
+export type ViewerRole = Trigger["roles"][number];
 export type Alert = z.infer<typeof AlertSchema>;
 export type GameStep = z.infer<typeof GameStepSchema>;
 export type GameAction = z.infer<typeof GameActionSchema>;

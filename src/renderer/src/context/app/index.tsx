@@ -62,6 +62,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         gain: res.volume / 100,
         key: res.id,
         cacheKey: res.key,
+        start: res.start,
+        end: res.end,
         ...res.filters,
       }),
     );

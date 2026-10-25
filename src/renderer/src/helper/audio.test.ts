@@ -1,14 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AudioQueue, DECODED_CACHE_BYTES, forgetDecoded } from "./audio";
+import {
+  AudioQueue,
+  CUT_FADE,
+  DECODED_CACHE_BYTES,
+  forgetDecoded,
+} from "./audio";
 
 type FakeAudio = { duration: number; length: number; numberOfChannels: number };
 
 // A Tone.js stand-in that records what the queue builds and schedules
 const tone = vi.hoisted(() => {
   class FakeParam {
+    // Values set ahead, as [value, time]
+    scheduled: [number, number][] = [];
     constructor(public value: number) {}
     rampTo(value: number) {
       this.value = value;
+    }
+    setValueAtTime(value: number, time: number) {
+      this.scheduled.push([value, time]);
+    }
+    linearRampToValueAtTime(value: number, time: number) {
+      this.scheduled.push([value, time]);
     }
   }
 
@@ -35,6 +48,9 @@ const tone = vi.hoisted(() => {
     playbackRate: number;
     detune: number;
     startedAt: number | null = null;
+    // The seconds of the sound it starts from, and plays for
+    offset?: number;
+    length?: number;
     stopped = false;
     disposed = false;
     onstop = () => {};
@@ -51,8 +67,10 @@ const tone = vi.hoisted(() => {
     connect() {
       return this;
     }
-    start(time: number) {
+    start(time: number, offset?: number, length?: number) {
       this.startedAt = time;
+      this.offset = offset;
+      this.length = length;
     }
     stop() {
       this.stopped = true;
@@ -482,6 +500,47 @@ describe("AudioQueue", () => {
     const copied = tone.decode.mock.calls[1][0];
     expect(copied).not.toBe(view.buffer);
     expect(copied.byteLength).toBe(3);
+  });
+
+  it("plays a cut's part, faded out at its end, for as long as it lasts", async () => {
+    const queue = new AudioQueue();
+    queue.setQueueOptions({ gapTime: 0.5 });
+    const onScheduled = vi.fn();
+
+    await queue.enqueue(bytes(), { start: 0.5, end: 1.5, onScheduled });
+    await queue.enqueue(bytes(), { start: 0.5, speed: 2 });
+    await queue.enqueue(bytes());
+
+    const [cut, toEnd] = tone.players;
+    expect([cut.offset, cut.length]).toEqual([0.5, 1]);
+    // To the sound's end at twice the speed
+    expect([toEnd.offset, toEnd.length]).toEqual([0.5, undefined]);
+    expect(tone.players.map((p) => p.startedAt)).toEqual([10, 11.5, 12.75]);
+    expect(onScheduled).toHaveBeenCalledWith(0.25, 1);
+
+    // Only the cut end fades, on its own node
+    const fades = tone.gains.filter((g) => g.gain.scheduled.length > 0);
+    expect(fades).toHaveLength(1);
+    expect(fades[0].gain.scheduled).toEqual([
+      [1, 11 - CUT_FADE],
+      [0, 11],
+    ]);
+    cut.finish();
+    expect(fades[0].disposed).toBe(true);
+  });
+
+  it("plays a cut that doesn't fit the sound whole", async () => {
+    const queue = new AudioQueue();
+
+    await queue.enqueue(bytes(), { start: 3, end: 5 });
+    await queue.enqueue(bytes(), { start: 1.5, end: 1 });
+    await queue.enqueue(bytes(), { end: 9 });
+
+    expect(tone.players.map((p) => [p.offset, p.length])).toEqual([
+      [0, undefined],
+      [0, undefined],
+      [0, undefined],
+    ]);
   });
 
   it("resolves false when the audio can't be decoded", async () => {

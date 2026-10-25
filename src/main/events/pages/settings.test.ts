@@ -63,6 +63,8 @@ const gamesOf = ({
           emotes: [],
           keyword: "",
           user: "",
+          min_coins: 0,
+          roles: [],
         },
         likes_every: 100,
         steps: [],

@@ -1,4 +1,4 @@
-import { Alert, Profile } from "@/common/schemas";
+import { Alert, AlertSound, Profile } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -27,6 +27,8 @@ import { Alerts } from ".";
 const airhorn = alertSound("Airhorn");
 const bell = alertSound("Bell");
 const aria = voice("en-US-AriaNeural");
+// A library sound on an alert, played whole
+const whole = (sound: AlertSound) => ({ ...sound, start: 0, end: null });
 
 const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({
   id,
@@ -38,8 +40,10 @@ const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({
     emotes: [],
     keyword: "",
     user: "",
+    min_coins: 0,
+    roles: [],
   },
-  sound: airhorn,
+  sound: whole(airhorn),
   tts: null,
   media: null,
   volume: 80,
@@ -80,22 +84,42 @@ const wait = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 const saves = () =>
   sent(APP_EVENTS.UPDATE_ALERTS_SETTINGS).map(({ settings }) => settings);
 
-// An alert's row: the cell with its Remove button sits in it
+// An alert's row, where its Remove button sits
 const rows = () =>
   screen
     .queryAllByRole("button", { name: "Remove" })
     .filter((button) => !button.closest("[role=dialog]"))
-    .map((button) => within(button.parentElement!.parentElement!));
+    .map((button) => within(button.parentElement!));
+// What a row says about its alert, which opens its editor
+const summary = (row: number) => rows()[row].getByTitle("Edit alert");
+
+// The editor, and the dialog on top of it: a picker, or the editor itself
+const editor = () => within(screen.getAllByRole("dialog")[0]);
+const top = () => within(screen.getAllByRole("dialog").at(-1)!);
+const dialogs = () => screen.queryAllByRole("dialog");
+
+// Opens the editor of the alert in the row, on one of its tabs
+async function edit(user: UserEvent, row: number, tab?: "Sound" | "Media") {
+  await user.click(summary(row));
+  if (tab) await user.click(editor().getByRole("tab", { name: tab }));
+  return editor();
+}
+
+// Opens the sound picker of the alert in the row, over its editor
+async function pickSound(user: UserEvent, row: number) {
+  const opened = await edit(user, row, "Sound");
+  await user.click(
+    opened.getByRole("button", { name: /^(Change|Choose sound)\.\.\.$/ }),
+  );
+  return top();
+}
 
 const addAlert = () => screen.getByRole("button", { name: "Add alert" });
 // Asks main for a file's sound, which it answers with SET_ALERT_SOUND
-const browse = () =>
-  within(screen.getByRole("dialog")).getByRole("button", {
-    name: "Browse file...",
-  });
+const browse = () => top().getByRole("button", { name: "Browse file..." });
 // Starts downloading a MyInstants sound in the open picker
 async function download(user: UserEvent) {
-  const dialog = within(screen.getByRole("dialog"));
+  const dialog = top();
   await user.click(dialog.getByRole("tab", { name: "MyInstants" }));
   await send(APP_EVENTS_RESPONSE.SEARCH_SOUNDS, {
     success: true,
@@ -140,17 +164,13 @@ describe("Alerts", () => {
     ]);
 
     const [follow, share] = rows();
-    expect(follow.getByText("Follow")).toBeInTheDocument();
-    expect(follow.getByRole("button", { name: "Airhorn" })).toBeInTheDocument();
+    expect(summary(0)).toHaveTextContent("Follow");
+    expect(summary(0)).toHaveTextContent("Airhorn");
     expect(follow.getByRole("checkbox")).toBeChecked();
-    expect(follow.getByRole("slider")).toHaveValue("80");
 
-    expect(share.getByText("Share")).toBeInTheDocument();
-    expect(
-      share.getByRole("button", { name: "TTS: Thanks for sharing" }),
-    ).toBeInTheDocument();
+    expect(summary(1)).toHaveTextContent("Share");
+    expect(summary(1)).toHaveTextContent("“Thanks for sharing”");
     expect(share.getByRole("checkbox")).not.toBeChecked();
-    expect(share.getByRole("slider")).toHaveValue("40");
     expect(screen.queryByText(empty)).not.toBeInTheDocument();
   });
 
@@ -167,10 +187,8 @@ describe("Alerts", () => {
     await user.click(addAlert());
 
     const [added] = rows();
-    expect(added.getByText("Follow")).toBeInTheDocument();
-    expect(
-      added.getByRole("button", { name: "Select a sound..." }),
-    ).toBeInTheDocument();
+    expect(summary(0)).toHaveTextContent("Follow");
+    expect(summary(0)).toHaveTextContent("No sound");
     expect(added.getByRole("button", { name: "Play" })).toBeDisabled();
 
     await wait(300);
@@ -289,10 +307,11 @@ describe("Alerts", () => {
   });
 
   it("changes the volume of an alert and of its sounds playing", async () => {
-    const { audio } = await load([alert("alert-1")]);
+    const { user, audio } = await load([alert("alert-1")]);
     expect(audio.value.setItemGain).toHaveBeenCalledWith("alert-1", 0.8);
 
-    fireEvent.change(rows()[0].getByRole("slider"), {
+    const opened = await edit(user, 0, "Sound");
+    fireEvent.change(opened.getByRole("slider", { name: "Sound volume" }), {
       target: { value: "30" },
     });
 
@@ -370,9 +389,12 @@ describe("Alerts", () => {
   it("changes the trigger and its filter", async () => {
     const { user, container } = await load([alert("alert-1")]);
 
-    await user.click(rows()[0].getByText("Follow"));
+    const opened = await edit(user, 0);
+    await user.click(opened.getByRole("combobox", { name: "Event" }));
     await user.click(inList(container, "Chat")!);
-    await user.type(rows()[0].getByPlaceholderText("Any message"), "hello");
+    await user.type(opened.getByPlaceholderText("Any message"), "hello");
+
+    expect(screen.getByRole("dialog", { name: "Chat alert" })).toBeVisible();
 
     await wait(300);
     expect(saves()[0].items[0].trigger).toEqual({
@@ -389,12 +411,12 @@ describe("Alerts", () => {
       data: [gift(1, "Rose"), gift(5, "Lion")],
     });
 
-    await user.click(rows()[0].getByText("Any gift"));
-    const dialog = within(screen.getByRole("dialog"));
+    await user.click((await edit(user, 0)).getByText("Any gift"));
+    const dialog = top();
     await user.click(dialog.getByTitle("Lion"));
     await user.click(dialog.getByRole("button", { name: "Done" }));
 
-    expect(rows()[0].getByText("Lion")).toBeInTheDocument();
+    expect(summary(0)).toHaveTextContent("Lion");
     await wait(300);
     expect(saves()[0].items[0].trigger.gifts).toEqual([5]);
   });
@@ -406,18 +428,17 @@ describe("Alerts", () => {
     await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
       data: [gift(1, "Rose"), gift(5, "Lion"), gift(9, "Galaxy")],
     });
-    const dialog = () => within(screen.getByRole("dialog"));
     const listed = () =>
-      dialog()
+      top()
         .getAllByRole("checkbox")
         .map((box) => box.closest("label")!.title);
 
-    await user.click(rows()[0].getByText("Any gift"));
+    await user.click((await edit(user, 0)).getByText("Any gift"));
     expect(listed()).toEqual(["Rose", "Lion", "Galaxy"]);
-    await user.click(dialog().getByTitle("Galaxy"));
-    await user.click(dialog().getByRole("button", { name: "Done" }));
+    await user.click(top().getByTitle("Galaxy"));
+    await user.click(top().getByRole("button", { name: "Done" }));
 
-    await user.click(rows()[0].getByText("Galaxy"));
+    await user.click(editor().getByText("Galaxy"));
 
     expect(listed()).toEqual(["Galaxy", "Rose", "Lion"]);
   });
@@ -431,8 +452,8 @@ describe("Alerts", () => {
       data: [gift(9, "Galaxy")],
     });
 
-    await user.click(rows()[0].getByText("Any gift"));
-    const dialog = within(screen.getByRole("dialog"));
+    await user.click((await edit(user, 0)).getByText("Any gift"));
+    const dialog = top();
     expect(dialog.queryByTitle("Rose")).not.toBeNull();
     expect(dialog.queryByTitle("Galaxy")).not.toBeNull();
     expect(dialog.queryByTitle("Comet")).toBeNull();
@@ -444,7 +465,7 @@ describe("Alerts", () => {
     await user.click(dialog.getByTitle("Comet"));
     await user.click(dialog.getByRole("button", { name: "Done" }));
 
-    expect(rows()[0].getByText("Comet")).toBeInTheDocument();
+    expect(summary(0)).toHaveTextContent("Comet");
     await wait(300);
     expect(saves()[0].items[0].trigger.gifts).toEqual([5]);
   });
@@ -457,8 +478,8 @@ describe("Alerts", () => {
       },
     );
 
-    await user.click(rows()[0].getByText("Any emote"));
-    const dialog = within(screen.getByRole("dialog"));
+    await user.click((await edit(user, 0)).getByText("Any emote"));
+    const dialog = top();
     expect(dialog.queryByTitle("Emote 1")).not.toBeNull();
     expect(dialog.queryByTitle("Emote 2")).toBeNull();
 
@@ -472,7 +493,7 @@ describe("Alerts", () => {
     await user.click(dialog.getByTitle("Emote 2"));
     await user.click(dialog.getByRole("button", { name: "Done" }));
 
-    expect(rows()[0].getByText("Emote 2")).toBeInTheDocument();
+    expect(summary(0)).toHaveTextContent("Emote 2");
     await wait(300);
     expect(saves()[0].items[0].trigger.emotes).toEqual(["e2"]);
   });
@@ -483,8 +504,7 @@ describe("Alerts", () => {
       alert("alert-2", { sound: null, tts: speech("Welcome") }),
     ]);
 
-    await user.click(rows()[1].getByRole("button", { name: "TTS: Welcome" }));
-    const dialog = within(screen.getByRole("dialog"));
+    const dialog = await pickSound(user, 1);
     expect(dialog.getByText("Speak a message")).toBeInTheDocument();
     expect(dialog.getByPlaceholderText(/Type what the alert says/)).toHaveValue(
       "Welcome",
@@ -497,12 +517,13 @@ describe("Alerts", () => {
     await user.click(dialog.getByRole("tab", { name: "My sounds" }));
     await user.click(dialog.getByRole("button", { name: "Bell" }));
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(rows()[1].getByRole("button", { name: "Bell" })).toBeInTheDocument();
+    // Back to the editor
+    expect(dialogs()).toHaveLength(1);
+    expect(summary(1)).toHaveTextContent("Bell");
     await wait(300);
     expect(saves()[0].items).toEqual([
       alert("alert-1"),
-      alert("alert-2", { sound: bell, tts: null }),
+      alert("alert-2", { sound: whole(bell), tts: null }),
     ]);
   });
 
@@ -512,8 +533,7 @@ describe("Alerts", () => {
       p.tts.filters = { speed: 1.2, pitch: 0.9, volume: 100 };
     });
 
-    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
-    const dialog = within(screen.getByRole("dialog"));
+    const dialog = await pickSound(user, 0);
     await user.click(dialog.getByRole("tab", { name: "Text-to-speech" }));
     const use = dialog.getByRole("button", { name: "Use text-to-speech" });
     expect(use).toBeDisabled();
@@ -524,10 +544,8 @@ describe("Alerts", () => {
     );
     await user.click(use);
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(
-      rows()[0].getByRole("button", { name: "TTS: Thanks for the follow" }),
-    ).toBeInTheDocument();
+    expect(dialogs()).toHaveLength(1);
+    expect(summary(0)).toHaveTextContent("“Thanks for the follow”");
     await wait(300);
     expect(saves()[0].items[0]).toEqual(
       alert("alert-1", {
@@ -545,15 +563,11 @@ describe("Alerts", () => {
   it("clears an alert's sound, keeping it in the library", async () => {
     const { user } = await load([alert("alert-1")]);
 
-    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
-    await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Clear" }),
-    );
+    const dialog = await pickSound(user, 0);
+    await user.click(dialog.getByRole("button", { name: "Clear" }));
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(
-      rows()[0].getByRole("button", { name: "Select a sound..." }),
-    ).toBeInTheDocument();
+    expect(dialogs()).toHaveLength(1);
+    expect(summary(0)).toHaveTextContent("No sound");
     expect(sent(APP_EVENTS.REMOVE_SOUND)).toEqual([]);
     await wait(300);
     expect(saves()[0].items[0]).toEqual(alert("alert-1", { sound: null }));
@@ -562,14 +576,10 @@ describe("Alerts", () => {
   it("closes the picker without changing the alert", async () => {
     const { user } = await load([alert("alert-1")]);
 
-    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
-    await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Cancel",
-      }),
-    );
+    const dialog = await pickSound(user, 0);
+    await user.click(dialog.getByRole("button", { name: "Cancel" }));
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(dialogs()).toHaveLength(1);
     await wait(300);
     expect(saves()).toEqual([]);
   });
@@ -578,8 +588,8 @@ describe("Alerts", () => {
     const { user } = await load([
       alert("alert-1", { sound: null, tts: speech("Welcome") }),
     ]);
-    await user.click(rows()[0].getByRole("button", { name: "TTS: Welcome" }));
-    await user.click(screen.getByRole("tab", { name: "My sounds" }));
+    const dialog = await pickSound(user, 0);
+    await user.click(dialog.getByRole("tab", { name: "My sounds" }));
     await user.click(browse());
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
@@ -589,16 +599,16 @@ describe("Alerts", () => {
       sound: bell,
     });
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(dialogs()).toHaveLength(1);
     await wait(300);
     expect(saves()[0].items[0]).toEqual(
-      alert("alert-1", { sound: bell, tts: null }),
+      alert("alert-1", { sound: whole(bell), tts: null }),
     );
   });
 
   it("keeps the picker open when main couldn't save the sound", async () => {
     const { user } = await load([alert("alert-1")]);
-    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await pickSound(user, 0);
     await user.click(browse());
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
@@ -607,9 +617,7 @@ describe("Alerts", () => {
       request: 1,
     });
 
-    expect(screen.getByRole("dialog")).toHaveTextContent(
-      "Couldn't save that sound.",
-    );
+    expect(dialogs().at(-1)).toHaveTextContent("Couldn't save that sound.");
     await wait(300);
     expect(saves()).toEqual([]);
   });
@@ -617,14 +625,11 @@ describe("Alerts", () => {
   // A download started from another alert's picker can finish meanwhile
   it("uses a sound saved after its picker closed, keeping another picker open", async () => {
     const { user } = await load([alert("alert-1"), alert("alert-2")]);
-    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await pickSound(user, 0);
     await download(user);
-    await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Cancel",
-      }),
-    );
-    await user.click(rows()[1].getByRole("button", { name: "Airhorn" }));
+    await user.click(top().getByRole("button", { name: "Cancel" }));
+    await user.click(editor().getByRole("button", { name: "Done" }));
+    await pickSound(user, 1);
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       success: true,
@@ -633,19 +638,19 @@ describe("Alerts", () => {
       sound: bell,
     });
 
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(rows()[0].getByRole("button", { name: "Bell" })).toBeInTheDocument();
+    expect(dialogs()).toHaveLength(2);
+    expect(summary(0)).toHaveTextContent("Bell");
   });
 
   it("ignores a download that finishes after another sound was picked", async () => {
     const { user } = await load([alert("alert-1")]);
-    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await pickSound(user, 0);
     await send(APP_EVENTS_RESPONSE.GET_SOUNDS, {
       success: true,
       data: [airhorn, bell],
     });
     await download(user);
-    const dialog = within(screen.getByRole("dialog"));
+    const dialog = top();
     await user.click(dialog.getByRole("tab", { name: "My sounds" }));
     await user.click(dialog.getByRole("button", { name: "Bell" }));
 
@@ -656,9 +661,11 @@ describe("Alerts", () => {
       sound: alertSound("Bruh"),
     });
 
-    expect(rows()[0].getByRole("button", { name: "Bell" })).toBeInTheDocument();
+    expect(summary(0)).toHaveTextContent("Bell");
     await wait(300);
-    expect(saves().at(-1)?.items[0]).toEqual(alert("alert-1", { sound: bell }));
+    expect(saves().at(-1)?.items[0]).toEqual(
+      alert("alert-1", { sound: whole(bell) }),
+    );
   });
 
   it.each([
@@ -666,7 +673,7 @@ describe("Alerts", () => {
     ["the later one first", [2, 1]],
   ])("uses the later of two picks whose replies come %s", async (_, order) => {
     const { user } = await load([alert("alert-1")]);
-    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await pickSound(user, 0);
     await user.click(browse());
     await download(user);
     const sounds = [bell, alertSound("Bruh")];
@@ -680,16 +687,16 @@ describe("Alerts", () => {
       });
     }
 
-    expect(rows()[0].getByRole("button", { name: "Bruh" })).toBeInTheDocument();
+    expect(summary(0)).toHaveTextContent("Bruh");
     await wait(300);
     expect(saves().at(-1)?.items[0]).toEqual(
-      alert("alert-1", { sound: alertSound("Bruh") }),
+      alert("alert-1", { sound: whole(alertSound("Bruh")) }),
     );
   });
 
   it("still uses a download after a browse was cancelled", async () => {
     const { user } = await load([alert("alert-1")]);
-    await user.click(rows()[0].getByRole("button", { name: "Airhorn" }));
+    await pickSound(user, 0);
     await download(user);
     // Main sends no reply for a cancelled dialog
     await user.click(browse());
@@ -701,7 +708,7 @@ describe("Alerts", () => {
       sound: alertSound("Bruh"),
     });
 
-    expect(rows()[0].getByRole("button", { name: "Bruh" })).toBeInTheDocument();
+    expect(summary(0)).toHaveTextContent("Bruh");
   });
 
   it("tests an alert's sound or message", async () => {
@@ -713,7 +720,7 @@ describe("Alerts", () => {
 
     await user.click(rows()[0].getByRole("button", { name: "Play" }));
     expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([
-      { id: "alert-1", file: "airhorn.mp3", volume: 80 },
+      { id: "alert-1", file: "airhorn.mp3", volume: 80, start: 0 },
     ]);
     expect(
       rows()[0].getByRole("button", { name: "Cancel" }),
@@ -734,27 +741,32 @@ describe("Alerts", () => {
     const shown = (file = party, duration = 5) =>
       alertMedia(file, { duration });
 
-    // Opens the media picker of the alert in the row, with the library listed
-    async function openMedia(user: UserEvent, row: number, name: string) {
-      await user.click(rows()[row].getByRole("button", { name }));
+    // Opens the media picker of the alert in the row over its editor, with
+    // the library listed
+    async function openMedia(user: UserEvent, row: number) {
+      const opened = await edit(user, row, "Media");
+      await user.click(
+        opened.getByRole("button", { name: /^(Change|Choose media)\.\.\.$/ }),
+      );
       await send(APP_EVENTS_RESPONSE.GET_MEDIA, {
         success: true,
         data: [party, confetti],
       });
-      return within(screen.getByRole("dialog"));
+      return top();
     }
+    const duration = () =>
+      editor().getByRole("spinbutton", { name: "Duration in seconds" });
 
     it("picks media for an alert from the library, for 5 seconds", async () => {
       const { user } = await load([alert("alert-1")]);
 
-      const dialog = await openMedia(user, 0, "Select media...");
+      const dialog = await openMedia(user, 0);
       await user.click(dialog.getByRole("button", { name: "Party" }));
 
-      // It stays open for the duration and the URL.
-      expect(dialog.getByRole("spinbutton")).toHaveValue(5);
-      expect(
-        rows()[0].getByRole("button", { name: "Party" }),
-      ).toBeInTheDocument();
+      // Back to the editor, which shows how long
+      expect(dialogs()).toHaveLength(1);
+      expect(duration()).toHaveValue(5);
+      expect(summary(0)).toHaveTextContent("Party");
       await wait(300);
       expect(saves()[0].items[0]).toEqual(alert("alert-1", { media: shown() }));
     });
@@ -764,25 +776,24 @@ describe("Alerts", () => {
         alert("alert-1", { media: shown(party, 9) }),
       ]);
 
-      const dialog = await openMedia(user, 0, "Party");
+      const dialog = await openMedia(user, 0);
       await user.click(dialog.getByRole("button", { name: "Confetti" }));
       await wait(300);
       expect(saves().at(-1)?.items[0].media).toEqual(shown(confetti, 9));
 
-      fireEvent.change(dialog.getByRole("spinbutton"), {
-        target: { value: "12" },
-      });
+      fireEvent.change(duration(), { target: { value: "12" } });
       await wait(300);
       expect(saves().at(-1)?.items[0].media).toEqual(shown(confetti, 12));
 
-      await user.click(dialog.getByRole("button", { name: "Clear" }));
+      await user.click(editor().getByRole("button", { name: "Change..." }));
+      await user.click(top().getByRole("button", { name: "Clear" }));
       await wait(300);
       expect(saves().at(-1)?.items[0].media).toBeNull();
     });
 
     it("uses a browsed file only for the alert waiting for one", async () => {
       const { user } = await load([alert("alert-1"), alert("alert-2")]);
-      const dialog = await openMedia(user, 0, "Select media...");
+      const dialog = await openMedia(user, 0);
       await user.click(dialog.getByRole("button", { name: "Browse file..." }));
 
       await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
@@ -796,18 +807,15 @@ describe("Alerts", () => {
         media: party,
       });
 
-      expect(
-        rows()[0].getByRole("button", { name: "Party" }),
-      ).toBeInTheDocument();
-      expect(
-        rows()[1].getByRole("button", { name: "Select media..." }),
-      ).toBeInTheDocument();
+      expect(dialogs()).toHaveLength(1);
+      expect(summary(0)).toHaveTextContent("Party");
+      expect(summary(1)).toHaveTextContent("No media");
     });
 
     it("takes a deleted file off the alerts it shows", async () => {
       await load([
         alert("alert-1", { media: shown() }),
-        alert("alert-2", { sound: bell, media: shown(confetti) }),
+        alert("alert-2", { sound: whole(bell), media: shown(confetti) }),
       ]);
 
       await send(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, {
@@ -819,16 +827,12 @@ describe("Alerts", () => {
         file: party.file,
       });
 
-      expect(
-        rows()[0].getByRole("button", { name: "Select a sound..." }),
-      ).toBeInTheDocument();
-      expect(
-        rows()[0].getByRole("button", { name: "Select media..." }),
-      ).toBeInTheDocument();
+      expect(summary(0)).toHaveTextContent("No sound");
+      expect(summary(0)).toHaveTextContent("No media");
       await wait(300);
       expect(saves().at(-1)?.items).toEqual([
         alert("alert-1", { sound: null }),
-        alert("alert-2", { sound: bell, media: shown(confetti) }),
+        alert("alert-2", { sound: whole(bell), media: shown(confetti) }),
       ]);
     });
 
@@ -839,7 +843,7 @@ describe("Alerts", () => {
         }),
       ]);
 
-      const dialog = await openMedia(user, 0, "Party");
+      const dialog = await openMedia(user, 0);
       await user.click(dialog.getByRole("button", { name: "Confetti" }));
 
       await wait(300);
@@ -853,11 +857,7 @@ describe("Alerts", () => {
       const { user } = await load([
         alert("alert-1", { media: alertMedia(clip) }),
       ]);
-      await user.click(rows()[0].getByRole("button", { name: "Clip" }));
-      await send(APP_EVENTS_RESPONSE.GET_MEDIA, {
-        success: true,
-        data: [clip],
-      });
+      await edit(user, 0, "Media");
       const video = screen.getByRole("dialog").querySelector("video")!;
       Object.defineProperty(video, "duration", { value: 7.4 });
       fireEvent.loadedMetadata(video);
@@ -872,7 +872,7 @@ describe("Alerts", () => {
 
     it("ignores a browsed file that comes after a pick", async () => {
       const { user } = await load([alert("alert-1")]);
-      const dialog = await openMedia(user, 0, "Select media...");
+      const dialog = await openMedia(user, 0);
       await user.click(dialog.getByRole("button", { name: "Browse file..." }));
       await user.click(dialog.getByRole("button", { name: "Confetti" }));
 
@@ -882,9 +882,236 @@ describe("Alerts", () => {
         media: party,
       });
 
+      expect(summary(0)).toHaveTextContent("Confetti");
+    });
+  });
+
+  describe("editor", () => {
+    const ding = new Uint8Array([1, 2, 3]);
+
+    // Main's reply to the waveform's request, then the decode
+    async function waveform() {
+      await send(APP_EVENTS_RESPONSE.SOUND_DATA, {
+        success: true,
+        file: "airhorn.mp3",
+        data: ding,
+      });
+      await act(async () => {});
+    }
+
+    it("cuts an alert's sound on its waveform, and tests the cut", async () => {
+      const { user, audio } = await load([alert("alert-1")]);
+      const opened = await edit(user, 0, "Sound");
+      expect(sent(APP_EVENTS.GET_SOUND_DATA)).toEqual([
+        { file: "airhorn.mp3" },
+      ]);
+
+      await waveform();
+      // The queues' decode, by the key main plays it with
+      expect(audio.value.decode).toHaveBeenCalledWith(ding, "airhorn.mp3");
+      // The fake sound lasts 2 seconds; Shift moves a handle by one
+      fireEvent.keyDown(opened.getByRole("slider", { name: "Start" }), {
+        key: "ArrowRight",
+        shiftKey: true,
+      });
+      fireEvent.change(opened.getByRole("spinbutton", { name: "End" }), {
+        target: { value: "1.5" },
+      });
+
+      expect(opened.getByText("Plays 0.5s of 2s")).toBeInTheDocument();
+      // How long the cut plays
+      expect(summary(0)).toHaveTextContent("0.5s");
+      await wait(300);
+      expect(saves().at(-1)?.items[0].sound).toEqual({
+        ...whole(airhorn),
+        start: 1,
+        end: 1.5,
+      });
+
+      await user.click(opened.getByRole("button", { name: "Play" }));
+      expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([
+        { id: "alert-1", file: "airhorn.mp3", volume: 80, start: 1, end: 1.5 },
+      ]);
+
+      await user.click(opened.getByRole("button", { name: "Reset cut" }));
+      await wait(300);
+      expect(saves().at(-1)?.items[0].sound).toEqual(whole(airhorn));
+    });
+
+    it("plays to the sound's end once the end handle reaches it", async () => {
+      const { user } = await load([
+        alert("alert-1", { sound: { ...whole(airhorn), end: 1 } }),
+      ]);
+      const opened = await edit(user, 0, "Sound");
+      await waveform();
+
+      fireEvent.keyDown(opened.getByRole("slider", { name: "End" }), {
+        key: "End",
+      });
+
+      await wait(300);
+      expect(saves().at(-1)?.items[0].sound?.end).toBeNull();
+    });
+
+    it("keeps a sound's cut when the same sound is picked again", async () => {
+      const cut = { ...whole(airhorn), start: 0.5, end: 1 };
+      const { user } = await load([alert("alert-1", { sound: cut })]);
+      const dialog = await pickSound(user, 0);
+      await send(APP_EVENTS_RESPONSE.GET_SOUNDS, {
+        success: true,
+        data: [airhorn, bell],
+      });
+
+      await user.click(dialog.getByRole("button", { name: "Airhorn" }));
+      expect(summary(0)).toHaveTextContent("0.5s");
+      await wait(300);
+      expect(saves()).toEqual([]);
+
+      await pickSound(user, 0);
+      await send(APP_EVENTS_RESPONSE.GET_SOUNDS, {
+        success: true,
+        data: [airhorn, bell],
+      });
+      await user.click(top().getByRole("button", { name: "Bell" }));
+      await wait(300);
+      expect(saves().at(-1)?.items[0].sound).toEqual(whole(bell));
+    });
+
+    it("says when it can't read the sound", async () => {
+      const { user } = await load([alert("alert-1")]);
+      const opened = await edit(user, 0, "Sound");
+
+      await send(APP_EVENTS_RESPONSE.SOUND_DATA, {
+        ...failure(),
+        file: "other.mp3",
+      });
+      expect(opened.queryByText("Couldn't read this sound.")).toBeNull();
+      await send(APP_EVENTS_RESPONSE.SOUND_DATA, {
+        ...failure(),
+        file: "airhorn.mp3",
+      });
+
+      expect(opened.getByText("Couldn't read this sound.")).toBeInTheDocument();
+    });
+
+    it("doesn't cut a message", async () => {
+      const { user } = await load([
+        alert("alert-1", { sound: null, tts: speech("Welcome") }),
+      ]);
+
+      const opened = await edit(user, 0, "Sound");
+
+      expect(opened.getByText(/Messages play whole/)).toBeInTheDocument();
+      expect(opened.queryByRole("slider", { name: "Start" })).toBeNull();
+      expect(sent(APP_EVENTS.GET_SOUND_DATA)).toEqual([]);
+    });
+
+    it("sets the coins a gift is worth and the viewers' roles", async () => {
+      const { user } = await load([
+        alert("alert-1", { trigger: trigger(TOKIO_EVENTS.GIFT) }),
+      ]);
+      const opened = await edit(user, 0);
+      expect(opened.getByText(/The whole streak's coins/)).toBeInTheDocument();
+
+      fireEvent.change(opened.getByRole("spinbutton", { name: "Coins" }), {
+        target: { value: "100" },
+      });
+      await user.click(opened.getByRole("checkbox", { name: "Moderators" }));
+      await user.click(opened.getByRole("checkbox", { name: "Super Fans" }));
+      await user.click(opened.getByRole("checkbox", { name: "Super Fans" }));
+
+      expect(summary(0)).toHaveTextContent(
+        "Any gift, when the streak ends, worth 100+ coins, from Moderators",
+      );
+      await wait(300);
+      expect(saves().at(-1)?.items[0].trigger).toMatchObject({
+        min_coins: 100,
+        roles: ["moderator"],
+      });
+    });
+
+    it.each([TOKIO_EVENTS.ENVELOPE, TOKIO_EVENTS.FOLLOW] as const)(
+      "offers no roles or coins for %s",
+      async (type) => {
+        const { user } = await load([
+          alert("alert-1", { trigger: trigger(type) }),
+        ]);
+
+        const opened = await edit(user, 0);
+
+        expect(opened.queryByRole("group", { name: "From" })).toBeNull();
+        expect(
+          opened.queryByRole("group", { name: "Worth at least" }),
+        ).toBeNull();
+      },
+    );
+
+    it("offers the coins only for any gift", async () => {
+      const { user } = await load([
+        alert("alert-1", {
+          trigger: { ...trigger(TOKIO_EVENTS.GIFT), gifts: [1] },
+        }),
+      ]);
+
+      const opened = await edit(user, 0);
+
       expect(
-        rows()[0].getByRole("button", { name: "Confetti" }),
-      ).toBeInTheDocument();
+        opened.queryByRole("group", { name: "Worth at least" }),
+      ).toBeNull();
+      expect(opened.getByRole("group", { name: "From" })).toBeInTheDocument();
+    });
+
+    it("tests a message next to it, and sets its volume", async () => {
+      const { user } = await load([
+        alert("alert-1", { sound: null, tts: speech("Welcome") }),
+      ]);
+      const opened = await edit(user, 0, "Sound");
+
+      await user.click(opened.getByRole("button", { name: "Play" }));
+      fireEvent.change(opened.getByRole("slider", { name: "Sound volume" }), {
+        target: { value: "45" },
+      });
+
+      expect(sent(APP_EVENTS.TEST_ALERT)).toHaveLength(1);
+      await wait(300);
+      expect(saves().at(-1)?.items[0].volume).toBe(45);
+    });
+
+    it("has no volume or test without a sound", async () => {
+      const { user } = await load([alert("alert-1", { sound: null })]);
+
+      const opened = await edit(user, 0, "Sound");
+
+      expect(opened.queryByRole("slider")).toBeNull();
+      expect(opened.queryByRole("button", { name: "Play" })).toBeNull();
+    });
+
+    it("closes the picker over it first, then itself", async () => {
+      const { user } = await load([alert("alert-1")]);
+      await pickSound(user, 0);
+      expect(dialogs()).toHaveLength(2);
+
+      await user.keyboard("{Escape}");
+      expect(dialogs()).toHaveLength(1);
+      // The focus went back to the button that opened the picker
+      expect(editor().getByRole("button", { name: "Change..." })).toHaveFocus();
+
+      await user.keyboard("{Escape}");
+      expect(dialogs()).toHaveLength(0);
+    });
+
+    it("closes when its alert is gone", async () => {
+      const { user } = await load([alert("alert-1")]);
+      await edit(user, 0);
+
+      await send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.alerts.items = [];
+        }),
+      );
+
+      expect(dialogs()).toHaveLength(0);
     });
   });
 });

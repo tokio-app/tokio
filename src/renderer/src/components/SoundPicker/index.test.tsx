@@ -158,7 +158,9 @@ describe("SoundPicker", () => {
     expect(screen.getByRole("button", { name: "Clear" })).toBeDisabled();
     unmount();
 
-    const withSound = setup(alert({ sound: LIBRARY[0] }));
+    const withSound = setup(
+      alert({ sound: { ...LIBRARY[0], start: 0, end: null } }),
+    );
     await user.click(screen.getByRole("button", { name: "Clear" }));
     expect(withSound.onClear).toHaveBeenCalledOnce();
     expect(onClear).not.toHaveBeenCalled();
@@ -166,7 +168,7 @@ describe("SoundPicker", () => {
   });
 
   it("marks the alert's sound in your sounds", async () => {
-    setup(alert({ sound: LIBRARY[1] }));
+    setup(alert({ sound: { ...LIBRARY[1], start: 0, end: null } }));
     await sounds(LIBRARY);
 
     expect(screen.getByRole("button", { current: true })).toHaveTextContent(

@@ -359,6 +359,42 @@ describe("alerts events", () => {
     });
   });
 
+  describe("GET_SOUND_DATA", () => {
+    const setup = (res: AlertsResult<Uint8Array>) => {
+      const readSound = vi.fn(async (_file: string) => res);
+      return { h: createHandler({ alertsService: { readSound } }), readSound };
+    };
+
+    it("replies with the sound's bytes", async () => {
+      const { h, readSound } = setup({ success: true, data: audio });
+
+      await h.invoke(alerts, APP_EVENTS.GET_SOUND_DATA, { file: ding.file });
+
+      expect(readSound).toHaveBeenCalledExactlyOnceWith(ding.file);
+      expect(h.replies(APP_EVENTS_RESPONSE.SOUND_DATA)).toEqual([
+        { success: true, file: ding.file, data: audio },
+      ]);
+    });
+
+    it("says which sound it couldn't read, without a notice", async () => {
+      const { h } = setup({ success: false, error: "ENOENT" });
+
+      await h.invoke(alerts, APP_EVENTS.GET_SOUND_DATA, { file: ding.file });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.SOUND_DATA)).toEqual([
+        {
+          success: false,
+          file: ding.file,
+          error: {
+            code: FEEDBACK_CODES.SOUND_READ_FAILED,
+            message: "Unable to read the sound.",
+          },
+        },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+  });
+
   describe("TEST_ALERT", () => {
     const setup = (spoken: SpeakResult = { success: true, data: audio }) => {
       const alertsService = {

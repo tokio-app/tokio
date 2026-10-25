@@ -3,9 +3,8 @@ import { APP_EVENTS } from "@/common/types";
 import { AudioQueue, EnqueueOptions } from "./audio";
 
 type QueuedAlert = {
-  // The alert, whose overlay shows its media
+  // The alert, whose overlay shows its media at the media's volume
   id: string;
-  volume: number;
   // None when the alert only shows media
   data?: Uint8Array;
   media?: AlertMedia;
@@ -18,7 +17,7 @@ type QueuedAlert = {
  */
 export function queueAlert(
   queue: AudioQueue,
-  { id, volume, data, media }: QueuedAlert,
+  { id, data, media }: QueuedAlert,
   options: EnqueueOptions = {},
 ): Promise<boolean> {
   if (!media) {
@@ -34,7 +33,7 @@ export function queueAlert(
         file: media.file,
         delay,
         duration,
-        volume,
+        volume: media.volume,
       }),
   };
   return data ? queue.enqueue(data, item) : queue.wait(media.duration, item);

@@ -1,4 +1,4 @@
-import { Alert, AlertTts, MediaFile } from "@/common/schemas";
+import { AlertSound, AlertTts, MediaFile } from "@/common/schemas";
 import {
   AlertTrigger,
   AppError,
@@ -80,7 +80,7 @@ const addPickedSound = async (
   { storeManagerService, notifier }: AppHandlerVariables,
   e: ReplyEvent,
   { id, request }: { id: string; request: number },
-  res: AlertsResult<NonNullable<Alert["sound"]>>,
+  res: AlertsResult<AlertSound>,
 ) => {
   if (!res.success || !res.data) throw new LoggedError(res.error);
   if (!(await storeManagerService.addSound(res.data))) throw saveFailure();
@@ -267,6 +267,29 @@ events.push(
         volume,
         error,
       }),
+  },
+);
+
+events.push(
+  APP_EVENTS.GET_SOUND_DATA,
+  async ({ alertsService }, e, { file }) => {
+    const res = await alertsService.readSound(file);
+    if (!res.success) throw new LoggedError(res.error);
+    e.reply(APP_EVENTS_RESPONSE.SOUND_DATA, {
+      success: true,
+      file,
+      data: res.data,
+    });
+  },
+  {
+    // The editor says it couldn't read the sound
+    notify: false,
+    failure: {
+      code: FEEDBACK_CODES.SOUND_READ_FAILED,
+      message: "Unable to read the sound.",
+    },
+    onError: (e, error, { file }) =>
+      e.reply(APP_EVENTS_RESPONSE.SOUND_DATA, { success: false, file, error }),
   },
 );
 

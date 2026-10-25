@@ -1,4 +1,4 @@
-import { AudioQueue } from "@/helper/audio";
+import { AudioQueue, decodeSound } from "@/helper/audio";
 import React, { createContext, useCallback, useMemo, useRef } from "react";
 import * as Tone from "tone";
 
@@ -7,6 +7,8 @@ export interface AudioContextType {
   stopQueues: (prefix: string) => void;
   setItemGain: (key: string, gain: number) => void;
   resumeContext: () => Promise<void>;
+  // Shares the decode with the queues' copies of the sound with that key
+  decode: (data: Uint8Array, cacheKey: string) => Promise<AudioBuffer>;
 }
 
 export const AudioContext = createContext<AudioContextType | null>(null);
@@ -40,7 +42,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const value = useMemo(
-    () => ({ getQueue, stopQueues, setItemGain, resumeContext }),
+    () => ({
+      getQueue,
+      stopQueues,
+      setItemGain,
+      resumeContext,
+      decode: decodeSound,
+    }),
     [getQueue, stopQueues, setItemGain, resumeContext],
   );
 

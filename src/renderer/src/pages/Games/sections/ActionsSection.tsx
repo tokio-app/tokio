@@ -201,7 +201,6 @@ function ActionItem({
             onChange({ ...action, trigger: { ...trigger, type } })
           }
         />
-        {/* Its line for triggers without a filter isn't needed here */}
         <div className={styles.filter}>
           {trigger.type === TOKIO_EVENTS.LIKE ? (
             // Counted as the countdown timer counts them, from all viewers

@@ -9,6 +9,7 @@ import {
   Modal,
   Section,
   SoundLength,
+  useVideoURL,
 } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
@@ -24,6 +25,8 @@ export function MediaSection() {
   const [removing, setRemoving] = useState<MediaFile | null>(null);
   // The videos' lengths in seconds, read by their thumbnails
   const [lengths, setLengths] = useState<Record<string, number>>({});
+  // Apart from its thumbnail's, which is loaded too
+  const fullVideo = useVideoURL(showing?.file ?? "");
 
   useIpcRequest(APP_EVENTS.GET_MEDIA);
 
@@ -46,7 +49,7 @@ export function MediaSection() {
           {mediaKind(showing.file) === "video" ? (
             <video
               className={styles.media_full}
-              src={getMediaPreviewURL(showing.file)}
+              src={fullVideo}
               controls
               autoPlay
             />

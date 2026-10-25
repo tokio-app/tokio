@@ -7,15 +7,17 @@ type Props = {
   file?: string;
   // The length already known, from a preview
   seconds?: number;
+  // Seconds of the file left out at its start, like an alert's cut
+  from?: number;
 };
 
 /**
  * A sound's or video's length ("2.5s", "1:05") once it's known. Nothing
  * shows for a file that doesn't say its length.
  */
-export function SoundLength({ file, seconds }: Props) {
+export function SoundLength({ file, seconds, from = 0 }: Props) {
   const [read, setRead] = useState<number>();
-  const length = seconds ?? read;
+  const length = seconds ?? (read === undefined ? undefined : read - from);
   return (
     <>
       {file && seconds === undefined && (

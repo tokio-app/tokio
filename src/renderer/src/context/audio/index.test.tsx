@@ -15,7 +15,10 @@ const mocks = vi.hoisted(() => {
   return { FakeQueue, created, tone: { state: "suspended", start: vi.fn() } };
 });
 
-vi.mock("@/helper/audio", () => ({ AudioQueue: mocks.FakeQueue }));
+vi.mock("@/helper/audio", () => ({
+  AudioQueue: mocks.FakeQueue,
+  decodeSound: vi.fn(),
+}));
 
 vi.mock("tone", () => ({
   getContext: () => ({ state: mocks.tone.state }),
