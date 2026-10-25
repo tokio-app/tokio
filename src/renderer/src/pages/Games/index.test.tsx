@@ -705,10 +705,13 @@ describe("Games overlay", () => {
       }),
       chatAction("a4"),
       action("a5", { trigger: { ...trigger, type: TOKIO_EVENTS.SUPER_FAN } }),
+      giftAction("a6", {
+        trigger: { ...trigger, type: TOKIO_EVENTS.GIFT, gifts: [] },
+      }),
     ]);
     await rose();
 
-    const [gifted, liked, followed, chatted, superFan] = recipes();
+    const [gifted, liked, followed, chatted, superFan, anyGift] = recipes();
     const [giftedRow] = recipeElements();
     // A gift shows only its picture, named for screen readers
     const roseGift = gifted.getByRole("img", { name: "Rose" });
@@ -718,7 +721,8 @@ describe("Games overlay", () => {
       ),
     ).toEqual(["https://example.com/rose.png"]);
     expect(gifted.queryByRole("textbox", { name: "Event text" })).toBeNull();
-    // Likes, follows and chat get Tokio's own pictures, the likes counted
+    // Likes, follows, chat and Super Fans get Tokio's own pictures, the
+    // likes counted
     const heart = liked.getByRole("img", { name: "100 likes" });
     expect(heart.querySelector("img")?.getAttribute("src")).toMatch(
       /^data:image\/svg\+xml,/,
@@ -726,6 +730,10 @@ describe("Games overlay", () => {
     expect(heart).toHaveTextContent("100");
     expect(liked.queryByRole("textbox", { name: "Event text" })).toBeNull();
     expect(followed.getByRole("img", { name: "Follow" })).toBeInTheDocument();
+    expect(
+      superFan.getByRole("img", { name: "Super Fan" }),
+    ).toBeInTheDocument();
+    expect(superFan.queryByRole("textbox", { name: "Event text" })).toBeNull();
     // A chat keeps its message's field by its bubble
     expect(chatted.getByRole("img", { name: "Chat" })).toBeInTheDocument();
     expect(
@@ -733,8 +741,8 @@ describe("Games overlay", () => {
     ).toHaveAttribute("placeholder", "“tnt”");
     // Empty, an event without pictures shows its own text
     expect(
-      superFan.getByRole("textbox", { name: "Event text" }),
-    ).toHaveAttribute("placeholder", "Super Fan");
+      anyGift.getByRole("textbox", { name: "Event text" }),
+    ).toHaveAttribute("placeholder", "Any gift");
     expect(
       gifted.getByRole("button", { name: "Pick a picture" }),
     ).toBeInTheDocument();

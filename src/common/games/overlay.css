@@ -194,7 +194,7 @@
 }
 
 /* PICTURES ONLY: the texts next to pictures go. A side without a picture
-   keeps its text, so "Super Fan ▸ [TNT]" still reads, and so does a chat's
+   keeps its text, so "Any gift ▸ [TNT]" still reads, and so does a chat's
    message, which its bubble can't say. */
 .games-pictures-only .has-picture .games-text {
   display: none;

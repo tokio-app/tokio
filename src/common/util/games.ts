@@ -120,7 +120,7 @@ export function gameStepsText({ edition, steps }: GameAction, counted = false) {
 }
 
 // The event's pictures: its gifts' or emotes', Tokio's own for follows,
-// shares, likes and chat, none for other events
+// shares, likes, chat and Super Fans, none without any picked
 export function gameEventPictures(
   action: GameAction,
   gifts: CustomGift[],

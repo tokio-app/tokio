@@ -9,6 +9,9 @@ const COLORS: Record<string, string> = {
   r: "#f43f5e",
   d: "#be123c",
   l: "#fecdd3",
+  y: "#facc15",
+  o: "#b45309",
+  h: "#fef9c3",
 };
 
 const HEART = [
@@ -76,6 +79,23 @@ const CHAT = [
   ".............",
 ];
 
+// A paid membership, with Tokio's rose for gems
+const SUPER_FAN = [
+  ".............",
+  ".............",
+  ".k....k....k.",
+  "khk..khk..khk",
+  "kyk..kyk..kyk",
+  "kyyk.kyk.kyok",
+  "kyyykyyykyyok",
+  "kyyyyyyyyyyok",
+  "kyyryyyyryyok",
+  "kyyyyyyyyyook",
+  "kkkkkkkkkkkkk",
+  ".............",
+  ".............",
+];
+
 // An SVG picture, one path per color with a rectangle per run of pixels.
 // crispEdges keeps them square at any size.
 function sprite(rows: string[]) {
@@ -101,4 +121,5 @@ export const EVENT_SPRITES: Partial<Record<AlertTrigger, string>> = {
   [TOKIO_EVENTS.FOLLOW]: sprite(FOLLOW),
   [TOKIO_EVENTS.SHARE]: sprite(SHARE),
   [TOKIO_EVENTS.CHAT]: sprite(CHAT),
+  [TOKIO_EVENTS.SUPER_FAN]: sprite(SUPER_FAN),
 };

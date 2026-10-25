@@ -17,7 +17,7 @@ const row = (
 ): GameOverlayRow => ({
   id,
   pictures: [],
-  event: "Super Fan",
+  event: "Any gift",
   withText: false,
   eventCount: 0,
   image: `/games/minecraft/pictures/${id}.png`,
@@ -235,7 +235,7 @@ describe("games overlay", () => {
     it("leaves the name out when there is none", async () => {
       send([row("a", { name: "" })]);
 
-      await vi.waitFor(() => expect(texts()).toEqual([["Super Fan"]]));
+      await vi.waitFor(() => expect(texts()).toEqual([["Any gift"]]));
       expect(document().querySelector(".games-result img")).not.toBeNull();
     });
 

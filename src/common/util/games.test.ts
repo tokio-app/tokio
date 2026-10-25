@@ -298,23 +298,31 @@ describe("gameEventPictures", () => {
     expect(gameEventPictures(rose, both, emotes)).toEqual(["tiktok.png"]);
   });
 
-  it("shows the emotes' pictures, and none for other events", () => {
+  it("shows the emotes' pictures, and none with no gift or emote picked", () => {
     const emote = action(
       (a) => (a.trigger.emotes = ["e1", "gone"]),
       EMOTE_TRIGGER,
     );
-    const superFan = action(() => {}, TOKIO_EVENTS.SUPER_FAN);
 
     expect(gameEventPictures(emote, gifts, emotes)).toEqual(["e1.png"]);
-    expect(gameEventPictures(superFan, gifts, emotes)).toEqual([]);
+    for (const type of [TOKIO_EVENTS.GIFT, EMOTE_TRIGGER] as const) {
+      expect(
+        gameEventPictures(
+          action(() => {}, type),
+          gifts,
+          emotes,
+        ),
+      ).toEqual([]);
+    }
   });
 
-  it("draws Tokio's own for follows, shares, likes and chat", () => {
+  it("draws Tokio's own for follows, shares, likes, chat and Super Fans", () => {
     const events: GameAction["trigger"]["type"][] = [
       TOKIO_EVENTS.FOLLOW,
       TOKIO_EVENTS.SHARE,
       TOKIO_EVENTS.LIKE,
       TOKIO_EVENTS.CHAT,
+      TOKIO_EVENTS.SUPER_FAN,
     ];
     const pictures = events.map((type) =>
       gameEventPictures(
@@ -324,7 +332,7 @@ describe("gameEventPictures", () => {
       ),
     );
 
-    expect(new Set(pictures.flat()).size).toBe(4);
+    expect(new Set(pictures.flat()).size).toBe(5);
     for (const [src] of pictures) {
       expect(src).toMatch(/^data:image\/svg\+xml,/);
     }
