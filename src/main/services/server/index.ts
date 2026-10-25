@@ -1,7 +1,9 @@
+import GAMES_STYLES from "@/common/games/overlay.css?raw";
 import { isLiveEvent, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import {
   ALERTS_PATH,
   formatError,
+  GAMES_PATH,
   SERVER_PORT,
   TIMER_PATH,
 } from "@/common/util";
@@ -15,12 +17,18 @@ import { TikTokConnectorService } from "../connector";
 import { MusicService } from "../music";
 import { Service } from "../shared";
 import ALERT_PAGE from "./alert.html?raw";
+import GAMES_HTML from "./games.html?raw";
 import TIMER_HTML from "./timer.html?raw";
 import { CustomWebSocketServer } from "./websocket";
 
 // Inlined, so streaming apps on any computer get the app's typeface, without
 // a font route (res.sendFile refuses the Linux AppImage's /tmp/.mount_ folder)
 const TIMER_PAGE = TIMER_HTML.replace("__ARCHIVO__", () => ARCHIVO);
+// With the look it shares with the Games page's preview
+const GAMES_PAGE = GAMES_HTML.replace("__ARCHIVO__", () => ARCHIVO).replace(
+  "/* __STYLES__ */",
+  () => GAMES_STYLES,
+);
 
 // Adapter names that are usually virtual: Hyper-V, WSL, VMs, Docker, bridges.
 // A real network card can have them too, with Hyper-V or a bridge set up.
@@ -51,6 +59,10 @@ export class ServerService extends Service {
     // The countdown timer's overlay. Express 5 matches /timer/ too.
     this._app.get(`/${TIMER_PATH}`, (_req, res) => {
       res.type("html").send(TIMER_PAGE);
+    });
+    // The games overlay. Its pictures are mounted at /games/minecraft/.
+    this._app.get(`/${GAMES_PATH}`, (_req, res) => {
+      res.type("html").send(GAMES_PAGE);
     });
 
     this._app.use((req, res, next) => {
