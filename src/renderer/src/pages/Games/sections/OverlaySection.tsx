@@ -4,6 +4,7 @@ import {
   GAMES_OVERLAY_MAX_COLUMNS,
   GamesOverlayFormat,
   GamesOverlayLayout,
+  GamesOverlaySize,
   Profile,
   SavedEmote,
 } from "@/common/schemas";
@@ -50,6 +51,12 @@ const LAYOUTS: { value: GamesOverlayLayout; label: string }[] = [
 const FORMATS: { value: GamesOverlayFormat; label: string }[] = [
   { value: "arrow", label: "Arrow" },
   { value: "sticker", label: "Sticker" },
+];
+
+const SIZES: { value: GamesOverlaySize; label: string }[] = [
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
 ];
 
 // 1 to the most, as RadioGroup takes text
@@ -220,6 +227,18 @@ export function OverlaySection({
                 }
               />
             </Field>
+            <Field label="Event pictures" className={styles.layouts}>
+              <RadioGroup
+                name="games-overlay-event-size"
+                value={look.event_size}
+                options={SIZES}
+                onChange={(size) =>
+                  setLook((l) => {
+                    l.event_size = size;
+                  })
+                }
+              />
+            </Field>
           </div>
           <Check
             label="Pictures only"
@@ -228,6 +247,16 @@ export function OverlaySection({
               const only = e.target.checked;
               setLook((l) => {
                 l.pictures_only = only;
+              });
+            }}
+          />
+          <Check
+            label="Text below pictures"
+            checked={look.text_below}
+            onChange={(e) => {
+              const below = e.target.checked;
+              setLook((l) => {
+                l.text_below = below;
               });
             }}
           />

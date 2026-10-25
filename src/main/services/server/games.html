@@ -262,6 +262,15 @@
         games.classList.toggle("games-carousel", carousel);
         games.classList.toggle("games-pictures-only", look.pictures_only);
         games.classList.toggle("games-sticker", look.format === "sticker");
+        games.classList.toggle("games-text-below", look.text_below);
+        games.classList.toggle(
+          "games-event-medium",
+          look.event_size === "medium",
+        );
+        games.classList.toggle(
+          "games-event-large",
+          look.event_size === "large",
+        );
         // Only when they changed, so a lit row keeps its flash going
         if (JSON.stringify(changed) !== JSON.stringify(rows)) {
           // One at a time stays on the row it shows, if it's still there
