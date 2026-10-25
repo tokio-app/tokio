@@ -1,6 +1,7 @@
 import {
   GameAction,
   GameStep,
+  GameStepSchema,
   MinecraftEdition,
   Trigger,
 } from "@/common/schemas";
@@ -599,6 +600,25 @@ describe("GamesService", () => {
       });
       expect(res.success).toBe(true);
       expect(minecraft.sent).toEqual(["summon minecraft:pig ~ ~ ~"]);
+    });
+
+    it("stops a launch at the top, once its push is over", async () => {
+      vi.useFakeTimers();
+      const minecraft = fakeMinecraft();
+      const done = service(minecraft).test({
+        edition: "bedrock",
+        trigger: TOKIO_EVENTS.FOLLOW,
+        steps: [GameStepSchema.parse({ type: "hazard", hazard: "launch" })],
+      });
+      await vi.advanceTimersByTimeAsync(999);
+      expect(minecraft.sent).toEqual([
+        expect.stringMatching(/^effect @p levitation 1 \d+$/),
+      ]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(minecraft.sent.at(-1)).toBe("teleport @p ~ ~ ~");
+      // The wait isn't a command, so it has no result
+      expect((await done).data).toHaveLength(2);
+      vi.useRealTimers();
     });
 
     it("lights no row on the overlay", async () => {

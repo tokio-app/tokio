@@ -19,6 +19,8 @@ import { EVENT_SPRITES } from "../games/sprites";
 type Names = Record<string, string>;
 type Weather = Extract<GameStep, { type: "weather" }>["weather"];
 type Time = Extract<GameStep, { type: "time" }>["time"];
+type Hazard = Extract<GameStep, { type: "hazard" }>["hazard"];
+type Help = Extract<GameStep, { type: "help" }>["help"];
 
 // Every mob and item each edition's summon and give take, id → the name the
 // game gives it in English (see .claude/rules/games.md)
@@ -39,6 +41,47 @@ export const TIME_NAMES: Record<Time, string> = {
   night: "Night",
   midnight: "Midnight",
 };
+
+export const HAZARD_NAMES: Record<Hazard, string> = {
+  tnt: "Falling TNT",
+  tnt_ring: "TNT ring",
+  lightning: "Lightning bolt",
+  charged_creeper: "Charged creeper",
+  evoker_fangs: "Evoker fangs",
+  anvil: "Anvil drop",
+  harming: "Harming",
+  launch: "Launch into the sky",
+  launch_water: "Launch + water",
+  freeze: "Freeze",
+  lights_out: "Lights out",
+  dizzy: "Dizzy",
+  turn_around: "Turn around",
+  random_teleport: "Random teleport",
+};
+
+export const HELP_NAMES: Record<Help, string> = {
+  netherite_armor: "Netherite armor",
+  heal: "Full heal",
+  regeneration: "Regeneration",
+  absorption: "Absorption",
+  resistance: "Resistance",
+  fire_resistance: "Fire resistance",
+  speed: "Speed",
+  jump_boost: "Jump boost",
+  strength: "Strength",
+  slow_falling: "Slow falling",
+  water_breathing: "Water breathing",
+  night_vision: "Night vision",
+  invisibility: "Invisibility",
+};
+
+// The hazards an amount repeats; the rest run once, as a second anvil has no
+// room and a second effect does nothing
+export const REPEATED_HAZARDS: readonly Hazard[] = [
+  "lightning",
+  "charged_creeper",
+  "evoker_fangs",
+];
 
 /**
  * The event's own text on the games overlay: the gifts' names, "100 likes",
@@ -114,6 +157,16 @@ export function gameStepsText({ edition, steps }: GameAction, counted = false) {
         return named(step, items, step.item, step.amount);
       if (step.type === "weather") return WEATHER_NAMES[step.weather];
       if (step.type === "time") return TIME_NAMES[step.time];
+      if (step.type === "hazard") {
+        const repeated = REPEATED_HAZARDS.includes(step.hazard);
+        return named(
+          step,
+          HAZARD_NAMES,
+          step.hazard,
+          repeated ? step.amount : 1,
+        );
+      }
+      if (step.type === "help") return HELP_NAMES[step.help];
       return [];
     })
     .join(", ");

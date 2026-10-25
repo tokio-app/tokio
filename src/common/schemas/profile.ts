@@ -127,6 +127,43 @@ const GameAmountSchema = z
   .max(GAME_STEP_MAX_AMOUNT)
   .default(1);
 
+// Built-in ways to try to kill the player, each with its own commands for
+// both editions (see gameCommands)
+export const GAME_HAZARDS = [
+  "tnt",
+  "tnt_ring",
+  "lightning",
+  "charged_creeper",
+  "evoker_fangs",
+  "anvil",
+  "harming",
+  "launch",
+  "launch_water",
+  "freeze",
+  "lights_out",
+  "dizzy",
+  "turn_around",
+  "random_teleport",
+] as const;
+
+// Built-in ways to help the player survive: netherite armor, a full heal and
+// potion effects, the same in both editions (see gameCommands)
+export const GAME_HELPS = [
+  "netherite_armor",
+  "heal",
+  "regeneration",
+  "absorption",
+  "resistance",
+  "fire_resistance",
+  "speed",
+  "jump_boost",
+  "strength",
+  "slow_falling",
+  "water_breathing",
+  "night_vision",
+  "invisibility",
+] as const;
+
 // One thing a game action does in Minecraft. Mob and item ids are the
 // game's, like "zombie". Text can hold the trigger's variables, see
 // ALERT_MESSAGE_VARIABLES.
@@ -153,7 +190,61 @@ export const GameStepSchema = z.discriminatedUnion("type", [
     type: z.literal("time"),
     time: z.enum(["day", "noon", "night", "midnight"]),
   }),
+  z.object({
+    type: z.literal("hazard"),
+    hazard: z.enum(GAME_HAZARDS),
+    amount: GameAmountSchema,
+    // The TNT's, in seconds
+    fuse: z.number().min(0).max(30).default(4),
+    // A launch's: how high, in blocks, and in how many seconds
+    height: z.number().int().min(5).max(300).default(50),
+    seconds: z.number().int().min(1).max(10).default(1),
+    // How long an effect lasts (freeze, lights out, dizzy), in seconds
+    duration: z.number().int().min(1).max(120).default(10),
+    // How far a random teleport can take the player, in blocks
+    distance: z.number().int().min(10).max(10_000).default(1000),
+  }),
+  z.object({
+    type: z.literal("help"),
+    help: z.enum(GAME_HELPS),
+    // How long an effect lasts, in seconds; armor and the heal have none
+    duration: z.number().int().min(1).max(600).default(30),
+  }),
 ]);
+
+// Before release, the creeper's hiss was a hazard and other armor sets were
+// helps. Dropping the hiss's steps and making the armor netherite keeps a
+// profile that saved one loading.
+const RemovedHazardSchema = z.object({
+  type: z.literal("hazard"),
+  hazard: z.literal("creeper_hiss"),
+});
+const RemovedArmorSchema = z.object({
+  type: z.literal("help"),
+  help: z.enum([
+    "leather_armor",
+    "chainmail_armor",
+    "copper_armor",
+    "iron_armor",
+    "golden_armor",
+    "diamond_armor",
+  ]),
+});
+
+const GameStepsSchema = z.preprocess(
+  (steps) =>
+    Array.isArray(steps)
+      ? steps
+          .filter((step) => !RemovedHazardSchema.safeParse(step).success)
+          .map((step: unknown) => {
+            const armor = RemovedArmorSchema.safeParse(step);
+            return armor.success
+              ? { ...armor.data, help: "netherite_armor" }
+              : step;
+          })
+      : steps,
+  z.array(GameStepSchema),
+);
 
 // Bedrock connects by itself; Java through the Tokio mod
 export const MINECRAFT_EDITIONS = ["bedrock", "java"] as const;
@@ -196,7 +287,7 @@ export const GameActionSchema = z.object({
   // On Like, it runs once every likes_every likes from all viewers, as the
   // countdown timer counts them
   likes_every: z.number().int().min(1).default(100),
-  steps: z.array(GameStepSchema),
+  steps: GameStepsSchema,
   overlay: GameOverlayItemSchema.prefault({}),
 });
 
