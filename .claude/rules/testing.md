@@ -31,7 +31,7 @@ paths:
 
 - Each test gets a fresh fake `window.api` (`test/renderer/setup.ts`). `send` from `@test/ipc` pushes a reply from main inside `act` (await it). `sent(event)` lists the payloads the renderer emitted for an event, and `sentEvents()` the events in order.
 - Render with `renderWithProviders` (`@test/render`), which adds fake audio queues, the real notifications provider, and a `user`. Pages that navigate use `renderApp(path)`: the real routes in memory history, built from `routerOptions` (`@/router`), so the app's error component applies.
-  - Components never reach Tone.js; `audio.queue(name)` is the fake queue they got.
+  - Components never reach Tone.js; `audio.queue(name)` is the fake queue they got, and `audio.value.decode` gives a 2 second sound of 8 samples.
   - Builders and replies are in `@test/fixtures`.
   - Entry points (`main.tsx`) run with `runEntry` from `@test/entry`, which gives them the `#root` their `index.html` has.
 - jsdom has no layout. `test/renderer/dom.ts` gives elements a size (virtualized lists like `Select` render nothing at zero), fakes the observers (`intersect()` fires `IntersectionObserver`) and `scrollTo`.
