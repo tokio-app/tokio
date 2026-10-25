@@ -5,5 +5,208 @@
  * plain stylesheet. Keep both pages' markup the same.
  *
  * It must work in OBS 30's browser (Chromium 103): no :has(), nesting,
- * subgrid or container queries.
+ * subgrid or container queries. The page's script sets classes like
+ * has-picture instead.
+ *
+ * Every class starts with games-, as the app loads this stylesheet globally.
+ * Each row reads like a crafting recipe: the event (TikTok's gift) is the
+ * ingredient, a pixel arrow, then the streamer's picture and name.
  */
+
+.games {
+  --games-text: #f1f5f9;
+  /* The arrows, and the glint of an action that runs */
+  --games-accent: #f43f5e;
+  /* Keeps the text legible over bright gameplay */
+  --games-halo: rgb(0 0 0 / 85%);
+  font-family: "Archivo Variable", sans-serif;
+  /* The page sets --games-size from the browser source's size; --fit
+     shrinks it when the rows wouldn't fit */
+  font-size: calc(var(--games-size, 16px) * var(--fit, 1));
+  line-height: 1.15;
+  color: var(--games-text);
+}
+
+/* The spine: events right-aligned on the arrows' left, results left-aligned
+   on their right. The rows' cells take part in this grid, so every arrow
+   lines up in one column. Each side is as wide as its widest, and shrinks
+   to cut texts short when the space is narrower. */
+.games-rows {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto minmax(0, auto);
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em 0.45em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.games-row {
+  display: contents;
+}
+
+/* Explicit columns, so one at a time can stack every row in one place */
+.games-event {
+  grid-column: 1;
+  justify-content: flex-end;
+}
+
+.games-arrow {
+  grid-column: 2;
+}
+
+.games-result {
+  grid-column: 3;
+  justify-content: flex-start;
+}
+
+.games-side {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  min-width: 0;
+}
+
+/* One line each, a long one cut short. The padding gives the halo room
+   inside the box that cuts it; the margins take it back. Set on each text:
+   on .games, the shadow's em would follow a font size it doesn't have. */
+.games-text {
+  min-width: 0;
+  max-width: 13em;
+  margin: -0.4em;
+  padding: 0.4em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 0 0.05em var(--games-halo),
+    0 0.02em 0.12em var(--games-halo),
+    0 0 0.4em rgb(0 0 0 / 30%);
+  transition: color 0.3s;
+}
+
+/* What it does, wide and heavy so it reads on a phone */
+.games-name {
+  font-weight: 800;
+  font-stretch: 112%;
+}
+
+/* The event's text, under the name's weight, its counts in even figures */
+.games-event .games-text {
+  font-size: 0.78em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The pictures sit in recessed slots, bevelled like an inventory's: dark on
+   the top and left, light on the bottom and right. */
+.games-slot {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2em;
+  height: 2em;
+  overflow: hidden;
+  background: rgb(0 0 0 / 60%);
+  box-shadow:
+    inset 0.1em 0.1em 0 rgb(0 0 0 / 55%),
+    inset -0.1em -0.1em 0 rgb(255 255 255 / 20%);
+}
+
+/* The result, larger, like a crafting table's */
+.games-slot-result {
+  width: 2.5em;
+  height: 2.5em;
+}
+
+.games-slot img {
+  display: block;
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+}
+
+/* Our own pixel arrow, the crafting table's, with a hard shadow */
+.games-arrow {
+  width: 1.1em;
+  height: 0.9em;
+  fill: var(--games-accent);
+  shape-rendering: crispEdges;
+  filter: drop-shadow(0.08em 0.08em 0 rgb(0 0 0 / 60%));
+}
+
+/* A RUN: the enchantment glint, two accent bands sweeping across the row's
+   slots while it's lit. The class stays on through a burst, so the sweep
+   never restarts. */
+.games-slot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    var(--games-accent) 42%,
+    transparent 48%,
+    var(--games-accent) 56%,
+    transparent 68%
+  );
+  background-size: 300% 100%;
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.games-lit .games-slot::after {
+  opacity: 0.75;
+  animation: games-glint 1.2s linear infinite;
+}
+
+.games-lit .games-slot-result {
+  box-shadow:
+    inset 0.1em 0.1em 0 var(--games-accent),
+    inset -0.1em -0.1em 0 var(--games-accent);
+}
+
+/* A side with no slot to glint shows the run in its text */
+.games-lit .games-side:not(.has-picture) .games-text {
+  color: var(--games-accent);
+}
+
+@keyframes games-glint {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* PICTURES ONLY: the texts next to pictures go. A side without a picture
+   keeps its text, so "100 likes ▸ [TNT]" still reads. */
+.games-pictures-only .has-picture .games-text {
+  display: none;
+}
+
+/* ONE AT A TIME: every row in the same place, the current one shown. The
+   columns fit the widest row, so nothing moves between turns. */
+.games-carousel .games-row > * {
+  grid-row: 1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.games-carousel .games-current > * {
+  opacity: 1;
+}
+
+/* Only the accent bevel shows a run */
+@media (prefers-reduced-motion: reduce) {
+  .games-lit .games-slot::after {
+    animation: none;
+    opacity: 0;
+  }
+}

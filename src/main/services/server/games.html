@@ -13,10 +13,225 @@
         font-stretch: 62% 125%;
         src: url(__ARCHIVO__) format("woff2-variations");
       }
+
+      :root {
+        /* As large as the browser source's width allows, so a strip of one
+           row at a time fills it. --fit shrinks the rows until they all fit
+           (fit below). */
+        --games-size: min(8vw, 30vh);
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* As wide as its rows, measured to fit the source. Shrunk by the
+         body instead, it would cut every text short. */
+      .games {
+        flex-shrink: 0;
+        width: max-content;
+      }
     </style>
     <style>
       /* __STYLES__ */
     </style>
   </head>
-  <body></body>
+  <body>
+    <main class="games" id="games">
+      <ol class="games-rows" id="rows"></ol>
+    </main>
+    <template id="arrow">
+      <svg class="games-arrow" viewBox="0 0 11 9" aria-hidden="true">
+        <path d="M6 0H7V1H8V2H9V3H10V4H11V5H10V6H9V7H8V8H7V9H6V6H0V3H6Z" />
+      </svg>
+    </template>
+    <script>
+      // The games overlay, at /games/. Main sends the shown actions' rows
+      // and their look on connect and on every change, and each action's id
+      // as it runs (registerGames in init.ts). The Games page's preview
+      // (OverlayPreview) draws the same markup, so keep the two in step.
+      const games = document.getElementById("games");
+      const list = document.getElementById("rows");
+      const arrow = document.getElementById("arrow");
+      // How long a row stays lit after its last run
+      const LIT_MS = 1500;
+      // How long one at a time shows each row
+      const TURN_MS = 3000;
+      let rows = [];
+      let carousel = false;
+      // The row one at a time shows, and its next turn
+      let turn = 0;
+      let turning = null;
+      // The lit rows' ids, each with the timeout that puts it out
+      const lit = new Map();
+
+      // A picture in its slot. One that doesn't load goes, and its side
+      // shows its text again if that was its only picture.
+      const slot = (src, result) => {
+        const box = document.createElement("span");
+        box.className = result ? "games-slot games-slot-result" : "games-slot";
+        const img = document.createElement("img");
+        img.alt = "";
+        img.addEventListener("error", () => {
+          const side = box.parentElement;
+          box.remove();
+          side?.classList.toggle(
+            "has-picture",
+            !!side.querySelector(".games-slot"),
+          );
+          fit();
+        });
+        img.src = src;
+        box.append(img);
+        return box;
+      };
+
+      // Text only, so a name can't add markup
+      const text = (value, className) => {
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = value;
+        return span;
+      };
+
+      // The event's text then its pictures, which hug the arrow, and the
+      // action's picture then its name
+      const rowElement = (row) => {
+        const event = document.createElement("span");
+        event.className = "games-side games-event";
+        event.append(
+          text(row.event, "games-text"),
+          ...row.pictures.map((src) => slot(src, false)),
+        );
+        event.classList.toggle("has-picture", row.pictures.length > 0);
+        const result = document.createElement("span");
+        result.className = "games-side games-result";
+        if (row.image) result.append(slot(row.image, true));
+        if (row.name) result.append(text(row.name, "games-text games-name"));
+        result.classList.toggle("has-picture", !!row.image);
+        const li = document.createElement("li");
+        li.className = "games-row";
+        li.append(
+          event,
+          arrow.content.firstElementChild.cloneNode(true),
+          result,
+        );
+        return li;
+      };
+
+      // Lit rows, and the one one at a time shows
+      const mark = () => {
+        [...list.children].forEach((li, index) => {
+          li.classList.toggle("games-lit", lit.has(rows[index].id));
+          li.classList.toggle("games-current", index === turn);
+        });
+      };
+
+      // A lit row holds its turn until it goes out
+      const next = () => {
+        const held = lit.has(rows[turn]?.id);
+        if (carousel && rows.length > 1 && !held) {
+          turn = (turn + 1) % rows.length;
+          mark();
+        }
+        turning = setTimeout(next, TURN_MS);
+      };
+      const turnAgain = () => {
+        clearTimeout(turning);
+        turning = setTimeout(next, TURN_MS);
+      };
+      turnAgain();
+
+      // Runs in a burst keep the row lit, 1.5 s after the last. One at a
+      // time turns to it.
+      const light = (id) => {
+        clearTimeout(lit.get(id));
+        lit.set(
+          id,
+          setTimeout(() => {
+            lit.delete(id);
+            mark();
+          }, LIT_MS),
+        );
+        const index = rows.findIndex((row) => row.id === id);
+        if (carousel && index !== -1 && index !== turn) {
+          turn = index;
+          turnAgain();
+        }
+        mark();
+      };
+
+      // One CSS property, so a font's name can't inject anything
+      const setFont = (font) => {
+        const name = font.trim();
+        games.style.fontFamily = name
+          ? `${JSON.stringify(name)}, "Archivo Variable", sans-serif`
+          : "";
+      };
+
+      const update = ({ look, rows: changed }) => {
+        games.style.setProperty("--games-text", look.text_color);
+        games.style.setProperty("--games-accent", look.accent_color);
+        setFont(look.font);
+        carousel = look.layout === "carousel";
+        games.classList.toggle("games-carousel", carousel);
+        games.classList.toggle("games-pictures-only", look.pictures_only);
+        // Only when they changed, so a lit row keeps its glint going
+        if (JSON.stringify(changed) !== JSON.stringify(rows)) {
+          // One at a time stays on the row it shows, if it's still there
+          const shown = rows[turn]?.id;
+          rows = changed;
+          turn = Math.max(
+            0,
+            rows.findIndex((row) => row.id === shown),
+          );
+          list.replaceChildren(...rows.map(rowElement));
+          mark();
+        }
+        fit();
+      };
+
+      // Wide fonts or many rows shrink everything until it all fits
+      const fit = () => {
+        const root = document.documentElement.style;
+        root.setProperty("--fit", "1");
+        const width = games.offsetWidth;
+        const height = games.offsetHeight;
+        if (width && height) {
+          const scale = Math.min(
+            1,
+            (innerWidth * 0.94) / width,
+            (innerHeight * 0.94) / height,
+          );
+          root.setProperty("--fit", String(scale));
+        }
+      };
+      addEventListener("resize", fit);
+      // The fonts' widths are known once they've loaded
+      document.fonts?.ready.then(fit);
+
+      const connect = () => {
+        // The id is GAMES_PATH
+        const socket = new WebSocket(`ws://${location.host}/?id=games`);
+        // Every overlay gets the LIVE's events too, this one ignores them.
+        socket.onmessage = (event) => {
+          const { type, data } = JSON.parse(event.data);
+          if (type === "tokio:games") update(data);
+          else if (type === "tokio:games:run") light(data.id);
+        };
+        socket.onclose = () => setTimeout(connect, 2000);
+      };
+      connect();
+    </script>
+  </body>
 </html>
