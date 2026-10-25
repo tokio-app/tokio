@@ -39,9 +39,6 @@ export const TIME_NAMES: Record<Time, string> = {
   midnight: "Midnight",
 };
 
-// As many as the gift picker's field shows
-const MAX_PICTURES = 3;
-
 /**
  * The event's own text on the games overlay: the gifts' names, "100 likes",
  * Chat “tnt” (quoted like the timer's carousel), or the trigger's label.
@@ -103,7 +100,8 @@ export function gameEventPictures(
       : trigger.type === EMOTE_TRIGGER
         ? trigger.emotes.map((id) => emotes.find((e) => e.id === id)?.image)
         : [];
-  return pictures.filter((src): src is string => !!src).slice(0, MAX_PICTURES);
+  // They take turns in one place, so two gifts with one picture show it once
+  return [...new Set(pictures.filter((src): src is string => !!src))];
 }
 
 /**

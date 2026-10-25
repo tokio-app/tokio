@@ -32,7 +32,7 @@ import { scopeUpdater, Updater } from "@/hooks";
 import { useState } from "react";
 import { FiPlay, FiPlus } from "react-icons/fi";
 import styles from "../games.module.css";
-import { OverlayPreview, PixelArrow } from "./OverlayPreview";
+import { OverlayPreview, PixelArrow, usePictureTurn } from "./OverlayPreview";
 
 const LAYOUTS: { value: GamesOverlayLayout; label: string }[] = [
   { value: "list", label: "List" },
@@ -83,6 +83,8 @@ export function OverlaySection({
   const [tests, setTests] = useState(0);
   const [run, setRun] = useState<{ id: string } | null>(null);
   const setLook = scopeUpdater(update, "overlay");
+  // Which of a row's gifts shows, all rows in step
+  const pictureTurn = usePictureTurn();
 
   const setItem = (id: string, patch: Partial<GameOverlayItem>) =>
     update((s) => {
@@ -147,6 +149,7 @@ export function OverlaySection({
                   key={action.id}
                   action={action}
                   columns={look.columns}
+                  pictureTurn={pictureTurn}
                   gifts={gifts}
                   emotes={emotes}
                   onChange={(patch) => setItem(action.id, patch)}
@@ -234,6 +237,7 @@ type RowProps = {
   action: GameAction;
   // With more than one, the row picks its column
   columns: number;
+  pictureTurn: number;
   gifts: CustomGift[];
   emotes: SavedEmote[];
   onChange: (patch: Partial<GameOverlayItem>) => void;
@@ -245,6 +249,7 @@ type RowProps = {
 function RecipeRow({
   action,
   columns,
+  pictureTurn,
   gifts,
   emotes,
   onChange,
@@ -267,20 +272,37 @@ function RecipeRow({
         checked={overlay.show}
         onChange={(e) => onChange({ show: e.target.checked })}
       />
-      <span className={styles.recipe_pictures}>
-        {pictures.map((src, i) => (
-          // Two gifts can share a picture
-          <img key={i} className={styles.recipe_picture} src={src} alt="" />
-        ))}
-      </span>
-      {/* Empty, the event's own text shows, and goes on the overlay */}
-      <Input
-        aria-label="Event text"
-        maxLength={40}
-        placeholder={gameEventText(action, gifts)}
-        value={overlay.event}
-        onChange={(e) => onChange({ event: e.target.value })}
-      />
+      {pictures.length > 0 ? (
+        // The gifts' or emotes' pictures say what they are, as on the
+        // overlay, taking turns in one place
+        <span
+          className={styles.recipe_gift}
+          role="img"
+          aria-label={gameEventText(action, gifts)}
+          title={gameEventText(action, gifts)}
+        >
+          {pictures.map((src, i) => (
+            <img
+              key={src}
+              className={cx(
+                styles.recipe_picture,
+                i !== pictureTurn % pictures.length && styles.recipe_away,
+              )}
+              src={src}
+              alt=""
+            />
+          ))}
+        </span>
+      ) : (
+        // Empty, the event's own text shows, and goes on the overlay
+        <Input
+          aria-label="Event text"
+          maxLength={40}
+          placeholder={gameEventText(action, gifts)}
+          value={overlay.event}
+          onChange={(e) => onChange({ event: e.target.value })}
+        />
+      )}
       <PixelArrow className={styles.recipe_arrow} />
       <button
         type="button"

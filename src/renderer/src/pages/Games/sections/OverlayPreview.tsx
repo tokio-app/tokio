@@ -24,6 +24,8 @@ declare module "react" {
 
 // How long a row stays lit after its last run, as the overlay's LIT_MS
 const LIT_MS = 1500;
+// How long each of an event's gifts shows, as the overlay's ROTATE_MS
+const ROTATE_MS = 2000;
 // How long one at a time shows each row, as the overlay's TURN_MS
 const TURN_MS = 3000;
 
@@ -41,6 +43,20 @@ const sharpen = (img: HTMLImageElement) =>
     "games-pixelated",
     img.naturalWidth > 0 && img.naturalWidth * 2 <= img.clientWidth,
   );
+
+/**
+ * The turn of pictures that share one place, a gift's and the next's, as
+ * the overlay counts them. Each picture shows while `turn % count` is its
+ * index.
+ */
+export function usePictureTurn() {
+  const [turn, setTurn] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTurn((n) => n + 1), ROTATE_MS);
+    return () => clearInterval(timer);
+  }, []);
+  return turn;
+}
 
 /** The overlay's pixel arrow, also the builder's rows' */
 export function PixelArrow({ className }: { className?: string }) {
@@ -93,6 +109,8 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
   const carousel = look.layout === "carousel";
   const [lit, setLit] = useState<string[]>([]);
   const [turn, setTurn] = useState(0);
+  // Which of an event's gifts shows
+  const pictureTurn = usePictureTurn();
   // Pictures that didn't load, hidden as on the overlay
   const [broken, setBroken] = useState<string[]>([]);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -211,12 +229,21 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
                   )}
                 >
                   <span className="games-text">{row.event}</span>
-                  {pictures.map((src, i) => (
-                    // Two gifts can share a picture
-                    <span key={i} className="games-slot">
-                      <img src={src} alt="" onError={onError(src)} />
+                  {pictures.length > 0 && (
+                    <span className="games-slot">
+                      {pictures.map((src, i) => (
+                        <img
+                          key={src}
+                          className={cx(
+                            i !== pictureTurn % pictures.length && "games-away",
+                          )}
+                          src={src}
+                          alt=""
+                          onError={onError(src)}
+                        />
+                      ))}
                     </span>
-                  ))}
+                  )}
                 </span>
                 <PixelArrow className="games-arrow" />
                 <span

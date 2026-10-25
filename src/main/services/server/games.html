@@ -91,23 +91,44 @@
           img.naturalWidth > 0 && img.naturalWidth * 2 <= img.clientWidth,
         );
 
-      const slot = (src, result) => {
+      // How long each of an event's gifts shows in their one slot
+      const ROTATE_MS = 2000;
+      // The turns so far, so every slot shows its pictures in step
+      let tick = 0;
+      // The turn's picture shows; a slot's only one always does
+      const show = (box) =>
+        [...box.children].forEach((img, index, all) =>
+          img.classList.toggle("games-away", index !== tick % all.length),
+        );
+      setInterval(() => {
+        tick++;
+        list.querySelectorAll(".games-slot").forEach(show);
+      }, ROTATE_MS);
+
+      // The pictures of one side, taking turns in one slot. One that doesn't
+      // load goes, and with none left the side shows its text again.
+      const slot = (sources, result) => {
         const box = document.createElement("span");
         box.className = result ? "games-slot games-slot-result" : "games-slot";
-        const img = document.createElement("img");
-        img.alt = "";
-        img.addEventListener("error", () => {
-          const side = box.parentElement;
-          box.remove();
-          side?.classList.toggle(
-            "has-picture",
-            !!side.querySelector(".games-slot"),
-          );
-          fit();
-        });
-        if (result) img.addEventListener("load", () => sharpen(img));
-        img.src = src;
-        box.append(img);
+        for (const src of sources) {
+          const img = document.createElement("img");
+          img.alt = "";
+          img.addEventListener("error", () => {
+            const side = box.parentElement;
+            img.remove();
+            if (box.children.length === 0) box.remove();
+            else show(box);
+            side?.classList.toggle(
+              "has-picture",
+              !!side.querySelector(".games-slot"),
+            );
+            fit();
+          });
+          if (result) img.addEventListener("load", () => sharpen(img));
+          img.src = src;
+          box.append(img);
+        }
+        show(box);
         return box;
       };
 
@@ -119,19 +140,17 @@
         return span;
       };
 
-      // The event's text then its pictures, which hug the arrow, and the
-      // action's picture then its name
+      // The event's pictures, or its text without any, by the arrow, then
+      // the action's picture and name
       const rowElement = (row) => {
         const event = document.createElement("span");
         event.className = "games-side games-event";
-        event.append(
-          text(row.event, "games-text"),
-          ...row.pictures.map((src) => slot(src, false)),
-        );
+        event.append(text(row.event, "games-text"));
+        if (row.pictures.length > 0) event.append(slot(row.pictures, false));
         event.classList.toggle("has-picture", row.pictures.length > 0);
         const result = document.createElement("span");
         result.className = "games-side games-result";
-        if (row.image) result.append(slot(row.image, true));
+        if (row.image) result.append(slot([row.image], true));
         if (row.name) result.append(text(row.name, "games-text games-name"));
         result.classList.toggle("has-picture", !!row.image);
         const li = document.createElement("li");

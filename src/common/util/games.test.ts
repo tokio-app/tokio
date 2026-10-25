@@ -215,7 +215,7 @@ describe("gameEventText", () => {
 });
 
 describe("gameEventPictures", () => {
-  it("shows the gifts' pictures, up to 3, skipping gifts without one", () => {
+  it("shows every gift's picture once, skipping gifts without one", () => {
     const many = action(
       (a) => (a.trigger.gifts = [1, 5655, 6369, 5655, 6369]),
       TOKIO_EVENTS.GIFT,
@@ -224,7 +224,6 @@ describe("gameEventPictures", () => {
     expect(gameEventPictures(many, gifts, emotes)).toEqual([
       "Rose.png",
       "Lion.png",
-      "Rose.png",
     ]);
   });
 

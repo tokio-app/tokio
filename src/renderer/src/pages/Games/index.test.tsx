@@ -664,7 +664,7 @@ describe("Games overlay", () => {
     expect(names(2)).toEqual(["Creeper"]);
   });
 
-  it("lists a row per action: the event's pictures and text, then its picture", async () => {
+  it("lists a row per action: the event's pictures or text, then its picture", async () => {
     await load([
       giftAction("a1"),
       likeAction("a2"),
@@ -677,17 +677,16 @@ describe("Games overlay", () => {
 
     const [gifted, liked, followed] = recipes();
     const [giftedRow, likedRow] = recipeElements();
+    // A gift shows only its picture, named for screen readers
+    const roseGift = gifted.getByRole("img", { name: "Rose" });
     expect(
-      [...giftedRow.querySelectorAll("img")].map((img) =>
+      [...roseGift.querySelectorAll("img")].map((img) =>
         img.getAttribute("src"),
       ),
     ).toEqual(["https://example.com/rose.png"]);
+    expect(gifted.queryByRole("textbox", { name: "Event text" })).toBeNull();
     expect(likedRow.querySelector("img")).toBeNull();
-    // Empty, they show the event's own text
-    expect(gifted.getByRole("textbox", { name: "Event text" })).toHaveAttribute(
-      "placeholder",
-      "Rose",
-    );
+    // Empty, an event without pictures shows its own text
     expect(liked.getByRole("textbox", { name: "Event text" })).toHaveAttribute(
       "placeholder",
       "100 likes",
@@ -708,14 +707,14 @@ describe("Games overlay", () => {
     expect(giftedRow).not.toHaveClass(styles.recipe_off);
   });
 
-  it("saves the rows' edits, an event's text typed over a gift's name too", async () => {
+  it("saves the rows' edits", async () => {
     const { user } = await load([giftAction("a1"), likeAction("a2")]);
     await rose();
     const [gifted, liked] = recipes();
 
     await user.type(
-      gifted.getByRole("textbox", { name: "Event text" }),
-      "A rose",
+      liked.getByRole("textbox", { name: "Event text" }),
+      "Tap tap",
     );
     await user.type(
       gifted.getByRole("textbox", { name: "Name on the overlay" }),
@@ -727,9 +726,47 @@ describe("Games overlay", () => {
     await wait(300);
 
     expect(savedOverlays()).toEqual([
-      { show: true, image: null, event: "A rose", name: "TNT", column: 1 },
-      { show: false, image: null, event: "", name: "", column: 1 },
+      { show: true, image: null, event: "", name: "TNT", column: 1 },
+      { show: false, image: null, event: "Tap tap", name: "", column: 1 },
     ]);
+  });
+
+  it("turns an event's gifts in one place, every 2 s, in the row and the preview", async () => {
+    await load([
+      giftAction("a1", {
+        trigger: { ...trigger, type: TOKIO_EVENTS.GIFT, gifts: [5655, 6369] },
+        overlay: { ...overlay, name: "TNT" },
+      }),
+    ]);
+    const lion = gift(6369, "Lion");
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
+      data: [gift(5655, "Rose"), lion],
+    });
+    const shown = (pictures: Element) =>
+      [...pictures.querySelectorAll("img")]
+        .filter(
+          (img) =>
+            !img.classList.contains(styles.recipe_away) &&
+            !img.classList.contains("games-away"),
+        )
+        .map((img) => img.getAttribute("src"));
+    const row = recipes()[0].getByRole("img", { name: "Rose or Lion" });
+    const slots = previewRows()[0].querySelectorAll(".games-event .games-slot");
+    expect(slots).toHaveLength(1);
+    const [slot] = slots;
+
+    const first = shown(row);
+    expect(first).toHaveLength(1);
+    expect(shown(slot)).toEqual(first);
+    await wait(2000);
+
+    const next = shown(row);
+    expect(next).toHaveLength(1);
+    expect(next).not.toEqual(first);
+    expect(new Set([...first, ...next])).toEqual(
+      new Set(["https://example.com/rose.png", lion.img]),
+    );
+    expect(shown(slot)).toEqual(next);
   });
 
   it("picks a picture from the Minecraft library", async () => {

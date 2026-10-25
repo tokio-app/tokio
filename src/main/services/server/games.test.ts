@@ -149,6 +149,28 @@ describe("games overlay", () => {
       ).toEqual([false, false]);
     });
 
+    it("shows an event's gifts in one slot, one at a time, turning every 2 s", async () => {
+      send([
+        row("a", {
+          pictures: ["https://cdn/rose.png", "https://cdn/lion.png"],
+        }),
+      ]);
+      await vi.waitFor(() => expect(rowElements()).toHaveLength(1));
+      const slots = document().querySelectorAll(".games-event .games-slot");
+      expect(slots).toHaveLength(1);
+      const shown = () =>
+        [...slots[0].querySelectorAll("img")]
+          .filter((img) => !img.classList.contains("games-away"))
+          .map((img) => img.getAttribute("src"));
+
+      const first = shown();
+      expect(first).toHaveLength(1);
+      await vi.waitFor(() => expect(shown()).not.toEqual(first), {
+        timeout: 2500,
+      });
+      expect(shown()).toHaveLength(1);
+    }, 6000);
+
     it("puts texts in as text, never markup", async () => {
       send([row("a", { event: "<b>Rose</b>", name: "<img src=x>" })]);
 
