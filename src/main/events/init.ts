@@ -671,12 +671,12 @@ const startApp = async (handler: AppHandlerVariables) => {
   const cachedGifts = await overlayService.getGifts();
   if (cachedGifts.length > 0) {
     await overlayService.load(cachedGifts);
-    await sendGamesOverlay(handler);
     void fetchOverlayGifts(connectorService)
       .then(async (gifts) => {
         if (gifts.length === 0) return;
         await overlayService.refreshGifts(gifts);
-        // Gift pictures may have changed
+        // Gift pictures may have changed. Before this, the games overlay
+        // gets the saved ones when it connects.
         await sendGamesOverlay(handler);
       })
       .catch((error) => {
@@ -699,7 +699,6 @@ const startApp = async (handler: AppHandlerVariables) => {
       );
     }
     await overlayService.load(gifts);
-    await sendGamesOverlay(handler);
   }
 
   // A taken port shouldn't stop the app, the server is turned off instead.

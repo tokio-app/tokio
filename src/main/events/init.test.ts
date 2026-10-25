@@ -1740,7 +1740,9 @@ describe("init events", () => {
         });
       });
 
-      it("sends the games overlay once loaded, and again with the fresh gifts", async () => {
+      // Before, the server isn't listening yet: a games overlay gets the
+      // saved gifts when it connects
+      it("sends the games overlay again with the fresh gifts", async () => {
         const s = setup();
         s.overlayService.getGifts.mockResolvedValue([lion]);
         let refreshed!: () => void;
@@ -1750,13 +1752,13 @@ describe("init events", () => {
 
         await load(s);
 
-        expect(gamesSent(s, "tokio:games")).toHaveLength(1);
+        expect(gamesSent(s, "tokio:games")).toEqual([]);
         await vi.waitFor(() =>
           expect(s.overlayService.refreshGifts).toHaveBeenCalled(),
         );
         refreshed();
         await vi.waitFor(() =>
-          expect(gamesSent(s, "tokio:games")).toHaveLength(2),
+          expect(gamesSent(s, "tokio:games")).toHaveLength(1),
         );
       });
 
@@ -1820,9 +1822,6 @@ describe("init events", () => {
         expect(s.overlayService.load).toHaveBeenCalledExactlyOnceWith([rose]);
         expect(s.overlayService.refreshGifts).not.toHaveBeenCalled();
         expect(noticesFor(s, FEEDBACK_CODES.GIFTS_FETCH_FAILED)).toEqual([]);
-        expect(gamesSent(s, "tokio:games")).toEqual([
-          { look: profile.games.overlay, rows: [] },
-        ]);
       });
 
       it("warns that the gift options stay empty when TikTok sends none", async () => {
