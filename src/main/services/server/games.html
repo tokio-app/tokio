@@ -75,7 +75,7 @@
       // The lit rows' ids, each with the timeout that puts it out
       const lit = new Map();
 
-      // A picture in its slot. One that doesn't load goes, and its side
+      // A picture in its box. One that doesn't load goes, and its side
       // shows its text again if that was its only picture.
       const slot = (src, result) => {
         const box = document.createElement("span");
@@ -186,7 +186,7 @@
         carousel = look.layout === "carousel";
         games.classList.toggle("games-carousel", carousel);
         games.classList.toggle("games-pictures-only", look.pictures_only);
-        // Only when they changed, so a lit row keeps its glint going
+        // Only when they changed, so a lit row keeps its flash going
         if (JSON.stringify(changed) !== JSON.stringify(rows)) {
           // One at a time stays on the row it shows, if it's still there
           const shown = rows[turn]?.id;

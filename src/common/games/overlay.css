@@ -99,8 +99,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The pictures sit in recessed slots, bevelled like an inventory's: dark on
-   the top and left, light on the bottom and right. */
+/* The pictures float over the game, as TikTok shows its gifts, with a halo
+   like the texts' that follows their shape */
 .games-slot {
   position: relative;
   display: flex;
@@ -109,24 +109,21 @@
   justify-content: center;
   width: 2em;
   height: 2em;
-  overflow: hidden;
-  background: rgb(0 0 0 / 60%);
-  box-shadow:
-    inset 0.1em 0.1em 0 rgb(0 0 0 / 55%),
-    inset -0.1em -0.1em 0 rgb(255 255 255 / 20%);
+}
+
+.games-slot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.03em 0.08em var(--games-halo))
+    drop-shadow(0 0 0 transparent) brightness(1);
 }
 
 /* The result, larger, like a crafting table's */
 .games-slot-result {
   width: 2.5em;
   height: 2.5em;
-}
-
-.games-slot img {
-  display: block;
-  width: 78%;
-  height: 78%;
-  object-fit: contain;
 }
 
 /* Our own pixel arrow, the crafting table's, with a hard shadow */
@@ -138,50 +135,24 @@
   filter: drop-shadow(0.08em 0.08em 0 rgb(0 0 0 / 60%));
 }
 
-/* A RUN: the enchantment glint, two accent bands sweeping across the row's
-   slots while it's lit. The class stays on through a burst, so the sweep
-   never restarts. */
-.games-slot::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 30%,
-    var(--games-accent) 42%,
-    transparent 48%,
-    var(--games-accent) 56%,
-    transparent 68%
-  );
-  background-size: 300% 100%;
-  mix-blend-mode: screen;
-  opacity: 0;
-  transition: opacity 0.3s;
-  pointer-events: none;
+/* A RUN: the row lights up while it's lit. Its pictures glow in the accent
+   along their shape and flash like an enchanted item, and its texts take
+   the accent. The class stays on through a burst, so the flash never
+   restarts. The filters keep the same functions, so they animate. */
+.games-lit .games-slot img {
+  filter: drop-shadow(0 0 0.06em var(--games-accent))
+    drop-shadow(0 0 0.2em var(--games-accent)) brightness(1);
+  animation: games-glint 1.2s ease-in-out infinite;
 }
 
-.games-lit .games-slot::after {
-  opacity: 0.75;
-  animation: games-glint 1.2s linear infinite;
-}
-
-.games-lit .games-slot-result {
-  box-shadow:
-    inset 0.1em 0.1em 0 var(--games-accent),
-    inset -0.1em -0.1em 0 var(--games-accent);
-}
-
-/* A side with no slot to glint shows the run in its text */
-.games-lit .games-side:not(.has-picture) .games-text {
+.games-lit .games-text {
   color: var(--games-accent);
 }
 
 @keyframes games-glint {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: 0 0;
+  50% {
+    filter: drop-shadow(0 0 0.06em var(--games-accent))
+      drop-shadow(0 0 0.35em var(--games-accent)) brightness(1.3);
   }
 }
 
@@ -203,10 +174,9 @@
   opacity: 1;
 }
 
-/* Only the accent bevel shows a run */
+/* The glow and the texts show a run, without the flash */
 @media (prefers-reduced-motion: reduce) {
-  .games-lit .games-slot::after {
+  .games-lit .games-slot img {
     animation: none;
-    opacity: 0;
   }
 }
