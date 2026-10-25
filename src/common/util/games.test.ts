@@ -7,7 +7,12 @@ import {
 } from "../schemas/profile";
 import { EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
 import { CustomGift } from "../types/overlay";
-import { gameEventPictures, gameEventText, gameOverlayRows } from "./games";
+import {
+  gameEventPictures,
+  gameEventText,
+  gameOverlayRows,
+  gameStepsText,
+} from "./games";
 
 const gift = (value: number, label: string, img = `${label}.png`) =>
   ({ value, label, img, coins: 1 }) satisfies CustomGift;
@@ -122,6 +127,55 @@ describe("gameOverlayRows", () => {
       event: "Rosa",
       pictures: ["Rose.png"],
     });
+  });
+});
+
+describe("gameStepsText", () => {
+  const steps = (
+    edition: GameAction["edition"],
+    ...list: GameAction["steps"]
+  ) =>
+    gameStepsText(
+      action((a) => {
+        a.edition = edition;
+        a.steps = list;
+      }),
+    );
+
+  it("names what the steps make, as the action's edition names it", () => {
+    expect(
+      steps(
+        "java",
+        { type: "spawn", mob: "zombie", amount: 5, name: "" },
+        { type: "give", item: "diamond", amount: 1 },
+        { type: "weather", weather: "thunder" },
+        { type: "time", time: "night" },
+      ),
+    ).toBe("Zombie ×5, Diamond, Thunder, Night");
+    // Bedrock's id for Java's cobweb
+    expect(steps("bedrock", { type: "give", item: "web", amount: 1 })).toBe(
+      "Cobweb",
+    );
+  });
+
+  it("names nothing for commands and ids the game doesn't have", () => {
+    expect(
+      steps(
+        "java",
+        { type: "command", command: "say hi" },
+        { type: "spawn", mob: "constructor", amount: 1, name: "" },
+        { type: "give", item: "web", amount: 1 },
+      ),
+    ).toBe("");
+  });
+
+  it("names a row on the overlay until the streamer types one", () => {
+    const zombie = action((a) => {
+      a.overlay.name = "";
+      a.steps = [{ type: "spawn", mob: "zombie", amount: 1, name: "" }];
+    });
+
+    expect(rows(zombie)[0].name).toBe("Zombie");
   });
 });
 

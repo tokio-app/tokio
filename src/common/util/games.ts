@@ -1,4 +1,10 @@
-import type { GameAction, Profile, SavedEmote } from "@/common/schemas";
+import type {
+  GameAction,
+  GameStep,
+  MinecraftEdition,
+  Profile,
+  SavedEmote,
+} from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
   CustomGift,
@@ -6,6 +12,32 @@ import {
   GameOverlayRow,
   TOKIO_EVENTS,
 } from "@/common/types";
+import bedrock from "../games/minecraft-bedrock.json";
+import java from "../games/minecraft-java.json";
+
+type Names = Record<string, string>;
+type Weather = Extract<GameStep, { type: "weather" }>["weather"];
+type Time = Extract<GameStep, { type: "time" }>["time"];
+
+// Every mob and item each edition's summon and give take, id → the name the
+// game gives it in English (see .claude/rules/games.md)
+export const MINECRAFT_NAMES: Record<
+  MinecraftEdition,
+  { mobs: Names; items: Names }
+> = { bedrock, java };
+
+export const WEATHER_NAMES: Record<Weather, string> = {
+  clear: "Clear",
+  rain: "Rain",
+  thunder: "Thunder",
+};
+
+export const TIME_NAMES: Record<Time, string> = {
+  day: "Day",
+  noon: "Noon",
+  night: "Night",
+  midnight: "Midnight",
+};
 
 // As many as the gift picker's field shows
 const MAX_PICTURES = 3;
@@ -32,6 +64,30 @@ export function gameEventText(action: GameAction, gifts: CustomGift[]) {
   const keyword =
     trigger.type === TOKIO_EVENTS.CHAT ? trigger.keyword.trim() : "";
   return keyword ? `${label} “${keyword}”` : label;
+}
+
+/**
+ * What the action makes, as the game names it, the default of its name on
+ * the games overlay: "Primed TNT", "Zombie ×5, Thunder". Commands have none.
+ */
+export function gameStepsText({ edition, steps }: GameAction) {
+  const { mobs, items } = MINECRAFT_NAMES[edition];
+  // An id the list doesn't have names nothing, "constructor" included
+  const named = (names: Names, id: string, amount: number) =>
+    !Object.hasOwn(names, id)
+      ? []
+      : amount > 1
+        ? `${names[id]} ×${amount}`
+        : names[id];
+  return steps
+    .flatMap((step) => {
+      if (step.type === "spawn") return named(mobs, step.mob, step.amount);
+      if (step.type === "give") return named(items, step.item, step.amount);
+      if (step.type === "weather") return WEATHER_NAMES[step.weather];
+      if (step.type === "time") return TIME_NAMES[step.time];
+      return [];
+    })
+    .join(", ");
 }
 
 // The event's pictures: its gifts' or emotes', none for other events
@@ -69,7 +125,7 @@ export function gameOverlayRows(
 ): GameOverlayRow[] {
   return games.actions.flatMap((action) => {
     const { overlay } = action;
-    const name = overlay.name.trim();
+    const name = overlay.name.trim() || gameStepsText(action);
     if (!action.enabled || !overlay.show || (!overlay.image && !name)) {
       return [];
     }

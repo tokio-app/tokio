@@ -5,10 +5,13 @@ import {
   MINECRAFT_EDITION_NAMES,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { MINECRAFT_PORT } from "@/common/util";
+import {
+  MINECRAFT_NAMES,
+  MINECRAFT_PORT,
+  TIME_NAMES,
+  WEATHER_NAMES,
+} from "@/common/util";
 import { SelectOption } from "@/components";
-import bedrock from "./minecraft-bedrock.json";
-import java from "./minecraft-java.json";
 
 export type StepKind = GameStep["type"];
 type Step<K extends StepKind> = Extract<GameStep, { type: K }>;
@@ -29,12 +32,12 @@ const options = (names: Record<string, string>): SelectOption<string>[] =>
   Object.entries(names).map(([value, label]) => ({ value, label }));
 
 export const MOBS: Record<MinecraftEdition, SelectOption<string>[]> = {
-  bedrock: options(bedrock.mobs),
-  java: options(java.mobs),
+  bedrock: options(MINECRAFT_NAMES.bedrock.mobs),
+  java: options(MINECRAFT_NAMES.java.mobs),
 };
 export const ITEMS: Record<MinecraftEdition, SelectOption<string>[]> = {
-  bedrock: options(bedrock.items),
-  java: options(java.items),
+  bedrock: options(MINECRAFT_NAMES.bedrock.items),
+  java: options(MINECRAFT_NAMES.java.items),
 };
 
 // The first words of each step's sentence
@@ -46,18 +49,13 @@ export const STEP_KINDS: SelectOption<StepKind>[] = [
   { value: "command", label: "Command" },
 ];
 
-export const WEATHERS: SelectOption<Step<"weather">["weather"]>[] = [
-  { value: "clear", label: "Clear" },
-  { value: "rain", label: "Rain" },
-  { value: "thunder", label: "Thunder" },
-];
+export const WEATHERS = (["clear", "rain", "thunder"] as const).map(
+  (value) => ({ value, label: WEATHER_NAMES[value] }),
+);
 
-export const TIMES: SelectOption<Step<"time">["time"]>[] = [
-  { value: "day", label: "Day" },
-  { value: "noon", label: "Noon" },
-  { value: "night", label: "Night" },
-  { value: "midnight", label: "Midnight" },
-];
+export const TIMES = (["day", "noon", "night", "midnight"] as const).map(
+  (value) => ({ value, label: TIME_NAMES[value] }),
+);
 
 const NEW_STEPS: { [K in StepKind]: Step<K> } = {
   spawn: { type: "spawn", mob: "zombie", amount: 1, name: "" },
@@ -90,12 +88,6 @@ export function createAction(edition: MinecraftEdition): GameAction {
   };
 }
 
-type Names = Record<string, string>;
-const NAMES: Record<MinecraftEdition, { mobs: Names; items: Names }> = {
-  bedrock,
-  java,
-};
-
 // Bedrock and Java ids for the same thing whose English names differ too
 const PAIRS = [
   ["ender_crystal", "end_crystal"],
@@ -122,11 +114,11 @@ function idIn(
   id: string,
   fallback: string,
 ) {
-  const names = NAMES[to][kind];
+  const names = MINECRAFT_NAMES[to][kind];
   if (Object.hasOwn(names, id)) return id;
   const renamed = RENAMED.get(id);
   if (renamed && Object.hasOwn(names, renamed)) return renamed;
-  const name = NAMES[from][kind][id]?.toLowerCase();
+  const name = MINECRAFT_NAMES[from][kind][id]?.toLowerCase();
   const same = Object.keys(names).find(
     (other) => names[other].toLowerCase() === name,
   );

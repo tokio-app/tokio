@@ -874,20 +874,30 @@ describe("Games overlay", () => {
     );
   });
 
-  it("previews the shown actions with a picture or a name", async () => {
+  it("previews the shown actions, named after their steps until named", async () => {
     const { user } = await load([
       giftAction("a1", { overlay: { ...overlay, image: TNT, name: "TNT" } }),
       likeAction("a2", { overlay: { ...overlay, name: "Creeper" } }),
       action("a3", { overlay: { ...overlay, show: false, name: "Hidden" } }),
       action("a4", { enabled: false, overlay: { ...overlay, name: "Off" } }),
+      // Its zombie names it
       action("a5"),
+      // A command makes nothing to name
+      action("a6", { steps: [command("say hi")] }),
     ]);
     await rose();
 
     expect(previewTexts()).toEqual([
       ["Rose", "TNT"],
       ["100 likes", "Creeper"],
+      ["Follow", "Zombie"],
     ]);
+    expect(
+      recipes()[4].getByRole("textbox", { name: "Name on the overlay" }),
+    ).toHaveAttribute("placeholder", "Zombie");
+    expect(
+      recipes()[5].getByRole("textbox", { name: "Name on the overlay" }),
+    ).toHaveAttribute("placeholder", "No name");
     expect(
       [...previewRows()[0].querySelectorAll("img")].map((img) =>
         img.getAttribute("src"),

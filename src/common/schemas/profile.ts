@@ -180,7 +180,7 @@ const GameOverlayItemSchema = z.object({
   image: AlertSoundSchema.nullable().default(null),
   // The event's text, empty for its own: the gifts' names, "100 likes"
   event: overlayText(),
-  // What it does, as the streamer calls it, none when empty
+  // What it does, empty for what its steps make: "Primed TNT", "Zombie ×5"
   name: overlayText(),
   // The column whose overlay shows it, the last one when there are fewer
   column: ColumnSchema,

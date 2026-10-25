@@ -11,6 +11,7 @@ import {
   gameEventPictures,
   gameEventText,
   gameOverlayRows,
+  gameStepsText,
   getMinecraftOverlayURL,
   getPicturePreviewURL,
 } from "@/common/util";
@@ -294,10 +295,11 @@ function RecipeRow({
           <FiPlus size={18} />
         )}
       </button>
+      {/* Empty, what the steps make shows, as the event's text does */}
       <Input
         aria-label="Name on the overlay"
         maxLength={40}
-        placeholder="No name"
+        placeholder={gameStepsText(action) || "No name"}
         value={overlay.name}
         onChange={(e) => onChange({ name: e.target.value })}
       />
