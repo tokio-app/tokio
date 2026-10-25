@@ -1,9 +1,10 @@
 import { APP_EVENTS_RESPONSE } from "@/common/types";
-import { formatError, MEDIA_SCHEME } from "@/common/util";
+import { formatError, MEDIA_SCHEME, mediaKind } from "@/common/util";
 import { Notifier } from "@/helper/feedback";
 import {
   mediaFile,
   previewFile,
+  videoResponse,
   withPreviewCORS,
   withPreviewStyles,
 } from "@/helper/preview";
@@ -205,11 +206,14 @@ app.whenReady().then(async () => {
   });
 
   // The media library, for the alerts' thumbnails, the sound library, for
-  // the sounds' lengths, and the Minecraft pictures. The Range header lets
-  // videos and sounds read only what they need.
+  // the sounds' lengths, and the Minecraft pictures. Videos come in the parts
+  // their players ask for, so the alert editor's preview can seek.
   protocol.handle(MEDIA_SCHEME, (request) => {
     const file = mediaFile(request.url, services.pathManagerService.folders);
     if (!file) return new Response(null, { status: 404 });
+    if (mediaKind(file) === "video") {
+      return videoResponse(file, request.headers.get("range"));
+    }
     return net.fetch(pathToFileURL(file).href, { headers: request.headers });
   });
 

@@ -2,6 +2,7 @@ import { Alert } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { formatAdded } from "@/common/util";
 import { Btn, NumberInput, Spinner } from "@/components";
+import { cx } from "@/helper";
 import { useAudio, useIpcListener } from "@/hooks";
 import {
   KeyboardEvent,
@@ -12,7 +13,7 @@ import {
   useState,
 } from "react";
 import styles from "./editor.module.css";
-import { waveform } from "./helper";
+import { cutPart, waveform } from "./helper";
 
 declare module "react" {
   interface CSSProperties {
@@ -23,7 +24,8 @@ declare module "react" {
 }
 
 type Sound = NonNullable<Alert["sound"]>;
-type Cut = Pick<Sound, "start" | "end">;
+// A sound's or video's
+export type Cut = Pick<Sound, "start" | "end">;
 type Handle = "start" | "end";
 
 const BARS = 96;
@@ -83,18 +85,13 @@ export function SoundCut({ sound, playing, play, onChange }: Props) {
   const actions = (
     <span className={styles.cut_actions}>
       {play}
-      <Btn
-        disabled={sound.start === 0 && sound.end === null}
-        onClick={() => onChange({ start: 0, end: null })}
-      >
-        Reset cut
-      </Btn>
+      <ResetCut cut={sound} onChange={onChange} />
     </span>
   );
 
   if (audio?.file === file) {
     return (
-      <Waveform
+      <CutTrack
         {...audio}
         cut={sound}
         playing={playing}
@@ -117,23 +114,49 @@ export function SoundCut({ sound, playing, play, onChange }: Props) {
   );
 }
 
-type WaveformProps = {
-  peaks: number[];
+// Plays the whole sound or video again
+export function ResetCut({
+  cut,
+  onChange,
+}: {
+  cut: Cut;
+  onChange: (cut: Cut) => void;
+}) {
+  return (
+    <Btn
+      disabled={cut.start === 0 && cut.end === null}
+      onClick={() => onChange({ start: 0, end: null })}
+    >
+      Reset cut
+    </Btn>
+  );
+}
+
+type CutTrackProps = {
+  // The sound's waveform, a plain track without
+  peaks?: number[];
   duration: number;
   cut: Cut;
   playing: boolean;
   actions: ReactNode;
   onChange: (cut: Cut) => void;
+  // The seconds a handle moved to
+  onSeek?: (seconds: number) => void;
 };
 
-function Waveform({
+/**
+ * The part of a sound or video that plays, between two handles over its
+ * length, and their seconds.
+ */
+export function CutTrack({
   peaks,
   duration,
   cut,
   playing,
   actions,
   onChange,
-}: WaveformProps) {
+  onSeek,
+}: CutTrackProps) {
   const box = useRef<HTMLDivElement>(null);
   const handles = useRef<Record<Handle, HTMLDivElement | null>>({
     start: null,
@@ -141,20 +164,18 @@ function Waveform({
   });
   const dragging = useRef<Handle | null>(null);
 
-  // A cut that doesn't fit the sound plays it whole, as the queue does.
-  let start = Math.min(cut.start, duration);
-  let stop = Math.min(cut.end ?? duration, duration);
-  if (stop <= start) [start, stop] = [0, duration];
+  const { start, stop } = cutPart(cut, duration);
   const percent = (value: number) => `${(value / duration) * 100}%`;
 
-  const setStart = (value: number) =>
-    onChange({
-      start: round(Math.max(0, Math.min(value, stop - MIN_PART))),
-      end: cut.end,
-    });
+  const setStart = (value: number) => {
+    const next = round(Math.max(0, Math.min(value, stop - MIN_PART)));
+    onSeek?.(next);
+    onChange({ start: next, end: cut.end });
+  };
   // At the sound's end, it plays to the end.
   const setEnd = (value: number) => {
     const end = Math.min(Math.max(value, start + MIN_PART), duration);
+    onSeek?.(end);
     onChange({
       start: cut.start,
       end: round(end) >= round(duration) ? null : round(end),
@@ -224,7 +245,7 @@ function Waveform({
     <div className={styles.cut}>
       <div
         ref={box}
-        className={styles.wave}
+        className={cx(styles.wave, !peaks && styles.track)}
         onPointerDown={onPointerDown}
         onPointerMove={(e) => {
           if (dragging.current) set(dragging.current, at(e.clientX));
@@ -236,29 +257,31 @@ function Waveform({
           className={styles.region}
           style={{ left: percent(start), width: percent(stop - start) }}
         />
-        <svg
-          className={styles.bars}
-          viewBox={`0 0 ${peaks.length} 100`}
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          {peaks.map((peak, i) => {
-            const height = Math.max(peak * 92, 2);
-            const middle = ((i + 0.5) / peaks.length) * duration;
-            return (
-              <rect
-                key={i}
-                x={i + 0.2}
-                width={0.6}
-                y={(100 - height) / 2}
-                height={height}
-                className={
-                  middle >= start && middle <= stop ? styles.kept : undefined
-                }
-              />
-            );
-          })}
-        </svg>
+        {peaks && (
+          <svg
+            className={styles.bars}
+            viewBox={`0 0 ${peaks.length} 100`}
+            preserveAspectRatio="none"
+            aria-hidden
+          >
+            {peaks.map((peak, i) => {
+              const height = Math.max(peak * 92, 2);
+              const middle = ((i + 0.5) / peaks.length) * duration;
+              return (
+                <rect
+                  key={i}
+                  x={i + 0.2}
+                  width={0.6}
+                  y={(100 - height) / 2}
+                  height={height}
+                  className={
+                    middle >= start && middle <= stop ? styles.kept : undefined
+                  }
+                />
+              );
+            })}
+          </svg>
+        )}
         {/* Sweeps the part while the test plays */}
         {playing && (
           <span

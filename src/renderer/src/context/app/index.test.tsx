@@ -215,14 +215,15 @@ describe("AppProvider", () => {
     );
   });
 
-  it("shows an alert's media on its overlay when the alert's turn comes, at its own volume", async () => {
+  it("shows an alert's media on its overlay when the alert's turn comes, at its own volume and cut", async () => {
     const audio = setup();
     const media = {
       name: "Party",
-      file: "party.gif",
+      file: "party.webm",
       duration: 5,
-      match_video: false,
       volume: 70,
+      start: 2,
+      end: 4.5,
     };
 
     await send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
@@ -242,7 +243,15 @@ describe("AppProvider", () => {
 
     options?.onScheduled?.(1.5, 6);
     expect(sent(APP_EVENTS.SHOW_ALERT_MEDIA)).toEqual([
-      { id: "alert-1", file: "party.gif", delay: 1.5, duration: 6, volume: 70 },
+      {
+        id: "alert-1",
+        file: "party.webm",
+        delay: 1.5,
+        duration: 6,
+        volume: 70,
+        start: 2,
+        end: 4.5,
+      },
     ]);
   });
 
@@ -258,8 +267,9 @@ describe("AppProvider", () => {
         name: "Party",
         file: "party.gif",
         duration: 5,
-        match_video: false,
         volume: 100,
+        start: 0,
+        end: null,
       },
     });
 

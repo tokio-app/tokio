@@ -836,11 +836,9 @@ describe("Alerts", () => {
       ]);
     });
 
-    it("keeps Match video when another file is picked", async () => {
+    it("keeps the duration when another file is picked", async () => {
       const { user } = await load([
-        alert("alert-1", {
-          media: alertMedia(party, { duration: 9, match_video: true }),
-        }),
+        alert("alert-1", { media: alertMedia(party, { duration: 9 }) }),
       ]);
 
       const dialog = await openMedia(user, 0);
@@ -848,11 +846,26 @@ describe("Alerts", () => {
 
       await wait(300);
       expect(saves().at(-1)?.items[0].media).toEqual(
-        alertMedia(confetti, { duration: 9, match_video: true }),
+        alertMedia(confetti, { duration: 9 }),
       );
     });
 
-    it("matches a video's length, and saves it", async () => {
+    it("keeps a cut when the same file is picked again, not for another", async () => {
+      const cut = alertMedia(party, { start: 1, end: 2 });
+      const { user } = await load([alert("alert-1", { media: cut })]);
+
+      let dialog = await openMedia(user, 0);
+      await user.click(dialog.getByRole("button", { name: "Party" }));
+      await wait(300);
+      expect(saves()).toEqual([]);
+
+      dialog = await openMedia(user, 0);
+      await user.click(dialog.getByRole("button", { name: "Confetti" }));
+      await wait(300);
+      expect(saves().at(-1)?.items[0].media).toEqual(alertMedia(confetti));
+    });
+
+    it("shows a video while it plays, and saves it", async () => {
       const clip = { name: "Clip", file: "clip.webm" };
       const { user } = await load([
         alert("alert-1", { media: alertMedia(clip) }),
@@ -862,12 +875,11 @@ describe("Alerts", () => {
       Object.defineProperty(video, "duration", { value: 7.4 });
       fireEvent.loadedMetadata(video);
 
-      await user.click(screen.getByRole("checkbox", { name: "Match video" }));
-
       await wait(300);
       expect(saves().at(-1)?.items[0].media).toEqual(
-        alertMedia(clip, { duration: 8, match_video: true }),
+        alertMedia(clip, { duration: 7.4 }),
       );
+      expect(summary(0)).toHaveTextContent("7.4s");
     });
 
     it("ignores a browsed file that comes after a pick", async () => {

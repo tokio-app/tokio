@@ -40,7 +40,7 @@ import {
 } from "@/components";
 import thumbs from "@/components/MediaPicker/mediapicker.module.css";
 import { AlertTestRequest } from "@/hooks";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, RefObject, useEffect, useRef, useState } from "react";
 import {
   FiImage,
   FiMessageSquare,
@@ -50,7 +50,8 @@ import {
   FiVolume2,
 } from "react-icons/fi";
 import styles from "./editor.module.css";
-import { SoundCut } from "./SoundCut";
+import { cutPart } from "./helper";
+import { Cut, CutTrack, ResetCut, SoundCut } from "./SoundCut";
 
 type Tab = "trigger" | "sound" | "media";
 
@@ -327,23 +328,41 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
   const { media } = alert;
   // The video's length in seconds, read by its preview
   const [length, setLength] = useState<{ file: string; seconds: number }>();
+  // The file whose preview plays, so another one picked meanwhile doesn't
+  const [playing, setPlaying] = useState<string | null>(null);
+  const player = useRef<HTMLVideoElement>(null);
 
   const video = media ? mediaKind(media.file) === "video" : false;
+  const read = !!media && length?.file === media.file;
   // Unknown for videos that don't say their length, like some recordings
   const seconds = media && length?.file === media.file ? length.seconds : NaN;
-  // Rounded up from the tenths the preview's length shows, so a 6.02s video
-  // is 6 seconds, as it reads
-  const match = Number.isFinite(seconds)
-    ? Math.min(Math.ceil(Math.round(seconds * 10) / 10), MEDIA_MAX_DURATION)
-    : null;
-  // The duration follows the video, also one picked after it was matched.
-  const following = !!media?.match_video && video && match !== null;
+  const cuttable = video && Number.isFinite(seconds) && seconds > 0;
+  // A cut video shows while its part plays, an image or a video of unknown
+  // length for the duration typed.
+  const shows =
+    media && cuttable
+      ? Math.min(
+          Math.max(Math.round(partLength(media, seconds) * 100) / 100, 1),
+          MEDIA_MAX_DURATION,
+        )
+      : null;
 
+  // Also for a video picked or cut while the tab shows
   useEffect(() => {
-    if (following && media && match !== null && media.duration !== match) {
-      onChange({ ...alert, media: { ...media, duration: match } });
+    if (media && shows !== null && media.duration !== shows) {
+      onChange({ ...alert, media: { ...media, duration: shows } });
     }
-  }, [following, match, media, alert, onChange]);
+  }, [shows, media, alert, onChange]);
+
+  // The preview shows the frame where the cut changed.
+  const seek = (time: number) => {
+    const el = player.current;
+    if (!el) return;
+    el.pause();
+    el.currentTime = time;
+  };
+  const setCut = (cut: Cut) =>
+    media && onChange({ ...alert, media: { ...media, ...cut } });
 
   return (
     <>
@@ -352,8 +371,11 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
         {media ? (
           <MediaPreview
             key={media.file}
+            ref={player}
             media={media}
+            playing={playing === media.file}
             onLength={(s) => setLength({ file: media.file, seconds: s })}
+            onPlaying={(on) => setPlaying(on ? media.file : null)}
           />
         ) : (
           <span className={styles.preview_empty}>
@@ -375,7 +397,8 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
             </span>
           </div>
 
-          {media && (
+          {/* None while the preview reads the video's length */}
+          {media && (!video || (read && !cuttable)) && (
             <Field label="Duration">
               <span className={styles.inline}>
                 <NumberInput
@@ -385,27 +408,11 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
                   className={styles.number}
                   aria-label="Duration in seconds"
                   value={media.duration}
-                  disabled={following}
                   onChange={(duration) =>
                     onChange({ ...alert, media: { ...media, duration } })
                   }
                 />
                 seconds
-                {video && (
-                  <Check
-                    label="Match video"
-                    title={`The video's length, up to ${MEDIA_MAX_DURATION} seconds`}
-                    checked={media.match_video}
-                    // Off, a video of unknown length can't be matched
-                    disabled={!media.match_video && match === null}
-                    onChange={(e) =>
-                      onChange({
-                        ...alert,
-                        media: { ...media, match_video: e.target.checked },
-                      })
-                    }
-                  />
-                )}
               </span>
               <p className={styles.note}>
                 At least this long, or while the sound plays if it's longer.
@@ -425,6 +432,29 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
         </div>
       </div>
 
+      {media && cuttable && (
+        <Field label="Cut">
+          <CutTrack
+            duration={seconds}
+            cut={media}
+            playing={playing === media.file}
+            actions={
+              <span className={styles.cut_actions}>
+                <ResetCut
+                  cut={media}
+                  onChange={(cut) => {
+                    seek(0);
+                    setCut(cut);
+                  }}
+                />
+              </span>
+            }
+            onChange={setCut}
+            onSeek={seek}
+          />
+        </Field>
+      )}
+
       <Field label="Overlay URL">
         <CopyField value={getAlertOverlayURL(alert.id)} title="Copy URL" />
       </Field>
@@ -432,27 +462,46 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
   );
 }
 
+const partLength = (cut: Cut, seconds: number) => {
+  const { start, stop } = cutPart(cut, seconds);
+  return stop - start;
+};
+
 /**
- * The alert's image, or its video with a button that plays it right here,
- * at the video's volume, and its length.
+ * The alert's image, or its video with a button that plays its cut right
+ * here, at the video's volume, and the cut's length.
  */
 function MediaPreview({
   media,
+  ref,
+  playing,
   onLength,
+  onPlaying,
 }: {
   media: AlertMedia;
+  ref: RefObject<HTMLVideoElement | null>;
+  playing: boolean;
   onLength: (seconds: number) => void;
+  onPlaying: (playing: boolean) => void;
 }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
   const [length, setLength] = useState(NaN);
-  const { file, volume } = media;
+  // Pauses the video at its cut's end
+  const stop = useRef<number>(undefined);
+  const { file, volume, start, end } = media;
   const src = useVideoURL(file);
+
+  // The video's clock can lag behind the timer, so it waits for the rest.
+  const stopAtEnd = (el: HTMLVideoElement) => {
+    if (end === null || el.paused) return;
+    const left = end - el.currentTime;
+    if (left <= 0.02) el.pause();
+    else stop.current = window.setTimeout(() => stopAtEnd(el), left * 1000);
+  };
 
   // Heard as it's set, while it plays
   useEffect(() => {
     if (ref.current) ref.current.volume = volume / 100;
-  }, [volume]);
+  }, [ref, volume]);
 
   if (mediaKind(file) !== "video") {
     return (
@@ -470,12 +519,24 @@ function MediaPreview({
         src={`${src}#t=0.1`}
         preload="metadata"
         onLoadedMetadata={(e) => {
-          setLength(e.currentTarget.duration);
-          onLength(e.currentTarget.duration);
+          const el = e.currentTarget;
+          setLength(el.duration);
+          onLength(el.duration);
+          // Its first frame is the cut's
+          if (start > 0) el.currentTime = start;
         }}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
+        // Its length unknown, the duration is typed
+        onError={() => onLength(NaN)}
+        onPlaying={(e) => {
+          onPlaying(true);
+          window.clearTimeout(stop.current);
+          stopAtEnd(e.currentTarget);
+        }}
+        onPause={() => {
+          window.clearTimeout(stop.current);
+          onPlaying(false);
+        }}
+        onEnded={() => onPlaying(false)}
       />
       <Btn
         variant="icon"
@@ -489,14 +550,16 @@ function MediaPreview({
             return;
           }
           el.volume = volume / 100;
-          el.play().catch(() => setPlaying(false));
+          // The whole cut, as the alert plays it
+          el.currentTime = start;
+          el.play().catch(() => onPlaying(false));
         }}
       >
         {playing ? <FiPause size={16} /> : <FiPlay size={16} />}
       </Btn>
       {Number.isFinite(length) && length > 0 && (
         <span className={styles.preview_length}>
-          {formatAdded(length * 1000)}
+          {formatAdded(partLength(media, length) * 1000)}
         </span>
       )}
     </span>

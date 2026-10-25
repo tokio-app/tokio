@@ -50,18 +50,35 @@
         current = null;
       };
 
-      const show = ({ src, kind, duration, volume }) => {
+      const show = ({ src, kind, duration, volume, start, end }) => {
         current?.remove();
-        const el = document.createElement(kind === "video" ? "video" : "img");
+        const video = kind === "video";
+        const el = document.createElement(video ? "video" : "img");
         current = el;
         el.onerror = () => hide(el);
-        el.src = src;
+        // A video's cut starts here, the browser seeks to it.
+        el.src = video && start > 0 ? `${src}#t=${start}` : src;
         document.body.append(el);
-        setTimeout(() => hide(el), duration * 1000);
-        if (kind !== "video") return;
+        // A video playing is timed by its own clock, below.
+        setTimeout(() => {
+          if (!video || el.paused) hide(el);
+        }, duration * 1000);
+        if (!video) return;
 
         el.volume = volume / 100;
         el.onended = () => hide(el);
+        // It stops at its cut's end, or once it has played its duration.
+        // It loads and starts after its turn does, and its clock can lag
+        // behind a timer, so it waits for the rest. A fragment's end would be
+        // checked only every 250 ms.
+        const stop = Math.min(end ?? Infinity, start + duration);
+        const stopAtEnd = () => {
+          if (el !== current || el.paused) return;
+          const left = stop - el.currentTime;
+          if (left <= 0.02) hide(el);
+          else setTimeout(stopAtEnd, left * 1000);
+        };
+        el.addEventListener("playing", stopAtEnd, { once: true });
         // A browser may refuse sound before a click, OBS doesn't.
         el.play()
           .catch(() => {

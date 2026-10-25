@@ -134,16 +134,18 @@ export function Alerts() {
     setOutput(res.id, { sound: res.sound, tts: null });
   });
 
-  // Another file keeps the alert's duration and volume.
+  // Another file keeps the alert's duration and volume, and plays whole.
   const setMedia = (id: string, file: MediaFile | null) => {
     update((s) => {
       const alert = s.items.find((a) => a.id === id);
       if (!alert) return;
+      const cut = alert.media?.file === file?.file ? alert.media : null;
       alert.media = file && {
         ...file,
         duration: alert.media?.duration ?? MEDIA_DURATION,
-        match_video: alert.media?.match_video ?? false,
         volume: alert.media?.volume ?? 100,
+        start: cut?.start ?? 0,
+        end: cut?.end ?? null,
       };
     });
     // A browsed file can arrive while another alert's picker is open

@@ -4,7 +4,7 @@ import {
   EMOTE_TRIGGER,
   TOKIO_EVENTS,
   TokioEventMap,
-} from "@/common/types";
+} from "../types/connector";
 
 const USER = ["username", "handle"];
 const CHAT = [...USER, "comment"];

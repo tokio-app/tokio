@@ -5,7 +5,7 @@ import {
   EMOTE_TRIGGER,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { giftNames, takesRoles } from "@/common/util";
+import { formatAdded, giftNames, takesRoles } from "@/common/util";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { FiEdit2, FiMessageSquare, FiMusic, FiTrash2 } from "react-icons/fi";
 import { Btn, Input, Select, SelectOption, Toggle } from "../Elements";
@@ -257,7 +257,9 @@ export function AlertItem({
               </span>
               <span className={styles.media_text}>
                 <span className={styles.text}>{media.name}</span>
-                <span className={styles.detail}>{media.duration}s</span>
+                <span className={styles.detail}>
+                  {formatAdded(media.duration * 1000)}
+                </span>
               </span>
             </span>
           ) : (

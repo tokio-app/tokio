@@ -1018,6 +1018,8 @@ describe("alerts events", () => {
         delay: 0.1,
         duration: 5,
         volume: 80,
+        start: 1,
+        end: null,
       };
 
       await h.invoke(alerts, APP_EVENTS.SHOW_ALERT_MEDIA, show);

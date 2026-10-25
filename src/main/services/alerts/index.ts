@@ -293,12 +293,14 @@ export class AlertsService extends Service {
     delay,
     duration,
     volume,
+    start,
+    end,
   }: AppEventsMap[APP_EVENTS.SHOW_ALERT_MEDIA]) {
     const kind = mediaKind(file);
     if (
       basename(file) !== file ||
       !kind ||
-      ![delay, duration, volume].every(Number.isFinite)
+      ![delay, duration, volume, start, end ?? 0].every(Number.isFinite)
     ) {
       Logger.warn(
         `<Alerts> Refused to show "${file}" on the overlay of alert ${id}.`,
@@ -317,6 +319,8 @@ export class AlertsService extends Service {
             kind,
             duration: clamp(duration, MAX_SECONDS),
             volume: clamp(volume, 100),
+            start: clamp(start, MAX_SECONDS),
+            end: end === null ? null : clamp(end, MAX_SECONDS),
           },
         });
         if (sent) this._shown.add(id);
