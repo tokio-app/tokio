@@ -24,11 +24,12 @@ const out = join(repo, ".github", "screenshots");
 const website = join(repo, "..", "tokio-web");
 const docs = join(website, "src", "assets", "screenshots");
 
-// Half a second of a quiet tone, as a 16-bit mono WAV. The library names
-// sounds by their content, so each needs its own pitch.
+// Three quiet chimes that fade out, two seconds as a 16-bit mono WAV, so the
+// alert editor's waveform has a shape. The library names sounds by their
+// content, so each needs its own pitch.
 function tone(file, hz) {
   const rate = 8000;
-  const samples = rate / 2;
+  const samples = rate * 2;
   const wav = Buffer.alloc(44 + samples * 2);
   wav.write("RIFF", 0);
   wav.writeUInt32LE(36 + samples * 2, 4);
@@ -43,8 +44,10 @@ function tone(file, hz) {
   wav.write("data", 36);
   wav.writeUInt32LE(samples * 2, 40);
   for (let i = 0; i < samples; i++) {
+    const t = i / rate;
+    const fade = t < 1.8 ? Math.exp(-(t % 0.6) / 0.15) : 0;
     wav.writeInt16LE(
-      Math.round(Math.sin((i * 2 * Math.PI * hz) / rate) * 3000),
+      Math.round(Math.sin((i * 2 * Math.PI * hz) / rate) * 3000 * fade),
       44 + i * 2,
     );
   }
@@ -175,8 +178,11 @@ export default async ({ app, page, home, push, toggle }) => {
       trigger: "Gift",
       sound: "Cash register",
       hz: 440,
+      cut: ["0.2", "1.3"],
       media,
       gifts: ["Rose", "Galaxy"],
+      coins: "100",
+      role: "Moderators",
     },
     { trigger: "Chat", sound: "Airhorn", hz: 523, keyword: "hype" },
     { trigger: "Share", sound: "Applause", hz: 659 },
@@ -187,79 +193,105 @@ export default async ({ app, page, home, push, toggle }) => {
       user: "@regular.viewer",
     },
   ];
+  // The alert's editor, and the picker over it
+  const editor = dialog.first();
+  const picker = dialog.last();
+  const dialogsOpen = (count) =>
+    page.waitForFunction(
+      (n) => document.querySelectorAll('[role="dialog"]').length === n,
+      count,
+    );
   for (const alert of alerts) {
     await page.getByRole("button", { name: "Add alert" }).first().click();
     // A new alert goes to the end of the list
-    await page.getByRole("combobox", { name: "Trigger" }).last().click();
+    await page.getByTitle("Edit alert").last().click();
+    await editor.getByRole("combobox", { name: "Event" }).click();
     await page
       .getByRole("option", { name: alert.trigger, exact: true })
       .click();
 
-    await page
-      .getByRole("button", { name: "Select a sound..." })
-      .last()
-      .click();
-    if (alert.speak) {
-      await dialog.getByRole("tab", { name: "Text-to-speech" }).click();
-      await dialog
-        .getByPlaceholder("Type what the alert says...")
-        .fill(alert.speak);
-      await dialog.getByRole("button", { name: "Use text-to-speech" }).click();
-    } else {
-      await pick(tone(join(home, `${alert.sound}.wav`), alert.hz));
-      await dialog.getByRole("button", { name: "Browse file..." }).click();
-    }
-    await dialog.waitFor({ state: "detached" });
-
-    if (alert.media) {
-      await page
-        .getByRole("button", { name: "Select media..." })
-        .last()
-        .click();
-      await pick(alert.media);
-      await dialog.getByRole("button", { name: "Browse file..." }).click();
-      await dialog.getByTitle("tokio-logo").click();
-      await crop("alerts-media", dialog);
-      await dialog.getByRole("button", { name: "Done" }).click();
-      await dialog.waitFor({ state: "detached" });
+    // The coins show only for any gift, before the gifts are picked
+    if (alert.coins) {
+      await editor.getByRole("spinbutton", { name: "Coins" }).fill(alert.coins);
+      await editor.getByRole("checkbox", { name: alert.role }).check();
+      await crop("alerts-trigger", editor);
     }
     if (alert.gifts) {
-      await page.getByRole("button", { name: "Any gift" }).click();
+      await editor.getByRole("button", { name: "Any gift" }).click();
       for (const gift of alert.gifts) {
-        await dialog.getByTitle(gift, { exact: true }).click();
+        await picker.getByTitle(gift, { exact: true }).click();
       }
-      await dialog
+      await picker
         .getByRole("combobox")
         .filter({ hasText: "Any price" })
         .click();
       await page.getByRole("option", { name: "At least", exact: true }).click();
-      await dialog.getByLabel("Coins", { exact: true }).fill("1000");
+      await picker.getByLabel("Coins", { exact: true }).fill("1000");
       await page.waitForTimeout(1500);
-      await crop("alerts-gifts", dialog);
-      await dialog.getByRole("button", { name: "Done" }).click();
-      await dialog.waitFor({ state: "detached" });
+      await crop("alerts-gifts", picker);
+      await picker.getByRole("button", { name: "Done" }).click();
+      await dialogsOpen(1);
     }
     if (alert.keyword) {
-      await page.getByPlaceholder("Any message").fill(alert.keyword);
+      await editor.getByPlaceholder("Any message").fill(alert.keyword);
     }
     if (alert.user) {
-      await page.getByPlaceholder("Anyone").fill(alert.user);
+      await editor.getByPlaceholder("Anyone").fill(alert.user);
     }
+
+    await editor.getByRole("tab", { name: "Sound" }).click();
+    await editor.getByRole("button", { name: "Choose sound..." }).click();
+    if (alert.speak) {
+      await picker.getByRole("tab", { name: "Text-to-speech" }).click();
+      await picker
+        .getByPlaceholder("Type what the alert says...")
+        .fill(alert.speak);
+      await picker.getByRole("button", { name: "Use text-to-speech" }).click();
+    } else {
+      await pick(tone(join(home, `${alert.sound}.wav`), alert.hz));
+      await picker.getByRole("button", { name: "Browse file..." }).click();
+    }
+    await dialogsOpen(1);
+    if (alert.cut) {
+      const [start, end] = alert.cut;
+      await editor.getByRole("spinbutton", { name: "Start" }).fill(start);
+      await editor.getByRole("spinbutton", { name: "End" }).fill(end);
+      await crop("alerts-cut", editor);
+    }
+
+    if (alert.media) {
+      await editor.getByRole("tab", { name: "Media" }).click();
+      await editor.getByRole("button", { name: "Choose media..." }).click();
+      await pick(alert.media);
+      await picker.getByRole("button", { name: "Browse file..." }).click();
+      await dialogsOpen(1);
+      await crop("alerts-media", editor);
+    }
+    await editor.getByRole("button", { name: "Done" }).click();
+    await dialog.waitFor({ state: "detached" });
   }
   await shoot("alerts");
   await crop("alerts-queue", section("Alerts"), { width: 640 });
-  // The list, from its column headers
+  // The list of alerts
   await crop(
     "alerts",
-    page.getByText("Volume", { exact: true }).locator("xpath=ancestor::div[2]"),
+    page.getByTitle("Edit alert").first().locator("xpath=ancestor::div[2]"),
   );
-  await page.getByRole("button", { name: "Cash register" }).click();
-  await crop("alerts-sounds", dialog);
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await page.getByRole("button", { name: /Thanks for the follow/ }).click();
-  await dialog.getByRole("tab", { name: "Text-to-speech" }).click();
-  await crop("alerts-tts", dialog);
-  await dialog.getByRole("button", { name: "Cancel" }).click();
+  // The pickers, over the editors of the gift and follow alerts
+  await page.getByTitle("Edit alert").nth(1).click();
+  await editor.getByRole("tab", { name: "Sound" }).click();
+  await editor.getByRole("button", { name: "Change..." }).click();
+  await crop("alerts-sounds", picker);
+  await picker.getByRole("button", { name: "Cancel" }).click();
+  await editor.getByRole("button", { name: "Done" }).click();
+  await page.getByTitle("Edit alert").first().click();
+  await editor.getByRole("tab", { name: "Sound" }).click();
+  await editor.getByRole("button", { name: "Change..." }).click();
+  await picker.getByRole("tab", { name: "Text-to-speech" }).click();
+  await crop("alerts-tts", picker);
+  await picker.getByRole("button", { name: "Cancel" }).click();
+  await editor.getByRole("button", { name: "Done" }).click();
+  await dialog.waitFor({ state: "detached" });
 
   // Text-to-speech: pick a voice, then show the list around it
   await open("TTS", "Voice");
