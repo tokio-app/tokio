@@ -1,4 +1,10 @@
-import { Alert, Profile, ProfileSchema, StoreSchema } from "@/common/schemas";
+import {
+  Alert,
+  GameAction,
+  Profile,
+  ProfileSchema,
+  StoreSchema,
+} from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
 import { safeStorage } from "@test/electron";
 import { defaultProfile } from "@/common/util";
@@ -1167,6 +1173,99 @@ describe("StoreManagerService", () => {
 
       await store.removeMedia("party.png");
       expect(store.getMedia()).toEqual([]);
+    });
+  });
+
+  describe("Minecraft pictures", () => {
+    const tnt = { name: "TNT", file: "tnt.png" };
+    const creeper = { name: "Creeper", file: "creeper.png" };
+    const gameAction = (id: string, image: typeof tnt | null): GameAction => ({
+      id,
+      enabled: true,
+      edition: "bedrock",
+      trigger: {
+        type: TOKIO_EVENTS.FOLLOW,
+        gifts: [],
+        every_gift: false,
+        emotes: [],
+        keyword: "",
+        user: "",
+      },
+      likes_every: 100,
+      steps: [],
+      overlay: { show: true, image, event: "", name: "Boom" },
+    });
+    const withActions = (...actions: GameAction[]) => ({
+      games: { ...defaultProfile.games, actions },
+    });
+    const images = (profile: { games: { actions: GameAction[] } }) =>
+      profile.games.actions.map((a) => a.overlay.image);
+
+    it("adds a picture once and removes it", async () => {
+      const store = await init();
+
+      await store.addMinecraftPicture(tnt);
+      await store.addMinecraftPicture({ ...tnt, name: "Other name" });
+      expect((await init()).getMinecraftPictures()).toEqual([tnt]);
+
+      await store.removeMinecraftPicture("tnt.png");
+      expect(store.getMinecraftPictures()).toEqual([]);
+    });
+
+    it("recovers the library when the store is rebuilt", async () => {
+      const folder = paths.folders.minecraftFolder;
+      for (const file of ["tnt.png", "zombie.gif", "clip.mp4"]) {
+        await writeFile(join(folder, file), "picture");
+      }
+      await writeFile(
+        defaultProfileFile,
+        JSON.stringify({
+          ...defaultProfile,
+          ...withActions(gameAction("a", tnt)),
+        }),
+      );
+      await writeFile(storeFile, "{ oops");
+
+      const store = await init();
+
+      expect(store.getMinecraftPictures()).toEqual([
+        tnt,
+        { name: "Recovered picture 1", file: "zombie.gif" },
+      ]);
+    });
+
+    it("takes a deleted picture off the actions of every profile", async () => {
+      const store = await init();
+      await store.updateProfileData(
+        withActions(gameAction("a", tnt), gameAction("b", creeper)),
+      );
+      await store.createNewProfile("stream.json", "Stream");
+      await store.updateActiveProfile("stream.json");
+      await store.updateProfileData(withActions(gameAction("c", tnt)));
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+
+      expect(await store.removeFromGames("tnt.png")).toBe(true);
+
+      // The active profile, in memory and on disk, and another one
+      expect(images((await store.getProfileData())!)).toEqual([null]);
+      expect(images(await readJSON(stream))).toEqual([null]);
+      expect(images(await readJSON(defaultProfileFile))).toEqual([
+        null,
+        creeper,
+      ]);
+    });
+
+    it("says so when a profile that has the picture can't be saved", async () => {
+      const store = await init();
+      await store.updateProfileData(withActions(gameAction("a", tnt)));
+      vi.spyOn(json, "updateFile").mockResolvedValue({
+        success: false,
+        data: null,
+      });
+
+      expect(await store.removeFromGames("tnt.png")).toBe(false);
+      // A profile without it saves nothing
+      expect(await store.removeFromGames("creeper.png")).toBe(true);
     });
   });
 

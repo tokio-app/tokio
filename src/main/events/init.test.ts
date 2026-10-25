@@ -317,6 +317,7 @@ function setup() {
     onStatus: vi.fn((..._args: Parameters<GamesService["onStatus"]>) => {}),
     onError: vi.fn((..._args: Parameters<GamesService["onError"]>) => {}),
     onRun: vi.fn((..._args: Parameters<GamesService["onRun"]>) => {}),
+    setPicturesFolder: vi.fn(),
     handle: vi.fn(async (..._args: Parameters<GamesService["handle"]>) => {}),
     clear: vi.fn(),
   };
@@ -1677,6 +1678,14 @@ describe("init events", () => {
       expect(s.serverService.mount).toHaveBeenCalledWith(
         "alerts/media",
         "app/media",
+      );
+      // The games overlay shows the Minecraft pictures from their folder
+      expect(s.gamesService.setPicturesFolder).toHaveBeenCalledWith(
+        "app/games/minecraft",
+      );
+      expect(s.serverService.mount).toHaveBeenCalledWith(
+        "games/minecraft",
+        "app/games/minecraft",
       );
     });
 

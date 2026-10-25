@@ -1,7 +1,11 @@
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { getMediaPreviewURL, getSoundPreviewURL } from "@/common/util";
+import {
+  getMediaPreviewURL,
+  getPicturePreviewURL,
+  getSoundPreviewURL,
+} from "@/common/util";
 import {
   mediaFile,
   previewFile,
@@ -48,6 +52,7 @@ describe("mediaFile", () => {
   const folders = {
     mediaFolder: resolve("tokio-data", "media"),
     soundsFolder: resolve("tokio-data", "sounds"),
+    minecraftFolder: resolve("tokio-data", "games", "minecraft"),
   };
 
   it("serves the images and videos in the media folder", () => {
@@ -64,6 +69,28 @@ describe("mediaFile", () => {
         join(folders.soundsFolder, file),
       );
     }
+  });
+
+  it("serves the images in the Minecraft pictures folder", () => {
+    for (const file of ["c0ffee.png", "My TNT.GIF", "zombie.webp"]) {
+      expect(mediaFile(getPicturePreviewURL(file), folders)).toBe(
+        join(folders.minecraftFolder, file),
+      );
+    }
+  });
+
+  it("refuses Minecraft pictures that aren't images right in their folder", () => {
+    const refused = [
+      getPicturePreviewURL("clip.mp4"),
+      getPicturePreviewURL("horn.mp3"),
+      getPicturePreviewURL("icon.svg"),
+      getPicturePreviewURL("../../settings/store.png"),
+      getPicturePreviewURL(".."),
+      "tokio-media:///games/minecraft/sub/a.png",
+      "tokio-media:///games/minecraft/../a.png",
+      "tokio-media:///games/a.png",
+    ];
+    for (const url of refused) expect(mediaFile(url, folders)).toBeNull();
   });
 
   it("refuses other files, and anything outside the folders", () => {

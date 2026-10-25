@@ -619,6 +619,9 @@ const startApp = async (handler: AppHandlerVariables) => {
       alertsService.setServer(serverService);
       // Not an overlay: the alerts' images and videos, for their overlay pages
       serverService.mount(`${ALERTS_PATH}/media`, folders.mediaFolder);
+      gamesService.setPicturesFolder(folders.minecraftFolder);
+      // The games overlay's pictures
+      serverService.mount(`${GAMES_PATH}/minecraft`, folders.minecraftFolder);
     },
   );
   await storeManagerService.initialize(

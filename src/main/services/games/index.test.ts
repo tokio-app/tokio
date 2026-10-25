@@ -13,7 +13,10 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import Logger from "@/logger";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GamesService, RUN_GAP_MS } from "./index";
 
 // Stands in for the game's WebSocket: records the commands, answers each
@@ -649,6 +652,73 @@ describe("GamesService", () => {
         { actions: [action()] },
       );
       expect(onRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("pictures", () => {
+    let dir: string;
+
+    beforeEach(async () => {
+      dir = await mkdtemp(join(tmpdir(), "tokio-test-"));
+    });
+
+    afterEach(async () => {
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    const picturesIn = async (games: GamesService) => {
+      const folder = join(dir, "games", "minecraft");
+      await mkdir(folder, { recursive: true });
+      games.setPicturesFolder(folder);
+      return folder;
+    };
+
+    it("imports an image into the pictures folder, named by its content", async () => {
+      const games = service();
+      const folder = await picturesIn(games);
+      await writeFile(join(dir, "TNT.webp"), "tnt");
+
+      const res = await games.importPicture(join(dir, "TNT.webp"));
+
+      expect(res).toEqual({
+        success: true,
+        data: {
+          name: "TNT",
+          file: expect.stringMatching(/^[0-9a-f]{32}\.webp$/),
+        },
+      });
+      expect(await readdir(folder)).toEqual([res.data?.file]);
+    });
+
+    it("refuses anything but an image, logging why", async () => {
+      const error = vi.spyOn(Logger, "error").mockImplementation(() => {});
+      const games = service();
+      games.setLogFile("games.log");
+      const folder = await picturesIn(games);
+      await writeFile(join(dir, "clip.mp4"), "clip");
+
+      const res = await games.importPicture(join(dir, "clip.mp4"));
+
+      expect(res).toEqual({ success: false, error: "Unsupported format: mp4" });
+      expect(error).toHaveBeenCalledWith(
+        "<Games> Unable to import picture -- Unsupported format: mp4",
+        "games.log",
+        expect.any(Error),
+      );
+      expect(await readdir(folder)).toEqual([]);
+    });
+
+    it("deletes a picture only inside its folder", async () => {
+      vi.spyOn(Logger, "error").mockImplementation(() => {});
+      const games = service();
+      const folder = await picturesIn(games);
+      await writeFile(join(folder, "tnt.png"), "tnt");
+      await writeFile(join(dir, "games", "keep.png"), "keep");
+
+      expect(await games.deletePicture("tnt.png")).toEqual({ success: true });
+      expect((await games.deletePicture("../keep.png")).success).toBe(false);
+      expect(await readdir(folder)).toEqual([]);
+      expect(await readdir(join(dir, "games"))).toContain("keep.png");
     });
   });
 });

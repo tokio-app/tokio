@@ -72,7 +72,8 @@ protocol.registerSchemesAsPrivileged([
     scheme: "local-resource",
     privileges: { corsEnabled: true, supportFetchAPI: true },
   },
-  // The media library's thumbnails and the sounds, see mediaFile. Videos
+  // The media library's thumbnails, the sounds and the Minecraft pictures,
+  // see mediaFile. Videos
   // need streaming.
   { scheme: MEDIA_SCHEME, privileges: { stream: true } },
 ]);
@@ -204,8 +205,8 @@ app.whenReady().then(async () => {
     return withPreviewCORS(await withPreviewStyles(res, file));
   });
 
-  // The media library, for the alerts' thumbnails, and the sound library, for
-  // the sounds' lengths. The Range header lets videos and sounds read only
+  // The media library, for the alerts' thumbnails, the sound library, for
+  // the sounds' lengths, and the Minecraft pictures. The Range header lets videos and sounds read only
   // what they need.
   protocol.handle(MEDIA_SCHEME, (request) => {
     const file = mediaFile(request.url, services.pathManagerService.folders);

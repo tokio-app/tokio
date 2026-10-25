@@ -2,6 +2,7 @@ import {
   GameAction,
   GamesSettings,
   GameStep,
+  MediaFile,
   MinecraftEdition,
   Profile,
 } from "@/common/schemas";
@@ -16,10 +17,19 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { formatAlertMessage, generateTikTokEventSample } from "@/common/util";
+import {
+  formatAlertMessage,
+  formatError,
+  generateTikTokEventSample,
+  IMAGE_EXTENSIONS,
+} from "@/common/util";
+import { importFile } from "@/helper/library";
 import { GiftStreaks } from "@/helper/streaks";
 import { giftOf, matchesTrigger } from "@/helper/triggers";
 import Logger from "@/logger";
+import { unlink } from "node:fs/promises";
+import { basename, join } from "node:path";
+import { MEDIA_MAX_BYTES } from "../alerts";
 import { Service } from "../shared";
 import { commandValue, gameCommands } from "./commands";
 import { MinecraftConnection } from "./minecraft";
@@ -81,6 +91,7 @@ export class GamesService extends Service {
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
   private _onRun?: (action: GameAction) => void;
+  private _picturesFolder = "";
 
   // Opens nothing until configure turns Minecraft on
   constructor(
@@ -113,6 +124,10 @@ export class GamesService extends Service {
     this._logFile = logFile;
   }
 
+  public setPicturesFolder(folder: string): void {
+    this._picturesFolder = folder;
+  }
+
   /** Turns the connections on or off. False when one can't listen. */
   public configure(settings: GamesSettings): Promise<boolean> {
     return this._minecraft.setEnabled(settings.minecraft.enabled);
@@ -135,6 +150,30 @@ export class GamesService extends Service {
   // One listener, init.ts, which lights the action's row on the overlay
   public onRun(listener: (action: GameAction) => void) {
     this._onRun = listener;
+  }
+
+  /** Copies a local image into the Minecraft pictures folder. */
+  public async importPicture(srcPath: string): Promise<GamesResult<MediaFile>> {
+    try {
+      const { entry } = await importFile(
+        srcPath,
+        this._picturesFolder,
+        IMAGE_EXTENSIONS,
+        MEDIA_MAX_BYTES,
+      );
+      return { success: true, data: entry };
+    } catch (error) {
+      return this._fail("Unable to import picture", error);
+    }
+  }
+
+  public async deletePicture(file: string): Promise<GamesResult<void>> {
+    try {
+      await unlink(join(this._picturesFolder, basename(file)));
+      return { success: true };
+    } catch (error) {
+      return this._fail("Unable to delete picture", error);
+    }
   }
 
   /**
@@ -318,5 +357,11 @@ export class GamesService extends Service {
     } finally {
       this._backlogs.delete(id);
     }
+  }
+
+  private _fail(action: string, error: unknown) {
+    const message = formatError(error);
+    Logger.error(`<Games> ${action} -- ${message}`, this._logFile, error);
+    return { success: false, error: message };
   }
 }

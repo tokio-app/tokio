@@ -4,6 +4,7 @@ import {
   AppProvider,
   AppSettings,
   EntityMetadata,
+  GameAction,
   GamesSettingsSchema,
   MediaFile,
   OverlayMetadata,
@@ -19,6 +20,7 @@ import {
   AUDIO_EXTENSIONS,
   defaultProfile,
   formatError,
+  IMAGE_EXTENSIONS,
   MEDIA_EXTENSIONS,
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
@@ -117,7 +119,8 @@ export class StoreManagerService extends Service {
           file,
           name: profile.name,
         }));
-        const { soundsFolder, mediaFolder } = this._pathManagerService.folders;
+        const { soundsFolder, mediaFolder, minecraftFolder } =
+          this._pathManagerService.folders;
         const alerts = profiles.flatMap(({ profile }) => profile.alerts.items);
         data.settings.sounds = await this._findFiles(
           soundsFolder,
@@ -130,6 +133,14 @@ export class StoreManagerService extends Service {
           MEDIA_EXTENSIONS,
           alerts.map((alert) => alert.media),
           "Recovered media",
+        );
+        data.settings.minecraftPictures = await this._findFiles(
+          minecraftFolder,
+          IMAGE_EXTENSIONS,
+          profiles.flatMap(({ profile }) =>
+            profile.games.actions.map((action) => action.overlay.image),
+          ),
+          "Recovered picture",
         );
         this._rebuilt = true;
         await this._jsonManagerService.saveFile(
@@ -229,8 +240,9 @@ export class StoreManagerService extends Service {
     ];
   }
 
-  // Alerts keep the names of the sounds and media they use. Files no alert
-  // uses lost their name, they're listed anyway so they can be deleted.
+  // Alerts keep the names of the sounds and media they use, game actions the
+  // pictures'. Files nothing uses lost their name, they're listed anyway so
+  // they can be deleted.
   private async _findFiles(
     folder: string,
     extensions: string[],
@@ -410,13 +422,57 @@ export class StoreManagerService extends Service {
     return this._removeFile("media", file);
   }
 
+  public getMinecraftPictures(): MediaFile[] {
+    this._ensureInitialized();
+    return this._storeData!.settings.minecraftPictures;
+  }
+
+  public addMinecraftPicture(picture: MediaFile): Promise<boolean> {
+    return this._addFile("minecraftPictures", picture);
+  }
+
+  public removeMinecraftPicture(file: string): Promise<boolean> {
+    return this._removeFile("minecraftPictures", file);
+  }
+
   /**
    * Takes a deleted sound or media file off every alert that has it, in
    * every profile. False when a profile that had it couldn't be saved.
    */
-  public async removeFromAlerts(
+  public removeFromAlerts(
     field: "sound" | "media",
     file: string,
+  ): Promise<boolean> {
+    return this._updateProfiles((profile) => {
+      if (!profile.alerts.items.some((a) => a[field]?.file === file)) {
+        return null;
+      }
+      const items = profile.alerts.items.map((a) =>
+        a[field]?.file === file ? { ...a, [field]: null } : a,
+      );
+      return { alerts: { ...profile.alerts, items } };
+    });
+  }
+
+  /**
+   * Takes a deleted Minecraft picture off every game action that has it, in
+   * every profile. False when a profile that had it couldn't be saved.
+   */
+  public removeFromGames(file: string): Promise<boolean> {
+    return this._updateProfiles(({ games }) => {
+      const has = (a: GameAction) => a.overlay.image?.file === file;
+      if (!games.actions.some(has)) return null;
+      const actions = games.actions.map((a) =>
+        has(a) ? { ...a, overlay: { ...a.overlay, image: null } } : a,
+      );
+      return { games: { ...games, actions } };
+    });
+  }
+
+  // Saves what change returns for each profile, nothing when it returns null.
+  // False when a profile couldn't be saved.
+  private async _updateProfiles(
+    change: (profile: Profile) => Partial<Profile> | null,
   ): Promise<boolean> {
     this._ensureInitialized();
     let saved = true;
@@ -429,21 +485,18 @@ export class StoreManagerService extends Service {
       const profile = active
         ? await this.getProfileData()
         : await this._jsonManagerService.loadFile(path, ProfileSchema);
-      if (!profile?.alerts.items.some((a) => a[field]?.file === file)) {
-        continue;
-      }
+      const updates = profile && change(profile);
+      if (!updates) continue;
 
-      const items = profile.alerts.items.map((a) =>
-        a[field]?.file === file ? { ...a, [field]: null } : a,
-      );
-      const alerts = { ...profile.alerts, items };
       // The active one through updateProfileData, which keeps it in memory
       const done = active
-        ? await this.updateProfileData({ alerts })
+        ? await this.updateProfileData(updates)
         : (
-            await this._jsonManagerService.updateFile(path, ProfileSchema, {
-              alerts,
-            })
+            await this._jsonManagerService.updateFile(
+              path,
+              ProfileSchema,
+              updates,
+            )
           ).success;
       saved &&= done;
     }
@@ -451,7 +504,7 @@ export class StoreManagerService extends Service {
   }
 
   private async _addFile(
-    library: "sounds" | "media",
+    library: "sounds" | "media" | "minecraftPictures",
     entry: AlertSound,
   ): Promise<boolean> {
     this._ensureInitialized();
@@ -463,7 +516,7 @@ export class StoreManagerService extends Service {
   }
 
   private async _removeFile(
-    library: "sounds" | "media",
+    library: "sounds" | "media" | "minecraftPictures",
     file: string,
   ): Promise<boolean> {
     this._ensureInitialized();
