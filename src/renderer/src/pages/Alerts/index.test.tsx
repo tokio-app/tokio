@@ -32,6 +32,7 @@ const whole = (sound: AlertSound) => ({ ...sound, start: 0, end: null });
 
 const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({
   id,
+  name: id,
   enabled: true,
   trigger: {
     type: TOKIO_EVENTS.FOLLOW,
@@ -199,6 +200,7 @@ describe("Alerts", () => {
         items: [
           {
             id: expect.any(String),
+            name: "alert-1",
             enabled: true,
             trigger: trigger(TOKIO_EVENTS.FOLLOW),
             sound: null,
@@ -209,6 +211,48 @@ describe("Alerts", () => {
         ],
       },
     ]);
+  });
+
+  it("names a new alert by its place, and renames it in its editor", async () => {
+    const { user } = await load([alert("Welcome")]);
+
+    await user.click(addAlert());
+    expect(summary(1)).toHaveTextContent("alert-2");
+
+    const opened = await edit(user, 1);
+    const name = opened.getByRole("textbox", { name: "Name" });
+    await user.clear(name);
+    // Its place's name while it has none
+    expect(summary(1)).toHaveTextContent("alert-2");
+    expect(name).toHaveAttribute("placeholder", "alert-2");
+    await user.type(name, "Big gifts");
+
+    await wait(300);
+    expect(
+      saves()
+        .at(-1)
+        ?.items.map((a) => a.name),
+    ).toEqual(["Welcome", "Big gifts"]);
+    expect(summary(1)).toHaveTextContent("Big gifts");
+  });
+
+  it("finds alerts by name, and shows a new one", async () => {
+    const { user } = await load([alert("Welcome"), alert("Big gifts")]);
+
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    const search = screen.getByPlaceholderText("Search alerts...");
+    await user.type(search, "GIFT");
+    expect(rows()).toHaveLength(1);
+    expect(summary(0)).toHaveTextContent("Big gifts");
+
+    await user.type(search, "zzz");
+    expect(rows()).toHaveLength(0);
+    expect(screen.getByText("No alerts found.")).toBeInTheDocument();
+
+    // The search would hide it
+    await user.click(addAlert());
+    expect(search).toHaveValue("");
+    expect(rows()).toHaveLength(3);
   });
 
   it("shows another add button under the alerts while the header's is out of view", async () => {

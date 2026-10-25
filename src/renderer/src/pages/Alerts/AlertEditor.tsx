@@ -12,6 +12,7 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import {
+  defaultAlertName,
   formatAdded,
   getAlertOverlayURL,
   mediaKind,
@@ -24,6 +25,7 @@ import {
   CopyField,
   EmoteOption,
   Field,
+  Input,
   MediaThumbnail,
   Modal,
   NumberInput,
@@ -72,6 +74,8 @@ const FILTER_LABELS: Partial<Record<Trigger["type"], string>> = {
 
 type Props = {
   alert: Alert;
+  // Its place in the list, which its default name counts
+  index: number;
   // TikTok's gifts and the ones seen in LIVEs, see giftOptions
   gifts: CustomGift[];
   emotes: EmoteOption[];
@@ -86,11 +90,12 @@ type Props = {
 };
 
 /**
- * Edits an alert: what sets it off, what it plays and how much of it, and
- * what it shows. Changes save as they're made.
+ * Edits an alert: its name, what sets it off, what it plays and how much of
+ * it, and what it shows. Changes save as they're made.
  */
 export function AlertEditor({
   alert,
+  index,
   gifts,
   emotes,
   testing,
@@ -114,6 +119,17 @@ export function AlertEditor({
         </Btn>
       }
     >
+      {/* The whole alert's, so above the tabs */}
+      <label className={styles.name}>
+        Name
+        <Input
+          className={styles.name_input}
+          placeholder={defaultAlertName(index)}
+          value={alert.name}
+          onChange={(e) => onChange({ ...alert, name: e.target.value })}
+        />
+      </label>
+
       <Tabs tabs={TABS} value={tab} onChange={setTab} />
 
       <div className={styles.panel}>

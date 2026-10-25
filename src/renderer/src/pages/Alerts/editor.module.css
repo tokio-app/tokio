@@ -1,3 +1,20 @@
+/* The alert's name, one line under the title, like the page's "Max queue
+   length" */
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--font-primary);
+}
+
+.name_input {
+  width: 100%;
+  max-width: 320px;
+}
+
 /* A tab's fields. The height, a gift trigger's, the tallest, keeps the
    dialog still between tabs. */
 .panel {

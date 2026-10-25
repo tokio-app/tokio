@@ -17,7 +17,8 @@
   }
 }
 
-/* The window's own corners: it's frameless and transparent around them */
+/* The whole window, which the system frames and rounds like the app's, so
+   no border or corners of its own */
 .container {
   -webkit-app-region: drag;
   display: flex;
@@ -27,9 +28,6 @@
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  border: 1px solid var(--border);
-  /* Off the radius scale: the window's corners, rounder than a dialog's */
-  border-radius: 12px;
   /* One of the brand's two warm spots: a rose wash behind the logo */
   background:
     radial-gradient(circle at 50% 36%, var(--accent-soft), transparent 55%),

@@ -64,6 +64,7 @@ const trigger = (
 
 const alert = (overrides: Partial<Alert> = {}): Alert => ({
   id: "alert-1",
+  name: "alert-1",
   enabled: true,
   trigger: trigger(TOKIO_EVENTS.FOLLOW),
   sound: { name: "Ding", file: "ding.mp3", start: 0, end: null },

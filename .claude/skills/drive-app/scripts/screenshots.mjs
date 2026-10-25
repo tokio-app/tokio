@@ -173,8 +173,13 @@ export default async ({ app, page, home, push, toggle }) => {
   const media = join(home, "tokio-logo.png");
   copyFileSync(join(repo, "resources", "icon.png"), media);
   const alerts = [
-    { trigger: "Follow", speak: "Thanks for the follow, {username}!" },
     {
+      name: "Thank followers",
+      trigger: "Follow",
+      speak: "Thanks for the follow, {username}!",
+    },
+    {
+      name: "Big gifts",
       trigger: "Gift",
       sound: "Cash register",
       hz: 440,
@@ -184,9 +189,16 @@ export default async ({ app, page, home, push, toggle }) => {
       coins: "100",
       role: "Moderators",
     },
-    { trigger: "Chat", sound: "Airhorn", hz: 523, keyword: "hype" },
-    { trigger: "Share", sound: "Applause", hz: 659 },
     {
+      name: "Hype",
+      trigger: "Chat",
+      sound: "Airhorn",
+      hz: 523,
+      keyword: "hype",
+    },
+    { name: "Shares", trigger: "Share", sound: "Applause", hz: 659 },
+    {
+      name: "Regulars",
       trigger: "Member Join",
       sound: "Doorbell",
       hz: 784,
@@ -205,6 +217,7 @@ export default async ({ app, page, home, push, toggle }) => {
     await page.getByRole("button", { name: "Add alert" }).first().click();
     // A new alert goes to the end of the list
     await page.getByTitle("Edit alert").last().click();
+    await editor.getByRole("textbox", { name: "Name" }).fill(alert.name);
     await editor.getByRole("combobox", { name: "Event" }).click();
     await page
       .getByRole("option", { name: alert.trigger, exact: true })

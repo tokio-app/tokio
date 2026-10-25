@@ -84,14 +84,29 @@ export const REPEATED_HAZARDS: readonly Hazard[] = [
 ];
 
 /**
- * The gifts' names joined with " or ", null while the lists don't have any
- * of them yet. For an id in gifts twice, the first entry wins.
+ * The names joined with " or ", or with more than `max` the first ones and
+ * how many more: "Rose, Lion or 230 more".
  */
-export function giftNames(ids: number[], gifts: CustomGift[]): string | null {
+export function orList(names: string[], max = Infinity): string {
+  if (names.length <= max) return names.join(" or ");
+  const shown = Math.max(max - 1, 1);
+  return `${names.slice(0, shown).join(", ")} or ${names.length - shown} more`;
+}
+
+/**
+ * The gifts' names joined with " or ", at most `max` of them (see orList),
+ * null while the lists don't have any of them yet. For an id in gifts twice,
+ * the first entry wins.
+ */
+export function giftNames(
+  ids: number[],
+  gifts: CustomGift[],
+  max?: number,
+): string | null {
   const names = ids.flatMap(
     (id) => gifts.find((gift) => gift.value === id)?.label ?? [],
   );
-  return names.length > 0 ? names.join(" or ") : null;
+  return names.length > 0 ? orList(names, max) : null;
 }
 
 /**

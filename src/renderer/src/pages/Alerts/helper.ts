@@ -6,11 +6,14 @@ import {
   SavedEmote,
 } from "@/common/schemas";
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
+import { defaultAlertName } from "@/common/util";
 import { EmoteOption } from "@/components";
 
-export function createAlert(): Alert {
+// A new alert, named by its place in the list
+export function createAlert(index = 0): Alert {
   return {
     id: crypto.randomUUID(),
+    name: defaultAlertName(index),
     enabled: true,
     trigger: {
       type: TOKIO_EVENTS.FOLLOW,

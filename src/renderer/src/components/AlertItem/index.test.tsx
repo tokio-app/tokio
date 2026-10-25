@@ -40,6 +40,7 @@ type Props = ComponentProps<typeof AlertItem>;
 function setup(item: Alert, props: Partial<Props> = {}) {
   const all: Props = {
     alert: item,
+    index: 0,
     gifts: GIFTS,
     emotes: EMOTES,
     testing: null,
@@ -227,6 +228,30 @@ describe("AlertItem", () => {
     expect(summary()).toHaveTextContent("7s");
   });
 
+  it("shows its name, or the one its place gives it while it has none", () => {
+    const { unmount } = setup(alert({ name: "Big gifts" }));
+    expect(summary()).toHaveTextContent("Big gifts");
+    unmount();
+
+    setup(alert({ name: "  " }), { index: 2 });
+    expect(summary()).toHaveTextContent("alert-3");
+  });
+
+  it("copies its overlay URL, only when it shows media", async () => {
+    const { user, unmount } = setup(alert({ media: alertMedia("Party") }));
+
+    await user.click(screen.getByRole("button", { name: "Copy overlay URL" }));
+    expect(await navigator.clipboard.readText()).toBe(
+      "http://tokio-app.local:37891/alerts/alert-1/",
+    );
+    unmount();
+
+    setup(alert());
+    expect(
+      screen.queryByRole("button", { name: "Copy overlay URL" }),
+    ).toBeNull();
+  });
+
   it("names its message when it speaks one", () => {
     setup(alert({ sound: alertClip("Airhorn"), tts: TTS }));
 
@@ -271,6 +296,20 @@ describe("triggerSummary", () => {
     );
     expect(sum({ type: TOKIO_EVENTS.FOLLOW, roles })).toBe("");
     expect(sum({ type: TOKIO_EVENTS.ENVELOPE, roles })).toBe("");
+  });
+
+  it("names three gifts or emotes at most, then counts the rest", () => {
+    const gifts = [...GIFTS, gift(1, "Lion"), gift(2, "Galaxy")];
+    const emotes = [...EMOTES, ...EMOTES.map((e) => ({ ...e, value: "x" }))];
+    const of = (trigger: Partial<Alert["trigger"]>) =>
+      triggerSummary(alert({}, trigger).trigger, gifts, emotes);
+
+    expect(of({ type: TOKIO_EVENTS.GIFT, gifts: [5655, 6064, 1, 2] })).toBe(
+      "Rose, GG or 2 more, when the streak ends",
+    );
+    expect(
+      of({ type: EMOTE_TRIGGER, emotes: ["emote-1", "emote-2", "x", "x"] }),
+    ).toBe("Emote 1, Emote 2 or 2 more");
   });
 
   it("counts on gifts the lists don't have yet", () => {

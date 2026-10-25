@@ -19,6 +19,7 @@ const alert = (patch: Partial<Alert> = {}): Alert => ({
 // Opens the editor on its Media tab
 async function setup(item: Alert) {
   const props = {
+    index: 0,
     gifts: [],
     emotes: [],
     testing: null,

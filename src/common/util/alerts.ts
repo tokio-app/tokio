@@ -108,3 +108,10 @@ export function formatAlertMessage(
     return value === undefined ? match : escape(value);
   });
 }
+
+// The name an alert gets from its place in the list, counted from 1
+export const defaultAlertName = (index: number) => `alert-${index + 1}`;
+
+// The name an alert shows, its default while it has none
+export const alertName = (name: string, index: number) =>
+  name.trim() || defaultAlertName(index);
