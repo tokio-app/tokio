@@ -1,21 +1,33 @@
 import {
+  GameAction,
   GamesOverlaySchema,
   GamesSettings,
   GamesSettingsSchema,
+  MediaFile,
   Profile,
 } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   AppEventsMap,
+  CustomGift,
   FEEDBACK_CODES,
+  GamesOverlayData,
   GamesStatus,
   TOKIO_EVENTS,
 } from "@/common/types";
+import { defaultProfile, GAMES_PATH } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import Logger from "@/logger";
 import { createHandler } from "@test/handler";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 import games from "./games";
 
 const waiting: GamesStatus = { minecraft: { state: "waiting" } };
@@ -33,9 +45,65 @@ const store = (saved = true) => {
   };
 };
 
+const tnt: MediaFile = { name: "TNT", file: "c0ffee.png" };
+
+const roseAction: GameAction = {
+  id: "action-1",
+  enabled: true,
+  edition: "bedrock",
+  trigger: {
+    type: TOKIO_EVENTS.GIFT,
+    gifts: [5655],
+    every_gift: false,
+    emotes: [],
+    keyword: "",
+    user: "",
+  },
+  likes_every: 100,
+  steps: [{ type: "command", command: "say hi" }],
+  overlay: { show: true, image: tnt, event: "", name: "Boom" },
+};
+
+const rose: CustomGift = {
+  value: 5655,
+  label: "Rose",
+  img: "rose.png",
+  coins: 1,
+};
+
+// What sendGamesOverlay reads, for a profile with one action on a Rose
+const overlay = () => ({
+  storeManagerService: {
+    getProfileData: async () => ({
+      ...defaultProfile,
+      games: { ...defaultProfile.games, actions: [roseAction] },
+    }),
+  },
+  overlayService: {
+    getGifts: async () => [rose],
+    getCustomGifts: async () => [],
+  },
+  serverService: { sendToClient: vi.fn((_id: string, _data: unknown) => true) },
+});
+
+const overlayData: GamesOverlayData = {
+  look: defaultProfile.games.overlay,
+  rows: [
+    {
+      id: "action-1",
+      pictures: ["rose.png"],
+      event: "Rose",
+      image: "/games/minecraft/c0ffee.png",
+      name: "Boom",
+    },
+  ],
+};
+
 describe("games events", () => {
+  let logError: MockInstance<typeof Logger.error>;
+
   beforeEach(() => {
-    vi.spyOn(Logger, "error").mockImplementation(() => {});
+    logError = vi.spyOn(Logger, "error").mockImplementation(() => {});
     vi.spyOn(Logger, "warn").mockImplementation(() => {});
   });
 
@@ -125,7 +193,15 @@ describe("games events", () => {
 
     it("saves the actions without a notice, since it's an autosave", async () => {
       const updateProfileData = vi.fn(async (_data: Partial<Profile>) => true);
-      const h = createHandler({ storeManagerService: { updateProfileData } });
+      const { serverService, ...services } = overlay();
+      const h = createHandler({
+        ...services,
+        serverService,
+        storeManagerService: {
+          ...services.storeManagerService,
+          updateProfileData,
+        },
+      });
 
       await h.invoke(games, APP_EVENTS.UPDATE_GAMES_SETTINGS, { settings });
 
@@ -136,14 +212,46 @@ describe("games events", () => {
         { success: true },
       ]);
       expect(h.notices).toEqual([]);
+      // The overlay gets the saved actions
+      expect(serverService.sendToClient).toHaveBeenCalledExactlyOnceWith(
+        GAMES_PATH,
+        { type: "tokio:games", data: overlayData },
+      );
     });
 
-    it("reports a failed save as the system's", async () => {
+    it("doesn't fail the save when the overlay can't be sent", async () => {
       const h = createHandler({
-        storeManagerService: { updateProfileData: async () => false },
+        ...overlay(),
+        storeManagerService: {
+          updateProfileData: async () => true,
+          getProfileData: async () => {
+            throw new Error("EBUSY");
+          },
+        },
       });
 
       await h.invoke(games, APP_EVENTS.UPDATE_GAMES_SETTINGS, { settings });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.UPDATE_GAMES_SETTINGS)).toEqual([
+        { success: true },
+      ]);
+      expect(h.notices).toEqual([]);
+      expect(logError).toHaveBeenCalledWith(
+        "<Games> Unable to update the games overlay -- EBUSY",
+        undefined,
+        expect.any(Error),
+      );
+    });
+
+    it("reports a failed save as the system's", async () => {
+      const sendToClient = vi.fn();
+      const h = createHandler({
+        storeManagerService: { updateProfileData: async () => false },
+        serverService: { sendToClient },
+      });
+
+      await h.invoke(games, APP_EVENTS.UPDATE_GAMES_SETTINGS, { settings });
+      expect(sendToClient).not.toHaveBeenCalled();
 
       const failure = {
         code: FEEDBACK_CODES.PROFILE_SAVE_FAILED,
@@ -234,6 +342,21 @@ describe("games events", () => {
           },
         },
       ]);
+    });
+  });
+
+  describe("TEST_GAMES_OVERLAY", () => {
+    it("lights the action's row up on the overlay, with no reply or notice", async () => {
+      const sendToClient = vi.fn((_id: string, _data: unknown) => true);
+      const h = createHandler({ serverService: { sendToClient } });
+
+      await h.invoke(games, APP_EVENTS.TEST_GAMES_OVERLAY, { id: "action-1" });
+
+      expect(sendToClient).toHaveBeenCalledExactlyOnceWith(GAMES_PATH, {
+        type: "tokio:games:run",
+        data: { id: "action-1" },
+      });
+      expect(h.sent()).toEqual([]);
     });
   });
 });

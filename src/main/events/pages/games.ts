@@ -10,6 +10,7 @@ import {
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
+import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { AppHandlerVariables } from "@/types";
 import { z } from "zod";
 
@@ -75,12 +76,13 @@ events.push(
 
 events.push(
   APP_EVENTS.UPDATE_GAMES_SETTINGS,
-  async ({ storeManagerService }, e, { settings }) => {
-    const res = await storeManagerService.updateProfileData({
+  async (services, e, { settings }) => {
+    const res = await services.storeManagerService.updateProfileData({
       games: settings,
     });
     if (!res) throw new LoggedError("The game actions were not saved.");
     e.reply(APP_EVENTS_RESPONSE.UPDATE_GAMES_SETTINGS, { success: true });
+    await sendGamesOverlay(services);
   },
   {
     source: "system",
@@ -127,4 +129,12 @@ events.push(
   },
 );
 
+// The overlay section's Test lights the row up as a run does
+events.push(
+  APP_EVENTS.TEST_GAMES_OVERLAY,
+  (services, _, { id }) => {
+    sendGamesRun(services, id);
+  },
+  { notify: false },
+);
 export default events;

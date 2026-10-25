@@ -1,11 +1,16 @@
-import { TimerProfileSchema } from "@/common/schemas";
+import { Profile, TimerProfileSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   AppEventsMap,
   FEEDBACK_CODES,
+  TOKIO_EVENTS,
 } from "@/common/types";
-import { SERVER_PORT } from "@/common/util";
+import {
+  defaultProfile as baseProfile,
+  GAMES_PATH,
+  SERVER_PORT,
+} from "@/common/util";
 import { TikTokConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
@@ -35,6 +40,41 @@ const notice = (fields: object) => ["notice", expect.objectContaining(fields)];
 const defaultProfile = { name: "Default", file: "default.json" };
 const streamProfile = { name: "Stream", file: "stream.json" };
 const appSettings = { activeProfile: defaultProfile };
+
+// A profile's games: one Follow action named after it, for the games overlay
+const gamesOf = ({
+  name,
+}: {
+  name: string;
+}): Pick<Profile, "emotes" | "games"> => ({
+  emotes: [],
+  games: {
+    ...baseProfile.games,
+    actions: [
+      {
+        id: name,
+        enabled: true,
+        edition: "bedrock",
+        trigger: {
+          type: TOKIO_EVENTS.FOLLOW,
+          gifts: [],
+          every_gift: false,
+          emotes: [],
+          keyword: "",
+          user: "",
+        },
+        likes_every: 100,
+        steps: [],
+        overlay: {
+          show: true,
+          image: null,
+          event: "",
+          name: `${name}'s action`,
+        },
+      },
+    ],
+  },
+});
 
 // A store with the Default and Stream profiles. The profiles it creates or
 // clones join the list, unless it's told to answer `fail`: null when it
@@ -367,7 +407,7 @@ describe("settings events", () => {
           return profile ? "switched" : "missing";
         }),
         getProfileData: vi.fn(async () =>
-          missing ? null : { name: active.name, timer },
+          missing ? null : { name: active.name, timer, ...gamesOf(active) },
         ),
         getProfiles: () => profiles,
         getSettings: () => ({ activeProfile: active }),
@@ -376,12 +416,20 @@ describe("settings events", () => {
         save: vi.fn(async () => timerSaved),
         load: vi.fn(),
       };
+      const serverService = {
+        sendToClient: vi.fn((_id: string, _data: unknown) => true),
+      };
       const h = createHandler({
         storeManagerService,
         connectorService: { isConnected: () => connected },
         timerService,
+        serverService,
+        overlayService: {
+          getGifts: async () => [],
+          getCustomGifts: async () => [],
+        },
       });
-      return { h, storeManagerService, timerService };
+      return { h, storeManagerService, timerService, serverService };
     };
 
     it("refuses to switch while a LIVE is connected", async () => {
@@ -423,7 +471,7 @@ describe("settings events", () => {
           APP_EVENTS_RESPONSE.GET_PROFILE,
           {
             success: true,
-            profile: { name: "Stream", timer },
+            profile: { name: "Stream", timer, ...gamesOf(streamProfile) },
             profiles: [defaultProfile, streamProfile],
           },
         ],
@@ -442,6 +490,51 @@ describe("settings events", () => {
           code: FEEDBACK_CODES.PROFILE_SWITCHED,
           message: 'Switched to the profile "Stream".',
         }),
+      ]);
+    });
+
+    it("sends the new profile's actions to the games overlay", async () => {
+      const { h, serverService } = setup();
+
+      await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
+
+      expect(serverService.sendToClient).toHaveBeenCalledExactlyOnceWith(
+        GAMES_PATH,
+        {
+          type: "tokio:games",
+          data: {
+            look: baseProfile.games.overlay,
+            rows: [
+              {
+                id: "Stream",
+                pictures: [],
+                event: "Follow",
+                image: null,
+                name: "Stream's action",
+              },
+            ],
+          },
+        },
+      );
+    });
+
+    it("still switches when the games overlay can't be sent", async () => {
+      const { h, storeManagerService } = setup();
+      storeManagerService.getProfileData
+        .mockResolvedValueOnce({
+          name: "Stream",
+          timer,
+          ...gamesOf(streamProfile),
+        })
+        .mockRejectedValueOnce(new Error("EBUSY"));
+
+      await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([
+        expect.objectContaining({ success: true }),
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ code: FEEDBACK_CODES.PROFILE_SWITCHED }),
       ]);
     });
 

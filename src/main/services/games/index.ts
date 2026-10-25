@@ -80,6 +80,7 @@ export class GamesService extends Service {
   private _last: GameStatus;
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
+  private _onRun?: (action: GameAction) => void;
 
   // Opens nothing until configure turns Minecraft on
   constructor(
@@ -129,6 +130,11 @@ export class GamesService extends Service {
   // One listener, init.ts, which turns failures into notices
   public onError(listener: (action: GameAction, error: GameError) => void) {
     this._onError = listener;
+  }
+
+  // One listener, init.ts, which lights the action's row on the overlay
+  public onRun(listener: (action: GameAction) => void) {
+    this._onRun = listener;
   }
 
   /**
@@ -295,6 +301,7 @@ export class GamesService extends Service {
           this._onError?.(action, { offline: true, message: unreachable });
           break;
         }
+        this._onRun?.(action);
         const failed = (await this._send(batch.commands)).find((r) => !r.ok);
         if (failed) {
           // A game that left or was replaced midway fails the commands it

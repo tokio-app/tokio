@@ -597,6 +597,59 @@ describe("GamesService", () => {
       expect(res.success).toBe(true);
       expect(minecraft.sent).toEqual(["summon minecraft:pig ~ ~ ~"]);
     });
+
+    it("lights no row on the overlay", async () => {
+      const games = service();
+      const onRun = vi.fn();
+      games.onRun(onRun);
+      await games.test({
+        edition: "bedrock",
+        trigger: TOKIO_EVENTS.FOLLOW,
+        steps: [say("say hi")],
+      });
+      expect(onRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("onRun", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("tells each run as it goes out, every gift's too", async () => {
+      vi.useFakeTimers();
+      const minecraft = fakeMinecraft();
+      const games = service(minecraft);
+      const sentBefore: number[] = [];
+      const onRun = vi.fn((_action: GameAction) => {
+        sentBefore.push(minecraft.sent.length);
+      });
+      games.onRun(onRun);
+      const every = action({
+        trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
+        steps: [say("a"), say("b")],
+      });
+
+      const run = games.handle(TOKIO_EVENTS.GIFT, gift(3), {
+        actions: [every],
+      });
+      await vi.runAllTimersAsync();
+      await run;
+
+      expect(onRun.mock.calls).toEqual([[every], [every], [every]]);
+      // Right before each run's commands
+      expect(sentBefore).toEqual([0, 2, 4]);
+    });
+
+    it("tells no run that's dropped while the game is offline", async () => {
+      const games = service(fakeMinecraft("waiting"));
+      const onRun = vi.fn();
+      games.onRun(onRun);
+      await games.handle(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+        { actions: [action()] },
+      );
+      expect(onRun).not.toHaveBeenCalled();
+    });
   });
 });
 

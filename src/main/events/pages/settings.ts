@@ -8,6 +8,7 @@ import { SERVER_PORT } from "@/common/util";
 import { showOpenDialog, showSaveDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
+import { sendGamesOverlay } from "@/helper/games";
 import { StoreManagerService } from "@/services/store";
 import { TTSService } from "@/services/tts";
 import { ReplyEvent } from "@/types";
@@ -162,11 +163,9 @@ events.push(
 
 events.push(
   APP_EVENTS.SET_PROFILE,
-  async (
-    { storeManagerService, connectorService, timerService, notifier },
-    e,
-    { file },
-  ) => {
+  async (services, e, { file }) => {
+    const { storeManagerService, connectorService, timerService, notifier } =
+      services;
     if (connectorService.isConnected()) {
       throw new AppFailure(
         FEEDBACK_CODES.PROFILE_LOCKED,
@@ -200,6 +199,8 @@ events.push(
       FEEDBACK_CODES.PROFILE_SWITCHED,
       `Switched to the profile "${storeManagerService.getSettings().activeProfile.name}".`,
     );
+    // The new profile's actions
+    await sendGamesOverlay(services);
   },
   {
     failure: {
