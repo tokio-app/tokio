@@ -81,6 +81,16 @@
 
       // A picture in its box. One that doesn't load goes, and its side
       // shows its text again if that was its only picture.
+      // A Minecraft picture drawn at twice its size or more, like a 16×16
+      // icon, keeps its pixels sharp. Smaller scales stay smooth: Chromium's
+      // pixelated is nearest-neighbor shrinking too, which makes renders
+      // jagged.
+      const sharpen = (img) =>
+        img.classList.toggle(
+          "games-pixelated",
+          img.naturalWidth > 0 && img.naturalWidth * 2 <= img.clientWidth,
+        );
+
       const slot = (src, result) => {
         const box = document.createElement("span");
         box.className = result ? "games-slot games-slot-result" : "games-slot";
@@ -95,6 +105,7 @@
           );
           fit();
         });
+        if (result) img.addEventListener("load", () => sharpen(img));
         img.src = src;
         box.append(img);
         return box;
@@ -222,6 +233,7 @@
           );
           root.setProperty("--fit", String(scale));
         }
+        list.querySelectorAll(".games-slot-result img").forEach(sharpen);
       };
       addEventListener("resize", fit);
       // The fonts' widths are known once they've loaded

@@ -928,6 +928,20 @@ describe("Games overlay", () => {
     );
   });
 
+  it("keeps a small Minecraft picture drawn large sharp in the preview", async () => {
+    await load([action("a1", { overlay: { ...overlay, image: TNT } })]);
+    const img = previewRows()[0].querySelector("img")!;
+    // jsdom loads no pictures and lays nothing out
+    Object.defineProperty(img, "naturalWidth", { value: 16 });
+    Object.defineProperty(img, "clientWidth", { value: 40 });
+
+    act(() => {
+      img.dispatchEvent(new Event("load"));
+    });
+
+    expect(img).toHaveClass("games-pixelated");
+  });
+
   it("lights the next shown row with Test, cycling, for 1.5 s", async () => {
     const { user } = await load([
       action("a1", { overlay: { ...overlay, name: "TNT" } }),

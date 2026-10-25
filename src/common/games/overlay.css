@@ -120,6 +120,12 @@
     drop-shadow(0 0 0 transparent) brightness(1);
 }
 
+/* A small Minecraft picture drawn large keeps its pixels sharp (the page
+   and the preview set it, see sharpen) */
+.games-pixelated {
+  image-rendering: pixelated;
+}
+
 /* The result, larger, like a crafting table's */
 .games-slot-result {
   width: 2.5em;

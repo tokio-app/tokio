@@ -34,6 +34,14 @@ const fontFamily = (font: string) =>
     ? `${JSON.stringify(font.trim())}, "Archivo Variable", sans-serif`
     : undefined;
 
+// A Minecraft picture drawn at twice its size or more keeps its pixels sharp,
+// as the overlay's sharpen does
+const sharpen = (img: HTMLImageElement) =>
+  img.classList.toggle(
+    "games-pixelated",
+    img.naturalWidth > 0 && img.naturalWidth * 2 <= img.clientWidth,
+  );
+
 /** The overlay's pixel arrow, also the builder's rows' */
 export function PixelArrow({ className }: { className?: string }) {
   return (
@@ -152,6 +160,9 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
       content.style.setProperty("--fit", "1");
       const scale = Math.min(1, room / content.offsetWidth);
       content.style.setProperty("--fit", String(scale));
+      content
+        .querySelectorAll<HTMLImageElement>(".games-slot-result img")
+        .forEach(sharpen);
     };
     fit();
     addEventListener("resize", fit);
@@ -216,7 +227,12 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
                 >
                   {image && (
                     <span className="games-slot games-slot-result">
-                      <img src={image} alt="" onError={onError(image)} />
+                      <img
+                        src={image}
+                        alt=""
+                        onLoad={(e) => sharpen(e.currentTarget)}
+                        onError={onError(image)}
+                      />
                     </span>
                   )}
                   {row.name && (

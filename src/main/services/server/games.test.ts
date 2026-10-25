@@ -196,6 +196,28 @@ describe("games overlay", () => {
       expect(rose.isConnected).toBe(true);
     });
 
+    it("keeps a small Minecraft picture drawn large sharp, and a big one smooth", async () => {
+      send([row("a"), row("b")]);
+      await vi.waitFor(() => expect(rowElements()).toHaveLength(2));
+      const [small, big] = [
+        ...document().querySelectorAll<HTMLImageElement>(
+          ".games-slot-result img",
+        ),
+      ];
+      // JSDOM loads no pictures and lays nothing out
+      const load = (img: HTMLImageElement, natural: number, drawn: number) => {
+        Object.defineProperty(img, "naturalWidth", { value: natural });
+        Object.defineProperty(img, "clientWidth", { value: drawn });
+        img.dispatchEvent(new dom.window.Event("load"));
+      };
+
+      load(small, 16, 120);
+      load(big, 300, 120);
+
+      expect(small.classList.contains("games-pixelated")).toBe(true);
+      expect(big.classList.contains("games-pixelated")).toBe(false);
+    });
+
     it("applies the colors and font, without letting a name add styles", async () => {
       send([row("a")], {
         text_color: "#112233",
