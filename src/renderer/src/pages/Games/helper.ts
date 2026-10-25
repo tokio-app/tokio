@@ -1,4 +1,10 @@
-import { GameAction, GameStep, MinecraftEdition } from "@/common/schemas";
+import {
+  GAME_HAZARDS,
+  GAME_HELPS,
+  GameAction,
+  GameStep,
+  MinecraftEdition,
+} from "@/common/schemas";
 import {
   CommandResult,
   GameStatus,
@@ -6,6 +12,8 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import {
+  HAZARD_NAMES,
+  HELP_NAMES,
   MINECRAFT_NAMES,
   MINECRAFT_PORT,
   TIME_NAMES,
@@ -59,6 +67,8 @@ export const STEP_KINDS: SelectOption<StepKind>[] = [
   { value: "give", label: "Give item" },
   { value: "weather", label: "Weather" },
   { value: "time", label: "Time of day" },
+  { value: "hazard", label: "Hazard" },
+  { value: "help", label: "Help" },
   { value: "command", label: "Command" },
 ];
 
@@ -70,11 +80,32 @@ export const TIMES = (["day", "noon", "night", "midnight"] as const).map(
   (value) => ({ value, label: TIME_NAMES[value] }),
 );
 
+export const HAZARDS = GAME_HAZARDS.map((value) => ({
+  value,
+  label: HAZARD_NAMES[value],
+}));
+
+export const HELPS = GAME_HELPS.map((value) => ({
+  value,
+  label: HELP_NAMES[value],
+}));
+
 const NEW_STEPS: { [K in StepKind]: Step<K> } = {
   spawn: { type: "spawn", mob: "zombie", amount: 1, name: "" },
   give: { type: "give", item: "diamond", amount: 1 },
   weather: { type: "weather", weather: "clear" },
   time: { type: "time", time: "day" },
+  hazard: {
+    type: "hazard",
+    hazard: "tnt",
+    amount: 1,
+    fuse: 4,
+    height: 50,
+    seconds: 1,
+    duration: 10,
+    distance: 1000,
+  },
+  help: { type: "help", help: "netherite_armor", duration: 30 },
   command: { type: "command", command: "" },
 };
 

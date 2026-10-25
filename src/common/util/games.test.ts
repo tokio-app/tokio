@@ -185,6 +185,35 @@ describe("gameStepsText", () => {
     );
   });
 
+  it("names hazards, counted only when they repeat", () => {
+    const hazard = {
+      type: "hazard",
+      fuse: 4,
+      height: 50,
+      seconds: 1,
+      duration: 10,
+      distance: 1000,
+    } as const;
+    expect(
+      steps(
+        "bedrock",
+        { ...hazard, hazard: "lightning", amount: 5 },
+        { ...hazard, hazard: "tnt", amount: 3 },
+        { ...hazard, hazard: "launch_water", amount: 1 },
+      ),
+    ).toBe("Lightning bolt ×5, Falling TNT, Launch + water");
+  });
+
+  it("names helps", () => {
+    expect(
+      steps(
+        "java",
+        { type: "help", help: "netherite_armor", duration: 30 },
+        { type: "help", help: "heal", duration: 30 },
+      ),
+    ).toBe("Netherite armor, Full heal");
+  });
+
   it("names nothing for commands and ids the game doesn't have", () => {
     expect(
       steps(

@@ -18,6 +18,7 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import {
+  delay,
   formatAlertMessage,
   formatError,
   generateTikTokEventSample,
@@ -31,7 +32,7 @@ import { unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { MEDIA_MAX_BYTES } from "../alerts";
 import { Service } from "../shared";
-import { commandValue, gameCommands } from "./commands";
+import { commandValue, GameCommand, gameCommands } from "./commands";
 import { MinecraftConnection } from "./minecraft";
 
 export interface GamesResult<T> {
@@ -53,7 +54,7 @@ export const RUN_GAP_MS = 100;
 // Runs of one action for one event, filled with its values, waiting their turn
 type Batch = {
   edition: MinecraftEdition;
-  commands: string[];
+  commands: GameCommand[];
   times: number;
   resolve: () => void;
   reject: (error: unknown) => void;
@@ -296,15 +297,30 @@ export class GamesService extends Service {
     return steps.flatMap((step) => gameCommands(step, fill, edition));
   }
 
-  // All sent at once, in order: the connection queues them
-  private _send(commands: string[]) {
-    return Promise.all(
-      commands.map((command) => this._minecraft.send(command)),
-    );
+  // Sent at once, in order, as the connection queues them, up to a wait: the
+  // rest go once those are answered and the wait is over
+  private async _send(commands: GameCommand[]) {
+    const results: CommandResult[] = [];
+    let sending: string[] = [];
+    const answers = async () => {
+      const sent = sending.map((command) => this._minecraft.send(command));
+      sending = [];
+      results.push(...(await Promise.all(sent)));
+    };
+    for (const command of commands) {
+      if (typeof command === "string") {
+        sending.push(command);
+        continue;
+      }
+      await answers();
+      await delay(command.wait);
+    }
+    await answers();
+    return results;
   }
 
   // Adds the runs to the action's backlog, and starts its pump if it's idle
-  private _queue(action: GameAction, commands: string[], times: number) {
+  private _queue(action: GameAction, commands: GameCommand[], times: number) {
     if (commands.length === 0) return Promise.resolve();
     return new Promise<void>((resolve, reject) => {
       const batch = {

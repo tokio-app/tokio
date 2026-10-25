@@ -338,6 +338,79 @@ describe("Games", () => {
     expect(saves().at(-1)!.actions[0].steps).toEqual([command("say hi")]);
   });
 
+  it("picks a hazard and shows only the fields it takes", async () => {
+    const { user } = await load([action("a1")]);
+    const panel = panels()[0];
+    const field = (name: string) => panel.queryByRole("spinbutton", { name });
+
+    await user.click(panel.getByText("Spawn mob"));
+    await user.click(inList(panelElements()[0], "Hazard")!);
+    expect(panel.getByText("Falling TNT")).toBeInTheDocument();
+    expect(field("Amount")).toBeNull();
+    expect(field("Fuse in seconds")).toHaveValue(4);
+    // A Bedrock action has only two fuses
+    expect(panel.getByText(/4 s in Bedrock/)).toBeInTheDocument();
+
+    await user.click(panel.getByText("Falling TNT"));
+    await user.click(inList(panelElements()[0], "Lightning bolt")!);
+    expect(field("Amount")).toBeVisible();
+    expect(field("Fuse in seconds")).toBeNull();
+
+    await user.click(panel.getByText("Lightning bolt"));
+    await user.click(inList(panelElements()[0], "Launch into the sky")!);
+    expect(field("Amount")).toBeNull();
+    await user.clear(field("Height in blocks")!);
+    await user.type(field("Height in blocks")!, "80");
+    await user.clear(field("Seconds")!);
+    await user.type(field("Seconds")!, "2");
+
+    await user.click(panel.getByText("Launch into the sky"));
+    await user.click(inList(panelElements()[0], "Lights out")!);
+    expect(field("Height in blocks")).toBeNull();
+    await user.clear(field("Duration in seconds")!);
+    await user.type(field("Duration in seconds")!, "30");
+
+    await user.click(panel.getByText("Lights out"));
+    await user.click(inList(panelElements()[0], "Random teleport")!);
+    expect(field("Distance in blocks")).toHaveValue(1000);
+    await wait(300);
+
+    expect(saves().at(-1)!.actions[0].steps).toEqual([
+      {
+        type: "hazard",
+        hazard: "random_teleport",
+        amount: 1,
+        fuse: 4,
+        height: 80,
+        seconds: 2,
+        duration: 30,
+        distance: 1000,
+      },
+    ]);
+  });
+
+  it("picks a help, with a duration only for effects", async () => {
+    const { user } = await load([action("a1")]);
+    const panel = panels()[0];
+    const duration = () =>
+      panel.queryByRole("spinbutton", { name: "Duration in seconds" });
+
+    await user.click(panel.getByText("Spawn mob"));
+    await user.click(inList(panelElements()[0], "Help")!);
+    expect(panel.getByText("Netherite armor")).toBeInTheDocument();
+    expect(duration()).toBeNull();
+
+    await user.click(panel.getByText("Netherite armor"));
+    await user.click(inList(panelElements()[0], "Regeneration")!);
+    await user.clear(duration()!);
+    await user.type(duration()!, "90");
+    await wait(300);
+
+    expect(saves().at(-1)!.actions[0].steps).toEqual([
+      { type: "help", help: "regeneration", duration: 90 },
+    ]);
+  });
+
   it("puts variables in the step's text field last focused", async () => {
     const { user } = await load([
       action("a1", {

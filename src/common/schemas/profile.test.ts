@@ -122,6 +122,35 @@ describe("ProfileSchema", () => {
     expect(GameStepSchema.safeParse(step).success).toBe(false);
   });
 
+  it("drops the steps of the creeper's hiss, a hazard no more", () => {
+    const action = GameActionSchema.parse({
+      ...oldAction,
+      steps: [
+        { type: "hazard", hazard: "creeper_hiss" },
+        { type: "hazard", hazard: "tnt" },
+      ],
+    });
+
+    expect(action.steps).toMatchObject([{ type: "hazard", hazard: "tnt" }]);
+  });
+
+  it("makes the armor sets helps no more netherite", () => {
+    const action = GameActionSchema.parse({
+      ...oldAction,
+      steps: [{ type: "help", help: "diamond_armor" }],
+    });
+
+    expect(action.steps).toEqual([
+      { type: "help", help: "netherite_armor", duration: 30 },
+    ]);
+  });
+
+  it("refuses a hazard Tokio doesn't have", () => {
+    const step = { type: "hazard", hazard: "lava" };
+
+    expect(GameStepSchema.safeParse(step).success).toBe(false);
+  });
+
   it("refuses a timer color that isn't a hex color", () => {
     const saved = structuredClone(defaultProfile);
     saved.timer.settings.look.clock_color = "red; background: url(x)";

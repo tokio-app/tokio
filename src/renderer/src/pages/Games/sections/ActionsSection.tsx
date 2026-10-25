@@ -12,7 +12,7 @@ import {
   CustomGift,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { ALERT_MESSAGE_VARIABLES } from "@/common/util";
+import { ALERT_MESSAGE_VARIABLES, REPEATED_HAZARDS } from "@/common/util";
 import {
   Btn,
   EmoteOption,
@@ -42,6 +42,8 @@ import {
   createStep,
   EDITIONS,
   GAME_TRIGGERS,
+  HAZARDS,
+  HELPS,
   ITEMS,
   MOBS,
   STEP_KINDS,
@@ -341,6 +343,9 @@ function ActionItem({
   );
 }
 
+// The hazards that last the duration set
+const EFFECT_HAZARDS: string[] = ["freeze", "lights_out", "dizzy"];
+
 type FieldsProps = {
   step: GameStep;
   // Whose mobs and items to list
@@ -423,6 +428,127 @@ function StepFields({
           value={step.time}
           onChange={(time) => onChange({ ...step, time })}
         />
+      );
+    case "hazard":
+      return (
+        <>
+          <Select
+            className={styles.thing}
+            aria-label="Hazard"
+            options={HAZARDS}
+            value={step.hazard}
+            onChange={(hazard) => onChange({ ...step, hazard })}
+          />
+          {REPEATED_HAZARDS.includes(step.hazard) && (
+            <Amount
+              value={step.amount}
+              onChange={(amount) => onChange({ ...step, amount })}
+            />
+          )}
+          {(step.hazard === "tnt" || step.hazard === "tnt_ring") && (
+            <>
+              <span className={styles.word}>fuse</span>
+              <NumberInput
+                className={styles.amount}
+                aria-label="Fuse in seconds"
+                min={0}
+                max={30}
+                step={0.5}
+                value={step.fuse}
+                onChange={(fuse) => onChange({ ...step, fuse })}
+              />
+              <span className={styles.word}>
+                s{/* Bedrock's TNT has only these two fuses */}
+                {edition === "bedrock" &&
+                  (step.fuse <= 2
+                    ? " (0.5–2 s in Bedrock)"
+                    : " (4 s in Bedrock)")}
+              </span>
+            </>
+          )}
+          {(step.hazard === "launch" || step.hazard === "launch_water") && (
+            <>
+              <NumberInput
+                className={styles.amount}
+                aria-label="Height in blocks"
+                integer
+                min={5}
+                max={250}
+                value={step.height}
+                onChange={(height) => onChange({ ...step, height })}
+              />
+              <span className={styles.word}>blocks up in</span>
+              <NumberInput
+                className={styles.amount}
+                aria-label="Seconds"
+                integer
+                min={1}
+                max={10}
+                value={step.seconds}
+                onChange={(seconds) => onChange({ ...step, seconds })}
+              />
+              <span className={styles.word}>s</span>
+            </>
+          )}
+          {EFFECT_HAZARDS.includes(step.hazard) && (
+            <>
+              <span className={styles.word}>for</span>
+              <NumberInput
+                className={styles.amount}
+                aria-label="Duration in seconds"
+                integer
+                min={1}
+                max={120}
+                value={step.duration}
+                onChange={(duration) => onChange({ ...step, duration })}
+              />
+              <span className={styles.word}>s</span>
+            </>
+          )}
+          {step.hazard === "random_teleport" && (
+            <>
+              <span className={styles.word}>within</span>
+              <NumberInput
+                className={styles.amount}
+                aria-label="Distance in blocks"
+                integer
+                min={10}
+                max={10_000}
+                value={step.distance}
+                onChange={(distance) => onChange({ ...step, distance })}
+              />
+              <span className={styles.word}>blocks</span>
+            </>
+          )}
+        </>
+      );
+    case "help":
+      return (
+        <>
+          <Select
+            className={styles.thing}
+            aria-label="Help"
+            options={HELPS}
+            value={step.help}
+            onChange={(help) => onChange({ ...step, help })}
+          />
+          {/* Armor and the heal are given at once; the rest are effects */}
+          {step.help !== "netherite_armor" && step.help !== "heal" && (
+            <>
+              <span className={styles.word}>for</span>
+              <NumberInput
+                className={styles.amount}
+                aria-label="Duration in seconds"
+                integer
+                min={1}
+                max={600}
+                value={step.duration}
+                onChange={(duration) => onChange({ ...step, duration })}
+              />
+              <span className={styles.word}>s</span>
+            </>
+          )}
+        </>
       );
     default:
       return (
