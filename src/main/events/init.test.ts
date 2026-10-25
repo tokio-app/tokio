@@ -152,6 +152,7 @@ const like = (totalLikes: number): LikeEvent => ({
 
 const alert = (overrides: Partial<Alert> = {}): Alert => ({
   id: "alert-1",
+  name: "alert-1",
   enabled: true,
   trigger: {
     type: TOKIO_EVENTS.FOLLOW,

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { AlertTrigger, EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
-import { mediaKind } from "../util/alerts";
+import { defaultAlertName, mediaKind } from "../util/alerts";
 import { ColorSchema, TimerProfileSchema } from "./timer";
 
 const PermissionsSchema = z.object({
@@ -140,6 +140,8 @@ const AlertSchema = z.preprocess(
   withSavedMedia,
   z.object({
     id: z.string(),
+    // To find it by, see alertName
+    name: z.string().default(""),
     enabled: z.boolean(),
     trigger: TriggerSchema,
     sound: AlertClipSchema.nullable(),
@@ -158,10 +160,17 @@ const RoomUserAlertSchema = z.object({
   trigger: z.object({ type: z.literal(TOKIO_EVENTS.ROOM_USER) }),
 });
 
+// Alerts saved before they had names are named by their place in the list.
 const AlertItemsSchema = z.preprocess(
   (items) =>
     Array.isArray(items)
-      ? items.filter((item) => !RoomUserAlertSchema.safeParse(item).success)
+      ? items
+          .filter((item) => !RoomUserAlertSchema.safeParse(item).success)
+          .map((item, index) =>
+            isRecord(item) && typeof item.name !== "string"
+              ? { ...item, name: defaultAlertName(index) }
+              : item,
+          )
       : items,
   z.array(AlertSchema),
 );

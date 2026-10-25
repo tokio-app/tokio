@@ -5,9 +5,18 @@ import {
   EMOTE_TRIGGER,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { formatAdded, giftNames, takesRoles } from "@/common/util";
+import {
+  alertName,
+  formatAdded,
+  getAlertOverlayURL,
+  giftNames,
+  orList,
+  takesRoles,
+} from "@/common/util";
+import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { FiEdit2, FiMessageSquare, FiMusic, FiTrash2 } from "react-icons/fi";
+import { CopyButton } from "../CopyField";
 import { Btn, Input, Select, SelectOption, Toggle } from "../Elements";
 import { EmoteMultiSelect, EmoteOption } from "../EmoteSelect";
 import { GiftMultiSelect } from "../GiftSelect";
@@ -105,6 +114,9 @@ export function TriggerFilter({
   }
 }
 
+// The most gifts or emotes a summary names, the rest counted
+const NAMED = 3;
+
 /**
  * What narrows the trigger, as one sentence: "Rose or Lion, when the streak
  * ends, worth 100+ coins, from Followers". Empty when nothing does.
@@ -121,7 +133,7 @@ export function triggerSummary(
         trigger.gifts.length === 0
           ? "Any gift"
           : // Gifts the lists don't have yet, until they load
-            (giftNames(trigger.gifts, gifts) ?? "Some gifts"),
+            (giftNames(trigger.gifts, gifts, NAMED) ?? "Some gifts"),
         trigger.every_gift ? "every gift" : "when the streak ends",
       );
       // Only any gift has a worth to reach
@@ -133,7 +145,7 @@ export function triggerSummary(
       const names = trigger.emotes.flatMap(
         (id) => emotes.find((emote) => emote.value === id)?.label ?? [],
       );
-      parts.push(names.length > 0 ? names.join(" or ") : "Any emote");
+      parts.push(names.length > 0 ? orList(names, NAMED) : "Any emote");
       break;
     }
     case TOKIO_EVENTS.CHAT: {
@@ -170,6 +182,8 @@ export function alertTest(alert: Alert): AlertTestRequest | null {
 
 type Props = {
   alert: Alert;
+  // Its place in the list, which its default name counts
+  index: number;
   gifts: CustomGift[];
   emotes: EmoteOption[];
   // The sound test loading or playing, maybe this alert's
@@ -182,11 +196,12 @@ type Props = {
 };
 
 /**
- * An alert as one row: whether it's on, and a summary of what sets it off,
- * what it plays and what it shows, which opens its editor.
+ * An alert as one row: whether it's on, and a summary of its name, what sets
+ * it off, what it plays and what it shows, which opens its editor.
  */
 export function AlertItem({
   alert,
+  index,
   gifts,
   emotes,
   testing,
@@ -213,11 +228,15 @@ export function AlertItem({
         title="Edit alert"
         onClick={onEdit}
       >
+        <span className={styles.name}>{alertName(alert.name, index)}</span>
+
         <span className={styles.part}>
-          <span className={styles.name}>
+          <span className={styles.trigger}>
             {ALERT_TRIGGER_LABELS[alert.trigger.type]}
           </span>
-          {detail && <span className={styles.detail}>{detail}</span>}
+          {detail && (
+            <span className={cx(styles.detail, styles.clamp)}>{detail}</span>
+          )}
         </span>
 
         <span className={styles.part}>
@@ -270,6 +289,18 @@ export function AlertItem({
         <FiEdit2 size={16} className={styles.edit} aria-hidden />
       </button>
 
+      {/* Without media its overlay shows nothing. The slot keeps the rows'
+          actions lined up. */}
+      <span
+        className={cx(!media && styles.unused)}
+        aria-hidden={!media || undefined}
+      >
+        <CopyButton
+          value={getAlertOverlayURL(alert.id)}
+          title="Copy overlay URL"
+          disabled={!media}
+        />
+      </span>
       <PlayButton
         {...testProps(testing, alert.id)}
         size={24}

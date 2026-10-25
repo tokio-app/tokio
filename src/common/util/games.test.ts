@@ -15,6 +15,8 @@ import {
   gameEventText,
   gameOverlayRows,
   gameStepsText,
+  giftNames,
+  orList,
 } from "./games";
 
 const gift = (value: number, label: string, img = `${label}.png`) =>
@@ -39,6 +41,24 @@ const action = (
   change(a);
   return a;
 };
+
+describe("orList", () => {
+  it("names them all up to the most, then how many more", () => {
+    const names = ["Rose", "Lion", "Galaxy", "Universe"];
+
+    expect(orList(names.slice(0, 3), 3)).toBe("Rose or Lion or Galaxy");
+    expect(orList(names, 3)).toBe("Rose, Lion or 2 more");
+    expect(orList(names)).toBe("Rose or Lion or Galaxy or Universe");
+  });
+});
+
+describe("giftNames", () => {
+  it("names the gifts the lists have, at most as many as asked", () => {
+    expect(giftNames([5655, 6369, 1], gifts, 2)).toBe("Rose or 2 more");
+    expect(giftNames([5655, 6369], gifts)).toBe("Rose or Lion");
+    expect(giftNames([42], gifts)).toBeNull();
+  });
+});
 
 const games = (actions: GameAction[], columns = 1): Profile["games"] => ({
   actions,

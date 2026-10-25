@@ -15,10 +15,8 @@ type Props = {
   display?: ReactNode;
 };
 
-// A field showing a value, like a URL or an address, which copies it when
-// clicked.
-export function CopyField({ value, title, code, display }: Props) {
-  // Shows a check for a moment after copying
+// Copies a value, and says so with a check for a moment
+function useCopied(value: string) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -27,21 +25,53 @@ export function CopyField({ value, title, code, display }: Props) {
     return () => clearTimeout(timer);
   }, [copied]);
 
+  const copy = () => {
+    void navigator.clipboard.writeText(value);
+    setCopied(true);
+  };
+  return { copied, copy };
+}
+
+const CopyIcon = ({ copied, size }: { copied: boolean; size: number }) =>
+  copied ? (
+    <FiCheck size={size} className={styles.copied} />
+  ) : (
+    <FaRegCopy size={size} />
+  );
+
+// A field showing a value, like a URL or an address, which copies it when
+// clicked.
+export function CopyField({ value, title, code, display }: Props) {
+  const { copied, copy } = useCopied(value);
+
   return (
     <Btn
       title={title}
       className={cx(styles.field, code && styles.code)}
-      onClick={() => {
-        void navigator.clipboard.writeText(value);
-        setCopied(true);
-      }}
+      onClick={copy}
     >
       <span className={styles.value}>{display ?? value}</span>
-      {copied ? (
-        <FiCheck size={16} className={styles.copied} />
-      ) : (
-        <FaRegCopy size={16} />
-      )}
+      <CopyIcon copied={copied} size={16} />
+    </Btn>
+  );
+}
+
+// The same as an icon button, for a row's actions
+export function CopyButton({
+  value,
+  title,
+  disabled,
+}: {
+  value: string;
+  // Says what it copies
+  title: string;
+  disabled?: boolean;
+}) {
+  const { copied, copy } = useCopied(value);
+
+  return (
+    <Btn variant="icon" title={title} disabled={disabled} onClick={copy}>
+      <CopyIcon copied={copied} size={22} />
     </Btn>
   );
 }

@@ -57,6 +57,8 @@ export function Alerts() {
   // shows under the alerts.
   const headerAdd = useRef<HTMLButtonElement>(null);
   const [headerAddShown, setHeaderAddShown] = useState(true);
+  // Shows only the alerts whose names have it
+  const [search, setSearch] = useState("");
 
   const { settings, update } = useEditableSettings("alerts", (profile) => {
     setEmotes(profile.emotes);
@@ -84,10 +86,13 @@ export function Alerts() {
     return () => observer.disconnect();
   }, []);
 
-  const addAlert = () =>
+  // A search would hide the new alert.
+  const addAlert = () => {
+    setSearch("");
     update((s) => {
-      s.items.push(createAlert());
+      s.items.push(createAlert(s.items.length));
     });
+  };
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_GIFTS, (res) => {
     if (res) setGifts(res.data);
@@ -180,7 +185,8 @@ export function Alerts() {
     });
   }, [settings.items, setItemGain]);
 
-  const editAlert = settings.items.find((a) => a.id === editing);
+  const editIndex = settings.items.findIndex((a) => a.id === editing);
+  const editAlert = settings.items[editIndex];
   const pickerAlert = settings.items.find((a) => a.id === pickerFor);
   const mediaAlert = settings.items.find((a) => a.id === mediaFor);
 
@@ -191,12 +197,15 @@ export function Alerts() {
           simultaneous={settings.simultaneous}
           queueLength={settings.queue_length}
           addRef={headerAdd}
+          search={search}
+          onSearch={setSearch}
           onAdd={addAlert}
           update={update}
         />
 
         <ItemsSection
           items={settings.items}
+          search={search}
           gifts={giftChoices}
           emotes={emoteChoices}
           testing={test.testing}
@@ -216,6 +225,7 @@ export function Alerts() {
       {editAlert && (
         <AlertEditor
           alert={editAlert}
+          index={editIndex}
           gifts={giftChoices}
           emotes={emoteChoices}
           testing={test.testing}

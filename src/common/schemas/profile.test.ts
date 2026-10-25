@@ -156,6 +156,30 @@ describe("ProfileSchema", () => {
     });
   });
 
+  it("names alerts saved before names by their place, after Room Users", () => {
+    const alert = (type: string, name?: string) => ({
+      id: type,
+      ...(name !== undefined && { name }),
+      enabled: true,
+      trigger: { ...oldAction.trigger, type },
+      sound: null,
+      volume: 80,
+    });
+    const items = [
+      alert(TOKIO_EVENTS.ROOM_USER),
+      alert(TOKIO_EVENTS.FOLLOW),
+      alert(TOKIO_EVENTS.SHARE, "Shares"),
+      alert(TOKIO_EVENTS.LIKE),
+    ];
+
+    const saved = ProfileSchema.parse({
+      ...defaultProfile,
+      alerts: { ...defaultProfile.alerts, items },
+    }).alerts.items;
+
+    expect(saved.map((a) => a.name)).toEqual(["alert-1", "Shares", "alert-3"]);
+  });
+
   it("makes a game action saved before Java a Bedrock one", () => {
     expect(GameActionSchema.parse(oldAction).edition).toBe("bedrock");
   });

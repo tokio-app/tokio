@@ -13,9 +13,10 @@ import {
 } from "./helper";
 
 describe("createAlert", () => {
-  it("makes an enabled follow alert without a sound", () => {
-    expect(createAlert()).toEqual({
+  it("makes an enabled follow alert without a sound, named by its place", () => {
+    expect(createAlert(2)).toEqual({
       id: expect.any(String),
+      name: "alert-3",
       enabled: true,
       trigger: {
         type: TOKIO_EVENTS.FOLLOW,

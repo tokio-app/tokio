@@ -1111,6 +1111,7 @@ describe("StoreManagerService", () => {
       const store = await init();
       const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({
         id,
+        name: id,
         enabled: true,
         trigger: {
           type: TOKIO_EVENTS.FOLLOW,
