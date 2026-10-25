@@ -1,23 +1,13 @@
-import {
-  Alert,
-  MEDIA_DURATION,
-  MEDIA_MAX_DURATION,
-  MediaFile,
-} from "@/common/schemas";
+import { Alert, MediaFile } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import {
-  getAlertOverlayURL,
-  getMediaPreviewURL,
-  mediaKind,
-} from "@/common/util";
+import { getMediaPreviewURL, mediaKind } from "@/common/util";
 import { cx } from "@/helper/cx";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
-import { useEffect, useState } from "react";
+import { useId, useState } from "react";
 import { FiCheck, FiFilm, FiTrash2 } from "react-icons/fi";
-import { CopyField } from "../CopyField";
 import { DeleteMediaModal } from "../DeleteModals";
-import { Btn, Check, NumberInput, SearchToggle } from "../Elements";
+import { Btn, SearchToggle } from "../Elements";
 import { Modal } from "../Modal";
 import { SoundLength } from "../SoundPicker/SoundLength";
 import list from "../SoundPicker/soundpicker.module.css";
@@ -30,11 +20,18 @@ type Props = {
   onRequest: () => void;
   // Picks a file from the library, or takes the alert's off it
   onSelect: (media: MediaFile | null) => void;
-  onDuration: (seconds: number) => void;
-  // Makes the duration follow the video's length, or not
-  onMatch: (match: boolean) => void;
   onClose: () => void;
 };
+
+/**
+ * A media library video's URL for one player. Chromium fails the players
+ * that load the same tokio-media: URL at once, like an alert's thumbnail and
+ * its preview, so each gets its own; main ignores the query.
+ */
+export function useVideoURL(file: string) {
+  const player = useId();
+  return `${getMediaPreviewURL(file)}?player=${encodeURIComponent(player)}`;
+}
 
 /**
  * What a media library file shows: an image, or a video's first frame. A
@@ -47,32 +44,30 @@ export function MediaThumbnail({
   file: string;
   onLength?: (seconds: number) => void;
 }) {
-  const src = getMediaPreviewURL(file);
+  const video = useVideoURL(file);
   return mediaKind(file) === "video" ? (
     <video
       className={styles.thumb}
-      src={`${src}#t=0.1`}
+      src={`${video}#t=0.1`}
       muted
       preload="metadata"
       onLoadedMetadata={(e) => onLength?.(e.currentTarget.duration)}
     />
   ) : (
-    <img className={styles.thumb} src={src} alt="" loading="lazy" />
+    <img
+      className={styles.thumb}
+      src={getMediaPreviewURL(file)}
+      alt=""
+      loading="lazy"
+    />
   );
 }
 
 /**
- * Picks the image or video an alert shows on its overlay, and gives that
- * overlay's URL. It stays open after a pick, for the duration and the URL.
+ * Picks the image or video an alert shows on its overlay. The alert's
+ * editor sets how long it shows.
  */
-export function MediaPicker({
-  alert,
-  onRequest,
-  onSelect,
-  onDuration,
-  onMatch,
-  onClose,
-}: Props) {
+export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
   const { id, media } = alert;
   const [library, setLibrary] = useState<MediaFile[]>([]);
   const [search, setSearch] = useState("");
@@ -98,23 +93,6 @@ export function MediaPicker({
   const needle = search.trim().toLowerCase();
   const files = library.filter((f) => f.name.toLowerCase().includes(needle));
 
-  const video = media ? mediaKind(media.file) === "video" : false;
-  // The whole video, in seconds the duration takes. Unknown for videos that
-  // don't say their length, like some recordings.
-  const length = media && lengths[media.file];
-  const match =
-    length && Number.isFinite(length)
-      ? Math.min(Math.ceil(length), MEDIA_MAX_DURATION)
-      : null;
-  // The duration follows the video, also one picked after it was matched.
-  const following = !!media?.match_video && video && match !== null;
-
-  useEffect(() => {
-    if (following && media && match !== null && media.duration !== match) {
-      onDuration(match);
-    }
-  }, [following, match, media, onDuration]);
-
   return (
     <>
       <Modal
@@ -131,34 +109,12 @@ export function MediaPicker({
         }
         footer={
           <>
-            <div className={styles.timing}>
-              <label className={styles.duration}>
-                Duration (seconds)
-                <NumberInput
-                  integer
-                  min={1}
-                  max={MEDIA_MAX_DURATION}
-                  className={styles.number}
-                  value={media?.duration ?? MEDIA_DURATION}
-                  disabled={!media || following}
-                  onChange={onDuration}
-                />
-              </label>
-              {media && video && (
-                <Check
-                  label="Match video"
-                  title={`The video's length, up to ${MEDIA_MAX_DURATION} seconds`}
-                  checked={media.match_video}
-                  // Off, a video of unknown length can't be matched
-                  disabled={!media.match_video && match === null}
-                  onChange={(e) => onMatch(e.target.checked)}
-                />
-              )}
-            </div>
             <Btn disabled={!media} onClick={() => onSelect(null)}>
               Clear
             </Btn>
+            <Btn onClick={onClose}>Cancel</Btn>
             <Btn
+              variant="accent"
               onClick={() => {
                 onRequest();
                 window.api.emit(APP_EVENTS.IMPORT_MEDIA, { id });
@@ -166,14 +122,9 @@ export function MediaPicker({
             >
               Browse file...
             </Btn>
-            <Btn variant="accent" onClick={onClose}>
-              Done
-            </Btn>
           </>
         }
       >
-        <CopyField value={getAlertOverlayURL(id)} title="Copy URL" />
-
         <div className={styles.grid}>
           {files.map((file) => {
             const current = file.file === media?.file;

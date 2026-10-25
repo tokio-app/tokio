@@ -100,6 +100,7 @@ export enum APP_EVENTS {
   IMPORT_SOUND = "app:alerts:import:sound",
   IMPORT_MEDIA = "app:alerts:import:media",
   TEST_ALERT = "app:alerts:test",
+  GET_SOUND_DATA = "app:alerts:get:sound:data",
   SHOW_ALERT_MEDIA = "app:alerts:show:media",
   GET_CUSTOM_GIFTS = "app:alerts:get:gifts",
 
@@ -318,6 +319,10 @@ export interface AppEventsMap {
     volume: number;
     // Identifies the test: the alert id, or the url for previews
     id: string;
+  };
+  // A library sound's bytes, for the alert editor's waveform
+  [APP_EVENTS.GET_SOUND_DATA]: {
+    file: string;
   };
   // An alert's media got its place in the window's queue: main shows it on
   // the alert's overlay when its turn comes.

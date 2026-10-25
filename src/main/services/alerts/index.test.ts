@@ -57,6 +57,8 @@ const trigger = (
   emotes: [],
   keyword: "",
   user: "",
+  min_coins: 0,
+  roles: [],
   ...filters,
 });
 
@@ -64,7 +66,7 @@ const alert = (overrides: Partial<Alert> = {}): Alert => ({
   id: "alert-1",
   enabled: true,
   trigger: trigger(TOKIO_EVENTS.FOLLOW),
-  sound: { name: "Ding", file: "ding.mp3" },
+  sound: { name: "Ding", file: "ding.mp3", start: 0, end: null },
   tts: null,
   media: null,
   volume: 80,
@@ -76,6 +78,7 @@ const picture = {
   file: "confetti.gif",
   duration: 5,
   match_video: false,
+  volume: 100,
 };
 
 type AlertProfile = Pick<Profile, "alerts" | "tts">;
@@ -166,8 +169,27 @@ describe("AlertsService", () => {
           id: "alert-1",
           key: "ding.mp3",
           repeat: 1,
+          start: 0,
         },
       ]);
+    });
+
+    it("sends the part of the sound a cut plays", async () => {
+      const ding = { name: "Ding", file: "ding.mp3" };
+      const [cut] = await run(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+        settings([alert({ sound: { ...ding, start: 0.5, end: 1.5 } })]),
+      );
+      const [toEnd] = await run(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+        settings([alert({ sound: { ...ding, start: 0.5, end: null } })]),
+      );
+
+      expect(cut).toMatchObject({ start: 0.5, end: 1.5 });
+      expect(toEnd.start).toBe(0.5);
+      expect(toEnd).not.toHaveProperty("end", expect.anything());
     });
 
     it("gives each trigger its own queue when simultaneous", async () => {
@@ -215,7 +237,10 @@ describe("AlertsService", () => {
       await writeFile(join(sounds, "pop.mp3"), bytes(9));
       const items = [
         alert({ id: "one" }),
-        alert({ id: "two", sound: { name: "Pop", file: "pop.mp3" } }),
+        alert({
+          id: "two",
+          sound: { name: "Pop", file: "pop.mp3", start: 0, end: null },
+        }),
       ];
 
       const sent = await run(TOKIO_EVENTS.FOLLOW, { user }, settings(items));
@@ -228,7 +253,9 @@ describe("AlertsService", () => {
         alert({ enabled: false }),
         alert({ sound: null }),
         alert({ trigger: trigger(TOKIO_EVENTS.SHARE) }),
-        alert({ sound: { name: "Gone", file: "gone.mp3" } }),
+        alert({
+          sound: { name: "Gone", file: "gone.mp3", start: 0, end: null },
+        }),
       ];
 
       expect(await run(TOKIO_EVENTS.FOLLOW, { user }, settings(items))).toEqual(
@@ -240,7 +267,7 @@ describe("AlertsService", () => {
       const logError = vi.spyOn(Logger, "error");
       const gone = alert({
         id: "gone",
-        sound: { name: "Gone", file: "gone.mp3" },
+        sound: { name: "Gone", file: "gone.mp3", start: 0, end: null },
       });
       const sent: AlertAudio[] = [];
       const onError = vi.fn();
@@ -261,7 +288,11 @@ describe("AlertsService", () => {
     it("reads a sound too big to cache once for events at the same time", async () => {
       const big = new Uint8Array(CACHE_MAX_FILE_BYTES + 1);
       await writeFile(join(sounds, "long.mp3"), big);
-      const items = [alert({ sound: { name: "Long", file: "long.mp3" } })];
+      const items = [
+        alert({
+          sound: { name: "Long", file: "long.mp3", start: 0, end: null },
+        }),
+      ];
       const sent: AlertAudio[] = [];
 
       await Promise.all(
@@ -477,6 +508,89 @@ describe("AlertsService", () => {
       ]);
     });
 
+    it("fires gift alerts only for streaks or gifts worth the coins", async () => {
+      const streak = settings([
+        alert({ trigger: trigger(TOKIO_EVENTS.GIFT, { min_coins: 10 }) }),
+      ]);
+      const each = settings([
+        alert({
+          trigger: trigger(TOKIO_EVENTS.GIFT, {
+            min_coins: 10,
+            every_gift: true,
+          }),
+        }),
+      ]);
+      // A streak of 5 gifts of 2 coins is worth 10, each gift 2
+      const fives = (id: string, repeatEnd: boolean) =>
+        gift(id, repeatEnd, { coins: 2, comboCount: 5 });
+
+      expect(
+        await run(TOKIO_EVENTS.GIFT, fives("1", true), streak),
+      ).toHaveLength(1);
+      expect(
+        await run(
+          TOKIO_EVENTS.GIFT,
+          gift("2", true, { coins: 2, comboCount: 4 }),
+          streak,
+        ),
+      ).toEqual([]);
+      expect(await run(TOKIO_EVENTS.GIFT, fives("3", false), each)).toEqual([]);
+      expect(
+        await run(TOKIO_EVENTS.GIFT, gift("4", false, { coins: 10 }), each),
+      ).toHaveLength(1);
+    });
+
+    it("ignores the coins once the alert has its own gifts", async () => {
+      const picked = settings([
+        alert({
+          trigger: trigger(TOKIO_EVENTS.GIFT, { gifts: [5], min_coins: 1000 }),
+        }),
+      ]);
+
+      expect(
+        await run(TOKIO_EVENTS.GIFT, gift("5", true, { coins: 1 }), picked),
+      ).toHaveLength(1);
+    });
+
+    it("fires alerts with roles only for viewers who have one of them", async () => {
+      const alerts = settings([
+        alert({
+          trigger: trigger(TOKIO_EVENTS.SHARE, {
+            roles: ["moderator", "superfan"],
+          }),
+        }),
+      ]);
+      const emotes = settings([
+        alert({ trigger: trigger(EMOTE_TRIGGER, { roles: ["follower"] }) }),
+      ]);
+      const envelope = settings([
+        alert({
+          trigger: trigger(TOKIO_EVENTS.ENVELOPE, { roles: ["follower"] }),
+        }),
+      ]);
+      // Roles left from another trigger
+      const follow = settings([
+        alert({
+          trigger: trigger(TOKIO_EVENTS.FOLLOW, { roles: ["moderator"] }),
+        }),
+      ]);
+      const superfan = { ...user, superfan: true };
+      const share = (viewer: typeof user) => ({ user: viewer, shareCount: 1 });
+
+      expect(await run(TOKIO_EVENTS.SHARE, share(user), alerts)).toEqual([]);
+      expect(
+        await run(TOKIO_EVENTS.SHARE, share(superfan), alerts),
+      ).toHaveLength(1);
+      // A follow's viewer only just followed, so roles don't narrow it
+      expect(await run(TOKIO_EVENTS.FOLLOW, { user }, follow)).toHaveLength(1);
+      // Emotes check the chat's viewer
+      expect(await run(TOKIO_EVENTS.CHAT, chat("", "e1"), emotes)).toEqual([]);
+      // An envelope comes without a viewer
+      expect(
+        await run(TOKIO_EVENTS.ENVELOPE, undefined, envelope),
+      ).toHaveLength(1);
+    });
+
     it.each([TOKIO_EVENTS.MEMBER_JOIN, TOKIO_EVENTS.SUPER_FAN_JOIN] as const)(
       "fires %s alerts for anyone or only for the named viewer",
       async (type) => {
@@ -599,7 +713,14 @@ describe("AlertsService", () => {
       it("speaks instead of playing the sound", async () => {
         await speak(
           gift("5655", true),
-          withTts([speaking("Thanks", { name: "Ding", file: "ding.mp3" })]),
+          withTts([
+            speaking("Thanks", {
+              name: "Ding",
+              file: "ding.mp3",
+              start: 0,
+              end: null,
+            }),
+          ]),
         );
 
         expect(sent.map(said)).toEqual(["Thanks"]);

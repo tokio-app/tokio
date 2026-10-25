@@ -1,0 +1,284 @@
+/* A tab's fields. The height, a gift trigger's, the tallest, keeps the
+   dialog still between tabs. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 402px;
+  padding-top: var(--space-2);
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--font-primary);
+}
+
+.number {
+  width: 88px;
+}
+
+.note {
+  font-size: var(--font-sm);
+  color: var(--font-secondary);
+}
+
+.roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+}
+
+/* What the alert plays or shows, with the button that changes it */
+.current {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  font-size: var(--font-md);
+  font-weight: 500;
+}
+
+.current > svg {
+  flex: none;
+  color: var(--font-secondary);
+}
+
+.current_actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.current_name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.none {
+  color: var(--font-muted);
+  font-weight: 400;
+}
+
+/* MEDIA */
+
+/* The preview, with its name, duration and volume beside it */
+.media {
+  display: grid;
+  grid-template-columns: 288px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-6);
+}
+
+.media_details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.preview {
+  position: relative;
+}
+
+/* Where the preview goes, until there's media */
+.preview_empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--font-muted);
+}
+
+/* A video's play button and length, in its corners */
+.preview .preview_play {
+  position: absolute;
+  bottom: var(--space-2);
+  left: var(--space-2);
+  background-color: var(--modal-background);
+  color: var(--font-primary);
+}
+
+.preview_length {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background-color: var(--modal-background);
+  color: var(--font-primary);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  color: var(--danger);
+  font-size: var(--font-sm);
+}
+
+/* THE CUT */
+
+.cut {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.wave,
+.wave_loading {
+  position: relative;
+  height: 112px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-primary);
+}
+
+.wave {
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.wave_loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--font-secondary);
+}
+
+/* The part that plays */
+.region {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background-color: var(--accent-soft);
+}
+
+.bars {
+  position: absolute;
+  inset: var(--space-2) 0;
+  width: 100%;
+  height: calc(100% - var(--space-4));
+}
+
+.bars rect {
+  fill: var(--background-secondary-hover);
+}
+
+.bars .kept {
+  fill: var(--accent-primary);
+}
+
+/* A line the width of the waveform's height, wide enough to grab */
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  margin-left: -8px;
+  cursor: ew-resize;
+}
+
+.handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 7px;
+  width: 2px;
+  background-color: var(--accent-primary);
+}
+
+/* The grip at its top */
+.handle::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 3px;
+  width: 10px;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background-color: var(--accent-primary);
+}
+
+/* Rose would vanish on the rose line, so Paper */
+.handle:focus-visible {
+  outline: 2px solid var(--font-primary);
+  outline-offset: 0;
+  border-radius: var(--radius-sm);
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--from);
+  width: 1px;
+  background-color: var(--font-primary);
+  pointer-events: none;
+  animation: sweep var(--length) linear forwards;
+}
+
+@keyframes sweep {
+  to {
+    left: var(--to);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playhead {
+    display: none;
+  }
+}
+
+.cut_fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+}
+
+.cut_fields > .inline {
+  gap: var(--space-2);
+}
+
+/* The test, then the reset */
+.cut_actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* VOLUMES */
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 320px;
+  color: var(--font-secondary);
+}
+
+.volume > div {
+  flex: 1;
+}
+
+.volume_value {
+  min-width: 3ch;
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--font-primary);
+}

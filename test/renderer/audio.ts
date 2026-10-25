@@ -40,6 +40,19 @@ export function createAudio() {
     stopQueues: vi.fn<AudioContextType["stopQueues"]>(),
     setItemGain: vi.fn<AudioContextType["setItemGain"]>(),
     resumeContext: vi.fn<AudioContextType["resumeContext"]>(async () => {}),
+    // A 2 second sound whose samples rise and fall back
+    decode: vi.fn<AudioContextType["decode"]>(async () => {
+      const samples = Float32Array.from([0, 0.5, 1, 0.5, 0, 0.25, 0.5, 0]);
+      return {
+        duration: 2,
+        length: samples.length,
+        numberOfChannels: 1,
+        sampleRate: samples.length / 2,
+        getChannelData: () => samples,
+        copyFromChannel: () => {},
+        copyToChannel: () => {},
+      } satisfies AudioBuffer;
+    }),
   } satisfies AudioContextType;
 
   return { value, queue };

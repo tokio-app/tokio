@@ -10,6 +10,7 @@ vi.mock("@/helper/audio", () => ({
     stop = vi.fn();
     setItemGain = vi.fn();
   },
+  decodeSound: vi.fn(),
 }));
 vi.mock("tone", () => ({
   getContext: () => ({ state: "running" }),

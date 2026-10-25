@@ -37,9 +37,8 @@ describe("MediaSection", () => {
       "src",
       "tokio-media:///party.png",
     );
-    expect(container.querySelector("video")).toHaveAttribute(
-      "src",
-      "tokio-media:///clip.webm#t=0.1",
+    expect(container.querySelector("video")?.getAttribute("src")).toMatch(
+      /^tokio-media:\/\/\/clip\.webm\?player=.+#t=0\.1$/,
     );
   });
 
@@ -67,10 +66,13 @@ describe("MediaSection", () => {
     await user.click(row("Clip").getByRole("button", { name: "Full size" }));
 
     const shown = screen.getByRole("dialog", { name: "Clip" });
-    expect(shown.querySelector("video")).toHaveAttribute(
-      "src",
-      "tokio-media:///clip.webm",
+    // Its own URL, apart from its thumbnail's
+    const full = shown.querySelector("video")?.getAttribute("src");
+    expect(full).toMatch(/^tokio-media:\/\/\/clip\.webm\?player=/);
+    const thumbnail = [...document.querySelectorAll("video")].find(
+      (video) => !video.closest("[role=dialog]"),
     );
+    expect(full).not.toBe(thumbnail?.getAttribute("src"));
     await user.click(within(shown).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 

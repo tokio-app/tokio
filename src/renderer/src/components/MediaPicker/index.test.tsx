@@ -6,11 +6,10 @@ import { send, sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { MediaPicker } from ".";
+import { MediaPicker, MediaThumbnail } from ".";
 
 const CLIP = { name: "Clip", file: "clip.webm" };
 const LIBRARY = [mediaFile("Party"), mediaFile("Confetti"), CLIP];
-const OVERLAY_URL = "http://tokio-app.local:37891/alerts/alert-1/";
 
 const alert = (patch: Partial<Alert> = {}): Alert => ({
   ...createAlert(),
@@ -22,8 +21,6 @@ function setup(item = alert()) {
   const handlers = {
     onRequest: vi.fn(),
     onSelect: vi.fn(),
-    onDuration: vi.fn(),
-    onMatch: vi.fn(),
     onClose: vi.fn(),
   };
   const view = renderWithProviders(<MediaPicker alert={item} {...handlers} />);
@@ -70,10 +67,25 @@ describe("MediaPicker", () => {
     expect(
       [...dialog.querySelectorAll("img")].map((img) => img.getAttribute("src")),
     ).toEqual(["tokio-media:///party.png", "tokio-media:///confetti.png"]);
-    // A video shows its first frame
-    expect(dialog.querySelector("video")?.getAttribute("src")).toBe(
-      "tokio-media:///clip.webm#t=0.1",
+    // A video shows its first frame, from a URL of its own
+    expect(dialog.querySelector("video")?.getAttribute("src")).toMatch(
+      /^tokio-media:\/\/\/clip\.webm\?player=.+#t=0\.1$/,
     );
+  });
+
+  // Chromium fails the players that load one tokio-media: URL at once.
+  it("gives each player of a video its own URL", () => {
+    const { container } = renderWithProviders(
+      <>
+        <MediaThumbnail file="clip.webm" />
+        <MediaThumbnail file="clip.webm" />
+      </>,
+    );
+
+    const [one, two] = [...container.querySelectorAll("video")].map((v) =>
+      v.getAttribute("src"),
+    );
+    expect(one).not.toBe(two);
   });
 
   it("marks the alert's media", async () => {
@@ -85,14 +97,13 @@ describe("MediaPicker", () => {
     );
   });
 
-  it("picks a file, and stays open for its duration and URL", async () => {
+  it("picks a file", async () => {
     const { user, onSelect } = setup();
     await library();
 
     await user.click(screen.getByRole("button", { name: "Party" }));
 
     expect(onSelect).toHaveBeenCalledExactlyOnceWith(LIBRARY[0]);
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("deletes a file once you confirm", async () => {
@@ -155,165 +166,40 @@ describe("MediaPicker", () => {
     ).toBeInTheDocument();
   });
 
-  it("changes how long the alert's media shows, or clears it", async () => {
-    const media = alertMedia("Party");
-    const { user, onDuration, onSelect } = setup(alert({ media }));
-
-    const seconds = screen.getByRole("spinbutton", {
-      name: "Duration (seconds)",
-    });
-    expect(seconds).toHaveValue(5);
-    await user.clear(seconds);
-    await user.type(seconds, "12");
-    expect(onDuration).toHaveBeenLastCalledWith(12);
+  it("takes the alert's media off it, and keeps the file", async () => {
+    const { user, onSelect } = setup(alert({ media: alertMedia("Party") }));
 
     await user.click(screen.getByRole("button", { name: "Clear" }));
+
     expect(onSelect).toHaveBeenCalledExactlyOnceWith(null);
     expect(sent(APP_EVENTS.REMOVE_MEDIA)).toEqual([]);
   });
 
-  it("keeps the duration in view, with nothing to set or clear without media", () => {
+  it("has nothing to clear without media", () => {
     setup();
 
-    const seconds = screen.getByRole("spinbutton", {
-      name: "Duration (seconds)",
-    });
-    expect(seconds).toBeDisabled();
-    expect(seconds).toHaveValue(5);
     expect(screen.getByRole("button", { name: "Clear" })).toBeDisabled();
-    expect(screen.queryByRole("checkbox", { name: "Match video" })).toBeNull();
   });
 
-  describe("Match video", () => {
-    const REEL = { name: "Reel", file: "reel.mp4" };
-    // A video's thumbnail read its length
-    const measure = (file: string, seconds: number) => {
-      const video = screen
-        .getByRole("dialog")
-        .querySelector<HTMLVideoElement>(
-          `video[src^="tokio-media:///${file}"]`,
-        )!;
-      Object.defineProperty(video, "duration", { value: seconds });
-      fireEvent.loadedMetadata(video);
-    };
-    const matched = () => screen.getByRole("checkbox", { name: "Match video" });
-    const seconds = () =>
-      screen.getByRole("spinbutton", { name: "Duration (seconds)" });
+  it("shows each video's length", async () => {
+    setup();
+    await library();
 
-    it("shows each video's length", async () => {
-      setup();
-      await library();
+    const video = screen
+      .getByRole("dialog")
+      .querySelector<HTMLVideoElement>(`video[src^="tokio-media:///clip"]`)!;
+    Object.defineProperty(video, "duration", { value: 12.3 });
+    fireEvent.loadedMetadata(video);
 
-      measure(CLIP.file, 12.3);
-
-      expect(
-        screen.getByRole("button", { name: "Clip 12s" }),
-      ).toBeInTheDocument();
-    });
-
-    it("turns on and off", async () => {
-      const { user, onMatch } = setup(alert({ media: alertMedia(CLIP) }));
-      await library();
-      measure(CLIP.file, 12.3);
-
-      expect(matched()).not.toBeChecked();
-      await user.click(matched());
-
-      expect(onMatch).toHaveBeenCalledExactlyOnceWith(true);
-    });
-
-    it("follows the video's length, rounded up", async () => {
-      const { onDuration } = setup(
-        alert({ media: alertMedia(CLIP, { match_video: true }) }),
-      );
-      await library();
-
-      measure(CLIP.file, 12.3);
-
-      expect(onDuration).toHaveBeenCalledExactlyOnceWith(13);
-      expect(matched()).toBeChecked();
-      // The video sets it
-      expect(seconds()).toBeDisabled();
-    });
-
-    it("follows another video picked after it was matched", async () => {
-      const media = alertMedia(CLIP, { duration: 13, match_video: true });
-      const { rerender, onDuration } = setup(alert({ media }));
-      await send(APP_EVENTS_RESPONSE.GET_MEDIA, {
-        success: true,
-        data: [...LIBRARY, REEL],
-      });
-      measure(CLIP.file, 12.3);
-      expect(onDuration).not.toHaveBeenCalled();
-
-      rerender(
-        <MediaPicker
-          alert={alert({ media: { ...media, ...REEL } })}
-          onRequest={vi.fn()}
-          onSelect={vi.fn()}
-          onDuration={onDuration}
-          onMatch={vi.fn()}
-          onClose={vi.fn()}
-        />,
-      );
-      await send(APP_EVENTS_RESPONSE.GET_MEDIA, {
-        success: true,
-        data: [...LIBRARY, REEL],
-      });
-      measure(REEL.file, 7.2);
-
-      expect(onDuration).toHaveBeenCalledExactlyOnceWith(8);
-    });
-
-    it("stops at the longest duration", async () => {
-      const { onDuration } = setup(
-        alert({ media: alertMedia(CLIP, { match_video: true }) }),
-      );
-      await library();
-
-      measure(CLIP.file, 95);
-
-      expect(onDuration).toHaveBeenCalledExactlyOnceWith(60);
-    });
-
-    // Some recordings don't say how long they are.
-    it("can't follow a video of unknown length", async () => {
-      const { onDuration, unmount } = setup(alert({ media: alertMedia(CLIP) }));
-      await library();
-      measure(CLIP.file, Infinity);
-      expect(matched()).toBeDisabled();
-      unmount();
-
-      // Turned on for another video, it can still be turned off.
-      setup(alert({ media: alertMedia(CLIP, { match_video: true }) }));
-      await library();
-      measure(CLIP.file, Infinity);
-      expect(matched()).toBeEnabled();
-      expect(seconds()).toBeEnabled();
-      expect(onDuration).not.toHaveBeenCalled();
-    });
-
-    it("isn't offered for an image", async () => {
-      setup(alert({ media: alertMedia(LIBRARY[0], { match_video: true }) }));
-      await library();
-
-      expect(screen.queryByRole("checkbox")).toBeNull();
-      expect(seconds()).toBeEnabled();
-    });
+    expect(
+      screen.getByRole("button", { name: "Clip 12s" }),
+    ).toBeInTheDocument();
   });
 
-  it("copies the URL of the alert's overlay", async () => {
-    const { user } = setup();
-
-    await user.click(screen.getByRole("button", { name: OVERLAY_URL }));
-
-    expect(await navigator.clipboard.readText()).toBe(OVERLAY_URL);
-  });
-
-  it("closes with Done", async () => {
+  it("closes with Cancel", async () => {
     const { user, onClose } = setup();
 
-    await user.click(screen.getByRole("button", { name: "Done" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onClose).toHaveBeenCalledOnce();
   });

@@ -19,6 +19,10 @@ export interface EnqueueOptions {
   pitch?: number;
   // Seconds the item holds its place at least, like an alert's image
   minDuration?: number;
+  // The part of the sound that plays, in seconds of the sound: from its
+  // start and to its end when missing
+  start?: number;
+  end?: number;
   // Called once the item has its place: seconds until it starts, and how
   // long its place lasts
   onScheduled?: (delay: number, duration: number) => void;
@@ -27,6 +31,8 @@ export interface EnqueueOptions {
 interface ActiveItem {
   player: Tone.GrainPlayer;
   gainNode: Tone.Gain;
+  // Fades out a sound cut before its end
+  fade?: Tone.Gain;
   key?: string;
   // Has its own speed and pitch, which setFilters leaves alone
   ownFilters: boolean;
@@ -34,6 +40,9 @@ interface ActiveItem {
 
 // Bytes of decoded sounds kept for their next copies, by every queue
 export const DECODED_CACHE_BYTES = 200 * 1024 * 1024;
+
+// Seconds a sound cut before its end fades out, so it doesn't click
+export const CUT_FADE = 0.05;
 
 // By cache key, least recently used first. A player keeps its own reference
 // to the buffer, so one dropped here still plays to its end.
@@ -73,6 +82,30 @@ function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
     },
   );
   return entry.audio;
+}
+
+// IPC hands over a view of its own buffer, decoded without a copy then.
+function bytesOf(input: Uint8Array | ArrayBuffer): ArrayBuffer {
+  if (!(input instanceof Uint8Array)) return input;
+  if (
+    input.byteOffset === 0 &&
+    input.byteLength === input.buffer.byteLength &&
+    input.buffer instanceof ArrayBuffer
+  ) {
+    return input.buffer;
+  }
+  return input.slice().buffer;
+}
+
+/**
+ * Decodes a sound, sharing the decode with the queues' copies of it that
+ * have the same cache key.
+ */
+export function decodeSound(
+  input: Uint8Array | ArrayBuffer,
+  cacheKey: string,
+): Promise<AudioBuffer> {
+  return decode(bytesOf(input), cacheKey);
 }
 
 /**
@@ -172,26 +205,11 @@ export class AudioQueue {
       return Promise.resolve(false);
     }
 
-    let audioData: ArrayBuffer;
-    if (
-      input instanceof Uint8Array &&
-      input.byteOffset === 0 &&
-      input.byteLength === input.buffer.byteLength &&
-      input.buffer instanceof ArrayBuffer
-    ) {
-      // IPC hands over a view of its own buffer, so it's decoded without a copy.
-      audioData = input.buffer;
-    } else if (input instanceof Uint8Array) {
-      audioData = input.slice().buffer;
-    } else {
-      audioData = input;
-    }
-
     // Started at once, so copies that come next share the cache entry, and
     // while earlier items still wait for theirs
     let decoding: Promise<AudioBuffer>;
     try {
-      decoding = decode(audioData, cacheKey);
+      decoding = decode(bytesOf(input), cacheKey);
     } catch (error) {
       decoding = Promise.reject(error);
     }
@@ -261,7 +279,7 @@ export class AudioQueue {
 
     const active = this.active;
     this.active = [];
-    for (const { player, gainNode } of active) {
+    for (const { player, gainNode, fade } of active) {
       player.onstop = () => {};
       try {
         player.stop();
@@ -271,6 +289,7 @@ export class AudioQueue {
       } catch {}
       try {
         gainNode.dispose();
+        fade?.dispose();
       } catch {}
     }
 
@@ -306,12 +325,32 @@ export class AudioQueue {
       overlap: 0.05,
     });
 
+    // A part that isn't in the sound plays it whole.
+    const { duration } = buffer;
+    let start = Math.min(Math.max(next.start ?? 0, 0), duration);
+    let end = Math.min(next.end ?? duration, duration);
+    if (end <= start) [start, end] = [0, duration];
+    // Seconds it's heard
+    const length = (end - start) / speed;
+
     const gainNode = new Tone.Gain(gain).connect(this.gainNode);
-    player.connect(gainNode);
-    player.start(this.nextPlayTime);
+    // Its own node, so setItemGain's ramps can't cancel the fade
+    const fade =
+      end < duration ? new Tone.Gain(1).connect(gainNode) : undefined;
+    player.connect(fade ?? gainNode);
+    const startAt = this.nextPlayTime;
+    if (fade) {
+      const stopAt = startAt + length;
+      fade.gain.setValueAtTime(1, Math.max(startAt, stopAt - CUT_FADE));
+      fade.gain.linearRampToValueAtTime(0, stopAt);
+      player.start(startAt, start, length);
+    } else {
+      player.start(startAt, start);
+    }
     this.active.push({
       player,
       gainNode,
+      fade,
       key,
       ownFilters: next.speed !== undefined || next.pitch !== undefined,
     });
@@ -320,13 +359,14 @@ export class AudioQueue {
       this.active = this.active.filter((item) => item.player !== player);
       player.dispose();
       gainNode.dispose();
+      fade?.dispose();
       onEnded?.();
     };
 
     // shortcut: a place longer than its sound leaves `active` (and calls
     // onEnded) when the sound ends, so the queue length counts it short; the
     // next item still waits for the place. Upgrade if that undercount matters.
-    const place = Math.max(buffer.duration / speed, minDuration);
+    const place = Math.max(length, minDuration);
     // Tone.now() is ahead of what's heard by the look ahead.
     onScheduled?.(this.nextPlayTime - Tone.immediate(), place);
     this.nextPlayTime += place + this.gapTime;

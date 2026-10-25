@@ -6,9 +6,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAudio } from "./useAudio";
 
 // A sound or message, which main reads or speaks, or an alert that only
-// shows media. An alert's media shows on its overlay.
+// shows media. An alert's media shows on its overlay. A sound plays from
+// start to end, the seconds of its cut.
 export type AlertTestRequest =
-  | (AppEventsMap[APP_EVENTS.TEST_ALERT] & { media?: AlertMedia })
+  | (AppEventsMap[APP_EVENTS.TEST_ALERT] & {
+      media?: AlertMedia;
+      start?: number;
+      end?: number;
+    })
   | { id: string; volume: number; media: AlertMedia };
 
 /**
@@ -44,14 +49,15 @@ export function useAlertTest() {
 
   const queueTest = useCallback(
     (
-      { id, volume, media }: AlertTestRequest,
+      req: AlertTestRequest,
       data?: Uint8Array,
       filters?: { speed: number; pitch: number },
     ) => {
+      const { id, volume, media } = req;
       queue.stop();
       void queueAlert(
         queue,
-        { id, volume, data, media },
+        { id, data, media },
         {
           gain: volume / 100,
           key: id,
@@ -59,6 +65,7 @@ export function useAlertTest() {
           // Media replaces it, its place isn't the sound's length.
           onScheduled: (_, seconds) =>
             setLengths((l) => ({ ...l, [id]: seconds })),
+          ...("start" in req && { start: req.start, end: req.end }),
           ...filters,
         },
       ).then((queued) => (queued ? started(id) : finish(id)));

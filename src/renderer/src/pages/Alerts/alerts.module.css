@@ -23,8 +23,6 @@
 /* ITEMS */
 
 .items {
-  /* Shared with AlertItem rows: 1040px page - 34px panel padding and border */
-  --alerts-columns: 88px 44px repeat(5, minmax(0, 1fr));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -37,31 +35,6 @@
 .items > p {
   border: none;
   border-radius: 0;
-}
-
-.columns {
-  display: grid;
-  grid-template-columns: var(--alerts-columns);
-  align-items: center;
-  gap: var(--space-3);
-  height: var(--control-height);
-  padding: 0 var(--space-4);
-  border-bottom: 1px solid var(--border);
-}
-
-.column {
-  font-size: var(--font-xs);
-  font-weight: 500;
-  color: var(--font-secondary);
-}
-
-/* Centered over the buttons and the toggle, at the text's start over fields */
-.column:nth-child(-n + 2) {
-  text-align: center;
-}
-
-.column:nth-child(n + 3):not(:last-child) {
-  padding-left: var(--space-3);
 }
 
 /* Under the alerts while the header's add button is out of view. The page

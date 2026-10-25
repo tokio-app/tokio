@@ -16,6 +16,7 @@ const party = {
   file: "party.gif",
   duration: 5,
   match_video: false,
+  volume: 60,
 };
 
 function setup() {
@@ -136,7 +137,7 @@ describe("useAlertTest", () => {
         file: "party.gif",
         delay: 0.25,
         duration: 5,
-        volume: 80,
+        volume: 60,
       },
     ]);
     // The media's place isn't a sound's length.

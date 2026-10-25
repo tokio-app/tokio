@@ -84,6 +84,17 @@ export const REPEATED_HAZARDS: readonly Hazard[] = [
 ];
 
 /**
+ * The gifts' names joined with " or ", null while the lists don't have any
+ * of them yet. For an id in gifts twice, the first entry wins.
+ */
+export function giftNames(ids: number[], gifts: CustomGift[]): string | null {
+  const names = ids.flatMap(
+    (id) => gifts.find((gift) => gift.value === id)?.label ?? [],
+  );
+  return names.length > 0 ? names.join(" or ") : null;
+}
+
+/**
  * The event's own text on the games overlay: the gifts' names, "100 likes",
  * chat's keyword quoted like the timer's carousel (“tnt”, none without one,
  * as its bubble says chat), or the trigger's label.
@@ -94,11 +105,7 @@ export function gameEventText(action: GameAction, gifts: CustomGift[]) {
   const label = ALERT_TRIGGER_LABELS[trigger.type];
   if (trigger.type === TOKIO_EVENTS.GIFT) {
     if (trigger.gifts.length === 0) return "Any gift";
-    const names = trigger.gifts.flatMap(
-      (id) => gifts.find((gift) => gift.value === id)?.label ?? [],
-    );
-    // Gifts the lists don't have yet, until they load
-    return names.length > 0 ? names.join(" or ") : label;
+    return giftNames(trigger.gifts, gifts) ?? label;
   }
   if (trigger.type === TOKIO_EVENTS.LIKE) {
     return `${likes_every} ${likes_every === 1 ? "like" : "likes"}`;

@@ -125,6 +125,8 @@ export function createAction(edition: MinecraftEdition): GameAction {
       emotes: [],
       keyword: "",
       user: "",
+      min_coins: 0,
+      roles: [],
     },
     likes_every: 100,
     steps: [createStep("spawn")],

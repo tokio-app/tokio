@@ -884,6 +884,8 @@ describe("StoreManagerService", () => {
           emotes: [],
           keyword: "",
           user: "",
+          min_coins: 0,
+          roles: [],
         },
       ]);
     });
@@ -1117,10 +1119,12 @@ describe("StoreManagerService", () => {
           emotes: [],
           keyword: "",
           user: "",
+          min_coins: 0,
+          roles: [],
         },
-        sound,
+        sound: { ...sound, start: 0, end: null },
         tts: null,
-        media: { ...picture, duration: 5, match_video: false },
+        media: { ...picture, duration: 5, match_video: false, volume: 100 },
         volume: 100,
         ...patch,
       });
@@ -1153,6 +1157,7 @@ describe("StoreManagerService", () => {
         ...picture,
         duration: 5,
         match_video: false,
+        volume: 100,
       });
 
       expect(await store.removeFromAlerts("media", "party.png")).toBe(true);
@@ -1190,6 +1195,8 @@ describe("StoreManagerService", () => {
         emotes: [],
         keyword: "",
         user: "",
+        min_coins: 0,
+        roles: [],
       },
       likes_every: 100,
       steps: [],

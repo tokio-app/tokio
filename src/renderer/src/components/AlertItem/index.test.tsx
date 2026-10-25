@@ -1,18 +1,12 @@
-import { Alert, ALERT_TRIGGERS } from "@/common/schemas";
-import {
-  ALERT_TRIGGER_LABELS,
-  AlertTrigger,
-  EMOTE_TRIGGER,
-  TOKIO_EVENTS,
-} from "@/common/types";
+import { Alert } from "@/common/schemas";
+import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import { createAlert } from "@/pages/Alerts/helper";
-import { alertMedia, alertSound, gift, voice } from "@test/fixtures";
-import { inList } from "@test/queries";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { alertClip, alertMedia, gift, voice } from "@test/fixtures";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { AlertItem } from ".";
+import { AlertItem, TriggerFilter, triggerSummary } from ".";
 
 const GIFTS = [gift(5655, "Rose"), gift(6064, "GG")];
 const EMOTES = [
@@ -51,9 +45,8 @@ function setup(item: Alert, props: Partial<Props> = {}) {
     testing: null,
     onTest: vi.fn(),
     onChange: vi.fn(),
+    onEdit: vi.fn(),
     onRemove: vi.fn(),
-    onPickSound: vi.fn(),
-    onPickMedia: vi.fn(),
     ...props,
   };
   const view = render(<AlertItem {...all} />);
@@ -62,17 +55,7 @@ function setup(item: Alert, props: Partial<Props> = {}) {
   return { ...view, ...all, rerender, user: userEvent.setup() };
 }
 
-const labeled = (...types: AlertTrigger[]) =>
-  types.map((type) => ({ type, label: ALERT_TRIGGER_LABELS[type] }));
-
-const FILTERS = ["Any gift", "Any emote", "Any message", "Anyone"];
-
-const filters = () =>
-  FILTERS.filter(
-    (text) =>
-      screen.queryByText(text) !== null ||
-      screen.queryByPlaceholderText(text) !== null,
-  );
+const summary = () => screen.getByTitle("Edit alert");
 
 describe("AlertItem", () => {
   it("can't play an alert with no sound, message or media", async () => {
@@ -85,22 +68,37 @@ describe("AlertItem", () => {
     expect(onTest).not.toHaveBeenCalled();
   });
 
-  it("plays its sound at its volume", async () => {
-    const { user, onTest } = setup(alert({ sound: alertSound("Airhorn") }));
+  it("plays its sound at its volume, the part its cut keeps", async () => {
+    const { user, onTest, unmount } = setup(
+      alert({ sound: alertClip("Airhorn") }),
+    );
 
     await user.click(screen.getByRole("button", { name: "Play" }));
-
     expect(onTest).toHaveBeenCalledWith({
       id: "alert-1",
       file: "airhorn.mp3",
       volume: 80,
+      start: 0,
+    });
+    unmount();
+
+    const cut = setup(
+      alert({ sound: alertClip("Airhorn", { start: 0.5, end: 1.5 }) }),
+    );
+    await user.click(screen.getByRole("button", { name: "Play" }));
+    expect(cut.onTest).toHaveBeenCalledWith({
+      id: "alert-1",
+      file: "airhorn.mp3",
+      volume: 80,
+      start: 0.5,
+      end: 1.5,
     });
   });
 
   it("speaks its message instead of the sound when it has both", async () => {
     const { user, onTest } = setup(
       alert(
-        { sound: alertSound("Airhorn"), tts: TTS },
+        { sound: alertClip("Airhorn"), tts: TTS },
         { type: TOKIO_EVENTS.GIFT },
       ),
     );
@@ -118,7 +116,7 @@ describe("AlertItem", () => {
   it("shows its media with its sound, or alone", async () => {
     const media = alertMedia("Party");
     const { user, onTest, unmount } = setup(
-      alert({ sound: alertSound("Airhorn"), media }),
+      alert({ sound: alertClip("Airhorn"), media }),
     );
 
     await user.click(screen.getByRole("button", { name: "Play" }));
@@ -126,6 +124,7 @@ describe("AlertItem", () => {
       id: "alert-1",
       file: "airhorn.mp3",
       volume: 80,
+      start: 0,
       media,
     });
     unmount();
@@ -140,7 +139,7 @@ describe("AlertItem", () => {
   });
 
   it("shows whether its own test is loading or playing", () => {
-    const { rerender } = setup(alert({ sound: alertSound("Airhorn") }), {
+    const { rerender } = setup(alert({ sound: alertClip("Airhorn") }), {
       testing: { id: "alert-2", loading: false },
     });
     expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
@@ -171,197 +170,127 @@ describe("AlertItem", () => {
     expect(onChange).toHaveBeenCalledWith({ ...item, enabled: false });
   });
 
-  it("changes its volume", () => {
-    const item = alert();
-    const { onChange } = setup(item);
-    const slider = screen.getByRole("slider", { name: "Volume" });
-    expect(slider).toHaveValue("80");
+  it("opens its editor from its summary", async () => {
+    const { user, onEdit } = setup(alert());
 
-    fireEvent.change(slider, { target: { value: "40" } });
+    await user.click(summary());
 
-    expect(onChange).toHaveBeenCalledWith({ ...item, volume: 40 });
+    expect(onEdit).toHaveBeenCalledOnce();
   });
 
-  it("lists every trigger, with Emote right after Chat", async () => {
-    const { user, container } = setup(alert());
-
-    await user.click(screen.getByRole("combobox", { name: "Trigger" }));
-
-    const listed = ALERT_TRIGGERS.map((trigger) =>
-      inList(container, ALERT_TRIGGER_LABELS[trigger]),
-    );
-    expect(listed).not.toContain(null);
-    for (let i = 1; i < listed.length; i++) {
-      expect(listed[i - 1]!.compareDocumentPosition(listed[i]!)).toBe(
-        Node.DOCUMENT_POSITION_FOLLOWING,
-      );
-    }
-    expect(ALERT_TRIGGERS.indexOf(EMOTE_TRIGGER)).toBe(
-      ALERT_TRIGGERS.indexOf(TOKIO_EVENTS.CHAT) + 1,
-    );
-  });
-
-  it("changes its trigger and keeps the trigger's filters", async () => {
-    const item = alert({}, { gifts: [5655], keyword: "hello" });
-    const { user, container, onChange } = setup(item);
-
-    await user.click(within(container).getByText("Follow"));
-    await user.click(inList(container, "Gift")!);
-
-    expect(onChange).toHaveBeenCalledWith({
-      ...item,
-      trigger: { ...item.trigger, type: TOKIO_EVENTS.GIFT },
-    });
-  });
-
-  it("narrows a gift alert to the gifts picked", async () => {
-    const item = alert({}, { type: TOKIO_EVENTS.GIFT });
-    const { user, onChange } = setup(item);
-    expect(filters()).toEqual(["Any gift"]);
-
-    await user.click(screen.getByRole("button", { name: "Any gift" }));
-    const picker = within(screen.getByRole("dialog"));
-    await user.click(picker.getByTitle("GG"));
-    await user.click(picker.getByRole("button", { name: "Done" }));
-
-    expect(onChange).toHaveBeenCalledWith({
-      ...item,
-      trigger: { ...item.trigger, gifts: [6064] },
-    });
-  });
-
-  it("shows the gifts a gift alert is narrowed to", () => {
-    const { container } = setup(
-      alert({}, { type: TOKIO_EVENTS.GIFT, gifts: [5655] }),
+  it("sums up what sets it off", () => {
+    setup(
+      alert(
+        {},
+        {
+          type: TOKIO_EVENTS.GIFT,
+          gifts: [5655, 6064],
+          roles: ["moderator"],
+        },
+      ),
     );
 
-    expect(within(container).getByText("Rose")).toBeInTheDocument();
-    expect(within(container).queryByText("GG")).not.toBeInTheDocument();
-  });
-
-  it("plays a gift alert when the streak ends, or on every gift", async () => {
-    const item = alert({}, { type: TOKIO_EVENTS.GIFT });
-    const { user, container, onChange } = setup(item);
-    const plays = screen.getByRole("combobox", { name: "When it plays" });
-    expect(plays).toHaveTextContent("When streak ends");
-
-    await user.click(plays);
-    await user.click(inList(container, "Every gift")!);
-
-    expect(onChange).toHaveBeenCalledWith({
-      ...item,
-      trigger: { ...item.trigger, every_gift: true },
-    });
-  });
-
-  it("narrows an emote alert to the emotes picked", async () => {
-    const item = alert({}, { type: EMOTE_TRIGGER, emotes: ["emote-1"] });
-    const { user, onChange } = setup(item);
-
-    await user.click(screen.getByRole("button", { name: "Emote 1" }));
-    const picker = within(screen.getByRole("dialog"));
-    await user.click(picker.getByTitle("Emote 2"));
-    await user.click(picker.getByRole("button", { name: "Done" }));
-
-    expect(onChange).toHaveBeenCalledWith({
-      ...item,
-      trigger: { ...item.trigger, emotes: ["emote-1", "emote-2"] },
-    });
-  });
-
-  it("says an emote alert without emotes plays for any", () => {
-    setup(alert({}, { type: EMOTE_TRIGGER }));
-
-    expect(filters()).toEqual(["Any emote"]);
-  });
-
-  it("narrows a chat alert to a keyword", async () => {
-    const item = alert({}, { type: TOKIO_EVENTS.CHAT, keyword: "hell" });
-    const { user, onChange } = setup(item);
-    expect(filters()).toEqual(["Any message"]);
-    const keyword = screen.getByPlaceholderText("Any message");
-    expect(keyword).toHaveValue("hell");
-
-    await user.type(keyword, "o");
-
-    expect(onChange).toHaveBeenCalledWith({
-      ...item,
-      trigger: { ...item.trigger, keyword: "hello" },
-    });
-  });
-
-  it.each(labeled(TOKIO_EVENTS.MEMBER_JOIN, TOKIO_EVENTS.SUPER_FAN_JOIN))(
-    "narrows a $label alert to a viewer",
-    async ({ type }) => {
-      const item = alert({}, { type });
-      const { user, onChange } = setup(item);
-      expect(filters()).toEqual(["Anyone"]);
-
-      await user.type(screen.getByPlaceholderText("Anyone"), "@");
-
-      expect(onChange).toHaveBeenCalledWith({
-        ...item,
-        trigger: { ...item.trigger, user: "@" },
-      });
-    },
-  );
-
-  it.each(
-    labeled(
-      TOKIO_EVENTS.FOLLOW,
-      TOKIO_EVENTS.LIKE,
-      TOKIO_EVENTS.SHARE,
-      TOKIO_EVENTS.MUSIC_CHANGE,
-    ),
-  )("has nothing to narrow a $label alert to", ({ type }) => {
-    setup(alert({}, { type }));
-
-    expect(filters()).toEqual([]);
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(summary()).toHaveTextContent("Gift");
     expect(
-      screen.queryByRole("combobox", { name: "When it plays" }),
-    ).not.toBeInTheDocument();
+      screen.getByText("Rose or GG, when the streak ends, from Moderators"),
+    ).toBeInTheDocument();
   });
 
-  it("names its sound, or asks for one", async () => {
-    const { user, onPickSound, unmount } = setup(alert());
-
-    await user.click(screen.getByRole("button", { name: "Select a sound..." }));
-    expect(onPickSound).toHaveBeenCalledOnce();
+  it("names its sound and how long it plays, or says it has none", () => {
+    const { unmount } = setup(alert());
+    expect(summary()).toHaveTextContent("No sound");
+    expect(summary()).toHaveTextContent("No media");
     unmount();
 
-    setup(alert({ sound: alertSound("Airhorn") }));
-    expect(screen.getByRole("button", { name: "Airhorn" })).toHaveAttribute(
-      "title",
-      "Airhorn",
+    const cut = setup(
+      alert({
+        sound: alertClip("Airhorn", { start: 3, end: 8 }),
+        media: alertMedia("Party", { duration: 9 }),
+      }),
     );
+    expect(summary()).toHaveTextContent("Airhorn");
+    // The cut's part, without reading the file
+    expect(summary()).toHaveTextContent("5s");
+    expect(cut.container.querySelector("audio")).toBeNull();
+    expect(summary()).toHaveTextContent("Party");
+    expect(summary()).toHaveTextContent("9s");
+    cut.unmount();
+
+    // To the end, from the file's length
+    const { container } = setup(
+      alert({ sound: alertClip("Airhorn", { start: 3 }) }),
+    );
+    const audio = container.querySelector("audio")!;
+    expect(audio.getAttribute("src")).toBe("tokio-media:///sounds/airhorn.mp3");
+    Object.defineProperty(audio, "duration", { value: 10 });
+    fireEvent.loadedMetadata(audio);
+    expect(summary()).toHaveTextContent("7s");
   });
 
-  it("names its media, or asks for some", async () => {
-    const { user, onPickMedia, unmount } = setup(alert());
+  it("names its message when it speaks one", () => {
+    setup(alert({ sound: alertClip("Airhorn"), tts: TTS }));
 
-    await user.click(screen.getByRole("button", { name: "Select media..." }));
-    expect(onPickMedia).toHaveBeenCalledOnce();
-    unmount();
+    expect(summary()).toHaveTextContent("“Thanks {username}!”");
+    expect(summary()).not.toHaveTextContent("Airhorn");
+  });
+});
 
-    setup(alert({ media: alertMedia("Party") }));
-    expect(screen.getByRole("button", { name: "Party" })).toHaveAttribute(
-      "title",
-      "Party",
+describe("triggerSummary", () => {
+  const sum = (trigger: Partial<Alert["trigger"]>) =>
+    triggerSummary(alert({}, trigger).trigger, GIFTS, EMOTES);
+
+  it("counts the coins only for any gift", () => {
+    expect(sum({ type: TOKIO_EVENTS.GIFT, min_coins: 100 })).toBe(
+      "Any gift, when the streak ends, worth 100+ coins",
     );
+    expect(
+      sum({ type: TOKIO_EVENTS.GIFT, gifts: [5655], min_coins: 100 }),
+    ).toBe("Rose, when the streak ends");
   });
 
-  it("names its message when it speaks one", async () => {
-    const { user, onPickSound } = setup(
-      alert({ sound: alertSound("Airhorn"), tts: TTS }),
+  it("says what each filter narrows the trigger to", () => {
+    expect(sum({ type: TOKIO_EVENTS.GIFT, every_gift: true })).toBe(
+      "Any gift, every gift",
+    );
+    expect(sum({ type: EMOTE_TRIGGER })).toBe("Any emote");
+    expect(sum({ type: EMOTE_TRIGGER, emotes: ["emote-2"] })).toBe("Emote 2");
+    expect(sum({ type: TOKIO_EVENTS.CHAT, keyword: " hi " })).toBe(
+      "Messages with “hi”",
+    );
+    expect(sum({ type: TOKIO_EVENTS.MEMBER_JOIN, user: "@viewer" })).toBe(
+      "Only @viewer",
+    );
+    expect(sum({ type: TOKIO_EVENTS.FOLLOW })).toBe("");
+  });
+
+  it("names the roles, but not for follows or events without a viewer", () => {
+    const roles: Alert["trigger"]["roles"] = ["follower", "superfan"];
+
+    expect(sum({ type: TOKIO_EVENTS.SHARE, roles })).toBe(
+      "From Followers or Super Fans",
+    );
+    expect(sum({ type: TOKIO_EVENTS.FOLLOW, roles })).toBe("");
+    expect(sum({ type: TOKIO_EVENTS.ENVELOPE, roles })).toBe("");
+  });
+
+  it("counts on gifts the lists don't have yet", () => {
+    expect(sum({ type: TOKIO_EVENTS.GIFT, gifts: [1] })).toBe(
+      "Some gifts, when the streak ends",
+    );
+  });
+});
+
+describe("TriggerFilter", () => {
+  it("has nothing for a trigger without a filter", () => {
+    const { container } = render(
+      <TriggerFilter
+        trigger={alert().trigger}
+        gifts={GIFTS}
+        emotes={EMOTES}
+        onChange={vi.fn()}
+      />,
     );
 
-    const button = screen.getByRole("button", {
-      name: "TTS: Thanks {username}!",
-    });
-    expect(screen.queryByText("Airhorn")).not.toBeInTheDocument();
-
-    await user.click(button);
-    expect(onPickSound).toHaveBeenCalledOnce();
+    expect(container).toBeEmptyDOMElement();
   });
 });

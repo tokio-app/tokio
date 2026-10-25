@@ -1,4 +1,5 @@
 import type {
+  Alert,
   AlertMedia,
   AlertSound,
   CatalogOverlay,
@@ -70,6 +71,17 @@ export const alertSound = (name: string): AlertSound => ({
   file: `${slug(name)}.mp3`,
 });
 
+// A sound as an alert has it, whole unless cut
+export const alertClip = (
+  name: string,
+  cut: Partial<Pick<NonNullable<Alert["sound"]>, "start" | "end">> = {},
+): NonNullable<Alert["sound"]> => ({
+  ...alertSound(name),
+  start: 0,
+  end: null,
+  ...cut,
+});
+
 // An image in the media library
 export const mediaFile = (name: string): MediaFile => ({
   name,
@@ -84,6 +96,7 @@ export const alertMedia = (
   ...(typeof file === "string" ? mediaFile(file) : file),
   duration: 5,
   match_video: false,
+  volume: 100,
   ...patch,
 });
 

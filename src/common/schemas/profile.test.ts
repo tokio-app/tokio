@@ -84,6 +84,55 @@ describe("ProfileSchema", () => {
     steps: [],
   };
 
+  it("plays an alert saved before cuts whole, for anyone and any gift", () => {
+    const saved = {
+      ...defaultProfile,
+      alerts: {
+        ...defaultProfile.alerts,
+        items: [
+          {
+            id: "alert-1",
+            enabled: true,
+            trigger: { ...oldAction.trigger, type: TOKIO_EVENTS.GIFT },
+            sound: { name: "Ding", file: "ding.mp3" },
+            volume: 80,
+          },
+        ],
+      },
+    };
+
+    const [alert] = ProfileSchema.parse(saved).alerts.items;
+
+    expect(alert.sound).toEqual({
+      name: "Ding",
+      file: "ding.mp3",
+      start: 0,
+      end: null,
+    });
+    expect(alert.trigger).toMatchObject({ min_coins: 0, roles: [] });
+  });
+
+  it("plays media saved before it had a volume at the alert's", () => {
+    const media = { name: "Clip", file: "clip.webm", duration: 5 };
+    const alert = (volume: number, saved: object) => ({
+      id: "alert-1",
+      enabled: true,
+      trigger: { ...oldAction.trigger, type: TOKIO_EVENTS.FOLLOW },
+      sound: null,
+      media: saved,
+      volume,
+    });
+    const parse = (...items: object[]) =>
+      ProfileSchema.parse({
+        ...defaultProfile,
+        alerts: { ...defaultProfile.alerts, items },
+      }).alerts.items.map((item) => item.media?.volume);
+
+    expect(
+      parse(alert(40, media), alert(40, { ...media, volume: 90 })),
+    ).toEqual([40, 90]);
+  });
+
   it("makes a game action saved before Java a Bedrock one", () => {
     expect(GameActionSchema.parse(oldAction).edition).toBe("bedrock");
   });

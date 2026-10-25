@@ -1,57 +1,114 @@
-/* --alerts-columns is defined by the Alerts page so rows line up with its header */
 .row {
   display: grid;
-  grid-template-columns: var(--alerts-columns);
-  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
 }
 
 .row + .row {
   border-top: 1px solid var(--border);
 }
 
-.cell {
-  display: flex;
+/* What sets it off, what it plays and what it shows. The trigger takes the
+   most room, as its sentence grows with its conditions. */
+.summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 16px;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  width: 100%;
-  min-height: var(--control-height);
+  gap: var(--space-4);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--font-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
 }
 
+.summary:hover {
+  background-color: var(--background-secondary-hover);
+}
+
+.part {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--font-md);
+  font-weight: 500;
+}
+
+.detail {
+  font-size: var(--font-sm);
+  color: var(--font-secondary);
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--font-md);
+}
+
+.line > svg {
+  flex: none;
+  color: var(--font-secondary);
+}
+
+.text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media_text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* A video's first frame or the image, the picker's thumbnail made small */
+.thumb {
+  flex: none;
+  width: 48px;
+}
+
+.none {
+  font-size: var(--font-md);
+  color: var(--font-muted);
+}
+
+/* Says the row opens its editor, once it's pointed at */
+.edit {
+  color: var(--font-secondary);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.summary:hover .edit,
+.summary:focus-visible .edit {
+  opacity: 1;
+}
+
+/* The filter's fields */
 .fill {
   width: 100%;
 }
 
-/* A gift alert's gifts, with when it plays under them */
+/* A gift trigger's gifts, with when it plays under them */
 .stack {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   width: 100%;
-}
-
-.delimiter {
-  width: 100%;
-  height: 1px;
-  background-color: var(--border);
-}
-
-/* A button that reads as a field, padded like one */
-.cell .sound {
-  width: 100%;
-  padding: 0 var(--space-3);
-  justify-content: flex-start;
-  font-weight: 400;
-  font-size: var(--font-md);
-}
-
-.sound_name {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }

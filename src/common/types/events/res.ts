@@ -3,7 +3,6 @@ import { MyInstantsSound } from "../alerts";
 import { TokioPayload } from "../connector";
 import { CustomGift, OverlayConfigRedux } from "../overlay";
 import {
-  Alert,
   AlertMedia,
   AlertSound,
   CatalogOverlay,
@@ -94,6 +93,7 @@ export enum APP_EVENTS_RESPONSE {
   ALERT_AUDIO = "app:alerts:audio",
   ALERT_CLEAR = "app:alerts:clear",
   TEST_ALERT = "app:alerts:res:test",
+  SOUND_DATA = "app:alerts:res:sound:data",
   UPDATE_ALERTS_SETTINGS = "app:alerts:res:update:settings",
   SEARCH_SOUNDS = "app:alerts:res:search:sounds",
   SET_ALERT_SOUND = "app:alerts:res:set:sound",
@@ -303,9 +303,18 @@ export interface AppEventsResponseMap {
     media?: AlertMedia;
     // How many times it plays in a row, 1 when missing
     repeat?: number;
+    // The part of the sound that plays, in seconds: from its start and to
+    // its end when missing
+    start?: number;
+    end?: number;
   };
   // Drops queued and playing alert sounds
   [APP_EVENTS_RESPONSE.ALERT_CLEAR]: void;
+  // The file is the sound asked for, failures included
+  [APP_EVENTS_RESPONSE.SOUND_DATA]: Reply<{
+    file: string;
+    data?: Uint8Array;
+  }>;
   [APP_EVENTS_RESPONSE.TEST_ALERT]: Reply<{
     id: string;
     data?: Uint8Array;
@@ -324,7 +333,7 @@ export interface AppEventsResponseMap {
     id: string;
     // The DOWNLOAD_SOUND or IMPORT_SOUND request this answers
     request: number;
-    sound?: Alert["sound"];
+    sound?: AlertSound;
   }>;
   [APP_EVENTS_RESPONSE.SET_ALERT_MEDIA]: Reply<{
     id: string;

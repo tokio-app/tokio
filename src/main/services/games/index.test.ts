@@ -67,6 +67,8 @@ const trigger = (
   emotes: [],
   keyword: "",
   user: "",
+  min_coins: 0,
+  roles: [],
   ...filters,
 });
 

@@ -1,4 +1,10 @@
-import { Alert, MEDIA_DURATION, MediaFile, SavedEmote } from "@/common/schemas";
+import {
+  Alert,
+  AlertSound,
+  MEDIA_DURATION,
+  MediaFile,
+  SavedEmote,
+} from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, CustomGift } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import { Btn, MediaPicker, Page, SoundPicker } from "@/components";
@@ -9,10 +15,17 @@ import {
   useIpcListener,
   useIpcRequest,
 } from "@/hooks";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MdOutlineAddAlert } from "react-icons/md";
+import { AlertEditor } from "./AlertEditor";
 import styles from "./alerts.module.css";
-import { createAlert, ttsDefaultsOf } from "./helper";
+import {
+  createAlert,
+  emoteOptions,
+  giftOptions,
+  soundClip,
+  ttsDefaultsOf,
+} from "./helper";
 import { HeaderSection } from "./sections/HeaderSection";
 import { ItemsSection } from "./sections/ItemsSection";
 
@@ -25,6 +38,8 @@ export function Alerts() {
   const [ttsDefaults, setTtsDefaults] = useState(() =>
     ttsDefaultsOf(defaultProfile.tts),
   );
+  // Id of the alert being edited
+  const [editing, setEditing] = useState<string | null>(null);
   // Id of the alert whose sound is being picked
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   // Alerts waiting for main to save a sound. A pick made since drops the
@@ -50,6 +65,12 @@ export function Alerts() {
 
   const { setItemGain } = useAudio();
   const test = useAlertTest();
+
+  const giftChoices = useMemo(
+    () => giftOptions(gifts, customGifts),
+    [gifts, customGifts],
+  );
+  const emoteChoices = useMemo(() => emoteOptions(emotes), [emotes]);
 
   useIpcRequest(APP_EVENTS.GET_GIFTS);
   useIpcRequest(APP_EVENTS.GET_CUSTOM_GIFTS);
@@ -83,16 +104,24 @@ export function Alerts() {
   });
 
   // An alert plays a sound or speaks a message, picking one drops the other.
-  const setOutput = (id: string, output: Pick<Alert, "sound" | "tts">) => {
+  const setOutput = (
+    id: string,
+    { sound, tts }: { sound: AlertSound | null; tts: Alert["tts"] },
+  ) => {
     update((s) => {
       const alert = s.items.find((a) => a.id === id);
-      if (alert) Object.assign(alert, output);
+      if (!alert) return;
+      alert.sound = sound && soundClip(sound, alert.sound);
+      alert.tts = tts;
     });
     // A download for another alert can finish while this picker is open
     setPickerFor((current) => (current === id ? null : current));
   };
 
-  const pick = (id: string, output: Pick<Alert, "sound" | "tts">) => {
+  const pick = (
+    id: string,
+    output: { sound: AlertSound | null; tts: Alert["tts"] },
+  ) => {
     asked.current.delete(id);
     setOutput(id, output);
   };
@@ -105,7 +134,7 @@ export function Alerts() {
     setOutput(res.id, { sound: res.sound, tts: null });
   });
 
-  // Another file keeps the alert's duration.
+  // Another file keeps the alert's duration and volume.
   const setMedia = (id: string, file: MediaFile | null) => {
     update((s) => {
       const alert = s.items.find((a) => a.id === id);
@@ -114,8 +143,11 @@ export function Alerts() {
         ...file,
         duration: alert.media?.duration ?? MEDIA_DURATION,
         match_video: alert.media?.match_video ?? false,
+        volume: alert.media?.volume ?? 100,
       };
     });
+    // A browsed file can arrive while another alert's picker is open
+    setMediaFor((current) => (current === id ? null : current));
   };
 
   const pickMedia = (id: string, file: MediaFile | null) => {
@@ -146,6 +178,7 @@ export function Alerts() {
     });
   }, [settings.items, setItemGain]);
 
+  const editAlert = settings.items.find((a) => a.id === editing);
   const pickerAlert = settings.items.find((a) => a.id === pickerFor);
   const mediaAlert = settings.items.find((a) => a.id === mediaFor);
 
@@ -162,14 +195,12 @@ export function Alerts() {
 
         <ItemsSection
           items={settings.items}
-          gifts={gifts}
-          customGifts={customGifts}
-          emotes={emotes}
+          gifts={giftChoices}
+          emotes={emoteChoices}
           testing={test.testing}
           onTest={test.toggle}
           update={update}
-          onPickSound={setPickerFor}
-          onPickMedia={setMediaFor}
+          onEdit={setEditing}
         />
 
         {!headerAddShown && (
@@ -180,6 +211,26 @@ export function Alerts() {
         )}
       </Page>
 
+      {editAlert && (
+        <AlertEditor
+          alert={editAlert}
+          gifts={giftChoices}
+          emotes={emoteChoices}
+          testing={test.testing}
+          onTest={test.toggle}
+          onChange={(changed) =>
+            update((s) => {
+              const index = s.items.findIndex((a) => a.id === changed.id);
+              if (index !== -1) s.items[index] = changed;
+            })
+          }
+          onPickSound={() => setPickerFor(editAlert.id)}
+          onPickMedia={() => setMediaFor(editAlert.id)}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
+      {/* Over the editor */}
       {pickerAlert && (
         <SoundPicker
           alert={pickerAlert}
@@ -203,18 +254,6 @@ export function Alerts() {
           alert={mediaAlert}
           onRequest={() => askedMedia.current.add(mediaAlert.id)}
           onSelect={(file) => pickMedia(mediaAlert.id, file)}
-          onDuration={(duration) =>
-            update((s) => {
-              const media = s.items.find((a) => a.id === mediaAlert.id)?.media;
-              if (media) media.duration = duration;
-            })
-          }
-          onMatch={(match) =>
-            update((s) => {
-              const media = s.items.find((a) => a.id === mediaAlert.id)?.media;
-              if (media) media.match_video = match;
-            })
-          }
           onClose={() => setMediaFor(null)}
         />
       )}

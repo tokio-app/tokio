@@ -140,6 +140,26 @@ describe("AppProvider", () => {
     });
   });
 
+  it("plays the part of an alert's sound its cut keeps", async () => {
+    const audio = setup();
+
+    await send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
+      data,
+      volume: 100,
+      channel: "alerts",
+      maxQueueLength: 3,
+      id: "alert-1",
+      key: "airhorn.mp3",
+      start: 0.5,
+      end: 1.5,
+    });
+
+    expect(audio.queue("alerts").enqueue).toHaveBeenCalledWith(
+      data,
+      expect.objectContaining({ start: 0.5, end: 1.5 }),
+    );
+  });
+
   it("queues the copies main asks for, sharing one decode", async () => {
     const audio = setup();
     vi.mocked(forgetDecoded).mockClear();
@@ -195,13 +215,14 @@ describe("AppProvider", () => {
     );
   });
 
-  it("shows an alert's media on its overlay when the alert's turn comes", async () => {
+  it("shows an alert's media on its overlay when the alert's turn comes, at its own volume", async () => {
     const audio = setup();
     const media = {
       name: "Party",
       file: "party.gif",
       duration: 5,
       match_video: false,
+      volume: 70,
     };
 
     await send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
@@ -221,7 +242,7 @@ describe("AppProvider", () => {
 
     options?.onScheduled?.(1.5, 6);
     expect(sent(APP_EVENTS.SHOW_ALERT_MEDIA)).toEqual([
-      { id: "alert-1", file: "party.gif", delay: 1.5, duration: 6, volume: 40 },
+      { id: "alert-1", file: "party.gif", delay: 1.5, duration: 6, volume: 70 },
     ]);
   });
 
@@ -238,6 +259,7 @@ describe("AppProvider", () => {
         file: "party.gif",
         duration: 5,
         match_video: false,
+        volume: 100,
       },
     });
 
