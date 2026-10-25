@@ -240,6 +240,32 @@ describe("Games", () => {
     ]);
   });
 
+  it("runs on every event but the joins, envelopes, Super Fan Boxes and song changes", async () => {
+    const { user } = await load([action("a1")]);
+
+    await user.click(panels()[0].getByText("Follow"));
+
+    for (const left of [
+      "Super Fan Join",
+      "Member Join",
+      "Envelope",
+      "Super Fan Box",
+      "Music Change",
+    ]) {
+      expect(inList(panelElements()[0], left)).toBeNull();
+    }
+    for (const kept of [
+      "Chat",
+      "Emote",
+      "Share",
+      "Gift",
+      "Like",
+      "Super Fan",
+    ]) {
+      expect(inList(panelElements()[0], kept)).not.toBeNull();
+    }
+  });
+
   it("says when there are no actions", async () => {
     await load([]);
 

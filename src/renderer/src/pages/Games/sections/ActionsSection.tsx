@@ -22,7 +22,6 @@ import {
   Section,
   Select,
   Toggle,
-  TRIGGER_OPTIONS,
   TriggerFilter,
   VariableList,
 } from "@/components";
@@ -42,6 +41,7 @@ import {
   createAction,
   createStep,
   EDITIONS,
+  GAME_TRIGGERS,
   ITEMS,
   MOBS,
   STEP_KINDS,
@@ -193,7 +193,7 @@ function ActionItem({
         <Select
           className={styles.trigger}
           aria-label="Trigger"
-          options={TRIGGER_OPTIONS}
+          options={GAME_TRIGGERS}
           value={trigger.type}
           onChange={(type) =>
             onChange({ ...action, trigger: { ...trigger, type } })

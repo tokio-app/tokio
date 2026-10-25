@@ -11,7 +11,7 @@ import {
   TIME_NAMES,
   WEATHER_NAMES,
 } from "@/common/util";
-import { SelectOption } from "@/components";
+import { SelectOption, TRIGGER_OPTIONS } from "@/components";
 
 export type StepKind = GameStep["type"];
 type Step<K extends StepKind> = Extract<GameStep, { type: K }>;
@@ -39,6 +39,19 @@ export const ITEMS: Record<MinecraftEdition, SelectOption<string>[]> = {
   bedrock: options(MINECRAFT_NAMES.bedrock.items),
   java: options(MINECRAFT_NAMES.java.items),
 };
+
+// The events an action can run on: the alerts' but the joins, envelopes,
+// Super Fan Boxes and song changes
+const LEFT_OUT: string[] = [
+  TOKIO_EVENTS.SUPER_FAN_JOIN,
+  TOKIO_EVENTS.MEMBER_JOIN,
+  TOKIO_EVENTS.ENVELOPE,
+  TOKIO_EVENTS.SUPER_FAN_BOX,
+  TOKIO_EVENTS.MUSIC_CHANGE,
+];
+export const GAME_TRIGGERS = TRIGGER_OPTIONS.filter(
+  ({ value }) => !LEFT_OUT.includes(value),
+);
 
 // The first words of each step's sentence
 export const STEP_KINDS: SelectOption<StepKind>[] = [
