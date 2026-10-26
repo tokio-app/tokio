@@ -350,14 +350,14 @@ export const GameActionSchema = z.object({
 });
 
 // Every shown action at once, or one at a time in turn
-export const GAMES_OVERLAY_LAYOUTS = ["list", "carousel"] as const;
+const GAMES_OVERLAY_LAYOUTS = ["list", "carousel"] as const;
 
 // The event, an arrow, then the action's picture; or the event's picture on
 // the corner of the action's, like a sticker
-export const GAMES_OVERLAY_FORMATS = ["arrow", "sticker"] as const;
+const GAMES_OVERLAY_FORMATS = ["arrow", "sticker"] as const;
 
 // How large the event's pictures (gifts, emotes, Tokio's own) show
-export const GAMES_OVERLAY_SIZES = ["small", "medium", "large"] as const;
+const GAMES_OVERLAY_SIZES = ["small", "medium", "large"] as const;
 
 // How the games overlay looks
 export const GamesOverlaySchema = z.object({
