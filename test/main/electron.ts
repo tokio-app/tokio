@@ -217,6 +217,20 @@ export class FakeTray extends EventEmitter {
   }
 }
 
+/** A system notification: tests click it with emit("click"). */
+export class FakeNotification extends EventEmitter {
+  static isSupported() {
+    return true;
+  }
+
+  readonly show = vi.fn();
+
+  constructor(readonly options: { title?: string; body?: string }) {
+    super();
+    fakes.created.notifications.push(this);
+  }
+}
+
 type RequestListener = (
   details: { url: string; resourceType: string },
   callback: (response: { cancel: boolean }) => void,
@@ -233,6 +247,7 @@ function createFakes() {
       windows: [] as FakeBrowserWindow[],
       views: [] as FakeWebContentsView[],
       trays: [] as FakeTray[],
+      notifications: [] as FakeNotification[],
     },
     ipcMain: new EventEmitter(),
     ipcRenderer: Object.assign(new EventEmitter(), {
@@ -351,6 +366,7 @@ export {
   FakeBrowserWindow as BrowserWindow,
   FakeWebContentsView as WebContentsView,
   FakeTray as Tray,
+  FakeNotification as Notification,
 };
 
 /** The windows created in this test, oldest first. */
@@ -361,6 +377,9 @@ export const views = () => [...fakes.created.views];
 
 /** The tray icons created in this test, oldest first. */
 export const trays = () => [...fakes.created.trays];
+
+/** The notifications created in this test, oldest first. */
+export const notifications = () => [...fakes.created.notifications];
 
 // restoreMocks only restores spies, so the fakes' calls and implementations
 // would carry over to the next test.
@@ -379,6 +398,7 @@ export function resetElectron() {
   fakes.created.windows.length = 0;
   fakes.created.views.length = 0;
   fakes.created.trays.length = 0;
+  fakes.created.notifications.length = 0;
   ipcMain.removeAllListeners();
   ipcRenderer.removeAllListeners();
   app.removeAllListeners();
