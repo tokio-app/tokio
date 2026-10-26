@@ -529,6 +529,26 @@ describe("GamesService", () => {
         ]);
       });
 
+      it("drops the rest quietly when Minecraft is turned off midway", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        minecraft.send.mockImplementation(async (command) => {
+          minecraft.sent.push(command);
+          minecraft.set({ state: "off" });
+          return { command, ok: false, message: "Minecraft disconnected." };
+        });
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [everyGift()],
+        });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toEqual(["each 300"]);
+        expect(onError).not.toHaveBeenCalled();
+      });
+
       it("skips new runs once an action has MAX_BACKLOG waiting", async () => {
         vi.useFakeTimers();
         const minecraft = fakeMinecraft();

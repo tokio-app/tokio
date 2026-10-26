@@ -386,6 +386,8 @@ export class GamesService extends Service {
         this._onRun?.(action);
         const failed = (await this._send(batch.commands)).find((r) => !r.ok);
         if (failed) {
+          // Turned off midway, which failed what the game hadn't answered
+          if (["off", "error"].includes(this._minecraft.status.state)) break;
           // A game that left or was replaced midway fails the commands it
           // hadn't answered, and drops the rest
           const offline = this._unreachable(action.edition) !== undefined;
