@@ -30,6 +30,7 @@ export class EdgeTTS extends TTSProvider {
   public readonly label = "Edge";
   private _config: EdgeConfig;
   private _voices: { list: ProviderVoice[]; fetchedAt: number } | null = null;
+  private _listing?: Promise<unknown>;
 
   constructor(overrides?: EdgeConfigOverrides) {
     super();
@@ -77,6 +78,12 @@ export class EdgeTTS extends TTSProvider {
     lang?: string,
     voice?: string,
   ): Promise<GenerationResponse> {
+    // The fallback needs the list; a failed fetch speaks as given and the next message tries again
+    if (!this._voices) {
+      await (this._listing ??= this.getVoices().catch(() => {
+        this._listing = undefined;
+      }));
+    }
     try {
       const buffer = await synthesize(
         this._config,
