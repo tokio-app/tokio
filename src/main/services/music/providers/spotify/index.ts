@@ -9,8 +9,6 @@ import config from "./config";
 
 export class Spotify extends MusicProvider {
   private _clientId: string;
-  private _redirectUri: string;
-  private _scopes: string;
   private _accessToken: string | null = null;
   private _refreshToken: string | null = null;
   private _cachedDeviceId: string | null = null;
@@ -25,11 +23,9 @@ export class Spotify extends MusicProvider {
   // The login window of the last connect
   private _authWindow: BrowserWindow | null = null;
 
-  constructor(clientId?: string, redirectUri?: string) {
+  constructor(clientId?: string) {
     super();
     this._clientId = clientId ?? "";
-    this._redirectUri = redirectUri ?? config.CALLBACK;
-    this._scopes = config.SCOPES;
   }
 
   // Trimmed, since a pasted Client ID with a space breaks the authorize URL
@@ -81,10 +77,10 @@ export class Spotify extends MusicProvider {
       const authUrl = new URL(config.AUTHORIZE_URL);
       authUrl.searchParams.append("client_id", this._clientId);
       authUrl.searchParams.append("response_type", "code");
-      authUrl.searchParams.append("redirect_uri", this._redirectUri);
+      authUrl.searchParams.append("redirect_uri", config.CALLBACK);
       authUrl.searchParams.append("code_challenge_method", "S256");
       authUrl.searchParams.append("code_challenge", codeChallenge);
-      authUrl.searchParams.append("scope", this._scopes);
+      authUrl.searchParams.append("scope", config.SCOPES);
 
       authView.webContents.loadURL(authUrl.toString());
       shellWindow.show();
@@ -105,7 +101,7 @@ export class Spotify extends MusicProvider {
       shellWindow.once("closed", handleUserAbort);
 
       const handleRedirect = async (url: string) => {
-        if (isProcessing || !url.startsWith(this._redirectUri)) return;
+        if (isProcessing || !url.startsWith(config.CALLBACK)) return;
         isProcessing = true;
 
         shellWindow.off("closed", handleUserAbort);
@@ -146,14 +142,14 @@ export class Spotify extends MusicProvider {
       };
 
       authView.webContents.on("will-redirect", (event, url) => {
-        if (url.startsWith(this._redirectUri)) {
+        if (url.startsWith(config.CALLBACK)) {
           event.preventDefault();
           handleRedirect(url);
         }
       });
 
       authView.webContents.on("will-navigate", (event, url) => {
-        if (url.startsWith(this._redirectUri)) {
+        if (url.startsWith(config.CALLBACK)) {
           event.preventDefault();
           handleRedirect(url);
         }
@@ -241,7 +237,7 @@ export class Spotify extends MusicProvider {
       client_id: this._clientId,
       grant_type: "authorization_code",
       code: code,
-      redirect_uri: this._redirectUri,
+      redirect_uri: config.CALLBACK,
       code_verifier: verifier,
     });
 
