@@ -117,6 +117,8 @@ export class TTSService extends ProviderService<TTSProvider> {
     // In any case: phone keyboards often capitalize the first letter
     const { trigger } = settings.format;
     if (trigger.mode !== "any") {
+      // A blank command would match every message
+      if (!trigger.value.trim()) return false;
       const start = chat.comment.content.slice(0, trigger.value.length);
       if (start.toLowerCase() !== trigger.value.toLowerCase()) return false;
     }

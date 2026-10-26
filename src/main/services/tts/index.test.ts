@@ -231,6 +231,16 @@ describe("TTSService", () => {
       expect(await say("!Tts hi", s)).toEqual(["hi"]);
     });
 
+    it("reads nothing with a blank custom command", async () => {
+      const s = settings((s) => {
+        s.format.trigger = { mode: "custom", value: " " };
+      });
+
+      expect(await say("hello", s)).toEqual([]);
+      s.format.trigger.value = "";
+      expect(await say("hello", s)).toEqual([]);
+    });
+
     it("skips a comment with only the trigger", async () => {
       const s = settings((s) => {
         s.format.trigger = { mode: "custom", value: "!tts" };

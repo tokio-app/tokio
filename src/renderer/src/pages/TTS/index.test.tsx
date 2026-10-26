@@ -329,8 +329,13 @@ describe("TTS", () => {
 
     await user.click(mode(/Custom Command/));
     expect(customTrigger()).toBeEnabled();
-    expect(customTrigger()).toHaveValue("");
+    expect(customTrigger()).toHaveValue("!tts");
+    expect((await saved()).format.trigger).toEqual({
+      mode: "custom",
+      value: "!tts",
+    });
 
+    await user.clear(customTrigger());
     await user.type(customTrigger(), "!speak");
     expect((await saved()).format.trigger).toEqual({
       mode: "custom",

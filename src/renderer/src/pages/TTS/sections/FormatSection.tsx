@@ -19,7 +19,7 @@ const MODE_VALUES: Record<Mode, string> = {
   any: "",
   dot: ".",
   slash: "/",
-  custom: "",
+  custom: "!tts",
 };
 
 // The ones TTSService fills in the template, see _parseText
