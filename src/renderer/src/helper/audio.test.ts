@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AudioQueue,
   CUT_FADE,
@@ -96,6 +96,7 @@ vi.mock("tone", () => ({
   Gain: tone.FakeGain,
   GrainPlayer: tone.FakePlayer,
   getContext: () => ({
+    lookAhead: 0.1,
     decodeAudioData: tone.decode,
     createBuffer: (channels: number, length: number, rate: number) => ({
       duration: length / rate,
@@ -135,6 +136,10 @@ beforeEach(() => {
   tone.clock.now = 10;
   tone.decode.mockReset();
   tone.decode.mockImplementation(async () => audio());
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("AudioQueue", () => {
@@ -537,8 +542,44 @@ describe("AudioQueue", () => {
       [1, 11 - CUT_FADE],
       [0, 11],
     ]);
+    vi.useFakeTimers();
     cut.finish();
+    vi.advanceTimersByTime((0.1 + CUT_FADE) * 1000);
     expect(fades[0].disposed).toBe(true);
+  });
+
+  it("keeps a sound's nodes until it's heard", async () => {
+    vi.useFakeTimers();
+    const ended = vi.fn();
+    const queue = new AudioQueue();
+    await queue.enqueue(bytes(), { end: 1, onEnded: ended });
+    const [player] = tone.players;
+    // Its own gain and the cut's fade, after the queue's output
+    const nodes = tone.gains.slice(1);
+
+    player.finish();
+    // Tone emits stop up to its look ahead early, while the fade still runs
+    expect(ended).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime((0.1 + CUT_FADE) * 1000 - 1);
+    expect([player, ...nodes].some((node) => node.disposed)).toBe(false);
+
+    vi.advanceTimersByTime(1);
+    expect([player, ...nodes].every((node) => node.disposed)).toBe(true);
+  });
+
+  it("disposes nothing twice when stopped while a sound is heard ending", async () => {
+    vi.useFakeTimers();
+    const queue = new AudioQueue();
+    await queue.enqueue(bytes());
+    const [player] = tone.players;
+    const dispose = vi.spyOn(player, "dispose");
+
+    player.finish();
+    queue.stop();
+    vi.runAllTimers();
+
+    expect(player.stopped).toBe(false);
+    expect(dispose).toHaveBeenCalledOnce();
   });
 
   it("plays a cut that doesn't fit the sound whole", async () => {

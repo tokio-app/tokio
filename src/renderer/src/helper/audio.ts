@@ -359,10 +359,16 @@ export class AudioQueue {
 
     player.onstop = () => {
       this.active = this.active.filter((item) => item.player !== player);
-      player.dispose();
-      gainNode.dispose();
-      fade?.dispose();
       onEnded?.();
+      // Tone emits stop up to its look ahead before the sound is heard ending
+      setTimeout(
+        () => {
+          player.dispose();
+          gainNode.dispose();
+          fade?.dispose();
+        },
+        (Tone.getContext().lookAhead + CUT_FADE) * 1000,
+      );
     };
 
     // shortcut: a place longer than its sound leaves `active` (and calls
