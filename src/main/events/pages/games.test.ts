@@ -19,7 +19,7 @@ import {
 import { defaultProfile, GAMES_PATH, IMAGE_EXTENSIONS } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import Logger from "@/logger";
-import type { GamesResult } from "@/services/games";
+import type { ServiceResult } from "@/services/shared";
 import { dialog } from "@test/electron";
 import { createHandler } from "@test/handler";
 import {
@@ -421,7 +421,7 @@ describe("games events", () => {
       const library: MediaFile[] = [];
       const gamesService = {
         importPicture: vi.fn(
-          async (path: string): Promise<GamesResult<MediaFile>> =>
+          async (path: string): Promise<ServiceResult<MediaFile>> =>
             path.endsWith(".svg")
               ? { success: false, error: "Unsupported format: svg" }
               : { success: true, data: path === "/tnt.png" ? tnt : creeper },
@@ -599,7 +599,7 @@ describe("games events", () => {
   describe("REMOVE_MINECRAFT_PICTURE", () => {
     const setup = (
       cleared = true,
-      deleted: GamesResult<void> = { success: true },
+      deleted: ServiceResult<void> = { success: true },
     ) => {
       const services = overlay();
       const gamesService = {

@@ -6,6 +6,13 @@ import Logger from "@/logger";
 import { promises as fs } from "fs";
 import { z } from "zod";
 
+// What fallible service methods return instead of throwing
+export interface ServiceResult<T = undefined> {
+  success: boolean;
+  error?: string;
+  data?: T;
+}
+
 export abstract class Service {
   protected _logFile: string;
 

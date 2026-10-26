@@ -31,15 +31,9 @@ import Logger from "@/logger";
 import { unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { MEDIA_MAX_BYTES } from "../alerts";
-import { Service } from "../shared";
+import { Service, type ServiceResult } from "../shared";
 import { commandValue, GameCommand, gameCommands } from "./commands";
 import { DISCONNECTED, MinecraftConnection } from "./minecraft";
-
-export interface GamesResult<T> {
-  success: boolean;
-  error?: string;
-  data?: T;
-}
 
 /**
  * Why an action's commands didn't all run: offline when no game of the
@@ -152,7 +146,9 @@ export class GamesService extends Service {
   }
 
   /** Copies a local image into the Minecraft pictures folder. */
-  public async importPicture(srcPath: string): Promise<GamesResult<MediaFile>> {
+  public async importPicture(
+    srcPath: string,
+  ): Promise<ServiceResult<MediaFile>> {
     try {
       const { entry } = await importFile(
         srcPath,
@@ -166,7 +162,7 @@ export class GamesService extends Service {
     }
   }
 
-  public async deletePicture(file: string): Promise<GamesResult<void>> {
+  public async deletePicture(file: string): Promise<ServiceResult<void>> {
     try {
       await unlink(join(this._picturesFolder, basename(file)));
       return { success: true };
@@ -222,7 +218,7 @@ export class GamesService extends Service {
     edition: MinecraftEdition;
     trigger: AlertTrigger;
     steps: GameStep[];
-  }): Promise<GamesResult<CommandResult[]>> {
+  }): Promise<ServiceResult<CommandResult[]>> {
     const unreachable = this._unreachable(edition);
     if (unreachable) return { success: false, error: unreachable };
     const event = trigger === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : trigger;

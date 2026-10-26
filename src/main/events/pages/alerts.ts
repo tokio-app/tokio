@@ -16,7 +16,7 @@ import {
 import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
-import { AlertsResult } from "@/services/alerts";
+import type { ServiceResult } from "@/services/shared";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("alerts");
@@ -80,7 +80,7 @@ const addPickedSound = async (
   { storeManagerService, notifier }: AppHandlerVariables,
   e: ReplyEvent,
   { id, request }: { id: string; request: number },
-  res: AlertsResult<AlertSound>,
+  res: ServiceResult<AlertSound>,
 ) => {
   if (!res.success || !res.data) throw new LoggedError(res.error);
   if (!(await storeManagerService.addSound(res.data))) throw saveFailure();
@@ -344,7 +344,7 @@ events.push(
 // the service logs each failure. Throws when the library couldn't be saved.
 const upload = async (
   paths: string[],
-  importFile: (path: string) => Promise<AlertsResult<MediaFile>>,
+  importFile: (path: string) => Promise<ServiceResult<MediaFile>>,
   library: {
     list: () => MediaFile[];
     add: (file: MediaFile) => Promise<boolean>;
@@ -435,7 +435,7 @@ const deleteFile = async (
   e: ReplyEvent,
   field: "sound" | "media",
   file: string,
-  remove: (file: string) => Promise<AlertsResult<void>>,
+  remove: (file: string) => Promise<ServiceResult<void>>,
 ) => {
   const cleared = await storeManagerService.removeFromAlerts(field, file);
   e.reply(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, { field, file });

@@ -4,13 +4,7 @@ import Logger from "@/logger";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { Service } from "../shared";
-
-export interface LicensesResult<T> {
-  success: boolean;
-  error?: string;
-  data?: T;
-}
+import { Service, type ServiceResult } from "../shared";
 
 // Shipped by electron-builder.yml (extraResources), same layout as the repo.
 const DOCUMENTS: (LicenseDocument & { file: string })[] = [
@@ -69,7 +63,7 @@ export class LicensesService extends Service {
   }
 
   /** Production dependencies, copyleft first. Scanned once. */
-  public async getPackages(): Promise<LicensesResult<PackageLicense[]>> {
+  public async getPackages(): Promise<ServiceResult<PackageLicense[]>> {
     try {
       const packages = await this.scan();
       const data = [...packages.values()]
@@ -93,7 +87,7 @@ export class LicensesService extends Service {
   }
 
   /** Text of a document or a package's license and notice files, by id. */
-  public async getText(id: string): Promise<LicensesResult<LicenseText>> {
+  public async getText(id: string): Promise<ServiceResult<LicenseText>> {
     try {
       const doc = DOCUMENTS.find((d) => d.id === id);
       if (doc) {
