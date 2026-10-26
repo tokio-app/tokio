@@ -23,6 +23,12 @@ describe("commandValue", () => {
   it("caps the text at 100 characters", () => {
     expect(commandValue("x".repeat(150))).toHaveLength(100);
   });
+
+  it("never leaves half an emoji at the cap", () => {
+    const value = commandValue(`${"x".repeat(99)}😀`);
+    expect(value).toBe("x".repeat(99));
+    expect(value).not.toMatch(/\p{Cs}/u);
+  });
 });
 
 describe("gameCommands in Bedrock", () => {

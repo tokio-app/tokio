@@ -218,6 +218,8 @@ export function commandValue(text: string): string {
       .replace(/ {2,}/g, " ")
       .trim()
       .slice(0, MAX_VALUE_LENGTH)
+      // A lone surrogate, which the slice can leave, isn't text the game takes
+      .replace(/\p{Cs}/gu, "")
       .trim()
   );
 }
