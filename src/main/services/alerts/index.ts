@@ -31,7 +31,7 @@ import { matchesTrigger, streakOf } from "@/helper/triggers";
 import Logger from "@/logger";
 import type { ServerService } from "@/services/server";
 import type { TTSService } from "@/services/tts";
-import { readFile, unlink } from "node:fs/promises";
+import { access, readFile, unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { Service } from "../shared";
 
@@ -415,17 +415,31 @@ export class AlertsService extends Service {
       }
 
       // The caller reports it, once per notice
-      const res = await this.readSound(sound.file, false);
-      // Cleared while it was read
+      const missing = await this._missing(sound.file);
+      // Cleared while it was checked
       if (run !== this._run) return;
-      if (!res.success || !res.data) {
-        onError?.(alert, res.error);
+      if (missing) {
+        onError?.(alert, missing);
         continue;
       }
-      play(res.data, basename(sound.file), {
+      // By key: the window asks for the bytes only when it hasn't decoded them
+      play(undefined, basename(sound.file), {
         start: sound.start,
         end: sound.end ?? undefined,
       });
+    }
+  }
+
+  // Why a library sound can't be played, if it can't
+  private async _missing(file: string): Promise<string | undefined> {
+    // basename keeps a stored value from pointing outside the sounds folder
+    const name = basename(file);
+    if (this._cache.has(name)) return undefined;
+    try {
+      await access(join(this._soundsFolder, name));
+      return undefined;
+    } catch (error) {
+      return formatError(error);
     }
   }
 

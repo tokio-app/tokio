@@ -564,6 +564,79 @@ describe("AudioQueue", () => {
     forgetDecoded("decoding-big");
   });
 
+  it("fetches a sound sent by key once for its copies, and not again once decoded", async () => {
+    const queue = new AudioQueue();
+    const fetch = vi.fn(async () => bytes());
+
+    const copies = [
+      queue.enqueue(fetch, { cacheKey: "fetch-once" }),
+      queue.enqueue(fetch, { cacheKey: "fetch-once" }),
+    ];
+    expect(await Promise.all(copies)).toEqual([true, true]);
+    expect(await queue.enqueue(fetch, { cacheKey: "fetch-once" })).toBe(true);
+
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(tone.decode).toHaveBeenCalledOnce();
+    expect(tone.players).toHaveLength(3);
+    forgetDecoded("fetch-once");
+  });
+
+  it("never fetches for a full queue", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const queue = new AudioQueue();
+    queue.setQueueOptions({ maxQueueLength: 1 });
+    const fetch = vi.fn(async () => bytes());
+
+    expect(await queue.enqueue(bytes())).toBe(true);
+    expect(await queue.enqueue(fetch, { cacheKey: "fetch-full" })).toBe(false);
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the order behind a sound still fetching", async () => {
+    const queue = new AudioQueue();
+    const fetchedBytes = bytes();
+    let fetched!: () => void;
+    const fetch = () =>
+      new Promise<Uint8Array>((resolve) => {
+        fetched = () => resolve(fetchedBytes);
+      });
+    // The quick one decodes first, as its bytes are already there
+    const first = audio();
+    tone.decode.mockImplementation(async (data) =>
+      data === fetchedBytes.buffer ? first : audio(),
+    );
+
+    const slow = queue.enqueue(fetch, { cacheKey: "fetch-slow" });
+    const quick = queue.enqueue(bytes());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(tone.players).toHaveLength(0);
+
+    fetched();
+    expect(await Promise.all([slow, quick])).toEqual([true, true]);
+    expect(tone.players.map((p) => [p.url === first, p.startedAt])).toEqual([
+      [true, 10],
+      [false, 12],
+    ]);
+    forgetDecoded("fetch-slow");
+  });
+
+  it("gives the place back when the fetch fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const queue = new AudioQueue();
+    queue.setQueueOptions({ maxQueueLength: 1 });
+    const fetch = vi
+      .fn<() => Promise<Uint8Array>>()
+      .mockRejectedValueOnce(new Error("Unable to read ding.mp3."))
+      .mockResolvedValue(bytes());
+
+    expect(await queue.enqueue(fetch, { cacheKey: "fetch-fails" })).toBe(false);
+    // And fetches again for the next one
+    expect(await queue.enqueue(fetch, { cacheKey: "fetch-fails" })).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    forgetDecoded("fetch-fails");
+  });
+
   it("decodes IPC bytes without copying them, and copies a view", async () => {
     const queue = new AudioQueue();
     const whole = bytes();

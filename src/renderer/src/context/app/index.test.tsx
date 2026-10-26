@@ -140,6 +140,33 @@ describe("AppProvider", () => {
     });
   });
 
+  it("plays a library sound by key", async () => {
+    const audio = setup();
+
+    await send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
+      volume: 100,
+      channel: "alerts",
+      maxQueueLength: 3,
+      id: "alert-1",
+      key: "airhorn.mp3",
+    });
+
+    // The queue fetches the bytes only when it hasn't decoded the sound
+    const [[fetch, options]] = audio.queue("alerts").enqueue.mock.calls;
+    expect(options).toMatchObject({ cacheKey: "airhorn.mp3" });
+    if (typeof fetch !== "function") throw new Error("No fetch was passed");
+    expect(sent(APP_EVENTS.GET_SOUND_DATA)).toEqual([]);
+
+    const bytes = fetch();
+    expect(sent(APP_EVENTS.GET_SOUND_DATA)).toEqual([{ file: "airhorn.mp3" }]);
+    await send(APP_EVENTS_RESPONSE.SOUND_DATA, {
+      success: true,
+      file: "airhorn.mp3",
+      data,
+    });
+    expect(await bytes).toBe(data);
+  });
+
   it("plays the part of an alert's sound its cut keeps", async () => {
     const audio = setup();
 

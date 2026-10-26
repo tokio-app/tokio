@@ -285,7 +285,9 @@ export interface AppEventsResponseMap {
 
   // ALERTS
   [APP_EVENTS_RESPONSE.ALERT_AUDIO]: {
-    // None when the alert only shows media
+    // A message's audio. Library sounds come by key alone, and the window asks
+    // for their bytes with GET_SOUND_DATA when it hasn't decoded them. Neither
+    // means the alert only shows media.
     data?: Uint8Array;
     volume: number;
     // Name of the renderer audio queue to play on
@@ -294,8 +296,9 @@ export interface AppEventsResponseMap {
     // Alert the sound belongs to, so volume changes reach it while playing,
     // and its media reaches its overlay
     id: string;
-    // The same for every copy of the sound, so the window decodes it once.
-    // Main always sets it with data, as the repeat's copies share its decode.
+    // The same for every copy of the sound, so the window decodes it once:
+    // a library sound's file, or a message's tts: cache key. Main always sets
+    // it with a sound, as the repeat's copies share its decode.
     key?: string;
     // A TTS alert's speed and pitch, for this sound only
     filters?: AlertFilters;

@@ -57,8 +57,16 @@ let decodedBytes = 0;
 // Sounds pushed out of the cache, found again while a player still holds them
 const evicted = new Map<string, WeakRef<AudioBuffer>>();
 
-function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
-  if (cacheKey === undefined) return Tone.getContext().decodeAudioData(data);
+// A sound's bytes, or what fetches them when it isn't decoded yet
+type Source = ArrayBuffer | (() => Promise<ArrayBuffer>);
+
+function decode(source: Source, cacheKey?: string): Promise<AudioBuffer> {
+  const context = Tone.getContext();
+  const load = () =>
+    typeof source === "function"
+      ? source().then((data) => context.decodeAudioData(data))
+      : context.decodeAudioData(source);
+  if (cacheKey === undefined) return load();
 
   const cached = decoded.get(cacheKey);
   if (cached) {
@@ -69,11 +77,10 @@ function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
 
   const alive = evicted.get(cacheKey)?.deref();
   evicted.delete(cacheKey);
-  // Kept while decoding, so copies that come meanwhile wait for this one
+  // Kept while fetching and decoding, so copies that come meanwhile wait for
+  // this one
   const entry: Decoded = {
-    audio: alive
-      ? Promise.resolve(alive)
-      : Tone.getContext().decodeAudioData(data),
+    audio: alive ? Promise.resolve(alive) : load(),
     bytes: 0,
   };
   decoded.set(cacheKey, entry);
@@ -215,10 +222,15 @@ export class AudioQueue {
     this.gapTime = options.gapTime ?? 0;
   }
 
+  /**
+   * Queues a sound, given as its bytes or as what fetches them: that runs
+   * only when the sound under cacheKey isn't decoded yet.
+   */
   enqueue(
-    input: Uint8Array | ArrayBuffer,
+    input: Uint8Array | ArrayBuffer | (() => Promise<Uint8Array | ArrayBuffer>),
     { cacheKey, ...item }: EnqueueOptions = {},
   ): Promise<boolean> {
+    // Before fetching, so a full queue never fetches
     if (this.pending() >= this.maxQueueLength) {
       console.warn("AudioQueue: Max queue length reached. Ignoring input.");
       return Promise.resolve(false);
@@ -228,7 +240,12 @@ export class AudioQueue {
     // while earlier items still wait for theirs
     let decoding: Promise<AudioBuffer>;
     try {
-      decoding = decode(bytesOf(input), cacheKey);
+      decoding = decode(
+        typeof input === "function"
+          ? () => input().then(bytesOf)
+          : bytesOf(input),
+        cacheKey,
+      );
     } catch (error) {
       decoding = Promise.reject(error);
     }
