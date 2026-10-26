@@ -323,7 +323,7 @@ export class StoreManagerService extends Service {
     const missing = service
       .providerNames()
       .filter((name) => !saved.some((p) => p.name === name))
-      .map((name) => ({ name, key: "", active: false }));
+      .map((name) => ({ name, key: "" }));
     return [...saved, ...missing];
   }
 
@@ -662,7 +662,6 @@ export class StoreManagerService extends Service {
     const provider = await this._encryptProviderKey({
       name,
       key: key || "",
-      active: true,
     });
 
     const settings = this._storeData!.settings;
@@ -697,7 +696,6 @@ export class StoreManagerService extends Service {
     const saved = await this._encryptProviderKey({
       name: engine,
       key,
-      active: list[index]?.active ?? false,
     });
     if (index !== -1) {
       list[index] = saved;

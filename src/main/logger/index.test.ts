@@ -1,3 +1,4 @@
+import { settle } from "@/helper/quit";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ describe("Logger", () => {
   });
 
   afterEach(async () => {
-    await Logger.flush();
+    await settle(5_000);
     await rm(dir, { recursive: true, force: true });
   });
 
@@ -23,7 +24,7 @@ describe("Logger", () => {
 
   it("writes a burst of lines in call order", async () => {
     for (let i = 0; i < 50; i++) Logger.info(`line ${i}`, file);
-    await Logger.flush();
+    await settle(5_000);
 
     const written = await lines();
     expect(written).toHaveLength(50);
@@ -34,7 +35,7 @@ describe("Logger", () => {
 
   it("writes the same line to the console and the file", async () => {
     Logger.success("connected", file);
-    await Logger.flush();
+    await settle(5_000);
 
     const [line] = await lines();
     expect(line).toMatch(/^\S+Z -- \[SUCCESS\]: connected$/);
@@ -58,7 +59,7 @@ describe("Logger", () => {
 
   it("indents the continuation lines of a message", async () => {
     Logger.error("first\nsecond", file);
-    await Logger.flush();
+    await settle(5_000);
 
     const written = await lines();
     expect(written[0]).toMatch(/\[ERROR\]: first$/);
@@ -68,7 +69,7 @@ describe("Logger", () => {
   it("appends the stack trace and causes of an error", async () => {
     const error = new Error("save failed", { cause: new Error("disk full") });
     Logger.error("<System> Unable to save", file, error);
-    await Logger.flush();
+    await settle(5_000);
 
     const text = await readFile(file, "utf-8");
     expect(text).toMatch(
@@ -88,7 +89,7 @@ describe("Logger", () => {
 
   it("logs only the message for values that are not errors", async () => {
     Logger.error("failed", file, "timeout");
-    await Logger.flush();
+    await settle(5_000);
 
     expect(await lines()).toEqual([
       expect.stringMatching(/\[ERROR\]: failed$/),
@@ -100,7 +101,7 @@ describe("Logger", () => {
 
     Logger.info("a", missing);
     Logger.info("b", missing);
-    await expect(Logger.flush()).resolves.toBeUndefined();
+    await expect(settle(5_000)).resolves.toBeUndefined();
 
     const reports = vi
       .mocked(console.error)

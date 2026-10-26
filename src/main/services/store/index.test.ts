@@ -348,7 +348,6 @@ describe("StoreManagerService", () => {
       data.settings.activeTTSProvider = {
         name: "Edge",
         key: "",
-        active: true,
       };
       await writeFile(storeFile, JSON.stringify(data));
 
@@ -392,7 +391,6 @@ describe("StoreManagerService", () => {
       expect(store.getSettings().providers.tts).toContainEqual({
         name: "Default",
         key: "session",
-        active: true,
       });
     });
   });
@@ -465,12 +463,11 @@ describe("StoreManagerService", () => {
 
       expect(settings.activeConnProvider.key).toBe("session");
       expect(settings.providers.connector).toEqual([
-        { name: "Default", key: "session", active: true },
+        { name: "Default", key: "session" },
       ]);
       expect(settings.providers.tts).toContainEqual({
         name: "Edge",
         key: "",
-        active: false,
       });
     });
 
@@ -479,7 +476,7 @@ describe("StoreManagerService", () => {
       Buffer.from(`${prefix}${text}`).toString("base64");
     const saveEulerKey = async (key: string) => {
       const data = structuredClone(defaultStoreData);
-      const euler = { name: "Default", key, active: true };
+      const euler = { name: "Default", key };
       data.settings.activeConnProvider = euler;
       data.settings.providers.connector = [euler];
       await writeFile(storeFile, JSON.stringify(data));
@@ -490,13 +487,12 @@ describe("StoreManagerService", () => {
       const euler = {
         name: "Default",
         key: encrypted("euler-key"),
-        active: true,
       };
       data.settings.activeConnProvider = euler;
       data.settings.providers.connector = [euler];
       // A newer key provider writes its own prefix
       data.settings.providers.tts = [
-        { name: "Default", key: encrypted("session", "v12"), active: true },
+        { name: "Default", key: encrypted("session", "v12") },
       ];
       await writeFile(storeFile, JSON.stringify(data));
       const setProvider = vi.spyOn(connector, "setProvider");
@@ -524,7 +520,7 @@ describe("StoreManagerService", () => {
 
     it("reads keys saved without encryption as they are", async () => {
       const data = structuredClone(defaultStoreData);
-      const plain = { name: "Default", key: "plain-key", active: true };
+      const plain = { name: "Default", key: "plain-key" };
       data.settings.activeConnProvider = plain;
       data.settings.providers.tts = [plain];
       await writeFile(storeFile, JSON.stringify(data));

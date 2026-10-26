@@ -12,8 +12,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Settings } from "..";
 
-const tiktok = { name: "Default", key: "", active: false };
-const euler = { name: "Euler", key: "euler-key", active: true };
+const tiktok = { name: "Default", key: "" };
+const euler = { name: "Euler", key: "euler-key" };
 
 // Two connectors, Euler the active one
 const twoConnectors = settingsReply((s) => {
@@ -95,8 +95,8 @@ describe("ProvidersSection", () => {
     await send(
       APP_EVENTS_RESPONSE.GET_SETTINGS,
       settingsReply((s) => {
-        const saved = { ...tiktok, key: "saved-key", active: true };
-        s.settings.providers.connector = [saved, { ...euler, active: false }];
+        const saved = { ...tiktok, key: "saved-key" };
+        s.settings.providers.connector = [saved, euler];
         s.settings.activeConnProvider = saved;
       }),
     );

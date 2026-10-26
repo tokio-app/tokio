@@ -85,8 +85,6 @@ export async function processOverlay(
   };
   paths?: {
     config: string;
-    html: string;
-    info: string;
   };
 }> {
   try {
@@ -149,8 +147,6 @@ export async function processOverlay(
       },
       paths: {
         config: configPath,
-        html: htmlPath,
-        info: infoPath,
       },
     };
   } catch {
