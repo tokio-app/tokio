@@ -76,14 +76,7 @@ export class ServerService extends Service {
   private rebuildRoutes() {
     const newRouter = express.Router();
     this._routes.forEach((path, id) => {
-      const route = "/" + id;
-      newRouter.use(route, (req, res, next) => {
-        if (req.originalUrl === route) {
-          return res.redirect(route + "/");
-        }
-        next();
-      });
-      newRouter.use(route, express.static(path));
+      newRouter.use("/" + id, express.static(path));
     });
     this._dynamicRouter = newRouter;
   }

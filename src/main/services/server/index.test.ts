@@ -246,7 +246,7 @@ describe("ServerService", () => {
     it("redirects to the trailing slash so relative paths work", async () => {
       const res = await fetch(url("/clock"), { redirect: "manual" });
 
-      expect(res.status).toBe(302);
+      expect(res.status).toBe(301);
       expect(res.headers.get("location")).toBe("/clock/");
     });
 
