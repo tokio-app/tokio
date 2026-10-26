@@ -435,7 +435,7 @@ describe("games events", () => {
         getMinecraftPictures: () => library,
       };
       const h = createHandler({ gamesService, storeManagerService });
-      return { h, gamesService, storeManagerService };
+      return { h, gamesService, storeManagerService, library };
     };
 
     it("does nothing when the dialog is canceled", async () => {
@@ -555,8 +555,13 @@ describe("games events", () => {
     });
 
     it("gives the action nothing when the library can't be saved", async () => {
-      const { h, storeManagerService } = setup();
-      storeManagerService.addMinecraftPicture.mockResolvedValue(false);
+      const { h, storeManagerService, library } = setup();
+      storeManagerService.addMinecraftPicture.mockImplementation(
+        async (picture) => {
+          library.push(picture);
+          return false;
+        },
+      );
       pickFiles("/tnt.png");
 
       await h.invoke(games, APP_EVENTS.IMPORT_MINECRAFT_PICTURE, {
@@ -564,6 +569,11 @@ describe("games events", () => {
       });
 
       expect(h.sent()).toEqual([
+        // The library main holds, unsaved, so the picker lists the picture
+        [
+          APP_EVENTS_RESPONSE.MINECRAFT_PICTURES,
+          { success: true, data: [tnt] },
+        ],
         [
           APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE,
           {
