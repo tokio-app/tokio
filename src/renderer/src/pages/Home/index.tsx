@@ -55,10 +55,11 @@ export function Home() {
 
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {
     if (!res) return;
-    setConnected(res.success);
+    setConnected(res.live);
+    // A connect still in progress keeps its spinner
+    setLoading(res.success && !res.live);
     setLikes(res.stats.likes);
     setViews({ current: res.stats.viewers, total: res.stats.views });
-    setLoading(false);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.VIEWS, (res) => {

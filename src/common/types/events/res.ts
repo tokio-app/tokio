@@ -217,7 +217,10 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES]: { addresses: string[] };
 
   // HOME
+  // success while connecting or connected, which locks the profile; live
+  // once the LIVE has started
   [APP_EVENTS_RESPONSE.CONNECTED]: Reply<{
+    live: boolean;
     stats: {
       views: number;
       viewers: number;

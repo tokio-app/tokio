@@ -300,6 +300,7 @@ const registerConnectorEvents = ({
       win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
       win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
+        live: false,
         stats: {
           likes: 0,
           viewers: 0,

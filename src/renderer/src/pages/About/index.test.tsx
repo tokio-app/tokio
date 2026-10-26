@@ -215,6 +215,7 @@ describe("About", () => {
     await status({ state: "ready", version: "1.2.0" });
     await send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: true,
+      live: true,
       stats: { views: 0, viewers: 0, likes: 0 },
     });
 

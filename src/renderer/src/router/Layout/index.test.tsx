@@ -143,11 +143,12 @@ describe("Layout", () => {
     ).toEqual([{ old: "", new: "" }]);
   });
 
-  it("locks the profile while connected", async () => {
+  it("locks the profile while connecting", async () => {
     const { user } = await renderApp();
     await send(APP_EVENTS_RESPONSE.GET_SETTINGS, profiles);
     await send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: true,
+      live: false,
       stats: { views: 0, viewers: 0, likes: 0 },
     });
 
@@ -162,11 +163,27 @@ describe("Layout", () => {
     expect(titleBar().queryByText("LIVE")).not.toBeInTheDocument();
 
     const stats = { views: 0, viewers: 0, likes: 0 };
-    await send(APP_EVENTS_RESPONSE.CONNECTED, { success: true, stats });
+    // Opened while a connect is still in progress
+    await send(APP_EVENTS_RESPONSE.CONNECTED, {
+      success: true,
+      live: false,
+      stats,
+    });
+    expect(titleBar().queryByText("LIVE")).not.toBeInTheDocument();
+
+    await send(APP_EVENTS_RESPONSE.CONNECTED, {
+      success: true,
+      live: true,
+      stats,
+    });
     expect(titleBar().getByText("LIVE")).toBeInTheDocument();
 
     // Main sends this when the LIVE ends, is lost, or the user disconnects
-    await send(APP_EVENTS_RESPONSE.CONNECTED, { success: false, stats });
+    await send(APP_EVENTS_RESPONSE.CONNECTED, {
+      success: false,
+      live: false,
+      stats,
+    });
     expect(titleBar().queryByText("LIVE")).not.toBeInTheDocument();
   });
 
