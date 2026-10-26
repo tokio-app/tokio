@@ -348,7 +348,6 @@ describe("StoreManagerService", () => {
       data.settings.activeTTSProvider = {
         name: "Edge",
         key: "",
-        active: true,
       };
       await writeFile(storeFile, JSON.stringify(data));
 
@@ -392,7 +391,6 @@ describe("StoreManagerService", () => {
       expect(store.getSettings().providers.tts).toContainEqual({
         name: "Default",
         key: "session",
-        active: true,
       });
     });
   });
@@ -465,12 +463,11 @@ describe("StoreManagerService", () => {
 
       expect(settings.activeConnProvider.key).toBe("session");
       expect(settings.providers.connector).toEqual([
-        { name: "Default", key: "session", active: true },
+        { name: "Default", key: "session" },
       ]);
       expect(settings.providers.tts).toContainEqual({
         name: "Edge",
         key: "",
-        active: false,
       });
     });
 
@@ -479,7 +476,7 @@ describe("StoreManagerService", () => {
       Buffer.from(`${prefix}${text}`).toString("base64");
     const saveEulerKey = async (key: string) => {
       const data = structuredClone(defaultStoreData);
-      const euler = { name: "Default", key, active: true };
+      const euler = { name: "Default", key };
       data.settings.activeConnProvider = euler;
       data.settings.providers.connector = [euler];
       await writeFile(storeFile, JSON.stringify(data));
@@ -490,13 +487,12 @@ describe("StoreManagerService", () => {
       const euler = {
         name: "Default",
         key: encrypted("euler-key"),
-        active: true,
       };
       data.settings.activeConnProvider = euler;
       data.settings.providers.connector = [euler];
       // A newer key provider writes its own prefix
       data.settings.providers.tts = [
-        { name: "Default", key: encrypted("session", "v12"), active: true },
+        { name: "Default", key: encrypted("session", "v12") },
       ];
       await writeFile(storeFile, JSON.stringify(data));
       const setProvider = vi.spyOn(connector, "setProvider");
@@ -524,7 +520,7 @@ describe("StoreManagerService", () => {
 
     it("reads keys saved without encryption as they are", async () => {
       const data = structuredClone(defaultStoreData);
-      const plain = { name: "Default", key: "plain-key", active: true };
+      const plain = { name: "Default", key: "plain-key" };
       data.settings.activeConnProvider = plain;
       data.settings.providers.tts = [plain];
       await writeFile(storeFile, JSON.stringify(data));
@@ -962,6 +958,44 @@ describe("StoreManagerService", () => {
       expect((await store.getProfileData())?.name).toBe("Default");
     });
 
+    it("saves the undone switch over an earlier save that wrote it", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      const release = holdStoreSave();
+      const earlier = store.updateServerSettings(true);
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      const switching = store.updateActiveProfile("stream.json");
+      await vi.waitFor(() =>
+        expect(store.getSettings().activeProfile.file).toBe("stream.json"),
+      );
+      release();
+      expect(await earlier).toBe(true);
+      expect(await switching).toBe("unsaved");
+      await settle(1000);
+
+      const saved = await readJSON(storeFile);
+      expect(saved.settings.activeProfile.file).toBe("default.json");
+      expect(saved.settings.server.enabled).toBe(true);
+    });
+
+    it("saves the undone listing over an earlier save that wrote it", async () => {
+      const store = await init();
+      const release = holdStoreSave();
+      const earlier = store.updateServerSettings(true);
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      const adding = store.addProfile({ file: "stream.json", name: "Stream" });
+      release();
+      expect(await earlier).toBe(true);
+      expect(await adding).toBeNull();
+      await settle(1000);
+
+      expect((await readJSON(storeFile)).profiles).toEqual(
+        defaultStoreData.profiles,
+      );
+    });
+
     it("updates a profile other than the active one when given its file", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");
@@ -1267,6 +1301,33 @@ describe("StoreManagerService", () => {
 
       expect(res.data).toEqual([{ id: "e1", image: "new" }]);
       expect(again).toEqual({ success: true });
+    });
+
+    it("tries a failed save again only after a while, for that profile", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.getProfileData();
+      await rm(defaultProfileFile);
+      vi.spyOn(Logger, "error");
+      const update = vi.spyOn(json, "updateFile");
+      const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+
+      expect(await store.recordEmotes([emote("e1")])).toEqual({
+        success: false,
+      });
+      now.mockReturnValue(30_999);
+      expect(await store.recordEmotes([emote("e2")])).toEqual({
+        success: false,
+      });
+      expect(update).toHaveBeenCalledOnce();
+
+      now.mockReturnValue(31_000);
+      await store.recordEmotes([emote("e2")]);
+      expect(update).toHaveBeenCalledTimes(2);
+
+      await store.updateActiveProfile("stream.json");
+      const res = await store.recordEmotes([emote("e3")]);
+      expect(res).toEqual({ success: true, data: [saved("e3")] });
     });
   });
 

@@ -46,7 +46,9 @@ export function Layout() {
   const notifications = useNotifications();
   const updateStatus = useUpdateStatus();
 
+  // Connecting or connected, which locks the profile
   const [isConnected, setIsConnected] = useState(false);
+  const [live, setLive] = useState(false);
   const [profiles, setProfiles] = useState<EntityMetadata[]>([]);
   const [activeProfile, setActiveProfile] = useState<EntityMetadata>({
     file: "",
@@ -63,7 +65,9 @@ export function Layout() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {
-    if (res) setIsConnected(res.success);
+    if (!res) return;
+    setIsConnected(res.success);
+    setLive(res.live);
   });
 
   useEffect(() => {
@@ -82,7 +86,7 @@ export function Layout() {
 
   return (
     <div className={styles.container}>
-      <TitleBar target="main" logo={Logo} live={isConnected}>
+      <TitleBar target="main" logo={Logo} live={live}>
         <ProfileDropdown
           disabled={isConnected}
           profiles={profiles}

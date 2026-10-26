@@ -246,7 +246,7 @@ describe("ServerService", () => {
     it("redirects to the trailing slash so relative paths work", async () => {
       const res = await fetch(url("/clock"), { redirect: "manual" });
 
-      expect(res.status).toBe(302);
+      expect(res.status).toBe(301);
       expect(res.headers.get("location")).toBe("/clock/");
     });
 
@@ -409,6 +409,35 @@ describe("ServerService", () => {
         expect(video()).not.toBeNull();
         time = 0.3;
         await vi.waitFor(() => expect(video()).toBeNull());
+      } finally {
+        dom.window.close();
+      }
+    });
+
+    it("doesn't play a video again once the next one replaced it", async () => {
+      const dom = await open();
+      let abort!: (error: Error) => void;
+      const start = vi
+        .spyOn(dom.window.HTMLMediaElement.prototype, "play")
+        .mockImplementationOnce(
+          () => new Promise((_, reject) => (abort = reject)),
+        )
+        .mockResolvedValue(undefined);
+
+      try {
+        await connected();
+        show("a.webm", "video");
+        await vi.waitFor(() => expect(start).toHaveBeenCalledOnce());
+        const [first] = start.mock.contexts;
+        show("b.webm", "video");
+        await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+
+        // The browser rejects a removed video's pending play.
+        abort(new dom.window.DOMException("Removed", "AbortError"));
+        await wait(20);
+
+        expect(start).toHaveBeenCalledTimes(2);
+        expect(first.muted).toBe(false);
       } finally {
         dom.window.close();
       }

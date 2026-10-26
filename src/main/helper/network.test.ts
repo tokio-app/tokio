@@ -2,7 +2,13 @@ import { APP_HOSTNAME, SERVER_PORT } from "@/common/util";
 import { shell, views } from "@test/electron";
 import { WebContentsView } from "electron";
 import { describe, expect, it, vi } from "vitest";
-import { isOverlayURL, limitPermissions, openLinksOutside } from "./network";
+import Logger from "@/logger";
+import {
+  isOverlayURL,
+  limitPermissions,
+  openLinksOutside,
+  reloadWhenGone,
+} from "./network";
 
 // A view's webContents, as the code gets it and as the fake records it
 const contents = () => {
@@ -28,6 +34,31 @@ describe("openLinksOutside", () => {
       ["https://tokio.ialfaro.com"],
       ["mailto:me@example.com"],
     ]);
+  });
+});
+
+describe("reloadWhenGone", () => {
+  it("reloads a page whose process crashed, and logs why", () => {
+    const error = vi.spyOn(Logger, "error");
+    const { real, fake } = contents();
+    reloadWhenGone(real, () => "system.log");
+
+    fake.emit("render-process-gone", {}, { reason: "crashed", exitCode: 1 });
+
+    expect(fake.reload).toHaveBeenCalledOnce();
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("crashed"),
+      "system.log",
+    );
+  });
+
+  it("leaves a page whose process exited cleanly", () => {
+    const { real, fake } = contents();
+    reloadWhenGone(real);
+
+    fake.emit("render-process-gone", {}, { reason: "clean-exit", exitCode: 0 });
+
+    expect(fake.reload).not.toHaveBeenCalled();
   });
 });
 

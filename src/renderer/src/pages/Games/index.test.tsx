@@ -945,18 +945,22 @@ describe("Games overlay", () => {
       recipes()[0].getByRole("button", { name: "Pick a picture" }),
     );
     await user.click(screen.getByRole("button", { name: "Browse files..." }));
-    expect(sent(APP_EVENTS.IMPORT_MINECRAFT_PICTURE)).toEqual([{ id: "a1" }]);
+    expect(sent(APP_EVENTS.IMPORT_MINECRAFT_PICTURE)).toEqual([
+      { id: "a1", request: 1 },
+    ]);
     await user.click(screen.getByRole("button", { name: "Done" }));
 
     // Another action's, which didn't ask
     await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       success: true,
       id: "a2",
+      request: 1,
       picture: CREEPER,
     });
     await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       success: true,
       id: "a1",
+      request: 1,
       picture: TNT,
     });
     await wait(300);
@@ -980,11 +984,61 @@ describe("Games overlay", () => {
     await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       success: true,
       id: "a1",
+      request: 1,
       picture: TNT,
     });
     await wait(300);
 
     expect(savedOverlays()[0].image).toEqual(CREEPER);
+  });
+
+  it("keeps a newer browse when an older one answers late", async () => {
+    const { user } = await load([action("a1")]);
+
+    await user.click(screen.getByRole("button", { name: "Pick a picture" }));
+    const browse = screen.getByRole("button", { name: "Browse files..." });
+    await user.click(browse);
+    await user.click(browse);
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      request: 2,
+      picture: CREEPER,
+    });
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      request: 1,
+      picture: TNT,
+    });
+    await wait(300);
+
+    expect(savedOverlays()[0].image).toEqual(CREEPER);
+  });
+
+  it("drops a browse made in another profile", async () => {
+    const { user } = await load([action("a1")]);
+
+    await user.click(screen.getByRole("button", { name: "Pick a picture" }));
+    await user.click(screen.getByRole("button", { name: "Browse files..." }));
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    // A clone, whose action has the same id
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.name = "Clone";
+        p.games.actions = [action("a1")];
+      }),
+    );
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      request: 1,
+      picture: TNT,
+    });
+    await wait(300);
+
+    expect(saves()).toEqual([]);
   });
 
   it("clears a deleted picture from the actions, so a save can't bring it back", async () => {
@@ -1261,5 +1315,45 @@ describe("Games overlay", () => {
     expect(current()).toBe("TNT");
     await wait(100);
     expect(current()).toBe("Creeper");
+  });
+
+  it("keeps the lit row it shows when Test lights another", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, name: "TNT" } }),
+      action("a2", { overlay: { ...overlay, name: "Creeper" } }),
+    ]);
+    const current = () =>
+      preview()!.querySelector(".games-current .games-name")?.textContent;
+    await user.click(screen.getByRole("radio", { name: "One at a time" }));
+
+    await user.click(testButton());
+    await user.click(testButton());
+
+    expect(litRows()).toEqual(["TNT", "Creeper"]);
+    expect(current()).toBe("TNT");
+  });
+
+  it("stays on the row one at a time shows when a row before it is hidden", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, name: "TNT" } }),
+      action("a2", { overlay: { ...overlay, name: "Creeper" } }),
+      action("a3", { overlay: { ...overlay, name: "Zombie" } }),
+    ]);
+    const current = () =>
+      preview()!.querySelector(".games-current .games-name")?.textContent;
+    await user.click(screen.getByRole("radio", { name: "One at a time" }));
+    await wait(3000);
+    await wait(3000);
+    expect(current()).toBe("Zombie");
+
+    await user.click(
+      recipes()[0].getByRole("checkbox", { name: "Show on the overlay" }),
+    );
+
+    expect(previewTexts()).toEqual([
+      ["Follow", "Creeper"],
+      ["Follow", "Zombie"],
+    ]);
+    expect(current()).toBe("Zombie");
   });
 });

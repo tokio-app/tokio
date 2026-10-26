@@ -7,7 +7,7 @@ import type {
   ProgressInfo,
   UpdateInfo,
 } from "electron-updater";
-import { Service } from "../shared";
+import { Service, type ServiceResult } from "../shared";
 
 // After startup, so the first check doesn't compete with loading the app.
 export const STARTUP_DELAY_MS = 15_000;
@@ -17,12 +17,6 @@ const PROGRESS_STEP = 5;
 
 // Set to 1 to try updates from `yarn dev`, with dev-app-update.yml.
 const DEV_ENV = "TOKIO_DEV_UPDATES";
-
-export interface UpdaterResult<T = undefined> {
-  success: boolean;
-  error?: string;
-  data?: T;
-}
 
 export type UpdateNotice = Extract<
   UpdateStatus,
@@ -64,7 +58,7 @@ export class UpdaterService extends Service {
   private readonly _platform: NodeJS.Platform;
   private _callbacks: UpdaterCallbacks = {};
   private _status: UpdateStatus = { state: "idle" };
-  private _checking?: Promise<UpdaterResult>;
+  private _checking?: Promise<ServiceResult>;
   private _installing?: Promise<void>;
   private _startup?: NodeJS.Timeout;
   private _interval?: NodeJS.Timeout;
@@ -147,7 +141,7 @@ export class UpdaterService extends Service {
   }
 
   /** Looks for a new release, and downloads it where that's supported. */
-  public check(): Promise<UpdaterResult> {
+  public check(): Promise<ServiceResult> {
     const updater = this._updater;
     if (!updater || this._status.state === "unsupported") {
       return Promise.resolve({
@@ -169,7 +163,7 @@ export class UpdaterService extends Service {
    * Restarts into the downloaded update once the saves still running are
    * done. On macOS, returns the release page to open instead.
    */
-  public install(): UpdaterResult<{ url: string }> {
+  public install(): ServiceResult<{ url: string }> {
     const status = this._status;
     if (status.state === "available" && status.manual) {
       return { success: true, data: { url: status.url } };
@@ -198,7 +192,7 @@ export class UpdaterService extends Service {
     this._interval = undefined;
   }
 
-  private async runCheck(updater: Updater): Promise<UpdaterResult> {
+  private async runCheck(updater: Updater): Promise<ServiceResult> {
     const previous = this._status;
     try {
       const result = await updater.checkForUpdates();

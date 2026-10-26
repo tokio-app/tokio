@@ -231,6 +231,16 @@ describe("TTSService", () => {
       expect(await say("!Tts hi", s)).toEqual(["hi"]);
     });
 
+    it("reads nothing with a blank custom command", async () => {
+      const s = settings((s) => {
+        s.format.trigger = { mode: "custom", value: " " };
+      });
+
+      expect(await say("hello", s)).toEqual([]);
+      s.format.trigger.value = "";
+      expect(await say("hello", s)).toEqual([]);
+    });
+
     it("skips a comment with only the trigger", async () => {
       const s = settings((s) => {
         s.format.trigger = { mode: "custom", value: "!tts" };
@@ -261,6 +271,17 @@ describe("TTSService", () => {
       expect(await say("you ídíot", s)).toEqual([]);
       expect(await say("mi idolo", s)).toEqual([]);
       expect(await say("you idol", s)).toHaveLength(1);
+    });
+
+    it("drops banned words with look-alike letters, not Russian words", async () => {
+      const s = settings((s) => {
+        s.protection.banned = ["idiot", "bot"];
+      });
+
+      expect(await say("you іdiot", s)).toEqual([]);
+      expect(await say("you ıdiot", s)).toEqual([]);
+      expect(await say("you idіоt", s)).toEqual([]);
+      expect(await say("вот так", s)).toHaveLength(1);
     });
 
     it("drops banned emojis, never matching an empty entry", async () => {

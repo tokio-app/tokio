@@ -49,10 +49,12 @@ const chat = (content: string, user: Partial<UserData> = {}): ChatEvent => ({
   comment: { content, emotes: [], lang: "en" },
 });
 
-// Without a cooldown unless `change` sets one, so requests don't wait
+// Without a cooldown unless `change` sets one, so requests don't wait, and
+// with every control open to every viewer
 const settings = (change: (music: Profile["music"]) => void = () => {}) => {
   const music = structuredClone(defaultProfile.music);
   music.protection.cooldown = 0;
+  music.protection.limit_controls = false;
   change(music);
   return music;
 };
@@ -238,7 +240,25 @@ describe("MusicService", () => {
       service.handle(chat("!play C"), music);
       await vi.advanceTimersByTimeAsync(10_000);
 
+      expect(searched()).toEqual(["A"]);
+    });
+
+    it("doesn't search a request while the queue is full, and gives the cooldown back", async () => {
+      const { request, searched, queue } = setup();
+      const music = settings((m) => {
+        m.protection.queue_length = 2;
+        m.protection.cooldown = 2;
+      });
+      await request("!play A", music);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await request("!play B", music);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      await request("!play C", music);
+      await request("!next", music);
+
       expect(searched()).toEqual(["A", "B"]);
+      expect(queue()).toEqual(["A", "B (playing)"]);
     });
 
     it("keeps as many songs as the queue length", async () => {
@@ -355,6 +375,92 @@ describe("MusicService", () => {
         await request("!play B");
 
         expect(queue()).toEqual(["A (playing)", "A", "B"]);
+      });
+    });
+
+    describe("limited controls", () => {
+      const music = settings((m) => {
+        m.protection.limit_controls = true;
+      });
+      const from = (handle: string, content: string, user = {}) =>
+        chat(content, { handle, ...user });
+
+      it("lets only the song's requester skip it", async () => {
+        const { service, played } = setup();
+        service.handle(from("a", "!play A"), music);
+        service.handle(from("b", "!play B"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        service.handle(from("b", "!next"), music);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(played()).toEqual(["A"]);
+
+        service.handle(from("A", "!next"), music);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(played()).toEqual(["A", "B"]);
+      });
+
+      it("lets moderators and the host use Next and Last", async () => {
+        const { service, played, queue } = setup();
+        service.handle(from("a", "!play A"), music);
+        service.handle(from("a", "!play B"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        service.handle(from("mod", "!next", { moderator: true }), music);
+        await vi.advanceTimersByTimeAsync(0);
+        service.handle(from("Host", "!last"), music, "@host");
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(played()).toEqual(["A", "B", "A"]);
+        expect(queue()).toEqual(["A (playing)", "B"]);
+      });
+
+      it("refuses Last from viewers", async () => {
+        const { service, queue } = setup();
+        service.handle(from("a", "!play A"), music);
+        service.handle(from("a", "!play B"), music);
+        await vi.advanceTimersByTimeAsync(0);
+        service.handle(from("a", "!next"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        service.handle(from("a", "!last"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(queue()).toEqual(["A", "B (playing)"]);
+      });
+
+      it("lets viewers revoke only their own requests, and moderators any", async () => {
+        const { service, queue } = setup();
+        service.handle(from("a", "!play A"), music);
+        service.handle(from("b", "!play B"), music);
+        service.handle(from("c", "!play B"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        service.handle(from("c", "!revoke B"), music);
+        service.handle(from("", "!revoke B"), music);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(queue()).toEqual(["A (playing)", "B"]);
+
+        service.handle(from("mod", "!revoke B", { moderator: true }), music);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(queue()).toEqual(["A (playing)"]);
+      });
+
+      it("keeps the cooldown free when it refuses a command", async () => {
+        const { service, searched } = setup();
+        const cooled = settings((m) => {
+          m.protection.limit_controls = true;
+          m.protection.cooldown = 2;
+        });
+        service.handle(from("a", "!play A"), cooled);
+        await vi.advanceTimersByTimeAsync(2_000);
+
+        service.handle(from("b", "!next"), cooled);
+        service.handle(from("b", "!last"), cooled);
+        service.handle(from("b", "!play B"), cooled);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "B"]);
       });
     });
   });

@@ -14,6 +14,7 @@ const loaded = profileReply((p) => {
     cooldown: 4,
     queue_length: 15,
     one_per_viewer: false,
+    limit_controls: true,
   };
   p.music.permissions.followers = true;
 });
@@ -218,6 +219,7 @@ describe("Music", () => {
       cooldown: 10,
       queue_length: 2,
       one_per_viewer: false,
+      limit_controls: true,
     });
     expect(
       section("Protection").queryByText("Max Comment Length"),
@@ -235,6 +237,19 @@ describe("Music", () => {
 
     expect(check).toBeChecked();
     expect((await saved()).protection.one_per_viewer).toBe(true);
+  });
+
+  it("saves the limit on Next, Last and Revoke", async () => {
+    const { user } = await setup();
+    const check = screen.getByRole("checkbox", {
+      name: "Limit Next, Last and Revoke",
+    });
+    expect(check).toBeChecked();
+
+    await user.click(check);
+
+    expect(check).not.toBeChecked();
+    expect((await saved()).protection.limit_controls).toBe(false);
   });
 
   it("saves a change 300ms later", async () => {

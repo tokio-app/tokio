@@ -11,7 +11,6 @@ export class Spotify extends MusicProvider {
   private _clientId: string;
   private _accessToken: string | null = null;
   private _refreshToken: string | null = null;
-  private _cachedDeviceId: string | null = null;
   private _isActive: boolean = false;
   private _refreshTimeout: NodeJS.Timeout | null = null;
   // Counts disconnects, so a refresh that ends after one is dropped
@@ -169,7 +168,6 @@ export class Spotify extends MusicProvider {
     this._refreshing = null;
     this._accessToken = null;
     this._refreshToken = null;
-    this._cachedDeviceId = null;
     this._isActive = false;
     this.emit(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED);
   }
@@ -366,7 +364,6 @@ export class Spotify extends MusicProvider {
     }
 
     if (!response.ok) {
-      if (response.status === 404) this._cachedDeviceId = null;
       const errorText = await response.text();
       let errorMessage = `API Error ${response.status}`;
       try {
@@ -380,9 +377,8 @@ export class Spotify extends MusicProvider {
       : null;
   }
 
+  // Asked on every play, since playback can move to another device
   private async getTargetDevice(): Promise<string> {
-    if (this._cachedDeviceId) return this._cachedDeviceId;
-
     const res = await this.fetchApi("/me/player/devices");
     const devices = res?.devices || [];
 
@@ -390,8 +386,7 @@ export class Spotify extends MusicProvider {
       throw new Error("No active devices. Play a song on Spotify first.");
 
     const activeDevice = devices.find((d: any) => d.is_active) || devices[0];
-    this._cachedDeviceId = activeDevice.id;
-    return this._cachedDeviceId!;
+    return activeDevice.id;
   }
 
   private generateRandomString(length: number) {

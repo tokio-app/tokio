@@ -6,6 +6,7 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import { formatError, TaskQueue } from "@/common/util";
+import { sameHandle } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "@/services/shared";
@@ -110,7 +111,8 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue.clear();
   }
 
-  public handle(chat: ChatEvent, settings: Profile["music"]) {
+  // The host is the handle of the LIVE's account
+  public handle(chat: ChatEvent, settings: Profile["music"], host = "") {
     const match = this._match(settings, chat);
     if (!match) return;
     const { control, args } = match;
@@ -126,6 +128,19 @@ export class MusicService extends ProviderService<MusicProvider> {
       unique &&
       handle &&
       (this._requesting.has(handle) || this._music_queue.waits(handle))
+    ) {
+      return;
+    }
+    // Viewers only skip their own song and revoke their own requests
+    const limited =
+      settings.protection.limit_controls &&
+      !chat.user.moderator &&
+      !sameHandle(handle, host);
+    if (
+      limited &&
+      (control === controls.last ||
+        (control === controls.next &&
+          !sameHandle(handle, this._music_queue.playingBy() ?? "")))
     ) {
       return;
     }
@@ -156,7 +171,9 @@ export class MusicService extends ProviderService<MusicProvider> {
     } else if (control === controls.last) {
       this._queue.enqueue(() => this._music_queue.triggerPrevious());
     } else if (control === controls.revoke) {
-      this._queue.enqueue(() => this._music_queue.revoke(args));
+      this._queue.enqueue(() =>
+        this._music_queue.revoke(args, limited ? handle : undefined),
+      );
     }
   }
 
@@ -183,6 +200,11 @@ export class MusicService extends ProviderService<MusicProvider> {
 
   // Searches first, so a request that finds nothing never reads the player
   private async play({ query, by, unique, refund }: SongRequest, run: number) {
+    // It would be dropped, so it isn't searched
+    if (this._music_queue.full()) {
+      refund();
+      return;
+    }
     const info = await this._current.provider.searchSong(query);
     if (info === null || run !== this._run) return;
     if (unique && this._music_queue.has(info.track)) {

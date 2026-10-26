@@ -1,5 +1,5 @@
 import { MusicInfo, SongInfo, TOKIO_EVENTS } from "@/common/types";
-import { cleanText } from "@/helper/chat";
+import { cleanText, sameHandle } from "@/helper/chat";
 import { TokioEmitter } from "../../shared/emitter";
 
 type PlayAction = () => void | Promise<void>;
@@ -141,13 +141,14 @@ export class MusicQueue extends TokioEmitter {
 
   // Removes every request for the song that's still waiting, by its request
   // or its title, whatever its case, spaces and accents. Songs that played
-  // or are playing stay.
-  public revoke(id: string) {
+  // or are playing stay, and with `by` so do other viewers' requests.
+  public revoke(id: string, by?: string) {
     const key = requestKey(id);
     if (!key) return;
     const kept = this._queue.filter(
       (item, index) =>
         index <= this._currentIndex ||
+        (by !== undefined && !sameHandle(by, item.by ?? "")) ||
         (requestKey(item.id) !== key && requestKey(item.song.title) !== key),
     );
     if (kept.length === this._queue.length) return;
@@ -161,6 +162,16 @@ export class MusicQueue extends TokioEmitter {
     return this._queue.some(
       (item, index) => index >= this._currentIndex && item.song.track === track,
     );
+  }
+
+  // Every place holds a song still to play, so a new one would be dropped
+  public full() {
+    return this._queue.length - this._currentIndex >= this._maxSize;
+  }
+
+  // The handle of the viewer who asked for the song playing
+  public playingBy(): string | undefined {
+    return this._queue[this._currentIndex]?.by;
   }
 
   // One of the viewer's requests is waiting

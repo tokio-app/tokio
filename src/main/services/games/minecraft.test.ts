@@ -123,8 +123,7 @@ async function game(
     const body = { publicKey: publicKey.toString("base64") };
 
     // Corked, the three frames leave in one TCP chunk, as the game sends them
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ws keeps its TCP socket private
-    const tcp = (socket as unknown as { _socket: Socket })._socket;
+    const tcp = tcpOf(socket);
     tcp.cork();
     fake.send({ header: { ...header, messagePurpose: "ws:encrypt" }, body });
     fake.send({
@@ -142,6 +141,22 @@ async function game(
 
   await once(socket, "open");
   return fake;
+}
+
+const tcpOf = (socket: WebSocket) =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ws keeps its TCP socket private
+  (socket as unknown as { _socket: Socket })._socket;
+
+// A port nothing listens on
+async function freePort() {
+  const server = createServer().listen(0);
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Expected a TCP server");
+  server.close();
+  await once(server, "close");
+  return address.port;
 }
 
 async function connected(connection: MinecraftConnection) {
@@ -393,6 +408,44 @@ describe("MinecraftConnection", () => {
     expect(connection.status.state).toBe("waiting");
   });
 
+  it("closes a socket that answers the handshake with a bad key", async () => {
+    const { connection, statuses } = await listen();
+    const socket = new WebSocket(`ws://127.0.0.1:${connection.port}//`, [
+      WSENCRYPT,
+    ]);
+    sockets.push(socket);
+    socket.on("message", (data: Buffer) => {
+      const { header } = JSON.parse(data.toString("utf8"));
+      socket.send(
+        JSON.stringify({
+          header: {
+            requestId: header.requestId,
+            messagePurpose: "commandResponse",
+          },
+          body: { publicKey: "AAAA" },
+        }),
+      );
+    });
+
+    await once(socket, "close");
+    expect(connection.status).toEqual({ state: "waiting" });
+    expect(statuses).toEqual([{ state: "waiting" }]);
+  });
+
+  it("ignores a frame that isn't JSON", async () => {
+    const { connection, statuses } = await listen();
+    const fake = await game(connection.port);
+    await connected(connection);
+
+    fake.socket.send("not json");
+
+    expect((await connection.send("say hi")).ok).toBe(true);
+    expect(statuses).toEqual([
+      { state: "waiting" },
+      { state: "connected", edition: "bedrock" },
+    ]);
+  });
+
   it("reports a port that's in use", async () => {
     // No host, like the game's port: on macOS a catch-all listen can share a
     // port with a 127.0.0.1 one.
@@ -437,5 +490,37 @@ describe("MinecraftConnection", () => {
     const server = createServer().listen(port);
     servers.push(server);
     await once(server, "listening");
+  });
+
+  it("turns off at once when the game never answers the close", async () => {
+    const { connection } = await listen();
+    const fake = await game(connection.port, {
+      protocols: [MINECRAFT_JAVA_PROTOCOL],
+    });
+    await connected(connection);
+    // Reads nothing more, so it never answers the close frame
+    tcpOf(fake.socket).pause();
+    const port = connection.port;
+
+    expect(await connection.setEnabled(false)).toBe(true);
+    const server = createServer().listen(port);
+    servers.push(server);
+    await once(server, "listening");
+  });
+
+  it("listens again on its port when turned off and on", async () => {
+    const port = await freePort();
+    const connection = new MinecraftConnection(port);
+    connections.push(connection);
+    expect(await connection.setEnabled(true)).toBe(true);
+    const fake = await game(port, { protocols: [MINECRAFT_JAVA_PROTOCOL] });
+    await connected(connection);
+    tcpOf(fake.socket).pause();
+
+    expect(await connection.setEnabled(false)).toBe(true);
+    expect(await connection.setEnabled(true)).toBe(true);
+    expect(connection.status).toEqual({ state: "waiting" });
+    await game(port, { protocols: [MINECRAFT_JAVA_PROTOCOL] });
+    await connected(connection);
   });
 });

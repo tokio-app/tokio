@@ -1,4 +1,5 @@
 import { APP_HOSTNAME, SERVER_PORT } from "@/common/util";
+import Logger from "@/logger";
 import { shell, type Session, type WebContents } from "electron";
 
 const OVERLAY_HOSTS = ["localhost", "127.0.0.1", "[::1]", APP_HOSTNAME];
@@ -32,6 +33,27 @@ export function stayOnPage(contents: WebContents) {
     if (withoutHash(event.url) !== withoutHash(contents.getURL())) {
       event.preventDefault();
     }
+  });
+}
+
+/**
+ * Loads a page again when its renderer process dies, e.g. out of memory, so
+ * a window doesn't stay blank and silent. `logFile` is read at the crash,
+ * since the log files are set once the app has loaded.
+ */
+export function reloadWhenGone(
+  contents: WebContents,
+  logFile?: () => string | undefined,
+) {
+  contents.on("render-process-gone", (_event, { reason }) => {
+    if (reason === "clean-exit") return;
+    Logger.error(
+      `<System> A page's process is gone (${reason}), reloading ${contents.getURL()}`,
+      logFile?.(),
+    );
+    // shortcut: a page that dies as it loads reloads in a loop, add a
+    // backoff if one ever does
+    contents.reload();
   });
 }
 

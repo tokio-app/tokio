@@ -217,7 +217,10 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES]: { addresses: string[] };
 
   // HOME
+  // success while connecting or connected, which locks the profile; live
+  // once the LIVE has started
   [APP_EVENTS_RESPONSE.CONNECTED]: Reply<{
+    live: boolean;
     stats: {
       views: number;
       viewers: number;
@@ -383,6 +386,8 @@ export interface AppEventsResponseMap {
   // The picture browsed for an action, the first when there were several
   [APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE]: Reply<{
     id: string;
+    // The IMPORT_MINECRAFT_PICTURE request this answers
+    request: number;
     picture?: MediaFile;
   }>;
   // A picture deleted from the library, which main took off every action

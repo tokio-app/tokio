@@ -1,7 +1,12 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import config from "@/config";
 import { Notifier } from "@/helper/feedback";
-import { isOverlayURL, openLinksOutside, stayOnPage } from "@/helper/network";
+import {
+  isOverlayURL,
+  openLinksOutside,
+  reloadWhenGone,
+  stayOnPage,
+} from "@/helper/network";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
 import { GamesService } from "@/services/games";
@@ -110,6 +115,11 @@ export class AppHandler implements AppHandlerVariables {
   private initWindow() {
     stayOnPage(this.win.webContents);
     openLinksOutside(this.win.webContents);
+    // It plays every sound, so a crash would silence the LIVE
+    reloadWhenGone(
+      this.win.webContents,
+      () => this.pathManagerService.files?.logs.system,
+    );
 
     this.ipcMain.on(APP_EVENTS.MINIMIZE_WINDOW, () => {
       this.win.minimize();

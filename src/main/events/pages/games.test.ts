@@ -19,7 +19,7 @@ import {
 import { defaultProfile, GAMES_PATH, IMAGE_EXTENSIONS } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import Logger from "@/logger";
-import type { GamesResult } from "@/services/games";
+import type { ServiceResult } from "@/services/shared";
 import { dialog } from "@test/electron";
 import { createHandler } from "@test/handler";
 import {
@@ -421,7 +421,7 @@ describe("games events", () => {
       const library: MediaFile[] = [];
       const gamesService = {
         importPicture: vi.fn(
-          async (path: string): Promise<GamesResult<MediaFile>> =>
+          async (path: string): Promise<ServiceResult<MediaFile>> =>
             path.endsWith(".svg")
               ? { success: false, error: "Unsupported format: svg" }
               : { success: true, data: path === "/tnt.png" ? tnt : creeper },
@@ -443,6 +443,7 @@ describe("games events", () => {
 
       await h.invoke(games, APP_EVENTS.IMPORT_MINECRAFT_PICTURE, {
         id: "action-1",
+        request: 1,
       });
 
       expect(gamesService.importPicture).not.toHaveBeenCalled();
@@ -455,6 +456,7 @@ describe("games events", () => {
 
       await h.invoke(games, APP_EVENTS.IMPORT_MINECRAFT_PICTURE, {
         id: "action-1",
+        request: 1,
       });
 
       expect(dialog.showOpenDialog.mock.calls[0][1]).toMatchObject({
@@ -468,7 +470,7 @@ describe("games events", () => {
       expect(h.sent()).toEqual([
         [
           APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE,
-          { success: true, id: "action-1", picture: tnt },
+          { success: true, id: "action-1", request: 1, picture: tnt },
         ],
         [
           APP_EVENTS_RESPONSE.MINECRAFT_PICTURES,
@@ -492,10 +494,11 @@ describe("games events", () => {
 
       await h.invoke(games, APP_EVENTS.IMPORT_MINECRAFT_PICTURE, {
         id: "action-1",
+        request: 1,
       });
 
       expect(h.replies(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE)).toEqual([
-        { success: true, id: "action-1", picture: creeper },
+        { success: true, id: "action-1", request: 1, picture: creeper },
       ]);
       expect(h.replies(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES)).toEqual([
         { success: true, data: [creeper, tnt] },
@@ -511,10 +514,11 @@ describe("games events", () => {
 
       await h.invoke(games, APP_EVENTS.IMPORT_MINECRAFT_PICTURE, {
         id: "action-1",
+        request: 1,
       });
 
       expect(h.replies(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE)).toEqual([
-        { success: true, id: "action-1", picture: tnt },
+        { success: true, id: "action-1", request: 1, picture: tnt },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({ code: FEEDBACK_CODES.GAME_PICTURES_ADDED }),
@@ -533,6 +537,7 @@ describe("games events", () => {
 
       await h.invoke(games, APP_EVENTS.IMPORT_MINECRAFT_PICTURE, {
         id: "action-1",
+        request: 1,
       });
 
       expect(h.sent()).toEqual([
@@ -541,6 +546,7 @@ describe("games events", () => {
           {
             success: false,
             id: "action-1",
+            request: 1,
             error: {
               code: FEEDBACK_CODES.GAME_PICTURE_IMPORT_FAILED,
               message:
@@ -566,6 +572,7 @@ describe("games events", () => {
 
       await h.invoke(games, APP_EVENTS.IMPORT_MINECRAFT_PICTURE, {
         id: "action-1",
+        request: 1,
       });
 
       expect(h.sent()).toEqual([
@@ -579,6 +586,7 @@ describe("games events", () => {
           {
             success: false,
             id: "action-1",
+            request: 1,
             error: expect.objectContaining({
               code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
             }),
@@ -591,7 +599,7 @@ describe("games events", () => {
   describe("REMOVE_MINECRAFT_PICTURE", () => {
     const setup = (
       cleared = true,
-      deleted: GamesResult<void> = { success: true },
+      deleted: ServiceResult<void> = { success: true },
     ) => {
       const services = overlay();
       const gamesService = {

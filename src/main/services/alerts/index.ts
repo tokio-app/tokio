@@ -33,13 +33,7 @@ import type { ServerService } from "@/services/server";
 import type { TTSService } from "@/services/tts";
 import { access, readFile, unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { Service } from "../shared";
-
-export interface AlertsResult<T> {
-  success: boolean;
-  error?: string;
-  data?: T;
-}
+import { Service, type ServiceResult } from "../shared";
 
 export interface MyInstantsPage {
   sounds: MyInstantsSound[];
@@ -117,7 +111,7 @@ export class AlertsService extends Service {
    */
   public async getTrending(
     page: number = 1,
-  ): Promise<AlertsResult<MyInstantsPage>> {
+  ): Promise<ServiceResult<MyInstantsPage>> {
     const url = new URL(this.BASE_URL);
     if (page > 1) url.searchParams.append("page", page.toString());
     return this._fetchPage(url, page);
@@ -129,7 +123,7 @@ export class AlertsService extends Service {
   public async search(
     query: string,
     page: number = 1,
-  ): Promise<AlertsResult<MyInstantsPage>> {
+  ): Promise<ServiceResult<MyInstantsPage>> {
     const url = new URL(`${this.BASE_URL}/search/`);
     url.searchParams.append("name", query);
     url.searchParams.append("page", page.toString());
@@ -140,7 +134,7 @@ export class AlertsService extends Service {
    * Gets a MyInstants sound without saving it, e.g. for previews.
    * Uses memory or the downloaded file before going to the network.
    */
-  public async fetchSound(url: string): Promise<AlertsResult<Uint8Array>> {
+  public async fetchSound(url: string): Promise<ServiceResult<Uint8Array>> {
     try {
       if (!this._isMyInstantsUrl(url)) {
         throw new Error(`Refusing to fetch non MyInstants url: ${url}`);
@@ -154,6 +148,8 @@ export class AlertsService extends Service {
       if (!response.ok) {
         throw new Error(`MyInstants responded with status: ${response.status}`);
       }
+      // Before the body is read, when MyInstants says how big it is
+      this._checkSize(Number(response.headers.get("content-length")));
       const data = new Uint8Array(await response.arrayBuffer());
       this._checkSize(data.byteLength);
       this._remember(file, data);
@@ -170,7 +166,7 @@ export class AlertsService extends Service {
   public async downloadSound(
     url: string,
     name: string,
-  ): Promise<AlertsResult<AlertSound>> {
+  ): Promise<ServiceResult<AlertSound>> {
     const file = this._fileForUrl(url);
     if (await isSaved(join(this._soundsFolder, file))) {
       return { success: true, data: { name, file } };
@@ -190,7 +186,9 @@ export class AlertsService extends Service {
   /**
    * Copies a local audio file into the sounds folder.
    */
-  public async importSound(srcPath: string): Promise<AlertsResult<AlertSound>> {
+  public async importSound(
+    srcPath: string,
+  ): Promise<ServiceResult<AlertSound>> {
     try {
       const { data, entry } = await importFile(
         srcPath,
@@ -208,7 +206,7 @@ export class AlertsService extends Service {
   /**
    * Copies a local image or video into the media folder.
    */
-  public async importMedia(srcPath: string): Promise<AlertsResult<MediaFile>> {
+  public async importMedia(srcPath: string): Promise<ServiceResult<MediaFile>> {
     try {
       const { entry } = await importFile(
         srcPath,
@@ -222,7 +220,7 @@ export class AlertsService extends Service {
     }
   }
 
-  public async deleteMedia(file: string): Promise<AlertsResult<void>> {
+  public async deleteMedia(file: string): Promise<ServiceResult<void>> {
     try {
       await unlink(join(this._mediaFolder, basename(file)));
       return { success: true };
@@ -231,7 +229,7 @@ export class AlertsService extends Service {
     }
   }
 
-  public async deleteSound(file: string): Promise<AlertsResult<void>> {
+  public async deleteSound(file: string): Promise<ServiceResult<void>> {
     const name = basename(file);
     this._forget(name);
     this._reading.delete(name);
@@ -246,7 +244,7 @@ export class AlertsService extends Service {
   public async readSound(
     file: string,
     logMissing: boolean = true,
-  ): Promise<AlertsResult<Uint8Array>> {
+  ): Promise<ServiceResult<Uint8Array>> {
     // basename keeps a stored value from pointing outside the sounds folder
     const name = basename(file);
     const cached = this._cache.get(name);
@@ -272,7 +270,7 @@ export class AlertsService extends Service {
     tts: AlertTts,
     payload: TokioEventMap[AppEvents],
     settings: Profile["tts"],
-  ): Promise<AlertsResult<Uint8Array> & { skipped?: boolean }> {
+  ): Promise<ServiceResult<Uint8Array> & { skipped?: boolean }> {
     const text = this._message(tts, payload, settings);
     if (text === null) return { success: false, skipped: true };
     return this._generate(tts, text);
@@ -489,7 +487,7 @@ export class AlertsService extends Service {
     tts: AlertTts,
     text: string,
     log = true,
-  ): Promise<AlertsResult<Uint8Array>> {
+  ): Promise<ServiceResult<Uint8Array>> {
     try {
       if (!this._speaker) throw new Error("No TTS to speak with.");
 
@@ -521,7 +519,7 @@ export class AlertsService extends Service {
   private async _fetchPage(
     url: URL,
     page: number,
-  ): Promise<AlertsResult<MyInstantsPage>> {
+  ): Promise<ServiceResult<MyInstantsPage>> {
     try {
       if (page < 1) throw new Error("Page must be a positive integer.");
 

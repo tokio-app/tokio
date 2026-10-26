@@ -1296,6 +1296,40 @@ describe("AlertsService", () => {
       );
     });
 
+    it("refuses a sound too big to keep", async () => {
+      // A stream, so the response doesn't say its size
+      const body = () =>
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(CACHE_MAX_FILE_BYTES + 1));
+            controller.close();
+          },
+        });
+      const fetchMock = vi.fn(async () => new Response(body()));
+      vi.stubGlobal("fetch", fetchMock);
+
+      expect((await service.downloadSound(SOUND_URL, "Long")).success).toBe(
+        false,
+      );
+      expect((await service.fetchSound(SOUND_URL)).success).toBe(false);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(await readdir(sounds)).toEqual(["ding.mp3"]);
+    });
+
+    it("refuses a sound that says it's too big before reading it", async () => {
+      const arrayBuffer = vi.fn();
+      const headers = { "content-length": `${CACHE_MAX_FILE_BYTES + 1}` };
+      vi.stubGlobal("fetch", async () => ({
+        ok: true,
+        headers: new Headers(headers),
+        arrayBuffer,
+      }));
+
+      expect((await service.fetchSound(SOUND_URL)).success).toBe(false);
+      expect(arrayBuffer).not.toHaveBeenCalled();
+    });
+
     it("parses search results with the file each saves to", async () => {
       const html = await readFile(FIXTURE, "utf-8");
       const fetchMock = vi.fn(async (url: string) =>

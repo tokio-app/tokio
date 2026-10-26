@@ -300,6 +300,7 @@ const registerConnectorEvents = ({
       win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
       win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
+        live: false,
         stats: {
           likes: 0,
           viewers: 0,
@@ -368,7 +369,7 @@ const registerConnectorEvents = ({
     }
     if (features.music && music.isActive()) {
       if (!profile) return;
-      music.handle(d, profile.music);
+      music.handle(d, profile.music, profile.connector.username);
     } else {
       music.clearHandler();
     }

@@ -172,7 +172,8 @@ export function parseSongRenderer(itemRenderer: any): SongInfo | null {
   const metaRuns =
     itemRenderer.flexColumns?.[1]?.musicResponsiveListItemFlexColumnRenderer
       ?.text?.runs ?? [];
-  const durationRun = metaRuns.find((run: any) =>
+  // The length is the last run: an album named "1989" also looks like a time.
+  const durationRun = metaRuns.findLast((run: any) =>
     TIME_REGEX.test(run.text?.trim()),
   );
   const duration = parseDurationToSeconds(durationRun?.text) * 1000;

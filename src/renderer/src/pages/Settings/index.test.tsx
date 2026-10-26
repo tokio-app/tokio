@@ -21,6 +21,7 @@ const serverBox = () => screen.getByRole("checkbox", { name: "Enable Server" });
 const connected = (success: boolean) =>
   send(APP_EVENTS_RESPONSE.CONNECTED, {
     success,
+    live: success,
     stats: { views: 0, viewers: 0, likes: 0 },
   });
 

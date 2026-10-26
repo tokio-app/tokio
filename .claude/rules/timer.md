@@ -23,7 +23,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
   - The end is a `setTimeout` capped at 2³¹−1 ms, scheduled again when it fires early.
   - `_settle()` ends an overdue clock first in every method, so a gift right after 0 can't bring it back.
 - `adjust(ms)` (Add and Remove, not while idle) is exact, without the multiplier. Removing down to 0 while running ends the clock.
-- `cap` (minutes) stops added time, from events or Add, at that much on the clock. It never cuts time already there, or the starting time.
+- `cap` (minutes) stops added time, from events or Add, at that much on the clock. It never cuts time already there, or the starting time. The clock is clamped to `Number.MAX_SAFE_INTEGER` ms, so an absurd multiplier or Adjust can't make it `Infinity`, which can't save.
 
 ## Triggers
 
@@ -69,7 +69,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 ## Tools page
 
 - **Tools** is a page of settings (`layout="aside"`): Countdown Timer, Timer Look, Time Added, then Test Overlays. The server-off notice sits above them. Timer Look comes right after the preview, colors first, so its changes show while they're made.
-- With **Show the triggers, one at a time** on, Timer Look lists a name field for each trigger that adds time. Those fields have their own accessible names ("Follows on stream"), apart from the seconds fields that share their labels.
+- With **Show the triggers, one at a time** on, Timer Look lists a name field for each trigger that adds time (its seconds × the multiplier over 0, as `timerTriggers` keeps them, so a multiplier of 0 lists none). Those fields have their own accessible names ("Follows on stream"), apart from the seconds fields that share their labels.
 - One `useAutosave(timer.settings)` feeds the three timer sections, nested fields through immer's `produce`. `useAutosave` keys its delay on `prevSaved`, so main's pushes (a new but equal `settings` every 250 ms on a busy LIVE) don't keep restarting it.
 - The controls (Start, Pause, Stop, Reset, Add, Remove) call `flushSettings()` before `TIMER_CONTROL` or `ADJUST_TIMER`, so a setting still waiting to save, like the starting time, reaches main first.
 - The preview counts down from the last push's `at`, ticking only while running. While idle, it shows the starting time as typed. Its clock is weight 800 like the overlay's, heavier than the app's other readouts (700).

@@ -14,11 +14,12 @@ import type { UserEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const connected = (stats = { views: 1234, viewers: 12, likes: 5 }) =>
-  send(APP_EVENTS_RESPONSE.CONNECTED, { success: true, stats });
+  send(APP_EVENTS_RESPONSE.CONNECTED, { success: true, live: true, stats });
 
 const disconnected = () =>
   send(APP_EVENTS_RESPONSE.CONNECTED, {
     success: false,
+    live: false,
     stats: { views: 0, viewers: 0, likes: 0 },
   });
 
@@ -94,6 +95,22 @@ describe("Home", () => {
     expect(
       page().getByRole("button", { name: "Disconnect" }),
     ).not.toHaveAttribute("aria-busy");
+  });
+
+  it("shows a connect still in progress when it opens", async () => {
+    await renderApp();
+
+    await send(APP_EVENTS_RESPONSE.CONNECTED, {
+      success: true,
+      live: false,
+      stats: { views: 0, viewers: 0, likes: 0 },
+    });
+
+    expect(status()).toHaveTextContent("Offline");
+    expect(page().getByRole("button", { name: "Loading" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
   });
 
   it("doesn't connect without a username", async () => {

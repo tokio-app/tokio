@@ -1297,7 +1297,7 @@ describe("init events", () => {
       expect(s.h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toEqual([undefined]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([undefined]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: false, stats: noStats },
+        { success: false, live: false, stats: noStats },
       ]);
       expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith(
         noStats,
@@ -1531,6 +1531,7 @@ describe("init events", () => {
         expect(s.musicService.handle).toHaveBeenCalledExactlyOnceWith(
           message,
           profile.music,
+          profile.connector.username,
         );
       });
       expect(s.musicService.clearHandler).not.toHaveBeenCalled();

@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GamesService, MAX_BACKLOG, RUN_GAP_MS } from "./index";
+import { DISCONNECTED } from "./minecraft";
 
 // Stands in for the game's WebSocket: records the commands, answers each
 // with `answer`. Connected, it's the edition's game.
@@ -113,7 +114,7 @@ describe("GamesService", () => {
     expect(minecraft.setEnabled).toHaveBeenCalledWith(true);
   });
 
-  it("passes on every status, and logs each change once", () => {
+  it("passes on every status and logs it", () => {
     const info = vi.spyOn(Logger, "info");
     const minecraft = fakeMinecraft("off");
     const games = service(minecraft);
@@ -122,13 +123,11 @@ describe("GamesService", () => {
     games.onStatus(listener);
 
     minecraft.set({ state: "waiting" });
-    minecraft.set({ state: "waiting" });
     minecraft.set({ state: "connected", edition: "bedrock" });
     minecraft.set({ state: "connected", edition: "java" });
     minecraft.set({ state: "error", error: "Port 37892 is in use." });
 
     expect(listener.mock.calls).toEqual([
-      [{ minecraft: { state: "waiting" } }],
       [{ minecraft: { state: "waiting" } }],
       [{ minecraft: { state: "connected", edition: "bedrock" } }],
       [{ minecraft: { state: "connected", edition: "java" } }],
@@ -527,6 +526,27 @@ describe("GamesService", () => {
             },
           ],
         ]);
+      });
+
+      it("goes on quietly in a game that replaced one of its edition", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft("connected", "java");
+        // The first run's game is replaced, and the new one is connected
+        // by the time it fails
+        minecraft.send.mockImplementationOnce(async (command) => {
+          minecraft.sent.push(command);
+          return { command, ok: false, message: DISCONNECTED };
+        });
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(3), {
+          actions: [{ ...everyGift(), edition: "java" }],
+        });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toEqual(["each 3", "each 3", "each 3"]);
+        expect(onError).not.toHaveBeenCalled();
       });
 
       it("drops the rest quietly when Minecraft is turned off midway", async () => {

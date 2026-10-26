@@ -169,7 +169,11 @@ events.push(
 // others, the service logs each failure. The picker shows a failure itself.
 events.push(
   APP_EVENTS.IMPORT_MINECRAFT_PICTURE,
-  async ({ win, gamesService, storeManagerService, notifier }, e, { id }) => {
+  async (
+    { win, gamesService, storeManagerService, notifier },
+    e,
+    { id, request },
+  ) => {
     const diagRes = await showOpenDialog(win, {
       title: "Select pictures",
       properties: ["openFile", "multiSelections"],
@@ -210,6 +214,7 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       success: true,
       id,
+      request,
       picture: pictures[0],
     });
     e.reply(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES, {
@@ -238,10 +243,11 @@ events.push(
       message:
         "Unable to use the file. Pick a png, jpg, gif or webp file up to 50 MB.",
     },
-    onError: (e, error, { id }) =>
+    onError: (e, error, { id, request }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
         success: false,
         id,
+        request,
         error,
       }),
   },

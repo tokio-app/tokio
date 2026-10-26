@@ -50,7 +50,7 @@ describe("home events", () => {
       });
       expect(connectorService.connect).toHaveBeenCalledWith("streamer");
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: true, stats },
+        { success: true, live: true, stats },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({
@@ -71,7 +71,7 @@ describe("home events", () => {
 
       expect(connectorService.connect).toHaveBeenCalledWith("streamer");
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: true, stats },
+        { success: true, live: true, stats },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({
@@ -117,7 +117,7 @@ describe("home events", () => {
         message: "Unable to connect to @streamer. Try again in a moment.",
       };
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: false, stats: noStats, error: failure },
+        { success: false, live: false, stats: noStats, error: failure },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({ level: "error", ...failure }),
@@ -187,7 +187,7 @@ describe("home events", () => {
 
       expect(disconnect).toHaveBeenCalledOnce();
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: false, stats: noStats },
+        { success: false, live: false, stats: noStats },
       ]);
       expect(h.notices).toEqual([]);
     });
@@ -209,23 +209,37 @@ describe("home events", () => {
         message: "Unable to disconnect from the LIVE.",
       };
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: false, stats: noStats, error: failure },
+        { success: false, live: false, stats: noStats, error: failure },
       ]);
       expect(h.notices).toEqual([expect.objectContaining(failure)]);
     });
   });
 
   describe("IS_CONNECTED", () => {
+    // A session starts once the connect worked
+    const connected = (startedAt: number | null) => ({
+      connectorService: { isConnected: () => true },
+      liveService: { getSession: () => ({ startedAt }) },
+      storeManagerService: { getSettings: () => ({ liveStats: stats }) },
+    });
+
     it("answers with the saved stats and whether the LIVE is connected", async () => {
-      const h = createHandler({
-        connectorService: { isConnected: () => true },
-        storeManagerService: { getSettings: () => ({ liveStats: stats }) },
-      });
+      const h = createHandler(connected(1000));
 
       await h.invoke(home, APP_EVENTS.IS_CONNECTED);
 
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: true, stats },
+        { success: true, live: true, stats },
+      ]);
+    });
+
+    it("locks the profile but isn't LIVE while connecting", async () => {
+      const h = createHandler(connected(null));
+
+      await h.invoke(home, APP_EVENTS.IS_CONNECTED);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
+        { success: true, live: false, stats },
       ]);
     });
 
@@ -243,7 +257,11 @@ describe("home events", () => {
       await h.invoke(home, APP_EVENTS.IS_CONNECTED);
 
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        expect.objectContaining({ success: false, stats: noStats }),
+        expect.objectContaining({
+          success: false,
+          live: false,
+          stats: noStats,
+        }),
       ]);
       expect(h.notices).toEqual([]);
     });

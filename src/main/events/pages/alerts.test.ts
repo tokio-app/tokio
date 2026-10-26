@@ -13,7 +13,8 @@ import {
   MEDIA_EXTENSIONS,
 } from "@/common/util";
 import Logger from "@/logger";
-import { type AlertsResult, type AlertsService } from "@/services/alerts";
+import { type AlertsService } from "@/services/alerts";
+import type { ServiceResult } from "@/services/shared";
 import { dialog } from "@test/electron";
 import { createHandler } from "@test/handler";
 import {
@@ -102,7 +103,7 @@ describe("alerts events", () => {
 
   describe("SEARCH_SOUNDS", () => {
     const setup = (
-      res: AlertsResult<{ sounds: MyInstantsSound[]; hasNextPage: boolean }>,
+      res: ServiceResult<{ sounds: MyInstantsSound[]; hasNextPage: boolean }>,
     ) => {
       const alertsService = {
         search: vi.fn(async (_query: string, _page?: number) => res),
@@ -201,7 +202,7 @@ describe("alerts events", () => {
       name: "Airhorn",
     };
 
-    const setup = (res: AlertsResult<AlertSound>) => {
+    const setup = (res: ServiceResult<AlertSound>) => {
       const alertsService = {
         downloadSound: vi.fn(async (_url: string, _name: string) => res),
       };
@@ -268,7 +269,7 @@ describe("alerts events", () => {
 
   describe("IMPORT_SOUND", () => {
     const setup = (
-      res: AlertsResult<AlertSound> = { success: true, data: ding },
+      res: ServiceResult<AlertSound> = { success: true, data: ding },
     ) => {
       const alertsService = {
         importSound: vi.fn(async (_path: string) => res),
@@ -360,7 +361,7 @@ describe("alerts events", () => {
   });
 
   describe("GET_SOUND_DATA", () => {
-    const setup = (res: AlertsResult<Uint8Array>) => {
+    const setup = (res: ServiceResult<Uint8Array>) => {
       const readSound = vi.fn(async (_file: string) => res);
       return { h: createHandler({ alertsService: { readSound } }), readSound };
     };
@@ -399,7 +400,7 @@ describe("alerts events", () => {
     const setup = (spoken: SpeakResult = { success: true, data: audio }) => {
       const alertsService = {
         readSound: vi.fn(
-          async (_file: string): Promise<AlertsResult<Uint8Array>> => ({
+          async (_file: string): Promise<ServiceResult<Uint8Array>> => ({
             success: true,
             data: audio,
           }),
@@ -684,7 +685,7 @@ describe("alerts events", () => {
     const setup = () => {
       const alertsService = {
         importSound: vi.fn(
-          async (path: string): Promise<AlertsResult<AlertSound>> =>
+          async (path: string): Promise<ServiceResult<AlertSound>> =>
             path.endsWith(".mp3")
               ? { success: true, data: { name: path, file: `${path}.hash` } }
               : { success: false, error: "Unsupported audio format" },
@@ -833,7 +834,7 @@ describe("alerts events", () => {
   ] as const)("$event", (c) => {
     const setup = (
       cleared = true,
-      deleted: AlertsResult<void> = { success: true },
+      deleted: ServiceResult<void> = { success: true },
     ) => {
       const remove = vi.fn(async (_file: string) => deleted);
       const alertsService = { deleteSound: remove, deleteMedia: remove };
@@ -938,7 +939,7 @@ describe("alerts events", () => {
 
   describe("IMPORT_MEDIA", () => {
     const setup = (
-      res: AlertsResult<MediaFile> = { success: true, data: party },
+      res: ServiceResult<MediaFile> = { success: true, data: party },
     ) => {
       const alertsService = {
         importMedia: vi.fn(async (_path: string) => res),
@@ -1081,7 +1082,7 @@ describe("alerts events", () => {
     const setup = (media: MediaFile[] = []) => {
       const alertsService = {
         importMedia: vi.fn(
-          async (path: string): Promise<AlertsResult<MediaFile>> =>
+          async (path: string): Promise<ServiceResult<MediaFile>> =>
             path.endsWith(".png")
               ? { success: true, data: { name: path, file: `${path}.hash` } }
               : { success: false, error: "Unsupported format" },

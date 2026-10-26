@@ -73,6 +73,7 @@ events.push(
       answered = true;
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: true,
+        live: true,
         stats,
       });
       notifier.success(
@@ -106,6 +107,7 @@ events.push(
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
+        live: false,
         stats: EMPTY_STATS,
         error,
       }),
@@ -118,6 +120,7 @@ events.push(
     await connectorService.disconnect();
     e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
       success: false,
+      live: false,
       stats: EMPTY_STATS,
     });
   },
@@ -129,6 +132,7 @@ events.push(
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
+        live: false,
         stats: EMPTY_STATS,
         error,
       }),
@@ -137,10 +141,13 @@ events.push(
 
 events.push(
   APP_EVENTS.IS_CONNECTED,
-  async ({ connectorService, storeManagerService }, e) => {
+  async ({ connectorService, liveService, storeManagerService }, e) => {
     e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
       stats: storeManagerService.getSettings().liveStats,
+      // True while connecting too, which locks the profile
       success: connectorService.isConnected(),
+      // A connect still in progress hasn't started the session
+      live: liveService.getSession().startedAt !== null,
     });
   },
   {
@@ -148,6 +155,7 @@ events.push(
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
+        live: false,
         stats: EMPTY_STATS,
         error,
       }),

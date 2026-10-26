@@ -47,11 +47,6 @@ export default class Logger {
     });
   }
 
-  /** Resolves once every pending file write has finished. */
-  public static async flush() {
-    await Promise.all(Logger._writes.values());
-  }
-
   public static info(msg: string, logFile?: string) {
     Logger.log("INFO", msg, logFile);
   }

@@ -662,8 +662,8 @@ describe("AudioQueue", () => {
 
     const [cut, toEnd] = tone.players;
     expect([cut.offset, cut.length]).toEqual([0.5, 1]);
-    // To the sound's end at twice the speed
-    expect([toEnd.offset, toEnd.length]).toEqual([0.5, undefined]);
+    // To the sound's end at twice the speed, from the offset in played seconds
+    expect([toEnd.offset, toEnd.length]).toEqual([0.25, undefined]);
     expect(tone.players.map((p) => p.startedAt)).toEqual([10, 11.5, 12.75]);
     expect(onScheduled).toHaveBeenCalledWith(0.25, 1);
 
@@ -678,6 +678,17 @@ describe("AudioQueue", () => {
     cut.finish();
     vi.advanceTimersByTime((0.1 + CUT_FADE) * 1000);
     expect(fades[0].disposed).toBe(true);
+  });
+
+  it("plays a cut's part at another speed", async () => {
+    const queue = new AudioQueue();
+    tone.decode.mockResolvedValueOnce({ ...audio(), duration: 4 });
+
+    await queue.enqueue(bytes(), { start: 1, end: 3, speed: 2 });
+
+    // GrainPlayer starts at the offset times the speed
+    const [cut] = tone.players;
+    expect([cut.offset, cut.length]).toEqual([0.5, 1]);
   });
 
   it("keeps a sound's nodes until it's heard", async () => {

@@ -5,7 +5,7 @@ const defaultEntity = {
   name: "Default",
 };
 
-const defaultProvider = { name: "Default", key: "", active: true };
+const defaultProvider = { name: "Default", key: "" };
 
 export const defaultStoreData: StoreSchema = {
   settings: {

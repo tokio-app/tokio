@@ -1,3 +1,4 @@
+import { OverlayConfig } from "@/common/schemas";
 import { YAMLManagerService } from "@/services/yaml";
 import { JSDOM } from "jsdom";
 import {
@@ -120,6 +121,31 @@ describe("processHTML", () => {
       await processHTML("a", '<script id="tokio-setup"></script>', dir),
     ).toEqual({ success: true });
     expect(await html()).toBe(written);
+  });
+
+  it("keeps a setting from closing the setup block", async () => {
+    const block = '<script id="tokio-setup"></script>';
+    await writeFile(join(dir, "index.html"), block);
+    const config: OverlayConfig = {
+      sections: [{ name: "Main", id: "main" }],
+      fields: [
+        {
+          name: "Title",
+          id: "title",
+          section: "main",
+          type: "input",
+          attributes: { mode: "text", value: "</script><b>", default: "" },
+        },
+      ],
+    };
+
+    expect((await processHTML("a", block, dir, config)).success).toBe(true);
+
+    const written = await html();
+    expect(written).toContain("\\u003c/script>\\u003cb>");
+    expect(written.split("tokio-setup")[1].match(/<\/script>/g)).toHaveLength(
+      1,
+    );
   });
 
   it("leaves an HTML that already has its settings alone", async () => {

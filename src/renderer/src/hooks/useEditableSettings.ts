@@ -65,8 +65,9 @@ export function useFlush(flush: () => void) {
  */
 export function useEditableSettings<K extends Section>(
   section: K,
-  // Called with the profile every time it's loaded
-  onLoad?: (profile: Profile) => void,
+  // Called with the profile every time it's loaded, `switched` when it's
+  // another profile than the last one
+  onLoad?: (profile: Profile, switched: boolean) => void,
 ) {
   const [settings, update, setSettings] = useImmerState<Profile[K]>(
     defaultProfile[section],
@@ -78,6 +79,12 @@ export function useEditableSettings<K extends Section>(
   // Until then the settings are the defaults, which a save would write over
   // the profile
   const loaded = useRef(false);
+  // Name of the profile last loaded. A reply also comes for a resync or
+  // another component's request, which isn't a switch.
+  // shortcut: names are unique per profile, but a rebuilt store copies the
+  // files' names and can repeat one; send the active file in GET_PROFILE if
+  // that ever matters
+  const shown = useRef<string | null>(null);
 
   const flush = useCallback(() => {
     const waiting = pending.current;
@@ -98,7 +105,9 @@ export function useEditableSettings<K extends Section>(
     loaded.current = true;
     setSettings(res.profile![section]);
     setSaved(res.profile![section]);
-    onLoad?.(res.profile!);
+    const switched = res.profile!.name !== shown.current;
+    shown.current = res.profile!.name;
+    onLoad?.(res.profile!, switched);
   });
 
   useIpcListener(SAVE_REPLY[section], (res) => {

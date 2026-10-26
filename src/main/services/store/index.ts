@@ -75,6 +75,8 @@ export class StoreManagerService extends Service {
   private _profileWrite: Promise<unknown> = Promise.resolve();
   // The active file's last failed load, so live events don't read it each time
   private _failedLoad: { file: string; at: number } | null = null;
+  // The last failed emote save, so chats don't write a broken file each time
+  private _failedEmotes: { file: string; at: number } | null = null;
 
   // fresh waits for updates still writing and retries a failed file at once.
   public async getProfileData({ fresh = false }: { fresh?: boolean } = {}) {
@@ -321,7 +323,7 @@ export class StoreManagerService extends Service {
     const missing = service
       .providerNames()
       .filter((name) => !saved.some((p) => p.name === name))
-      .map((name) => ({ name, key: "", active: false }));
+      .map((name) => ({ name, key: "" }));
     return [...saved, ...missing];
   }
 
@@ -577,9 +579,19 @@ export class StoreManagerService extends Service {
     }
 
     if (!changed) return { success: true };
-    if (!(await this.updateProfileData({ emotes: saved }))) {
+    const file = this._activeProfileFile();
+    const failed = this._failedEmotes;
+    if (
+      failed?.file === file &&
+      performance.now() - failed.at < LOAD_RETRY_MS
+    ) {
       return { success: false };
     }
+    if (!(await this.updateProfileData({ emotes: saved }, file))) {
+      this._failedEmotes = { file, at: performance.now() };
+      return { success: false };
+    }
+    this._failedEmotes = null;
     return { success: true, data: saved };
   }
 
@@ -635,6 +647,8 @@ export class StoreManagerService extends Service {
     if (!(await this._queueSave())) {
       this._storeData!.settings.activeProfile = previous;
       this._memoryProfile = previousProfile;
+      // An earlier save still queued may have written the switch.
+      void this._queueSave();
       return "unsaved";
     }
     return "switched";
@@ -648,7 +662,6 @@ export class StoreManagerService extends Service {
     const provider = await this._encryptProviderKey({
       name,
       key: key || "",
-      active: true,
     });
 
     const settings = this._storeData!.settings;
@@ -683,7 +696,6 @@ export class StoreManagerService extends Service {
     const saved = await this._encryptProviderKey({
       name: engine,
       key,
-      active: list[index]?.active ?? false,
     });
     if (index !== -1) {
       list[index] = saved;
@@ -951,6 +963,8 @@ export class StoreManagerService extends Service {
     if (await this._queueSave()) return profile;
     // Unlisted again, so trying again isn't refused as a taken name.
     profiles.splice(profiles.indexOf(profile), 1);
+    // An earlier save still queued may have listed it.
+    void this._queueSave();
     return null;
   }
 

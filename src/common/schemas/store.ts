@@ -4,7 +4,6 @@ import { AlertSoundSchema } from "./profile";
 const ProviderSchema = z.object({
   name: z.string(),
   key: z.string(),
-  active: z.boolean(),
 });
 
 const EntityMetadataSchema = z.object({

@@ -19,9 +19,19 @@ export function Games() {
   // Actions waiting for main to save browsed pictures. A pick made since
   // drops the action, so a slow dialog can't replace it.
   const asked = useRef(new Set<string>());
+  // Numbers the browses, and the newest one applied per action, so a late
+  // reply to an older browse can't replace a newer one
+  const counter = useRef(0);
+  const applied = useRef(new Map<string, number>());
 
-  const { settings, update } = useEditableSettings("games", (profile) =>
-    setEmotes(profile.emotes),
+  const { settings, update } = useEditableSettings(
+    "games",
+    (profile, switched) => {
+      setEmotes(profile.emotes);
+      // A clone has the same action ids: a browse for the last profile
+      // mustn't land in this one
+      if (switched) asked.current.clear();
+    },
   );
 
   useIpcRequest(APP_EVENTS.GET_GAMES);
@@ -46,6 +56,8 @@ export function Games() {
   // A browse still applies after its picker closed
   useIpcListener(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, (res) => {
     if (!res?.success || !res.picture || !asked.current.has(res.id)) return;
+    if (res.request <= (applied.current.get(res.id) ?? 0)) return;
+    applied.current.set(res.id, res.request);
     setPicture(res.id, res.picture);
   });
 
@@ -106,7 +118,10 @@ export function Games() {
         <PicturePicker
           id={pictureAction.id}
           picture={pictureAction.overlay.image}
-          onRequest={() => asked.current.add(pictureAction.id)}
+          onRequest={() => {
+            asked.current.add(pictureAction.id);
+            return ++counter.current;
+          }}
           onSelect={(picture) => {
             asked.current.delete(pictureAction.id);
             setPicture(pictureAction.id, picture);

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushSettings, useEditableSettings } from "./useEditableSettings";
 
 // The TTS settings, as the TTS page edits them
-function setup(onLoad?: (profile: Profile) => void) {
+function setup(onLoad?: (profile: Profile, switched: boolean) => void) {
   const { wrapper } = providers();
   const hook = renderHook(() => useEditableSettings("tts", onLoad), {
     wrapper,
@@ -55,7 +55,26 @@ describe("useEditableSettings", () => {
     await send(APP_EVENTS_RESPONSE.GET_PROFILE, loaded);
 
     expect(result.current.settings).toEqual(loaded.profile.tts);
-    expect(onLoad).toHaveBeenCalledWith(loaded.profile);
+    expect(onLoad).toHaveBeenCalledWith(loaded.profile, true);
+  });
+
+  it("says when the profile loaded is another one", async () => {
+    const onLoad = vi.fn();
+    setup(onLoad);
+    const other = profileReply((p) => {
+      p.name = "Other";
+    });
+
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, loaded);
+    // A resync of the same profile
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, loaded);
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, other);
+
+    expect(onLoad.mock.calls.map(([, switched]) => switched)).toEqual([
+      true,
+      false,
+      true,
+    ]);
   });
 
   it("ignores a failed profile reply", async () => {

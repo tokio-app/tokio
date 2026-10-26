@@ -7,7 +7,8 @@ export class JSONManagerService extends BaseFileManagerService {
     return JSON.stringify(data, null, 2);
   }
 
+  // Without the BOM some editors write first, which JSON.parse refuses
   protected deserialize(content: string): unknown {
-    return JSON.parse(content);
+    return JSON.parse(content.replace(/^\uFEFF/, ""));
   }
 }

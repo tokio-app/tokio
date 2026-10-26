@@ -486,5 +486,23 @@ describe("games overlay", () => {
       // Once out, it turns again
       await vi.waitFor(() => expect(current()).toBe("A"), { timeout: 3500 });
     }, 12_000);
+
+    it("keeps the lit row it shows when another row runs in the same burst", async () => {
+      send([row("a"), row("b"), row("c")], { layout: "carousel" });
+      await vi.waitFor(() => expect(current()).toBe("A"));
+
+      run("b");
+      await vi.waitFor(() => expect(current()).toBe("B"), { timeout: 200 });
+      // Two actions on one gift, their runs 100 ms apart
+      for (let i = 0; i < 5; i++) {
+        run("c");
+        await sleep(100);
+        expect(current()).toBe("B");
+        run("b");
+        await sleep(100);
+        expect(current()).toBe("B");
+      }
+      expect(lit()).toEqual(["B", "C"]);
+    }, 10_000);
   });
 });

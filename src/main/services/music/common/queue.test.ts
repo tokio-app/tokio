@@ -498,6 +498,19 @@ describe("MusicQueue", () => {
       expect(playing(queue)).toBe("b");
     });
 
+    it("is full while every place holds a song still to play", async () => {
+      const queue = new MusicQueue();
+      queue.setMaxSize(2);
+      queue.enqueue("a", song("a"), () => {});
+      expect(queue.full()).toBe(false);
+
+      queue.enqueue("b", song("b"), () => {});
+      expect(queue.full()).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(queue.full()).toBe(false);
+    });
+
     it("trims right away and never goes below 1", () => {
       const queue = new MusicQueue();
       queue.enqueue("a", song("a"), () => {});
@@ -598,6 +611,19 @@ describe("MusicQueue", () => {
 
       expect(titles(queue)).toEqual(["a", "c"]);
     });
+
+    it("removes only the viewer's requests when given one", () => {
+      const queue = new MusicQueue();
+      queue.addCurrentlyPlaying("a", song("a"), 0, () => {});
+      queue.enqueue("b", song("b (ana)"), () => {}, "ana");
+      queue.enqueue("b", song("b (ben)"), () => {}, "ben");
+      queue.addCurrentlyPlaying("b", song("b (player)"), 0, () => {});
+
+      queue.revoke("b", "@Ana");
+      queue.revoke("b", "");
+
+      expect(titles(queue)).toEqual(["a", "b (ben)", "b (player)"]);
+    });
   });
 
   describe("has and waits", () => {
@@ -627,6 +653,18 @@ describe("MusicQueue", () => {
       expect(queue.waits("ana")).toBe(false);
       expect(queue.waits("ben")).toBe(true);
       expect(queue.waits("cat")).toBe(false);
+    });
+
+    it("tells who asked for the song playing", async () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a"), () => {}, "ana");
+      queue.enqueue("b", song("b"), () => {});
+      expect(queue.playingBy()).toBe("ana");
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(queue.playingBy()).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(queue.playingBy()).toBeUndefined();
     });
   });
 

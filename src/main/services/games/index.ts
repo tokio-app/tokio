@@ -31,15 +31,9 @@ import Logger from "@/logger";
 import { unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { MEDIA_MAX_BYTES } from "../alerts";
-import { Service } from "../shared";
+import { Service, type ServiceResult } from "../shared";
 import { commandValue, GameCommand, gameCommands } from "./commands";
-import { MinecraftConnection } from "./minecraft";
-
-export interface GamesResult<T> {
-  success: boolean;
-  error?: string;
-  data?: T;
-}
+import { DISCONNECTED, MinecraftConnection } from "./minecraft";
 
 /**
  * Why an action's commands didn't all run: offline when no game of the
@@ -93,7 +87,6 @@ export class GamesService extends Service {
   private _backlogs = new Map<string, Batch[]>();
   // The latest profile's actions, which can stop a backlog
   private _games: Pick<Profile["games"], "actions"> = { actions: [] };
-  private _last: GameStatus;
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
   private _onRun?: (action: GameAction) => void;
@@ -104,24 +97,17 @@ export class GamesService extends Service {
     private readonly _minecraft: Connection = new MinecraftConnection(),
   ) {
     super();
-    this._last = _minecraft.status;
+    // The connection tells only changes
     _minecraft.onStatus((status) => {
-      if (
-        status.state !== this._last.state ||
-        status.error !== this._last.error ||
-        status.edition !== this._last.edition
-      ) {
-        const why = status.error
-          ? `: ${status.error}`
-          : status.edition
-            ? ` (${MINECRAFT_EDITION_NAMES[status.edition]}).`
-            : ".";
-        Logger.info(
-          `<Games> Minecraft ${STATES[status.state]}${why}`,
-          this._logFile,
-        );
-      }
-      this._last = status;
+      const why = status.error
+        ? `: ${status.error}`
+        : status.edition
+          ? ` (${MINECRAFT_EDITION_NAMES[status.edition]}).`
+          : ".";
+      Logger.info(
+        `<Games> Minecraft ${STATES[status.state]}${why}`,
+        this._logFile,
+      );
       this._onStatus?.(this.status());
     });
   }
@@ -160,7 +146,9 @@ export class GamesService extends Service {
   }
 
   /** Copies a local image into the Minecraft pictures folder. */
-  public async importPicture(srcPath: string): Promise<GamesResult<MediaFile>> {
+  public async importPicture(
+    srcPath: string,
+  ): Promise<ServiceResult<MediaFile>> {
     try {
       const { entry } = await importFile(
         srcPath,
@@ -174,7 +162,7 @@ export class GamesService extends Service {
     }
   }
 
-  public async deletePicture(file: string): Promise<GamesResult<void>> {
+  public async deletePicture(file: string): Promise<ServiceResult<void>> {
     try {
       await unlink(join(this._picturesFolder, basename(file)));
       return { success: true };
@@ -230,7 +218,7 @@ export class GamesService extends Service {
     edition: MinecraftEdition;
     trigger: AlertTrigger;
     steps: GameStep[];
-  }): Promise<GamesResult<CommandResult[]>> {
+  }): Promise<ServiceResult<CommandResult[]>> {
     const unreachable = this._unreachable(edition);
     if (unreachable) return { success: false, error: unreachable };
     const event = trigger === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : trigger;
@@ -385,9 +373,12 @@ export class GamesService extends Service {
           // Turned off midway, which failed what the game hadn't answered
           if (["off", "error"].includes(this._minecraft.status.state)) break;
           // A game that left or was replaced midway fails the commands it
-          // hadn't answered, and drops the rest
+          // hadn't answered, and drops the rest. Replaced by a game of its
+          // edition, the run counts as done and the rest go to the new one.
           const offline = this._unreachable(action.edition) !== undefined;
-          this._onError?.(action, { offline, message: failed.message });
+          if (offline || failed.message !== DISCONNECTED) {
+            this._onError?.(action, { offline, message: failed.message });
+          }
           if (offline) break;
         }
         if (--batch.times === 0) backlog.shift()?.resolve();

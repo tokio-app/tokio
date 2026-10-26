@@ -60,6 +60,8 @@ export const MAX_IN_FLIGHT = 50;
 // Only a safety net: GamesService spaces out each action's runs, so this
 // fills only with many actions firing at once on a game that stopped answering
 export const MAX_WAITING = 10_000;
+// What the pending commands of a game that left or was replaced fail with
+export const DISCONNECTED = "Minecraft disconnected.";
 // Body version 42 parses today's syntax (execute … run); 1 doesn't
 const COMMAND_VERSION = 42;
 const REPLACED: Close = {
@@ -139,7 +141,7 @@ export class MinecraftConnection {
   /** Starts or stops listening. False when the port can't be listened on. */
   public async setEnabled(enabled: boolean): Promise<boolean> {
     if (!enabled) {
-      await this._stop();
+      this._stop();
       return true;
     }
     return (this._listening ??= this._listen());
@@ -204,15 +206,15 @@ export class MinecraftConnection {
     });
   }
 
-  private _stop(): Promise<void> {
-    const wss = this._wss;
+  // The port stops listening at once. Not waiting for the server's close,
+  // which waits for every socket to end: a game that never answers the
+  // close frame would hold it for ws's 30 s timeout.
+  private _stop() {
+    this._wss?.close();
     this._wss = null;
     this._listening = null;
     this._drop(TURNED_OFF);
     this._set({ state: "off" });
-    return new Promise((resolve) =>
-      wss ? wss.close(() => resolve()) : resolve(),
-    );
   }
 
   private _connect(socket: WebSocket) {
@@ -297,7 +299,7 @@ export class MinecraftConnection {
     this._waiting.length = 0;
     for (const { command, resolve, timer } of commands) {
       clearTimeout(timer);
-      resolve(failed(command, "Minecraft disconnected."));
+      resolve(failed(command, DISCONNECTED));
     }
   }
 

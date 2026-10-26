@@ -25,6 +25,7 @@ export const defaultProfile: Profile = {
       cooldown: 2,
       queue_length: 10,
       one_per_viewer: false,
+      limit_controls: true,
     },
     controls: {
       play: {
