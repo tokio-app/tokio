@@ -1,6 +1,6 @@
 import { TimerSettings } from "@/common/schemas";
 import { formatAdded, timerTriggers } from "@/common/util";
-import { formatDuration } from "@/helper";
+import { fontFamily, formatDuration } from "@/helper";
 import { useEffect, useState } from "react";
 import { TimerPush } from "../helper";
 import styles from "../tools.module.css";
@@ -9,13 +9,6 @@ import styles from "../tools.module.css";
 const SLOT_MS = 1500;
 // How long the carousel shows each trigger, as the overlay's TURN_MS
 const TURN_MS = 3000;
-
-// A font named by the streamer, with the app's as the fallback. One CSSOM
-// property, so a name can't add any other style.
-const fontFamily = (font: string) =>
-  font.trim()
-    ? `${JSON.stringify(font.trim())}, "Archivo Variable", sans-serif`
-    : undefined;
 
 interface Props {
   timer: TimerPush;

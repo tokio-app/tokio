@@ -5,6 +5,7 @@ import { GamesOverlay } from "@/common/schemas";
 import { GameOverlayRow } from "@/common/types";
 import { EmptyState } from "@/components";
 import { cx } from "@/helper/cx";
+import { fontFamily } from "@/helper/format";
 import {
   CSSProperties,
   useEffect,
@@ -29,13 +30,6 @@ const LIT_MS = 1500;
 const ROTATE_MS = 2000;
 // How long one at a time shows each row, as the overlay's TURN_MS
 const TURN_MS = 3000;
-
-// A font named by the streamer, with the overlay's as the fallback. One
-// CSSOM property, so a name can't add any other style.
-const fontFamily = (font: string) =>
-  font.trim()
-    ? `${JSON.stringify(font.trim())}, "Archivo Variable", sans-serif`
-    : undefined;
 
 // A Minecraft picture drawn at twice its size or more keeps its pixels sharp,
 // as the overlay's sharpen does
