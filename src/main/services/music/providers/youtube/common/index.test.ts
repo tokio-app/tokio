@@ -145,6 +145,19 @@ describe("parseSongRenderer", () => {
     expect(song?.duration).toBe(3_723_000);
   });
 
+  it("doesn't take an album named like a number for the duration", () => {
+    const song = parseSongRenderer(
+      renderer({
+        columns: [
+          ["Blank Space"],
+          ["Taylor Swift", " • ", "1989", " • ", "3:52"],
+        ],
+      }),
+    );
+
+    expect(song?.duration).toBe(232_000);
+  });
+
   it("gives a duration of 0 without a time", () => {
     const song = parseSongRenderer(
       renderer({ columns: [["Song"], ["Artist", " • ", "Album"]] }),
