@@ -114,7 +114,7 @@ describe("GamesService", () => {
     expect(minecraft.setEnabled).toHaveBeenCalledWith(true);
   });
 
-  it("passes on every status, and logs each change once", () => {
+  it("passes on every status and logs it", () => {
     const info = vi.spyOn(Logger, "info");
     const minecraft = fakeMinecraft("off");
     const games = service(minecraft);
@@ -123,13 +123,11 @@ describe("GamesService", () => {
     games.onStatus(listener);
 
     minecraft.set({ state: "waiting" });
-    minecraft.set({ state: "waiting" });
     minecraft.set({ state: "connected", edition: "bedrock" });
     minecraft.set({ state: "connected", edition: "java" });
     minecraft.set({ state: "error", error: "Port 37892 is in use." });
 
     expect(listener.mock.calls).toEqual([
-      [{ minecraft: { state: "waiting" } }],
       [{ minecraft: { state: "waiting" } }],
       [{ minecraft: { state: "connected", edition: "bedrock" } }],
       [{ minecraft: { state: "connected", edition: "java" } }],

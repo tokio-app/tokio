@@ -93,7 +93,6 @@ export class GamesService extends Service {
   private _backlogs = new Map<string, Batch[]>();
   // The latest profile's actions, which can stop a backlog
   private _games: Pick<Profile["games"], "actions"> = { actions: [] };
-  private _last: GameStatus;
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
   private _onRun?: (action: GameAction) => void;
@@ -104,24 +103,17 @@ export class GamesService extends Service {
     private readonly _minecraft: Connection = new MinecraftConnection(),
   ) {
     super();
-    this._last = _minecraft.status;
+    // The connection tells only changes
     _minecraft.onStatus((status) => {
-      if (
-        status.state !== this._last.state ||
-        status.error !== this._last.error ||
-        status.edition !== this._last.edition
-      ) {
-        const why = status.error
-          ? `: ${status.error}`
-          : status.edition
-            ? ` (${MINECRAFT_EDITION_NAMES[status.edition]}).`
-            : ".";
-        Logger.info(
-          `<Games> Minecraft ${STATES[status.state]}${why}`,
-          this._logFile,
-        );
-      }
-      this._last = status;
+      const why = status.error
+        ? `: ${status.error}`
+        : status.edition
+          ? ` (${MINECRAFT_EDITION_NAMES[status.edition]}).`
+          : ".";
+      Logger.info(
+        `<Games> Minecraft ${STATES[status.state]}${why}`,
+        this._logFile,
+      );
       this._onStatus?.(this.status());
     });
   }
