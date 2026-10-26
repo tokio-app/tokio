@@ -123,8 +123,7 @@ async function game(
     const body = { publicKey: publicKey.toString("base64") };
 
     // Corked, the three frames leave in one TCP chunk, as the game sends them
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ws keeps its TCP socket private
-    const tcp = (socket as unknown as { _socket: Socket })._socket;
+    const tcp = tcpOf(socket);
     tcp.cork();
     fake.send({ header: { ...header, messagePurpose: "ws:encrypt" }, body });
     fake.send({
@@ -142,6 +141,22 @@ async function game(
 
   await once(socket, "open");
   return fake;
+}
+
+const tcpOf = (socket: WebSocket) =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ws keeps its TCP socket private
+  (socket as unknown as { _socket: Socket })._socket;
+
+// A port nothing listens on
+async function freePort() {
+  const server = createServer().listen(0);
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Expected a TCP server");
+  server.close();
+  await once(server, "close");
+  return address.port;
 }
 
 async function connected(connection: MinecraftConnection) {
@@ -437,5 +452,37 @@ describe("MinecraftConnection", () => {
     const server = createServer().listen(port);
     servers.push(server);
     await once(server, "listening");
+  });
+
+  it("turns off at once when the game never answers the close", async () => {
+    const { connection } = await listen();
+    const fake = await game(connection.port, {
+      protocols: [MINECRAFT_JAVA_PROTOCOL],
+    });
+    await connected(connection);
+    // Reads nothing more, so it never answers the close frame
+    tcpOf(fake.socket).pause();
+    const port = connection.port;
+
+    expect(await connection.setEnabled(false)).toBe(true);
+    const server = createServer().listen(port);
+    servers.push(server);
+    await once(server, "listening");
+  });
+
+  it("listens again on its port when turned off and on", async () => {
+    const port = await freePort();
+    const connection = new MinecraftConnection(port);
+    connections.push(connection);
+    expect(await connection.setEnabled(true)).toBe(true);
+    const fake = await game(port, { protocols: [MINECRAFT_JAVA_PROTOCOL] });
+    await connected(connection);
+    tcpOf(fake.socket).pause();
+
+    expect(await connection.setEnabled(false)).toBe(true);
+    expect(await connection.setEnabled(true)).toBe(true);
+    expect(connection.status).toEqual({ state: "waiting" });
+    await game(port, { protocols: [MINECRAFT_JAVA_PROTOCOL] });
+    await connected(connection);
   });
 });

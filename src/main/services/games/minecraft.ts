@@ -141,7 +141,7 @@ export class MinecraftConnection {
   /** Starts or stops listening. False when the port can't be listened on. */
   public async setEnabled(enabled: boolean): Promise<boolean> {
     if (!enabled) {
-      await this._stop();
+      this._stop();
       return true;
     }
     return (this._listening ??= this._listen());
@@ -206,15 +206,15 @@ export class MinecraftConnection {
     });
   }
 
-  private _stop(): Promise<void> {
-    const wss = this._wss;
+  // The port stops listening at once. Not waiting for the server's close,
+  // which waits for every socket to end: a game that never answers the
+  // close frame would hold it for ws's 30 s timeout.
+  private _stop() {
+    this._wss?.close();
     this._wss = null;
     this._listening = null;
     this._drop(TURNED_OFF);
     this._set({ state: "off" });
-    return new Promise((resolve) =>
-      wss ? wss.close(() => resolve()) : resolve(),
-    );
   }
 
   private _connect(socket: WebSocket) {
