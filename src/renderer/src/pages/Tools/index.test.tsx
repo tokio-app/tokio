@@ -21,7 +21,7 @@ const create = () => screen.getByRole("button", { name: "Create ID" });
 // A test overlay's item: its name, buttons, ID and status
 function item(name: string) {
   let el: HTMLElement = screen.getByRole("heading", { name });
-  while (!el.querySelector("input")) el = el.parentElement!;
+  while (!el.querySelector('[title="Copy ID"]')) el = el.parentElement!;
   return within(el);
 }
 
@@ -41,8 +41,8 @@ describe("Tools", () => {
 
     await testOverlays(CLOCK, GOAL);
 
-    expect(item("Clock").getByRole("textbox")).toHaveValue(CLOCK.id);
-    expect(item("Goal").getByRole("textbox")).toHaveValue(GOAL.id);
+    expect(item("Clock").getByTitle("Copy ID")).toHaveTextContent(CLOCK.id);
+    expect(item("Goal").getByTitle("Copy ID")).toHaveTextContent(GOAL.id);
     expect(screen.queryByText("No test overlays yet.")).not.toBeInTheDocument();
   });
 
@@ -165,12 +165,12 @@ describe("Tools", () => {
     const { user } = renderWithProviders(<Tools />);
     await testOverlays(CLOCK, GOAL);
 
-    await user.click(item("Goal").getByRole("button", { name: "Copy ID" }));
+    await user.click(item("Goal").getByTitle("Copy ID"));
     expect(await navigator.clipboard.readText()).toBe(GOAL.id);
 
-    await user.click(
-      item("Goal").getByRole("button", { name: "Copy WebSocket URL" }),
-    );
+    const url = item("Goal").getByTitle("Copy WebSocket URL");
+    expect(url).toHaveTextContent(getOverlaySocketURL(GOAL.id));
+    await user.click(url);
     expect(await navigator.clipboard.readText()).toBe(
       getOverlaySocketURL(GOAL.id),
     );
