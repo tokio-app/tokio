@@ -309,6 +309,24 @@ describe("MusicService", () => {
         expect(queue()).toEqual(["A (playing)", "B"]);
       });
 
+      it("drops the song the player is playing outside the queue and gives the cooldown back", async () => {
+        const { service, provider, searched, played, queue } = setup();
+        provider.playerStatus.mockResolvedValue({
+          ...song("A", 10_000),
+          playing: true,
+          time: 4_000,
+        });
+
+        service.handle(from("a", "!play A"), music);
+        await vi.advanceTimersByTimeAsync(0);
+        service.handle(from("b", "!play B"), music);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(searched()).toEqual(["A", "B"]);
+        expect(queue()).toEqual(["A (playing)", "B"]);
+        expect(played()).toEqual([]);
+      });
+
       it("keeps the cooldown of a command taken while the duplicate searched", async () => {
         const { service, provider, searched } = setup();
         service.handle(from("a", "!play A"), music);

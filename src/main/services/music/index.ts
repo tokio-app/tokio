@@ -193,6 +193,11 @@ export class MusicService extends ProviderService<MusicProvider> {
     if (!this._music_queue.getQueueState().isPlaying) {
       const current = await this._current.provider.playerStatus();
       if (run !== this._run) return;
+      // The player's own song isn't in the queue yet, so has() missed it
+      if (unique && current?.playing && current.track === info.track) {
+        refund();
+        return;
+      }
       if (current && current.playing) {
         this._music_queue.addCurrentlyPlaying(
           current.title,
