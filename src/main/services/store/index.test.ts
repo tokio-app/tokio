@@ -962,6 +962,44 @@ describe("StoreManagerService", () => {
       expect((await store.getProfileData())?.name).toBe("Default");
     });
 
+    it("saves the undone switch over an earlier save that wrote it", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      const release = holdStoreSave();
+      const earlier = store.updateServerSettings(true);
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      const switching = store.updateActiveProfile("stream.json");
+      await vi.waitFor(() =>
+        expect(store.getSettings().activeProfile.file).toBe("stream.json"),
+      );
+      release();
+      expect(await earlier).toBe(true);
+      expect(await switching).toBe("unsaved");
+      await settle(1000);
+
+      const saved = await readJSON(storeFile);
+      expect(saved.settings.activeProfile.file).toBe("default.json");
+      expect(saved.settings.server.enabled).toBe(true);
+    });
+
+    it("saves the undone listing over an earlier save that wrote it", async () => {
+      const store = await init();
+      const release = holdStoreSave();
+      const earlier = store.updateServerSettings(true);
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      const adding = store.addProfile({ file: "stream.json", name: "Stream" });
+      release();
+      expect(await earlier).toBe(true);
+      expect(await adding).toBeNull();
+      await settle(1000);
+
+      expect((await readJSON(storeFile)).profiles).toEqual(
+        defaultStoreData.profiles,
+      );
+    });
+
     it("updates a profile other than the active one when given its file", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");

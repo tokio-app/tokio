@@ -647,6 +647,8 @@ export class StoreManagerService extends Service {
     if (!(await this._queueSave())) {
       this._storeData!.settings.activeProfile = previous;
       this._memoryProfile = previousProfile;
+      // An earlier save still queued may have written the switch.
+      void this._queueSave();
       return "unsaved";
     }
     return "switched";
@@ -963,6 +965,8 @@ export class StoreManagerService extends Service {
     if (await this._queueSave()) return profile;
     // Unlisted again, so trying again isn't refused as a taken name.
     profiles.splice(profiles.indexOf(profile), 1);
+    // An earlier save still queued may have listed it.
+    void this._queueSave();
     return null;
   }
 
