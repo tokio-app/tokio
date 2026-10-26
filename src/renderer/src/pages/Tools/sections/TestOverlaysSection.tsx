@@ -66,13 +66,12 @@ export function TestOverlaysSection({
                 </div>
               </div>
 
-              <div className={styles.row}>
-                <CopyField value={overlay.id} title="Copy ID" />
-                <CopyField
-                  value={getOverlaySocketURL(overlay.id)}
-                  title="Copy WebSocket URL"
-                />
-              </div>
+              {/* One a line: side by side they can't shrink and overflow */}
+              <CopyField value={overlay.id} title="Copy ID" />
+              <CopyField
+                value={getOverlaySocketURL(overlay.id)}
+                title="Copy WebSocket URL"
+              />
 
               {statuses[overlay.id] && (
                 <p className={styles.test_status}>
