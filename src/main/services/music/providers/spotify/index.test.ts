@@ -684,14 +684,26 @@ describe("Spotify", () => {
       });
     });
 
-    it("keeps the device for the next play", async () => {
-      const fetch = stubFetch({ api: devicesAnd() });
+    it("plays on the device playback moved to", async () => {
+      let active = "phone";
+      const fetch = stubFetch({
+        api: (path) =>
+          path === "/me/player/devices"
+            ? json({
+                devices: [
+                  { id: "phone", is_active: active === "phone" },
+                  { id: "desktop", is_active: active === "desktop" },
+                ],
+              })
+            : noContent(),
+      });
       const spotify = await login();
-
-      await spotify.play(parsed);
       await spotify.play(parsed);
 
-      expect(devicesListed(fetch)).toBe(1);
+      active = "desktop";
+      await spotify.play(parsed);
+
+      expect(devicesListed(fetch)).toBe(2);
       expect(apiRequests(fetch).at(-1)?.path).toBe(
         "/me/player/play?device_id=desktop",
       );
@@ -722,36 +734,6 @@ describe("Spotify", () => {
       await expect(spotify.play(parsed)).rejects.toThrow(
         "No active devices. Play a song on Spotify first.",
       );
-    });
-
-    it("forgets the device after a 404", async () => {
-      let gone = false;
-      const fetch = stubFetch({
-        api: devicesAnd(() =>
-          gone ? apiError(404, "Device not found") : noContent(),
-        ),
-      });
-      const spotify = await login();
-      await spotify.play(parsed);
-
-      gone = true;
-      await expect(spotify.play(parsed)).rejects.toThrow("Device not found");
-      gone = false;
-      await spotify.play(parsed);
-
-      expect(devicesListed(fetch)).toBe(2);
-    });
-
-    it("lists the devices again after a new login", async () => {
-      const fetch = stubFetch({ api: devicesAnd() });
-      const spotify = await login();
-      await spotify.play(parsed);
-
-      spotify.disconnect();
-      await login(spotify);
-      await spotify.play(parsed);
-
-      expect(devicesListed(fetch)).toBe(2);
     });
 
     it("does nothing while inactive", async () => {
