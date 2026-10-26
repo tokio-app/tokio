@@ -408,6 +408,44 @@ describe("MinecraftConnection", () => {
     expect(connection.status.state).toBe("waiting");
   });
 
+  it("closes a socket that answers the handshake with a bad key", async () => {
+    const { connection, statuses } = await listen();
+    const socket = new WebSocket(`ws://127.0.0.1:${connection.port}//`, [
+      WSENCRYPT,
+    ]);
+    sockets.push(socket);
+    socket.on("message", (data: Buffer) => {
+      const { header } = JSON.parse(data.toString("utf8"));
+      socket.send(
+        JSON.stringify({
+          header: {
+            requestId: header.requestId,
+            messagePurpose: "commandResponse",
+          },
+          body: { publicKey: "AAAA" },
+        }),
+      );
+    });
+
+    await once(socket, "close");
+    expect(connection.status).toEqual({ state: "waiting" });
+    expect(statuses).toEqual([{ state: "waiting" }]);
+  });
+
+  it("ignores a frame that isn't JSON", async () => {
+    const { connection, statuses } = await listen();
+    const fake = await game(connection.port);
+    await connected(connection);
+
+    fake.socket.send("not json");
+
+    expect((await connection.send("say hi")).ok).toBe(true);
+    expect(statuses).toEqual([
+      { state: "waiting" },
+      { state: "connected", edition: "bedrock" },
+    ]);
+  });
+
   it("reports a port that's in use", async () => {
     // No host, like the game's port: on macOS a catch-all listen can share a
     // port with a 127.0.0.1 one.
