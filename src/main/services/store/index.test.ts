@@ -917,6 +917,51 @@ describe("StoreManagerService", () => {
       expect(active?.connector.username).toBe("");
     });
 
+    it("reads a broken active profile again only after a while, or when asked fresh", async () => {
+      const store = await init();
+      await writeFile(defaultProfileFile, "{");
+      vi.spyOn(Logger, "error");
+      const load = vi.spyOn(json, "loadFile");
+      const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+
+      expect(await store.getProfileData()).toBeNull();
+      expect(await store.getProfileData()).toBeNull();
+      expect(load).toHaveBeenCalledOnce();
+
+      expect(await store.getProfileData({ fresh: true })).toBeNull();
+      expect(load).toHaveBeenCalledTimes(2);
+
+      now.mockReturnValue(30_999);
+      await store.getProfileData();
+      expect(load).toHaveBeenCalledTimes(2);
+      now.mockReturnValue(31_000);
+      await store.getProfileData();
+      expect(load).toHaveBeenCalledTimes(3);
+    });
+
+    it("answers a fresh read with an update still writing", async () => {
+      const store = await init();
+      await store.getProfileData();
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => (release = resolve));
+      const save = json.saveArbitraryFile.bind(json);
+      vi.spyOn(json, "saveArbitraryFile").mockImplementationOnce(
+        async (...args) => {
+          await released;
+          return save(...args);
+        },
+      );
+
+      const saving = store.updateProfileData({
+        connector: { username: "streamer" },
+      });
+      const read = store.getProfileData({ fresh: true });
+      release();
+
+      expect((await read)?.connector.username).toBe("streamer");
+      expect(await saving).toBe(true);
+    });
+
     it("loads profiles saved before emotes and alert filters", async () => {
       const old: Partial<Profile> = structuredClone(defaultProfile);
       delete old.emotes;
@@ -1240,6 +1285,45 @@ describe("StoreManagerService", () => {
       expect(
         (await readJSON(defaultProfileFile)).alerts.items[0].media,
       ).toBeNull();
+    });
+
+    it("keeps an alerts update still writing when it takes a file off", async () => {
+      const store = await init();
+      const alert = (id: string): Alert => ({
+        id,
+        name: id,
+        enabled: true,
+        trigger: {
+          type: TOKIO_EVENTS.FOLLOW,
+          gifts: [],
+          every_gift: false,
+          emotes: [],
+          keyword: "",
+          user: "",
+          min_coins: 0,
+          roles: [],
+        },
+        sound: { ...sound, start: 0, end: null },
+        tts: null,
+        media: null,
+        volume: 100,
+      });
+      const withAlerts = (...items: Alert[]) => ({
+        alerts: { ...defaultProfile.alerts, items },
+      });
+      await store.updateProfileData(withAlerts(alert("a")));
+
+      const saving = store.updateProfileData(
+        withAlerts(alert("a"), alert("b")),
+      );
+      expect(await store.removeFromAlerts("sound", "ding.mp3")).toBe(true);
+      expect(await saving).toBe(true);
+
+      const { items } = (await readJSON(defaultProfileFile)).alerts;
+      expect(items.map((a: Alert) => [a.id, a.sound])).toEqual([
+        ["a", null],
+        ["b", null],
+      ]);
     });
 
     it("adds a media file once and removes it", async () => {

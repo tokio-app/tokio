@@ -581,7 +581,8 @@ const registerTimer = ({
 events.push(
   APP_EVENTS.GET_PROFILE,
   async ({ storeManagerService }, e) => {
-    const profile = await storeManagerService.getProfileData();
+    // Fresh, so a page reopened right after a save gets what it saved
+    const profile = await storeManagerService.getProfileData({ fresh: true });
     const profiles = storeManagerService.getProfiles();
     if (!profile || !profiles)
       throw new Error("The active profile is missing.");

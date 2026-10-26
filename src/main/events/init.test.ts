@@ -1769,6 +1769,16 @@ describe("init events", () => {
       expect(s.h.notices).toEqual([]);
     });
 
+    it("reads the profile after the saves still writing", async () => {
+      const s = setup();
+
+      await s.h.invoke(init, APP_EVENTS.GET_PROFILE);
+
+      expect(s.storeManagerService.getProfileData).toHaveBeenCalledWith({
+        fresh: true,
+      });
+    });
+
     const failure = {
       code: FEEDBACK_CODES.PROFILE_LOAD_FAILED,
       message: "Unable to load the profile.",

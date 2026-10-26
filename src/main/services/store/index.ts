@@ -49,6 +49,9 @@ type Providers = {
 const isEncrypted = (key: string) =>
   /^v\d\d$/.test(Buffer.from(key, "base64").subarray(0, 3).toString("latin1"));
 
+// How long live events go without reading again an active profile that failed
+const LOAD_RETRY_MS = 30_000;
+
 export class StoreManagerService extends Service {
   private _jsonManagerService!: JSONManagerService;
   private _pathManagerService!: PathManagerService;
@@ -66,14 +69,32 @@ export class StoreManagerService extends Service {
   // Saved key (encrypted, in base64) → the key. Filled at startup and as keys
   // change, so reads don't wait for safeStorage's async calls.
   private _keys = new Map<string, string>();
+  // The active profile's last update, which memory holds once it's written
+  private _profileWrite: Promise<unknown> = Promise.resolve();
+  // The active file's last failed load, so live events don't read it each time
+  private _failedLoad: { file: string; at: number } | null = null;
 
   public setLogFile(logFile: string) {
     this._logFile = logFile;
   }
 
-  public async getProfileData() {
+  // fresh waits for updates still writing and retries a failed file at once.
+  public async getProfileData({ fresh = false }: { fresh?: boolean } = {}) {
+    if (fresh) await this._profileWrite;
     if (this._memoryProfile !== null) return this._memoryProfile;
+    const file = this._activeProfileFile();
+    const failed = this._failedLoad;
+    if (
+      !fresh &&
+      failed?.file === file &&
+      performance.now() - failed.at < LOAD_RETRY_MS
+    ) {
+      return null;
+    }
     const loaded = await this._getProfileData();
+    if (file === this._activeProfileFile()) {
+      this._failedLoad = loaded ? null : { file, at: performance.now() };
+    }
     // A switch or an update while this was loading holds the newer profile.
     this._memoryProfile ??= loaded;
     return this._memoryProfile;
@@ -484,8 +505,9 @@ export class StoreManagerService extends Service {
         this._pathManagerService.folders.profilesFolder,
         profileFile,
       );
+      // Fresh, so the items changed aren't older than an update still writing
       const profile = active
-        ? await this.getProfileData()
+        ? await this.getProfileData({ fresh: true })
         : await this._jsonManagerService.loadFile(path, ProfileSchema);
       const updates = profile && change(profile);
       if (!updates) continue;
@@ -978,16 +1000,23 @@ export class StoreManagerService extends Service {
     file = this._activeProfileFile(),
   ): Promise<boolean> {
     this._ensureInitialized();
-    const res = await this._jsonManagerService.updateFile(
-      join(this._pathManagerService.folders.profilesFolder, file),
-      ProfileSchema,
-      updates,
-    );
-    if (!res.success || !res.data) return false;
-    // A switch while this was writing made another profile active, that's
-    // the one to keep in memory.
-    if (file === this._activeProfileFile()) this._memoryProfile = res.data;
-    return true;
+    const write = this._jsonManagerService
+      .updateFile(
+        join(this._pathManagerService.folders.profilesFolder, file),
+        ProfileSchema,
+        updates,
+      )
+      .then((res) => {
+        if (!res.success || !res.data) return false;
+        // A switch while this was writing made another profile active, that's
+        // the one to keep in memory.
+        if (file === this._activeProfileFile()) this._memoryProfile = res.data;
+        return true;
+      });
+    if (file === this._activeProfileFile()) {
+      this._profileWrite = write.catch(() => {});
+    }
+    return write;
   }
 
   private async _addEntity(
