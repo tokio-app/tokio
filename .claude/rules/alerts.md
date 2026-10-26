@@ -34,7 +34,7 @@ paths:
 ## Gifts
 
 - TikTok's gift list (`extra/gifts.json`) misses some gifts, like other regions' ones. `OverlayService.recordGift` saves the ones viewers send that aren't on it to `extra/custom-gifts.json`, shared by all profiles. It saves nothing while TikTok's list is empty, since every gift would look missing, and keeps both lists in memory once read, since every gift event checks them.
-- The Alerts page reads them with `GET_CUSTOM_GIFTS`, and main pushes new ones on its reply, `CUSTOM_GIFTS`. `giftOptions` merges both lists cheapest first, each id once. Overlay gift settings use TikTok's list only.
+- The Alerts and Games pages read them through `useTriggerChoices` (`pages/Alerts`), which also holds TikTok's list and the emotes: `GET_CUSTOM_GIFTS`, and main pushes new ones on its reply, `CUSTOM_GIFTS`. `giftOptions` merges both lists cheapest first, each id once. Overlay gift settings use TikTok's list only.
 
 ## Page
 

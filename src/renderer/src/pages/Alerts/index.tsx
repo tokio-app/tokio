@@ -1,11 +1,5 @@
-import {
-  Alert,
-  AlertSound,
-  MEDIA_DURATION,
-  MediaFile,
-  SavedEmote,
-} from "@/common/schemas";
-import { APP_EVENTS, APP_EVENTS_RESPONSE, CustomGift } from "@/common/types";
+import { Alert, AlertSound, MEDIA_DURATION, MediaFile } from "@/common/schemas";
+import { APP_EVENTS_RESPONSE } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import { Btn, MediaPicker, Page, SoundPicker } from "@/components";
 import {
@@ -13,27 +7,18 @@ import {
   useAudio,
   useEditableSettings,
   useIpcListener,
-  useIpcRequest,
 } from "@/hooks";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MdOutlineAddAlert } from "react-icons/md";
 import { AlertEditor } from "./AlertEditor";
 import styles from "./alerts.module.css";
-import {
-  createAlert,
-  emoteOptions,
-  giftOptions,
-  soundClip,
-  ttsDefaultsOf,
-} from "./helper";
+import { createAlert, soundClip, ttsDefaultsOf } from "./helper";
 import { HeaderSection } from "./sections/HeaderSection";
 import { ItemsSection } from "./sections/ItemsSection";
+import { useTriggerChoices } from "./useTriggerChoices";
 
 export function Alerts() {
-  const [gifts, setGifts] = useState<CustomGift[]>([]);
-  // Gifts seen in LIVEs that TikTok's list doesn't have
-  const [customGifts, setCustomGifts] = useState<CustomGift[]>([]);
-  const [emotes, setEmotes] = useState<SavedEmote[]>([]);
+  const { giftChoices, emoteChoices, setEmotes } = useTriggerChoices();
   // What a new TTS message starts with: the TTS page's voice
   const [ttsDefaults, setTtsDefaults] = useState(() =>
     ttsDefaultsOf(defaultProfile.tts),
@@ -68,15 +53,6 @@ export function Alerts() {
   const { setItemGain } = useAudio();
   const test = useAlertTest();
 
-  const giftChoices = useMemo(
-    () => giftOptions(gifts, customGifts),
-    [gifts, customGifts],
-  );
-  const emoteChoices = useMemo(() => emoteOptions(emotes), [emotes]);
-
-  useIpcRequest(APP_EVENTS.GET_GIFTS);
-  useIpcRequest(APP_EVENTS.GET_CUSTOM_GIFTS);
-
   useEffect(() => {
     if (!headerAdd.current) return undefined;
     const observer = new IntersectionObserver(([entry]) =>
@@ -93,20 +69,6 @@ export function Alerts() {
       s.items.push(createAlert(s.items.length));
     });
   };
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_GIFTS, (res) => {
-    if (res) setGifts(res.data);
-  });
-
-  // The reply, then new ones while connected
-  useIpcListener(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, (res) => {
-    if (res) setCustomGifts(res.data);
-  });
-
-  // New emotes arrive while connected.
-  useIpcListener(APP_EVENTS_RESPONSE.EMOTES, (res) => {
-    if (res) setEmotes(res.data);
-  });
 
   // An alert plays a sound or speaks a message, picking one drops the other.
   const setOutput = (

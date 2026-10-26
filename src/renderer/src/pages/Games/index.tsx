@@ -1,14 +1,9 @@
-import { MediaFile, SavedEmote } from "@/common/schemas";
-import {
-  APP_EVENTS,
-  APP_EVENTS_RESPONSE,
-  CustomGift,
-  GamesData,
-} from "@/common/types";
+import { MediaFile } from "@/common/schemas";
+import { APP_EVENTS, APP_EVENTS_RESPONSE, GamesData } from "@/common/types";
 import { Page } from "@/components";
 import { useEditableSettings, useIpcListener, useIpcRequest } from "@/hooks";
-import { emoteOptions, giftOptions } from "@/pages/Alerts/helper";
-import { useMemo, useRef, useState } from "react";
+import { useTriggerChoices } from "@/pages/Alerts/useTriggerChoices";
+import { useRef, useState } from "react";
 import { PicturePicker } from "./PicturePicker";
 import { ActionsSection } from "./sections/ActionsSection";
 import { MinecraftSection } from "./sections/MinecraftSection";
@@ -17,10 +12,7 @@ import { OverlaySection } from "./sections/OverlaySection";
 export function Games() {
   // Until main's first push
   const [games, setGames] = useState<GamesData | null>(null);
-  const [gifts, setGifts] = useState<CustomGift[]>([]);
-  // Gifts seen in LIVEs that TikTok's list doesn't have
-  const [customGifts, setCustomGifts] = useState<CustomGift[]>([]);
-  const [emotes, setEmotes] = useState<SavedEmote[]>([]);
+  const { giftChoices, emoteChoices, emotes, setEmotes } = useTriggerChoices();
   const [serverEnabled, setServerEnabled] = useState(true);
   // Id of the action whose overlay picture is being picked
   const [pictureFor, setPictureFor] = useState<string | null>(null);
@@ -33,26 +25,12 @@ export function Games() {
   );
 
   useIpcRequest(APP_EVENTS.GET_GAMES);
-  useIpcRequest(APP_EVENTS.GET_GIFTS);
-  useIpcRequest(APP_EVENTS.GET_CUSTOM_GIFTS);
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
 
   // The reply, then each change of a connection. A failed one keeps the
   // last shown.
   useIpcListener(APP_EVENTS_RESPONSE.GAMES, (res) => {
     if (res?.success && res.data) setGames(res.data);
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_GIFTS, (res) => {
-    if (res) setGifts(res.data);
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, (res) => {
-    if (res) setCustomGifts(res.data);
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.EMOTES, (res) => {
-    if (res) setEmotes(res.data);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
@@ -83,11 +61,6 @@ export function Games() {
     });
   });
 
-  const giftChoices = useMemo(
-    () => giftOptions(gifts, customGifts),
-    [gifts, customGifts],
-  );
-  const emoteChoices = useMemo(() => emoteOptions(emotes), [emotes]);
   const pictureAction = settings.actions.find((a) => a.id === pictureFor);
 
   return (
