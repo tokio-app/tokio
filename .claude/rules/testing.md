@@ -18,13 +18,17 @@ paths:
 
 ## Main process
 
-- `test/setup.ts` mocks `electron` with the fakes in `test/main/electron.ts` (import them from `@test/electron`) and resets them before each test: windows, views and webContents that record what they get (`reload` too, a `vi.fn`; emit `render-process-gone` on a `FakeWebContents` to test `reloadWhenGone`), `ipcMain`, `app`, `session`, `protocol`, `shell`, `dialog`, `net`, tray icons (`trays()`), `Notification` (the ones created, `notifications()`), `Menu`, a `nativeImage` whose images only say what they were made from, and a `safeStorage` whose async calls round-trip text with the `v10` prefix Chromium adds (a saved key that doesn't start with `v` and two digits is read as plain text). Their state survives `vi.resetModules()`.
+- `test/setup.ts` mocks `electron` with the fakes in `test/main/electron.ts` (import them from `@test/electron`) and resets them before each test. Their state survives `vi.resetModules()`.
+  - Windows, views and webContents record what they get (`reload` too, a `vi.fn`; emit `render-process-gone` on a `FakeWebContents` to test `reloadWhenGone`).
+  - Also faked: `ipcMain`, `app`, `session`, `protocol`, `shell`, `dialog`, `net`, tray icons (`trays()`), `Notification` (the ones created, `notifications()`) and `Menu`.
+  - A `nativeImage`'s images only say what they were made from.
+  - `safeStorage`'s async calls round-trip text with the `v10` prefix Chromium adds; a saved key that doesn't start with `v` and two digits is read as plain text.
 - The setup also silences the console, and Logger only writes to absolute paths, so tests can name log files `"system.log"`. Spy on `Logger` to assert logs; after `vi.resetModules()`, on the copy the re-imported code got.
 - Test IPC handlers with `createHandler(stubs)` from `@test/handler`: the services the handler uses as partial stubs (anything else it reaches for fails the test), fake windows and a real `Notifier`.
   - `invoke(stack, APP_EVENTS.X, data)` runs a page's handler as the Handler does. Read `replies(channel)`, `pushed(channel)`, `notices`, or `sent()` for all of them in order.
   - `eventSource()` stands in for the live events of the connector and the music service.
 - Give services a temp folder (`mkdtemp(join(tmpdir(), "tokio-test-"))`) through their setters or `initialize`, stub `fetch` with `vi.stubGlobal`, and use fake timers for the queues.
-- The Windows TTS script runs for real, on Windows only (`describe.runIf`), in `src/main/services/tts/providers/windows/common/script.test.ts`.
+- The Windows TTS script runs for real, on Windows only (`describe.runIf`).
 - Pages main serves, like the alert overlay page, run in `JSDOM` (`runScripts: "dangerously"`), loaded from a real `ServerService(0)` so their WebSocket connects (`src/main/services/server/index.test.ts`). jsdom doesn't play media: stub `HTMLMediaElement.prototype.play` in `beforeParse`. Close the window before the server stops, or the page keeps reconnecting.
 
 ## Renderer
@@ -43,3 +47,4 @@ paths:
 
 - `e2e/` drives the built app with Playwright's `_electron`. It runs in a temporary folder that main reads from `TOKIO_HOME`, setting `home` and `userData`, and answers native dialogs from main with `electronApp.evaluate`. The single-instance lock follows `userData`, so a run doesn't clash with an open Tokio (port 37891 aside).
 - Built pages carry the production CSP as a meta tag. Check it with an inline script: what Playwright evaluates goes through DevTools, which skips the CSP's `eval` check.
+- Playwright's focus emulation keeps pages visible, so `drive-app` and `e2e/` can't show how a hidden page behaves. For hidden-window checks, see `.claude/skills/drive-app/RECIPES.md`.

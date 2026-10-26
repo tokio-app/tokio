@@ -11,11 +11,11 @@ paths:
 
 # Updates
 
-- `UpdaterService` (`src/main/services/updater`) wraps electron-updater's `autoUpdater`. It's loaded with a dynamic `import()` because the package is CJS and main builds to ESM, so use its default export. Tests inject a fake `Updater` instead.
+- `UpdaterService` (`src/main/services/updater`) wraps electron-updater's `autoUpdater`. It's loaded with a dynamic `import()` because the package is CJS and main builds to ESM, so use its default export. Tests inject a fake `Updater`.
 - It reads the GitHub release marked latest (`allowPrerelease = false`). Without that, the library would allow prereleases on its own for `-alpha` versions.
 - Windows (NSIS) and Linux (AppImage) download in the background and install on restart. macOS builds are ad-hoc signed, which Squirrel.Mac rejects, so mac only checks (`manual: true`) and opens the release page.
 - `install()` calls `quitAndInstall` only after `settle(3000)` (see Persistence in `AGENTS.md`), without awaiting it, because the request that asked is tracked too. electron-updater starts the installer before it quits the app, so a quit held for saves would race it. Clicks during the wait install once.
-- Status reaches the renderer as `UpdateStatus` (`src/common/types/updates.ts`) on `UPDATE_STATUS`, pushed on every change. Read it with `useUpdateStatus`. `UpdateButton` (title bar and About) restarts or opens the release page, and asks first while a LIVE is connected.
-- Checks run 15s after `LOAD_APP` and then every 6h while `settings.updates.auto` is on. A failed background check is only logged, since it's usually just offline; About shows a failed manual check.
+- Status reaches the renderer as `UpdateStatus` (`src/common/types/updates.ts`) on `UPDATE_STATUS`, pushed on every change; read it with `useUpdateStatus`. `UpdateButton` (title bar and About) asks first while a LIVE is connected.
+- Checks run `STARTUP_DELAY_MS` after `LOAD_APP`, then every `CHECK_INTERVAL_MS` while `settings.updates.auto` is on. A failed background check is only logged, since it's usually just offline; About shows a failed manual check.
 - The updater logs its own errors through `<Updater>`, so don't log them again.
 - `app-update.yml` is only packaged for update-capable targets (NSIS, mac zip, AppImage), not `--dir` builds. In dev, `TOKIO_DEV_UPDATES=1 yarn dev` checks against `dev-app-update.yml`.

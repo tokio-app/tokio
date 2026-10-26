@@ -35,7 +35,7 @@ export const connectCommand = (host: string, edition: MinecraftEdition) =>
   `${edition === "java" ? "/tokio connect" : "/connect"} ${host}:${MINECRAFT_PORT}`;
 
 // Every mob and item each edition's summon and give take, named as the game
-// names them in English (see .claude/rules/games.md)
+// names them in English (see .claude/skills/minecraft-lists/SKILL.md)
 const options = (names: Record<string, string>): SelectOption<string>[] =>
   Object.entries(names).map(([value, label]) => ({ value, label }));
 

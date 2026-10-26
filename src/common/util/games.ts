@@ -23,7 +23,7 @@ type Hazard = Extract<GameStep, { type: "hazard" }>["hazard"];
 type Help = Extract<GameStep, { type: "help" }>["help"];
 
 // Every mob and item each edition's summon and give take, id → the name the
-// game gives it in English (see .claude/rules/games.md)
+// game gives it in English (see .claude/skills/minecraft-lists/SKILL.md)
 export const MINECRAFT_NAMES: Record<
   MinecraftEdition,
   { mobs: Names; items: Names }
