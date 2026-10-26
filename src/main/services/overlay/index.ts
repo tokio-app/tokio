@@ -363,12 +363,16 @@ export class OverlayService extends Service {
       const dir = this._dir(id);
       const res = await processOverlay(dir, this._yaml, false);
       if (!res.success) return { success: false };
+      // A dialog opened before an update has the old version's fields.
+      const merged = res.data!.config
+        ? mergeOverlayConfig(res.data!.config, config)
+        : config;
 
       // First, so settings the schema refuses never reach the HTML.
       const saved = await this._yaml.saveFile(
         res.paths!.config,
         OverlayConfigSchema,
-        config,
+        merged,
       );
       if (!saved) return { success: false };
 
@@ -376,7 +380,7 @@ export class OverlayService extends Service {
         id,
         res.data!.htmlContent,
         dir,
-        config,
+        merged,
         gifts,
       );
       if (!html.success) return { success: false };

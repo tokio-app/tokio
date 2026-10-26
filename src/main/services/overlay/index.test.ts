@@ -939,28 +939,34 @@ describe("OverlayService", () => {
     expect((await service.getConfig("title")).data).toEqual(res.data);
   });
 
-  it("saves nothing when the schema refuses the config", async () => {
+  it("saves the installed version's fields with the dialog's values", async () => {
     const dir = join(folder, "title");
     await configurable(dir);
     stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
-    const read = () =>
-      Promise.all(
-        ["index.html", "config.yaml"].map((f) =>
-          readFile(join(dir, f), "utf-8"),
-        ),
-      );
-    const before = await read();
-    const res = await service.getConfig("title");
-    const field = res.data!.fields[0];
+    const installed = (await service.getConfig("title")).data!;
+    // A dialog opened on an older version: another section and field.
+    const old = structuredClone(installed);
+    old.sections.push({ name: "Old", id: "old" });
+    old.fields.push({
+      ...structuredClone(old.fields[0]),
+      name: "Gone",
+      id: "gone",
+      section: "old",
+    });
+    const field = old.fields[0];
     if (field.type !== "input") throw new Error("Expected an input field");
     field.attributes.value = "Changed";
-    // Two sections with the same id
-    res.data!.sections.push(res.data!.sections[0]);
 
-    expect(await service.saveConfig("title", res.data!, gifts)).toEqual({
-      success: false,
+    expect(await service.saveConfig("title", old, gifts)).toEqual({
+      success: true,
+      data: { title: "Changed" },
     });
-    expect(await read()).toEqual(before);
+    const expected = structuredClone(installed);
+    expected.fields[0].attributes.value = "Changed";
+    expect((await service.getConfig("title")).data).toEqual(expected);
+    expect(await readFile(join(dir, "index.html"), "utf-8")).toContain(
+      `window.__OVERLAY_CONFIG__ = {"title":"Changed"}`,
+    );
   });
 
   it("refuses to get or save the config of an id that isn't stored", async () => {
