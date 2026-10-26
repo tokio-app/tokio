@@ -56,7 +56,8 @@ export class PathManagerService {
     const logFiles = Object.values(this.files.logs);
     for (const file of logFiles) {
       if (existsSync(file) && (await stat(file)).size > MAX_LOG_SIZE) {
-        await rename(file, file.replace(/\.log$/, ".old.log"));
+        // A log held by another program only means a bigger log, not no start
+        await rename(file, file.replace(/\.log$/, ".old.log")).catch(() => {});
       }
       if (!existsSync(file)) {
         await writeFile(file, "", { encoding: "utf-8" });
