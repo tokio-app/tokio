@@ -1332,4 +1332,28 @@ describe("Games overlay", () => {
     expect(litRows()).toEqual(["TNT", "Creeper"]);
     expect(current()).toBe("TNT");
   });
+
+  it("stays on the row one at a time shows when a row before it is hidden", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, name: "TNT" } }),
+      action("a2", { overlay: { ...overlay, name: "Creeper" } }),
+      action("a3", { overlay: { ...overlay, name: "Zombie" } }),
+    ]);
+    const current = () =>
+      preview()!.querySelector(".games-current .games-name")?.textContent;
+    await user.click(screen.getByRole("radio", { name: "One at a time" }));
+    await wait(3000);
+    await wait(3000);
+    expect(current()).toBe("Zombie");
+
+    await user.click(
+      recipes()[0].getByRole("checkbox", { name: "Show on the overlay" }),
+    );
+
+    expect(previewTexts()).toEqual([
+      ["Follow", "Creeper"],
+      ["Follow", "Zombie"],
+    ]);
+    expect(current()).toBe("Zombie");
+  });
 });

@@ -109,14 +109,19 @@ export function OverlayPreview({ look, rows, run }: Props) {
 function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
   const carousel = look.layout === "carousel";
   const [lit, setLit] = useState<string[]>([]);
-  const [turn, setTurn] = useState(0);
+  // The row one at a time shows, by id, so it stays on it when the rows
+  // change, as the overlay's update does: the first when it's gone
+  const [shownId, setShownId] = useState(rows[0]?.id ?? "");
+  const current = Math.max(
+    0,
+    rows.findIndex((row) => row.id === shownId),
+  );
+  const currentId = rows[current]?.id ?? "";
+  if (currentId !== shownId) setShownId(currentId);
   // Pictures that didn't load, hidden as on the overlay
   const [broken, setBroken] = useState<string[]>([]);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [prevRun, setPrevRun] = useState(run);
-
-  const current = rows.length > 0 ? turn % rows.length : 0;
-  const currentId = rows.length > 0 ? rows[current].id : "";
 
   // One at a time turns to the row Test lit, unless the row it shows is
   // still lit, as on the overlay
@@ -124,8 +129,9 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
     setPrevRun(run);
     if (run) {
       setLit((ids) => (ids.includes(run.id) ? ids : [...ids, run.id]));
-      const index = rows.findIndex((row) => row.id === run.id);
-      if (index !== -1 && !lit.includes(currentId)) setTurn(index);
+      if (rows.some((row) => row.id === run.id) && !lit.includes(currentId)) {
+        setShownId(run.id);
+      }
     }
   }
 
@@ -164,16 +170,17 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
   const gifts =
     rows[current]?.pictures.filter((src) => !broken.includes(src)).length ?? 0;
   const turnMs = Math.max(TURN_MS, gifts * ROTATE_MS);
+  const nextId = rows[(current + 1) % rows.length]?.id ?? "";
   // A lit row holds its turn until it goes out, as on the overlay. Keyed by
-  // the row's id, as the rows are a new array on every render.
+  // the rows' ids, as the rows are a new array on every render.
   useEffect(() => {
     if (!carousel || rows.length < 2) return undefined;
     const next = setTimeout(() => {
       if (litNow.current.includes(currentId)) setWait((w) => w + 1);
-      else setTurn(current + 1);
+      else setShownId(nextId);
     }, turnMs);
     return () => clearTimeout(next);
-  }, [carousel, rows.length, current, currentId, wait, turnMs]);
+  }, [carousel, rows.length, current, currentId, nextId, wait, turnMs]);
 
   // Shrinks to fit its share of the preview, as the overlay fits its source.
   // Written to the style, so measuring doesn't render again.
