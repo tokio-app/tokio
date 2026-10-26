@@ -26,7 +26,7 @@ import {
 } from "@/common/util";
 import { importFile } from "@/helper/library";
 import { GiftStreaks } from "@/helper/streaks";
-import { giftOf, matchesTrigger } from "@/helper/triggers";
+import { matchesTrigger, streakOf } from "@/helper/triggers";
 import Logger from "@/logger";
 import { unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -198,14 +198,7 @@ export class GamesService extends Service {
     if (state === "off" || state === "error") return;
 
     // Once per event, whichever actions it runs
-    const gift = giftOf(type, payload);
-    const { added, total } = gift
-      ? this._streaks.add(gift)
-      : { added: 0, total: 0 };
-    // {count} is the streak's count so far, not TikTok's
-    const values = gift
-      ? { ...gift, gift: { ...gift.gift, comboCount: total } }
-      : payload;
+    const { added, total, values } = streakOf(this._streaks, type, payload);
 
     const runs: Promise<void>[] = [];
     for (const action of games.actions) {

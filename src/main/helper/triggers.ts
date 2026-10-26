@@ -8,6 +8,7 @@ import {
 } from "@/common/types";
 import { takesRoles } from "@/common/util";
 import { hasKeyword, isUser } from "@/helper/chat";
+import type { GiftStreaks } from "@/helper/streaks";
 
 /**
  * Whether a live event sets off a trigger, an alert's or a game action's,
@@ -75,8 +76,28 @@ export function matchesTrigger(
   return true;
 }
 
-/** The event as a gift event, null for any other. */
-export function giftOf(
+/**
+ * Counts a gift event in its streak, once per event. values is the payload
+ * with the streak's count so far as {count}, not TikTok's; any other event
+ * adds nothing and keeps its payload.
+ */
+export function streakOf(
+  streaks: GiftStreaks,
+  type: AppEvents,
+  payload: TokioEventMap[AppEvents],
+): { added: number; total: number; values: TokioEventMap[AppEvents] } {
+  const gift = giftOf(type, payload);
+  if (!gift) return { added: 0, total: 0, values: payload };
+  const { added, total } = streaks.add(gift);
+  return {
+    added,
+    total,
+    values: { ...gift, gift: { ...gift.gift, comboCount: total } },
+  };
+}
+
+// The event as a gift event, null for any other
+function giftOf(
   type: AppEvents,
   payload: TokioEventMap[AppEvents],
 ): GiftEvent | null {

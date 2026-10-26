@@ -27,7 +27,7 @@ import {
 import { writeFileAtomic } from "@/helper/fs";
 import { hash, importFile, isSaved } from "@/helper/library";
 import { GiftStreaks } from "@/helper/streaks";
-import { giftOf, matchesTrigger } from "@/helper/triggers";
+import { matchesTrigger, streakOf } from "@/helper/triggers";
 import Logger from "@/logger";
 import type { ServerService } from "@/services/server";
 import type { TTSService } from "@/services/tts";
@@ -361,14 +361,11 @@ export class AlertsService extends Service {
     const settings = profile.alerts;
     const run = this._run;
     // Once per event, whichever alerts it plays
-    const gift = giftOf(type, payload);
-    const { added, total } = gift
-      ? this._streaks.add(gift)
-      : { added: 0, total: 0 };
-    // A message's {count} is the streak's count so far, not TikTok's
-    const speech = gift
-      ? { ...gift, gift: { ...gift.gift, comboCount: total } }
-      : payload;
+    const {
+      added,
+      total,
+      values: speech,
+    } = streakOf(this._streaks, type, payload);
     for (const alert of settings.items) {
       if (!alert.enabled || (!alert.sound && !alert.tts && !alert.media)) {
         continue;
