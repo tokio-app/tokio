@@ -201,6 +201,18 @@ describe("AudioQueue", () => {
     expect(tone.players[2].url).toBe(tone.players[0].url);
   });
 
+  it("starts over once it holds 16 silent buffers", async () => {
+    // Lengths no other test uses: the buffers are kept for every queue
+    const waits = Array.from({ length: 17 }, (_, i) => 101 + i);
+    for (const seconds of waits) await new AudioQueue().wait(seconds);
+    const first = tone.players[0].url;
+
+    await new AudioQueue().wait(waits[0]);
+
+    expect(tone.players.at(-1)?.url).not.toBe(first);
+    expect(tone.players.at(-1)?.url).toEqual(first);
+  });
+
   it("keeps a silent place behind a sound still decoding", async () => {
     const queue = new AudioQueue();
     queue.setQueueOptions({ gapTime: 0.5 });
