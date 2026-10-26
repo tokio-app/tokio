@@ -725,6 +725,19 @@ describe("OverlayService", () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
+    it("reads it once for calls that come together", async () => {
+      const fetchMock = publish(release("1.0.0"));
+
+      const [a, b] = await Promise.all([
+        service.getCatalog(),
+        service.getCatalog(),
+      ]);
+
+      expect(a).toEqual(b);
+      expect(a.success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
     it("tries again after a failure", async () => {
       const fetchMock = vi.fn(async () => {
         throw new TypeError("fetch failed");

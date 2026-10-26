@@ -85,6 +85,7 @@ export class OverlayService extends Service {
   private _server: ServerService;
   private _store: OverlayStore;
   private _catalog: { overlays: CatalogOverlay[]; time: number } | null = null;
+  private _catalogFetch: Promise<OverlayResult<CatalogOverlay[]>> | null = null;
   // Installs in progress, by overlay id
   private _installs = new Map<string, Promise<OverlayResult>>();
   // The last task queued for each overlay's files, see _lock
@@ -235,7 +236,15 @@ export class OverlayService extends Service {
    * again after CATALOG_TTL_MS, and a failure isn't kept, so the next call
    * tries again.
    */
-  public async getCatalog(): Promise<OverlayResult<CatalogOverlay[]>> {
+  public getCatalog(): Promise<OverlayResult<CatalogOverlay[]>> {
+    // Pages opening together share one read.
+    this._catalogFetch ??= this._fetchCatalog().finally(
+      () => (this._catalogFetch = null),
+    );
+    return this._catalogFetch;
+  }
+
+  private async _fetchCatalog(): Promise<OverlayResult<CatalogOverlay[]>> {
     if (this._catalog && Date.now() - this._catalog.time < CATALOG_TTL_MS) {
       return { success: true, data: this._catalog.overlays };
     }
