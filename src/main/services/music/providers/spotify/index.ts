@@ -331,7 +331,7 @@ export class Spotify extends MusicProvider {
     if (!this._accessToken)
       throw new Error("Not authenticated. Call authenticate() first.");
 
-    const wait = Math.ceil((this._retryAt - Date.now()) / 1000);
+    const wait = Math.ceil((this._retryAt - performance.now()) / 1000);
     if (wait > 0) throw new Error(`Rate Limit Hit. Wait ${wait} seconds.`);
 
     // Each try gets its own timeout
@@ -365,7 +365,7 @@ export class Spotify extends MusicProvider {
       throw new Error("Premium Required or user not whitelisted.");
     if (response.status === 429) {
       const retryAfter = Number(response.headers.get("Retry-After")) || 60;
-      this._retryAt = Date.now() + retryAfter * 1000;
+      this._retryAt = performance.now() + retryAfter * 1000;
       throw new Error(`Rate Limit Hit. Wait ${retryAfter} seconds.`);
     }
 

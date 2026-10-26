@@ -42,7 +42,7 @@ export class MusicService extends ProviderService<MusicProvider> {
       // What's left of the song while the player plays it, after an ad
       // too. Paused, it can't tell when the song ends. Times are in ms.
       remaining: async (song) => {
-        const sent = Date.now();
+        const sent = performance.now();
         const status = await this._current.provider.playerStatus();
         if (!status) return null;
         if (status.track !== song.track && status.title !== song.title) {
@@ -50,7 +50,7 @@ export class MusicService extends ProviderService<MusicProvider> {
         }
         if (!status.playing) return null;
         // The player read its time about halfway through the request
-        const age = (Date.now() - sent) / 2;
+        const age = (performance.now() - sent) / 2;
         return Math.max(0, status.duration - status.time - age);
       },
     });
@@ -131,7 +131,7 @@ export class MusicService extends ProviderService<MusicProvider> {
     }
     // One command per cooldown, whoever sends it
     const previous = this._lastCommand;
-    const taken = Date.now();
+    const taken = performance.now();
     if (taken - previous < settings.protection.cooldown * 1000) return;
     this._lastCommand = taken;
 
