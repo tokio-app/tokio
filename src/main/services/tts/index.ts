@@ -47,7 +47,7 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   public getEngines(): VoiceEngine[] {
-    return [...(this._providerPool?.entries() ?? [])].map(([id, provider]) => ({
+    return [...this._providerPool.entries()].map(([id, provider]) => ({
       id,
       label: provider.label,
       keyLabel: provider.keyLabel,
@@ -55,12 +55,12 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   public setEngineKey(engine: string, key: string) {
-    this._providerPool?.get(engine)?.setKey(key.trim());
+    this._providerPool.get(engine)?.setKey(key.trim());
   }
 
   // The voices of every engine. An engine that fails is left out.
   public async getVoices(): Promise<VoiceData[]> {
-    const engines = [...(this._providerPool?.entries() ?? [])];
+    const engines = [...this._providerPool.entries()];
     const results = await Promise.allSettled(
       engines.map(async ([, provider]) => provider.getVoices()),
     );
@@ -79,25 +79,27 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   public dispose() {
-    for (const provider of this._providerPool?.values() ?? []) {
+    for (const provider of this._providerPool.values()) {
       provider.dispose();
     }
   }
 
   // Voices saved before the engines were combined have no engine, and
   // imported profiles may name one that isn't available here.
-  private _engineOf(voice?: VoiceData): TTSProvider | null {
-    const engine = voice?.engine && this._providerPool?.get(voice.engine);
-    return engine || this._current?.provider || null;
+  private _engineOf(voice?: VoiceData): TTSProvider {
+    const engine = voice?.engine && this._providerPool.get(voice.engine);
+    return engine || this._current.provider;
   }
 
   public async generateBuffer(
     text: string,
     voice?: VoiceData,
   ): Promise<GenerationResponse> {
-    const engine = this._engineOf(voice);
-    if (!engine) return { success: false };
-    return await engine.generateBuffer(text, voice?.lang, voice?.name);
+    return await this._engineOf(voice).generateBuffer(
+      text,
+      voice?.lang,
+      voice?.name,
+    );
   }
 
   // The comment without its trigger, which isn't read
