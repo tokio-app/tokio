@@ -297,7 +297,10 @@ function TimerLookSection({ settings, update }: SectionProps) {
 function TriggerNames({ settings, update }: SectionProps) {
   const { seconds, look } = settings;
   const id = useId();
-  const shown = TRIGGERS.filter(({ key }) => seconds[key] > 0);
+  // As timerTriggers keeps them, so a multiplier of 0 hides them all
+  const shown = TRIGGERS.filter(
+    ({ key }) => seconds[key] * settings.multiplier > 0,
+  );
 
   if (shown.length === 0) {
     return (

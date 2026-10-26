@@ -432,6 +432,21 @@ describe("Tools' countdown timer", () => {
     expect(saved.names.follow).toBe("Seguir");
   });
 
+  it("lists no names when the multiplier makes every trigger add nothing", async () => {
+    const { user } = renderWithProviders(<Tools />);
+    await timer((t) => {
+      t.settings.multiplier = 0;
+    });
+    const look = section("Timer Look");
+
+    await user.click(
+      look.getByRole("checkbox", { name: "Show the triggers, one at a time" }),
+    );
+
+    expect(look.getByText(/No trigger adds time yet/)).toBeInTheDocument();
+    expect(look.queryByRole("list", { name: "Names on stream" })).toBeNull();
+  });
+
   it("adds a trigger's seconds and the likes per cycle", async () => {
     vi.useFakeTimers();
     const { user } = renderWithProviders(<Tools />, fakeTimers());
