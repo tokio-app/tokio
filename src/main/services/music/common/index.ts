@@ -7,6 +7,7 @@ import {
 import {
   limitPermissions,
   openLinksOutside,
+  reloadWhenGone,
   stayOnPage,
 } from "@/helper/network";
 import { BrowserWindow, WebContentsView } from "electron";
@@ -61,6 +62,7 @@ export function createWindow(content: WebContentsView) {
   // microphone or other device
   openLinksOutside(content.webContents);
   limitPermissions(content.webContents.session);
+  reloadWhenGone(content.webContents);
 
   const _navView = new WebContentsView({
     webPreferences: {
@@ -87,6 +89,7 @@ export function createWindow(content: WebContentsView) {
   // The title bar lives in the nav view, so it gets the window state.
   const nav = _navView.webContents;
   stayOnPage(nav);
+  reloadWhenGone(nav);
   const sendWindowState = () => {
     if (nav.isDestroyed()) return;
     nav.send(APP_EVENTS_RESPONSE.RESIZE_MUSIC_WINDOW, {

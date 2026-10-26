@@ -171,6 +171,14 @@ describe("AppHandler", () => {
       expect(navigate("http://localhost:5173/index.html#/")).toBe(true);
     });
 
+    it("reloads its page when the page's process crashes", () => {
+      const { win } = start();
+
+      win.webContents.emit("render-process-gone", {}, { reason: "oom" });
+
+      expect(win.webContents.reload).toHaveBeenCalledOnce();
+    });
+
     it("opens web and mail links in the browser instead of a new window", () => {
       const { win } = start();
       const [handler] = win.webContents.setWindowOpenHandler.mock.calls[0];

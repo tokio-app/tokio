@@ -61,6 +61,7 @@ export class FakeWebContents extends EventEmitter {
     this.url = pathToFileURL(file).href;
   });
   readonly close = vi.fn<() => void>(() => this.destroy());
+  readonly reload = vi.fn<() => void>();
   private url = "";
   private destroyed = false;
 
