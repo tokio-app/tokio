@@ -247,6 +247,7 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.TEST_ALERT, {
       success: true,
       id: data.id,
+      request: data.request,
       data: res.data,
       volume: data.volume,
       filters:
@@ -260,10 +261,11 @@ events.push(
       code: FEEDBACK_CODES.SOUND_READ_FAILED,
       message: "Unable to play the sound.",
     },
-    onError: (e, error, { id, volume }) =>
+    onError: (e, error, { id, request, volume }) =>
       e.reply(APP_EVENTS_RESPONSE.TEST_ALERT, {
         success: false,
         id,
+        request,
         volume,
         error,
       }),

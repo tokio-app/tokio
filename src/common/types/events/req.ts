@@ -136,6 +136,10 @@ export enum APP_EVENTS {
   INSTALL_UPDATE = "app:updates:install",
 }
 
+// What an alert test plays: a library sound, a sound's URL or a message
+export type AlertTestSource =
+  { file: string } | { url: string } | { tts: AlertTts; trigger: AlertTrigger };
+
 export interface AppEventsMap {
   // INIT
   [APP_EVENTS.LOAD_APP]: void;
@@ -311,14 +315,12 @@ export interface AppEventsMap {
     id: string;
   };
   // A TTS test speaks the message filled with a sample of the trigger
-  [APP_EVENTS.TEST_ALERT]: (
-    | { file: string }
-    | { url: string }
-    | { tts: AlertTts; trigger: AlertTrigger }
-  ) & {
+  [APP_EVENTS.TEST_ALERT]: AlertTestSource & {
     volume: number;
     // Identifies the test: the alert id, or the url for previews
     id: string;
+    // Comes back on the reply, so a late one for an older test is dropped
+    request: number;
   };
   // A library sound's bytes, for the alert editor's waveform
   [APP_EVENTS.GET_SOUND_DATA]: {

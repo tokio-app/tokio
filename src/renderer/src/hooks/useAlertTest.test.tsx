@@ -32,11 +32,12 @@ describe("useAlertTest", () => {
 
     act(() => result.current.toggle(airhorn));
     expect(result.current.testing).toEqual({ id: "alert-1", loading: true });
-    expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([airhorn]);
+    expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([{ ...airhorn, request: 1 }]);
 
     await send(TEST_ALERT, {
       success: true,
       id: "alert-1",
+      request: 1,
       data,
       volume: 80,
       filters: { speed: 1.2, pitch: 0.9 },
@@ -56,7 +57,13 @@ describe("useAlertTest", () => {
   it("ends the test when its sound ends", async () => {
     const { result, queue } = setup();
     act(() => result.current.toggle(airhorn));
-    await send(TEST_ALERT, { success: true, id: "alert-1", data, volume: 80 });
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-1",
+      request: 1,
+      data,
+      volume: 80,
+    });
 
     const [, options] = queue.enqueue.mock.calls[0];
     act(() => options?.onEnded?.());
@@ -67,7 +74,13 @@ describe("useAlertTest", () => {
   it("keeps each tested sound's length", async () => {
     const { result, queue } = setup();
     act(() => result.current.toggle(airhorn));
-    await send(TEST_ALERT, { success: true, id: "alert-1", data, volume: 80 });
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-1",
+      request: 1,
+      data,
+      volume: 80,
+    });
     expect(result.current.lengths).toEqual({});
 
     const [, options] = queue.enqueue.mock.calls[0];
@@ -81,7 +94,13 @@ describe("useAlertTest", () => {
 
     act(() => result.current.toggle(airhorn));
     act(() => result.current.toggle(airhorn));
-    await send(TEST_ALERT, { success: true, id: "alert-1", data, volume: 80 });
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-1",
+      request: 1,
+      data,
+      volume: 80,
+    });
 
     expect(result.current.testing).toBeNull();
     expect(queue.stop).toHaveBeenCalled();
@@ -93,26 +112,126 @@ describe("useAlertTest", () => {
 
     act(() => result.current.toggle(airhorn));
     act(() => result.current.toggle(bell));
-    await send(TEST_ALERT, { success: true, id: "alert-1", data, volume: 80 });
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-1",
+      request: 1,
+      data,
+      volume: 80,
+    });
 
     expect(result.current.testing).toEqual({ id: "alert-2", loading: true });
     expect(queue.enqueue).not.toHaveBeenCalled();
 
-    await send(TEST_ALERT, { success: true, id: "alert-2", data, volume: 100 });
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-2",
+      request: 2,
+      data,
+      volume: 100,
+    });
     expect(queue.enqueue).toHaveBeenCalledOnce();
+  });
+
+  it("ignores a late reply to a test toggled off and on again", async () => {
+    const { result, queue } = setup();
+    const reply = (request: number) =>
+      send(TEST_ALERT, {
+        success: true,
+        id: "alert-1",
+        request,
+        data,
+        volume: 80,
+      });
+
+    act(() => result.current.toggle(airhorn));
+    act(() => result.current.toggle(airhorn));
+    act(() => result.current.toggle(airhorn));
+    expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([
+      { ...airhorn, request: 1 },
+      { ...airhorn, request: 2 },
+    ]);
+
+    await reply(1);
+    expect(queue.enqueue).not.toHaveBeenCalled();
+    expect(result.current.testing).toEqual({ id: "alert-1", loading: true });
+
+    await reply(2);
+    await reply(1);
+    expect(queue.enqueue).toHaveBeenCalledOnce();
+    expect(result.current.testing).toEqual({ id: "alert-1", loading: false });
+  });
+
+  it("doesn't end the newer test on a late failure", async () => {
+    const { result } = setup();
+
+    act(() => result.current.toggle(airhorn));
+    act(() => result.current.toggle(airhorn));
+    act(() => result.current.toggle(airhorn));
+    await send(TEST_ALERT, {
+      ...failure(),
+      id: "alert-1",
+      request: 1,
+      volume: 80,
+    });
+
+    expect(result.current.testing).toEqual({ id: "alert-1", loading: true });
+  });
+
+  it("doesn't end the newer test when the stopped one's sound finishes decoding", async () => {
+    const { result, queue } = setup();
+    let decoded!: (queued: boolean) => void;
+    queue.enqueue.mockImplementationOnce(
+      () => new Promise((resolve) => (decoded = resolve)),
+    );
+    act(() => result.current.toggle(airhorn));
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-1",
+      request: 1,
+      data,
+      volume: 80,
+    });
+
+    act(() => result.current.toggle(airhorn));
+    act(() => result.current.toggle(airhorn));
+    // Stopped, the first sound's decode ends without a place
+    await act(async () => decoded(false));
+
+    expect(result.current.testing).toEqual({ id: "alert-1", loading: true });
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-1",
+      request: 2,
+      data,
+      volume: 80,
+    });
+    expect(queue.enqueue).toHaveBeenCalledTimes(2);
+    expect(result.current.testing).toEqual({ id: "alert-1", loading: false });
   });
 
   it("ends a test whose sound failed or couldn't be queued", async () => {
     const { result, queue } = setup();
 
     act(() => result.current.toggle(airhorn));
-    await send(TEST_ALERT, { ...failure(), id: "alert-1", volume: 80 });
+    await send(TEST_ALERT, {
+      ...failure(),
+      id: "alert-1",
+      request: 1,
+      volume: 80,
+    });
     expect(result.current.testing).toBeNull();
     expect(queue.enqueue).not.toHaveBeenCalled();
 
     queue.enqueue.mockResolvedValueOnce(false);
     act(() => result.current.toggle(bell));
-    await send(TEST_ALERT, { success: true, id: "alert-2", data, volume: 100 });
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-2",
+      request: 2,
+      data,
+      volume: 100,
+    });
     expect(result.current.testing).toBeNull();
   });
 
@@ -154,7 +273,13 @@ describe("useAlertTest", () => {
     const { result, queue } = setup();
 
     act(() => result.current.toggle({ ...airhorn, media: party }));
-    await send(TEST_ALERT, { success: true, id: "alert-1", data, volume: 80 });
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-1",
+      request: 1,
+      data,
+      volume: 80,
+    });
 
     expect(queue.enqueue).toHaveBeenCalledWith(
       data,

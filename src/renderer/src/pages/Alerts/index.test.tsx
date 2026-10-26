@@ -764,7 +764,7 @@ describe("Alerts", () => {
 
     await user.click(rows()[0].getByRole("button", { name: "Play" }));
     expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([
-      { id: "alert-1", file: "airhorn.mp3", volume: 80, start: 0 },
+      { id: "alert-1", file: "airhorn.mp3", volume: 80, start: 0, request: 1 },
     ]);
     expect(
       rows()[0].getByRole("button", { name: "Cancel" }),
@@ -776,6 +776,7 @@ describe("Alerts", () => {
       tts: message,
       trigger: TOKIO_EVENTS.FOLLOW,
       volume: 50,
+      request: 2,
     });
   });
 
@@ -986,7 +987,14 @@ describe("Alerts", () => {
 
       await user.click(opened.getByRole("button", { name: "Play" }));
       expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([
-        { id: "alert-1", file: "airhorn.mp3", volume: 80, start: 1, end: 1.5 },
+        {
+          id: "alert-1",
+          file: "airhorn.mp3",
+          volume: 80,
+          start: 1,
+          end: 1.5,
+          request: 1,
+        },
       ]);
 
       await user.click(opened.getByRole("button", { name: "Reset cut" }));
