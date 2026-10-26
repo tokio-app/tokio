@@ -370,6 +370,9 @@ export class AudioQueue {
     );
     // Seconds it's heard
     const length = (end - start) / speed;
+    // GrainPlayer reads the offset in played seconds too: it starts at the
+    // offset times the speed
+    const offset = start / speed;
 
     const gainNode = new Tone.Gain(gain).connect(this.gainNode);
     // Its own node, so setItemGain's ramps can't cancel the fade
@@ -381,9 +384,9 @@ export class AudioQueue {
       const stopAt = startAt + length;
       fade.gain.setValueAtTime(1, Math.max(startAt, stopAt - CUT_FADE));
       fade.gain.linearRampToValueAtTime(0, stopAt);
-      player.start(startAt, start, length);
+      player.start(startAt, offset, length);
     } else {
-      player.start(startAt, start);
+      player.start(startAt, offset);
     }
     this.active.push({
       player,
