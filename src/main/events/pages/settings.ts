@@ -166,6 +166,8 @@ events.push(
   async (services, e, { file }) => {
     const { storeManagerService, connectorService, timerService, notifier } =
       services;
+    // Picking the active profile again changes nothing, even during a LIVE
+    if (file === storeManagerService.getSettings().activeProfile.file) return;
     if (connectorService.isConnected()) {
       throw new AppFailure(
         FEEDBACK_CODES.PROFILE_LOCKED,

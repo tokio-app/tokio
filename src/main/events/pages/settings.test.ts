@@ -625,6 +625,21 @@ describe("settings events", () => {
         }),
       ]);
     });
+
+    it.each([false, true])(
+      "does nothing for the active profile (connected: %s)",
+      async (connected) => {
+        const { h, storeManagerService, timerService } = setup({ connected });
+
+        await h.invoke(settings, APP_EVENTS.SET_PROFILE, {
+          file: defaultProfile.file,
+        });
+
+        expect(timerService.save).not.toHaveBeenCalled();
+        expect(storeManagerService.updateActiveProfile).not.toHaveBeenCalled();
+        expect(h.sent()).toEqual([]);
+      },
+    );
   });
 
   describe("EXPORT_ENTITY", () => {
