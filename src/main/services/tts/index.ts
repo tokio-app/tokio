@@ -17,6 +17,9 @@ import { EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
 // after this long, like the ones it had when it reloaded or crashed.
 const HOLD_TIMEOUT_MS = 2 * 60_000;
 
+// Edge sends no audio for text of only punctuation ("?", "..."), so it isn't sent
+const SPEAKABLE = /[\p{L}\p{N}\p{Extended_Pictographic}]/u;
+
 // Without accents, invisible characters or styled letters ("ｉｄｉｏｔ"), so a
 // banned word can't hide behind them.
 const fold = (text: string) =>
@@ -176,7 +179,11 @@ export class TTSService extends ProviderService<TTSProvider> {
   ): string | null {
     if (this._hasBanned(checked, settings)) return null;
     const out = this._clean(text, settings);
-    return isBlank(out) ? null : out;
+    return this._speakable(out) ? out : null;
+  }
+
+  private _speakable(text: string) {
+    return !isBlank(text) && SPEAKABLE.test(text);
   }
 
   private _replacementRegExp(old: string) {
@@ -237,6 +244,7 @@ export class TTSService extends ProviderService<TTSProvider> {
     const comment = this._comment(settings, chat);
     if (!this._valid(settings, chat, comment)) return;
     const text = this._parseText(settings, chat, comment);
+    if (!this._speakable(text)) return;
     this._queue.setQueueOptions({
       gapTime: settings.protection.cooldown,
       maxQueueLength: settings.protection.queue_length,
