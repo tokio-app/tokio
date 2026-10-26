@@ -239,7 +239,8 @@ export class MusicQueue extends TokioEmitter {
         // Not for a song skipped while it loaded
         if (active()) this._hooks.onError?.(item.id, error);
         if (++failures === 2 && active()) {
-          this._currentIndex--;
+          // The first is gone when the queue was full: stop at the second
+          this._currentIndex = Math.max(0, this._currentIndex - 1);
           this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
           break;
         }
