@@ -89,10 +89,6 @@ export class TimerService extends Service {
         : 0,
   };
 
-  public setLogFile(logFile: string) {
-    this._logFile = logFile;
-  }
-
   public initialize({
     store,
   }: {

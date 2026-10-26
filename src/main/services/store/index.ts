@@ -76,10 +76,6 @@ export class StoreManagerService extends Service {
   // The active file's last failed load, so live events don't read it each time
   private _failedLoad: { file: string; at: number } | null = null;
 
-  public setLogFile(logFile: string) {
-    this._logFile = logFile;
-  }
-
   // fresh waits for updates still writing and retries a failed file at once.
   public async getProfileData({ fresh = false }: { fresh?: boolean } = {}) {
     if (fresh) await this._profileWrite;

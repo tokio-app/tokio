@@ -118,10 +118,6 @@ export class LiveService extends Service {
     [TOKIO_EVENTS.MEMBER_JOIN]: ({ user }) => this._join(activityUser(user)),
   };
 
-  public setLogFile(logFile: string) {
-    this._logFile = logFile;
-  }
-
   /** Starts a LIVE, clearing the last one's totals and feed. */
   public start(now = Date.now()) {
     this._startedAt = now;

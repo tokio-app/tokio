@@ -96,10 +96,6 @@ export class AlertsService extends Service {
   // Each viewer's streak of a gift, see GiftStreaks
   private _streaks = new GiftStreaks();
 
-  public setLogFile(logFile: string): void {
-    this._logFile = logFile;
-  }
-
   public setSoundsFolder(folder: string): void {
     this._soundsFolder = folder;
   }

@@ -126,10 +126,6 @@ export class GamesService extends Service {
     });
   }
 
-  public setLogFile(logFile: string): void {
-    this._logFile = logFile;
-  }
-
   public setPicturesFolder(folder: string): void {
     this._picturesFolder = folder;
   }

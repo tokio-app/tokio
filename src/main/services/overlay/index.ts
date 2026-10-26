@@ -91,10 +91,6 @@ export class OverlayService extends Service {
   // The last task queued for each overlay's files, see _lock
   private _locks = new Map<string, Promise<unknown>>();
 
-  public setLogFile(logFile: string): void {
-    this._logFile = logFile;
-  }
-
   public initialize(
     paths: { folder: string; giftsFile: string; customGiftsFile: string },
     services: {

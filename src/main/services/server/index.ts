@@ -88,10 +88,6 @@ export class ServerService extends Service {
     this._dynamicRouter = newRouter;
   }
 
-  public setLogFile(logFile: string) {
-    this._logFile = logFile;
-  }
-
   public getPort(): number {
     return this._port;
   }
