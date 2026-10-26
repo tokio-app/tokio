@@ -800,13 +800,34 @@ export class StoreManagerService extends Service {
   }
 
   public async exportProfile(ref: string, path: string): Promise<boolean> {
-    return this._exportEntity(
-      ref,
-      path,
-      this._pathManagerService.folders.profilesFolder,
+    if (!ref || !path) return false;
+
+    const data = await this._jsonManagerService.loadFile(
+      join(this._pathManagerService.folders.profilesFolder, ref),
       ProfileSchema,
-      "profile",
     );
+    if (!data) {
+      Logger.error(
+        `<System> Export failed: Reference profile ${ref} not found.`,
+        this._logFile,
+      );
+      return false;
+    }
+
+    const saved = await this._jsonManagerService.saveFile(
+      resolve(path),
+      ProfileSchema,
+      data,
+    );
+    if (!saved) {
+      Logger.error(
+        `<System> Failed to write the exported profile ${path}`,
+        this._logFile,
+      );
+      return false;
+    }
+
+    return true;
   }
 
   // Copied to a free file named after its file, and listed under its own
@@ -817,15 +838,41 @@ export class StoreManagerService extends Service {
     this._ensureInitialized();
     if (!ref) return null;
     const file = await this._freeProfileFile(basename(ref, extname(ref)));
-    const result = await this._importEntity(
-      ref,
-      file,
-      this._pathManagerService.folders.profilesFolder,
+    const newPath = join(this._pathManagerService.folders.profilesFolder, file);
+
+    const data = await this._jsonManagerService.loadFile(
+      resolve(ref),
       ProfileSchema,
-      "profile",
     );
-    if (!result) return null;
-    return this._listNewProfile(result);
+    if (!data) {
+      Logger.error(
+        `<System> Import failed: Reference profile ${ref} not found.`,
+        this._logFile,
+      );
+      return null;
+    }
+
+    // A name the trim made too short would fail the save's validation.
+    const trimmed = data.name.trim();
+    const name = this._freeProfileName(
+      trimmed.length < (ProfileSchema.shape.name.minLength ?? 1)
+        ? "Imported profile"
+        : trimmed,
+    );
+    const saved = await this._jsonManagerService.saveFile(
+      newPath,
+      ProfileSchema,
+      { ...data, name },
+    );
+    if (!saved) {
+      Logger.error(
+        `<System> Failed to write imported profile file: ${newPath}`,
+        this._logFile,
+      );
+      return null;
+    }
+
+    return this._listNewProfile({ file, name });
   }
 
   // A profile whose file the store can't list is deleted, so it doesn't take
@@ -885,92 +932,6 @@ export class StoreManagerService extends Service {
     );
   }
 
-  private async _exportEntity(
-    ref: string,
-    destPath: string,
-    sourceFolder: string,
-    schema: any,
-    typeName: string,
-  ): Promise<boolean> {
-    if (!ref || !destPath) return false;
-
-    const refPath = join(sourceFolder, ref);
-    const newPath = resolve(destPath);
-    const existingData = await this._jsonManagerService.loadFile(
-      refPath,
-      schema,
-    );
-
-    if (!existingData) {
-      Logger.error(
-        `<System> Clone failed: Reference ${typeName} ${ref} not found.`,
-        this._logFile,
-      );
-      return false;
-    }
-
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      schema,
-      existingData,
-    );
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write cloned ${typeName} file: ${destPath}`,
-        this._logFile,
-      );
-      return false;
-    }
-
-    return true;
-  }
-
-  private async _importEntity(
-    ref: string,
-    file: string,
-    destFolder: string,
-    schema: typeof ProfileSchema,
-    typeName: string,
-  ): Promise<EntityMetadata | null> {
-    if (!ref) return null;
-
-    const refPath = resolve(ref);
-    const newPath = join(destFolder, file);
-
-    const existingData = await this._jsonManagerService.loadFile(
-      refPath,
-      schema,
-    );
-    if (!existingData) {
-      Logger.error(
-        `<System> Import failed: Reference ${typeName} ${ref} not found.`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    // A name the trim made too short would fail the save's validation.
-    const trimmed = existingData.name.trim();
-    const name = this._freeProfileName(
-      trimmed.length < (schema.shape.name.minLength ?? 1)
-        ? "Imported profile"
-        : trimmed,
-    );
-    const saved = await this._jsonManagerService.saveFile(newPath, schema, {
-      ...existingData,
-      name,
-    });
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write imported ${typeName} file: ${newPath}`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    return { file, name };
-  }
-
   // `name`, or `name 2` and on when a profile has it, compared as the
   // settings events do: trimmed and in any case.
   private _freeProfileName(name: string): string {
@@ -985,7 +946,16 @@ export class StoreManagerService extends Service {
   public async addProfile(
     profile: EntityMetadata,
   ): Promise<EntityMetadata | null> {
-    return this._addEntity(profile, this._storeData!.profiles);
+    this._ensureInitialized();
+    if (!profile) return null;
+    const profiles = this._storeData!.profiles;
+    if (profiles.some((p) => p.file === profile.file)) return profile;
+
+    profiles.push(profile);
+    if (await this._queueSave()) return profile;
+    // Unlisted again, so trying again isn't refused as a taken name.
+    profiles.splice(profiles.indexOf(profile), 1);
+    return null;
   }
 
   // `file` defaults to the active profile's. A service saving the profile it
@@ -1012,21 +982,6 @@ export class StoreManagerService extends Service {
       this._profileWrite = write.catch(() => {});
     }
     return write;
-  }
-
-  private async _addEntity(
-    entity: EntityMetadata,
-    collection: EntityMetadata[],
-  ): Promise<EntityMetadata | null> {
-    this._ensureInitialized();
-    if (!entity) return null;
-    if (collection.some((e) => e.file === entity.file)) return entity;
-
-    collection.push(entity);
-    if (await this._queueSave()) return entity;
-    // Unlisted again, so trying again isn't refused as a taken name.
-    collection.splice(collection.indexOf(entity), 1);
-    return null;
   }
 
   private _ensureInitialized() {

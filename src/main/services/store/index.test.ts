@@ -1118,7 +1118,10 @@ describe("StoreManagerService", () => {
       expect(
         await store.exportProfile("missing.json", join(elsewhere, "x.json")),
       ).toBe(false);
-      expect(error).toHaveBeenCalled();
+      expect(error).toHaveBeenCalledWith(
+        "<System> Export failed: Reference profile missing.json not found.",
+        undefined,
+      );
     });
 
     it("imports a profile and lists it under its own name", async () => {
