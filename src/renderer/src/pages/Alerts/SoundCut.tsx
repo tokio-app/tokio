@@ -1,6 +1,6 @@
 import { Alert } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { formatAdded } from "@/common/util";
+import { cutPart, formatAdded } from "@/common/util";
 import { Btn, NumberInput, Spinner } from "@/components";
 import { cx } from "@/helper";
 import { useAudio, useIpcListener } from "@/hooks";
@@ -13,7 +13,7 @@ import {
   useState,
 } from "react";
 import styles from "./editor.module.css";
-import { cutPart, waveform } from "./helper";
+import { waveform } from "./helper";
 
 declare module "react" {
   interface CSSProperties {

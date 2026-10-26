@@ -6,7 +6,6 @@ import {
   createAlert,
   emoteOptions,
   giftOptions,
-  cutPart,
   soundClip,
   ttsDefaultsOf,
   waveform,
@@ -90,21 +89,6 @@ describe("giftOptions", () => {
     expect(giftOptions([rose], [{ ...rose, label: "Old Rose" }])).toEqual([
       rose,
     ]);
-  });
-});
-
-describe("cutPart", () => {
-  it("plays the cut, or the whole length when it doesn't fit", () => {
-    expect(cutPart({ start: 1, end: 3 }, 10)).toEqual({ start: 1, stop: 3 });
-    expect(cutPart({ start: 1, end: null }, 10)).toEqual({
-      start: 1,
-      stop: 10,
-    });
-    expect(cutPart({ start: 1, end: 30 }, 10)).toEqual({ start: 1, stop: 10 });
-    expect(cutPart({ start: 12, end: null }, 10)).toEqual({
-      start: 0,
-      stop: 10,
-    });
   });
 });
 

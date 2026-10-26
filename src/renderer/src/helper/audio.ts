@@ -1,3 +1,4 @@
+import { cutPart } from "@/common/util";
 import * as Tone from "tone";
 
 interface AudioQueueOptions {
@@ -363,9 +364,10 @@ export class AudioQueue {
 
     // A part that isn't in the sound plays it whole.
     const { duration } = buffer;
-    let start = Math.min(Math.max(next.start ?? 0, 0), duration);
-    let end = Math.min(next.end ?? duration, duration);
-    if (end <= start) [start, end] = [0, duration];
+    const { start, stop: end } = cutPart(
+      { start: next.start ?? 0, end: next.end ?? null },
+      duration,
+    );
     // Seconds it's heard
     const length = (end - start) / speed;
 

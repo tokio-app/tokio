@@ -1,4 +1,4 @@
-import { formatAdded, getSoundPreviewURL } from "@/common/util";
+import { cutPart, formatAdded, getSoundPreviewURL } from "@/common/util";
 import { useState } from "react";
 import styles from "./soundpicker.module.css";
 
@@ -7,17 +7,22 @@ type Props = {
   file?: string;
   // The length already known, from a preview
   seconds?: number;
-  // Seconds of the file left out at its start, like an alert's cut
-  from?: number;
+  // The part of the file that plays, like an alert's cut
+  cut?: { start: number; end: number | null };
 };
 
 /**
  * A sound's or video's length ("2.5s", "1:05") once it's known. Nothing
  * shows for a file that doesn't say its length.
  */
-export function SoundLength({ file, seconds, from = 0 }: Props) {
+export function SoundLength({ file, seconds, cut }: Props) {
   const [read, setRead] = useState<number>();
-  const length = seconds ?? (read === undefined ? undefined : read - from);
+  // The part the queue plays: a cut that doesn't fit plays the whole file
+  const part =
+    read === undefined
+      ? undefined
+      : cutPart(cut ?? { start: 0, end: null }, read);
+  const length = seconds ?? (part && part.stop - part.start);
   return (
     <>
       {file && seconds === undefined && (

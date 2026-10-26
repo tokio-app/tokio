@@ -29,6 +29,21 @@ describe("SoundLength", () => {
     expect(screen.getByText("1:05")).toBeInTheDocument();
   });
 
+  it("shows the cut's part of the file's length, whole when the cut doesn't fit", () => {
+    const cut = (start: number, end: number | null) => {
+      const { container } = render(
+        <SoundLength file="horn.mp3" cut={{ start, end }} />,
+      );
+      measure(container, 10);
+      return container.textContent;
+    };
+
+    expect(cut(2, 5)).toBe("3s");
+    expect(cut(2, null)).toBe("8s");
+    expect(cut(2, 30)).toBe("8s");
+    expect(cut(12, 15)).toBe("10s");
+  });
+
   it.each([NaN, Infinity, 0])("shows nothing for a length of %s", (seconds) => {
     const { container } = render(<SoundLength file="horn.mp3" />);
     measure(container, seconds);

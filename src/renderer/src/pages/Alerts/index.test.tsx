@@ -1007,7 +1007,10 @@ describe("Alerts", () => {
       });
 
       expect(opened.getByText("Plays 0.5s of 2s")).toBeInTheDocument();
-      // How long the cut plays
+      // How long the cut plays, of the file's length the row read
+      const length = summary(0).querySelector("audio")!;
+      Object.defineProperty(length, "duration", { value: 2 });
+      fireEvent.loadedMetadata(length);
       expect(summary(0)).toHaveTextContent("0.5s");
       await wait(300);
       expect(saves().at(-1)?.items[0].sound).toEqual({
@@ -1058,6 +1061,9 @@ describe("Alerts", () => {
       });
 
       await user.click(dialog.getByRole("button", { name: "Airhorn" }));
+      const length = summary(0).querySelector("audio")!;
+      Object.defineProperty(length, "duration", { value: 2 });
+      fireEvent.loadedMetadata(length);
       expect(summary(0)).toHaveTextContent("0.5s");
       await wait(300);
       expect(saves()).toEqual([]);
