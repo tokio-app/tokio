@@ -289,8 +289,7 @@ export class OverlayService extends Service {
   }
 
   private async _remove(id: string): Promise<OverlayResult> {
-    // Only stored ids, so the renderer's id can't point outside the folder
-    if (!this._store.getSettings().overlays.some((o) => o.id === id)) {
+    if (!this._isStored(id)) {
       Logger.warn(
         `<Overlays> Unable to remove overlay ${id}, it isn't installed.`,
         this._logFile,
@@ -314,6 +313,12 @@ export class OverlayService extends Service {
     return { success: true, saved: await this._store.removeOverlayInfo(id) };
   }
 
+  // Only stored ids, so the renderer's id can't point outside the folder.
+  // It doesn't log: the callers do.
+  private _isStored(id: string) {
+    return this._store.getSettings().overlays.some((o) => o.id === id);
+  }
+
   // Paths point at the overlay's HTML file.
   public getOverlays(): OverlayApp[] {
     return this._overlays.map((ov) => ({
@@ -325,7 +330,9 @@ export class OverlayService extends Service {
   public getConfig(
     id: string,
   ): Promise<OverlayResult<OverlayConfig | undefined>> {
-    return this._lock(id, () => this._readConfig(id));
+    return this._lock(id, async () =>
+      this._isStored(id) ? this._readConfig(id) : { success: false },
+    );
   }
 
   private async _readConfig(
@@ -351,6 +358,7 @@ export class OverlayService extends Service {
     config: OverlayConfig,
     gifts: CustomGift[],
   ): Promise<OverlayResult<OverlayConfigRedux>> {
+    if (!this._isStored(id)) return { success: false };
     try {
       const dir = this._dir(id);
       const res = await processOverlay(dir, this._yaml, false);
