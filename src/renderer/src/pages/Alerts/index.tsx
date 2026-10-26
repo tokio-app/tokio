@@ -46,10 +46,19 @@ export function Alerts() {
   // Shows only the alerts whose names have it
   const [search, setSearch] = useState("");
 
-  const { settings, update } = useEditableSettings("alerts", (profile) => {
-    setEmotes(profile.emotes);
-    setTtsDefaults(ttsDefaultsOf(profile.tts));
-  });
+  const { settings, update } = useEditableSettings(
+    "alerts",
+    (profile, switched) => {
+      setEmotes(profile.emotes);
+      setTtsDefaults(ttsDefaultsOf(profile.tts));
+      // A clone has the same alert ids: a reply for the last profile mustn't
+      // land in this one
+      if (switched) {
+        asked.current.clear();
+        askedMedia.current.clear();
+      }
+    },
+  );
 
   const { setItemGain } = useAudio();
   const test = useAlertTest();

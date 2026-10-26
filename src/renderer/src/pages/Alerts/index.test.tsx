@@ -755,6 +755,32 @@ describe("Alerts", () => {
     expect(summary(0)).toHaveTextContent("Bruh");
   });
 
+  it("drops a download started in another profile", async () => {
+    const items = [alert("alert-1")];
+    const { user } = await load(items);
+    await pickSound(user, 0);
+    await download(user);
+    // A clone, whose alert has the same id
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.name = "Clone";
+        p.alerts.items = items;
+      }),
+    );
+
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+      success: true,
+      id: "alert-1",
+      request: 1,
+      sound: alertSound("Bruh"),
+    });
+
+    expect(summary(0)).not.toHaveTextContent("Bruh");
+    await wait(300);
+    expect(saves()).toEqual([]);
+  });
+
   it("tests an alert's sound or message", async () => {
     const message = speech("Welcome");
     const { user } = await load([
@@ -971,6 +997,31 @@ describe("Alerts", () => {
       });
 
       expect(summary(0)).toHaveTextContent("Confetti");
+    });
+
+    it("drops a browsed file asked for in another profile", async () => {
+      const items = [alert("alert-1")];
+      const { user } = await load(items);
+      const dialog = await openMedia(user, 0);
+      await user.click(dialog.getByRole("button", { name: "Browse file..." }));
+      await send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.name = "Clone";
+          p.alerts.items = items;
+        }),
+      );
+
+      await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+        success: true,
+        id: "alert-1",
+        request: 1,
+        media: party,
+      });
+
+      expect(summary(0)).toHaveTextContent("No media");
+      await wait(300);
+      expect(saves()).toEqual([]);
     });
   });
 

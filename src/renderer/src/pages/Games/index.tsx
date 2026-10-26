@@ -24,8 +24,14 @@ export function Games() {
   const counter = useRef(0);
   const applied = useRef(new Map<string, number>());
 
-  const { settings, update } = useEditableSettings("games", (profile) =>
-    setEmotes(profile.emotes),
+  const { settings, update } = useEditableSettings(
+    "games",
+    (profile, switched) => {
+      setEmotes(profile.emotes);
+      // A clone has the same action ids: a browse for the last profile
+      // mustn't land in this one
+      if (switched) asked.current.clear();
+    },
   );
 
   useIpcRequest(APP_EVENTS.GET_GAMES);

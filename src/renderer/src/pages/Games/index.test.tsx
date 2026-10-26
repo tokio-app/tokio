@@ -1016,6 +1016,31 @@ describe("Games overlay", () => {
     expect(savedOverlays()[0].image).toEqual(CREEPER);
   });
 
+  it("drops a browse made in another profile", async () => {
+    const { user } = await load([action("a1")]);
+
+    await user.click(screen.getByRole("button", { name: "Pick a picture" }));
+    await user.click(screen.getByRole("button", { name: "Browse files..." }));
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    // A clone, whose action has the same id
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.name = "Clone";
+        p.games.actions = [action("a1")];
+      }),
+    );
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      request: 1,
+      picture: TNT,
+    });
+    await wait(300);
+
+    expect(saves()).toEqual([]);
+  });
+
   it("clears a deleted picture from the actions, so a save can't bring it back", async () => {
     await load([
       action("a1", { overlay: { ...overlay, image: TNT } }),
