@@ -216,6 +216,17 @@ describe("ServerService", () => {
     expect(res.success).toBe(false);
   });
 
+  it("keeps running, stoppable and restartable, after an error once listening", async () => {
+    await server.start();
+    const http = server["_server"]!;
+
+    http.emit("error", Object.assign(new Error("accept"), { code: "EMFILE" }));
+    server.stop();
+
+    expect(http.listening).toBe(false);
+    expect((await server.start()).success).toBe(true);
+  });
+
   describe("overlays", () => {
     beforeEach(async () => {
       const overlay = join(dir, "clock");
