@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createPortal } from "react-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -206,6 +206,29 @@ describe("Modal", () => {
     await user.tab({ shift: true });
 
     expect(dialog().getByRole("button", { name: "Confirm" })).toHaveFocus();
+  });
+
+  it("lets Tab reach a video's controls, and wraps after them", () => {
+    render(
+      <Modal title="Full size" onClose={vi.fn()} closeButton>
+        <video controls aria-label="Clip" />
+      </Modal>,
+    );
+    const close = dialog().getByRole("button", { name: "Close" });
+    const video = dialog().getByLabelText("Clip");
+    close.focus();
+
+    // The browser moves into the controls, which jsdom doesn't have.
+    expect(fireEvent.keyDown(close, { key: "Tab" })).toBe(true);
+    expect(close).toHaveFocus();
+
+    // Chromium reports the video while its controls have the focus.
+    const active = vi
+      .spyOn(Document.prototype, "activeElement", "get")
+      .mockReturnValue(video);
+    expect(fireEvent.keyDown(video, { key: "Tab" })).toBe(false);
+    active.mockRestore();
+    expect(close).toHaveFocus();
   });
 
   it("closes only the innermost dialog on Escape", async () => {
