@@ -1058,6 +1058,58 @@ describe("Alerts", () => {
       expect(opened.getByText("Couldn't read this sound.")).toBeInTheDocument();
     });
 
+    // Airhorn's decode, which ends once Bell was picked in its place
+    async function lateDecode(ok: boolean) {
+      const app = await load([alert("alert-1")]);
+      const decode = app.audio.value.decode;
+      const decoded = decode.getMockImplementation()!;
+      let end = () => {};
+      decode.mockImplementationOnce(
+        (data, key) =>
+          new Promise((resolve, reject) => {
+            end = () =>
+              ok ? resolve(decoded(data, key)) : reject(new Error("Bad data."));
+          }),
+      );
+      const dialog = await pickSound(app.user, 0);
+      await waveform();
+      await send(APP_EVENTS_RESPONSE.GET_SOUNDS, {
+        success: true,
+        data: [airhorn, bell],
+      });
+      await app.user.click(dialog.getByRole("button", { name: "Bell" }));
+      return () => act(async () => end());
+    }
+
+    it("keeps the new sound's waveform when the old one's decode ends late", async () => {
+      const end = await lateDecode(true);
+      await send(APP_EVENTS_RESPONSE.SOUND_DATA, {
+        success: true,
+        file: bell.file,
+        data: new Uint8Array([4]),
+      });
+      await act(async () => {});
+      expect(editor().getByRole("slider", { name: "Start" })).toBeVisible();
+
+      await end();
+
+      expect(editor().getByRole("slider", { name: "Start" })).toBeVisible();
+    });
+
+    it("keeps the new sound's failure when the old one's decode fails late", async () => {
+      const end = await lateDecode(false);
+      await send(APP_EVENTS_RESPONSE.SOUND_DATA, {
+        ...failure(),
+        file: bell.file,
+      });
+
+      await end();
+
+      expect(
+        editor().getByText("Couldn't read this sound."),
+      ).toBeInTheDocument();
+    });
+
     it("doesn't cut a message", async () => {
       const { user } = await load([
         alert("alert-1", { sound: null, tts: speech("Welcome") }),
