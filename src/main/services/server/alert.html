@@ -82,6 +82,8 @@
         // A browser may refuse sound before a click, OBS doesn't.
         el.play()
           .catch(() => {
+            // Removed before it started, its play was aborted.
+            if (el !== current) return;
             el.muted = true;
             return el.play();
           })
