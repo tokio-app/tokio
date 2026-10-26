@@ -1316,4 +1316,20 @@ describe("Games overlay", () => {
     await wait(100);
     expect(current()).toBe("Creeper");
   });
+
+  it("keeps the lit row it shows when Test lights another", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, name: "TNT" } }),
+      action("a2", { overlay: { ...overlay, name: "Creeper" } }),
+    ]);
+    const current = () =>
+      preview()!.querySelector(".games-current .games-name")?.textContent;
+    await user.click(screen.getByRole("radio", { name: "One at a time" }));
+
+    await user.click(testButton());
+    await user.click(testButton());
+
+    expect(litRows()).toEqual(["TNT", "Creeper"]);
+    expect(current()).toBe("TNT");
+  });
 });

@@ -222,8 +222,10 @@
       turnAgain();
 
       // Runs in a burst keep the row lit, 1.5 s after the last. One at a
-      // time turns to it.
+      // time turns to it, unless the row it shows is still lit: two actions
+      // on one gift would flip between their rows every run.
       const light = (id) => {
+        const held = lit.has(rows[turn]?.id);
         clearTimeout(lit.get(id));
         lit.set(
           id,
@@ -233,7 +235,7 @@
           }, LIT_MS),
         );
         const index = rows.findIndex((row) => row.id === id);
-        if (carousel && index !== -1 && index !== turn) {
+        if (carousel && index !== -1 && index !== turn && !held) {
           turn = index;
           turnAgain();
         }

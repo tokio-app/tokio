@@ -115,13 +115,17 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [prevRun, setPrevRun] = useState(run);
 
-  // One at a time turns to the row Test lit
+  const current = rows.length > 0 ? turn % rows.length : 0;
+  const currentId = rows.length > 0 ? rows[current].id : "";
+
+  // One at a time turns to the row Test lit, unless the row it shows is
+  // still lit, as on the overlay
   if (run !== prevRun) {
     setPrevRun(run);
     if (run) {
       setLit((ids) => (ids.includes(run.id) ? ids : [...ids, run.id]));
       const index = rows.findIndex((row) => row.id === run.id);
-      if (index !== -1) setTurn(index);
+      if (index !== -1 && !lit.includes(currentId)) setTurn(index);
     }
   }
 
@@ -152,8 +156,6 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
   // Bumped to wait another turn
   const [wait, setWait] = useState(0);
 
-  const current = rows.length > 0 ? turn % rows.length : 0;
-  const currentId = rows.length > 0 ? rows[current].id : "";
   // Which of an event's gifts shows: one at a time starts the row's from the
   // first as its turn begins
   const pictureTurn = usePictureTurn(carousel ? currentId : undefined);
