@@ -292,7 +292,7 @@ function setup() {
     initialize: vi.fn(
       async (..._args: Parameters<UpdaterService["initialize"]>) => {},
     ),
-    start: vi.fn(),
+    setAuto: vi.fn(),
   };
   const trayService = { setEnabled: vi.fn() };
   const urlManagerService = { setLogFile: vi.fn() };
@@ -1941,10 +1941,10 @@ describe("init events", () => {
       expect(s.h.notices).toEqual([]);
       expect(s.updaterService.initialize).toHaveBeenCalledOnce();
       expect(s.trayService.setEnabled).toHaveBeenCalledExactlyOnceWith(true);
-      expect(s.updaterService.start).toHaveBeenCalledExactlyOnceWith(false);
+      expect(s.updaterService.setAuto).toHaveBeenCalledExactlyOnceWith(false);
       expect(
         s.updaterService.initialize.mock.invocationCallOrder[0],
-      ).toBeLessThan(s.updaterService.start.mock.invocationCallOrder[0]);
+      ).toBeLessThan(s.updaterService.setAuto.mock.invocationCallOrder[0]);
     });
 
     describe("updater", () => {
@@ -2057,7 +2057,7 @@ describe("init events", () => {
         "system.log",
         expect.any(Error),
       );
-      expect(s.updaterService.start).not.toHaveBeenCalled();
+      expect(s.updaterService.setAuto).not.toHaveBeenCalled();
       // So closing the window quits
       expect(s.trayService.setEnabled).not.toHaveBeenCalled();
     });
@@ -2086,7 +2086,7 @@ describe("init events", () => {
       expect(s.serverService.initEvents).toHaveBeenCalledOnce();
       expect(s.overlayService.load).toHaveBeenCalledOnce();
       expect(s.updaterService.initialize).toHaveBeenCalledOnce();
-      expect(s.updaterService.start).toHaveBeenCalledOnce();
+      expect(s.updaterService.setAuto).toHaveBeenCalledOnce();
       expect(s.ttsService.talk).toHaveBeenCalledOnce();
       // The reloaded window plays none of the TTS it had
       expect(s.ttsService.releaseHeld).toHaveBeenCalledOnce();
@@ -2113,7 +2113,7 @@ describe("init events", () => {
         { success: true },
       ]);
       expect(s.storeManagerService.initialize).toHaveBeenCalledOnce();
-      expect(s.updaterService.start).toHaveBeenCalledOnce();
+      expect(s.updaterService.setAuto).toHaveBeenCalledOnce();
     });
 
     it("starts again on the next load after failing, adding the listeners once", async () => {
@@ -2132,7 +2132,7 @@ describe("init events", () => {
       expect(s.storeManagerService.initialize).toHaveBeenCalledTimes(2);
       expect(s.serverService.initEvents).toHaveBeenCalledOnce();
       expect(s.ttsService.talk).toHaveBeenCalledOnce();
-      expect(s.updaterService.start).toHaveBeenCalledOnce();
+      expect(s.updaterService.setAuto).toHaveBeenCalledOnce();
     });
   });
 });

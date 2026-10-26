@@ -140,12 +140,8 @@ export class UpdaterService extends Service {
   }
 
   /** Checks on startup and every few hours while `auto` is on. */
-  public start(auto: boolean) {
-    this.setAuto(auto);
-  }
-
   public setAuto(auto: boolean) {
-    this.stop();
+    this.dispose();
     if (!auto || this._status.state === "unsupported") return;
 
     this._startup = setTimeout(() => void this.check(), STARTUP_DELAY_MS);
@@ -200,10 +196,6 @@ export class UpdaterService extends Service {
   }
 
   public dispose() {
-    this.stop();
-  }
-
-  private stop() {
     clearTimeout(this._startup);
     clearInterval(this._interval);
     this._startup = undefined;
