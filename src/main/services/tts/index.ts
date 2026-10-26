@@ -244,10 +244,11 @@ export class TTSService extends ProviderService<TTSProvider> {
       // The window gets one message to play and the next one ready. The rest
       // wait here, where the queue length drops what's too many.
       const held = Math.min(2, settings.protection.queue_length);
-      const until = Date.now() + HOLD_TIMEOUT_MS;
+      // Not Date.now(), so a clock change can't end the hold early or late
+      const until = performance.now() + HOLD_TIMEOUT_MS;
       // shortcut: polls every 250 ms, wake it from played() if the gap is heard
       while (this._held.size >= held && run === this._run) {
-        if (Date.now() >= until) {
+        if (performance.now() >= until) {
           this._held.clear();
           break;
         }
