@@ -506,12 +506,13 @@ events.push(
   APP_EVENTS.REQ_FQDN,
   async ({ urlManagerService }, e) => {
     const res = await urlManagerService.installAppFQDN();
-    // Also false when the administrator prompt is declined.
+    // Also false when the administrator prompt is declined. The service
+    // logged why.
     if (!res) {
       throw new AppFailure(
         FEEDBACK_CODES.FQDN_INSTALL_FAILED,
         "Unable to set up the overlay address. Accept the administrator prompt to add it.",
-        { level: "warning" },
+        { level: "warning", logged: true },
       );
     }
     e.reply(APP_EVENTS_RESPONSE.REQ_FQDN, {

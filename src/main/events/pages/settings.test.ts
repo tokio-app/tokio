@@ -12,6 +12,7 @@ import {
   GAMES_PATH,
   SERVER_PORT,
 } from "@/common/util";
+import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
@@ -1356,6 +1357,8 @@ describe("settings events", () => {
     });
 
     it("warns when the address isn't set up, as when the prompt is declined", async () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const error = vi.spyOn(Logger, "error");
       const h = createHandler({
         urlManagerService: { installAppFQDN: async () => false },
       });
@@ -1373,6 +1376,9 @@ describe("settings events", () => {
       expect(h.notices).toEqual([
         expect.objectContaining({ level: "warning", ...failure }),
       ]);
+      // The service already logged why
+      expect(warn).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
     });
   });
 
