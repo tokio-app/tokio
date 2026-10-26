@@ -139,13 +139,22 @@ const registerConnectorEvents = ({
           key: `alert:${alert.id}`,
           windowMs: REPEAT_NOTICE_MS,
         };
+        // Logged only when the notice goes out, so a failing engine or a
+        // missing file can't flood the log on every event
         if (alert.tts) {
-          notifier.warn(
-            "alerts",
-            FEEDBACK_CODES.ALERT_TTS_FAILED,
-            `Unable to speak the ${label} alert. Try another voice in Alerts.`,
-            options,
-          );
+          if (
+            notifier.warn(
+              "alerts",
+              FEEDBACK_CODES.ALERT_TTS_FAILED,
+              `Unable to speak the ${label} alert. Try another voice in Alerts.`,
+              options,
+            )
+          ) {
+            Logger.error(
+              `<Alerts> Unable to speak the ${label} alert -- ${error}`,
+              paths.files.logs.alerts,
+            );
+          }
         } else if (
           notifier.warn(
             "alerts",
@@ -154,7 +163,6 @@ const registerConnectorEvents = ({
             options,
           )
         ) {
-          // TTS failures are logged where they're made
           Logger.warn(
             `<Alerts> The sound of the ${label} alert is missing -- ${error}`,
             paths.files.logs.alerts,

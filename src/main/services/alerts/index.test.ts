@@ -787,6 +787,21 @@ describe("AlertsService", () => {
         expect(onError).toHaveBeenCalledExactlyOnceWith(failing, "offline");
       });
 
+      it("leaves a failed message's log to the caller, but logs a preview's", async () => {
+        const logError = vi.spyOn(Logger, "error");
+        generateBuffer.mockResolvedValue({
+          success: false,
+          error: new Error("offline"),
+        });
+        const failing = speaking("Thanks");
+
+        await speak(gift("5655", true), withTts([failing]));
+        expect(logError).not.toHaveBeenCalled();
+
+        await service.speak(tts("Thanks"), { user }, defaultProfile.tts);
+        expect(logError).toHaveBeenCalledOnce();
+      });
+
       it("makes the same message once", async () => {
         const alerts = withTts([speaking("Thanks for the {gift}")]);
 

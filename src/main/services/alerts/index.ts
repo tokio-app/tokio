@@ -452,7 +452,8 @@ export class AlertsService extends Service {
     });
     const run = this._run;
     this._speech.enqueue(async () => {
-      const res = await this._generate(tts, text);
+      // init.ts logs it with its notice, so a failing engine can't flood the log
+      const res = await this._generate(tts, text, false);
       // Cleared while it was being made
       if (run !== this._run) return;
       if (res.success && res.data) play(res.data, this._ttsKey(tts, text));
@@ -477,6 +478,7 @@ export class AlertsService extends Service {
   private async _generate(
     tts: AlertTts,
     text: string,
+    log = true,
   ): Promise<AlertsResult<Uint8Array>> {
     try {
       if (!this._speaker) throw new Error("No TTS to speak with.");
@@ -497,6 +499,7 @@ export class AlertsService extends Service {
       this._remember(key, data);
       return { success: true, data };
     } catch (error) {
+      if (!log) return { success: false, error: formatError(error) };
       return this._fail("Unable to speak alert", error);
     }
   }
