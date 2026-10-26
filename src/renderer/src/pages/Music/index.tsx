@@ -71,6 +71,16 @@ export function Music() {
             })
           }
         />
+        <Check
+          label="Limit Next, Last and Revoke"
+          title="Next and Last work for the host and moderators, who can revoke any song. Viewers can skip a song they asked for while it plays, and revoke their own requests."
+          checked={settings.protection.limit_controls}
+          onChange={(e) =>
+            update((s) => {
+              s.protection.limit_controls = e.target.checked;
+            })
+          }
+        />
       </ProtectionSection>
     </Page>
   );

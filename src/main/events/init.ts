@@ -369,7 +369,7 @@ const registerConnectorEvents = ({
     }
     if (features.music && music.isActive()) {
       if (!profile) return;
-      music.handle(d, profile.music);
+      music.handle(d, profile.music, profile.connector.username);
     } else {
       music.clearHandler();
     }

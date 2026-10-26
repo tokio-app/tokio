@@ -1531,6 +1531,7 @@ describe("init events", () => {
         expect(s.musicService.handle).toHaveBeenCalledExactlyOnceWith(
           message,
           profile.music,
+          profile.connector.username,
         );
       });
       expect(s.musicService.clearHandler).not.toHaveBeenCalled();

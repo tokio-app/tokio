@@ -396,6 +396,9 @@ export const ProfileSchema = z.object({
       queue_length: z.number(),
       // One waiting request per viewer, and no song twice in the queue
       one_per_viewer: z.boolean().default(false),
+      // Next, Last and Revoke of any song for the host and moderators. Viewers
+      // skip only a song they asked for and revoke only their own requests.
+      limit_controls: z.boolean().default(true),
     }),
     controls: z.object({
       play: MusicControl,
