@@ -476,6 +476,16 @@ describe("Tools' countdown timer", () => {
     expect(screen.queryByText("×2")).toBeNull();
   });
 
+  it("rounds the multiplier as the overlay does", async () => {
+    renderWithProviders(<Tools />);
+
+    await timer((t) => {
+      t.settings.multiplier = 1.3333;
+    });
+
+    expect(screen.getByText("×1.33")).toBeInTheDocument();
+  });
+
   it("starts from the starting time being typed while idle", async () => {
     const { user } = renderWithProviders(<Tools />);
     await timer();

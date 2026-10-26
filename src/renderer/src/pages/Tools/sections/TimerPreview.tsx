@@ -114,7 +114,7 @@ export function TimerPreview({ timer, settings }: Props) {
           look.show_multiplier &&
           settings.multiplier !== 1 && (
             <span style={{ color: look.accent_color }}>
-              ×{settings.multiplier}
+              ×{+settings.multiplier.toFixed(2)}
             </span>
           )
         )}
