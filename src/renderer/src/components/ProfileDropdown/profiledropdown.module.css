@@ -64,6 +64,9 @@
   flex-direction: column;
   gap: 2px;
   width: 220px;
+  /* Many profiles scroll: it opens about 42px down, under the title bar */
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
   padding: var(--space-1);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
