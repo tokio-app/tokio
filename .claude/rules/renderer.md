@@ -31,7 +31,7 @@ paths:
   - The section's actions go on the title's row, as icon buttons with a `title`: text buttons don't fit there.
   - Descriptions there are a few words, not explanations.
   - `Section` wraps the content in `.section_body`, which is `display: contents` in the stacked layout.
-- `TitleBar`'s `live` prop (Layout passes the connection) draws the tally on every page: a rose line at the top's center, fading out to both sides. "LIVE" is said only to screen readers.
+- `TitleBar`'s `live` prop (Layout passes the `CONNECTED` reply's `live`: connected or reconnecting, not while a connect is still in progress) draws the tally on every page: a rose line at the top's center, fading out to both sides. "LIVE" is said only to screen readers.
 - The sidebar shows icons only. Each page's name is a span in its link, shown beside the icon on hover and keyboard focus. Opacity hides it, not `visibility`, so it still names the link. Escape hides it until the pointer or focus moves to another link (WCAG 1.4.13).
 
 ## Keyboard
@@ -50,7 +50,7 @@ paths:
 - Global state is in `context/` (`app`, `audio`, `notifications`); shared hooks are in `hooks/`.
 - If `LOAD_APP` fails, `AppProvider` still sends `SHOW_WINDOW`, but shows only the title bar and "Tokio couldn't start" instead of the pages. Toasts still work, since `NotificationsProvider` sits outside it.
 - `useImmerState` returns an immer `Updater`; `scopeUpdater(update, key)` hands a section one field.
-- `useEditableSettings(section, onLoad?)` loads a profile section (TTS, Music, Alerts) and saves it 300ms after the last change, so quick changes go in one save. A change still waiting is sent when the page or the window closes (`pagehide`; not `beforeunload`, which can keep the window open) and dropped when another profile loads, and a failed save reloads the profile. Nothing is saved before a profile has loaded, so the defaults it starts from never reach one.
+- `useEditableSettings(section, onLoad?)` loads a profile section (TTS, Music, Alerts, Games) and saves it 300ms after the last change, so quick changes go in one save. A change still waiting is sent when the page or the window closes (`pagehide`; not `beforeunload`, which can keep the window open) and dropped when another profile loads, and a failed save reloads the profile. Nothing is saved before a profile has loaded, so the defaults it starts from never reach one. `onLoad(profile, switched)` runs on every load; `switched` is true when it's another profile than the last one (by name), not for a resync, so a page can drop what it waits for from the last profile.
 - Main saves to whichever profile is active, so call `flushSettings()` before switching profiles: it sends the changes still waiting to the profile they were made on, and the `useAutosave` fields still waiting.
 - `useAutosave(saved, save)` does the same for one field outside the profile, such as the keys in Settings, which have no Save button.
   - It saves 300ms after the last change, and sends a change still waiting when the field unmounts, the window closes or `flushSettings()` runs (both hooks join one set through `useFlush`).
