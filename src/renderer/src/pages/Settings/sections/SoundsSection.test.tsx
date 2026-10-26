@@ -83,7 +83,7 @@ describe("SoundsSection", () => {
 
     await user.click(row("Airhorn").getByRole("button", { name: "Play" }));
     expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([
-      { id: "airhorn.mp3", file: "airhorn.mp3", volume: 100 },
+      { id: "airhorn.mp3", file: "airhorn.mp3", volume: 100, request: 1 },
     ]);
     expect(
       row("Airhorn").getByRole("button", { name: "Cancel" }),
@@ -92,6 +92,7 @@ describe("SoundsSection", () => {
     await send(APP_EVENTS_RESPONSE.TEST_ALERT, {
       success: true,
       id: "airhorn.mp3",
+      request: 1,
       data,
       volume: 100,
     });
@@ -111,6 +112,7 @@ describe("SoundsSection", () => {
     await send(APP_EVENTS_RESPONSE.TEST_ALERT, {
       success: true,
       id: "airhorn.mp3",
+      request: 1,
       data,
       volume: 100,
     });

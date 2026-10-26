@@ -27,7 +27,7 @@ import {
 import { writeFileAtomic } from "@/helper/fs";
 import { hash, importFile, isSaved } from "@/helper/library";
 import { GiftStreaks } from "@/helper/streaks";
-import { giftOf, matchesTrigger } from "@/helper/triggers";
+import { matchesTrigger, streakOf } from "@/helper/triggers";
 import Logger from "@/logger";
 import type { ServerService } from "@/services/server";
 import type { TTSService } from "@/services/tts";
@@ -361,14 +361,11 @@ export class AlertsService extends Service {
     const settings = profile.alerts;
     const run = this._run;
     // Once per event, whichever alerts it plays
-    const gift = giftOf(type, payload);
-    const { added, total } = gift
-      ? this._streaks.add(gift)
-      : { added: 0, total: 0 };
-    // A message's {count} is the streak's count so far, not TikTok's
-    const speech = gift
-      ? { ...gift, gift: { ...gift.gift, comboCount: total } }
-      : payload;
+    const {
+      added,
+      total,
+      values: speech,
+    } = streakOf(this._streaks, type, payload);
     for (const alert of settings.items) {
       if (!alert.enabled || (!alert.sound && !alert.tts && !alert.media)) {
         continue;
@@ -455,7 +452,8 @@ export class AlertsService extends Service {
     });
     const run = this._run;
     this._speech.enqueue(async () => {
-      const res = await this._generate(tts, text);
+      // init.ts logs it with its notice, so a failing engine can't flood the log
+      const res = await this._generate(tts, text, false);
       // Cleared while it was being made
       if (run !== this._run) return;
       if (res.success && res.data) play(res.data, this._ttsKey(tts, text));
@@ -480,6 +478,7 @@ export class AlertsService extends Service {
   private async _generate(
     tts: AlertTts,
     text: string,
+    log = true,
   ): Promise<AlertsResult<Uint8Array>> {
     try {
       if (!this._speaker) throw new Error("No TTS to speak with.");
@@ -500,6 +499,7 @@ export class AlertsService extends Service {
       this._remember(key, data);
       return { success: true, data };
     } catch (error) {
+      if (!log) return { success: false, error: formatError(error) };
       return this._fail("Unable to speak alert", error);
     }
   }

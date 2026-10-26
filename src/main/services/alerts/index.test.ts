@@ -557,7 +557,7 @@ describe("AlertsService", () => {
     it("fires alerts with roles only for viewers who have one of them", async () => {
       const alerts = settings([
         alert({
-          trigger: trigger(TOKIO_EVENTS.SHARE, {
+          trigger: trigger(TOKIO_EVENTS.GIFT, {
             roles: ["moderator", "superfan"],
           }),
         }),
@@ -576,15 +576,27 @@ describe("AlertsService", () => {
           trigger: trigger(TOKIO_EVENTS.FOLLOW, { roles: ["moderator"] }),
         }),
       ]);
+      const share = settings([
+        alert({
+          trigger: trigger(TOKIO_EVENTS.SHARE, { roles: ["moderator"] }),
+        }),
+      ]);
       const superfan = { ...user, superfan: true };
-      const share = (viewer: typeof user) => ({ user: viewer, shareCount: 1 });
+      const sent = (viewer: typeof user) => ({
+        ...gift("5", true),
+        user: viewer,
+      });
 
-      expect(await run(TOKIO_EVENTS.SHARE, share(user), alerts)).toEqual([]);
-      expect(
-        await run(TOKIO_EVENTS.SHARE, share(superfan), alerts),
-      ).toHaveLength(1);
+      expect(await run(TOKIO_EVENTS.GIFT, sent(user), alerts)).toEqual([]);
+      expect(await run(TOKIO_EVENTS.GIFT, sent(superfan), alerts)).toHaveLength(
+        1,
+      );
       // A follow's viewer only just followed, so roles don't narrow it
       expect(await run(TOKIO_EVENTS.FOLLOW, { user }, follow)).toHaveLength(1);
+      // A share comes without the viewer's roles
+      expect(
+        await run(TOKIO_EVENTS.SHARE, { user, shareCount: 1 }, share),
+      ).toHaveLength(1);
       // Emotes check the chat's viewer
       expect(await run(TOKIO_EVENTS.CHAT, chat("", "e1"), emotes)).toEqual([]);
       // An envelope comes without a viewer
@@ -773,6 +785,21 @@ describe("AlertsService", () => {
         await speak(gift("5655", true), withTts([failing]));
 
         expect(onError).toHaveBeenCalledExactlyOnceWith(failing, "offline");
+      });
+
+      it("leaves a failed message's log to the caller, but logs a preview's", async () => {
+        const logError = vi.spyOn(Logger, "error");
+        generateBuffer.mockResolvedValue({
+          success: false,
+          error: new Error("offline"),
+        });
+        const failing = speaking("Thanks");
+
+        await speak(gift("5655", true), withTts([failing]));
+        expect(logError).not.toHaveBeenCalled();
+
+        await service.speak(tts("Thanks"), { user }, defaultProfile.tts);
+        expect(logError).toHaveBeenCalledOnce();
       });
 
       it("makes the same message once", async () => {

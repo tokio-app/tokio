@@ -186,6 +186,9 @@ describe("Spotify", () => {
       const view = authView();
 
       expect(shell.isVisible()).toBe(true);
+      // Spotify's page never gets the bridge
+      expect(view.options.webPreferences?.preload).toBeUndefined();
+      expect(view.options.webPreferences?.nodeIntegration).not.toBe(true);
       expect(shell.contentView.children).toContain(view);
       expect(view.setBounds).toHaveBeenLastCalledWith({
         x: 0,

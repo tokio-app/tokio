@@ -30,6 +30,7 @@ import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
+import { MAX_BACKLOG } from "@/services/games";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { TIMER_EVENTS } from "@/services/timer";
 import { AppHandlerVariables } from "@/types";
@@ -138,13 +139,22 @@ const registerConnectorEvents = ({
           key: `alert:${alert.id}`,
           windowMs: REPEAT_NOTICE_MS,
         };
+        // Logged only when the notice goes out, so a failing engine or a
+        // missing file can't flood the log on every event
         if (alert.tts) {
-          notifier.warn(
-            "alerts",
-            FEEDBACK_CODES.ALERT_TTS_FAILED,
-            `Unable to speak the ${label} alert. Try another voice in Alerts.`,
-            options,
-          );
+          if (
+            notifier.warn(
+              "alerts",
+              FEEDBACK_CODES.ALERT_TTS_FAILED,
+              `Unable to speak the ${label} alert. Try another voice in Alerts.`,
+              options,
+            )
+          ) {
+            Logger.error(
+              `<Alerts> Unable to speak the ${label} alert -- ${error}`,
+              paths.files.logs.alerts,
+            );
+          }
         } else if (
           notifier.warn(
             "alerts",
@@ -153,7 +163,6 @@ const registerConnectorEvents = ({
             options,
           )
         ) {
-          // TTS failures are logged where they're made
           Logger.warn(
             `<Alerts> The sound of the ${label} alert is missing -- ${error}`,
             paths.files.logs.alerts,
@@ -211,12 +220,15 @@ const registerConnectorEvents = ({
   }
 
   // Busy lives send many of these, the UI only needs the latest few a second.
+  // A throttled push can come after the window closed on quit.
   const sendViews = throttle((views: number, viewers: number) => {
+    if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.VIEWS, {
       data: { views, viewers },
     });
   }, STATS_THROTTLE_MS);
   const sendLikes = throttle((likes: number) => {
+    if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.LIKES, { likes });
   }, STATS_THROTTLE_MS);
 
@@ -231,6 +243,7 @@ const registerConnectorEvents = ({
 
   // The Home page's feed and totals, throttled like the stats.
   const pushSession = () => {
+    if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
       data: live.getSession(),
     });
@@ -279,16 +292,19 @@ const registerConnectorEvents = ({
     music.clearHandler();
     tts.clearTalk();
     alerts.clear();
-    win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
-    win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
-    win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
-      success: false,
-      stats: {
-        likes: 0,
-        viewers: 0,
-        views: 0,
-      },
-    });
+    // The connection stops on quit too, after the window closed
+    if (!win.isDestroyed()) {
+      win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
+      win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
+      win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
+        success: false,
+        stats: {
+          likes: 0,
+          viewers: 0,
+          views: 0,
+        },
+      });
+    }
   });
   // A drop the connector recovers from keeps the LIVE session going.
   conn.onReconnect((state) => {
@@ -443,9 +459,23 @@ const registerGames = (handler: AppHandlerVariables) => {
     });
   });
   // Logged once per notice, as they can repeat on every event
-  games.onError((action, { offline, message }) => {
+  games.onError((action, { offline, full, message }) => {
     const label = ALERT_TRIGGER_LABELS[action.trigger.type];
-    if (offline) {
+    if (full) {
+      if (
+        notifier.warn(
+          "games",
+          FEEDBACK_CODES.GAME_BACKLOG_FULL,
+          `The ${label} action has ${MAX_BACKLOG} runs waiting, so new ones are skipped until Minecraft catches up.`,
+          { key: `game:${action.id}:full`, windowMs: REPEAT_NOTICE_MS },
+        )
+      ) {
+        Logger.warn(
+          `<Games> The ${label} action has ${MAX_BACKLOG} runs waiting, new ones are skipped.`,
+          paths.files.logs.games,
+        );
+      }
+    } else if (offline) {
       // Named by edition: the other one may be connected. Java Edition joins
       // through the Tokio mod's command.
       const game = `Minecraft ${MINECRAFT_EDITION_NAMES[action.edition]}`;
@@ -757,7 +787,7 @@ events.push(
 
     handler.trayService.setEnabled(settings.tray.enabled);
     await initUpdater(handler);
-    handler.updaterService.start(settings.updates.auto);
+    handler.updaterService.setAuto(settings.updates.auto);
   },
   {
     failure: {

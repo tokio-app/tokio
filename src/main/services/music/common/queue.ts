@@ -239,7 +239,8 @@ export class MusicQueue extends TokioEmitter {
         // Not for a song skipped while it loaded
         if (active()) this._hooks.onError?.(item.id, error);
         if (++failures === 2 && active()) {
-          this._currentIndex--;
+          // The first is gone when the queue was full: stop at the second
+          this._currentIndex = Math.max(0, this._currentIndex - 1);
           this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
           break;
         }
@@ -266,7 +267,7 @@ export class MusicQueue extends TokioEmitter {
     waitTime: number,
     signal: AbortSignal,
   ) {
-    const listedEnd = Date.now() + waitTime;
+    const listedEnd = performance.now() + waitTime;
     const { remaining } = this._hooks;
     if (!remaining) return delayWithAbort(waitTime, signal);
 
@@ -277,7 +278,10 @@ export class MusicQueue extends TokioEmitter {
         // shortcut: a song paused past its listed end is cut, which also
         // restarts music after YouTube's "Continue watching?"; wait out
         // pauses if streamers ask
-        await delayWithAbort(Math.max(0, listedEnd - Date.now()), signal);
+        await delayWithAbort(
+          Math.max(0, listedEnd - performance.now()),
+          signal,
+        );
         return;
       }
       // Still far from the end, like after an ad: asked again near it

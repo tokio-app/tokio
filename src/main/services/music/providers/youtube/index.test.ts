@@ -204,6 +204,9 @@ describe("YouTubeMusic", () => {
       expect(view.options.webPreferences).toMatchObject({
         partition: PARTITION,
       });
+      // YouTube's page never gets the bridge
+      expect(view.options.webPreferences?.preload).toBeUndefined();
+      expect(view.options.webPreferences?.nodeIntegration).not.toBe(true);
       expect(shell.contentView.children).toContain(view);
       expect(view.webContents.loadURL).toHaveBeenCalledWith(config.YTM_URL);
       expect(view.setBounds).toHaveBeenLastCalledWith({

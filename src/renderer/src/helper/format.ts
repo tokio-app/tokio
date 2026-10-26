@@ -12,6 +12,13 @@ export function formatList(items: string[]): string {
   return items.join(", ");
 }
 
+// A font named by the streamer, with the app's (and the overlays') as the
+// fallback. One CSSOM property, so a name can't add any other style.
+export const fontFamily = (font: string) =>
+  font.trim()
+    ? `${JSON.stringify(font.trim())}, "Archivo Variable", sans-serif`
+    : undefined;
+
 const compactFormat = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,

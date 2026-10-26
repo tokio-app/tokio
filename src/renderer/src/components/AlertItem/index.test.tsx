@@ -288,12 +288,13 @@ describe("triggerSummary", () => {
     expect(sum({ type: TOKIO_EVENTS.FOLLOW })).toBe("");
   });
 
-  it("names the roles, but not for follows or events without a viewer", () => {
+  it("names the roles only for events with the viewer's roles", () => {
     const roles: Alert["trigger"]["roles"] = ["follower", "superfan"];
 
-    expect(sum({ type: TOKIO_EVENTS.SHARE, roles })).toBe(
-      "From Followers or Super Fans",
+    expect(sum({ type: TOKIO_EVENTS.CHAT, roles })).toBe(
+      "Any message, from Followers or Super Fans",
     );
+    expect(sum({ type: TOKIO_EVENTS.SHARE, roles })).toBe("");
     expect(sum({ type: TOKIO_EVENTS.FOLLOW, roles })).toBe("");
     expect(sum({ type: TOKIO_EVENTS.ENVELOPE, roles })).toBe("");
   });

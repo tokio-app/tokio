@@ -123,7 +123,8 @@ export function forgetDecoded(cacheKey: string) {
 const clampRate = (value: number) => Math.max(0.5, Math.min(value, 2));
 
 // Silent places for wait(), by length, shared by every queue. 8 kHz, the
-// lowest rate browsers must take, keeps a minute under 2 MB.
+// lowest rate browsers must take, keeps a minute under 2 MB. At most 16
+// lengths are kept, then they start over.
 const SILENCE_RATE = 8000;
 const silences = new Map<number, AudioBuffer>();
 
@@ -131,6 +132,7 @@ function silence(seconds: number): AudioBuffer {
   const length = Math.max(1, Math.round(seconds * SILENCE_RATE));
   let buffer = silences.get(length);
   if (!buffer) {
+    if (silences.size >= 16) silences.clear();
     buffer = Tone.getContext().createBuffer(1, length, SILENCE_RATE);
     silences.set(length, buffer);
   }

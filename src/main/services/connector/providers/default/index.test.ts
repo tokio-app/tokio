@@ -441,6 +441,11 @@ describe("TikTokLiveConnector", () => {
       const onGift = capture(TOKIO_EVENTS.GIFT);
       const gift = {
         user: rawUser,
+        userIdentity: {
+          isSubscriberOfAnchor: true,
+          isFollowerOfAnchor: true,
+          isModeratorOfAnchor: false,
+        },
         giftId: "5655",
         gift: {
           type: 1,
@@ -459,7 +464,7 @@ describe("TikTokLiveConnector", () => {
         true,
       ]);
       expect(onGift).toHaveBeenLastCalledWith({
-        user: mappedUser,
+        user: { ...mappedUser, follower: true, superfan: true },
         gift: {
           id: "5655",
           type: 1,

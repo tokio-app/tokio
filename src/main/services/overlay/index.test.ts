@@ -923,6 +923,7 @@ describe("OverlayService", () => {
 
   it("saves a config into the overlay's HTML and config file", async () => {
     await configurable(join(folder, "title"));
+    stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
     const res = await service.getConfig("title");
     const field = res.data!.fields[0];
     if (field.type !== "input") throw new Error("Expected an input field");
@@ -941,6 +942,7 @@ describe("OverlayService", () => {
   it("saves nothing when the schema refuses the config", async () => {
     const dir = join(folder, "title");
     await configurable(dir);
+    stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
     const read = () =>
       Promise.all(
         ["index.html", "config.yaml"].map((f) =>
@@ -959,6 +961,34 @@ describe("OverlayService", () => {
       success: false,
     });
     expect(await read()).toEqual(before);
+  });
+
+  it("refuses to get or save the config of an id that isn't stored", async () => {
+    const dir = join(folder, "title");
+    await configurable(dir);
+    const read = () =>
+      Promise.all(
+        ["index.html", "config.yaml"].map((f) =>
+          readFile(join(dir, f), "utf-8"),
+        ),
+      );
+    const before = await read();
+    stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
+    const saved = (await service.getConfig("title")).data!;
+    stored = [];
+    const warn = vi.spyOn(Logger, "warn");
+    const error = vi.spyOn(Logger, "error");
+
+    for (const id of ["..", "title"]) {
+      expect(await service.getConfig(id)).toEqual({ success: false });
+      expect(await service.saveConfig(id, saved, gifts)).toEqual({
+        success: false,
+      });
+    }
+    expect(await read()).toEqual(before);
+    // The handlers log the failure
+    expect(warn).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
   });
 
   it("fails to get the config of a missing overlay", async () => {

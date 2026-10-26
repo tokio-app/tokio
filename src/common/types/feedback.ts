@@ -115,6 +115,7 @@ export enum FEEDBACK_CODES {
   // GAMES
   GAME_NOT_CONNECTED = "game_not_connected",
   GAME_COMMAND_FAILED = "game_command_failed",
+  GAME_BACKLOG_FULL = "game_backlog_full",
   GAME_LISTEN_FAILED = "game_listen_failed",
   GAME_TEST_FAILED = "game_test_failed",
   GAME_ACTION_FAILED = "game_action_failed",

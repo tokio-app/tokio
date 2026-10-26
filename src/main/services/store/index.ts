@@ -73,7 +73,9 @@ export class StoreManagerService extends Service {
 
   public async getProfileData() {
     if (this._memoryProfile !== null) return this._memoryProfile;
-    this._memoryProfile = await this._getProfileData();
+    const loaded = await this._getProfileData();
+    // A switch or an update while this was loading holds the newer profile.
+    this._memoryProfile ??= loaded;
     return this._memoryProfile;
   }
 
@@ -611,13 +613,17 @@ export class StoreManagerService extends Service {
     );
     if (!profile) return "missing";
 
+    // Both together, so a change made while saving reads and writes the new
+    // profile, and memory after the save holds that change.
     const previous = this._storeData!.settings.activeProfile;
+    const previousProfile = this._memoryProfile;
     this._storeData!.settings.activeProfile = entity;
+    this._memoryProfile = profile;
     if (!(await this._queueSave())) {
       this._storeData!.settings.activeProfile = previous;
+      this._memoryProfile = previousProfile;
       return "unsaved";
     }
-    this._memoryProfile = profile;
     return "switched";
   }
 

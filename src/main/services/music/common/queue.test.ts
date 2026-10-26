@@ -270,6 +270,43 @@ describe("MusicQueue", () => {
 
       expect(playing(queue)).toBe("d");
     });
+
+    it("stops at the second song when the first was trimmed away", async () => {
+      const queue = new MusicQueue();
+      queue.setMaxSize(2);
+      const player = { gone: true };
+      const actions: Record<string, Mock<() => Promise<void>>> = {};
+      // Fails 3 seconds in while the player is gone, like a request to Spotify
+      const request = (title: string) => {
+        actions[title] = vi.fn(async () => {
+          if (!player.gone) return;
+          await new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error("No active devices.")), 3000),
+          );
+        });
+        queue.enqueue(title, song(title), actions[title]);
+      };
+
+      request("b");
+      request("c");
+      await vi.advanceTimersByTimeAsync(4000);
+      // c loads, so b is history and gives its place to d
+      request("d");
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(playing(queue)).toBe("c");
+      expect(titles(queue)).toEqual(["c", "d"]);
+
+      player.gone = false;
+      request("e");
+      expect(actions.c).toHaveBeenCalledTimes(2);
+      // Full with no history
+      expect(titles(queue)).toEqual(["c", "d"]);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(actions.d).toHaveBeenCalledOnce();
+      expect(playing(queue)).toBe("d");
+      expect(actions.e).not.toHaveBeenCalled();
+    });
   });
 
   it("keeps one song playing when a skip comes while a song loads", async () => {

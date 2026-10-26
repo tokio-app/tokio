@@ -317,6 +317,8 @@ export interface AppEventsResponseMap {
   }>;
   [APP_EVENTS_RESPONSE.TEST_ALERT]: Reply<{
     id: string;
+    // The TEST_ALERT request this answers
+    request: number;
     data?: Uint8Array;
     volume: number;
     filters?: AlertFilters;

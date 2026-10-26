@@ -195,7 +195,7 @@ describe("UpdaterService", () => {
     vi.useFakeTimers();
     const service = await create();
 
-    service.start(true);
+    service.setAuto(true);
     expect(updater.checkForUpdates).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(STARTUP_DELAY_MS);
     expect(updater.checkForUpdates).toHaveBeenCalledTimes(1);
@@ -211,9 +211,9 @@ describe("UpdaterService", () => {
     vi.useFakeTimers();
     const service = await create();
 
-    service.start(false);
+    service.setAuto(false);
     await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
-    service.start(true);
+    service.setAuto(true);
     service.dispose();
     await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
 

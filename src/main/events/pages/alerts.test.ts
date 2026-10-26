@@ -424,6 +424,7 @@ describe("alerts events", () => {
         file: ding.file,
         volume: 80,
         id: "alert-1",
+        request: 1,
       });
 
       expect(alertsService.readSound).toHaveBeenCalledExactlyOnceWith(
@@ -433,6 +434,7 @@ describe("alerts events", () => {
         {
           success: true,
           id: "alert-1",
+          request: 1,
           data: audio,
           volume: 80,
           filters: undefined,
@@ -448,6 +450,7 @@ describe("alerts events", () => {
         url: airhornUrl,
         volume: 100,
         id: airhornUrl,
+        request: 2,
       });
 
       expect(alertsService.fetchSound).toHaveBeenCalledExactlyOnceWith(
@@ -455,7 +458,13 @@ describe("alerts events", () => {
       );
       expect(alertsService.readSound).not.toHaveBeenCalled();
       expect(h.replies(APP_EVENTS_RESPONSE.TEST_ALERT)).toEqual([
-        { success: true, id: airhornUrl, data: audio, volume: 100 },
+        {
+          success: true,
+          id: airhornUrl,
+          request: 2,
+          data: audio,
+          volume: 100,
+        },
       ]);
     });
 
@@ -467,6 +476,7 @@ describe("alerts events", () => {
         trigger: TOKIO_EVENTS.FOLLOW,
         volume: 70,
         id: "alert-2",
+        request: 3,
       });
 
       expect(alertsService.speak).toHaveBeenCalledExactlyOnceWith(
@@ -478,6 +488,7 @@ describe("alerts events", () => {
         {
           success: true,
           id: "alert-2",
+          request: 3,
           data: audio,
           volume: 70,
           filters: { speed: 1.5, pitch: 0.8 },
@@ -493,6 +504,7 @@ describe("alerts events", () => {
         trigger: EMOTE_TRIGGER,
         volume: 70,
         id: "alert-3",
+        request: 4,
       });
 
       expect(alertsService.speak.mock.calls[0][1]).toMatchObject({
@@ -509,6 +521,7 @@ describe("alerts events", () => {
         trigger: TOKIO_EVENTS.SHARE,
         volume: 70,
         id: "alert-2",
+        request: 5,
       });
 
       const failure = {
@@ -516,7 +529,13 @@ describe("alerts events", () => {
         message: "The message is empty or has a banned word.",
       };
       expect(h.replies(APP_EVENTS_RESPONSE.TEST_ALERT)).toEqual([
-        { success: false, id: "alert-2", volume: 70, error: failure },
+        {
+          success: false,
+          id: "alert-2",
+          request: 5,
+          volume: 70,
+          error: failure,
+        },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({ level: "warning", ...failure }),
@@ -532,6 +551,7 @@ describe("alerts events", () => {
         trigger: TOKIO_EVENTS.SHARE,
         volume: 70,
         id: "alert-2",
+        request: 6,
       });
 
       const failure = {
@@ -539,7 +559,13 @@ describe("alerts events", () => {
         message: "Unable to speak the message. Try another voice.",
       };
       expect(h.replies(APP_EVENTS_RESPONSE.TEST_ALERT)).toEqual([
-        { success: false, id: "alert-2", volume: 70, error: failure },
+        {
+          success: false,
+          id: "alert-2",
+          request: 6,
+          volume: 70,
+          error: failure,
+        },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({ level: "error", ...failure }),
@@ -559,6 +585,7 @@ describe("alerts events", () => {
         file: "gone.mp3",
         volume: 40,
         id: "alert-4",
+        request: 7,
       });
 
       const failure = {
@@ -566,7 +593,13 @@ describe("alerts events", () => {
         message: "Unable to play the sound.",
       };
       expect(h.replies(APP_EVENTS_RESPONSE.TEST_ALERT)).toEqual([
-        { success: false, id: "alert-4", volume: 40, error: failure },
+        {
+          success: false,
+          id: "alert-4",
+          request: 7,
+          volume: 40,
+          error: failure,
+        },
       ]);
       expect(h.notices).toEqual([expect.objectContaining(failure)]);
       expect(logError).not.toHaveBeenCalled();

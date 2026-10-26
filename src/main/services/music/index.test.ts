@@ -203,6 +203,20 @@ describe("MusicService", () => {
       expect(searched()).toEqual(["A", "C"]);
     });
 
+    it("keeps the cooldown when the system clock is set back", async () => {
+      const { request, searched } = setup();
+      const music = settings((m) => {
+        m.protection.cooldown = 2;
+      });
+
+      await request("!play A", music);
+      await vi.advanceTimersByTimeAsync(2000);
+      vi.setSystemTime(Date.now() - 60_000);
+      await request("!play B", music);
+
+      expect(searched()).toEqual(["A", "B"]);
+    });
+
     it("takes every command without a cooldown", async () => {
       const { service, searched } = setup();
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, formatList, formatStat, parseList } from "./format";
+import {
+  fontFamily,
+  formatDuration,
+  formatList,
+  formatStat,
+  parseList,
+} from "./format";
 
 describe("parseList", () => {
   it("trims the items and drops empty ones", () => {
@@ -41,5 +47,24 @@ describe("formatDuration", () => {
   // The renderer's clock can be a little behind main's
   it("never goes below zero", () => {
     expect(formatDuration(-1500)).toBe("00:00:00");
+  });
+});
+
+describe("fontFamily", () => {
+  it("falls back to the app's font", () => {
+    expect(fontFamily(" Comic Sans MS ")).toBe(
+      '"Comic Sans MS", "Archivo Variable", sans-serif',
+    );
+  });
+
+  it("gives nothing for an empty name", () => {
+    expect(fontFamily("")).toBeUndefined();
+    expect(fontFamily("   ")).toBeUndefined();
+  });
+
+  it("keeps quotes and semicolons inside one quoted name", () => {
+    expect(fontFamily('Evil"; color: red; x: "')).toBe(
+      '"Evil\\"; color: red; x: \\"", "Archivo Variable", sans-serif',
+    );
   });
 });
