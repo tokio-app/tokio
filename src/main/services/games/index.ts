@@ -33,7 +33,7 @@ import { basename, join } from "node:path";
 import { MEDIA_MAX_BYTES } from "../alerts";
 import { Service } from "../shared";
 import { commandValue, GameCommand, gameCommands } from "./commands";
-import { MinecraftConnection } from "./minecraft";
+import { DISCONNECTED, MinecraftConnection } from "./minecraft";
 
 export interface GamesResult<T> {
   success: boolean;
@@ -385,9 +385,12 @@ export class GamesService extends Service {
           // Turned off midway, which failed what the game hadn't answered
           if (["off", "error"].includes(this._minecraft.status.state)) break;
           // A game that left or was replaced midway fails the commands it
-          // hadn't answered, and drops the rest
+          // hadn't answered, and drops the rest. Replaced by a game of its
+          // edition, the run counts as done and the rest go to the new one.
           const offline = this._unreachable(action.edition) !== undefined;
-          this._onError?.(action, { offline, message: failed.message });
+          if (offline || failed.message !== DISCONNECTED) {
+            this._onError?.(action, { offline, message: failed.message });
+          }
           if (offline) break;
         }
         if (--batch.times === 0) backlog.shift()?.resolve();

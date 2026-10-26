@@ -60,6 +60,8 @@ export const MAX_IN_FLIGHT = 50;
 // Only a safety net: GamesService spaces out each action's runs, so this
 // fills only with many actions firing at once on a game that stopped answering
 export const MAX_WAITING = 10_000;
+// What the pending commands of a game that left or was replaced fail with
+export const DISCONNECTED = "Minecraft disconnected.";
 // Body version 42 parses today's syntax (execute … run); 1 doesn't
 const COMMAND_VERSION = 42;
 const REPLACED: Close = {
@@ -297,7 +299,7 @@ export class MinecraftConnection {
     this._waiting.length = 0;
     for (const { command, resolve, timer } of commands) {
       clearTimeout(timer);
-      resolve(failed(command, "Minecraft disconnected."));
+      resolve(failed(command, DISCONNECTED));
     }
   }
 
