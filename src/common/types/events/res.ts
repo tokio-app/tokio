@@ -383,6 +383,8 @@ export interface AppEventsResponseMap {
   // The picture browsed for an action, the first when there were several
   [APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE]: Reply<{
     id: string;
+    // The IMPORT_MINECRAFT_PICTURE request this answers
+    request: number;
     picture?: MediaFile;
   }>;
   // A picture deleted from the library, which main took off every action

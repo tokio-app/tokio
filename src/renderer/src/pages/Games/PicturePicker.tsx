@@ -7,15 +7,16 @@ import styles from "@/components/MediaPicker/mediapicker.module.css";
 import list from "@/components/SoundPicker/soundpicker.module.css";
 import { cx } from "@/helper/cx";
 import { useIpcListener, useIpcRequest } from "@/hooks";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FiCheck, FiTrash2 } from "react-icons/fi";
 
 type Props = {
   // The game action the picture is for
   id: string;
   picture: MediaFile | null;
-  // Main is asked to browse for pictures, the first going on the action
-  onRequest: () => void;
+  // Asks main to browse for pictures, the first going on the action, which
+  // replies SET_MINECRAFT_PICTURE with the request number this returns
+  onRequest: () => number;
   // Picks a picture from the library, or takes the action's off it
   onSelect: (picture: MediaFile | null) => void;
   onClose: () => void;
@@ -35,6 +36,8 @@ export function PicturePicker({
   const [library, setLibrary] = useState<MediaFile[]>([]);
   const [search, setSearch] = useState("");
   const [failed, setFailed] = useState(false);
+  // The newest request sent, the only one whose failure is shown
+  const latest = useRef(0);
   // Picture waiting for the user to confirm it's deleted
   const [removing, setRemoving] = useState<MediaFile | null>(null);
 
@@ -48,7 +51,9 @@ export function PicturePicker({
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, (res) => {
-    if (res?.id === id) setFailed(!res.success);
+    if (res?.id === id && res.request === latest.current) {
+      setFailed(!res.success);
+    }
   });
 
   const needle = search.trim().toLowerCase();
@@ -75,8 +80,11 @@ export function PicturePicker({
             </Btn>
             <Btn
               onClick={() => {
-                onRequest();
-                window.api.emit(APP_EVENTS.IMPORT_MINECRAFT_PICTURE, { id });
+                latest.current = onRequest();
+                window.api.emit(APP_EVENTS.IMPORT_MINECRAFT_PICTURE, {
+                  id,
+                  request: latest.current,
+                });
               }}
             >
               Browse files...

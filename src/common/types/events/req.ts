@@ -367,9 +367,11 @@ export interface AppEventsMap {
   // MINECRAFT PICTURES
   [APP_EVENTS.GET_MINECRAFT_PICTURES]: void;
   // Browses for pictures to add, the first going on the action, which
-  // SET_MINECRAFT_PICTURE names
+  // SET_MINECRAFT_PICTURE names. `request` comes back on it, so the page keeps
+  // the newest pick
   [APP_EVENTS.IMPORT_MINECRAFT_PICTURE]: {
     id: string;
+    request: number;
   };
   [APP_EVENTS.REMOVE_MINECRAFT_PICTURE]: {
     file: string;

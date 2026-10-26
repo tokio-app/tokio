@@ -10,8 +10,9 @@ import { PicturePicker } from "./PicturePicker";
 const LIBRARY = [mediaFile("TNT"), mediaFile("Creeper"), mediaFile("Zombie")];
 
 function setup(picture: MediaFile | null = null) {
+  let requests = 0;
   const handlers = {
-    onRequest: vi.fn(),
+    onRequest: vi.fn(() => ++requests),
     onSelect: vi.fn(),
     onClose: vi.fn(),
   };
@@ -102,7 +103,9 @@ describe("PicturePicker", () => {
     await user.click(screen.getByRole("button", { name: "Browse files..." }));
 
     expect(onRequest).toHaveBeenCalledOnce();
-    expect(sent(APP_EVENTS.IMPORT_MINECRAFT_PICTURE)).toEqual([{ id: "a1" }]);
+    expect(sent(APP_EVENTS.IMPORT_MINECRAFT_PICTURE)).toEqual([
+      { id: "a1", request: 1 },
+    ]);
   });
 
   it("deletes a picture once you confirm, and keeps it when you cancel", async () => {
@@ -134,17 +137,20 @@ describe("PicturePicker", () => {
   });
 
   it("says when main couldn't save or load the pictures", async () => {
-    setup();
+    const { user } = setup();
+    await user.click(screen.getByRole("button", { name: "Browse files..." }));
 
     await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       ...failure(),
       id: "a2",
+      request: 1,
     });
     expect(screen.queryByText(/Couldn't save/)).toBeNull();
 
     await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       ...failure(),
       id: "a1",
+      request: 1,
     });
     expect(
       screen.getByText("Couldn't save or load the pictures."),
@@ -152,5 +158,28 @@ describe("PicturePicker", () => {
 
     await library();
     expect(screen.queryByText(/Couldn't save/)).toBeNull();
+  });
+
+  it("shows only the failure of the newest request", async () => {
+    const { user } = setup();
+    const browse = screen.getByRole("button", { name: "Browse files..." });
+    await user.click(browse);
+    await user.click(browse);
+
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      ...failure(),
+      id: "a1",
+      request: 1,
+    });
+    expect(screen.queryByText(/Couldn't save/)).toBeNull();
+
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      ...failure(),
+      id: "a1",
+      request: 2,
+    });
+    expect(
+      screen.getByText("Couldn't save or load the pictures."),
+    ).toBeInTheDocument();
   });
 });

@@ -945,18 +945,22 @@ describe("Games overlay", () => {
       recipes()[0].getByRole("button", { name: "Pick a picture" }),
     );
     await user.click(screen.getByRole("button", { name: "Browse files..." }));
-    expect(sent(APP_EVENTS.IMPORT_MINECRAFT_PICTURE)).toEqual([{ id: "a1" }]);
+    expect(sent(APP_EVENTS.IMPORT_MINECRAFT_PICTURE)).toEqual([
+      { id: "a1", request: 1 },
+    ]);
     await user.click(screen.getByRole("button", { name: "Done" }));
 
     // Another action's, which didn't ask
     await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       success: true,
       id: "a2",
+      request: 1,
       picture: CREEPER,
     });
     await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       success: true,
       id: "a1",
+      request: 1,
       picture: TNT,
     });
     await wait(300);
@@ -980,6 +984,31 @@ describe("Games overlay", () => {
     await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       success: true,
       id: "a1",
+      request: 1,
+      picture: TNT,
+    });
+    await wait(300);
+
+    expect(savedOverlays()[0].image).toEqual(CREEPER);
+  });
+
+  it("keeps a newer browse when an older one answers late", async () => {
+    const { user } = await load([action("a1")]);
+
+    await user.click(screen.getByRole("button", { name: "Pick a picture" }));
+    const browse = screen.getByRole("button", { name: "Browse files..." });
+    await user.click(browse);
+    await user.click(browse);
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      request: 2,
+      picture: CREEPER,
+    });
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      request: 1,
       picture: TNT,
     });
     await wait(300);
