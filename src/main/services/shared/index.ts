@@ -98,6 +98,27 @@ export abstract class BaseFileManagerService extends Service {
     return this._validate(schema, data, filePath, "loading");
   }
 
+  // Content read elsewhere, checked as loadFile checks what it reads
+  public parseFile<T>(
+    filePath: string,
+    content: string,
+    schema: z.ZodType<T>,
+  ): T | null {
+    let data: unknown;
+    try {
+      data = this.deserialize(content);
+    } catch (error) {
+      this._logError(
+        `Malformed ${this.fileType.toUpperCase()} in file`,
+        filePath,
+        formatError(error),
+        error,
+      );
+      return null;
+    }
+    return this._validate(schema, data, filePath, "loading");
+  }
+
   public async loadArbitraryFile<T>(filePath: string): Promise<T | null> {
     try {
       const fileContent = await fs.readFile(filePath, "utf-8");

@@ -25,6 +25,7 @@ import {
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
+import { writeFileAtomic } from "@/helper/fs";
 import { isInside } from "@/helper/path";
 import { track } from "@/helper/quit";
 import Logger from "@/logger";
@@ -33,9 +34,10 @@ import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { TTSService } from "@/services/tts";
 import { safeStorage } from "electron";
-import { access, copyFile, readdir, readFile, unlink } from "fs/promises";
+import { access, readdir, readFile, unlink } from "fs/promises";
 import { randomUUID } from "node:crypto";
-import { basename, extname, join, resolve } from "path";
+import { basename, dirname, extname, join, resolve } from "path";
+import { z } from "zod";
 import { Service } from "../shared";
 
 type Providers = {
@@ -117,21 +119,13 @@ export class StoreManagerService extends Service {
     );
 
     let data: StoreSchema | null = null;
-    let storeFileExists = true;
 
     try {
-      await access(this._storeFilePath);
-    } catch {
-      storeFileExists = false;
-    }
-
-    try {
-      if (storeFileExists) {
-        data = await this._jsonManagerService.loadFile(
-          this._storeFilePath,
-          StoreZodSchema,
-        );
-        if (!data) await this._backupCorruptedStore();
+      // Read once: a store held for a moment throws instead of being replaced.
+      const read = await this._readChecked(this._storeFilePath, StoreZodSchema);
+      data = read.data;
+      if (read.raw && !data) {
+        await this._backupCorrupted(this._storeFilePath, read.raw);
       }
 
       if (!data) {
@@ -215,12 +209,13 @@ export class StoreManagerService extends Service {
     );
 
     // The store can be rebuilt (missing or corrupted) while the user's Default
-    // profile is fine, so only write it when it can't be loaded.
-    const existing = await this._jsonManagerService.loadFile(
+    // profile is fine, so only write it when it's missing or invalid.
+    const { raw, data } = await this._readChecked(
       defaultProfilePath,
       ProfileSchema,
     );
-    if (existing) return;
+    if (data) return;
+    if (raw) await this._backupCorrupted(defaultProfilePath, raw);
 
     await this._jsonManagerService.saveFile(
       defaultProfilePath,
@@ -1055,18 +1050,40 @@ export class StoreManagerService extends Service {
     return save;
   }
 
-  // Throws when the store can't be read or copied, so the defaults never
-  // replace the only copy of the user's settings.
-  private async _backupCorruptedStore() {
-    await readFile(this._storeFilePath);
-    const name = basename(this._storeFilePath, ".json");
+  // The file's bytes and what they hold. Both null for a missing file, and
+  // any other read error throws, so a file held for a moment isn't replaced.
+  private async _readChecked<T>(
+    path: string,
+    schema: z.ZodType<T>,
+  ): Promise<{ raw: Buffer | null; data: T | null }> {
+    const raw = await readFile(path).catch((error: unknown) => {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
+        return null;
+      }
+      throw error;
+    });
+    if (!raw) return { raw: null, data: null };
+    const content = raw.toString("utf-8");
+    return {
+      raw,
+      data: this._jsonManagerService.parseFile(path, content, schema),
+    };
+  }
+
+  // Throws when the copy can't be written, so the defaults never replace the
+  // only copy of the user's data.
+  private async _backupCorrupted(path: string, raw: Buffer) {
     const corruptedPath = join(
-      this._pathManagerService.folders.settingsFolder,
-      `${name}.corrupted-${Date.now()}.json`,
+      dirname(path),
+      `${basename(path, ".json")}.corrupted-${Date.now()}.json`,
     );
-    await copyFile(this._storeFilePath, corruptedPath);
+    await writeFileAtomic(corruptedPath, raw);
     Logger.info(
-      `<System> Backed up corrupted store file to ${corruptedPath}`,
+      `<System> Backed up the corrupted ${path} to ${corruptedPath}`,
       this._logFile,
     );
   }
