@@ -154,6 +154,8 @@ export class AlertsService extends Service {
       if (!response.ok) {
         throw new Error(`MyInstants responded with status: ${response.status}`);
       }
+      // Before the body is read, when MyInstants says how big it is
+      this._checkSize(Number(response.headers.get("content-length")));
       const data = new Uint8Array(await response.arrayBuffer());
       this._checkSize(data.byteLength);
       this._remember(file, data);
