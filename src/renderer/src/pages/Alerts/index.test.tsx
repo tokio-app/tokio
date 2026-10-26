@@ -1086,21 +1086,26 @@ describe("Alerts", () => {
       });
     });
 
-    it.each([TOKIO_EVENTS.ENVELOPE, TOKIO_EVENTS.FOLLOW] as const)(
-      "offers no roles or coins for %s",
-      async (type) => {
-        const { user } = await load([
-          alert("alert-1", { trigger: trigger(type) }),
-        ]);
+    it.each([
+      TOKIO_EVENTS.ENVELOPE,
+      TOKIO_EVENTS.FOLLOW,
+      TOKIO_EVENTS.LIKE,
+      TOKIO_EVENTS.SHARE,
+      TOKIO_EVENTS.MEMBER_JOIN,
+      TOKIO_EVENTS.SUPER_FAN,
+      TOKIO_EVENTS.SUPER_FAN_JOIN,
+    ] as const)("offers no roles or coins for %s", async (type) => {
+      const { user } = await load([
+        alert("alert-1", { trigger: trigger(type) }),
+      ]);
 
-        const opened = await edit(user, 0);
+      const opened = await edit(user, 0);
 
-        expect(opened.queryByRole("group", { name: "From" })).toBeNull();
-        expect(
-          opened.queryByRole("group", { name: "Worth at least" }),
-        ).toBeNull();
-      },
-    );
+      expect(opened.queryByRole("group", { name: "From" })).toBeNull();
+      expect(
+        opened.queryByRole("group", { name: "Worth at least" }),
+      ).toBeNull();
+    });
 
     it("offers the coins only for any gift", async () => {
       const { user } = await load([

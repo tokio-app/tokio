@@ -211,7 +211,7 @@ export class TikTokLiveConnector extends ConnectorProvider {
 
     connection.on(WebcastEvent.GIFT, (tdata) => {
       const data: GiftEvent = {
-        user: getUserData(tdata.user),
+        user: getUserData(tdata.user, tdata.userIdentity),
         gift: {
           id: tdata.giftId,
           type: tdata.gift?.type ?? 1,

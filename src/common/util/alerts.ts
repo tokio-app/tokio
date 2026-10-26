@@ -40,17 +40,16 @@ export const getSoundPreviewURL = (file: string) =>
 export const getPicturePreviewURL = (file: string) =>
   `${MEDIA_SCHEME}:///games/minecraft/${encodeURIComponent(file)}`;
 
-// Triggers whose viewer a role can't narrow: envelopes, Super Fan Boxes and
-// songs come without one, and a follow's viewer only just followed.
-const NO_ROLES: AlertTrigger[] = [
-  TOKIO_EVENTS.FOLLOW,
-  TOKIO_EVENTS.ENVELOPE,
-  TOKIO_EVENTS.SUPER_FAN_BOX,
-  TOKIO_EVENTS.MUSIC_CHANGE,
+// Triggers a role can narrow: only these events carry the viewer's roles
+// (emotes the chat's). A new trigger offers none until its event has them.
+const ROLE_TRIGGERS: AlertTrigger[] = [
+  TOKIO_EVENTS.CHAT,
+  EMOTE_TRIGGER,
+  TOKIO_EVENTS.GIFT,
 ];
 
 export const takesRoles = (trigger: AlertTrigger) =>
-  !NO_ROLES.includes(trigger);
+  ROLE_TRIGGERS.includes(trigger);
 
 // What a TTS alert's message can say, by trigger. Typed as a Record so a new
 // trigger can't be left out.
