@@ -338,6 +338,23 @@ describe("ServerService", () => {
       }
     });
 
+    it("hides an image once its duration is over", async () => {
+      const dom = await open();
+      const { document } = dom.window;
+      const image = () => document.querySelector("img");
+
+      try {
+        await connected();
+        show("a.png", "image", { duration: 0.2 });
+        await vi.waitFor(() => expect(image()).not.toBeNull());
+
+        await wait(300);
+        expect(image()).toBeNull();
+      } finally {
+        dom.window.close();
+      }
+    });
+
     it("plays a video's cut, and hides it at the cut's end", async () => {
       const dom = await open();
       const { document } = dom.window;
