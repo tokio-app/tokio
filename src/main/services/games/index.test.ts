@@ -458,6 +458,34 @@ describe("GamesService", () => {
         }
       });
 
+      it("stops an action's backlog once a save disables it", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [everyGift()],
+        });
+        await vi.advanceTimersByTimeAsync(RUN_GAP_MS);
+        games.setGames({ actions: [{ ...everyGift(), enabled: false }] });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toEqual(["each 300", "each 300"]);
+      });
+
+      it("stops backlogs when another profile loads", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [everyGift()],
+        });
+        await vi.advanceTimersByTimeAsync(RUN_GAP_MS);
+        games.setGames({ actions: [] });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toEqual(["each 300", "each 300"]);
+      });
+
       it("drops the backlog when the game leaves, reporting it once", async () => {
         vi.useFakeTimers();
         const minecraft = fakeMinecraft();

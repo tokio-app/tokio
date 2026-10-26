@@ -84,6 +84,7 @@ events.push(
       games: settings,
     });
     if (!res) throw new LoggedError("The game actions were not saved.");
+    services.gamesService.setGames(settings);
     e.reply(APP_EVENTS_RESPONSE.UPDATE_GAMES_SETTINGS, { success: true });
     await sendGamesOverlay(services);
   },

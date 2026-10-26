@@ -187,6 +187,7 @@ events.push(
     const profiles = storeManagerService.getProfiles();
     if (!profile || !profiles) throw new Error(`Unable to load ${file}.`);
     timerService.load(profile.timer, file);
+    services.gamesService.setGames(profile.games);
 
     e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
       success: true,

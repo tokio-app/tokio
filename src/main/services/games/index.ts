@@ -134,6 +134,11 @@ export class GamesService extends Service {
     this._picturesFolder = folder;
   }
 
+  // The active profile's actions after a save or a switch, so backlogs stop at once
+  public setGames(games: Pick<Profile["games"], "actions">): void {
+    this._games = games;
+  }
+
   /** Turns the connections on or off. False when one can't listen. */
   public configure(settings: GamesSettings): Promise<boolean> {
     return this._minecraft.setEnabled(settings.minecraft.enabled);
