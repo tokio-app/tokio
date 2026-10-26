@@ -53,7 +53,8 @@ export function cleanText(
 ): string {
   if (!input) return "";
 
-  let out = removeEmojis(input).normalize("NFKC");
+  // A space, so the words on each side of an emoji stay apart
+  let out = removeEmojis(input, " ").normalize("NFKC");
   if (asciiOnly) out = out.normalize("NFKD").replace(/\p{M}+/gu, "");
 
   return out.replace(/\s+/g, " ").trim().toLowerCase();
