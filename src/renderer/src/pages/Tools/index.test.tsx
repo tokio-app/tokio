@@ -266,6 +266,26 @@ describe("Tools' countdown timer", () => {
     ]);
   });
 
+  it("saves a starting time being typed before Start", async () => {
+    const { user } = renderWithProviders(<Tools />);
+    await timer();
+    const start = within(
+      screen.getByRole("group", { name: /Starting time/ }),
+    ).getByRole("spinbutton");
+
+    await user.clear(start);
+    await user.type(start, "90");
+    await user.click(button("Start"));
+
+    expect(
+      sentEvents().filter(
+        (e) =>
+          e === APP_EVENTS.SET_TIMER_SETTINGS || e === APP_EVENTS.TIMER_CONTROL,
+      ),
+    ).toEqual([APP_EVENTS.SET_TIMER_SETTINGS, APP_EVENTS.TIMER_CONTROL]);
+    expect(sent(APP_EVENTS.SET_TIMER_SETTINGS)[0].settings.start).toBe(90);
+  });
+
   it("adds and removes the minutes typed", async () => {
     const { user } = renderWithProviders(<Tools />);
     await running(60_000);

@@ -14,7 +14,7 @@ import {
   Section,
 } from "@/components";
 import { cx } from "@/helper";
-import { scopeUpdater, Updater, useAutosave } from "@/hooks";
+import { flushSettings, scopeUpdater, Updater, useAutosave } from "@/hooks";
 import homeStyles from "@/pages/Home/home.module.css";
 import { produce } from "immer";
 import { useId, useState } from "react";
@@ -56,8 +56,11 @@ export function TimerSections({ timer }: { timer: TimerPush }) {
   );
 }
 
-const control = (action: TimerAction) =>
+// A setting still waiting to save, like the starting time, reaches main first.
+const control = (action: TimerAction) => {
+  flushSettings();
   window.api.emit(APP_EVENTS.TIMER_CONTROL, { action });
+};
 
 function CountdownSection({
   timer,
@@ -73,8 +76,11 @@ function CountdownSection({
   const seconds = Math.round(minutes * 60);
   // In idle the starting time is what to change
   const canAdjust = status !== "idle" && seconds > 0;
-  const adjust = (sign: 1 | -1) =>
+  const adjust = (sign: 1 | -1) => {
+    // So added time is capped by the cap being typed
+    flushSettings();
     window.api.emit(APP_EVENTS.ADJUST_TIMER, { seconds: sign * seconds });
+  };
 
   return (
     <Section
