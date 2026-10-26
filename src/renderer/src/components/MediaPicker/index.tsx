@@ -4,7 +4,7 @@ import { getMediaPreviewURL, mediaKind } from "@/common/util";
 import { cx } from "@/helper/cx";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { FiCheck, FiFilm, FiTrash2 } from "react-icons/fi";
 import { DeleteMediaModal } from "../DeleteModals";
 import { Btn, SearchToggle } from "../Elements";
@@ -17,7 +17,8 @@ type Props = {
   // The alert the image or video is for
   alert: Alert;
   // Asks main to save a file for the alert, which replies SET_ALERT_MEDIA
-  onRequest: () => void;
+  // with the request number this returns
+  onRequest: () => number;
   // Picks a file from the library, or takes the alert's off it
   onSelect: (media: MediaFile | null) => void;
   onClose: () => void;
@@ -72,6 +73,8 @@ export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
   const [library, setLibrary] = useState<MediaFile[]>([]);
   const [search, setSearch] = useState("");
   const [failed, setFailed] = useState(false);
+  // The newest request sent, the only one whose failure is shown
+  const latest = useRef(0);
   // File waiting for the user to confirm it's deleted
   const [removing, setRemoving] = useState<MediaFile | null>(null);
   // The videos' lengths in seconds, read by their thumbnails
@@ -87,7 +90,9 @@ export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, (res) => {
-    if (res?.id === id) setFailed(!res.success);
+    if (res?.id === id && res.request === latest.current) {
+      setFailed(!res.success);
+    }
   });
 
   const needle = search.trim().toLowerCase();
@@ -116,8 +121,11 @@ export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
             <Btn
               variant="accent"
               onClick={() => {
-                onRequest();
-                window.api.emit(APP_EVENTS.IMPORT_MEDIA, { id });
+                latest.current = onRequest();
+                window.api.emit(APP_EVENTS.IMPORT_MEDIA, {
+                  id,
+                  request: latest.current,
+                });
               }}
             >
               Browse file...

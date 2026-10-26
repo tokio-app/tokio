@@ -152,7 +152,11 @@ events.push(
 // The picker stays open after a pick, so its list gets the new file too.
 events.push(
   APP_EVENTS.IMPORT_MEDIA,
-  async ({ win, alertsService, storeManagerService, notifier }, e, { id }) => {
+  async (
+    { win, alertsService, storeManagerService, notifier },
+    e,
+    { id, request },
+  ) => {
     const diagRes = await showOpenDialog(win, {
       title: "Select an image or video",
       properties: ["openFile"],
@@ -166,6 +170,7 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
       success: true,
       id,
+      request,
       media: res.data,
     });
     e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
@@ -185,10 +190,11 @@ events.push(
       message:
         "Unable to use the file. Pick a png, jpg, gif, webp, mp4 or webm file up to 50 MB.",
     },
-    onError: (e, error, { id }) =>
+    onError: (e, error, { id, request }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
         success: false,
         id,
+        request,
         error,
       }),
   },

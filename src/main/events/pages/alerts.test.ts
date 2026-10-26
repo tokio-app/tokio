@@ -958,7 +958,10 @@ describe("alerts events", () => {
         filePaths: [],
       });
 
-      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, { id: "alert-1" });
+      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, {
+        id: "alert-1",
+        request: 3,
+      });
 
       expect(alertsService.importMedia).not.toHaveBeenCalled();
       expect(h.sent()).toEqual([]);
@@ -968,7 +971,10 @@ describe("alerts events", () => {
       const { h, alertsService, storeManagerService } = setup();
       pickFiles("/pictures/party.gif");
 
-      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, { id: "alert-1" });
+      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, {
+        id: "alert-1",
+        request: 3,
+      });
 
       expect(dialog.showOpenDialog.mock.calls[0][1]).toMatchObject({
         properties: ["openFile"],
@@ -981,7 +987,7 @@ describe("alerts events", () => {
         party,
       );
       expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA)).toEqual([
-        { success: true, id: "alert-1", media: party },
+        { success: true, id: "alert-1", request: 3, media: party },
       ]);
       // The picker stays open, its list gets the file too.
       expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
@@ -1003,12 +1009,16 @@ describe("alerts events", () => {
       });
       pickFiles("/pictures/icon.svg");
 
-      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, { id: "alert-1" });
+      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, {
+        id: "alert-1",
+        request: 3,
+      });
 
       expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA)).toEqual([
         {
           success: false,
           id: "alert-1",
+          request: 3,
           error: {
             code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
             message:
@@ -1026,12 +1036,16 @@ describe("alerts events", () => {
       storeManagerService.addMedia.mockResolvedValue(false);
       pickFiles("/pictures/party.gif");
 
-      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, { id: "alert-1" });
+      await h.invoke(alerts, APP_EVENTS.IMPORT_MEDIA, {
+        id: "alert-1",
+        request: 3,
+      });
 
       expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA)).toEqual([
         {
           success: false,
           id: "alert-1",
+          request: 3,
           error: expect.objectContaining({
             code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
           }),

@@ -339,6 +339,8 @@ export interface AppEventsResponseMap {
   }>;
   [APP_EVENTS_RESPONSE.SET_ALERT_MEDIA]: Reply<{
     id: string;
+    // The IMPORT_MEDIA request this answers
+    request: number;
     media?: MediaFile;
   }>;
   // A sound or media file deleted from its library, which main took off

@@ -18,8 +18,9 @@ const alert = (patch: Partial<Alert> = {}): Alert => ({
 });
 
 function setup(item = alert()) {
+  let requests = 0;
   const handlers = {
-    onRequest: vi.fn(),
+    onRequest: vi.fn(() => ++requests),
     onSelect: vi.fn(),
     onClose: vi.fn(),
   };
@@ -145,21 +146,49 @@ describe("MediaPicker", () => {
     await user.click(screen.getByRole("button", { name: "Browse file..." }));
 
     expect(onRequest).toHaveBeenCalledOnce();
-    expect(sent(APP_EVENTS.IMPORT_MEDIA)).toEqual([{ id: "alert-1" }]);
+    expect(sent(APP_EVENTS.IMPORT_MEDIA)).toEqual([
+      { id: "alert-1", request: 1 },
+    ]);
   });
 
   it("says when main couldn't save this alert's file", async () => {
-    setup();
+    const { user } = setup();
+    await user.click(screen.getByRole("button", { name: "Browse file..." }));
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
       ...failure(),
       id: "alert-2",
+      request: 1,
     });
     expect(screen.queryByText(/Couldn't save/)).toBeNull();
 
     await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
       ...failure(),
       id: "alert-1",
+      request: 1,
+    });
+    expect(
+      screen.getByText("Couldn't save or load the media."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows only the failure of the newest request", async () => {
+    const { user } = setup();
+    const browse = screen.getByRole("button", { name: "Browse file..." });
+    await user.click(browse);
+    await user.click(browse);
+
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+      ...failure(),
+      id: "alert-1",
+      request: 1,
+    });
+    expect(screen.queryByText(/Couldn't save/)).toBeNull();
+
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+      ...failure(),
+      id: "alert-1",
+      request: 2,
     });
     expect(
       screen.getByText("Couldn't save or load the media."),

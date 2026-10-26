@@ -844,11 +844,13 @@ describe("Alerts", () => {
       await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
         success: true,
         id: "alert-2",
+        request: 1,
         media: confetti,
       });
       await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
         success: true,
         id: "alert-1",
+        request: 1,
         media: party,
       });
 
@@ -927,6 +929,34 @@ describe("Alerts", () => {
       expect(summary(0)).toHaveTextContent("7.4s");
     });
 
+    it.each([
+      ["in order", [1, 2]],
+      ["the later one first", [2, 1]],
+    ])(
+      "uses the later of two browsed files whose replies come %s",
+      async (_, order) => {
+        const { user } = await load([alert("alert-1")]);
+        const dialog = await openMedia(user, 0);
+        const browse = dialog.getByRole("button", { name: "Browse file..." });
+        await user.click(browse);
+        await user.click(browse);
+        const files = [party, confetti];
+
+        for (const request of order) {
+          await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+            success: true,
+            id: "alert-1",
+            request,
+            media: files[request - 1],
+          });
+        }
+
+        expect(summary(0)).toHaveTextContent("Confetti");
+        await wait(300);
+        expect(saves().at(-1)?.items[0].media).toEqual(shown(confetti));
+      },
+    );
+
     it("ignores a browsed file that comes after a pick", async () => {
       const { user } = await load([alert("alert-1")]);
       const dialog = await openMedia(user, 0);
@@ -936,6 +966,7 @@ describe("Alerts", () => {
       await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
         success: true,
         id: "alert-1",
+        request: 1,
         media: party,
       });
 
