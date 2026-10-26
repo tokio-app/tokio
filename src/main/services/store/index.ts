@@ -75,6 +75,8 @@ export class StoreManagerService extends Service {
   private _profileWrite: Promise<unknown> = Promise.resolve();
   // The active file's last failed load, so live events don't read it each time
   private _failedLoad: { file: string; at: number } | null = null;
+  // The last failed emote save, so chats don't write a broken file each time
+  private _failedEmotes: { file: string; at: number } | null = null;
 
   // fresh waits for updates still writing and retries a failed file at once.
   public async getProfileData({ fresh = false }: { fresh?: boolean } = {}) {
@@ -577,9 +579,19 @@ export class StoreManagerService extends Service {
     }
 
     if (!changed) return { success: true };
-    if (!(await this.updateProfileData({ emotes: saved }))) {
+    const file = this._activeProfileFile();
+    const failed = this._failedEmotes;
+    if (
+      failed?.file === file &&
+      performance.now() - failed.at < LOAD_RETRY_MS
+    ) {
       return { success: false };
     }
+    if (!(await this.updateProfileData({ emotes: saved }, file))) {
+      this._failedEmotes = { file, at: performance.now() };
+      return { success: false };
+    }
+    this._failedEmotes = null;
     return { success: true, data: saved };
   }
 

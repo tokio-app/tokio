@@ -1268,6 +1268,33 @@ describe("StoreManagerService", () => {
       expect(res.data).toEqual([{ id: "e1", image: "new" }]);
       expect(again).toEqual({ success: true });
     });
+
+    it("tries a failed save again only after a while, for that profile", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.getProfileData();
+      await rm(defaultProfileFile);
+      vi.spyOn(Logger, "error");
+      const update = vi.spyOn(json, "updateFile");
+      const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+
+      expect(await store.recordEmotes([emote("e1")])).toEqual({
+        success: false,
+      });
+      now.mockReturnValue(30_999);
+      expect(await store.recordEmotes([emote("e2")])).toEqual({
+        success: false,
+      });
+      expect(update).toHaveBeenCalledOnce();
+
+      now.mockReturnValue(31_000);
+      await store.recordEmotes([emote("e2")]);
+      expect(update).toHaveBeenCalledTimes(2);
+
+      await store.updateActiveProfile("stream.json");
+      const res = await store.recordEmotes([emote("e3")]);
+      expect(res).toEqual({ success: true, data: [saved("e3")] });
+    });
   });
 
   describe("sounds and media", () => {
