@@ -231,6 +231,32 @@ describe("Modal", () => {
     expect(close).toHaveFocus();
   });
 
+  it("skips a disabled button both ways", async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal
+        title="Rename"
+        onClose={vi.fn()}
+        closeButton
+        footer={
+          <>
+            <button>Cancel</button>
+            <button disabled>Save</button>
+            <button>Help</button>
+          </>
+        }
+      />,
+    );
+    const cancel = dialog().getByRole("button", { name: "Cancel" });
+    const help = dialog().getByRole("button", { name: "Help" });
+    cancel.focus();
+
+    await user.tab();
+    expect(help).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(cancel).toHaveFocus();
+  });
+
   it("closes only the innermost dialog on Escape", async () => {
     const user = userEvent.setup();
     const closeSound = vi.fn();
