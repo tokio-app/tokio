@@ -512,6 +512,32 @@ describe("init events", () => {
       });
     });
 
+    it("pushes no sound to a closed window", async () => {
+      const s = await live();
+      const played = vi.fn();
+      s.alertsService.handle.mockImplementation(async (_t, _p, _prof, play) => {
+        s.h.win.close();
+        play({
+          data: new Uint8Array([1]),
+          volume: 80,
+          channel: "alerts",
+          maxQueueLength: 100,
+          id: "alert-1",
+          key: "ding.mp3",
+        });
+        played();
+      });
+
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+
+      await vi.waitFor(() => {
+        expect(played).toHaveBeenCalledOnce();
+      });
+      await flushPromises();
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.ALERT_AUDIO)).toEqual([]);
+      expect(s.h.notices).toEqual([]);
+    });
+
     it("reports an alert that fails to play with its trigger's label", async () => {
       const s = await live();
       s.alertsService.handle.mockRejectedValue(new Error("decode failed"));
@@ -1422,6 +1448,23 @@ describe("init events", () => {
       expect(s.h.pushed(APP_EVENTS_RESPONSE.TTS_AUDIO)).toEqual([audio]);
     });
 
+    it("pushes no TTS audio to a closed window", async () => {
+      const s = await live({ tts: true });
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
+      const { onAudio } = await talked(s);
+      s.h.win.close();
+
+      onAudio({
+        id: 1,
+        data: Buffer.from([7]),
+        filters: profile.tts.filters,
+        queueOptions: { gapTime: 2, maxQueueLength: 10 },
+      });
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.TTS_AUDIO)).toEqual([]);
+      expect(s.h.notices).toEqual([]);
+    });
+
     it("reports TTS failures at most once every 30 seconds", async () => {
       const s = await live({ tts: true });
       s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
@@ -1570,6 +1613,22 @@ describe("init events", () => {
       expect(s.h.pushed(APP_EVENTS_RESPONSE.EMOTES)).toEqual([]);
     });
 
+    it("records the new emotes when the window is closed, pushing nothing", async () => {
+      const s = await live({ alerts: false });
+      s.storeManagerService.recordEmotes.mockResolvedValue({
+        success: true,
+        data: [{ id: "wave", image: "wave.png" }],
+      });
+      s.h.win.close();
+
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hi", [emote("wave")]));
+
+      expect(s.storeManagerService.recordEmotes).toHaveBeenCalledOnce();
+      await flushPromises();
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.EMOTES)).toEqual([]);
+      expect(s.h.notices).toEqual([]);
+    });
+
     it("records nothing for a chat without emotes", async () => {
       const s = await live({ alerts: false });
 
@@ -1602,6 +1661,24 @@ describe("init events", () => {
       await vi.waitFor(() => {
         expect(gamesSent(s, "tokio:games")).toHaveLength(1);
       });
+    });
+
+    it("still sends the games overlay a new gift when the window is closed", async () => {
+      const s = await live({ alerts: false });
+      s.serverService.sendToClient.mockClear();
+      s.overlayService.recordGift.mockResolvedValue({
+        success: true,
+        data: [{ value: 9, label: "Galaxy", img: "9.png", coins: 1 }],
+      });
+      s.h.win.close();
+
+      s.conn.emit(TOKIO_EVENTS.GIFT, giftEvent("9", "Galaxy"));
+
+      await vi.waitFor(() => {
+        expect(gamesSent(s, "tokio:games")).toHaveLength(1);
+      });
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CUSTOM_GIFTS)).toEqual([]);
+      expect(s.h.notices).toEqual([]);
     });
 
     it("pushes nothing when a gift changed no custom gift", async () => {
