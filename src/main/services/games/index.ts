@@ -44,12 +44,17 @@ export interface GamesResult<T> {
 /**
  * Why an action's commands didn't all run: offline when no game of the
  * action's edition was connected, otherwise the game refused one, with its
- * reply in message.
+ * reply in message. full when the action had MAX_BACKLOG runs waiting, so
+ * the event's were skipped.
  */
-export type GameError = { offline: boolean; message: string };
+export type GameError = { offline: boolean; full?: boolean; message: string };
 
 // The wait between two runs of an action, so a burst doesn't flood the game
 export const RUN_GAP_MS = 100;
+
+// The runs one action can have waiting, but on Gift and Like, whose every
+// gift and like count runs
+export const MAX_BACKLOG = 100;
 
 // Runs of one action for one event, filled with its values, waiting their turn
 type Batch = {
@@ -321,9 +326,26 @@ export class GamesService extends Service {
     return results;
   }
 
-  // Adds the runs to the action's backlog, and starts its pump if it's idle
+  // Adds the runs to the action's backlog, and starts its pump if it's idle.
+  // Skips them when the backlog is full, but for gifts and likes.
   private _queue(action: GameAction, commands: GameCommand[], times: number) {
     if (commands.length === 0) return Promise.resolve();
+    const { type } = action.trigger;
+    // Counted only when capped: a gift action's backlog can grow long
+    const waiting =
+      type === TOKIO_EVENTS.GIFT || type === TOKIO_EVENTS.LIKE
+        ? undefined
+        : this._backlogs
+            .get(action.id)
+            ?.reduce((runs, batch) => runs + batch.times, 0);
+    if (waiting !== undefined && waiting + times > MAX_BACKLOG) {
+      this._onError?.(action, {
+        offline: false,
+        full: true,
+        message: `${MAX_BACKLOG} runs are waiting.`,
+      });
+      return Promise.resolve();
+    }
     return new Promise<void>((resolve, reject) => {
       const batch = {
         edition: action.edition,

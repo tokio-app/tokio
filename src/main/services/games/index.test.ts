@@ -18,7 +18,7 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GamesService, RUN_GAP_MS } from "./index";
+import { GamesService, MAX_BACKLOG, RUN_GAP_MS } from "./index";
 
 // Stands in for the game's WebSocket: records the commands, answers each
 // with `answer`. Connected, it's the edition's game.
@@ -483,6 +483,80 @@ describe("GamesService", () => {
             },
           ],
         ]);
+      });
+
+      it("skips new runs once an action has MAX_BACKLOG waiting", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        let answerFirst = () => {};
+        minecraft.send.mockImplementationOnce(
+          (command) =>
+            new Promise((resolve) => {
+              minecraft.sent.push(command);
+              answerFirst = () => resolve({ command, ok: true, message: "" });
+            }),
+        );
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const follow = action();
+        const actions = { actions: [follow] };
+        // Not awaited one by one: each waits for its run
+        const runs = Array.from({ length: MAX_BACKLOG }, () =>
+          games.handle(TOKIO_EVENTS.FOLLOW, { user }, actions),
+        );
+
+        await games.handle(TOKIO_EVENTS.FOLLOW, { user }, actions);
+        expect(onError.mock.calls).toEqual([
+          [
+            follow,
+            {
+              offline: false,
+              full: true,
+              message: `${MAX_BACKLOG} runs are waiting.`,
+            },
+          ],
+        ]);
+
+        answerFirst();
+        await vi.runAllTimersAsync();
+        await Promise.all(runs);
+        expect(minecraft.sent).toHaveLength(MAX_BACKLOG);
+      });
+
+      it("never skips a gift or like run", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const actions = {
+          actions: [
+            everyGift([say("gift")]),
+            action({
+              id: "likes",
+              trigger: trigger(TOKIO_EVENTS.LIKE),
+              likes_every: 1,
+              steps: [say("like")],
+            }),
+          ],
+        };
+        const runs = [
+          games.handle(TOKIO_EVENTS.GIFT, gift(150), actions),
+          games.handle(TOKIO_EVENTS.GIFT, gift(300), actions),
+          ...Array.from({ length: 150 }, () =>
+            games.handle(
+              TOKIO_EVENTS.LIKE,
+              { user, likeCount: 1, totalLikes: 0 },
+              actions,
+            ),
+          ),
+        ];
+        await vi.runAllTimersAsync();
+        await Promise.all(runs);
+        expect(minecraft.sent.filter((c) => c === "gift")).toHaveLength(300);
+        expect(minecraft.sent.filter((c) => c === "like")).toHaveLength(150);
+        expect(onError).not.toHaveBeenCalled();
       });
 
       it("keeps serving the backlogs on clear", async () => {

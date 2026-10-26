@@ -798,6 +798,36 @@ describe("init events", () => {
       expect(logWarn.mock.calls).toEqual([logged, logged, logged]);
     });
 
+    it("warns that an action's backlog is full at most once every 30 seconds", async () => {
+      const s = await live();
+      const fail = s.gamesService.onError.mock.calls[0][0];
+      vi.useFakeTimers();
+      const full = { offline: false, full: true, message: "100 runs." };
+
+      fail(action, full);
+      fail(action, full);
+      fail({ ...action, id: "action-2" }, full);
+      vi.advanceTimersByTime(29_999);
+      fail(action, full);
+      expect(s.h.notices).toHaveLength(2);
+      vi.advanceTimersByTime(1);
+      fail(action, full);
+
+      const notice = expect.objectContaining({
+        level: "warning",
+        source: "games",
+        code: FEEDBACK_CODES.GAME_BACKLOG_FULL,
+        message:
+          "The Follow action has 100 runs waiting, so new ones are skipped until Minecraft catches up.",
+      });
+      expect(s.h.notices).toEqual([notice, notice, notice]);
+      const logged = [
+        "<Games> The Follow action has 100 runs waiting, new ones are skipped.",
+        "games.log",
+      ];
+      expect(logWarn.mock.calls).toEqual([logged, logged, logged]);
+    });
+
     describe("overlay", () => {
       // A Rose action, whose row shows TikTok's picture over the custom one
       const roseAction: GameAction = {

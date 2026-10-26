@@ -30,6 +30,7 @@ import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
+import { MAX_BACKLOG } from "@/services/games";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { TIMER_EVENTS } from "@/services/timer";
 import { AppHandlerVariables } from "@/types";
@@ -443,9 +444,23 @@ const registerGames = (handler: AppHandlerVariables) => {
     });
   });
   // Logged once per notice, as they can repeat on every event
-  games.onError((action, { offline, message }) => {
+  games.onError((action, { offline, full, message }) => {
     const label = ALERT_TRIGGER_LABELS[action.trigger.type];
-    if (offline) {
+    if (full) {
+      if (
+        notifier.warn(
+          "games",
+          FEEDBACK_CODES.GAME_BACKLOG_FULL,
+          `The ${label} action has ${MAX_BACKLOG} runs waiting, so new ones are skipped until Minecraft catches up.`,
+          { key: `game:${action.id}:full`, windowMs: REPEAT_NOTICE_MS },
+        )
+      ) {
+        Logger.warn(
+          `<Games> The ${label} action has ${MAX_BACKLOG} runs waiting, new ones are skipped.`,
+          paths.files.logs.games,
+        );
+      }
+    } else if (offline) {
       // Named by edition: the other one may be connected. Java Edition joins
       // through the Tokio mod's command.
       const game = `Minecraft ${MINECRAFT_EDITION_NAMES[action.edition]}`;
