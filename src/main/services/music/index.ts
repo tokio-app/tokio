@@ -200,6 +200,11 @@ export class MusicService extends ProviderService<MusicProvider> {
 
   // Searches first, so a request that finds nothing never reads the player
   private async play({ query, by, unique, refund }: SongRequest, run: number) {
+    // It would be dropped, so it isn't searched
+    if (this._music_queue.full()) {
+      refund();
+      return;
+    }
     const info = await this._current.provider.searchSong(query);
     if (info === null || run !== this._run) return;
     if (unique && this._music_queue.has(info.track)) {

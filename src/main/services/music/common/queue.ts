@@ -164,6 +164,11 @@ export class MusicQueue extends TokioEmitter {
     );
   }
 
+  // Every place holds a song still to play, so a new one would be dropped
+  public full() {
+    return this._queue.length - this._currentIndex >= this._maxSize;
+  }
+
   // The handle of the viewer who asked for the song playing
   public playingBy(): string | undefined {
     return this._queue[this._currentIndex]?.by;

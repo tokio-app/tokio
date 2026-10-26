@@ -240,7 +240,25 @@ describe("MusicService", () => {
       service.handle(chat("!play C"), music);
       await vi.advanceTimersByTimeAsync(10_000);
 
+      expect(searched()).toEqual(["A"]);
+    });
+
+    it("doesn't search a request while the queue is full, and gives the cooldown back", async () => {
+      const { request, searched, queue } = setup();
+      const music = settings((m) => {
+        m.protection.queue_length = 2;
+        m.protection.cooldown = 2;
+      });
+      await request("!play A", music);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await request("!play B", music);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      await request("!play C", music);
+      await request("!next", music);
+
       expect(searched()).toEqual(["A", "B"]);
+      expect(queue()).toEqual(["A", "B (playing)"]);
     });
 
     it("keeps as many songs as the queue length", async () => {

@@ -498,6 +498,19 @@ describe("MusicQueue", () => {
       expect(playing(queue)).toBe("b");
     });
 
+    it("is full while every place holds a song still to play", async () => {
+      const queue = new MusicQueue();
+      queue.setMaxSize(2);
+      queue.enqueue("a", song("a"), () => {});
+      expect(queue.full()).toBe(false);
+
+      queue.enqueue("b", song("b"), () => {});
+      expect(queue.full()).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(queue.full()).toBe(false);
+    });
+
     it("trims right away and never goes below 1", () => {
       const queue = new MusicQueue();
       queue.enqueue("a", song("a"), () => {});
