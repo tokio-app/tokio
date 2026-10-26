@@ -159,11 +159,6 @@ export class MinecraftConnection {
     });
   }
 
-  /** Stops listening and drops the game. */
-  public close() {
-    void this._stop();
-  }
-
   private _listen(): Promise<boolean> {
     return new Promise((resolve) => {
       const wss = new WebSocketServer({

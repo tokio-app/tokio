@@ -46,7 +46,6 @@ const fakeMinecraft = (
       fake.sent.push(command);
       return fake.answer(command);
     }),
-    close: vi.fn(),
     set: (status: GameStatus) => {
       fake.status = status;
       listener?.(status);
