@@ -264,7 +264,8 @@ export class TimerService extends Service {
     const cap = this._settings.cap * MINUTE_MS;
     let next = left + ms;
     if (ms > 0 && cap > 0) next = Math.min(next, Math.max(left, cap));
-    next = Math.max(0, next);
+    // An absurd multiplier or Adjust would make it Infinity, which can't save
+    next = Math.min(Math.max(0, next), Number.MAX_SAFE_INTEGER);
     const delta = next - left;
     if (delta === 0) return;
 

@@ -400,6 +400,17 @@ describe("TimerService", () => {
       expect(changes).toContain(-10 * MIN);
     });
 
+    it("keeps the clock finite and savable after an absurd amount", async () => {
+      ready();
+
+      timer.adjust(1e306 * 1000);
+
+      expect(Number.isFinite(left())).toBe(true);
+      expect(await timer.save()).toBe(true);
+      const [[{ timer: saved }]] = updateProfileData.mock.calls;
+      expect(TimerProfileSchema.safeParse(saved).success).toBe(true);
+    });
+
     it("leaves an idle clock alone", () => {
       ready(settings(), false);
 
