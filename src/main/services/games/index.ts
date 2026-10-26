@@ -365,11 +365,16 @@ export class GamesService extends Service {
     try {
       for (let first = true; backlog.length > 0; first = false) {
         if (!first) await new Promise((r) => setTimeout(r, RUN_GAP_MS));
-        const batch = backlog[0];
-        // Stopped when the latest profile removed, disabled or moved the
-        // action; runs it accepted keep their commands if only steps changed
+        // Stopped when the latest profile removed or disabled the action; runs
+        // it accepted keep their commands if only steps changed
         const action = this._games.actions.find((a) => a.id === id);
-        if (!action?.enabled || action.edition !== batch.edition) break;
+        if (!action?.enabled) break;
+        // Runs accepted for the action's old edition are dropped, the rest go on
+        while (backlog.length > 0 && backlog[0].edition !== action.edition) {
+          backlog.shift()?.resolve();
+        }
+        const batch = backlog[0];
+        if (!batch) break;
         // Turned off: dropped quietly, as handle skips everything then
         const { state } = this._minecraft.status;
         if (state === "off" || state === "error") break;

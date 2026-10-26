@@ -458,6 +458,23 @@ describe("GamesService", () => {
         }
       });
 
+      it("drops the old edition's waiting runs and runs the new one's", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const bedrock = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [everyGift()],
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        minecraft.set({ state: "connected", edition: "java" });
+        const java = games.handle(TOKIO_EVENTS.GIFT, gift(302), {
+          actions: [{ ...everyGift(), edition: "java" }],
+        });
+        await vi.runAllTimersAsync();
+        await Promise.all([bedrock, java]);
+        expect(minecraft.sent).toEqual(["each 300", "each 302", "each 302"]);
+      });
+
       it("stops an action's backlog once a save disables it", async () => {
         vi.useFakeTimers();
         const minecraft = fakeMinecraft();
