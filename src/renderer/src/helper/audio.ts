@@ -46,11 +46,16 @@ export const CUT_FADE = 0.05;
 
 // By cache key, least recently used first. A player keeps its own reference
 // to the buffer, so one dropped here still plays to its end.
-const decoded = new Map<
-  string,
-  { audio: Promise<AudioBuffer>; bytes: number }
->();
+// The buffer is set once decoded.
+type Decoded = {
+  audio: Promise<AudioBuffer>;
+  bytes: number;
+  buffer?: AudioBuffer;
+};
+const decoded = new Map<string, Decoded>();
 let decodedBytes = 0;
+// Sounds pushed out of the cache, found again while a player still holds them
+const evicted = new Map<string, WeakRef<AudioBuffer>>();
 
 function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
   if (cacheKey === undefined) return Tone.getContext().decodeAudioData(data);
@@ -62,19 +67,30 @@ function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
     return cached.audio;
   }
 
+  const alive = evicted.get(cacheKey)?.deref();
+  evicted.delete(cacheKey);
   // Kept while decoding, so copies that come meanwhile wait for this one
-  const entry = { audio: Tone.getContext().decodeAudioData(data), bytes: 0 };
+  const entry: Decoded = {
+    audio: alive
+      ? Promise.resolve(alive)
+      : Tone.getContext().decodeAudioData(data),
+    bytes: 0,
+  };
   decoded.set(cacheKey, entry);
   entry.audio.then(
     (audio) => {
       if (decoded.get(cacheKey) !== entry) return;
+      entry.buffer = audio;
       // 32-bit samples
       entry.bytes = audio.length * audio.numberOfChannels * 4;
       decodedBytes += entry.bytes;
       for (const [key, oldest] of decoded) {
         if (decodedBytes <= DECODED_CACHE_BYTES) break;
+        // The sound just decoded, and the ones still decoding, stay
+        if (key === cacheKey || !oldest.buffer) continue;
         decoded.delete(key);
         decodedBytes -= oldest.bytes;
+        evicted.set(key, new WeakRef(oldest.buffer));
       }
     },
     () => {
@@ -113,6 +129,7 @@ export function decodeSound(
  * alert's message. Players that have it still play it to the end.
  */
 export function forgetDecoded(cacheKey: string) {
+  evicted.delete(cacheKey);
   const entry = decoded.get(cacheKey);
   if (!entry) return;
   decoded.delete(cacheKey);
