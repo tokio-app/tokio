@@ -832,6 +832,71 @@ describe("StoreManagerService", () => {
       );
     });
 
+    // Holds the next store save until release() is called, ok() decides its result
+    const holdStoreSave = (ok = true) => {
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => (release = resolve));
+      const save = json.saveFile.bind(json);
+      vi.spyOn(json, "saveFile").mockImplementationOnce(async (...args) => {
+        await released;
+        return ok ? save(...args) : false;
+      });
+      return () => release();
+    };
+
+    it("holds the new profile in memory while the switch is saving", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.getProfileData();
+      const release = holdStoreSave();
+
+      const switching = store.updateActiveProfile("stream.json");
+      await vi.waitFor(() =>
+        expect(store.getSettings().activeProfile.file).toBe("stream.json"),
+      );
+
+      expect((await store.getProfileData())?.name).toBe("Stream");
+      release();
+      expect(await switching).toBe("switched");
+    });
+
+    it("keeps an update made while the switch is saving", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.getProfileData();
+      const release = holdStoreSave();
+
+      const switching = store.updateActiveProfile("stream.json");
+      await vi.waitFor(() =>
+        expect(store.getSettings().activeProfile.file).toBe("stream.json"),
+      );
+      await store.updateProfileData({ connector: { username: "streamer" } });
+      release();
+      expect(await switching).toBe("switched");
+
+      const active = await store.getProfileData();
+      expect(active?.name).toBe("Stream");
+      expect(active?.connector.username).toBe("streamer");
+      expect(await readJSON(defaultProfileFile)).toEqual(defaultProfile);
+    });
+
+    it("holds the old profile in memory again when the switch can't be saved", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.getProfileData();
+      const release = holdStoreSave(false);
+
+      const switching = store.updateActiveProfile("stream.json");
+      await vi.waitFor(() =>
+        expect(store.getSettings().activeProfile.file).toBe("stream.json"),
+      );
+      release();
+      expect(await switching).toBe("unsaved");
+
+      expect(store.getSettings().activeProfile.file).toBe("default.json");
+      expect((await store.getProfileData())?.name).toBe("Default");
+    });
+
     it("updates a profile other than the active one when given its file", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");
