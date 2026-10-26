@@ -20,13 +20,25 @@ const HOLD_TIMEOUT_MS = 2 * 60_000;
 // Edge sends no audio for text of only punctuation ("?", "..."), so it isn't sent
 const SPEAKABLE = /[\p{L}\p{N}\p{Extended_Pictographic}]/u;
 
-// Without accents, invisible characters or styled letters ("ｉｄｉｏｔ"), so a
-// banned word can't hide behind them.
+// Cyrillic, Greek and Turkish letters that look Latin, and the Latin letter
+// at the same place
+const LOOKALIKES = "авекмнорстухѕіјԁһαεικνορτυχı";
+const LATIN = "abekmhopctyxsijdhaeikvoptuxi";
+const LOOKALIKE = new RegExp(`[${LOOKALIKES}]`, "g");
+
+// Without accents, invisible characters, styled letters ("ｉｄｉｏｔ") or
+// look-alike letters ("іdiot"), so a banned word can't hide behind them. Only
+// words that mix in a Latin letter are mapped, so Russian or Greek is kept.
 const fold = (text: string) =>
   text
     .normalize("NFKD")
     .replace(/[\p{M}\p{Cf}]/gu, "")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/\S+/g, (word) =>
+      /\p{Script=Latin}/u.test(word)
+        ? word.replace(LOOKALIKE, (c) => LATIN[LOOKALIKES.indexOf(c)])
+        : word,
+    );
 
 // Every provider is an engine, and voices name the engine that speaks them.
 // The active provider only speaks voices with no engine, or an unknown one.

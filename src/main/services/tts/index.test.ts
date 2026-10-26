@@ -273,6 +273,17 @@ describe("TTSService", () => {
       expect(await say("you idol", s)).toHaveLength(1);
     });
 
+    it("drops banned words with look-alike letters, not Russian words", async () => {
+      const s = settings((s) => {
+        s.protection.banned = ["idiot", "bot"];
+      });
+
+      expect(await say("you іdiot", s)).toEqual([]);
+      expect(await say("you ıdiot", s)).toEqual([]);
+      expect(await say("you idіоt", s)).toEqual([]);
+      expect(await say("вот так", s)).toHaveLength(1);
+    });
+
     it("drops banned emojis, never matching an empty entry", async () => {
       const s = settings((s) => {
         s.protection.banned = ["🍆", "❤️", "", "\u0301"];
