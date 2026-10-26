@@ -59,13 +59,21 @@ const row = (name: string) => within(picker().getByTitle(name).parentElement!);
 const option = (text: string) =>
   screen.getAllByText(text).find((el) => !dialog()?.contains(el))!;
 
-const previewId = (v: VoiceData) =>
-  `voice-preview:${v.engine}|${v.lang}|${v.name}`;
+const previewId = (v: VoiceData, n = 1) =>
+  `voice-preview:${n}:${v.engine}|${v.lang}|${v.name}`;
 
-const previewed = (v: VoiceData, reply: object = { success: true, data }) =>
+// Answers the voice's last request, the one `nth` picks, or one never sent
+const previewed = (
+  v: VoiceData,
+  reply: object = { success: true, data },
+  nth = -1,
+) =>
   send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
     success: true,
-    id: previewId(v),
+    id:
+      sent(APP_EVENTS.GET_TTS_TEST)
+        .filter((req) => req.voice?.name === v.name)
+        .at(nth)?.id ?? previewId(v),
     ...reply,
   });
 
@@ -274,6 +282,24 @@ describe("VoiceSelect", () => {
       expect(queue.stop).toHaveBeenCalled();
       expect(row("Bob").getByRole("button", { name: "Play" })).toBeVisible();
       expect(sent(APP_EVENTS.GET_TTS_TEST)).toHaveLength(1);
+    });
+
+    it("ignores the reply to a request stopped before the voice was played again", async () => {
+      const { user, queue } = await openPicker();
+      const bob = voice("Bob", "en-US");
+      await user.click(row("Bob").getByRole("button", { name: "Play" }));
+      await user.click(row("Bob").getByRole("button", { name: "Cancel" }));
+      await user.click(row("Bob").getByRole("button", { name: "Play" }));
+
+      await previewed(bob, undefined, 0);
+
+      expect(queue.enqueue).not.toHaveBeenCalled();
+      expect(row("Bob").getByRole("button", { name: "Cancel" })).toBeVisible();
+
+      await previewed(bob);
+
+      expect(sent(APP_EVENTS.GET_TTS_TEST)[1].id).toBe(previewId(bob, 2));
+      expect(queue.enqueue).toHaveBeenCalledOnce();
     });
 
     it("cancels a preview that's loading", async () => {

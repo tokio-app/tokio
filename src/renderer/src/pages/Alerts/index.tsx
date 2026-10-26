@@ -30,14 +30,15 @@ export function Alerts() {
   // Alerts waiting for main to save a sound. A pick made since drops the
   // alert, so a slow download can't replace it.
   const asked = useRef(new Set<string>());
-  // Numbers the sound requests, and the newest one applied per alert, so a
-  // late reply to an older request can't replace a newer pick
+  // Numbers the sound and media requests, and the newest one applied per
+  // alert, so a late reply to an older request can't replace a newer pick
   const counter = useRef(0);
   const applied = useRef(new Map<string, number>());
   // Id of the alert whose image or video is being picked
   const [mediaFor, setMediaFor] = useState<string | null>(null);
-  // The same as asked, for browsed media
+  // The same as asked and applied, for browsed media
   const askedMedia = useRef(new Set<string>());
+  const appliedMedia = useRef(new Map<string, number>());
   // The header's add button, and whether it's in view. Out of it, another
   // shows under the alerts.
   const headerAdd = useRef<HTMLButtonElement>(null);
@@ -126,6 +127,8 @@ export function Alerts() {
 
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, (res) => {
     if (!res?.success || !res.media || !askedMedia.current.has(res.id)) return;
+    if (res.request <= (appliedMedia.current.get(res.id) ?? 0)) return;
+    appliedMedia.current.set(res.id, res.request);
     setMedia(res.id, res.media);
   });
 
@@ -226,7 +229,10 @@ export function Alerts() {
       {mediaAlert && (
         <MediaPicker
           alert={mediaAlert}
-          onRequest={() => askedMedia.current.add(mediaAlert.id)}
+          onRequest={() => {
+            askedMedia.current.add(mediaAlert.id);
+            return ++counter.current;
+          }}
           onSelect={(file) => pickMedia(mediaAlert.id, file)}
           onClose={() => setMediaFor(null)}
         />

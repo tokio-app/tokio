@@ -126,12 +126,13 @@ export class GamesService extends Service {
     });
   }
 
-  public setLogFile(logFile: string): void {
-    this._logFile = logFile;
-  }
-
   public setPicturesFolder(folder: string): void {
     this._picturesFolder = folder;
+  }
+
+  // The active profile's actions after a save or a switch, so backlogs stop at once
+  public setGames(games: Pick<Profile["games"], "actions">): void {
+    this._games = games;
   }
 
   /** Turns the connections on or off. False when one can't listen. */
@@ -360,11 +361,16 @@ export class GamesService extends Service {
     try {
       for (let first = true; backlog.length > 0; first = false) {
         if (!first) await new Promise((r) => setTimeout(r, RUN_GAP_MS));
-        const batch = backlog[0];
-        // Stopped when the latest profile removed, disabled or moved the
-        // action; runs it accepted keep their commands if only steps changed
+        // Stopped when the latest profile removed or disabled the action; runs
+        // it accepted keep their commands if only steps changed
         const action = this._games.actions.find((a) => a.id === id);
-        if (!action?.enabled || action.edition !== batch.edition) break;
+        if (!action?.enabled) break;
+        // Runs accepted for the action's old edition are dropped, the rest go on
+        while (backlog.length > 0 && backlog[0].edition !== action.edition) {
+          backlog.shift()?.resolve();
+        }
+        const batch = backlog[0];
+        if (!batch) break;
         // Turned off: dropped quietly, as handle skips everything then
         const { state } = this._minecraft.status;
         if (state === "off" || state === "error") break;
@@ -376,6 +382,8 @@ export class GamesService extends Service {
         this._onRun?.(action);
         const failed = (await this._send(batch.commands)).find((r) => !r.ok);
         if (failed) {
+          // Turned off midway, which failed what the game hadn't answered
+          if (["off", "error"].includes(this._minecraft.status.state)) break;
           // A game that left or was replaced midway fails the commands it
           // hadn't answered, and drops the rest
           const offline = this._unreachable(action.edition) !== undefined;

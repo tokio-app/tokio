@@ -210,9 +210,11 @@ describe("AlertItem", () => {
       }),
     );
     expect(summary()).toHaveTextContent("Airhorn");
-    // The cut's part, without reading the file
+    // The cut's part of the file's length, as the queue plays it
+    const length = cut.container.querySelector("audio")!;
+    Object.defineProperty(length, "duration", { value: 10 });
+    fireEvent.loadedMetadata(length);
     expect(summary()).toHaveTextContent("5s");
-    expect(cut.container.querySelector("audio")).toBeNull();
     expect(summary()).toHaveTextContent("Party");
     expect(summary()).toHaveTextContent("9s");
     cut.unmount();

@@ -131,6 +131,8 @@ const registerConnectorEvents = ({
       payload,
       profile,
       (audio) => {
+        // A sound read or a message made after the window closed on quit
+        if (win.isDestroyed()) return;
         win.webContents.send(APP_EVENTS_RESPONSE.ALERT_AUDIO, audio);
       },
       (alert, error) => {
@@ -334,6 +336,8 @@ const registerConnectorEvents = ({
         d,
         profile.tts,
         (res) => {
+          // A message made after the window closed on quit
+          if (win.isDestroyed()) return;
           win.webContents.send(APP_EVENTS_RESPONSE.TTS_AUDIO, {
             id: res.id,
             data: res.data!,
@@ -387,7 +391,7 @@ const registerConnectorEvents = ({
         "Unable to save the LIVE's new emotes.",
         { key: "emotes", windowMs: REPEAT_NOTICE_MS },
       );
-    } else if (res.data) {
+    } else if (res.data && !win.isDestroyed()) {
       win.webContents.send(APP_EVENTS_RESPONSE.EMOTES, { data: res.data });
     }
   };
@@ -412,9 +416,11 @@ const registerConnectorEvents = ({
         { key: "gifts", windowMs: REPEAT_NOTICE_MS },
       );
     } else if (res.data) {
-      win.webContents.send(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, {
-        data: res.data,
-      });
+      if (!win.isDestroyed()) {
+        win.webContents.send(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, {
+          data: res.data,
+        });
+      }
       // The games overlay's rows with that gift get its picture and name
       await sendGamesOverlay({
         storeManagerService: store,
@@ -575,7 +581,8 @@ const registerTimer = ({
 events.push(
   APP_EVENTS.GET_PROFILE,
   async ({ storeManagerService }, e) => {
-    const profile = await storeManagerService.getProfileData();
+    // Fresh, so a page reopened right after a save gets what it saved
+    const profile = await storeManagerService.getProfileData({ fresh: true });
     const profiles = storeManagerService.getProfiles();
     if (!profile || !profiles)
       throw new Error("The active profile is missing.");

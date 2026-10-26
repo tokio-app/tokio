@@ -1,12 +1,10 @@
 import { TestOverlay } from "@/common/schemas";
 import { getOverlaySocketURL } from "@/common/util";
-import { Btn, EmptyState, Input, Section } from "@/components";
+import { Btn, CopyField, EmptyState, Input, Section } from "@/components";
 import { useState } from "react";
-import { FaRegCopy } from "react-icons/fa";
 import { FiTrash2 } from "react-icons/fi";
 import { LuPlus } from "react-icons/lu";
 import { PiShootingStarThin } from "react-icons/pi";
-import { VscPlug } from "react-icons/vsc";
 import { STATUS_LABELS, TestStatus } from "../helper";
 import styles from "../tools.module.css";
 
@@ -68,25 +66,12 @@ export function TestOverlaysSection({
                 </div>
               </div>
 
-              <div className={styles.row}>
-                <Input readOnly value={overlay.id} />
-                <Btn
-                  title="Copy ID"
-                  onClick={() => void navigator.clipboard.writeText(overlay.id)}
-                >
-                  <FaRegCopy size={18} />
-                </Btn>
-                <Btn
-                  title="Copy WebSocket URL"
-                  onClick={() =>
-                    void navigator.clipboard.writeText(
-                      getOverlaySocketURL(overlay.id),
-                    )
-                  }
-                >
-                  <VscPlug size={18} />
-                </Btn>
-              </div>
+              {/* One a line: side by side they can't shrink and overflow */}
+              <CopyField value={overlay.id} title="Copy ID" />
+              <CopyField
+                value={getOverlaySocketURL(overlay.id)}
+                title="Copy WebSocket URL"
+              />
 
               {statuses[overlay.id] && (
                 <p className={styles.test_status}>

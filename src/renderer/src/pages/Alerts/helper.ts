@@ -75,19 +75,6 @@ export function soundClip(
 }
 
 /**
- * The seconds a cut plays of a sound or video `duration` long. A cut that
- * doesn't fit plays it whole, as the queue and the overlay do.
- */
-export function cutPart(
-  cut: Pick<NonNullable<Alert["sound"]>, "start" | "end">,
-  duration: number,
-): { start: number; stop: number } {
-  const start = Math.min(cut.start, duration);
-  const stop = Math.min(cut.end ?? duration, duration);
-  return stop > start ? { start, stop } : { start: 0, stop: duration };
-}
-
-/**
  * The sound's loudness in `bars` slices, each its loudest sample over every
  * channel, 1 for the loudest slice.
  */

@@ -9,10 +9,6 @@ import { Service } from "../shared";
 export class URLManagerService extends Service {
   private _installing: Promise<boolean> | null = null;
 
-  public setLogFile(logFile: string) {
-    this._logFile = logFile;
-  }
-
   public installAppFQDN() {
     // Calls made while the admin prompt is open share it, so the block is added once.
     if (!this._installing) {

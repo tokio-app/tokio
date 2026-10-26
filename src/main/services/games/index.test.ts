@@ -458,6 +458,51 @@ describe("GamesService", () => {
         }
       });
 
+      it("drops the old edition's waiting runs and runs the new one's", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const bedrock = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [everyGift()],
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        minecraft.set({ state: "connected", edition: "java" });
+        const java = games.handle(TOKIO_EVENTS.GIFT, gift(302), {
+          actions: [{ ...everyGift(), edition: "java" }],
+        });
+        await vi.runAllTimersAsync();
+        await Promise.all([bedrock, java]);
+        expect(minecraft.sent).toEqual(["each 300", "each 302", "each 302"]);
+      });
+
+      it("stops an action's backlog once a save disables it", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [everyGift()],
+        });
+        await vi.advanceTimersByTimeAsync(RUN_GAP_MS);
+        games.setGames({ actions: [{ ...everyGift(), enabled: false }] });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toEqual(["each 300", "each 300"]);
+      });
+
+      it("stops backlogs when another profile loads", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [everyGift()],
+        });
+        await vi.advanceTimersByTimeAsync(RUN_GAP_MS);
+        games.setGames({ actions: [] });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toEqual(["each 300", "each 300"]);
+      });
+
       it("drops the backlog when the game leaves, reporting it once", async () => {
         vi.useFakeTimers();
         const minecraft = fakeMinecraft();
@@ -482,6 +527,26 @@ describe("GamesService", () => {
             },
           ],
         ]);
+      });
+
+      it("drops the rest quietly when Minecraft is turned off midway", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        minecraft.send.mockImplementation(async (command) => {
+          minecraft.sent.push(command);
+          minecraft.set({ state: "off" });
+          return { command, ok: false, message: "Minecraft disconnected." };
+        });
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [everyGift()],
+        });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toEqual(["each 300"]);
+        expect(onError).not.toHaveBeenCalled();
       });
 
       it("skips new runs once an action has MAX_BACKLOG waiting", async () => {

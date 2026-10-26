@@ -52,7 +52,8 @@ export function writeFileAtomic(
 async function write(path: string, data: string | Uint8Array) {
   const temp = `${path}.tmp`;
   try {
-    await writeFile(temp, data);
+    // Without the flush, a power cut after the rename can leave a file of NULs.
+    await writeFile(temp, data, { flush: true });
     await renameWithRetry(temp, path);
   } catch (error) {
     await rm(temp, { force: true }).catch(() => {});

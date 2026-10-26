@@ -1,14 +1,32 @@
 import { AlertMedia } from "@/common/schemas";
-import { APP_EVENTS } from "@/common/types";
+import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { AudioQueue, EnqueueOptions } from "./audio";
 
 type QueuedAlert = {
   // The alert, whose overlay shows its media at the media's volume
   id: string;
-  // None when the alert only shows media
+  // A message's audio
   data?: Uint8Array;
+  // A library sound's file, fetched only when it isn't decoded yet. Without
+  // it or data, the alert only shows media.
+  key?: string;
   media?: AlertMedia;
 };
+
+/**
+ * Asks main for a library sound's bytes, rejecting when it can't read them.
+ */
+export function soundData(file: string): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const off = window.api.on(APP_EVENTS_RESPONSE.SOUND_DATA, (res) => {
+      if (!res || res.file !== file) return;
+      off();
+      if (res.success && res.data) resolve(res.data);
+      else reject(new Error(res.error?.message ?? `Unable to read ${file}.`));
+    });
+    window.api.emit(APP_EVENTS.GET_SOUND_DATA, { file });
+  });
+}
 
 /**
  * Queues an alert's sound, or a silent place when it only shows media. Its
@@ -17,11 +35,12 @@ type QueuedAlert = {
  */
 export function queueAlert(
   queue: AudioQueue,
-  { id, data, media }: QueuedAlert,
+  { id, data, key, media }: QueuedAlert,
   options: EnqueueOptions = {},
 ): Promise<boolean> {
+  const sound = data ?? (key ? () => soundData(key) : undefined);
   if (!media) {
-    return data ? queue.enqueue(data, options) : Promise.resolve(false);
+    return sound ? queue.enqueue(sound, options) : Promise.resolve(false);
   }
 
   const item: EnqueueOptions = {
@@ -38,5 +57,5 @@ export function queueAlert(
         end: media.end,
       }),
   };
-  return data ? queue.enqueue(data, item) : queue.wait(media.duration, item);
+  return sound ? queue.enqueue(sound, item) : queue.wait(media.duration, item);
 }

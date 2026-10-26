@@ -216,6 +216,17 @@ describe("ServerService", () => {
     expect(res.success).toBe(false);
   });
 
+  it("keeps running, stoppable and restartable, after an error once listening", async () => {
+    await server.start();
+    const http = server["_server"]!;
+
+    http.emit("error", Object.assign(new Error("accept"), { code: "EMFILE" }));
+    server.stop();
+
+    expect(http.listening).toBe(false);
+    expect((await server.start()).success).toBe(true);
+  });
+
   describe("overlays", () => {
     beforeEach(async () => {
       const overlay = join(dir, "clock");
@@ -333,6 +344,23 @@ describe("ServerService", () => {
 
         server.sendToClient("abc", { type: "tokio:alert:clear" });
         await vi.waitFor(() => expect(shown()).toEqual([]));
+      } finally {
+        dom.window.close();
+      }
+    });
+
+    it("hides an image once its duration is over", async () => {
+      const dom = await open();
+      const { document } = dom.window;
+      const image = () => document.querySelector("img");
+
+      try {
+        await connected();
+        show("a.png", "image", { duration: 0.2 });
+        await vi.waitFor(() => expect(image()).not.toBeNull());
+
+        await wait(300);
+        expect(image()).toBeNull();
       } finally {
         dom.window.close();
       }

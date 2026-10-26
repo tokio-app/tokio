@@ -68,6 +68,11 @@ describe("hasKeyword", () => {
     expect(hasKeyword("🔥hi🔥", "hi")).toBe(true);
   });
 
+  it("keeps the words next to an emoji apart", () => {
+    expect(hasKeyword("hi❤️everyone", "hi")).toBe(true);
+    expect(hasKeyword("hi❤️everyone", "everyone")).toBe(true);
+  });
+
   it("looks for a keyword of only emojis as written", () => {
     expect(hasKeyword("a 🌹 for you", "🌹")).toBe(true);
     expect(hasKeyword("hello", "🌹")).toBe(false);

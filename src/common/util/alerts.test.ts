@@ -3,6 +3,7 @@ import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import { describe, expect, it } from "vitest";
 import {
   ALERT_MESSAGE_VARIABLES,
+  cutPart,
   formatAlertMessage,
   mediaKind,
 } from "./alerts";
@@ -78,5 +79,24 @@ describe("mediaKind", () => {
     for (const file of ["icon.svg", "ding.mp3", "mp4", "", "."]) {
       expect(mediaKind(file)).toBeNull();
     }
+  });
+});
+
+describe("cutPart", () => {
+  it("plays the cut, or the whole length when it doesn't fit", () => {
+    expect(cutPart({ start: 1, end: 3 }, 10)).toEqual({ start: 1, stop: 3 });
+    expect(cutPart({ start: 1, end: null }, 10)).toEqual({
+      start: 1,
+      stop: 10,
+    });
+    expect(cutPart({ start: 1, end: 30 }, 10)).toEqual({ start: 1, stop: 10 });
+    expect(cutPart({ start: 12, end: null }, 10)).toEqual({
+      start: 0,
+      stop: 10,
+    });
+  });
+
+  it("starts a cut from before the start at the start", () => {
+    expect(cutPart({ start: -2, end: 3 }, 10)).toEqual({ start: 0, stop: 3 });
   });
 });

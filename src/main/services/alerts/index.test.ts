@@ -162,9 +162,9 @@ describe("AlertsService", () => {
         settings([alert()]),
       );
 
+      // By key alone: the window asks for the bytes it hasn't decoded
       expect(sent).toEqual([
         {
-          data: bytes(1, 2, 3),
           volume: 80,
           channel: "alerts",
           maxQueueLength: 100,
@@ -212,8 +212,9 @@ describe("AlertsService", () => {
       );
 
       expect(sent).toEqual([
-        expect.objectContaining({ data: bytes(1, 2, 3), media: picture }),
+        expect.objectContaining({ key: "ding.mp3", media: picture }),
       ]);
+      expect(sent[0]).not.toHaveProperty("data", expect.anything());
     });
 
     it("sends an alert with only media, to hold its turn in the queue", async () => {
@@ -287,7 +288,7 @@ describe("AlertsService", () => {
       expect(logError).not.toHaveBeenCalled();
     });
 
-    it("reads a sound too big to cache once for events at the same time", async () => {
+    it("checks a sound too big to cache without reading it", async () => {
       const big = new Uint8Array(CACHE_MAX_FILE_BYTES + 1);
       await writeFile(join(sounds, "long.mp3"), big);
       const items = [
@@ -306,12 +307,12 @@ describe("AlertsService", () => {
       );
 
       expect(sent).toHaveLength(50);
-      expect(new Set(sent.map((a) => a.data)).size).toBe(1);
+      expect(sent.every((a) => a.key === "long.mp3" && !a.data)).toBe(true);
       expect(
         vi
           .mocked(readFile)
           .mock.calls.filter(([path]) => path === join(sounds, "long.mp3")),
-      ).toHaveLength(1);
+      ).toHaveLength(0);
     });
 
     it("fires gift alerts once per combo, when it ends", async () => {
@@ -437,7 +438,7 @@ describe("AlertsService", () => {
       });
     });
 
-    it("sends no sound read while the alerts were cleared", async () => {
+    it("sends no sound checked while the alerts were cleared", async () => {
       const sent: AlertAudio[] = [];
 
       const handled = service.handle(

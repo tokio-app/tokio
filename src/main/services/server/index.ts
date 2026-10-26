@@ -88,10 +88,6 @@ export class ServerService extends Service {
     this._dynamicRouter = newRouter;
   }
 
-  public setLogFile(logFile: string) {
-    this._logFile = logFile;
-  }
-
   public getPort(): number {
     return this._port;
   }
@@ -108,14 +104,14 @@ export class ServerService extends Service {
       // On every interface on purpose: a streaming app on another computer
       // opens overlays from this PC, through its network address.
       // Express 5 calls this with the error too, the "error" handler reports it.
-      this._server = this._app.listen(this._port, (error) => {
+      const server = this._app.listen(this._port, (error) => {
         if (error) return;
         // Port 0 picks a free port.
-        const address = this._server!.address();
+        const address = server.address();
         if (address && typeof address === "object") this._port = address.port;
         // Overlays only listen, so a big message is never one of theirs.
         this._wss = new CustomWebSocketServer({
-          server: this._server!,
+          server,
           maxPayload: 64 * 1024,
         });
         this._wss.on("error", (err) =>
@@ -162,7 +158,18 @@ export class ServerService extends Service {
         });
       });
 
-      this._server.on("error", (err) => {
+      this._server = server;
+
+      server.on("error", (err) => {
+        // After listening (EMFILE on accept) it still runs, and stop() must reach it.
+        if (server.listening) {
+          Logger.error(
+            `<Server> Server error -- ${formatError(err)}`,
+            this._logFile,
+            err,
+          );
+          return;
+        }
         this._server = null;
         Logger.error(
           `<Server> Unable to start server on port ${this._port} -- ${formatError(err)}`,

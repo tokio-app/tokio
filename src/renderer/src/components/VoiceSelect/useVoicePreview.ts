@@ -26,6 +26,9 @@ export function useVoicePreview({
   const [previewing, setPreviewing] = useState<TestState>(null);
   // Read by the IPC callback, which would otherwise see a stale `previewing`
   const current = useRef<string | null>(null);
+  // Numbered, so a reply to a stopped request for the same voice is ignored
+  const requests = useRef(0);
+  const pending = useRef<string | null>(null);
 
   const finish = (key: string) => {
     if (current.current !== key) return;
@@ -45,10 +48,12 @@ export function useVoicePreview({
     queue.stop();
     current.current = playing ? null : key;
     setPreviewing(playing ? null : { id: key, loading: true });
+    pending.current = null;
     if (playing) return;
 
+    pending.current = `${ID_PREFIX}${++requests.current}:${key}`;
     window.api.emit(APP_EVENTS.GET_TTS_TEST, {
-      id: ID_PREFIX + key,
+      id: pending.current,
       text: voiceSample(voice.lang),
       voice,
     });
@@ -57,8 +62,8 @@ export function useVoicePreview({
   useIpcListener(APP_EVENTS_RESPONSE.GET_TTS_TEST, (res) => {
     if (!res?.id.startsWith(ID_PREFIX)) return;
     // Ignore previews that were replaced or stopped while loading.
-    const key = res.id.slice(ID_PREFIX.length);
-    if (key !== current.current) return;
+    const key = current.current;
+    if (res.id !== pending.current || key === null) return;
     if (!res.success || !res.data) {
       finish(key);
       return;

@@ -17,6 +17,9 @@ import { EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
 // after this long, like the ones it had when it reloaded or crashed.
 const HOLD_TIMEOUT_MS = 2 * 60_000;
 
+// Edge sends no audio for text of only punctuation ("?", "..."), so it isn't sent
+const SPEAKABLE = /[\p{L}\p{N}\p{Extended_Pictographic}]/u;
+
 // Without accents, invisible characters or styled letters ("ｉｄｉｏｔ"), so a
 // banned word can't hide behind them.
 const fold = (text: string) =>
@@ -47,7 +50,7 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   public getEngines(): VoiceEngine[] {
-    return [...(this._providerPool?.entries() ?? [])].map(([id, provider]) => ({
+    return [...this._providerPool.entries()].map(([id, provider]) => ({
       id,
       label: provider.label,
       keyLabel: provider.keyLabel,
@@ -55,12 +58,12 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   public setEngineKey(engine: string, key: string) {
-    this._providerPool?.get(engine)?.setKey(key.trim());
+    this._providerPool.get(engine)?.setKey(key.trim());
   }
 
   // The voices of every engine. An engine that fails is left out.
   public async getVoices(): Promise<VoiceData[]> {
-    const engines = [...(this._providerPool?.entries() ?? [])];
+    const engines = [...this._providerPool.entries()];
     const results = await Promise.allSettled(
       engines.map(async ([, provider]) => provider.getVoices()),
     );
@@ -79,25 +82,27 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   public dispose() {
-    for (const provider of this._providerPool?.values() ?? []) {
+    for (const provider of this._providerPool.values()) {
       provider.dispose();
     }
   }
 
   // Voices saved before the engines were combined have no engine, and
   // imported profiles may name one that isn't available here.
-  private _engineOf(voice?: VoiceData): TTSProvider | null {
-    const engine = voice?.engine && this._providerPool?.get(voice.engine);
-    return engine || this._current?.provider || null;
+  private _engineOf(voice?: VoiceData): TTSProvider {
+    const engine = voice?.engine && this._providerPool.get(voice.engine);
+    return engine || this._current.provider;
   }
 
   public async generateBuffer(
     text: string,
     voice?: VoiceData,
   ): Promise<GenerationResponse> {
-    const engine = this._engineOf(voice);
-    if (!engine) return { success: false };
-    return await engine.generateBuffer(text, voice?.lang, voice?.name);
+    return await this._engineOf(voice).generateBuffer(
+      text,
+      voice?.lang,
+      voice?.name,
+    );
   }
 
   // The comment without its trigger, which isn't read
@@ -174,7 +179,11 @@ export class TTSService extends ProviderService<TTSProvider> {
   ): string | null {
     if (this._hasBanned(checked, settings)) return null;
     const out = this._clean(text, settings);
-    return isBlank(out) ? null : out;
+    return this._speakable(out) ? out : null;
+  }
+
+  private _speakable(text: string) {
+    return !isBlank(text) && SPEAKABLE.test(text);
   }
 
   private _replacementRegExp(old: string) {
@@ -235,6 +244,7 @@ export class TTSService extends ProviderService<TTSProvider> {
     const comment = this._comment(settings, chat);
     if (!this._valid(settings, chat, comment)) return;
     const text = this._parseText(settings, chat, comment);
+    if (!this._speakable(text)) return;
     this._queue.setQueueOptions({
       gapTime: settings.protection.cooldown,
       maxQueueLength: settings.protection.queue_length,
@@ -244,10 +254,11 @@ export class TTSService extends ProviderService<TTSProvider> {
       // The window gets one message to play and the next one ready. The rest
       // wait here, where the queue length drops what's too many.
       const held = Math.min(2, settings.protection.queue_length);
-      const until = Date.now() + HOLD_TIMEOUT_MS;
+      // Not Date.now(), so a clock change can't end the hold early or late
+      const until = performance.now() + HOLD_TIMEOUT_MS;
       // shortcut: polls every 250 ms, wake it from played() if the gap is heard
       while (this._held.size >= held && run === this._run) {
-        if (Date.now() >= until) {
+        if (performance.now() >= until) {
           this._held.clear();
           break;
         }

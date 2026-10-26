@@ -64,10 +64,6 @@ export class LicensesService extends Service {
     this._scan = undefined;
   }
 
-  public setLogFile(logFile: string): void {
-    this._logFile = logFile;
-  }
-
   public getDocuments(): LicenseDocument[] {
     return DOCUMENTS.map(({ id, title }) => ({ id, title }));
   }

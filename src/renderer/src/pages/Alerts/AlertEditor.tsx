@@ -12,6 +12,7 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import {
+  cutPart,
   defaultAlertName,
   formatAdded,
   getAlertOverlayURL,
@@ -52,7 +53,6 @@ import {
   FiVolume2,
 } from "react-icons/fi";
 import styles from "./editor.module.css";
-import { cutPart } from "./helper";
 import { Cut, CutTrack, ResetCut, SoundCut } from "./SoundCut";
 
 type Tab = "trigger" | "sound" | "media";

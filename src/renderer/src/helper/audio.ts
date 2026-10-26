@@ -1,3 +1,4 @@
+import { cutPart } from "@/common/util";
 import * as Tone from "tone";
 
 interface AudioQueueOptions {
@@ -46,14 +47,27 @@ export const CUT_FADE = 0.05;
 
 // By cache key, least recently used first. A player keeps its own reference
 // to the buffer, so one dropped here still plays to its end.
-const decoded = new Map<
-  string,
-  { audio: Promise<AudioBuffer>; bytes: number }
->();
+// The buffer is set once decoded.
+type Decoded = {
+  audio: Promise<AudioBuffer>;
+  bytes: number;
+  buffer?: AudioBuffer;
+};
+const decoded = new Map<string, Decoded>();
 let decodedBytes = 0;
+// Sounds pushed out of the cache, found again while a player still holds them
+const evicted = new Map<string, WeakRef<AudioBuffer>>();
 
-function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
-  if (cacheKey === undefined) return Tone.getContext().decodeAudioData(data);
+// A sound's bytes, or what fetches them when it isn't decoded yet
+type Source = ArrayBuffer | (() => Promise<ArrayBuffer>);
+
+function decode(source: Source, cacheKey?: string): Promise<AudioBuffer> {
+  const context = Tone.getContext();
+  const load = () =>
+    typeof source === "function"
+      ? source().then((data) => context.decodeAudioData(data))
+      : context.decodeAudioData(source);
+  if (cacheKey === undefined) return load();
 
   const cached = decoded.get(cacheKey);
   if (cached) {
@@ -62,19 +76,29 @@ function decode(data: ArrayBuffer, cacheKey?: string): Promise<AudioBuffer> {
     return cached.audio;
   }
 
-  // Kept while decoding, so copies that come meanwhile wait for this one
-  const entry = { audio: Tone.getContext().decodeAudioData(data), bytes: 0 };
+  const alive = evicted.get(cacheKey)?.deref();
+  evicted.delete(cacheKey);
+  // Kept while fetching and decoding, so copies that come meanwhile wait for
+  // this one
+  const entry: Decoded = {
+    audio: alive ? Promise.resolve(alive) : load(),
+    bytes: 0,
+  };
   decoded.set(cacheKey, entry);
   entry.audio.then(
     (audio) => {
       if (decoded.get(cacheKey) !== entry) return;
+      entry.buffer = audio;
       // 32-bit samples
       entry.bytes = audio.length * audio.numberOfChannels * 4;
       decodedBytes += entry.bytes;
       for (const [key, oldest] of decoded) {
         if (decodedBytes <= DECODED_CACHE_BYTES) break;
+        // The sound just decoded, and the ones still decoding, stay
+        if (key === cacheKey || !oldest.buffer) continue;
         decoded.delete(key);
         decodedBytes -= oldest.bytes;
+        evicted.set(key, new WeakRef(oldest.buffer));
       }
     },
     () => {
@@ -113,6 +137,7 @@ export function decodeSound(
  * alert's message. Players that have it still play it to the end.
  */
 export function forgetDecoded(cacheKey: string) {
+  evicted.delete(cacheKey);
   const entry = decoded.get(cacheKey);
   if (!entry) return;
   decoded.delete(cacheKey);
@@ -198,10 +223,15 @@ export class AudioQueue {
     this.gapTime = options.gapTime ?? 0;
   }
 
+  /**
+   * Queues a sound, given as its bytes or as what fetches them: that runs
+   * only when the sound under cacheKey isn't decoded yet.
+   */
   enqueue(
-    input: Uint8Array | ArrayBuffer,
+    input: Uint8Array | ArrayBuffer | (() => Promise<Uint8Array | ArrayBuffer>),
     { cacheKey, ...item }: EnqueueOptions = {},
   ): Promise<boolean> {
+    // Before fetching, so a full queue never fetches
     if (this.pending() >= this.maxQueueLength) {
       console.warn("AudioQueue: Max queue length reached. Ignoring input.");
       return Promise.resolve(false);
@@ -211,7 +241,12 @@ export class AudioQueue {
     // while earlier items still wait for theirs
     let decoding: Promise<AudioBuffer>;
     try {
-      decoding = decode(bytesOf(input), cacheKey);
+      decoding = decode(
+        typeof input === "function"
+          ? () => input().then(bytesOf)
+          : bytesOf(input),
+        cacheKey,
+      );
     } catch (error) {
       decoding = Promise.reject(error);
     }
@@ -329,9 +364,10 @@ export class AudioQueue {
 
     // A part that isn't in the sound plays it whole.
     const { duration } = buffer;
-    let start = Math.min(Math.max(next.start ?? 0, 0), duration);
-    let end = Math.min(next.end ?? duration, duration);
-    if (end <= start) [start, end] = [0, duration];
+    const { start, stop: end } = cutPart(
+      { start: next.start ?? 0, end: next.end ?? null },
+      duration,
+    );
     // Seconds it's heard
     const length = (end - start) / speed;
 
@@ -359,10 +395,16 @@ export class AudioQueue {
 
     player.onstop = () => {
       this.active = this.active.filter((item) => item.player !== player);
-      player.dispose();
-      gainNode.dispose();
-      fade?.dispose();
       onEnded?.();
+      // Tone emits stop up to its look ahead before the sound is heard ending
+      setTimeout(
+        () => {
+          player.dispose();
+          gainNode.dispose();
+          fade?.dispose();
+        },
+        (Tone.getContext().lookAhead + CUT_FADE) * 1000,
+      );
     };
 
     // shortcut: a place longer than its sound leaves `active` (and calls

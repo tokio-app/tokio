@@ -472,7 +472,7 @@ function StepFields({
                 aria-label="Height in blocks"
                 integer
                 min={5}
-                max={250}
+                max={300}
                 value={step.height}
                 onChange={(height) => onChange({ ...step, height })}
               />

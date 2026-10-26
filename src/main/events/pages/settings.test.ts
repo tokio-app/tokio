@@ -423,6 +423,7 @@ describe("settings events", () => {
       const serverService = {
         sendToClient: vi.fn((_id: string, _data: unknown) => true),
       };
+      const gamesService = { setGames: vi.fn() };
       const h = createHandler({
         storeManagerService,
         connectorService: { isConnected: () => connected },
@@ -432,8 +433,15 @@ describe("settings events", () => {
           getGifts: async () => [],
           getCustomGifts: async () => [],
         },
+        gamesService,
       });
-      return { h, storeManagerService, timerService, serverService };
+      return {
+        h,
+        storeManagerService,
+        timerService,
+        serverService,
+        gamesService,
+      };
     };
 
     it("refuses to switch while a LIVE is connected", async () => {
@@ -498,9 +506,14 @@ describe("settings events", () => {
     });
 
     it("sends the new profile's actions to the games overlay", async () => {
-      const { h, serverService } = setup();
+      const { h, serverService, gamesService } = setup();
 
       await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
+
+      // So the old profile's backlogs stop at once
+      expect(gamesService.setGames).toHaveBeenCalledExactlyOnceWith(
+        gamesOf(streamProfile).games,
+      );
 
       expect(serverService.sendToClient).toHaveBeenCalledExactlyOnceWith(
         GAMES_PATH,
@@ -612,6 +625,21 @@ describe("settings events", () => {
         }),
       ]);
     });
+
+    it.each([false, true])(
+      "does nothing for the active profile (connected: %s)",
+      async (connected) => {
+        const { h, storeManagerService, timerService } = setup({ connected });
+
+        await h.invoke(settings, APP_EVENTS.SET_PROFILE, {
+          file: defaultProfile.file,
+        });
+
+        expect(timerService.save).not.toHaveBeenCalled();
+        expect(storeManagerService.updateActiveProfile).not.toHaveBeenCalled();
+        expect(h.sent()).toEqual([]);
+      },
+    );
   });
 
   describe("EXPORT_ENTITY", () => {

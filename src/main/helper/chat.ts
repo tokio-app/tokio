@@ -10,7 +10,7 @@ const EMOJI_REGEX = new RegExp(
 );
 
 /** The text with its regex syntax characters escaped. */
-export const escapeRegExp = (text: string) =>
+const escapeRegExp = (text: string) =>
   text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 
 // Letters of scripts written without spaces don't make a word longer, so
@@ -53,7 +53,8 @@ export function cleanText(
 ): string {
   if (!input) return "";
 
-  let out = removeEmojis(input).normalize("NFKC");
+  // A space, so the words on each side of an emoji stay apart
+  let out = removeEmojis(input, " ").normalize("NFKC");
   if (asciiOnly) out = out.normalize("NFKD").replace(/\p{M}+/gu, "");
 
   return out.replace(/\s+/g, " ").trim().toLowerCase();

@@ -42,7 +42,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
   - The handlers save after each change, and throw `saveFailure()` when that fails.
   - A 5 s unref'd interval saves while running, or after a change no request saves: added time, the end, a pause on disconnect.
   - Never on quit (`shortcut:`): that would hold the quit the updater's install can't wait for (`.claude/rules/updates.md`). A quit or crash while running loses up to 5 s.
-- `SET_PROFILE` saves the timer first and refuses the switch when that fails, then loads the new profile's timer.
+- `SET_PROFILE` saves the timer first and refuses the switch when that fails, then loads the new profile's timer. Picking the profile that's already active does nothing, even during a LIVE.
 
 ## Pushes and the overlay
 
@@ -59,7 +59,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
   - The halo is set on each text, since `em` in a `text-shadow` set on `body` resolves against the body's 16px.
   - The title wraps instead of clipping, which would cut its halo into a box.
 - **The slot under the clock:**
-  - It shows `×N` (`show_multiplier`, multiplier not 1), or `added` summed until 1.5 s after the last change: `+` in the accent color, `−` in the clock's.
+  - It shows `×N` (`show_multiplier`, multiplier not 1, rounded to two decimals here and in the Tools preview), or `added` summed until 1.5 s after the last change: `+` in the accent color, `−` in the clock's.
   - A sum that rounds to under a second shows `×N` meanwhile.
   - Times read like `formatAdded` (`src/common/util/timer.ts`): tenths under 10 s, then `1:30` and `1:00:00`. The page's `changeText` repeats it in plain JS.
 - **The carousel** under the slot shows one trigger at a time for 3 s (`TURN_MS`), its name in the title's font and color and its time in the accent color, as text nodes. A push restarts the turns only when the triggers changed. It's one line that a long name cuts short; the padding inside its clipping box, taken back by negative margins, keeps the halo from being cut into a box.
@@ -71,4 +71,5 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 - **Tools** is a page of settings (`layout="aside"`): Countdown Timer, Timer Look, Time Added, then Test Overlays. The server-off notice sits above them. Timer Look comes right after the preview, colors first, so its changes show while they're made.
 - With **Show the triggers, one at a time** on, Timer Look lists a name field for each trigger that adds time. Those fields have their own accessible names ("Follows on stream"), apart from the seconds fields that share their labels.
 - One `useAutosave(timer.settings)` feeds the three timer sections, nested fields through immer's `produce`. `useAutosave` keys its delay on `prevSaved`, so main's pushes (a new but equal `settings` every 250 ms on a busy LIVE) don't keep restarting it.
+- The controls (Start, Pause, Stop, Reset, Add, Remove) call `flushSettings()` before `TIMER_CONTROL` or `ADJUST_TIMER`, so a setting still waiting to save, like the starting time, reaches main first.
 - The preview counts down from the last push's `at`, ticking only while running. While idle, it shows the starting time as typed. Its clock is weight 800 like the overlay's, heavier than the app's other readouts (700).

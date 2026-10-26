@@ -10,7 +10,8 @@ import { VscClose } from "react-icons/vsc";
 import { Btn } from "../Elements";
 import styles from "./modal.module.css";
 
-const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]";
+const FOCUSABLE =
+  "a[href], button, input, select, textarea, video[controls], audio[controls], [tabindex]";
 
 // Wraps Tab between its first and last controls, so Escape still reaches it
 function keepTab(e: KeyboardEvent<HTMLDivElement>) {
@@ -20,7 +21,8 @@ function keepTab(e: KeyboardEvent<HTMLDivElement>) {
   if (e.defaultPrevented || !focused || !dialog.contains(focused)) return;
 
   const items = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (el) => el.tabIndex >= 0 && !el.matches(":disabled"),
+    // Not tabIndex: a video without the attribute reports -1, yet its controls take Tab.
+    (el) => !el.matches(':disabled, [tabindex^="-"]'),
   );
   const first = items.at(0) ?? dialog;
   const last = items.at(-1) ?? dialog;

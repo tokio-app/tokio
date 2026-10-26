@@ -257,13 +257,7 @@ export function AlertItem({
           {/* How long it plays, the cut's part of it */}
           {sound && !tts && (
             <span className={styles.detail}>
-              <SoundLength
-                file={sound.file}
-                seconds={
-                  sound.end === null ? undefined : sound.end - sound.start
-                }
-                from={sound.start}
-              />
+              <SoundLength file={sound.file} cut={sound} />
             </span>
           )}
         </span>

@@ -39,8 +39,11 @@ export function CatalogSection({ overlays }: Props) {
   useIpcRequest(APP_EVENTS.GET_OVERLAY_CATALOG);
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_OVERLAY_CATALOG, (res) => {
-    if (res?.success) setCatalog(res.data!);
-    else {
+    if (res?.success) {
+      setCatalog(res.data!);
+      setError(null);
+    } else if (!catalog) {
+      // A late failure (another page's request) leaves the shown catalog.
       setError(res?.error?.message ?? "Unable to load the official overlays.");
     }
   });

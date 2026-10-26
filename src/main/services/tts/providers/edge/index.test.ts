@@ -140,15 +140,39 @@ describe("EdgeTTS", () => {
       );
     });
 
-    it("speaks with a voice it hasn't listed yet", async () => {
-      await tts.generateBuffer("Hola", "es-MX", "Jorge");
+    it("speaks with the voice it's given while the list can't be fetched", async () => {
+      list.mockRejectedValue(new EdgeTTSError("network", "offline"));
 
-      expect(list).not.toHaveBeenCalled();
-      expect(speak).toHaveBeenCalledWith(
+      await tts.generateBuffer("Hola", "es-MX", "Retired");
+      await tts.generateBuffer("Hola", "es-MX", "Retired");
+
+      expect(list).toHaveBeenCalledTimes(2);
+      expect(speak.mock.calls.map(([, , name]) => name)).toEqual([
+        "es-MX-RetiredNeural",
+        "es-MX-RetiredNeural",
+      ]);
+    });
+
+    it("fetches the list before its first message, so a retired voice falls back", async () => {
+      await tts.generateBuffer("Hola", "es-MX", "Retired");
+
+      expect(list).toHaveBeenCalledOnce();
+      expect(speak).toHaveBeenCalledExactlyOnceWith(
         tts.config,
         "Hola",
-        "es-MX-JorgeNeural",
+        DEFAULT,
       );
+    });
+
+    it("fetches the list once for messages made at the same time", async () => {
+      await Promise.all([
+        tts.generateBuffer("Hola", "es-MX", "Jorge"),
+        tts.generateBuffer("Hola", "es-MX", "Dalia"),
+      ]);
+      await tts.generateBuffer("Hola", "es-MX", "Jorge");
+
+      expect(list).toHaveBeenCalledOnce();
+      expect(speak).toHaveBeenCalledTimes(3);
     });
 
     it("speaks with a listed voice and with its legacy name", async () => {

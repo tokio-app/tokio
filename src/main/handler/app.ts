@@ -22,6 +22,7 @@ import { YAMLManagerService } from "@/services/yaml";
 import { AppHandlerVariables, CustomBrowserWindow } from "@/types";
 import {
   BrowserWindow,
+  Notification,
   type App,
   type IpcMain,
   type session as Session,
@@ -34,6 +35,8 @@ const SPLASH_MIN_MS = 2000;
 
 export class AppHandler implements AppHandlerVariables {
   public readonly app: App;
+  // Shown once a run, and kept: a collected notification loses its click
+  private _stillRunning: Notification | null = null;
   public readonly win: CustomBrowserWindow;
   public readonly splash: BrowserWindow;
   public readonly ipcMain: IpcMain;
@@ -145,6 +148,10 @@ export class AppHandler implements AppHandlerVariables {
       if (!quitting && this.trayService.isEnabled()) {
         event.preventDefault();
         this.win.hide();
+        // Desktops without a tray host (GNOME) show no icon to bring it back
+        if (process.platform === "linux" && !this._stillRunning) {
+          this.stillRunningNotice();
+        }
         return;
       }
       BrowserWindow.getAllWindows().forEach((window) => {
@@ -161,6 +168,16 @@ export class AppHandler implements AppHandlerVariables {
     this.trayService.onOpen(() => this.bringToFront());
     this.app.on("second-instance", () => this.bringToFront());
     this.app.on("activate", () => this.bringToFront());
+  }
+
+  private stillRunningNotice() {
+    if (!Notification.isSupported()) return;
+    const notice = (this._stillRunning = new Notification({
+      title: "Tokio is still running",
+      body: "Click here to show it. To quit when you close it, turn off Settings → Tray.",
+    }));
+    notice.on("click", () => this.bringToFront());
+    notice.show();
   }
 
   // The splash while the app loads, then the app, also out of the tray

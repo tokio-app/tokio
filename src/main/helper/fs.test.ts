@@ -14,7 +14,11 @@ import { hasPending } from "./quit";
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
-  return { ...actual, rename: vi.fn(actual.rename) };
+  return {
+    ...actual,
+    rename: vi.fn(actual.rename),
+    writeFile: vi.fn(actual.writeFile),
+  };
 });
 
 const failure = (code: string) =>
@@ -42,6 +46,16 @@ describe("fs helpers", () => {
 
       expect(await readFile(file, "utf-8")).toBe("new");
       expect(await readdir(folder)).toEqual(["index.html"]);
+    });
+
+    it("flushes the data to disk before the rename", async () => {
+      const file = join(folder, "index.html");
+
+      await writeFileAtomic(file, "new");
+
+      expect(writeFile).toHaveBeenCalledWith(`${file}.tmp`, "new", {
+        flush: true,
+      });
     });
 
     it("keeps the old file whole when it can't be replaced", async () => {

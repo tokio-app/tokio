@@ -1,6 +1,6 @@
 import { Alert } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { formatAdded } from "@/common/util";
+import { cutPart, formatAdded } from "@/common/util";
 import { Btn, NumberInput, Spinner } from "@/components";
 import { cx } from "@/helper";
 import { useAudio, useIpcListener } from "@/hooks";
@@ -13,7 +13,7 @@ import {
   useState,
 } from "react";
 import styles from "./editor.module.css";
-import { cutPart, waveform } from "./helper";
+import { waveform } from "./helper";
 
 declare module "react" {
   interface CSSProperties {
@@ -58,8 +58,11 @@ export function SoundCut({ sound, playing, play, onChange }: Props) {
     duration: number;
   } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // The sound shown now, which a decode that ends late checks against
+  const current = useRef(file);
 
   useEffect(() => {
+    current.current = file;
     window.api.emit(APP_EVENTS.GET_SOUND_DATA, { file });
   }, [file]);
 
@@ -71,13 +74,17 @@ export function SoundCut({ sound, playing, play, onChange }: Props) {
       return;
     }
     decode(res.data, res.file).then(
-      (buffer) =>
+      (buffer) => {
+        if (current.current !== res.file) return;
         setAudio({
           file: res.file,
           peaks: waveform(buffer, BARS),
           duration: buffer.duration,
-        }),
-      () => setFailed(res.file),
+        });
+      },
+      () => {
+        if (current.current === res.file) setFailed(res.file);
+      },
     );
   });
 

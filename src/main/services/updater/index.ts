@@ -75,10 +75,6 @@ export class UpdaterService extends Service {
     this._platform = platform;
   }
 
-  public setLogFile(logFile: string): void {
-    this._logFile = logFile;
-  }
-
   private get manual() {
     return this._platform === "darwin";
   }

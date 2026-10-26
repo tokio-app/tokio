@@ -79,6 +79,30 @@ describe("OfficialOverlays", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a catalog that comes after a failure", async () => {
+    await renderApp("/overlays/official");
+
+    await send(APP_EVENTS_RESPONSE.GET_OVERLAY_CATALOG, { success: false });
+    await catalog(GIFT_JAR);
+
+    expect(
+      page().queryByText("Unable to load the official overlays."),
+    ).toBeNull();
+    expect(page().getByRole("heading", { name: "Gift Jar" })).toBeVisible();
+  });
+
+  it("keeps the catalog shown when a later read fails", async () => {
+    await renderApp("/overlays/official");
+
+    await catalog(GIFT_JAR);
+    await send(APP_EVENTS_RESPONSE.GET_OVERLAY_CATALOG, { success: false });
+
+    expect(
+      page().queryByText("Unable to load the official overlays."),
+    ).toBeNull();
+    expect(page().getByRole("heading", { name: "Gift Jar" })).toBeVisible();
+  });
+
   it("says when there are no official overlays yet", async () => {
     await renderApp("/overlays/official");
 

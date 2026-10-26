@@ -389,6 +389,23 @@ describe("Games", () => {
     ]);
   });
 
+  it("launches up to the 300 blocks the schema takes", async () => {
+    const { user } = await load([action("a1")]);
+    const panel = panels()[0];
+    const height = () =>
+      panel.getByRole("spinbutton", { name: "Height in blocks" });
+
+    await user.click(panel.getByText("Spawn mob"));
+    await user.click(inList(panelElements()[0], "Hazard")!);
+    await user.click(panel.getByText("Falling TNT"));
+    await user.click(inList(panelElements()[0], "Launch into the sky")!);
+    await user.clear(height());
+    await user.type(height(), "300");
+    await wait(300);
+
+    expect(saves().at(-1)!.actions[0].steps[0]).toMatchObject({ height: 300 });
+  });
+
   it("picks a help, with a duration only for effects", async () => {
     const { user } = await load([action("a1")]);
     const panel = panels()[0];

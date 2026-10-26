@@ -166,6 +166,8 @@ events.push(
   async (services, e, { file }) => {
     const { storeManagerService, connectorService, timerService, notifier } =
       services;
+    // Picking the active profile again changes nothing, even during a LIVE
+    if (file === storeManagerService.getSettings().activeProfile.file) return;
     if (connectorService.isConnected()) {
       throw new AppFailure(
         FEEDBACK_CODES.PROFILE_LOCKED,
@@ -187,6 +189,7 @@ events.push(
     const profiles = storeManagerService.getProfiles();
     if (!profile || !profiles) throw new Error(`Unable to load ${file}.`);
     timerService.load(profile.timer, file);
+    services.gamesService.setGames(profile.games);
 
     e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
       success: true,

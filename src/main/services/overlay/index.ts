@@ -85,14 +85,11 @@ export class OverlayService extends Service {
   private _server: ServerService;
   private _store: OverlayStore;
   private _catalog: { overlays: CatalogOverlay[]; time: number } | null = null;
+  private _catalogFetch: Promise<OverlayResult<CatalogOverlay[]>> | null = null;
   // Installs in progress, by overlay id
   private _installs = new Map<string, Promise<OverlayResult>>();
   // The last task queued for each overlay's files, see _lock
   private _locks = new Map<string, Promise<unknown>>();
-
-  public setLogFile(logFile: string): void {
-    this._logFile = logFile;
-  }
 
   public initialize(
     paths: { folder: string; giftsFile: string; customGiftsFile: string },
@@ -235,7 +232,15 @@ export class OverlayService extends Service {
    * again after CATALOG_TTL_MS, and a failure isn't kept, so the next call
    * tries again.
    */
-  public async getCatalog(): Promise<OverlayResult<CatalogOverlay[]>> {
+  public getCatalog(): Promise<OverlayResult<CatalogOverlay[]>> {
+    // Pages opening together share one read.
+    this._catalogFetch ??= this._fetchCatalog().finally(
+      () => (this._catalogFetch = null),
+    );
+    return this._catalogFetch;
+  }
+
+  private async _fetchCatalog(): Promise<OverlayResult<CatalogOverlay[]>> {
     if (this._catalog && Date.now() - this._catalog.time < CATALOG_TTL_MS) {
       return { success: true, data: this._catalog.overlays };
     }
@@ -363,12 +368,16 @@ export class OverlayService extends Service {
       const dir = this._dir(id);
       const res = await processOverlay(dir, this._yaml, false);
       if (!res.success) return { success: false };
+      // A dialog opened before an update has the old version's fields.
+      const merged = res.data!.config
+        ? mergeOverlayConfig(res.data!.config, config)
+        : config;
 
       // First, so settings the schema refuses never reach the HTML.
       const saved = await this._yaml.saveFile(
         res.paths!.config,
         OverlayConfigSchema,
-        config,
+        merged,
       );
       if (!saved) return { success: false };
 
@@ -376,7 +385,7 @@ export class OverlayService extends Service {
         id,
         res.data!.htmlContent,
         dir,
-        config,
+        merged,
         gifts,
       );
       if (!html.success) return { success: false };

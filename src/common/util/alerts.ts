@@ -114,3 +114,16 @@ export const defaultAlertName = (index: number) => `alert-${index + 1}`;
 // The name an alert shows, its default while it has none
 export const alertName = (name: string, index: number) =>
   name.trim() || defaultAlertName(index);
+
+/**
+ * The seconds a cut plays of a sound or video `duration` long. A cut that
+ * doesn't fit plays it whole, as the queue and the overlay do.
+ */
+export function cutPart(
+  cut: { start: number; end: number | null },
+  duration: number,
+): { start: number; stop: number } {
+  const start = Math.min(Math.max(0, cut.start), duration);
+  const stop = Math.min(cut.end ?? duration, duration);
+  return stop > start ? { start, stop } : { start: 0, stop: duration };
+}

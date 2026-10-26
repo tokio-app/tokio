@@ -84,6 +84,7 @@ events.push(
       games: settings,
     });
     if (!res) throw new LoggedError("The game actions were not saved.");
+    services.gamesService.setGames(settings);
     e.reply(APP_EVENTS_RESPONSE.UPDATE_GAMES_SETTINGS, { success: true });
     await sendGamesOverlay(services);
   },
@@ -197,7 +198,14 @@ events.push(
         saved = false;
       }
     }
-    if (!saved) throw saveFailure();
+    if (!saved) {
+      // What main holds: the pictures stay in its library, unsaved
+      e.reply(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES, {
+        success: true,
+        data: storeManagerService.getMinecraftPictures(),
+      });
+      throw saveFailure();
+    }
 
     e.reply(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
       success: true,

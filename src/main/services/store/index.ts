@@ -25,6 +25,7 @@ import {
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
+import { writeFileAtomic } from "@/helper/fs";
 import { isInside } from "@/helper/path";
 import { track } from "@/helper/quit";
 import Logger from "@/logger";
@@ -33,9 +34,10 @@ import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { TTSService } from "@/services/tts";
 import { safeStorage } from "electron";
-import { access, copyFile, readdir, readFile, unlink } from "fs/promises";
+import { access, readdir, readFile, unlink } from "fs/promises";
 import { randomUUID } from "node:crypto";
-import { basename, extname, join, resolve } from "path";
+import { basename, dirname, extname, join, resolve } from "path";
+import { z } from "zod";
 import { Service } from "../shared";
 
 type Providers = {
@@ -48,6 +50,9 @@ type Providers = {
 // was unavailable, as plain text.
 const isEncrypted = (key: string) =>
   /^v\d\d$/.test(Buffer.from(key, "base64").subarray(0, 3).toString("latin1"));
+
+// How long live events go without reading again an active profile that failed
+const LOAD_RETRY_MS = 30_000;
 
 export class StoreManagerService extends Service {
   private _jsonManagerService!: JSONManagerService;
@@ -66,14 +71,28 @@ export class StoreManagerService extends Service {
   // Saved key (encrypted, in base64) → the key. Filled at startup and as keys
   // change, so reads don't wait for safeStorage's async calls.
   private _keys = new Map<string, string>();
+  // The active profile's last update, which memory holds once it's written
+  private _profileWrite: Promise<unknown> = Promise.resolve();
+  // The active file's last failed load, so live events don't read it each time
+  private _failedLoad: { file: string; at: number } | null = null;
 
-  public setLogFile(logFile: string) {
-    this._logFile = logFile;
-  }
-
-  public async getProfileData() {
+  // fresh waits for updates still writing and retries a failed file at once.
+  public async getProfileData({ fresh = false }: { fresh?: boolean } = {}) {
+    if (fresh) await this._profileWrite;
     if (this._memoryProfile !== null) return this._memoryProfile;
+    const file = this._activeProfileFile();
+    const failed = this._failedLoad;
+    if (
+      !fresh &&
+      failed?.file === file &&
+      performance.now() - failed.at < LOAD_RETRY_MS
+    ) {
+      return null;
+    }
     const loaded = await this._getProfileData();
+    if (file === this._activeProfileFile()) {
+      this._failedLoad = loaded ? null : { file, at: performance.now() };
+    }
     // A switch or an update while this was loading holds the newer profile.
     this._memoryProfile ??= loaded;
     return this._memoryProfile;
@@ -96,21 +115,13 @@ export class StoreManagerService extends Service {
     );
 
     let data: StoreSchema | null = null;
-    let storeFileExists = true;
 
     try {
-      await access(this._storeFilePath);
-    } catch {
-      storeFileExists = false;
-    }
-
-    try {
-      if (storeFileExists) {
-        data = await this._jsonManagerService.loadFile(
-          this._storeFilePath,
-          StoreZodSchema,
-        );
-        if (!data) await this._backupCorruptedStore();
+      // Read once: a store held for a moment throws instead of being replaced.
+      const read = await this._readChecked(this._storeFilePath, StoreZodSchema);
+      data = read.data;
+      if (read.raw && !data) {
+        await this._backupCorrupted(this._storeFilePath, read.raw);
       }
 
       if (!data) {
@@ -194,12 +205,13 @@ export class StoreManagerService extends Service {
     );
 
     // The store can be rebuilt (missing or corrupted) while the user's Default
-    // profile is fine, so only write it when it can't be loaded.
-    const existing = await this._jsonManagerService.loadFile(
+    // profile is fine, so only write it when it's missing or invalid.
+    const { raw, data } = await this._readChecked(
       defaultProfilePath,
       ProfileSchema,
     );
-    if (existing) return;
+    if (data) return;
+    if (raw) await this._backupCorrupted(defaultProfilePath, raw);
 
     await this._jsonManagerService.saveFile(
       defaultProfilePath,
@@ -484,8 +496,9 @@ export class StoreManagerService extends Service {
         this._pathManagerService.folders.profilesFolder,
         profileFile,
       );
+      // Fresh, so the items changed aren't older than an update still writing
       const profile = active
-        ? await this.getProfileData()
+        ? await this.getProfileData({ fresh: true })
         : await this._jsonManagerService.loadFile(path, ProfileSchema);
       const updates = profile && change(profile);
       if (!updates) continue;
@@ -783,13 +796,34 @@ export class StoreManagerService extends Service {
   }
 
   public async exportProfile(ref: string, path: string): Promise<boolean> {
-    return this._exportEntity(
-      ref,
-      path,
-      this._pathManagerService.folders.profilesFolder,
+    if (!ref || !path) return false;
+
+    const data = await this._jsonManagerService.loadFile(
+      join(this._pathManagerService.folders.profilesFolder, ref),
       ProfileSchema,
-      "profile",
     );
+    if (!data) {
+      Logger.error(
+        `<System> Export failed: Reference profile ${ref} not found.`,
+        this._logFile,
+      );
+      return false;
+    }
+
+    const saved = await this._jsonManagerService.saveFile(
+      resolve(path),
+      ProfileSchema,
+      data,
+    );
+    if (!saved) {
+      Logger.error(
+        `<System> Failed to write the exported profile ${path}`,
+        this._logFile,
+      );
+      return false;
+    }
+
+    return true;
   }
 
   // Copied to a free file named after its file, and listed under its own
@@ -800,15 +834,41 @@ export class StoreManagerService extends Service {
     this._ensureInitialized();
     if (!ref) return null;
     const file = await this._freeProfileFile(basename(ref, extname(ref)));
-    const result = await this._importEntity(
-      ref,
-      file,
-      this._pathManagerService.folders.profilesFolder,
+    const newPath = join(this._pathManagerService.folders.profilesFolder, file);
+
+    const data = await this._jsonManagerService.loadFile(
+      resolve(ref),
       ProfileSchema,
-      "profile",
     );
-    if (!result) return null;
-    return this._listNewProfile(result);
+    if (!data) {
+      Logger.error(
+        `<System> Import failed: Reference profile ${ref} not found.`,
+        this._logFile,
+      );
+      return null;
+    }
+
+    // A name the trim made too short would fail the save's validation.
+    const trimmed = data.name.trim();
+    const name = this._freeProfileName(
+      trimmed.length < (ProfileSchema.shape.name.minLength ?? 1)
+        ? "Imported profile"
+        : trimmed,
+    );
+    const saved = await this._jsonManagerService.saveFile(
+      newPath,
+      ProfileSchema,
+      { ...data, name },
+    );
+    if (!saved) {
+      Logger.error(
+        `<System> Failed to write imported profile file: ${newPath}`,
+        this._logFile,
+      );
+      return null;
+    }
+
+    return this._listNewProfile({ file, name });
   }
 
   // A profile whose file the store can't list is deleted, so it doesn't take
@@ -868,92 +928,6 @@ export class StoreManagerService extends Service {
     );
   }
 
-  private async _exportEntity(
-    ref: string,
-    destPath: string,
-    sourceFolder: string,
-    schema: any,
-    typeName: string,
-  ): Promise<boolean> {
-    if (!ref || !destPath) return false;
-
-    const refPath = join(sourceFolder, ref);
-    const newPath = resolve(destPath);
-    const existingData = await this._jsonManagerService.loadFile(
-      refPath,
-      schema,
-    );
-
-    if (!existingData) {
-      Logger.error(
-        `<System> Clone failed: Reference ${typeName} ${ref} not found.`,
-        this._logFile,
-      );
-      return false;
-    }
-
-    const saved = await this._jsonManagerService.saveFile(
-      newPath,
-      schema,
-      existingData,
-    );
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write cloned ${typeName} file: ${destPath}`,
-        this._logFile,
-      );
-      return false;
-    }
-
-    return true;
-  }
-
-  private async _importEntity(
-    ref: string,
-    file: string,
-    destFolder: string,
-    schema: typeof ProfileSchema,
-    typeName: string,
-  ): Promise<EntityMetadata | null> {
-    if (!ref) return null;
-
-    const refPath = resolve(ref);
-    const newPath = join(destFolder, file);
-
-    const existingData = await this._jsonManagerService.loadFile(
-      refPath,
-      schema,
-    );
-    if (!existingData) {
-      Logger.error(
-        `<System> Import failed: Reference ${typeName} ${ref} not found.`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    // A name the trim made too short would fail the save's validation.
-    const trimmed = existingData.name.trim();
-    const name = this._freeProfileName(
-      trimmed.length < (schema.shape.name.minLength ?? 1)
-        ? "Imported profile"
-        : trimmed,
-    );
-    const saved = await this._jsonManagerService.saveFile(newPath, schema, {
-      ...existingData,
-      name,
-    });
-    if (!saved) {
-      Logger.error(
-        `<System> Failed to write imported ${typeName} file: ${newPath}`,
-        this._logFile,
-      );
-      return null;
-    }
-
-    return { file, name };
-  }
-
   // `name`, or `name 2` and on when a profile has it, compared as the
   // settings events do: trimmed and in any case.
   private _freeProfileName(name: string): string {
@@ -968,7 +942,16 @@ export class StoreManagerService extends Service {
   public async addProfile(
     profile: EntityMetadata,
   ): Promise<EntityMetadata | null> {
-    return this._addEntity(profile, this._storeData!.profiles);
+    this._ensureInitialized();
+    if (!profile) return null;
+    const profiles = this._storeData!.profiles;
+    if (profiles.some((p) => p.file === profile.file)) return profile;
+
+    profiles.push(profile);
+    if (await this._queueSave()) return profile;
+    // Unlisted again, so trying again isn't refused as a taken name.
+    profiles.splice(profiles.indexOf(profile), 1);
+    return null;
   }
 
   // `file` defaults to the active profile's. A service saving the profile it
@@ -978,31 +961,23 @@ export class StoreManagerService extends Service {
     file = this._activeProfileFile(),
   ): Promise<boolean> {
     this._ensureInitialized();
-    const res = await this._jsonManagerService.updateFile(
-      join(this._pathManagerService.folders.profilesFolder, file),
-      ProfileSchema,
-      updates,
-    );
-    if (!res.success || !res.data) return false;
-    // A switch while this was writing made another profile active, that's
-    // the one to keep in memory.
-    if (file === this._activeProfileFile()) this._memoryProfile = res.data;
-    return true;
-  }
-
-  private async _addEntity(
-    entity: EntityMetadata,
-    collection: EntityMetadata[],
-  ): Promise<EntityMetadata | null> {
-    this._ensureInitialized();
-    if (!entity) return null;
-    if (collection.some((e) => e.file === entity.file)) return entity;
-
-    collection.push(entity);
-    if (await this._queueSave()) return entity;
-    // Unlisted again, so trying again isn't refused as a taken name.
-    collection.splice(collection.indexOf(entity), 1);
-    return null;
+    const write = this._jsonManagerService
+      .updateFile(
+        join(this._pathManagerService.folders.profilesFolder, file),
+        ProfileSchema,
+        updates,
+      )
+      .then((res) => {
+        if (!res.success || !res.data) return false;
+        // A switch while this was writing made another profile active, that's
+        // the one to keep in memory.
+        if (file === this._activeProfileFile()) this._memoryProfile = res.data;
+        return true;
+      });
+    if (file === this._activeProfileFile()) {
+      this._profileWrite = write.catch(() => {});
+    }
+    return write;
   }
 
   private _ensureInitialized() {
@@ -1026,18 +1001,40 @@ export class StoreManagerService extends Service {
     return save;
   }
 
-  // Throws when the store can't be read or copied, so the defaults never
-  // replace the only copy of the user's settings.
-  private async _backupCorruptedStore() {
-    await readFile(this._storeFilePath);
-    const name = basename(this._storeFilePath, ".json");
+  // The file's bytes and what they hold. Both null for a missing file, and
+  // any other read error throws, so a file held for a moment isn't replaced.
+  private async _readChecked<T>(
+    path: string,
+    schema: z.ZodType<T>,
+  ): Promise<{ raw: Buffer | null; data: T | null }> {
+    const raw = await readFile(path).catch((error: unknown) => {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
+        return null;
+      }
+      throw error;
+    });
+    if (!raw) return { raw: null, data: null };
+    const content = raw.toString("utf-8");
+    return {
+      raw,
+      data: this._jsonManagerService.parseFile(path, content, schema),
+    };
+  }
+
+  // Throws when the copy can't be written, so the defaults never replace the
+  // only copy of the user's data.
+  private async _backupCorrupted(path: string, raw: Buffer) {
     const corruptedPath = join(
-      this._pathManagerService.folders.settingsFolder,
-      `${name}.corrupted-${Date.now()}.json`,
+      dirname(path),
+      `${basename(path, ".json")}.corrupted-${Date.now()}.json`,
     );
-    await copyFile(this._storeFilePath, corruptedPath);
+    await writeFileAtomic(corruptedPath, raw);
     Logger.info(
-      `<System> Backed up corrupted store file to ${corruptedPath}`,
+      `<System> Backed up the corrupted ${path} to ${corruptedPath}`,
       this._logFile,
     );
   }

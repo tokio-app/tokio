@@ -338,6 +338,11 @@ describe("TTSService", () => {
       expect(service.prepareText("Thanks fan", s)).toBe("Thanks fan");
     });
 
+    it("refuses text of only punctuation", () => {
+      expect(service.prepareText("?!...", settings())).toBeNull();
+      expect(service.prepareText("1?", settings())).toBe("1?");
+    });
+
     it("checks banned words only in the part given to check", () => {
       const s = settings((s) => {
         s.protection.banned = ["follow"];
@@ -402,6 +407,19 @@ describe("TTSService", () => {
   });
 
   describe("text", () => {
+    it("skips a message of only punctuation", async () => {
+      expect(await say("?")).toEqual([]);
+      expect(await say("...")).toEqual([]);
+    });
+
+    it("reads the name with a comment of only punctuation", async () => {
+      const s = settings((s) => {
+        s.format.template = "{username} {comment}";
+      });
+
+      expect(await say("?", s)).toEqual(["Viewer ?"]);
+    });
+
     it("fills the template variables", async () => {
       const s = settings((s) => {
         s.format.template = "{username} ({handle}) says {comment}";
@@ -627,6 +645,20 @@ describe("TTSService", () => {
       await vi.advanceTimersByTimeAsync(250);
 
       expect(texts(sent)).toEqual(["one", "two", "three", "four"]);
+    });
+
+    it("gives up after two minutes even when the system clock changes", async () => {
+      const sent = talkAll(["one", "two", "three"]);
+      await vi.advanceTimersByTimeAsync(1000);
+      vi.setSystemTime(Date.now() + 60 * 60_000);
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(texts(sent)).toEqual(["one", "two"]);
+
+      vi.setSystemTime(Date.now() - 2 * 60 * 60_000);
+      await vi.advanceTimersByTimeAsync(2 * 60_000);
+
+      expect(texts(sent)).toEqual(["one", "two", "three"]);
     });
 
     it("gives every message a new id", async () => {

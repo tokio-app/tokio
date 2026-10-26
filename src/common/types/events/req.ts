@@ -311,8 +311,10 @@ export interface AppEventsMap {
     id: string;
     request: number;
   };
+  // `request` comes back on SET_ALERT_MEDIA, so the page keeps the newest pick
   [APP_EVENTS.IMPORT_MEDIA]: {
     id: string;
+    request: number;
   };
   // A TTS test speaks the message filled with a sample of the trigger
   [APP_EVENTS.TEST_ALERT]: AlertTestSource & {

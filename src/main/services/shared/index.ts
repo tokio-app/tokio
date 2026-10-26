@@ -8,7 +8,10 @@ import { z } from "zod";
 
 export abstract class Service {
   protected _logFile: string;
-  public abstract setLogFile(logFile: string): void;
+
+  public setLogFile(logFile: string): void {
+    this._logFile = logFile;
+  }
 }
 
 interface IProvider {
@@ -28,10 +31,6 @@ export class ProviderService<T extends IProvider>
     if (start) {
       this.setProvider(name);
     }
-  }
-
-  public setLogFile(logFile: string): void {
-    this._logFile = logFile;
   }
 
   public setKey(key: string): void {
@@ -57,10 +56,6 @@ export abstract class BaseFileManagerService extends Service {
   protected abstract fileType: string;
   protected abstract serialize(data: unknown): string;
   protected abstract deserialize(content: string): unknown;
-
-  public setLogFile(logFile: string) {
-    this._logFile = logFile;
-  }
 
   public async saveArbitraryFile(
     filePath: string,
@@ -95,6 +90,27 @@ export abstract class BaseFileManagerService extends Service {
   ): Promise<T | null> {
     const data = await this.loadArbitraryFile(filePath);
     if (data === null) return null;
+    return this._validate(schema, data, filePath, "loading");
+  }
+
+  // Content read elsewhere, checked as loadFile checks what it reads
+  public parseFile<T>(
+    filePath: string,
+    content: string,
+    schema: z.ZodType<T>,
+  ): T | null {
+    let data: unknown;
+    try {
+      data = this.deserialize(content);
+    } catch (error) {
+      this._logError(
+        `Malformed ${this.fileType.toUpperCase()} in file`,
+        filePath,
+        formatError(error),
+        error,
+      );
+      return null;
+    }
     return this._validate(schema, data, filePath, "loading");
   }
 

@@ -5,6 +5,7 @@ import {
   cancelableEvent,
   FakeBrowserWindow,
   ipcMain,
+  notifications,
   session,
   shell,
 } from "@test/electron";
@@ -249,6 +250,34 @@ describe("AppHandler", () => {
         expect(win.isVisible()).toBe(true);
       }
     });
+
+    it("says once on Linux that it still runs, and shows it on a click", async () => {
+      vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+      const { win } = await reveal();
+
+      win.close();
+      win.show();
+      win.close();
+
+      expect(notifications()).toHaveLength(1);
+      const [notice] = notifications();
+      expect(notice.options.title).toBe("Tokio is still running");
+      expect(notice.show).toHaveBeenCalledOnce();
+      notice.emit("click");
+      expect(win.isVisible()).toBe(true);
+    });
+
+    it.each(["win32", "darwin"] as const)(
+      "says nothing on %s, where the tray icon shows",
+      (platform) => {
+        vi.spyOn(process, "platform", "get").mockReturnValue(platform);
+        const { win } = start();
+
+        win.close();
+
+        expect(notifications()).toEqual([]);
+      },
+    );
   });
 
   describe("session", () => {
