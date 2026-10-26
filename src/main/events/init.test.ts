@@ -971,6 +971,21 @@ describe("init events", () => {
         { likes: 300 },
       ]);
     });
+
+    it("doesn't push throttled views or likes to a closed window", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      for (const n of [1, 2]) {
+        s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(n * 10, n));
+        s.conn.emit(TOKIO_EVENTS.LIKE, like(n * 100));
+      }
+      s.h.win.close();
+
+      vi.advanceTimersByTime(250);
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.VIEWS)).toHaveLength(1);
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.LIKES)).toHaveLength(1);
+    });
   });
 
   describe("live session", () => {
@@ -1038,6 +1053,21 @@ describe("init events", () => {
       expect(sessions(s).at(-1)).toMatchObject({
         activity: [expect.objectContaining({ type: "follow" })],
       });
+    });
+
+    it("doesn't push the session to a closed window", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      connect(s);
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("bye"));
+      // Waits for the throttle
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("see you"));
+      s.h.win.close();
+
+      vi.advanceTimersByTime(250);
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+
+      expect(sessions(s)).toHaveLength(2);
     });
 
     it("ends the session when the LIVE disconnects, keeping its feed", async () => {
@@ -1246,6 +1276,19 @@ describe("init events", () => {
       expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith(
         noStats,
       );
+    });
+
+    it("still stops everything when the window is closed, pushing nothing", async () => {
+      const s = await live();
+      s.h.win.close();
+      s.h.win.webContents.send.mockClear();
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+
+      expect(s.musicService.clearHandler).toHaveBeenCalledOnce();
+      expect(s.ttsService.clearTalk).toHaveBeenCalledOnce();
+      expect(s.alertsService.clear).toHaveBeenCalledOnce();
+      expect(s.h.win.webContents.send).not.toHaveBeenCalled();
     });
 
     it("says when the LIVE has ended", async () => {

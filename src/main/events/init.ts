@@ -220,12 +220,15 @@ const registerConnectorEvents = ({
   }
 
   // Busy lives send many of these, the UI only needs the latest few a second.
+  // A throttled push can come after the window closed on quit.
   const sendViews = throttle((views: number, viewers: number) => {
+    if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.VIEWS, {
       data: { views, viewers },
     });
   }, STATS_THROTTLE_MS);
   const sendLikes = throttle((likes: number) => {
+    if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.LIKES, { likes });
   }, STATS_THROTTLE_MS);
 
@@ -240,6 +243,7 @@ const registerConnectorEvents = ({
 
   // The Home page's feed and totals, throttled like the stats.
   const pushSession = () => {
+    if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
       data: live.getSession(),
     });
@@ -288,16 +292,19 @@ const registerConnectorEvents = ({
     music.clearHandler();
     tts.clearTalk();
     alerts.clear();
-    win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
-    win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
-    win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
-      success: false,
-      stats: {
-        likes: 0,
-        viewers: 0,
-        views: 0,
-      },
-    });
+    // The connection stops on quit too, after the window closed
+    if (!win.isDestroyed()) {
+      win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
+      win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
+      win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
+        success: false,
+        stats: {
+          likes: 0,
+          viewers: 0,
+          views: 0,
+        },
+      });
+    }
   });
   // A drop the connector recovers from keeps the LIVE session going.
   conn.onReconnect((state) => {
