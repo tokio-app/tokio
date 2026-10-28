@@ -1,11 +1,13 @@
 // Launches the built app for a one-off check, the way e2e/app.spec.ts does,
 // and runs a steps file against it. See ../SKILL.md.
 //
-//   node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>]
+//   node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>] [--lang <tag>]
 //
 // With --exe it starts a packaged build instead (yarn build:unpack), such as
 // dist/win-unpacked/tokio.exe. With --scale it renders at that device scale,
-// 2 for sharp screenshots, whatever the display's.
+// 2 for sharp screenshots, whatever the display's. With --lang it runs in
+// that language as the system's (TOKIO_LANG), en by default, so a run doesn't
+// depend on the machine's language.
 import { _electron as electron } from "@playwright/test";
 import {
   copyFileSync,
@@ -29,11 +31,12 @@ const { values, positionals } = parseArgs({
     home: { type: "string" },
     exe: { type: "string" },
     scale: { type: "string" },
+    lang: { type: "string", default: "en" },
   },
 });
 if (positionals.length !== 1) {
   console.error(
-    "Usage: node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>]",
+    "Usage: node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>] [--lang <tag>]",
   );
   process.exit(2);
 }
@@ -103,7 +106,7 @@ try {
     ...(exe
       ? { executablePath: exe, args }
       : { args: [...args, "."], cwd: repo }),
-    env: { ...env, TOKIO_HOME: home },
+    env: { ...env, TOKIO_HOME: home, TOKIO_LANG: values.lang },
   });
 
   const report = (window) => {
