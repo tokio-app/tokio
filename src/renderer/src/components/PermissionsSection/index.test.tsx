@@ -37,7 +37,7 @@ function setup(recipe?: (p: Permissions) => void) {
 }
 
 const box = (name: string) => screen.getByRole("checkbox", { name });
-// Hidden from screen readers while Minimum Fan Level is off
+// Hidden from screen readers while Minimum fan level is off
 const level = () => screen.getByRole("spinbutton", { hidden: true });
 // The control under a field's label
 const field = (label: string) =>
@@ -68,17 +68,17 @@ describe("PermissionsSection", () => {
       p.moderators = true;
     });
 
-    expect(box("Allow Everyone")).not.toBeChecked();
-    expect(box("Followers Only")).not.toBeChecked();
-    expect(box("Superfans Only")).not.toBeChecked();
-    expect(box("Moderators Only")).toBeChecked();
+    expect(box("Allow everyone")).not.toBeChecked();
+    expect(box("Followers only")).not.toBeChecked();
+    expect(box("Super Fans only")).not.toBeChecked();
+    expect(box("Moderators only")).toBeChecked();
   });
 
   it.each([
-    ["Allow Everyone", "all"],
-    ["Followers Only", "followers"],
-    ["Superfans Only", "superfans"],
-    ["Moderators Only", "moderators"],
+    ["Allow everyone", "all"],
+    ["Followers only", "followers"],
+    ["Super Fans only", "superfans"],
+    ["Moderators only", "moderators"],
   ] as const)("toggles %s", async (label, key) => {
     const user = setup();
     const before = current()[key];
@@ -91,11 +91,11 @@ describe("PermissionsSection", () => {
     expect(current()[key]).toBe(before);
   });
 
-  it("edits the fan level once Minimum Fan Level is on", async () => {
+  it("edits the fan level once Minimum fan level is on", async () => {
     const user = setup();
     expect(level()).toBeDisabled();
 
-    await user.click(box("Minimum Fan Level"));
+    await user.click(box("Minimum fan level"));
     expect(current().level.enabled).toBe(true);
     expect(level()).toBeEnabled();
 
@@ -103,7 +103,7 @@ describe("PermissionsSection", () => {
     await user.type(level(), "12");
     expect(current().level.value).toBe(12);
 
-    await user.click(box("Minimum Fan Level"));
+    await user.click(box("Minimum fan level"));
     expect(level()).toBeDisabled();
     expect(current().level).toEqual({ enabled: false, value: 12 });
   });
@@ -114,7 +114,7 @@ describe("PermissionsSection", () => {
     expect(level()).toHaveAttribute("tabindex", "-1");
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
 
-    await user.click(box("Minimum Fan Level"));
+    await user.click(box("Minimum fan level"));
 
     expect(screen.getByRole("spinbutton")).not.toHaveAttribute("aria-hidden");
     expect(level()).not.toHaveAttribute("tabindex");
@@ -125,11 +125,11 @@ describe("PermissionsSection", () => {
     expect(screen.queryByText("Whitelist")).not.toBeInTheDocument();
     expect(screen.queryAllByRole("textbox")).toHaveLength(0);
 
-    await user.click(box("Enable Whitelist / Blacklist"));
+    await user.click(box("Enable whitelist / blacklist"));
     expect(current().list.enabled).toBe(true);
     expect(screen.getAllByRole("textbox")).toHaveLength(2);
 
-    await user.click(box("Enable Whitelist / Blacklist"));
+    await user.click(box("Enable whitelist / blacklist"));
     expect(screen.queryAllByRole("textbox")).toHaveLength(0);
   });
 

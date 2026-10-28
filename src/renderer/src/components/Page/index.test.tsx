@@ -70,13 +70,13 @@ describe("Section", () => {
   it("puts the icon before the title", () => {
     render(
       <Section
-        title="Official Overlays"
+        title="Official overlays"
         icon={<button aria-label="Back">{"<"}</button>}
       />,
     );
 
     const heading = screen.getByRole("heading");
-    expect(heading).toHaveTextContent("<Official Overlays");
+    expect(heading).toHaveTextContent("<Official overlays");
     expect(heading.firstChild).toBe(
       screen.getByRole("button", { name: "Back" }),
     );

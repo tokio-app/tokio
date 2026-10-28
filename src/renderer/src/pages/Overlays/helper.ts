@@ -2,7 +2,7 @@ import { translate } from "@/common/i18n";
 import { APP_EVENTS, TokioPayload, TokioPreviewMessage } from "@/common/types";
 
 /**
- * The hint on Official Overlays while installed ones have updates, or
+ * The hint on Official overlays while installed ones have updates, or
  * undefined without any.
  */
 export function updatesHint(

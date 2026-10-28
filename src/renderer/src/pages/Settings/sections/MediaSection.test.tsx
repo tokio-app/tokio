@@ -9,7 +9,7 @@ import { MediaSection } from "./MediaSection";
 
 const party = mediaFile("Party");
 const clip = { name: "Clip", file: "clip.webm" };
-const failed = "Some media couldn't be uploaded or removed.";
+const failed = "Some media couldn't be uploaded or deleted.";
 
 const media = (...list: MediaFile[]) =>
   send(APP_EVENTS_RESPONSE.GET_MEDIA, { success: true, data: list });

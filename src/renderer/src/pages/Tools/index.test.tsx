@@ -149,8 +149,8 @@ describe("Tools", () => {
     );
     expect(screen.getByText(notice)).toBeInTheDocument();
     // Once, above the timer's and the test overlays' sections
-    expect(section("Countdown Timer").queryByText(notice)).toBeNull();
-    expect(section("Test Overlays").queryByText(notice)).toBeNull();
+    expect(section("Countdown timer").queryByText(notice)).toBeNull();
+    expect(section("Test overlays").queryByText(notice)).toBeNull();
 
     await send(
       APP_EVENTS_RESPONSE.GET_SETTINGS,
@@ -187,7 +187,7 @@ const running = (remaining: number) =>
 
 const titleInput = () =>
   within(
-    section("Timer Look").getByRole("group", { name: /optional/ }),
+    section("Timer look").getByRole("group", { name: /optional/ }),
   ).getByRole("textbox");
 const button = (name: string) => screen.getByRole("button", { name });
 const clock = () => screen.getByRole("timer");
@@ -347,20 +347,20 @@ describe("Tools' countdown timer", () => {
     expect(saves[0].settings.seconds.follow).toBe(31);
   });
 
-  it("puts Timer Look right after the countdown, where the preview shows", async () => {
+  it("puts Timer look right after the countdown, where the preview shows", async () => {
     renderWithProviders(<Tools />);
     await timer();
 
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
-    ).toEqual(["Countdown Timer", "Timer Look", "Time Added", "Test Overlays"]);
+    ).toEqual(["Countdown timer", "Timer look", "Time added", "Test overlays"]);
   });
 
   it("gives chat a keyword and a cooldown, and no boxes, joins or envelopes", async () => {
     vi.useFakeTimers();
     const { user } = renderWithProviders(<Tools />, fakeTimers());
     await timer();
-    const added = section("Time Added");
+    const added = section("Time added");
     for (const gone of [
       "Super Fan boxes",
       "Envelopes",
@@ -398,7 +398,7 @@ describe("Tools' countdown timer", () => {
         superfan: 0,
       };
     });
-    const look = section("Timer Look");
+    const look = section("Timer look");
     const names = () =>
       within(look.getByRole("list", { name: "Names on stream" }));
     expect(look.queryByRole("list", { name: "Names on stream" })).toBeNull();
@@ -437,7 +437,7 @@ describe("Tools' countdown timer", () => {
     await timer((t) => {
       t.settings.multiplier = 0;
     });
-    const look = section("Timer Look");
+    const look = section("Timer look");
 
     await user.click(
       look.getByRole("checkbox", { name: "Show the triggers, one at a time" }),
@@ -470,7 +470,7 @@ describe("Tools' countdown timer", () => {
     await timer((t) => {
       t.settings.multiplier = 2;
     });
-    const look = section("Timer Look");
+    const look = section("Timer look");
     expect(screen.getByText("×2")).toBeInTheDocument();
     await user.type(titleInput(), "Subathon");
     await user.type(

@@ -9,16 +9,16 @@ describe("Check", () => {
     const changes: boolean[] = [];
     render(
       <Check
-        label="Followers Only"
+        label="Followers only"
         checked={false}
         onChange={(e) => changes.push(e.target.checked)}
       />,
     );
 
-    await user.click(screen.getByText("Followers Only"));
+    await user.click(screen.getByText("Followers only"));
 
     expect(
-      screen.getByRole("checkbox", { name: "Followers Only" }),
+      screen.getByRole("checkbox", { name: "Followers only" }),
     ).not.toBeChecked();
     expect(changes).toEqual([true]);
   });

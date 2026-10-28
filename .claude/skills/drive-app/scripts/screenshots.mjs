@@ -179,9 +179,9 @@ export default async ({ app, page, home, push, toggle }) => {
   );
 
   // Overlays
-  await open("Overlays", "Overlay Gallery");
-  await page.getByRole("button", { name: "Official Overlays" }).click();
-  await page.getByRole("heading", { name: "Official Overlays" }).waitFor();
+  await open("Overlays", "Overlay gallery");
+  await page.getByRole("button", { name: "Official overlays" }).click();
+  await page.getByRole("heading", { name: "Official overlays" }).waitFor();
   for (const name of ["Gift Jar", "Top Likes"]) {
     const install = card(name).getByRole("button", { name: "Install" });
     await install.click();
@@ -190,7 +190,7 @@ export default async ({ app, page, home, push, toggle }) => {
   await page.waitForTimeout(3000);
   await crop("overlays-official", card("Like Fountain"));
   await page.getByTitle("Back to Overlays").click();
-  await page.getByRole("heading", { name: "Overlay Gallery" }).waitFor();
+  await page.getByRole("heading", { name: "Overlay gallery" }).waitFor();
   await page.waitForTimeout(8000);
   await shoot("overlays");
   await crop("overlays-gallery", [card("Gift Jar"), card("Top Likes")]);
@@ -233,7 +233,7 @@ export default async ({ app, page, home, push, toggle }) => {
     { name: "Shares", trigger: "Share", sound: "Applause", hz: 659 },
     {
       name: "Regulars",
-      trigger: "Member Join",
+      trigger: "Member join",
       sound: "Doorbell",
       hz: 784,
       user: "@regular.viewer",
@@ -343,7 +343,7 @@ export default async ({ app, page, home, push, toggle }) => {
   // Text-to-speech: pick a voice, then show the list around it
   await open("TTS", "Voice");
   const voice = page
-    .getByRole("group", { name: "Voice Selection" })
+    .getByRole("group", { name: "Voice selection" })
     .getByRole("button");
   await voice.click();
   await dialog.getByPlaceholder("Search voices...").fill("Jenny");
@@ -364,7 +364,7 @@ export default async ({ app, page, home, push, toggle }) => {
     ["gg", "good game"],
   ];
   for (const [word, sound] of replacements) {
-    await page.getByTitle("Add Replacement").click();
+    await page.getByTitle("Add replacement").click();
     await page
       .getByPlaceholder("Word to replace (e.g. 'brb')")
       .last()
@@ -376,7 +376,7 @@ export default async ({ app, page, home, push, toggle }) => {
   }
   await crop("tts-replacements", body("Replacements"));
   await section("Permissions")
-    .getByRole("checkbox", { name: "Enable Whitelist / Blacklist" })
+    .getByRole("checkbox", { name: "Enable whitelist / blacklist" })
     .check();
   await section("Permissions")
     .getByRole("group", { name: /^Blacklist/ })
@@ -530,13 +530,13 @@ export default async ({ app, page, home, push, toggle }) => {
   await crop("games-test", follow, { pad: 12 });
 
   // Countdown timer
-  await open("Tools", "Countdown Timer");
+  await open("Tools", "Countdown timer");
   await page
     .getByRole("group", { name: "Title (optional)" })
     .getByRole("textbox")
     .fill("Subathon");
   await page
-    .getByRole("heading", { name: "Countdown Timer" })
+    .getByRole("heading", { name: "Countdown timer" })
     .scrollIntoViewIfNeeded();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.getByRole("button", { name: "Add", exact: true }).click();
@@ -544,7 +544,7 @@ export default async ({ app, page, home, push, toggle }) => {
   await shoot("countdown-timer");
   await crop("timer-preview", page.getByRole("timer").locator(".."));
   // The controls, under the preview timer-preview shows
-  const timer = body("Countdown Timer");
+  const timer = body("Countdown timer");
   await crop(
     "timer-controls",
     [
@@ -553,31 +553,31 @@ export default async ({ app, page, home, push, toggle }) => {
     ],
     { pad: 16 },
   );
-  await crop("timer-time-added", body("Time Added"));
+  await crop("timer-time-added", body("Time added"));
   await toggle(
     page.getByRole("checkbox", { name: "Show the triggers, one at a time" }),
   );
-  await crop("timer-look", body("Timer Look"));
+  await crop("timer-look", body("Timer look"));
   await page.getByPlaceholder("Overlay name").fill("My overlay");
   await page.getByTitle("Create ID").click();
-  await crop("tools-test-overlays", section("Test Overlays"));
+  await crop("tools-test-overlays", section("Test overlays"));
 
   // Settings, with a made-up network address
-  await open("Settings", "Live Profiles");
-  await section("Overlay Server")
+  await open("Settings", "Live profiles");
+  await section("Overlay server")
     .getByText(/^\d+\.\d+\.\d+\.\d+$/)
     .evaluate((el) => (el.textContent = "192.168.1.20"));
   await crop("settings-tiktok-live", section("TikTok LIVE"), { width: 640 });
-  await crop("settings-overlay-server", section("Overlay Server"), {
+  await crop("settings-overlay-server", section("Overlay server"), {
     width: 640,
   });
   await crop("settings", [section("TikTok LIVE"), section("Tray")], {
     width: 640,
   });
-  await crop("settings-profiles", section("Live Profiles"));
+  await crop("settings-profiles", section("Live profiles"));
   await crop("settings-libraries", [
-    section("Sound Library"),
-    section("Media Library"),
+    section("Sound library"),
+    section("Media library"),
   ]);
   // An overlay of your own, the e2e fixture under the docs' example name
   const own = join(home, "likes-counter");
@@ -587,14 +587,14 @@ export default async ({ app, page, home, push, toggle }) => {
     "name: Likes Counter\nversion: 1.0.0\nconfig: false\n",
   );
   await pick(own);
-  await section("Overlay Library")
+  await section("Overlay library")
     .getByRole("button", { name: "Import" })
     .click();
-  await section("Overlay Library").getByText("Likes Counter").waitFor();
-  await crop("settings-overlay-library", section("Overlay Library"));
-  await page.getByTitle("Create New Profile").click();
+  await section("Overlay library").getByText("Likes Counter").waitFor();
+  await crop("settings-overlay-library", section("Overlay library"));
+  await page.getByTitle("Create a profile").click();
   await page.getByPlaceholder("e.g. Chill Stream").fill("Just Chatting");
-  await page.getByRole("button", { name: "Create Profile" }).click();
+  await page.getByRole("button", { name: "Create profile" }).click();
   await dialog.waitFor({ state: "detached" });
 
   // The title bar's menus, each with its button and little else. Closing
@@ -620,7 +620,7 @@ export default async ({ app, page, home, push, toggle }) => {
   for (const feature of ["TTS", "Alerts"]) {
     await toggle(page.getByRole("checkbox", { name: feature, exact: true }));
   }
-  await crop("home-features", section("Active Features"));
+  await crop("home-features", section("Active features"));
   await page.getByTitle("Feed settings").click();
   await crop("home-feed-settings", dialog);
   await dialog.getByRole("button", { name: "Cancel" }).click();

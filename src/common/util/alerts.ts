@@ -74,7 +74,7 @@ function messageValues(payload: TokioEventMap[AppEvents]) {
   if (typeof payload !== "object" || payload === null) return values;
 
   if (Array.isArray(payload)) {
-    // Music Change sends the whole queue
+    // Music change sends the whole queue
     values.set("song", payload.find((song) => song.playing)?.title ?? "");
     return values;
   }

@@ -320,7 +320,7 @@ describe("settings events", () => {
         notice({
           level: "success",
           code: FEEDBACK_CODES.PROFILE_CLONED,
-          message: 'Profile "Chill Stream" created as a copy.',
+          message: 'Profile "Chill Stream" cloned.',
         }),
       ]);
     });

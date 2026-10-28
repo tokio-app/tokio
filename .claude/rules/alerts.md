@@ -25,7 +25,7 @@ paths:
 - `AlertTriggerSchema` (`src/common/schemas/profile.ts`) derives the triggers from `TOKIO_EVENTS` (for a new event, see the `live-event` skill). `ROOM_USER` is excluded there and from the `AlertTrigger` type: it comes every few seconds and is meant for overlays.
 - Migration: `AlertItemsSchema`'s preprocess drops saved Room Users alerts, then names alerts saved without a name by their place.
 - `registerConnectorEvents` (`src/main/events/init.ts`) passes every trigger to `AlertsService.handle` while `activeFeatures.alerts` is on.
-- Music Change alerts come from `MusicService.onSongChange`: once each time a song starts, not for one that fails to start, is skipped while it loads, or was already playing when a request came. `MUSIC_CHANGE` also fires when the queue changes, and overlays get every one through `ServerService.initEvents`.
+- Music change alerts come from `MusicService.onSongChange`: once each time a song starts, not for one that fails to start, is skipped while it loads, or was already playing when a request came. `MUSIC_CHANGE` also fires when the queue changes, and overlays get every one through `ServerService.initEvents`.
 - Gift alerts fire once per combo, on `repeatEnd`, or with `trigger.every_gift` (**Every gift**) once per gift sent, at most `queue_length` times per event.
 - `GiftStreaks` (`src/main/helper/streaks.ts`, also used by `LiveService`, `GamesService` and the timer) counts what each gift event adds to its sender's streak, like the gift jar overlay's `Tally`. `AlertsService` runs it once per event, even with no alert on every gift, but only while alerts are on: alerts turned on mid-streak play the whole count so far.
 - Matching is `matchesTrigger` (`src/main/helper/triggers.ts`), shared with `GamesService` (see `.claude/rules/games.md`). Both callers get `added` and `total` from `streakOf` (same file), which counts the event in their `GiftStreaks` once and gives the streak's total as `{count}`. `AlertsService` keeps `enabled` and the sound, message or media check.
@@ -34,7 +34,7 @@ paths:
   - `min_coins`: the streak's worth when it ends (`gift.coins × total`), or each gift's `coins` with `every_gift`. Only for any gift: picked gifts are the alert's choice, so `matchesTrigger` ignores it then, and the editor and the summary leave it out.
   - `roles` (`VIEWER_ROLES`; `[]` is anyone): only Chat, Emote and Gift carry the viewer's roles (the connector maps `userIdentity` for chat and gifts), so `takesRoles` (`src/common/util/alerts.ts`), shared by the matcher, the editor and the summary, allows only them. Other triggers' saved roles are ignored.
 - The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: the loop skips it and `matchesTrigger` matches it on `CHAT`. TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`, and main pushes the list with `EMOTES`.
-- Chat alerts filter on `trigger.keyword` through `hasKeyword`, Member Join and Super Fan Join alerts on `trigger.user` through `isUser` (both `src/main/helper/chat.ts`). Keywords match whole words (`wholeWord`), except next to scripts written without spaces (Chinese, Japanese, Thai); an emoji between words counts as a space.
+- Chat alerts filter on `trigger.keyword` through `hasKeyword`, Member join and Super Fan join alerts on `trigger.user` through `isUser` (both `src/main/helper/chat.ts`). Keywords match whole words (`wholeWord`), except next to scripts written without spaces (Chinese, Japanese, Thai); an emoji between words counts as a space.
 
 ## Gifts
 
@@ -126,12 +126,12 @@ paths:
 - The `MediaPicker` only picks: it closes after a pick, and once a browsed file for its alert arrives.
 - The windows load thumbnails from `tokio-media:///<file>` (`getMediaPreviewURL`). Main registers `MEDIA_SCHEME` with `stream` for videos and serves only images and videos right in the media folder (`mediaFile`, `src/main/helper/preview.ts`). The CSP allows it in `img-src` and `media-src`.
 - Chromium and `tokio-media:`:
-  - Every video player loads its own URL, `useVideoURL(file)` (`components/MediaPicker`, a `?player=` query from `useId`, which `mediaFile` ignores). Chromium fails every player that loads one `tokio-media:` URL at once (error 4), and the URL stays failed. A row's thumbnail and the editor's preview, or a Media Library row and its **Full size**, load together.
+  - Every video player loads its own URL, `useVideoURL(file)` (`components/MediaPicker`, a `?player=` query from `useId`, which `mediaFile` ignores). Chromium fails every player that loads one `tokio-media:` URL at once (error 4), and the URL stays failed. A row's thumbnail and the editor's preview, or a Media library row and its **Full size**, load together.
   - Videos come in the parts their players ask for (`videoResponse`, `src/main/helper/preview.ts`, 206 with `Content-Range`). Chromium seeks only in media served in parts, and net.fetch of a `file:` URL answers a Range with the whole file, so the editor's cut couldn't seek, nor a thumbnail's `#t=0.1` show its frame. Images and sounds still go through net.fetch.
 - The Media tab (`MediaPreview`):
   - A video whose length the preview read gets a **Cut** (`CutTrack` without `peaks`) and no Duration to type: an effect sets the duration to the part that plays (`cutPart` of the length read on `loadedmetadata`), to the hundredth, from 1 to `MEDIA_MAX_DURATION`. The tab sets it, so a file browsed while it isn't shown keeps the old duration until it is.
   - A video whose length is unknown (some recordings don't say it, or the preview fails) can't be cut and keeps a typed Duration.
   - `MEDIA_DURATION` and `MEDIA_MAX_DURATION` are next to the schema, in `src/common/schemas/profile.ts`.
 - A space between a picker tile's name and its length keeps the button's name "Clip 12s".
-- **Settings → Media Library** (`MediaSection`): **Upload** sends `UPLOAD_MEDIA`, which shares the `upload` loop with `UPLOAD_SOUNDS`.
+- **Settings → Media library** (`MediaSection`): **Upload** sends `UPLOAD_MEDIA`, which shares the `upload` loop with `UPLOAD_SOUNDS`.
 - `useAlertTest` queues a test of media alone without asking main. A test with a sound or message passes the request's `media` to `queueAlert` on the reply. Stopping a test leaves its media on the overlay until it ends.

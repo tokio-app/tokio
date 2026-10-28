@@ -10,7 +10,7 @@ import { SoundsSection } from "./SoundsSection";
 const airhorn = alertSound("Airhorn");
 const bell = alertSound("Bell");
 const data = new Uint8Array([1, 2, 3]);
-const failed = "Some sounds couldn't be uploaded or removed.";
+const failed = "Some sounds couldn't be uploaded or deleted.";
 
 const sounds = (...list: AlertSound[]) =>
   send(APP_EVENTS_RESPONSE.GET_SOUNDS, { success: true, data: list });

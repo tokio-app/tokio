@@ -25,7 +25,7 @@ Read the diff before writing anything: `git diff` for uncommitted work, `git dif
 ## Writing
 
 - Check each fact against the code. Don't describe behavior you haven't confirmed.
-- Match each doc's voice. The README and the website: plain English, second person, short sentences, UI names in bold (**Settings → Overlay Server**). `AGENTS.md`, rules and skills: terse, with names and paths in backticks.
+- Match each doc's voice. The README and the website: plain English, second person, short sentences, UI names in bold (**Settings → Overlay server**). `AGENTS.md`, rules and skills: terse, with names and paths in backticks.
 - Run Prettier on what you touched, in each repo.
 - Each repo gets its own commit, `docs: <what changed>` (`docs: describe the activity feed's settings`), and only when the user asks.
 

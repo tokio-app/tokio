@@ -332,7 +332,7 @@ describe("SoundPicker", () => {
 
       expect(
         screen.getByText(
-          "No sounds yet. Download one from MyInstants, upload them in Settings, or browse for a file.",
+          "No sounds yet. Download one from MyInstants, upload some in Settings, or browse for a file.",
         ),
       ).toBeInTheDocument();
 

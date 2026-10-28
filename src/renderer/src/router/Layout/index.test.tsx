@@ -53,11 +53,11 @@ describe("Layout", () => {
     );
   });
 
-  it("keeps Overlays marked on Official Overlays", async () => {
+  it("keeps Overlays marked on Official overlays", async () => {
     await renderApp("/overlays/official");
 
     expect(
-      screen.getByRole("heading", { name: "Official Overlays" }),
+      screen.getByRole("heading", { name: "Official overlays" }),
     ).toBeInTheDocument();
     expect(sidebar().getByRole("link", { name: "Overlays" })).toHaveAttribute(
       "aria-current",
@@ -86,7 +86,7 @@ describe("Layout", () => {
     await user.click(sidebar().getByRole("link", { name: "Tools" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Test Overlays" }),
+      await screen.findByRole("heading", { name: "Test overlays" }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/tools");
   });
@@ -94,7 +94,7 @@ describe("Layout", () => {
   it("saves a change still waiting when leaving a page", async () => {
     const { user, router } = await renderApp("/tts");
     await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
-    await user.click(screen.getByRole("button", { name: "Add Replacement" }));
+    await user.click(screen.getByRole("button", { name: "Add replacement" }));
 
     await user.click(sidebar().getByRole("link", { name: "Home" }));
 
@@ -126,7 +126,7 @@ describe("Layout", () => {
     });
     await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
     await send(APP_EVENTS_RESPONSE.GET_SETTINGS, profiles);
-    await user.click(screen.getByRole("button", { name: "Add Replacement" }));
+    await user.click(screen.getByRole("button", { name: "Add replacement" }));
 
     await user.click(titleBar().getByText("Default"));
     await user.click(titleBar().getByText("Horror"));

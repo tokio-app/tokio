@@ -12,7 +12,7 @@ Profile sections save through `useEditableSettings`, single fields through `useA
 
 - Each page is a folder `src/renderer/src/pages/<Page>/` with `index.tsx`, `<page>.module.css`, an optional `helper.ts` and `sections/*Section.tsx`. The router uses hash history. The `new-page` skill has the steps.
 - The router's `defaultErrorComponent` keeps a page's render error inside the page, with the title bar and sidebar.
-- A page opened from another page instead of the sidebar (Official Overlays) gets a path under its parent's (`/overlays/official`), which keeps the parent's sidebar item active, and a back button in its header (`Section`'s `icon`).
+- A page opened from another page instead of the sidebar (Official overlays) gets a path under its parent's (`/overlays/official`), which keeps the parent's sidebar item active, and a back button in its header (`Section`'s `icon`).
 - Build pages from `components/Page` (`Page`, `Section`, `Field`, `FormGrid`, `EmptyState`); a page module only holds page-specific layout.
 - Components are folders with `index.tsx` and `<name>.module.css`, re-exported from `components/index.tsx`. Use the primitives in `components/Elements` before creating new ones; they take colors from the tokens, not props.
 - `Modal` is the only modal shell. A search in a header is a `SearchToggle`. A value to copy is a `CopyField` with a `title` saying what it copies, or a `CopyButton` among a row's actions.

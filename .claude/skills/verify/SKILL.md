@@ -41,7 +41,7 @@ wsl.exe -e bash -lc 'cd ~/tokio-wsl && export PATH=$HOME/.local/node24/bin:$PATH
 - "Vitest failed to find the runner" in every suite means the shell's working directory has a lowercase drive letter (`c:\`). Run from `C:\…`; it isn't a real failure. In PowerShell, run `Set-Location 'C:\Users\…\tokio'` first: a Git Bash `cd /c/…` can keep the lowercase drive.
 - While `.claude/worktrees/` holds agents' worktrees, `yarn lint` lints them too. Run `npx oxlint --type-aware --deny-warnings --ignore-pattern ".claude/worktrees/**"` instead.
 - An `it.fails` test that passes now means its bug is fixed: turn it into `it`.
-- The renderer tests that render the whole app (App, Home, Overlays, Official Overlays, Layout) slow down when other test runs share the machine, which is why the renderer's timeout is 15s. If one still times out, rerun it alone before calling it a failure.
+- The renderer tests that render the whole app (App, Home, Overlays, Official overlays, Layout) slow down when other test runs share the machine, which is why the renderer's timeout is 15s. If one still times out, rerun it alone before calling it a failure.
 
 ## Report
 

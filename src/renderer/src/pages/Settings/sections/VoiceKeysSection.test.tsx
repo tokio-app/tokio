@@ -33,18 +33,18 @@ describe("VoiceKeysSection", () => {
   it("stays hidden until an engine takes a key", async () => {
     renderWithProviders(<VoiceKeysSection />);
     expect(
-      screen.queryByRole("heading", { name: "Voice Engines" }),
+      screen.queryByRole("heading", { name: "Voice engines" }),
     ).not.toBeInTheDocument();
 
     await send(APP_EVENTS_RESPONSE.GET_VOICE_KEYS, failure());
     await keys();
     expect(
-      screen.queryByRole("heading", { name: "Voice Engines" }),
+      screen.queryByRole("heading", { name: "Voice engines" }),
     ).not.toBeInTheDocument();
 
     await keys(azure());
     expect(
-      screen.getByRole("heading", { name: "Voice Engines" }),
+      screen.getByRole("heading", { name: "Voice engines" }),
     ).toBeInTheDocument();
   });
 

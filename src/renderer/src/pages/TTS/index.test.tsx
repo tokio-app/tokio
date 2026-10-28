@@ -32,14 +32,14 @@ const loaded = profileReply((p) => {
 const field = (label: string | RegExp) =>
   within(screen.getByText(label).closest("div")!);
 
-const testButton = () => screen.getByRole("button", { name: "Test Voice" });
+const testButton = () => screen.getByRole("button", { name: "Test voice" });
 const testMessage = () =>
   screen.getByPlaceholderText("Type a message to test how the TTS sounds...");
 const customTrigger = () => screen.getByPlaceholderText("!tts");
-const template = () => field("Message Template").getByRole("textbox");
+const template = () => field("Message template").getByRole("textbox");
 const mode = (label: RegExp) => screen.getByRole("radio", { name: label });
 const removeEmojis = () =>
-  screen.getByRole("checkbox", { name: "Remove Emojis" });
+  screen.getByRole("checkbox", { name: "Remove emojis" });
 
 async function setup(reply = loaded) {
   const app = renderWithProviders(<TTS />, {
@@ -83,7 +83,7 @@ describe("TTS", () => {
     expect(field("Pitch (0.8)").getByRole("slider")).toHaveValue("0.8");
     expect(field("Volume (70%)").getByRole("slider")).toHaveValue("70");
 
-    expect(mode(/Custom Command/)).toBeChecked();
+    expect(mode(/Custom command/)).toBeChecked();
     expect(customTrigger()).toHaveValue("!say");
     expect(customTrigger()).toBeEnabled();
     expect(template()).toHaveValue("{username} says {comment}");
@@ -96,7 +96,7 @@ describe("TTS", () => {
 
     expect(field("Cooldown").getByRole("spinbutton")).toHaveValue(5);
     expect(field("Max queue length").getByRole("spinbutton")).toHaveValue(20);
-    expect(field("Max Comment Length").getByRole("spinbutton")).toHaveValue(
+    expect(field("Max message length").getByRole("spinbutton")).toHaveValue(
       150,
     );
     expect(screen.getByPlaceholderText("word1, word2, word3...")).toHaveValue(
@@ -307,7 +307,7 @@ describe("TTS", () => {
   it("sets the trigger of each format mode", async () => {
     const { user } = await setup();
 
-    await user.click(mode(/Read All Comments/));
+    await user.click(mode(/Read all messages/));
     expect((await saved()).format.trigger).toEqual({
       mode: "any",
       value: "",
@@ -315,19 +315,19 @@ describe("TTS", () => {
     expect(customTrigger()).toBeDisabled();
     expect(customTrigger()).toHaveValue("");
 
-    await user.click(mode(/Dot Prefix/));
+    await user.click(mode(/Dot prefix/));
     expect((await saved()).format.trigger).toEqual({
       mode: "dot",
       value: ".",
     });
 
-    await user.click(mode(/Slash Prefix/));
+    await user.click(mode(/Slash prefix/));
     expect((await saved()).format.trigger).toEqual({
       mode: "slash",
       value: "/",
     });
 
-    await user.click(mode(/Custom Command/));
+    await user.click(mode(/Custom command/));
     expect(customTrigger()).toBeEnabled();
     expect(customTrigger()).toHaveValue("!tts");
     expect((await saved()).format.trigger).toEqual({
@@ -366,13 +366,11 @@ describe("TTS", () => {
   it("adds, edits and removes replacements", async () => {
     const { user } = await setup(profileReply());
     const replacements = section("Replacements");
-    expect(
-      replacements.getByText("No custom replacements added."),
-    ).toBeInTheDocument();
+    expect(replacements.getByText("No replacements yet.")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Add Replacement" }));
+    await user.click(screen.getByRole("button", { name: "Add replacement" }));
     expect(
-      replacements.queryByText("No custom replacements added."),
+      replacements.queryByText("No replacements yet."),
     ).not.toBeInTheDocument();
     expect(replacements.getByPlaceholderText(/Word to replace/)).toHaveValue(
       "",
@@ -388,9 +386,7 @@ describe("TTS", () => {
     ]);
 
     await user.click(replacements.getByRole("button", { name: "Remove" }));
-    expect(
-      replacements.getByText("No custom replacements added."),
-    ).toBeInTheDocument();
+    expect(replacements.getByText("No replacements yet.")).toBeInTheDocument();
     expect((await saved()).replacements).toEqual([]);
   });
 
@@ -422,7 +418,7 @@ describe("TTS", () => {
     fireEvent.change(field("Max queue length").getByRole("spinbutton"), {
       target: { value: "3" },
     });
-    fireEvent.change(field("Max Comment Length").getByRole("spinbutton"), {
+    fireEvent.change(field("Max message length").getByRole("spinbutton"), {
       target: { value: "99" },
     });
     const banned = screen.getByPlaceholderText("word1, word2, word3...");
@@ -441,7 +437,7 @@ describe("TTS", () => {
     await setup();
 
     for (const value of ["0", "2.5"]) {
-      fireEvent.change(field("Max Comment Length").getByRole("spinbutton"), {
+      fireEvent.change(field("Max message length").getByRole("spinbutton"), {
         target: { value },
       });
     }
@@ -453,22 +449,22 @@ describe("TTS", () => {
   it("changes who may use TTS", async () => {
     const { user } = await setup();
     const permissions = section("Permissions");
-    // Hidden from screen readers until Minimum Fan Level is on
+    // Hidden from screen readers until Minimum fan level is on
     const level = permissions.getByRole("spinbutton", { hidden: true });
     expect(level).toBeDisabled();
 
-    await user.click(screen.getByRole("checkbox", { name: "Allow Everyone" }));
-    await user.click(screen.getByRole("checkbox", { name: "Followers Only" }));
-    await user.click(screen.getByRole("checkbox", { name: "Moderators Only" }));
+    await user.click(screen.getByRole("checkbox", { name: "Allow everyone" }));
+    await user.click(screen.getByRole("checkbox", { name: "Followers only" }));
+    await user.click(screen.getByRole("checkbox", { name: "Moderators only" }));
     await user.click(
-      screen.getByRole("checkbox", { name: "Minimum Fan Level" }),
+      screen.getByRole("checkbox", { name: "Minimum fan level" }),
     );
     expect(level).toBeEnabled();
     fireEvent.change(level, { target: { value: "10" } });
 
     expect(permissions.queryByText("Whitelist")).not.toBeInTheDocument();
     await user.click(
-      screen.getByRole("checkbox", { name: "Enable Whitelist / Blacklist" }),
+      screen.getByRole("checkbox", { name: "Enable whitelist / blacklist" }),
     );
     await user.type(field("Whitelist").getByRole("textbox"), "alice, bob");
     await user.type(field("Blacklist").getByRole("textbox"), "troll");

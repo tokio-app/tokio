@@ -126,7 +126,7 @@ describe("tools events", () => {
         expect.objectContaining({
           level: "success",
           code: FEEDBACK_CODES.TEST_OVERLAY_REMOVED,
-          message: "Test overlay removed.",
+          message: "Test overlay deleted.",
         }),
       ]);
     });
@@ -166,7 +166,7 @@ describe("tools events", () => {
 
       const failure = {
         code: FEEDBACK_CODES.TEST_OVERLAY_FAILED,
-        message: "Unable to remove the test overlay.",
+        message: "Unable to delete the test overlay.",
       };
       expect(h.replies(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS)).toEqual([
         { success: false, error: failure },

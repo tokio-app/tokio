@@ -378,7 +378,7 @@ describe("Alerts", () => {
   it("plays alerts simultaneously and limits their queue", async () => {
     const { user } = await load([]);
     const simultaneous = screen.getByRole("checkbox", {
-      name: "Play alerts simultaneously",
+      name: "Play alerts at the same time",
     });
     const queueLength = screen.getByRole("spinbutton", {
       name: "Max queue length",

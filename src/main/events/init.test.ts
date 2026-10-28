@@ -432,7 +432,7 @@ describe("init events", () => {
       const s = await live();
       const { data } = generateTikTokEventSample(trigger);
 
-      // Music Change comes once per song, through onSongChange
+      // Music change comes once per song, through onSongChange
       const songStarts = {
         emit: (_event: TOKIO_EVENTS, songs: MusicInfo[]) =>
           s.musicService.onSongChange.mock.calls[0][0](songs),
@@ -452,7 +452,7 @@ describe("init events", () => {
       });
     });
 
-    it("takes Music Change from the song starts and the rest from the connector", async () => {
+    it("takes Music change from the song starts and the rest from the connector", async () => {
       const s = await live();
       const subscribed = (source: Setup["conn"]) =>
         source.on.mock.calls.map(([event]) => event);
@@ -704,7 +704,7 @@ describe("init events", () => {
       const s = await live({ alerts: false });
       const { data } = generateTikTokEventSample(trigger);
 
-      // Music Change comes once per song, through the alerts' onSongChange
+      // Music change comes once per song, through the alerts' onSongChange
       const songStarts = {
         emit: (_event: TOKIO_EVENTS, songs: MusicInfo[]) =>
           s.musicService.onSongChange.mock.calls[0][0](songs),
@@ -2153,7 +2153,7 @@ describe("init events", () => {
       await load(s);
 
       const message =
-        "Tokio couldn't listen for Minecraft, port 37892 may be in use.";
+        "Tokio couldn't listen for Minecraft. Port 37892 may be in use.";
       expect(noticesFor(s, FEEDBACK_CODES.GAME_LISTEN_FAILED)).toEqual([
         expect.objectContaining({ level: "warning", source: "games", message }),
       ]);
@@ -2174,7 +2174,7 @@ describe("init events", () => {
       await load(s);
 
       const message =
-        "The overlay server couldn't start, port 37891 may be in use. It has been turned off.";
+        "The overlay server couldn't start, so Tokio turned it off. Port 37891 may be in use.";
       expect(noticesFor(s, FEEDBACK_CODES.SERVER_START_FAILED)).toEqual([
         expect.objectContaining({
           level: "warning",
@@ -2294,7 +2294,7 @@ describe("init events", () => {
             source: "system",
             code: FEEDBACK_CODES.UPDATE_DOWNLOAD_FAILED,
             message:
-              "Unable to download the Tokio update. It will be tried again later.",
+              "Unable to download the Tokio update. Tokio will try again later.",
           }),
         ]);
       });

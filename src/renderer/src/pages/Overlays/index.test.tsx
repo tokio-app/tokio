@@ -442,7 +442,7 @@ describe("Overlays", () => {
     ]);
   });
 
-  it("marks Official Overlays while an installed one has an update", async () => {
+  it("marks Official overlays while an installed one has an update", async () => {
     await renderApp("/overlays");
     await overlays(GIFT_JAR, TOP_LIKES);
 
@@ -452,12 +452,12 @@ describe("Overlays", () => {
     );
 
     const button = page().getByRole("button", {
-      name: "Official Overlays, 1 update available",
+      name: "Official overlays, 1 update available",
     });
     expect(button).toHaveAttribute("title", "1 update available");
   });
 
-  it("counts every update on Official Overlays", async () => {
+  it("counts every update on Official overlays", async () => {
     await renderApp("/overlays");
     await overlays(GIFT_JAR, TOP_LIKES);
 
@@ -468,12 +468,12 @@ describe("Overlays", () => {
 
     expect(
       page().getByRole("button", {
-        name: "Official Overlays, 2 updates available",
+        name: "Official overlays, 2 updates available",
       }),
     ).toBeInTheDocument();
   });
 
-  it("doesn't mark Official Overlays for up to date or imported overlays", async () => {
+  it("doesn't mark Official overlays for up to date or imported overlays", async () => {
     await renderApp("/overlays");
     await overlays(GIFT_JAR, overlayApp("clock", { external: true }));
 
@@ -483,32 +483,32 @@ describe("Overlays", () => {
       catalogEntry("top-likes", { version: "3.0.0" }),
     );
 
-    const button = page().getByRole("button", { name: "Official Overlays" });
+    const button = page().getByRole("button", { name: "Official overlays" });
     expect(button).not.toHaveAttribute("title");
     expect(button).not.toHaveAttribute("aria-label");
   });
 
-  it("doesn't mark Official Overlays without the catalog", async () => {
+  it("doesn't mark Official overlays without the catalog", async () => {
     await renderApp("/overlays");
     await overlays(GIFT_JAR);
 
     await send(APP_EVENTS_RESPONSE.GET_OVERLAY_CATALOG, failure("Offline."));
 
     expect(
-      page().getByRole("button", { name: "Official Overlays" }),
+      page().getByRole("button", { name: "Official overlays" }),
     ).not.toHaveAttribute("title");
   });
 
-  it("opens Official Overlays", async () => {
+  it("opens Official overlays", async () => {
     const { user, router } = await renderApp("/overlays");
 
-    await user.click(page().getByRole("button", { name: "Official Overlays" }));
+    await user.click(page().getByRole("button", { name: "Official overlays" }));
 
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/overlays/official"),
     );
     expect(
-      page().getByRole("heading", { name: "Official Overlays" }),
+      page().getByRole("heading", { name: "Official overlays" }),
     ).toBeInTheDocument();
   });
 });

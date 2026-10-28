@@ -120,14 +120,14 @@ test("sets the production CSP on the page loaded from disk", async () => {
 
 test("opens every page from the sidebar", async () => {
   const pages = [
-    ["Overlays", "Overlay Gallery"],
+    ["Overlays", "Overlay gallery"],
     ["TTS", "Voice"],
     ["Alerts", "Alerts"],
     ["Music", "Controls"],
     ["Games", "Actions"],
-    ["Tools", "Test Overlays"],
+    ["Tools", "Test overlays"],
     ["About", "Online services"],
-    ["Settings", "Live Profiles"],
+    ["Settings", "Live profiles"],
     ["Home", "Dashboard"],
   ];
   const sidebar = page.getByRole("navigation");
@@ -145,9 +145,9 @@ test("creates a profile and saves it", async () => {
     .getByRole("navigation")
     .getByRole("link", { name: "Settings" })
     .click();
-  await page.getByTitle("Create New Profile").click();
+  await page.getByTitle("Create a profile").click();
   await page.getByPlaceholder("e.g. Chill Stream").fill("E2E Stream");
-  await page.getByRole("button", { name: "Create Profile" }).click();
+  await page.getByRole("button", { name: "Create profile" }).click();
 
   await expect(page.getByText('Profile "E2E Stream" created.')).toBeVisible();
   const names = await Promise.all(
@@ -174,7 +174,7 @@ test("imports an overlay and runs its preview from disk", async () => {
     .click();
   await page
     .locator("section", {
-      has: page.getByRole("heading", { name: "Overlay Library" }),
+      has: page.getByRole("heading", { name: "Overlay library" }),
     })
     .getByRole("button", { name: "Import" })
     .click();

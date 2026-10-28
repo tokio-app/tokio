@@ -47,7 +47,7 @@ argument-hint: "[what to check]"
 
 - `RECIPES.md` has the checks that need more than clicks: fake live events in main, counting what main sends, test media, minimized windows and overlay pages.
 - Query by role and visible text, as the tests do (`.claude/rules/testing.md`).
-- To watch an overlay page (an alert's `/alerts/<id>/`, the timer's), turn the server on first: `toggle` **Enable Server** in Settings, then click the confirm dialog's **Enable Server**. Open the page in `app.evaluate` with `new BrowserWindow({ webPreferences: { partition: "obs", backgroundThrottling: false } })`: the app's own session cancels WebSockets, so the page couldn't connect there. Then find it with `windowWith("alerts/")`.
+- To watch an overlay page (an alert's `/alerts/<id>/`, the timer's), turn the server on first: `toggle` **Enable server** in Settings, then click the confirm dialog's **Enable server**. Open the page in `app.evaluate` with `new BrowserWindow({ webPreferences: { partition: "obs", backgroundThrottling: false } })`: the app's own session cancels WebSockets, so the page couldn't connect there. Then find it with `windowWith("alerts/")`.
 - A real connector check needs a username that's LIVE right now: ask the user for one.
 
 ## Done when

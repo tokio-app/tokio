@@ -56,7 +56,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 
 ## Tools page
 
-- Timer Look comes right after the preview, colors first, so its changes show while they're made.
+- Timer look comes right after the preview, colors first, so its changes show while they're made.
 - One `useAutosave(timer.settings)` feeds the three timer sections, nested fields through immer's `produce`. Its delay keys on `prevSaved`, so main's pushes (a new but equal `settings` every 250 ms on a busy LIVE) don't keep restarting it.
 - The controls call `flushSettings()` before `TIMER_CONTROL` or `ADJUST_TIMER`, so a setting still waiting to save, like the starting time, reaches main first.
 - The preview counts down from the last push's `at`, ticking only while running. While idle, it shows the starting time as typed.

@@ -280,7 +280,7 @@ describe("OfficialOverlays", () => {
       expect(router.state.location.pathname).toBe("/overlays"),
     );
     expect(
-      page().getByRole("heading", { name: "Overlay Gallery" }),
+      page().getByRole("heading", { name: "Overlay gallery" }),
     ).toBeInTheDocument();
   });
 });

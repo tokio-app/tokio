@@ -84,8 +84,8 @@ Playwright turns on Chromium's focus emulation for every page it drives, so `doc
 
 ## Overlays
 
-- **Import a local build:** stub `dialog.showOpenDialog` to return `../tokio-overlays/overlays/<id>/dist` (build it there first), then click the Overlay Library's `button[title="Import"]`: Settings has two Import buttons.
-- **Watch what main sends overlays:** create an ID in Tools → Test Overlays (placeholder "Overlay name", **Create ID**), then connect Node's global `WebSocket` to `ws://localhost:37891?id=<id>`. Messages are `{ type, data }`, `type` a `TOKIO_EVENTS` name. Each press of Test plays the next moment of that ID's test LIVE.
+- **Import a local build:** stub `dialog.showOpenDialog` to return `../tokio-overlays/overlays/<id>/dist` (build it there first), then click the Overlay library's `button[title="Import"]`: Settings has two Import buttons.
+- **Watch what main sends overlays:** create an ID in Tools → Test overlays (placeholder "Overlay name", **Create ID**), then connect Node's global `WebSocket` to `ws://localhost:37891?id=<id>`. Messages are `{ type, data }`, `type` a `TOKIO_EVENTS` name. Each press of Test plays the next moment of that ID's test LIVE.
 - **The games overlay:** seed a `--home` with the profile's `games.actions`, the store's `minecraftPictures` and the server on. Then open `http://localhost:37891/games/minecraft/` in a separate browser, through a page that iframes it over a game-like backdrop, to see the pictures float over a game.
 
 ## Gotchas
@@ -94,4 +94,4 @@ Playwright turns on Chromium's focus emulation for every page it drives, so `doc
 - A shell started by a VS Code extension (Claude Code's, for one) inherits `ELECTRON_RUN_AS_NODE=1`, which makes Electron run as plain Node ("Process failed to launch!"). drive.mjs drops it. Unset it for any other launch, such as `yarn dev` or `npx electron .` (`env -u ELECTRON_RUN_AS_NODE …`).
 - Google refuses sign-ins in a browser Playwright drives. For YouTube Music, sign in once in a normal launch (`TOKIO_HOME=<dir>`, `ELECTRON_RUN_AS_NODE` unset), then pass `--home <dir>` to drive.mjs.
 - Closing YouTube Music's page sends Playwright a `beforeunload` dialog: accept it with a `dialog` handler on every window, or Playwright throws.
-- A Music Change alert plays only when a song starts, while overlays get `tokio:event:music:change` on every queue change.
+- A Music change alert plays only when a song starts, while overlays get `tokio:event:music:change` on every queue change.
