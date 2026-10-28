@@ -26,8 +26,9 @@ import {
   VariableList,
 } from "@/components";
 import { Updater, useIpcListener } from "@/hooks";
-import { useOptions } from "@/ui/i18n";
-import { Ref, useRef, useState } from "react";
+import { MessageKey } from "@/common/i18n";
+import { rich, useLanguage, useOptions, useT } from "@/ui/i18n";
+import { ReactNode, Ref, useRef, useState } from "react";
 import {
   FiCheck,
   FiChevronRight,
@@ -72,13 +73,14 @@ export function ActionsSection({
   emotes,
   update,
 }: Props) {
+  const t = useT();
   return (
     <Section
-      title="Actions"
-      description="What viewers set off in your world."
+      title={t("games.actions.title")}
+      description={t("games.actions.description")}
       actions={
         <Btn
-          title="Add action"
+          title={t("games.actions.add")}
           onClick={() =>
             update((s) => {
               s.actions.push(createAction(edition));
@@ -90,9 +92,7 @@ export function ActionsSection({
       }
     >
       {actions.length === 0 ? (
-        <EmptyState>
-          No actions yet. Use the add button to create one.
-        </EmptyState>
+        <EmptyState>{t("games.actions.empty")}</EmptyState>
       ) : (
         <ul className={styles.actions}>
           {actions.map((action) => (
@@ -144,6 +144,18 @@ type TestResult = { results: CommandResult[]; error?: string };
 // A test sends up to 100 commands; the last ones are enough to read
 const RESULTS_SHOWN = 25;
 
+// A sentence with fields inside, its words in spans between them
+const sentence = (message: string, fields: Record<string, ReactNode>) =>
+  rich(message, fields).map((part, i) =>
+    typeof part === "string"
+      ? part.trim() && (
+          <span key={i} className={styles.word}>
+            {part.trim()}
+          </span>
+        )
+      : part,
+  );
+
 function ActionItem({
   action,
   gifts,
@@ -152,7 +164,10 @@ function ActionItem({
   onDuplicate,
   onRemove,
 }: ItemProps) {
+  const t = useT();
+  const language = useLanguage();
   const triggers = useOptions(GAME_TRIGGERS);
+  const kinds = useOptions(STEP_KINDS);
   const { trigger, steps } = action;
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
@@ -183,20 +198,20 @@ function ActionItem({
     <li className={styles.action}>
       <div className={styles.action_header}>
         <Toggle
-          aria-label="Enabled"
+          aria-label={t("common.enabled")}
           checked={action.enabled}
           onChange={(e) => onChange({ ...action, enabled: e.target.checked })}
         />
         <Select
           className={styles.edition_select}
-          aria-label="Edition"
+          aria-label={t("games.actions.edition")}
           options={EDITIONS}
           value={action.edition}
           onChange={(edition) => onChange(withEdition(action, edition))}
         />
         <Select
           className={styles.trigger}
-          aria-label="Trigger"
+          aria-label={t("games.actions.trigger")}
           options={triggers}
           value={trigger.type}
           onChange={(type) =>
@@ -207,16 +222,20 @@ function ActionItem({
           {trigger.type === TOKIO_EVENTS.LIKE ? (
             // Counted as the countdown timer counts them, from all viewers
             <span className={styles.likes}>
-              <span className={styles.word}>every</span>
-              <NumberInput
-                className={styles.amount}
-                aria-label="Likes per run"
-                integer
-                min={1}
-                value={action.likes_every}
-                onChange={(likes_every) => onChange({ ...action, likes_every })}
-              />
-              <span className={styles.word}>likes</span>
+              {sentence(t("games.actions.likesEvery"), {
+                likes: (
+                  <NumberInput
+                    className={styles.amount}
+                    aria-label={t("games.actions.likesPerRun")}
+                    integer
+                    min={1}
+                    value={action.likes_every}
+                    onChange={(likes_every) =>
+                      onChange({ ...action, likes_every })
+                    }
+                  />
+                ),
+              })}
             </span>
           ) : (
             <TriggerFilter
@@ -230,8 +249,8 @@ function ActionItem({
         <div className={styles.action_buttons}>
           <Btn
             variant="icon"
-            title="Test"
-            aria-label="Test"
+            title={t("common.test")}
+            aria-label={t("common.test")}
             loading={testing}
             disabled={steps.length === 0}
             onClick={() => {
@@ -246,23 +265,31 @@ function ActionItem({
           >
             <FiPlay size={20} />
           </Btn>
-          <Btn variant="icon" title="Duplicate action" onClick={onDuplicate}>
+          <Btn
+            variant="icon"
+            title={t("games.actions.duplicate")}
+            onClick={onDuplicate}
+          >
             <FiCopy size={20} />
           </Btn>
-          <Btn variant="icon" title="Remove action" onClick={onRemove}>
+          <Btn
+            variant="icon"
+            title={t("games.actions.remove")}
+            onClick={onRemove}
+          >
             <FiTrash2 size={20} />
           </Btn>
         </div>
       </div>
 
       {steps.length > 0 && (
-        <ol className={styles.steps} aria-label="Steps">
+        <ol className={styles.steps} aria-label={t("games.actions.steps")}>
           {steps.map((step, index) => (
             <li key={index} className={styles.step}>
               <Select
                 className={styles.kind}
-                aria-label="Step"
-                options={STEP_KINDS}
+                aria-label={t("games.actions.step")}
+                options={kinds}
                 value={step.type}
                 onChange={(kind) => {
                   if (kind !== step.type) setStep(index, createStep(kind));
@@ -278,7 +305,7 @@ function ActionItem({
               <Btn
                 variant="icon"
                 className={styles.remove_step}
-                title="Remove step"
+                title={t("games.actions.removeStep")}
                 onClick={() => setSteps(steps.filter((_, i) => i !== index))}
               >
                 <FiX size={18} />
@@ -290,7 +317,7 @@ function ActionItem({
 
       <div className={styles.action_footer}>
         <Btn onClick={() => setSteps([...steps, createStep("spawn")])}>
-          <FiPlus size={16} /> Add step
+          <FiPlus size={16} /> {t("games.actions.addStep")}
         </Btn>
         {target !== -1 && (
           <VariableList
@@ -298,7 +325,7 @@ function ActionItem({
             inputRef={textRef}
             value={stepText(steps[target]) ?? ""}
             onChange={(text) => setStep(target, withText(steps[target], text))}
-            empty="This event has no variables."
+            empty={t("games.actions.noVariables")}
           />
         )}
       </div>
@@ -313,11 +340,11 @@ function ActionItem({
             <details open className={styles.result_log}>
               <summary className={styles.result_summary}>
                 <FiChevronRight size={16} />
-                {testSummary(result.results)}
+                {testSummary(result.results, language)}
               </summary>
               {result.results.length > RESULTS_SHOWN && (
                 <p className={styles.result_note}>
-                  Showing the last {RESULTS_SHOWN}.
+                  {t("games.test.lastShown", { shown: String(RESULTS_SHOWN) })}
                 </p>
               )}
               <ul className={styles.result_list}>
@@ -327,9 +354,17 @@ function ActionItem({
                     className={r.ok ? styles.result : styles.result_failed}
                   >
                     {r.ok ? (
-                      <FiCheck role="img" aria-label="Ran" size={16} />
+                      <FiCheck
+                        role="img"
+                        aria-label={t("games.test.okLabel")}
+                        size={16}
+                      />
                     ) : (
-                      <FiX role="img" aria-label="Failed" size={16} />
+                      <FiX
+                        role="img"
+                        aria-label={t("games.test.failedLabel")}
+                        size={16}
+                      />
                     )}
                     <code className={styles.result_command}>{r.command}</code>
                     <span className={styles.result_message}>{r.message}</span>
@@ -346,6 +381,14 @@ function ActionItem({
 
 // The hazards that last the duration set
 const EFFECT_HAZARDS: string[] = ["freeze", "lights_out", "dizzy"];
+
+// A TNT's fuse. Bedrock's TNT has only two fuses, said after it.
+function fuseText(edition: MinecraftEdition, fuse: number): MessageKey {
+  if (edition !== "bedrock") return "games.step.fuse";
+  return fuse <= 2
+    ? "games.step.fuseBedrockShort"
+    : "games.step.fuseBedrockLong";
+}
 
 type FieldsProps = {
   step: GameStep;
@@ -365,6 +408,7 @@ function StepFields({
   onFocusText,
   onChange,
 }: FieldsProps) {
+  const t = useT();
   const weathers = useOptions(WEATHERS);
   const times = useOptions(TIMES);
   const hazards = useOptions(HAZARDS);
@@ -376,7 +420,7 @@ function StepFields({
           <Select
             searchable
             className={styles.thing}
-            aria-label="Mob"
+            aria-label={t("games.step.mob")}
             options={MOBS[edition]}
             value={step.mob}
             onChange={(mob) => onChange({ ...step, mob })}
@@ -385,12 +429,12 @@ function StepFields({
             value={step.amount}
             onChange={(amount) => onChange({ ...step, amount })}
           />
-          <span className={styles.word}>named</span>
+          <span className={styles.word}>{t("games.step.named")}</span>
           <Input
             ref={textRef}
             className={styles.name}
-            aria-label="Name"
-            placeholder="No name"
+            aria-label={t("games.step.name")}
+            placeholder={t("games.overlay.noName")}
             value={step.name}
             onFocus={onFocusText}
             onChange={(e) => onChange({ ...step, name: e.target.value })}
@@ -403,7 +447,7 @@ function StepFields({
           <Select
             searchable
             className={styles.thing}
-            aria-label="Item"
+            aria-label={t("games.step.item")}
             options={ITEMS[edition]}
             value={step.item}
             onChange={(item) => onChange({ ...step, item })}
@@ -418,7 +462,7 @@ function StepFields({
       return (
         <Select
           className={styles.thing}
-          aria-label="Weather"
+          aria-label={t("games.steps.weather")}
           options={weathers}
           value={step.weather}
           onChange={(weather) => onChange({ ...step, weather })}
@@ -428,7 +472,7 @@ function StepFields({
       return (
         <Select
           className={styles.thing}
-          aria-label="Time of day"
+          aria-label={t("games.steps.time")}
           options={times}
           value={step.time}
           onChange={(time) => onChange({ ...step, time })}
@@ -439,7 +483,7 @@ function StepFields({
         <>
           <Select
             className={styles.thing}
-            aria-label="Hazard"
+            aria-label={t("games.steps.hazard")}
             options={hazards}
             value={step.hazard}
             onChange={(hazard) => onChange({ ...step, hazard })}
@@ -450,81 +494,73 @@ function StepFields({
               onChange={(amount) => onChange({ ...step, amount })}
             />
           )}
-          {(step.hazard === "tnt" || step.hazard === "tnt_ring") && (
-            <>
-              <span className={styles.word}>fuse</span>
-              <NumberInput
-                className={styles.amount}
-                aria-label="Fuse in seconds"
-                min={0}
-                max={30}
-                step={0.5}
-                value={step.fuse}
-                onChange={(fuse) => onChange({ ...step, fuse })}
-              />
-              <span className={styles.word}>
-                s{/* Bedrock's TNT has only these two fuses */}
-                {edition === "bedrock" &&
-                  (step.fuse <= 2
-                    ? " (0.5–2 s in Bedrock)"
-                    : " (4 s in Bedrock)")}
-              </span>
-            </>
-          )}
-          {(step.hazard === "launch" || step.hazard === "launch_water") && (
-            <>
-              <NumberInput
-                className={styles.amount}
-                aria-label="Height in blocks"
-                integer
-                min={5}
-                max={300}
-                value={step.height}
-                onChange={(height) => onChange({ ...step, height })}
-              />
-              <span className={styles.word}>blocks up in</span>
-              <NumberInput
-                className={styles.amount}
-                aria-label="Seconds"
-                integer
-                min={1}
-                max={10}
-                value={step.seconds}
-                onChange={(seconds) => onChange({ ...step, seconds })}
-              />
-              <span className={styles.word}>s</span>
-            </>
-          )}
-          {EFFECT_HAZARDS.includes(step.hazard) && (
-            <>
-              <span className={styles.word}>for</span>
-              <NumberInput
-                className={styles.amount}
-                aria-label="Duration in seconds"
-                integer
-                min={1}
-                max={120}
-                value={step.duration}
-                onChange={(duration) => onChange({ ...step, duration })}
-              />
-              <span className={styles.word}>s</span>
-            </>
-          )}
-          {step.hazard === "random_teleport" && (
-            <>
-              <span className={styles.word}>within</span>
-              <NumberInput
-                className={styles.amount}
-                aria-label="Distance in blocks"
-                integer
-                min={10}
-                max={10_000}
-                value={step.distance}
-                onChange={(distance) => onChange({ ...step, distance })}
-              />
-              <span className={styles.word}>blocks</span>
-            </>
-          )}
+          {(step.hazard === "tnt" || step.hazard === "tnt_ring") &&
+            sentence(t(fuseText(edition, step.fuse)), {
+              fuse: (
+                <NumberInput
+                  className={styles.amount}
+                  aria-label={t("games.step.fuseLabel")}
+                  min={0}
+                  max={30}
+                  step={0.5}
+                  value={step.fuse}
+                  onChange={(fuse) => onChange({ ...step, fuse })}
+                />
+              ),
+            })}
+          {(step.hazard === "launch" || step.hazard === "launch_water") &&
+            sentence(t("games.step.launch"), {
+              height: (
+                <NumberInput
+                  className={styles.amount}
+                  aria-label={t("games.step.heightLabel")}
+                  integer
+                  min={5}
+                  max={300}
+                  value={step.height}
+                  onChange={(height) => onChange({ ...step, height })}
+                />
+              ),
+              seconds: (
+                <NumberInput
+                  className={styles.amount}
+                  aria-label={t("games.step.secondsLabel")}
+                  integer
+                  min={1}
+                  max={10}
+                  value={step.seconds}
+                  onChange={(seconds) => onChange({ ...step, seconds })}
+                />
+              ),
+            })}
+          {EFFECT_HAZARDS.includes(step.hazard) &&
+            sentence(t("games.step.duration"), {
+              duration: (
+                <NumberInput
+                  className={styles.amount}
+                  aria-label={t("games.step.durationLabel")}
+                  integer
+                  min={1}
+                  max={120}
+                  value={step.duration}
+                  onChange={(duration) => onChange({ ...step, duration })}
+                />
+              ),
+            })}
+          {step.hazard === "random_teleport" &&
+            sentence(t("games.step.teleport"), {
+              distance: (
+                <NumberInput
+                  className={styles.amount}
+                  aria-label={t("games.step.distanceLabel")}
+                  integer
+                  min={10}
+                  max={10_000}
+                  value={step.distance}
+                  onChange={(distance) => onChange({ ...step, distance })}
+                />
+              ),
+            })}
         </>
       );
     case "help":
@@ -532,27 +568,27 @@ function StepFields({
         <>
           <Select
             className={styles.thing}
-            aria-label="Help"
+            aria-label={t("games.steps.help")}
             options={helps}
             value={step.help}
             onChange={(help) => onChange({ ...step, help })}
           />
           {/* Armor and the heal are given at once; the rest are effects */}
-          {step.help !== "netherite_armor" && step.help !== "heal" && (
-            <>
-              <span className={styles.word}>for</span>
-              <NumberInput
-                className={styles.amount}
-                aria-label="Duration in seconds"
-                integer
-                min={1}
-                max={600}
-                value={step.duration}
-                onChange={(duration) => onChange({ ...step, duration })}
-              />
-              <span className={styles.word}>s</span>
-            </>
-          )}
+          {step.help !== "netherite_armor" &&
+            step.help !== "heal" &&
+            sentence(t("games.step.duration"), {
+              duration: (
+                <NumberInput
+                  className={styles.amount}
+                  aria-label={t("games.step.durationLabel")}
+                  integer
+                  min={1}
+                  max={600}
+                  value={step.duration}
+                  onChange={(duration) => onChange({ ...step, duration })}
+                />
+              ),
+            })}
         </>
       );
     default:
@@ -560,8 +596,8 @@ function StepFields({
         <Input
           ref={textRef}
           className={styles.command}
-          aria-label="Command"
-          placeholder="say Thanks {username}!"
+          aria-label={t("games.steps.command")}
+          placeholder={t("games.step.commandPlaceholder")}
           spellCheck={false}
           value={step.command}
           onFocus={onFocusText}
@@ -578,12 +614,13 @@ function Amount({
   value: number;
   onChange: (value: number) => void;
 }) {
+  const t = useT();
   return (
     <>
       <span className={styles.word}>×</span>
       <NumberInput
         className={styles.amount}
-        aria-label="Amount"
+        aria-label={t("games.step.amount")}
         integer
         min={1}
         max={GAME_STEP_MAX_AMOUNT}

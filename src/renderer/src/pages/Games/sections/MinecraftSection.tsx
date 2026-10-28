@@ -1,3 +1,4 @@
+import { MessageKey } from "@/common/i18n";
 import { MinecraftEdition } from "@/common/schemas";
 import {
   APP_EVENTS,
@@ -10,34 +11,36 @@ import { CopyField, Section, Toggle } from "@/components";
 import { cx } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import homeStyles from "@/pages/Home/home.module.css";
+import { rich, useLanguage, useT } from "@/ui/i18n";
 import { ReactNode, useState } from "react";
 import styles from "../games.module.css";
 import { connectCommand, EDITIONS, statusText } from "../helper";
 
 // Each edition's way in, side by side until a game connects
-const SETUP: Record<MinecraftEdition, ReactNode[]> = {
+const SETUP: Record<MinecraftEdition, MessageKey[]> = {
   bedrock: [
-    "In Settings → General → Network settings, turn on Enable WebSockets.",
-    "Open a world with cheats on.",
-    "Paste the command in the chat.",
+    "games.minecraft.bedrock.websockets",
+    "games.minecraft.bedrock.world",
+    "games.minecraft.paste",
   ],
   java: [
-    <>
-      Install Fabric Loader and Fabric API for Minecraft 26.3, then the Tokio
-      mod.{" "}
-      <a
-        className={styles.link}
-        href={MINECRAFT_MOD_DOCS_URL}
-        target="_blank"
-        rel="noreferrer"
-      >
-        See how
-      </a>
-    </>,
-    "Open a world. Cheats can stay off.",
-    "Paste the command in the chat.",
+    "games.minecraft.java.install",
+    "games.minecraft.java.world",
+    "games.minecraft.paste",
   ],
 };
+
+// Java's install step links to the mod's docs
+const docsLink = (text: ReactNode) => (
+  <a
+    className={styles.link}
+    href={MINECRAFT_MOD_DOCS_URL}
+    target="_blank"
+    rel="noreferrer"
+  >
+    {text}
+  </a>
+);
 
 type Props = {
   games: GamesData;
@@ -45,6 +48,8 @@ type Props = {
 };
 
 export function MinecraftSection({ games, onToggle }: Props) {
+  const t = useT();
+  const language = useLanguage();
   const { settings } = games;
   const status = games.status.minecraft;
   const { state } = status;
@@ -59,14 +64,11 @@ export function MinecraftSection({ games, onToggle }: Props) {
   });
 
   return (
-    <Section
-      title="Minecraft"
-      description="Bedrock and Java connect from their chat."
-    >
+    <Section title="Minecraft" description={t("games.minecraft.description")}>
       <div className={styles.panel}>
         <div className={styles.status_row}>
           <Toggle
-            aria-label="Listen for Minecraft"
+            aria-label={t("games.minecraft.listen")}
             checked={settings.minecraft.enabled}
             onChange={(e) => onToggle(e.target.checked)}
           />
@@ -84,7 +86,7 @@ export function MinecraftSection({ games, onToggle }: Props) {
                 state === "error" && styles.dot_error,
               )}
             />
-            {statusText(status)}
+            {statusText(status, language)}
           </p>
         </div>
 
@@ -98,7 +100,7 @@ export function MinecraftSection({ games, onToggle }: Props) {
                 <ol className={styles.setup_steps}>
                   {SETUP[edition].map((step, i) => (
                     <li key={i}>
-                      <span>{step}</span>
+                      <span>{rich(t(step), { link: docsLink })}</span>
                     </li>
                   ))}
                 </ol>
@@ -109,7 +111,9 @@ export function MinecraftSection({ games, onToggle }: Props) {
                         key={host}
                         code
                         value={connectCommand(host, edition)}
-                        title={`Copy the ${label} command`}
+                        title={t("games.minecraft.copyCommand", {
+                          edition: label,
+                        })}
                         display={
                           <>
                             {connectCommand(host, edition)}

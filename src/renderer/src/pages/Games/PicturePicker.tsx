@@ -7,6 +7,7 @@ import styles from "@/components/MediaPicker/mediapicker.module.css";
 import list from "@/components/SoundPicker/soundpicker.module.css";
 import { cx } from "@/helper/cx";
 import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import { FiCheck, FiTrash2 } from "react-icons/fi";
 
@@ -33,6 +34,7 @@ export function PicturePicker({
   onSelect,
   onClose,
 }: Props) {
+  const t = useT();
   const [library, setLibrary] = useState<MediaFile[]>([]);
   const [search, setSearch] = useState("");
   const [failed, setFailed] = useState(false);
@@ -62,13 +64,13 @@ export function PicturePicker({
   return (
     <>
       <Modal
-        title="Select picture"
-        description="The item or mob this action makes, shown on the overlay."
+        title={t("games.pictures.title")}
+        description={t("games.pictures.description")}
         maxWidth="840px"
         onClose={onClose}
         actions={
           <SearchToggle
-            placeholder="Search your pictures..."
+            placeholder={t("games.pictures.search")}
             value={search}
             onChange={setSearch}
           />
@@ -76,7 +78,7 @@ export function PicturePicker({
         footer={
           <>
             <Btn disabled={!picture} onClick={() => onSelect(null)}>
-              Clear
+              {t("common.clear")}
             </Btn>
             <Btn
               onClick={() => {
@@ -87,10 +89,10 @@ export function PicturePicker({
                 });
               }}
             >
-              Browse files...
+              {t("games.pictures.browse")}
             </Btn>
             <Btn variant="accent" onClick={onClose}>
-              Done
+              {t("games.pictures.done")}
             </Btn>
           </>
         }
@@ -122,7 +124,7 @@ export function PicturePicker({
                 </button>
                 <Btn
                   variant="icon"
-                  title="Delete"
+                  title={t("common.delete")}
                   className={styles.delete}
                   onClick={() => setRemoving(item)}
                 >
@@ -135,15 +137,13 @@ export function PicturePicker({
           {pictures.length === 0 && (
             <p className={cx(list.status, styles.empty)}>
               {library.length === 0
-                ? "No pictures yet. Browse for the items and mobs your actions make."
-                : "No pictures match."}
+                ? t("games.pictures.empty")
+                : t("games.pictures.noMatch")}
             </p>
           )}
         </div>
 
-        {failed && (
-          <p className={list.error}>Couldn't save or load the pictures.</p>
-        )}
+        {failed && <p className={list.error}>{t("games.pictures.failed")}</p>}
       </Modal>
 
       {removing && (

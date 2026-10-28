@@ -6,6 +6,7 @@ import { GameOverlayRow } from "@/common/types";
 import { EmptyState } from "@/components";
 import { cx } from "@/helper/cx";
 import { fontFamily } from "@/helper/format";
+import { useT } from "@/ui/i18n";
 import {
   CSSProperties,
   useEffect,
@@ -81,10 +82,9 @@ type Props = {
  * step.
  */
 export function OverlayPreview({ look, rows, run }: Props) {
+  const t = useT();
   if (rows.length === 0) {
-    return (
-      <EmptyState>Pick a picture or name an action to show it here.</EmptyState>
-    );
+    return <EmptyState>{t("games.preview.empty")}</EmptyState>;
   }
   return (
     <div className={styles.preview}>
@@ -93,8 +93,8 @@ export function OverlayPreview({ look, rows, run }: Props) {
           key={i}
           label={
             look.columns > 1
-              ? `Column ${i + 1} of the overlay preview`
-              : "Overlay preview"
+              ? t("games.preview.column", { column: String(i + 1) })
+              : t("games.preview.label")
           }
           look={look}
           rows={rows.filter((row) => row.column === i + 1)}

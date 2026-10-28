@@ -143,18 +143,20 @@ describe("Games helper", () => {
   });
 
   it("says each connection status", () => {
-    expect(statusText({ state: "off" })).toBe("Off");
-    expect(statusText({ state: "waiting" })).toBe("Waiting for Minecraft");
-    expect(statusText({ state: "connected" })).toBe("Connected");
-    expect(statusText({ state: "connected", edition: "bedrock" })).toBe(
+    expect(statusText({ state: "off" }, "en")).toBe("Off");
+    expect(statusText({ state: "waiting" }, "en")).toBe(
+      "Waiting for Minecraft",
+    );
+    expect(statusText({ state: "connected" }, "en")).toBe("Connected");
+    expect(statusText({ state: "connected", edition: "bedrock" }, "en")).toBe(
       "Connected to Bedrock Edition",
     );
-    expect(statusText({ state: "connected", edition: "java" })).toBe(
+    expect(statusText({ state: "connected", edition: "java" }, "en")).toBe(
       "Connected to Java Edition",
     );
-    expect(statusText({ state: "error", error: "Port 37892 is in use." })).toBe(
-      "Port 37892 is in use.",
-    );
+    expect(
+      statusText({ state: "error", error: "Port 37892 is in use." }, "en"),
+    ).toBe("Port 37892 is in use.");
   });
 
   it("writes each edition's connect command", () => {
@@ -169,11 +171,11 @@ describe("Games helper", () => {
   it("sums up a test by the commands that failed", () => {
     const result = (ok: boolean) => ({ command: "say hi", ok, message: "" });
 
-    expect(testSummary([result(true)])).toBe("1 command ran");
-    expect(testSummary([result(true), result(false)])).toBe(
+    expect(testSummary([result(true)], "en")).toBe("1 command ran");
+    expect(testSummary([result(true), result(false)], "en")).toBe(
       "1 of 2 commands failed",
     );
-    expect(testSummary([result(false), result(false)])).toBe(
+    expect(testSummary([result(false), result(false)], "en")).toBe(
       "2 commands failed",
     );
   });
