@@ -76,7 +76,7 @@ export const SERVICES: { name: string; note: string }[] = [
   },
   {
     name: "TikTok TTS proxy",
-    note: "The TikTok voices when no session ID is set (tiktok-tts.weilnet.workers.dev). It gets the text of each message to read and its voice. It's run by a third party, not by TikTok or Tokio.",
+    note: "The TikTok voices when no session ID is set (ottsy.weilbyte.dev). It gets the text of each message to read and its voice. It's run by a third party, not by TikTok or Tokio.",
   },
   {
     name: "Euler Stream",
