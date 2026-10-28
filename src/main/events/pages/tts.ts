@@ -21,7 +21,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.TTS_VOICES_FAILED,
-      message: "Unable to load the voices.",
+      message: "main.failure.getVoices",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_VOICES),
   },
@@ -43,7 +43,7 @@ events.push(
     source: "system",
     failure: {
       code: FEEDBACK_CODES.PROFILE_SAVE_FAILED,
-      message: "Unable to save the TTS settings.",
+      message: "main.failure.updateTtsSettings",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS),
   },
@@ -74,7 +74,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.TTS_GENERATION_FAILED,
-      message: "Unable to generate the test audio. Try another voice.",
+      message: "main.failure.getTtsTest",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_TTS_TEST, {

@@ -29,7 +29,7 @@ events.push(
     source: "system",
     failure: {
       code: FEEDBACK_CODES.PROFILE_SAVE_FAILED,
-      message: "Unable to save the music settings.",
+      message: "main.failure.updateMusicSettings",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.UPDATE_MUSIC_SETTINGS),
   },
@@ -88,7 +88,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.MUSIC_CONNECT_FAILED,
-      message: "Unable to connect the music provider.",
+      message: "main.failure.connectMusic",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.MUSIC_CONNECTED),
   },
@@ -118,7 +118,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.MUSIC_DISCONNECT_FAILED,
-      message: "Unable to disconnect the music provider.",
+      message: "main.failure.disconnectMusic",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.MUSIC_CONNECTED),
   },

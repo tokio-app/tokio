@@ -34,7 +34,7 @@ events.push(
     source: "system",
     failure: {
       code: FEEDBACK_CODES.PROFILE_SAVE_FAILED,
-      message: "Unable to save the alerts.",
+      message: "main.failure.updateAlertsSettings",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.UPDATE_ALERTS_SETTINGS),
   },
@@ -61,7 +61,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_SEARCH_FAILED,
-      message: "Unable to reach MyInstants. Try again in a few minutes.",
+      message: "main.failure.searchSounds",
     },
     onError: (e, error, { query, page }) =>
       e.reply(APP_EVENTS_RESPONSE.SEARCH_SOUNDS, {
@@ -119,7 +119,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_DOWNLOAD_FAILED,
-      message: "Unable to download the sound. Sounds can be up to 8 MB.",
+      message: "main.failure.downloadSound",
     },
     onError: replySoundFailure,
   },
@@ -142,8 +142,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-      message:
-        "Unable to use the sound. Pick an mp3, wav or ogg file up to 8 MB.",
+      message: "main.failure.importSound",
     },
     onError: replySoundFailure,
   },
@@ -187,8 +186,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
-      message:
-        "Unable to use the file. Pick a png, jpg, gif, webp, mp4 or webm file up to 50 MB.",
+      message: "main.failure.importMedia",
     },
     onError: (e, error, { id, request }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
@@ -265,7 +263,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SOUND_READ_FAILED,
-      message: "Unable to play the sound.",
+      message: "main.failure.testAlert",
     },
     onError: (e, error, { id, request, volume }) =>
       e.reply(APP_EVENTS_RESPONSE.TEST_ALERT, {
@@ -294,7 +292,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_READ_FAILED,
-      message: "Unable to read the sound.",
+      message: "main.failure.getSoundData",
     },
     onError: (e, error, { file }) =>
       e.reply(APP_EVENTS_RESPONSE.SOUND_DATA, { success: false, file, error }),
@@ -312,7 +310,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-      message: "Unable to load the gifts saved from your LIVEs.",
+      message: "main.failure.getCustomGifts",
     },
     onError: (e) => e.reply(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, { data: [] }),
   },
@@ -329,7 +327,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SOUNDS_LOAD_FAILED,
-      message: "Unable to load the sound library.",
+      message: "main.failure.getSounds",
     },
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.GET_SOUNDS, {
@@ -415,7 +413,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-      message: "Unable to upload the sounds.",
+      message: "main.failure.uploadSounds",
     },
     onError: (e, error, _, { storeManagerService }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_SOUNDS, {
@@ -474,7 +472,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_REMOVE_FAILED,
-      message: "Unable to remove the sound.",
+      message: "main.failure.removeSound",
     },
     onError: (e, error, _, { storeManagerService }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_SOUNDS, {
@@ -531,7 +529,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
-      message: "Unable to upload the files.",
+      message: "main.failure.uploadMedia",
     },
     onError: (e, error, _, { storeManagerService }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
@@ -553,7 +551,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.MEDIA_LOAD_FAILED,
-      message: "Unable to load the media library.",
+      message: "main.failure.getMedia",
     },
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
@@ -596,7 +594,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.MEDIA_REMOVE_FAILED,
-      message: "Unable to remove the media.",
+      message: "main.failure.removeMedia",
     },
     onError: (e, error, _, { storeManagerService }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {

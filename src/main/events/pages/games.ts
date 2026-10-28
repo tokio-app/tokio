@@ -48,7 +48,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SETTINGS_LOAD_FAILED,
-      message: "Unable to load the games.",
+      message: "main.failure.getGames",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GAMES),
   },
@@ -71,7 +71,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-      message: "Unable to change the Minecraft connection.",
+      message: "main.failure.setGamesSettings",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GAMES),
   },
@@ -92,7 +92,7 @@ events.push(
     source: "system",
     failure: {
       code: FEEDBACK_CODES.PROFILE_SAVE_FAILED,
-      message: "Unable to save the game actions.",
+      message: "main.failure.updateGamesSettings",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.UPDATE_GAMES_SETTINGS),
   },
@@ -121,7 +121,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.GAME_TEST_FAILED,
-      message: "Unable to test the action.",
+      message: "main.failure.testGameAction",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, {
@@ -153,7 +153,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.GAME_PICTURES_LOAD_FAILED,
-      message: "Unable to load the Minecraft pictures.",
+      message: "main.failure.getMinecraftPictures",
     },
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES, {
@@ -240,8 +240,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.GAME_PICTURE_IMPORT_FAILED,
-      message:
-        "Unable to use the file. Pick a png, jpg, gif or webp file up to 50 MB.",
+      message: "main.failure.importMinecraftPicture",
     },
     onError: (e, error, { id, request }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
@@ -292,7 +291,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.GAME_PICTURE_REMOVE_FAILED,
-      message: "Unable to remove the picture.",
+      message: "main.failure.removeMinecraftPicture",
     },
     onError: (e, error, _, { storeManagerService }) =>
       e.reply(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES, {

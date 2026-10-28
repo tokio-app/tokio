@@ -35,7 +35,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.UPDATE_CHECK_FAILED,
-      message: "Unable to check for updates.",
+      message: "main.failure.checkUpdates",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.CHECK_UPDATES),
   },
@@ -57,7 +57,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.UPDATE_INSTALL_FAILED,
-      message: "Unable to install the update.",
+      message: "main.failure.installUpdate",
     },
   },
 );

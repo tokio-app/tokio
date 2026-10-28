@@ -6,13 +6,15 @@ import {
   FeedbackSource,
 } from "@/common/types";
 import { formatError } from "@/common/util";
+import { t } from "@/helper/i18n";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
 
-export const UNKNOWN_ERROR: AppError = {
+// Made when it's used, in the language shown then
+export const unknownError = (): AppError => ({
   code: FEEDBACK_CODES.UNKNOWN,
-  message: "Something went wrong.",
-};
+  message: t("main.unknownError"),
+});
 
 // The same warning or error is sent at most once in this window.
 export const DEDUPE_MS = 5000;
@@ -62,11 +64,9 @@ export class AppFailure extends Error {
 
 // A store write that failed. JSONManagerService logged why.
 export const saveFailure = () =>
-  new AppFailure(
-    FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-    "Tokio couldn't save the change. Check the logs folder for details.",
-    { logged: true },
-  );
+  new AppFailure(FEEDBACK_CODES.SETTINGS_SAVE_FAILED, t("main.saveFailed"), {
+    logged: true,
+  });
 
 /**
  * A failure a service already logged with its details, such as the error of
@@ -82,7 +82,7 @@ export class LoggedError extends Error {
 
 export function toAppError(
   error: unknown,
-  fallback: AppError = UNKNOWN_ERROR,
+  fallback: AppError = unknownError(),
 ): AppError {
   if (error instanceof AppFailure) {
     return { code: error.code, message: error.message };

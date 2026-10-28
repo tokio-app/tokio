@@ -53,8 +53,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAY_IMPORT_FAILED,
-      message:
-        'Unable to import the overlay. Check that the folder has an info.yaml and an index.html with a <script id="tokio-setup"> block.',
+      message: "main.failure.importOverlay",
     },
     onError: replyOverlays,
   },
@@ -80,7 +79,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAY_REMOVE_FAILED,
-      message: "Unable to remove the overlay.",
+      message: "main.failure.removeOverlay",
     },
     onError: replyOverlays,
   },
@@ -99,8 +98,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAY_CATALOG_FAILED,
-      message:
-        "Unable to load the official overlays. Check your internet connection.",
+      message: "main.failure.getOverlayCatalog",
     },
     // The page shows it, with a button to try again.
     notify: false,
@@ -149,7 +147,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAY_INSTALL_FAILED,
-      message: "Unable to install the overlay.",
+      message: "main.failure.installOverlay",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.INSTALL_OVERLAY, {
@@ -171,7 +169,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAYS_LOAD_FAILED,
-      message: "Unable to load the overlays.",
+      message: "main.failure.getOverlays",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_OVERLAYS),
   },
@@ -191,7 +189,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAY_CONFIG_FAILED,
-      message: "Unable to load the overlay's settings.",
+      message: "main.failure.getOverlayConfig",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG, {
@@ -212,7 +210,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-      message: "Unable to load the gifts.",
+      message: "main.failure.getGifts",
     },
     onError: (e) => e.reply(APP_EVENTS_RESPONSE.GET_GIFTS, { data: [] }),
   },
@@ -240,7 +238,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAY_SAVE_FAILED,
-      message: "Unable to save the overlay's settings.",
+      message: "main.failure.saveOverlayConfig",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG, {
@@ -259,7 +257,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAY_SEND_FAILED,
-      message: "Unable to send the data to the overlay.",
+      message: "main.failure.sendOverlayData",
     },
   },
 );
@@ -275,7 +273,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.TEST_OVERLAY_FAILED,
-      message: "Unable to test the overlay.",
+      message: "main.failure.testOverlay",
     },
     onError: (e, _, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.TEST_OVERLAY, { payloads: [], id }),

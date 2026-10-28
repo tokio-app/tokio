@@ -604,7 +604,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.PROFILE_LOAD_FAILED,
-      message: "Unable to load the profile.",
+      message: "main.failure.getProfile",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_PROFILE),
   },
@@ -811,7 +811,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.APP_LOAD_FAILED,
-      message: "Tokio couldn't start. Check the logs folder for details.",
+      message: "app.startFailed",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.LOAD_APP),
   },

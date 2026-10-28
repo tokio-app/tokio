@@ -7,7 +7,7 @@ import {
   DEDUPE_MS,
   Notifier,
   toAppError,
-  UNKNOWN_ERROR,
+  unknownError,
 } from "./feedback";
 
 const fallback = {
@@ -32,7 +32,7 @@ describe("toAppError", () => {
     expect(toAppError(new Error("EACCES: /secret/path"), fallback)).toEqual(
       fallback,
     );
-    expect(toAppError("boom")).toEqual(UNKNOWN_ERROR);
+    expect(toAppError("boom")).toEqual(unknownError());
   });
 });
 

@@ -61,7 +61,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SETTINGS_LOAD_FAILED,
-      message: "Unable to load the settings.",
+      message: "main.failure.getSettings",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_SETTINGS),
   },
@@ -132,7 +132,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.PROFILE_CREATE_FAILED,
-      message: "Unable to create the profile.",
+      message: "main.failure.createProfile",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.CREATE_PROFILE),
   },
@@ -157,7 +157,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.PROFILE_CLONE_FAILED,
-      message: "Unable to clone the profile.",
+      message: "main.failure.cloneProfile",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.CLONE_PROFILE),
   },
@@ -210,7 +210,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.PROFILE_LOAD_FAILED,
-      message: "Unable to switch the profile.",
+      message: "main.failure.setProfile",
     },
   },
 );
@@ -248,7 +248,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.PROFILE_EXPORT_FAILED,
-      message: "Unable to export the profile.",
+      message: "main.failure.exportEntity",
     },
     onError: (e, error, { type }) =>
       e.reply(APP_EVENTS_RESPONSE.EXPORT_ENTITY, {
@@ -299,7 +299,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.PROFILE_IMPORT_FAILED,
-      message: "Unable to import the profile. Check that it's a Tokio profile.",
+      message: "main.failure.importEntity",
     },
     onError: (e, error, { type }) =>
       e.reply(APP_EVENTS_RESPONSE.IMPORT_ENTITY, {
@@ -326,7 +326,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.PROVIDER_UPDATE_FAILED,
-      message: "Unable to change the provider.",
+      message: "main.failure.setProvider",
     },
     onError: (e, error, { type }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_PROVIDER, {
@@ -359,7 +359,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SETTINGS_LOAD_FAILED,
-      message: "Unable to load the voice keys.",
+      message: "main.failure.getVoiceKeys",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_VOICE_KEYS),
   },
@@ -386,7 +386,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.PROVIDER_UPDATE_FAILED,
-      message: "Unable to save the key.",
+      message: "main.failure.setVoiceKey",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.SET_VOICE_KEY),
   },
@@ -432,7 +432,7 @@ events.push(
     source: "server",
     failure: {
       code: FEEDBACK_CODES.SERVER_START_FAILED,
-      message: "Unable to change the overlay server.",
+      message: "main.failure.setServer",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.SET_SERVER),
   },
@@ -465,7 +465,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-      message: "Unable to save the update setting.",
+      message: "main.failure.setAutoUpdates",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.SET_AUTO_UPDATES),
   },
@@ -498,7 +498,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-      message: "Unable to save the tray setting.",
+      message: "main.failure.setTray",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.SET_TRAY),
   },
@@ -525,7 +525,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-      message: "Unable to save the language setting.",
+      message: "main.failure.setLanguage",
     },
   },
 );
@@ -550,7 +550,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.FQDN_INSTALL_FAILED,
-      message: "Unable to set up the overlay address.",
+      message: "main.failure.reqFqdn",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.REQ_FQDN),
   },

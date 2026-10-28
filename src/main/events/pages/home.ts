@@ -102,7 +102,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.CONNECT_FAILED,
-      message: "Unable to connect to the LIVE.",
+      message: "main.failure.connect",
     },
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
@@ -127,7 +127,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.DISCONNECT_FAILED,
-      message: "Unable to disconnect from the LIVE.",
+      message: "main.failure.disconnect",
     },
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
@@ -192,7 +192,7 @@ events.push(
     source: "system",
     failure: {
       code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-      message: "Unable to save the activity feed.",
+      message: "main.failure.setActivityFeed",
     },
   },
 );
@@ -223,7 +223,7 @@ events.push(
     source: "system",
     failure: {
       code: FEEDBACK_CODES.FEATURES_UPDATE_FAILED,
-      message: "Unable to change the active features.",
+      message: "main.failure.activeFeatures",
     },
   },
 );
