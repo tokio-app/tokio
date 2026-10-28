@@ -118,31 +118,80 @@ export function TriggerFilter({
   }
 }
 
-// The most gifts or emotes a summary names, the rest counted
+// The most gifts or emotes a summary names or shows, the rest counted
 const NAMED = 3;
+
+// The gifts or emotes picked, as the summary names them, null while the
+// lists don't have any of them
+function pickedNames(
+  trigger: Trigger,
+  gifts: CustomGift[],
+  emotes: EmoteOption[],
+  language: string,
+): string | null {
+  if (trigger.type === TOKIO_EVENTS.GIFT) {
+    return giftNames(trigger.gifts, gifts, language, NAMED);
+  }
+  const names = trigger.emotes.flatMap(
+    (id) => emotes.find((emote) => emote.value === id)?.label ?? [],
+  );
+  return names.length > 0
+    ? listOf(language, names, { type: "or", max: NAMED })
+    : null;
+}
+
+/**
+ * The pictures of the gifts or emotes picked, at most NAMED, and how many
+ * more are picked. Null when the lists have none of their pictures, so the
+ * summary names them instead.
+ */
+function triggerPictures(
+  trigger: Trigger,
+  gifts: CustomGift[],
+  emotes: EmoteOption[],
+): { shown: string[]; more: number } | null {
+  const pictures =
+    trigger.type === TOKIO_EVENTS.GIFT
+      ? trigger.gifts.map((id) => gifts.find((gift) => gift.value === id)?.img)
+      : trigger.type === EMOTE_TRIGGER
+        ? trigger.emotes.map(
+            (id) => emotes.find((emote) => emote.value === id)?.img,
+          )
+        : [];
+  const shown = pictures.filter((img): img is string => !!img).slice(0, NAMED);
+  // The rest counts the ones without a picture too, the trigger reacts to them
+  return shown.length > 0
+    ? { shown, more: pictures.length - shown.length }
+    : null;
+}
 
 /**
  * What narrows the trigger, as one sentence in the language: "Rose or Lion,
  * when the streak ends, worth 100+ coins, from Followers". Empty when nothing
- * does.
+ * does. Pictured leaves out the gifts or emotes, which their pictures show.
  */
 export function triggerSummary(
   trigger: Trigger,
   gifts: CustomGift[],
   emotes: EmoteOption[],
   language: string,
+  pictured = false,
 ): string {
   const t = (key: MessageKey, params?: Params) =>
     translate(language, key, params);
   const parts: string[] = [];
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
+      if (!pictured) {
+        parts.push(
+          trigger.gifts.length === 0
+            ? t("common.anyGift")
+            : // Gifts the lists don't have yet, until they load
+              (pickedNames(trigger, gifts, emotes, language) ??
+                t("components.alertItem.someGifts")),
+        );
+      }
       parts.push(
-        trigger.gifts.length === 0
-          ? t("common.anyGift")
-          : // Gifts the lists don't have yet, until they load
-            (giftNames(trigger.gifts, gifts, language, NAMED) ??
-              t("components.alertItem.someGifts")),
         trigger.every_gift
           ? t("components.alertItem.everyGift")
           : t("components.alertItem.streakEnds"),
@@ -154,17 +203,14 @@ export function triggerSummary(
         );
       }
       break;
-    case EMOTE_TRIGGER: {
-      const names = trigger.emotes.flatMap(
-        (id) => emotes.find((emote) => emote.value === id)?.label ?? [],
-      );
-      parts.push(
-        names.length > 0
-          ? listOf(language, names, { type: "or", max: NAMED })
-          : t("components.alertItem.anyEmote"),
-      );
+    case EMOTE_TRIGGER:
+      if (!pictured) {
+        parts.push(
+          pickedNames(trigger, gifts, emotes, language) ??
+            t("components.alertItem.anyEmote"),
+        );
+      }
       break;
-    }
     case TOKIO_EVENTS.CHAT: {
       const keyword = trigger.keyword.trim();
       parts.push(
@@ -242,11 +288,22 @@ export function AlertItem({
   const t = useT();
   const language = useLanguage();
   const { sound, tts, media } = alert;
-  const detail = triggerSummary(alert.trigger, gifts, emotes, language);
+  const pictures = triggerPictures(alert.trigger, gifts, emotes);
+  const detail = triggerSummary(
+    alert.trigger,
+    gifts,
+    emotes,
+    language,
+    !!pictures,
+  );
+  // What the pictures show, for screen readers and on hover
+  const names = pictures
+    ? (pickedNames(alert.trigger, gifts, emotes, language) ?? undefined)
+    : undefined;
   const test = alertTest(alert);
 
   return (
-    <div className={styles.row}>
+    <div className={cx(styles.row, !alert.enabled && styles.off)}>
       <Toggle
         aria-label={t("common.enabled")}
         checked={alert.enabled}
@@ -259,15 +316,33 @@ export function AlertItem({
         title={t("components.alertItem.edit")}
         onClick={onEdit}
       >
-        <span className={styles.name}>{alertName(alert.name, index)}</span>
-
         <span className={styles.part}>
+          <span className={styles.name}>{alertName(alert.name, index)}</span>
           <span className={styles.trigger}>
-            {t(ALERT_TRIGGER_LABELS[alert.trigger.type])}
+            <span className={styles.event}>
+              {t(ALERT_TRIGGER_LABELS[alert.trigger.type])}
+            </span>
+            {pictures && (
+              <span
+                role="img"
+                aria-label={names}
+                title={names}
+                className={styles.pictures}
+              >
+                {pictures.shown.map((src, i) => (
+                  <img key={i} src={src} alt="" />
+                ))}
+                {pictures.more > 0 && (
+                  <span className={styles.more}>
+                    {t("components.alertItem.morePictures", {
+                      count: pictures.more,
+                    })}
+                  </span>
+                )}
+              </span>
+            )}
+            {detail && <span className={styles.conditions}>{detail}</span>}
           </span>
-          {detail && (
-            <span className={cx(styles.detail, styles.clamp)}>{detail}</span>
-          )}
         </span>
 
         <span className={styles.part}>
@@ -336,12 +411,11 @@ export function AlertItem({
       </span>
       <PlayButton
         {...testProps(testing, alert.id)}
-        size={24}
         disabled={!test}
         onClick={() => test && onTest(test)}
       />
       <Btn variant="icon" title={t("common.remove")} onClick={onRemove}>
-        <FiTrash2 size={24} />
+        <FiTrash2 size={20} />
       </Btn>
     </div>
   );

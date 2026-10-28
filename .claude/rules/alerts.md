@@ -46,6 +46,9 @@ paths:
 
 - An alert row without media keeps its **Copy overlay URL** button's slot, hidden (`visibility`, `aria-hidden`, disabled), so the rows' actions line up.
 - The row's summary is `triggerSummary`: one sentence, at most `NAMED` gifts or emotes, the rest counted by `listOf` (`src/common/i18n`). `gameEventText` (the Games overlay) shares `giftNames` but names every gift. There are no columns: a new condition goes in the editor and the sentence.
+- Picked gifts and emotes show as pictures before the sentence instead (`triggerPictures`): at most `NAMED`, then `+N` for the rest, ones without a picture or not on the lists yet included, so more picks don't widen the row. The pictures are one `role="img"` named, and titled, by the names the sentence would say. With none of their pictures known the sentence names them.
+- The row has three columns, each a name over its details: the alert's name over the trigger's line (the event, the pictures, the sentence), the sound or message over its length, and the media over its duration. No arrows between them: the user rejected one, and sound and media stacked in one column. A sentence too long for its line wraps rather than hide a condition.
+- An alert that's off greys its pictures and texts.
 - The row's sound length is `SoundLength`'s, given the alert's `cut` (`cutPart`), so a cut that doesn't fit shows the whole file, as the queue plays it.
 - Each alert has a `name` (default `""`). A new one gets `defaultAlertName(index)`; an empty one shows its place's default (`alertName`, `src/common/util/alerts.ts`). Defaults count the place when made, so after a delete two alerts can share one.
 - The header's `SearchToggle` matches `alertName`; each alert keeps its list index for its default name. Adding an alert clears the search, which would hide it.

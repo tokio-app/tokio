@@ -192,8 +192,37 @@ describe("AlertItem", () => {
     );
 
     expect(summary()).toHaveTextContent("Gift");
+    expect(screen.getByRole("img", { name: "Rose or GG" })).toBeInTheDocument();
     expect(
-      screen.getByText("Rose or GG, when the streak ends, from Moderators"),
+      screen.getByText("When the streak ends, from Moderators"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows three gifts' or emotes' pictures at most, and names them without any", () => {
+    const gifts = [
+      ...GIFTS,
+      gift(1, "Lion"),
+      { ...gift(2, "Galaxy"), img: "" },
+    ];
+    const many = setup(
+      alert({}, { type: TOKIO_EVENTS.GIFT, gifts: [5655, 6064, 1, 2] }),
+      { gifts },
+    );
+    const pictures = screen.getByRole("img", { name: "Rose, GG, or 2 more" });
+    expect(pictures.querySelectorAll("img")).toHaveLength(3);
+    expect(pictures).toHaveTextContent("+1");
+    many.unmount();
+
+    const emote = setup(
+      alert({}, { type: EMOTE_TRIGGER, emotes: ["emote-2"] }),
+    );
+    expect(screen.getByRole("img", { name: "Emote 2" })).toBeInTheDocument();
+    emote.unmount();
+
+    setup(alert({}, { type: TOKIO_EVENTS.GIFT, gifts: [2] }), { gifts });
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(
+      screen.getByText("Galaxy, when the streak ends"),
     ).toBeInTheDocument();
   });
 

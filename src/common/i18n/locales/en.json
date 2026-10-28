@@ -207,6 +207,7 @@
   "components.alertItem.anyone": "Anyone",
   "components.alertItem.userTitle": "A viewer's @handle or name",
   "components.alertItem.someGifts": "Some gifts",
+  "components.alertItem.morePictures": "+{count}",
   "components.alertItem.everyGift": "every gift",
   "components.alertItem.streakEnds": "when the streak ends",
   "components.alertItem.worth#one": "worth {count}+ coins",

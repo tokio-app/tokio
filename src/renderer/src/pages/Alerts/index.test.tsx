@@ -460,7 +460,9 @@ describe("Alerts", () => {
     await user.click(dialog.getByTitle("Lion"));
     await user.click(dialog.getByRole("button", { name: "Done" }));
 
-    expect(summary(0)).toHaveTextContent("Lion");
+    expect(
+      within(summary(0)).getByRole("img", { name: "Lion" }),
+    ).toBeInTheDocument();
     await wait(300);
     expect(saves()[0].items[0].trigger.gifts).toEqual([5]);
   });
@@ -509,7 +511,9 @@ describe("Alerts", () => {
     await user.click(dialog.getByTitle("Comet"));
     await user.click(dialog.getByRole("button", { name: "Done" }));
 
-    expect(summary(0)).toHaveTextContent("Comet");
+    expect(
+      within(summary(0)).getByRole("img", { name: "Comet" }),
+    ).toBeInTheDocument();
     await wait(300);
     expect(saves()[0].items[0].trigger.gifts).toEqual([5]);
   });
@@ -537,7 +541,9 @@ describe("Alerts", () => {
     await user.click(dialog.getByTitle("Emote 2"));
     await user.click(dialog.getByRole("button", { name: "Done" }));
 
-    expect(summary(0)).toHaveTextContent("Emote 2");
+    expect(
+      within(summary(0)).getByRole("img", { name: "Emote 2" }),
+    ).toBeInTheDocument();
     await wait(300);
     expect(saves()[0].items[0].trigger.emotes).toEqual(["e2"]);
   });

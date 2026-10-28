@@ -207,6 +207,7 @@
   "components.alertItem.anyone": "Cualquiera",
   "components.alertItem.userTitle": "El @usuario o el nombre de un espectador",
   "components.alertItem.someGifts": "Algunos regalos",
+  "components.alertItem.morePictures": "+{count}",
   "components.alertItem.everyGift": "cada regalo",
   "components.alertItem.streakEnds": "al terminar el combo",
   "components.alertItem.worth#one": "de {count}+ moneda",

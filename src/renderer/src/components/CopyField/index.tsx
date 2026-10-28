@@ -71,7 +71,7 @@ export function CopyButton({
 
   return (
     <Btn variant="icon" title={title} disabled={disabled} onClick={copy}>
-      <CopyIcon copied={copied} size={22} />
+      <CopyIcon copied={copied} size={18} />
     </Btn>
   );
 }

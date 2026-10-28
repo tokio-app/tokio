@@ -4,23 +4,24 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-4);
 }
 
 .row + .row {
   border-top: 1px solid var(--border);
 }
 
-/* Its name, what sets it off, what it plays and what it shows. The trigger
-   takes the most room, as its sentence grows with its conditions. */
+/* What sets it off, what it plays and what it shows, each a name over its
+   details. The trigger takes the most room, as its sentence grows with its
+   conditions, and a sound's name or message runs longer than a file's. */
 .summary {
   display: grid;
   grid-template-columns:
-    minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)
+    minmax(0, 2fr) minmax(0, 1.25fr) minmax(0, 1fr)
     16px;
   align-items: center;
-  gap: var(--space-4);
-  min-height: 48px;
+  column-gap: var(--space-5);
+  min-height: 56px;
   padding: var(--space-2) var(--space-3);
   border: none;
   border-radius: var(--radius-md);
@@ -46,14 +47,53 @@
 /* The row's one heavier label, what a search finds */
 .name {
   overflow: hidden;
-  font-size: var(--font-md);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* The event, its gifts' or emotes' pictures, then what else narrows it */
 .trigger {
-  font-size: var(--font-md);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  line-height: 20px;
+}
+
+.event {
+  flex: none;
+}
+
+/* At most NAMED of them, so picking more doesn't widen it */
+.pictures {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.pictures img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.more {
+  margin-left: 2px;
+  color: var(--font-secondary);
+}
+
+/* A long sentence wraps rather than hide a condition, up to two lines for a
+   long keyword */
+.conditions {
+  display: -webkit-box;
+  overflow: hidden;
+  min-width: 0;
+  color: var(--font-secondary);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .detail {
@@ -61,20 +101,11 @@
   color: var(--font-secondary);
 }
 
-/* Every gift picked, or a long keyword, can't make the row taller */
-.clamp {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
 .line {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-  font-size: var(--font-md);
 }
 
 .line > svg {
@@ -102,8 +133,28 @@
 }
 
 .none {
-  font-size: var(--font-md);
   color: var(--font-muted);
+}
+
+/* An alert that's off: its pictures lose their color, its texts step back */
+.name,
+.event,
+.text,
+.row img,
+.row video {
+  transition:
+    color var(--transition-fast),
+    filter var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.off :is(.name, .event, .text) {
+  color: var(--font-secondary);
+}
+
+.off :is(img, video) {
+  opacity: 0.5;
+  filter: grayscale(1);
 }
 
 /* Says the row opens its editor, once it's pointed at */
