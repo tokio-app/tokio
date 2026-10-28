@@ -45,7 +45,7 @@ paths:
 ## Page
 
 - An alert row without media keeps its **Copy overlay URL** button's slot, hidden (`visibility`, `aria-hidden`, disabled), so the rows' actions line up.
-- The row's summary is `triggerSummary`: one sentence, at most `NAMED` gifts or emotes, the rest counted by `orList`. `gameEventText` (the Games overlay) shares `giftNames` but names every gift. There are no columns: a new condition goes in the editor and the sentence.
+- The row's summary is `triggerSummary`: one sentence, at most `NAMED` gifts or emotes, the rest counted by `listOf` (`src/common/i18n`). `gameEventText` (the Games overlay) shares `giftNames` but names every gift. There are no columns: a new condition goes in the editor and the sentence.
 - The row's sound length is `SoundLength`'s, given the alert's `cut` (`cutPart`), so a cut that doesn't fit shows the whole file, as the queue plays it.
 - Each alert has a `name` (default `""`). A new one gets `defaultAlertName(index)`; an empty one shows its place's default (`alertName`, `src/common/util/alerts.ts`). Defaults count the place when made, so after a delete two alerts can share one.
 - The header's `SearchToggle` matches `alertName`; each alert keeps its list index for its default name. Adding an alert clears the search, which would hide it.

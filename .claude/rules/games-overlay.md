@@ -26,7 +26,7 @@ The **Overlay** section on the Games page builds the games overlay: each shown a
 
 ## Rows
 
-`gameOverlayRows(games, { gifts, emotes, mediaURL })` (`src/common/util/games.ts`) is shared by main and the preview, like `timerTriggers`.
+`gameOverlayRows(games, { gifts, emotes, mediaURL, language })` (`src/common/util/games.ts`) is shared by main and the preview, like `timerTriggers`. Its automatic texts are in the app's language (main passes `language()`, and sends the overlay again on a change); mob and item names stay English.
 
 - **Shown:** an action shows when it's enabled, `show` is on, and it has a picture or a name. Rows keep the actions' order.
 - **Event pictures:** every picture of the trigger's gifts (`gameEventPictures`; the gift lists are TikTok's then the custom ones, so TikTok's entry wins) or emotes (`Profile.emotes`), each once. A gift or emote trigger with none picked has no picture.

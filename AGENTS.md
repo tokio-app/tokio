@@ -75,6 +75,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `overlays.md`: overlay previews and official overlays
 - `updates.md`: the auto-updater
 - `timer.md`: the countdown timer, its overlay and the Tools page
+- `i18n.md`: the locale files, translating in the windows and main, and the language setting
 
 When a change alters what a rule says, update the rule with it. A new area gets its own rule with `paths`.
 
