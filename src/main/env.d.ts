@@ -1,3 +1,6 @@
+// import.meta.glob, which src/common/i18n loads the locale files with
+/// <reference types="vite/types/importMeta.d.ts" />
+
 // A file's text, loaded by Vite. electron-vite's types don't declare it.
 declare module "*?raw" {
   const text: string;
