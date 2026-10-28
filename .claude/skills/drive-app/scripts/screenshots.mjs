@@ -376,10 +376,10 @@ export default async ({ app, page, home, push, toggle }) => {
   }
   await crop("tts-replacements", body("Replacements"));
   await section("Permissions")
-    .getByRole("checkbox", { name: "Enable whitelist / blacklist" })
+    .getByRole("checkbox", { name: "Use allow and block lists" })
     .check();
   await section("Permissions")
-    .getByRole("group", { name: /^Blacklist/ })
+    .getByRole("group", { name: /^Block list/ })
     .getByRole("textbox")
     .fill("@spam.account");
   await crop("tts-permissions", body("Permissions"));

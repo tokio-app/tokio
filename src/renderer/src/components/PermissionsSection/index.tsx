@@ -78,7 +78,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
       {permissions.list.enabled && (
         <>
           <Field
-            label={t("components.permissions.whitelist")}
+            label={t("components.permissions.allowList")}
             hint={t("components.permissions.listHint")}
           >
             <ListTextarea
@@ -92,7 +92,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
             />
           </Field>
           <Field
-            label={t("components.permissions.blacklist")}
+            label={t("components.permissions.blockList")}
             hint={t("components.permissions.listHint")}
           >
             <ListTextarea

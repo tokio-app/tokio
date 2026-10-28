@@ -29,7 +29,7 @@ paths:
 - Banned words are checked in the comment, the name and the handle, not in the template's own words.
 - Both sides are folded first (NFKD, without marks or invisible characters, lowercased, look-alike Cyrillic, Greek and Turkish letters mapped to Latin by `LOOKALIKES`), so accents, styled letters, look-alikes and zero-width spaces can't hide a word. Look-alikes are mapped only in words with a Latin letter, so Russian or Greek is kept. An entry that folds to nothing matches nothing.
 - The template is filled once with `formatAlertMessage`, so a comment or name that looks like a variable is read as written.
-- `hasPermission` (`src/main/helper/permissions.ts`, shared with music requests): with the lists on, a blacklisted handle is refused and a non-empty whitelist decides alone; otherwise Allow everyone, then the roles.
+- `hasPermission` (`src/main/helper/permissions.ts`, shared with music requests): with the lists on, a handle on the block list is refused and a non-empty allow list decides alone; otherwise Allow everyone, then the roles.
 - Main sends each message with `TTS_AUDIO { id, data, filters, queueOptions }` to the window's `tts_data` queue, with speed and pitch per message, so a change spares the queued ones.
 - The window answers `TTS_PLAYED { id }` when a message ends or is dropped. Main makes the next message only while fewer than min(2, queue length) are held, so the queue length bounds main's backlog and nothing is made just to be dropped. A hold ends after `HOLD_TIMEOUT_MS`, and a repeat `LOAD_APP` (a reloaded window) calls `releaseHeld()`.
 - A failed generation isn't logged by `TTSService`: `init.ts` logs it to `tts.log` only when its notice (`TTS_GENERATION_FAILED`) goes out, like a missing alert sound.

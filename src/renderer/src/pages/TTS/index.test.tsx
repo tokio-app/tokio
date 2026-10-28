@@ -462,12 +462,12 @@ describe("TTS", () => {
     expect(level).toBeEnabled();
     fireEvent.change(level, { target: { value: "10" } });
 
-    expect(permissions.queryByText("Whitelist")).not.toBeInTheDocument();
+    expect(permissions.queryByText("Allow list")).not.toBeInTheDocument();
     await user.click(
-      screen.getByRole("checkbox", { name: "Enable whitelist / blacklist" }),
+      screen.getByRole("checkbox", { name: "Use allow and block lists" }),
     );
-    await user.type(field("Whitelist").getByRole("textbox"), "alice, bob");
-    await user.type(field("Blacklist").getByRole("textbox"), "troll");
+    await user.type(field("Allow list").getByRole("textbox"), "alice, bob");
+    await user.type(field("Block list").getByRole("textbox"), "troll");
 
     expect((await saved()).permissions).toEqual({
       all: false,

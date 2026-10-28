@@ -120,28 +120,28 @@ describe("PermissionsSection", () => {
     expect(level()).not.toHaveAttribute("tabindex");
   });
 
-  it("shows the lists only while the whitelist and blacklist are on", async () => {
+  it("shows the lists only while the allow and block lists are on", async () => {
     const user = setup();
-    expect(screen.queryByText("Whitelist")).not.toBeInTheDocument();
+    expect(screen.queryByText("Allow list")).not.toBeInTheDocument();
     expect(screen.queryAllByRole("textbox")).toHaveLength(0);
 
-    await user.click(box("Enable whitelist / blacklist"));
+    await user.click(box("Use allow and block lists"));
     expect(current().list.enabled).toBe(true);
     expect(screen.getAllByRole("textbox")).toHaveLength(2);
 
-    await user.click(box("Enable whitelist / blacklist"));
+    await user.click(box("Use allow and block lists"));
     expect(screen.queryAllByRole("textbox")).toHaveLength(0);
   });
 
-  it("edits the whitelist and the blacklist", async () => {
+  it("edits the allow list and the block list", async () => {
     const user = setup((p) => {
       p.list.enabled = true;
       p.list.black = ["spammer"];
     });
-    expect(field("Blacklist")).toHaveValue("spammer");
+    expect(field("Block list")).toHaveValue("spammer");
 
-    await user.type(field("Whitelist"), "alice, bob");
-    await user.type(field("Blacklist"), ", troll");
+    await user.type(field("Allow list"), "alice, bob");
+    await user.type(field("Block list"), ", troll");
 
     expect(current().list.white).toEqual(["alice", "bob"]);
     expect(current().list.black).toEqual(["spammer", "troll"]);
