@@ -1,5 +1,6 @@
 import { cx } from "@/helper/cx";
 import { usePopover } from "@/hooks/usePopover";
+import { useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import { HexAlphaColorPicker, HexColorInput } from "react-colorful";
 import { createPortal } from "react-dom";
@@ -16,6 +17,7 @@ const fullHex = (color: string) =>
   color.length > 5 ? color : color.replace(/\w/g, "$&$&");
 
 export function Color({ value, onChange }: Props) {
+  const t = useT();
   const { open, toggle, close, position, anchorRef, popoverRef } =
     usePopover(8);
   const swatchRef = useRef<HTMLButtonElement>(null);
@@ -56,7 +58,7 @@ export function Color({ value, onChange }: Props) {
         className={styles.color_swatch}
         style={{ backgroundColor: value }}
         onClick={toggle}
-        aria-label="Choose color"
+        aria-label={t("components.color.choose")}
         aria-expanded={open}
       />
 
@@ -85,7 +87,7 @@ export function Color({ value, onChange }: Props) {
                 onChange(fullHex(color));
               }}
               onBlur={() => setTyped(null)}
-              placeholder="Type a color"
+              placeholder={t("components.color.placeholder")}
               // The picker is portaled out of the Tab order, so it takes the focus
               autoFocus
               prefixed

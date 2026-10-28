@@ -17,8 +17,8 @@ export function useSoundSearch(active: boolean) {
   const [sounds, setSounds] = useState<MyInstantsSound[]>([]);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [loading, setLoading] = useState(true);
-  // Message of the last request's failure
-  const [error, setError] = useState<string | null>(null);
+  // The last request's failure, with main's message if it sent one
+  const [error, setError] = useState<{ message?: string } | null>(null);
 
   // Latest request, so responses to older ones are ignored
   const request = useRef({ query: "", page: 1 });
@@ -52,7 +52,7 @@ export function useSoundSearch(active: boolean) {
 
         // Keeps the page, so a retry loads the one that failed.
         if (!res.success) {
-          setError(res.error?.message ?? "Unable to reach MyInstants.");
+          setError({ message: res.error?.message });
           // A new search's failure shouldn't show the last search's results.
           if (res.page === 1) setSounds([]);
           return;

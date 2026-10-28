@@ -1,3 +1,4 @@
+import { useT } from "@/ui/i18n";
 import { FiPlayCircle, FiStopCircle } from "react-icons/fi";
 import { Btn, Spinner } from "../Elements";
 
@@ -34,14 +35,15 @@ export function PlayButton({
   disabled,
   size = 20,
 }: Props) {
-  let title = "Play";
+  const t = useT();
+  let title = t("common.play");
   let icon = <FiPlayCircle size={size} />;
   if (loading) {
-    title = "Cancel";
+    title = t("common.cancel");
     // The spinner's margin makes up the difference, so the row doesn't shift.
     icon = <Spinner size={size - 8} />;
   } else if (playing) {
-    title = "Stop";
+    title = t("common.stop");
     icon = <FiStopCircle size={size} />;
   }
 

@@ -1,5 +1,6 @@
 import { AppNotification, FeedbackLevel } from "@/common/types";
 import { cx } from "@/helper/cx";
+import { useT } from "@/ui/i18n";
 import { useEffect, useRef, useState } from "react";
 import { IconType } from "react-icons";
 import {
@@ -65,6 +66,7 @@ function Toast({ notification, onExpire, onClose }: ToastProps) {
   const [paused, setPaused] = useState(false);
   // Time left, kept while hovering pauses the timer
   const remaining = useRef(duration);
+  const t = useT();
 
   useEffect(() => {
     if (paused) return undefined;
@@ -87,7 +89,7 @@ function Toast({ notification, onExpire, onClose }: ToastProps) {
       <p className={styles.message}>{message}</p>
       <Btn
         variant="icon"
-        title="Close"
+        title={t("common.close")}
         className={styles.close}
         onClick={() => onClose(id)}
       >
@@ -106,8 +108,13 @@ type Props = {
 
 /** Notices stacked in the bottom right corner, above modals. */
 export function Toasts({ toasts, onExpire, onClose }: Props) {
+  const t = useT();
   return (
-    <div role="region" aria-label="Notifications" className={styles.viewport}>
+    <div
+      role="region"
+      aria-label={t("components.notifications.title")}
+      className={styles.viewport}
+    >
       {toasts.map((n) => (
         <Toast
           key={n.id}

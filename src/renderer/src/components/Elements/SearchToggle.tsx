@@ -1,4 +1,5 @@
 import { cx } from "@/helper/cx";
+import { useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import { MdOutlineSearch, MdOutlineSearchOff } from "react-icons/md";
 import { Btn } from "./Btn";
@@ -16,6 +17,7 @@ type Props = {
  * actions. Closing it clears the search.
  */
 export function SearchToggle({ value, onChange, placeholder }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
 
@@ -32,7 +34,7 @@ export function SearchToggle({ value, onChange, placeholder }: Props) {
         aria-hidden={!open || undefined}
       />
       <Btn
-        title={open ? "Close search" : "Search"}
+        title={open ? t("components.searchToggle.close") : t("common.search")}
         onClick={() => {
           if (open) onChange("");
           else ref.current?.focus();

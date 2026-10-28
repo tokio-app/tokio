@@ -1,3 +1,4 @@
+import { useT } from "@/ui/i18n";
 import { Ref, useMemo, useState } from "react";
 import { Spinner } from "../Elements";
 import styles from "./iframe.module.css";
@@ -10,6 +11,7 @@ interface IframeProps {
 }
 
 export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
+  const t = useT();
   const [loading, setLoading] = useState(true);
 
   const iframeSrc = useMemo(() => {
@@ -37,7 +39,7 @@ export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
       <iframe
         ref={ref}
         src={iframeSrc}
-        title={`Viewer for ${name}`}
+        title={t("components.iframe.title", { name })}
         name={`TOKIO_APP-${name}`}
         // Off-screen previews don't load or run until scrolled to.
         loading="lazy"

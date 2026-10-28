@@ -1,3 +1,4 @@
+import { useT } from "@/ui/i18n";
 import { RefObject } from "react";
 import styles from "./variablelist.module.css";
 
@@ -43,6 +44,7 @@ export function VariableList({
   onChange,
   empty,
 }: Props) {
+  const t = useT();
   if (variables.length === 0) {
     return empty ? <p className={styles.list}>{empty}</p> : null;
   }
@@ -71,13 +73,13 @@ export function VariableList({
 
   return (
     <p className={styles.list}>
-      <span className={styles.label}>Variables:</span>
+      <span className={styles.label}>{t("components.variables.label")}</span>
       {variables.map((name) => (
         <button
           key={name}
           type="button"
           className={styles.variable}
-          title={`Insert {${name}}`}
+          title={t("components.variables.insert", { variable: `{${name}}` })}
           // Keeps the input focused, with its cursor where it was
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => insert(name)}

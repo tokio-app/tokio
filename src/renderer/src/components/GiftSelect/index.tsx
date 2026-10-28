@@ -2,7 +2,7 @@ import { CustomGift } from "@/common/types";
 import { cx } from "@/helper/cx";
 import { formatList } from "@/helper/format";
 import { coinsLabel, giftsLabel } from "@/helper/gifts";
-import { useLanguage } from "@/ui/i18n";
+import { useLanguage, useT } from "@/ui/i18n";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { FiChevronDown } from "react-icons/fi";
@@ -23,16 +23,17 @@ type CommonProps = {
 export function GiftSelect({
   value,
   onChange,
-  placeholder = "Select a gift...",
+  placeholder,
   ...common
 }: CommonProps & {
   value: number | undefined;
   onChange: (value: number) => void;
 }) {
+  const t = useT();
   return (
     <GiftField
       {...common}
-      placeholder={placeholder}
+      placeholder={placeholder ?? t("components.gifts.placeholder")}
       selected={value === undefined ? [] : [value]}
       onApply={(gifts) => onChange(gifts[0])}
     />
@@ -43,17 +44,18 @@ export function GiftSelect({
 export function GiftMultiSelect({
   value,
   onChange,
-  placeholder = "Select gifts...",
+  placeholder,
   ...common
 }: CommonProps & {
   value: number[];
   onChange: (value: number[]) => void;
 }) {
+  const t = useT();
   return (
     <GiftField
       {...common}
       multiple
-      placeholder={placeholder}
+      placeholder={placeholder ?? t("components.gifts.placeholderMultiple")}
       selected={value}
       onApply={(gifts) => {
         // Done without a change saves nothing.

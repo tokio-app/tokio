@@ -1,5 +1,6 @@
 import { cx } from "@/helper/cx";
 import { formatList } from "@/helper/format";
+import { useT } from "@/ui/i18n";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { FiChevronDown } from "react-icons/fi";
@@ -13,9 +14,6 @@ export type EmoteOption = { value: string; label: string; img: string };
 
 // How many pictures the field shows for several emotes
 const FIELD_IMAGES = 3;
-
-const emotesLabel = (count: number) =>
-  `${count} ${count === 1 ? "emote" : "emotes"}`;
 
 /**
  * Shows the emotes picked, and opens a picker to check them, kept on Done.
@@ -34,6 +32,7 @@ export function EmoteMultiSelect({
   placeholder: string;
   onChange: (value: string[]) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   // In the list's order. Ids it doesn't have are still counted, the trigger
@@ -73,7 +72,9 @@ export function EmoteMultiSelect({
                 </span>
               )}
               <span className={styles.name}>
-                {only ? only.label : emotesLabel(value.length)}
+                {only
+                  ? only.label
+                  : t("components.emotes.count", { count: value.length })}
               </span>
             </>
           )}
@@ -112,6 +113,7 @@ type PickerProps = {
 
 // The gift picker's checked list, with every emote shown
 function EmotePicker({ emotes, selected, onApply, onClose }: PickerProps) {
+  const t = useT();
   // What Done applies: the emotes picked first, then the ones checked here
   const [picked, setPicked] = useState(selected);
   // The emotes picked when it opened are listed first. Checking doesn't move
@@ -139,32 +141,35 @@ function EmotePicker({ emotes, selected, onApply, onClose }: PickerProps) {
 
   return (
     <Modal
-      title="Select emotes"
-      description="Emotes show up here once a viewer uses them in chat while you're connected."
+      title={t("components.emotes.title")}
+      description={t("components.emotes.description")}
       maxWidth="640px"
       onClose={onClose}
       footer={
         <>
-          <Btn onClick={onClose}>Cancel</Btn>
+          <Btn onClick={onClose}>{t("common.cancel")}</Btn>
           <Btn variant="accent" onClick={() => onApply(picked)}>
-            Done
+            {t("components.picker.done")}
           </Btn>
         </>
       }
     >
       <div className={styles.toolbar}>
         <span className={styles.count}>
-          {`${emotesLabel(emotes.length)} · ${picked.length} selected`}
+          {t("components.picker.selected", {
+            items: t("components.emotes.count", { count: emotes.length }),
+            count: picked.length,
+          })}
         </span>
         <div className={styles.actions}>
           <Btn
             disabled={unchecked.length === 0}
             onClick={() => setPicked([...picked, ...unchecked])}
           >
-            Select all
+            {t("components.emotes.selectAll")}
           </Btn>
           <Btn disabled={picked.length === 0} onClick={() => setPicked([])}>
-            Clear
+            {t("common.clear")}
           </Btn>
         </div>
       </div>
@@ -188,7 +193,9 @@ function EmotePicker({ emotes, selected, onApply, onClose }: PickerProps) {
           </label>
         ))}
 
-        {shown.length === 0 && <p className={styles.status}>No emotes yet.</p>}
+        {shown.length === 0 && (
+          <p className={styles.status}>{t("components.emotes.empty")}</p>
+        )}
       </div>
     </Modal>
   );

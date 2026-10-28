@@ -1,6 +1,7 @@
 import { OverlayConfigField } from "@/common/schemas";
 import { CustomGift } from "@/common/types";
 import { cx } from "@/helper/cx";
+import { useT } from "@/ui/i18n";
 import { ReactNode, useId } from "react";
 import { VscDiscard } from "react-icons/vsc";
 import {
@@ -45,13 +46,14 @@ interface Props {
 
 export function SettingField({ field, gifts, onChange, onReset }: Props) {
   const changed = !sameValue(field.attributes.value, field.attributes.default);
+  const t = useT();
   const labelId = useId();
 
   // Kept in place while hidden, so the values beside it don't move.
   const reset = (
     <Btn
       variant="icon"
-      title="Reset to default"
+      title={t("components.overlayModal.reset")}
       className={cx(styles.reset, !changed && styles.reset_hidden)}
       disabled={!changed}
       onClick={onReset}

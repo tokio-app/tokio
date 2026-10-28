@@ -4,6 +4,7 @@ import { getMediaPreviewURL, mediaKind } from "@/common/util";
 import { cx } from "@/helper/cx";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
+import { useT } from "@/ui/i18n";
 import { useId, useRef, useState } from "react";
 import { FiCheck, FiFilm, FiTrash2 } from "react-icons/fi";
 import { DeleteMediaModal } from "../DeleteModals";
@@ -69,6 +70,7 @@ export function MediaThumbnail({
  * editor sets how long it shows.
  */
 export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
+  const t = useT();
   const { id, media } = alert;
   const [library, setLibrary] = useState<MediaFile[]>([]);
   const [search, setSearch] = useState("");
@@ -101,13 +103,13 @@ export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
   return (
     <>
       <Modal
-        title="Select media"
-        description="An image or video shown on this alert's overlay."
+        title={t("components.mediaPicker.title")}
+        description={t("components.mediaPicker.description")}
         maxWidth="840px"
         onClose={onClose}
         actions={
           <SearchToggle
-            placeholder="Search your media..."
+            placeholder={t("components.mediaPicker.searchPlaceholder")}
             value={search}
             onChange={setSearch}
           />
@@ -115,9 +117,9 @@ export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
         footer={
           <>
             <Btn disabled={!media} onClick={() => onSelect(null)}>
-              Clear
+              {t("common.clear")}
             </Btn>
-            <Btn onClick={onClose}>Cancel</Btn>
+            <Btn onClick={onClose}>{t("common.cancel")}</Btn>
             <Btn
               variant="accent"
               onClick={() => {
@@ -128,7 +130,7 @@ export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
                 });
               }}
             >
-              Browse file...
+              {t("common.browse")}
             </Btn>
           </>
         }
@@ -168,7 +170,7 @@ export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
                 </button>
                 <Btn
                   variant="icon"
-                  title="Delete"
+                  title={t("common.delete")}
                   className={styles.delete}
                   onClick={() => setRemoving(file)}
                 >
@@ -181,14 +183,14 @@ export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
           {files.length === 0 && (
             <p className={cx(list.status, styles.empty)}>
               {library.length === 0
-                ? "No media yet. Browse for an image or video."
-                : "No media matches."}
+                ? t("components.mediaPicker.empty")
+                : t("components.mediaPicker.noMatch")}
             </p>
           )}
         </div>
 
         {failed && (
-          <p className={list.error}>Couldn't save or load the media.</p>
+          <p className={list.error}>{t("components.mediaPicker.failed")}</p>
         )}
       </Modal>
 

@@ -3,6 +3,7 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useIpcListener } from "@/hooks/useIpcListener";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiDownload, FiTrash2 } from "react-icons/fi";
 import { Btn, Input } from "../Elements";
@@ -45,6 +46,7 @@ export function MyInstantsTab({
   onSelect,
   onRemove,
 }: Props) {
+  const t = useT();
   const [query, setQuery] = useState("");
   // The sound being downloaded, and the request its reply carries
   const [downloading, setDownloading] = useState<{
@@ -72,7 +74,7 @@ export function MyInstantsTab({
         }}
       >
         <Input
-          placeholder="Search sounds... (Enter)"
+          placeholder={t("components.soundPicker.searchPlaceholder")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -112,7 +114,7 @@ export function MyInstantsTab({
               {entry ? (
                 <Btn
                   variant="icon"
-                  title="Delete from your sounds"
+                  title={t("components.soundPicker.deleteSaved")}
                   disabled={downloading !== null}
                   onClick={() => onRemove(entry)}
                 >
@@ -121,7 +123,7 @@ export function MyInstantsTab({
               ) : (
                 <Btn
                   variant="icon"
-                  title="Download and use this sound"
+                  title={t("components.soundPicker.download")}
                   disabled={downloading !== null}
                   onClick={() => {
                     const request = onRequest();
@@ -141,14 +143,18 @@ export function MyInstantsTab({
           );
         })}
 
-        {loading && <p className={styles.status}>Loading...</p>}
+        {loading && (
+          <p className={styles.status}>{t("components.soundPicker.loading")}</p>
+        )}
         {!loading && sounds.length === 0 && !error && (
-          <p className={styles.status}>No sounds found.</p>
+          <p className={styles.status}>
+            {t("components.soundPicker.noResults")}
+          </p>
         )}
         {error && (
           <div className={styles.failed}>
-            <p>{error}</p>
-            <Btn onClick={retry}>Try again</Btn>
+            <p>{error.message ?? t("components.soundPicker.unreachable")}</p>
+            <Btn onClick={retry}>{t("common.tryAgain")}</Btn>
           </div>
         )}
 

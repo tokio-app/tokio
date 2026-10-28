@@ -1,5 +1,6 @@
 import { cx } from "@/helper/cx";
 import { usePopover } from "@/hooks/usePopover";
+import { useT } from "@/ui/i18n";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   KeyboardEvent,
@@ -75,6 +76,7 @@ export function MultiSelect<V extends Value>({
   value: V[];
   onChange: (value: V[]) => void;
 }) {
+  const t = useT();
   const selected = new Set(value);
   const chips = common.options.filter((opt) => selected.has(opt.value));
 
@@ -101,7 +103,9 @@ export function MultiSelect<V extends Value>({
                 {!common.disabled && (
                   <button
                     type="button"
-                    aria-label={`Remove ${chip.label}`}
+                    aria-label={t("components.select.removeChip", {
+                      label: String(chip.label),
+                    })}
                     className={styles.select_chip_remove}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -152,7 +156,7 @@ const MOVES: Partial<Record<string, Move>> = {
 function SelectBase<V extends Value>({
   options,
   searchable,
-  placeholder = "Select an option...",
+  placeholder,
   className,
   disabled,
   display,
@@ -161,6 +165,7 @@ function SelectBase<V extends Value>({
   multiple,
   "aria-label": ariaLabel,
 }: BaseProps<V>) {
+  const t = useT();
   const { open, toggle, close, position, anchorRef, popoverRef } = usePopover();
   const displayRef = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -263,7 +268,9 @@ function SelectBase<V extends Value>({
         }}
       >
         {display ?? (
-          <span className={styles.select_placeholder}>{placeholder}</span>
+          <span className={styles.select_placeholder}>
+            {placeholder ?? t("components.select.placeholder")}
+          </span>
         )}
         <FiChevronDown
           size={16}
@@ -332,6 +339,7 @@ function SelectMenu<V extends Value>({
   onPick: (value: V) => void;
   onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
 }) {
+  const t = useT();
   const listRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -354,7 +362,7 @@ function SelectMenu<V extends Value>({
         <div className={styles.select_search}>
           <input
             type="text"
-            placeholder="Search..."
+            placeholder={t("common.searchPlaceholder")}
             className={styles.select_search_input}
             value={search}
             aria-controls={listId}
@@ -375,7 +383,9 @@ function SelectMenu<V extends Value>({
         className={styles.select_list}
       >
         {rows.length === 0 ? (
-          <div className={styles.select_empty}>No options found</div>
+          <div className={styles.select_empty}>
+            {t("components.select.empty")}
+          </div>
         ) : (
           <div
             className={styles.select_rows}

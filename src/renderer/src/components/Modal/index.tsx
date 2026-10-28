@@ -1,3 +1,4 @@
+import { useT } from "@/ui/i18n";
 import {
   KeyboardEvent,
   ReactNode,
@@ -57,13 +58,14 @@ export function Modal({
   description,
   onClose,
   onConfirm,
-  confirmText = "Confirm",
+  confirmText,
   footer,
   actions,
   closeButton,
   maxWidth = "400px",
   children,
 }: Props) {
+  const t = useT();
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -83,9 +85,9 @@ export function Modal({
     footer ??
     (onConfirm && (
       <>
-        <Btn onClick={onClose}>Cancel</Btn>
+        <Btn onClick={onClose}>{t("common.cancel")}</Btn>
         <Btn variant="accent" onClick={onConfirm}>
-          {confirmText}
+          {confirmText ?? t("common.confirm")}
         </Btn>
       </>
     ));
@@ -115,7 +117,7 @@ export function Modal({
           </h3>
           {actions && <div className={styles.actions}>{actions}</div>}
           {closeButton && (
-            <Btn variant="icon" title="Close" onClick={onClose}>
+            <Btn variant="icon" title={t("common.close")} onClick={onClose}>
               <VscClose size={24} />
             </Btn>
           )}

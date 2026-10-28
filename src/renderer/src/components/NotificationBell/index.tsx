@@ -1,6 +1,7 @@
 import { AppNotification } from "@/common/types";
 import { cx } from "@/helper/cx";
 import { useMenu } from "@/hooks/useMenu";
+import { useLanguage, useT } from "@/ui/i18n";
 import { useEffect } from "react";
 import { FiBell } from "react-icons/fi";
 import { Btn } from "../Elements";
@@ -17,8 +18,8 @@ type Props = {
   onClear: () => void;
 };
 
-const formatTime = (timestamp: number) =>
-  new Date(timestamp).toLocaleTimeString([], {
+const formatTime = (timestamp: number, language: string) =>
+  new Date(timestamp).toLocaleTimeString(language, {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -31,6 +32,8 @@ export function NotificationBell({
   onSeen,
   onClear,
 }: Props) {
+  const t = useT();
+  const language = useLanguage();
   const { open, ref, toggleRef, toggle, onKeyDown } = useMenu();
 
   // Also marks the notices that arrive while the list is open.
@@ -43,10 +46,12 @@ export function NotificationBell({
       <Btn
         ref={toggleRef}
         variant="icon"
-        title="Notifications"
+        title={t("components.notifications.title")}
         // The badge would name it otherwise
         aria-label={
-          unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
+          unread > 0
+            ? t("components.notifications.unread", { count: unread })
+            : t("components.notifications.title")
         }
         aria-expanded={open}
         active={open}
@@ -67,23 +72,29 @@ export function NotificationBell({
       {open && (
         <div className={styles.menu}>
           <div className={styles.header}>
-            <span className={styles.title}>Notifications</span>
+            <span className={styles.title}>
+              {t("components.notifications.title")}
+            </span>
             {history.length > 0 && (
               <Btn variant="icon" onClick={onClear}>
-                Clear all
+                {t("components.notifications.clear")}
               </Btn>
             )}
           </div>
 
           {history.length === 0 ? (
-            <p className={styles.empty}>No notifications yet</p>
+            <p className={styles.empty}>
+              {t("components.notifications.empty")}
+            </p>
           ) : (
             <ul className={styles.list}>
               {history.map((n) => (
                 <li key={n.id} className={styles.item}>
                   <LevelIcon level={n.level} size={16} />
                   <span className={styles.message}>{n.message}</span>
-                  <time className={styles.time}>{formatTime(n.timestamp)}</time>
+                  <time className={styles.time}>
+                    {formatTime(n.timestamp, language)}
+                  </time>
                 </li>
               ))}
             </ul>

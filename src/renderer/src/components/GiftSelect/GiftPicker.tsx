@@ -9,7 +9,7 @@ import {
   GiftFilter,
   giftsLabel,
 } from "@/helper/gifts";
-import { useLanguage, useOptions } from "@/ui/i18n";
+import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { FocusEvent, useMemo, useState } from "react";
 import { Btn, Check, Input, NumberInput, Select } from "../Elements";
 import { Modal } from "../Modal";
@@ -33,6 +33,7 @@ export function GiftPicker({
   onApply,
   onClose,
 }: Props) {
+  const t = useT();
   const sorts = useOptions(GIFT_SORTS);
   const [filter, setFilter] = useState<GiftFilter>({
     search: "",
@@ -53,20 +54,24 @@ export function GiftPicker({
 
   return (
     <Modal
-      title={multiple ? "Select gifts" : "Select a gift"}
+      title={
+        multiple
+          ? t("components.gifts.titleMultiple")
+          : t("components.gifts.title")
+      }
       description={
         multiple
-          ? "Search by name, filter by coins and sort the list. Select all shown checks every gift the filters leave."
-          : "Search by name, filter by coins and sort the list."
+          ? t("components.gifts.descriptionMultiple")
+          : t("components.gifts.description")
       }
       maxWidth="640px"
       onClose={onClose}
       footer={
         <>
-          <Btn onClick={onClose}>Cancel</Btn>
+          <Btn onClick={onClose}>{t("common.cancel")}</Btn>
           {multiple && (
             <Btn variant="accent" onClick={() => onApply(picked)}>
-              Done
+              {t("components.picker.done")}
             </Btn>
           )}
         </>
@@ -75,7 +80,7 @@ export function GiftPicker({
       <div className={styles.filters}>
         <Input
           autoFocus
-          placeholder="Search gifts..."
+          placeholder={t("components.gifts.searchPlaceholder")}
           value={filter.search}
           onChange={(e) => setFilter({ ...filter, search: e.target.value })}
         />
@@ -100,7 +105,11 @@ export function GiftPicker({
 
       <GiftList
         shown={shown}
-        empty={gifts.length === 0 ? "No gifts available." : "No gifts match."}
+        empty={
+          gifts.length === 0
+            ? t("components.gifts.empty")
+            : t("components.gifts.noMatch")
+        }
         multiple={multiple}
         picked={picked}
         // Checking changes the picks, clicking a gift of a single pick applies it.
@@ -120,6 +129,7 @@ type FilterProps = {
 
 // An operator and its amount, or the two ends of a range
 function CoinFilter({ filter, onChange }: FilterProps) {
+  const t = useT();
   const language = useLanguage();
   const operators = useOptions(COIN_OPERATORS);
   const { operator } = filter;
@@ -138,7 +148,7 @@ function CoinFilter({ filter, onChange }: FilterProps) {
           <NumberInput
             integer
             min={0}
-            aria-label="Coins"
+            aria-label={t("components.gifts.coins")}
             className={styles.amount}
             value={filter.coins}
             onFocus={selectText}
@@ -146,11 +156,11 @@ function CoinFilter({ filter, onChange }: FilterProps) {
           />
           {range && (
             <>
-              <span className={styles.unit}>and</span>
+              <span className={styles.unit}>{t("components.gifts.and")}</span>
               <NumberInput
                 integer
                 min={0}
-                aria-label="To coins"
+                aria-label={t("components.gifts.toCoins")}
                 className={styles.amount}
                 value={filter.to}
                 onFocus={selectText}
@@ -177,6 +187,7 @@ type SelectionProps = {
 
 // How many gifts are shown and checked, and the actions on them
 function SelectionBar({ shown, total, picked, onChange }: SelectionProps) {
+  const t = useT();
   const language = useLanguage();
   const checked = new Set(picked);
   const unchecked = shown
@@ -186,20 +197,26 @@ function SelectionBar({ shown, total, picked, onChange }: SelectionProps) {
   return (
     <div className={styles.toolbar}>
       <span className={styles.count}>
-        {shown.length === total
-          ? giftsLabel(total, language)
-          : `${shown.length} of ${giftsLabel(total, language)}`}
-        {` · ${picked.length} selected`}
+        {t("components.picker.selected", {
+          items:
+            shown.length === total
+              ? giftsLabel(total, language)
+              : t("components.gifts.shownOf", {
+                  shown: shown.length,
+                  gifts: giftsLabel(total, language),
+                }),
+          count: picked.length,
+        })}
       </span>
       <div className={styles.actions}>
         <Btn
           disabled={unchecked.length === 0}
           onClick={() => onChange([...picked, ...unchecked])}
         >
-          Select all shown
+          {t("components.gifts.selectAll")}
         </Btn>
         <Btn disabled={picked.length === 0} onClick={() => onChange([])}>
-          Clear
+          {t("common.clear")}
         </Btn>
       </div>
     </div>

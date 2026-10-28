@@ -8,6 +8,7 @@ import {
   VoiceFilter,
   voiceKey,
 } from "@/helper/voices";
+import { useT } from "@/ui/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Btn, Input, Select } from "../Elements";
 import { Modal } from "../Modal";
@@ -33,6 +34,7 @@ export function VoicePicker({
   onSelect,
   onClose,
 }: Props) {
+  const t = useT();
   const [filter, setFilter] = useState<VoiceFilter>({
     search: "",
     engine: "",
@@ -64,16 +66,16 @@ export function VoicePicker({
 
   return (
     <Modal
-      title="Select a voice"
-      description="Search by name, or narrow the list by engine and language. Play a voice to hear it."
+      title={t("components.voicePicker.title")}
+      description={t("components.voicePicker.description")}
       maxWidth="640px"
       onClose={onClose}
-      footer={<Btn onClick={onClose}>Cancel</Btn>}
+      footer={<Btn onClick={onClose}>{t("common.cancel")}</Btn>}
     >
       <div className={styles.filters}>
         <Input
           autoFocus
-          placeholder="Search voices..."
+          placeholder={t("components.voicePicker.searchPlaceholder")}
           value={filter.search}
           onChange={(e) => setFilter({ ...filter, search: e.target.value })}
         />
@@ -117,7 +119,9 @@ export function VoicePicker({
 
         {shown.length === 0 && (
           <p className={styles.status}>
-            {voices.length === 0 ? "No voices available." : "No voices match."}
+            {voices.length === 0
+              ? t("components.voicePicker.empty")
+              : t("components.voicePicker.noMatch")}
           </p>
         )}
       </div>

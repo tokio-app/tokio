@@ -1,5 +1,6 @@
 import { Permissions } from "@/common/schemas";
 import { Updater } from "@/hooks/useImmerState";
+import { useT } from "@/ui/i18n";
 import { Check, ListTextarea, NumberInput } from "../Elements";
 import { Field, Section } from "../Page";
 import styles from "./permissionssection.module.css";
@@ -7,25 +8,29 @@ import styles from "./permissionssection.module.css";
 interface Props {
   permissions: Permissions;
   update: Updater<Permissions>;
-  // Feature name shown in the description
-  feature: "TTS" | "Music";
+  // Feature name shown in the description, in the window's language
+  feature: string;
 }
 
 const ROLES = [
-  { key: "all", label: "Allow Everyone" },
-  { key: "followers", label: "Followers Only" },
-  { key: "superfans", label: "Superfans Only" },
-  { key: "moderators", label: "Moderators Only" },
+  { key: "all", label: "components.permissions.all" },
+  { key: "followers", label: "components.permissions.followers" },
+  { key: "superfans", label: "components.permissions.superfans" },
+  { key: "moderators", label: "components.permissions.moderators" },
 ] as const;
 
 export function PermissionsSection({ permissions, update, feature }: Props) {
+  const t = useT();
   return (
-    <Section title="Permissions" description={`Who can use ${feature}.`}>
+    <Section
+      title={t("components.permissions.title")}
+      description={t("components.permissions.description", { feature })}
+    >
       <div className={styles.grid}>
         {ROLES.map(({ key, label }) => (
           <Check
             key={key}
-            label={label}
+            label={t(label)}
             checked={permissions[key]}
             onChange={(e) =>
               update((p) => {
@@ -36,7 +41,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
         ))}
 
         <Check
-          label="Minimum Fan Level"
+          label={t("components.permissions.level")}
           checked={permissions.level.enabled}
           onChange={(e) =>
             update((p) => {
@@ -61,7 +66,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
       </div>
 
       <Check
-        label="Enable Whitelist / Blacklist"
+        label={t("components.permissions.list")}
         checked={permissions.list.enabled}
         onChange={(e) =>
           update((p) => {
@@ -72,9 +77,12 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
 
       {permissions.list.enabled && (
         <>
-          <Field label="Whitelist" hint="(comma separated)">
+          <Field
+            label={t("components.permissions.whitelist")}
+            hint={t("components.permissions.listHint")}
+          >
             <ListTextarea
-              placeholder="@handle1, @handle2, @handle3, ..."
+              placeholder={t("components.permissions.listPlaceholder")}
               value={permissions.list.white}
               onChange={(white) =>
                 update((p) => {
@@ -83,9 +91,12 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
               }
             />
           </Field>
-          <Field label="Blacklist" hint="(comma separated)">
+          <Field
+            label={t("components.permissions.blacklist")}
+            hint={t("components.permissions.listHint")}
+          >
             <ListTextarea
-              placeholder="@handle1, @handle2, @handle3, ..."
+              placeholder={t("components.permissions.listPlaceholder")}
               value={permissions.list.black}
               onChange={(black) =>
                 update((p) => {
