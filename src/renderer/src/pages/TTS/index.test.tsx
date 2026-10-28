@@ -409,6 +409,33 @@ describe("TTS", () => {
     ]);
   });
 
+  it("adds a special user, picks their voice and removes them", async () => {
+    const { user } = await setup();
+    const users = section("Special users");
+    expect(users.getByText("No special users yet.")).toBeInTheDocument();
+
+    await user.click(users.getByRole("button", { name: "Add user" }));
+    await user.type(users.getByPlaceholderText("@handle"), "@alice");
+    await send(APP_EVENTS_RESPONSE.GET_VOICES, {
+      success: true,
+      voices: [aria, guy],
+      engines: [engine("edge", "Edge")],
+    });
+    // A new user starts with the page's voice
+    await user.click(users.getByRole("button", { name: /en-US-AriaNeural/ }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByTitle("en-US-GuyNeural"),
+    );
+
+    const settings = await saved();
+    expect(settings.user_voices).toEqual([{ handle: "@alice", voice: guy }]);
+    expect(settings.voice).toEqual(aria);
+
+    await user.click(users.getByRole("button", { name: "Remove" }));
+    expect(users.getByText("No special users yet.")).toBeInTheDocument();
+    expect((await saved()).user_voices).toEqual([]);
+  });
+
   it("changes the protection limits and the banned words", async () => {
     const { user } = await setup();
 

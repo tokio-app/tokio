@@ -193,6 +193,25 @@ describe("TTSService", () => {
     });
   });
 
+  it("reads a special user with their voice, other viewers with the page's", async () => {
+    const s = settings((s) => {
+      s.user_voices = [
+        {
+          handle: "@VIEWER",
+          voice: { engine: "Edge", name: "Jorge", lang: "es-MX" },
+        },
+      ];
+    });
+    const edge = vi.spyOn(engine("Edge"), "generateBuffer");
+    const tiktok = vi.spyOn(engine("Default"), "generateBuffer");
+
+    await say("hola", s);
+    await say(chat("hi", { ...viewer, handle: "other" }), s);
+
+    expect(edge).toHaveBeenCalledExactlyOnceWith("hola", "es-MX", "Jorge");
+    expect(tiktok).toHaveBeenCalledExactlyOnceWith("hi", "en", "Default");
+  });
+
   describe("filters", () => {
     it("ignores comments with nothing to read, not even the name", async () => {
       const s = settings((s) => {

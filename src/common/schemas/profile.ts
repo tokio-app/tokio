@@ -440,6 +440,10 @@ export const ProfileSchema = z.object({
         new: z.string(),
       }),
     ),
+    // Special users: chat from these handles is read with their own voice
+    user_voices: z
+      .array(z.object({ handle: z.string(), voice: VoiceSchema }))
+      .default([]),
   }),
   // Defaults keep profiles saved before alerts existed valid.
   alerts: z
