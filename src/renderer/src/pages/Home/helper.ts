@@ -41,8 +41,10 @@ export function joinedText(
   if (others > 0) {
     names.push(translate(language, "home.activity.others", { count: others }));
   }
+  // count picks the verb's number: "kai se unió", "kai y yui se unieron"
   return translate(language, "home.activity.joined", {
     names: listOf(language, names),
+    count,
   });
 }
 
