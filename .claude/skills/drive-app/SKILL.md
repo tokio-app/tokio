@@ -24,6 +24,12 @@ argument-hint: "[what to check]"
 
 `scripts/screenshots.mjs` is a steps file that retakes the README's screenshots into `.github/screenshots/` (the whole window, 1200×800) and the website docs' into `../tokio-web/src/assets/screenshots/` (crops of what each docs section describes), with made-up viewers: `node .claude/skills/drive-app/scripts/drive.mjs --scale 2 .claude/skills/drive-app/scripts/screenshots.mjs`. It needs the network for the official overlays. A docs crop is named after its file, which the docs reference; a new one needs a line in the docs page that shows it.
 
+The website is in English and Spanish, so retake both:
+
+- Add `--lang es-419` to the same command for the Spanish crops. They go to `../tokio-web/src/assets/screenshots/es/`, and the README stays English.
+- Every UI text the script looks for goes through `tr()`: the text is found in `en.json`, and its key is read in the run's language. A text with `{params}`, or one whose keys translate differently, passes its key.
+- What a streamer or viewer typed goes through `say()`, with its Spanish in `TYPED`. A new typed text that a picture shows needs a line there. The Spanish docs' alt texts name what the Spanish pictures show.
+
 ## Helpers
 
 - `page` is the main window. `windowWith("splash.html")` finds a window by the page it loaded.

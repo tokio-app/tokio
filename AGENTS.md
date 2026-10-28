@@ -197,6 +197,8 @@ The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
+It's in English and Spanish, so an update lands in both: its docs in `src/content/docs/docs/` and `src/content/docs/es/docs/`, its pages' text in `src/i18n/en.json` and `es.json`, and the screenshots retaken in both languages. Its Spanish quotes this app's own Spanish labels (`es-419.json`).
+
 ## Overlays repo
 
 The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`), which has its own `AGENTS.md`.
