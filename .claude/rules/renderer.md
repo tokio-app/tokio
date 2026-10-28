@@ -14,6 +14,7 @@ Profile sections save through `useEditableSettings`, single fields through `useA
 - The router's `defaultErrorComponent` keeps a page's render error inside the page, with the title bar and sidebar.
 - A page opened from another page instead of the sidebar (Official overlays) gets a path under its parent's (`/overlays/official`), which keeps the parent's sidebar item active, and a back button in its header (`Section`'s `icon`).
 - Build pages from `components/Page` (`Page`, `Section`, `Field`, `FormGrid`, `EmptyState`); a page module only holds page-specific layout.
+- Every text on screen comes from the locale files through `useT()`, and lint fails on text written into JSX: see `.claude/rules/i18n.md`. Leave room for Spanish, which runs about 25% longer.
 - Components are folders with `index.tsx` and `<name>.module.css`, re-exported from `components/index.tsx`. Use the primitives in `components/Elements` before creating new ones; they take colors from the tokens, not props.
 - `Modal` is the only modal shell. A search in a header is a `SearchToggle`. A value to copy is a `CopyField` with a `title` saying what it copies, or a `CopyButton` among a row's actions.
 - Deleting a sound or media file or removing an overlay asks with `DeleteSoundModal`, `DeleteMediaModal` or `RemoveOverlayModal` (`components/DeleteModals`), which send the request themselves.

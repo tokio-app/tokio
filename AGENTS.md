@@ -35,7 +35,7 @@ The `verify` skill picks the checks a change needs, the Linux run in WSL include
 - `src/preload/`: exposes the typed `window.api.emit` / `window.api.on` bridge. The windows are sandboxed, so it builds as CommonJS (`out/preload/index.cjs`) and can load only `electron` at runtime; anything else it imports must be bundled, like `src/common`.
 - `src/renderer/`: main React UI (pages, components, contexts, router)
 - `src/music/`: separate music window UI, built as a single file into `music-out/`
-- `src/common/`: shared by both processes (Zod schemas, event types, constants, utils). It must not import from `src/main` or `src/renderer`, and must stay free of Node/Electron-only APIs if the renderer uses it.
+- `src/common/`: shared by both processes (Zod schemas, event types, constants, utils, and the locale files in `src/common/i18n`). It must not import from `src/main` or `src/renderer`, and must stay free of Node/Electron-only APIs if the renderer uses it.
 - `src/ui/`: web-only code shared by the main and music windows (design tokens, base CSS, `TitleBar`)
 - `test/`: Vitest setup, fakes, helpers and fixtures; `e2e/`: Playwright tests of the built app
 - `scripts/`: repo maintenance scripts (`edge-tts`, `release-notes`)
@@ -101,6 +101,15 @@ When a procedure changes, update its skill with it.
 
 ## Architecture
 
+### Languages
+
+Tokio is in English and Spanish, following the system's language unless **Settings → Language** picks one. Details in `.claude/rules/i18n.md`.
+
+- Every text the user or the stream sees comes from `src/common/i18n/locales/<tag>.json`. A new language is one new file there; `yarn test` checks it against `en.json`.
+- The windows use `useT()` (`@/ui/i18n`), main uses `t()` (`@/helper/i18n`), and helpers that write text take the `language`. Logs stay English.
+- `react/jsx-no-literals` (`.oxlintrc.json`) fails lint on text written into the windows' JSX or text props.
+- UI text and translations go through the `humanizer` skill.
+
 ### Services (main process)
 
 - Each service lives in `src/main/services/<name>/index.ts` and extends `Service` (or `ProviderService<T>`) from `src/main/services/shared`. It's created once in `src/main/index.ts`, added to `AppServices` (`src/main/types`) and injected into `AppHandler`.
@@ -127,9 +136,9 @@ Live stream events (`TOKIO_EVENTS` / `TokioEventMap`) come from the connector. `
 
 Main tells the renderer what failed so it can show notifications. Types are in `src/common/types/feedback.ts`, helpers in `src/main/helper/feedback.ts` and `src/main/helper/events.ts`.
 
-- Replies use `Reply<{ ... }>`, which adds `error?: AppError` (`{ code: FEEDBACK_CODES, message }`). The message is plain English for the user; details go only to the logs.
+- Replies use `Reply<{ ... }>`, which adds `error?: AppError` (`{ code: FEEDBACK_CODES, message }`). The message is plain text for the user, in their language (`t()`, see Languages); details go only to the logs, in English.
 - `createStack(source)` sets the `FeedbackSource` (and log file) of a page's handlers.
-- `push` options: `failure` (the `AppError` for unexpected throws), `onError(e, error, data, services)` to send the failure reply (`replyFailure(APP_EVENTS_RESPONSE.X)` for a plain `{ success: false, error }`), `notify: false` when the page already shows the failure or for status probes, and `source` to override the stack's.
+- `push` options: `failure` (`{ code, message }` for unexpected throws, its message a locale key that `runEvent` translates when it reports), `onError(e, error, data, services)` to send the failure reply (`replyFailure(APP_EVENTS_RESPONSE.X)` for a plain `{ success: false, error }`), `notify: false` when the page already shows the failure or for status probes, and `source` to override the stack's.
 - Throw `new AppFailure(code, message, { level: "warning", cause })` for an expected failure with its own message or level. A canceled dialog is not a failure: just `return`.
 - Log failures once. If a service already logged it, throw `new LoggedError(res.error)` or pass `{ logged: true }` to `AppFailure`.
 - A store mutator that returns false couldn't write the store file (`JSONManagerService` logged why): send the reply that shows what main holds, then throw `saveFailure()` (`SETTINGS_SAVE_FAILED`), with no success notice.
