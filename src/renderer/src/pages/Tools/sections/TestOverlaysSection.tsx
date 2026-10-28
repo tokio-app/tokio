@@ -1,6 +1,7 @@
 import { TestOverlay } from "@/common/schemas";
 import { getOverlaySocketURL } from "@/common/util";
 import { Btn, CopyField, EmptyState, Input, Section } from "@/components";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import { LuPlus } from "react-icons/lu";
@@ -23,12 +24,13 @@ export function TestOverlaysSection({
   onRemove,
   onTest,
 }: Props) {
+  const t = useT();
   const [name, setName] = useState("");
 
   return (
     <Section
-      title="Test Overlays"
-      description="Send test events to an overlay you're building."
+      title={t("tools.test.title")}
+      description={t("tools.test.description")}
     >
       <form
         className={styles.row}
@@ -40,11 +42,15 @@ export function TestOverlaysSection({
         }}
       >
         <Input
-          placeholder="Overlay name"
+          placeholder={t("tools.test.name")}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <Btn type="submit" disabled={!name.trim()} title="Create ID">
+        <Btn
+          type="submit"
+          disabled={!name.trim()}
+          title={t("tools.test.create")}
+        >
           <LuPlus size={20} />
         </Btn>
       </form>
@@ -58,31 +64,34 @@ export function TestOverlaysSection({
                 <div className={styles.row}>
                   <Btn onClick={() => onTest(overlay.id)}>
                     <PiShootingStarThin size={20} />
-                    Test
+                    {t("common.test")}
                   </Btn>
-                  <Btn title="Delete" onClick={() => onRemove(overlay.id)}>
+                  <Btn
+                    title={t("common.delete")}
+                    onClick={() => onRemove(overlay.id)}
+                  >
                     <FiTrash2 size={18} />
                   </Btn>
                 </div>
               </div>
 
               {/* One a line: side by side they can't shrink and overflow */}
-              <CopyField value={overlay.id} title="Copy ID" />
+              <CopyField value={overlay.id} title={t("tools.test.copyId")} />
               <CopyField
                 value={getOverlaySocketURL(overlay.id)}
-                title="Copy WebSocket URL"
+                title={t("tools.test.copyUrl")}
               />
 
               {statuses[overlay.id] && (
                 <p className={styles.test_status}>
-                  {STATUS_LABELS[statuses[overlay.id]]}
+                  {t(STATUS_LABELS[statuses[overlay.id]])}
                 </p>
               )}
             </div>
           ))}
         </div>
       ) : (
-        <EmptyState>No test overlays yet.</EmptyState>
+        <EmptyState>{t("tools.test.empty")}</EmptyState>
       )}
     </Section>
   );

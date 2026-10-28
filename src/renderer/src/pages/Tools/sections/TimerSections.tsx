@@ -16,7 +16,7 @@ import {
 import { cx } from "@/helper";
 import { flushSettings, scopeUpdater, Updater, useAutosave } from "@/hooks";
 import homeStyles from "@/pages/Home/home.module.css";
-import { useT } from "@/ui/i18n";
+import { rich, useLanguage, useT } from "@/ui/i18n";
 import { produce } from "immer";
 import { useId, useState } from "react";
 import {
@@ -68,6 +68,8 @@ function CountdownSection({
   settings,
   update,
 }: SectionProps & { timer: TimerPush }) {
+  const t = useT();
+  const language = useLanguage();
   const { state } = timer.data;
   const { status } = state;
   const running = status === "running";
@@ -85,8 +87,8 @@ function CountdownSection({
 
   return (
     <Section
-      title="Countdown Timer"
-      description="A countdown viewers add time to."
+      title={t("tools.countdown.title")}
+      description={t("tools.countdown.description")}
     >
       <TimerPreview timer={timer} settings={settings} />
 
@@ -95,7 +97,7 @@ function CountdownSection({
           <span
             className={cx(homeStyles.dot, running && homeStyles.dot_live)}
           />
-          {timerStatusText(state)}
+          {timerStatusText(state, language)}
         </p>
         <div className={styles.row}>
           <Btn
@@ -103,19 +105,19 @@ function CountdownSection({
             disabled={running || state.remaining <= 0}
             onClick={() => control("start")}
           >
-            <FiPlay size={16} /> Start
+            <FiPlay size={16} /> {t("tools.countdown.start")}
           </Btn>
           <Btn disabled={!running} onClick={() => control("pause")}>
-            <FiPause size={16} /> Pause
+            <FiPause size={16} /> {t("common.pause")}
           </Btn>
           <Btn
             disabled={!running && status !== "paused"}
             onClick={() => control("stop")}
           >
-            <FiSquare size={16} /> Stop
+            <FiSquare size={16} /> {t("common.stop")}
           </Btn>
           <Btn disabled={status === "idle"} onClick={() => setResetting(true)}>
-            <FiRotateCcw size={16} /> Reset
+            <FiRotateCcw size={16} /> {t("common.reset")}
           </Btn>
         </div>
       </div>
@@ -123,22 +125,25 @@ function CountdownSection({
       <div className={styles.row}>
         <NumberInput
           className={styles.minutes}
-          aria-label="Minutes to add or remove"
+          aria-label={t("tools.countdown.adjust")}
           min={0}
           value={minutes}
           onChange={setMinutes}
         />
-        <span className={styles.unit}>minutes</span>
+        <span className={styles.unit}>{t("tools.countdown.minutes")}</span>
         <Btn disabled={!canAdjust} onClick={() => adjust(-1)}>
-          <FiMinus size={16} /> Remove
+          <FiMinus size={16} /> {t("common.remove")}
         </Btn>
         <Btn disabled={!canAdjust} onClick={() => adjust(1)}>
-          <FiPlus size={16} /> Add
+          <FiPlus size={16} /> {t("common.add")}
         </Btn>
       </div>
 
       <FormGrid>
-        <Field label="Starting time" hint="(minutes)">
+        <Field
+          label={t("tools.countdown.startingTime")}
+          hint={t("tools.countdown.startingTimeHint")}
+        >
           <NumberInput
             integer
             min={1}
@@ -150,16 +155,16 @@ function CountdownSection({
             }
           />
         </Field>
-        <Field label="Overlay URL">
+        <Field label={t("tools.countdown.url")}>
           <CopyField
             value={getOverlayURL(TIMER_PATH)}
-            title="Copy the timer's URL"
+            title={t("tools.countdown.copyUrl")}
           />
         </Field>
       </FormGrid>
 
       <Check
-        label="Pause when the LIVE ends or disconnects"
+        label={t("tools.countdown.pauseOnEnd")}
         checked={settings.pause_on_end}
         onChange={(e) =>
           update((s) => {
@@ -170,9 +175,11 @@ function CountdownSection({
 
       {resetting && (
         <Modal
-          title="Reset the timer?"
-          description={`It goes back to the starting time, ${formatAdded(settings.start * 60_000)}. The time added so far is lost.`}
-          confirmText="Reset"
+          title={t("tools.countdown.resetTitle")}
+          description={t("tools.countdown.resetDescription", {
+            time: formatAdded(settings.start * 60_000),
+          })}
+          confirmText={t("common.reset")}
           onClose={() => setResetting(false)}
           onConfirm={() => {
             control("reset");
@@ -185,22 +192,26 @@ function CountdownSection({
 }
 
 const COLORS = [
-  { key: "clock_color", label: "Clock" },
-  { key: "title_color", label: "Title" },
-  { key: "accent_color", label: "Added time" },
-  { key: "warning_color", label: "Warning" },
+  { key: "clock_color", label: "tools.look.clockColor" },
+  { key: "title_color", label: "tools.look.titleColor" },
+  { key: "accent_color", label: "tools.look.accentColor" },
+  { key: "warning_color", label: "tools.look.warningColor" },
 ] as const;
 
 function TimerLookSection({ settings, update }: SectionProps) {
+  const t = useT();
   const { look } = settings;
   const set = scopeUpdater(update, "look");
 
   return (
-    <Section title="Timer Look" description="How it shows on stream.">
+    <Section
+      title={t("tools.look.title")}
+      description={t("tools.look.description")}
+    >
       {/* First, as they show the most in the preview above */}
       <div className={styles.colors}>
         {COLORS.map(({ key, label }) => (
-          <Field key={key} label={label}>
+          <Field key={key} label={t(label)}>
             <Color
               value={look[key]}
               onChange={(color) =>
@@ -214,7 +225,10 @@ function TimerLookSection({ settings, update }: SectionProps) {
       </div>
 
       <FormGrid>
-        <Field label="Title" hint="(optional)">
+        <Field
+          label={t("tools.look.titleField")}
+          hint={t("tools.look.titleHint")}
+        >
           <Input
             maxLength={60}
             value={look.title}
@@ -226,7 +240,10 @@ function TimerLookSection({ settings, update }: SectionProps) {
             }}
           />
         </Field>
-        <Field label="Warning" hint="(minutes before the end, 0 = off)">
+        <Field
+          label={t("tools.look.warning")}
+          hint={t("tools.look.warningHint")}
+        >
           <NumberInput
             min={0}
             value={look.warn_at}
@@ -237,7 +254,7 @@ function TimerLookSection({ settings, update }: SectionProps) {
             }
           />
         </Field>
-        <Field label="Clock font">
+        <Field label={t("tools.look.clockFont")}>
           <Input
             maxLength={60}
             placeholder="Archivo"
@@ -250,7 +267,7 @@ function TimerLookSection({ settings, update }: SectionProps) {
             }}
           />
         </Field>
-        <Field label="Title font">
+        <Field label={t("tools.look.titleFont")}>
           <Input
             maxLength={60}
             placeholder="Archivo"
@@ -263,13 +280,11 @@ function TimerLookSection({ settings, update }: SectionProps) {
             }}
           />
         </Field>
-        <p className={styles.note}>
-          Fonts installed on the computer with your streaming app.
-        </p>
+        <p className={styles.note}>{t("tools.look.fontsNote")}</p>
       </FormGrid>
 
       <Check
-        label="Show the multiplier"
+        label={t("tools.look.showMultiplier")}
         checked={look.show_multiplier}
         onChange={(e) =>
           set((l) => {
@@ -278,7 +293,7 @@ function TimerLookSection({ settings, update }: SectionProps) {
         }
       />
       <Check
-        label="Show the triggers, one at a time"
+        label={t("tools.look.showTriggers")}
         checked={look.show_triggers}
         onChange={(e) =>
           set((l) => {
@@ -305,18 +320,14 @@ function TriggerNames({ settings, update }: SectionProps) {
   );
 
   if (shown.length === 0) {
-    return (
-      <p className={styles.note_plain}>
-        No trigger adds time yet. Set their seconds in Time Added.
-      </p>
-    );
+    return <p className={styles.note_plain}>{t("tools.look.noTriggers")}</p>;
   }
   return (
-    <ul className={styles.triggers} aria-label="Names on stream">
+    <ul className={styles.triggers} aria-label={t("tools.look.names")}>
       {shown.map(({ key, label }) => (
         <li key={key} className={styles.trigger}>
           <label htmlFor={`${id}-${key}`} className={styles.trigger_label}>
-            {label}
+            {t(label)}
           </label>
           <span className={styles.trigger_rule}>
             {/* Coins and likes show after their count. A column for every
@@ -328,7 +339,7 @@ function TriggerNames({ settings, update }: SectionProps) {
             <Input
               id={`${id}-${key}`}
               // Apart from the seconds field with the same label
-              aria-label={`${label} on stream`}
+              aria-label={t("tools.look.nameOnStream", { trigger: t(label) })}
               className={styles.name}
               maxLength={40}
               // Blank, the carousel shows the app language's name
@@ -349,14 +360,18 @@ function TriggerNames({ settings, update }: SectionProps) {
 }
 
 function TimeAddedSection({ settings, update }: SectionProps) {
+  const t = useT();
   const id = useId();
   const seconds = scopeUpdater(update, "seconds");
   const chat = scopeUpdater(update, "chat");
 
   return (
-    <Section title="Time Added" description="Seconds per trigger.">
+    <Section
+      title={t("tools.added.title")}
+      description={t("tools.added.description")}
+    >
       <FormGrid>
-        <Field label="Multiplier" hint="(×)">
+        <Field label={t("tools.added.multiplier")} hint="(×)">
           <NumberInput
             min={0}
             value={settings.multiplier}
@@ -367,7 +382,7 @@ function TimeAddedSection({ settings, update }: SectionProps) {
             }
           />
         </Field>
-        <Field label="Maximum time" hint="(minutes, 0 = no limit)">
+        <Field label={t("tools.added.cap")} hint={t("tools.added.capHint")}>
           <NumberInput
             min={0}
             value={settings.cap}
@@ -384,27 +399,28 @@ function TimeAddedSection({ settings, update }: SectionProps) {
         {TRIGGERS.map(({ key, label, rule }) => (
           <li key={key} className={styles.trigger}>
             <label htmlFor={`${id}-${key}`} className={styles.trigger_label}>
-              {label}
+              {t(label)}
             </label>
             <div className={styles.trigger_rules}>
               <span className={styles.trigger_rule}>
-                <NumberInput
-                  id={`${id}-${key}`}
-                  className={styles.seconds}
-                  min={0}
-                  value={settings.seconds[key]}
-                  onChange={(value) =>
-                    seconds((s) => {
-                      s[key] = value;
-                    })
-                  }
-                />
-                {rule}
-                {key === "likes" && (
-                  <>
+                {rich(t(rule), {
+                  input: (
+                    <NumberInput
+                      id={`${id}-${key}`}
+                      className={styles.seconds}
+                      min={0}
+                      value={settings.seconds[key]}
+                      onChange={(value) =>
+                        seconds((s) => {
+                          s[key] = value;
+                        })
+                      }
+                    />
+                  ),
+                  likes: (
                     <NumberInput
                       className={styles.seconds}
-                      aria-label="Likes per cycle"
+                      aria-label={t("tools.added.likesPerCycle")}
                       integer
                       min={1}
                       value={settings.seconds.likes_every}
@@ -414,16 +430,15 @@ function TimeAddedSection({ settings, update }: SectionProps) {
                         })
                       }
                     />
-                    likes
-                  </>
-                )}
+                  ),
+                })}
               </span>
               {key === "chat" && (
                 <>
                   {/* Matched like chat alerts' keywords */}
                   <Input
-                    aria-label="Keyword or phrase"
-                    placeholder="Any message"
+                    aria-label={t("tools.added.keyword")}
+                    placeholder={t("tools.added.anyMessage")}
                     value={settings.chat.keyword}
                     onChange={(e) => {
                       const keyword = e.target.value;
@@ -433,19 +448,21 @@ function TimeAddedSection({ settings, update }: SectionProps) {
                     }}
                   />
                   <span className={styles.trigger_rule}>
-                    once per viewer every
-                    <NumberInput
-                      className={styles.seconds}
-                      aria-label="Seconds between a viewer's messages"
-                      min={0}
-                      value={settings.chat.cooldown}
-                      onChange={(cooldown) =>
-                        chat((c) => {
-                          c.cooldown = cooldown;
-                        })
-                      }
-                    />
-                    seconds
+                    {rich(t("tools.rules.cooldown"), {
+                      input: (
+                        <NumberInput
+                          className={styles.seconds}
+                          aria-label={t("tools.added.cooldown")}
+                          min={0}
+                          value={settings.chat.cooldown}
+                          onChange={(cooldown) =>
+                            chat((c) => {
+                              c.cooldown = cooldown;
+                            })
+                          }
+                        />
+                      ),
+                    })}
                   </span>
                 </>
               )}

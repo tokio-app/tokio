@@ -3,12 +3,14 @@ import { timerStatusText } from "./helper";
 
 describe("timerStatusText", () => {
   it("says when the time is up", () => {
-    expect(timerStatusText({ status: "stopped", remaining: 0 })).toBe(
+    expect(timerStatusText({ status: "stopped", remaining: 0 }, "en")).toBe(
       "Time's up",
     );
-    expect(timerStatusText({ status: "stopped", remaining: 1 })).toBe(
+    expect(timerStatusText({ status: "stopped", remaining: 1 }, "en")).toBe(
       "Stopped",
     );
-    expect(timerStatusText({ status: "idle", remaining: 0 })).toBe("Ready");
+    expect(timerStatusText({ status: "idle", remaining: 0 }, "en")).toBe(
+      "Ready",
+    );
   });
 });
