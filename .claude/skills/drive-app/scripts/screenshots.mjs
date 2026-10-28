@@ -431,6 +431,22 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     .getByPlaceholder(tr("Type a message to test how the TTS sounds..."))
     .fill(say("brb, getting a drink"));
   await crop("tts-voice", body(tr("Voice")));
+  // Special users, on voices of two engines
+  for (const [handle, name] of [
+    ["@lucia.lima", "Dalia"],
+    ["@marco_gamer", "Jessie"],
+  ]) {
+    await page.getByTitle(tr("Add user")).click();
+    await page.getByPlaceholder(tr("@handle")).last().fill(handle);
+    // A new user starts with the page's voice
+    await body(tr("Special users"))
+      .getByRole("button", { name: /^Jenny/ })
+      .click();
+    await dialog.getByPlaceholder(tr("Search voices...")).fill(name);
+    await dialog.getByTitle(name, { exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+  }
+  await crop("tts-special-users", body(tr("Special users")));
   await crop("tts-format", body(tr("Format")));
   const replacements = [
     ["brb", "be right back"],
