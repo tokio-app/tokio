@@ -21,6 +21,11 @@ const asReplyEvent = (value: any): ReplyEvent => value;
 
 const failure = {
   code: FEEDBACK_CODES.PROFILE_CREATE_FAILED,
+  message: "main.failure.createProfile",
+} as const;
+// The failure as reported, its key translated
+const failureError = {
+  code: FEEDBACK_CODES.PROFILE_CREATE_FAILED,
   message: "Unable to create the profile.",
 };
 
@@ -119,12 +124,12 @@ describe("runEvent", () => {
 
     expect(reply).toHaveBeenCalledWith(APP_EVENTS_RESPONSE.CREATE_PROFILE, {
       success: false,
-      error: failure,
+      error: failureError,
     });
     expect(sent[0]).toMatchObject({
       source: "alerts",
       level: "error",
-      ...failure,
+      ...failureError,
     });
     expect(logError).toHaveBeenCalledWith(
       expect.stringContaining("EACCES"),

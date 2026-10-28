@@ -1,6 +1,7 @@
 import { Profile } from "@/common/schemas";
 import { Btn, NumberInput, SearchToggle, Section, Toggle } from "@/components";
 import { Updater } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { Ref } from "react";
 import { MdOutlineAddAlert } from "react-icons/md";
 import styles from "../alerts.module.css";
@@ -27,18 +28,19 @@ export function HeaderSection({
   onAdd,
   update,
 }: Props) {
+  const t = useT();
   return (
     <Section
-      title="Alerts"
-      description="Enhance your stream with custom alerts."
+      title={t("alerts.header.title")}
+      description={t("alerts.header.description")}
       actions={
         <>
           <SearchToggle
-            placeholder="Search alerts..."
+            placeholder={t("alerts.header.searchPlaceholder")}
             value={search}
             onChange={onSearch}
           />
-          <Btn ref={addRef} title="Add alert" onClick={onAdd}>
+          <Btn ref={addRef} title={t("alerts.header.add")} onClick={onAdd}>
             <MdOutlineAddAlert size={20} />
           </Btn>
         </>
@@ -46,7 +48,7 @@ export function HeaderSection({
     >
       <div className={styles.settings}>
         <Toggle
-          label="Play alerts simultaneously"
+          label={t("alerts.header.simultaneous")}
           checked={simultaneous}
           onChange={(e) =>
             update((s) => {
@@ -55,7 +57,7 @@ export function HeaderSection({
           }
         />
         <label className={styles.queue_length}>
-          Max queue length
+          {t("common.maxQueueLength")}
           <NumberInput
             min={1}
             integer

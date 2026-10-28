@@ -264,7 +264,7 @@ describe("AlertItem", () => {
 
 describe("triggerSummary", () => {
   const sum = (trigger: Partial<Alert["trigger"]>) =>
-    triggerSummary(alert({}, trigger).trigger, GIFTS, EMOTES);
+    triggerSummary(alert({}, trigger).trigger, GIFTS, EMOTES, "en");
 
   it("counts the coins only for any gift", () => {
     expect(sum({ type: TOKIO_EVENTS.GIFT, min_coins: 100 })).toBe(
@@ -305,14 +305,14 @@ describe("triggerSummary", () => {
     const gifts = [...GIFTS, gift(1, "Lion"), gift(2, "Galaxy")];
     const emotes = [...EMOTES, ...EMOTES.map((e) => ({ ...e, value: "x" }))];
     const of = (trigger: Partial<Alert["trigger"]>) =>
-      triggerSummary(alert({}, trigger).trigger, gifts, emotes);
+      triggerSummary(alert({}, trigger).trigger, gifts, emotes, "en");
 
     expect(of({ type: TOKIO_EVENTS.GIFT, gifts: [5655, 6064, 1, 2] })).toBe(
-      "Rose, GG or 2 more, when the streak ends",
+      "Rose, GG, or 2 more, when the streak ends",
     );
     expect(
       of({ type: EMOTE_TRIGGER, emotes: ["emote-1", "emote-2", "x", "x"] }),
-    ).toBe("Emote 1, Emote 2 or 2 more");
+    ).toBe("Emote 1, Emote 2, or 2 more");
   });
 
   it("counts on gifts the lists don't have yet", () => {

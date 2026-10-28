@@ -1,3 +1,4 @@
+import type { MessageKey } from "@/common/i18n";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -92,8 +93,9 @@ export type EventCallback<K extends APP_EVENTS> = (
 export interface EventOptions<K extends APP_EVENTS> {
   // Where failures are logged and reported, the stack's source by default
   source?: FeedbackSource;
-  // Reported when the handler throws something other than an AppFailure
-  failure?: AppError;
+  // Reported when the handler throws something other than an AppFailure. Its
+  // message is a key, translated when it's reported.
+  failure?: Omit<AppError, "message"> & { message: MessageKey };
   // Sends the page's failure reply
   onError?: (
     event: ReplyEvent,

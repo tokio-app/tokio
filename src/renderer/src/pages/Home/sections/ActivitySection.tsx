@@ -1,7 +1,9 @@
+import { MessageKey } from "@/common/i18n";
 import { ActivityItem, ActivityUser } from "@/common/types";
 import { Btn, EmptyState, Section } from "@/components";
 import { cx } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
+import { rich, useLanguage, useT } from "@/ui/i18n";
 import { FiSettings } from "react-icons/fi";
 import styles from "../home.module.css";
 import { joinedText, Stat, statText } from "../helper";
@@ -34,45 +36,62 @@ function Avatar({ user }: { user: ActivityUser }) {
   );
 }
 
-const DID = {
-  follow: "followed you",
-  share: "shared the LIVE",
-  superfan: "became a Super Fan",
+const DID: Record<"follow" | "share" | "superfan", MessageKey> = {
+  follow: "home.activity.followed",
+  share: "home.activity.shared",
+  superfan: "home.activity.superfan",
 };
 
-// What the viewer did, after their name
+// The viewer's name and what they did, in the language's order
 function Action({ item }: { item: Exclude<ActivityItem, { type: "join" }> }) {
+  const t = useT();
+  const language = useLanguage();
+  const name = (
+    <span className={styles.event_name} title={`@${item.user.handle}`}>
+      {item.user.name}
+    </span>
+  );
   if (item.type === "chat") {
     return (
-      <p className={styles.event_message}>
-        {item.text}
-        {item.emotes.map((emote, i) => (
-          <img key={i} className={styles.inline_img} src={emote} alt="" />
-        ))}
-      </p>
-    );
-  }
-  if (item.type === "gift") {
-    const { name, count } = item.gift;
-    return (
       <>
-        {count > 1 ? `sent ${name} ×${count}` : `sent ${name}`}
-        {item.gift.image && (
-          <img className={styles.inline_img} src={item.gift.image} alt="" />
-        )}{" "}
-        <span className={styles.coins}>{coinsLabel(item.gift.coins)}</span>
+        {name}{" "}
+        <p className={styles.event_message}>
+          {item.text}
+          {item.emotes.map((emote, i) => (
+            <img key={i} className={styles.inline_img} src={emote} alt="" />
+          ))}
+        </p>
       </>
     );
   }
-  return DID[item.type];
+  if (item.type === "gift") {
+    const { count } = item.gift;
+    const sent =
+      count > 1
+        ? t("home.activity.giftCount", { gift: item.gift.name, count })
+        : t("home.activity.gift", { gift: item.gift.name });
+    return (
+      <>
+        {rich(sent, { name })}
+        {item.gift.image && (
+          <img className={styles.inline_img} src={item.gift.image} alt="" />
+        )}{" "}
+        <span className={styles.coins}>
+          {coinsLabel(item.gift.coins, language)}
+        </span>
+      </>
+    );
+  }
+  return rich(t(DID[item.type]), { name });
 }
 
 function Event({ item }: { item: ActivityItem }) {
+  const language = useLanguage();
   if (item.type === "join") {
     return (
       <li className={cx(styles.event, styles.event_quiet)}>
         <Avatar user={item.users[0]} />
-        {joinedText(item.users, item.count)}
+        {joinedText(item.users, item.count, language)}
       </li>
     );
   }
@@ -80,21 +99,16 @@ function Event({ item }: { item: ActivityItem }) {
     <li className={styles.event}>
       <Avatar user={item.user} />
       <div className={styles.event_body}>
-        <span className={styles.event_name} title={`@${item.user.handle}`}>
-          {item.user.name}
-        </span>{" "}
         <Action item={item} />
       </div>
     </li>
   );
 }
 
-function emptyText(connected: boolean, feedOff: boolean) {
-  if (feedOff) {
-    return "Every event is hidden. Pick what the feed shows in its settings.";
-  }
-  if (connected) return "Waiting for the first event…";
-  return "Your LIVE's events show up here once you're connected.";
+function emptyText(connected: boolean, feedOff: boolean): MessageKey {
+  if (feedOff) return "home.activity.feedOff";
+  if (connected) return "home.activity.waiting";
+  return "home.activity.offline";
 }
 
 export function ActivitySection({
@@ -104,24 +118,30 @@ export function ActivitySection({
   feedOff,
   onFeedSettings,
 }: Props) {
+  const t = useT();
+  const language = useLanguage();
   return (
     <Section
-      title="Activity"
+      title={t("home.activity.title")}
       actions={
-        <Btn variant="icon" title="Feed settings" onClick={onFeedSettings}>
+        <Btn
+          variant="icon"
+          title={t("home.activity.feedSettings")}
+          onClick={onFeedSettings}
+        >
           <FiSettings size={18} />
         </Btn>
       }
     >
       <div className={styles.totals}>
         {totals.map(({ label, value }) => {
-          const { text, title } = statText(value, connected);
+          const { text, title } = statText(value, connected, language);
           return (
             <div key={label} className={styles.total}>
               <span className={styles.total_value} title={title}>
                 {text}
               </span>
-              <span className={styles.stat_label}>{label}</span>
+              <span className={styles.stat_label}>{t(label)}</span>
             </div>
           );
         })}
@@ -129,10 +149,13 @@ export function ActivitySection({
 
       <div className={styles.feed}>
         {activity.length === 0 ? (
-          <EmptyState>{emptyText(connected, feedOff)}</EmptyState>
+          <EmptyState>{t(emptyText(connected, feedOff))}</EmptyState>
         ) : (
           // Not a live region, a busy chat would flood screen readers
-          <ol className={styles.feed_list} aria-label="Activity">
+          <ol
+            className={styles.feed_list}
+            aria-label={t("home.activity.title")}
+          >
             {activity.map((item) => (
               <Event key={item.id} item={item} />
             ))}

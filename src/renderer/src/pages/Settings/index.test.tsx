@@ -17,7 +17,7 @@ const profiles = settingsReply((s) => {
 
 const dialog = () => within(screen.getByRole("dialog"));
 
-const serverBox = () => screen.getByRole("checkbox", { name: "Enable Server" });
+const serverBox = () => screen.getByRole("checkbox", { name: "Enable server" });
 const connected = (success: boolean) =>
   send(APP_EVENTS_RESPONSE.CONNECTED, {
     success,
@@ -39,12 +39,14 @@ describe("Settings", () => {
     expect(sent(APP_EVENTS.IS_CONNECTED)).toHaveLength(1);
   });
 
-  describe("Overlay Server", () => {
+  describe("Overlay server", () => {
     it("asks before enabling the server, and Cancel leaves it off", async () => {
       const { user } = await setup();
 
       await user.click(serverBox());
-      expect(dialog().getByText("Enable Overlay Server?")).toBeInTheDocument();
+      expect(
+        dialog().getByText("Enable the overlay server?"),
+      ).toBeInTheDocument();
       expect(serverBox()).not.toBeChecked();
 
       await user.click(dialog().getByRole("button", { name: "Cancel" }));
@@ -59,7 +61,7 @@ describe("Settings", () => {
       const { user } = await setup();
 
       await user.click(serverBox());
-      await user.click(dialog().getByRole("button", { name: "Enable Server" }));
+      await user.click(dialog().getByRole("button", { name: "Enable server" }));
 
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(serverBox()).toBeChecked();
@@ -75,7 +77,7 @@ describe("Settings", () => {
     it("turns the server back off when the hostname fails", async () => {
       const { user } = await setup();
       await user.click(serverBox());
-      await user.click(dialog().getByRole("button", { name: "Enable Server" }));
+      await user.click(dialog().getByRole("button", { name: "Enable server" }));
 
       await send(APP_EVENTS_RESPONSE.REQ_FQDN, failure());
 
@@ -145,11 +147,44 @@ describe("Settings", () => {
     });
   });
 
-  describe("Live Profiles", () => {
+  describe("Language", () => {
+    it("follows the system until a language is picked, each in its own name", async () => {
+      const { user, container } = await setup();
+      const language = section("Language");
+      expect(language.getByText("System language")).toBeInTheDocument();
+
+      await user.click(language.getByText("System language"));
+      expect(inList(container, "English")).not.toBeNull();
+      await user.click(inList(container, "Español")!);
+      expect(language.getByText("Español")).toBeInTheDocument();
+
+      await user.click(language.getByText("Español"));
+      await user.click(inList(container, "System language")!);
+
+      expect(sent(APP_EVENTS.SET_LANGUAGE)).toEqual([
+        { language: "es-419" },
+        { language: "system" },
+      ]);
+    });
+
+    it("shows a saved language Tokio no longer has as the system's", async () => {
+      await setup(
+        settingsReply((s) => {
+          s.settings.language = "fr";
+        }),
+      );
+
+      expect(
+        section("Language").getByText("System language"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("Live profiles", () => {
     it("switches to the profile picked", async () => {
       const { user, container } = await setup();
 
-      await user.click(section("Live Profiles").getByText("Horror"));
+      await user.click(section("Live profiles").getByText("Horror"));
       await user.click(inList(container, "Default")!);
 
       expect(sent(APP_EVENTS.SET_PROFILE)).toEqual([{ file: "default.json" }]);
@@ -164,7 +199,7 @@ describe("Settings", () => {
       await connected(true);
       expect(screen.getByText("(disconnect to switch)")).toBeInTheDocument();
 
-      await user.click(section("Live Profiles").getByText("Horror"));
+      await user.click(section("Live profiles").getByText("Horror"));
       expect(inList(container, "Default")).toBeNull();
 
       await connected(false);
@@ -177,20 +212,20 @@ describe("Settings", () => {
       const { user } = await setup();
 
       await user.click(
-        section("Live Profiles").getByRole("button", { name: "New" }),
+        section("Live profiles").getByRole("button", { name: "New" }),
       );
-      expect(dialog().getByText("Create New Profile")).toBeInTheDocument();
+      expect(dialog().getByText("Create a profile")).toBeInTheDocument();
 
       await user.type(
         dialog().getByPlaceholderText("e.g. Chill Stream"),
         "Chill",
       );
       await user.click(
-        dialog().getByRole("button", { name: "Create Profile" }),
+        dialog().getByRole("button", { name: "Create profile" }),
       );
 
       expect(sent(APP_EVENTS.CREATE_PROFILE)).toEqual([{ name: "Chill" }]);
-      expect(dialog().getByText("Create New Profile")).toBeInTheDocument();
+      expect(dialog().getByText("Create a profile")).toBeInTheDocument();
 
       await send(APP_EVENTS_RESPONSE.CREATE_PROFILE, { success: true });
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -199,26 +234,26 @@ describe("Settings", () => {
     it("keeps the new profile's name to fix when main refuses it", async () => {
       const { user } = await setup();
       await user.click(
-        section("Live Profiles").getByRole("button", { name: "New" }),
+        section("Live profiles").getByRole("button", { name: "New" }),
       );
       const field = dialog().getByPlaceholderText("e.g. Chill Stream");
       await user.type(field, "Horror");
       await user.click(
-        dialog().getByRole("button", { name: "Create Profile" }),
+        dialog().getByRole("button", { name: "Create profile" }),
       );
       // Once until main answers
       await user.click(
-        dialog().getByRole("button", { name: "Create Profile" }),
+        dialog().getByRole("button", { name: "Create profile" }),
       );
       expect(sent(APP_EVENTS.CREATE_PROFILE)).toEqual([{ name: "Horror" }]);
 
       await send(APP_EVENTS_RESPONSE.CREATE_PROFILE, failure());
 
-      expect(dialog().getByText("Create New Profile")).toBeInTheDocument();
+      expect(dialog().getByText("Create a profile")).toBeInTheDocument();
       expect(field).toHaveValue("Horror");
       await user.type(field, " 2");
       await user.click(
-        dialog().getByRole("button", { name: "Create Profile" }),
+        dialog().getByRole("button", { name: "Create profile" }),
       );
       expect(sent(APP_EVENTS.CREATE_PROFILE)).toEqual([
         { name: "Horror" },
@@ -229,16 +264,16 @@ describe("Settings", () => {
     it("doesn't create a profile without a name", async () => {
       const { user } = await setup();
       await user.click(
-        section("Live Profiles").getByRole("button", { name: "New" }),
+        section("Live profiles").getByRole("button", { name: "New" }),
       );
 
       await user.type(dialog().getByPlaceholderText("e.g. Chill Stream"), "  ");
       await user.click(
-        dialog().getByRole("button", { name: "Create Profile" }),
+        dialog().getByRole("button", { name: "Create profile" }),
       );
 
       expect(sent(APP_EVENTS.CREATE_PROFILE)).toEqual([]);
-      expect(dialog().getByText("Create New Profile")).toBeInTheDocument();
+      expect(dialog().getByText("Create a profile")).toBeInTheDocument();
 
       await user.click(dialog().getByRole("button", { name: "Cancel" }));
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -248,21 +283,21 @@ describe("Settings", () => {
       const { user } = await setup();
 
       await user.click(
-        section("Live Profiles").getByRole("button", { name: "Clone" }),
+        section("Live profiles").getByRole("button", { name: "Clone" }),
       );
-      expect(dialog().getByText("Clone Existing Profile")).toBeInTheDocument();
+      expect(dialog().getByText("Clone a profile")).toBeInTheDocument();
       expect(dialog().getByText("Horror")).toBeInTheDocument();
 
       await user.type(
         dialog().getByPlaceholderText("e.g. Horror Stream Layout"),
         "Horror 2",
       );
-      await user.click(dialog().getByRole("button", { name: "Clone Profile" }));
+      await user.click(dialog().getByRole("button", { name: "Clone profile" }));
 
       expect(sent(APP_EVENTS.CLONE_PROFILE)).toEqual([
         { name: "Horror 2", ref: "horror.json" },
       ]);
-      expect(dialog().getByText("Clone Existing Profile")).toBeInTheDocument();
+      expect(dialog().getByText("Clone a profile")).toBeInTheDocument();
 
       await send(APP_EVENTS_RESPONSE.CLONE_PROFILE, { success: true });
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -271,22 +306,22 @@ describe("Settings", () => {
     it("stays open when main refuses the clone", async () => {
       const { user } = await setup();
       await user.click(
-        section("Live Profiles").getByRole("button", { name: "Clone" }),
+        section("Live profiles").getByRole("button", { name: "Clone" }),
       );
       const field = dialog().getByPlaceholderText("e.g. Horror Stream Layout");
       await user.type(field, "Default");
-      await user.click(dialog().getByRole("button", { name: "Clone Profile" }));
+      await user.click(dialog().getByRole("button", { name: "Clone profile" }));
 
       await send(APP_EVENTS_RESPONSE.CLONE_PROFILE, failure());
 
-      expect(dialog().getByText("Clone Existing Profile")).toBeInTheDocument();
+      expect(dialog().getByText("Clone a profile")).toBeInTheDocument();
       expect(field).toHaveValue("Default");
     });
 
     it("clones the profile picked", async () => {
       const { user, container } = await setup();
       await user.click(
-        section("Live Profiles").getByRole("button", { name: "Clone" }),
+        section("Live profiles").getByRole("button", { name: "Clone" }),
       );
 
       await user.click(dialog().getByText("Horror"));
@@ -295,7 +330,7 @@ describe("Settings", () => {
         dialog().getByPlaceholderText("e.g. Horror Stream Layout"),
         "Copy",
       );
-      await user.click(dialog().getByRole("button", { name: "Clone Profile" }));
+      await user.click(dialog().getByRole("button", { name: "Clone profile" }));
 
       expect(sent(APP_EVENTS.CLONE_PROFILE)).toEqual([
         { name: "Copy", ref: "default.json" },
@@ -305,18 +340,18 @@ describe("Settings", () => {
     it("doesn't clone without a name", async () => {
       const { user } = await setup();
       await user.click(
-        section("Live Profiles").getByRole("button", { name: "Clone" }),
+        section("Live profiles").getByRole("button", { name: "Clone" }),
       );
 
-      await user.click(dialog().getByRole("button", { name: "Clone Profile" }));
+      await user.click(dialog().getByRole("button", { name: "Clone profile" }));
 
       expect(sent(APP_EVENTS.CLONE_PROFILE)).toEqual([]);
-      expect(dialog().getByText("Clone Existing Profile")).toBeInTheDocument();
+      expect(dialog().getByText("Clone a profile")).toBeInTheDocument();
     });
 
     it("imports a profile and exports the active one", async () => {
       const { user } = await setup();
-      const profilesSection = section("Live Profiles");
+      const profilesSection = section("Live profiles");
 
       await user.click(profilesSection.getByRole("button", { name: "Import" }));
       await user.click(profilesSection.getByRole("button", { name: "Export" }));

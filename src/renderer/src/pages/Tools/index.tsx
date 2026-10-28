@@ -2,6 +2,7 @@ import { TestOverlay } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { Page } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { TestStatus, TimerPush } from "./helper";
 import { TestOverlaysSection } from "./sections/TestOverlaysSection";
@@ -9,6 +10,7 @@ import { TimerSections } from "./sections/TimerSections";
 import styles from "./tools.module.css";
 
 export function Tools() {
+  const t = useT();
   const [testOverlays, setTestOverlays] = useState<TestOverlay[]>([]);
   const [statuses, setStatuses] = useState<Record<string, TestStatus>>({});
   const [serverEnabled, setServerEnabled] = useState(true);
@@ -44,10 +46,7 @@ export function Tools() {
   return (
     <Page width="wide" layout="aside">
       {!serverEnabled && (
-        <p className={styles.notice}>
-          The overlay server is off. Enable it in Settings to show the timer on
-          stream and send test events.
-        </p>
+        <p className={styles.notice}>{t("tools.serverOff")}</p>
       )}
 
       {timer && <TimerSections timer={timer} />}

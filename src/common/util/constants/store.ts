@@ -18,6 +18,7 @@ export const defaultStoreData: StoreSchema = {
     tray: {
       enabled: true,
     },
+    language: "system",
     overlays: [],
     testOverlays: [],
     sounds: [],

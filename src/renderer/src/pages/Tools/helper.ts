@@ -1,28 +1,34 @@
+import { MessageKey, translate } from "@/common/i18n";
 import { TimerSettings, TimerStatus } from "@/common/schemas";
 import { TimerData, TimerState } from "@/common/types";
 
 // Result of the last test events sent to a test overlay
 export type TestStatus = "sent" | "no-client";
 
-export const STATUS_LABELS: Record<TestStatus, string> = {
-  sent: "Test events sent.",
-  "no-client": "No overlay connected with this ID.",
+export const STATUS_LABELS: Record<TestStatus, MessageKey> = {
+  sent: "tools.test.sent",
+  "no-client": "tools.test.noClient",
 };
 
 // The last TIMER from main, with the performance.now() it came at, which the
 // preview counts down from
 export type TimerPush = { data: TimerData; at: number };
 
-const TIMER_LABELS: Record<TimerStatus, string> = {
-  idle: "Ready",
-  running: "Running",
-  paused: "Paused",
-  stopped: "Stopped",
+const TIMER_LABELS: Record<TimerStatus, MessageKey> = {
+  idle: "tools.timer.idle",
+  running: "tools.timer.running",
+  paused: "tools.timer.paused",
+  stopped: "tools.timer.stopped",
 };
 
-export function timerStatusText({ status, remaining }: TimerState): string {
-  if (status === "stopped" && remaining === 0) return "Time's up";
-  return TIMER_LABELS[status];
+export function timerStatusText(
+  { status, remaining }: TimerState,
+  language: string,
+): string {
+  if (status === "stopped" && remaining === 0) {
+    return translate(language, "tools.timer.timeUp");
+  }
+  return translate(language, TIMER_LABELS[status]);
 }
 
 // The triggers that add time, as rows that read "Follows [30] seconds each".
@@ -30,13 +36,18 @@ export function timerStatusText({ status, remaining }: TimerState): string {
 // Their keys name their names in the carousel too.
 export const TRIGGERS: {
   key: keyof TimerSettings["look"]["names"];
-  label: string;
-  rule: string;
+  label: MessageKey;
+  // With the seconds field as {input}, and the likes per cycle as {likes}
+  rule: MessageKey;
 }[] = [
-  { key: "coin", label: "Coins", rule: "seconds per coin" },
-  { key: "likes", label: "Likes", rule: "seconds every" },
-  { key: "superfan", label: "New Super Fans", rule: "seconds each" },
-  { key: "follow", label: "Follows", rule: "seconds each" },
-  { key: "share", label: "Shares", rule: "seconds each" },
-  { key: "chat", label: "Chat messages", rule: "seconds each" },
+  { key: "coin", label: "tools.triggers.coin", rule: "tools.rules.perCoin" },
+  { key: "likes", label: "tools.triggers.likes", rule: "tools.rules.likes" },
+  {
+    key: "superfan",
+    label: "tools.triggers.superfan",
+    rule: "tools.rules.each",
+  },
+  { key: "follow", label: "tools.triggers.follow", rule: "tools.rules.each" },
+  { key: "share", label: "tools.triggers.share", rule: "tools.rules.each" },
+  { key: "chat", label: "tools.triggers.chat", rule: "tools.rules.each" },
 ];

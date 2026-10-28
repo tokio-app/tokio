@@ -1,6 +1,7 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, LicenseText } from "@/common/types";
 import { Modal, Spinner } from "@/components";
 import { useIpcListener } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { marked } from "marked";
 import { MouseEvent, useEffect, useMemo, useState } from "react";
 import styles from "../about.module.css";
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function LicenseModal({ id, onClose, onView }: Props) {
+  const t = useT();
   const [license, setLicense] = useState<LicenseText | null>(null);
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export function LicenseModal({ id, onClose, onView }: Props) {
 
   return (
     <Modal
-      title={license?.title ?? "License"}
+      title={license?.title ?? t("about.license")}
       onClose={onClose}
       closeButton
       maxWidth="800px"

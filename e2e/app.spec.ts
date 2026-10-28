@@ -45,9 +45,16 @@ const args = [
   ...(process.env.CI && process.platform === "linux" ? ["--no-sandbox"] : []),
 ];
 
+// English whatever the machine's language, as the tests read the English
+const launch = () =>
+  electron.launch({
+    args,
+    env: { ...env, TOKIO_HOME: home, TOKIO_LANG: "en" },
+  });
+
 test.beforeAll(async () => {
   home = await mkdtemp(join(tmpdir(), "tokio-e2e-"));
-  app = await electron.launch({ args, env: { ...env, TOKIO_HOME: home } });
+  app = await launch();
 });
 
 test.afterAll(async () => {
@@ -113,14 +120,14 @@ test("sets the production CSP on the page loaded from disk", async () => {
 
 test("opens every page from the sidebar", async () => {
   const pages = [
-    ["Overlays", "Overlay Gallery"],
+    ["Overlays", "Overlay gallery"],
     ["TTS", "Voice"],
     ["Alerts", "Alerts"],
     ["Music", "Controls"],
     ["Games", "Actions"],
-    ["Tools", "Test Overlays"],
+    ["Tools", "Test overlays"],
     ["About", "Online services"],
-    ["Settings", "Live Profiles"],
+    ["Settings", "Live profiles"],
     ["Home", "Dashboard"],
   ];
   const sidebar = page.getByRole("navigation");
@@ -138,9 +145,9 @@ test("creates a profile and saves it", async () => {
     .getByRole("navigation")
     .getByRole("link", { name: "Settings" })
     .click();
-  await page.getByTitle("Create New Profile").click();
+  await page.getByTitle("Create a profile").click();
   await page.getByPlaceholder("e.g. Chill Stream").fill("E2E Stream");
-  await page.getByRole("button", { name: "Create Profile" }).click();
+  await page.getByRole("button", { name: "Create profile" }).click();
 
   await expect(page.getByText('Profile "E2E Stream" created.')).toBeVisible();
   const names = await Promise.all(
@@ -167,7 +174,7 @@ test("imports an overlay and runs its preview from disk", async () => {
     .click();
   await page
     .locator("section", {
-      has: page.getByRole("heading", { name: "Overlay Library" }),
+      has: page.getByRole("heading", { name: "Overlay library" }),
     })
     .getByRole("button", { name: "Import" })
     .click();
@@ -282,4 +289,39 @@ test("quits when the title bar closes it with the tray off, keeping a change mad
   await closed;
 
   expect(await savedBanned()).toEqual(["second"]);
+});
+
+test("switches the app to the language picked in Settings, and back to the system's", async () => {
+  // The test before quit it
+  app = await launch();
+  page = await windowWith("index.html");
+  const savedLanguage = async () =>
+    JSON.parse(await readFile(data("settings", "tokio.json"), "utf8")).settings
+      .language;
+  const sidebar = page.getByRole("navigation");
+  await sidebar.getByRole("link", { name: "Settings", exact: true }).click();
+
+  await page.getByRole("combobox", { name: "Language" }).click();
+  await page.getByRole("option", { name: "Español" }).click();
+
+  await expect(
+    sidebar.getByRole("link", { name: "Configuración", exact: true }),
+  ).toBeAttached();
+  await expect(sidebar.getByRole("link", { name: "Inicio" })).toBeAttached();
+  await expect(
+    page.getByRole("heading", { name: "Idioma", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "es-419");
+  await expect.poll(savedLanguage).toBe("es-419");
+
+  await page.getByRole("combobox", { name: "Idioma" }).click();
+  await page.getByRole("option", { name: "Idioma del sistema" }).click();
+
+  await expect(
+    sidebar.getByRole("link", { name: "Settings", exact: true }),
+  ).toBeAttached();
+  await expect(
+    page.getByRole("heading", { name: "Language", exact: true }),
+  ).toBeVisible();
+  await expect.poll(savedLanguage).toBe("system");
 });

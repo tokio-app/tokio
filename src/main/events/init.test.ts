@@ -8,7 +8,6 @@ import {
 } from "@/common/schemas";
 import {
   AlertTrigger,
-  ALERT_TRIGGER_LABELS,
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   ChatEvent,
@@ -34,6 +33,7 @@ import {
   timerTriggers,
 } from "@/common/util";
 import config from "@/config";
+import { language, setLanguage } from "@/helper/i18n";
 import Logger from "@/logger";
 import type { AlertsService } from "@/services/alerts";
 import type { ReconnectState } from "@/services/connector/common";
@@ -189,6 +189,7 @@ function setup() {
     server: { enabled: true },
     updates: { auto: false },
     tray: { enabled: true },
+    language: "system",
     activityFeed: { ...defaultStoreData.settings.activityFeed },
     games: { minecraft: { enabled: true } },
   };
@@ -431,7 +432,7 @@ describe("init events", () => {
       const s = await live();
       const { data } = generateTikTokEventSample(trigger);
 
-      // Music Change comes once per song, through onSongChange
+      // Music change comes once per song, through onSongChange
       const songStarts = {
         emit: (_event: TOKIO_EVENTS, songs: MusicInfo[]) =>
           s.musicService.onSongChange.mock.calls[0][0](songs),
@@ -451,7 +452,7 @@ describe("init events", () => {
       });
     });
 
-    it("takes Music Change from the song starts and the rest from the connector", async () => {
+    it("takes Music change from the song starts and the rest from the connector", async () => {
       const s = await live();
       const subscribed = (source: Setup["conn"]) =>
         source.on.mock.calls.map(([event]) => event);
@@ -553,7 +554,7 @@ describe("init events", () => {
             level: "error",
             source: "alerts",
             code: FEEDBACK_CODES.ALERT_FAILED,
-            message: `Unable to play the ${ALERT_TRIGGER_LABELS[TOKIO_EVENTS.GIFT]} alert.`,
+            message: "Unable to play the Gift alert.",
           }),
         ]);
       });
@@ -665,6 +666,21 @@ describe("init events", () => {
         ],
       ]);
     });
+
+    it("names the trigger in the user's language, and in English in the log", async () => {
+      const { s, callback } = await onFailure();
+      setLanguage("es-419");
+
+      callback(alert({ tts: speech }), "Engine down");
+
+      expect(s.h.notices[0].message).toContain("Seguir");
+      expect(logError.mock.calls).toEqual([
+        [
+          "<Alerts> Unable to speak the Follow alert -- Engine down",
+          "alerts.log",
+        ],
+      ]);
+    });
   });
 
   describe("games", () => {
@@ -688,7 +704,7 @@ describe("init events", () => {
       const s = await live({ alerts: false });
       const { data } = generateTikTokEventSample(trigger);
 
-      // Music Change comes once per song, through the alerts' onSongChange
+      // Music change comes once per song, through the alerts' onSongChange
       const songStarts = {
         emit: (_event: TOKIO_EVENTS, songs: MusicInfo[]) =>
           s.musicService.onSongChange.mock.calls[0][0](songs),
@@ -923,6 +939,37 @@ describe("init events", () => {
               },
             ],
           ]);
+        });
+      });
+
+      it("sends the games overlay again in a new language", async () => {
+        const s = await live();
+        s.storeManagerService.getProfileData.mockResolvedValue({
+          ...profile,
+          games: {
+            ...profile.games,
+            actions: [
+              {
+                ...roseAction,
+                trigger: { ...roseAction.trigger, gifts: [] },
+                overlay: { ...roseAction.overlay, event: "" },
+              },
+            ],
+          },
+        });
+        s.serverService.sendToClient.mockClear();
+
+        setLanguage("es-419");
+
+        await vi.waitFor(() => {
+          expect(s.serverService.sendToClient).toHaveBeenCalledWith(
+            "games",
+            expect.objectContaining({
+              data: expect.objectContaining({
+                rows: [expect.objectContaining({ event: "Cualquier regalo" })],
+              }),
+            }),
+          );
         });
       });
 
@@ -1195,13 +1242,32 @@ describe("init events", () => {
 
       change(s, 0);
 
-      const triggers = timerTriggers(s.timer.settings);
+      const triggers = timerTriggers(s.timer.settings, "en");
       expect(triggers).toContainEqual({ label: "Follow", value: "+30s" });
       expect(overlayPushes(s)).toEqual([
         expect.objectContaining({
           data: expect.objectContaining({ triggers }),
         }),
       ]);
+    });
+
+    it("sends the carousel to the overlay again in a new language", async () => {
+      const s = await live();
+      s.timer.settings.look.show_triggers = true;
+      s.serverService.sendToClient.mockClear();
+
+      setLanguage("es-419");
+
+      expect(overlayPushes(s)).toEqual([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            triggers: timerTriggers(s.timer.settings, "es-419"),
+          }),
+        }),
+      ]);
+      expect(
+        timerTriggers(s.timer.settings, "es-419").map((t) => t.label),
+      ).toContain("Seguir");
     });
 
     it("sends the timer to its overlay when it connects", async () => {
@@ -1811,6 +1877,35 @@ describe("init events", () => {
   });
 
   describe("LOAD_APP", () => {
+    it("shows the saved language from the store, before its reply on every load", async () => {
+      const s = setup();
+      s.settings.language = "es-419";
+
+      await load(s);
+      await load(s);
+
+      const watched: string[] = [
+        APP_EVENTS_RESPONSE.LANGUAGE,
+        APP_EVENTS_RESPONSE.LOAD_APP,
+      ];
+      expect(language()).toBe("es-419");
+      expect(
+        s.h
+          .sent()
+          .map(([channel]) => channel)
+          .filter((channel) => watched.includes(channel)),
+      ).toEqual([
+        APP_EVENTS_RESPONSE.LANGUAGE,
+        APP_EVENTS_RESPONSE.LOAD_APP,
+        APP_EVENTS_RESPONSE.LANGUAGE,
+        APP_EVENTS_RESPONSE.LOAD_APP,
+      ]);
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LANGUAGE)).toEqual([
+        "es-419",
+        "es-419",
+      ]);
+    });
+
     it("sets up the folders in the home folder and hands out the log files", async () => {
       const s = setup();
       app.getPath.mockImplementation((name) => `/users/${name}`);
@@ -2058,7 +2153,7 @@ describe("init events", () => {
       await load(s);
 
       const message =
-        "Tokio couldn't listen for Minecraft, port 37892 may be in use.";
+        "Tokio couldn't listen for Minecraft. Port 37892 may be in use.";
       expect(noticesFor(s, FEEDBACK_CODES.GAME_LISTEN_FAILED)).toEqual([
         expect.objectContaining({ level: "warning", source: "games", message }),
       ]);
@@ -2079,7 +2174,7 @@ describe("init events", () => {
       await load(s);
 
       const message =
-        "The overlay server couldn't start, port 37891 may be in use. It has been turned off.";
+        "The overlay server couldn't start, so Tokio turned it off. Port 37891 may be in use.";
       expect(noticesFor(s, FEEDBACK_CODES.SERVER_START_FAILED)).toEqual([
         expect.objectContaining({
           level: "warning",
@@ -2199,7 +2294,7 @@ describe("init events", () => {
             source: "system",
             code: FEEDBACK_CODES.UPDATE_DOWNLOAD_FAILED,
             message:
-              "Unable to download the Tokio update. It will be tried again later.",
+              "Unable to download the Tokio update. Tokio will try again later.",
           }),
         ]);
       });

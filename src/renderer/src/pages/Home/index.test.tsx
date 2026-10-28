@@ -286,7 +286,7 @@ describe("Home", () => {
       });
 
       expect(events().map((event) => event.textContent)).toEqual([
-        "kai, yui and 3 others joined",
+        "kai, yui, and 3 others joined",
         "mia sent Rose ×5 5 coins",
         "kenji hello from Osaka",
         "yui became a Super Fan",
@@ -324,7 +324,7 @@ describe("Home", () => {
     it.each([
       [[viewer("kai")], 1, "kai joined"],
       [[viewer("kai"), viewer("yui")], 2, "kai and yui joined"],
-      [[viewer("kai"), viewer("yui")], 3, "kai, yui and 1 other joined"],
+      [[viewer("kai"), viewer("yui")], 3, "kai, yui, and 1 other joined"],
     ])("names who joined: %#", async (users, count, text) => {
       await renderApp();
 

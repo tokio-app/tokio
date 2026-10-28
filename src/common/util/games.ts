@@ -1,3 +1,4 @@
+import { listOf, MessageKey, translate } from "@/common/i18n";
 import type {
   GameAction,
   GameStep,
@@ -29,50 +30,51 @@ export const MINECRAFT_NAMES: Record<
   { mobs: Names; items: Names }
 > = { bedrock, java };
 
-export const WEATHER_NAMES: Record<Weather, string> = {
-  clear: "Clear",
-  rain: "Rain",
-  thunder: "Thunder",
+// Keys of the names Tokio gives its own steps, translated where they show
+export const WEATHER_NAMES: Record<Weather, MessageKey> = {
+  clear: "minecraft.weather.clear",
+  rain: "minecraft.weather.rain",
+  thunder: "minecraft.weather.thunder",
 };
 
-export const TIME_NAMES: Record<Time, string> = {
-  day: "Day",
-  noon: "Noon",
-  night: "Night",
-  midnight: "Midnight",
+export const TIME_NAMES: Record<Time, MessageKey> = {
+  day: "minecraft.time.day",
+  noon: "minecraft.time.noon",
+  night: "minecraft.time.night",
+  midnight: "minecraft.time.midnight",
 };
 
-export const HAZARD_NAMES: Record<Hazard, string> = {
-  tnt: "Falling TNT",
-  tnt_ring: "TNT ring",
-  lightning: "Lightning bolt",
-  charged_creeper: "Charged creeper",
-  evoker_fangs: "Evoker fangs",
-  anvil: "Anvil drop",
-  harming: "Harming",
-  launch: "Launch into the sky",
-  launch_water: "Launch + water",
-  freeze: "Freeze",
-  lights_out: "Lights out",
-  dizzy: "Dizzy",
-  turn_around: "Turn around",
-  random_teleport: "Random teleport",
+export const HAZARD_NAMES: Record<Hazard, MessageKey> = {
+  tnt: "minecraft.hazard.tnt",
+  tnt_ring: "minecraft.hazard.tnt_ring",
+  lightning: "minecraft.hazard.lightning",
+  charged_creeper: "minecraft.hazard.charged_creeper",
+  evoker_fangs: "minecraft.hazard.evoker_fangs",
+  anvil: "minecraft.hazard.anvil",
+  harming: "minecraft.hazard.harming",
+  launch: "minecraft.hazard.launch",
+  launch_water: "minecraft.hazard.launch_water",
+  freeze: "minecraft.hazard.freeze",
+  lights_out: "minecraft.hazard.lights_out",
+  dizzy: "minecraft.hazard.dizzy",
+  turn_around: "minecraft.hazard.turn_around",
+  random_teleport: "minecraft.hazard.random_teleport",
 };
 
-export const HELP_NAMES: Record<Help, string> = {
-  netherite_armor: "Netherite armor",
-  heal: "Full heal",
-  regeneration: "Regeneration",
-  absorption: "Absorption",
-  resistance: "Resistance",
-  fire_resistance: "Fire resistance",
-  speed: "Speed",
-  jump_boost: "Jump boost",
-  strength: "Strength",
-  slow_falling: "Slow falling",
-  water_breathing: "Water breathing",
-  night_vision: "Night vision",
-  invisibility: "Invisibility",
+export const HELP_NAMES: Record<Help, MessageKey> = {
+  netherite_armor: "minecraft.help.netherite_armor",
+  heal: "minecraft.help.heal",
+  regeneration: "minecraft.help.regeneration",
+  absorption: "minecraft.help.absorption",
+  resistance: "minecraft.help.resistance",
+  fire_resistance: "minecraft.help.fire_resistance",
+  speed: "minecraft.help.speed",
+  jump_boost: "minecraft.help.jump_boost",
+  strength: "minecraft.help.strength",
+  slow_falling: "minecraft.help.slow_falling",
+  water_breathing: "minecraft.help.water_breathing",
+  night_vision: "minecraft.help.night_vision",
+  invisibility: "minecraft.help.invisibility",
 };
 
 // The hazards an amount repeats; the rest run once, as a second anvil has no
@@ -84,46 +86,43 @@ export const REPEATED_HAZARDS: readonly Hazard[] = [
 ];
 
 /**
- * The names joined with " or ", or with more than `max` the first ones and
- * how many more: "Rose, Lion or 230 more".
- */
-export function orList(names: string[], max = Infinity): string {
-  if (names.length <= max) return names.join(" or ");
-  const shown = Math.max(max - 1, 1);
-  return `${names.slice(0, shown).join(", ")} or ${names.length - shown} more`;
-}
-
-/**
- * The gifts' names joined with " or ", at most `max` of them (see orList),
- * null while the lists don't have any of them yet. For an id in gifts twice,
- * the first entry wins.
+ * The gifts' names as the language lists them with "or", at most `max` of
+ * them (see listOf), null while the lists don't have any of them yet. For an
+ * id in gifts twice, the first entry wins.
  */
 export function giftNames(
   ids: number[],
   gifts: CustomGift[],
+  language: string,
   max?: number,
 ): string | null {
   const names = ids.flatMap(
     (id) => gifts.find((gift) => gift.value === id)?.label ?? [],
   );
-  return names.length > 0 ? orList(names, max) : null;
+  return names.length > 0 ? listOf(language, names, { type: "or", max }) : null;
 }
 
 /**
- * The event's own text on the games overlay: the gifts' names, "100 likes",
- * chat's keyword quoted like the timer's carousel (“tnt”, none without one,
- * as its bubble says chat), or the trigger's label.
+ * The event's own text on the games overlay, in the language: the gifts'
+ * names, "100 likes", chat's keyword quoted like the timer's carousel (“tnt”,
+ * none without one, as its bubble says chat), or the trigger's label.
  * For an id in gifts twice, the first entry wins, so TikTok's list goes first.
  */
-export function gameEventText(action: GameAction, gifts: CustomGift[]) {
+export function gameEventText(
+  action: GameAction,
+  gifts: CustomGift[],
+  language: string,
+) {
   const { trigger, likes_every } = action;
-  const label = ALERT_TRIGGER_LABELS[trigger.type];
+  const label = translate(language, ALERT_TRIGGER_LABELS[trigger.type]);
   if (trigger.type === TOKIO_EVENTS.GIFT) {
-    if (trigger.gifts.length === 0) return "Any gift";
-    return giftNames(trigger.gifts, gifts) ?? label;
+    if (trigger.gifts.length === 0) {
+      return translate(language, "common.anyGift");
+    }
+    return giftNames(trigger.gifts, gifts, language) ?? label;
   }
   if (trigger.type === TOKIO_EVENTS.LIKE) {
-    return `${likes_every} ${likes_every === 1 ? "like" : "likes"}`;
+    return translate(language, "minecraft.likes", { count: likes_every });
   }
   if (trigger.type === TOKIO_EVENTS.CHAT) {
     const keyword = trigger.keyword.trim();
@@ -156,39 +155,48 @@ export function gameCount({ steps }: GameAction) {
 }
 
 /**
- * What the action makes, as the game names it, the default of its name on
- * the games overlay: "Primed TNT", "Zombie ×5, Thunder". Commands have none.
+ * What the action makes, the default of its name on the games overlay:
+ * "Primed TNT", "Zombie ×5, Thunder". Mobs and items as the game names them
+ * in English, Tokio's own steps in the language. Commands have none.
  * With `counted`, its picture shows the first mob's or item's count, so the
  * name leaves it out: "Zombie, Thunder".
  */
-export function gameStepsText({ edition, steps }: GameAction, counted = false) {
+export function gameStepsText(
+  { edition, steps }: GameAction,
+  language: string,
+  counted = false,
+) {
   const { mobs, items } = MINECRAFT_NAMES[edition];
   const first = counted ? firstCounted(steps) : undefined;
+  const t = (key: MessageKey) => translate(language, key);
   // An id the list doesn't have names nothing, "constructor" included
-  const named = (step: GameStep, names: Names, id: string, amount: number) =>
-    !Object.hasOwn(names, id)
+  const named = (step: GameStep, name: string | undefined, amount: number) =>
+    name === undefined
       ? []
       : amount > 1 && step !== first
-        ? `${names[id]} ×${amount}`
-        : names[id];
+        ? `${name} ×${amount}`
+        : name;
+  const listed = (names: Names, id: string) =>
+    Object.hasOwn(names, id) ? names[id] : undefined;
   return steps
     .flatMap((step) => {
-      if (step.type === "spawn")
-        return named(step, mobs, step.mob, step.amount);
-      if (step.type === "give")
-        return named(step, items, step.item, step.amount);
-      if (step.type === "weather") return WEATHER_NAMES[step.weather];
-      if (step.type === "time") return TIME_NAMES[step.time];
+      if (step.type === "spawn") {
+        return named(step, listed(mobs, step.mob), step.amount);
+      }
+      if (step.type === "give") {
+        return named(step, listed(items, step.item), step.amount);
+      }
+      if (step.type === "weather") return t(WEATHER_NAMES[step.weather]);
+      if (step.type === "time") return t(TIME_NAMES[step.time]);
       if (step.type === "hazard") {
         const repeated = REPEATED_HAZARDS.includes(step.hazard);
         return named(
           step,
-          HAZARD_NAMES,
-          step.hazard,
+          t(HAZARD_NAMES[step.hazard]),
           repeated ? step.amount : 1,
         );
       }
-      if (step.type === "help") return HELP_NAMES[step.help];
+      if (step.type === "help") return t(HELP_NAMES[step.help]);
       return [];
     })
     .join(", ");
@@ -217,7 +225,8 @@ export function gameEventPictures(
 /**
  * The rows of the games overlay, for main to send and the Games page to
  * preview: each enabled action shown on it, with a picture or a name, in
- * order. mediaURL turns a Minecraft picture's file into the URL that loads it.
+ * order, its automatic texts in the language. mediaURL turns a Minecraft
+ * picture's file into the URL that loads it.
  */
 export function gameOverlayRows(
   games: Profile["games"],
@@ -225,17 +234,20 @@ export function gameOverlayRows(
     gifts,
     emotes,
     mediaURL,
+    language,
   }: {
     gifts: CustomGift[];
     emotes: SavedEmote[];
     mediaURL: (file: string) => string;
+    language: string;
   },
 ): GameOverlayRow[] {
   return games.actions.flatMap((action) => {
     const { overlay } = action;
     // On its picture's corner
     const count = overlay.image ? gameCount(action) : 0;
-    const name = overlay.name.trim() || gameStepsText(action, count > 0);
+    const name =
+      overlay.name.trim() || gameStepsText(action, language, count > 0);
     if (!action.enabled || !overlay.show || (!overlay.image && !name)) {
       return [];
     }
@@ -243,7 +255,7 @@ export function gameOverlayRows(
       {
         id: action.id,
         pictures: gameEventPictures(action, gifts, emotes),
-        event: overlay.event.trim() || gameEventText(action, gifts),
+        event: overlay.event.trim() || gameEventText(action, gifts, language),
         // A chat's message shows beside its bubble
         withText: action.trigger.type === TOKIO_EVENTS.CHAT,
         eventCount: gameEventCount(action),

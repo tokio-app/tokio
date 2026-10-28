@@ -1,6 +1,7 @@
 import { TimerSettings } from "@/common/schemas";
 import { formatAdded, timerTriggers } from "@/common/util";
 import { fontFamily, formatDuration } from "@/helper";
+import { useLanguage } from "@/ui/i18n";
 import { useEffect, useState } from "react";
 import { TimerPush } from "../helper";
 import styles from "../tools.module.css";
@@ -21,6 +22,7 @@ interface Props {
  * between main's pushes, ticking only while the timer runs.
  */
 export function TimerPreview({ timer, settings }: Props) {
+  const language = useLanguage();
   const { state, added } = timer.data;
   const { look } = settings;
   const running = state.status === "running";
@@ -50,7 +52,7 @@ export function TimerPreview({ timer, settings }: Props) {
   }, [slot]);
 
   // The carousel turns while it has more than one trigger
-  const triggers = look.show_triggers ? timerTriggers(settings) : [];
+  const triggers = look.show_triggers ? timerTriggers(settings, language) : [];
   const [turn, setTurn] = useState(0);
   useEffect(() => {
     if (triggers.length < 2) return undefined;

@@ -6,6 +6,7 @@ import {
   VscChromeMinimize,
   VscChromeRestore,
 } from "react-icons/vsc";
+import { useT } from "../i18n";
 import styles from "./titlebar.module.css";
 
 const WINDOW_EVENTS = {
@@ -41,6 +42,7 @@ type Props = {
  * controls.
  */
 export function TitleBar({ target, logo, compact, live, children }: Props) {
+  const t = useT();
   const events = WINDOW_EVENTS[target];
   const [maximized, setMaximized] = useState(false);
 
@@ -68,14 +70,14 @@ export function TitleBar({ target, logo, compact, live, children }: Props) {
         <div className={styles.controls}>
           <button
             className={styles.control}
-            title="Minimize"
+            title={t("titlebar.minimize")}
             onClick={() => window.api.emit(events.minimize)}
           >
             <VscChromeMinimize size={14} />
           </button>
           <button
             className={styles.control}
-            title={maximized ? "Restore" : "Maximize"}
+            title={t(maximized ? "titlebar.restore" : "titlebar.maximize")}
             onClick={() => window.api.emit(events.maximize)}
           >
             {maximized ? (
@@ -86,7 +88,7 @@ export function TitleBar({ target, logo, compact, live, children }: Props) {
           </button>
           <button
             className={`${styles.control} ${styles.close}`}
-            title="Close"
+            title={t("common.close")}
             onClick={() => window.api.emit(events.close)}
           >
             <VscChromeClose size={14} />

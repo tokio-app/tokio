@@ -6,6 +6,7 @@ import {
   AppEventsMap,
   FEEDBACK_CODES,
   TOKIO_EVENTS,
+  VoiceEngine,
 } from "@/common/types";
 import {
   defaultProfile as baseProfile,
@@ -19,7 +20,8 @@ import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { TTSService } from "@/services/tts";
-import { dialog } from "@test/electron";
+import { language } from "@/helper/i18n";
+import { app, dialog } from "@test/electron";
 import { createHandler } from "@test/handler";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -318,7 +320,7 @@ describe("settings events", () => {
         notice({
           level: "success",
           code: FEEDBACK_CODES.PROFILE_CLONED,
-          message: 'Profile "Chill Stream" created as a copy.',
+          message: 'Profile "Chill Stream" cloned.',
         }),
       ]);
     });
@@ -886,8 +888,8 @@ describe("settings events", () => {
   });
 
   describe("voice keys", () => {
-    const engines = [
-      { id: "Default", label: "TikTok", keyLabel: "Session ID" },
+    const engines: VoiceEngine[] = [
+      { id: "Default", label: "TikTok", keyLabel: "voiceKeys.sessionId" },
       { id: "Windows", label: "Windows" },
       { id: "Edge", label: "Edge" },
     ];
@@ -911,7 +913,7 @@ describe("settings events", () => {
         {
           id: "Default",
           label: "TikTok",
-          keyLabel: "Session ID",
+          keyLabel: "voiceKeys.sessionId",
           key: "session",
         },
       ],
@@ -1338,6 +1340,76 @@ describe("settings events", () => {
           level: "error",
           code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
         }),
+      ]);
+    });
+  });
+
+  describe("SET_LANGUAGE", () => {
+    const setup = (saved = true) => {
+      const updateLanguage = vi.fn(async () => saved);
+      const h = createHandler({
+        storeManagerService: { ...profileStore(), updateLanguage },
+      });
+      return { h, updateLanguage };
+    };
+
+    it("saves the language and shows it in the window, with no notice", async () => {
+      const { h, updateLanguage } = setup();
+
+      const sent = await run(h, APP_EVENTS.SET_LANGUAGE, {
+        language: "es-419",
+      });
+
+      expect(updateLanguage).toHaveBeenCalledWith("es-419");
+      expect(language()).toBe("es-419");
+      expect(sent).toEqual([
+        [APP_EVENTS_RESPONSE.LANGUAGE, "es-419"],
+        [APP_EVENTS_RESPONSE.GET_SETTINGS, expect.anything()],
+      ]);
+    });
+
+    it("follows the system's language for system", async () => {
+      app.getPreferredSystemLanguages.mockReturnValue(["es-PE"]);
+      const { h, updateLanguage } = setup();
+
+      await h.invoke(settings, APP_EVENTS.SET_LANGUAGE, { language: "system" });
+
+      expect(updateLanguage).toHaveBeenCalledWith("system");
+      expect(h.replies(APP_EVENTS_RESPONSE.LANGUAGE)).toEqual(["es-419"]);
+    });
+
+    it("refuses a language Tokio doesn't have", async () => {
+      const { h, updateLanguage } = setup();
+
+      await h.invoke(settings, APP_EVENTS.SET_LANGUAGE, { language: "fr" });
+
+      expect(updateLanguage).not.toHaveBeenCalled();
+      expect(language()).toBe("en");
+      expect(h.replies(APP_EVENTS_RESPONSE.LANGUAGE)).toEqual([]);
+      // What main holds, for the page's copy
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          message: "Unable to save the language setting.",
+        }),
+      ]);
+    });
+
+    it("shows a language the store couldn't write, and reports it", async () => {
+      const { h } = setup(false);
+
+      const sent = await run(h, APP_EVENTS.SET_LANGUAGE, {
+        language: "es-419",
+      });
+
+      // Main holds it, so the windows follow it
+      expect(language()).toBe("es-419");
+      expect(sent).toEqual([
+        [APP_EVENTS_RESPONSE.LANGUAGE, "es-419"],
+        [APP_EVENTS_RESPONSE.GET_SETTINGS, expect.anything()],
+        notice({ level: "error", code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED }),
       ]);
     });
   });

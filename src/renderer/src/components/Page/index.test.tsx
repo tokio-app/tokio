@@ -70,13 +70,13 @@ describe("Section", () => {
   it("puts the icon before the title", () => {
     render(
       <Section
-        title="Official Overlays"
+        title="Official overlays"
         icon={<button aria-label="Back">{"<"}</button>}
       />,
     );
 
     const heading = screen.getByRole("heading");
-    expect(heading).toHaveTextContent("<Official Overlays");
+    expect(heading).toHaveTextContent("<Official overlays");
     expect(heading.firstChild).toBe(
       screen.getByRole("button", { name: "Back" }),
     );
@@ -130,14 +130,14 @@ describe("FormGrid", () => {
         <Field label="Cooldown">
           <input />
         </Field>
-        <Field label="Max Queue Length">
+        <Field label="Max queue length">
           <input />
         </Field>
       </FormGrid>,
     );
 
     expect(screen.getAllByRole("textbox")).toHaveLength(2);
-    expect(screen.getByText("Max Queue Length")).toBeInTheDocument();
+    expect(screen.getByText("Max queue length")).toBeInTheDocument();
   });
 });
 

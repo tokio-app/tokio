@@ -16,6 +16,7 @@ import {
 import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 import type { ServiceResult } from "@/services/shared";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
@@ -34,7 +35,7 @@ events.push(
     source: "system",
     failure: {
       code: FEEDBACK_CODES.PROFILE_SAVE_FAILED,
-      message: "Unable to save the alerts.",
+      message: "main.failure.updateAlertsSettings",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.UPDATE_ALERTS_SETTINGS),
   },
@@ -61,7 +62,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_SEARCH_FAILED,
-      message: "Unable to reach MyInstants. Try again in a few minutes.",
+      message: "main.failure.searchSounds",
     },
     onError: (e, error, { query, page }) =>
       e.reply(APP_EVENTS_RESPONSE.SEARCH_SOUNDS, {
@@ -93,7 +94,7 @@ const addPickedSound = async (
   notifier.success(
     "alerts",
     FEEDBACK_CODES.SOUND_ADDED,
-    `Sound "${res.data.name}" added.`,
+    t("main.alerts.soundAdded", { name: res.data.name }),
   );
 };
 
@@ -119,7 +120,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_DOWNLOAD_FAILED,
-      message: "Unable to download the sound. Sounds can be up to 8 MB.",
+      message: "main.failure.downloadSound",
     },
     onError: replySoundFailure,
   },
@@ -129,9 +130,9 @@ events.push(
   APP_EVENTS.IMPORT_SOUND,
   async (services, e, data) => {
     const diagRes = await showOpenDialog(services.win, {
-      title: "Select a sound",
+      title: t("main.dialog.selectSound"),
       properties: ["openFile"],
-      filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS }],
+      filters: [{ name: t("main.dialog.audio"), extensions: AUDIO_EXTENSIONS }],
     });
     if (diagRes.canceled || !diagRes.filePaths[0]) return;
 
@@ -142,8 +143,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-      message:
-        "Unable to use the sound. Pick an mp3, wav or ogg file up to 8 MB.",
+      message: "main.failure.importSound",
     },
     onError: replySoundFailure,
   },
@@ -158,9 +158,14 @@ events.push(
     { id, request },
   ) => {
     const diagRes = await showOpenDialog(win, {
-      title: "Select an image or video",
+      title: t("main.dialog.selectMedia"),
       properties: ["openFile"],
-      filters: [{ name: "Images and videos", extensions: MEDIA_EXTENSIONS }],
+      filters: [
+        {
+          name: t("main.dialog.imagesAndVideos"),
+          extensions: MEDIA_EXTENSIONS,
+        },
+      ],
     });
     if (diagRes.canceled || !diagRes.filePaths[0]) return;
 
@@ -180,15 +185,14 @@ events.push(
     notifier.success(
       "alerts",
       FEEDBACK_CODES.MEDIA_ADDED,
-      `Media "${res.data.name}" added.`,
+      t("main.alerts.mediaAdded", { name: res.data.name }),
     );
   },
   {
     notify: false,
     failure: {
       code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
-      message:
-        "Unable to use the file. Pick a png, jpg, gif, webp, mp4 or webm file up to 50 MB.",
+      message: "main.failure.importMedia",
     },
     onError: (e, error, { id, request }) =>
       e.reply(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
@@ -226,14 +230,14 @@ const speakTest = async (
   if (res.skipped) {
     throw new AppFailure(
       FEEDBACK_CODES.ALERT_TTS_FAILED,
-      "The message is empty or has a banned word.",
+      t("main.alerts.ttsSkipped"),
       { level: "warning" },
     );
   }
   if (!res.success) {
     throw new AppFailure(
       FEEDBACK_CODES.ALERT_TTS_FAILED,
-      "Unable to speak the message. Try another voice.",
+      t("main.alerts.ttsFailed"),
       { logged: true },
     );
   }
@@ -265,7 +269,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SOUND_READ_FAILED,
-      message: "Unable to play the sound.",
+      message: "main.failure.testAlert",
     },
     onError: (e, error, { id, request, volume }) =>
       e.reply(APP_EVENTS_RESPONSE.TEST_ALERT, {
@@ -294,7 +298,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_READ_FAILED,
-      message: "Unable to read the sound.",
+      message: "main.failure.getSoundData",
     },
     onError: (e, error, { file }) =>
       e.reply(APP_EVENTS_RESPONSE.SOUND_DATA, { success: false, file, error }),
@@ -312,7 +316,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-      message: "Unable to load the gifts saved from your LIVEs.",
+      message: "main.failure.getCustomGifts",
     },
     onError: (e) => e.reply(APP_EVENTS_RESPONSE.CUSTOM_GIFTS, { data: [] }),
   },
@@ -329,7 +333,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.SOUNDS_LOAD_FAILED,
-      message: "Unable to load the sound library.",
+      message: "main.failure.getSounds",
     },
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.GET_SOUNDS, {
@@ -373,9 +377,9 @@ events.push(
   APP_EVENTS.UPLOAD_SOUNDS,
   async ({ win, alertsService, storeManagerService, notifier }, e) => {
     const diagRes = await showOpenDialog(win, {
-      title: "Upload sounds",
+      title: t("main.dialog.uploadSounds"),
       properties: ["openFile", "multiSelections"],
-      filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS }],
+      filters: [{ name: t("main.dialog.audio"), extensions: AUDIO_EXTENSIONS }],
     });
     if (diagRes.canceled) return;
 
@@ -392,7 +396,7 @@ events.push(
       failed > 0
         ? {
             code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-            message: `Unable to upload ${failed} of the sounds. Use mp3, wav or ogg files up to 8 MB.`,
+            message: t("main.alerts.soundsUploadFailed", { failed }),
           }
         : undefined;
 
@@ -405,9 +409,7 @@ events.push(
       notifier.success(
         "alerts",
         FEEDBACK_CODES.SOUNDS_UPLOADED,
-        added === 1
-          ? "1 sound added to the library."
-          : `${added} sounds added to the library.`,
+        t("main.alerts.soundsUploaded", { count: added }),
       );
     }
   },
@@ -415,7 +417,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
-      message: "Unable to upload the sounds.",
+      message: "main.failure.uploadSounds",
     },
     onError: (e, error, _, { storeManagerService }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_SOUNDS, {
@@ -460,13 +462,13 @@ events.push(
       notifier.success(
         "alerts",
         FEEDBACK_CODES.SOUND_REMOVED,
-        "Sound removed.",
+        t("main.alerts.soundRemoved"),
       );
     } else {
       notifier.warn(
         "alerts",
         FEEDBACK_CODES.SOUND_REMOVE_FAILED,
-        "Sound removed from the library, but its file couldn't be deleted.",
+        t("main.alerts.soundFileNotDeleted"),
       );
     }
   },
@@ -474,7 +476,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.SOUND_REMOVE_FAILED,
-      message: "Unable to remove the sound.",
+      message: "main.failure.removeSound",
     },
     onError: (e, error, _, { storeManagerService }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_SOUNDS, {
@@ -490,9 +492,14 @@ events.push(
   APP_EVENTS.UPLOAD_MEDIA,
   async ({ win, alertsService, storeManagerService, notifier }, e) => {
     const diagRes = await showOpenDialog(win, {
-      title: "Upload images and videos",
+      title: t("main.dialog.uploadMedia"),
       properties: ["openFile", "multiSelections"],
-      filters: [{ name: "Images and videos", extensions: MEDIA_EXTENSIONS }],
+      filters: [
+        {
+          name: t("main.dialog.imagesAndVideos"),
+          extensions: MEDIA_EXTENSIONS,
+        },
+      ],
     });
     if (diagRes.canceled) return;
 
@@ -508,7 +515,7 @@ events.push(
       failed > 0
         ? {
             code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
-            message: `Unable to upload ${failed} of the files. Use png, jpg, gif, webp, mp4 or webm files up to 50 MB.`,
+            message: t("main.alerts.mediaUploadFailed", { failed }),
           }
         : undefined;
 
@@ -521,9 +528,7 @@ events.push(
       notifier.success(
         "alerts",
         FEEDBACK_CODES.MEDIA_UPLOADED,
-        added === 1
-          ? "1 file added to the media library."
-          : `${added} files added to the media library.`,
+        t("main.alerts.mediaUploaded", { count: added }),
       );
     }
   },
@@ -531,7 +536,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
-      message: "Unable to upload the files.",
+      message: "main.failure.uploadMedia",
     },
     onError: (e, error, _, { storeManagerService }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
@@ -553,7 +558,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.MEDIA_LOAD_FAILED,
-      message: "Unable to load the media library.",
+      message: "main.failure.getMedia",
     },
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
@@ -582,13 +587,13 @@ events.push(
       notifier.success(
         "alerts",
         FEEDBACK_CODES.MEDIA_REMOVED,
-        "Media removed.",
+        t("main.alerts.mediaRemoved"),
       );
     } else {
       notifier.warn(
         "alerts",
         FEEDBACK_CODES.MEDIA_REMOVE_FAILED,
-        "Media removed from the library, but its file couldn't be deleted.",
+        t("main.alerts.mediaFileNotDeleted"),
       );
     }
   },
@@ -596,7 +601,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.MEDIA_REMOVE_FAILED,
-      message: "Unable to remove the media.",
+      message: "main.failure.removeMedia",
     },
     onError: (e, error, _, { storeManagerService }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {

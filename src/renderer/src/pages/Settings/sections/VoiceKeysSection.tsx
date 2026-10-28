@@ -1,6 +1,7 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceEngine } from "@/common/types";
 import { Field, FormGrid, Input, Section } from "@/components";
 import { useAutosave, useIpcListener, useIpcRequest } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiKey } from "react-icons/fi";
 import styles from "../settings.module.css";
@@ -9,6 +10,7 @@ type EngineKey = VoiceEngine & { key: string };
 
 // Keys for the voice engines that take one. Hidden when none does.
 export function VoiceKeysSection() {
+  const t = useT();
   const [engines, setEngines] = useState<EngineKey[]>([]);
 
   useIpcRequest(APP_EVENTS.GET_VOICE_KEYS);
@@ -22,8 +24,8 @@ export function VoiceKeysSection() {
   return (
     <Section
       icon={<FiKey />}
-      title="Voice Engines"
-      description="Keys for the TTS voice engines."
+      title={t("settings.voiceKeys.title")}
+      description={t("settings.voiceKeys.description")}
     >
       <FormGrid>
         {engines.map((engine) => (
@@ -36,6 +38,9 @@ export function VoiceKeysSection() {
 
 // Saved as it changes; an empty key removes the saved one
 function KeyForm({ engine }: { engine: EngineKey }) {
+  const t = useT();
+  // Only engines with one are listed
+  const keyLabel = engine.keyLabel ? t(engine.keyLabel) : "";
   const [key, setKey] = useAutosave(engine.key, (value) =>
     window.api.emit(APP_EVENTS.SET_VOICE_KEY, {
       engine: engine.id,
@@ -46,12 +51,15 @@ function KeyForm({ engine }: { engine: EngineKey }) {
   return (
     <div className={styles.provider}>
       <Field
-        label={`${engine.label} voices`}
-        hint={`(${engine.keyLabel}, optional)`}
+        label={t("settings.voiceKeys.label", { engine: engine.label })}
+        hint={t("settings.voiceKeys.hint", { key: keyLabel })}
       >
         <Input
           type="password"
-          placeholder={`${engine.label} ${engine.keyLabel}...`}
+          placeholder={t("settings.voiceKeys.placeholder", {
+            engine: engine.label,
+            key: keyLabel,
+          })}
           value={key}
           onChange={(e) => setKey(e.target.value)}
         />

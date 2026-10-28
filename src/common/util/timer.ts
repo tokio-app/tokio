@@ -1,3 +1,4 @@
+import { translate } from "../i18n";
 import type { TimerSettings } from "../schemas/timer";
 
 // "5s", "0.5s", "1:30", "1:00:00", as the countdown timer shows time added.
@@ -24,24 +25,25 @@ export interface TimerTrigger {
 
 /**
  * The triggers that add time, in Tools' order, as the carousel shows them:
- * the streamer's name for each, counted for coins and likes, and the time it
- * adds with the multiplier. Triggers that add nothing are left out.
+ * the streamer's name for each (the language's when blank), counted for coins
+ * and likes, and the time it adds with the multiplier. Triggers that add
+ * nothing are left out.
  */
-export function timerTriggers({
-  seconds,
-  multiplier,
-  chat,
-  look: { names },
-}: TimerSettings): TimerTrigger[] {
+export function timerTriggers(
+  { seconds, multiplier, chat, look }: TimerSettings,
+  language: string,
+): TimerTrigger[] {
+  const name = (key: keyof typeof look.names) =>
+    look.names[key].trim() || translate(language, `timer.names.${key}`);
   const keyword = chat.keyword.trim();
   const triggers: [string, number][] = [
-    [`1 ${names.coin.trim()}`, seconds.coin],
-    [`${seconds.likes_every} ${names.likes.trim()}`, seconds.likes],
-    [names.superfan, seconds.superfan],
-    [names.follow, seconds.follow],
-    [names.share, seconds.share],
+    [`1 ${name("coin")}`, seconds.coin],
+    [`${seconds.likes_every} ${name("likes")}`, seconds.likes],
+    [name("superfan"), seconds.superfan],
+    [name("follow"), seconds.follow],
+    [name("share"), seconds.share],
     // Only messages with the keyword count, so viewers need to see it
-    [keyword ? `${names.chat.trim()} “${keyword}”` : names.chat, seconds.chat],
+    [keyword ? `${name("chat")} “${keyword}”` : name("chat"), seconds.chat],
   ];
   return triggers
     .filter(([, s]) => s * multiplier > 0)

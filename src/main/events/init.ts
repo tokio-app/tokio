@@ -1,3 +1,4 @@
+import { DEFAULT_LANGUAGE, translate } from "@/common/i18n";
 import { ALERT_TRIGGERS, AppSettings } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
@@ -27,6 +28,7 @@ import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
+import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
 import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
@@ -80,14 +82,14 @@ const initUpdater = async ({
         notifier.info(
           "system",
           FEEDBACK_CODES.UPDATE_READY,
-          `Tokio ${status.version} is ready. Restart from the title bar to update.`,
+          t("main.init.updateReady", { version: status.version }),
           options,
         );
       } else {
         notifier.info(
           "system",
           FEEDBACK_CODES.UPDATE_AVAILABLE,
-          `Tokio ${status.version} is available. Download it from the title bar.`,
+          t("main.init.updateAvailable", { version: status.version }),
           options,
         );
       }
@@ -96,7 +98,7 @@ const initUpdater = async ({
       notifier.warn(
         "system",
         FEEDBACK_CODES.UPDATE_DOWNLOAD_FAILED,
-        "Unable to download the Tokio update. It will be tried again later.",
+        t("main.init.updateDownloadFailed"),
         { windowMs: UPDATE_NOTICE_MS },
       );
     },
@@ -136,7 +138,12 @@ const registerConnectorEvents = ({
         win.webContents.send(APP_EVENTS_RESPONSE.ALERT_AUDIO, audio);
       },
       (alert, error) => {
-        const label = ALERT_TRIGGER_LABELS[alert.trigger.type];
+        const label = t(ALERT_TRIGGER_LABELS[alert.trigger.type]);
+        // Logs stay English
+        const logged = translate(
+          DEFAULT_LANGUAGE,
+          ALERT_TRIGGER_LABELS[alert.trigger.type],
+        );
         const options = {
           key: `alert:${alert.id}`,
           windowMs: REPEAT_NOTICE_MS,
@@ -148,12 +155,12 @@ const registerConnectorEvents = ({
             notifier.warn(
               "alerts",
               FEEDBACK_CODES.ALERT_TTS_FAILED,
-              `Unable to speak the ${label} alert. Try another voice in Alerts.`,
+              t("main.init.alertTtsFailed", { label, alerts: t("nav.alerts") }),
               options,
             )
           ) {
             Logger.error(
-              `<Alerts> Unable to speak the ${label} alert -- ${error}`,
+              `<Alerts> Unable to speak the ${logged} alert -- ${error}`,
               paths.files.logs.alerts,
             );
           }
@@ -161,12 +168,15 @@ const registerConnectorEvents = ({
           notifier.warn(
             "alerts",
             FEEDBACK_CODES.ALERT_SOUND_MISSING,
-            `The sound of the ${label} alert is missing. Pick it again in Alerts.`,
+            t("main.init.alertSoundMissing", {
+              label,
+              alerts: t("nav.alerts"),
+            }),
             options,
           )
         ) {
           Logger.warn(
-            `<Alerts> The sound of the ${label} alert is missing -- ${error}`,
+            `<Alerts> The sound of the ${logged} alert is missing -- ${error}`,
             paths.files.logs.alerts,
           );
         }
@@ -188,14 +198,14 @@ const registerConnectorEvents = ({
     // Not a live event, the services match emote triggers on chat events.
     if (trigger === EMOTE_TRIGGER) continue;
     const listener = (d: TokioEventMap[typeof trigger]) => {
-      const label = ALERT_TRIGGER_LABELS[trigger];
+      const label = t(ALERT_TRIGGER_LABELS[trigger]);
       dispatchAlert(trigger, d).catch((error) => {
         notifier.report({
           source: "alerts",
           error,
           fallback: {
             code: FEEDBACK_CODES.ALERT_FAILED,
-            message: `Unable to play the ${label} alert.`,
+            message: t("main.init.alertFailed", { label }),
           },
           context: trigger,
         });
@@ -206,13 +216,13 @@ const registerConnectorEvents = ({
           error,
           fallback: {
             code: FEEDBACK_CODES.GAME_ACTION_FAILED,
-            message: `Unable to run the ${label} game action.`,
+            message: t("main.init.gameActionFailed", { label }),
           },
           context: trigger,
         });
       });
     };
-    // Music Change alerts come once per song from the music service, whose
+    // Music change alerts come once per song from the music service, whose
     // MUSIC_CHANGE also fires on queue changes. The rest from the connector.
     if (trigger === TOKIO_EVENTS.MUSIC_CHANGE) {
       music.onSongChange(listener);
@@ -269,19 +279,19 @@ const registerConnectorEvents = ({
       notifier.info(
         "connector",
         FEEDBACK_CODES.LIVE_ENDED,
-        "The LIVE has ended.",
+        t("main.init.liveEnded"),
       );
     } else if (d?.reason === "lost") {
       notifier.warn(
         "connector",
         FEEDBACK_CODES.CONNECTION_LOST,
-        "Unable to reconnect to the LIVE. Connect again from Home.",
+        t("main.init.connectionLost", { home: t("nav.home") }),
       );
     } else {
       notifier.info(
         "connector",
         FEEDBACK_CODES.DISCONNECTED,
-        "Disconnected from the LIVE.",
+        t("main.init.disconnected"),
       );
     }
     // A late stats update would overwrite the reset below.
@@ -315,14 +325,14 @@ const registerConnectorEvents = ({
       notifier.warn(
         "connector",
         FEEDBACK_CODES.RECONNECTING,
-        "The connection to the LIVE dropped. Reconnecting…",
+        t("main.init.reconnecting"),
         { key: "reconnect", windowMs: REPEAT_NOTICE_MS },
       );
     } else {
       notifier.info(
         "connector",
         FEEDBACK_CODES.RECONNECTED,
-        "Reconnected to the LIVE.",
+        t("main.init.reconnected"),
         { key: "reconnected", windowMs: REPEAT_NOTICE_MS },
       );
     }
@@ -352,7 +362,7 @@ const registerConnectorEvents = ({
             notifier.error(
               "tts",
               FEEDBACK_CODES.TTS_GENERATION_FAILED,
-              "Unable to generate TTS audio. Try another voice, or check its engine's key in Settings.",
+              t("main.init.ttsFailed", { settings: t("nav.settings") }),
               { windowMs: REPEAT_NOTICE_MS },
             )
           ) {
@@ -389,7 +399,7 @@ const registerConnectorEvents = ({
       notifier.warn(
         "alerts",
         FEEDBACK_CODES.EMOTES_SAVE_FAILED,
-        "Unable to save the LIVE's new emotes.",
+        t("main.init.emotesSaveFailed"),
         { key: "emotes", windowMs: REPEAT_NOTICE_MS },
       );
     } else if (res.data && !win.isDestroyed()) {
@@ -413,7 +423,7 @@ const registerConnectorEvents = ({
       notifier.warn(
         "alerts",
         FEEDBACK_CODES.GIFTS_SAVE_FAILED,
-        "Unable to save the LIVE's new gifts.",
+        t("main.init.giftsSaveFailed"),
         { key: "gifts", windowMs: REPEAT_NOTICE_MS },
       );
     } else if (res.data) {
@@ -441,7 +451,7 @@ const registerConnectorEvents = ({
     notifier.warn(
       "music",
       FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED,
-      "A song request couldn't be played.",
+      t("main.init.musicPlaybackFailed"),
       { windowMs: REPEAT_NOTICE_MS },
     );
   });
@@ -467,18 +477,23 @@ const registerGames = (handler: AppHandlerVariables) => {
   });
   // Logged once per notice, as they can repeat on every event
   games.onError((action, { offline, full, message }) => {
-    const label = ALERT_TRIGGER_LABELS[action.trigger.type];
+    const label = t(ALERT_TRIGGER_LABELS[action.trigger.type]);
+    // Logs stay English
+    const logged = translate(
+      DEFAULT_LANGUAGE,
+      ALERT_TRIGGER_LABELS[action.trigger.type],
+    );
     if (full) {
       if (
         notifier.warn(
           "games",
           FEEDBACK_CODES.GAME_BACKLOG_FULL,
-          `The ${label} action has ${MAX_BACKLOG} runs waiting, so new ones are skipped until Minecraft catches up.`,
+          t("main.init.gameBacklogFull", { label, max: String(MAX_BACKLOG) }),
           { key: `game:${action.id}:full`, windowMs: REPEAT_NOTICE_MS },
         )
       ) {
         Logger.warn(
-          `<Games> The ${label} action has ${MAX_BACKLOG} runs waiting, new ones are skipped.`,
+          `<Games> The ${logged} action has ${MAX_BACKLOG} runs waiting, new ones are skipped.`,
           paths.files.logs.games,
         );
       }
@@ -491,12 +506,17 @@ const registerGames = (handler: AppHandlerVariables) => {
         notifier.warn(
           "games",
           FEEDBACK_CODES.GAME_NOT_CONNECTED,
-          `${game} isn't connected, so the ${label} action didn't run. Type the ${connect} command from Games in the game's chat.`,
+          t("main.init.gameNotConnected", {
+            game,
+            label,
+            connect,
+            games: t("nav.games"),
+          }),
           { key: "game:minecraft:offline", windowMs: 60_000 },
         )
       ) {
         Logger.warn(
-          `<Games> The ${label} action didn't run, ${game} isn't connected.`,
+          `<Games> The ${logged} action didn't run, ${game} isn't connected.`,
           paths.files.logs.games,
         );
       }
@@ -504,12 +524,12 @@ const registerGames = (handler: AppHandlerVariables) => {
       notifier.warn(
         "games",
         FEEDBACK_CODES.GAME_COMMAND_FAILED,
-        `A command of the ${label} action failed in Minecraft: ${message}`,
+        t("main.init.gameCommandFailed", { label, message }),
         { key: `game:${action.id}`, windowMs: REPEAT_NOTICE_MS },
       )
     ) {
       Logger.warn(
-        `<Games> A command of the ${label} action failed -- ${message}`,
+        `<Games> A command of the ${logged} action failed -- ${message}`,
         paths.files.logs.games,
       );
     }
@@ -521,6 +541,8 @@ const registerGames = (handler: AppHandlerVariables) => {
   handler.serverService.onConnect((id) => {
     if (id === GAMES_PATH) void sendGamesOverlay(handler);
   });
+  // Its automatic texts are in the app's language
+  onLanguage(() => void sendGamesOverlay(handler));
 };
 
 // The countdown timer takes time from live events whatever features are on.
@@ -540,7 +562,7 @@ const registerTimer = ({
       notifier.info(
         "system",
         FEEDBACK_CODES.TIMER_PAUSED,
-        "The countdown timer paused, since Tokio is no longer connected to the LIVE.",
+        t("main.init.timerPaused"),
       );
     }
   });
@@ -555,7 +577,9 @@ const registerTimer = ({
         multiplier: settings.multiplier,
         look: settings.look,
         // The carousel's items, none while it's off
-        triggers: settings.look.show_triggers ? timerTriggers(settings) : [],
+        triggers: settings.look.show_triggers
+          ? timerTriggers(settings, language())
+          : [],
       },
     };
   };
@@ -577,6 +601,8 @@ const registerTimer = ({
   server.onConnect((id) => {
     if (id === TIMER_PATH) server.sendToClient(TIMER_PATH, overlayMessage(0));
   });
+  // The carousel's automatic names are in the app's language
+  onLanguage(() => server.sendToClient(TIMER_PATH, overlayMessage(0)));
 };
 
 events.push(
@@ -597,7 +623,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.PROFILE_LOAD_FAILED,
-      message: "Unable to load the profile.",
+      message: "main.failure.getProfile",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_PROFILE),
   },
@@ -672,6 +698,8 @@ const startApp = async (handler: AppHandlerVariables) => {
     jsonManagerService,
     pathManagerService,
   );
+  // Before any notice, so they're all in the user's language
+  setLanguage(storeManagerService.getSettings().language);
   timerService.initialize({ store: storeManagerService });
   overlayService.initialize(
     {
@@ -723,7 +751,7 @@ const startApp = async (handler: AppHandlerVariables) => {
           source: "overlays",
           error: new AppFailure(
             FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-            "Unable to update the gifts from TikTok. Overlays use the ones saved last time.",
+            t("main.init.giftsRefreshFailed"),
             { level: "warning", cause: error },
           ),
         });
@@ -734,7 +762,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       notifier.warn(
         "overlays",
         FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-        "Unable to get the gifts from TikTok. Overlay gift options stay empty until the next start.",
+        t("main.init.giftsFetchFailed"),
       );
     }
     await overlayService.load(gifts);
@@ -746,7 +774,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       source: "server",
       error: new AppFailure(
         FEEDBACK_CODES.SERVER_START_FAILED,
-        `The overlay server couldn't start, port ${SERVER_PORT} may be in use. It has been turned off.`,
+        t("main.init.serverStartFailed", { port: String(SERVER_PORT) }),
         { level: "warning" },
       ),
     });
@@ -759,7 +787,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       source: "games",
       error: new AppFailure(
         FEEDBACK_CODES.GAME_LISTEN_FAILED,
-        `Tokio couldn't listen for Minecraft, port ${MINECRAFT_PORT} may be in use.`,
+        t("main.init.minecraftListenFailed", { port: String(MINECRAFT_PORT) }),
         { level: "warning" },
       ),
     });
@@ -784,6 +812,8 @@ events.push(
     }
     const settings = await start;
 
+    // On every load, so a reloaded window gets it too
+    e.reply(APP_EVENTS_RESPONSE.LANGUAGE, language());
     e.reply(APP_EVENTS_RESPONSE.LOAD_APP, {
       success: true,
     });
@@ -800,7 +830,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.APP_LOAD_FAILED,
-      message: "Tokio couldn't start. Check the logs folder for details.",
+      message: "app.startFailed",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.LOAD_APP),
   },

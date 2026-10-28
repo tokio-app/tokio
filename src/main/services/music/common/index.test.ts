@@ -1,4 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { setLanguage } from "@/helper/i18n";
 import {
   cancelableEvent,
   ipcMain,
@@ -23,6 +24,7 @@ const open = () => {
 };
 
 const RESIZE: string = APP_EVENTS_RESPONSE.RESIZE_MUSIC_WINDOW;
+const LANGUAGE: string = APP_EVENTS_RESPONSE.LANGUAGE;
 
 const states = (nav: ReturnType<typeof open>["nav"]) =>
   nav.webContents.send.mock.calls
@@ -56,6 +58,26 @@ describe("createWindow", () => {
       "music-out",
       "index.html",
     ]);
+  });
+
+  it("shows the title bar in main's language, following it until the window closes", () => {
+    setLanguage("es-419");
+    const { shell, nav } = open();
+    const pushed = () =>
+      nav.webContents.send.mock.calls
+        .filter(([channel]) => channel === LANGUAGE)
+        .map(([, data]) => data);
+
+    expect(nav.webContents.loadFile.mock.calls[0][1]).toEqual({
+      query: { lang: "es-419" },
+    });
+
+    setLanguage("en");
+    expect(pushed()).toEqual(["en"]);
+
+    shell.close();
+    setLanguage("es-419");
+    expect(pushed()).toEqual(["en"]);
   });
 
   it("keeps the title bar at the top and the content under it", () => {

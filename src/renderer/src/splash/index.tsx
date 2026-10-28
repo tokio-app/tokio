@@ -1,8 +1,10 @@
 import Logo from "@/assets/logo.png";
 import { Spinner } from "@/components/Elements/Spinner";
+import { useT } from "@/ui/i18n";
 import styles from "./splash.module.css";
 
 export function SplashScreen() {
+  const t = useT();
   return (
     <div className={styles.container}>
       <div className={styles.glow_wrapper}>
@@ -17,17 +19,14 @@ export function SplashScreen() {
 
           <div className={styles.loading}>
             <Spinner size={20} />
-            <span className={styles.status_text}>Starting up...</span>
+            <span className={styles.status_text}>{t("splash.starting")}</span>
           </div>
         </div>
       </div>
 
       <div className={styles.footer}>
         <span className={styles.version}>v{__APP_VERSION__}</span>
-        <span className={styles.disclaimer}>
-          Not affiliated with, endorsed by, or associated with TikTok or
-          ByteDance Ltd.
-        </span>
+        <span className={styles.disclaimer}>{t("splash.disclaimer")}</span>
       </div>
     </div>
   );

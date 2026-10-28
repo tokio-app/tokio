@@ -7,7 +7,7 @@ import { TTSResponse, TTSResponseALT } from "./types";
 
 export class TikTokTTS extends TTSProvider {
   public readonly label = "TikTok";
-  public override readonly keyLabel = "Session ID";
+  public override readonly keyLabel = "voiceKeys.sessionId";
   private sessionId: string | undefined;
 
   private getURL(text: string, speaker: string, lang: string) {

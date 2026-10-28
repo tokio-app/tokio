@@ -6,6 +6,7 @@ import {
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
 import { saveFailure } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 import type { TimerService } from "@/services/timer";
 import { z } from "zod";
 
@@ -22,7 +23,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.OVERLAYS_LOAD_FAILED,
-      message: "Unable to load the test overlays.",
+      message: "main.failure.getTestOverlays",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS),
   },
@@ -42,13 +43,13 @@ events.push(
     notifier.success(
       "overlays",
       FEEDBACK_CODES.TEST_OVERLAY_ADDED,
-      `Test overlay "${name.trim()}" added.`,
+      t("main.tools.testOverlayAdded", { name: name.trim() }),
     );
   },
   {
     failure: {
       code: FEEDBACK_CODES.TEST_OVERLAY_FAILED,
-      message: "Unable to add the test overlay.",
+      message: "main.failure.addTestOverlay",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS),
   },
@@ -66,13 +67,13 @@ events.push(
     notifier.success(
       "overlays",
       FEEDBACK_CODES.TEST_OVERLAY_REMOVED,
-      "Test overlay removed.",
+      t("main.tools.testOverlayRemoved"),
     );
   },
   {
     failure: {
       code: FEEDBACK_CODES.TEST_OVERLAY_FAILED,
-      message: "Unable to remove the test overlay.",
+      message: "main.failure.removeTestOverlay",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS),
   },
@@ -91,7 +92,7 @@ events.push(
     notify: false,
     failure: {
       code: FEEDBACK_CODES.TEST_OVERLAY_FAILED,
-      message: "Unable to send the test events.",
+      message: "main.failure.sendTestEvents",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.SEND_TEST_EVENTS, {
@@ -109,7 +110,7 @@ const timerOptions = {
   source: "system",
   failure: {
     code: FEEDBACK_CODES.TIMER_FAILED,
-    message: "Unable to update the countdown timer.",
+    message: "main.failure.timer",
   },
   onError: replyFailure(APP_EVENTS_RESPONSE.TIMER),
 } as const;
@@ -130,7 +131,7 @@ events.push(
     ...timerOptions,
     failure: {
       code: FEEDBACK_CODES.TIMER_FAILED,
-      message: "Unable to load the countdown timer.",
+      message: "main.failure.getTimer",
     },
   },
 );

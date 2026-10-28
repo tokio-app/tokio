@@ -388,7 +388,7 @@ describe("Spotify", () => {
       expect(await spotify.searchSong("song")).toEqual({
         album: "Unknown",
         track: "Unknown",
-        title: "Unknown Track - Unknown Artist",
+        title: "Unknown track - Unknown artist",
         thumbnail: "",
         duration: 0,
       });
@@ -401,7 +401,7 @@ describe("Spotify", () => {
       const spotify = await login();
 
       expect((await spotify.searchSong("song"))?.title).toMatch(
-        / - Unknown Artist$/,
+        / - Unknown artist$/,
       );
     });
 

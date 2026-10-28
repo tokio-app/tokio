@@ -60,6 +60,7 @@ export enum APP_EVENTS {
   SET_SERVER = "app:settings:set:server",
   SET_AUTO_UPDATES = "app:settings:set:updates",
   SET_TRAY = "app:settings:set:tray",
+  SET_LANGUAGE = "app:settings:set:language",
   REQ_FQDN = "app:settings:req:fqdn",
   GET_NETWORK_ADDRESSES = "app:settings:get:network",
 
@@ -237,6 +238,10 @@ export interface AppEventsMap {
   };
   [APP_EVENTS.SET_TRAY]: {
     enabled: boolean;
+  };
+  // "system", or a tag in APP_LANGUAGES
+  [APP_EVENTS.SET_LANGUAGE]: {
+    language: string;
   };
 
   [APP_EVENTS.REQ_FQDN]: void;

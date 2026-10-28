@@ -6,6 +6,7 @@ import {
   useEditableSettings,
   useIpcListener,
 } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useEffect, useState } from "react";
 import { FormatSection } from "./sections/FormatSection";
 import { ProtectionFields } from "./sections/ProtectionFields";
@@ -16,6 +17,7 @@ import { VoiceSection } from "./sections/VoiceSection";
 const TEST_ID = "tts-test";
 
 export function TTS() {
+  const t = useT();
   const { getQueue } = useAudio();
   const testQueue = getQueue("tts_test");
 
@@ -65,13 +67,13 @@ export function TTS() {
       />
 
       <PermissionsSection
-        feature="TTS"
+        feature={t("nav.tts")}
         permissions={settings.permissions}
         update={scopeUpdater(update, "permissions")}
       />
 
       <ProtectionSection
-        feature="TTS"
+        feature={t("nav.tts")}
         protection={settings.protection}
         update={scopeUpdater(update, "protection")}
       >

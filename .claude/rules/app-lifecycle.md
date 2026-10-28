@@ -19,7 +19,7 @@ paths:
 ## Tray and closing
 
 - While **Settings → Tray** is on (the default, `settings.tray`), closing the main window only hides it.
-- `TrayService` shows the icon once `LOAD_APP` has run and on `SET_TRAY`. `AppHandler` (`src/main/handler/app.ts`) hides the window on `close` until a quit.
+- `TrayService` shows the icon once `LOAD_APP` has run and on `SET_TRAY`. Its menu is built again in the new language when it changes (`onLanguage`). `AppHandler` (`src/main/handler/app.ts`) hides the window on `close` until a quit.
 - On Linux, the first time each run that closing hides it, a system notification says Tokio is still running, and clicking it shows the window: desktops without a tray host (vanilla GNOME) show no icon.
 
 ## Quitting

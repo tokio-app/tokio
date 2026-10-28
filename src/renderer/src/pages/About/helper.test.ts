@@ -36,20 +36,22 @@ describe("resolveNoticeLink", () => {
 
 describe("updateText", () => {
   it("describes every update state", () => {
-    expect(updateText({ state: "idle" })).toBe(
+    expect(updateText({ state: "idle" }, "en")).toBe(
       "Tokio hasn't checked for updates yet.",
     );
-    expect(updateText({ state: "unsupported" })).toBe(
+    expect(updateText({ state: "unsupported" }, "en")).toBe(
       "Updates aren't available in this build.",
     );
-    expect(updateText({ state: "checking" })).toBe("Checking for updates…");
-    expect(updateText({ state: "none", checkedAt: 0 })).toBe(
+    expect(updateText({ state: "checking" }, "en")).toBe(
+      "Checking for updates…",
+    );
+    expect(updateText({ state: "none", checkedAt: 0 }, "en")).toBe(
       "Tokio is up to date.",
     );
     expect(
-      updateText({ state: "downloading", version: "1.2.0", percent: 40 }),
+      updateText({ state: "downloading", version: "1.2.0", percent: 40 }, "en"),
     ).toBe("Downloading Tokio 1.2.0… 40%");
-    expect(updateText({ state: "ready", version: "1.2.0" })).toBe(
+    expect(updateText({ state: "ready", version: "1.2.0" }, "en")).toBe(
       "Tokio 1.2.0 is ready to install.",
     );
   });
@@ -60,10 +62,10 @@ describe("updateText", () => {
       version: "1.2.0",
       url: "",
     } as const;
-    expect(updateText({ ...available, manual: false })).toBe(
+    expect(updateText({ ...available, manual: false }, "en")).toBe(
       "Tokio 1.2.0 is available.",
     );
-    expect(updateText({ ...available, manual: true })).toBe(
+    expect(updateText({ ...available, manual: true }, "en")).toBe(
       "Tokio 1.2.0 is available. Download it from the release page.",
     );
   });

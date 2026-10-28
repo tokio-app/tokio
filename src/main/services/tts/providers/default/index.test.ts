@@ -257,7 +257,7 @@ describe("TikTokTTS", () => {
     });
 
     it("takes a Session ID", () => {
-      expect(tts.keyLabel).toBe("Session ID");
+      expect(tts.keyLabel).toBe("voiceKeys.sessionId");
     });
   });
 });

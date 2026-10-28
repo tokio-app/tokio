@@ -6,6 +6,7 @@ import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
 import styles from "@/router/Layout/layout.module.css";
+import { useT } from "@/ui/i18n";
 import { TitleBar } from "@/ui/TitleBar";
 import React, { useEffect, useState } from "react";
 
@@ -17,6 +18,7 @@ import React, { useEffect, useState } from "react";
 export function AppProvider({ children }: { children: React.ReactNode }) {
   // Null until main has loaded
   const [started, setStarted] = useState<boolean | null>(null);
+  const t = useT();
 
   const { getQueue, stopQueues } = useAudio();
 
@@ -83,7 +85,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       <div className={styles.container}>
         <TitleBar target="main" logo={Logo} />
         <main className={styles.content}>
-          <p>Tokio couldn't start. Check the logs folder for details.</p>
+          <p>{t("app.startFailed")}</p>
         </main>
       </div>
     );

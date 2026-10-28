@@ -2,6 +2,7 @@ import { Alert, AlertTts } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
 import { ALERT_MESSAGE_VARIABLES } from "@/common/util";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
+import { useT } from "@/ui/i18n";
 import { useRef } from "react";
 import { Input, Slider } from "../Elements";
 import { Field } from "../Page";
@@ -33,6 +34,7 @@ export function TtsTab({
   testing,
   onTest,
 }: Props) {
+  const t = useT();
   const messageRef = useRef<HTMLInputElement>(null);
   const testId = `${alertId}:tts`;
   // An alert on every gift speaks for each one, it has no count to say.
@@ -43,11 +45,11 @@ export function TtsTab({
 
   return (
     <div className={styles.tts}>
-      <Field label="Message">
+      <Field label={t("components.soundPicker.message")}>
         <div className={styles.tts_message}>
           <Input
             ref={messageRef}
-            placeholder="Type what the alert says..."
+            placeholder={t("components.soundPicker.messagePlaceholder")}
             value={value.message}
             onChange={(e) => onChange({ ...value, message: e.target.value })}
           />
@@ -69,11 +71,11 @@ export function TtsTab({
           inputRef={messageRef}
           value={value.message}
           onChange={(message) => onChange({ ...value, message })}
-          empty="This event has no variables."
+          empty={t("common.noVariables")}
         />
       </Field>
 
-      <Field label="Voice">
+      <Field label={t("components.soundPicker.voice")}>
         <VoiceSelect
           value={value.voice}
           filters={value}
@@ -81,7 +83,7 @@ export function TtsTab({
         />
       </Field>
 
-      <Field label={`Speed (${value.speed}x)`}>
+      <Field label={t("common.speed", { speed: value.speed })}>
         <Slider
           min={0.5}
           max={2}
@@ -91,7 +93,7 @@ export function TtsTab({
         />
       </Field>
 
-      <Field label={`Pitch (${value.pitch})`}>
+      <Field label={t("common.pitch", { pitch: value.pitch })}>
         <Slider
           min={0.5}
           max={2}

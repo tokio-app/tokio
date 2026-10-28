@@ -1,12 +1,16 @@
+import { translate } from "@/common/i18n";
 import { APP_EVENTS, TokioPayload, TokioPreviewMessage } from "@/common/types";
 
 /**
- * The hint on Official Overlays while installed ones have updates, or
+ * The hint on Official overlays while installed ones have updates, or
  * undefined without any.
  */
-export function updatesHint(count: number): string | undefined {
+export function updatesHint(
+  count: number,
+  language: string,
+): string | undefined {
   if (count === 0) return undefined;
-  return count === 1 ? "1 update available" : `${count} updates available`;
+  return translate(language, "overlays.updates", { count });
 }
 
 /**

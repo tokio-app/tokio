@@ -5,6 +5,7 @@ import {
   Profile,
   SavedEmote,
 } from "@/common/schemas";
+import { translate } from "@/common/i18n";
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
 import { defaultAlertName } from "@/common/util";
 import { EmoteOption } from "@/components";
@@ -42,10 +43,13 @@ export function ttsDefaultsOf(tts: Profile["tts"]): Omit<AlertTts, "message"> {
 }
 
 // TikTok doesn't name emotes, they're numbered in the order they appeared.
-export function emoteOptions(emotes: SavedEmote[]): EmoteOption[] {
+export function emoteOptions(
+  emotes: SavedEmote[],
+  language: string,
+): EmoteOption[] {
   return emotes.map((emote, index) => ({
     value: emote.id,
-    label: `Emote ${index + 1}`,
+    label: translate(language, "alerts.emote", { number: index + 1 }),
     img: emote.image,
   }));
 }

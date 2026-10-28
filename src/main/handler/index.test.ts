@@ -55,7 +55,7 @@ describe("Handler", () => {
       {
         failure: {
           code: FEEDBACK_CODES.SETTINGS_LOAD_FAILED,
-          message: "Unable to load the settings.",
+          message: "main.failure.getSettings",
         },
         onError: (e, error) =>
           e.reply(APP_EVENTS_RESPONSE.GET_SETTINGS, { success: false, error }),

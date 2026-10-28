@@ -1,6 +1,7 @@
 import { Profile } from "@/common/schemas";
 import { Btn, EmptyState, Input, Section } from "@/components";
 import { Updater } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { FiArrowRight, FiPlus, FiTrash2 } from "react-icons/fi";
 import styles from "../tts.module.css";
 
@@ -12,14 +13,15 @@ interface Props {
 }
 
 export function ReplacementsSection({ replacements, update }: Props) {
+  const t = useT();
   return (
     <Section
-      title="Replacements"
-      description="Words to pronounce differently, like brb."
+      title={t("tts.replacements.title")}
+      description={t("tts.replacements.description")}
       actions={
         <Btn
           variant="icon"
-          title="Add Replacement"
+          title={t("tts.replacements.add")}
           onClick={() =>
             update((r) => {
               r.push({ old: "", new: "" });
@@ -34,7 +36,7 @@ export function ReplacementsSection({ replacements, update }: Props) {
         {replacements.map((replacement, index) => (
           <div key={index} className={styles.replacement}>
             <Input
-              placeholder="Word to replace (e.g. 'brb')"
+              placeholder={t("tts.replacements.oldPlaceholder")}
               value={replacement.old}
               onChange={(e) =>
                 update((r) => {
@@ -44,7 +46,7 @@ export function ReplacementsSection({ replacements, update }: Props) {
             />
             <FiArrowRight size={16} className={styles.replacement_arrow} />
             <Input
-              placeholder="How it sounds (e.g. 'be right back')"
+              placeholder={t("tts.replacements.newPlaceholder")}
               value={replacement.new}
               onChange={(e) =>
                 update((r) => {
@@ -54,7 +56,7 @@ export function ReplacementsSection({ replacements, update }: Props) {
             />
             <Btn
               variant="icon"
-              title="Remove"
+              title={t("common.remove")}
               onClick={() =>
                 update((r) => {
                   r.splice(index, 1);
@@ -67,7 +69,7 @@ export function ReplacementsSection({ replacements, update }: Props) {
         ))}
 
         {replacements.length === 0 && (
-          <EmptyState>No custom replacements added.</EmptyState>
+          <EmptyState>{t("tts.replacements.empty")}</EmptyState>
         )}
       </div>
     </Section>

@@ -43,7 +43,8 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 
 - `onChange(deltaMs)` feeds `registerTimer` (`src/main/events/init.ts`). `added` sums the deltas, sent through a no-argument `throttle` that reads `timer.get()` when it fires, so a late push never sends an old time.
 - The window gets `TIMER` (`{ settings, state, added }`), and the overlay's clients get `tokio:timer` (`{ status, remaining, added, multiplier, look, triggers }`). A client connecting with the id `timer` gets the state from `ServerService.onConnect`, with `added: 0`.
-- `triggers` are the carousel's items, `[]` while `look.show_triggers` is off. `timerTriggers` (`src/common/util/timer.ts`) builds them for main and the Tools preview alike; triggers that add nothing are left out.
+- `triggers` are the carousel's items, `[]` while `look.show_triggers` is off. `timerTriggers(settings, language)` (`src/common/util/timer.ts`) builds them for main and the Tools preview alike; triggers that add nothing are left out.
+- The names (`look.names`) default to `""`, the app language's name (`timer.names.*`), which Tools shows as each field's placeholder. A saved name equal to its old English default reads as `""`. Main sends the overlay again when the language changes.
 - **The font:** `timer.html` is served from memory, with Archivo inlined as a `data:` URL. Main imports the woff2 with `?inline`, which works only because `@fontsource-variable/archivo` is in main's `externalizeDeps.exclude` (`electron.vite.config.ts`). `packaging.test.ts` skips query imports.
 - **Drawing:** the page anchors `remaining` to `performance.now()` and redraws every 250 ms. Sizes follow `--size`, times `--fit`, which shrinks everything when a wide font or a wrapped title wouldn't fit.
   - The halo is set on each text, since `em` in a `text-shadow` set on `body` resolves against the body's 16px.
@@ -55,7 +56,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 
 ## Tools page
 
-- Timer Look comes right after the preview, colors first, so its changes show while they're made.
+- Timer look comes right after the preview, colors first, so its changes show while they're made.
 - One `useAutosave(timer.settings)` feeds the three timer sections, nested fields through immer's `produce`. Its delay keys on `prevSaved`, so main's pushes (a new but equal `settings` every 250 ms on a busy LIVE) don't keep restarting it.
 - The controls call `flushSettings()` before `TIMER_CONTROL` or `ADJUST_TIMER`, so a setting still waiting to save, like the starting time, reaches main first.
 - The preview counts down from the last push's `at`, ticking only while running. While idle, it shows the starting time as typed.

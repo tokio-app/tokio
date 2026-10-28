@@ -5,6 +5,7 @@ import {
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 
 const events = createStack("tts");
 
@@ -21,7 +22,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.TTS_VOICES_FAILED,
-      message: "Unable to load the voices.",
+      message: "main.failure.getVoices",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_VOICES),
   },
@@ -43,7 +44,7 @@ events.push(
     source: "system",
     failure: {
       code: FEEDBACK_CODES.PROFILE_SAVE_FAILED,
-      message: "Unable to save the TTS settings.",
+      message: "main.failure.updateTtsSettings",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.UPDATE_TTS_SETTINGS),
   },
@@ -57,7 +58,7 @@ events.push(
     if (spoken === null) {
       throw new AppFailure(
         FEEDBACK_CODES.TTS_TEST_BLOCKED,
-        "This message wouldn't be read aloud: it has a banned word or nothing left to read.",
+        t("main.tts.testBlocked"),
         { level: "warning" },
       );
     }
@@ -74,7 +75,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.TTS_GENERATION_FAILED,
-      message: "Unable to generate the test audio. Try another voice.",
+      message: "main.failure.getTtsTest",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_TTS_TEST, {

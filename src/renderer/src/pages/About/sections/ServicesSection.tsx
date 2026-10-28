@@ -1,14 +1,16 @@
 import { Section } from "@/components";
+import { useT } from "@/ui/i18n";
 import { FiGlobe } from "react-icons/fi";
 import styles from "../about.module.css";
 import { SERVICES } from "../helper";
 
 export function ServicesSection() {
+  const t = useT();
   return (
     <Section
       icon={<FiGlobe />}
-      title="Online services"
-      description="Tokio talks to these services. They aren't covered by Tokio's license or the licenses above: each one is subject to its operator's terms and can stop working at any time."
+      title={t("about.services.title")}
+      description={t("about.services.description")}
     >
       <div className={styles.list}>
         {SERVICES.map(({ name, note }) => (
@@ -20,10 +22,7 @@ export function ServicesSection() {
           </div>
         ))}
       </div>
-      <p className={styles.muted}>
-        Tokio is not affiliated with, endorsed by, or associated with TikTok or
-        ByteDance Ltd.
-      </p>
+      <p className={styles.muted}>{t("about.services.disclaimer")}</p>
     </Section>
   );
 }

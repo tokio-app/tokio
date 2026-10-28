@@ -8,6 +8,7 @@ import {
   VariableList,
 } from "@/components";
 import { Updater } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useRef } from "react";
 import styles from "../tts.module.css";
 
@@ -33,9 +34,13 @@ interface Props {
 export function FormatSection({ format, update }: Props) {
   const custom = format.trigger.mode === "custom";
   const templateRef = useRef<HTMLInputElement>(null);
+  const t = useT();
 
   return (
-    <Section title="Format" description="Which chat messages get read.">
+    <Section
+      title={t("tts.format.title")}
+      description={t("tts.format.description")}
+    >
       <RadioGroup
         name="trigger"
         value={format.trigger.mode}
@@ -47,26 +52,24 @@ export function FormatSection({ format, update }: Props) {
         options={[
           {
             value: "any",
-            label: "Read All Comments",
-            description:
-              "Every single message in chat will be processed by TTS.",
+            label: t("tts.format.any"),
+            description: t("tts.format.anyDescription"),
           },
           {
             value: "dot",
-            label: "Dot Prefix ( . )",
-            description: "Only messages starting with a period will be read.",
+            label: t("tts.format.dot"),
+            description: t("tts.format.dotDescription"),
           },
           {
             value: "slash",
-            label: "Slash Prefix ( / )",
-            description:
-              "Only messages starting with a forward slash will be read.",
+            label: t("tts.format.slash"),
+            description: t("tts.format.slashDescription"),
           },
           {
             value: "custom",
             label: (
               <>
-                Custom Command
+                {t("tts.format.custom")}
                 <Input
                   className={styles.trigger_input}
                   placeholder="!tts"
@@ -80,13 +83,12 @@ export function FormatSection({ format, update }: Props) {
                 />
               </>
             ),
-            description:
-              "Only messages starting with this phrase, in any case, will be read, without the phrase.",
+            description: t("tts.format.customDescription"),
           },
         ]}
       />
 
-      <Field label="Message Template">
+      <Field label={t("tts.format.template")}>
         <Input
           ref={templateRef}
           value={format.template}
@@ -109,7 +111,7 @@ export function FormatSection({ format, update }: Props) {
       </Field>
 
       <Check
-        label="Remove Emojis"
+        label={t("tts.format.removeEmojis")}
         checked={format.remove_emojis}
         onChange={(e) =>
           update((f) => {

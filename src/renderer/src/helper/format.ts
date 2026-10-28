@@ -19,19 +19,31 @@ export const fontFamily = (font: string) =>
     ? `${JSON.stringify(font.trim())}, "Archivo Variable", sans-serif`
     : undefined;
 
-const compactFormat = new Intl.NumberFormat("en-US", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const exactFormat = new Intl.NumberFormat("en-US");
+// Made once per language, a busy LIVE formats stats many times a second
+const formats = new Map<
+  string,
+  { short: Intl.NumberFormat; full: Intl.NumberFormat }
+>();
 
 /**
- * A live stat as short text (1.2K) and as the exact number (1,234).
+ * A live stat as short text (1.2K) and as the exact number (1,234), as the
+ * language writes them.
  */
-export function formatStat(value: number) {
+export function formatStat(value: number, language: string) {
+  let format = formats.get(language);
+  if (!format) {
+    format = {
+      short: new Intl.NumberFormat(language, {
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }),
+      full: new Intl.NumberFormat(language),
+    };
+    formats.set(language, format);
+  }
   return {
-    short: compactFormat.format(value),
-    full: exactFormat.format(value),
+    short: format.short.format(value),
+    full: format.full.format(value),
   };
 }
 

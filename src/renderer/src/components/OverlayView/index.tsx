@@ -1,5 +1,6 @@
 import { OverlayApp } from "@/common/types";
 import { getOverlayURL } from "@/common/util";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiMaximize2 } from "react-icons/fi";
 import { GoUnverified, GoVerified } from "react-icons/go";
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function OverlayView({ onTest, onCustomize, overlay }: Props) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -32,7 +34,7 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
           footer={
             <Btn onClick={() => onTest(overlay.id)}>
               <PiShootingStarThin size={18} />
-              Test
+              {t("common.test")}
             </Btn>
           }
         >
@@ -55,12 +57,12 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
             {overlay.external ? (
               <span className={styles.tag}>
                 <GoUnverified size={14} />
-                External
+                {t("components.overlayView.external")}
               </span>
             ) : (
               <span className={styles.tag}>
                 <GoVerified size={14} color="var(--success)" />
-                Verified
+                {t("components.overlayView.verified")}
               </span>
             )}
           </div>
@@ -69,12 +71,12 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
         <div className={styles.buttons}>
           <Btn onClick={() => onTest(overlay.id)}>
             <PiShootingStarThin size={18} />
-            Test
+            {t("common.test")}
           </Btn>
           {overlay.config && (
             <Btn onClick={() => onCustomize(overlay.id)}>
               <VscSettings size={18} />
-              Customize
+              {t("components.overlayView.customize")}
             </Btn>
           )}
         </div>
@@ -84,7 +86,7 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
       <OverlayPreview overlay={overlay}>
         <Btn
           variant="icon"
-          title="Full size"
+          title={t("common.fullSize")}
           className={styles.expand}
           onClick={() => setExpanded(true)}
         >
@@ -92,7 +94,10 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
         </Btn>
       </OverlayPreview>
 
-      <CopyField value={getOverlayURL(overlay.id)} title="Copy URL" />
+      <CopyField
+        value={getOverlayURL(overlay.id)}
+        title={t("common.copyUrl")}
+      />
     </div>
   );
 }

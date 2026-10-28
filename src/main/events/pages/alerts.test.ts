@@ -816,7 +816,7 @@ describe("alerts events", () => {
       list: APP_EVENTS_RESPONSE.GET_SOUNDS,
       removed: FEEDBACK_CODES.SOUND_REMOVED,
       failed: FEEDBACK_CODES.SOUND_REMOVE_FAILED,
-      notice: "Sound removed.",
+      notice: "Sound deleted.",
       warning:
         "Sound removed from the library, but its file couldn't be deleted.",
     },
@@ -827,7 +827,7 @@ describe("alerts events", () => {
       list: APP_EVENTS_RESPONSE.GET_MEDIA,
       removed: FEEDBACK_CODES.MEDIA_REMOVED,
       failed: FEEDBACK_CODES.MEDIA_REMOVE_FAILED,
-      notice: "Media removed.",
+      notice: "Media deleted.",
       warning:
         "Media removed from the library, but its file couldn't be deleted.",
     },

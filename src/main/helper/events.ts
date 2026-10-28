@@ -7,6 +7,7 @@ import {
   FeedbackSource,
 } from "@/common/types";
 import { formatError } from "@/common/util";
+import { t } from "@/helper/i18n";
 import Logger from "@/logger";
 import {
   AppHandlerVariables,
@@ -92,10 +93,11 @@ export async function runEvent<K extends APP_EVENTS>(
   try {
     await callback(handler, e, data);
   } catch (error) {
+    const { failure } = options;
     const appError = handler.notifier.report({
       source: options.source ?? "system",
       error,
-      fallback: options.failure,
+      fallback: failure && { ...failure, message: t(failure.message) },
       context: event,
       notify: options.notify,
     });

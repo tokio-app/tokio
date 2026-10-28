@@ -19,9 +19,9 @@ afterEach(() => {
 
 describe("updatesHint", () => {
   it("counts the updates, and says nothing without any", () => {
-    expect(updatesHint(0)).toBeUndefined();
-    expect(updatesHint(1)).toBe("1 update available");
-    expect(updatesHint(3)).toBe("3 updates available");
+    expect(updatesHint(0, "en")).toBeUndefined();
+    expect(updatesHint(1, "en")).toBe("1 update available");
+    expect(updatesHint(3, "en")).toBe("3 updates available");
   });
 });
 

@@ -23,7 +23,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 
 - The Overlays page shows each overlay in an `Iframe` named `TOKIO_APP-<id>`, loaded from disk through `local-resource:` so previews work with the overlay server off. `postToOverlay` posts `TOKIO_PREVIEW` messages to it, which `@tokioapp/overlay` reads instead of opening a WebSocket.
 - The settings dialog (`OverlayModal`) posts the unsaved settings (`getOverlayConfig`) to its own preview alone, through a ref, so the card and the live overlays keep the saved ones until Save. While it's open, Test reaches only the previews (`postToPreviews`), never the stream.
-- Test sends every live event at once, as the next moment of a test LIVE (`createTestLive`, `src/common/util/samples`) that `OverlayService` keeps per overlay id, Tools → Test Overlays' ids included, until the app quits. The settings' Test carries on the card's.
+- Test sends every live event at once, as the next moment of a test LIVE (`createTestLive`, `src/common/util/samples`) that `OverlayService` keeps per overlay id, Tools → Test overlays' ids included, until the app quits. The settings' Test carries on the card's.
 - `local-resource:` has no origin, so it's registered with `corsEnabled` and `supportFetchAPI`, and `withPreviewCORS` adds `Access-Control-Allow-Origin: *`. Without them Chromium blocks module scripts, `crossorigin` styles, fonts and `fetch`, and overlays built with Vite never run in previews.
 - Overlay code can load any `local-resource:` URL, so the handler serves only files inside the overlays folder (`previewFile`). Don't widen it.
 - `getConfig`, `saveConfig` and `remove` refuse an id that isn't stored (`_isStored`), so the renderer's id can't point outside the overlays folder. The check doesn't log; the config handlers and `_remove` do.
@@ -48,13 +48,13 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 - The server listens on every interface on purpose (see Conventions in `AGENTS.md`). A streaming app on another computer opens overlays through `tokio-app.local` pointed at this PC's address in that computer's hosts file or a DNS entry (as the website's docs describe), or at the address itself. Tokio's own hosts-file entry (`services/url`) is only for this PC.
 - `processHTML` appends `REMOTE_SOCKET` (`services/overlay/common`) to every setup block. On a page opened on port 37891 from a host other than `localhost`, `127.0.0.1` or `[::1]`, it wraps `WebSocket` so sockets to a loopback host on that port go to `location.host`.
 - Previews (`local-resource:`) and pages opened at `localhost` are left alone. A page Tokio doesn't serve gets no setup block, so it must connect to the Tokio PC's address itself.
-- **Settings → Overlay Server** lists `ServerService.networkAddresses()` (`GET_NETWORK_ADDRESSES`, `notify: false`, `[]` on failure), each a `CopyField` of the IP alone, what a hosts file or a DNS entry needs.
+- **Settings → Overlay server** lists `ServerService.networkAddresses()` (`GET_NETWORK_ADDRESSES`, `notify: false`, `[]` on failure), each a `CopyField` of the IP alone, what a hosts file or a DNS entry needs.
 
 ## Official overlays
 
-- They come from the catalog of `tokio-app/overlays` (see Overlays repo in `AGENTS.md`), listed on **Official Overlays** (`pages/OfficialOverlays`, `/overlays/official`).
+- They come from the catalog of `tokio-app/overlays` (see Overlays repo in `AGENTS.md`), listed on **Official overlays** (`pages/OfficialOverlays`, `/overlays/official`).
 - `OverlayService.getCatalog` reads the catalog when that page or the Overlays page opens and keeps it for `CATALOG_TTL_MS`. Calls made while it fetches share that one fetch. A failure isn't kept; a failure that comes while a catalog shows is ignored.
-- The Overlays page reads the catalog only for the dot on its **Official Overlays** button (`countUpdates`, `src/common/util/catalog.ts`, next to `catalogState`).
+- The Overlays page reads the catalog only for the dot on its **Official overlays** button (`countUpdates`, `src/common/util/catalog.ts`, next to `catalogState`).
 - `parseCatalog` (`services/overlay/common/catalog.ts`) drops entries that don't parse (`CatalogOverlaySchema`, `src/common/schemas/catalog.ts`) or whose zip isn't under `https://github.com/tokio-app/overlays/releases/download/`, and previews from anywhere else. Only fetch that prefix.
 - The renderer sends only the id (`INSTALL_OVERLAY`); main looks the entry up in its catalog, so it never downloads a URL from the renderer.
 - `installFromCatalog` downloads the zip, checks its size and SHA-256 against the catalog, and extracts it (`extractZip`, refusing paths outside the folder) into `.install-<uuid>` inside the overlays folder. It's then checked like an import.
@@ -63,4 +63,4 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 - Keeping the catalog id over generated ids is the user's call: readable URLs survive removing and reinstalling, so OBS links keep working. A random id adds no security, since the socket accepts any id and every client gets the LIVE events. Don't propose switching.
 - `CatalogOverlaySchema` refuses the ids `alerts`, `timer` and `games`: `/alerts/` serves each alert's own overlay, `/timer/` the countdown timer's and `/games/` the games' overlays. None is stored or in the gallery (see `.claude/rules/alerts.md`, `.claude/rules/timer.md` and `.claude/rules/games-overlay.md`).
 - An update keeps the saved settings that still fit the new `config.yaml` (`mergeOverlayConfig`, `src/common/schemas/overlay.ts`) and replaces the store entry in place. Streaming apps keep the old page until refreshed, as the success notice says. The gallery keys cards by id and version, so previews reload.
-- Official overlays are removed from their card on Official Overlays, imported ones in **Settings → Overlay Library**. Both use `REMOVE_OVERLAY`.
+- Official overlays are removed from their card on Official overlays, imported ones in **Settings → Overlay library**. Both use `REMOVE_OVERLAY`.

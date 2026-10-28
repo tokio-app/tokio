@@ -2,7 +2,9 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { defaultStoreData } from "@/common/util";
 import { Modal, Page } from "@/components";
 import { useImmerState, useIpcListener, useIpcRequest } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
+import { LanguageSection } from "./sections/LanguageSection";
 import { MediaSection } from "./sections/MediaSection";
 import { OverlaysSection } from "./sections/OverlaysSection";
 import { CloneProfileModal, NewProfileModal } from "./sections/ProfileModals";
@@ -17,6 +19,7 @@ import { VoiceKeysSection } from "./sections/VoiceKeysSection";
 type ModalType = "newProfile" | "cloneProfile" | "confirmServer";
 
 export function Settings() {
+  const t = useT();
   const [store, updateStore, setStore] = useImmerState(defaultStoreData);
   const [modal, setModal] = useState<ModalType | null>(null);
   const [connected, setConnected] = useState(false);
@@ -48,9 +51,9 @@ export function Settings() {
     <>
       {modal === "confirmServer" && (
         <Modal
-          title="Enable Overlay Server?"
-          description="Starting the local overlay server will open the specified port on your network to allow OBS and other browser sources to connect. Are you sure you want to proceed?"
-          confirmText="Enable Server"
+          title={t("settings.server.confirmTitle")}
+          description={t("settings.server.confirmDescription")}
+          confirmText={t("settings.server.enable")}
           onClose={closeModal}
           onConfirm={() => {
             setServerEnabled(true);
@@ -83,6 +86,16 @@ export function Settings() {
               setServerEnabled(false);
               window.api.emit(APP_EVENTS.SET_SERVER, { enabled: false });
             }
+          }}
+        />
+
+        <LanguageSection
+          language={store.settings.language}
+          onChange={(language) => {
+            updateStore((s) => {
+              s.settings.language = language;
+            });
+            window.api.emit(APP_EVENTS.SET_LANGUAGE, { language });
           }}
         />
 

@@ -18,11 +18,17 @@ argument-hint: "[what to check]"
    };
    ```
 
-3. Run it from the repository root: `node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs>`. With `--home <dir>` it uses that data folder and keeps it, to look at what the app saved or to start the next run from there. One Tokio runs per data folder, so runs on the same `--home` go one after the other: a second one quits at once. With `--exe <app>` it starts a packaged build instead, made with `yarn build:unpack`: `dist/win-unpacked/tokio.exe`, or `dist/linux-unpacked/tokio` on Linux. With `--scale 2` it renders at twice the device scale, for sharp screenshots on any display.
+3. Run it from the repository root: `node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs>`. With `--home <dir>` it uses that data folder and keeps it, to look at what the app saved or to start the next run from there. One Tokio runs per data folder, so runs on the same `--home` go one after the other: a second one quits at once. With `--exe <app>` it starts a packaged build instead, made with `yarn build:unpack`: `dist/win-unpacked/tokio.exe`, or `dist/linux-unpacked/tokio` on Linux. With `--scale 2` it renders at twice the device scale, for sharp screenshots on any display. With `--lang <tag>` it runs as if the system's language were that one (`TOKIO_LANG`, `en` by default): `--lang es-419` shows Spanish, unless the data folder saved another language.
 4. It refuses to start while port 37891 is in use. Ask the user to quit Tokio or stop `yarn dev`; don't stop them yourself.
 5. Look at the screenshots, and at what the script printed: renderer errors come out as `[page]` and `[console]` lines, and it exits with 1 when a step throws.
 
 `scripts/screenshots.mjs` is a steps file that retakes the README's screenshots into `.github/screenshots/` (the whole window, 1200×800) and the website docs' into `../tokio-web/src/assets/screenshots/` (crops of what each docs section describes), with made-up viewers: `node .claude/skills/drive-app/scripts/drive.mjs --scale 2 .claude/skills/drive-app/scripts/screenshots.mjs`. It needs the network for the official overlays. A docs crop is named after its file, which the docs reference; a new one needs a line in the docs page that shows it.
+
+The website is in English and Spanish, so retake both:
+
+- Add `--lang es-419` to the same command for the Spanish crops. They go to `../tokio-web/src/assets/screenshots/es/`, and the README stays English.
+- Every UI text the script looks for goes through `tr()`: the text is found in `en.json`, and its key is read in the run's language. A text with `{params}`, or one whose keys translate differently, passes its key.
+- What a streamer or viewer typed goes through `say()`, with its Spanish in `TYPED`. A new typed text that a picture shows needs a line there. The Spanish docs' alt texts name what the Spanish pictures show.
 
 ## Helpers
 
@@ -47,7 +53,7 @@ argument-hint: "[what to check]"
 
 - `RECIPES.md` has the checks that need more than clicks: fake live events in main, counting what main sends, test media, minimized windows and overlay pages.
 - Query by role and visible text, as the tests do (`.claude/rules/testing.md`).
-- To watch an overlay page (an alert's `/alerts/<id>/`, the timer's), turn the server on first: `toggle` **Enable Server** in Settings, then click the confirm dialog's **Enable Server**. Open the page in `app.evaluate` with `new BrowserWindow({ webPreferences: { partition: "obs", backgroundThrottling: false } })`: the app's own session cancels WebSockets, so the page couldn't connect there. Then find it with `windowWith("alerts/")`.
+- To watch an overlay page (an alert's `/alerts/<id>/`, the timer's), turn the server on first: `toggle` **Enable server** in Settings, then click the confirm dialog's **Enable server**. Open the page in `app.evaluate` with `new BrowserWindow({ webPreferences: { partition: "obs", backgroundThrottling: false } })`: the app's own session cancels WebSockets, so the page couldn't connect there. Then find it with `windowWith("alerts/")`.
 - A real connector check needs a username that's LIVE right now: ask the user for one.
 
 ## Done when

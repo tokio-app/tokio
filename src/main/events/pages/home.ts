@@ -6,33 +6,37 @@ import {
 } from "@/common/types";
 import { createStack } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 import { ConnectorFailure } from "@/services/connector/common";
 
 const events = createStack("connector");
 
 // What to tell the user about a connect that failed, by what went wrong.
 const connectMessage = (handle: string, error?: ConnectorFailure) => {
+  const settings = t("nav.settings");
   switch (error?.kind) {
     case "offline":
-      return `${handle} isn't LIVE right now. Connect once the LIVE has started.`;
+      return t("main.home.connect.offline", { handle });
     case "notFound":
-      return `Couldn't find ${handle} on TikTok. Check the username.`;
+      return t("main.home.connect.notFound", { handle });
     case "rateLimited": {
       const wait = error.retryAfterSeconds;
-      return `Your Euler Stream API key hit its rate limit. Try again in ${wait ? `${wait} seconds` : "a minute"}.`;
+      return wait
+        ? t("main.home.connect.rateLimited", { count: wait })
+        : t("main.home.connect.rateLimitedMinute");
     }
     case "noKey":
-      return "Tokio needs your Euler Stream API key to connect. Add it in Settings.";
+      return t("main.home.connect.noKey", { settings });
     case "badKey":
-      return "Euler Stream didn't accept your API key. Check it in Settings.";
+      return t("main.home.connect.badKey", { settings });
     case "premium":
-      return "Your Euler Stream plan doesn't include this connection. Check your plan on Euler Stream.";
+      return t("main.home.connect.premium");
     case "sign":
-      return "Euler Stream couldn't sign the connection. Try again in a moment.";
+      return t("main.home.connect.sign");
     case "network":
-      return "Unable to reach TikTok. Check your internet connection.";
+      return t("main.home.connect.network");
     default:
-      return `Unable to connect to ${handle}. Try again in a moment.`;
+      return t("main.home.connect.failed", { handle });
   }
 };
 
@@ -61,7 +65,7 @@ events.push(
       notifier.warn(
         "connector",
         FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-        "Tokio couldn't save the username. Check the logs folder for details.",
+        t("main.home.usernameSaveFailed"),
       );
     }
     const stats = storeManagerService.getSettings().liveStats;
@@ -79,7 +83,7 @@ events.push(
       notifier.success(
         "connector",
         FEEDBACK_CODES.CONNECTED,
-        `Connected to ${handle}.`,
+        t("main.home.connected", { handle }),
       );
     };
     // Answers this connect only, so connects don't pile up listeners.
@@ -102,7 +106,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.CONNECT_FAILED,
-      message: "Unable to connect to the LIVE.",
+      message: "main.failure.connect",
     },
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
@@ -127,7 +131,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.DISCONNECT_FAILED,
-      message: "Unable to disconnect from the LIVE.",
+      message: "main.failure.disconnect",
     },
     onError: (e, error) =>
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
@@ -185,14 +189,14 @@ events.push(
     notifier.success(
       "system",
       FEEDBACK_CODES.ACTIVITY_FEED_UPDATED,
-      "Activity feed updated.",
+      t("main.home.activityFeedUpdated"),
     );
   },
   {
     source: "system",
     failure: {
       code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
-      message: "Unable to save the activity feed.",
+      message: "main.failure.setActivityFeed",
     },
   },
 );
@@ -223,7 +227,7 @@ events.push(
     source: "system",
     failure: {
       code: FEEDBACK_CODES.FEATURES_UPDATE_FAILED,
-      message: "Unable to change the active features.",
+      message: "main.failure.activeFeatures",
     },
   },
 );

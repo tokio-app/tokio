@@ -24,6 +24,7 @@ import {
   generateTikTokEventSample,
   IMAGE_EXTENSIONS,
 } from "@/common/util";
+import { t } from "@/helper/i18n";
 import { importFile } from "@/helper/library";
 import { GiftStreaks } from "@/helper/streaks";
 import { matchesTrigger, streakOf } from "@/helper/triggers";
@@ -64,8 +65,6 @@ type Connection = Pick<
   MinecraftConnection,
   "status" | "onStatus" | "setEnabled" | "send"
 >;
-
-const NOT_CONNECTED = "Turn on Minecraft and connect the game first.";
 
 const STATES: Record<GameStatus["state"], string> = {
   off: "is off",
@@ -268,9 +267,11 @@ export class GamesService extends Service {
   // Why the edition's commands can't run: no game, or the other edition's
   private _unreachable(edition: MinecraftEdition): string | undefined {
     const status = this._minecraft.status;
-    if (status.state !== "connected") return NOT_CONNECTED;
+    if (status.state !== "connected") return t("main.games.notConnected");
     if (status.edition !== edition) {
-      return `Connect Minecraft ${MINECRAFT_EDITION_NAMES[edition]} first.`;
+      return t("main.games.connectEdition", {
+        edition: MINECRAFT_EDITION_NAMES[edition],
+      });
     }
     return undefined;
   }

@@ -8,6 +8,7 @@ import {
   useEditableSettings,
   useIpcListener,
 } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useEffect, useRef, useState } from "react";
 import { MdOutlineAddAlert } from "react-icons/md";
 import { AlertEditor } from "./AlertEditor";
@@ -18,6 +19,7 @@ import { ItemsSection } from "./sections/ItemsSection";
 import { useTriggerChoices } from "./useTriggerChoices";
 
 export function Alerts() {
+  const t = useT();
   const { giftChoices, emoteChoices, setEmotes } = useTriggerChoices();
   // What a new TTS message starts with: the TTS page's voice
   const [ttsDefaults, setTtsDefaults] = useState(() =>
@@ -191,7 +193,7 @@ export function Alerts() {
         {!headerAddShown && (
           <Btn className={styles.add} onClick={addAlert}>
             <MdOutlineAddAlert size={20} />
-            Add alert
+            {t("alerts.header.add")}
           </Btn>
         )}
       </Page>

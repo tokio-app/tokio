@@ -29,7 +29,7 @@ events.push(
       // An expected failure with its own message, already logged by the service
       throw new AppFailure(
         FEEDBACK_CODES.UPDATE_CHECK_FAILED,
-        "Unable to check for updates. Check your connection.",
+        t("main.updates.checkFailed"), // in the user's language, see below
         { level: "warning", logged: true, cause: res.error },
       );
     }
@@ -39,12 +39,14 @@ events.push(
     notify: false, // About shows the failure
     failure: {
       code: FEEDBACK_CODES.UPDATE_CHECK_FAILED,
-      message: "Unable to check for updates.",
+      message: "main.failure.checkUpdates", // a key, translated when reported
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.CHECK_UPDATES),
   },
 );
 ```
+
+- Texts the user sees come from `src/common/i18n/locales/` (`.claude/rules/i18n.md`): add the English to `en.json`'s `main.*` block and the same key to `es-419.json`. Messages made in the handler use `t(key, params)` from `@/helper/i18n`; `failure.message` is the key alone.
 
 - A user action that changes something calls `notifier.success(source, code, message)` after its reply; `notifier` is among the services. Reads, status checks and autosaves send nothing.
 - To push without a request: `win.webContents.send(APP_EVENTS_RESPONSE.<NAME>, data)`, with `undefined` for a `void` payload.

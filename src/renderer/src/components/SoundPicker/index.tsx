@@ -1,8 +1,10 @@
+import { MessageKey } from "@/common/i18n";
 import { Alert, AlertSound, AlertTts } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
+import { useOptions, useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import { DeleteSoundModal } from "../DeleteModals";
 import { Btn, Tabs } from "../Elements";
@@ -17,10 +19,10 @@ export { SoundLength } from "./SoundLength";
 
 type Tab = "library" | "myinstants" | "tts";
 
-const TABS: { value: Tab; label: string }[] = [
-  { value: "library", label: "My sounds" },
-  { value: "myinstants", label: "MyInstants" },
-  { value: "tts", label: "Text-to-speech" },
+const TABS: { value: Tab; label: MessageKey }[] = [
+  { value: "library", label: "components.soundPicker.tabLibrary" },
+  { value: "myinstants", label: "components.soundPicker.tabMyInstants" },
+  { value: "tts", label: "components.soundPicker.tabTts" },
 ];
 
 type Props = {
@@ -57,6 +59,8 @@ export function SoundPicker({
   onClear,
   onClose,
 }: Props) {
+  const t = useT();
+  const tabs = useOptions(TABS);
   const { id } = alert;
   // Chosen once the library loads: the library if it has sounds. An alert
   // that speaks opens on its message.
@@ -77,7 +81,7 @@ export function SoundPicker({
   useIpcListener(APP_EVENTS_RESPONSE.GET_SOUNDS, (res) => {
     if (!res) return;
     setLibrary(res.data);
-    setTab((t) => t ?? (res.data.length > 0 ? "library" : "myinstants"));
+    setTab((open) => open ?? (res.data.length > 0 ? "library" : "myinstants"));
   });
 
   // Downloads and browsed files both report here.
@@ -92,27 +96,31 @@ export function SoundPicker({
   return (
     <>
       <Modal
-        title={speaking ? "Speak a message" : "Select a sound"}
+        title={
+          speaking
+            ? t("components.soundPicker.ttsTitle")
+            : t("components.soundPicker.title")
+        }
         description={
           speaking
-            ? "The alert says this with text-to-speech instead of playing a sound."
-            : "Pick one of your sounds, search MyInstants, or use a file from your computer."
+            ? t("components.soundPicker.ttsDescription")
+            : t("components.soundPicker.description")
         }
         maxWidth="640px"
         onClose={onClose}
         footer={
           <>
             <Btn disabled={!alert.sound && !alert.tts} onClick={onClear}>
-              Clear
+              {t("common.clear")}
             </Btn>
-            <Btn onClick={onClose}>Cancel</Btn>
+            <Btn onClick={onClose}>{t("common.cancel")}</Btn>
             {speaking ? (
               <Btn
                 variant="accent"
                 disabled={tts.message.trim() === ""}
                 onClick={() => onSelectTts(tts)}
               >
-                Use text-to-speech
+                {t("components.soundPicker.useTts")}
               </Btn>
             ) : (
               <Btn
@@ -124,13 +132,13 @@ export function SoundPicker({
                   });
                 }}
               >
-                Browse file...
+                {t("common.browse")}
               </Btn>
             )}
           </>
         }
       >
-        <Tabs tabs={TABS} value={tab} onChange={setTab} />
+        <Tabs tabs={tabs} value={tab} onChange={setTab} />
 
         {tab === "library" && (
           <LibraryTab
@@ -167,7 +175,9 @@ export function SoundPicker({
         )}
 
         {saveFailed && (
-          <p className={styles.error}>Couldn't save that sound.</p>
+          <p className={styles.error}>
+            {t("components.soundPicker.saveFailed")}
+          </p>
         )}
       </Modal>
 

@@ -1,3 +1,4 @@
+import type { MessageKey } from "@/common/i18n";
 import type {
   Alert,
   AlertMedia,
@@ -63,7 +64,7 @@ export const voice = (
 export const engine = (
   id: string,
   label: string,
-  keyLabel?: string,
+  keyLabel?: MessageKey,
 ): VoiceEngine => ({ id, label, ...(keyLabel && { keyLabel }) });
 
 export const alertSound = (name: string): AlertSound => ({

@@ -1,3 +1,4 @@
+import { MessageKey } from "@/common/i18n";
 import { AppProvider, AppSettings } from "@/common/schemas";
 import { APP_EVENTS } from "@/common/types";
 import {
@@ -7,6 +8,8 @@ import {
 } from "@/common/util";
 import { Field, FormGrid, Input, Section, Select } from "@/components";
 import { useAutosave } from "@/hooks";
+import { rich, useT } from "@/ui/i18n";
+import { ReactNode } from "react";
 import { FiBox } from "react-icons/fi";
 import styles from "../settings.module.css";
 
@@ -14,29 +17,28 @@ interface Props {
   settings: AppSettings;
 }
 
-const link = (href: string, text: string) => (
+const link = (href: string) => (text: ReactNode) => (
   <a className={styles.link} href={href} target="_blank" rel="noreferrer">
     {text}
   </a>
 );
 
 export function ProvidersSection({ settings }: Props) {
+  const t = useT();
   return (
     <Section
       icon={<FiBox />}
       title="TikTok LIVE"
-      description={
-        <>
-          Your {link(EULER_STREAM_URL, "Euler Stream")} API key.{" "}
-          {link(EULER_SIGNUP_URL, "Get one free")}; your{" "}
-          {link(EULER_PRICING_URL, "plan")} sets how often you can connect.
-        </>
-      }
+      description={rich(t("settings.providers.description"), {
+        euler: link(EULER_STREAM_URL),
+        signup: link(EULER_SIGNUP_URL),
+        pricing: link(EULER_PRICING_URL),
+      })}
     >
       <FormGrid>
         <ProviderForm
           type="connector"
-          label="TikTok Events"
+          labelKey="settings.providers.connector"
           providers={settings.providers.connector}
           active={settings.activeConnProvider}
         />
@@ -47,24 +49,25 @@ export function ProvidersSection({ settings }: Props) {
 
 interface FormProps {
   type: "connector";
-  label: string;
+  labelKey: MessageKey;
   providers: AppProvider[];
   active: AppProvider;
 }
 
 // Saved as it changes
-function ProviderForm({ type, label, providers, active }: FormProps) {
+function ProviderForm({ type, labelKey, providers, active }: FormProps) {
   const [provider, setProvider] = useAutosave(
     { name: active.name, key: active.key },
     ({ name, key }) =>
       window.api.emit(APP_EVENTS.SET_PROVIDER, { name, key, type }),
   );
+  const t = useT();
 
   return (
     <div className={styles.provider}>
       {/* Nothing to pick from with a single connector */}
       {providers.length > 1 && (
-        <Field label={label}>
+        <Field label={t(labelKey)}>
           <Select
             options={providers.map((p) => ({ label: p.name, value: p.name }))}
             value={provider.name}
@@ -72,10 +75,10 @@ function ProviderForm({ type, label, providers, active }: FormProps) {
           />
         </Field>
       )}
-      <Field label="Euler Stream API key">
+      <Field label={t("settings.providers.key")}>
         <Input
           type="password"
-          placeholder="Your API key..."
+          placeholder={t("settings.providers.keyPlaceholder")}
           value={provider.key}
           onChange={(e) => {
             const key = e.target.value;

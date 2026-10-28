@@ -1,5 +1,6 @@
 import { AlertSound, MediaFile } from "@/common/schemas";
 import { APP_EVENTS, OverlayApp } from "@/common/types";
+import { useT } from "@/ui/i18n";
 import { Modal } from "../Modal";
 
 type Props<T> = {
@@ -15,11 +16,14 @@ export function DeleteSoundModal({
   onClose,
   onDelete,
 }: Props<AlertSound>) {
+  const t = useT();
   return (
     <Modal
-      title="Delete sound?"
-      description={`"${item.name}" will be deleted from your computer and from every alert that plays it, in all your profiles.`}
-      confirmText="Delete"
+      title={t("components.deleteModals.soundTitle")}
+      description={t("components.deleteModals.soundDescription", {
+        name: item.name,
+      })}
+      confirmText={t("common.delete")}
       onClose={onClose}
       onConfirm={() => {
         onDelete?.(item);
@@ -35,11 +39,14 @@ export function DeleteMediaModal({
   onClose,
   onDelete,
 }: Props<MediaFile>) {
+  const t = useT();
   return (
     <Modal
-      title="Delete media?"
-      description={`"${item.name}" will be deleted from your computer and from every alert that shows it, in all your profiles.`}
-      confirmText="Delete"
+      title={t("components.deleteModals.mediaTitle")}
+      description={t("components.deleteModals.mediaDescription", {
+        name: item.name,
+      })}
+      confirmText={t("common.delete")}
       onClose={onClose}
       onConfirm={() => {
         onDelete?.(item);
@@ -56,11 +63,14 @@ export function DeletePictureModal({
   onClose,
   onDelete,
 }: Props<MediaFile>) {
+  const t = useT();
   return (
     <Modal
-      title="Delete picture?"
-      description={`"${item.name}" will be deleted from your computer and from every game action that shows it, in all your profiles.`}
-      confirmText="Delete"
+      title={t("components.deleteModals.pictureTitle")}
+      description={t("components.deleteModals.pictureDescription", {
+        name: item.name,
+      })}
+      confirmText={t("common.delete")}
       onClose={onClose}
       onConfirm={() => {
         onDelete?.(item);
@@ -78,11 +88,14 @@ export function RemoveOverlayModal({
   onClose,
   onDelete,
 }: Props<Pick<OverlayApp, "id" | "name">>) {
+  const t = useT();
   return (
     <Modal
-      title="Remove overlay?"
-      description={`${item.name} and its settings will be deleted. Streaming apps using its URL will stop showing it.`}
-      confirmText="Remove"
+      title={t("components.deleteModals.overlayTitle")}
+      description={t("components.deleteModals.overlayDescription", {
+        name: item.name,
+      })}
+      confirmText={t("common.remove")}
       onClose={onClose}
       onConfirm={() => {
         onDelete?.(item);

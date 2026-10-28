@@ -13,7 +13,7 @@ import {
 const ENGINES = [
   engine("edge", "Edge"),
   engine("windows", "Windows"),
-  engine("tiktok", "TikTok", "Session ID"),
+  engine("tiktok", "TikTok", "voiceKeys.sessionId"),
 ];
 
 const VOICES = [
@@ -31,31 +31,39 @@ describe("voiceKey", () => {
 
 describe("voiceDetails", () => {
   it("shows the locale and the engine", () => {
-    expect(voiceDetails(voice("Aria", "en-US"), ENGINES)).toBe(
+    expect(voiceDetails(voice("Aria", "en-US"), ENGINES, "en")).toBe(
       "English (United States) · Edge",
     );
   });
 
   it("leaves the engine out until it's known", () => {
-    expect(voiceDetails(voice("Aria", "en-US"), [])).toBe(
+    expect(voiceDetails(voice("Aria", "en-US"), [], "en")).toBe(
       "English (United States)",
     );
-    expect(voiceDetails(voice("Aria", "en", "gone"), ENGINES)).toBe("English");
+    expect(voiceDetails(voice("Aria", "en", "gone"), ENGINES, "en")).toBe(
+      "English",
+    );
+  });
+
+  it("names the locale in the window's language", () => {
+    expect(voiceDetails(voice("Aria", "en-US"), ENGINES, "es-419")).toBe(
+      "inglés (Estados Unidos) · Edge",
+    );
   });
 
   it("shows a tag Intl can't read as it is", () => {
-    expect(voiceDetails(voice("Odd", "not a tag"), [])).toBe("not a tag");
+    expect(voiceDetails(voice("Odd", "not a tag"), [], "en")).toBe("not a tag");
   });
 });
 
 describe("voiceEntries", () => {
   it("sorts by locale and engine, then by name", () => {
-    const names = voiceEntries(VOICES, ENGINES).map((e) => e.voice.name);
+    const names = voiceEntries(VOICES, ENGINES, "en").map((e) => e.voice.name);
     expect(names).toEqual(["Amy", "Bob", "Zed", "Ana"]);
   });
 
   it("keeps the base language and the text the search looks in", () => {
-    const [entry] = voiceEntries([voice("Zed", "es-MX")], ENGINES);
+    const [entry] = voiceEntries([voice("Zed", "es-MX")], ENGINES, "en");
     expect(entry).toEqual({
       voice: voice("Zed", "es-MX"),
       key: "edge|es-MX|Zed",
@@ -67,7 +75,7 @@ describe("voiceEntries", () => {
 });
 
 describe("filterVoices", () => {
-  const entries = voiceEntries(VOICES, ENGINES);
+  const entries = voiceEntries(VOICES, ENGINES, "en");
   const names = (filter: Partial<Parameters<typeof filterVoices>[1]>) =>
     filterVoices(entries, {
       search: "",
@@ -96,7 +104,9 @@ describe("filterVoices", () => {
 
 describe("engineOptions", () => {
   it("lists only the engines that have voices", () => {
-    expect(engineOptions(voiceEntries(VOICES, ENGINES), ENGINES)).toEqual([
+    expect(
+      engineOptions(voiceEntries(VOICES, ENGINES, "en"), ENGINES, "en"),
+    ).toEqual([
       { value: "", label: "All engines" },
       { value: "edge", label: "Edge" },
       { value: "windows", label: "Windows" },
@@ -109,8 +119,9 @@ describe("languageOptions", () => {
     const entries = voiceEntries(
       [...VOICES, voice("Gus", "en-GB"), voice("Ola", "en")],
       ENGINES,
+      "en",
     );
-    expect(languageOptions(entries)).toEqual([
+    expect(languageOptions(entries, "en")).toEqual([
       { value: "", label: "All languages" },
       { value: "en", label: "English" },
       { value: "es", label: "Spanish" },

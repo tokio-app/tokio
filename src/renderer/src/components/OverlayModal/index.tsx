@@ -4,6 +4,7 @@ import {
   resetOverlayConfig,
 } from "@/common/schemas";
 import { CustomGift, OverlayApp, TokioPreviewMessage } from "@/common/types";
+import { useT } from "@/ui/i18n";
 import { useEffect, useRef, useState } from "react";
 import { PiShootingStarThin } from "react-icons/pi";
 import { Btn, Spinner } from "../Elements";
@@ -33,6 +34,7 @@ export function OverlayModal({
   onSave,
   onTest,
 }: Props) {
+  const t = useT();
   const [settings, setSettings] = useState<OverlayConfig | null>(config);
   const [prevConfig, setPrevConfig] = useState(config);
   const preview = useRef<HTMLIFrameElement>(null);
@@ -101,10 +103,10 @@ export function OverlayModal({
               )
             }
           >
-            Reset to defaults
+            {t("components.overlayModal.resetAll")}
           </Btn>
           <div className={styles.footer_actions}>
-            <Btn onClick={onRequestClose}>Cancel</Btn>
+            <Btn onClick={onRequestClose}>{t("common.cancel")}</Btn>
             <Btn
               variant="accent"
               disabled={!dirty}
@@ -113,7 +115,7 @@ export function OverlayModal({
                 if (settings != null) onSave(settings);
               }}
             >
-              Save
+              {t("common.save")}
             </Btn>
           </div>
         </div>
@@ -129,11 +131,9 @@ export function OverlayModal({
           <div className={styles.preview_actions}>
             <Btn onClick={onTest}>
               <PiShootingStarThin size={18} />
-              Test
+              {t("common.test")}
             </Btn>
-            <p className={styles.note}>
-              Changes show here first. Save to update your stream.
-            </p>
+            <p className={styles.note}>{t("components.overlayModal.note")}</p>
           </div>
         </div>
 

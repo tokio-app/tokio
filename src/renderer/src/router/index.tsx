@@ -1,10 +1,14 @@
+import { Btn } from "@/components/Elements";
+import { EmptyState, Page, Section } from "@/components/Page";
+import { useT } from "@/ui/i18n";
 import {
   createHashHistory,
   createRootRoute,
   createRoute,
   createRouter,
-  ErrorComponent,
+  ErrorComponentProps,
 } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   About,
   Alerts,
@@ -18,6 +22,38 @@ import {
   TTS,
 } from "../pages";
 import { Layout } from "./Layout";
+
+// TanStack's own error and not found pages, in the window's language
+function RouteError({ error }: ErrorComponentProps) {
+  const t = useT();
+  const [show, setShow] = useState(false);
+  return (
+    <Page>
+      <Section title={t("layout.error.title")}>
+        {/* Wrapped, or the section's column stretches it */}
+        <div>
+          <Btn onClick={() => setShow(!show)}>
+            {show ? t("layout.error.hide") : t("layout.error.show")}
+          </Btn>
+        </div>
+        {show && (
+          <EmptyState>
+            {error instanceof Error ? error.message : String(error)}
+          </EmptyState>
+        )}
+      </Section>
+    </Page>
+  );
+}
+
+function NotFound() {
+  const t = useT();
+  return (
+    <Page>
+      <EmptyState>{t("layout.notFound")}</EmptyState>
+    </Page>
+  );
+}
 
 const rootRoute = createRootRoute({
   component: Layout,
@@ -102,7 +138,8 @@ const routeTree = rootRoute.addChildren([
 export const routerOptions = {
   routeTree,
   // Keeps a page's error inside the page, with the title bar and sidebar
-  defaultErrorComponent: ErrorComponent,
+  defaultErrorComponent: RouteError,
+  defaultNotFoundComponent: NotFound,
 };
 
 export const router = createRouter({

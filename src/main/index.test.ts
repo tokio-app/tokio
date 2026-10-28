@@ -69,6 +69,9 @@ vi.mock("./handler", () => ({
 }));
 vi.mock("./events", () => ({ default: { getEvents: () => [] } }));
 
+// A UTF-8 byte order mark
+const BOM = "\uFEFF";
+
 // What the entry point adds to the process, kept apart from the runner's
 let fatal: {
   exception?: NodeJS.UncaughtExceptionListener;
@@ -144,13 +147,41 @@ describe("main process entry", () => {
     });
     // Electron sandboxes the page unless told not to.
     expect(win.options.webPreferences).not.toHaveProperty("sandbox");
+    // In main's language: English, with nothing saved on an English system
     expect(splash.loadFile).toHaveBeenCalledWith(
       expect.stringMatching(/renderer[\\/]splash\.html$/),
+      { query: { lang: "en" } },
     );
     expect(win.loadFile).toHaveBeenCalledWith(
       expect.stringMatching(/renderer[\\/]index\.html$/),
+      { query: { lang: "en" } },
     );
     expect(mocks.deps).toMatchObject({ app, win, splash });
+  });
+
+  it("opens the windows in the language saved in the store file", async () => {
+    const home = await mkdtemp(join(tmpdir(), "tokio-test-"));
+    try {
+      await mkdir(join(home, ".tokio", "settings"), { recursive: true });
+      // Saved with a BOM, which the store reads too
+      await writeFile(
+        join(home, ".tokio", "settings", "tokio.json"),
+        `${BOM}${JSON.stringify({ settings: { language: "es-419" } })}`,
+      );
+      app.getPath.mockImplementation((name: string) =>
+        name === "home" ? home : `/fake/${name}`,
+      );
+
+      const { splash, win } = await start();
+
+      for (const window of [splash, win]) {
+        expect(window.loadFile).toHaveBeenCalledWith(expect.any(String), {
+          query: { lang: "es-419" },
+        });
+      }
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
   });
 
   describe("overlay previews", () => {

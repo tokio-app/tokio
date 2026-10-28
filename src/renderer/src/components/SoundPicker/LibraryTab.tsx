@@ -1,6 +1,7 @@
 import { AlertSound } from "@/common/schemas";
 import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import { Btn, Input } from "../Elements";
@@ -32,6 +33,7 @@ export function LibraryTab({
   onSelect,
   onRemove,
 }: Props) {
+  const t = useT();
   const [filter, setFilter] = useState("");
 
   const needle = filter.trim().toLowerCase();
@@ -39,13 +41,13 @@ export function LibraryTab({
 
   const emptyText =
     library.length === 0
-      ? "No sounds yet. Download one from MyInstants, upload them in Settings, or browse for a file."
-      : "No sounds match.";
+      ? t("components.soundPicker.libraryEmpty")
+      : t("components.soundPicker.libraryNoMatch");
 
   return (
     <>
       <Input
-        placeholder="Filter your sounds..."
+        placeholder={t("components.soundPicker.filterPlaceholder")}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
       />
@@ -79,7 +81,7 @@ export function LibraryTab({
               />
               <Btn
                 variant="icon"
-                title="Delete"
+                title={t("common.delete")}
                 onClick={() => onRemove(sound)}
               >
                 <FiTrash2 size={20} />

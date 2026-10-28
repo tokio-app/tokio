@@ -1,5 +1,6 @@
 import { AudioContext } from "@/context/audio";
 import { NotificationsProvider } from "@/context/notifications";
+import { LanguageProvider } from "@/ui/i18n";
 import {
   createMemoryHistory,
   createRouter,
@@ -22,10 +23,13 @@ type Options = Omit<RenderOptions, "wrapper"> & {
 export function providers() {
   const audio = createAudio();
 
+  // jsdom's page has no ?lang, so it's English
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <AudioContext.Provider value={audio.value}>
-      <NotificationsProvider>{children}</NotificationsProvider>
-    </AudioContext.Provider>
+    <LanguageProvider>
+      <AudioContext.Provider value={audio.value}>
+        <NotificationsProvider>{children}</NotificationsProvider>
+      </AudioContext.Provider>
+    </LanguageProvider>
   );
 
   return { wrapper, audio };

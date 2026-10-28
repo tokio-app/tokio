@@ -81,10 +81,10 @@ describe("Music", () => {
     expect(screen.getByPlaceholderText("!next")).toBeEnabled();
 
     expect(
-      screen.getByRole("checkbox", { name: "Followers Only" }),
+      screen.getByRole("checkbox", { name: "Followers only" }),
     ).toBeChecked();
     expect(field("Cooldown").getByRole("spinbutton")).toHaveValue(4);
-    expect(field("Max Queue Length").getByRole("spinbutton")).toHaveValue(15);
+    expect(field("Max queue length").getByRole("spinbutton")).toHaveValue(15);
   });
 
   it("switches the provider with the tabs", async () => {
@@ -205,11 +205,11 @@ describe("Music", () => {
   it("changes who may request songs and the limits", async () => {
     const { user } = await setup();
 
-    await user.click(screen.getByRole("checkbox", { name: "Superfans Only" }));
+    await user.click(screen.getByRole("checkbox", { name: "Super Fans only" }));
     fireEvent.change(field("Cooldown").getByRole("spinbutton"), {
       target: { value: "10" },
     });
-    fireEvent.change(field("Max Queue Length").getByRole("spinbutton"), {
+    fireEvent.change(field("Max queue length").getByRole("spinbutton"), {
       target: { value: "2" },
     });
 
@@ -222,7 +222,7 @@ describe("Music", () => {
       limit_controls: true,
     });
     expect(
-      section("Protection").queryByText("Max Comment Length"),
+      section("Protection").queryByText("Max message length"),
     ).not.toBeInTheDocument();
   });
 

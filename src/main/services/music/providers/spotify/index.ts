@@ -1,5 +1,6 @@
 import { CurrentSongInfo, SongInfo, TOKIO_EVENTS } from "@/common/types";
 import { formatError } from "@/common/util";
+import { t } from "@/helper/i18n";
 import Logger from "@/logger";
 import crypto from "crypto";
 import { BrowserWindow, WebContentsView } from "electron";
@@ -216,12 +217,13 @@ export class Spotify extends MusicProvider {
     if (!track) return null;
 
     const artistNames =
-      track.artists?.map((a: any) => a.name).join(", ") || "Unknown Artist";
+      track.artists?.map((a: any) => a.name).join(", ") ||
+      t("main.spotify.unknownArtist");
 
     return {
       album: track.album?.uri ?? "Unknown",
       track: track.uri ?? "Unknown",
-      title: `${track.name ?? "Unknown Track"} - ${artistNames}`,
+      title: `${track.name ?? t("main.spotify.unknownTrack")} - ${artistNames}`,
       thumbnail: track.album?.images?.[0]?.url ?? "",
       duration: track.duration_ms ?? 0,
     };

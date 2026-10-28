@@ -1,4 +1,5 @@
 import { Check, Section } from "@/components";
+import { useT } from "@/ui/i18n";
 import { FiInbox } from "react-icons/fi";
 
 interface Props {
@@ -7,14 +8,15 @@ interface Props {
 }
 
 export function TraySection({ enabled, onChange }: Props) {
+  const t = useT();
   return (
     <Section
       icon={<FiInbox />}
-      title="Tray"
-      description="Open Tokio or quit from its icon."
+      title={t("settings.tray.title")}
+      description={t("settings.tray.description")}
     >
       <Check
-        label="Keep Tokio running in the tray when you close it"
+        label={t("settings.tray.label")}
         checked={enabled}
         onChange={(e) => onChange(e.target.checked)}
       />

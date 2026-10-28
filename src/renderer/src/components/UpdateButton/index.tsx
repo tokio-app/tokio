@@ -1,4 +1,5 @@
 import { APP_EVENTS, UpdateStatus } from "@/common/types";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { FiDownload, FiRefreshCw } from "react-icons/fi";
@@ -17,6 +18,7 @@ type Props = {
  * can be downloaded from the release page.
  */
 export function UpdateButton({ status, connected }: Props) {
+  const t = useT();
   const [confirm, setConfirm] = useState(false);
 
   const ready = status.state === "ready";
@@ -30,9 +32,9 @@ export function UpdateButton({ status, connected }: Props) {
       {confirm &&
         createPortal(
           <Modal
-            title="Restart to update?"
-            description="Tokio will disconnect from the LIVE. TTS, music requests and alerts stop until you connect again."
-            confirmText="Restart"
+            title={t("components.update.confirmTitle")}
+            description={t("components.update.confirmDescription")}
+            confirmText={t("components.update.restart")}
             onClose={() => setConfirm(false)}
             onConfirm={() => {
               setConfirm(false);
@@ -49,7 +51,9 @@ export function UpdateButton({ status, connected }: Props) {
         onClick={() => (ready && connected ? setConfirm(true) : install())}
       >
         {ready ? <FiRefreshCw size={14} /> : <FiDownload size={14} />}
-        {ready ? "Restart to update" : "Download update"}
+        {ready
+          ? t("components.update.restartToUpdate")
+          : t("components.update.download")}
       </Btn>
     </div>
   );

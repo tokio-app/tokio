@@ -63,6 +63,9 @@ const AppSettingsSchema = z.object({
       enabled: z.boolean(),
     })
     .default({ enabled: true }),
+  // A tag in APP_LANGUAGES, or "system" to follow the OS. Any string, so a
+  // language removed later can't invalidate the store.
+  language: z.string().default("system"),
   overlays: z.array(z.object({ ...OverlayMeta, id: z.string() })),
   testOverlays: z.array(TestOverlaySchema).default([]),
   // Uploaded sounds, available to alerts in every profile

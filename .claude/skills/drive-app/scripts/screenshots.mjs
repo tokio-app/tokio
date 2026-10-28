@@ -4,6 +4,9 @@
 //
 //   node .claude/skills/drive-app/scripts/drive.mjs --scale 2 .claude/skills/drive-app/scripts/screenshots.mjs
 //
+// With --lang es-419 it takes only the docs' screenshots, in Spanish, into
+// their language's folder (screenshots/es/).
+//
 // The README's are 1200x800 whatever the scale; the docs' are crops of what
 // each section describes, at the device scale, so --scale 2 keeps them sharp.
 // It installs official overlays, so it needs the network, and takes its gifts
@@ -23,7 +26,38 @@ import { join, resolve } from "node:path";
 const repo = resolve(import.meta.dirname, "../../../..");
 const out = join(repo, ".github", "screenshots");
 const website = join(repo, "..", "tokio-web");
-const docs = join(website, "src", "assets", "screenshots");
+const docsRoot = join(website, "src", "assets", "screenshots");
+const locale = (tag) =>
+  JSON.parse(
+    readFileSync(
+      join(repo, "src", "common", "i18n", "locales", `${tag}.json`),
+      "utf8",
+    ),
+  );
+const en = locale("en");
+
+// What the pictures show that the streamer or a viewer typed, by language
+const TYPED = {
+  es: {
+    "Thanks for the follow, {username}!": "¡Gracias por seguirme, {username}!",
+    "brb, getting a drink": "ntp, voy por algo de tomar",
+    brb: "ntp",
+    "be right back": "no te preocupes",
+    "good game": "buena partida",
+    "say {username} sent {count} {gift}": "say {username} envió {count} {gift}",
+    "Object successfully summoned": "Objeto invocado correctamente",
+    "Gave Diamond * 3 to Steve": "Se dio Diamante * 3 a Steve",
+    "The block couldn't be placed": "No se pudo colocar el bloque",
+    "My overlay": "Mi overlay",
+    "Just Chatting": "Solo charla",
+    "Thank followers": "Gracias por seguir",
+    "Big gifts": "Regalos grandes",
+    Shares: "Compartidos",
+    Regulars: "Habituales",
+    "this song is a vibe 🎶": "esta canción es un temazo 🎶",
+    "hi from Lisbon 👋": "saludos desde Lima 👋",
+  },
+};
 
 // Three quiet chimes that fade out, two seconds as a 16-bit mono WAV, so the
 // alert editor's waveform has a shape. The library names sounds by their
@@ -58,8 +92,30 @@ function tone(file, hz) {
 
 const user = (name, handle) => ({ handle, name, picture: "" });
 
-export default async ({ app, page, home, push, toggle }) => {
-  mkdirSync(out, { recursive: true });
+export default async ({ app, page, home, push, toggle, lang = "en" }) => {
+  const english = lang === "en";
+  const base = lang.split("-")[0];
+  const docs = english ? docsRoot : join(docsRoot, base);
+  const texts = english ? en : locale(lang);
+  // An English UI text in the run's language, through its key in en.json
+  // (x#one and x#other count as x). A text with {params}, or whose keys
+  // translate differently, names its key.
+  const tr = (text, key, params = {}) => {
+    if (english) return text;
+    const keys = key
+      ? [key]
+      : Object.keys(en)
+          .filter((k) => en[k] === text)
+          .map((k) => k.split("#")[0]);
+    const found = new Set(keys.map((k) => texts[k] ?? texts[`${k}#other`]));
+    if (found.size !== 1 || found.has(undefined)) {
+      throw new Error(`No one ${lang} text for "${text}"`);
+    }
+    return [...found][0].replace(/\{(\w+)\}/g, (m, name) => params[name] ?? m);
+  };
+  // What someone typed, in the run's language
+  const say = (text) => TYPED[base]?.[text] ?? text;
+  if (english) mkdirSync(out, { recursive: true });
   const web = existsSync(website);
   if (web) mkdirSync(docs, { recursive: true });
   else console.log(`No ${website}: skipping the docs' screenshots.`);
@@ -89,13 +145,15 @@ export default async ({ app, page, home, push, toggle }) => {
     await page.evaluate(() => document.activeElement?.blur());
     const toasts = page
       .locator('[role="status"], [role="alert"]')
-      .filter({ has: page.getByTitle("Close", { exact: true }) });
+      .filter({ has: page.getByTitle(tr("Close"), { exact: true }) });
     while ((await toasts.count()) > 0) {
-      await toasts.first().getByTitle("Close", { exact: true }).click();
+      await toasts.first().getByTitle(tr("Close"), { exact: true }).click();
     }
     await page.waitForTimeout(800);
   };
+  // The README's are English only
   const shoot = async (name) => {
+    if (!english) return;
     await settle();
     await page.screenshot({ path: join(out, `${name}.png`), scale: "css" });
   };
@@ -168,7 +226,7 @@ export default async ({ app, page, home, push, toggle }) => {
       });
     }, file);
 
-  await page.getByRole("heading", { name: "Dashboard" }).waitFor();
+  await page.getByRole("heading", { name: tr("Dashboard") }).waitFor();
 
   // The overlay server, through IPC as e2e/app.spec.ts does: the Settings
   // switch asks first
@@ -179,31 +237,33 @@ export default async ({ app, page, home, push, toggle }) => {
   );
 
   // Overlays
-  await open("Overlays", "Overlay Gallery");
-  await page.getByRole("button", { name: "Official Overlays" }).click();
-  await page.getByRole("heading", { name: "Official Overlays" }).waitFor();
+  await open(tr("Overlays"), tr("Overlay gallery"));
+  await page.getByRole("button", { name: tr("Official overlays") }).click();
+  await page.getByRole("heading", { name: tr("Official overlays") }).waitFor();
   for (const name of ["Gift Jar", "Top Likes"]) {
-    const install = card(name).getByRole("button", { name: "Install" });
+    const install = card(name).getByRole("button", { name: tr("Install") });
     await install.click();
     await install.waitFor({ state: "detached" });
   }
   await page.waitForTimeout(3000);
   await crop("overlays-official", card("Like Fountain"));
-  await page.getByTitle("Back to Overlays").click();
-  await page.getByRole("heading", { name: "Overlay Gallery" }).waitFor();
+  await page.getByTitle(tr("Back to Overlays")).click();
+  await page.getByRole("heading", { name: tr("Overlay gallery") }).waitFor();
   await page.waitForTimeout(8000);
   await shoot("overlays");
   await crop("overlays-gallery", [card("Gift Jar"), card("Top Likes")]);
   await crop("overlays-card", card("Gift Jar"));
-  await card("Gift Jar").getByRole("button", { name: "Customize" }).click();
+  await card("Gift Jar")
+    .getByRole("button", { name: tr("Customize") })
+    .click();
   await dialog.waitFor();
   await page.waitForTimeout(3000);
   await crop("overlays-customize", dialog);
-  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await dialog.getByRole("button", { name: tr("Cancel") }).click();
   await dialog.waitFor({ state: "detached" });
 
   // Alerts
-  await open("Alerts", "Alerts");
+  await open(tr("Alerts"), tr("Alerts"));
   const media = join(home, "tokio-logo.png");
   copyFileSync(join(repo, "resources", "icon.png"), media);
   const alerts = [
@@ -233,7 +293,7 @@ export default async ({ app, page, home, push, toggle }) => {
     { name: "Shares", trigger: "Share", sound: "Applause", hz: 659 },
     {
       name: "Regulars",
-      trigger: "Member Join",
+      trigger: "Member join",
       sound: "Doorbell",
       hz: 784,
       user: "@regular.viewer",
@@ -248,161 +308,176 @@ export default async ({ app, page, home, push, toggle }) => {
       count,
     );
   for (const alert of alerts) {
-    await page.getByRole("button", { name: "Add alert" }).first().click();
-    // A new alert goes to the end of the list
-    await page.getByTitle("Edit alert").last().click();
-    await editor.getByRole("textbox", { name: "Name" }).fill(alert.name);
-    await editor.getByRole("combobox", { name: "Event" }).click();
     await page
-      .getByRole("option", { name: alert.trigger, exact: true })
+      .getByRole("button", { name: tr("Add alert") })
+      .first()
+      .click();
+    // A new alert goes to the end of the list
+    await page.getByTitle(tr("Edit alert")).last().click();
+    await editor
+      .getByRole("textbox", { name: tr("Name") })
+      .fill(say(alert.name));
+    await editor.getByRole("combobox", { name: tr("Event") }).click();
+    await page
+      .getByRole("option", { name: tr(alert.trigger), exact: true })
       .click();
 
     // The coins show only for any gift, before the gifts are picked
     if (alert.coins) {
-      await editor.getByRole("spinbutton", { name: "Coins" }).fill(alert.coins);
-      await editor.getByRole("checkbox", { name: alert.role }).check();
+      await editor
+        .getByRole("spinbutton", { name: tr("Coins") })
+        .fill(alert.coins);
+      await editor.getByRole("checkbox", { name: tr(alert.role) }).check();
       await crop("alerts-trigger", editor);
     }
     if (alert.gifts) {
-      await editor.getByRole("button", { name: "Any gift" }).click();
+      await editor.getByRole("button", { name: tr("Any gift") }).click();
       for (const gift of alert.gifts) {
         await picker.getByTitle(gift, { exact: true }).click();
       }
       await picker
         .getByRole("combobox")
-        .filter({ hasText: "Any price" })
+        .filter({ hasText: tr("Any price") })
         .click();
-      await page.getByRole("option", { name: "At least", exact: true }).click();
-      await picker.getByLabel("Coins", { exact: true }).fill("1000");
+      await page
+        .getByRole("option", { name: tr("At least"), exact: true })
+        .click();
+      await picker.getByLabel(tr("Coins"), { exact: true }).fill("1000");
       await page.waitForTimeout(1500);
       await crop("alerts-gifts", picker);
-      await picker.getByRole("button", { name: "Done" }).click();
+      await picker.getByRole("button", { name: tr("Done") }).click();
       await dialogsOpen(1);
     }
     if (alert.keyword) {
-      await editor.getByPlaceholder("Any message").fill(alert.keyword);
+      await editor.getByPlaceholder(tr("Any message")).fill(alert.keyword);
     }
     if (alert.user) {
-      await editor.getByPlaceholder("Anyone").fill(alert.user);
+      await editor.getByPlaceholder(tr("Anyone")).fill(alert.user);
     }
 
-    await editor.getByRole("tab", { name: "Sound" }).click();
-    await editor.getByRole("button", { name: "Choose sound..." }).click();
+    await editor.getByRole("tab", { name: tr("Sound") }).click();
+    await editor.getByRole("button", { name: tr("Choose sound...") }).click();
     if (alert.speak) {
-      await picker.getByRole("tab", { name: "Text-to-speech" }).click();
+      await picker.getByRole("tab", { name: tr("Text-to-speech") }).click();
       await picker
-        .getByPlaceholder("Type what the alert says...")
-        .fill(alert.speak);
-      await picker.getByRole("button", { name: "Use text-to-speech" }).click();
+        .getByPlaceholder(tr("Type what the alert says..."))
+        .fill(say(alert.speak));
+      await picker
+        .getByRole("button", { name: tr("Use text-to-speech") })
+        .click();
     } else {
       await pick(tone(join(home, `${alert.sound}.wav`), alert.hz));
-      await picker.getByRole("button", { name: "Browse file..." }).click();
+      await picker.getByRole("button", { name: tr("Browse file...") }).click();
     }
     await dialogsOpen(1);
     if (alert.cut) {
       const [start, end] = alert.cut;
-      await editor.getByRole("spinbutton", { name: "Start" }).fill(start);
-      await editor.getByRole("spinbutton", { name: "End" }).fill(end);
+      await editor
+        .getByRole("spinbutton", { name: tr("Start", "alerts.cut.start") })
+        .fill(start);
+      await editor.getByRole("spinbutton", { name: tr("End") }).fill(end);
       await crop("alerts-cut", editor);
     }
 
     if (alert.media) {
-      await editor.getByRole("tab", { name: "Media" }).click();
-      await editor.getByRole("button", { name: "Choose media..." }).click();
+      await editor.getByRole("tab", { name: tr("Media") }).click();
+      await editor.getByRole("button", { name: tr("Choose media...") }).click();
       await pick(alert.media);
-      await picker.getByRole("button", { name: "Browse file..." }).click();
+      await picker.getByRole("button", { name: tr("Browse file...") }).click();
       await dialogsOpen(1);
       await crop("alerts-media", editor);
     }
-    await editor.getByRole("button", { name: "Done" }).click();
+    await editor.getByRole("button", { name: tr("Done") }).click();
     await dialog.waitFor({ state: "detached" });
   }
   await shoot("alerts");
-  await crop("alerts-queue", section("Alerts"), { width: 640 });
+  await crop("alerts-queue", section(tr("Alerts")), { width: 640 });
   // The list of alerts
   await crop(
     "alerts",
-    page.getByTitle("Edit alert").first().locator("xpath=ancestor::div[2]"),
+    page.getByTitle(tr("Edit alert")).first().locator("xpath=ancestor::div[2]"),
   );
   // The pickers, over the editors of the gift and follow alerts
-  await page.getByTitle("Edit alert").nth(1).click();
-  await editor.getByRole("tab", { name: "Sound" }).click();
-  await editor.getByRole("button", { name: "Change..." }).click();
+  await page.getByTitle(tr("Edit alert")).nth(1).click();
+  await editor.getByRole("tab", { name: tr("Sound") }).click();
+  await editor.getByRole("button", { name: tr("Change...") }).click();
   await crop("alerts-sounds", picker);
-  await picker.getByRole("button", { name: "Cancel" }).click();
-  await editor.getByRole("button", { name: "Done" }).click();
-  await page.getByTitle("Edit alert").first().click();
-  await editor.getByRole("tab", { name: "Sound" }).click();
-  await editor.getByRole("button", { name: "Change..." }).click();
-  await picker.getByRole("tab", { name: "Text-to-speech" }).click();
+  await picker.getByRole("button", { name: tr("Cancel") }).click();
+  await editor.getByRole("button", { name: tr("Done") }).click();
+  await page.getByTitle(tr("Edit alert")).first().click();
+  await editor.getByRole("tab", { name: tr("Sound") }).click();
+  await editor.getByRole("button", { name: tr("Change...") }).click();
+  await picker.getByRole("tab", { name: tr("Text-to-speech") }).click();
   await crop("alerts-tts", picker);
-  await picker.getByRole("button", { name: "Cancel" }).click();
-  await editor.getByRole("button", { name: "Done" }).click();
+  await picker.getByRole("button", { name: tr("Cancel") }).click();
+  await editor.getByRole("button", { name: tr("Done") }).click();
   await dialog.waitFor({ state: "detached" });
 
   // Text-to-speech: pick a voice, then show the list around it
-  await open("TTS", "Voice");
+  await open(tr("TTS"), tr("Voice"));
   const voice = page
-    .getByRole("group", { name: "Voice Selection" })
+    .getByRole("group", { name: tr("Voice selection") })
     .getByRole("button");
   await voice.click();
-  await dialog.getByPlaceholder("Search voices...").fill("Jenny");
+  await dialog.getByPlaceholder(tr("Search voices...")).fill("Jenny");
   await dialog.getByTitle("Jenny", { exact: true }).click();
   await dialog.waitFor({ state: "detached" });
   await voice.click();
   await dialog.getByTitle("Jenny", { exact: true }).waitFor();
   await shoot("text-to-speech");
   await crop("tts-voices", dialog);
-  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await dialog.getByRole("button", { name: tr("Cancel") }).click();
   await page
-    .getByPlaceholder("Type a message to test how the TTS sounds...")
-    .fill("brb, getting a drink");
-  await crop("tts-voice", body("Voice"));
-  await crop("tts-format", body("Format"));
+    .getByPlaceholder(tr("Type a message to test how the TTS sounds..."))
+    .fill(say("brb, getting a drink"));
+  await crop("tts-voice", body(tr("Voice")));
+  await crop("tts-format", body(tr("Format")));
   const replacements = [
     ["brb", "be right back"],
     ["gg", "good game"],
-  ];
+  ].map((pair) => pair.map(say));
   for (const [word, sound] of replacements) {
-    await page.getByTitle("Add Replacement").click();
+    await page.getByTitle(tr("Add replacement")).click();
     await page
-      .getByPlaceholder("Word to replace (e.g. 'brb')")
+      .getByPlaceholder(tr("Word to replace (e.g. 'brb')"))
       .last()
       .fill(word);
     await page
-      .getByPlaceholder("How it sounds (e.g. 'be right back')")
+      .getByPlaceholder(tr("How it sounds (e.g. 'be right back')"))
       .last()
       .fill(sound);
   }
-  await crop("tts-replacements", body("Replacements"));
-  await section("Permissions")
-    .getByRole("checkbox", { name: "Enable Whitelist / Blacklist" })
+  await crop("tts-replacements", body(tr("Replacements")));
+  await section(tr("Permissions"))
+    .getByRole("checkbox", { name: tr("Use allow and block lists") })
     .check();
-  await section("Permissions")
-    .getByRole("group", { name: /^Blacklist/ })
+  await section(tr("Permissions"))
+    .getByRole("group", { name: new RegExp(`^${tr("Block list")}`) })
     .getByRole("textbox")
     .fill("@spam.account");
-  await crop("tts-permissions", body("Permissions"));
-  await page.getByPlaceholder("word1, word2, word3...").fill("spoiler, spam");
-  await crop("tts-protection", body("Protection"));
+  await crop("tts-permissions", body(tr("Permissions")));
+  await page
+    .getByPlaceholder(tr("word1, word2, word3..."))
+    .fill("spoiler, spam");
+  await crop("tts-protection", body(tr("Protection")));
 
   // Music
-  await open("Music", "Controls");
-  await crop("music-provider", section("Provider"), { width: 560 });
+  await open(tr("Music"), tr("Controls"));
+  await crop("music-provider", section(tr("Provider")), { width: 560 });
   // Spotify's Client ID field, then back to YouTube for Home's shots
   await page.getByRole("tab", { name: "Spotify" }).click();
   await page.waitForTimeout(500);
-  await crop("music-spotify", section("Provider"), { width: 680 });
+  await crop("music-spotify", section(tr("Provider")), { width: 680 });
   await page.getByRole("tab", { name: "YouTube" }).click();
-  await crop("music-commands", section("Controls"), { width: 600 });
-  await section("Protection")
-    .getByRole("checkbox", { name: "One request per viewer" })
+  await crop("music-commands", section(tr("Controls")), { width: 600 });
+  await section(tr("Protection"))
+    .getByRole("checkbox", { name: tr("One request per viewer") })
     .check();
-  await crop("music-protection", body("Protection"));
+  await crop("music-protection", body(tr("Protection")));
 
   // Games: no Minecraft to join, so push what main would. Waiting shows the
   // setup, connected the actions.
-  await open("Games", "Minecraft");
+  await open(tr("Games"), "Minecraft");
   const games = (state) => ({
     success: true,
     data: {
@@ -418,7 +493,9 @@ export default async ({ app, page, home, push, toggle }) => {
     ["Java", "/tokio connect 192.168.1.20:37892"],
   ]) {
     const copies = section("Minecraft").getByTitle(
-      `Copy the ${edition} command`,
+      tr(`Copy the ${edition} command`, "games.minecraft.copyCommand", {
+        edition,
+      }),
     );
     await copies.first().waitFor();
     await copies.evaluateAll((buttons, command) => {
@@ -438,43 +515,49 @@ export default async ({ app, page, home, push, toggle }) => {
   }
 
   await push("app:games:res:games", games("connected"));
-  const actions = section("Actions");
-  await actions.getByRole("button", { name: "Add action" }).click();
+  const actions = section(tr("Actions"));
+  await actions.getByRole("button", { name: tr("Add action") }).click();
   await page
-    .getByRole("textbox", { name: "Name", exact: true })
+    .getByRole("textbox", { name: tr("Name"), exact: true })
     .fill("{username}");
-  await actions.getByRole("button", { name: "Add action" }).click();
-  await page.getByRole("combobox", { name: "Trigger" }).last().click();
-  await page.getByRole("option", { name: "Gift", exact: true }).click();
-  await page.getByRole("combobox", { name: "Step" }).last().click();
-  await page.getByRole("option", { name: "Command", exact: true }).click();
+  await actions.getByRole("button", { name: tr("Add action") }).click();
   await page
-    .getByRole("textbox", { name: "Command" })
-    .fill("say {username} sent {count} {gift}");
+    .getByRole("combobox", { name: tr("Trigger") })
+    .last()
+    .click();
+  await page.getByRole("option", { name: tr("Gift"), exact: true }).click();
+  await page
+    .getByRole("combobox", { name: tr("Step") })
+    .last()
+    .click();
+  await page.getByRole("option", { name: tr("Command"), exact: true }).click();
+  await page
+    .getByRole("textbox", { name: tr("Command") })
+    .fill(say("say {username} sent {count} {gift}"));
   await crop("games-actions", actions);
 
   // The overlay: the gift action on a Rose, and each action with a picture
   // browsed into the Minecraft library (pixel art drawn for these shots)
-  await actions.getByRole("button", { name: "Any gift" }).click();
+  await actions.getByRole("button", { name: tr("Any gift") }).click();
   await dialog.getByTitle("Rose", { exact: true }).click();
-  await dialog.getByRole("button", { name: "Done" }).click();
+  await dialog.getByRole("button", { name: tr("Done") }).click();
   await dialog.waitFor({ state: "detached" });
-  const overlay = section("Overlay");
+  const overlay = section(tr("Overlay"));
   const pictures = join(import.meta.dirname, "pictures");
   for (const [index, [file, name]] of [
     ["zombie.png", "Zombie"],
     ["tnt.png", "TNT"],
   ].entries()) {
     await overlay
-      .getByRole("button", { name: "Pick a picture" })
+      .getByRole("button", { name: tr("Pick a picture") })
       .first()
       .click();
     await pick(join(pictures, file));
-    await dialog.getByRole("button", { name: "Browse files..." }).click();
-    await dialog.getByRole("button", { name: "Done" }).click();
+    await dialog.getByRole("button", { name: tr("Browse files...") }).click();
+    await dialog.getByRole("button", { name: tr("Done") }).click();
     await dialog.waitFor({ state: "detached" });
     await overlay
-      .getByRole("textbox", { name: "Name on the overlay" })
+      .getByRole("textbox", { name: tr("Name on the overlay") })
       .nth(index)
       .fill(name);
   }
@@ -482,9 +565,9 @@ export default async ({ app, page, home, push, toggle }) => {
   const preview = overlay.locator('[class*="_preview_"]').first();
   await crop("games-preview", preview, { pad: 12 });
   // Sticker, then back to Arrow so the later shots are as before
-  await overlay.getByRole("radio", { name: "Sticker" }).check();
+  await overlay.getByRole("radio", { name: tr("Sticker") }).check();
   await crop("games-preview-sticker", preview, { pad: 12 });
-  await overlay.getByRole("radio", { name: "Arrow" }).check();
+  await overlay.getByRole("radio", { name: tr("Arrow") }).check();
 
   // A test of the follow action, once it has three steps: no game answers,
   // so push the replies Bedrock gives. Its anvil can't drop under a roof.
@@ -493,13 +576,21 @@ export default async ({ app, page, home, push, toggle }) => {
     [1, "Give item"],
     [2, "Hazard"],
   ]) {
-    await follow.getByRole("button", { name: "Add step" }).click();
-    await follow.getByRole("combobox", { name: "Step" }).nth(index).click();
-    await page.getByRole("option", { name: kind, exact: true }).click();
+    await follow.getByRole("button", { name: tr("Add step") }).click();
+    await follow
+      .getByRole("combobox", { name: tr("Step") })
+      .nth(index)
+      .click();
+    await page.getByRole("option", { name: tr(kind), exact: true }).click();
   }
-  await follow.getByRole("spinbutton", { name: "Amount" }).nth(1).fill("3");
-  await follow.getByRole("combobox", { name: "Hazard" }).click();
-  await page.getByRole("option", { name: "Anvil drop", exact: true }).click();
+  await follow
+    .getByRole("spinbutton", { name: tr("Amount") })
+    .nth(1)
+    .fill("3");
+  await follow.getByRole("combobox", { name: tr("Hazard") }).click();
+  await page
+    .getByRole("option", { name: tr("Anvil drop"), exact: true })
+    .click();
   // The page autosaves 300 ms after a change; the reply needs the action's id
   await page.waitForTimeout(1000);
   const saved = join(home, ".tokio", "profiles");
@@ -513,71 +604,80 @@ export default async ({ app, page, home, push, toggle }) => {
       {
         command: 'summon zombie "Cosmic Gamer" ~ ~ ~',
         ok: true,
-        message: "Object successfully summoned",
+        message: say("Object successfully summoned"),
       },
       {
         command: "give @p diamond 3",
         ok: true,
-        message: "Gave Diamond * 3 to Steve",
+        message: say("Gave Diamond * 3 to Steve"),
       },
       {
         command: "setblock ~ ~20 ~ anvil keep",
         ok: false,
-        message: "The block couldn't be placed",
+        message: say("The block couldn't be placed"),
       },
     ],
   });
   await crop("games-test", follow, { pad: 12 });
 
   // Countdown timer
-  await open("Tools", "Countdown Timer");
+  await open(tr("Tools"), tr("Countdown timer"));
   await page
-    .getByRole("group", { name: "Title (optional)" })
+    .getByRole("group", {
+      name: `${tr("Title", "tools.look.titleField")} ${tr("(optional)")}`,
+    })
     .getByRole("textbox")
     .fill("Subathon");
   await page
-    .getByRole("heading", { name: "Countdown Timer" })
+    .getByRole("heading", { name: tr("Countdown timer"), exact: true })
     .scrollIntoViewIfNeeded();
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: tr("Start", "tools.countdown.start"),
+      exact: true,
+    })
+    .click();
+  await page.getByRole("button", { name: tr("Add"), exact: true }).click();
   await page.waitForTimeout(1500);
   await shoot("countdown-timer");
   await crop("timer-preview", page.getByRole("timer").locator(".."));
   // The controls, under the preview timer-preview shows
-  const timer = body("Countdown Timer");
+  const timer = body(tr("Countdown timer"));
   await crop(
     "timer-controls",
     [
       timer.locator('[class*="timer_bar"]'),
-      timer.getByText("Pause when the LIVE ends or disconnects"),
+      timer.getByText(tr("Pause when the LIVE ends or disconnects")),
     ],
     { pad: 16 },
   );
-  await crop("timer-time-added", body("Time Added"));
+  await crop("timer-time-added", body(tr("Time added")));
   await toggle(
-    page.getByRole("checkbox", { name: "Show the triggers, one at a time" }),
+    page.getByRole("checkbox", {
+      name: tr("Show the triggers, one at a time"),
+    }),
   );
-  await crop("timer-look", body("Timer Look"));
-  await page.getByPlaceholder("Overlay name").fill("My overlay");
-  await page.getByTitle("Create ID").click();
-  await crop("tools-test-overlays", section("Test Overlays"));
+  await crop("timer-look", body(tr("Timer look")));
+  await page.getByPlaceholder(tr("Overlay name")).fill(say("My overlay"));
+  await page.getByTitle(tr("Create ID")).click();
+  await crop("tools-test-overlays", section(tr("Test overlays")));
 
   // Settings, with a made-up network address
-  await open("Settings", "Live Profiles");
-  await section("Overlay Server")
+  await open(tr("Settings"), tr("Live profiles"));
+  await section(tr("Overlay server"))
     .getByText(/^\d+\.\d+\.\d+\.\d+$/)
     .evaluate((el) => (el.textContent = "192.168.1.20"));
   await crop("settings-tiktok-live", section("TikTok LIVE"), { width: 640 });
-  await crop("settings-overlay-server", section("Overlay Server"), {
+  await crop("settings-overlay-server", section(tr("Overlay server")), {
     width: 640,
   });
-  await crop("settings", [section("TikTok LIVE"), section("Tray")], {
+  await crop("settings", [section("TikTok LIVE"), section(tr("Tray"))], {
     width: 640,
   });
-  await crop("settings-profiles", section("Live Profiles"));
+  await crop("settings-profiles", section(tr("Live profiles")));
   await crop("settings-libraries", [
-    section("Sound Library"),
-    section("Media Library"),
+    section(tr("Sound library")),
+    section(tr("Media library")),
   ]);
   // An overlay of your own, the e2e fixture under the docs' example name
   const own = join(home, "likes-counter");
@@ -587,14 +687,16 @@ export default async ({ app, page, home, push, toggle }) => {
     "name: Likes Counter\nversion: 1.0.0\nconfig: false\n",
   );
   await pick(own);
-  await section("Overlay Library")
-    .getByRole("button", { name: "Import" })
+  await section(tr("Overlay library"))
+    .getByRole("button", { name: tr("Import") })
     .click();
-  await section("Overlay Library").getByText("Likes Counter").waitFor();
-  await crop("settings-overlay-library", section("Overlay Library"));
-  await page.getByTitle("Create New Profile").click();
-  await page.getByPlaceholder("e.g. Chill Stream").fill("Just Chatting");
-  await page.getByRole("button", { name: "Create Profile" }).click();
+  await section(tr("Overlay library")).getByText("Likes Counter").waitFor();
+  await crop("settings-overlay-library", section(tr("Overlay library")));
+  await page.getByTitle(tr("Create a profile")).click();
+  await page
+    .getByPlaceholder(tr("e.g. Chill Stream"))
+    .fill(say("Just Chatting"));
+  await page.getByRole("button", { name: tr("Create profile") }).click();
   await dialog.waitFor({ state: "detached" });
 
   // The title bar's menus, each with its button and little else. Closing
@@ -616,19 +718,25 @@ export default async ({ app, page, home, push, toggle }) => {
   await profiles.click();
 
   // Home, LIVE, last: what main would push while connected
-  await open("Home", "Dashboard");
+  await open(tr("Home"), tr("Dashboard"));
   for (const feature of ["TTS", "Alerts"]) {
-    await toggle(page.getByRole("checkbox", { name: feature, exact: true }));
+    await toggle(
+      page.getByRole("checkbox", { name: tr(feature), exact: true }),
+    );
   }
-  await crop("home-features", section("Active Features"));
-  await page.getByTitle("Feed settings").click();
+  await crop("home-features", section(tr("Active features")));
+  await page.getByTitle(tr("Feed settings")).click();
   await crop("home-feed-settings", dialog);
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await page.getByPlaceholder("@username").fill("@tokio.demo");
+  await dialog.getByRole("button", { name: tr("Cancel") }).click();
+  await page.getByPlaceholder(tr("@username")).fill("@tokio.demo");
   // The box alone: with no Euler key saved, a hint shows under it
-  await crop("home-connect", page.getByPlaceholder("@username").locator(".."), {
-    pad: 16,
-  });
+  await crop(
+    "home-connect",
+    page.getByPlaceholder(tr("@username")).locator(".."),
+    {
+      pad: 16,
+    },
+  );
   // A downloaded update, then a state that shows no button
   await push("app:updates:res:status", { state: "ready", version: "1.5.0" });
   await crop("update-button", titleBar, { left: 600, top: 0 });
@@ -644,7 +752,7 @@ export default async ({ app, page, home, push, toggle }) => {
     {
       type: "chat",
       user: user("Maya", "maya.draws"),
-      text: "this song is a vibe 🎶",
+      text: say("this song is a vibe 🎶"),
       emotes: [],
     },
     { type: "gift", user: user("Leo", "leo_on_air"), gift: gift("Galaxy", 1) },
@@ -669,7 +777,7 @@ export default async ({ app, page, home, push, toggle }) => {
     {
       type: "chat",
       user: user("Ravi", "ravi.codes"),
-      text: "hi from Lisbon 👋",
+      text: say("hi from Lisbon 👋"),
       emotes: [],
     },
     { type: "superfan", user: user("Emma", "emma.m") },
@@ -694,7 +802,7 @@ export default async ({ app, page, home, push, toggle }) => {
   await crop("dashboard", page.locator("body"), { pad: 0 });
 
   await settle();
-  const bell = titleBar.getByTitle("Notifications");
+  const bell = titleBar.getByTitle(tr("Notifications"));
   await bell.click();
   await behind("hidden");
   await crop("notifications", [bell, menu], { pad: 8, top: 0 });

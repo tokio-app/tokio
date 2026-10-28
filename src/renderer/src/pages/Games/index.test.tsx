@@ -246,11 +246,11 @@ describe("Games", () => {
     await user.click(panels()[0].getByText("Follow"));
 
     for (const left of [
-      "Super Fan Join",
-      "Member Join",
+      "Super Fan join",
+      "Member join",
       "Envelope",
       "Super Fan Box",
-      "Music Change",
+      "Music change",
     ]) {
       expect(inList(panelElements()[0], left)).toBeNull();
     }
@@ -915,7 +915,7 @@ describe("Games overlay", () => {
     const { user } = await load([action("a1")]);
 
     await user.click(screen.getByRole("button", { name: "Pick a picture" }));
-    const picker = screen.getByRole("dialog", { name: "Select picture" });
+    const picker = screen.getByRole("dialog", { name: "Select a picture" });
     expect(sent(APP_EVENTS.GET_MINECRAFT_PICTURES)).toHaveLength(1);
     await send(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES, {
       success: true,

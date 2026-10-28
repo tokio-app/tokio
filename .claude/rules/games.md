@@ -107,7 +107,7 @@ The rest is Bedrock's.
 
 - `MinecraftSection` shows, until a game connects, both editions' setup side by side, with a command per address of this PC (`connectCommand(host, edition)`). The Java steps link to `MINECRAFT_MOD_DOCS_URL`, the website's `#java-edition` anchor: keep that heading there.
 - Actions save through `useEditableSettings("games")`; the toggle emits `SET_GAMES_SETTINGS` at once.
-- The trigger picker offers `GAME_TRIGGERS` (`helper.ts`): `TRIGGER_OPTIONS` without Super Fan Join, Member Join, Envelope, Super Fan Box and Music Change (the user's call). The schema still takes them, so an action saved with one keeps running, its picker empty until another is picked.
+- The trigger picker offers `GAME_TRIGGERS` (`helper.ts`): `TRIGGER_OPTIONS` without Super Fan join, Member join, Envelope, Super Fan Box and Music change (the user's call). The schema still takes them, so an action saved with one keeps running, its picker empty until another is picked.
 - `TriggerFilter` comes from `components/AlertItem`; gifts and emotes load as on Alerts, through `useTriggerChoices`. Like shows its own `likes_every` field in the filter's place.
 - The trigger's `min_coins` and `roles` (the Alerts editor's conditions) aren't offered here; actions keep their defaults, which match everything.
 - A new action takes the connected game's edition, else Bedrock (`Games/index.tsx`).

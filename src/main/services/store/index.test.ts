@@ -605,6 +605,29 @@ describe("StoreManagerService", () => {
     });
   });
 
+  describe("language", () => {
+    it("follows the system for stores saved before the setting", async () => {
+      const { language: _language, ...settings } = defaultStoreData.settings;
+      await writeFile(
+        storeFile,
+        JSON.stringify({ ...defaultStoreData, settings }),
+      );
+
+      const store = await init();
+
+      expect(store.getSettings().language).toBe("system");
+    });
+
+    it("saves the setting", async () => {
+      const store = await init();
+
+      await store.updateLanguage("es-419");
+
+      expect((await readJSON(storeFile)).settings.language).toBe("es-419");
+      expect((await init()).getSettings().language).toBe("es-419");
+    });
+  });
+
   describe("activity feed", () => {
     it("shows every event for stores saved before the setting", async () => {
       const { activityFeed: _feed, ...settings } = defaultStoreData.settings;

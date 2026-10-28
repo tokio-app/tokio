@@ -1,6 +1,7 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
 import { Btn, EmptyState, RemoveOverlayModal, Section } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import { LuPackagePlus } from "react-icons/lu";
@@ -8,6 +9,7 @@ import { VscPackage } from "react-icons/vsc";
 import styles from "../settings.module.css";
 
 export function OverlaysSection() {
+  const t = useT();
   const [overlays, setOverlays] = useState<OverlayApp[]>([]);
   // Overlay waiting for the user to confirm its removal
   const [removing, setRemoving] = useState<OverlayApp | null>(null);
@@ -30,12 +32,12 @@ export function OverlaysSection() {
 
       <Section
         icon={<VscPackage />}
-        title="Overlay Library"
-        description="Removing one deletes its settings too."
+        title={t("settings.overlays.title")}
+        description={t("settings.overlays.description")}
         actions={
           <Btn
             variant="icon"
-            title="Import"
+            title={t("common.import")}
             onClick={() => window.api.emit(APP_EVENTS.IMPORT_OVERLAY)}
           >
             <LuPackagePlus size={20} />
@@ -43,7 +45,7 @@ export function OverlaysSection() {
         }
       >
         {imported.length === 0 ? (
-          <EmptyState>No overlays imported yet.</EmptyState>
+          <EmptyState>{t("settings.overlays.empty")}</EmptyState>
         ) : (
           <div className={styles.library}>
             {imported.map((overlay) => (
@@ -54,7 +56,7 @@ export function OverlaysSection() {
                 <span className={styles.library_meta}>{overlay.version}</span>
                 <Btn
                   variant="icon"
-                  title="Remove"
+                  title={t("common.remove")}
                   onClick={() => setRemoving(overlay)}
                 >
                   <FiTrash2 size={20} />

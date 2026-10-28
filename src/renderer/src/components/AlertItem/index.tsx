@@ -1,3 +1,4 @@
+import { listOf, MessageKey, Params, translate } from "@/common/i18n";
 import { Alert, ALERT_TRIGGERS, Trigger, ViewerRole } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
@@ -10,14 +11,14 @@ import {
   formatAdded,
   getAlertOverlayURL,
   giftNames,
-  orList,
   takesRoles,
 } from "@/common/util";
 import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
+import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { FiEdit2, FiMessageSquare, FiMusic, FiTrash2 } from "react-icons/fi";
 import { CopyButton } from "../CopyField";
-import { Btn, Input, Select, SelectOption, Toggle } from "../Elements";
+import { Btn, Input, Select, Toggle } from "../Elements";
 import { EmoteMultiSelect, EmoteOption } from "../EmoteSelect";
 import { GiftMultiSelect } from "../GiftSelect";
 import { MediaThumbnail } from "../MediaPicker";
@@ -25,23 +26,24 @@ import { PlayButton, TestState, testProps } from "../PlayButton";
 import { SoundLength } from "../SoundPicker/SoundLength";
 import styles from "./alertitem.module.css";
 
-// zod types the options as any live event, but they are the triggers.
-export const TRIGGER_OPTIONS = ALERT_TRIGGERS.map((value) => ({
-  value,
-  label: ALERT_TRIGGER_LABELS[value],
-})) as SelectOption<Trigger["type"]>[];
+// The triggers, their labels keys (see useOptions)
+export const TRIGGER_OPTIONS: { value: Trigger["type"]; label: MessageKey }[] =
+  ALERT_TRIGGERS.map((value) => ({
+    value,
+    label: ALERT_TRIGGER_LABELS[value],
+  }));
 
 // When a gift alert plays, see every_gift
-const GIFT_PLAYS: SelectOption<"streak" | "gift">[] = [
-  { value: "streak", label: "When streak ends" },
-  { value: "gift", label: "Every gift" },
+const GIFT_PLAYS: { value: "streak" | "gift"; label: MessageKey }[] = [
+  { value: "streak", label: "components.alertItem.playsStreak" },
+  { value: "gift", label: "components.alertItem.playsGift" },
 ];
 
-// As the summary names them
-export const ROLE_NAMES: Record<ViewerRole, string> = {
-  follower: "Followers",
-  moderator: "Moderators",
-  superfan: "Super Fans",
+// As the summary names them, keys translated where they show
+export const ROLE_NAMES: Record<ViewerRole, MessageKey> = {
+  follower: "roles.follower",
+  moderator: "roles.moderator",
+  superfan: "roles.superfan",
 };
 
 type FilterProps = {
@@ -59,23 +61,25 @@ export function TriggerFilter({
   emotes,
   onChange,
 }: FilterProps) {
+  const t = useT();
+  const plays = useOptions(GIFT_PLAYS);
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
       return (
         <div className={styles.stack}>
           <GiftMultiSelect
-            placeholder="Any gift"
+            placeholder={t("common.anyGift")}
             gifts={gifts}
             value={trigger.gifts}
             onChange={(ids) => onChange({ ...trigger, gifts: ids })}
           />
           <Select
             className={styles.fill}
-            aria-label="When it plays"
-            options={GIFT_PLAYS}
+            aria-label={t("components.alertItem.whenItPlays")}
+            options={plays}
             value={trigger.every_gift ? "gift" : "streak"}
-            onChange={(plays) =>
-              onChange({ ...trigger, every_gift: plays === "gift" })
+            onChange={(play) =>
+              onChange({ ...trigger, every_gift: play === "gift" })
             }
           />
         </div>
@@ -83,7 +87,7 @@ export function TriggerFilter({
     case EMOTE_TRIGGER:
       return (
         <EmoteMultiSelect
-          placeholder="Any emote"
+          placeholder={t("components.alertItem.anyEmote")}
           emotes={emotes}
           value={trigger.emotes}
           onChange={(ids) => onChange({ ...trigger, emotes: ids })}
@@ -93,7 +97,7 @@ export function TriggerFilter({
       return (
         <Input
           className={styles.fill}
-          placeholder="Any message"
+          placeholder={t("common.anyMessage")}
           value={trigger.keyword}
           onChange={(e) => onChange({ ...trigger, keyword: e.target.value })}
         />
@@ -103,8 +107,8 @@ export function TriggerFilter({
       return (
         <Input
           className={styles.fill}
-          placeholder="Anyone"
-          title="A viewer's @handle or name"
+          placeholder={t("components.alertItem.anyone")}
+          title={t("components.alertItem.userTitle")}
           value={trigger.user}
           onChange={(e) => onChange({ ...trigger, user: e.target.value })}
         />
@@ -118,54 +122,79 @@ export function TriggerFilter({
 const NAMED = 3;
 
 /**
- * What narrows the trigger, as one sentence: "Rose or Lion, when the streak
- * ends, worth 100+ coins, from Followers". Empty when nothing does.
+ * What narrows the trigger, as one sentence in the language: "Rose or Lion,
+ * when the streak ends, worth 100+ coins, from Followers". Empty when nothing
+ * does.
  */
 export function triggerSummary(
   trigger: Trigger,
   gifts: CustomGift[],
   emotes: EmoteOption[],
+  language: string,
 ): string {
+  const t = (key: MessageKey, params?: Params) =>
+    translate(language, key, params);
   const parts: string[] = [];
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
       parts.push(
         trigger.gifts.length === 0
-          ? "Any gift"
+          ? t("common.anyGift")
           : // Gifts the lists don't have yet, until they load
-            (giftNames(trigger.gifts, gifts, NAMED) ?? "Some gifts"),
-        trigger.every_gift ? "every gift" : "when the streak ends",
+            (giftNames(trigger.gifts, gifts, language, NAMED) ??
+              t("components.alertItem.someGifts")),
+        trigger.every_gift
+          ? t("components.alertItem.everyGift")
+          : t("components.alertItem.streakEnds"),
       );
       // Only any gift has a worth to reach
       if (trigger.gifts.length === 0 && trigger.min_coins > 0) {
-        parts.push(`worth ${trigger.min_coins}+ coins`);
+        parts.push(
+          t("components.alertItem.worth", { count: trigger.min_coins }),
+        );
       }
       break;
     case EMOTE_TRIGGER: {
       const names = trigger.emotes.flatMap(
         (id) => emotes.find((emote) => emote.value === id)?.label ?? [],
       );
-      parts.push(names.length > 0 ? orList(names, NAMED) : "Any emote");
+      parts.push(
+        names.length > 0
+          ? listOf(language, names, { type: "or", max: NAMED })
+          : t("components.alertItem.anyEmote"),
+      );
       break;
     }
     case TOKIO_EVENTS.CHAT: {
       const keyword = trigger.keyword.trim();
-      parts.push(keyword ? `Messages with “${keyword}”` : "Any message");
+      parts.push(
+        keyword
+          ? t("components.alertItem.keyword", { keyword })
+          : t("common.anyMessage"),
+      );
       break;
     }
     case TOKIO_EVENTS.MEMBER_JOIN:
     case TOKIO_EVENTS.SUPER_FAN_JOIN: {
       const user = trigger.user.trim();
-      parts.push(user ? `Only ${user}` : "Anyone");
+      parts.push(
+        user
+          ? t("components.alertItem.onlyUser", { user })
+          : t("components.alertItem.anyone"),
+      );
       break;
     }
   }
   if (takesRoles(trigger.type) && trigger.roles.length > 0) {
-    const roles = trigger.roles.map((role) => ROLE_NAMES[role]).join(" or ");
-    parts.push(`from ${roles}`);
+    const roles = listOf(
+      language,
+      trigger.roles.map((role) => t(ROLE_NAMES[role])),
+      { type: "or" },
+    );
+    parts.push(t("components.alertItem.fromRoles", { roles }));
   }
   const text = parts.join(", ");
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return text.charAt(0).toLocaleUpperCase(language) + text.slice(1);
 }
 
 /** The test of what the alert plays and shows, null when it has nothing. */
@@ -210,14 +239,16 @@ export function AlertItem({
   onEdit,
   onRemove,
 }: Props) {
+  const t = useT();
+  const language = useLanguage();
   const { sound, tts, media } = alert;
-  const detail = triggerSummary(alert.trigger, gifts, emotes);
+  const detail = triggerSummary(alert.trigger, gifts, emotes, language);
   const test = alertTest(alert);
 
   return (
     <div className={styles.row}>
       <Toggle
-        aria-label="Enabled"
+        aria-label={t("common.enabled")}
         checked={alert.enabled}
         onChange={(e) => onChange({ ...alert, enabled: e.target.checked })}
       />
@@ -225,14 +256,14 @@ export function AlertItem({
       <button
         type="button"
         className={styles.summary}
-        title="Edit alert"
+        title={t("components.alertItem.edit")}
         onClick={onEdit}
       >
         <span className={styles.name}>{alertName(alert.name, index)}</span>
 
         <span className={styles.part}>
           <span className={styles.trigger}>
-            {ALERT_TRIGGER_LABELS[alert.trigger.type]}
+            {t(ALERT_TRIGGER_LABELS[alert.trigger.type])}
           </span>
           {detail && (
             <span className={cx(styles.detail, styles.clamp)}>{detail}</span>
@@ -248,11 +279,17 @@ export function AlertItem({
                 <FiMusic size={14} aria-hidden />
               )}
               <span className={styles.text}>
-                {tts ? `“${tts.message}”` : sound?.name}
+                {tts
+                  ? t("common.quotedMessage", {
+                      message: tts.message,
+                    })
+                  : sound?.name}
               </span>
             </span>
           ) : (
-            <span className={styles.none}>No sound</span>
+            <span className={styles.none}>
+              {t("components.alertItem.noSound")}
+            </span>
           )}
           {/* How long it plays, the cut's part of it */}
           {sound && !tts && (
@@ -276,7 +313,9 @@ export function AlertItem({
               </span>
             </span>
           ) : (
-            <span className={styles.none}>No media</span>
+            <span className={styles.none}>
+              {t("components.alertItem.noMedia")}
+            </span>
           )}
         </span>
 
@@ -291,7 +330,7 @@ export function AlertItem({
       >
         <CopyButton
           value={getAlertOverlayURL(alert.id)}
-          title="Copy overlay URL"
+          title={t("components.alertItem.copyUrl")}
           disabled={!media}
         />
       </span>
@@ -301,7 +340,7 @@ export function AlertItem({
         disabled={!test}
         onClick={() => test && onTest(test)}
       />
-      <Btn variant="icon" title="Remove" onClick={onRemove}>
+      <Btn variant="icon" title={t("common.remove")} onClick={onRemove}>
         <FiTrash2 size={24} />
       </Btn>
     </div>

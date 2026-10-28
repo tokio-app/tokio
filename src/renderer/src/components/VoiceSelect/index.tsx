@@ -8,6 +8,7 @@ import { cx } from "@/helper/cx";
 import { voiceDetails } from "@/helper/voices";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
+import { useLanguage } from "@/ui/i18n";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { FiChevronDown } from "react-icons/fi";
@@ -28,6 +29,7 @@ type Props = {
  * over a modal it's opened from.
  */
 export function VoiceSelect({ value, filters, onChange }: Props) {
+  const language = useLanguage();
   const [voices, setVoices] = useState<VoiceData[]>([]);
   const [engines, setEngines] = useState<VoiceEngine[]>([]);
   const [open, setOpen] = useState(false);
@@ -50,7 +52,9 @@ export function VoiceSelect({ value, filters, onChange }: Props) {
       >
         <span className={styles.field_label}>
           <span className={styles.name}>{value.name}</span>
-          <span className={styles.details}>{voiceDetails(value, engines)}</span>
+          <span className={styles.details}>
+            {voiceDetails(value, engines, language)}
+          </span>
         </span>
         <FiChevronDown size={16} className={styles.chevron} />
       </button>

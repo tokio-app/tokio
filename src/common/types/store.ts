@@ -1,3 +1,5 @@
+import type { MessageKey } from "../i18n";
+
 // engine is the id of the TTS engine (provider) that speaks the voice.
 export type VoiceData = {
   engine: string;
@@ -5,8 +7,9 @@ export type VoiceData = {
   lang: string;
 };
 
-// keyLabel is set when the engine takes a key, e.g. TikTok's session ID.
-export type VoiceEngine = { id: string; label: string; keyLabel?: string };
+// keyLabel is set when the engine takes a key, e.g. TikTok's session ID: the
+// key of its name, translated where it's shown.
+export type VoiceEngine = { id: string; label: string; keyLabel?: MessageKey };
 
 export interface Folders {
   appFolder: string;

@@ -1,3 +1,4 @@
+import { MessageKey } from "@/common/i18n";
 import {
   Alert,
   AlertMedia,
@@ -43,6 +44,7 @@ import {
 } from "@/components";
 import thumbs from "@/components/MediaPicker/mediapicker.module.css";
 import { AlertTestRequest } from "@/hooks";
+import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode, RefObject, useEffect, useRef, useState } from "react";
 import {
   FiImage,
@@ -57,19 +59,19 @@ import { Cut, CutTrack, ResetCut, SoundCut } from "./SoundCut";
 
 type Tab = "trigger" | "sound" | "media";
 
-const TABS: { value: Tab; label: string }[] = [
-  { value: "trigger", label: "Trigger" },
-  { value: "sound", label: "Sound" },
-  { value: "media", label: "Media" },
+const TABS: { value: Tab; label: MessageKey }[] = [
+  { value: "trigger", label: "alerts.editor.tabs.trigger" },
+  { value: "sound", label: "alerts.editor.tabs.sound" },
+  { value: "media", label: "alerts.editor.tabs.media" },
 ];
 
 // What TriggerFilter's field is for, for the triggers that have one
-const FILTER_LABELS: Partial<Record<Trigger["type"], string>> = {
-  [TOKIO_EVENTS.GIFT]: "Gifts",
-  [EMOTE_TRIGGER]: "Emotes",
-  [TOKIO_EVENTS.CHAT]: "Keyword",
-  [TOKIO_EVENTS.MEMBER_JOIN]: "Viewer",
-  [TOKIO_EVENTS.SUPER_FAN_JOIN]: "Viewer",
+const FILTER_LABELS: Partial<Record<Trigger["type"], MessageKey>> = {
+  [TOKIO_EVENTS.GIFT]: "alerts.editor.filters.gifts",
+  [EMOTE_TRIGGER]: "alerts.editor.filters.emotes",
+  [TOKIO_EVENTS.CHAT]: "alerts.editor.filters.keyword",
+  [TOKIO_EVENTS.MEMBER_JOIN]: "alerts.editor.filters.viewer",
+  [TOKIO_EVENTS.SUPER_FAN_JOIN]: "alerts.editor.filters.viewer",
 };
 
 type Props = {
@@ -105,23 +107,27 @@ export function AlertEditor({
   onPickMedia,
   onClose,
 }: Props) {
+  const t = useT();
   const [tab, setTab] = useState<Tab>("trigger");
   const test = alertTest(alert);
+  const tabs = useOptions(TABS);
 
   return (
     <Modal
-      title={`${ALERT_TRIGGER_LABELS[alert.trigger.type]} alert`}
+      title={t("alerts.editor.title", {
+        trigger: t(ALERT_TRIGGER_LABELS[alert.trigger.type]),
+      })}
       maxWidth="720px"
       onClose={onClose}
       footer={
         <Btn variant="accent" onClick={onClose}>
-          Done
+          {t("common.done")}
         </Btn>
       }
     >
       {/* The whole alert's, so above the tabs */}
       <label className={styles.name}>
-        Name
+        {t("common.name")}
         <Input
           className={styles.name_input}
           placeholder={defaultAlertName(index)}
@@ -130,7 +136,7 @@ export function AlertEditor({
         />
       </label>
 
-      <Tabs tabs={TABS} value={tab} onChange={setTab} />
+      <Tabs tabs={tabs} value={tab} onChange={setTab} />
 
       <div className={styles.panel}>
         {tab === "trigger" && (
@@ -172,22 +178,24 @@ type TriggerTabProps = {
 };
 
 function TriggerTab({ trigger, gifts, emotes, onChange }: TriggerTabProps) {
+  const t = useT();
+  const triggers = useOptions(TRIGGER_OPTIONS);
   const filter = FILTER_LABELS[trigger.type];
   const { roles } = trigger;
 
   return (
     <>
-      <Field label="Event">
+      <Field label={t("alerts.editor.event")}>
         <Select
-          aria-label="Event"
-          options={TRIGGER_OPTIONS}
+          aria-label={t("alerts.editor.event")}
+          options={triggers}
           value={trigger.type}
           onChange={(type) => onChange({ ...trigger, type })}
         />
       </Field>
 
       {filter && (
-        <Field label={filter}>
+        <Field label={t(filter)}>
           <TriggerFilter
             trigger={trigger}
             gifts={gifts}
@@ -199,33 +207,38 @@ function TriggerTab({ trigger, gifts, emotes, onChange }: TriggerTabProps) {
 
       {/* Picked gifts are the alert's choice already */}
       {trigger.type === TOKIO_EVENTS.GIFT && trigger.gifts.length === 0 && (
-        <Field label="Worth at least">
+        <Field label={t("alerts.editor.minCoins")}>
           <span className={styles.inline}>
-            <NumberInput
-              integer
-              min={0}
-              className={styles.number}
-              aria-label="Coins"
-              value={trigger.min_coins}
-              onChange={(min_coins) => onChange({ ...trigger, min_coins })}
-            />
-            coins
+            {rich(t("alerts.editor.minCoinsInput"), {
+              input: (
+                <NumberInput
+                  integer
+                  min={0}
+                  className={styles.number}
+                  aria-label={t("common.coins")}
+                  value={trigger.min_coins}
+                  onChange={(min_coins) => onChange({ ...trigger, min_coins })}
+                />
+              ),
+            })}
           </span>
           <p className={styles.note}>
-            {trigger.every_gift
-              ? "Each gift's coins. 0 for any gift."
-              : "The whole streak's coins, when it ends. 0 for any streak."}
+            {t(
+              trigger.every_gift
+                ? "alerts.editor.everyGiftNote"
+                : "alerts.editor.streakNote",
+            )}
           </p>
         </Field>
       )}
 
       {takesRoles(trigger.type) && (
-        <Field label="From">
+        <Field label={t("alerts.editor.from")}>
           <div className={styles.roles}>
             {VIEWER_ROLES.map((role) => (
               <Check
                 key={role}
-                label={ROLE_NAMES[role]}
+                label={t(ROLE_NAMES[role])}
                 checked={roles.includes(role)}
                 onChange={(e) =>
                   onChange({
@@ -238,7 +251,7 @@ function TriggerTab({ trigger, gifts, emotes, onChange }: TriggerTabProps) {
               />
             ))}
           </div>
-          <p className={styles.note}>None checked: anyone.</p>
+          <p className={styles.note}>{t("alerts.editor.rolesNote")}</p>
         </Field>
       )}
     </>
@@ -255,8 +268,9 @@ function Volume({
   value: number;
   onChange: (volume: number) => void;
 }) {
+  const t = useT();
   return (
-    <Field label="Volume">
+    <Field label={t("alerts.editor.volume")}>
       <div className={styles.volume}>
         <FiVolume2 size={18} aria-hidden />
         <Slider
@@ -285,6 +299,7 @@ function SoundTab({
   onChange,
   onPick,
 }: TabProps & { playing: boolean; play: ReactNode }) {
+  const t = useT();
   const { sound, tts } = alert;
 
   return (
@@ -293,7 +308,9 @@ function SoundTab({
         {tts ? (
           <>
             <FiMessageSquare size={18} aria-hidden />
-            <span className={styles.current_name}>“{tts.message}”</span>
+            <span className={styles.current_name}>
+              {t("common.quotedMessage", { message: tts.message })}
+            </span>
           </>
         ) : sound ? (
           <>
@@ -301,20 +318,24 @@ function SoundTab({
             <span className={styles.current_name}>{sound.name}</span>
           </>
         ) : (
-          <span className={styles.none}>No sound yet.</span>
+          <span className={styles.none}>{t("alerts.editor.noSound")}</span>
         )}
         <span className={styles.current_actions}>
           {/* A sound's goes with its cut */}
           {tts && play}
           <Btn onClick={onPick}>
-            {tts || sound ? "Change..." : "Choose sound..."}
+            {t(
+              tts || sound
+                ? "alerts.editor.change"
+                : "alerts.editor.chooseSound",
+            )}
           </Btn>
         </span>
       </div>
 
       {tts ? (
         <p className={styles.note}>
-          Spoken with {tts.voice.name}. Messages play whole.
+          {t("alerts.editor.spokenWith", { voice: tts.voice.name })}
         </p>
       ) : (
         sound && (
@@ -331,7 +352,7 @@ function SoundTab({
 
       {(tts || sound) && (
         <Volume
-          label="Sound volume"
+          label={t("alerts.editor.soundVolume")}
           value={alert.volume}
           onChange={(volume) => onChange({ ...alert, volume })}
         />
@@ -341,6 +362,7 @@ function SoundTab({
 }
 
 function MediaTab({ alert, onChange, onPick }: TabProps) {
+  const t = useT();
   const { media } = alert;
   // The video's length in seconds, read by its preview
   const [length, setLength] = useState<{ file: string; seconds: number }>();
@@ -404,41 +426,44 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
             {media ? (
               <span className={styles.current_name}>{media.name}</span>
             ) : (
-              <span className={styles.none}>No media yet.</span>
+              <span className={styles.none}>{t("alerts.editor.noMedia")}</span>
             )}
             <span className={styles.current_actions}>
               <Btn onClick={onPick}>
-                {media ? "Change..." : "Choose media..."}
+                {t(
+                  media ? "alerts.editor.change" : "alerts.editor.chooseMedia",
+                )}
               </Btn>
             </span>
           </div>
 
           {/* None while the preview reads the video's length */}
           {media && (!video || (read && !cuttable)) && (
-            <Field label="Duration">
+            <Field label={t("alerts.editor.duration")}>
               <span className={styles.inline}>
-                <NumberInput
-                  integer
-                  min={1}
-                  max={MEDIA_MAX_DURATION}
-                  className={styles.number}
-                  aria-label="Duration in seconds"
-                  value={media.duration}
-                  onChange={(duration) =>
-                    onChange({ ...alert, media: { ...media, duration } })
-                  }
-                />
-                seconds
+                {rich(t("alerts.editor.durationInput"), {
+                  input: (
+                    <NumberInput
+                      integer
+                      min={1}
+                      max={MEDIA_MAX_DURATION}
+                      className={styles.number}
+                      aria-label={t("common.durationSeconds")}
+                      value={media.duration}
+                      onChange={(duration) =>
+                        onChange({ ...alert, media: { ...media, duration } })
+                      }
+                    />
+                  ),
+                })}
               </span>
-              <p className={styles.note}>
-                At least this long, or while the sound plays if it's longer.
-              </p>
+              <p className={styles.note}>{t("alerts.editor.durationNote")}</p>
             </Field>
           )}
 
           {media && video && (
             <Volume
-              label="Video volume"
+              label={t("alerts.editor.videoVolume")}
               value={media.volume}
               onChange={(volume) =>
                 onChange({ ...alert, media: { ...media, volume } })
@@ -449,7 +474,7 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
       </div>
 
       {media && cuttable && (
-        <Field label="Cut">
+        <Field label={t("alerts.editor.cut")}>
           <CutTrack
             duration={seconds}
             cut={media}
@@ -471,8 +496,11 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
         </Field>
       )}
 
-      <Field label="Overlay URL">
-        <CopyField value={getAlertOverlayURL(alert.id)} title="Copy URL" />
+      <Field label={t("common.overlayUrl")}>
+        <CopyField
+          value={getAlertOverlayURL(alert.id)}
+          title={t("common.copyUrl")}
+        />
       </Field>
     </>
   );
@@ -500,6 +528,7 @@ function MediaPreview({
   onLength: (seconds: number) => void;
   onPlaying: (playing: boolean) => void;
 }) {
+  const t = useT();
   const [length, setLength] = useState(NaN);
   // Pauses the video at its cut's end
   const stop = useRef<number>(undefined);
@@ -557,7 +586,7 @@ function MediaPreview({
       <Btn
         variant="icon"
         className={styles.preview_play}
-        title={playing ? "Pause" : "Play video"}
+        title={t(playing ? "common.pause" : "alerts.editor.playVideo")}
         onClick={() => {
           const el = ref.current;
           if (!el) return;

@@ -1,6 +1,8 @@
 import { MinecraftEdition } from "@/common/schemas";
 import { CommandResult, GameStatus } from "@/common/types";
+import type { MessageKey } from "@/common/i18n";
 import { MINECRAFT_JAVA_PROTOCOL, MINECRAFT_PORT } from "@/common/util";
+import { t } from "@/helper/i18n";
 import {
   Cipheriv,
   createCipheriv,
@@ -37,7 +39,10 @@ type Command = {
 };
 
 // Why Tokio closed a game's socket, so the Java mod can tell the player
-type Close = { code: number; reason: string };
+// The reason is translated as the socket closes. The Java mod shows it in
+// the game's chat, and WebSocket allows 123 bytes: minecraft.test.ts checks
+// every language's.
+type Close = { code: number; reason: MessageKey };
 
 type Frame = {
   header?: { requestId?: string; messagePurpose?: string };
@@ -60,17 +65,18 @@ export const MAX_IN_FLIGHT = 50;
 // Only a safety net: GamesService spaces out each action's runs, so this
 // fills only with many actions firing at once on a game that stopped answering
 export const MAX_WAITING = 10_000;
-// What the pending commands of a game that left or was replaced fail with
+// What the pending commands of a game that left or was replaced fail with.
+// English: GamesService compares it.
 export const DISCONNECTED = "Minecraft disconnected.";
 // Body version 42 parses today's syntax (execute … run); 1 doesn't
 const COMMAND_VERSION = 42;
 const REPLACED: Close = {
   code: 4000,
-  reason: "Another game connected to Tokio.",
+  reason: "main.minecraft.replaced",
 };
 const TURNED_OFF: Close = {
   code: 1001,
-  reason: "Minecraft was turned off in Tokio.",
+  reason: "main.minecraft.turnedOff",
 };
 
 const request = (requestId: string, commandLine: string, version: number) =>
@@ -150,10 +156,12 @@ export class MinecraftConnection {
   /** Runs a command as the connected player, and resolves with its answer. */
   public send(command: string): Promise<CommandResult> {
     if (!this._game?.ready) {
-      return Promise.resolve(failed(command, "Minecraft isn't connected."));
+      return Promise.resolve(failed(command, t("main.minecraft.notConnected")));
     }
     if (this._waiting.length >= MAX_WAITING) {
-      return Promise.resolve(failed(command, "Too many commands are waiting."));
+      return Promise.resolve(
+        failed(command, t("main.minecraft.tooManyWaiting")),
+      );
     }
     return new Promise((resolve) => {
       this._waiting.push({ command, resolve });
@@ -192,8 +200,8 @@ export class MinecraftConnection {
           state: "error",
           error:
             err.code === "EADDRINUSE"
-              ? `Port ${this._port} is in use.`
-              : `Couldn't listen on port ${this._port}.`,
+              ? t("main.minecraft.portInUse", { port: String(this._port) })
+              : t("main.minecraft.listenFailed", { port: String(this._port) }),
         });
         resolve(false);
       });
@@ -292,7 +300,7 @@ export class MinecraftConnection {
     if (!game) return;
     this._game = null;
     clearTimeout(game.handshake);
-    if (close) game.socket.close(close.code, close.reason);
+    if (close) game.socket.close(close.code, t(close.reason));
     else game.socket.terminate();
     const commands = [...this._inFlight.values(), ...this._waiting];
     this._inFlight.clear();
@@ -348,7 +356,7 @@ export class MinecraftConnection {
         () =>
           this._finish(
             requestId,
-            failed(next.command, "Minecraft didn't answer."),
+            failed(next.command, t("main.minecraft.noAnswer")),
           ),
         this._timeoutMs,
       );

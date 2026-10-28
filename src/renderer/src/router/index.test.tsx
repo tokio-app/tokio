@@ -12,7 +12,15 @@ describe("router", () => {
   it("shows a page's error inside the page, keeping the sidebar", async () => {
     await renderApp("/about");
 
-    expect(screen.getByText("Something went wrong!")).toBeInTheDocument();
+    expect(
+      screen.getByText("Tokio couldn't show this page"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Home" })).toBeInTheDocument();
+  });
+
+  it("says when a page doesn't exist", async () => {
+    await renderApp("/nowhere");
+
+    expect(screen.getByText("Page not found")).toBeInTheDocument();
   });
 });

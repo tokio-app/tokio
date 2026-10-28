@@ -11,11 +11,13 @@ import {
   testProps,
 } from "@/components";
 import { useAlertTest, useIpcListener, useIpcRequest } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiMusic, FiTrash2, FiUpload } from "react-icons/fi";
 import styles from "../settings.module.css";
 
 export function SoundsSection() {
+  const t = useT();
   const [sounds, setSounds] = useState<AlertSound[]>([]);
   const [error, setError] = useState(false);
   // Sound waiting for the user to confirm it's deleted
@@ -45,12 +47,12 @@ export function SoundsSection() {
 
       <Section
         icon={<FiMusic />}
-        title="Sound Library"
-        description="Sounds for alerts, shared by every profile."
+        title={t("settings.sounds.title")}
+        description={t("settings.sounds.description")}
         actions={
           <Btn
             variant="icon"
-            title="Upload"
+            title={t("common.upload")}
             onClick={() => window.api.emit(APP_EVENTS.UPLOAD_SOUNDS)}
           >
             <FiUpload size={20} />
@@ -58,7 +60,7 @@ export function SoundsSection() {
         }
       >
         {sounds.length === 0 ? (
-          <EmptyState>No sounds yet.</EmptyState>
+          <EmptyState>{t("settings.sounds.empty")}</EmptyState>
         ) : (
           <div className={styles.library}>
             {sounds.map((sound) => {
@@ -80,7 +82,7 @@ export function SoundsSection() {
                   <SoundLength file={sound.file} />
                   <Btn
                     variant="icon"
-                    title="Delete"
+                    title={t("common.delete")}
                     onClick={() => setRemoving(sound)}
                   >
                     <FiTrash2 size={20} />
@@ -91,11 +93,7 @@ export function SoundsSection() {
           </div>
         )}
 
-        {error && (
-          <p className={styles.error}>
-            Some sounds couldn't be uploaded or removed.
-          </p>
-        )}
+        {error && <p className={styles.error}>{t("settings.sounds.error")}</p>}
       </Section>
     </>
   );

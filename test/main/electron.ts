@@ -7,6 +7,8 @@ import { vi } from "vitest";
 // created, sent and registered. Don't import "electron" here.
 
 type Bounds = { x: number; y: number; width: number; height: number };
+// The page's ?query, as Electron's loadFile takes it
+type LoadFileOptions = { query?: Record<string, string> };
 
 /** An event its listeners can cancel, like Electron's. */
 export function cancelableEvent<T extends object>(props: T) {
@@ -57,8 +59,14 @@ export class FakeWebContents extends EventEmitter {
   readonly loadURL = vi.fn<(url: string) => Promise<void>>(async (url) => {
     this.url = url;
   });
-  readonly loadFile = vi.fn<(file: string) => Promise<void>>(async (file) => {
-    this.url = pathToFileURL(file).href;
+  readonly loadFile = vi.fn<
+    (file: string, options?: LoadFileOptions) => Promise<void>
+  >(async (file, options) => {
+    const url = pathToFileURL(file);
+    for (const [key, value] of Object.entries(options?.query ?? {})) {
+      url.searchParams.set(key, value);
+    }
+    this.url = url.href;
   });
   readonly close = vi.fn<() => void>(() => this.destroy());
   readonly reload = vi.fn<() => void>();
@@ -154,7 +162,9 @@ export class FakeBrowserWindow extends EventEmitter {
     this.emit("closed");
   });
   readonly loadURL = vi.fn((url: string) => this.webContents.loadURL(url));
-  readonly loadFile = vi.fn((file: string) => this.webContents.loadFile(file));
+  readonly loadFile = vi.fn((file: string, options?: LoadFileOptions) =>
+    this.webContents.loadFile(file, options),
+  );
   private bounds: Bounds;
   private state: "normal" | "maximized" | "minimized" = "normal";
   private visible: boolean;
@@ -270,6 +280,7 @@ function createFakes() {
       requestSingleInstanceLock: vi.fn(() => true),
       getLocale: vi.fn(() => "en-US"),
       getLocaleCountryCode: vi.fn(() => "US"),
+      getPreferredSystemLanguages: vi.fn(() => ["en-US"]),
     }),
     session: {
       defaultSession: {

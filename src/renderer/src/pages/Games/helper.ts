@@ -1,3 +1,4 @@
+import { MessageKey, translate } from "@/common/i18n";
 import {
   GAME_HAZARDS,
   GAME_HELPS,
@@ -62,14 +63,14 @@ export const GAME_TRIGGERS = TRIGGER_OPTIONS.filter(
 );
 
 // The first words of each step's sentence
-export const STEP_KINDS: SelectOption<StepKind>[] = [
-  { value: "spawn", label: "Spawn mob" },
-  { value: "give", label: "Give item" },
-  { value: "weather", label: "Weather" },
-  { value: "time", label: "Time of day" },
-  { value: "hazard", label: "Hazard" },
-  { value: "help", label: "Help" },
-  { value: "command", label: "Command" },
+export const STEP_KINDS: { value: StepKind; label: MessageKey }[] = [
+  { value: "spawn", label: "games.steps.spawn" },
+  { value: "give", label: "games.steps.give" },
+  { value: "weather", label: "games.steps.weather" },
+  { value: "time", label: "games.steps.time" },
+  { value: "hazard", label: "games.steps.hazard" },
+  { value: "help", label: "games.steps.help" },
+  { value: "command", label: "games.steps.command" },
 ];
 
 export const WEATHERS = (["clear", "rain", "thunder"] as const).map(
@@ -205,26 +206,33 @@ export function withText(step: GameStep, text: string): GameStep {
 }
 
 // How a test went, in a few words
-export function testSummary(results: CommandResult[]) {
+export function testSummary(results: CommandResult[], language: string) {
   const failed = results.filter((result) => !result.ok).length;
-  const commands = `${results.length} ${results.length === 1 ? "command" : "commands"}`;
-  if (failed === 0) return `${commands} ran`;
-  if (failed === results.length) return `${commands} failed`;
-  return `${failed} of ${commands} failed`;
+  const count = results.length;
+  if (failed === 0) return translate(language, "games.test.ran", { count });
+  if (failed === count)
+    return translate(language, "games.test.failed", { count });
+  return translate(language, "games.test.someFailed", {
+    count,
+    failed: String(failed),
+  });
 }
 
-const STATUS_TEXT: Record<GameStatus["state"], string> = {
-  off: "Off",
-  waiting: "Waiting for Minecraft",
-  connected: "Connected",
-  error: "Minecraft can't connect.",
+const STATUS_TEXT: Record<GameStatus["state"], MessageKey> = {
+  off: "games.status.off",
+  waiting: "games.status.waiting",
+  connected: "common.connected",
+  error: "games.status.error",
 };
 
 // An error says why, a connection which edition
-export function statusText(status: GameStatus) {
+export function statusText(status: GameStatus, language: string) {
   if (status.state === "connected" && status.edition)
-    return `Connected to ${MINECRAFT_EDITION_NAMES[status.edition]}`;
+    return translate(language, "games.status.connectedTo", {
+      edition: MINECRAFT_EDITION_NAMES[status.edition],
+    });
   return (
-    (status.state === "error" && status.error) || STATUS_TEXT[status.state]
+    (status.state === "error" && status.error) ||
+    translate(language, STATUS_TEXT[status.state])
   );
 }

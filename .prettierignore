@@ -5,5 +5,7 @@ tsconfig.*.json
 test/fixtures
 # Vendored from anthropics/skills, kept as published
 .claude/skills/frontend-design
+# Vendored from blader/humanizer v3.1.0, kept as published
+.claude/skills/humanizer
 # Agents' git worktrees
 .claude/worktrees/

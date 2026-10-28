@@ -10,6 +10,7 @@ import {
 } from "@/components";
 import { AudioQueue } from "@/helper";
 import { Updater } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import styles from "../tts.module.css";
 
@@ -32,11 +33,15 @@ export function VoiceSection({
 }: Props) {
   const [testMessage, setTestMessage] = useState("");
   const { filters } = settings;
+  const t = useT();
 
   return (
-    <Section title="Voice" description="The voice that reads chat aloud.">
+    <Section
+      title={t("tts.voice.title")}
+      description={t("tts.voice.description")}
+    >
       <FormGrid>
-        <Field label="Voice Selection">
+        <Field label={t("tts.voice.selection")}>
           <VoiceSelect
             value={settings.voice}
             filters={filters}
@@ -48,7 +53,7 @@ export function VoiceSection({
           />
         </Field>
 
-        <Field label={`Speed (${filters.speed}x)`}>
+        <Field label={t("common.speed", { speed: filters.speed })}>
           <Slider
             min={0.5}
             max={2}
@@ -63,7 +68,7 @@ export function VoiceSection({
           />
         </Field>
 
-        <Field label={`Pitch (${filters.pitch})`}>
+        <Field label={t("common.pitch", { pitch: filters.pitch })}>
           <Slider
             min={0.5}
             max={2}
@@ -78,7 +83,7 @@ export function VoiceSection({
           />
         </Field>
 
-        <Field label={`Volume (${filters.volume}%)`}>
+        <Field label={t("tts.voice.volume", { volume: filters.volume })}>
           <Slider
             min={0}
             max={100}
@@ -101,10 +106,10 @@ export function VoiceSection({
           disabled={testMessage === ""}
           onClick={() => onTest(testMessage)}
         >
-          Test Voice
+          {t("tts.voice.test")}
         </Btn>
         <Input
-          placeholder="Type a message to test how the TTS sounds..."
+          placeholder={t("tts.voice.testPlaceholder")}
           value={testMessage}
           onChange={(e) => setTestMessage(e.target.value)}
         />

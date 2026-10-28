@@ -15,5 +15,52 @@
     "no-console": "allow",
     "no-underscore-dangle": "allow",
     "no-floating-promises": "allow"
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/renderer/**/*.tsx",
+        "src/ui/**/*.tsx",
+        "src/music/**/*.tsx"
+      ],
+      "plugins": ["typescript", "react"],
+      "rules": {
+        "react/react-in-jsx-scope": "off",
+        "react/jsx-no-literals": [
+          "error",
+          {
+            "restrictedAttributes": [
+              "title",
+              "label",
+              "aria-label",
+              "description",
+              "placeholder",
+              "confirmText",
+              "hint",
+              "empty",
+              "alt",
+              "feature"
+            ],
+            "allowedStrings": [
+              "",
+              "Tokio",
+              "Tok",
+              "io",
+              "v",
+              "TikTok LIVE",
+              "Minecraft",
+              "×",
+              "(×)",
+              "🌹"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.test.tsx"],
+      "plugins": ["typescript", "react"],
+      "rules": { "react/jsx-no-literals": "off" }
+    }
+  ]
 }

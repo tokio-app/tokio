@@ -11,7 +11,7 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
 ## In this repo
 
 1. Types, in `src/common/types/connector.ts`: the `TOKIO_EVENTS` entry (`tokio:event:<name>`), the payload type next to the others, and its row in `TokioEventMap`. Typecheck then asks for:
-   - its label in `ALERT_TRIGGER_LABELS` (same file)
+   - its label in `ALERT_TRIGGER_LABELS` (same file), a `triggers.*` key added to every locale file (`.claude/rules/i18n.md`)
    - its message variables in `ALERT_MESSAGE_VARIABLES` (`src/common/util/alerts.ts`)
    - its sample in `src/common/util/samples/index.ts`, which the alerts' TTS test and the unit tests use
 
@@ -26,7 +26,7 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
    - `FeedModal` (`src/renderer/src/pages/Home/sections/`)
 6. The countdown timer, when viewers doing it should add time:
    - its trigger in `TIMER_EVENTS` (`src/main/services/timer/index.ts`)
-   - a field in the `seconds` and `names` groups of `TimerSettingsSchema` (`src/common/schemas/timer.ts`), and its carousel item in `timerTriggers` (`src/common/util/timer.ts`)
+   - a field in the `seconds` and `names` groups of `TimerSettingsSchema` (`src/common/schemas/timer.ts`), its automatic name as `timer.names.<field>` in the locale files, and its carousel item in `timerTriggers` (`src/common/util/timer.ts`)
    - its row in `TRIGGERS` (`src/renderer/src/pages/Tools/helper.ts`)
 
    See `.claude/rules/timer.md`.

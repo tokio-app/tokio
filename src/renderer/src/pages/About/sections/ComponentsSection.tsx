@@ -1,4 +1,5 @@
 import { Btn, Section } from "@/components";
+import { useT } from "@/ui/i18n";
 import { FiExternalLink, FiFileText, FiPackage } from "react-icons/fi";
 import styles from "../about.module.css";
 import { COMPONENTS } from "../helper";
@@ -8,11 +9,12 @@ type Props = {
 };
 
 export function ComponentsSection({ onView }: Props) {
+  const t = useT();
   return (
     <Section
       icon={<FiPackage />}
-      title="Third-party components"
-      description="Code and assets included in Tokio that don't come from an npm package."
+      title={t("about.components.title")}
+      description={t("about.components.description")}
     >
       <div className={styles.list}>
         {COMPONENTS.map(({ name, author, license, url, note, doc }) => (
@@ -30,14 +32,14 @@ export function ComponentsSection({ onView }: Props) {
               href={url}
               target="_blank"
               rel="noreferrer"
-              title="Website"
+              title={t("about.components.website")}
             >
               <FiExternalLink size={18} />
             </a>
             {doc && (
               <Btn
                 variant="icon"
-                title="View license"
+                title={t("about.viewLicense")}
                 onClick={() => onView(doc)}
               >
                 <FiFileText size={18} />

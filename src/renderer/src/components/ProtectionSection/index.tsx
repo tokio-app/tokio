@@ -1,5 +1,6 @@
 import { Profile } from "@/common/schemas";
 import { Updater } from "@/hooks/useImmerState";
+import { useT } from "@/ui/i18n";
 import { ReactNode } from "react";
 import { NumberInput } from "../Elements";
 import { Field, FormGrid, Section } from "../Page";
@@ -13,8 +14,8 @@ type Protection = Pick<
 interface Props {
   protection: Protection;
   update: Updater<Protection>;
-  // Feature name shown in the description
-  feature: "TTS" | "Music";
+  // Feature name shown in the description, in the window's language
+  feature: string;
   // More fields, after the shared ones
   children?: ReactNode;
 }
@@ -25,13 +26,17 @@ export function ProtectionSection({
   feature,
   children,
 }: Props) {
+  const t = useT();
   return (
     <Section
-      title="Protection"
-      description={`Limits that keep chat from flooding ${feature}.`}
+      title={t("components.protection.title")}
+      description={t("components.protection.description", { feature })}
     >
       <FormGrid>
-        <Field label="Cooldown" hint="(seconds)">
+        <Field
+          label={t("components.protection.cooldown")}
+          hint={t("components.protection.cooldownHint")}
+        >
           <NumberInput
             min={0}
             value={protection.cooldown}
@@ -42,7 +47,7 @@ export function ProtectionSection({
             }
           />
         </Field>
-        <Field label="Max Queue Length">
+        <Field label={t("common.maxQueueLength")}>
           <NumberInput
             min={1}
             integer

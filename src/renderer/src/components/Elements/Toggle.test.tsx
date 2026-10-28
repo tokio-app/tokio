@@ -9,14 +9,14 @@ describe("Toggle", () => {
     const changes: boolean[] = [];
     render(
       <Toggle
-        label="Play alerts simultaneously"
+        label="Play alerts at the same time"
         checked
         onChange={(e) => changes.push(e.target.checked)}
       />,
     );
 
     const toggle = screen.getByRole("checkbox", {
-      name: "Play alerts simultaneously",
+      name: "Play alerts at the same time",
     });
     expect(toggle).toBeChecked();
 

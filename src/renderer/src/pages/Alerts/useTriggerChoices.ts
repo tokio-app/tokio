@@ -1,6 +1,7 @@
 import { SavedEmote } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, CustomGift } from "@/common/types";
 import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useLanguage } from "@/ui/i18n";
 import { useMemo, useState } from "react";
 import { emoteOptions, giftOptions } from "./helper";
 
@@ -10,6 +11,7 @@ import { emoteOptions, giftOptions } from "./helper";
  * connected.
  */
 export function useTriggerChoices() {
+  const language = useLanguage();
   const [gifts, setGifts] = useState<CustomGift[]>([]);
   // Gifts seen in LIVEs that TikTok's list doesn't have
   const [customGifts, setCustomGifts] = useState<CustomGift[]>([]);
@@ -35,7 +37,10 @@ export function useTriggerChoices() {
     () => giftOptions(gifts, customGifts),
     [gifts, customGifts],
   );
-  const emoteChoices = useMemo(() => emoteOptions(emotes), [emotes]);
+  const emoteChoices = useMemo(
+    () => emoteOptions(emotes, language),
+    [emotes, language],
+  );
 
   return { giftChoices, emoteChoices, emotes, setEmotes };
 }

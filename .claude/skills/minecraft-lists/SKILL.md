@@ -6,7 +6,7 @@ argument-hint: "<bedrock|java> [version]"
 
 # Regenerate the Minecraft lists
 
-`src/common/games/minecraft-bedrock.json` and `minecraft-java.json` hold every mob and item each edition's `summon` and `give` take: `{ mobs, items }`, id → the game's English name, sorted by name. They feed `MINECRAFT_NAMES` (`src/common/util/games.ts`), and through it the Games page's pickers (`MOBS`, `ITEMS`) and the overlay's names. See `.claude/rules/games.md`.
+`src/common/games/minecraft-bedrock.json` and `minecraft-java.json` hold every mob and item each edition's `summon` and `give` take: `{ mobs, items }`, id → the game's English name, sorted by name. They feed `MINECRAFT_NAMES` (`src/common/util/games.ts`), and through it the Games page's pickers (`MOBS`, `ITEMS`) and the overlay's names. See `.claude/rules/games.md`. The names stay English in every app language: they're also how `withEdition` matches ids, and they aren't in the locale files.
 
 ## Bedrock
 

@@ -1,3 +1,4 @@
+import { MessageKey, Params, translate } from "@/common/i18n";
 import { UpdateStatus } from "@/common/types";
 import { REPOSITORY_URL } from "@/common/util";
 
@@ -120,23 +121,29 @@ export function resolveNoticeLink(href: string): LinkTarget | null {
 }
 
 /** What the About page says about updates. */
-export function updateText(status: UpdateStatus): string {
+export function updateText(status: UpdateStatus, language: string): string {
+  const t = (key: MessageKey, params?: Params) =>
+    translate(language, key, params);
   switch (status.state) {
     case "idle":
-      return "Tokio hasn't checked for updates yet.";
+      return t("about.update.idle");
     case "unsupported":
-      return "Updates aren't available in this build.";
+      return t("about.update.unsupported");
     case "checking":
-      return "Checking for updates…";
+      return t("about.update.checking");
     case "none":
-      return "Tokio is up to date.";
+      return t("about.update.none");
     case "available":
-      return status.manual
-        ? `Tokio ${status.version} is available. Download it from the release page.`
-        : `Tokio ${status.version} is available.`;
+      return t(
+        status.manual ? "about.update.manual" : "about.update.available",
+        { version: status.version },
+      );
     case "downloading":
-      return `Downloading Tokio ${status.version}… ${status.percent}%`;
+      return t("about.update.downloading", {
+        version: status.version,
+        percent: String(status.percent),
+      });
     default:
-      return `Tokio ${status.version} is ready to install.`;
+      return t("about.update.ready", { version: status.version });
   }
 }

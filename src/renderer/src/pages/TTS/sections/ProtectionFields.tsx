@@ -1,6 +1,7 @@
 import { Profile } from "@/common/schemas";
 import { Field, FormGrid, ListTextarea, NumberInput } from "@/components";
 import { Updater } from "@/hooks";
+import { useT } from "@/ui/i18n";
 
 type Protection = Profile["tts"]["protection"];
 
@@ -13,10 +14,14 @@ interface Props {
  * TTS only protection settings, shown under the shared ones.
  */
 export function ProtectionFields({ protection, update }: Props) {
+  const t = useT();
   return (
     <>
       <FormGrid>
-        <Field label="Max Comment Length" hint="(characters)">
+        <Field
+          label={t("tts.protection.commentLength")}
+          hint={t("tts.protection.characters")}
+        >
           <NumberInput
             min={1}
             integer
@@ -30,9 +35,12 @@ export function ProtectionFields({ protection, update }: Props) {
         </Field>
       </FormGrid>
 
-      <Field label="Banned Words Filter" hint="(comma separated)">
+      <Field
+        label={t("tts.protection.banned")}
+        hint={t("tts.protection.commaSeparated")}
+      >
         <ListTextarea
-          placeholder="word1, word2, word3..."
+          placeholder={t("tts.protection.bannedPlaceholder")}
           value={protection.banned}
           onChange={(banned) =>
             update((p) => {

@@ -4,11 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import { RadioGroup } from "./RadioGroup";
 
 const OPTIONS = [
-  { value: "any", label: "Read All Comments" },
+  { value: "any", label: "Read all messages" },
   {
     value: "dot",
-    label: "Dot Prefix",
-    description: "Only messages starting with a period will be read.",
+    label: "Dot prefix",
+    description: "Reads only messages that start with a period.",
   },
 ] as const;
 
@@ -24,11 +24,11 @@ describe("RadioGroup", () => {
     );
 
     expect(
-      screen.getByRole("radio", { name: "Read All Comments" }),
+      screen.getByRole("radio", { name: "Read all messages" }),
     ).not.toBeChecked();
-    expect(screen.getByRole("radio", { name: /Dot Prefix/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Dot prefix/ })).toBeChecked();
     expect(
-      screen.getByText("Only messages starting with a period will be read."),
+      screen.getByText("Reads only messages that start with a period."),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("radio")).toHaveLength(2);
   });
@@ -45,8 +45,8 @@ describe("RadioGroup", () => {
       />,
     );
 
-    await user.click(screen.getByText("Read All Comments"));
-    await user.click(screen.getByText("Dot Prefix"));
+    await user.click(screen.getByText("Read all messages"));
+    await user.click(screen.getByText("Dot prefix"));
 
     expect(onChange).toHaveBeenCalledExactlyOnceWith("any");
   });

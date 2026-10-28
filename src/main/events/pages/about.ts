@@ -30,7 +30,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.ABOUT_LOAD_FAILED,
-      message: "Unable to load the open-source licenses.",
+      message: "main.failure.getAbout",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.GET_ABOUT),
   },
@@ -51,7 +51,7 @@ events.push(
   {
     failure: {
       code: FEEDBACK_CODES.LICENSE_LOAD_FAILED,
-      message: "Unable to read the license.",
+      message: "main.failure.getLicenseText",
     },
     onError: (e, error, { id }) =>
       e.reply(APP_EVENTS_RESPONSE.GET_LICENSE_TEXT, {
