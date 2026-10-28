@@ -1,6 +1,7 @@
 import { PackageLicense } from "@/common/types";
 import { Btn, EmptyState, Input, Section, Spinner } from "@/components";
 import { cx } from "@/helper/cx";
+import { useT } from "@/ui/i18n";
 import { useMemo, useState } from "react";
 import { FiBox, FiExternalLink, FiFileText } from "react-icons/fi";
 import styles from "../about.module.css";
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function PackagesSection({ packages, failed, onView }: Props) {
+  const t = useT();
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -27,15 +29,15 @@ export function PackagesSection({ packages, failed, onView }: Props) {
   return (
     <Section
       icon={<FiBox />}
-      title="Open-source packages"
+      title={t("about.packages.title")}
       description={
         packages
-          ? `The ${packages.length} npm packages shipped with Tokio and their licenses. Copyleft licenses are listed first.`
-          : "The npm packages shipped with Tokio and their licenses."
+          ? t("about.packages.count", { count: packages.length })
+          : t("about.packages.description")
       }
     >
       {failed ? (
-        <EmptyState>The package list couldn&apos;t be loaded.</EmptyState>
+        <EmptyState>{t("about.packages.failed")}</EmptyState>
       ) : !packages ? (
         <div className={styles.loading}>
           <Spinner size={24} />
@@ -43,13 +45,13 @@ export function PackagesSection({ packages, failed, onView }: Props) {
       ) : (
         <>
           <Input
-            placeholder="Search by name or license"
+            placeholder={t("about.packages.search")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           {filtered.length === 0 ? (
             <EmptyState>
-              No package matches &quot;{query.trim()}&quot;.
+              {t("about.packages.noMatch", { query: query.trim() })}
             </EmptyState>
           ) : (
             <div className={cx(styles.list, styles.list_scroll)}>
@@ -76,14 +78,14 @@ export function PackagesSection({ packages, failed, onView }: Props) {
                       href={pkg.url}
                       target="_blank"
                       rel="noreferrer"
-                      title="Repository"
+                      title={t("about.packages.repository")}
                     >
                       <FiExternalLink size={18} />
                     </a>
                   )}
                   <Btn
                     variant="icon"
-                    title="View license"
+                    title={t("about.viewLicense")}
                     onClick={() => onView(pkg.id)}
                   >
                     <FiFileText size={18} />
