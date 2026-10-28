@@ -15,6 +15,7 @@ import {
   StoreZodSchema,
   TestOverlay,
 } from "@/common/schemas";
+import type { MessageKey } from "@/common/i18n";
 import { Emotes } from "@/common/types";
 import {
   AUDIO_EXTENSIONS,
@@ -26,6 +27,7 @@ import {
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
 import { writeFileAtomic } from "@/helper/fs";
+import { t } from "@/helper/i18n";
 import { isInside } from "@/helper/path";
 import { track } from "@/helper/quit";
 import Logger from "@/logger";
@@ -141,13 +143,13 @@ export class StoreManagerService extends Service {
           soundsFolder,
           AUDIO_EXTENSIONS,
           alerts.map((alert) => alert.sound),
-          "Recovered sound",
+          "main.store.recoveredSound",
         );
         data.settings.media = await this._findFiles(
           mediaFolder,
           MEDIA_EXTENSIONS,
           alerts.map((alert) => alert.media),
-          "Recovered media",
+          "main.store.recoveredMedia",
         );
         data.settings.minecraftPictures = await this._findFiles(
           minecraftFolder,
@@ -155,7 +157,7 @@ export class StoreManagerService extends Service {
           profiles.flatMap(({ profile }) =>
             profile.games.actions.map((action) => action.overlay.image),
           ),
-          "Recovered picture",
+          "main.store.recoveredPicture",
         );
         this._rebuilt = true;
         await this._jsonManagerService.saveFile(
@@ -263,7 +265,7 @@ export class StoreManagerService extends Service {
     folder: string,
     extensions: string[],
     used: (AlertSound | null)[],
-    label: string,
+    label: MessageKey,
   ): Promise<AlertSound[]> {
     const files = new Set(
       (await readdir(folder).catch(() => []))
@@ -282,7 +284,10 @@ export class StoreManagerService extends Service {
     let unnamed = 0;
     for (const file of files) {
       if (!found.has(file)) {
-        found.set(file, { name: `${label} ${++unnamed}`, file });
+        found.set(file, {
+          name: t(label, { number: String(++unnamed) }),
+          file,
+        });
       }
     }
 
@@ -870,7 +875,7 @@ export class StoreManagerService extends Service {
     const trimmed = data.name.trim();
     const name = this._freeProfileName(
       trimmed.length < (ProfileSchema.shape.name.minLength ?? 1)
-        ? "Imported profile"
+        ? t("main.store.importedProfile")
         : trimmed,
     );
     const saved = await this._jsonManagerService.saveFile(

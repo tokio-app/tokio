@@ -1,6 +1,7 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import config from "@/config";
 import { Notifier } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 import {
   isOverlayURL,
   openLinksOutside,
@@ -183,8 +184,11 @@ export class AppHandler implements AppHandlerVariables {
   private stillRunningNotice() {
     if (!Notification.isSupported()) return;
     const notice = (this._stillRunning = new Notification({
-      title: "Tokio is still running",
-      body: "Click here to show it. To quit when you close it, turn off Settings → Tray.",
+      title: t("main.app.stillRunning.title"),
+      body: t("main.app.stillRunning.body", {
+        settings: t("nav.settings"),
+        tray: t("settings.tray.title"),
+      }),
     }));
     notice.on("click", () => this.bringToFront());
     notice.show();

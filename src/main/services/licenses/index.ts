@@ -1,5 +1,7 @@
+import type { MessageKey } from "@/common/i18n";
 import { LicenseDocument, LicenseText, PackageLicense } from "@/common/types";
 import { formatError } from "@/common/util";
+import { t } from "@/helper/i18n";
 import Logger from "@/logger";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
@@ -7,31 +9,32 @@ import { dirname, join, resolve } from "node:path";
 import { Service, type ServiceResult } from "../shared";
 
 // Shipped by electron-builder.yml (extraResources), same layout as the repo.
-const DOCUMENTS: (LicenseDocument & { file: string })[] = [
-  { id: "tokio", title: "Tokio (MIT License)", file: "LICENSE" },
+// Titles are keys, translated when they're read.
+const DOCUMENTS: (LicenseDocument & { title: MessageKey; file: string })[] = [
+  { id: "tokio", title: "main.licenses.tokio", file: "LICENSE" },
   {
     id: "notices",
-    title: "Third-party notices",
+    title: "main.licenses.notices",
     file: "THIRD_PARTY_NOTICES.md",
   },
   {
     id: "LGPL-3.0",
-    title: "GNU Lesser General Public License v3.0",
+    title: "main.licenses.lgpl3",
     file: "LICENSES/LGPL-3.0.txt",
   },
   {
     id: "GPL-3.0",
-    title: "GNU General Public License v3.0",
+    title: "main.licenses.gpl3",
     file: "LICENSES/GPL-3.0.txt",
   },
   {
     id: "Apache-2.0",
-    title: "Apache License 2.0",
+    title: "main.licenses.apache2",
     file: "LICENSES/Apache-2.0.txt",
   },
   {
     id: "CC-BY-4.0",
-    title: "Creative Commons Attribution 4.0",
+    title: "main.licenses.ccBy4",
     file: "LICENSES/CC-BY-4.0.txt",
   },
 ];
@@ -59,7 +62,7 @@ export class LicensesService extends Service {
   }
 
   public getDocuments(): LicenseDocument[] {
-    return DOCUMENTS.map(({ id, title }) => ({ id, title }));
+    return DOCUMENTS.map(({ id, title }) => ({ id, title: t(title) }));
   }
 
   /** Production dependencies, copyleft first. Scanned once. */
@@ -95,7 +98,7 @@ export class LicensesService extends Service {
         const markdown = doc.file.endsWith(".md");
         return {
           success: true,
-          data: { id, title: doc.title, text, markdown },
+          data: { id, title: t(doc.title), text, markdown },
         };
       }
 
@@ -104,7 +107,7 @@ export class LicensesService extends Service {
 
       const title = `${pkg.name} ${pkg.version} (${pkg.license})`;
       if (pkg.files.length === 0) {
-        const text = `This package doesn't include a license file. Its package.json declares the license: ${pkg.license}.`;
+        const text = t("main.licenses.noFile", { license: pkg.license });
         return { success: true, data: { id, title, text } };
       }
 
