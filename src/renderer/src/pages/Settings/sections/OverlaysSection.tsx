@@ -3,8 +3,7 @@ import { Btn, EmptyState, RemoveOverlayModal, Section } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
-import { FiTrash2 } from "react-icons/fi";
-import { LuPackagePlus } from "react-icons/lu";
+import { FiTrash2, FiUpload } from "react-icons/fi";
 import { VscPackage } from "react-icons/vsc";
 import styles from "../settings.module.css";
 
@@ -40,7 +39,7 @@ export function OverlaysSection() {
             title={t("common.import")}
             onClick={() => window.api.emit(APP_EVENTS.IMPORT_OVERLAY)}
           >
-            <LuPackagePlus size={20} />
+            <FiUpload size={20} />
           </Btn>
         }
       >

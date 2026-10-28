@@ -75,9 +75,11 @@
 
 /* ASIDE: the header in a column on the left, the content on the right */
 
+/* Wide enough for the longest title with an icon and a button, Spanish's
+   "Biblioteca de overlays" */
 .page_aside .section {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 264px minmax(0, 1fr);
   align-items: start;
   column-gap: var(--space-10);
 }
