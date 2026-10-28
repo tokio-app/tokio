@@ -666,6 +666,21 @@ describe("init events", () => {
         ],
       ]);
     });
+
+    it("names the trigger in the user's language, and in English in the log", async () => {
+      const { s, callback } = await onFailure();
+      setLanguage("es-419");
+
+      callback(alert({ tts: speech }), "Engine down");
+
+      expect(s.h.notices[0].message).toContain("Seguir");
+      expect(logError.mock.calls).toEqual([
+        [
+          "<Alerts> Unable to speak the Follow alert -- Engine down",
+          "alerts.log",
+        ],
+      ]);
+    });
   });
 
   describe("games", () => {

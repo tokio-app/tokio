@@ -1,3 +1,4 @@
+import { DEFAULT_LANGUAGE, translate } from "@/common/i18n";
 import { ALERT_TRIGGERS, AppSettings } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
@@ -138,6 +139,11 @@ const registerConnectorEvents = ({
       },
       (alert, error) => {
         const label = t(ALERT_TRIGGER_LABELS[alert.trigger.type]);
+        // Logs stay English
+        const logged = translate(
+          DEFAULT_LANGUAGE,
+          ALERT_TRIGGER_LABELS[alert.trigger.type],
+        );
         const options = {
           key: `alert:${alert.id}`,
           windowMs: REPEAT_NOTICE_MS,
@@ -154,7 +160,7 @@ const registerConnectorEvents = ({
             )
           ) {
             Logger.error(
-              `<Alerts> Unable to speak the ${label} alert -- ${error}`,
+              `<Alerts> Unable to speak the ${logged} alert -- ${error}`,
               paths.files.logs.alerts,
             );
           }
@@ -170,7 +176,7 @@ const registerConnectorEvents = ({
           )
         ) {
           Logger.warn(
-            `<Alerts> The sound of the ${label} alert is missing -- ${error}`,
+            `<Alerts> The sound of the ${logged} alert is missing -- ${error}`,
             paths.files.logs.alerts,
           );
         }
@@ -472,6 +478,11 @@ const registerGames = (handler: AppHandlerVariables) => {
   // Logged once per notice, as they can repeat on every event
   games.onError((action, { offline, full, message }) => {
     const label = t(ALERT_TRIGGER_LABELS[action.trigger.type]);
+    // Logs stay English
+    const logged = translate(
+      DEFAULT_LANGUAGE,
+      ALERT_TRIGGER_LABELS[action.trigger.type],
+    );
     if (full) {
       if (
         notifier.warn(
@@ -482,7 +493,7 @@ const registerGames = (handler: AppHandlerVariables) => {
         )
       ) {
         Logger.warn(
-          `<Games> The ${label} action has ${MAX_BACKLOG} runs waiting, new ones are skipped.`,
+          `<Games> The ${logged} action has ${MAX_BACKLOG} runs waiting, new ones are skipped.`,
           paths.files.logs.games,
         );
       }
@@ -505,7 +516,7 @@ const registerGames = (handler: AppHandlerVariables) => {
         )
       ) {
         Logger.warn(
-          `<Games> The ${label} action didn't run, ${game} isn't connected.`,
+          `<Games> The ${logged} action didn't run, ${game} isn't connected.`,
           paths.files.logs.games,
         );
       }
@@ -518,7 +529,7 @@ const registerGames = (handler: AppHandlerVariables) => {
       )
     ) {
       Logger.warn(
-        `<Games> A command of the ${label} action failed -- ${message}`,
+        `<Games> A command of the ${logged} action failed -- ${message}`,
         paths.files.logs.games,
       );
     }
