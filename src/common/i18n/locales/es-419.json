@@ -47,6 +47,7 @@
   "common.durationSeconds": "Duración en segundos",
   "common.maxQueueLength": "Largo máximo de la cola",
   "common.fontsNote": "Fuentes instaladas en la computadora donde está tu app de streaming.",
+  "common.defaultFont": "Archivo (predeterminada)",
   "list.more#one": "{count} más",
   "list.more#other": "{count} más",
   "nav.home": "Inicio",

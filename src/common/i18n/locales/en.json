@@ -47,6 +47,7 @@
   "common.durationSeconds": "Duration in seconds",
   "common.maxQueueLength": "Max queue length",
   "common.fontsNote": "Fonts installed on the computer with your streaming app.",
+  "common.defaultFont": "Archivo",
   "list.more#one": "{count} more",
   "list.more#other": "{count} more",
   "nav.home": "Home",

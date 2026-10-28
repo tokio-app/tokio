@@ -277,7 +277,7 @@ export function OverlaySection({
             <Field label={t("games.overlay.font")}>
               <Input
                 maxLength={60}
-                placeholder="Archivo"
+                placeholder={t("common.defaultFont")}
                 value={look.font}
                 onChange={(e) => {
                   const font = e.target.value;

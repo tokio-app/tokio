@@ -257,7 +257,7 @@ function TimerLookSection({ settings, update }: SectionProps) {
         <Field label={t("tools.look.clockFont")}>
           <Input
             maxLength={60}
-            placeholder="Archivo"
+            placeholder={t("common.defaultFont")}
             value={look.clock_font}
             onChange={(e) => {
               const font = e.target.value;
@@ -270,7 +270,7 @@ function TimerLookSection({ settings, update }: SectionProps) {
         <Field label={t("tools.look.titleFont")}>
           <Input
             maxLength={60}
-            placeholder="Archivo"
+            placeholder={t("common.defaultFont")}
             value={look.title_font}
             onChange={(e) => {
               const font = e.target.value;
