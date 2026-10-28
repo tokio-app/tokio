@@ -11,11 +11,13 @@ import {
   useIpcListener,
   useIpcRequest,
 } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { ControlsSection } from "./sections/ControlsSection";
 import { ProviderSection } from "./sections/ProviderSection";
 
 export function Music() {
+  const t = useT();
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -62,8 +64,8 @@ export function Music() {
         update={scopeUpdater(update, "protection")}
       >
         <Check
-          label="One request per viewer"
-          title="A viewer can request another song once theirs plays, and a song already playing or waiting isn't added again."
+          label={t("music.protection.onePerViewer")}
+          title={t("music.protection.onePerViewerHint")}
           checked={settings.protection.one_per_viewer}
           onChange={(e) =>
             update((s) => {
@@ -72,8 +74,8 @@ export function Music() {
           }
         />
         <Check
-          label="Limit Next, Last and Revoke"
-          title="Next and Last work for the host and moderators, who can revoke any song. Viewers can skip a song they asked for while it plays, and revoke their own requests."
+          label={t("music.protection.limitControls")}
+          title={t("music.protection.limitControlsHint")}
           checked={settings.protection.limit_controls}
           onChange={(e) =>
             update((s) => {

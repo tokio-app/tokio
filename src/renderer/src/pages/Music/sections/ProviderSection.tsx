@@ -2,6 +2,7 @@ import { Profile } from "@/common/schemas";
 import { Btn, Field, Input, Section, Tabs } from "@/components";
 import { cx } from "@/helper";
 import { Updater } from "@/hooks";
+import { rich, useT } from "@/ui/i18n";
 import { FaSpotify, FaYoutube } from "react-icons/fa";
 import styles from "../music.module.css";
 
@@ -42,16 +43,27 @@ export function ProviderSection({
   loading,
   onConnect,
 }: Props) {
+  const t = useT();
   const isSpotify = provider.name === "Spotify";
   const missingKey = isSpotify && provider.key === "";
 
   return (
-    <Section title="Provider" description="Where requested songs play.">
+    <Section
+      title={t("music.provider.title")}
+      description={t("music.provider.description")}
+    >
       <div className={styles.status}>
-        Status:{" "}
-        <span className={cx(connected && styles.status_connected)}>
-          {connected ? "Connected" : "Disconnected"}
-        </span>
+        {rich(t("music.provider.status"), {
+          status: (
+            <span className={cx(connected && styles.status_connected)}>
+              {t(
+                connected
+                  ? "music.provider.connected"
+                  : "music.provider.disconnected",
+              )}
+            </span>
+          ),
+        })}
       </div>
 
       <Tabs
@@ -76,12 +88,12 @@ export function ProviderSection({
         aria-hidden={!isSpotify || undefined}
       >
         <div className={styles.expandable_content}>
-          <Field label="Spotify Client ID">
+          <Field label={t("music.provider.spotifyKey")}>
             <Input
               type="password"
               tabIndex={isSpotify ? undefined : -1}
               className={styles.key_input}
-              placeholder="Enter your Spotify Client ID..."
+              placeholder={t("music.provider.spotifyKeyPlaceholder")}
               value={provider.key}
               disabled={connected}
               onChange={(e) =>
@@ -102,7 +114,9 @@ export function ProviderSection({
           disabled={missingKey}
           onClick={onConnect}
         >
-          {connected ? "Disconnect" : "Connect"}
+          {t(
+            connected ? "music.provider.disconnect" : "music.provider.connect",
+          )}
         </Btn>
       </div>
     </Section>
