@@ -59,7 +59,7 @@ describe("emoteOptions", () => {
       { id: "e2", image: "https://example.com/e2.png" },
     ];
 
-    expect(emoteOptions(emotes)).toEqual([
+    expect(emoteOptions(emotes, "en")).toEqual([
       { value: "e1", label: "Emote 1", img: "https://example.com/e1.png" },
       { value: "e2", label: "Emote 2", img: "https://example.com/e2.png" },
     ]);

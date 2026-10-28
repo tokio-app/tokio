@@ -4,6 +4,7 @@ import { cutPart, formatAdded } from "@/common/util";
 import { Btn, NumberInput, Spinner } from "@/components";
 import { cx } from "@/helper";
 import { useAudio, useIpcListener } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import {
   KeyboardEvent,
   PointerEvent,
@@ -50,6 +51,7 @@ type Props = {
  * part that plays, and their seconds.
  */
 export function SoundCut({ sound, playing, play, onChange }: Props) {
+  const t = useT();
   const { decode } = useAudio();
   const { file } = sound;
   const [audio, setAudio] = useState<{
@@ -110,7 +112,7 @@ export function SoundCut({ sound, playing, play, onChange }: Props) {
   return (
     <div className={styles.cut}>
       {failed === file ? (
-        <p className={styles.error}>Couldn't read this sound.</p>
+        <p className={styles.error}>{t("alerts.cut.readFailed")}</p>
       ) : (
         <div className={styles.wave_loading}>
           <Spinner />
@@ -129,12 +131,13 @@ export function ResetCut({
   cut: Cut;
   onChange: (cut: Cut) => void;
 }) {
+  const t = useT();
   return (
     <Btn
       disabled={cut.start === 0 && cut.end === null}
       onClick={() => onChange({ start: 0, end: null })}
     >
-      Reset cut
+      {t("alerts.cut.reset")}
     </Btn>
   );
 }
@@ -164,6 +167,7 @@ export function CutTrack({
   onChange,
   onSeek,
 }: CutTrackProps) {
+  const t = useT();
   const box = useRef<HTMLDivElement>(null);
   const handles = useRef<Record<Handle, HTMLDivElement | null>>({
     start: null,
@@ -237,11 +241,11 @@ export function CutTrack({
       }}
       role="slider"
       tabIndex={0}
-      aria-label={handle === "start" ? "Start" : "End"}
+      aria-label={t(handle === "start" ? "alerts.cut.start" : "alerts.cut.end")}
       aria-valuemin={round(min)}
       aria-valuemax={round(max)}
       aria-valuenow={round(value)}
-      aria-valuetext={`${round(value)} seconds`}
+      aria-valuetext={t("alerts.cut.seconds", { count: round(value) })}
       className={styles.handle}
       style={{ left: percent(value) }}
       onKeyDown={(e) => onKeyDown(e, handle, value)}
@@ -307,7 +311,7 @@ export function CutTrack({
 
       <div className={styles.cut_fields}>
         <label className={styles.inline}>
-          Start
+          {t("alerts.cut.start")}
           <NumberInput
             className={styles.number}
             step={0.1}
@@ -318,7 +322,7 @@ export function CutTrack({
           />
         </label>
         <label className={styles.inline}>
-          End
+          {t("alerts.cut.end")}
           <NumberInput
             className={styles.number}
             step={0.1}
@@ -329,7 +333,10 @@ export function CutTrack({
           />
         </label>
         <span className={styles.note}>
-          Plays {seconds(stop - start)} of {seconds(duration)}
+          {t("alerts.cut.plays", {
+            part: seconds(stop - start),
+            length: seconds(duration),
+          })}
         </span>
         {actions}
       </div>

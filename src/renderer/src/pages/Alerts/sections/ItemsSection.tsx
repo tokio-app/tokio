@@ -3,6 +3,7 @@ import { CustomGift } from "@/common/types";
 import { alertName } from "@/common/util";
 import { AlertItem, EmoteOption, EmptyState, TestState } from "@/components";
 import { AlertTestRequest, Updater } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import styles from "../alerts.module.css";
 
 type Props = {
@@ -29,6 +30,7 @@ export function ItemsSection({
   update,
   onEdit,
 }: Props) {
+  const t = useT();
   const needle = search.trim().toLowerCase();
   // Each keeps its place in the list, which its default name counts
   const shown = items
@@ -41,9 +43,7 @@ export function ItemsSection({
     <div className={styles.items}>
       {shown.length === 0 ? (
         <EmptyState>
-          {items.length > 0
-            ? "No alerts found."
-            : "No alerts yet. Use the add button to create one."}
+          {t(items.length > 0 ? "alerts.items.notFound" : "alerts.items.empty")}
         </EmptyState>
       ) : (
         shown.map(({ alert, index }) => (
