@@ -38,7 +38,7 @@ export function ProvidersSection({ settings }: Props) {
       <FormGrid>
         <ProviderForm
           type="connector"
-          label="settings.providers.connector"
+          labelKey="settings.providers.connector"
           providers={settings.providers.connector}
           active={settings.activeConnProvider}
         />
@@ -49,13 +49,13 @@ export function ProvidersSection({ settings }: Props) {
 
 interface FormProps {
   type: "connector";
-  label: MessageKey;
+  labelKey: MessageKey;
   providers: AppProvider[];
   active: AppProvider;
 }
 
 // Saved as it changes
-function ProviderForm({ type, label, providers, active }: FormProps) {
+function ProviderForm({ type, labelKey, providers, active }: FormProps) {
   const [provider, setProvider] = useAutosave(
     { name: active.name, key: active.key },
     ({ name, key }) =>
@@ -67,7 +67,7 @@ function ProviderForm({ type, label, providers, active }: FormProps) {
     <div className={styles.provider}>
       {/* Nothing to pick from with a single connector */}
       {providers.length > 1 && (
-        <Field label={t(label)}>
+        <Field label={t(labelKey)}>
           <Select
             options={providers.map((p) => ({ label: p.name, value: p.name }))}
             value={provider.name}
