@@ -94,6 +94,7 @@ Procedures live in `.claude/skills/<name>/SKILL.md`. Claude Code offers each one
 - `new-page`: add a page to the main window
 - `minecraft-lists`: regenerate the Minecraft mob and item lists
 - `frontend-design`: the visual direction for new or reshaped UI (Anthropic's skill, Apache-2.0, vendored as published)
+- `humanizer`: rewrite UI text, translations and docs that read as AI-written (blader/humanizer v3.1.0, MIT, vendored as published)
 
 When a procedure changes, update its skill with it.
 
