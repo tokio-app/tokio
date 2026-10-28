@@ -349,8 +349,9 @@ export const GameActionSchema = z.object({
   overlay: GameOverlayItemSchema.prefault({}),
 });
 
-// Every shown action at once, or one at a time in turn
-const GAMES_OVERLAY_LAYOUTS = ["list", "carousel"] as const;
+// Every shown action at once, top to bottom (list) or side by side
+// (horizontal), or one at a time in turn
+const GAMES_OVERLAY_LAYOUTS = ["list", "horizontal", "carousel"] as const;
 
 // The event, an arrow, then the action's picture; or the event's picture on
 // the corner of the action's, like a sticker
@@ -363,7 +364,8 @@ const GAMES_OVERLAY_SIZES = ["small", "medium", "large"] as const;
 export const GamesOverlaySchema = z.object({
   layout: z.enum(GAMES_OVERLAY_LAYOUTS).default("list"),
   format: z.enum(GAMES_OVERLAY_FORMATS).default("arrow"),
-  // Each column is its own overlay, at /games/minecraft/<column>/
+  // Each column (a row when horizontal) is its own overlay, at
+  // /games/minecraft/<column>/
   columns: ColumnSchema,
   // Hides the texts next to pictures; a side without one keeps its text
   pictures_only: z.boolean().default(false),

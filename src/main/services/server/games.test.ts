@@ -270,6 +270,21 @@ describe("games overlay", () => {
       expect(games.classList.contains("games-text-below")).toBe(false);
     });
 
+    it("lays the rows side by side with Horizontal, never one at a time", async () => {
+      send([row("a"), row("b")], { layout: "horizontal" });
+      const games = document().getElementById("games")!;
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-horizontal")).toBe(true),
+      );
+      expect(games.classList.contains("games-carousel")).toBe(false);
+
+      send([row("a"), row("b")], { layout: "carousel" });
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-carousel")).toBe(true),
+      );
+      expect(games.classList.contains("games-horizontal")).toBe(false);
+    });
+
     it("sizes the event's pictures", async () => {
       send([row("a")], { event_size: "large" });
       const games = document().getElementById("games")!;

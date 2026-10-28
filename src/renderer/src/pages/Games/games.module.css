@@ -538,3 +538,13 @@
   flex-shrink: 0;
   width: max-content;
 }
+
+/* Horizontal: each row's overlay under the last, as wide as the preview and
+   as tall as its strip, centered together */
+.preview_rows {
+  flex-direction: column;
+}
+
+.preview_rows .preview_column {
+  flex: none;
+}

@@ -79,6 +79,12 @@ In `src/main/helper/games.ts`:
 - There, a text with no picture beside it (`:last-child` on the event's side, `:first-child` on the result's, from the markup's order) stays on the pictures' line, and the sides and the arrow align to the top so the arrows stay on that line.
 - Those rules use `:not(.games-sticker)`, as Sticker's sides are `display: contents`.
 
+### Horizontal
+
+- The `layout` `"horizontal"` (`games-horizontal`) puts the rows side by side on one line, a strip like a hotbar: `.games-rows` is a flex row and each Arrow row its own grid (Sticker's already are), with a wider gap between rows than inside one so each reads as one recipe.
+- With **Text below pictures** the rows align to the top, so the pictures share a line.
+- It's a `layout`, so it can't be on with one at a time, which has no direction. "list" is the vertical one.
+
 ### Event picture sizes
 
 - **Event pictures** sizes the gifts, emotes and Tokio's sprites, not the action's picture: `games-event-medium` or `games-event-large` (Small has none) set `--games-event-scale`.
@@ -89,7 +95,9 @@ In `src/main/helper/games.ts`:
 
 - The rows panel is as wide as its rows need (`.overlay`'s `auto` track). The rows share one grid (each `li` a `subgrid`), so arrows line up while the event column is only as wide as its widest content.
 - With more than one column, each row gets a **Column** picker and the section gives one URL per column.
+- Horizontal calls them rows (**Rows**, a **Row** picker, "Copy row N's URL"). The saved `columns` and `column` and the URLs stay the same, so column 2 becomes row 2.
 - `OverlayPreview` draws the columns side by side, each shrunk to fit its share as the page fits its source (`--fit`, written to the style in a layout effect, so measuring doesn't render again).
+- Horizontal stacks the rows (`preview_rows`), and the section puts the preview above the builder's rows instead of in the side column, so a strip previews near its size on stream.
 
 ## Minecraft pictures library
 

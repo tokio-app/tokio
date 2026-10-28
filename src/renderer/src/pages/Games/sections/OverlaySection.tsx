@@ -47,6 +47,7 @@ import { OverlayPreview, PixelArrow, usePictureTurn } from "./OverlayPreview";
 
 const LAYOUTS: { value: GamesOverlayLayout; label: MessageKey }[] = [
   { value: "list", label: "games.overlay.layout.list" },
+  { value: "horizontal", label: "games.overlay.layout.horizontal" },
   { value: "carousel", label: "games.overlay.layout.carousel" },
 ];
 
@@ -114,6 +115,9 @@ export function OverlaySection({
   const setLook = scopeUpdater(update, "overlay");
   // Which of a row's gifts shows, all rows in step
   const pictureTurn = usePictureTurn();
+  // Side by side, the overlay splits into rows instead of columns
+  const horizontal = look.layout === "horizontal";
+  const preview = <OverlayPreview look={look} rows={rows} run={run} />;
 
   const setItem = (id: string, patch: Partial<GameOverlayItem>) =>
     update((s) => {
@@ -146,16 +150,18 @@ export function OverlaySection({
         <p className={styles.notice}>{t("games.overlay.serverOff")}</p>
       )}
 
-      {/* Each column is its own overlay, with its own URL */}
+      {/* Each column (or row) is its own overlay, with its own URL */}
       <Field label={t("games.overlay.urls", { count: look.columns })}>
         {look.columns > 1 ? (
           Array.from({ length: look.columns }, (_, i) => (
             <CopyField
               key={i}
               value={getMinecraftOverlayURL(i + 1)}
-              title={t("games.overlay.copyColumnURL", {
-                column: String(i + 1),
-              })}
+              title={
+                horizontal
+                  ? t("games.overlay.copyRowURL", { row: String(i + 1) })
+                  : t("games.overlay.copyColumnURL", { column: String(i + 1) })
+              }
             />
           ))
         ) : (
@@ -165,6 +171,9 @@ export function OverlaySection({
           />
         )}
       </Field>
+
+      {/* A strip previews across the section, near its size on stream */}
+      {horizontal && preview}
 
       <div className={styles.overlay}>
         <div className={styles.overlay_rows}>
@@ -183,6 +192,7 @@ export function OverlaySection({
                   key={action.id}
                   action={action}
                   columns={look.columns}
+                  horizontal={horizontal}
                   pictureTurn={pictureTurn}
                   gifts={gifts}
                   emotes={emotes}
@@ -195,7 +205,7 @@ export function OverlaySection({
         </div>
 
         <div className={styles.overlay_side}>
-          <OverlayPreview look={look} rows={rows} run={run} />
+          {!horizontal && preview}
 
           <div className={styles.look_choices}>
             <Field label={t("games.overlay.layout")} className={styles.layouts}>
@@ -223,7 +233,9 @@ export function OverlaySection({
               />
             </Field>
             <Field
-              label={t("games.overlay.columns")}
+              label={t(
+                horizontal ? "games.overlay.rowCount" : "games.overlay.columns",
+              )}
               className={styles.layouts}
             >
               <RadioGroup
@@ -312,8 +324,9 @@ export function OverlaySection({
 
 type RowProps = {
   action: GameAction;
-  // With more than one, the row picks its column
+  // With more than one, the row picks its column (a row, when horizontal)
   columns: number;
+  horizontal: boolean;
   pictureTurn: number;
   gifts: CustomGift[];
   emotes: SavedEmote[];
@@ -326,6 +339,7 @@ type RowProps = {
 function RecipeRow({
   action,
   columns,
+  horizontal,
   pictureTurn,
   gifts,
   emotes,
@@ -431,10 +445,14 @@ function RecipeRow({
       />
       {columns > 1 && (
         <Select
-          aria-label={t("games.overlay.column")}
+          aria-label={t(
+            horizontal ? "games.overlay.row" : "games.overlay.column",
+          )}
           options={Array.from({ length: columns }, (_, i) => ({
             value: i + 1,
-            label: t("games.overlay.columnN", { column: String(i + 1) }),
+            label: horizontal
+              ? t("games.overlay.rowN", { row: String(i + 1) })
+              : t("games.overlay.columnN", { column: String(i + 1) }),
           }))}
           // One past the columns shows in the last, as on stream
           value={Math.min(overlay.column, columns)}

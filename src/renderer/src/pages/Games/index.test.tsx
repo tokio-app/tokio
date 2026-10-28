@@ -721,7 +721,7 @@ describe("Games overlay", () => {
       .filter((li) => li.classList.contains("games-lit"))
       .map((li) => li.querySelector(".games-name")?.textContent);
   const testButton = () =>
-    screen.getByRole("button", { name: "Light up the next row" });
+    screen.getByRole("button", { name: "Light up the next action" });
 
   it("says when there are no actions, and has nothing to test", async () => {
     await load([]);
@@ -783,6 +783,56 @@ describe("Games overlay", () => {
       ].map((name) => name.textContent);
     expect(names(1)).toEqual(["TNT"]);
     expect(names(2)).toEqual(["Creeper"]);
+  });
+
+  it("lays the overlay side by side with Horizontal, split into rows previewed across the section", async () => {
+    const { user } = await load([
+      giftAction("a1", { overlay: { ...overlay, name: "TNT" } }),
+      likeAction("a2", { overlay: { ...overlay, name: "Creeper" } }),
+    ]);
+    await rose();
+
+    await user.click(
+      within(screen.getByRole("group", { name: "Layout" })).getByRole("radio", {
+        name: "Horizontal",
+      }),
+    );
+    // The columns are rows now
+    expect(screen.queryByRole("group", { name: "Columns" })).toBeNull();
+    await user.click(
+      within(screen.getByRole("group", { name: "Rows" })).getByRole("radio", {
+        name: "2",
+      }),
+    );
+    await user.click(recipes()[1].getByRole("combobox", { name: "Row" }));
+    await user.click(inList(recipeElements()[1], "Row 2")!);
+    await wait(300);
+
+    expect(saves().at(-1)!.overlay).toMatchObject({
+      layout: "horizontal",
+      columns: 2,
+    });
+    expect(savedOverlays().map((o) => o.column)).toEqual([1, 2]);
+    for (const row of [1, 2]) {
+      expect(screen.getByTitle(`Copy row ${row}'s URL`)).toHaveTextContent(
+        `http://tokio-app.local:37891/games/minecraft/${row}/`,
+      );
+    }
+    const strip = (row: number) =>
+      screen.getByRole("list", { name: `Row ${row} of the overlay preview` });
+    const names = (row: number) =>
+      [...strip(row).querySelectorAll(".games-name")].map(
+        (name) => name.textContent,
+      );
+    expect(names(1)).toEqual(["TNT"]);
+    expect(names(2)).toEqual(["Creeper"]);
+    expect(strip(1).parentElement).toHaveClass("games", "games-horizontal");
+    // Above the builder's rows, as wide as the section
+    expect(
+      strip(1).compareDocumentPosition(
+        screen.getByRole("list", { name: "Actions on the overlay" }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("lists a row per action: the event's pictures or text, then its picture", async () => {

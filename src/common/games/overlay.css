@@ -388,6 +388,34 @@
   margin-top: 0;
 }
 
+/* HORIZONTAL: the rows side by side on one line, a strip for the stream's
+   top or bottom, like a hotbar. Each row is its own grid, its sides in the
+   spine's columns. The gap between rows is wider than any inside one, so
+   each reads as one recipe. Sticker's rows are their own grids already. */
+.games-horizontal .games-rows {
+  display: flex;
+  align-items: center;
+  gap: 1.6em;
+}
+
+.games-horizontal:not(.games-sticker) .games-row {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto minmax(0, auto);
+  align-items: center;
+  column-gap: 0.45em;
+}
+
+/* Without names between them, the arrow's span would match the gap, so the
+   rows get more room */
+.games-horizontal.games-pictures-only:not(.games-sticker) .games-rows {
+  gap: 2.6em;
+}
+
+/* With the texts below, every row hangs from the pictures' line */
+.games-horizontal.games-text-below .games-rows {
+  align-items: flex-start;
+}
+
 /* ONE AT A TIME: every row in the same place, the current one shown. The
    columns fit the widest row, so nothing moves between turns. */
 .games-carousel .games-row > * {
