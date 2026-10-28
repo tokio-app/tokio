@@ -10,7 +10,7 @@ import { showOpenDialog, showSaveDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay } from "@/helper/games";
-import { language, setLanguage } from "@/helper/i18n";
+import { language, setLanguage, t } from "@/helper/i18n";
 import { StoreManagerService } from "@/services/store";
 import { TTSService } from "@/services/tts";
 import { ReplyEvent } from "@/types";
@@ -19,12 +19,15 @@ const events = createStack("system");
 
 const MIN_NAME = ProfileSchema.shape.name.minLength ?? 1;
 
+// What the file dialogs call each kind of entity
+const ENTITY_NAMES = { profile: "main.settings.entity.profile" } as const;
+
 // A shorter name would make the profile fail to load.
 const assertNameLong = (name: string) => {
   if (name.length < MIN_NAME) {
     throw new AppFailure(
       FEEDBACK_CODES.PROFILE_NAME_INVALID,
-      `A profile name needs at least ${MIN_NAME} characters.`,
+      t("main.settings.nameTooShort", { count: MIN_NAME }),
       { level: "warning" },
     );
   }
@@ -36,7 +39,7 @@ const assertNameFree = (store: StoreManagerService, name: string) => {
   if (store.getProfiles().some((p) => p.name.trim().toLowerCase() === wanted)) {
     throw new AppFailure(
       FEEDBACK_CODES.PROFILE_EXISTS,
-      `A profile named "${name}" already exists.`,
+      t("main.settings.nameTaken", { name }),
       { level: "warning" },
     );
   }
@@ -126,7 +129,7 @@ events.push(
     notifier.success(
       "system",
       FEEDBACK_CODES.PROFILE_CREATED,
-      `Profile "${name}" created.`,
+      t("main.settings.profileCreated", { name }),
     );
   },
   {
@@ -151,7 +154,7 @@ events.push(
     notifier.success(
       "system",
       FEEDBACK_CODES.PROFILE_CLONED,
-      `Profile "${name}" created as a copy.`,
+      t("main.settings.profileCloned", { name }),
     );
   },
   {
@@ -173,7 +176,7 @@ events.push(
     if (connectorService.isConnected()) {
       throw new AppFailure(
         FEEDBACK_CODES.PROFILE_LOCKED,
-        "Disconnect from the LIVE before switching profiles.",
+        t("main.settings.profileLocked"),
         { level: "warning" },
       );
     }
@@ -184,7 +187,7 @@ events.push(
     if (res === "missing") {
       throw new AppFailure(
         FEEDBACK_CODES.PROFILE_LOAD_FAILED,
-        "Unable to switch to that profile. Its file is missing or damaged.",
+        t("main.settings.profileMissing"),
       );
     }
     const profile = await storeManagerService.getProfileData();
@@ -202,7 +205,9 @@ events.push(
     notifier.success(
       "system",
       FEEDBACK_CODES.PROFILE_SWITCHED,
-      `Switched to the profile "${storeManagerService.getSettings().activeProfile.name}".`,
+      t("main.settings.profileSwitched", {
+        name: storeManagerService.getSettings().activeProfile.name,
+      }),
     );
     // The new profile's actions
     await sendGamesOverlay(services);
@@ -218,13 +223,14 @@ events.push(
 events.push(
   APP_EVENTS.EXPORT_ENTITY,
   async ({ storeManagerService, win, notifier }, e, { type, file }) => {
+    const name = t(ENTITY_NAMES[type]);
     const diagRes = await showSaveDialog(win, {
-      title: `Export ${type}`,
+      title: t("main.dialog.export", { type: name }),
       defaultPath: file,
       filters: [
         {
           extensions: ["json"],
-          name: type,
+          name,
         },
       ],
     });
@@ -242,7 +248,7 @@ events.push(
     notifier.success(
       "system",
       FEEDBACK_CODES.PROFILE_EXPORTED,
-      "Profile exported.",
+      t("main.settings.profileExported"),
     );
   },
   {
@@ -262,13 +268,14 @@ events.push(
 events.push(
   APP_EVENTS.IMPORT_ENTITY,
   async ({ storeManagerService, win, notifier }, e, { type }) => {
+    const name = t(ENTITY_NAMES[type]);
     const diagRes = await showOpenDialog(win, {
-      title: `Import ${type}`,
+      title: t("main.dialog.import", { type: name }),
       properties: ["openFile"],
       filters: [
         {
           extensions: ["json"],
-          name: type,
+          name,
         },
       ],
     });
@@ -293,7 +300,7 @@ events.push(
     notifier.success(
       "system",
       FEEDBACK_CODES.PROFILE_IMPORTED,
-      "Profile imported.",
+      t("main.settings.profileImported"),
     );
   },
   {
@@ -406,8 +413,8 @@ events.push(
       throw new AppFailure(
         FEEDBACK_CODES.SERVER_START_FAILED,
         enabled
-          ? `The overlay server couldn't start. Port ${SERVER_PORT} may be in use.`
-          : "Unable to stop the overlay server.",
+          ? t("main.settings.serverStartFailed", { port: String(SERVER_PORT) })
+          : t("main.settings.serverStopFailed"),
       );
     }
     if (!saved) throw saveFailure();
@@ -418,13 +425,13 @@ events.push(
       notifier.success(
         "server",
         FEEDBACK_CODES.SERVER_STARTED,
-        "The overlay server is on.",
+        t("main.settings.serverOn"),
       );
     } else {
       notifier.info(
         "server",
         FEEDBACK_CODES.SERVER_STOPPED,
-        "The overlay server is off.",
+        t("main.settings.serverOff"),
       );
     }
   },
@@ -452,13 +459,13 @@ events.push(
       notifier.success(
         "system",
         FEEDBACK_CODES.UPDATES_ENABLED,
-        "Tokio checks for updates automatically.",
+        t("main.settings.updatesOn"),
       );
     } else {
       notifier.info(
         "system",
         FEEDBACK_CODES.UPDATES_DISABLED,
-        "Automatic update checks are off. Check from About.",
+        t("main.settings.updatesOff", { about: t("nav.about") }),
       );
     }
   },
@@ -485,13 +492,13 @@ events.push(
       notifier.success(
         "system",
         FEEDBACK_CODES.TRAY_ENABLED,
-        "Tokio keeps running in the tray when you close it.",
+        t("main.settings.trayOn"),
       );
     } else {
       notifier.info(
         "system",
         FEEDBACK_CODES.TRAY_DISABLED,
-        "Closing Tokio's window quits it.",
+        t("main.settings.trayOff"),
       );
     }
   },
@@ -539,7 +546,7 @@ events.push(
     if (!res) {
       throw new AppFailure(
         FEEDBACK_CODES.FQDN_INSTALL_FAILED,
-        "Unable to set up the overlay address. Accept the administrator prompt to add it.",
+        t("main.settings.fqdnDeclined"),
         { level: "warning", logged: true },
       );
     }
