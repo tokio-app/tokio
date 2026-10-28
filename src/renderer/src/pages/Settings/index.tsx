@@ -5,6 +5,7 @@ import { useImmerState, useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
 import { MediaSection } from "./sections/MediaSection";
 import { OverlaysSection } from "./sections/OverlaysSection";
+import { LanguageSection } from "./sections/LanguageSection";
 import { CloneProfileModal, NewProfileModal } from "./sections/ProfileModals";
 import { ProfileSection } from "./sections/ProfileSection";
 import { ProvidersSection } from "./sections/ProvidersSection";
@@ -83,6 +84,16 @@ export function Settings() {
               setServerEnabled(false);
               window.api.emit(APP_EVENTS.SET_SERVER, { enabled: false });
             }
+          }}
+        />
+
+        <LanguageSection
+          language={store.settings.language}
+          onChange={(language) => {
+            updateStore((s) => {
+              s.settings.language = language;
+            });
+            window.api.emit(APP_EVENTS.SET_LANGUAGE, { language });
           }}
         />
 

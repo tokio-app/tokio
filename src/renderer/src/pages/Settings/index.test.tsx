@@ -145,6 +145,39 @@ describe("Settings", () => {
     });
   });
 
+  describe("Language", () => {
+    it("follows the system until a language is picked, each in its own name", async () => {
+      const { user, container } = await setup();
+      const language = section("Language");
+      expect(language.getByText("System language")).toBeInTheDocument();
+
+      await user.click(language.getByText("System language"));
+      expect(inList(container, "English")).not.toBeNull();
+      await user.click(inList(container, "Español")!);
+      expect(language.getByText("Español")).toBeInTheDocument();
+
+      await user.click(language.getByText("Español"));
+      await user.click(inList(container, "System language")!);
+
+      expect(sent(APP_EVENTS.SET_LANGUAGE)).toEqual([
+        { language: "es-419" },
+        { language: "system" },
+      ]);
+    });
+
+    it("shows a saved language Tokio no longer has as the system's", async () => {
+      await setup(
+        settingsReply((s) => {
+          s.settings.language = "fr";
+        }),
+      );
+
+      expect(
+        section("Language").getByText("System language"),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("Live Profiles", () => {
     it("switches to the profile picked", async () => {
       const { user, container } = await setup();

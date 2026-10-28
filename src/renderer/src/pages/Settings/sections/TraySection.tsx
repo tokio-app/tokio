@@ -1,4 +1,5 @@
 import { Check, Section } from "@/components";
+import { useT } from "@/ui/i18n";
 import { FiInbox } from "react-icons/fi";
 
 interface Props {
@@ -7,10 +8,11 @@ interface Props {
 }
 
 export function TraySection({ enabled, onChange }: Props) {
+  const t = useT();
   return (
     <Section
       icon={<FiInbox />}
-      title="Tray"
+      title={t("settings.tray.title")}
       description="Open Tokio or quit from its icon."
     >
       <Check

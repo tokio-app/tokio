@@ -22,6 +22,15 @@
   flex: 1;
 }
 
+/* LANGUAGE */
+
+/* About as wide as Active Profile's beside its buttons, at the window's
+   minimum width */
+.language_select {
+  width: 320px;
+  max-width: 100%;
+}
+
 .buttons {
   display: flex;
   gap: var(--space-2);
