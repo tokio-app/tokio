@@ -1,8 +1,7 @@
 import { APP_LANGUAGES } from "@/common/i18n";
-import { Section, Select } from "@/components";
+import { FormGrid, Section, Select } from "@/components";
 import { useT } from "@/ui/i18n";
 import { FiGlobe } from "react-icons/fi";
-import styles from "../settings.module.css";
 
 interface Props {
   // "system", or a tag in APP_LANGUAGES
@@ -27,13 +26,15 @@ export function LanguageSection({ language, onChange }: Props) {
       title={title}
       description={t("settings.language.description")}
     >
-      <Select
-        aria-label={title}
-        className={styles.language_select}
-        options={options}
-        value={value}
-        onChange={onChange}
-      />
+      {/* In the grid's first column, like the fields above and below */}
+      <FormGrid>
+        <Select
+          aria-label={title}
+          options={options}
+          value={value}
+          onChange={onChange}
+        />
+      </FormGrid>
     </Section>
   );
 }
