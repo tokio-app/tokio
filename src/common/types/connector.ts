@@ -1,3 +1,4 @@
+import type { MessageKey } from "../i18n";
 import { OverlayConfigRedux } from "./overlay";
 
 export interface UserData {
@@ -155,20 +156,21 @@ export const EMOTE_TRIGGER = "tokio:alert:emote";
 export type AlertTrigger =
   Exclude<AppEvents, TOKIO_EVENTS.ROOM_USER> | typeof EMOTE_TRIGGER;
 
-// Typed as Record<AlertTrigger, ...> so a new live event can't be left out of the alert triggers.
-export const ALERT_TRIGGER_LABELS: Record<AlertTrigger, string> = {
-  [TOKIO_EVENTS.CHAT]: "Chat",
-  [EMOTE_TRIGGER]: "Emote",
-  [TOKIO_EVENTS.SHARE]: "Share",
-  [TOKIO_EVENTS.FOLLOW]: "Follow",
-  [TOKIO_EVENTS.GIFT]: "Gift",
-  [TOKIO_EVENTS.LIKE]: "Like",
-  [TOKIO_EVENTS.ENVELOPE]: "Envelope",
-  [TOKIO_EVENTS.SUPER_FAN]: "Super Fan",
-  [TOKIO_EVENTS.SUPER_FAN_BOX]: "Super Fan Box",
-  [TOKIO_EVENTS.SUPER_FAN_JOIN]: "Super Fan Join",
-  [TOKIO_EVENTS.MEMBER_JOIN]: "Member Join",
-  [TOKIO_EVENTS.MUSIC_CHANGE]: "Music Change",
+// Typed as Record<AlertTrigger, ...> so a new live event can't be left out of
+// the alert triggers. Keys of their names, translated where they're shown.
+export const ALERT_TRIGGER_LABELS: Record<AlertTrigger, MessageKey> = {
+  [TOKIO_EVENTS.CHAT]: "triggers.chat",
+  [EMOTE_TRIGGER]: "triggers.emote",
+  [TOKIO_EVENTS.SHARE]: "triggers.share",
+  [TOKIO_EVENTS.FOLLOW]: "triggers.follow",
+  [TOKIO_EVENTS.GIFT]: "triggers.gift",
+  [TOKIO_EVENTS.LIKE]: "triggers.like",
+  [TOKIO_EVENTS.ENVELOPE]: "triggers.envelope",
+  [TOKIO_EVENTS.SUPER_FAN]: "triggers.superfan",
+  [TOKIO_EVENTS.SUPER_FAN_BOX]: "triggers.superfanBox",
+  [TOKIO_EVENTS.SUPER_FAN_JOIN]: "triggers.superfanJoin",
+  [TOKIO_EVENTS.MEMBER_JOIN]: "triggers.memberJoin",
+  [TOKIO_EVENTS.MUSIC_CHANGE]: "triggers.musicChange",
 };
 
 export type TokioPayload =

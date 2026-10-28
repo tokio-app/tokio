@@ -24,10 +24,11 @@ const plural = (count: number, word: string) =>
 
 export type Stat = { label: string; value: number };
 
-// Short, with the exact number on hover. Dashes while offline.
-export function statText(value: number, connected: boolean) {
+// Short, with the exact number on hover, as the language writes them. Dashes
+// while offline.
+export function statText(value: number, connected: boolean, language: string) {
   if (!connected) return { text: "--", title: undefined };
-  const { short, full } = formatStat(value);
+  const { short, full } = formatStat(value, language);
   return { text: short, title: full };
 }
 

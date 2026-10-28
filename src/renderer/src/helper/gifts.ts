@@ -1,6 +1,5 @@
+import { MessageKey, translate } from "@/common/i18n";
 import { CustomGift } from "@/common/types";
-import type { SelectOption } from "@/components/Elements";
-import { formatStat } from "./format";
 
 export type CoinOperator =
   "any" | "eq" | "gt" | "gte" | "lt" | "lte" | "between";
@@ -19,19 +18,25 @@ export type GiftFilter = {
 const OPERATORS: Record<
   CoinOperator,
   {
-    label: string;
+    label: MessageKey;
     test: (coins: number, amount: number, to: number) => boolean;
   }
 > = {
-  any: { label: "Any price", test: () => true },
-  eq: { label: "Exactly", test: (coins, amount) => coins === amount },
-  gt: { label: "More than", test: (coins, amount) => coins > amount },
-  gte: { label: "At least", test: (coins, amount) => coins >= amount },
-  lt: { label: "Less than", test: (coins, amount) => coins < amount },
-  lte: { label: "At most", test: (coins, amount) => coins <= amount },
+  any: { label: "gifts.operator.any", test: () => true },
+  eq: { label: "gifts.operator.eq", test: (coins, amount) => coins === amount },
+  gt: { label: "gifts.operator.gt", test: (coins, amount) => coins > amount },
+  gte: {
+    label: "gifts.operator.gte",
+    test: (coins, amount) => coins >= amount,
+  },
+  lt: { label: "gifts.operator.lt", test: (coins, amount) => coins < amount },
+  lte: {
+    label: "gifts.operator.lte",
+    test: (coins, amount) => coins <= amount,
+  },
   // Either end can be the bigger one, both are in.
   between: {
-    label: "Between",
+    label: "gifts.operator.between",
     test: (coins, amount, to) =>
       coins >= Math.min(amount, to) && coins <= Math.max(amount, to),
   },
@@ -43,30 +48,31 @@ const byName: Compare = (a, b) => a.label.localeCompare(b.label);
 const byCoins: Compare = (a, b) => a.coins - b.coins;
 
 // Ties go to the name, or to the price when sorting by name.
-const SORTS: Record<GiftSort, { label: string; compare: Compare }> = {
+const SORTS: Record<GiftSort, { label: MessageKey; compare: Compare }> = {
   cheapest: {
-    label: "Cheapest first",
+    label: "gifts.sort.cheapest",
     compare: (a, b) => byCoins(a, b) || byName(a, b),
   },
   priciest: {
-    label: "Most expensive first",
+    label: "gifts.sort.priciest",
     compare: (a, b) => byCoins(b, a) || byName(a, b),
   },
   az: {
-    label: "Name, A to Z",
+    label: "gifts.sort.az",
     compare: (a, b) => byName(a, b) || byCoins(a, b),
   },
   za: {
-    label: "Name, Z to A",
+    label: "gifts.sort.za",
     compare: (a, b) => byName(b, a) || byCoins(a, b),
   },
 };
 
-// A record's entries as choices, in its order
+// A record's entries as choices, in its order, their labels keys (see
+// useOptions)
 function choices<K extends string>(
-  record: Record<K, { label: string }>,
-): SelectOption<K>[] {
-  const options: SelectOption<K>[] = [];
+  record: Record<K, { label: MessageKey }>,
+): { value: K; label: MessageKey }[] {
+  const options: { value: K; label: MessageKey }[] = [];
   for (const value in record) {
     options.push({ value, label: record[value].label });
   }
@@ -98,11 +104,13 @@ export function filterGifts(
     .sort((a, b) => rank(a) - rank(b) || compare(a, b));
 }
 
-export const coinUnit = (coins: number) => (coins === 1 ? "coin" : "coins");
+// "coin" or "coins", after a number the user types
+export const coinUnit = (coins: number, language: string) =>
+  translate(language, "gifts.coinUnit", { count: coins });
 
 // "1 coin", "1,000 coins"
-export const coinsLabel = (coins: number) =>
-  `${formatStat(coins).full} ${coinUnit(coins)}`;
+export const coinsLabel = (coins: number, language: string) =>
+  translate(language, "gifts.coins", { count: coins });
 
-export const giftsLabel = (count: number) =>
-  `${formatStat(count).full} ${count === 1 ? "gift" : "gifts"}`;
+export const giftsLabel = (count: number, language: string) =>
+  translate(language, "gifts.gifts", { count });

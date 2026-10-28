@@ -27,6 +27,7 @@ import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
+import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
 import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
@@ -136,7 +137,7 @@ const registerConnectorEvents = ({
         win.webContents.send(APP_EVENTS_RESPONSE.ALERT_AUDIO, audio);
       },
       (alert, error) => {
-        const label = ALERT_TRIGGER_LABELS[alert.trigger.type];
+        const label = t(ALERT_TRIGGER_LABELS[alert.trigger.type]);
         const options = {
           key: `alert:${alert.id}`,
           windowMs: REPEAT_NOTICE_MS,
@@ -188,7 +189,7 @@ const registerConnectorEvents = ({
     // Not a live event, the services match emote triggers on chat events.
     if (trigger === EMOTE_TRIGGER) continue;
     const listener = (d: TokioEventMap[typeof trigger]) => {
-      const label = ALERT_TRIGGER_LABELS[trigger];
+      const label = t(ALERT_TRIGGER_LABELS[trigger]);
       dispatchAlert(trigger, d).catch((error) => {
         notifier.report({
           source: "alerts",
@@ -467,7 +468,7 @@ const registerGames = (handler: AppHandlerVariables) => {
   });
   // Logged once per notice, as they can repeat on every event
   games.onError((action, { offline, full, message }) => {
-    const label = ALERT_TRIGGER_LABELS[action.trigger.type];
+    const label = t(ALERT_TRIGGER_LABELS[action.trigger.type]);
     if (full) {
       if (
         notifier.warn(
@@ -521,6 +522,8 @@ const registerGames = (handler: AppHandlerVariables) => {
   handler.serverService.onConnect((id) => {
     if (id === GAMES_PATH) void sendGamesOverlay(handler);
   });
+  // Its automatic texts are in the app's language
+  onLanguage(() => void sendGamesOverlay(handler));
 };
 
 // The countdown timer takes time from live events whatever features are on.
@@ -555,7 +558,9 @@ const registerTimer = ({
         multiplier: settings.multiplier,
         look: settings.look,
         // The carousel's items, none while it's off
-        triggers: settings.look.show_triggers ? timerTriggers(settings) : [],
+        triggers: settings.look.show_triggers
+          ? timerTriggers(settings, language())
+          : [],
       },
     };
   };
@@ -577,6 +582,8 @@ const registerTimer = ({
   server.onConnect((id) => {
     if (id === TIMER_PATH) server.sendToClient(TIMER_PATH, overlayMessage(0));
   });
+  // The carousel's automatic names are in the app's language
+  onLanguage(() => server.sendToClient(TIMER_PATH, overlayMessage(0)));
 };
 
 events.push(
@@ -672,6 +679,8 @@ const startApp = async (handler: AppHandlerVariables) => {
     jsonManagerService,
     pathManagerService,
   );
+  // Before any notice, so they're all in the user's language
+  setLanguage(storeManagerService.getSettings().language);
   timerService.initialize({ store: storeManagerService });
   overlayService.initialize(
     {
@@ -784,6 +793,8 @@ events.push(
     }
     const settings = await start;
 
+    // On every load, so a reloaded window gets it too
+    e.reply(APP_EVENTS_RESPONSE.LANGUAGE, language());
     e.reply(APP_EVENTS_RESPONSE.LOAD_APP, {
       success: true,
     });

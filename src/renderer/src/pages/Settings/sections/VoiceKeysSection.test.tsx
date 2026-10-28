@@ -6,9 +6,12 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { VoiceKeysSection } from "./VoiceKeysSection";
 
-const azure = (key = "") => ({ ...engine("azure", "Azure", "API key"), key });
+const azure = (key = "") => ({
+  ...engine("azure", "Azure", "voiceKeys.sessionId"),
+  key,
+});
 const eleven = (key = "") => ({
-  ...engine("elevenlabs", "ElevenLabs", "API key"),
+  ...engine("elevenlabs", "ElevenLabs", "voiceKeys.sessionId"),
   key,
 });
 
@@ -51,10 +54,10 @@ describe("VoiceKeysSection", () => {
     await keys(azure(), eleven("saved-key"));
 
     expect(
-      form("Azure voices").getByText("(API key, optional)"),
+      form("Azure voices").getByText("(Session ID, optional)"),
     ).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Azure API key...")).toHaveValue("");
-    expect(screen.getByPlaceholderText("ElevenLabs API key...")).toHaveValue(
+    expect(screen.getByPlaceholderText("Azure Session ID...")).toHaveValue("");
+    expect(screen.getByPlaceholderText("ElevenLabs Session ID...")).toHaveValue(
       "saved-key",
     );
   });
@@ -63,7 +66,7 @@ describe("VoiceKeysSection", () => {
     const { user } = renderWithProviders(<VoiceKeysSection />);
     await keys(azure(), eleven("saved-key"));
 
-    await user.type(screen.getByPlaceholderText("Azure API key..."), "abc");
+    await user.type(screen.getByPlaceholderText("Azure Session ID..."), "abc");
 
     await waitFor(() =>
       expect(saves().at(-1)).toEqual({ engine: "azure", key: "abc" }),
@@ -78,7 +81,7 @@ describe("VoiceKeysSection", () => {
     const { user } = renderWithProviders(<VoiceKeysSection />);
     await keys(eleven("saved-key"));
 
-    await user.clear(screen.getByPlaceholderText("ElevenLabs API key..."));
+    await user.clear(screen.getByPlaceholderText("ElevenLabs Session ID..."));
 
     await waitFor(() =>
       expect(saves()).toEqual([{ engine: "elevenlabs", key: "" }]),
@@ -88,7 +91,7 @@ describe("VoiceKeysSection", () => {
   it("replaces the typed key when main holds another one", async () => {
     const { user } = renderWithProviders(<VoiceKeysSection />);
     await keys(azure());
-    const input = screen.getByPlaceholderText("Azure API key...");
+    const input = screen.getByPlaceholderText("Azure Session ID...");
     await user.type(input, "abc");
 
     await keys(azure("abc"));

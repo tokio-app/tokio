@@ -4,11 +4,17 @@ import { alertsStatus, serverStatus, statText } from "./helper";
 
 describe("statText", () => {
   it("gives the short number with the exact one for the title", () => {
-    expect(statText(1234, true)).toEqual({ text: "1.2K", title: "1,234" });
+    expect(statText(1234, true, "en")).toEqual({
+      text: "1.2K",
+      title: "1,234",
+    });
   });
 
   it("gives dashes while offline", () => {
-    expect(statText(1234, false)).toEqual({ text: "--", title: undefined });
+    expect(statText(1234, false, "en")).toEqual({
+      text: "--",
+      title: undefined,
+    });
   });
 });
 

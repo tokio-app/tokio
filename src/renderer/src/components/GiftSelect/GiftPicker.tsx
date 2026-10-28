@@ -9,6 +9,7 @@ import {
   GiftFilter,
   giftsLabel,
 } from "@/helper/gifts";
+import { useLanguage, useOptions } from "@/ui/i18n";
 import { FocusEvent, useMemo, useState } from "react";
 import { Btn, Check, Input, NumberInput, Select } from "../Elements";
 import { Modal } from "../Modal";
@@ -32,6 +33,7 @@ export function GiftPicker({
   onApply,
   onClose,
 }: Props) {
+  const sorts = useOptions(GIFT_SORTS);
   const [filter, setFilter] = useState<GiftFilter>({
     search: "",
     operator: "any",
@@ -79,7 +81,7 @@ export function GiftPicker({
         />
         <Select
           className={styles.sort}
-          options={GIFT_SORTS}
+          options={sorts}
           value={filter.sort}
           onChange={(sort) => setFilter({ ...filter, sort })}
         />
@@ -118,6 +120,8 @@ type FilterProps = {
 
 // An operator and its amount, or the two ends of a range
 function CoinFilter({ filter, onChange }: FilterProps) {
+  const language = useLanguage();
+  const operators = useOptions(COIN_OPERATORS);
   const { operator } = filter;
   const range = operator === "between";
 
@@ -125,7 +129,7 @@ function CoinFilter({ filter, onChange }: FilterProps) {
     <div className={styles.filters}>
       <Select
         className={styles.operator}
-        options={COIN_OPERATORS}
+        options={operators}
         value={operator}
         onChange={(value) => onChange({ ...filter, operator: value })}
       />
@@ -155,7 +159,7 @@ function CoinFilter({ filter, onChange }: FilterProps) {
             </>
           )}
           <span className={styles.unit}>
-            {coinUnit(range ? filter.to : filter.coins)}
+            {coinUnit(range ? filter.to : filter.coins, language)}
           </span>
         </>
       )}
@@ -173,6 +177,7 @@ type SelectionProps = {
 
 // How many gifts are shown and checked, and the actions on them
 function SelectionBar({ shown, total, picked, onChange }: SelectionProps) {
+  const language = useLanguage();
   const checked = new Set(picked);
   const unchecked = shown
     .filter((gift) => !checked.has(gift.value))
@@ -182,8 +187,8 @@ function SelectionBar({ shown, total, picked, onChange }: SelectionProps) {
     <div className={styles.toolbar}>
       <span className={styles.count}>
         {shown.length === total
-          ? giftsLabel(total)
-          : `${shown.length} of ${giftsLabel(total)}`}
+          ? giftsLabel(total, language)
+          : `${shown.length} of ${giftsLabel(total, language)}`}
         {` · ${picked.length} selected`}
       </span>
       <div className={styles.actions}>
@@ -260,6 +265,7 @@ function GiftList({ shown, empty, multiple, picked, onChange }: ListProps) {
 
 // Gifts without a picture keep its room, so the names line up.
 function GiftInfo({ gift }: { gift: CustomGift }) {
+  const language = useLanguage();
   return (
     <>
       {gift.img ? (
@@ -268,7 +274,7 @@ function GiftInfo({ gift }: { gift: CustomGift }) {
         <span className={styles.img} />
       )}
       <span className={styles.name}>{gift.label}</span>
-      <span className={styles.coins}>{coinsLabel(gift.coins)}</span>
+      <span className={styles.coins}>{coinsLabel(gift.coins, language)}</span>
     </>
   );
 }

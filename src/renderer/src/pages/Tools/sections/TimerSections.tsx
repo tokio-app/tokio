@@ -16,6 +16,7 @@ import {
 import { cx } from "@/helper";
 import { flushSettings, scopeUpdater, Updater, useAutosave } from "@/hooks";
 import homeStyles from "@/pages/Home/home.module.css";
+import { useT } from "@/ui/i18n";
 import { produce } from "immer";
 import { useId, useState } from "react";
 import {
@@ -295,6 +296,7 @@ function TimerLookSection({ settings, update }: SectionProps) {
 // The names the carousel shows, for the triggers that add time, so they can
 // be in the audience's language
 function TriggerNames({ settings, update }: SectionProps) {
+  const t = useT();
   const { seconds, look } = settings;
   const id = useId();
   // As timerTriggers keeps them, so a multiplier of 0 hides them all
@@ -329,6 +331,8 @@ function TriggerNames({ settings, update }: SectionProps) {
               aria-label={`${label} on stream`}
               className={styles.name}
               maxLength={40}
+              // Blank, the carousel shows the app language's name
+              placeholder={t(`timer.names.${key}`)}
               value={look.names[key]}
               onChange={(e) => {
                 const name = e.target.value;

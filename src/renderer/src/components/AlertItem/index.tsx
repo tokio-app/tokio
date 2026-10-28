@@ -1,3 +1,4 @@
+import { listOf, MessageKey, translate } from "@/common/i18n";
 import { Alert, ALERT_TRIGGERS, Trigger, ViewerRole } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
@@ -10,11 +11,11 @@ import {
   formatAdded,
   getAlertOverlayURL,
   giftNames,
-  orList,
   takesRoles,
 } from "@/common/util";
 import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
+import { useLanguage, useT } from "@/ui/i18n";
 import { FiEdit2, FiMessageSquare, FiMusic, FiTrash2 } from "react-icons/fi";
 import { CopyButton } from "../CopyField";
 import { Btn, Input, Select, SelectOption, Toggle } from "../Elements";
@@ -25,11 +26,12 @@ import { PlayButton, TestState, testProps } from "../PlayButton";
 import { SoundLength } from "../SoundPicker/SoundLength";
 import styles from "./alertitem.module.css";
 
-// zod types the options as any live event, but they are the triggers.
-export const TRIGGER_OPTIONS = ALERT_TRIGGERS.map((value) => ({
-  value,
-  label: ALERT_TRIGGER_LABELS[value],
-})) as SelectOption<Trigger["type"]>[];
+// The triggers, their labels keys (see useOptions)
+export const TRIGGER_OPTIONS: { value: Trigger["type"]; label: MessageKey }[] =
+  ALERT_TRIGGERS.map((value) => ({
+    value,
+    label: ALERT_TRIGGER_LABELS[value],
+  }));
 
 // When a gift alert plays, see every_gift
 const GIFT_PLAYS: SelectOption<"streak" | "gift">[] = [
@@ -37,11 +39,11 @@ const GIFT_PLAYS: SelectOption<"streak" | "gift">[] = [
   { value: "gift", label: "Every gift" },
 ];
 
-// As the summary names them
-export const ROLE_NAMES: Record<ViewerRole, string> = {
-  follower: "Followers",
-  moderator: "Moderators",
-  superfan: "Super Fans",
+// As the summary names them, keys translated where they show
+export const ROLE_NAMES: Record<ViewerRole, MessageKey> = {
+  follower: "roles.follower",
+  moderator: "roles.moderator",
+  superfan: "roles.superfan",
 };
 
 type FilterProps = {
@@ -118,13 +120,15 @@ export function TriggerFilter({
 const NAMED = 3;
 
 /**
- * What narrows the trigger, as one sentence: "Rose or Lion, when the streak
- * ends, worth 100+ coins, from Followers". Empty when nothing does.
+ * What narrows the trigger, as one sentence in the language: "Rose or Lion,
+ * when the streak ends, worth 100+ coins, from Followers". Empty when nothing
+ * does.
  */
 export function triggerSummary(
   trigger: Trigger,
   gifts: CustomGift[],
   emotes: EmoteOption[],
+  language: string,
 ): string {
   const parts: string[] = [];
   switch (trigger.type) {
@@ -133,7 +137,7 @@ export function triggerSummary(
         trigger.gifts.length === 0
           ? "Any gift"
           : // Gifts the lists don't have yet, until they load
-            (giftNames(trigger.gifts, gifts, NAMED) ?? "Some gifts"),
+            (giftNames(trigger.gifts, gifts, language, NAMED) ?? "Some gifts"),
         trigger.every_gift ? "every gift" : "when the streak ends",
       );
       // Only any gift has a worth to reach
@@ -145,7 +149,11 @@ export function triggerSummary(
       const names = trigger.emotes.flatMap(
         (id) => emotes.find((emote) => emote.value === id)?.label ?? [],
       );
-      parts.push(names.length > 0 ? orList(names, NAMED) : "Any emote");
+      parts.push(
+        names.length > 0
+          ? listOf(language, names, { type: "or", max: NAMED })
+          : "Any emote",
+      );
       break;
     }
     case TOKIO_EVENTS.CHAT: {
@@ -161,7 +169,11 @@ export function triggerSummary(
     }
   }
   if (takesRoles(trigger.type) && trigger.roles.length > 0) {
-    const roles = trigger.roles.map((role) => ROLE_NAMES[role]).join(" or ");
+    const roles = listOf(
+      language,
+      trigger.roles.map((role) => translate(language, ROLE_NAMES[role])),
+      { type: "or" },
+    );
     parts.push(`from ${roles}`);
   }
   const text = parts.join(", ");
@@ -210,8 +222,10 @@ export function AlertItem({
   onEdit,
   onRemove,
 }: Props) {
+  const t = useT();
+  const language = useLanguage();
   const { sound, tts, media } = alert;
-  const detail = triggerSummary(alert.trigger, gifts, emotes);
+  const detail = triggerSummary(alert.trigger, gifts, emotes, language);
   const test = alertTest(alert);
 
   return (
@@ -232,7 +246,7 @@ export function AlertItem({
 
         <span className={styles.part}>
           <span className={styles.trigger}>
-            {ALERT_TRIGGER_LABELS[alert.trigger.type]}
+            {t(ALERT_TRIGGER_LABELS[alert.trigger.type])}
           </span>
           {detail && (
             <span className={cx(styles.detail, styles.clamp)}>{detail}</span>

@@ -38,6 +38,7 @@ import {
 } from "@/components";
 import { cx } from "@/helper/cx";
 import { scopeUpdater, Updater } from "@/hooks";
+import { useLanguage, useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiPlay, FiPlus } from "react-icons/fi";
 import styles from "../games.module.css";
@@ -94,11 +95,13 @@ export function OverlaySection({
   update,
   onPickPicture,
 }: Props) {
+  const language = useLanguage();
   const { actions, overlay: look } = games;
   const rows = gameOverlayRows(games, {
     gifts,
     emotes,
     mediaURL: getPicturePreviewURL,
+    language,
   });
   // How many times Test was pressed, and the row it lit last
   const [tests, setTests] = useState(0);
@@ -321,9 +324,11 @@ function RecipeRow({
   onChange,
   onPickPicture,
 }: RowProps) {
+  const t = useT();
+  const language = useLanguage();
   const { overlay, trigger } = action;
   const pictures = gameEventPictures(action, gifts, emotes);
-  const eventText = gameEventText(action, gifts);
+  const eventText = gameEventText(action, gifts, language);
   // A chat's message shows by its bubble, so it keeps its text field
   const chat = trigger.type === TOKIO_EVENTS.CHAT;
   const pick = overlay.image ? "Change the picture" : "Pick a picture";
@@ -337,8 +342,8 @@ function RecipeRow({
     <span
       className={styles.recipe_gift}
       role="img"
-      aria-label={chat ? ALERT_TRIGGER_LABELS[trigger.type] : eventText}
-      title={chat ? ALERT_TRIGGER_LABELS[trigger.type] : eventText}
+      aria-label={chat ? t(ALERT_TRIGGER_LABELS[trigger.type]) : eventText}
+      title={chat ? t(ALERT_TRIGGER_LABELS[trigger.type]) : eventText}
     >
       {pictures.map((src, i) => (
         <img
@@ -407,7 +412,10 @@ function RecipeRow({
       <Input
         aria-label="Name on the overlay"
         maxLength={40}
-        placeholder={gameStepsText(action, count > 0) || "No name"}
+        placeholder={
+          gameStepsText(action, language, count > 0) ||
+          t("games.overlay.noName")
+        }
         value={overlay.name}
         onChange={(e) => onChange({ name: e.target.value })}
       />

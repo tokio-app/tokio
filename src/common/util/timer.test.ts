@@ -19,6 +19,30 @@ describe("formatAdded", () => {
   });
 });
 
+describe("TimerSettingsSchema's names", () => {
+  it("are blank by default, and read the old English defaults as blank", () => {
+    const names = (saved: Record<string, string>) =>
+      TimerSettingsSchema.parse({ look: { names: saved } }).look.names;
+
+    expect(names({})).toEqual({
+      coin: "",
+      likes: "",
+      superfan: "",
+      follow: "",
+      share: "",
+      chat: "",
+    });
+    expect(
+      names({ coin: "coin", superfan: "New Super Fan", follow: "Follow" }),
+    ).toMatchObject({ coin: "", superfan: "", follow: "" });
+    // Typed by the streamer
+    expect(names({ follow: "Seguir", share: "share" })).toMatchObject({
+      follow: "Seguir",
+      share: "share",
+    });
+  });
+});
+
 describe("timerTriggers", () => {
   const settings = (
     change: (s: TimerSettings) => void = () => {},
@@ -36,6 +60,7 @@ describe("timerTriggers", () => {
           s.seconds.coin = 0.5;
           s.seconds.likes_every = 50;
         }),
+        "en",
       ),
     ).toEqual([
       { label: "1 coin", value: "+1s" },
@@ -61,6 +86,7 @@ describe("timerTriggers", () => {
         s.chat.keyword = " !sub ";
         s.look.names.chat = "Escribe";
       }),
+      "en",
     );
 
     expect(triggers).toEqual([{ label: "Escribe “!sub”", value: "+2s" }]);
@@ -71,6 +97,24 @@ describe("timerTriggers", () => {
       s.multiplier = 0;
     });
 
-    expect(timerTriggers(off)).toEqual([]);
+    expect(timerTriggers(off, "en")).toEqual([]);
+  });
+
+  it("names the triggers left blank in the language", () => {
+    const triggers = timerTriggers(
+      settings((s) => {
+        s.seconds.likes_every = 1000;
+        s.look.names.follow = "Sígueme";
+      }),
+      "es-419",
+    );
+
+    expect(triggers.map((t) => t.label)).toEqual([
+      "1 moneda",
+      "1000 Me gusta",
+      "Nuevo Super Fan",
+      "Sígueme",
+      "Compartir",
+    ]);
   });
 });

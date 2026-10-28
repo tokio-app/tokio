@@ -26,6 +26,7 @@ import {
   VariableList,
 } from "@/components";
 import { Updater, useIpcListener } from "@/hooks";
+import { useOptions } from "@/ui/i18n";
 import { Ref, useRef, useState } from "react";
 import {
   FiCheck,
@@ -151,6 +152,7 @@ function ActionItem({
   onDuplicate,
   onRemove,
 }: ItemProps) {
+  const triggers = useOptions(GAME_TRIGGERS);
   const { trigger, steps } = action;
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
@@ -195,7 +197,7 @@ function ActionItem({
         <Select
           className={styles.trigger}
           aria-label="Trigger"
-          options={GAME_TRIGGERS}
+          options={triggers}
           value={trigger.type}
           onChange={(type) =>
             onChange({ ...action, trigger: { ...trigger, type } })
@@ -363,6 +365,10 @@ function StepFields({
   onFocusText,
   onChange,
 }: FieldsProps) {
+  const weathers = useOptions(WEATHERS);
+  const times = useOptions(TIMES);
+  const hazards = useOptions(HAZARDS);
+  const helps = useOptions(HELPS);
   switch (step.type) {
     case "spawn":
       return (
@@ -413,7 +419,7 @@ function StepFields({
         <Select
           className={styles.thing}
           aria-label="Weather"
-          options={WEATHERS}
+          options={weathers}
           value={step.weather}
           onChange={(weather) => onChange({ ...step, weather })}
         />
@@ -423,7 +429,7 @@ function StepFields({
         <Select
           className={styles.thing}
           aria-label="Time of day"
-          options={TIMES}
+          options={times}
           value={step.time}
           onChange={(time) => onChange({ ...step, time })}
         />
@@ -434,7 +440,7 @@ function StepFields({
           <Select
             className={styles.thing}
             aria-label="Hazard"
-            options={HAZARDS}
+            options={hazards}
             value={step.hazard}
             onChange={(hazard) => onChange({ ...step, hazard })}
           />
@@ -527,7 +533,7 @@ function StepFields({
           <Select
             className={styles.thing}
             aria-label="Help"
-            options={HELPS}
+            options={helps}
             value={step.help}
             onChange={(help) => onChange({ ...step, help })}
           />

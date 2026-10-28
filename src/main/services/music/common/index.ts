@@ -4,6 +4,7 @@ import {
   CurrentSongInfo,
   SongInfo,
 } from "@/common/types";
+import { language, onLanguage } from "@/helper/i18n";
 import {
   limitPermissions,
   openLinksOutside,
@@ -70,7 +71,10 @@ export function createWindow(content: WebContentsView) {
     },
   });
 
-  _navView.webContents.loadFile(join(__dirname, "../../music-out/index.html"));
+  // In main's language, which it follows while the window is open
+  _navView.webContents.loadFile(join(__dirname, "../../music-out/index.html"), {
+    query: { lang: language() },
+  });
 
   _shellWindow.contentView.addChildView(_navView);
   _shellWindow.contentView.addChildView(content);
@@ -104,6 +108,9 @@ export function createWindow(content: WebContentsView) {
   });
   _shellWindow.on("maximize", sendWindowState);
   _shellWindow.on("unmaximize", sendWindowState);
+  const offLanguage = onLanguage((lang) => {
+    if (!nav.isDestroyed()) nav.send(APP_EVENTS_RESPONSE.LANGUAGE, lang);
+  });
 
   // Registered on the nav view, not ipcMain, so the controls only answer this
   // window's title bar and go away with it. Global handlers piled up on every
@@ -126,6 +133,7 @@ export function createWindow(content: WebContentsView) {
   });
 
   _shellWindow.on("close", () => {
+    offLanguage();
     try {
       _shellWindow.contentView.removeChildView(_navView);
     } catch {

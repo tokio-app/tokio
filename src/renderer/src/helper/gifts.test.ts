@@ -1,8 +1,10 @@
+import { MessageKey, translate } from "@/common/i18n";
 import { gift } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   COIN_OPERATORS,
   coinsLabel,
+  coinUnit,
   filterGifts,
   GIFT_SORTS,
   GiftFilter,
@@ -121,16 +123,28 @@ describe("filterGifts", () => {
 
 describe("COIN_OPERATORS and GIFT_SORTS", () => {
   it("offers the operators and the sorts in order", () => {
-    expect(COIN_OPERATORS).toEqual([
-      { value: "any", label: "Any price" },
-      { value: "eq", label: "Exactly" },
-      { value: "gt", label: "More than" },
-      { value: "gte", label: "At least" },
-      { value: "lt", label: "Less than" },
-      { value: "lte", label: "At most" },
-      { value: "between", label: "Between" },
+    const labels = (options: { label: MessageKey }[]) =>
+      options.map(({ label }) => translate("en", label));
+
+    expect(COIN_OPERATORS.map(({ value }) => value)).toEqual([
+      "any",
+      "eq",
+      "gt",
+      "gte",
+      "lt",
+      "lte",
+      "between",
     ]);
-    expect(GIFT_SORTS.map((sort) => sort.label)).toEqual([
+    expect(labels(COIN_OPERATORS)).toEqual([
+      "Any price",
+      "Exactly",
+      "More than",
+      "At least",
+      "Less than",
+      "At most",
+      "Between",
+    ]);
+    expect(labels(GIFT_SORTS)).toEqual([
       "Cheapest first",
       "Most expensive first",
       "Name, A to Z",
@@ -139,12 +153,16 @@ describe("COIN_OPERATORS and GIFT_SORTS", () => {
   });
 });
 
-describe("coinsLabel and giftsLabel", () => {
-  it("count coins and gifts", () => {
-    expect(coinsLabel(1)).toBe("1 coin");
-    expect(coinsLabel(0)).toBe("0 coins");
-    expect(coinsLabel(29999)).toBe("29,999 coins");
-    expect(giftsLabel(1)).toBe("1 gift");
-    expect(giftsLabel(3)).toBe("3 gifts");
+describe("coinsLabel, giftsLabel and coinUnit", () => {
+  it("count coins and gifts in the language", () => {
+    expect(coinsLabel(1, "en")).toBe("1 coin");
+    expect(coinsLabel(0, "en")).toBe("0 coins");
+    expect(coinsLabel(29999, "en")).toBe("29,999 coins");
+    expect(giftsLabel(1, "en")).toBe("1 gift");
+    expect(giftsLabel(3, "en")).toBe("3 gifts");
+    expect(coinUnit(1, "en")).toBe("coin");
+    expect(coinUnit(2, "en")).toBe("coins");
+    expect(coinsLabel(1, "es-419")).toBe("1 moneda");
+    expect(giftsLabel(1500, "es-419")).toBe("1,500 regalos");
   });
 });

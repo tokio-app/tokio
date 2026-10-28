@@ -1,3 +1,4 @@
+import { APP_LANGUAGES } from "@/common/i18n";
 import { ProfileSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
@@ -9,6 +10,7 @@ import { showOpenDialog, showSaveDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay } from "@/helper/games";
+import { language, setLanguage } from "@/helper/i18n";
 import { StoreManagerService } from "@/services/store";
 import { TTSService } from "@/services/tts";
 import { ReplyEvent } from "@/types";
@@ -499,6 +501,32 @@ events.push(
       message: "Unable to save the tray setting.",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.SET_TRAY),
+  },
+);
+
+// Applies on pick, like the tray. Every window shows the change, so there's
+// no success notice.
+events.push(
+  APP_EVENTS.SET_LANGUAGE,
+  async ({ storeManagerService }, e, { language: setting }) => {
+    if (
+      setting !== "system" &&
+      !APP_LANGUAGES.some(({ tag }) => tag === setting)
+    ) {
+      replySettings(e, storeManagerService);
+      throw new Error(`Tokio has no language "${setting}".`);
+    }
+    const saved = await storeManagerService.updateLanguage(setting);
+    setLanguage(setting);
+    e.reply(APP_EVENTS_RESPONSE.LANGUAGE, language());
+    replySettings(e, storeManagerService);
+    if (!saved) throw saveFailure();
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "Unable to save the language setting.",
+    },
   },
 );
 

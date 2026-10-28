@@ -5,6 +5,7 @@ import {
   gameOverlayRows,
   MINECRAFT_PICTURES_PATH,
 } from "@/common/util";
+import { language } from "@/helper/i18n";
 import Logger from "@/logger";
 import { AppHandlerVariables } from "@/types";
 
@@ -52,6 +53,7 @@ export async function sendGamesOverlay({
         gifts,
         emotes: profile.emotes,
         mediaURL,
+        language: language(),
       }),
     };
     serverService.sendToClient(GAMES_PATH, { type: GAMES_OVERLAY, data });

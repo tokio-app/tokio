@@ -10,6 +10,7 @@ import {
   useNotifications,
   useUpdateStatus,
 } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { TitleBar } from "@/ui/TitleBar";
 import { Link, Outlet } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -28,20 +29,21 @@ import styles from "./layout.module.css";
 
 // Lucide only, so the rail's strokes match
 const NAV_ITEMS = [
-  { to: "/", label: "Home", icon: LuRadio },
-  { to: "/overlays", label: "Overlays", icon: LuPictureInPicture2 },
-  { to: "/tts", label: "TTS", icon: LuSpeech },
-  { to: "/alerts", label: "Alerts", icon: LuPartyPopper },
-  { to: "/music", label: "Music", icon: LuListMusic },
-  { to: "/games", label: "Games", icon: LuGamepad2 },
+  { to: "/", label: "nav.home", icon: LuRadio },
+  { to: "/overlays", label: "nav.overlays", icon: LuPictureInPicture2 },
+  { to: "/tts", label: "nav.tts", icon: LuSpeech },
+  { to: "/alerts", label: "nav.alerts", icon: LuPartyPopper },
+  { to: "/music", label: "nav.music", icon: LuListMusic },
+  { to: "/games", label: "nav.games", icon: LuGamepad2 },
   // Pinned to the bottom of the sidebar from here on
-  { to: "/tools", label: "Tools", icon: LuFlaskConical, bottom: true },
+  { to: "/tools", label: "nav.tools", icon: LuFlaskConical, bottom: true },
   // Shows the license notices, keep it in the sidebar
-  { to: "/about", label: "About", icon: LuInfo },
-  { to: "/settings", label: "Settings", icon: LuSettings },
+  { to: "/about", label: "nav.about", icon: LuInfo },
+  { to: "/settings", label: "nav.settings", icon: LuSettings },
 ] as const;
 
 export function Layout() {
+  const t = useT();
   const { resumeContext } = useAudio();
   const notifications = useNotifications();
   const updateStatus = useUpdateStatus();
@@ -124,7 +126,7 @@ export function Layout() {
               onFocus={() => setNamesHidden(false)}
             >
               <item.icon size={20} />
-              <span className={styles.sidebar_name}>{item.label}</span>
+              <span className={styles.sidebar_name}>{t(item.label)}</span>
             </Link>
           ))}
         </nav>

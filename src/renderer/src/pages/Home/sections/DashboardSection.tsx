@@ -1,6 +1,7 @@
 import { EULER_SIGNUP_URL } from "@/common/util";
 import { Btn, Input, Section } from "@/components";
 import { cx, formatDuration } from "@/helper";
+import { useLanguage } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { FiPlay, FiSquare } from "react-icons/fi";
@@ -45,6 +46,7 @@ export function DashboardSection({
   onConnect,
   onDisconnect,
 }: Props) {
+  const language = useLanguage();
   return (
     <Section
       title="Dashboard"
@@ -104,7 +106,7 @@ export function DashboardSection({
 
       <div className={styles.stats}>
         {stats.map(({ label, value }) => {
-          const { text, title } = statText(value, connected);
+          const { text, title } = statText(value, connected, language);
           return (
             <div key={label} className={styles.stat}>
               <span className={styles.stat_value} title={title}>

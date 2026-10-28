@@ -2,6 +2,7 @@ import { CustomGift } from "@/common/types";
 import { cx } from "@/helper/cx";
 import { formatList } from "@/helper/format";
 import { coinsLabel, giftsLabel } from "@/helper/gifts";
+import { useLanguage } from "@/ui/i18n";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { FiChevronDown } from "react-icons/fi";
@@ -81,6 +82,7 @@ function GiftField({
   selected: number[];
   onApply: (gifts: number[]) => void;
 }) {
+  const language = useLanguage();
   const [open, setOpen] = useState(false);
 
   // In the list's order. Ids it doesn't have are still counted, the trigger
@@ -121,10 +123,12 @@ function GiftField({
                 </span>
               )}
               <span className={styles.name}>
-                {only ? only.label : giftsLabel(selected.length)}
+                {only ? only.label : giftsLabel(selected.length, language)}
               </span>
               {only && (
-                <span className={styles.details}>{coinsLabel(only.coins)}</span>
+                <span className={styles.details}>
+                  {coinsLabel(only.coins, language)}
+                </span>
               )}
             </>
           )}

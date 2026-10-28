@@ -2,6 +2,7 @@ import { ActivityItem, ActivityUser } from "@/common/types";
 import { Btn, EmptyState, Section } from "@/components";
 import { cx } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
+import { useLanguage } from "@/ui/i18n";
 import { FiSettings } from "react-icons/fi";
 import styles from "../home.module.css";
 import { joinedText, Stat, statText } from "../helper";
@@ -42,6 +43,7 @@ const DID = {
 
 // What the viewer did, after their name
 function Action({ item }: { item: Exclude<ActivityItem, { type: "join" }> }) {
+  const language = useLanguage();
   if (item.type === "chat") {
     return (
       <p className={styles.event_message}>
@@ -60,7 +62,9 @@ function Action({ item }: { item: Exclude<ActivityItem, { type: "join" }> }) {
         {item.gift.image && (
           <img className={styles.inline_img} src={item.gift.image} alt="" />
         )}{" "}
-        <span className={styles.coins}>{coinsLabel(item.gift.coins)}</span>
+        <span className={styles.coins}>
+          {coinsLabel(item.gift.coins, language)}
+        </span>
       </>
     );
   }
@@ -104,6 +108,7 @@ export function ActivitySection({
   feedOff,
   onFeedSettings,
 }: Props) {
+  const language = useLanguage();
   return (
     <Section
       title="Activity"
@@ -115,7 +120,7 @@ export function ActivitySection({
     >
       <div className={styles.totals}>
         {totals.map(({ label, value }) => {
-          const { text, title } = statText(value, connected);
+          const { text, title } = statText(value, connected, language);
           return (
             <div key={label} className={styles.total}>
               <span className={styles.total_value} title={title}>

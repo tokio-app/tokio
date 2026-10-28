@@ -8,7 +8,6 @@ import {
 } from "@/common/schemas";
 import {
   AlertTrigger,
-  ALERT_TRIGGER_LABELS,
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   ChatEvent,
@@ -34,6 +33,7 @@ import {
   timerTriggers,
 } from "@/common/util";
 import config from "@/config";
+import { language, setLanguage } from "@/helper/i18n";
 import Logger from "@/logger";
 import type { AlertsService } from "@/services/alerts";
 import type { ReconnectState } from "@/services/connector/common";
@@ -189,6 +189,7 @@ function setup() {
     server: { enabled: true },
     updates: { auto: false },
     tray: { enabled: true },
+    language: "system",
     activityFeed: { ...defaultStoreData.settings.activityFeed },
     games: { minecraft: { enabled: true } },
   };
@@ -553,7 +554,7 @@ describe("init events", () => {
             level: "error",
             source: "alerts",
             code: FEEDBACK_CODES.ALERT_FAILED,
-            message: `Unable to play the ${ALERT_TRIGGER_LABELS[TOKIO_EVENTS.GIFT]} alert.`,
+            message: "Unable to play the Gift alert.",
           }),
         ]);
       });
@@ -926,6 +927,37 @@ describe("init events", () => {
         });
       });
 
+      it("sends the games overlay again in a new language", async () => {
+        const s = await live();
+        s.storeManagerService.getProfileData.mockResolvedValue({
+          ...profile,
+          games: {
+            ...profile.games,
+            actions: [
+              {
+                ...roseAction,
+                trigger: { ...roseAction.trigger, gifts: [] },
+                overlay: { ...roseAction.overlay, event: "" },
+              },
+            ],
+          },
+        });
+        s.serverService.sendToClient.mockClear();
+
+        setLanguage("es-419");
+
+        await vi.waitFor(() => {
+          expect(s.serverService.sendToClient).toHaveBeenCalledWith(
+            "games",
+            expect.objectContaining({
+              data: expect.objectContaining({
+                rows: [expect.objectContaining({ event: "Cualquier regalo" })],
+              }),
+            }),
+          );
+        });
+      });
+
       it("sends nothing to the timer's overlay", async () => {
         const s = await live();
         s.serverService.sendToClient.mockClear();
@@ -1195,13 +1227,32 @@ describe("init events", () => {
 
       change(s, 0);
 
-      const triggers = timerTriggers(s.timer.settings);
+      const triggers = timerTriggers(s.timer.settings, "en");
       expect(triggers).toContainEqual({ label: "Follow", value: "+30s" });
       expect(overlayPushes(s)).toEqual([
         expect.objectContaining({
           data: expect.objectContaining({ triggers }),
         }),
       ]);
+    });
+
+    it("sends the carousel to the overlay again in a new language", async () => {
+      const s = await live();
+      s.timer.settings.look.show_triggers = true;
+      s.serverService.sendToClient.mockClear();
+
+      setLanguage("es-419");
+
+      expect(overlayPushes(s)).toEqual([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            triggers: timerTriggers(s.timer.settings, "es-419"),
+          }),
+        }),
+      ]);
+      expect(
+        timerTriggers(s.timer.settings, "es-419").map((t) => t.label),
+      ).toContain("Seguir");
     });
 
     it("sends the timer to its overlay when it connects", async () => {
@@ -1811,6 +1862,35 @@ describe("init events", () => {
   });
 
   describe("LOAD_APP", () => {
+    it("shows the saved language from the store, before its reply on every load", async () => {
+      const s = setup();
+      s.settings.language = "es-419";
+
+      await load(s);
+      await load(s);
+
+      const watched: string[] = [
+        APP_EVENTS_RESPONSE.LANGUAGE,
+        APP_EVENTS_RESPONSE.LOAD_APP,
+      ];
+      expect(language()).toBe("es-419");
+      expect(
+        s.h
+          .sent()
+          .map(([channel]) => channel)
+          .filter((channel) => watched.includes(channel)),
+      ).toEqual([
+        APP_EVENTS_RESPONSE.LANGUAGE,
+        APP_EVENTS_RESPONSE.LOAD_APP,
+        APP_EVENTS_RESPONSE.LANGUAGE,
+        APP_EVENTS_RESPONSE.LOAD_APP,
+      ]);
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LANGUAGE)).toEqual([
+        "es-419",
+        "es-419",
+      ]);
+    });
+
     it("sets up the folders in the home folder and hands out the log files", async () => {
       const s = setup();
       app.getPath.mockImplementation((name) => `/users/${name}`);

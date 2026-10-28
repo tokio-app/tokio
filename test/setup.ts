@@ -1,3 +1,4 @@
+import { resetLanguage } from "@/helper/i18n";
 import Logger from "@/logger";
 import { isAbsolute } from "node:path";
 import { beforeEach, vi } from "vitest";
@@ -21,6 +22,7 @@ function keepLogsInTempFolders(logger: any) {
 // the test output readable.
 beforeEach(() => {
   resetElectron();
+  resetLanguage();
   keepLogsInTempFolders(Logger);
   for (const method of ["log", "warn", "error"] as const) {
     vi.spyOn(console, method).mockImplementation(() => {});

@@ -359,6 +359,12 @@ export class StoreManagerService extends Service {
     return this._queueSave();
   }
 
+  public async updateLanguage(language: string): Promise<boolean> {
+    this._ensureInitialized();
+    this._storeData!.settings.language = language;
+    return this._queueSave();
+  }
+
   public async updateActivityFeed(feed: ActivityFeed): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.activityFeed = { ...feed };

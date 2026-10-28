@@ -43,6 +43,7 @@ import {
 } from "@/components";
 import thumbs from "@/components/MediaPicker/mediapicker.module.css";
 import { AlertTestRequest } from "@/hooks";
+import { useOptions, useT } from "@/ui/i18n";
 import { ReactNode, RefObject, useEffect, useRef, useState } from "react";
 import {
   FiImage,
@@ -105,12 +106,15 @@ export function AlertEditor({
   onPickMedia,
   onClose,
 }: Props) {
+  const t = useT();
   const [tab, setTab] = useState<Tab>("trigger");
   const test = alertTest(alert);
 
   return (
     <Modal
-      title={`${ALERT_TRIGGER_LABELS[alert.trigger.type]} alert`}
+      title={t("alerts.editor.title", {
+        trigger: t(ALERT_TRIGGER_LABELS[alert.trigger.type]),
+      })}
       maxWidth="720px"
       onClose={onClose}
       footer={
@@ -172,6 +176,8 @@ type TriggerTabProps = {
 };
 
 function TriggerTab({ trigger, gifts, emotes, onChange }: TriggerTabProps) {
+  const t = useT();
+  const triggers = useOptions(TRIGGER_OPTIONS);
   const filter = FILTER_LABELS[trigger.type];
   const { roles } = trigger;
 
@@ -180,7 +186,7 @@ function TriggerTab({ trigger, gifts, emotes, onChange }: TriggerTabProps) {
       <Field label="Event">
         <Select
           aria-label="Event"
-          options={TRIGGER_OPTIONS}
+          options={triggers}
           value={trigger.type}
           onChange={(type) => onChange({ ...trigger, type })}
         />
@@ -225,7 +231,7 @@ function TriggerTab({ trigger, gifts, emotes, onChange }: TriggerTabProps) {
             {VIEWER_ROLES.map((role) => (
               <Check
                 key={role}
-                label={ROLE_NAMES[role]}
+                label={t(ROLE_NAMES[role])}
                 checked={roles.includes(role)}
                 onChange={(e) =>
                   onChange({

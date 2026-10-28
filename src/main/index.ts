@@ -1,6 +1,7 @@
 import { APP_EVENTS_RESPONSE } from "@/common/types";
 import { formatError, MEDIA_SCHEME, mediaKind } from "@/common/util";
 import { Notifier } from "@/helper/feedback";
+import { language, savedLanguage, setLanguage } from "@/helper/i18n";
 import {
   mediaFile,
   previewFile,
@@ -122,12 +123,18 @@ const APP_PRELOAD = join(__dirname, "../preload/index.cjs");
 
 let win: BrowserWindow | null = null;
 
-// A page of the renderer build, served by the dev server in development
+// A page of the renderer build, served by the dev server in development. It
+// starts in main's language (?lang), even when LOAD_APP fails.
 function loadPage(window: BrowserWindow, page: string) {
+  const lang = language();
   if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-    window.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/${page}`);
+    window.loadURL(
+      `${process.env["ELECTRON_RENDERER_URL"]}/${page}?lang=${encodeURIComponent(lang)}`,
+    );
   } else {
-    window.loadFile(join(__dirname, `../renderer/${page}`));
+    window.loadFile(join(__dirname, `../renderer/${page}`), {
+      query: { lang },
+    });
   }
 }
 
@@ -217,6 +224,9 @@ app.whenReady().then(async () => {
     return net.fetch(pathToFileURL(file).href, { headers: request.headers });
   });
 
+  // The splash shows before the store loads, so the saved language is read
+  // from its file here. startApp applies it again once the store has loaded.
+  setLanguage(savedLanguage(app.getPath("home")));
   createWindows();
 });
 

@@ -1,10 +1,17 @@
 import { app, trays } from "@test/electron";
+import { setLanguage } from "@/helper/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { TrayService } from ".";
 
+// The labels of the tray's last menu
+const labels = () => {
+  const [menu] = trays()[0].setContextMenu.mock.calls.at(-1)!;
+  return menu.items.map((i) => i.label);
+};
+
 // The tray's menu item with this label
 const item = (label: string) => {
-  const [menu] = trays()[0].setContextMenu.mock.calls[0];
+  const [menu] = trays()[0].setContextMenu.mock.calls.at(-1)!;
   return menu.items.find((i) => i.label === label)!;
 };
 
@@ -47,5 +54,20 @@ describe("TrayService", () => {
 
     tray.setEnabled(true);
     expect(trays()).toHaveLength(2);
+  });
+
+  it("builds its menu again in the language Tokio switches to", () => {
+    const tray = new TrayService();
+    // Nothing to build while it's off
+    setLanguage("es-419");
+    setLanguage("en");
+
+    tray.setEnabled(true);
+    expect(labels()).toEqual(["Open Tokio", "Quit Tokio"]);
+
+    setLanguage("es-419");
+    expect(labels()).toEqual(["Abrir Tokio", "Salir de Tokio"]);
+    item("Salir de Tokio").click!();
+    expect(app.quit).toHaveBeenCalledOnce();
   });
 });

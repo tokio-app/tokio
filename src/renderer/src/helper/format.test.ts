@@ -23,13 +23,21 @@ describe("parseList", () => {
 
 describe("formatStat", () => {
   it("gives a short text and the exact number", () => {
-    expect(formatStat(1234)).toEqual({ short: "1.2K", full: "1,234" });
-    expect(formatStat(1_550_000)).toEqual({ short: "1.6M", full: "1,550,000" });
+    expect(formatStat(1234, "en")).toEqual({ short: "1.2K", full: "1,234" });
+    expect(formatStat(1_550_000, "en")).toEqual({
+      short: "1.6M",
+      full: "1,550,000",
+    });
+    // Latin American Spanish, with a no-break space before the K
+    expect(formatStat(1234, "es-419")).toEqual({
+      short: expect.stringMatching(/^1\.2\sK$/),
+      full: "1,234",
+    });
   });
 
   it("leaves small numbers as they are", () => {
-    expect(formatStat(0)).toEqual({ short: "0", full: "0" });
-    expect(formatStat(999)).toEqual({ short: "999", full: "999" });
+    expect(formatStat(0, "en")).toEqual({ short: "0", full: "0" });
+    expect(formatStat(999, "en")).toEqual({ short: "999", full: "999" });
   });
 });
 

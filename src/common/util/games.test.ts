@@ -16,7 +16,6 @@ import {
   gameOverlayRows,
   gameStepsText,
   giftNames,
-  orList,
 } from "./games";
 
 const gift = (value: number, label: string, img = `${label}.png`) =>
@@ -42,21 +41,12 @@ const action = (
   return a;
 };
 
-describe("orList", () => {
-  it("names them all up to the most, then how many more", () => {
-    const names = ["Rose", "Lion", "Galaxy", "Universe"];
-
-    expect(orList(names.slice(0, 3), 3)).toBe("Rose or Lion or Galaxy");
-    expect(orList(names, 3)).toBe("Rose, Lion or 2 more");
-    expect(orList(names)).toBe("Rose or Lion or Galaxy or Universe");
-  });
-});
-
 describe("giftNames", () => {
   it("names the gifts the lists have, at most as many as asked", () => {
-    expect(giftNames([5655, 6369, 1], gifts, 2)).toBe("Rose or 2 more");
-    expect(giftNames([5655, 6369], gifts)).toBe("Rose or Lion");
-    expect(giftNames([42], gifts)).toBeNull();
+    expect(giftNames([5655, 6369, 1], gifts, "en", 2)).toBe("Rose or 2 more");
+    expect(giftNames([5655, 6369, 1], gifts, "en")).toBe("Rose, Lion, or Bare");
+    expect(giftNames([5655, 6369], gifts, "es-419")).toBe("Rose o Lion");
+    expect(giftNames([42], gifts, "en")).toBeNull();
   });
 });
 
@@ -69,6 +59,7 @@ const sources = {
   gifts,
   emotes,
   mediaURL: (file: string) => `/games/minecraft/pictures/${file}`,
+  language: "en",
 };
 
 const rows = (...actions: GameAction[]) =>
@@ -187,6 +178,7 @@ describe("gameStepsText", () => {
         a.edition = edition;
         a.steps = list;
       }),
+      "en",
     );
 
   it("names what the steps make, as the action's edition names it", () => {
@@ -255,8 +247,10 @@ describe("gameStepsText", () => {
     });
 
     expect(gameCount(zombies)).toBe(5);
-    expect(gameStepsText(zombies, true)).toBe("Thunder, Zombie, Diamond ×3");
-    expect(gameStepsText(zombies)).toBe("Thunder, Zombie ×5, Diamond ×3");
+    expect(gameStepsText(zombies, "en", true)).toBe(
+      "Thunder, Zombie, Diamond ×3",
+    );
+    expect(gameStepsText(zombies, "en")).toBe("Thunder, Zombie ×5, Diamond ×3");
     expect(gameCount(action())).toBe(0);
   });
 
@@ -286,19 +280,37 @@ describe("gameStepsText", () => {
 
     expect(rows(zombie)[0].name).toBe("Zombie");
   });
+
+  it("names Tokio's own steps in the language, and mobs and items in English", () => {
+    const night = action((a) => {
+      a.steps = [
+        { type: "spawn", mob: "zombie", amount: 2, name: "" },
+        { type: "time", time: "night" },
+        { type: "help", help: "heal", duration: 30 },
+      ];
+    });
+
+    expect(gameStepsText(night, "es-419")).toBe(
+      "Zombie ×2, Noche, Curación completa",
+    );
+  });
 });
 
 describe("gameEventText", () => {
-  const text = (a: GameAction) => gameEventText(a, gifts);
+  const text = (a: GameAction, language = "en") =>
+    gameEventText(a, gifts, language);
 
   it("names the gifts, or any gift when none are picked", () => {
     const giftAction = (ids: number[]) =>
       action((a) => (a.trigger.gifts = ids), TOKIO_EVENTS.GIFT);
 
     expect(text(giftAction([5655, 6369]))).toBe("Rose or Lion");
+    expect(text(giftAction([5655, 6369, 1]))).toBe("Rose, Lion, or Bare");
     expect(text(giftAction([]))).toBe("Any gift");
     // Until the gift lists load
     expect(text(giftAction([42]))).toBe("Gift");
+    expect(text(giftAction([]), "es-419")).toBe("Cualquier regalo");
+    expect(text(giftAction([42]), "es-419")).toBe("Regalo");
   });
 
   it("counts the likes", () => {
@@ -307,6 +319,7 @@ describe("gameEventText", () => {
 
     expect(text(likes(100))).toBe("100 likes");
     expect(text(likes(1))).toBe("1 like");
+    expect(text(likes(1000), "es-419")).toBe("1,000 Me gusta");
   });
 
   it("quotes chat's keyword, as the timer's carousel does", () => {

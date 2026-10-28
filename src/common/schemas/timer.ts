@@ -33,7 +33,14 @@ const TimerChatSchema = z.object({
   cooldown: z.number().min(0).default(30),
 });
 
-const name = (value: string) => z.string().max(40).default(value);
+// Blank is the app language's name (timerTriggers). A name saved as the old
+// English default reads as blank, so it follows the language too.
+const name = (legacy: string) =>
+  z
+    .string()
+    .max(40)
+    .transform((value) => (value === legacy ? "" : value))
+    .default("");
 
 // The triggers' names in the carousel, in the streamer's language. Coins and
 // likes show after their count: "1 coin", "100 likes".

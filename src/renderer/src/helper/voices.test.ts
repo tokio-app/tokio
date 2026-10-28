@@ -13,7 +13,7 @@ import {
 const ENGINES = [
   engine("edge", "Edge"),
   engine("windows", "Windows"),
-  engine("tiktok", "TikTok", "Session ID"),
+  engine("tiktok", "TikTok", "voiceKeys.sessionId"),
 ];
 
 const VOICES = [
