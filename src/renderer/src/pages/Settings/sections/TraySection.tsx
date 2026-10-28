@@ -13,10 +13,10 @@ export function TraySection({ enabled, onChange }: Props) {
     <Section
       icon={<FiInbox />}
       title={t("settings.tray.title")}
-      description="Open Tokio or quit from its icon."
+      description={t("settings.tray.description")}
     >
       <Check
-        label="Keep Tokio running in the tray when you close it"
+        label={t("settings.tray.label")}
         checked={enabled}
         onChange={(e) => onChange(e.target.checked)}
       />

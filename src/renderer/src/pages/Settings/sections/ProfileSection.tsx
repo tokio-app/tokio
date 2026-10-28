@@ -2,6 +2,7 @@ import { EntityMetadata } from "@/common/schemas";
 import { APP_EVENTS } from "@/common/types";
 import { Btn, Field, Section, Select } from "@/components";
 import { flushSettings } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { FiCopy, FiDownload, FiPlus, FiUpload, FiUsers } from "react-icons/fi";
 import styles from "../settings.module.css";
 
@@ -20,16 +21,17 @@ export function ProfileSection({
   onNew,
   onClone,
 }: Props) {
+  const t = useT();
   return (
     <Section
       icon={<FiUsers />}
-      title="Live Profiles"
-      description="Separate settings for different streams."
+      title={t("settings.profiles.title")}
+      description={t("settings.profiles.description")}
     >
       <div className={styles.profiles}>
         <Field
-          label="Active Profile"
-          hint={locked ? "(disconnect to switch)" : undefined}
+          label={t("settings.profiles.active")}
+          hint={locked ? t("settings.profiles.locked") : undefined}
           className={styles.profile_select}
         >
           <Select
@@ -46,18 +48,18 @@ export function ProfileSection({
         </Field>
 
         <div className={styles.buttons}>
-          <Btn title="Create New Profile" onClick={onNew}>
-            <FiPlus /> New
+          <Btn title={t("settings.profiles.newTitle")} onClick={onNew}>
+            <FiPlus /> {t("settings.profiles.new")}
           </Btn>
-          <Btn title="Clone a Profile" onClick={onClone}>
-            <FiCopy /> Clone
+          <Btn title={t("settings.profiles.cloneHint")} onClick={onClone}>
+            <FiCopy /> {t("settings.profiles.clone")}
           </Btn>
           <Btn
             onClick={() =>
               window.api.emit(APP_EVENTS.IMPORT_ENTITY, { type: "profile" })
             }
           >
-            <FiDownload /> Import
+            <FiDownload /> {t("common.import")}
           </Btn>
           <Btn
             onClick={() =>
@@ -67,7 +69,7 @@ export function ProfileSection({
               })
             }
           >
-            <FiUpload /> Export
+            <FiUpload /> {t("common.export")}
           </Btn>
         </div>
       </div>

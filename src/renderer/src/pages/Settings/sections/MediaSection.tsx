@@ -12,11 +12,13 @@ import {
   useVideoURL,
 } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiImage, FiMaximize2, FiTrash2, FiUpload } from "react-icons/fi";
 import styles from "../settings.module.css";
 
 export function MediaSection() {
+  const t = useT();
   const [media, setMedia] = useState<MediaFile[]>([]);
   const [error, setError] = useState(false);
   // File shown full size
@@ -69,12 +71,12 @@ export function MediaSection() {
 
       <Section
         icon={<FiImage />}
-        title="Media Library"
-        description="Images and videos for alerts, shared by every profile."
+        title={t("settings.media.title")}
+        description={t("settings.media.description")}
         actions={
           <Btn
             variant="icon"
-            title="Upload"
+            title={t("common.upload")}
             onClick={() => window.api.emit(APP_EVENTS.UPLOAD_MEDIA)}
           >
             <FiUpload size={20} />
@@ -82,7 +84,7 @@ export function MediaSection() {
         }
       >
         {media.length === 0 ? (
-          <EmptyState>No media yet.</EmptyState>
+          <EmptyState>{t("settings.media.empty")}</EmptyState>
         ) : (
           <div className={styles.library}>
             {media.map((file) => (
@@ -104,14 +106,14 @@ export function MediaSection() {
                 <SoundLength seconds={lengths[file.file]} />
                 <Btn
                   variant="icon"
-                  title="Full size"
+                  title={t("settings.media.fullSize")}
                   onClick={() => setShowing(file)}
                 >
                   <FiMaximize2 size={20} />
                 </Btn>
                 <Btn
                   variant="icon"
-                  title="Delete"
+                  title={t("common.delete")}
                   onClick={() => setRemoving(file)}
                 >
                   <FiTrash2 size={20} />
@@ -121,11 +123,7 @@ export function MediaSection() {
           </div>
         )}
 
-        {error && (
-          <p className={styles.error}>
-            Some media couldn't be uploaded or removed.
-          </p>
-        )}
+        {error && <p className={styles.error}>{t("settings.media.error")}</p>}
       </Section>
     </>
   );

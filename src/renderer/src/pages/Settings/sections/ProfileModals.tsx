@@ -2,6 +2,7 @@ import { EntityMetadata } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { Field, Input, Modal, Select } from "@/components";
 import { useIpcListener } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 
 // Open until main answers: a refused name stays to fix, the notice says why.
@@ -19,6 +20,7 @@ function useAnswered(
 }
 
 export function NewProfileModal({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [waiting, setWaiting] = useAnswered(
     APP_EVENTS_RESPONSE.CREATE_PROFILE,
@@ -27,9 +29,9 @@ export function NewProfileModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="Create New Profile"
-      description="Enter a name for your new streamer profile. This will start with completely blank settings."
-      confirmText="Create Profile"
+      title={t("settings.profiles.newTitle")}
+      description={t("settings.profiles.newDescription")}
+      confirmText={t("settings.profiles.create")}
       onClose={onClose}
       onConfirm={() => {
         if (!name.trim() || waiting) return;
@@ -37,9 +39,9 @@ export function NewProfileModal({ onClose }: { onClose: () => void }) {
         window.api.emit(APP_EVENTS.CREATE_PROFILE, { name });
       }}
     >
-      <Field label="Profile Name">
+      <Field label={t("settings.profiles.name")}>
         <Input
-          placeholder="e.g. Chill Stream"
+          placeholder={t("settings.profiles.namePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
           autoFocus
@@ -57,6 +59,7 @@ type CloneProps = {
 };
 
 export function CloneProfileModal({ profiles, active, onClose }: CloneProps) {
+  const t = useT();
   const [ref, setRef] = useState(active.file);
   const [name, setName] = useState("");
   const [waiting, setWaiting] = useAnswered(
@@ -66,9 +69,9 @@ export function CloneProfileModal({ profiles, active, onClose }: CloneProps) {
 
   return (
     <Modal
-      title="Clone Existing Profile"
-      description="Select an existing profile to copy its settings, and give the new clone a name."
-      confirmText="Clone Profile"
+      title={t("settings.profiles.cloneTitle")}
+      description={t("settings.profiles.cloneDescription")}
+      confirmText={t("settings.profiles.cloneConfirm")}
       onClose={onClose}
       onConfirm={() => {
         if (!name.trim() || waiting) return;
@@ -76,16 +79,16 @@ export function CloneProfileModal({ profiles, active, onClose }: CloneProps) {
         window.api.emit(APP_EVENTS.CLONE_PROFILE, { name, ref });
       }}
     >
-      <Field label="Profile to Clone">
+      <Field label={t("settings.profiles.cloneFrom")}>
         <Select
           options={profiles.map((p) => ({ label: p.name, value: p.file }))}
           value={ref}
           onChange={setRef}
         />
       </Field>
-      <Field label="New Profile Name">
+      <Field label={t("settings.profiles.cloneName")}>
         <Input
-          placeholder="e.g. Horror Stream Layout"
+          placeholder={t("settings.profiles.cloneNamePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />

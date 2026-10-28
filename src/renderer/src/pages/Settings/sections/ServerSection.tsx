@@ -1,6 +1,7 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { Check, CopyField, Field, FormGrid, Section } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiMonitor } from "react-icons/fi";
 import styles from "../settings.module.css";
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function ServerSection({ enabled, onChange }: Props) {
+  const t = useT();
   // This PC's addresses, once main answers
   const [addresses, setAddresses] = useState<string[] | null>(null);
 
@@ -22,11 +24,11 @@ export function ServerSection({ enabled, onChange }: Props) {
   return (
     <Section
       icon={<FiMonitor />}
-      title="Overlay Server"
-      description="Serves your overlays to your streaming app."
+      title={t("settings.server.title")}
+      description={t("settings.server.description")}
     >
       <Check
-        label="Enable Server"
+        label={t("settings.server.enable")}
         checked={enabled}
         onChange={(e) => onChange(e.target.checked)}
       />
@@ -36,14 +38,20 @@ export function ServerSection({ enabled, onChange }: Props) {
       {addresses && (
         <FormGrid>
           <Field
-            label="Network address"
-            hint="(for tokio-app.local on another computer)"
+            label={t("settings.server.address")}
+            hint={t("settings.server.addressHint")}
           >
             {addresses.length === 0 ? (
-              <p className={styles.library_meta}>No network address found.</p>
+              <p className={styles.library_meta}>
+                {t("settings.server.noAddress")}
+              </p>
             ) : (
               addresses.map((ip) => (
-                <CopyField key={ip} value={ip} title="Copy address" />
+                <CopyField
+                  key={ip}
+                  value={ip}
+                  title={t("settings.server.copyAddress")}
+                />
               ))
             )}
           </Field>

@@ -10,6 +10,7 @@ type EngineKey = VoiceEngine & { key: string };
 
 // Keys for the voice engines that take one. Hidden when none does.
 export function VoiceKeysSection() {
+  const t = useT();
   const [engines, setEngines] = useState<EngineKey[]>([]);
 
   useIpcRequest(APP_EVENTS.GET_VOICE_KEYS);
@@ -23,8 +24,8 @@ export function VoiceKeysSection() {
   return (
     <Section
       icon={<FiKey />}
-      title="Voice Engines"
-      description="Keys for the TTS voice engines."
+      title={t("settings.voiceKeys.title")}
+      description={t("settings.voiceKeys.description")}
     >
       <FormGrid>
         {engines.map((engine) => (
@@ -49,10 +50,16 @@ function KeyForm({ engine }: { engine: EngineKey }) {
 
   return (
     <div className={styles.provider}>
-      <Field label={`${engine.label} voices`} hint={`(${keyLabel}, optional)`}>
+      <Field
+        label={t("settings.voiceKeys.label", { engine: engine.label })}
+        hint={t("settings.voiceKeys.hint", { key: keyLabel })}
+      >
         <Input
           type="password"
-          placeholder={`${engine.label} ${keyLabel}...`}
+          placeholder={t("settings.voiceKeys.placeholder", {
+            engine: engine.label,
+            key: keyLabel,
+          })}
           value={key}
           onChange={(e) => setKey(e.target.value)}
         />
