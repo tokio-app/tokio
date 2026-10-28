@@ -7,7 +7,7 @@
 // dist/win-unpacked/tokio.exe. With --scale it renders at that device scale,
 // 2 for sharp screenshots, whatever the display's. With --lang it runs in
 // that language as the system's (TOKIO_LANG), en by default, so a run doesn't
-// depend on the machine's language.
+// depend on the machine's language. The steps file gets it as `lang`.
 import { _electron as electron } from "@playwright/test";
 import {
   copyFileSync,
@@ -146,7 +146,7 @@ try {
   const toggle = (locator) => locator.evaluate((el) => el.click());
 
   const page = await windowWith("index.html");
-  await steps({ app, page, home, push, toggle, windowWith });
+  await steps({ app, page, home, push, toggle, windowWith, lang: values.lang });
 } catch (error) {
   failed = true;
   console.error(error);
