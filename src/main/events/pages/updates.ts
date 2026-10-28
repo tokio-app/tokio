@@ -5,6 +5,7 @@ import {
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 
 const events = createStack("system");
 
@@ -24,7 +25,7 @@ events.push(
     if (!res.success) {
       throw new AppFailure(
         FEEDBACK_CODES.UPDATE_CHECK_FAILED,
-        "Unable to check for updates. Check your connection.",
+        t("main.updates.checkFailed"),
         { level: "warning", logged: true, cause: res.error },
       );
     }
@@ -48,7 +49,7 @@ events.push(
     if (!res.success) {
       throw new AppFailure(
         FEEDBACK_CODES.UPDATE_INSTALL_FAILED,
-        "No update is ready to install yet.",
+        t("main.updates.notReady"),
         { level: "warning", cause: res.error },
       );
     }
