@@ -15,4 +15,10 @@ describe("router", () => {
     expect(screen.getByText("Something went wrong!")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Home" })).toBeInTheDocument();
   });
+
+  it("says when a page doesn't exist", async () => {
+    await renderApp("/nowhere");
+
+    expect(screen.getByText("Not Found")).toBeInTheDocument();
+  });
 });

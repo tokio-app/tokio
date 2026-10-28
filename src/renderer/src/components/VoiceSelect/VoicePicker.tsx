@@ -8,7 +8,7 @@ import {
   VoiceFilter,
   voiceKey,
 } from "@/helper/voices";
-import { useT } from "@/ui/i18n";
+import { useLanguage, useT } from "@/ui/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Btn, Input, Select } from "../Elements";
 import { Modal } from "../Modal";
@@ -35,6 +35,7 @@ export function VoicePicker({
   onClose,
 }: Props) {
   const t = useT();
+  const language = useLanguage();
   const [filter, setFilter] = useState<VoiceFilter>({
     search: "",
     engine: "",
@@ -45,14 +46,17 @@ export function VoicePicker({
   const selectedRef = useRef<HTMLDivElement>(null);
 
   const entries = useMemo(
-    () => voiceEntries(voices, engines),
-    [voices, engines],
+    () => voiceEntries(voices, engines, language),
+    [voices, engines, language],
   );
   const engineChoices = useMemo(
-    () => engineOptions(entries, engines),
-    [entries, engines],
+    () => engineOptions(entries, engines, language),
+    [entries, engines, language],
   );
-  const languageChoices = useMemo(() => languageOptions(entries), [entries]);
+  const languageChoices = useMemo(
+    () => languageOptions(entries, language),
+    [entries, language],
+  );
   const shown = useMemo(() => filterVoices(entries, filter), [entries, filter]);
   const selected = voiceKey(value);
 

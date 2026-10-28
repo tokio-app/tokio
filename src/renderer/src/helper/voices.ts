@@ -1,22 +1,29 @@
+import { translate } from "@/common/i18n";
 import { VoiceData, VoiceEngine } from "@/common/types";
 import type { SelectOption } from "@/components/Elements";
 
 export const voiceKey = (voice: VoiceData) =>
   `${voice.engine}|${voice.lang}|${voice.name}`;
 
-const displayNames = new Intl.DisplayNames(["en"], {
-  type: "language",
-  languageDisplay: "standard",
-});
+// Language names in each window language, made once
+const displayNames = new Map<string, Intl.DisplayNames>();
 
 // Base language of a locale: "en" for "en-US", and for TikTok's "en".
 const languageOf = (lang: string) => lang.split(/[-_]/)[0].toLowerCase();
 
-// "English" for "en", "English (United States)" for "en-US". Tags Intl can't
-// read are shown as they are.
-function languageName(lang: string): string {
+// "English" for "en", "English (United States)" for "en-US", named in the
+// window's language. Tags Intl can't read are shown as they are.
+function languageName(lang: string, language: string): string {
+  let names = displayNames.get(language);
+  if (!names) {
+    names = new Intl.DisplayNames([language], {
+      type: "language",
+      languageDisplay: "standard",
+    });
+    displayNames.set(language, names);
+  }
   try {
-    return displayNames.of(lang) ?? lang;
+    return names.of(lang) ?? lang;
   } catch {
     return lang;
   }
@@ -47,8 +54,12 @@ export function voiceSample(lang: string): string {
 
 // Locale and engine of a voice, e.g. "English (United States) · Edge". The
 // engine is left out until it's known.
-export function voiceDetails(voice: VoiceData, engines: VoiceEngine[]) {
-  const locale = languageName(voice.lang);
+export function voiceDetails(
+  voice: VoiceData,
+  engines: VoiceEngine[],
+  language: string,
+) {
+  const locale = languageName(voice.lang, language);
   const engine = engines.find((e) => e.id === voice.engine);
   return engine ? `${locale} · ${engine.label}` : locale;
 }
@@ -68,10 +79,11 @@ export type VoiceEntry = {
 export function voiceEntries(
   voices: VoiceData[],
   engines: VoiceEngine[],
+  language: string,
 ): VoiceEntry[] {
   return voices
     .map((voice) => {
-      const details = voiceDetails(voice, engines);
+      const details = voiceDetails(voice, engines, language);
       return {
         voice,
         key: voiceKey(voice),
@@ -82,8 +94,8 @@ export function voiceEntries(
     })
     .sort(
       (a, b) =>
-        a.details.localeCompare(b.details) ||
-        a.voice.name.localeCompare(b.voice.name),
+        a.details.localeCompare(b.details, language) ||
+        a.voice.name.localeCompare(b.voice.name, language),
     );
 }
 
@@ -107,10 +119,14 @@ export function filterVoices(
 export function engineOptions(
   entries: VoiceEntry[],
   engines: VoiceEngine[],
+  language: string,
 ): SelectOption<string>[] {
   const used = new Set(entries.map((e) => e.voice.engine));
   return [
-    { value: "", label: "All engines" },
+    {
+      value: "",
+      label: translate(language, "components.voicePicker.allEngines"),
+    },
     ...engines
       .filter((e) => used.has(e.id))
       .map((e) => ({ value: e.id, label: e.label })),
@@ -118,10 +134,19 @@ export function engineOptions(
 }
 
 // Base languages by name, e.g. "English" for en-US, en-GB and en.
-export function languageOptions(entries: VoiceEntry[]): SelectOption<string>[] {
+export function languageOptions(
+  entries: VoiceEntry[],
+  language: string,
+): SelectOption<string>[] {
   const languages = new Set(entries.map((e) => e.language));
   const options = [...languages]
-    .map((language) => ({ value: language, label: languageName(language) }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-  return [{ value: "", label: "All languages" }, ...options];
+    .map((base) => ({ value: base, label: languageName(base, language) }))
+    .sort((a, b) => a.label.localeCompare(b.label, language));
+  return [
+    {
+      value: "",
+      label: translate(language, "components.voicePicker.allLanguages"),
+    },
+    ...options,
+  ];
 }
