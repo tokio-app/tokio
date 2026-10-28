@@ -71,7 +71,7 @@ export function GiftPicker({
           <Btn onClick={onClose}>{t("common.cancel")}</Btn>
           {multiple && (
             <Btn variant="accent" onClick={() => onApply(picked)}>
-              {t("components.picker.done")}
+              {t("common.done")}
             </Btn>
           )}
         </>
@@ -148,7 +148,7 @@ function CoinFilter({ filter, onChange }: FilterProps) {
           <NumberInput
             integer
             min={0}
-            aria-label={t("components.gifts.coins")}
+            aria-label={t("common.coins")}
             className={styles.amount}
             value={filter.coins}
             onFocus={selectText}

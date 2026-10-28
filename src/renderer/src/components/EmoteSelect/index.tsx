@@ -149,7 +149,7 @@ function EmotePicker({ emotes, selected, onApply, onClose }: PickerProps) {
         <>
           <Btn onClick={onClose}>{t("common.cancel")}</Btn>
           <Btn variant="accent" onClick={() => onApply(picked)}>
-            {t("components.picker.done")}
+            {t("common.done")}
           </Btn>
         </>
       }

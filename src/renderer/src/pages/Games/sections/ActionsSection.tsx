@@ -325,7 +325,7 @@ function ActionItem({
             inputRef={textRef}
             value={stepText(steps[target]) ?? ""}
             onChange={(text) => setStep(target, withText(steps[target], text))}
-            empty={t("games.actions.noVariables")}
+            empty={t("common.noVariables")}
           />
         )}
       </div>
@@ -433,7 +433,7 @@ function StepFields({
           <Input
             ref={textRef}
             className={styles.name}
-            aria-label={t("games.step.name")}
+            aria-label={t("common.name")}
             placeholder={t("games.overlay.noName")}
             value={step.name}
             onFocus={onFocusText}
@@ -538,7 +538,7 @@ function StepFields({
               duration: (
                 <NumberInput
                   className={styles.amount}
-                  aria-label={t("games.step.durationLabel")}
+                  aria-label={t("common.durationSeconds")}
                   integer
                   min={1}
                   max={120}
@@ -580,7 +580,7 @@ function StepFields({
               duration: (
                 <NumberInput
                   className={styles.amount}
-                  aria-label={t("games.step.durationLabel")}
+                  aria-label={t("common.durationSeconds")}
                   integer
                   min={1}
                   max={600}

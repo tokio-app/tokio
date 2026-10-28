@@ -47,7 +47,7 @@ export function ProtectionSection({
             }
           />
         </Field>
-        <Field label={t("components.protection.queueLength")}>
+        <Field label={t("common.maxQueueLength")}>
           <NumberInput
             min={1}
             integer

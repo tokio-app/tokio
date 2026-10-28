@@ -53,7 +53,7 @@ export function VoiceSection({
           />
         </Field>
 
-        <Field label={t("tts.voice.speed", { speed: filters.speed })}>
+        <Field label={t("common.speed", { speed: filters.speed })}>
           <Slider
             min={0.5}
             max={2}
@@ -68,7 +68,7 @@ export function VoiceSection({
           />
         </Field>
 
-        <Field label={t("tts.voice.pitch", { pitch: filters.pitch })}>
+        <Field label={t("common.pitch", { pitch: filters.pitch })}>
           <Slider
             min={0.5}
             max={2}

@@ -155,7 +155,7 @@ function CountdownSection({
             }
           />
         </Field>
-        <Field label={t("tools.countdown.url")}>
+        <Field label={t("common.overlayUrl")}>
           <CopyField
             value={getOverlayURL(TIMER_PATH)}
             title={t("tools.countdown.copyUrl")}
@@ -280,7 +280,7 @@ function TimerLookSection({ settings, update }: SectionProps) {
             }}
           />
         </Field>
-        <p className={styles.note}>{t("tools.look.fontsNote")}</p>
+        <p className={styles.note}>{t("common.fontsNote")}</p>
       </FormGrid>
 
       <Check
@@ -438,7 +438,7 @@ function TimeAddedSection({ settings, update }: SectionProps) {
                   {/* Matched like chat alerts' keywords */}
                   <Input
                     aria-label={t("tools.added.keyword")}
-                    placeholder={t("tools.added.anyMessage")}
+                    placeholder={t("common.anyMessage")}
                     value={settings.chat.keyword}
                     onChange={(e) => {
                       const keyword = e.target.value;

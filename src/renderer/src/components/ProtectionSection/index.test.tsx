@@ -61,7 +61,7 @@ describe("ProtectionSection", () => {
 
     expect(screen.getByText("(seconds)")).toBeInTheDocument();
     expect(field("Cooldown")).toHaveValue(2);
-    expect(field("Max Queue Length")).toHaveValue(10);
+    expect(field("Max queue length")).toHaveValue(10);
   });
 
   it("saves the limits as numbers", async () => {
@@ -70,8 +70,8 @@ describe("ProtectionSection", () => {
 
     await user.clear(field("Cooldown"));
     await user.type(field("Cooldown"), "5");
-    await user.clear(field("Max Queue Length"));
-    await user.type(field("Max Queue Length"), "25");
+    await user.clear(field("Max queue length"));
+    await user.type(field("Max queue length"), "25");
 
     expect(current()).toEqual({ cooldown: 5, queue_length: 25 });
   });
@@ -80,7 +80,7 @@ describe("ProtectionSection", () => {
     render(<ProtectionForm />);
 
     for (const value of ["0", "2.5"]) {
-      fireEvent.change(field("Max Queue Length"), { target: { value } });
+      fireEvent.change(field("Max queue length"), { target: { value } });
     }
     fireEvent.change(field("Cooldown"), { target: { value: "-1" } });
     expect(current()).toEqual({ cooldown: 2, queue_length: 10 });
@@ -98,7 +98,7 @@ describe("ProtectionSection", () => {
     );
 
     expect(
-      field("Max Queue Length").compareDocumentPosition(
+      field("Max queue length").compareDocumentPosition(
         screen.getByPlaceholderText("Banned words"),
       ),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);

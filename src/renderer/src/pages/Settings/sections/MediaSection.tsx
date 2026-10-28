@@ -106,7 +106,7 @@ export function MediaSection() {
                 <SoundLength seconds={lengths[file.file]} />
                 <Btn
                   variant="icon"
-                  title={t("settings.media.fullSize")}
+                  title={t("common.fullSize")}
                   onClick={() => setShowing(file)}
                 >
                   <FiMaximize2 size={20} />

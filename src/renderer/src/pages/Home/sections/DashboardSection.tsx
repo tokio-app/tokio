@@ -85,11 +85,11 @@ export function DashboardSection({
         >
           {connected ? (
             <>
-              <FiSquare size={18} /> {t("home.dashboard.disconnect")}
+              <FiSquare size={18} /> {t("common.disconnect")}
             </>
           ) : (
             <>
-              <FiPlay size={18} /> {t("home.dashboard.connect")}
+              <FiPlay size={18} /> {t("common.connect")}
             </>
           )}
         </Btn>

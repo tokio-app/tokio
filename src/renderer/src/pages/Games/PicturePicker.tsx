@@ -92,7 +92,7 @@ export function PicturePicker({
               {t("games.pictures.browse")}
             </Btn>
             <Btn variant="accent" onClick={onClose}>
-              {t("games.pictures.done")}
+              {t("common.done")}
             </Btn>
           </>
         }

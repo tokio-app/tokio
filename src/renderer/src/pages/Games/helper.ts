@@ -221,7 +221,7 @@ export function testSummary(results: CommandResult[], language: string) {
 const STATUS_TEXT: Record<GameStatus["state"], MessageKey> = {
   off: "games.status.off",
   waiting: "games.status.waiting",
-  connected: "games.status.connected",
+  connected: "common.connected",
   error: "games.status.error",
 };
 

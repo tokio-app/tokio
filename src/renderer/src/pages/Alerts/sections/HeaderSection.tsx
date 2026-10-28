@@ -57,7 +57,7 @@ export function HeaderSection({
           }
         />
         <label className={styles.queue_length}>
-          {t("alerts.header.queueLength")}
+          {t("common.maxQueueLength")}
           <NumberInput
             min={1}
             integer

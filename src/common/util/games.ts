@@ -117,7 +117,7 @@ export function gameEventText(
   const label = translate(language, ALERT_TRIGGER_LABELS[trigger.type]);
   if (trigger.type === TOKIO_EVENTS.GIFT) {
     if (trigger.gifts.length === 0) {
-      return translate(language, "minecraft.anyGift");
+      return translate(language, "common.anyGift");
     }
     return giftNames(trigger.gifts, gifts, language) ?? label;
   }

@@ -68,7 +68,7 @@ export function TriggerFilter({
       return (
         <div className={styles.stack}>
           <GiftMultiSelect
-            placeholder={t("components.alertItem.anyGift")}
+            placeholder={t("common.anyGift")}
             gifts={gifts}
             value={trigger.gifts}
             onChange={(ids) => onChange({ ...trigger, gifts: ids })}
@@ -97,7 +97,7 @@ export function TriggerFilter({
       return (
         <Input
           className={styles.fill}
-          placeholder={t("components.alertItem.anyMessage")}
+          placeholder={t("common.anyMessage")}
           value={trigger.keyword}
           onChange={(e) => onChange({ ...trigger, keyword: e.target.value })}
         />
@@ -139,7 +139,7 @@ export function triggerSummary(
     case TOKIO_EVENTS.GIFT:
       parts.push(
         trigger.gifts.length === 0
-          ? t("components.alertItem.anyGift")
+          ? t("common.anyGift")
           : // Gifts the lists don't have yet, until they load
             (giftNames(trigger.gifts, gifts, language, NAMED) ??
               t("components.alertItem.someGifts")),
@@ -170,7 +170,7 @@ export function triggerSummary(
       parts.push(
         keyword
           ? t("components.alertItem.keyword", { keyword })
-          : t("components.alertItem.anyMessage"),
+          : t("common.anyMessage"),
       );
       break;
     }
@@ -280,7 +280,7 @@ export function AlertItem({
               )}
               <span className={styles.text}>
                 {tts
-                  ? t("components.alertItem.ttsMessage", {
+                  ? t("common.quotedMessage", {
                       message: tts.message,
                     })
                   : sound?.name}

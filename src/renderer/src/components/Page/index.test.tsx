@@ -130,14 +130,14 @@ describe("FormGrid", () => {
         <Field label="Cooldown">
           <input />
         </Field>
-        <Field label="Max Queue Length">
+        <Field label="Max queue length">
           <input />
         </Field>
       </FormGrid>,
     );
 
     expect(screen.getAllByRole("textbox")).toHaveLength(2);
-    expect(screen.getByText("Max Queue Length")).toBeInTheDocument();
+    expect(screen.getByText("Max queue length")).toBeInTheDocument();
   });
 });
 

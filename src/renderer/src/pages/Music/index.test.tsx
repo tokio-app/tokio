@@ -84,7 +84,7 @@ describe("Music", () => {
       screen.getByRole("checkbox", { name: "Followers Only" }),
     ).toBeChecked();
     expect(field("Cooldown").getByRole("spinbutton")).toHaveValue(4);
-    expect(field("Max Queue Length").getByRole("spinbutton")).toHaveValue(15);
+    expect(field("Max queue length").getByRole("spinbutton")).toHaveValue(15);
   });
 
   it("switches the provider with the tabs", async () => {
@@ -209,7 +209,7 @@ describe("Music", () => {
     fireEvent.change(field("Cooldown").getByRole("spinbutton"), {
       target: { value: "10" },
     });
-    fireEvent.change(field("Max Queue Length").getByRole("spinbutton"), {
+    fireEvent.change(field("Max queue length").getByRole("spinbutton"), {
       target: { value: "2" },
     });
 

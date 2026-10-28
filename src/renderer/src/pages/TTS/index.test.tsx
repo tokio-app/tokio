@@ -95,7 +95,7 @@ describe("TTS", () => {
     );
 
     expect(field("Cooldown").getByRole("spinbutton")).toHaveValue(5);
-    expect(field("Max Queue Length").getByRole("spinbutton")).toHaveValue(20);
+    expect(field("Max queue length").getByRole("spinbutton")).toHaveValue(20);
     expect(field("Max Comment Length").getByRole("spinbutton")).toHaveValue(
       150,
     );
@@ -419,7 +419,7 @@ describe("TTS", () => {
     fireEvent.change(field("Cooldown").getByRole("spinbutton"), {
       target: { value: "8" },
     });
-    fireEvent.change(field("Max Queue Length").getByRole("spinbutton"), {
+    fireEvent.change(field("Max queue length").getByRole("spinbutton"), {
       target: { value: "3" },
     });
     fireEvent.change(field("Max Comment Length").getByRole("spinbutton"), {

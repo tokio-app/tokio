@@ -121,13 +121,13 @@ export function AlertEditor({
       onClose={onClose}
       footer={
         <Btn variant="accent" onClick={onClose}>
-          {t("alerts.editor.done")}
+          {t("common.done")}
         </Btn>
       }
     >
       {/* The whole alert's, so above the tabs */}
       <label className={styles.name}>
-        {t("alerts.editor.name")}
+        {t("common.name")}
         <Input
           className={styles.name_input}
           placeholder={defaultAlertName(index)}
@@ -215,7 +215,7 @@ function TriggerTab({ trigger, gifts, emotes, onChange }: TriggerTabProps) {
                   integer
                   min={0}
                   className={styles.number}
-                  aria-label={t("alerts.editor.coins")}
+                  aria-label={t("common.coins")}
                   value={trigger.min_coins}
                   onChange={(min_coins) => onChange({ ...trigger, min_coins })}
                 />
@@ -309,7 +309,7 @@ function SoundTab({
           <>
             <FiMessageSquare size={18} aria-hidden />
             <span className={styles.current_name}>
-              {t("alerts.editor.ttsMessage", { message: tts.message })}
+              {t("common.quotedMessage", { message: tts.message })}
             </span>
           </>
         ) : sound ? (
@@ -448,7 +448,7 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
                       min={1}
                       max={MEDIA_MAX_DURATION}
                       className={styles.number}
-                      aria-label={t("alerts.editor.durationLabel")}
+                      aria-label={t("common.durationSeconds")}
                       value={media.duration}
                       onChange={(duration) =>
                         onChange({ ...alert, media: { ...media, duration } })
@@ -496,10 +496,10 @@ function MediaTab({ alert, onChange, onPick }: TabProps) {
         </Field>
       )}
 
-      <Field label={t("alerts.editor.overlayUrl")}>
+      <Field label={t("common.overlayUrl")}>
         <CopyField
           value={getAlertOverlayURL(alert.id)}
-          title={t("alerts.editor.copyUrl")}
+          title={t("common.copyUrl")}
         />
       </Field>
     </>

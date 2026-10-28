@@ -86,7 +86,7 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
       <OverlayPreview overlay={overlay}>
         <Btn
           variant="icon"
-          title={t("components.overlayView.fullSize")}
+          title={t("common.fullSize")}
           className={styles.expand}
           onClick={() => setExpanded(true)}
         >
@@ -96,7 +96,7 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
 
       <CopyField
         value={getOverlayURL(overlay.id)}
-        title={t("components.overlayView.copyUrl")}
+        title={t("common.copyUrl")}
       />
     </div>
   );

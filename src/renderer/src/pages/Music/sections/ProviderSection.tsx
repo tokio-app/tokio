@@ -57,9 +57,7 @@ export function ProviderSection({
           status: (
             <span className={cx(connected && styles.status_connected)}>
               {t(
-                connected
-                  ? "music.provider.connected"
-                  : "music.provider.disconnected",
+                connected ? "common.connected" : "music.provider.disconnected",
               )}
             </span>
           ),
@@ -114,9 +112,7 @@ export function ProviderSection({
           disabled={missingKey}
           onClick={onConnect}
         >
-          {t(
-            connected ? "music.provider.disconnect" : "music.provider.connect",
-          )}
+          {t(connected ? "common.disconnect" : "common.connect")}
         </Btn>
       </div>
     </Section>

@@ -303,7 +303,7 @@ export function OverlaySection({
               </Field>
             ))}
           </div>
-          <p className={styles.note}>{t("games.overlay.fontNote")}</p>
+          <p className={styles.note}>{t("common.fontsNote")}</p>
         </div>
       </div>
     </Section>

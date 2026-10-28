@@ -71,7 +71,7 @@ export function TtsTab({
           inputRef={messageRef}
           value={value.message}
           onChange={(message) => onChange({ ...value, message })}
-          empty={t("components.soundPicker.noVariables")}
+          empty={t("common.noVariables")}
         />
       </Field>
 
@@ -83,7 +83,7 @@ export function TtsTab({
         />
       </Field>
 
-      <Field label={t("components.soundPicker.speed", { speed: value.speed })}>
+      <Field label={t("common.speed", { speed: value.speed })}>
         <Slider
           min={0.5}
           max={2}
@@ -93,7 +93,7 @@ export function TtsTab({
         />
       </Field>
 
-      <Field label={t("components.soundPicker.pitch", { pitch: value.pitch })}>
+      <Field label={t("common.pitch", { pitch: value.pitch })}>
         <Slider
           min={0.5}
           max={2}

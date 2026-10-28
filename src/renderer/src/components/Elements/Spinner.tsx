@@ -6,7 +6,7 @@ export function Spinner({ size = 16 }: { size?: number }) {
   return (
     <span
       role="status"
-      aria-label={t("components.spinner.name")}
+      aria-label={t("common.loading")}
       className={styles.spinner}
       style={{ width: size, height: size }}
     />
