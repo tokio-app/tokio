@@ -53,13 +53,13 @@ export function Music() {
       />
 
       <PermissionsSection
-        feature="Music"
+        feature={t("nav.music")}
         permissions={settings.permissions}
         update={scopeUpdater(update, "permissions")}
       />
 
       <ProtectionSection
-        feature="Music"
+        feature={t("nav.music")}
         protection={settings.protection}
         update={scopeUpdater(update, "protection")}
       >
