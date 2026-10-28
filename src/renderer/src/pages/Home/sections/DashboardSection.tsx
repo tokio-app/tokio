@@ -1,7 +1,7 @@
 import { EULER_SIGNUP_URL } from "@/common/util";
 import { Btn, Input, Section } from "@/components";
 import { cx, formatDuration } from "@/helper";
-import { useLanguage } from "@/ui/i18n";
+import { rich, useLanguage, useT } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { FiPlay, FiSquare } from "react-icons/fi";
@@ -46,16 +46,17 @@ export function DashboardSection({
   onConnect,
   onDisconnect,
 }: Props) {
+  const t = useT();
   const language = useLanguage();
   return (
     <Section
-      title="Dashboard"
-      description="Connect to your TikTok LIVE to begin receiving events."
+      title={t("home.dashboard.title")}
+      description={t("home.dashboard.description")}
       actions={
         <p className={cx(styles.status, connected && styles.status_live)}>
           <span className={cx(styles.dot, connected && styles.dot_live)} />
           <span>
-            {connected ? "LIVE" : "Offline"}
+            {connected ? "LIVE" : t("home.dashboard.offline")}
             {connected && startedAt !== null && (
               <>
                 {" · "}
@@ -69,7 +70,7 @@ export function DashboardSection({
       <div className={styles.connect}>
         <Input
           className={styles.username}
-          placeholder="@username"
+          placeholder={t("home.dashboard.username")}
           value={username}
           disabled={connected}
           onChange={(e) => onUsernameChange(e.target.value)}
@@ -84,11 +85,11 @@ export function DashboardSection({
         >
           {connected ? (
             <>
-              <FiSquare size={18} /> Disconnect
+              <FiSquare size={18} /> {t("home.dashboard.disconnect")}
             </>
           ) : (
             <>
-              <FiPlay size={18} /> Connect
+              <FiPlay size={18} /> {t("home.dashboard.connect")}
             </>
           )}
         </Btn>
@@ -96,11 +97,14 @@ export function DashboardSection({
 
       {needsKey && !connected && (
         <p className={styles.key_hint}>
-          Connecting needs your Euler Stream API key.{" "}
-          <a href={EULER_SIGNUP_URL} target="_blank" rel="noreferrer">
-            Get a free key
-          </a>{" "}
-          and add it in <Link to="/settings">Settings</Link>.
+          {rich(t("home.dashboard.keyHint"), {
+            link: (text) => (
+              <a href={EULER_SIGNUP_URL} target="_blank" rel="noreferrer">
+                {text}
+              </a>
+            ),
+            settings: (text) => <Link to="/settings">{text}</Link>,
+          })}
         </p>
       )}
 
@@ -112,7 +116,7 @@ export function DashboardSection({
               <span className={styles.stat_value} title={title}>
                 {text}
               </span>
-              <span className={styles.stat_label}>{label}</span>
+              <span className={styles.stat_label}>{t(label)}</span>
             </div>
           );
         })}

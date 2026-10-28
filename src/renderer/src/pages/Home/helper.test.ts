@@ -20,7 +20,7 @@ describe("statText", () => {
 
 describe("feature status", () => {
   it("counts one alert or overlay in the singular", () => {
-    expect(alertsStatus([createAlert()])).toBe("1 of 1 alert on");
-    expect(serverStatus(true, 1)).toBe("Running · 1 overlay");
+    expect(alertsStatus([createAlert()], "en")).toBe("1 of 1 alert on");
+    expect(serverStatus(true, 1, "en")).toBe("Running · 1 overlay");
   });
 });

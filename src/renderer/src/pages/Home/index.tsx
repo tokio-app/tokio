@@ -108,9 +108,9 @@ export function Home() {
               needsKey={needsKey}
               startedAt={session.startedAt}
               stats={[
-                { label: "Viewers", value: views.current },
-                { label: "Likes", value: likes },
-                { label: "Total views", value: views.total },
+                { label: "home.stats.viewers", value: views.current },
+                { label: "home.stats.likes", value: likes },
+                { label: "home.stats.totalViews", value: views.total },
               ]}
               onUsernameChange={setUsername}
               onConnect={() => {
@@ -143,10 +143,10 @@ export function Home() {
           <ActivitySection
             connected={connected}
             totals={[
-              { label: "New followers", value: totals.followers },
-              { label: "Shares", value: totals.shares },
-              { label: "Gifts", value: totals.gifts },
-              { label: "Coins", value: totals.coins },
+              { label: "home.totals.followers", value: totals.followers },
+              { label: "home.totals.shares", value: totals.shares },
+              { label: "home.totals.gifts", value: totals.gifts },
+              { label: "home.totals.coins", value: totals.coins },
             ]}
             activity={session.activity}
             feedOff={!Object.values(feed).some(Boolean)}
