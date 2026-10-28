@@ -9,6 +9,7 @@ import {
   Section,
 } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useLanguage, useT } from "@/ui/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { LuPackageSearch } from "react-icons/lu";
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function GallerySection({ overlays, onTest, onCustomize }: Props) {
+  const t = useT();
   const [search, setSearch] = useState("");
 
   const shown = useMemo(() => {
@@ -31,13 +33,13 @@ export function GallerySection({ overlays, onTest, onCustomize }: Props) {
 
   return (
     <Section
-      title="Overlay Gallery"
-      description="Enhance your stream layout with overlays."
+      title={t("overlays.gallery.title")}
+      description={t("overlays.gallery.description")}
       divider
       actions={
         <>
           <SearchToggle
-            placeholder="Search overlays..."
+            placeholder={t("overlays.gallery.search")}
             value={search}
             onChange={setSearch}
           />
@@ -60,8 +62,8 @@ export function GallerySection({ overlays, onTest, onCustomize }: Props) {
       ) : (
         <EmptyState>
           {overlays.length > 0
-            ? "No overlays found."
-            : "No overlays yet. Install an official one, or import your own in Settings."}
+            ? t("overlays.gallery.notFound")
+            : t("overlays.gallery.empty")}
         </EmptyState>
       )}
     </Section>
@@ -70,10 +72,12 @@ export function GallerySection({ overlays, onTest, onCustomize }: Props) {
 
 // Opens the official overlays, with a dot while updates are waiting
 function OfficialButton({ overlays }: { overlays: OverlayApp[] }) {
+  const t = useT();
+  const language = useLanguage();
   const navigate = useNavigate();
   // Only to count the updates
   const [catalog, setCatalog] = useState<CatalogOverlay[]>([]);
-  const hint = updatesHint(countUpdates(catalog, overlays));
+  const hint = updatesHint(countUpdates(catalog, overlays), language);
 
   useIpcRequest(APP_EVENTS.GET_OVERLAY_CATALOG);
 
@@ -86,11 +90,11 @@ function OfficialButton({ overlays }: { overlays: OverlayApp[] }) {
   return (
     <Btn
       title={hint}
-      aria-label={hint && `Official Overlays, ${hint}`}
+      aria-label={hint && t("overlays.gallery.officialHint", { hint })}
       onClick={() => navigate({ to: "/overlays/official" })}
     >
       <LuPackageSearch size={18} />
-      Official Overlays
+      {t("overlays.official.title")}
       {hint && <span className={styles.update_dot} />}
     </Btn>
   );
