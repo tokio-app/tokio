@@ -81,14 +81,14 @@ const initUpdater = async ({
         notifier.info(
           "system",
           FEEDBACK_CODES.UPDATE_READY,
-          `Tokio ${status.version} is ready. Restart from the title bar to update.`,
+          t("main.init.updateReady", { version: status.version }),
           options,
         );
       } else {
         notifier.info(
           "system",
           FEEDBACK_CODES.UPDATE_AVAILABLE,
-          `Tokio ${status.version} is available. Download it from the title bar.`,
+          t("main.init.updateAvailable", { version: status.version }),
           options,
         );
       }
@@ -97,7 +97,7 @@ const initUpdater = async ({
       notifier.warn(
         "system",
         FEEDBACK_CODES.UPDATE_DOWNLOAD_FAILED,
-        "Unable to download the Tokio update. It will be tried again later.",
+        t("main.init.updateDownloadFailed"),
         { windowMs: UPDATE_NOTICE_MS },
       );
     },
@@ -149,7 +149,7 @@ const registerConnectorEvents = ({
             notifier.warn(
               "alerts",
               FEEDBACK_CODES.ALERT_TTS_FAILED,
-              `Unable to speak the ${label} alert. Try another voice in Alerts.`,
+              t("main.init.alertTtsFailed", { label, alerts: t("nav.alerts") }),
               options,
             )
           ) {
@@ -162,7 +162,10 @@ const registerConnectorEvents = ({
           notifier.warn(
             "alerts",
             FEEDBACK_CODES.ALERT_SOUND_MISSING,
-            `The sound of the ${label} alert is missing. Pick it again in Alerts.`,
+            t("main.init.alertSoundMissing", {
+              label,
+              alerts: t("nav.alerts"),
+            }),
             options,
           )
         ) {
@@ -196,7 +199,7 @@ const registerConnectorEvents = ({
           error,
           fallback: {
             code: FEEDBACK_CODES.ALERT_FAILED,
-            message: `Unable to play the ${label} alert.`,
+            message: t("main.init.alertFailed", { label }),
           },
           context: trigger,
         });
@@ -207,7 +210,7 @@ const registerConnectorEvents = ({
           error,
           fallback: {
             code: FEEDBACK_CODES.GAME_ACTION_FAILED,
-            message: `Unable to run the ${label} game action.`,
+            message: t("main.init.gameActionFailed", { label }),
           },
           context: trigger,
         });
@@ -270,19 +273,19 @@ const registerConnectorEvents = ({
       notifier.info(
         "connector",
         FEEDBACK_CODES.LIVE_ENDED,
-        "The LIVE has ended.",
+        t("main.init.liveEnded"),
       );
     } else if (d?.reason === "lost") {
       notifier.warn(
         "connector",
         FEEDBACK_CODES.CONNECTION_LOST,
-        "Unable to reconnect to the LIVE. Connect again from Home.",
+        t("main.init.connectionLost", { home: t("nav.home") }),
       );
     } else {
       notifier.info(
         "connector",
         FEEDBACK_CODES.DISCONNECTED,
-        "Disconnected from the LIVE.",
+        t("main.init.disconnected"),
       );
     }
     // A late stats update would overwrite the reset below.
@@ -316,14 +319,14 @@ const registerConnectorEvents = ({
       notifier.warn(
         "connector",
         FEEDBACK_CODES.RECONNECTING,
-        "The connection to the LIVE dropped. Reconnecting…",
+        t("main.init.reconnecting"),
         { key: "reconnect", windowMs: REPEAT_NOTICE_MS },
       );
     } else {
       notifier.info(
         "connector",
         FEEDBACK_CODES.RECONNECTED,
-        "Reconnected to the LIVE.",
+        t("main.init.reconnected"),
         { key: "reconnected", windowMs: REPEAT_NOTICE_MS },
       );
     }
@@ -353,7 +356,7 @@ const registerConnectorEvents = ({
             notifier.error(
               "tts",
               FEEDBACK_CODES.TTS_GENERATION_FAILED,
-              "Unable to generate TTS audio. Try another voice, or check its engine's key in Settings.",
+              t("main.init.ttsFailed", { settings: t("nav.settings") }),
               { windowMs: REPEAT_NOTICE_MS },
             )
           ) {
@@ -390,7 +393,7 @@ const registerConnectorEvents = ({
       notifier.warn(
         "alerts",
         FEEDBACK_CODES.EMOTES_SAVE_FAILED,
-        "Unable to save the LIVE's new emotes.",
+        t("main.init.emotesSaveFailed"),
         { key: "emotes", windowMs: REPEAT_NOTICE_MS },
       );
     } else if (res.data && !win.isDestroyed()) {
@@ -414,7 +417,7 @@ const registerConnectorEvents = ({
       notifier.warn(
         "alerts",
         FEEDBACK_CODES.GIFTS_SAVE_FAILED,
-        "Unable to save the LIVE's new gifts.",
+        t("main.init.giftsSaveFailed"),
         { key: "gifts", windowMs: REPEAT_NOTICE_MS },
       );
     } else if (res.data) {
@@ -442,7 +445,7 @@ const registerConnectorEvents = ({
     notifier.warn(
       "music",
       FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED,
-      "A song request couldn't be played.",
+      t("main.init.musicPlaybackFailed"),
       { windowMs: REPEAT_NOTICE_MS },
     );
   });
@@ -474,7 +477,7 @@ const registerGames = (handler: AppHandlerVariables) => {
         notifier.warn(
           "games",
           FEEDBACK_CODES.GAME_BACKLOG_FULL,
-          `The ${label} action has ${MAX_BACKLOG} runs waiting, so new ones are skipped until Minecraft catches up.`,
+          t("main.init.gameBacklogFull", { label, max: String(MAX_BACKLOG) }),
           { key: `game:${action.id}:full`, windowMs: REPEAT_NOTICE_MS },
         )
       ) {
@@ -492,7 +495,12 @@ const registerGames = (handler: AppHandlerVariables) => {
         notifier.warn(
           "games",
           FEEDBACK_CODES.GAME_NOT_CONNECTED,
-          `${game} isn't connected, so the ${label} action didn't run. Type the ${connect} command from Games in the game's chat.`,
+          t("main.init.gameNotConnected", {
+            game,
+            label,
+            connect,
+            games: t("nav.games"),
+          }),
           { key: "game:minecraft:offline", windowMs: 60_000 },
         )
       ) {
@@ -505,7 +513,7 @@ const registerGames = (handler: AppHandlerVariables) => {
       notifier.warn(
         "games",
         FEEDBACK_CODES.GAME_COMMAND_FAILED,
-        `A command of the ${label} action failed in Minecraft: ${message}`,
+        t("main.init.gameCommandFailed", { label, message }),
         { key: `game:${action.id}`, windowMs: REPEAT_NOTICE_MS },
       )
     ) {
@@ -543,7 +551,7 @@ const registerTimer = ({
       notifier.info(
         "system",
         FEEDBACK_CODES.TIMER_PAUSED,
-        "The countdown timer paused, since Tokio is no longer connected to the LIVE.",
+        t("main.init.timerPaused"),
       );
     }
   });
@@ -732,7 +740,7 @@ const startApp = async (handler: AppHandlerVariables) => {
           source: "overlays",
           error: new AppFailure(
             FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-            "Unable to update the gifts from TikTok. Overlays use the ones saved last time.",
+            t("main.init.giftsRefreshFailed"),
             { level: "warning", cause: error },
           ),
         });
@@ -743,7 +751,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       notifier.warn(
         "overlays",
         FEEDBACK_CODES.GIFTS_FETCH_FAILED,
-        "Unable to get the gifts from TikTok. Overlay gift options stay empty until the next start.",
+        t("main.init.giftsFetchFailed"),
       );
     }
     await overlayService.load(gifts);
@@ -755,7 +763,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       source: "server",
       error: new AppFailure(
         FEEDBACK_CODES.SERVER_START_FAILED,
-        `The overlay server couldn't start, port ${SERVER_PORT} may be in use. It has been turned off.`,
+        t("main.init.serverStartFailed", { port: String(SERVER_PORT) }),
         { level: "warning" },
       ),
     });
@@ -768,7 +776,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       source: "games",
       error: new AppFailure(
         FEEDBACK_CODES.GAME_LISTEN_FAILED,
-        `Tokio couldn't listen for Minecraft, port ${MINECRAFT_PORT} may be in use.`,
+        t("main.init.minecraftListenFailed", { port: String(MINECRAFT_PORT) }),
         { level: "warning" },
       ),
     });
