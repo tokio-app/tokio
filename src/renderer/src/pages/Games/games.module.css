@@ -110,6 +110,51 @@
 
 /* ACTIONS */
 
+/* The section's title opens and closes it, like an accordion, so the
+   overlay below gets the room. Its chevron turns as the test results' do. */
+.collapse {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.collapse svg {
+  flex-shrink: 0;
+  color: var(--font-secondary);
+  transition: transform var(--transition-fast);
+}
+
+.collapse:hover svg {
+  color: var(--font-primary);
+}
+
+.collapse[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+/* The editions' tabs over their actions */
+.actions_body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Its display would show it */
+.actions_body[hidden] {
+  display: none;
+}
+
+/* The one add button, under the tab's actions */
+.add {
+  align-self: flex-start;
+}
+
 .actions {
   display: flex;
   flex-direction: column;

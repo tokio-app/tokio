@@ -21,6 +21,7 @@ import {
   NumberInput,
   Section,
   Select,
+  Tabs,
   Toggle,
   TriggerFilter,
   VariableList,
@@ -28,7 +29,7 @@ import {
 import { Updater, useIpcListener } from "@/hooks";
 import { MessageKey } from "@/common/i18n";
 import { rich, useLanguage, useOptions, useT } from "@/ui/i18n";
-import { ReactNode, Ref, useRef, useState } from "react";
+import { ReactNode, Ref, useId, useRef, useState } from "react";
 import {
   FiCheck,
   FiChevronRight,
@@ -59,8 +60,8 @@ import {
 
 type Props = {
   actions: GameAction[];
-  // New actions' edition: the connected game's, else Bedrock
-  edition: MinecraftEdition;
+  // The connected game's edition, whose tab shows when it connects
+  connected?: MinecraftEdition;
   gifts: CustomGift[];
   emotes: EmoteOption[];
   update: Updater<Profile["games"]>;
@@ -68,64 +69,103 @@ type Props = {
 
 export function ActionsSection({
   actions,
-  edition,
+  connected,
   gifts,
   emotes,
   update,
 }: Props) {
   const t = useT();
+  // Collapsed, the overlay below gets the room. Only while on the page.
+  const [open, setOpen] = useState(true);
+  const body = useId();
+  // The edition whose actions show, which new ones take: the connected
+  // game's, else Bedrock unless only Java has actions. A game that connects
+  // turns to its own; one that leaves changes nothing.
+  const [tab, setTab] = useState<MinecraftEdition>(
+    () =>
+      connected ??
+      (actions.length > 0 && actions.every((a) => a.edition === "java")
+        ? "java"
+        : "bedrock"),
+  );
+  const [seen, setSeen] = useState(connected);
+  if (connected !== seen) {
+    setSeen(connected);
+    if (connected) setTab(connected);
+  }
+  const shown = actions.filter((action) => action.edition === tab);
+
   return (
     <Section
-      title={t("games.actions.title")}
+      title={
+        <button
+          type="button"
+          className={styles.collapse}
+          aria-expanded={open}
+          aria-controls={body}
+          onClick={() => setOpen(!open)}
+        >
+          <FiChevronRight size={20} aria-hidden />
+          {t("games.actions.title")}
+        </button>
+      }
       description={t("games.actions.description")}
-      actions={
+    >
+      <div id={body} className={styles.actions_body} hidden={!open}>
+        <Tabs tabs={EDITIONS} value={tab} onChange={setTab} />
+        {shown.length === 0 ? (
+          <EmptyState>{t("games.actions.empty")}</EmptyState>
+        ) : (
+          <ul className={styles.actions}>
+            {shown.map((action) => (
+              <ActionItem
+                key={action.id}
+                action={action}
+                gifts={gifts}
+                emotes={emotes}
+                onChange={(changed) => {
+                  update((s) => {
+                    const index = s.actions.findIndex(
+                      (a) => a.id === changed.id,
+                    );
+                    if (index !== -1) s.actions[index] = changed;
+                  });
+                  // Its new edition's tab, so the action stays in view
+                  if (changed.edition !== tab) setTab(changed.edition);
+                }}
+                onDuplicate={() =>
+                  update((s) => {
+                    const index = s.actions.findIndex(
+                      (a) => a.id === action.id,
+                    );
+                    const copy = structuredClone(action);
+                    s.actions.splice(index + 1, 0, {
+                      ...copy,
+                      id: crypto.randomUUID(),
+                    });
+                  })
+                }
+                onRemove={() =>
+                  update((s) => {
+                    s.actions = s.actions.filter((a) => a.id !== action.id);
+                  })
+                }
+              />
+            ))}
+          </ul>
+        )}
         <Btn
-          title={t("games.actions.add")}
+          className={styles.add}
           onClick={() =>
             update((s) => {
-              s.actions.push(createAction(edition));
+              s.actions.push(createAction(tab));
             })
           }
         >
           <FiPlus size={20} />
+          {t("games.actions.add")}
         </Btn>
-      }
-    >
-      {actions.length === 0 ? (
-        <EmptyState>{t("games.actions.empty")}</EmptyState>
-      ) : (
-        <ul className={styles.actions}>
-          {actions.map((action) => (
-            <ActionItem
-              key={action.id}
-              action={action}
-              gifts={gifts}
-              emotes={emotes}
-              onChange={(changed) =>
-                update((s) => {
-                  const index = s.actions.findIndex((a) => a.id === changed.id);
-                  if (index !== -1) s.actions[index] = changed;
-                })
-              }
-              onDuplicate={() =>
-                update((s) => {
-                  const index = s.actions.findIndex((a) => a.id === action.id);
-                  const copy = structuredClone(action);
-                  s.actions.splice(index + 1, 0, {
-                    ...copy,
-                    id: crypto.randomUUID(),
-                  });
-                })
-              }
-              onRemove={() =>
-                update((s) => {
-                  s.actions = s.actions.filter((a) => a.id !== action.id);
-                })
-              }
-            />
-          ))}
-        </ul>
-      )}
+      </div>
     </Section>
   );
 }

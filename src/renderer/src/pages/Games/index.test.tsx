@@ -576,7 +576,7 @@ describe("Games", () => {
     expect(screen.getByRole("button", { name: "Test" })).toBeDisabled();
   });
 
-  it("switches an action's edition, moving its mobs over, and tests it there", async () => {
+  it("switches an action's edition, moving its mobs and its tab over, and tests it there", async () => {
     const { user } = await load([
       action("a1", {
         steps: [
@@ -587,7 +587,7 @@ describe("Games", () => {
     const panel = panels()[0];
 
     await user.click(panel.getByText("Bedrock"));
-    await user.click(inList(panelElements()[0], "Java")!);
+    await user.click(screen.getByRole("option", { name: "Java" }));
     await wait(300);
 
     const saved = saves().at(-1)!.actions[0];
@@ -595,6 +595,11 @@ describe("Games", () => {
     expect(saved.steps).toEqual([
       { type: "spawn", mob: "evoker", amount: 1, name: "" },
     ]);
+    // Java's tab, so the action stays in view
+    expect(screen.getByRole("tab", { name: "Java" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(panel.getByText("Java")).toBeInTheDocument();
 
     await user.click(panel.getByRole("button", { name: "Test" }));
@@ -612,17 +617,19 @@ describe("Games", () => {
         ],
       }),
     ]);
-    const [bedrock, java] = panels();
-    const [bedrockPanel, javaPanel] = panelElements();
     const search = (text: string) =>
       user.type(screen.getByPlaceholderText("Search..."), text);
 
     // Bedrock names the spawn egg after the old mob, Java doesn't
-    await user.click(bedrock.getByText("Diamond"));
+    const bedrockPanel = panelElements()[0];
+    await user.click(within(bedrockPanel).getByText("Diamond"));
     await search("Zombie Pigman");
     expect(inList(bedrockPanel, "Zombie Pigman Spawn Egg")).not.toBeNull();
     await user.keyboard("{Escape}");
 
+    await user.click(screen.getByRole("tab", { name: "Java" }));
+    const javaPanel = panelElements()[0];
+    const java = within(javaPanel);
     await user.click(java.getByText("Diamond"));
     await search("Zombie Pigman");
     expect(inList(javaPanel, "Zombie Pigman Spawn Egg")).toBeNull();
@@ -648,26 +655,69 @@ describe("Games", () => {
       action("a2"),
     ]);
 
+    await user.click(screen.getByRole("tab", { name: "Java" }));
     await user.click(
       panels()[0].getByRole("button", { name: "Duplicate action" }),
     );
     await wait(300);
 
     const saved = saves().at(-1)!.actions;
-    expect(panels()).toHaveLength(3);
+    // In its edition's tab
+    expect(panels()).toHaveLength(2);
     expect(saved.map((a) => a.id)).toEqual(["a1", expect.any(String), "a2"]);
     expect(saved[1].id).not.toBe("a1");
     expect(saved[1]).toEqual({ ...saved[0], id: saved[1].id });
   });
 
-  it("gives new actions the connected game's edition, else Bedrock", async () => {
+  it("shows each edition's actions under its own tab", async () => {
+    const { user } = await load([
+      action("b1"),
+      action("j1", { edition: "java" }),
+      action("b2"),
+    ]);
+
+    expect(screen.getByRole("tab", { name: "Bedrock" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(panels()).toHaveLength(2);
+
+    await user.click(screen.getByRole("tab", { name: "Java" }));
+    expect(panels()).toHaveLength(1);
+    expect(panels()[0].getByText("Java")).toBeInTheDocument();
+  });
+
+  it("opens on Java when only Java has actions, for each profile loaded", async () => {
+    await load([action("j1", { edition: "java" })]);
+    const shown = () => screen.getByRole("tab", { selected: true }).textContent;
+    expect(shown()).toBe("Java");
+    expect(panels()).toHaveLength(1);
+
+    // Another profile, with a Bedrock action too
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.name = "Clone";
+        p.games.actions = [action("j1", { edition: "java" }), action("b1")];
+      }),
+    );
+    expect(shown()).toBe("Bedrock");
+  });
+
+  it("turns to the tab of a game that connects, and adds to the tab shown", async () => {
     const { user } = await load([]);
     const add = () =>
       user.click(screen.getByRole("button", { name: "Add action" }));
+    const shown = () => screen.getByRole("tab", { selected: true }).textContent;
 
+    expect(shown()).toBe("Bedrock");
     await status({ state: "connected", edition: "java" });
+    expect(shown()).toBe("Java");
     await add();
+    // A game that leaves keeps the tab
     await status({ state: "waiting" });
+    expect(shown()).toBe("Java");
+    await user.click(screen.getByRole("tab", { name: "Bedrock" }));
     await add();
     await wait(300);
 
@@ -676,6 +726,24 @@ describe("Games", () => {
         .at(-1)!
         .actions.map((a) => a.edition),
     ).toEqual(["java", "bedrock"]);
+  });
+
+  it("folds the actions and their add button under their title", async () => {
+    const { user } = await load([action("a1")]);
+    const title = () => screen.getByRole("button", { name: "Actions" });
+    const add = () => screen.queryByRole("button", { name: "Add action" });
+    expect(title()).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(title());
+    expect(title()).toHaveAttribute("aria-expanded", "false");
+    expect(panels()).toHaveLength(0);
+    expect(screen.queryByRole("tab", { name: "Bedrock" })).toBeNull();
+    expect(add()).toBeNull();
+
+    await user.click(title());
+    expect(panels()).toHaveLength(1);
+    await user.click(add()!);
+    expect(panels()).toHaveLength(2);
   });
 });
 

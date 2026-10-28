@@ -23,14 +23,20 @@ export function Games() {
   // reply to an older browse can't replace a newer one
   const counter = useRef(0);
   const applied = useRef(new Map<string, number>());
+  // Each profile loaded, which the actions open on, on the tab of an
+  // edition that has some
+  const [loads, setLoads] = useState(0);
 
   const { settings, update } = useEditableSettings(
     "games",
     (profile, switched) => {
       setEmotes(profile.emotes);
-      // A clone has the same action ids: a browse for the last profile
-      // mustn't land in this one
-      if (switched) asked.current.clear();
+      if (switched) {
+        // A clone has the same action ids: a browse for the last profile
+        // mustn't land in this one
+        asked.current.clear();
+        setLoads((n) => n + 1);
+      }
     },
   );
 
@@ -93,11 +99,12 @@ export function Games() {
         )}
 
         <ActionsSection
+          key={loads}
           actions={settings.actions}
-          edition={
-            (games?.status.minecraft.state === "connected" &&
-              games.status.minecraft.edition) ||
-            "bedrock"
+          connected={
+            games?.status.minecraft.state === "connected"
+              ? games.status.minecraft.edition
+              : undefined
           }
           gifts={giftChoices}
           emotes={emoteChoices}
