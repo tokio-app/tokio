@@ -32,9 +32,9 @@ export function ReplacementsSection({ replacements, update }: Props) {
         </Btn>
       }
     >
-      <div className={styles.replacements}>
+      <div className={styles.rows}>
         {replacements.map((replacement, index) => (
-          <div key={index} className={styles.replacement}>
+          <div key={index} className={styles.row}>
             <Input
               placeholder={t("tts.replacements.oldPlaceholder")}
               value={replacement.old}

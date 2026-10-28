@@ -6,7 +6,7 @@ import {
   formatError,
   TaskQueue,
 } from "@/common/util";
-import { isBlank, removeEmojis, wholeWord } from "@/helper/chat";
+import { isBlank, removeEmojis, sameHandle, wholeWord } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
@@ -259,6 +259,10 @@ export class TTSService extends ProviderService<TTSProvider> {
     if (!this._valid(settings, chat, comment)) return;
     const text = this._parseText(settings, chat, comment);
     if (!this._speakable(text)) return;
+    // A special user's own voice, else the page's
+    const voice =
+      settings.user_voices.find((u) => sameHandle(u.handle, chat.user.handle))
+        ?.voice ?? settings.voice;
     this._queue.setQueueOptions({
       gapTime: settings.protection.cooldown,
       maxQueueLength: settings.protection.queue_length,
@@ -280,7 +284,7 @@ export class TTSService extends ProviderService<TTSProvider> {
       }
       if (run !== this._run) return;
 
-      const res = await this.generateBuffer(text, settings.voice);
+      const res = await this.generateBuffer(text, voice);
       // Cleared while it was being made
       if (run !== this._run) return;
       if (res.success) {

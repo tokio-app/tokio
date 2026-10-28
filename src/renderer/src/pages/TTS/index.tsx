@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { FormatSection } from "./sections/FormatSection";
 import { ProtectionFields } from "./sections/ProtectionFields";
 import { ReplacementsSection } from "./sections/ReplacementsSection";
+import { UserVoicesSection } from "./sections/UserVoicesSection";
 import { VoiceSection } from "./sections/VoiceSection";
 
 // Id of the tester's requests, voice previews share the event
@@ -59,6 +60,13 @@ export function TTS() {
             settings,
           });
         }}
+      />
+
+      <UserVoicesSection
+        userVoices={settings.user_voices}
+        voice={settings.voice}
+        filters={settings.filters}
+        update={scopeUpdater(update, "user_voices")}
       />
 
       <FormatSection

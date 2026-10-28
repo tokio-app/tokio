@@ -30,6 +30,14 @@ describe("ProfileSchema", () => {
     expect(timer).toEqual(defaultProfile.timer);
   });
 
+  it("gives TTS settings saved before special users none", () => {
+    const saved = structuredClone(defaultProfile);
+    const tts: Partial<Profile["tts"]> = saved.tts;
+    delete tts.user_voices;
+
+    expect(ProfileSchema.parse(saved).tts.user_voices).toEqual([]);
+  });
+
   it("gives a profile saved before games no game actions", () => {
     const saved: Partial<Profile> = structuredClone(defaultProfile);
     delete saved.games;

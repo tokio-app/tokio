@@ -91,6 +91,7 @@ export const defaultProfile: Profile = {
       queue_length: 10,
     },
     replacements: [],
+    user_voices: [],
   },
   alerts: {
     simultaneous: false,

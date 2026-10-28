@@ -20,15 +20,15 @@
   font-weight: 500;
 }
 
-/* REPLACEMENTS */
+/* LISTS (special users, replacements) */
 
-.replacements {
+.rows {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
-.replacement {
+.row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
