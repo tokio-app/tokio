@@ -9,6 +9,7 @@ import {
   Spinner,
 } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { FiCheck, FiTrash2 } from "react-icons/fi";
@@ -26,6 +27,7 @@ interface Props {
  * with the new overlay list, which the page passes back down.
  */
 export function CatalogSection({ overlays }: Props) {
+  const t = useT();
   const navigate = useNavigate();
   // Null while it loads
   const [catalog, setCatalog] = useState<CatalogOverlay[] | null>(null);
@@ -44,7 +46,7 @@ export function CatalogSection({ overlays }: Props) {
       setError(null);
     } else if (!catalog) {
       // A late failure (another page's request) leaves the shown catalog.
-      setError(res?.error?.message ?? "Unable to load the official overlays.");
+      setError(res?.error?.message ?? t("overlays.official.loadFailed"));
     }
   });
 
@@ -73,17 +75,17 @@ export function CatalogSection({ overlays }: Props) {
         icon={
           <Btn
             variant="icon"
-            title="Back to Overlays"
+            title={t("overlays.official.back")}
             className={styles.back}
             onClick={() => navigate({ to: "/overlays" })}
           >
             <LuArrowLeft size={22} />
           </Btn>
         }
-        title="Official Overlays"
-        description="Made for Tokio. Updates keep your settings."
+        title={t("overlays.official.title")}
+        description={t("overlays.official.description")}
         divider
-        actions={error && <Btn onClick={retry}>Try again</Btn>}
+        actions={error && <Btn onClick={retry}>{t("common.tryAgain")}</Btn>}
       >
         <CatalogList
           catalog={catalog}
@@ -116,6 +118,7 @@ function CatalogList({
   onInstall,
   onRemove,
 }: ListProps) {
+  const t = useT();
   if (error) return <EmptyState>{error}</EmptyState>;
   if (!catalog) {
     return (
@@ -125,7 +128,7 @@ function CatalogList({
     );
   }
   if (catalog.length === 0) {
-    return <EmptyState>No official overlays yet.</EmptyState>;
+    return <EmptyState>{t("overlays.official.empty")}</EmptyState>;
   }
 
   return (
@@ -153,6 +156,7 @@ interface CardProps {
 }
 
 function CatalogCard({ entry, state, busy, onInstall, onRemove }: CardProps) {
+  const t = useT();
   // The preview can't load offline, the placeholder shows instead
   const [broken, setBroken] = useState(false);
 
@@ -162,7 +166,7 @@ function CatalogCard({ entry, state, busy, onInstall, onRemove }: CardProps) {
         {entry.preview && !broken ? (
           <img
             src={entry.preview}
-            alt={`Preview of ${entry.name}`}
+            alt={t("overlays.official.previewOf", { name: entry.name })}
             loading="lazy"
             onError={() => setBroken(true)}
           />
@@ -201,28 +205,34 @@ function CatalogActions({
   onInstall,
   onRemove,
 }: Omit<CardProps, "entry">) {
+  const t = useT();
   return (
     <div className={styles.actions}>
       {state === "installed" && (
         <span className={styles.installed}>
           <FiCheck size={16} />
-          Installed
+          {t("overlays.official.installed")}
         </span>
       )}
       {state === "update" && (
         <Btn loading={busy} onClick={onInstall}>
           <LuRefreshCw size={16} />
-          Update
+          {t("overlays.official.update")}
         </Btn>
       )}
       {state === "install" && (
         <Btn loading={busy} onClick={onInstall}>
           <LuDownload size={16} />
-          Install
+          {t("overlays.official.install")}
         </Btn>
       )}
       {state !== "install" && (
-        <Btn variant="icon" title="Remove" disabled={busy} onClick={onRemove}>
+        <Btn
+          variant="icon"
+          title={t("common.remove")}
+          disabled={busy}
+          onClick={onRemove}
+        >
           <FiTrash2 size={20} />
         </Btn>
       )}
