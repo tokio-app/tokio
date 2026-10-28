@@ -584,6 +584,12 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await overlay.getByRole("radio", { name: tr("Sticker") }).check();
   await crop("games-preview-sticker", preview, { pad: 12 });
   await overlay.getByRole("radio", { name: tr("Arrow") }).check();
+  // Horizontal's strip, with the world around it, then back to Vertical
+  await overlay.getByRole("radio", { name: tr("Horizontal") }).check();
+  await crop("games-preview-horizontal", preview.locator(".games"), {
+    pad: 32,
+  });
+  await overlay.getByRole("radio", { name: tr("Vertical") }).check();
 
   // A test of the follow action, once it has three steps: no game answers,
   // so push the replies Bedrock gives. Its anvil can't drop under a roof.
