@@ -1,3 +1,4 @@
+import { MESSAGES, translate } from "@/common/i18n";
 import { CommandResult, GameStatus } from "@/common/types";
 import { MINECRAFT_JAVA_PROTOCOL } from "@/common/util";
 import {
@@ -490,6 +491,18 @@ describe("MinecraftConnection", () => {
     const server = createServer().listen(port);
     servers.push(server);
     await once(server, "listening");
+  });
+
+  it("closes with a reason within WebSocket's 123 bytes in every language", () => {
+    for (const language of Object.keys(MESSAGES)) {
+      for (const key of [
+        "main.minecraft.replaced",
+        "main.minecraft.turnedOff",
+      ] as const) {
+        const bytes = Buffer.byteLength(translate(language, key));
+        expect(bytes, `${language} ${key}`).toBeLessThanOrEqual(123);
+      }
+    }
   });
 
   it("turns off at once when the game never answers the close", async () => {

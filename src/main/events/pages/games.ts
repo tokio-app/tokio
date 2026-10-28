@@ -14,6 +14,7 @@ import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
+import { t } from "@/helper/i18n";
 import { AppHandlerVariables } from "@/types";
 import { z } from "zod";
 
@@ -107,7 +108,7 @@ events.push(
     if (!res.success) {
       throw new AppFailure(
         FEEDBACK_CODES.GAME_TEST_FAILED,
-        res.error ?? "Unable to test the action.",
+        res.error ?? t("main.failure.testGameAction"),
         { level: "warning" },
       );
     }
@@ -175,9 +176,11 @@ events.push(
     { id, request },
   ) => {
     const diagRes = await showOpenDialog(win, {
-      title: "Select pictures",
+      title: t("main.dialog.selectPictures"),
       properties: ["openFile", "multiSelections"],
-      filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }],
+      filters: [
+        { name: t("main.dialog.images"), extensions: IMAGE_EXTENSIONS },
+      ],
     });
     if (diagRes.canceled || diagRes.filePaths.length === 0) return;
 
@@ -225,14 +228,14 @@ events.push(
       "games",
       FEEDBACK_CODES.GAME_PICTURES_ADDED,
       pictures.length === 1
-        ? `Picture "${pictures[0].name}" added.`
-        : `${pictures.length} pictures added.`,
+        ? t("main.games.pictureAdded", { name: pictures[0].name })
+        : t("main.games.picturesAdded", { count: pictures.length }),
     );
     if (failed > 0) {
       notifier.warn(
         "games",
         FEEDBACK_CODES.GAME_PICTURE_IMPORT_FAILED,
-        `Unable to use ${failed} of the files. Pick png, jpg, gif or webp files up to 50 MB.`,
+        t("main.games.picturesFailed", { failed }),
       );
     }
   },
@@ -277,13 +280,13 @@ events.push(
       notifier.success(
         "games",
         FEEDBACK_CODES.GAME_PICTURE_REMOVED,
-        "Picture deleted.",
+        t("main.games.pictureDeleted"),
       );
     } else {
       notifier.warn(
         "games",
         FEEDBACK_CODES.GAME_PICTURE_REMOVE_FAILED,
-        "Picture removed from the library, but its file couldn't be deleted.",
+        t("main.games.pictureFileNotDeleted"),
       );
     }
   },
