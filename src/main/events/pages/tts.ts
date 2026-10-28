@@ -5,6 +5,7 @@ import {
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 
 const events = createStack("tts");
 
@@ -57,7 +58,7 @@ events.push(
     if (spoken === null) {
       throw new AppFailure(
         FEEDBACK_CODES.TTS_TEST_BLOCKED,
-        "This message wouldn't be read aloud: it has a banned word or nothing left to read.",
+        t("main.tts.testBlocked"),
         { level: "warning" },
       );
     }

@@ -7,6 +7,7 @@ import {
 import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("overlays");
@@ -28,7 +29,7 @@ events.push(
   APP_EVENTS.IMPORT_OVERLAY,
   async ({ win, overlayService, notifier }, e) => {
     const diagRes = await showOpenDialog(win, {
-      title: `Import Overlay`,
+      title: t("main.dialog.importOverlay"),
       properties: ["openDirectory"],
     });
     if (diagRes.canceled) return;
@@ -47,7 +48,7 @@ events.push(
     notifier.success(
       "overlays",
       FEEDBACK_CODES.OVERLAY_IMPORTED,
-      "Overlay imported.",
+      t("main.overlays.imported"),
     );
   },
   {
@@ -73,7 +74,7 @@ events.push(
     notifier.success(
       "overlays",
       FEEDBACK_CODES.OVERLAY_REMOVED,
-      "Overlay removed.",
+      t("main.overlays.removed"),
     );
   },
   {
@@ -119,7 +120,9 @@ events.push(
         updating
           ? FEEDBACK_CODES.OVERLAY_UPDATE_FAILED
           : FEEDBACK_CODES.OVERLAY_INSTALL_FAILED,
-        `Unable to ${updating ? "update" : "install"} the overlay. Check your internet connection and try again.`,
+        updating
+          ? t("main.overlays.updateFailed")
+          : t("main.overlays.installFailed"),
         { logged: true },
       );
     }
@@ -134,13 +137,13 @@ events.push(
       notifier.success(
         "overlays",
         FEEDBACK_CODES.OVERLAY_UPDATED,
-        "Overlay updated. Refresh it in your streaming app to load the new version.",
+        t("main.overlays.updated"),
       );
     } else {
       notifier.success(
         "overlays",
         FEEDBACK_CODES.OVERLAY_INSTALLED,
-        "Overlay installed.",
+        t("main.overlays.installed"),
       );
     }
   },
@@ -232,7 +235,7 @@ events.push(
     notifier.success(
       "overlays",
       FEEDBACK_CODES.OVERLAY_SAVED,
-      "Overlay settings saved.",
+      t("main.overlays.settingsSaved"),
     );
   },
   {

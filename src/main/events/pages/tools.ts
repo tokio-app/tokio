@@ -6,6 +6,7 @@ import {
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
 import { saveFailure } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 import type { TimerService } from "@/services/timer";
 import { z } from "zod";
 
@@ -42,7 +43,7 @@ events.push(
     notifier.success(
       "overlays",
       FEEDBACK_CODES.TEST_OVERLAY_ADDED,
-      `Test overlay "${name.trim()}" added.`,
+      t("main.tools.testOverlayAdded", { name: name.trim() }),
     );
   },
   {
@@ -66,7 +67,7 @@ events.push(
     notifier.success(
       "overlays",
       FEEDBACK_CODES.TEST_OVERLAY_REMOVED,
-      "Test overlay removed.",
+      t("main.tools.testOverlayRemoved"),
     );
   },
   {

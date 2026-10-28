@@ -6,6 +6,7 @@ import {
 } from "@/common/types";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 
 const events = createStack("music");
 
@@ -60,7 +61,7 @@ events.push(
       notifier.info(
         "music",
         FEEDBACK_CODES.MUSIC_DISCONNECTED,
-        `Disconnected from ${name}.`,
+        t("main.music.disconnected", { name }),
       );
     };
     musicService.on(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, onMusicEnded);
@@ -70,7 +71,7 @@ events.push(
     if (!res.success) {
       throw new AppFailure(
         FEEDBACK_CODES.MUSIC_CONNECT_FAILED,
-        `Unable to connect to ${name}.`,
+        t("main.music.connectFailed", { name }),
         { cause: res.error },
       );
     }
@@ -82,7 +83,7 @@ events.push(
     notifier.success(
       "music",
       FEEDBACK_CODES.MUSIC_CONNECTED,
-      `Connected to ${name}.`,
+      t("main.music.connected", { name }),
     );
   },
   {
