@@ -2,6 +2,7 @@ import { Alert, MediaFile } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { getMediaPreviewURL, mediaKind } from "@/common/util";
 import { cx } from "@/helper/cx";
+import { releaseOnUnmount } from "@/helper/media";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
 import { useT } from "@/ui/i18n";
@@ -49,6 +50,7 @@ export function MediaThumbnail({
   const video = useVideoURL(file);
   return mediaKind(file) === "video" ? (
     <video
+      ref={releaseOnUnmount}
       className={styles.thumb}
       src={`${video}#t=0.1`}
       muted
