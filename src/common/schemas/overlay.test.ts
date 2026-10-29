@@ -88,12 +88,154 @@ function makeConfig(): OverlayConfig {
   };
 }
 
+// A font and a table of social links, whose rows name a gift
+function makeTable(): OverlayConfig {
+  return {
+    sections: [{ id: "general", name: "General" }],
+    fields: [
+      {
+        id: "font",
+        name: "Font",
+        section: "general",
+        type: "font",
+        attributes: { value: "Comic Sans MS", default: "" },
+      },
+      {
+        id: "socials",
+        name: "Social links",
+        section: "general",
+        type: "table",
+        attributes: {
+          max: 3,
+          columns: [
+            {
+              id: "platform",
+              name: "Platform",
+              type: "dropdown",
+              attributes: {
+                multiple: false,
+                searchable: false,
+                default: "facebook",
+                options: [
+                  { value: "facebook", label: "Facebook" },
+                  { value: "instagram", label: "Instagram" },
+                ],
+              },
+            },
+            {
+              id: "username",
+              name: "Username",
+              type: "input",
+              attributes: { mode: "text", default: "" },
+            },
+            {
+              id: "color",
+              name: "Icon color",
+              type: "color",
+              attributes: { default: "ffffff" },
+            },
+            {
+              id: "gift",
+              name: "Gift",
+              type: "gifts",
+              attributes: { multiple: false, default: 1 },
+            },
+          ],
+          value: [
+            {
+              platform: "instagram",
+              username: "@tokio",
+              color: "ff0000",
+              gift: 2,
+            },
+            { platform: "facebook", username: "", color: "ffffff", gift: 3 },
+          ],
+          default: [
+            { platform: "facebook", username: "", color: "ffffff", gift: 1 },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+// The attributes of makeTable's table
+function socials(config: OverlayConfig) {
+  const field = config.fields[1];
+  if (field.type !== "table") throw new Error("Not a table");
+  return field.attributes;
+}
+
 describe("OverlayConfigSchema", () => {
   const issues = (config: OverlayConfig) =>
     OverlayConfigSchema.safeParse(config).error?.issues.map((i) => i.path);
 
   it("accepts a valid config", () => {
     expect(issues(makeConfig())).toBeUndefined();
+  });
+
+  it("accepts fonts and tables", () => {
+    expect(issues(makeTable())).toBeUndefined();
+  });
+
+  it("refuses a font name over 60 characters", () => {
+    const config = makeTable();
+    config.fields[0].attributes.value = "a".repeat(61);
+
+    expect(issues(config)).toEqual([["fields", 0, "attributes", "value"]]);
+  });
+
+  it("points at a table's column with the id of another", () => {
+    const config = makeTable();
+    socials(config).columns[2].id = "platform";
+
+    expect(issues(config)).toContainEqual([
+      "fields",
+      1,
+      "attributes",
+      "columns",
+      2,
+      "id",
+    ]);
+  });
+
+  it("refuses more rows than the table's max", () => {
+    const config = makeTable();
+    const table = socials(config);
+    table.max = 1;
+
+    expect(issues(config)).toEqual([["fields", 1, "attributes", "value"]]);
+
+    table.default.push(...table.value);
+    expect(issues(config)).toEqual([
+      ["fields", 1, "attributes", "value"],
+      ["fields", 1, "attributes", "default"],
+    ]);
+  });
+
+  it("points at the rows that don't fit the columns", () => {
+    const config = makeTable();
+    const table = socials(config);
+    const row = {
+      platform: "facebook",
+      username: "",
+      color: "ffffff",
+      gift: 1,
+    };
+    table.value = [
+      // A missing cell, an extra one, and a cell of another kind
+      { platform: "facebook", color: "ffffff", gift: 1 },
+      { ...row, extra: "x" },
+      { ...row, username: true },
+    ];
+    table.default = [{ ...row, color: "red" }];
+
+    expect(issues(config)).toEqual([
+      ["fields", 1, "attributes", "value", 0],
+      ["fields", 1, "attributes", "value", 1],
+      ["fields", 1, "attributes", "value", 2],
+      ["fields", 1, "attributes", "default", 0],
+    ]);
   });
 
   it("points at the field whose section doesn't exist", () => {
@@ -147,6 +289,15 @@ describe("resetOverlayConfig", () => {
       }
     }
   });
+
+  it("sets a table back to a copy of its default rows", () => {
+    const config = makeTable();
+    const table = socials(resetOverlayConfig(config));
+
+    expect(table.value).toEqual(socials(config).default);
+    expect(table.value).not.toBe(table.default);
+    expect(table.value[0]).not.toBe(table.default[0]);
+  });
 });
 
 describe("getOverlayConfig", () => {
@@ -182,6 +333,26 @@ describe("getOverlayConfig", () => {
 
     expect(getOverlayConfig(config, GIFTS).gifts).toEqual([GIFTS[0]]);
     expect(getOverlayConfig(config, null).gifts).toEqual([]);
+  });
+
+  it("gives a font's name and a table's rows, each cell read like a field", () => {
+    expect(getOverlayConfig(makeTable(), GIFTS)).toEqual({
+      font: "Comic Sans MS",
+      socials: [
+        {
+          platform: "instagram",
+          username: "@tokio",
+          color: "#ff0000",
+          gift: GIFTS[1],
+        },
+        {
+          platform: "facebook",
+          username: "",
+          color: "#ffffff",
+          gift: GIFTS[2],
+        },
+      ],
+    });
   });
 });
 
@@ -262,6 +433,74 @@ describe("mergeOverlayConfig", () => {
     for (const i of [0, 1, 3, 6])
       expect(merged.fields[i]).toEqual(next.fields[i]);
     expect(merged.fields[2].attributes.value).toBe("ff0000");
+  });
+
+  it("keeps a table's saved rows", () => {
+    expect(
+      mergeOverlayConfig(resetOverlayConfig(makeTable()), makeTable()),
+    ).toEqual(makeTable());
+  });
+
+  it("keeps a table the streamer emptied", () => {
+    const saved = makeTable();
+    socials(saved).value = [];
+
+    const merged = mergeOverlayConfig(resetOverlayConfig(makeTable()), saved);
+
+    expect(socials(merged).value).toEqual([]);
+  });
+
+  it("fits a table's saved rows to the new version's columns", () => {
+    const next = resetOverlayConfig(makeTable());
+    const table = socials(next);
+    table.max = 1;
+    table.columns = [
+      // Instagram is gone
+      {
+        id: "platform",
+        name: "Platform",
+        type: "dropdown",
+        attributes: {
+          multiple: false,
+          searchable: false,
+          default: "facebook",
+          options: [
+            { value: "facebook", label: "Facebook" },
+            { value: "tiktok", label: "TikTok" },
+          ],
+        },
+      },
+      // Another type, the gift's column is gone, and a new column
+      {
+        id: "username",
+        name: "Username",
+        type: "check",
+        attributes: { default: false },
+      },
+      {
+        id: "color",
+        name: "Icon color",
+        type: "color",
+        attributes: { default: "ffffff" },
+      },
+      {
+        id: "label",
+        name: "Label",
+        type: "input",
+        attributes: { mode: "text", default: "Hi" },
+      },
+    ];
+    table.default = [
+      { platform: "facebook", username: false, color: "ffffff", label: "Hi" },
+    ];
+
+    const merged = mergeOverlayConfig(next, makeTable());
+
+    // The first row alone, as the new max is 1
+    expect(socials(merged).value).toEqual([
+      { platform: "facebook", username: false, color: "ff0000", label: "Hi" },
+    ]);
+    expect(OverlayConfigSchema.safeParse(merged).success).toBe(true);
   });
 
   it("doesn't change its inputs", () => {

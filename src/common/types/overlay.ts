@@ -5,7 +5,8 @@ export type CustomGift = {
   coins: number;
 };
 
-type ConfigValue =
+// What an overlay reads for a field, or a table's cell
+type FieldValue =
   | string
   | number
   | boolean
@@ -14,6 +15,9 @@ type ConfigValue =
   | CustomGift
   | CustomGift[]
   | undefined;
+
+// A table gives its rows, each cell keyed by its column's id
+type ConfigValue = FieldValue | { [id: string]: FieldValue }[];
 
 export type OverlayConfigRedux = {
   [id: string]: ConfigValue;
