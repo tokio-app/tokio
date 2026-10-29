@@ -52,6 +52,20 @@ describe("WindowsTTS", () => {
     expect(host.request).toHaveBeenCalledExactlyOnceWith({ type: "voices" });
   });
 
+  it("lists the voices once, asking again only after a failure", async () => {
+    host.request.mockRejectedValueOnce(
+      new Error("SAPI host exited with code 1"),
+    );
+    await expect(tts.getVoices()).rejects.toThrow(
+      "SAPI host exited with code 1",
+    );
+
+    await tts.getVoices();
+    await tts.getVoices();
+
+    expect(types()).toEqual(["voices", "voices"]);
+  });
+
   it("speaks with an installed voice and its engine", async () => {
     const res = await tts.generateBuffer(
       "Hola",
