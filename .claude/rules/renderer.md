@@ -17,6 +17,7 @@ Profile sections save through `useEditableSettings`, single fields through `useA
 - Every text on screen comes from the locale files through `useT()`, and lint fails on text written into JSX: see `.claude/rules/i18n.md`. Leave room for Spanish, which runs about 25% longer.
 - Components are folders with `index.tsx` and `<name>.module.css`, re-exported from `components/index.tsx`. Use the primitives in `components/Elements` before creating new ones; they take colors from the tokens, not props.
 - `Modal` is the only modal shell. A search in a header is a `SearchToggle`. A value to copy is a `CopyField` with a `title` saying what it copies, or a `CopyButton` among a row's actions.
+- An overlay's font is a `FontSelect`: Chromium's `queryLocalFonts()` lists this computer's families, which works because the main window's session has no permission handler (one added there must allow `local-fonts`). Its rows skip layout out of view (`content-visibility`), so opening it doesn't load every font.
 - Deleting a sound or media file or removing an overlay asks with `DeleteSoundModal`, `DeleteMediaModal` or `RemoveOverlayModal` (`components/DeleteModals`), which send the request themselves.
 - Loaders use `Spinner` (`components/Elements`): a ring in the text color (set `color` on its container), announced as a `status` named "Loading". A button showing it is named by it, so a button named only by its `title` also needs an `aria-label`, as `PlayButton` has.
 

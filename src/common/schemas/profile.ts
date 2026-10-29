@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AlertTrigger, EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
 import { defaultAlertName, mediaKind } from "../util/alerts";
-import { ColorSchema, TimerProfileSchema } from "./timer";
+import { ColorSchema, FONT_MAX_LENGTH, TimerProfileSchema } from "./timer";
 
 const PermissionsSchema = z.object({
   all: z.boolean(),
@@ -373,7 +373,7 @@ export const GamesOverlaySchema = z.object({
   text_below: z.boolean().default(false),
   event_size: z.enum(GAMES_OVERLAY_SIZES).default("small"),
   // A font installed where the streaming app runs, Archivo when empty
-  font: z.string().max(60).default(""),
+  font: z.string().max(FONT_MAX_LENGTH).default(""),
   text_color: ColorSchema.default("#f1f5f9"),
   // The glint of an action that runs
   accent_color: ColorSchema.default("#f43f5e"),

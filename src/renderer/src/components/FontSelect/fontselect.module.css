@@ -1,0 +1,12 @@
+/* With the gift picker's row. A row out of view isn't laid out, so opening
+   the list doesn't load every font at once. 27px is one line of .specimen. */
+.row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 27px;
+}
+
+/* A font's name, set in that font */
+.specimen {
+  font-size: var(--font-xl);
+  font-weight: 400;
+}

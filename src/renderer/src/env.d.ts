@@ -21,5 +21,7 @@ declare global {
       ) => () => void;
       emit: <T extends APP_EVENTS>(event: T, data?: AppEventsMap[T]) => void;
     };
+    // Chromium's Local Font Access API, which TypeScript's DOM types lack
+    queryLocalFonts(): Promise<{ family: string }[]>;
   }
 }

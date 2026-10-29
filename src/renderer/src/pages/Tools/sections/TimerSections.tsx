@@ -7,6 +7,7 @@ import {
   Color,
   CopyField,
   Field,
+  FontSelect,
   FormGrid,
   Input,
   Modal,
@@ -255,29 +256,23 @@ function TimerLookSection({ settings, update }: SectionProps) {
           />
         </Field>
         <Field label={t("tools.look.clockFont")}>
-          <Input
-            maxLength={60}
-            placeholder={t("common.defaultFont")}
+          <FontSelect
             value={look.clock_font}
-            onChange={(e) => {
-              const font = e.target.value;
+            onChange={(font) =>
               set((l) => {
                 l.clock_font = font;
-              });
-            }}
+              })
+            }
           />
         </Field>
         <Field label={t("tools.look.titleFont")}>
-          <Input
-            maxLength={60}
-            placeholder={t("common.defaultFont")}
+          <FontSelect
             value={look.title_font}
-            onChange={(e) => {
-              const font = e.target.value;
+            onChange={(font) =>
               set((l) => {
                 l.title_font = font;
-              });
-            }}
+              })
+            }
           />
         </Field>
         <p className={styles.note}>{t("common.fontsNote")}</p>

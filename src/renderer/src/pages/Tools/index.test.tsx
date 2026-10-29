@@ -466,6 +466,7 @@ describe("Tools' countdown timer", () => {
   });
 
   it("shows the preview with the look being edited", async () => {
+    vi.stubGlobal("queryLocalFonts", async () => [{ family: "Bebas Neue" }]);
     const { user } = renderWithProviders(<Tools />);
     await timer((t) => {
       t.settings.multiplier = 2;
@@ -473,12 +474,12 @@ describe("Tools' countdown timer", () => {
     const look = section("Timer look");
     expect(screen.getByText("×2")).toBeInTheDocument();
     await user.type(titleInput(), "Subathon");
-    await user.type(
+    await user.click(
       within(look.getByRole("group", { name: "Clock font" })).getByRole(
-        "textbox",
+        "button",
       ),
-      "Bebas Neue",
     );
+    await user.click(await screen.findByRole("button", { name: "Bebas Neue" }));
     await user.click(
       look.getByRole("checkbox", { name: "Show the multiplier" }),
     );

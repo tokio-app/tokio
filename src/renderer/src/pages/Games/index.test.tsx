@@ -1200,6 +1200,7 @@ describe("Games overlay", () => {
   });
 
   it("saves the look, and shows it in the preview", async () => {
+    vi.stubGlobal("queryLocalFonts", async () => [{ family: "Minecrafter" }]);
     const { user } = await load([
       action("a1", { overlay: { ...overlay, image: TNT } }),
     ]);
@@ -1210,7 +1211,12 @@ describe("Games overlay", () => {
       screen.getByRole("checkbox", { name: "Text below pictures" }),
     );
     await user.click(screen.getByRole("radio", { name: "Large" }));
-    await user.type(screen.getByPlaceholderText("Archivo"), "Minecrafter");
+    await user.click(
+      within(screen.getByRole("group", { name: "Font" })).getByRole("button"),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Minecrafter" }),
+    );
     await wait(300);
 
     expect(saves().at(-1)!.overlay).toEqual({

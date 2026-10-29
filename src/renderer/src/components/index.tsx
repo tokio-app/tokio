@@ -3,6 +3,7 @@ export * from "./CopyField";
 export * from "./DeleteModals";
 export * from "./Elements";
 export * from "./EmoteSelect";
+export * from "./FontSelect";
 export * from "./GiftSelect";
 export * from "./Iframe";
 export * from "./MediaPicker";

@@ -32,6 +32,7 @@ import {
   CopyField,
   EmptyState,
   Field,
+  FontSelect,
   Input,
   RadioGroup,
   Section,
@@ -287,16 +288,13 @@ export function OverlaySection({
           />
           <div className={styles.look_fields}>
             <Field label={t("games.overlay.font")}>
-              <Input
-                maxLength={60}
-                placeholder={t("common.defaultFont")}
+              <FontSelect
                 value={look.font}
-                onChange={(e) => {
-                  const font = e.target.value;
+                onChange={(font) =>
                   setLook((l) => {
                     l.font = font;
-                  });
-                }}
+                  })
+                }
               />
             </Field>
             {/* Stickers have no arrow */}

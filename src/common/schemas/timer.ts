@@ -9,6 +9,9 @@ export const TIMER_ACTIONS = ["start", "pause", "stop", "reset"] as const;
 // What Color gives: #rrggbb, or #rrggbbaa with alpha
 export const ColorSchema = z.string().regex(/^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i);
 
+// The longest font name a look saves. FontSelect leaves out longer ones.
+export const FONT_MAX_LENGTH = 60;
+
 const addedSeconds = (value: number) => z.number().min(0).default(value);
 
 // Seconds each trigger adds, before the multiplier. 0 leaves it out.
@@ -63,8 +66,8 @@ const TimerLookSchema = z.object({
   // Minutes before the end when the clock takes warning_color, 0 never
   warn_at: z.number().min(0).default(1),
   // Fonts installed where the streaming app runs, Archivo when empty
-  clock_font: z.string().max(60).default(""),
-  title_font: z.string().max(60).default(""),
+  clock_font: z.string().max(FONT_MAX_LENGTH).default(""),
+  title_font: z.string().max(FONT_MAX_LENGTH).default(""),
   clock_color: ColorSchema.default("#f1f5f9"),
   title_color: ColorSchema.default("#f1f5f9"),
   // Added time and the multiplier
