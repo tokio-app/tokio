@@ -43,9 +43,17 @@ import {
   TriggerFilter,
 } from "@/components";
 import thumbs from "@/components/MediaPicker/mediapicker.module.css";
+import { releaseOnUnmount } from "@/helper/media";
 import { AlertTestRequest } from "@/hooks";
 import { rich, useOptions, useT } from "@/ui/i18n";
-import { ReactNode, RefObject, useEffect, useRef, useState } from "react";
+import {
+  ReactNode,
+  RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   FiImage,
   FiMessageSquare,
@@ -548,6 +556,19 @@ function MediaPreview({
     if (ref.current) ref.current.volume = volume / 100;
   }, [ref, volume]);
 
+  // The editor's player, freed once it's removed
+  const video = useCallback(
+    (el: HTMLVideoElement | null) => {
+      ref.current = el;
+      const release = releaseOnUnmount(el);
+      return () => {
+        ref.current = null;
+        release();
+      };
+    },
+    [ref],
+  );
+
   if (mediaKind(file) !== "video") {
     return (
       <span className={styles.preview}>
@@ -559,7 +580,7 @@ function MediaPreview({
   return (
     <span className={styles.preview}>
       <video
-        ref={ref}
+        ref={video}
         className={thumbs.thumb}
         src={`${src}#t=0.1`}
         preload="metadata"

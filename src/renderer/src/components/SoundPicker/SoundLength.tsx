@@ -1,4 +1,5 @@
 import { cutPart, formatAdded, getSoundPreviewURL } from "@/common/util";
+import { releaseOnUnmount } from "@/helper/media";
 import { useState } from "react";
 import styles from "./soundpicker.module.css";
 
@@ -27,6 +28,7 @@ export function SoundLength({ file, seconds, cut }: Props) {
     <>
       {file && seconds === undefined && (
         <audio
+          ref={releaseOnUnmount}
           src={getSoundPreviewURL(file)}
           preload="metadata"
           onLoadedMetadata={(e) => setRead(e.currentTarget.duration)}

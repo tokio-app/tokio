@@ -17,7 +17,9 @@ export class WindowsTTS extends TTSProvider {
   public setKey(_key: string) {}
 
   public async getVoices(): Promise<ProviderVoice[]> {
-    const voices = await this._fetchVoices();
+    // Asking starts the PowerShell host, so they're listed once a run: a
+    // voice installed meanwhile shows after a restart
+    const voices = this._voices ?? (await this._fetchVoices());
     return voices.map(({ name, lang }) => ({ name, lang }));
   }
 

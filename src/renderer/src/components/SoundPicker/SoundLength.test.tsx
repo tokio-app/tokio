@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { describe, expect, it } from "vitest";
 import { SoundLength } from "./SoundLength";
 
@@ -53,5 +54,29 @@ describe("SoundLength", () => {
   it("shows nothing without a file or a length", () => {
     const { container } = render(<SoundLength />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("frees its audio once it's removed", async () => {
+    const { container, unmount } = render(<SoundLength file="horn.mp3" />);
+    const audio = container.querySelector("audio")!;
+
+    unmount();
+    await Promise.resolve();
+
+    expect(audio).not.toHaveAttribute("src");
+  });
+
+  it("keeps its audio through StrictMode's second mount", async () => {
+    const { container } = render(
+      <StrictMode>
+        <SoundLength file="horn.mp3" />
+      </StrictMode>,
+    );
+    await Promise.resolve();
+
+    expect(container.querySelector("audio")).toHaveAttribute(
+      "src",
+      "tokio-media:///sounds/horn.mp3",
+    );
   });
 });

@@ -13,6 +13,11 @@ Object.defineProperties(HTMLElement.prototype, {
 Element.prototype.scrollTo = () => {};
 globalThis.scrollTo = () => {};
 
+// jsdom doesn't play media, and logs an error for each player that
+// releaseOnUnmount frees.
+HTMLMediaElement.prototype.load = () => {};
+HTMLMediaElement.prototype.pause = () => {};
+
 globalThis.ResizeObserver = class {
   observe() {}
   unobserve() {}

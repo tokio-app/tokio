@@ -11,6 +11,7 @@ import {
   SoundLength,
   useVideoURL,
 } from "@/components";
+import { releaseOnUnmount } from "@/helper/media";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
@@ -50,6 +51,7 @@ export function MediaSection() {
         >
           {mediaKind(showing.file) === "video" ? (
             <video
+              ref={releaseOnUnmount}
               className={styles.media_full}
               src={fullVideo}
               controls
