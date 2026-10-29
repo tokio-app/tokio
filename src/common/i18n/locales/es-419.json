@@ -230,6 +230,8 @@
   "components.fonts.searchPlaceholder": "Buscar fuentes...",
   "components.fonts.noMatch": "Ninguna fuente coincide.",
   "components.fonts.failed": "No se pudieron cargar las fuentes de esta computadora.",
+  "components.overlayModal.rows": "{count} de {max}",
+  "components.overlayModal.overlayFont": "Fuente del overlay",
   "settings.language.title": "Idioma",
   "settings.language.description": "Menús y mensajes. Elige las voces en TTS.",
   "settings.language.system": "Idioma del sistema",

@@ -1,11 +1,12 @@
 import { OverlayConfig } from "@/common/schemas";
 import { OverlayConfigRedux, TokioPreviewMessage } from "@/common/types";
-import { gift, overlayApp, overlayConfig } from "@test/fixtures";
+import { gift, overlayApp, overlayConfig, socialsTable } from "@test/fixtures";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { OverlayModal } from ".";
+import styles from "./overlaymodal.module.css";
 
 const GIFTS = [gift(5655, "Rose"), gift(6064, "GG")];
 
@@ -285,5 +286,100 @@ describe("OverlayModal", () => {
       }),
       "*",
     );
+  });
+
+  describe("with a table", () => {
+    const withTable = (table = socialsTable()) => {
+      const config = overlayConfig();
+      config.fields.push(table);
+      return config;
+    };
+    const removes = () => screen.queryAllByRole("button", { name: "Remove" });
+    const add = () => button("Add");
+
+    it("gives the settings a wider column", () => {
+      const wide = `.${styles.editor_wide}`;
+      const { unmount } = setup();
+      expect(document.querySelector(wide)).toBeNull();
+      unmount();
+
+      setup({ config: withTable() });
+      expect(screen.getByRole("table").closest(wide)).toBeInTheDocument();
+    });
+
+    it("can't save after a row is added and removed", async () => {
+      const { user } = setup({ config: withTable() });
+
+      await user.click(add());
+      expect(button("Save")).toBeEnabled();
+      await user.click(removes()[1]);
+
+      expect(button("Save")).toBeDisabled();
+    });
+
+    it("resets the rows to their defaults", async () => {
+      const { user, onSave } = setup({ config: withTable() });
+
+      await user.click(button("Reset to defaults"));
+      expect(button("Reset to defaults")).toBeDisabled();
+      await user.click(button("Save"));
+
+      const expected = withValue(withTable(), "socials", [
+        { platform: "facebook", username: "", color: "ffffff" },
+      ]);
+      expect(onSave).toHaveBeenCalledWith(expected);
+    });
+
+    it("sends its preview the rows, colors with their #", async () => {
+      const { user } = setup({ config: withTable() });
+      const { iframe, post } = preview();
+      fireEvent.load(iframe);
+
+      await user.click(add());
+
+      expect(post).toHaveBeenLastCalledWith(
+        configMessage({
+          title: "Goal",
+          size: 50,
+          show: true,
+          socials: [
+            { platform: "facebook", username: "@tokio", color: "#ffffff" },
+            { platform: "instagram", username: "", color: "#ff0000" },
+          ],
+        }),
+        "*",
+      );
+    });
+
+    it("focuses the new row's first control, even when Add turns disabled", async () => {
+      const { user } = setup({ config: withTable() });
+
+      await user.click(add());
+      await user.click(add());
+
+      expect(add()).toBeDisabled();
+      const rows = within(screen.getByRole("table")).getAllByRole("row");
+      expect(within(rows[3]).getByRole("combobox")).toHaveFocus();
+    });
+
+    it("keeps the focus in the dialog when the last row goes", async () => {
+      const table = socialsTable([
+        { platform: "facebook", username: "@tokio", color: "ffffff" },
+        { platform: "instagram", username: "@tokio.live", color: "000000" },
+      ]);
+      const { user, onRequestClose } = setup({ config: withTable(table) });
+
+      await user.click(removes()[1]);
+      expect(removes()).toHaveLength(1);
+      expect(removes()[0]).toHaveFocus();
+
+      await user.click(removes()[0]);
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      expect(add()).toHaveFocus();
+
+      // The dialog still sees Escape
+      await user.keyboard("{Escape}");
+      expect(onRequestClose).toHaveBeenCalledOnce();
+    });
   });
 });

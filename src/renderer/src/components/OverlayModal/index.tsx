@@ -4,14 +4,16 @@ import {
   resetOverlayConfig,
 } from "@/common/schemas";
 import { CustomGift, OverlayApp, TokioPreviewMessage } from "@/common/types";
+import { cx } from "@/helper/cx";
 import { useT } from "@/ui/i18n";
+import isEqual from "fast-deep-equal";
 import { useEffect, useRef, useState } from "react";
 import { PiShootingStarThin } from "react-icons/pi";
 import { Btn, Spinner } from "../Elements";
 import { Modal } from "../Modal";
 import { OverlayPreview } from "../OverlayPreview";
 import styles from "./overlaymodal.module.css";
-import { sameValue, SettingField } from "./SettingField";
+import { SettingField } from "./SettingField";
 
 interface Props {
   overlay: OverlayApp;
@@ -65,10 +67,10 @@ export function OverlayModal({
     config != null &&
     fields.some(
       (field, i) =>
-        !sameValue(field.attributes.value, config.fields[i]?.attributes.value),
+        !isEqual(field.attributes.value, config.fields[i]?.attributes.value),
     );
   const atDefaults = fields.every((field) =>
-    sameValue(field.attributes.value, field.attributes.default),
+    isEqual(field.attributes.value, field.attributes.default),
   );
 
   const handleValueChange = (id: string, value: unknown) => {
@@ -121,7 +123,13 @@ export function OverlayModal({
         </div>
       }
     >
-      <div className={styles.editor}>
+      <div
+        className={cx(
+          styles.editor,
+          // Room for a table's columns
+          fields.some((f) => f.type === "table") && styles.editor_wide,
+        )}
+      >
         <div className={styles.preview}>
           <OverlayPreview
             ref={preview}

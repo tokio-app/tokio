@@ -230,6 +230,8 @@
   "components.fonts.searchPlaceholder": "Search fonts...",
   "components.fonts.noMatch": "No fonts match.",
   "components.fonts.failed": "Couldn't load this computer's fonts.",
+  "components.overlayModal.rows": "{count} of {max}",
+  "components.overlayModal.overlayFont": "Overlay's font",
   "settings.language.title": "Language",
   "settings.language.description": "Menus and messages. Pick voices in TTS.",
   "settings.language.system": "System language",

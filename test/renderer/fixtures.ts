@@ -6,6 +6,8 @@ import type {
   CatalogOverlay,
   MediaFile,
   OverlayConfig,
+  OverlayConfigRow,
+  OverlayConfigTable,
   Profile,
   StoreSchema,
 } from "@/common/schemas";
@@ -190,6 +192,53 @@ export const overlayConfig = (): OverlayConfig => ({
       attributes: { value: true, default: true },
     },
   ],
+});
+
+/** A table of social links: a platform, a username and a color per row. */
+export const socialsTable = (
+  value: OverlayConfigRow[] = [
+    { platform: "facebook", username: "@tokio", color: "ffffff" },
+  ],
+  // {} for no limit
+  { max }: { max?: number } = { max: 3 },
+): OverlayConfigTable => ({
+  id: "socials",
+  name: "Social links",
+  section: "general",
+  type: "table",
+  attributes: {
+    max,
+    columns: [
+      {
+        id: "platform",
+        name: "Platform",
+        type: "dropdown",
+        attributes: {
+          multiple: false,
+          searchable: false,
+          options: [
+            { value: "facebook", label: "Facebook" },
+            { value: "instagram", label: "Instagram" },
+          ],
+          default: "instagram",
+        },
+      },
+      {
+        id: "username",
+        name: "Username",
+        type: "input",
+        attributes: { mode: "text", placeholder: "@username", default: "" },
+      },
+      {
+        id: "color",
+        name: "Icon color",
+        type: "color",
+        attributes: { default: "ff0000" },
+      },
+    ],
+    value,
+    default: [{ platform: "facebook", username: "", color: "ffffff" }],
+  },
 });
 
 /** A failed reply, as main sends them. */

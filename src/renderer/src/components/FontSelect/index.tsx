@@ -22,18 +22,24 @@ async function listFonts() {
 
 /**
  * Shows the font in its own face, and opens a picker of the fonts installed
- * on this computer. "" is Archivo, the overlays' own font.
+ * on this computer. "" is the overlay's own font, Archivo unless
+ * `defaultLabel` names another.
  */
 export function FontSelect({
   value,
+  defaultLabel,
   onChange,
 }: {
   value: string;
+  // What "" reads as
+  defaultLabel?: string;
   onChange: (value: string) => void;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const name = value || t("common.defaultFont");
+  const label = (font: string) =>
+    font || (defaultLabel ?? t("common.defaultFont"));
+  const name = label(value);
 
   return (
     <>
@@ -54,6 +60,7 @@ export function FontSelect({
         createPortal(
           <FontPicker
             value={value}
+            label={label}
             onPick={(font) => {
               // Picking the font in use saves nothing.
               if (font !== value) onChange(font);
@@ -69,12 +76,13 @@ export function FontSelect({
 
 type PickerProps = {
   value: string;
+  label: (font: string) => string;
   onPick: (font: string) => void;
   onClose: () => void;
 };
 
 // The gift picker's list of one pick, each font's name set in that font
-function FontPicker({ value, onPick, onClose }: PickerProps) {
+function FontPicker({ value, label, onPick, onClose }: PickerProps) {
   const t = useT();
   const listRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
@@ -85,9 +93,8 @@ function FontPicker({ value, onPick, onClose }: PickerProps) {
     listFonts().then(setFonts, () => setFonts(null));
   }, []);
 
-  const label = (font: string) => font || t("common.defaultFont");
-  // Archivo, then this computer's fonts. The one in use comes first, as in
-  // the gift picker, when this computer has it.
+  // The overlay's own font, then this computer's fonts. The one in use comes
+  // first, as in the gift picker, when this computer has it.
   const fontsHere = ["", ...(fonts ?? [])];
   const needle = search.trim().toLowerCase();
   const shown = [

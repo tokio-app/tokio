@@ -6,6 +6,11 @@
   height: 520px;
 }
 
+/* A table's columns need the room */
+.editor_wide {
+  grid-template-columns: minmax(0, 1fr) 480px;
+}
+
 .preview {
   display: flex;
   flex-direction: column;
@@ -119,6 +124,77 @@
 
 .reset_hidden {
   visibility: hidden;
+}
+
+/* The table, then Add under it */
+.table_field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Scrolls sideways when the columns don't fit, the remove buttons kept in
+   view on the right (46px: the trash button and its cell's padding) */
+.table_box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  scroll-padding-right: 46px;
+}
+
+/* Overflow clips rings drawn outside */
+.table_box :focus-visible {
+  outline-offset: -2px;
+}
+
+/* No line between cells: the controls' borders already mark the columns */
+.table {
+  width: 100%;
+  border-spacing: 0;
+}
+
+.table th,
+.table td {
+  padding: var(--space-2);
+  vertical-align: middle;
+}
+
+/* Long names wrap, since an auto-layout table can't cut them short, and every
+   name sits right over its control */
+.table th {
+  padding-bottom: 0;
+  vertical-align: bottom;
+  font-size: var(--font-xs);
+  font-weight: 500;
+  text-align: start;
+  color: var(--font-secondary);
+}
+
+.table tbody tr + tr td {
+  border-top: 1px solid var(--border);
+}
+
+/* As narrow as the control, so text fields and dropdowns take the rest */
+.narrow {
+  width: 1%;
+}
+
+/* Text fields and dropdowns keep room to read, scrolling the box instead */
+.wide {
+  min-width: 120px;
+}
+
+/* On the dialog's surface, over the cells scrolling under it */
+.pinned {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  width: 1%;
+  background-color: var(--background-tertiary);
+}
+
+.add {
+  align-self: flex-start;
 }
 
 .footer {

@@ -43,6 +43,15 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
   - `writeFileAtomic` also runs writes to one file in the order they came.
 - Import, remove, install and the Tools page's test overlays keep their change when the store file can't be written (`OverlayResult.saved: false`): the handler replies with the list main holds, then throws `saveFailure()`, with no success notice.
 
+## Settings fields
+
+- `OverlayConfigSchema` (`src/common/schemas/overlay.ts`) holds the field types. `SettingField` lays each one out and `FieldControl` draws its control, which a table's cells reuse through `cellField`.
+- A `font` field is a `FontSelect` whose `""` reads as the overlay's own font (`components.overlayModal.overlayFont`): the official overlays use `system-ui`, not Archivo.
+- A `table` field's rows are objects of cells keyed by column id. Columns take every type but `table` and `slider`, and `checkTable` refuses a row without exactly one cell of its column's kind per column.
+- `TableField` draws a real table, each cell a group named by its column. The settings column widens (`editor_wide`) for an overlay with a table, and the box scrolls sideways under the pinned remove buttons when the columns still don't fit.
+- Removing the last row, or adding one, moves the focus (to the previous row's remove button, Add, or the new row's first control). A button that leaves the DOM drops it on `<body>`, where the `Modal` no longer sees Escape or Tab.
+- A merge (`mergeOverlayConfig`) keeps a table's rows up to the new `max`. A cell stays when the old table had a column with the same id and type and the value still fits (`fits`); the others take the column's default.
+
 ## Another computer
 
 - The server listens on every interface on purpose (see Conventions in `AGENTS.md`). A streaming app on another computer opens overlays through `tokio-app.local` pointed at this PC's address in that computer's hosts file or a DNS entry (as the website's docs describe), or at the address itself. Tokio's own hosts-file entry (`services/url`) is only for this PC.

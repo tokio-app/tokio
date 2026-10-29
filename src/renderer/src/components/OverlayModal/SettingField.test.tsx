@@ -1,10 +1,10 @@
 import { OverlayConfigField } from "@/common/schemas";
-import { gift } from "@test/fixtures";
+import { gift, socialsTable } from "@test/fixtures";
 import { inList } from "@test/queries";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { sameValue, SettingField } from "./SettingField";
+import { SettingField } from "./SettingField";
 
 const GIFTS = [gift(5655, "Rose"), gift(6064, "GG"), gift(7934, "Heart Me")];
 
@@ -264,19 +264,122 @@ describe("SettingField", () => {
   );
 });
 
-describe("sameValue", () => {
-  it("compares primitives", () => {
-    expect(sameValue("a", "a")).toBe(true);
-    expect(sameValue(1, 1)).toBe(true);
-    expect(sameValue(true, false)).toBe(false);
-    expect(sameValue(1, "1")).toBe(false);
+describe("SettingField fonts", () => {
+  it("picks a font, starting from the overlay's own", async () => {
+    vi.stubGlobal("queryLocalFonts", async () => [{ family: "Bebas Neue" }]);
+    const { user, onChange } = setup({
+      ...base,
+      name: "Font",
+      type: "font",
+      attributes: { value: "", default: "" },
+    });
+    const font = within(screen.getByRole("group", { name: "Font" }));
+    expect(
+      font.getByText(
+        "If your streaming app runs on another computer, install the font there too.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(font.getByRole("button", { name: "Overlay's font" }));
+    const picker = within(screen.getByRole("dialog"));
+    await user.click(await picker.findByRole("button", { name: "Bebas Neue" }));
+
+    expect(onChange).toHaveBeenCalledWith("Bebas Neue");
+  });
+});
+
+describe("SettingField tables", () => {
+  const ROWS = [
+    { platform: "facebook", username: "@tokio", color: "ffffff" },
+    { platform: "instagram", username: "@tokio.live", color: "000000" },
+  ];
+
+  const usernames = () =>
+    screen
+      .getAllByRole("group", { name: "Username" })
+      .map((cell) =>
+        within(cell).getByPlaceholderText<HTMLInputElement>("@username"),
+      );
+  const removes = () => screen.getAllByRole("button", { name: "Remove" });
+  const add = () => screen.getByRole("button", { name: "Add" });
+
+  it("shows its rows under the column names", () => {
+    setup(socialsTable(ROWS));
+
+    expect(
+      screen.getAllByRole("columnheader").map((th) => th.textContent),
+    ).toEqual(["Platform", "Username", "Icon color"]);
+    const rows = within(screen.getByRole("table")).getAllByRole("row");
+    // The column names, then a row each
+    expect(rows).toHaveLength(3);
+    expect(within(rows[1]).getByText("Facebook")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("Instagram")).toBeInTheDocument();
+    expect(usernames().map((input) => input.value)).toEqual([
+      "@tokio",
+      "@tokio.live",
+    ]);
+    expect(removes()).toHaveLength(2);
   });
 
-  it("compares lists by their items, in order", () => {
-    expect(sameValue([1, 2], [1, 2])).toBe(true);
-    expect(sameValue([], [])).toBe(true);
-    expect(sameValue([1, 2], [2, 1])).toBe(false);
-    expect(sameValue([1, 2], [1, 2, 3])).toBe(false);
-    expect(sameValue(["a"], "a")).toBe(false);
+  it("edits a cell", async () => {
+    const { user, container, onChange } = setup(socialsTable(ROWS));
+
+    await user.type(usernames()[1], "!");
+    expect(onChange).toHaveBeenLastCalledWith([
+      ROWS[0],
+      { ...ROWS[1], username: "@tokio.live!" },
+    ]);
+
+    await user.click(within(container).getByText("Facebook"));
+    await user.click(inList(container, "Instagram")!);
+    expect(onChange).toHaveBeenLastCalledWith([
+      { ...ROWS[0], platform: "instagram" },
+      ROWS[1],
+    ]);
+  });
+
+  it("removes a row", async () => {
+    const { user, onChange } = setup(socialsTable(ROWS));
+
+    await user.click(removes()[0]);
+
+    expect(onChange).toHaveBeenCalledWith([ROWS[1]]);
+  });
+
+  it("adds a row of the column defaults", async () => {
+    const { user, onChange } = setup(socialsTable(ROWS));
+
+    await user.click(add());
+
+    expect(onChange).toHaveBeenCalledWith([
+      ...ROWS,
+      { platform: "instagram", username: "", color: "ff0000" },
+    ]);
+  });
+
+  it("can't add past its max, and counts the rows", () => {
+    const { unmount } = setup(socialsTable(ROWS));
+    expect(screen.getByText("2 of 3")).toBeInTheDocument();
+    expect(add()).toBeEnabled();
+    unmount();
+
+    setup(socialsTable([...ROWS, ROWS[0]]));
+    expect(screen.getByText("3 of 3")).toBeInTheDocument();
+    expect(add()).toBeDisabled();
+  });
+
+  it("has no counter without a max", () => {
+    setup(socialsTable(ROWS, {}));
+
+    expect(screen.queryByText(/ of /)).not.toBeInTheDocument();
+    expect(add()).toBeEnabled();
+  });
+
+  it("shows only Add with no rows", () => {
+    setup(socialsTable([]));
+
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(add()).toBeEnabled();
+    expect(screen.getByText("0 of 3")).toBeInTheDocument();
   });
 });

@@ -2,40 +2,13 @@ import { OverlayConfigField } from "@/common/schemas";
 import { CustomGift } from "@/common/types";
 import { cx } from "@/helper/cx";
 import { useT } from "@/ui/i18n";
+import isEqual from "fast-deep-equal";
 import { ReactNode, useId } from "react";
 import { VscDiscard } from "react-icons/vsc";
-import {
-  Btn,
-  Check,
-  Color,
-  Input,
-  MultiSelect,
-  NumberInput,
-  Select,
-  Slider,
-  Toggle,
-} from "../Elements";
-import { GiftMultiSelect, GiftSelect } from "../GiftSelect";
+import { Btn } from "../Elements";
+import { FieldControl } from "./FieldControl";
 import styles from "./overlaymodal.module.css";
-
-type Value = string | number;
-
-// Dropdown values are stored as one value or a list, depending on `multiple`.
-function asList<V extends Value>(value: V | V[]): V[] {
-  return Array.isArray(value) ? value : [value];
-}
-
-function asSingle<V extends Value>(value: V | V[]): V | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-/** Compares field values: primitives, or lists of them. */
-export function sameValue(a: unknown, b: unknown): boolean {
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((v, i) => v === b[i]);
-  }
-  return a === b;
-}
+import { TableField } from "./TableField";
 
 interface Props {
   field: OverlayConfigField;
@@ -45,7 +18,7 @@ interface Props {
 }
 
 export function SettingField({ field, gifts, onChange, onReset }: Props) {
-  const changed = !sameValue(field.attributes.value, field.attributes.default);
+  const changed = !isEqual(field.attributes.value, field.attributes.default);
   const t = useT();
   const labelId = useId();
 
@@ -76,80 +49,37 @@ export function SettingField({ field, gifts, onChange, onReset }: Props) {
     </div>
   );
 
+  if (field.type === "table") {
+    const { max, value } = field.attributes;
+    return stacked(
+      <TableField table={field} gifts={gifts} onChange={onChange} />,
+      max === undefined
+        ? undefined
+        : t("components.overlayModal.rows", {
+            count: value.length,
+            max,
+          }),
+    );
+  }
+
+  const control = (
+    <FieldControl
+      field={field}
+      gifts={gifts}
+      label={field.name}
+      onChange={onChange}
+    />
+  );
+
   switch (field.type) {
-    case "input":
-      return stacked(
-        field.attributes.mode === "number" ? (
-          <NumberInput
-            placeholder={field.attributes.placeholder}
-            value={Number(field.attributes.value)}
-            onChange={onChange}
-          />
-        ) : (
-          <Input
-            placeholder={field.attributes.placeholder}
-            value={field.attributes.value}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        ),
-      );
-
-    case "dropdown":
-      return stacked(
-        field.attributes.multiple ? (
-          <MultiSelect
-            searchable={field.attributes.searchable}
-            options={field.attributes.options}
-            value={asList<Value>(field.attributes.value)}
-            onChange={onChange}
-          />
-        ) : (
-          <Select
-            searchable={field.attributes.searchable}
-            options={field.attributes.options}
-            value={asSingle<Value>(field.attributes.value)}
-            onChange={onChange}
-          />
-        ),
-      );
-
-    case "gifts":
-      return stacked(
-        field.attributes.multiple ? (
-          <GiftMultiSelect
-            gifts={gifts}
-            value={asList(field.attributes.value)}
-            onChange={onChange}
-          />
-        ) : (
-          <GiftSelect
-            gifts={gifts}
-            value={asSingle(field.attributes.value)}
-            onChange={onChange}
-          />
-        ),
-      );
-
     case "slider":
-      return stacked(
-        <Slider
-          className={styles.slider}
-          min={field.attributes.min}
-          max={field.attributes.max}
-          value={field.attributes.value}
-          onChange={onChange}
-        />,
-        field.attributes.value,
-      );
+      return stacked(control, field.attributes.value);
 
     // The swatch first, so its picker opens toward the middle of the window
     case "color":
       return (
         <div className={styles.row} role="group" aria-labelledby={labelId}>
-          <Color
-            value={`#${field.attributes.value}`}
-            onChange={(color) => onChange(color.replace(/^#/, ""))}
-          />
+          {control}
           <span id={labelId} className={styles.label}>
             {field.name}
           </span>
@@ -159,24 +89,18 @@ export function SettingField({ field, gifts, onChange, onReset }: Props) {
 
     // One click puts these back, so they have no reset
     case "check":
-      return (
-        <Check
-          label={field.name}
-          checked={field.attributes.value}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-      );
-
     case "toggle":
-      return (
-        <Toggle
-          label={field.name}
-          checked={field.attributes.value}
-          onChange={(e) => onChange(e.target.checked)}
-        />
+      return control;
+
+    case "font":
+      return stacked(
+        <>
+          {control}
+          <p className={styles.note}>{t("common.fontsNote")}</p>
+        </>,
       );
 
     default:
-      return null;
+      return stacked(control);
   }
 }

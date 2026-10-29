@@ -111,6 +111,32 @@ describe("FontSelect", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("names the overlay's own font as told, in the field and the picker", async () => {
+    vi.stubGlobal("queryLocalFonts", async () => [{ family: "Arial" }]);
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(
+      <FontSelect value="" defaultLabel="Overlay's font" onChange={onChange} />,
+    );
+    const field = within(container).getByRole("button");
+    expect(field).toHaveTextContent("Overlay's font");
+    expect(field).toHaveAttribute("title", "Overlay's font");
+
+    await user.click(field);
+    await picker().findByRole("button", { name: "Arial" });
+    expect(listed()).toEqual(["Overlay's font", "Arial"]);
+
+    await user.type(
+      picker().getByPlaceholderText("Search fonts..."),
+      "overlay",
+    );
+    expect(listed()).toEqual(["Overlay's font"]);
+
+    await user.click(row("Overlay's font"));
+    // Already the font in use
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("shows a spinner while it lists the fonts", async () => {
     const { user, field } = setup("", () => new Promise(() => {}));
 
