@@ -62,6 +62,8 @@
 
   /* The main window's sidebar; the title bar centers the logo over it */
   --rail-width: 48px;
+  /* Pages as tall as the window leave it out */
+  --title-bar-height: 44px;
 
   /* Elevation */
   --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.45);

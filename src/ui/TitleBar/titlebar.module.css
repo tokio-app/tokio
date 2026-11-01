@@ -1,6 +1,6 @@
 .bar {
   flex-shrink: 0;
-  height: 44px;
+  height: var(--title-bar-height);
   width: 100%;
   display: flex;
   align-items: center;
