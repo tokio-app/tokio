@@ -48,7 +48,7 @@ The look follows the `frontend-design` skill. The palette's values and the logos
 - **Never:** shadows on cards, pills, or uppercase labels.
 - Type is Archivo (`@fontsource-variable/archivo`, imported by `base.css`), at 400 for text, 500 for labels and controls, 600 for titles. Live numbers (Home's stats and totals) use the readout: `font-stretch: var(--stretch-readout)`, 700, `tabular-nums`.
 - A page of settings uses `<Page width="wide" layout="aside">`: each section's header sits in a column beside its content. `Section` wraps the content in `.section_body`, which is `display: contents` in the stacked layout.
-- Section descriptions are a few words, not explanations, and a section's actions go on the title's row as icon buttons with a `title` (text buttons don't fit there). The user's call.
+- Section descriptions are a few words, not explanations, and a section's actions go on the title's row as icon buttons with a `title` (text buttons don't fit there). The user's call. Fans' **Super Fans only** `Toggle` sits there too, the user's request.
 - `TitleBar`'s `live` prop (Layout passes the `CONNECTED` reply's `live`, see `.claude/rules/live-session.md`) draws the tally on every page: a rose line at the top's center, fading out to both sides, with no "LIVE" label (the user's call). "LIVE" is said only to screen readers.
 - The sidebar shows icons only. Each page's name is a span in its link, shown beside the icon on hover and keyboard focus. Opacity hides it, not `visibility`, so it still names the link. Escape hides it until the pointer or focus moves to another link (WCAG 1.4.13).
 

@@ -12,7 +12,8 @@ paths:
 
 - A fan is keyed by TikTok's user id (`UserData.userId`), since handles change. Viewers without one are skipped.
 - The user of each `FAN_EVENTS` event with a fan level of 1 or more updates their entry: name, handle, level, the badge's picture (`fanBadge`) and `seenAt` (ms since the epoch). A level of 0 changes nothing, since a missing badge isn't proof they left the fan club. ROOM_USER's ranks carry no badges, so they're left out.
-- A new live event with a `user` goes in `FAN_EVENTS`.
+- **Super Fan status** (`superfan`): chat and gifts carry TikTok's flag (`isSubscriberOfAnchor`), so they set it either way. Becoming a Super Fan (`SUPER_FAN`) or joining as one (`SUPER_FAN_JOIN`) sets it. The other events keep what's known, since the connector fills their flag with `false` (`SUPERFAN`, passed the event's type by `registerFans`). A file saved without it loads with `false`.
+- A new live event with a `user` goes in `FAN_EVENTS`, and in `SUPERFAN` when it tells whether they're a Super Fan.
 - Up to `MAX_FANS` (5,000) per profile. The one not seen for the longest is dropped first, in the `Map`'s order, which the file keeps.
 - No profile pictures, the user's call: TikTok signs their links (`x-expires`), and in the 2026-10-20 captures they expired 2 days after they were sent. An overlay takes the picture of a fan in the LIVE from their live events.
 - The badge's picture is kept: the connector takes it from the fan badge (`getFanBadge`), next to the level. They're TikTok's fixed files on `p16-webcast.tiktokcdn.com`, unsigned: a heart with a tier mark and no number, one per 10 levels (`fans_badge_icon_lv1`, `lv10` … `lv50`), in two designs (`_v2`, `_v4`) and grey versions. Overlays draw `fanLevel` next to it. A file saved without `fanBadge` loads with `""`.
@@ -39,4 +40,5 @@ paths:
 - `pages/Fans` (`/tools/fans`), opened from Tools' list with a `BackButton`. Its header and the list share the window's height, and the list scrolls inside. Rows out of view skip layout (`content-visibility`), so 5,000 fans stay cheap.
 - Each row: the badge's picture before the level in the readout, the page's one bold element (no picture, or one that fails, leaves the level alone), the name and @handle, and when Tokio last saw them.
 - The search runs in the window over every fan, by name or @handle, with the gifter search's rule (`viewerMatcher`, `src/common/util/history.ts`).
+- A Super Fan's row says "Super Fan" after the name. **Super Fans only**, a `Toggle` on the title row beside the search (the user's request), lists just them, together with the search.
 - Fans can't be removed from the page.
