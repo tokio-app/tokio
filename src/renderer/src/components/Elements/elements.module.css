@@ -471,8 +471,9 @@
   border-color: var(--accent-primary);
 }
 
+/* Six options whole, and half of a seventh hints that a longer list scrolls */
 .select_list {
-  max-height: 220px;
+  max-height: 260px;
   overflow-y: auto;
 }
 
