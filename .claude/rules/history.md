@@ -56,7 +56,10 @@ paths:
 
 - `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top 100. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page asks again on each `GET_PROFILE` reply, a profile switch.
 - `GET_LIVE { startedAt }` replies `LIVE` with that LIVE's record. Failures carry the `startedAt` too.
-- `GET_GIFTERS { from?, to? }` replies `GIFTERS` with the top 100 of the finished LIVEs that started from `from` (included) to `to` (left out), added up from their files by `getGifters` (a file that doesn't load is left out). The reply carries the range, failures included.
+- `GET_GIFTERS { from?, to?, query? }` replies `GIFTERS` with the top 100 of the finished LIVEs that started from `from` (included) to `to` (left out), each with their `rank` among them (`RankedGifter`).
+  - With a query, only the ones whose name or @handle has it, in any case, with a leading @ ignored.
+  - A range of every LIVE reads all time's list. Others are added up from their files by `getGifters`, leaving out a file that doesn't load.
+  - The reply carries the range and the query, failures included.
 - `DELETE_LIVE` and `CLEAR_LIVES` reply `LIVES` with what main holds, then send `LIVE_DELETED` or `HISTORY_CLEARED`. A failed save after a delete throws `HISTORY_SAVE_FAILED`, a refused clear `HISTORY_CLEAR_FAILED`.
 
 ## The page
@@ -74,5 +77,9 @@ paths:
   - The list keeps the matching LIVEs, with the bars scaled to the best of them.
   - The first row becomes their totals, named by `periodText` ("Oct 1, 2026 to Oct 31, 2026"), with the top gifters main adds up (`GET_GIFTERS`, asked again when the LIVEs change). A new filter selects it.
   - The date fields' format and calendar follow the system's language, not Tokio's (`.claude/rules/i18n.md`).
+- **The gifter search** is a `SearchToggle` on the gifters' title row.
+  - Main searches (`GET_GIFTERS`, `SEARCH_DELAY_MS` after the last key), so it finds anyone, not only the 100 listed. The selected LIVE goes as a one-LIVE range, or the filter's range.
+  - The rows show each match's `rank`.
+  - The search stays while the selection and the dates change: both cases render the same `GiftersSection`.
 - Delete and Clear history are icon buttons on the left's title row, which ask first with `DeleteLiveModal` and `ClearHistoryModal` (`components/DeleteModals`). Clear history shows only on All time, since it takes every LIVE, and is disabled while there's nothing to clear.
 - Dates go through `formatDate` (`helper/format.ts`), and a Spanish long date is capitalized for the title (`capitalize`).
