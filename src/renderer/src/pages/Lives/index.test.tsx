@@ -141,6 +141,14 @@ describe("Lives", () => {
     ]);
   });
 
+  it("leaves out the @username a LIVE doesn't have", async () => {
+    renderWithProviders(<Lives />);
+    await lives([liveSummary(SATURDAY, { username: "" })]);
+
+    expect(heading()).toHaveTextContent("Saturday, October 31, 2026");
+    expect(screen.queryByText("@")).not.toBeInTheDocument();
+  });
+
   it("moves the selection with the arrow keys, Home and End", async () => {
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday]);

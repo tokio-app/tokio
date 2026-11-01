@@ -112,7 +112,8 @@ export function Lives() {
                       end: formatDate(live.endedAt, language, "time"),
                     }),
                     formatDuration(live.endedAt - live.startedAt),
-                    `@${live.username}`,
+                    // Empty only for a LIVE no connect started
+                    ...(live.username ? [`@${live.username}`] : []),
                   ]}
                   action={
                     <Btn
