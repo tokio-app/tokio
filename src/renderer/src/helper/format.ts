@@ -54,6 +54,8 @@ const DATE_STYLES = {
   short: { dateStyle: "medium" },
   // "8:14 PM"
   time: { timeStyle: "short" },
+  // "Oct 31, 2026, 8:14 PM"
+  shortTime: { dateStyle: "medium", timeStyle: "short" },
   // "Friday, October 31, 2026 at 8:14 PM"
   dateTime: { dateStyle: "full", timeStyle: "short" },
 } satisfies Record<string, Intl.DateTimeFormatOptions>;

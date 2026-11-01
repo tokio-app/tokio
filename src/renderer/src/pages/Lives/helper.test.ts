@@ -10,55 +10,84 @@ import {
   periodText,
 } from "./helper";
 
-// Local midnights, so the days read the same in any time zone
-const day = (date: number) => new Date(2026, 9, date).getTime();
+// Local times, so the days read the same in any time zone
+const day = (date: number, hours = 0, minutes = 0) =>
+  new Date(2026, 9, date, hours, minutes).getTime();
+const NOW = day(31, 12);
+const HOUR = 3_600_000;
+
+const custom = (patch: Partial<DateFilter>): DateFilter => ({
+  preset: "custom",
+  operator: "between",
+  from: { date: "", time: "" },
+  to: { date: "", time: "" },
+  ...patch,
+});
+const at = (date: string, time = "") => ({ date, time });
 
 describe("dateRange", () => {
-  const filter = (patch: Partial<DateFilter>): DateFilter => ({
-    operator: "any",
-    date: "",
-    to: "",
-    ...patch,
+  it("counts the presets back from now", () => {
+    const preset = (preset: DateFilter["preset"]) =>
+      dateRange({ ...custom({}), preset }, NOW);
+    expect(preset("all")).toBeNull();
+    expect(preset("day")).toEqual({ from: NOW - 24 * HOUR });
+    expect(preset("week")).toEqual({ from: NOW - 7 * 24 * HOUR });
+    expect(preset("month")).toEqual({ from: NOW - 30 * 24 * HOUR });
+    // 12 months follow the calendar
+    expect(preset("year")).toEqual({
+      from: new Date(2025, 9, 31, 12).getTime(),
+    });
   });
 
-  it("keeps the LIVEs that started on, after or before a day", () => {
-    expect(dateRange(filter({ operator: "on", date: "2026-10-30" }))).toEqual({
-      from: day(30),
-      to: day(31),
-    });
+  it("keeps whole days without a time, and On's always", () => {
+    expect(
+      dateRange(
+        custom({ operator: "on", from: at("2026-10-30", "18:00") }),
+        NOW,
+      ),
+    ).toEqual({ from: day(30), to: day(31) });
     // The day itself is left out
     expect(
-      dateRange(filter({ operator: "after", date: "2026-10-30" })),
+      dateRange(custom({ operator: "after", from: at("2026-10-30") }), NOW),
     ).toEqual({ from: day(31) });
     expect(
-      dateRange(filter({ operator: "before", date: "2026-10-30" })),
+      dateRange(custom({ operator: "before", from: at("2026-10-30") }), NOW),
     ).toEqual({ to: day(30) });
+    expect(
+      dateRange(custom({ from: at("2026-10-20"), to: at("2026-10-10") }), NOW),
+    ).toEqual({ from: day(10), to: day(21) });
   });
 
-  it("takes both days of a range, in either order", () => {
-    const range = { from: day(10), to: day(21) };
+  it("goes to the minute with a time", () => {
     expect(
       dateRange(
-        filter({ operator: "between", date: "2026-10-10", to: "2026-10-20" }),
+        custom({ operator: "after", from: at("2026-10-30", "18:30") }),
+        NOW,
       ),
-    ).toEqual(range);
+    ).toEqual({ from: day(30, 18, 30) });
     expect(
       dateRange(
-        filter({ operator: "between", date: "2026-10-20", to: "2026-10-10" }),
+        custom({ operator: "before", from: at("2026-10-30", "18:30") }),
+        NOW,
       ),
-    ).toEqual(range);
+    ).toEqual({ to: day(30, 18, 30) });
+    // Both ends' minutes in, in either order, with a whole day for an end
+    // without a time
+    expect(
+      dateRange(
+        custom({ from: at("2026-10-30", "22:00"), to: at("2026-10-29") }),
+        NOW,
+      ),
+    ).toEqual({ from: day(29), to: day(30, 22, 1) });
   });
 
   it("keeps everything until the days are picked", () => {
-    expect(dateRange(filter({}))).toBeNull();
-    expect(dateRange(filter({ operator: "on" }))).toBeNull();
-    expect(
-      dateRange(filter({ operator: "between", date: "2026-10-10" })),
-    ).toBeNull();
+    expect(dateRange(custom({ operator: "on" }), NOW)).toBeNull();
+    expect(dateRange(custom({ from: at("2026-10-10") }), NOW)).toBeNull();
   });
 
   it("checks a LIVE by when it started", () => {
-    const evening = liveSummary(day(30) + 20 * 3_600_000);
+    const evening = liveSummary(day(30, 20));
     expect(inRange(evening, { from: day(30), to: day(31) })).toBe(true);
     expect(inRange(evening, { to: day(30) })).toBe(false);
     expect(inRange(evening, {})).toBe(true);
@@ -66,24 +95,33 @@ describe("dateRange", () => {
 });
 
 describe("periodText", () => {
-  it("names the days the filter keeps, or All time", () => {
-    expect(periodText({ operator: "any", date: "", to: "" }, "en")).toBe(
+  it("names the preset or the custom dates, with their times", () => {
+    expect(periodText({ ...custom({}), preset: "all" }, "en", NOW)).toBe(
       "All time",
     );
-    expect(periodText({ operator: "after", date: "", to: "" }, "en")).toBe(
+    expect(periodText({ ...custom({}), preset: "week" }, "en", NOW)).toBe(
+      "Last 7 days",
+    );
+    // Not picked yet
+    expect(periodText(custom({ operator: "after" }), "en", NOW)).toBe(
       "All time",
     );
     expect(
-      periodText({ operator: "on", date: "2026-10-30", to: "" }, "en"),
+      periodText(custom({ operator: "on", from: at("2026-10-30") }), "en", NOW),
     ).toBe("On Oct 30, 2026");
     expect(
       periodText(
-        { operator: "between", date: "2026-10-20", to: "2026-10-01" },
+        custom({ from: at("2026-10-20", "18:00"), to: at("2026-10-01") }),
         "en",
+        NOW,
       ),
-    ).toBe("Oct 1, 2026 to Oct 20, 2026");
+    ).toMatch(/^Oct 1, 2026 to Oct 20, 2026, 6:00\sPM$/);
     expect(
-      periodText({ operator: "before", date: "2026-10-30", to: "" }, "es-419"),
+      periodText(
+        custom({ operator: "before", from: at("2026-10-30") }),
+        "es-419",
+        NOW,
+      ),
     ).toBe("Antes del 30 oct 2026");
   });
 });

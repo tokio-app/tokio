@@ -8,16 +8,13 @@ import {
 import { gifter, liveSummary, profileReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Lives } from ".";
 
 // Local times, so the dates read the same in any time zone
 const FRIDAY = new Date(2026, 9, 30, 20, 14).getTime();
 const SATURDAY = new Date(2026, 9, 31, 19, 0).getTime();
-const OCT_30 = new Date(2026, 9, 30).getTime();
-const OCT_31 = new Date(2026, 9, 31).getTime();
-const NOV_1 = new Date(2026, 10, 1).getTime();
 
 const friday = liveSummary(FRIDAY, {
   username: "kai_live",
@@ -69,18 +66,21 @@ const gifterRows = (name: string) =>
   within(screen.getByRole("list", { name }))
     .getAllByRole("listitem")
     .map((row) => row.textContent);
-// Picks a date filter, and its days
+// Picks one of a select's options, the date filter's by default
 const dates = async (
   user: ReturnType<typeof renderWithProviders>["user"],
-  operator: string,
+  choice: string,
+  select = "Dates",
 ) => {
-  await user.click(screen.getByRole("combobox", { name: "Dates" }));
-  await user.click(screen.getByRole("option", { name: operator }));
+  await user.click(screen.getByRole("combobox", { name: select }));
+  await user.click(screen.getByRole("option", { name: choice }));
 };
-const pick = (field: string, day: string) =>
-  fireEvent.change(screen.getByLabelText(field), { target: { value: day } });
 
 describe("Lives", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("asks main for the LIVEs", () => {
     renderWithProviders(<Lives />);
 
@@ -163,31 +163,32 @@ describe("Lives", () => {
   });
 
   it("filters the LIVEs by date, with their totals and top gifters", async () => {
+    // A day back reaches Saturday's LIVE, not Friday's
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 31, 21));
+    const since = new Date(2026, 9, 30, 21).getTime();
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday]);
 
-    await dates(user, "On");
-    pick("Date", "2026-10-30");
+    await dates(user, "Last 24 hours");
 
     expect(options()).toEqual([
-      expect.stringMatching(/^On Oct 30, 2026, 12,400 coins$/),
-      expect.stringMatching(/^Friday/),
+      "Last 24 hours, 600 coins",
+      expect.stringMatching(/^Saturday/),
     ]);
-    expect(selected()).toMatch(/^On Oct 30, 2026/);
-    expect(heading()).toHaveTextContent("On Oct 30, 2026");
-    expect(stat("Coins")).toHaveTextContent("12.4K");
+    expect(selected()).toMatch(/^Last 24 hours/);
+    expect(heading()).toHaveTextContent("Last 24 hours");
+    expect(stat("Coins")).toHaveTextContent("600");
     // Clearing takes every LIVE, so only All time offers it
     expect(
       screen.queryByRole("button", { name: "Clear history" }),
     ).not.toBeInTheDocument();
-    expect(sent(APP_EVENTS.GET_GIFTERS)).toEqual([
-      { from: OCT_30, to: OCT_31 },
-    ]);
+    expect(sent(APP_EVENTS.GET_GIFTERS)).toEqual([{ from: since }]);
 
     // A late reply for other dates is dropped
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
-      to: OCT_30,
+      from: since - 1,
       data: [{ ...gifter("Old", 1), rank: 1 }],
     });
     expect(
@@ -195,45 +196,36 @@ describe("Lives", () => {
     ).not.toBeInTheDocument();
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
-      from: OCT_30,
-      to: OCT_31,
+      from: since,
       data: [{ ...gifter("Ana", 5200, 53), rank: 1 }],
     });
     expect(gifterRows("Top gifters")).toEqual([expect.stringContaining("Ana")]);
   });
 
   it("says when no LIVE or gift matches the dates", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 11, 31));
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday]);
 
-    // The day itself is left out
-    await dates(user, "After");
-    pick("Date", "2026-10-31");
+    await dates(user, "Last 7 days");
 
     expect(screen.getByText("No LIVEs on these dates.")).toBeInTheDocument();
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
-      from: NOV_1,
+      from: new Date(2026, 11, 24).getTime(),
       data: [],
     });
     expect(screen.getByText("No gifts on these dates.")).toBeInTheDocument();
   });
 
-  it("takes a range in either order, and goes back to All time", async () => {
+  it("goes back to All time from a preset", async () => {
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday]);
 
-    await dates(user, "Between");
-    pick("Date", "2026-10-31");
-    // Not a range until both days are picked
-    expect(heading()).toHaveTextContent("All time");
-    pick("End date", "2026-10-30");
+    await dates(user, "Last 12 months");
+    await dates(user, "All time");
 
-    expect(heading()).toHaveTextContent("Oct 30, 2026 to Oct 31, 2026");
-    expect(options()).toHaveLength(3);
-    expect(sent(APP_EVENTS.GET_GIFTERS)).toEqual([{ from: OCT_30, to: NOV_1 }]);
-
-    await dates(user, "Any date");
     expect(heading()).toHaveTextContent("All time");
     expect(
       screen.getByRole("button", { name: "Clear history" }),

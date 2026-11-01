@@ -155,7 +155,8 @@
   gap: var(--space-4);
 }
 
-/* The operator and its day, with between's second day under the first */
+/* The preset on its own row; custom dates' operator and day under it, with
+   between's other end under that */
 .filters {
   display: grid;
   grid-template-columns: 136px minmax(0, 1fr);
@@ -163,14 +164,8 @@
   gap: var(--space-2);
 }
 
-/* Alone, the operator takes the row */
-.filters > :only-child {
+.preset {
   grid-column: 1 / -1;
-}
-
-/* Its calendar button and picker follow the dark page */
-.day {
-  color-scheme: dark;
 }
 
 .and {

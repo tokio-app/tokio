@@ -1,5 +1,6 @@
 import { MessageKey, translate } from "@/common/i18n";
 import { LiveSummary } from "@/common/types";
+import { DateTimeValue, NO_DATE } from "@/components";
 import { formatDate } from "@/helper";
 
 export type Totals = Pick<
@@ -71,16 +72,36 @@ export function keepSelection(
 export const capitalize = (text: string, language: string) =>
   text.charAt(0).toLocaleUpperCase(language) + text.slice(1);
 
-export type DateOperator = "any" | "on" | "after" | "before" | "between";
+// Counting back from now, or custom dates
+export type DatePreset = "all" | "day" | "week" | "month" | "year" | "custom";
+export type DateOperator = "on" | "after" | "before" | "between";
 
-// The operator and its days, "YYYY-MM-DD" as the date fields give them, ""
-// until one is picked
-export type DateFilter = { operator: DateOperator; date: string; to: string };
+// A preset, or custom dates: the operator and its days and times
+export type DateFilter = {
+  preset: DatePreset;
+  operator: DateOperator;
+  from: DateTimeValue;
+  // Between's other end
+  to: DateTimeValue;
+};
 
-export const NO_FILTER: DateFilter = { operator: "any", date: "", to: "" };
+export const NO_FILTER: DateFilter = {
+  preset: "all",
+  operator: "between",
+  from: NO_DATE,
+  to: NO_DATE,
+};
+
+export const DATE_PRESETS: { value: DatePreset; label: MessageKey }[] = [
+  { value: "all", label: "lives.filter.all" },
+  { value: "day", label: "lives.filter.day" },
+  { value: "week", label: "lives.filter.week" },
+  { value: "month", label: "lives.filter.month" },
+  { value: "year", label: "lives.filter.year" },
+  { value: "custom", label: "lives.filter.custom" },
+];
 
 export const DATE_OPERATORS: { value: DateOperator; label: MessageKey }[] = [
-  { value: "any", label: "lives.filter.any" },
   { value: "on", label: "lives.filter.on" },
   { value: "after", label: "lives.filter.after" },
   { value: "before", label: "lives.filter.before" },
@@ -90,30 +111,54 @@ export const DATE_OPERATORS: { value: DateOperator; label: MessageKey }[] = [
 // From `from` (included) to `to` (left out), in ms
 export type DateRange = { from?: number; to?: number };
 
-// Local midnight at the start of a "YYYY-MM-DD" day, or of one `later`
-const dayStart = (day: string, later = 0) => {
-  const [year, month, date] = day.split("-").map(Number);
-  return new Date(year, month - 1, date + later).getTime();
+const MINUTE = 60_000;
+const DAY = 24 * 60 * MINUTE;
+
+// The picked minute in local time, or the day's start without a time, or
+// the start of a day `later`
+const moment = ({ date, time }: DateTimeValue, later = 0) => {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hours, minutes] = time ? time.split(":").map(Number) : [0, 0];
+  return new Date(year, month - 1, day + later, hours, minutes).getTime();
 };
 
+// Past the picked minute, or the whole day without a time
+const momentEnd = (value: DateTimeValue) =>
+  value.time ? moment(value) + MINUTE : moment(value, 1);
+
+// The days back each preset reaches; 12 months follow the calendar
+const PRESET_DAYS = { day: 1, week: 7, month: 30 };
+
 /**
- * The LIVEs a filter keeps, by the local day they started. After and before
- * leave the day itself out; between takes both days, in either order. Null
- * while it keeps them all, or a day isn't picked yet.
+ * The LIVEs a filter keeps, by when they started. The presets count back from
+ * `now`. A custom day without a time is the whole day: after and before leave
+ * it out, and between takes both ends, in either order. On is always a whole
+ * day. Null while it keeps them all, or a day isn't picked yet.
  */
-export function dateRange({
-  operator,
-  date,
-  to,
-}: DateFilter): DateRange | null {
-  if (operator === "any" || !date) return null;
-  if (operator === "on") return { from: dayStart(date), to: dayStart(date, 1) };
-  if (operator === "after") return { from: dayStart(date, 1) };
-  if (operator === "before") return { to: dayStart(date) };
-  if (!to) return null;
-  // Days in this form sort as they come
-  const [first, last] = [date, to].sort();
-  return { from: dayStart(first), to: dayStart(last, 1) };
+export function dateRange(
+  { preset, operator, from, to }: DateFilter,
+  now: number,
+): DateRange | null {
+  if (preset === "all") return null;
+  if (preset === "year") {
+    const since = new Date(now);
+    since.setFullYear(since.getFullYear() - 1);
+    return { from: since.getTime() };
+  }
+  if (preset !== "custom") return { from: now - PRESET_DAYS[preset] * DAY };
+  if (!from.date) return null;
+  if (operator === "on") {
+    const day = { date: from.date, time: "" };
+    return { from: moment(day), to: moment(day, 1) };
+  }
+  if (operator === "after")
+    return { from: from.time ? moment(from) : moment(from, 1) };
+  if (operator === "before") return { to: moment(from) };
+  if (!to.date) return null;
+  return {
+    from: Math.min(moment(from), moment(to)),
+    to: Math.max(momentEnd(from), momentEnd(to)),
+  };
 }
 
 export const inRange = (
@@ -121,23 +166,36 @@ export const inRange = (
   { from = -Infinity, to = Infinity }: DateRange,
 ) => startedAt >= from && startedAt < to;
 
-// The totals' name: All time, or the days the filter keeps
-export function periodText(filter: DateFilter, language: string): string {
-  if (!dateRange(filter)) return translate(language, "lives.allTime.title");
-  const day = (value: string) => formatDate(dayStart(value), language, "short");
-  const { operator, date, to } = filter;
+// The totals' name: All time, the preset, or the custom dates
+export function periodText(
+  filter: DateFilter,
+  language: string,
+  now: number,
+): string {
+  if (!dateRange(filter, now))
+    return translate(language, "lives.allTime.title");
+  const { preset, operator, from, to } = filter;
+  if (preset !== "custom") {
+    return translate(language, `lives.filter.${preset}`);
+  }
+  // With its time when one was picked
+  const text = (value: DateTimeValue) =>
+    formatDate(moment(value), language, value.time ? "shortTime" : "short");
   switch (operator) {
     case "on":
-      return translate(language, "lives.period.on", { date: day(date) });
+      return translate(language, "lives.period.on", {
+        date: text({ date: from.date, time: "" }),
+      });
     case "after":
-      return translate(language, "lives.period.after", { date: day(date) });
+      return translate(language, "lives.period.after", { date: text(from) });
     case "before":
-      return translate(language, "lives.period.before", { date: day(date) });
+      return translate(language, "lives.period.before", { date: text(from) });
     default: {
-      const [first, last] = [date, to].sort();
+      const [first, last] =
+        moment(from) <= moment(to) ? [from, to] : [to, from];
       return translate(language, "lives.period.between", {
-        from: day(first),
-        to: day(last),
+        from: text(first),
+        to: text(last),
       });
     }
   }

@@ -1,11 +1,11 @@
 import { LiveSummary } from "@/common/types";
-import { EmptyState, Input, Select } from "@/components";
+import { DateTimePicker, EmptyState, Select } from "@/components";
 import { cx, formatDate, formatDuration, formatStat } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
 import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { KeyboardEvent } from "react";
 import styles from "../lives.module.css";
-import { DATE_OPERATORS, DateFilter } from "../helper";
+import { DATE_OPERATORS, DATE_PRESETS, DateFilter } from "../helper";
 
 interface Props {
   // The ones the filter keeps, newest first
@@ -27,40 +27,48 @@ type FilterProps = {
   onChange: (filter: DateFilter) => void;
 };
 
-// An operator and its day, or the two days of a range, like the gift picker's
-// coin filter
+// A preset, or custom dates: an operator and its day, or the two ends of a
+// range, like the gift picker's coin filter. Days can take a time, except On's.
 function DateFilterBar({ filter, onChange }: FilterProps) {
   const t = useT();
+  const presets = useOptions(DATE_PRESETS);
   const operators = useOptions(DATE_OPERATORS);
   const { operator } = filter;
 
   return (
     <div className={styles.filters}>
       <Select
+        className={styles.preset}
         aria-label={t("lives.filter.label")}
-        options={operators}
-        value={operator}
-        onChange={(value) => onChange({ ...filter, operator: value })}
+        options={presets}
+        value={filter.preset}
+        onChange={(preset) => onChange({ ...filter, preset })}
       />
-      {operator !== "any" && (
-        <Input
-          type="date"
-          className={styles.day}
-          aria-label={t("lives.filter.date")}
-          value={filter.date}
-          onChange={(e) => onChange({ ...filter, date: e.target.value })}
-        />
-      )}
-      {operator === "between" && (
+      {filter.preset === "custom" && (
         <>
-          <span className={styles.and}>{t("lives.filter.and")}</span>
-          <Input
-            type="date"
-            className={styles.day}
-            aria-label={t("lives.filter.toDate")}
-            value={filter.to}
-            onChange={(e) => onChange({ ...filter, to: e.target.value })}
+          <Select
+            aria-label={t("lives.filter.operator")}
+            options={operators}
+            value={operator}
+            onChange={(value) => onChange({ ...filter, operator: value })}
           />
+          <DateTimePicker
+            aria-label={t("lives.filter.date")}
+            withTime={operator !== "on"}
+            value={filter.from}
+            onChange={(from) => onChange({ ...filter, from })}
+          />
+          {operator === "between" && (
+            <>
+              <span className={styles.and}>{t("lives.filter.and")}</span>
+              <DateTimePicker
+                aria-label={t("lives.filter.toDate")}
+                withTime
+                value={filter.to}
+                onChange={(to) => onChange({ ...filter, to })}
+              />
+            </>
+          )}
         </>
       )}
     </div>

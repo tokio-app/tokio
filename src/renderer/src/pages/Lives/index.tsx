@@ -49,6 +49,9 @@ export function Lives() {
   // The selected LIVE's gifters come with it
   const [reply, setReply] = useState<LiveReply>();
   const [filter, setFilter] = useState<DateFilter>(NO_FILTER);
+  // What the presets count back from: set with the filter, and again when
+  // the LIVEs change, so it doesn't move on every render
+  const [now, setNow] = useState(Date.now);
   // The filtered dates' gifters, which main adds up from their LIVEs
   const [datesReply, setDatesReply] = useState<GiftersReply>();
   // The gifter search, kept while the selection and the dates change
@@ -59,7 +62,7 @@ export function Lives() {
   // The next LIVES is another profile's, which starts from its newest LIVE
   const switched = useRef(false);
 
-  const range = dateRange(filter);
+  const range = dateRange(filter, now);
   const visible = (lives: LiveSummary[]) =>
     range ? lives.filter((live) => inRange(live, range)) : lives;
   const shown = visible(history?.lives ?? []);
@@ -93,6 +96,7 @@ export function Lives() {
       ),
     );
     setHistory(res.data);
+    setNow(Date.now());
   });
 
   // Asked again when the dates or the LIVEs change
@@ -228,7 +232,7 @@ export function Lives() {
               />
             ) : (
               <SummarySection
-                title={periodText(filter, language)}
+                title={periodText(filter, language, now)}
                 lines={[
                   t("lives.allTime.count", { count: shown.length }),
                   t("lives.allTime.length", {
@@ -265,7 +269,7 @@ export function Lives() {
 
           <ListSection
             lives={shown}
-            title={periodText(filter, language)}
+            title={periodText(filter, language, now)}
             coins={total.coins}
             filter={filter}
             filtered={!!range}
@@ -273,6 +277,7 @@ export function Lives() {
             onSelect={setSelected}
             onFilter={(next) => {
               setFilter(next);
+              setNow(Date.now());
               // New dates open on their totals
               setSelected(null);
             }}
