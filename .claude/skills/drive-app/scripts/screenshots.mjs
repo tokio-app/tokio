@@ -92,6 +92,67 @@ function tone(file, hz) {
 
 const user = (name, handle) => ({ handle, name, picture: "" });
 
+// Coin stats' and Fans' data, sent as main's replies: the LIVEs newest first
+// (days ago, minutes after 8 PM, hours, coins, gifts), the top gifters and
+// the fans
+const DAY = 86_400_000;
+const evening = new Date().setHours(20, 0, 0, 0);
+const LIVES = [
+  [1, 12, 2.4, 6240, 318],
+  [2, -25, 1.6, 2150, 97],
+  [4, 40, 3.1, 11870, 605],
+  [5, -50, 1.2, 980, 54],
+  [7, 5, 2.8, 8430, 412],
+  [8, 30, 1.9, 3310, 160],
+  [10, -15, 2.2, 4620, 233],
+  [12, 20, 3.5, 15200, 790],
+  [13, -35, 1.4, 1740, 88],
+].map(([days, minutes, hours, coins, gifts]) => {
+  const startedAt = evening - days * DAY + minutes * 60_000;
+  const endedAt = startedAt + hours * 3_600_000;
+  return { username: "tokio.demo", startedAt, endedAt, coins, gifts };
+});
+const GIFTERS = [
+  ["Leo", "leo_on_air", 9870, 412],
+  ["Maya", "maya.draws", 7420, 365],
+  ["Sunny Fox", "sunnyfox", 5310, 248],
+  ["Pixel Panda", "pixel.panda", 3980, 190],
+  ["Ana", "ana.bakes", 2650, 132],
+  ["Kai", "kai.k", 1820, 97],
+  ["Noor", "noor22", 1240, 61],
+  ["Theo", "theo.plays", 760, 38],
+].map(([username, handle, coins, gifts], i) => ({
+  userId: `gifter-${i}`,
+  username,
+  handle,
+  picture: "",
+  coins,
+  gifts,
+  giftedAt: evening - (i + 1) * DAY,
+}));
+// TikTok's own badge for the level's tier, as the connector gets it
+const badge = (level) =>
+  `https://p16-webcast.tiktokcdn.com/webcast-va/fans_badge_icon_lv${Math.max(1, Math.floor(level / 10) * 10)}_v4.png~tplv-obj.image`;
+const FANS = [
+  ["Leo", "leo_on_air", 41, true, 1],
+  ["Maya", "maya.draws", 36, true, 2],
+  ["Sunny Fox", "sunnyfox", 33, false, 1],
+  ["Pixel Panda", "pixel.panda", 27, false, 4],
+  ["Ana", "ana.bakes", 24, true, 5],
+  ["Kai", "kai.k", 18, false, 2],
+  ["Noor", "noor22", 15, false, 7],
+  ["Theo", "theo.plays", 12, false, 1],
+  ["Jules", "jules.mp4", 9, false, 10],
+].map(([username, handle, fanLevel, superfan, days], i) => ({
+  userId: `fan-${i}`,
+  username,
+  handle,
+  fanLevel,
+  fanBadge: badge(fanLevel),
+  superfan,
+  seenAt: evening - days * DAY,
+}));
+
 export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   const english = lang === "en";
   const base = lang.split("-")[0];
@@ -643,19 +704,22 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await crop("games-test", follow, { pad: 12 });
 
   // A tool, opened from its row on Tools. Its heading's name starts with
-  // the back button's title, so its sections are found without `exact`.
+  // the back button's title, so it's found by how it ends, case and all:
+  // Spanish's "Temporizador" is also in "Aspecto del temporizador".
+  const toolHeading = (name) =>
+    page.getByRole("heading", {
+      name: new RegExp(`${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
+    });
   const tool = async (name) => {
     await open(tr("Tools"), tr("Tools"));
     await page
       .getByRole("main")
       .getByRole("link", { name, exact: true })
       .click();
-    await page.getByRole("heading", { name }).waitFor();
+    await toolHeading(name).waitFor();
   };
   const toolSection = (name) =>
-    page
-      .locator("section")
-      .filter({ has: page.getByRole("heading", { name }) });
+    page.locator("section").filter({ has: toolHeading(name) });
 
   // Countdown timer
   await tool(tr("Countdown timer"));
@@ -665,9 +729,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     })
     .getByRole("textbox")
     .fill("Subathon");
-  await page
-    .getByRole("heading", { name: tr("Countdown timer") })
-    .scrollIntoViewIfNeeded();
+  await toolHeading(tr("Countdown timer")).scrollIntoViewIfNeeded();
   await page
     .getByRole("button", {
       name: tr("Start", "tools.countdown.start"),
@@ -703,6 +765,29 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await page.getByPlaceholder(tr("Overlay name")).fill(say("My overlay"));
   await page.getByTitle(tr("Create ID")).click();
   await crop("tools-test-overlays", toolSection(tr("Test overlays")));
+
+  // Coin stats on All time, once its own request found no LIVEs
+  await tool(tr("Coin stats"));
+  await page
+    .getByText(tr(en["coinStats.list.empty"], "coinStats.list.empty"))
+    .waitFor();
+  await push("app:lives:res:get", { data: { lives: LIVES, gifters: GIFTERS } });
+  await page
+    .getByRole("listbox", { name: tr("Your LIVEs") })
+    .getByRole("option")
+    .nth(1)
+    .waitFor();
+  await crop("coin-stats", toolSection(tr("Coin stats")));
+
+  // Fans, once its own request found none, with TikTok's badges loaded
+  await tool(tr("Fans"));
+  await page.getByText(tr(en["fans.empty"], "fans.empty")).waitFor();
+  await push("app:tools:res:fans:get", { data: FANS });
+  await page.waitForFunction(() => {
+    const badges = [...document.querySelectorAll("main ul img")];
+    return badges.length > 0 && badges.every((img) => img.complete);
+  });
+  await crop("fans", toolSection(tr("Fans")));
 
   // Settings, with a made-up network address
   await open(tr("Settings"), tr("Live profiles"));
