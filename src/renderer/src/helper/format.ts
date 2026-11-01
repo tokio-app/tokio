@@ -47,6 +47,33 @@ export function formatStat(value: number, language: string) {
   };
 }
 
+const DATE_STYLES = {
+  // "Friday, October 31, 2026"
+  long: { dateStyle: "full" },
+  // "Oct 31, 2026"
+  short: { dateStyle: "medium" },
+  // "8:14 PM"
+  time: { timeStyle: "short" },
+  // "Friday, October 31, 2026 at 8:14 PM"
+  dateTime: { dateStyle: "full", timeStyle: "short" },
+} satisfies Record<string, Intl.DateTimeFormatOptions>;
+
+export type DateStyle = keyof typeof DATE_STYLES;
+
+// Made once per language and style, a list of LIVEs formats many dates
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+
+// A time in ms since the epoch, as the language writes it
+export function formatDate(ms: number, language: string, style: DateStyle) {
+  const key = `${language} ${style}`;
+  let format = dateFormats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(language, DATE_STYLES[style]);
+    dateFormats.set(key, format);
+  }
+  return format.format(ms);
+}
+
 // "00:42:13". Hours keep counting past a day.
 export function formatDuration(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));

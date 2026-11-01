@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   fontFamily,
+  formatDate,
   formatDuration,
   formatList,
   formatStat,
@@ -38,6 +39,31 @@ describe("formatStat", () => {
   it("leaves small numbers as they are", () => {
     expect(formatStat(0, "en")).toEqual({ short: "0", full: "0" });
     expect(formatStat(999, "en")).toEqual({ short: "999", full: "999" });
+  });
+});
+
+describe("formatDate", () => {
+  // Local time, so the test passes in any time zone
+  const night = new Date(2026, 9, 31, 20, 14).getTime();
+
+  it("writes each style as the language does", () => {
+    expect(formatDate(night, "en", "long")).toBe("Saturday, October 31, 2026");
+    expect(formatDate(night, "en", "short")).toBe("Oct 31, 2026");
+    // Intl puts a narrow no-break space before PM
+    expect(formatDate(night, "en", "time")).toMatch(/^8:14\sPM$/);
+    expect(formatDate(night, "en", "dateTime")).toMatch(
+      /^Saturday, October 31, 2026 at 8:14\sPM$/,
+    );
+    expect(formatDate(night, "es-419", "long")).toBe(
+      "sábado, 31 de octubre de 2026",
+    );
+    expect(formatDate(night, "es-419", "short")).toBe("31 oct 2026");
+  });
+
+  it("keeps each language's formats apart", () => {
+    expect(formatDate(night, "en", "long")).toMatch(/^Saturday/);
+    expect(formatDate(night, "es-419", "long")).toMatch(/^sábado/);
+    expect(formatDate(night, "en", "long")).toMatch(/^Saturday/);
   });
 });
 

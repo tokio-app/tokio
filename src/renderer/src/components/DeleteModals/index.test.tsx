@@ -4,7 +4,54 @@ import { sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
 import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { DeletePictureModal } from ".";
+import { ClearHistoryModal, DeleteLiveModal, DeletePictureModal } from ".";
+
+describe("DeleteLiveModal", () => {
+  it("names the LIVE by when it started, and asks main to delete it", async () => {
+    const startedAt = new Date(2026, 9, 31, 20, 14).getTime();
+    const onClose = vi.fn();
+    const { user } = renderWithProviders(
+      <DeleteLiveModal item={{ startedAt }} onClose={onClose} />,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Delete LIVE?" }),
+    ).toHaveTextContent(
+      /The LIVE from Saturday, October 31, 2026 at 8:14\sPM will be deleted, and its gifts will no longer count in All time\./,
+    );
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(sent(APP_EVENTS.DELETE_LIVE)).toEqual([{ startedAt }]);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ClearHistoryModal", () => {
+  it("asks main to clear the history", async () => {
+    const onClose = vi.fn();
+    const { user } = renderWithProviders(
+      <ClearHistoryModal onClose={onClose} />,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Clear history?" }),
+    ).toHaveTextContent("A LIVE you're connected to keeps counting.");
+    await user.click(screen.getByRole("button", { name: "Clear history" }));
+
+    expect(sent(APP_EVENTS.CLEAR_LIVES)).toEqual([undefined]);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("clears nothing when canceled", async () => {
+    const { user } = renderWithProviders(
+      <ClearHistoryModal onClose={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(sent(APP_EVENTS.CLEAR_LIVES)).toEqual([]);
+  });
+});
 
 describe("DeletePictureModal", () => {
   it("says what deleting a Minecraft picture does, and asks main to", async () => {

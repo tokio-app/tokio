@@ -1,6 +1,7 @@
 import { AlertSound, MediaFile } from "@/common/schemas";
-import { APP_EVENTS, OverlayApp } from "@/common/types";
-import { useT } from "@/ui/i18n";
+import { APP_EVENTS, LiveSummary, OverlayApp } from "@/common/types";
+import { formatDate } from "@/helper/format";
+import { useLanguage, useT } from "@/ui/i18n";
 import { Modal } from "../Modal";
 
 type Props<T> = {
@@ -77,6 +78,48 @@ export function DeletePictureModal({
         window.api.emit(APP_EVENTS.REMOVE_MINECRAFT_PICTURE, {
           file: item.file,
         });
+        onClose();
+      }}
+    />
+  );
+}
+
+// A LIVE in the profile's history, by when it started
+export function DeleteLiveModal({
+  item,
+  onClose,
+  onDelete,
+}: Props<Pick<LiveSummary, "startedAt">>) {
+  const t = useT();
+  const language = useLanguage();
+  return (
+    <Modal
+      title={t("components.deleteModals.liveTitle")}
+      description={t("components.deleteModals.liveDescription", {
+        date: formatDate(item.startedAt, language, "dateTime"),
+      })}
+      confirmText={t("common.delete")}
+      onClose={onClose}
+      onConfirm={() => {
+        onDelete?.(item);
+        window.api.emit(APP_EVENTS.DELETE_LIVE, { startedAt: item.startedAt });
+        onClose();
+      }}
+    />
+  );
+}
+
+// Every LIVE the profile kept
+export function ClearHistoryModal({ onClose }: { onClose: () => void }) {
+  const t = useT();
+  return (
+    <Modal
+      title={t("components.deleteModals.historyTitle")}
+      description={t("components.deleteModals.historyDescription")}
+      confirmText={t("components.deleteModals.historyConfirm")}
+      onClose={onClose}
+      onConfirm={() => {
+        window.api.emit(APP_EVENTS.CLEAR_LIVES);
         onClose();
       }}
     />
