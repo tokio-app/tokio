@@ -219,6 +219,50 @@ describe("Lives", () => {
     expect(screen.getByText("No gifts on these dates.")).toBeInTheDocument();
   });
 
+  it("takes custom dates in either order, to the minute", async () => {
+    // Today, for the calendars, is October 31
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 31, 21));
+    const { user } = renderWithProviders(<Lives />);
+    await lives([saturday, friday]);
+    await dates(user, "Custom dates");
+    expect(
+      screen.getByRole("combobox", { name: "Custom range" }),
+    ).toHaveTextContent("Between");
+
+    // October 31 at 6:00 PM, before Saturday's LIVE started at 7:00 PM
+    await user.click(screen.getByRole("button", { name: "Date" }));
+    await user.click(
+      screen.getByRole("button", { name: "Saturday, October 31, 2026" }),
+    );
+    await user.type(screen.getByRole("textbox", { name: "Hours" }), "6");
+    await user.click(screen.getByRole("button", { name: "PM" }));
+    await user.keyboard("{Escape}");
+    // Not a range until both ends are picked
+    expect(heading()).toHaveTextContent("All time");
+
+    // October 30, the whole day
+    await user.click(screen.getByRole("button", { name: "End date" }));
+    await user.click(
+      screen.getByRole("button", { name: "Friday, October 30, 2026" }),
+    );
+    await user.keyboard("{Escape}");
+
+    expect(heading()).toHaveTextContent(
+      /^Oct 30, 2026 to Oct 31, 2026, 6:00\sPM$/,
+    );
+    expect(options()).toEqual([
+      expect.stringMatching(/^Oct 30, 2026 to/),
+      expect.stringMatching(/^Friday/),
+    ]);
+    expect(sent(APP_EVENTS.GET_GIFTERS)).toEqual([
+      {
+        from: new Date(2026, 9, 30).getTime(),
+        to: new Date(2026, 9, 31, 18, 1).getTime(),
+      },
+    ]);
+  });
+
   it("goes back to All time from a preset", async () => {
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday]);
