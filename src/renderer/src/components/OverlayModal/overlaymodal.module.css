@@ -36,13 +36,16 @@
   color: var(--font-secondary);
 }
 
-/* Only the settings scroll */
+/* Only the settings scroll. The scrolling clips what's drawn outside the box,
+   so the padding leaves room for the controls' focus rings (4px out) on the
+   left and under the last one, and the margin keeps the controls in place */
 .settings {
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
   min-height: 0;
-  padding-right: var(--space-4);
+  margin-left: calc(-1 * var(--space-1));
+  padding: 0 var(--space-4) var(--space-1) var(--space-1);
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
