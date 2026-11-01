@@ -28,6 +28,22 @@ export interface Fan {
   seenAt: number;
 }
 
+// A viewer in tokio:gifters' top 10s, with their coins and gifts in this LIVE
+// (0 when they sent none in it) and in all the profile's LIVEs, this one
+// included
+export interface TopGifter {
+  userId: string;
+  username: string;
+  handle: string;
+  // TikTok's link from their latest gift, which can expire. Empty when TikTok
+  // sent none.
+  picture: string;
+  live: { coins: number; gifts: number };
+  allTime: { coins: number; gifts: number };
+  // When their last gift came, in ms since the epoch
+  giftedAt: number;
+}
+
 export interface ChatEvent {
   user: UserData;
   comment: {
@@ -204,6 +220,11 @@ export type TokioPayload =
   | {
       type: "tokio:fans";
       data: { fans: Fan[] };
+    }
+  // live is empty while Tokio isn't connected
+  | {
+      type: "tokio:gifters";
+      data: { live: TopGifter[]; allTime: TopGifter[] };
     };
 
 export interface TokioPreviewMessage {

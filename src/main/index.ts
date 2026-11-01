@@ -15,6 +15,7 @@ import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
 import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
+import { HistoryService } from "@/services/history";
 import { JSONManagerService } from "@/services/json";
 import { LicensesService } from "@/services/licenses";
 import { LiveService } from "@/services/live";
@@ -97,6 +98,7 @@ const services: AppServices = {
   liveService: new LiveService(),
   timerService: new TimerService(),
   fansService: new FansService(),
+  historyService: new HistoryService(),
   gamesService: new GamesService(),
   trayService: new TrayService(),
 };

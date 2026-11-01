@@ -12,6 +12,7 @@ import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
 import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
+import { HistoryService } from "@/services/history";
 import { JSONManagerService } from "@/services/json";
 import { LicensesService } from "@/services/licenses";
 import { LiveService } from "@/services/live";
@@ -64,6 +65,7 @@ export interface AppServices {
   readonly liveService: LiveService;
   readonly timerService: TimerService;
   readonly fansService: FansService;
+  readonly historyService: HistoryService;
   readonly gamesService: GamesService;
   readonly trayService: TrayService;
 }

@@ -91,6 +91,13 @@ export enum FEEDBACK_CODES {
   TIMER_PAUSED = "timer_paused",
   TIMER_FAILED = "timer_failed",
 
+  // LIVES
+  LIVE_DELETED = "live_deleted",
+  HISTORY_CLEARED = "history_cleared",
+  LIVE_LOAD_FAILED = "live_load_failed",
+  HISTORY_SAVE_FAILED = "history_save_failed",
+  HISTORY_CLEAR_FAILED = "history_clear_failed",
+
   // ALERTS
   SOUND_ADDED = "sound_added",
   SOUNDS_UPLOADED = "sounds_uploaded",

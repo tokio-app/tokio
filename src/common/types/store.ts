@@ -23,6 +23,7 @@ export interface Folders {
   // Each game's own folder sits in games/
   minecraftFolder: string;
   fansFolder: string;
+  historyFolder: string;
 }
 
 export interface Files {

@@ -88,6 +88,7 @@ const folders: Folders = {
   mediaFolder: "app/media",
   minecraftFolder: "app/games/minecraft",
   fansFolder: "app/fans",
+  historyFolder: "app/history",
 };
 
 const noStats = { likes: 0, viewers: 0, views: 0 };

@@ -72,6 +72,12 @@ export enum APP_EVENTS {
   GET_LIVE_SESSION = "app:home:session",
   SET_ACTIVITY_FEED = "app:home:set:feed",
 
+  // LIVES
+  GET_LIVES = "app:lives:get",
+  GET_LIVE = "app:lives:get:live",
+  DELETE_LIVE = "app:lives:delete",
+  CLEAR_LIVES = "app:lives:clear",
+
   // OVERLAYS
   IMPORT_OVERLAY = "app:overlays:add",
   GET_OVERLAYS = "app:overlays:get",
@@ -261,6 +267,14 @@ export interface AppEventsMap {
   [APP_EVENTS.GET_LIVE_SESSION]: void;
   // Main replies LIVE_SESSION without the events the feed no longer shows
   [APP_EVENTS.SET_ACTIVITY_FEED]: { feed: ActivityFeed };
+
+  // LIVES
+  [APP_EVENTS.GET_LIVES]: void;
+  // A finished LIVE, by when it started
+  [APP_EVENTS.GET_LIVE]: { startedAt: number };
+  // Both are answered with LIVES: what main holds after them
+  [APP_EVENTS.DELETE_LIVE]: { startedAt: number };
+  [APP_EVENTS.CLEAR_LIVES]: void;
 
   // OVERLAYS
   [APP_EVENTS.IMPORT_OVERLAY]: void;

@@ -15,7 +15,7 @@ import {
 } from "../../schemas";
 import { AppNotification, Reply } from "../feedback";
 import { CommandResult, GamesData } from "../games";
-import { LiveSession } from "../live";
+import { LiveHistory, LiveRecord, LiveSession } from "../live";
 import { OverlayApp } from "../server";
 import { VoiceData, VoiceEngine } from "../store";
 import { TimerData } from "../timer";
@@ -75,6 +75,10 @@ export enum APP_EVENTS_RESPONSE {
   VIEWS = "app:home:res:views",
   LIKES = "app:home:res:likes",
   LIVE_SESSION = "app:home:res:session",
+
+  // LIVES
+  LIVES = "app:lives:res:get",
+  LIVE = "app:lives:res:live",
 
   // OVERLAYS
   GET_OVERLAYS = "app:overlays:res:get",
@@ -244,6 +248,18 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.LIVE_SESSION]: {
     data: LiveSession;
   };
+
+  // LIVES
+  // The reply to GET_LIVES, DELETE_LIVE and CLEAR_LIVES, pushed again when a
+  // LIVE ends
+  [APP_EVENTS_RESPONSE.LIVES]: {
+    data: LiveHistory;
+  };
+  // The startedAt it was asked for, failures included
+  [APP_EVENTS_RESPONSE.LIVE]: Reply<{
+    startedAt: number;
+    data?: LiveRecord;
+  }>;
 
   // OVERLAYS
   [APP_EVENTS_RESPONSE.GET_OVERLAYS]: Reply<{

@@ -30,6 +30,8 @@ export class PathManagerService {
       minecraftFolder: join(appFolder, "games", "minecraft"),
       // Each profile's fans, under the profile's file name
       fansFolder: join(appFolder, "fans"),
+      // Each profile's LIVEs, in a folder named after the profile's file
+      historyFolder: join(appFolder, "history"),
     };
 
     this.files = {
