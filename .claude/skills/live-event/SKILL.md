@@ -31,7 +31,7 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
 
    See `.claude/rules/timer.md`.
 
-7. A LIVE's record on the LIVEs page, when the event should count in its stats: `HISTORY_EVENTS` and its recorder in `src/main/services/history/index.ts`, and a field in `LiveSummary` (`src/common/types/live.ts`) with a `.default(...)` in `LiveSummarySchema` so older files load. See `.claude/rules/history.md`.
+7. A LIVE's record on the LIVEs page keeps only gifts (the user's call). An event that sends coins goes in `HISTORY_EVENTS` with its recorder in `src/main/services/history/index.ts`, which adds it to the LIVE and to its minute. See `.claude/rules/history.md`.
 8. Overlays get every live event on their own: `ServerService` broadcasts each one `isLiveEvent` lets through. An event whose payload has a `user` also goes in `FAN_EVENTS` (`src/main/services/fans/index.ts`), so the profile keeps its viewers' fan levels for `tokio:fans` (`.claude/rules/fans.md`).
 9. Tests next to each file you changed: the connector mapping, alerts, the live session, the timer and the history.
 
