@@ -57,3 +57,16 @@ paths:
 - `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top 100. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page asks again on each `GET_PROFILE` reply, a profile switch.
 - `GET_LIVE { startedAt }` replies `LIVE` with that LIVE's record. Failures carry the `startedAt` too.
 - `DELETE_LIVE` and `CLEAR_LIVES` reply `LIVES` with what main holds, then send `LIVE_DELETED` or `HISTORY_CLEARED`. A failed save after a delete throws `HISTORY_SAVE_FAILED`, a refused clear `HISTORY_CLEAR_FAILED`.
+
+## The page
+
+- `pages/Lives`, second in the sidebar (`LuHistory`), on Home's grid. The layout the user picked: the selected LIVE on the left as Home showed it when it ended, the list on the right.
+- The dashboard is as tall as the window leaves it (`--title-bar-height`), and both lists scroll inside it, so picking a LIVE with more gifters doesn't move the list.
+- **The list** is a `listbox` with one tab stop (a roving `tabIndex`): Up, Down, Home and End move the selection and the focus, and each option is named by its date, time and coins. All time comes first, then the LIVEs, newest first.
+  - Under each LIVE, a 2px coin bar in Iron is scaled to the best LIVE, the page's one bold element. The selected one gets the rose edge, bar and `--accent-soft` wash.
+  - Hovered rows use Field (`--background-secondary`), since Iron would hide the bars.
+- **The left column** shows the LIVE's long date, its times, length and @username, the readout (Home's: 36px, then 24px) and its gifters, which come with `GET_LIVE` (a `Spinner` until then; a reply for another `startedAt` is dropped).
+  - All time sums the LIVEs' numbers in `allTime` (`helper.ts`), with the best peak instead of a sum, and lists the top 100.
+- **Selection:** the newest LIVE, or All time when there are none. After a delete, the one that took its place, or the one before when it was the last (`keepSelection`). A LIVE that ends and joins keeps the selection; another profile's `LIVES` starts from its newest.
+- Delete and Clear history are icon buttons on the left's title row, which ask first with `DeleteLiveModal` and `ClearHistoryModal` (`components/DeleteModals`). Clear is disabled while there's nothing to clear.
+- Dates go through `formatDate` (`helper/format.ts`), and a Spanish long date is capitalized for the title (`capitalize`).
