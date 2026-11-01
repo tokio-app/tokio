@@ -460,9 +460,13 @@ export class HistoryService extends Service {
 
   // Sorts all time and caps it, after it changes
   private _rank() {
-    const sorted = [...this._gifters.values()]
-      .sort(byCoins)
-      .slice(0, MAX_GIFTERS);
+    let kept = [...this._gifters.values()];
+    // Past the cap, the fewest coins go first, then the oldest last gift
+    if (kept.length > MAX_GIFTERS)
+      kept = kept
+        .sort((a, b) => b.coins - a.coins || b.giftedAt - a.giftedAt)
+        .slice(0, MAX_GIFTERS);
+    const sorted = kept.sort(byCoins);
     this._gifters = new Map(sorted.map((g) => [g.userId, g]));
     this._best = sorted.slice(0, TOP_GIFTERS);
   }
