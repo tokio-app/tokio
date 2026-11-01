@@ -159,7 +159,7 @@ export const gifter = (name: string, coins: number, gifts = 1): Gifter => ({
   giftedAt: 0,
 });
 
-/** A viewer at fan level `fanLevel`, with TikTok's badge, never seen. */
+/** A viewer at fan level `fanLevel`, with TikTok's badge, never seen, not a Super Fan. */
 export const fan = (
   name: string,
   fanLevel: number,
@@ -170,6 +170,7 @@ export const fan = (
   handle: slug(name),
   fanLevel,
   fanBadge: `https://example.com/fans_badge_icon_lv${Math.max(1, Math.floor(fanLevel / 10) * 10)}.png`,
+  superfan: false,
   seenAt: 0,
   ...patch,
 });

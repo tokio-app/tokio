@@ -19,6 +19,18 @@ export const FAN_EVENTS = [
   TOKIO_EVENTS.SUPER_FAN_JOIN,
 ] as const;
 
+export type FanEvent = (typeof FAN_EVENTS)[number];
+
+// What an event says about a viewer's Super Fan subscription. Only chat and
+// gifts carry TikTok's flag (the connector says false on the others), and
+// becoming a Super Fan or joining as one says yes. The rest keep what's known.
+const SUPERFAN: Partial<Record<FanEvent, (user: UserData) => boolean>> = {
+  [TOKIO_EVENTS.CHAT]: (user) => Boolean(user.superfan),
+  [TOKIO_EVENTS.GIFT]: (user) => Boolean(user.superfan),
+  [TOKIO_EVENTS.SUPER_FAN]: () => true,
+  [TOKIO_EVENTS.SUPER_FAN_JOIN]: () => true,
+};
+
 // Kept per profile, the ones not seen for the longest dropped first
 export const MAX_FANS = 5000;
 // What overlays get
@@ -30,6 +42,7 @@ const FanSchema: z.ZodType<Fan> = z.object({
   handle: z.string(),
   fanLevel: z.number(),
   fanBadge: z.string().default(""),
+  superfan: z.boolean().default(false),
   seenAt: z.number(),
 });
 
@@ -86,11 +99,13 @@ export class FansService extends Service {
     this._emit();
   }
 
-  /** Keeps a viewer with a fan level, as they show now. */
-  public record(user: UserData) {
+  /** Keeps a viewer with a fan level, as the event `type` shows them now. */
+  public record(user: UserData, type?: FanEvent) {
     // A missing badge isn't proof they left the fan club, so 0 changes nothing.
     const level = user.fanLevel ?? 0;
     if (this._file === null || !user.userId || level <= 0) return;
+    const said = type ? SUPERFAN[type]?.(user) : undefined;
+    const superfan = said ?? this._fans.get(user.userId)?.superfan ?? false;
     // Set again, so it's the most recently seen
     this._fans.delete(user.userId);
     this._fans.set(user.userId, {
@@ -99,6 +114,7 @@ export class FansService extends Service {
       handle: user.handle,
       fanLevel: level,
       fanBadge: user.fanBadge ?? "",
+      superfan,
       seenAt: Date.now(),
     });
     if (this._fans.size > MAX_FANS) {

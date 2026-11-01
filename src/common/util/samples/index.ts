@@ -316,14 +316,20 @@ export const createTestLive = () => {
     for (const { viewer } of cast) seen.set(viewer, Date.now());
     const fans: Fan[] = [...seen]
       .filter(([user]) => user.fanLevel)
-      .map(([{ userId, username, handle, fanLevel, fanBadge }, seenAt]) => ({
-        userId: userId ?? "",
-        username,
-        handle,
-        fanLevel: fanLevel ?? 0,
-        fanBadge: fanBadge ?? "",
-        seenAt,
-      }))
+      .map(
+        ([
+          { userId, username, handle, fanLevel, fanBadge, superfan },
+          seenAt,
+        ]) => ({
+          userId: userId ?? "",
+          username,
+          handle,
+          fanLevel: fanLevel ?? 0,
+          fanBadge: fanBadge ?? "",
+          superfan: superfan ?? false,
+          seenAt,
+        }),
+      )
       .sort((a, b) => b.fanLevel - a.fanLevel || b.seenAt - a.seenAt)
       .slice(0, 100);
 

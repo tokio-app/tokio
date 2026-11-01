@@ -27,6 +27,7 @@ describe("tools events", () => {
         handle: "ana",
         fanLevel: 12,
         fanBadge: "",
+        superfan: false,
         seenAt: 1,
       };
       const list = vi.fn(() => [fan]);

@@ -7,6 +7,7 @@ import {
   SearchToggle,
   Section,
   Spinner,
+  Toggle,
 } from "@/components";
 import { formatDate } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
@@ -20,6 +21,7 @@ export function Fans() {
   // The highest level first, then the most recently seen, as main sorts them
   const [fans, setFans] = useState<Fan[]>();
   const [search, setSearch] = useState("");
+  const [superfansOnly, setSuperfansOnly] = useState(false);
   // Badges that didn't load. A few files serve every fan, so one is enough.
   const [broken, setBroken] = useState<ReadonlySet<string>>(new Set());
 
@@ -34,7 +36,11 @@ export function Fans() {
   });
 
   const query = search.trim();
-  const shown = query ? fans?.filter(viewerMatcher(query)) : fans;
+  // An empty search names everyone
+  const named = viewerMatcher(query);
+  const shown = fans?.filter(
+    (fan) => (!superfansOnly || fan.superfan) && named(fan),
+  );
 
   let content;
   if (!shown) {
@@ -46,7 +52,11 @@ export function Fans() {
   } else if (shown.length === 0) {
     content = (
       <EmptyState>
-        {query ? t("fans.noMatch", { query }) : t("fans.empty")}
+        {query
+          ? t("fans.noMatch", { query })
+          : superfansOnly
+            ? t("fans.noSuperfans")
+            : t("fans.empty")}
       </EmptyState>
     );
   } else {
@@ -74,7 +84,14 @@ export function Fans() {
             </span>
             {/* The handle when TikTok sent no nickname, as Home's feed does */}
             <span className={styles.who}>
-              <span className={styles.name}>{fan.username || fan.handle}</span>
+              <span className={styles.headline}>
+                <span className={styles.name}>
+                  {fan.username || fan.handle}
+                </span>
+                {fan.superfan && (
+                  <span className={styles.superfan}>{t("fans.superfan")}</span>
+                )}
+              </span>
               <span className={styles.handle}>{`@${fan.handle}`}</span>
             </span>
             <span className={styles.seen}>
@@ -96,11 +113,19 @@ export function Fans() {
           title={t("fans.title")}
           description={t("fans.description")}
           actions={
-            <SearchToggle
-              placeholder={t("fans.search")}
-              value={search}
-              onChange={setSearch}
-            />
+            <>
+              <SearchToggle
+                placeholder={t("fans.search")}
+                value={search}
+                onChange={setSearch}
+              />
+              <Toggle
+                className={styles.only}
+                label={t("fans.superfansOnly")}
+                checked={superfansOnly}
+                onChange={(e) => setSuperfansOnly(e.target.checked)}
+              />
+            </>
           }
         >
           {content}

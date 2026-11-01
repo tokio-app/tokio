@@ -627,7 +627,7 @@ const registerFans = ({
   notifier,
 }: AppHandlerVariables) => {
   for (const type of FAN_EVENTS) {
-    conn.on(type, (d) => fans.record(d.user));
+    conn.on(type, (d) => fans.record(d.user, type));
   }
 
   const message = (): TokioPayload => ({

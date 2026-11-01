@@ -5,7 +5,7 @@ import {
   Fan,
   TimerData,
 } from "@/common/types";
-import { liveSummary, profileReply, timerReply } from "@test/fixtures";
+import { fan, liveSummary, profileReply, timerReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
 import { act, screen, waitFor, within } from "@testing-library/react";
@@ -13,15 +13,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const OCT_31 = new Date(2026, 9, 31, 20).getTime();
 const OCT_24 = new Date(2026, 9, 24, 20).getTime();
-
-const fan = (name: string, fanLevel: number): Fan => ({
-  userId: `id-${name}`,
-  username: name,
-  handle: name.toLowerCase(),
-  fanLevel,
-  fanBadge: `https://example.com/badge-${fanLevel}.png`,
-  seenAt: OCT_31,
-});
 
 const CLOCK: TestOverlay = { id: "4f9c2a", name: "Clock" };
 

@@ -24,6 +24,8 @@ export interface Fan {
   handle: string;
   fanLevel: number;
   fanBadge: string;
+  // A Super Fan subscriber, as their last chat, gift or Super Fan event said
+  superfan: boolean;
   // When they were last seen in a LIVE, in ms since the epoch
   seenAt: number;
 }

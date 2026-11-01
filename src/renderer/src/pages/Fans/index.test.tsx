@@ -34,6 +34,46 @@ describe("Fans", () => {
     expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
   });
 
+  it("says who is a Super Fan, next to their name", async () => {
+    renderWithProviders(<Fans />);
+    await fans([{ ...jules, superfan: true }, sofi]);
+
+    expect(row("Jules Pixel").getByText("Super Fan")).toBeInTheDocument();
+    expect(row("Sofi Rose").queryByText("Super Fan")).toBeNull();
+    // The name stays apart from the word
+    expect(names()).toEqual(["Jules Pixel", "Sofi Rose"]);
+  });
+
+  it("shows only the Super Fans while the toggle is on, with the search", async () => {
+    const { user } = renderWithProviders(<Fans />);
+    await fans([
+      { ...jules, superfan: true },
+      sofi,
+      { ...fan("Kai Moon", 2), superfan: true },
+    ]);
+    const only = screen.getByRole("checkbox", { name: "Super Fans only" });
+
+    await user.click(only);
+    expect(names()).toEqual(["Jules Pixel", "Kai Moon"]);
+
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    await user.type(screen.getByPlaceholderText("Name or @handle"), "kai");
+    expect(names()).toEqual(["Kai Moon"]);
+
+    await user.click(only);
+    await user.clear(screen.getByPlaceholderText("Name or @handle"));
+    expect(names()).toEqual(["Jules Pixel", "Sofi Rose", "Kai Moon"]);
+  });
+
+  it("says when there are no Super Fans yet", async () => {
+    const { user } = renderWithProviders(<Fans />);
+    await fans([sofi]);
+
+    await user.click(screen.getByRole("checkbox", { name: "Super Fans only" }));
+
+    expect(screen.getByText(/^No Super Fans yet\./)).toBeInTheDocument();
+  });
+
   it("keeps main's order", async () => {
     renderWithProviders(<Fans />);
     // Main sorts by level, then by when they were seen

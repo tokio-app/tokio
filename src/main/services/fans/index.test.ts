@@ -1,4 +1,4 @@
-import { Fan, UserData } from "@/common/types";
+import { Fan, TOKIO_EVENTS, UserData } from "@/common/types";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { existsSync } from "node:fs";
@@ -62,12 +62,35 @@ describe("FansService", () => {
         handle: "ana_2",
         fanLevel: 7,
         fanBadge: "https://p16/lv7.png",
+        superfan: false,
         seenAt: 2000,
       },
     ]);
   });
 
-  it("loads a fan saved without a badge picture", async () => {
+  it("keeps whether a fan is a Super Fan, as the events that carry it say", async () => {
+    const fans = await loaded();
+    const superfan = () => fans.list()[0].superfan;
+
+    fans.record({ ...viewer("1"), superfan: true }, TOKIO_EVENTS.CHAT);
+    expect(superfan()).toBe(true);
+    // Likes carry no Super Fan flag: the connector says false
+    fans.record({ ...viewer("1"), superfan: false }, TOKIO_EVENTS.LIKE);
+    expect(superfan()).toBe(true);
+    // A gift says they no longer are
+    fans.record({ ...viewer("1"), superfan: false }, TOKIO_EVENTS.GIFT);
+    expect(superfan()).toBe(false);
+    // Becoming one, or joining as one, says they are, whatever the flag
+    fans.record({ ...viewer("1"), superfan: false }, TOKIO_EVENTS.SUPER_FAN);
+    expect(superfan()).toBe(true);
+    fans.record(
+      { ...viewer("2"), superfan: false },
+      TOKIO_EVENTS.SUPER_FAN_JOIN,
+    );
+    expect(fans.list().find((f) => f.userId === "2")?.superfan).toBe(true);
+  });
+
+  it("loads a fan saved without a badge picture or Super Fan status", async () => {
     const fan = { userId: "1", username: "Ana", handle: "ana", fanLevel: 3 };
     await writeFile(
       join(dir, "a.json"),
@@ -75,7 +98,7 @@ describe("FansService", () => {
     );
 
     expect((await loaded()).list()).toEqual([
-      { ...fan, fanBadge: "", seenAt: 1 },
+      { ...fan, fanBadge: "", superfan: false, seenAt: 1 },
     ]);
   });
 

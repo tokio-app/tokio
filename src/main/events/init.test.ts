@@ -1377,6 +1377,7 @@ describe("init events", () => {
       handle: "ana",
       fanLevel: 12,
       fanBadge: "lv10.png",
+      superfan: false,
       seenAt: 1000,
     };
     const message = (fans: Fan[]) => ({ type: "tokio:fans", data: { fans } });
@@ -1388,7 +1389,10 @@ describe("init events", () => {
 
       emitLive(s.conn, event, data);
 
-      expect(s.fansService.record).toHaveBeenCalledExactlyOnceWith(data.user);
+      expect(s.fansService.record).toHaveBeenCalledExactlyOnceWith(
+        data.user,
+        event,
+      );
     });
 
     it("sends the fans to each overlay as it connects", async () => {
