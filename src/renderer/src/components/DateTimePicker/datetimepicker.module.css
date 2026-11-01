@@ -1,0 +1,4 @@
+.picker {
+  display: flex;
+  gap: var(--space-2);
+}
