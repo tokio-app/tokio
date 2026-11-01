@@ -2,6 +2,7 @@ export * from "./About";
 export * from "./Alerts";
 export * from "./Games";
 export * from "./Home";
+export * from "./Lives";
 export * from "./Music";
 export * from "./OfficialOverlays";
 export * from "./Overlays";

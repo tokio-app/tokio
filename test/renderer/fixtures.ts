@@ -16,7 +16,9 @@ import {
   AppNotification,
   CustomGift,
   FEEDBACK_CODES,
+  Gifter,
   LiveSession,
+  LiveSummary,
   MyInstantsSound,
   OverlayApp,
   PackageLicense,
@@ -130,6 +132,35 @@ export const liveSession = (patch: Partial<LiveSession> = {}): LiveSession => ({
   totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
   activity: [],
   ...patch,
+});
+
+/** A finished LIVE that ran an hour from `startedAt`, with nothing counted. */
+export const liveSummary = (
+  startedAt: number,
+  patch: Partial<LiveSummary> = {},
+): LiveSummary => ({
+  username: "streamer",
+  startedAt,
+  endedAt: startedAt + 3_600_000,
+  coins: 0,
+  gifts: 0,
+  followers: 0,
+  shares: 0,
+  likes: 0,
+  views: 0,
+  peakViewers: 0,
+  ...patch,
+});
+
+/** A viewer who sent `coins` in `gifts` gifts, without a picture. */
+export const gifter = (name: string, coins: number, gifts = 1): Gifter => ({
+  userId: `id-${slug(name)}`,
+  username: name,
+  handle: slug(name),
+  picture: "",
+  coins,
+  gifts,
+  giftedAt: 0,
 });
 
 let notices = 0;

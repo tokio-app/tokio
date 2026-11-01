@@ -30,6 +30,7 @@ describe("Layout", () => {
       .map((link) => [link.textContent, link.getAttribute("href")]);
     expect(links).toEqual([
       ["Home", "/"],
+      ["LIVEs", "/lives"],
       ["Overlays", "/overlays"],
       ["TTS", "/tts"],
       ["Alerts", "/alerts"],

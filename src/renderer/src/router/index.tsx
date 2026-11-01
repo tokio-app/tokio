@@ -14,6 +14,7 @@ import {
   Alerts,
   Games,
   Home,
+  Lives,
   Music,
   OfficialOverlays,
   Overlays,
@@ -63,6 +64,12 @@ const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: Home,
+});
+
+const livesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/lives",
+  component: Lives,
 });
 
 const overlaysRoute = createRoute({
@@ -123,6 +130,7 @@ const aboutRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   homeRoute,
+  livesRoute,
   overlaysRoute,
   officialOverlaysRoute,
   ttsRoute,

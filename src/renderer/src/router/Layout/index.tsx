@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import {
   LuFlaskConical,
   LuGamepad2,
+  LuHistory,
   LuInfo,
   LuListMusic,
   LuPartyPopper,
@@ -30,6 +31,7 @@ import styles from "./layout.module.css";
 // Lucide only, so the rail's strokes match
 const NAV_ITEMS = [
   { to: "/", label: "nav.home", icon: LuRadio },
+  { to: "/lives", label: "nav.lives", icon: LuHistory },
   { to: "/overlays", label: "nav.overlays", icon: LuPictureInPicture2 },
   { to: "/tts", label: "nav.tts", icon: LuSpeech },
   { to: "/alerts", label: "nav.alerts", icon: LuPartyPopper },

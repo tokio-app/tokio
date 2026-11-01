@@ -1,0 +1,255 @@
+/* The selected LIVE on the left and the list on the right, as tall as the
+   window leaves them: both lists scroll inside, like Home's feed, so picking
+   a LIVE doesn't move the list */
+.dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--space-10);
+  height: calc(100vh - 44px - 2 * var(--space-8) - var(--space-12));
+}
+
+.column,
+.side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The gifters take what the readout leaves */
+.column > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6);
+  color: var(--font-secondary);
+}
+
+/* SUMMARY */
+
+/* When, how long and whose, each on its own line */
+.line {
+  display: block;
+}
+
+.readout {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.big {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.small {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Home's readout */
+.stat_value {
+  color: var(--font-primary);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.big .stat_value {
+  font-size: var(--font-3xl);
+}
+
+.small .stat_value {
+  font-size: var(--font-2xl);
+}
+
+.stat_label {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+/* GIFTERS */
+
+.gifters {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
+  list-style: none;
+}
+
+/* Rows out of view skip layout, so a LIVE with thousands of gifters opens
+   fast */
+.gifter {
+  display: grid;
+  grid-template-columns: 28px 28px minmax(0, 1fr) 136px 104px;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 52px;
+}
+
+.gifter + .gifter {
+  border-top: 1px solid var(--border);
+}
+
+.rank {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name,
+.handle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-weight: 500;
+}
+
+.handle {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.amount {
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* THE LIST */
+
+.side {
+  gap: var(--space-4);
+}
+
+/* Grows with its LIVEs and scrolls once they fill the column */
+.list {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
+  list-style: none;
+}
+
+/* Date, start, length and coins in columns, so the times line up down the
+   list, and the coin bar on a row of its own */
+.option {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 60px 52px;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 54px;
+}
+
+.option + .option {
+  border-top: 1px solid var(--border);
+}
+
+.option:hover {
+  background-color: var(--background-secondary);
+}
+
+/* Inside the panel, which would clip the ring outside */
+.option:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Selection is one of rose's jobs */
+.selected,
+.selected:hover {
+  background-color: var(--accent-soft);
+}
+
+.selected::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background-color: var(--accent-primary);
+}
+
+.all_time {
+  grid-column: 1 / 4;
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-weight: 600;
+}
+
+.date {
+  overflow: hidden;
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.coins {
+  color: var(--font-primary);
+  font-size: var(--font-lg);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* The LIVE's coins against the best LIVE's, from the left edge. Square at
+   the start, rounded at the end. */
+.bar {
+  grid-column: 1 / -1;
+  height: 2px;
+  border-radius: 0 1px 1px 0;
+  background-color: var(--background-secondary-hover);
+}
+
+.selected .bar {
+  background-color: var(--accent-primary);
+}
