@@ -48,6 +48,22 @@ describe("TikTokConnectorService", () => {
     );
   });
 
+  it("knows the username before the provider connects", async () => {
+    const { service, provider } = setup();
+    let during = "";
+    provider.connect.mockImplementation(async () => {
+      during = service.username;
+      return { success: true };
+    });
+
+    expect(service.username).toBe("");
+    await service.connect("streamer");
+    await service.connect("other");
+
+    expect(during).toBe("other");
+    expect(service.username).toBe("other");
+  });
+
   it("logs and returns a failed connection", async () => {
     const error = vi.spyOn(Logger, "error");
     const { service, provider } = setup();

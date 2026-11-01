@@ -11,6 +11,8 @@ import {
 import { TikTokLiveConnector } from "./providers";
 
 export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
+  private _username = "";
+
   constructor() {
     super();
     this.addProvider("Default", new TikTokLiveConnector(), true); // NOTE: DO NOT CHANGE, Add your providers below.
@@ -39,7 +41,13 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
     this._current.provider.onReconnect(listener);
   }
 
+  /** The last connect()'s @username, set before CONNECTED fires. */
+  public get username(): string {
+    return this._username;
+  }
+
   public async connect(username: string): Promise<ConnectorResponse> {
+    this._username = username;
     Logger.info(`<Connector> Connecting to: ${username}`, this._logFile);
     const res = await this._current.provider.connect(username);
     if (!res.success) {
