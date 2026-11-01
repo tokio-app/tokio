@@ -404,6 +404,7 @@ describe("settings events", () => {
       unsaved = false,
       timerSaved = true,
       fansSaved = true,
+      historySaved = true,
     } = {}) => {
       const profiles = [defaultProfile, streamProfile];
       let active = defaultProfile;
@@ -428,6 +429,10 @@ describe("settings events", () => {
         save: vi.fn(async () => fansSaved),
         load: vi.fn(async (_file: string) => {}),
       };
+      const historyService = {
+        save: vi.fn(async () => historySaved),
+        load: vi.fn(async (_file: string) => {}),
+      };
       const serverService = {
         sendToClient: vi.fn((_id: string, _data: unknown) => true),
       };
@@ -437,6 +442,7 @@ describe("settings events", () => {
         connectorService: { isConnected: () => connected },
         timerService,
         fansService,
+        historyService,
         serverService,
         overlayService: {
           getGifts: async () => [],
@@ -449,6 +455,7 @@ describe("settings events", () => {
         storeManagerService,
         timerService,
         fansService,
+        historyService,
         serverService,
         gamesService,
       };
@@ -471,20 +478,31 @@ describe("settings events", () => {
     });
 
     it("switches the profile, then sends it, the settings and a notice", async () => {
-      const { h, storeManagerService, timerService, fansService } = setup();
+      const {
+        h,
+        storeManagerService,
+        timerService,
+        fansService,
+        historyService,
+      } = setup();
 
       const log = await run(h, APP_EVENTS.SET_PROFILE, {
         file: "stream.json",
       });
 
-      // The old profile's timer and fans are saved before the switch, the new
-      // one's loaded
+      // The old profile's timer, fans and history are saved before the
+      // switch, the new one's loaded
       expect(timerService.save).toHaveBeenCalledBefore(
         storeManagerService.updateActiveProfile,
       );
-      expect(fansService.save).toHaveBeenCalledBefore(
+      expect(fansService.save).toHaveBeenCalledBefore(historyService.save);
+      expect(historyService.save).toHaveBeenCalledBefore(
         storeManagerService.updateActiveProfile,
       );
+      expect(historyService.load).toHaveBeenCalledExactlyOnceWith(
+        "stream.json",
+      );
+      expect(fansService.load).toHaveBeenCalledBefore(historyService.load);
       expect(storeManagerService.updateActiveProfile).toHaveBeenCalledWith(
         "stream.json",
       );
@@ -643,6 +661,24 @@ describe("settings events", () => {
       ]);
     });
 
+    it("refuses to switch when the LIVE history can't be saved, so it isn't lost", async () => {
+      const { h, storeManagerService, historyService } = setup({
+        historySaved: false,
+      });
+
+      await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
+
+      expect(storeManagerService.updateActiveProfile).not.toHaveBeenCalled();
+      expect(historyService.load).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        }),
+      ]);
+    });
+
     it("notifies without a reply when the profile can't be read after", async () => {
       const { h } = setup({ missing: true });
 
@@ -662,9 +698,13 @@ describe("settings events", () => {
     it.each([false, true])(
       "does nothing for the active profile (connected: %s)",
       async (connected) => {
-        const { h, storeManagerService, timerService, fansService } = setup({
-          connected,
-        });
+        const {
+          h,
+          storeManagerService,
+          timerService,
+          fansService,
+          historyService,
+        } = setup({ connected });
 
         await h.invoke(settings, APP_EVENTS.SET_PROFILE, {
           file: defaultProfile.file,
@@ -672,6 +712,8 @@ describe("settings events", () => {
 
         expect(timerService.save).not.toHaveBeenCalled();
         expect(fansService.save).not.toHaveBeenCalled();
+        expect(historyService.save).not.toHaveBeenCalled();
+        expect(historyService.load).not.toHaveBeenCalled();
         expect(storeManagerService.updateActiveProfile).not.toHaveBeenCalled();
         expect(h.sent()).toEqual([]);
       },

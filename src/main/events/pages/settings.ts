@@ -180,10 +180,11 @@ events.push(
         { level: "warning" },
       );
     }
-    // The timer and the fans are saved where they came from before the
-    // profile is replaced, so they're never lost
+    // The timer, the fans and the LIVE history are saved where they came from
+    // before the profile is replaced, so they're never lost
     if (!(await timerService.save())) throw saveFailure();
     if (!(await services.fansService.save())) throw saveFailure();
+    if (!(await services.historyService.save())) throw saveFailure();
     const res = await storeManagerService.updateActiveProfile(file);
     if (res === "unsaved") throw saveFailure();
     if (res === "missing") {
@@ -198,6 +199,7 @@ events.push(
     timerService.load(profile.timer, file);
     // Overlays get the new profile's fans once they load
     await services.fansService.load(file);
+    await services.historyService.load(file);
     services.gamesService.setGames(profile.games);
 
     e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
