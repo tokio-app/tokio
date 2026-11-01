@@ -1,0 +1,4 @@
+/* Lines the arrow up with the page, past the icon button's padding */
+.back {
+  margin-left: -6px;
+}

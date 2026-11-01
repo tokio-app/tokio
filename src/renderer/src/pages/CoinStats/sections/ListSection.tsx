@@ -4,7 +4,7 @@ import { cx, formatDate, formatDuration, formatStat } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
 import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { KeyboardEvent } from "react";
-import styles from "../lives.module.css";
+import styles from "../coinstats.module.css";
 import { DATE_OPERATORS, DATE_PRESETS, DateFilter } from "../helper";
 
 interface Props {
@@ -39,7 +39,7 @@ function DateFilterBar({ filter, onChange }: FilterProps) {
     <div className={styles.filters}>
       <Select
         className={styles.preset}
-        aria-label={t("lives.filter.label")}
+        aria-label={t("coinStats.filter.label")}
         options={presets}
         value={filter.preset}
         onChange={(preset) => onChange({ ...filter, preset })}
@@ -47,22 +47,22 @@ function DateFilterBar({ filter, onChange }: FilterProps) {
       {filter.preset === "custom" && (
         <>
           <Select
-            aria-label={t("lives.filter.operator")}
+            aria-label={t("coinStats.filter.operator")}
             options={operators}
             value={operator}
             onChange={(value) => onChange({ ...filter, operator: value })}
           />
           <DateTimePicker
-            aria-label={t("lives.filter.date")}
+            aria-label={t("coinStats.filter.date")}
             withTime={operator !== "on"}
             value={filter.from}
             onChange={(from) => onChange({ ...filter, from })}
           />
           {operator === "between" && (
             <>
-              <span className={styles.and}>{t("lives.filter.and")}</span>
+              <span className={styles.and}>{t("coinStats.filter.and")}</span>
               <DateTimePicker
-                aria-label={t("lives.filter.toDate")}
+                aria-label={t("coinStats.filter.toDate")}
                 withTime
                 value={filter.to}
                 onChange={(to) => onChange({ ...filter, to })}
@@ -125,12 +125,12 @@ export function ListSection({
       <ul
         className={styles.list}
         role="listbox"
-        aria-label={t("lives.list.title")}
+        aria-label={t("coinStats.list.title")}
         onKeyDown={onKeyDown}
       >
         <li
           {...option(null)}
-          aria-label={t("lives.list.option", {
+          aria-label={t("coinStats.list.option", {
             date: title,
             coins: coinsLabel(coins, language),
           })}
@@ -146,7 +146,7 @@ export function ListSection({
             <li
               key={live.startedAt}
               {...option(live.startedAt)}
-              aria-label={t("lives.list.option", {
+              aria-label={t("coinStats.list.option", {
                 date: formatDate(live.startedAt, language, "dateTime"),
                 coins: coinsLabel(live.coins, language),
               })}
@@ -173,7 +173,7 @@ export function ListSection({
       </ul>
       {lives.length === 0 && (
         <EmptyState>
-          {t(filtered ? "lives.filter.empty" : "lives.list.empty")}
+          {t(filtered ? "coinStats.filter.empty" : "coinStats.list.empty")}
         </EmptyState>
       )}
     </div>

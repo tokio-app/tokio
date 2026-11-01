@@ -125,7 +125,7 @@ test("opens every page from the sidebar", async () => {
     ["Alerts", "Alerts"],
     ["Music", "Controls"],
     ["Games", "Actions"],
-    ["Tools", "Test overlays"],
+    ["Tools", "Tools"],
     ["About", "Online services"],
     ["Settings", "Live profiles"],
     ["Home", "Dashboard"],

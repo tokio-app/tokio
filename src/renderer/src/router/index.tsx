@@ -12,13 +12,16 @@ import { useState } from "react";
 import {
   About,
   Alerts,
+  CoinStats,
+  CountdownTimer,
+  Fans,
   Games,
   Home,
-  Lives,
   Music,
   OfficialOverlays,
   Overlays,
   Settings,
+  TestOverlays,
   Tools,
   TTS,
 } from "../pages";
@@ -66,12 +69,6 @@ const homeRoute = createRoute({
   component: Home,
 });
 
-const livesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/lives",
-  component: Lives,
-});
-
 const overlaysRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/overlays",
@@ -116,6 +113,32 @@ const toolsRoute = createRoute({
   component: Tools,
 });
 
+// The tools, opened from Tools. Under /tools, so the sidebar keeps Tools
+// active.
+const countdownTimerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tools/timer",
+  component: CountdownTimer,
+});
+
+const coinStatsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tools/coin-stats",
+  component: CoinStats,
+});
+
+const fansRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tools/fans",
+  component: Fans,
+});
+
+const testOverlaysRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tools/test-overlays",
+  component: TestOverlays,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
@@ -130,7 +153,6 @@ const aboutRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   homeRoute,
-  livesRoute,
   overlaysRoute,
   officialOverlaysRoute,
   ttsRoute,
@@ -138,6 +160,10 @@ const routeTree = rootRoute.addChildren([
   musicRoute,
   gamesRoute,
   toolsRoute,
+  countdownTimerRoute,
+  coinStatsRoute,
+  fansRoute,
+  testOverlaysRoute,
   settingsRoute,
   aboutRoute,
 ]);

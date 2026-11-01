@@ -2,17 +2,20 @@ import { MessageKey, translate } from "@/common/i18n";
 import { TimerSettings, TimerStatus } from "@/common/schemas";
 import { TimerData, TimerState } from "@/common/types";
 
-// Result of the last test events sent to a test overlay
-export type TestStatus = "sent" | "no-client";
-
-export const STATUS_LABELS: Record<TestStatus, MessageKey> = {
-  sent: "tools.test.sent",
-  "no-client": "tools.test.noClient",
-};
-
 // The last TIMER from main, with the performance.now() it came at, which the
 // preview counts down from
 export type TimerPush = { data: TimerData; at: number };
+
+/**
+ * The ms left on the clock at `now` (a performance.now()): the starting time
+ * in minutes while idle, counted down from the push while running.
+ */
+export function timeLeft(timer: TimerPush, start: number, now: number) {
+  const { state } = timer.data;
+  if (state.status === "idle") return start * 60_000;
+  if (state.status !== "running") return state.remaining;
+  return Math.max(0, state.remaining - Math.max(0, now - timer.at));
+}
 
 const TIMER_LABELS: Record<TimerStatus, MessageKey> = {
   idle: "tools.timer.idle",

@@ -15,6 +15,7 @@ import {
   ActivityUser,
   AppNotification,
   CustomGift,
+  Fan,
   FEEDBACK_CODES,
   Gifter,
   LiveSession,
@@ -156,6 +157,21 @@ export const gifter = (name: string, coins: number, gifts = 1): Gifter => ({
   coins,
   gifts,
   giftedAt: 0,
+});
+
+/** A viewer at fan level `fanLevel`, with TikTok's badge, never seen. */
+export const fan = (
+  name: string,
+  fanLevel: number,
+  patch: Partial<Fan> = {},
+): Fan => ({
+  userId: `id-${slug(name)}`,
+  username: name,
+  handle: slug(name),
+  fanLevel,
+  fanBadge: `https://example.com/fans_badge_icon_lv${Math.max(1, Math.floor(fanLevel / 10) * 10)}.png`,
+  seenAt: 0,
+  ...patch,
 });
 
 let notices = 0;

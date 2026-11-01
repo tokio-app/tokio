@@ -1,13 +1,20 @@
 import { TestOverlay } from "@/common/schemas";
 import { getOverlaySocketURL } from "@/common/util";
-import { Btn, CopyField, EmptyState, Input, Section } from "@/components";
+import {
+  BackButton,
+  Btn,
+  CopyField,
+  EmptyState,
+  Input,
+  Section,
+} from "@/components";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import { LuPlus } from "react-icons/lu";
 import { PiShootingStarThin } from "react-icons/pi";
 import { STATUS_LABELS, TestStatus } from "../helper";
-import styles from "../tools.module.css";
+import styles from "../testoverlays.module.css";
 
 interface Props {
   overlays: TestOverlay[];
@@ -29,6 +36,7 @@ export function TestOverlaysSection({
 
   return (
     <Section
+      icon={<BackButton to="/tools" title={t("tools.back")} />}
       title={t("tools.test.title")}
       description={t("tools.test.description")}
     >

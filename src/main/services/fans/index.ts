@@ -109,11 +109,14 @@ export class FansService extends Service {
     this._emit();
   }
 
-  /** What overlays get: the highest levels, then the most recently seen. */
-  public list(): Fan[] {
+  /**
+   * The highest levels first, then the most recently seen. Overlays get the
+   * first SENT_FANS, the Fans page all of them.
+   */
+  public list(limit = SENT_FANS): Fan[] {
     return [...this._fans.values()]
       .sort((a, b) => b.fanLevel - a.fanLevel || b.seenAt - a.seenAt)
-      .slice(0, SENT_FANS);
+      .slice(0, limit);
   }
 
   /**

@@ -16,3 +16,14 @@ export const allInRange = (
   { startedAt, endedAt }: Span,
   { from = -Infinity, to = Infinity }: DateRange,
 ) => startedAt >= from && endedAt <= to;
+
+type Viewer = { username: string; handle: string };
+
+// A viewer search: trimmed, in any case, in their name or @handle. "@kai"
+// finds kai too.
+export const viewerMatcher = (query: string) => {
+  const needle = query.trim().replace(/^@/, "").toLocaleLowerCase();
+  return ({ username, handle }: Viewer) =>
+    username.toLocaleLowerCase().includes(needle) ||
+    handle.toLocaleLowerCase().includes(needle);
+};

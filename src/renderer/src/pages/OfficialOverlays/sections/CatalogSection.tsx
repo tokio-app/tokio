@@ -2,6 +2,7 @@ import { CatalogOverlay } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
 import { catalogState, CatalogState } from "@/common/util";
 import {
+  BackButton,
   Btn,
   EmptyState,
   RemoveOverlayModal,
@@ -10,10 +11,9 @@ import {
 } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
-import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { FiCheck, FiTrash2 } from "react-icons/fi";
-import { LuArrowLeft, LuDownload, LuRefreshCw } from "react-icons/lu";
+import { LuDownload, LuRefreshCw } from "react-icons/lu";
 import { VscPackage } from "react-icons/vsc";
 import styles from "../officialoverlays.module.css";
 
@@ -28,7 +28,6 @@ interface Props {
  */
 export function CatalogSection({ overlays }: Props) {
   const t = useT();
-  const navigate = useNavigate();
   // Null while it loads
   const [catalog, setCatalog] = useState<CatalogOverlay[] | null>(null);
   // Why it couldn't be loaded
@@ -72,16 +71,7 @@ export function CatalogSection({ overlays }: Props) {
       )}
 
       <Section
-        icon={
-          <Btn
-            variant="icon"
-            title={t("overlays.official.back")}
-            className={styles.back}
-            onClick={() => navigate({ to: "/overlays" })}
-          >
-            <LuArrowLeft size={22} />
-          </Btn>
-        }
+        icon={<BackButton to="/overlays" title={t("overlays.official.back")} />}
         title={t("overlays.official.title")}
         description={t("overlays.official.description")}
         divider

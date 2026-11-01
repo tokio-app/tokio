@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allInRange, inRange } from "./history";
+import { allInRange, inRange, viewerMatcher } from "./history";
 
 // A LIVE from 8:00 to 10:00, in minutes
 const live = { startedAt: 8 * 60, endedAt: 10 * 60 };
@@ -29,5 +29,21 @@ describe("allInRange", () => {
     expect(allInRange(live, { from: 8 * 60, to: 10 * 60 })).toBe(true);
     expect(allInRange(live, { from: 9 * 60 })).toBe(false);
     expect(allInRange(live, { to: 9 * 60 })).toBe(false);
+  });
+});
+
+describe("viewerMatcher", () => {
+  const kai = { username: "Kai Rivera", handle: "kai.r" };
+
+  it("finds a viewer by name or handle, in any case", () => {
+    expect(viewerMatcher("rivera")(kai)).toBe(true);
+    expect(viewerMatcher("KAI.R")(kai)).toBe(true);
+    expect(viewerMatcher("  kai  ")(kai)).toBe(true);
+    expect(viewerMatcher("sofi")(kai)).toBe(false);
+  });
+
+  it("ignores a leading @", () => {
+    expect(viewerMatcher("@kai.r")(kai)).toBe(true);
+    expect(viewerMatcher("k@i")(kai)).toBe(false);
   });
 });

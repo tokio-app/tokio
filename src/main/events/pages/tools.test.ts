@@ -4,6 +4,7 @@ import {
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
 } from "@/common/types";
+import { MAX_FANS } from "@/services/fans";
 import { createHandler } from "@test/handler";
 import { describe, expect, it, vi } from "vitest";
 import tools from "./tools";
@@ -18,6 +19,27 @@ const saveError = {
 };
 
 describe("tools events", () => {
+  describe("GET_FANS", () => {
+    it("replies every fan the profile keeps", async () => {
+      const fan = {
+        userId: "7",
+        username: "Ana",
+        handle: "ana",
+        fanLevel: 12,
+        fanBadge: "",
+        seenAt: 1,
+      };
+      const list = vi.fn(() => [fan]);
+      const h = createHandler({ fansService: { list } });
+
+      await h.invoke(tools, APP_EVENTS.GET_FANS);
+
+      expect(list).toHaveBeenCalledWith(MAX_FANS);
+      expect(h.replies(APP_EVENTS_RESPONSE.FANS)).toEqual([{ data: [fan] }]);
+      expect(h.notices).toEqual([]);
+    });
+  });
+
   describe("GET_TEST_OVERLAYS", () => {
     it("replies the test overlays", async () => {
       const h = createHandler({

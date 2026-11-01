@@ -2,6 +2,7 @@ import { TimerAction, TimerSettings } from "@/common/schemas";
 import { APP_EVENTS } from "@/common/types";
 import { formatAdded, getOverlayURL, TIMER_PATH } from "@/common/util";
 import {
+  BackButton,
   Btn,
   Check,
   Color,
@@ -28,8 +29,8 @@ import {
   FiRotateCcw,
   FiSquare,
 } from "react-icons/fi";
+import styles from "../countdowntimer.module.css";
 import { timerStatusText, TimerPush, TRIGGERS } from "../helper";
-import styles from "../tools.module.css";
 import { TimerPreview } from "./TimerPreview";
 
 interface SectionProps {
@@ -88,6 +89,7 @@ function CountdownSection({
 
   return (
     <Section
+      icon={<BackButton to="/tools" title={t("tools.back")} />}
       title={t("tools.countdown.title")}
       description={t("tools.countdown.description")}
     >

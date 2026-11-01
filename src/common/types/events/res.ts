@@ -1,6 +1,6 @@
 import { AboutInfo, LicenseText } from "../about";
 import { MyInstantsSound } from "../alerts";
-import { TokioPayload } from "../connector";
+import { Fan, TokioPayload } from "../connector";
 import { CustomGift, OverlayConfigRedux } from "../overlay";
 import {
   AlertMedia,
@@ -100,6 +100,7 @@ export enum APP_EVENTS_RESPONSE {
   GET_TEST_OVERLAYS = "app:tools:res:overlays:get",
   SEND_TEST_EVENTS = "app:tools:res:overlays:test",
   TIMER = "app:tools:res:timer",
+  FANS = "app:tools:res:fans:get",
 
   // ALERTS
   ALERT_AUDIO = "app:alerts:audio",
@@ -320,6 +321,9 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.TIMER]: Reply<{
     data?: TimerData;
   }>;
+  // Every fan the active profile keeps, the highest levels first, then the
+  // most recently seen. Not pushed: the Fans page asks again on a switch.
+  [APP_EVENTS_RESPONSE.FANS]: { data: Fan[] };
 
   // ALERTS
   [APP_EVENTS_RESPONSE.ALERT_AUDIO]: {

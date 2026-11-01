@@ -2,7 +2,7 @@ import { Section } from "@/components";
 import { formatStat } from "@/helper";
 import { useLanguage, useT } from "@/ui/i18n";
 import { ReactNode } from "react";
-import styles from "../lives.module.css";
+import styles from "../coinstats.module.css";
 import { READOUT, Totals } from "../helper";
 
 interface Props {

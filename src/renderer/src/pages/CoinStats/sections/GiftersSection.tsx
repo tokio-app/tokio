@@ -8,7 +8,7 @@ import {
 } from "@/components";
 import { coinsLabel, giftsLabel } from "@/helper/gifts";
 import { useLanguage, useT } from "@/ui/i18n";
-import styles from "../lives.module.css";
+import styles from "../coinstats.module.css";
 
 export interface GiftersList {
   // The most coins first, undefined until main sends them. A search's come
@@ -84,7 +84,7 @@ export function GiftersSection({
       title={title}
       actions={
         <SearchToggle
-          placeholder={t("lives.gifters.search")}
+          placeholder={t("coinStats.gifters.search")}
           value={search}
           onChange={onSearch}
         />

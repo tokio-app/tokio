@@ -1,5 +1,6 @@
 export * from "./AlertItem";
 export * from "./Avatar";
+export * from "./BackButton";
 export * from "./CopyField";
 export * from "./DateTimePicker";
 export * from "./DeleteModals";

@@ -7,18 +7,20 @@ import {
 } from "@/common/types";
 import { DateRange, inRange } from "@/common/util";
 import {
+  BackButton,
   Btn,
   ClearHistoryModal,
   DeleteLiveModal,
   Page,
+  Section,
   Spinner,
 } from "@/components";
 import { formatDate, formatDuration } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useLanguage, useT } from "@/ui/i18n";
-import { useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
-import styles from "./lives.module.css";
+import styles from "./coinstats.module.css";
 import {
   allTime,
   capitalize,
@@ -39,7 +41,24 @@ type GiftersReply = AppEventsResponseMap[APP_EVENTS_RESPONSE.GIFTERS];
 // reads many LIVEs' files
 const SEARCH_DELAY_MS = 250;
 
-export function Lives() {
+// The header row, with the dashboard or the spinner under it
+function Frame({ children }: { children: ReactNode }) {
+  const t = useT();
+  return (
+    <Page width="wide">
+      <div className={styles.frame}>
+        <Section
+          icon={<BackButton to="/tools" title={t("tools.back")} />}
+          title={t("coinStats.title")}
+        >
+          {children}
+        </Section>
+      </div>
+    </Page>
+  );
+}
+
+export function CoinStats() {
   const t = useT();
   const language = useLanguage();
   const [history, setHistory] = useState<LiveHistory>();
@@ -146,11 +165,11 @@ export function Lives() {
 
   if (!history) {
     return (
-      <Page width="wide">
+      <Frame>
         <div className={styles.loading}>
           <Spinner size={20} />
         </div>
-      </Page>
+      </Frame>
     );
   }
 
@@ -164,10 +183,10 @@ export function Lives() {
       const found = isSearch(searchReply) ? searchReply : undefined;
       return {
         gifters: found?.data,
-        empty: t("lives.gifters.noMatch", { query: search.trim() }),
+        empty: t("coinStats.gifters.noMatch", { query: search.trim() }),
         failed:
           found?.success === false
-            ? t("lives.gifters.failedSearch")
+            ? t("coinStats.gifters.failedSearch")
             : undefined,
       };
     }
@@ -175,19 +194,22 @@ export function Lives() {
       const got = reply?.startedAt === live.startedAt ? reply : undefined;
       return {
         gifters: got?.data?.gifters,
-        empty: t("lives.gifters.empty"),
-        failed: got?.success === false ? t("lives.gifters.failed") : undefined,
+        empty: t("coinStats.gifters.empty"),
+        failed:
+          got?.success === false ? t("coinStats.gifters.failed") : undefined,
       };
     }
     if (range) {
       return {
         gifters: dates?.data,
-        empty: t("lives.gifters.emptyDates"),
+        empty: t("coinStats.gifters.emptyDates"),
         failed:
-          dates?.success === false ? t("lives.gifters.failedDates") : undefined,
+          dates?.success === false
+            ? t("coinStats.gifters.failedDates")
+            : undefined,
       };
     }
-    return { gifters: history.gifters, empty: t("lives.gifters.empty") };
+    return { gifters: history.gifters, empty: t("coinStats.gifters.empty") };
   };
 
   return (
@@ -200,7 +222,7 @@ export function Lives() {
       )}
       {clearing && <ClearHistoryModal onClose={() => setClearing(false)} />}
 
-      <Page width="wide">
+      <Frame>
         <div className={styles.dashboard}>
           {/* Swapped at once on a new selection, with no motion */}
           <div className={styles.column}>
@@ -211,7 +233,7 @@ export function Lives() {
                   language,
                 )}
                 lines={[
-                  t("lives.live.times", {
+                  t("coinStats.live.times", {
                     start: formatDate(live.startedAt, language, "time"),
                     end: formatDate(live.endedAt, language, "time"),
                   }),
@@ -222,7 +244,7 @@ export function Lives() {
                 action={
                   <Btn
                     variant="icon"
-                    title={t("lives.live.delete")}
+                    title={t("coinStats.live.delete")}
                     onClick={() => setDeleting(live)}
                   >
                     <FiTrash2 size={18} />
@@ -234,8 +256,8 @@ export function Lives() {
               <SummarySection
                 title={periodText(filter, language, now)}
                 lines={[
-                  t("lives.allTime.count", { count: shown.length }),
-                  t("lives.allTime.length", {
+                  t("coinStats.allTime.count", { count: shown.length }),
+                  t("coinStats.allTime.length", {
                     length: formatDuration(total.length),
                   }),
                 ]}
@@ -244,7 +266,7 @@ export function Lives() {
                   !range && (
                     <Btn
                       variant="icon"
-                      title={t("lives.allTime.clear")}
+                      title={t("coinStats.allTime.clear")}
                       disabled={
                         history.lives.length === 0 &&
                         history.gifters.length === 0
@@ -260,7 +282,9 @@ export function Lives() {
             )}
             {/* One in both cases, so an open search stays open */}
             <GiftersSection
-              title={t(live ? "lives.gifters.title" : "lives.gifters.top")}
+              title={t(
+                live ? "coinStats.gifters.title" : "coinStats.gifters.top",
+              )}
               {...gifters()}
               search={search}
               onSearch={setSearch}
@@ -283,7 +307,7 @@ export function Lives() {
             }}
           />
         </div>
-      </Page>
+      </Frame>
     </>
   );
 }

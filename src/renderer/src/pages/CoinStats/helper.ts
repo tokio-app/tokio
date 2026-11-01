@@ -7,8 +7,8 @@ import { formatDate } from "@/helper";
 export type Totals = Pick<LiveSummary, "coins" | "gifts">;
 
 export const READOUT: { key: keyof Totals; label: MessageKey }[] = [
-  { key: "coins", label: "lives.stats.coins" },
-  { key: "gifts", label: "lives.stats.gifts" },
+  { key: "coins", label: "coinStats.stats.coins" },
+  { key: "gifts", label: "coinStats.stats.gifts" },
 ];
 
 /**
@@ -75,19 +75,19 @@ export const NO_FILTER: DateFilter = {
 };
 
 export const DATE_PRESETS: { value: DatePreset; label: MessageKey }[] = [
-  { value: "all", label: "lives.filter.all" },
-  { value: "day", label: "lives.filter.day" },
-  { value: "week", label: "lives.filter.week" },
-  { value: "month", label: "lives.filter.month" },
-  { value: "year", label: "lives.filter.year" },
-  { value: "custom", label: "lives.filter.custom" },
+  { value: "all", label: "coinStats.filter.all" },
+  { value: "day", label: "coinStats.filter.day" },
+  { value: "week", label: "coinStats.filter.week" },
+  { value: "month", label: "coinStats.filter.month" },
+  { value: "year", label: "coinStats.filter.year" },
+  { value: "custom", label: "coinStats.filter.custom" },
 ];
 
 export const DATE_OPERATORS: { value: DateOperator; label: MessageKey }[] = [
-  { value: "on", label: "lives.filter.on" },
-  { value: "after", label: "lives.filter.after" },
-  { value: "before", label: "lives.filter.before" },
-  { value: "between", label: "lives.filter.between" },
+  { value: "on", label: "coinStats.filter.on" },
+  { value: "after", label: "coinStats.filter.after" },
+  { value: "before", label: "coinStats.filter.before" },
+  { value: "between", label: "coinStats.filter.between" },
 ];
 
 const MINUTE = 60_000;
@@ -147,27 +147,31 @@ export function periodText(
   now: number,
 ): string {
   if (!dateRange(filter, now))
-    return translate(language, "lives.allTime.title");
+    return translate(language, "coinStats.allTime.title");
   const { preset, operator, from, to } = filter;
   if (preset !== "custom") {
-    return translate(language, `lives.filter.${preset}`);
+    return translate(language, `coinStats.filter.${preset}`);
   }
   // With its time when one was picked
   const text = (value: DateTimeValue) =>
     formatDate(moment(value), language, value.time ? "shortTime" : "short");
   switch (operator) {
     case "on":
-      return translate(language, "lives.period.on", {
+      return translate(language, "coinStats.period.on", {
         date: text({ date: from.date, time: "" }),
       });
     case "after":
-      return translate(language, "lives.period.after", { date: text(from) });
+      return translate(language, "coinStats.period.after", {
+        date: text(from),
+      });
     case "before":
-      return translate(language, "lives.period.before", { date: text(from) });
+      return translate(language, "coinStats.period.before", {
+        date: text(from),
+      });
     default: {
       const [first, last] =
         moment(from) <= moment(to) ? [from, to] : [to, from];
-      return translate(language, "lives.period.between", {
+      return translate(language, "coinStats.period.between", {
         from: text(first),
         to: text(last),
       });

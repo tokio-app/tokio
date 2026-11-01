@@ -30,7 +30,6 @@ describe("Layout", () => {
       .map((link) => [link.textContent, link.getAttribute("href")]);
     expect(links).toEqual([
       ["Home", "/"],
-      ["LIVEs", "/lives"],
       ["Overlays", "/overlays"],
       ["TTS", "/tts"],
       ["Alerts", "/alerts"],
@@ -87,7 +86,7 @@ describe("Layout", () => {
     await user.click(sidebar().getByRole("link", { name: "Tools" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Test overlays" }),
+      await screen.findByRole("heading", { name: "Tools" }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/tools");
   });

@@ -9,7 +9,13 @@ import {
   TokioEventMap,
   TopGifter,
 } from "@/common/types";
-import { allInRange, DateRange, formatError, inRange } from "@/common/util";
+import {
+  allInRange,
+  DateRange,
+  formatError,
+  inRange,
+  viewerMatcher,
+} from "@/common/util";
 import { renameWithRetry } from "@/helper/fs";
 import { GiftStreaks } from "@/helper/streaks";
 import Logger from "@/logger";
@@ -31,7 +37,7 @@ export const MAX_LIVES = 1500;
 export const MAX_GIFTERS = 10_000;
 // Overlays get this many of each list
 export const TOP_GIFTERS = 10;
-// The LIVEs page gets this many of all time's
+// Coin stats gets this many of all time's
 export const SHOWN_GIFTERS = 100;
 
 const GifterSchema: z.ZodType<Gifter> = z.object({
@@ -392,15 +398,11 @@ export class HistoryService extends Service {
       ranked = [...gifters.values()].sort(byCoins);
     }
 
-    // "@kai" finds kai too
-    const needle = query.trim().replace(/^@/, "").toLocaleLowerCase();
+    const named = viewerMatcher(query);
     const found: RankedGifter[] = [];
     for (const [i, gifter] of ranked.entries()) {
       if (found.length === SHOWN_GIFTERS) break;
-      const named =
-        gifter.username.toLocaleLowerCase().includes(needle) ||
-        gifter.handle.toLocaleLowerCase().includes(needle);
-      if (named) found.push({ ...gifter, rank: i + 1 });
+      if (named(gifter)) found.push({ ...gifter, rank: i + 1 });
     }
     return found;
   }

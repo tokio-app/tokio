@@ -1,13 +1,28 @@
-/* The selected LIVE on the left and the list on the right, as tall as the
-   window leaves them: both lists scroll inside, like Home's feed, so picking
-   a LIVE doesn't move the list */
+/* The header and the dashboard, as tall as the window leaves them: both
+   lists scroll inside, like Home's feed, so picking a LIVE doesn't move the
+   list */
+.frame {
+  display: flex;
+  flex-direction: column;
+  height: calc(
+    100vh - var(--title-bar-height) - 2 * var(--space-8) - var(--space-12)
+  );
+}
+
+/* The header's section, its only child, so it has no divider */
+.frame > section {
+  flex: 1;
+  min-height: 0;
+}
+
+/* The selected LIVE on the left and the list on the right, under the
+   header */
 .dashboard {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: var(--space-10);
-  height: calc(
-    100vh - var(--title-bar-height) - 2 * var(--space-8) - var(--space-12)
-  );
+  flex: 1;
+  min-height: 0;
 }
 
 .column,

@@ -7,10 +7,10 @@ import {
 } from "@/common/types";
 import { gifter, liveSummary, profileReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
-import { renderWithProviders } from "@test/render";
+import { renderApp, renderWithProviders } from "@test/render";
 import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Lives } from ".";
+import { CoinStats } from ".";
 
 // Local times, so the dates read the same in any time zone
 const FRIDAY = new Date(2026, 9, 30, 20, 14).getTime();
@@ -49,7 +49,8 @@ const selected = () =>
   within(list())
     .getByRole("option", { selected: true })
     .getAttribute("aria-label");
-const heading = () => screen.getAllByRole("heading", { level: 2 })[0];
+// The summary's title, after the page's
+const heading = () => screen.getAllByRole("heading", { level: 2 })[1];
 // The value shown above a stat's label
 const stat = (label: string) => screen.getByText(label).previousElementSibling;
 const gifterRows = (name: string) =>
@@ -66,19 +67,50 @@ const dates = async (
   await user.click(screen.getByRole("option", { name: choice }));
 };
 
-describe("Lives", () => {
+describe("Coin stats", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
+  it("has a header with the page's title, also while it loads", () => {
+    renderWithProviders(<CoinStats />);
+
+    expect(
+      screen.getByRole("heading", { name: "Coin stats" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Back to Tools" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
+  });
+
+  it("keeps the header over the dashboard", async () => {
+    renderWithProviders(<CoinStats />);
+
+    await lives([saturday, friday]);
+
+    expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent(
+      "Coin stats",
+    );
+    expect(list()).toBeInTheDocument();
+  });
+
+  it("goes back to Tools", async () => {
+    const { user, router } = await renderApp("/tools/coin-stats");
+
+    await user.click(screen.getByRole("button", { name: "Back to Tools" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/tools"));
+  });
+
   it("asks main for the LIVEs", () => {
-    renderWithProviders(<Lives />);
+    renderWithProviders(<CoinStats />);
 
     expect(sent(APP_EVENTS.GET_LIVES)).toEqual([undefined]);
   });
 
   it("lists All time first, then the LIVEs newest first", async () => {
-    renderWithProviders(<Lives />);
+    renderWithProviders(<CoinStats />);
 
     await lives([saturday, friday]);
 
@@ -97,7 +129,7 @@ describe("Lives", () => {
   });
 
   it("opens on the newest LIVE, and asks for its gifters", async () => {
-    renderWithProviders(<Lives />);
+    renderWithProviders(<CoinStats />);
 
     await lives([saturday, friday]);
 
@@ -110,7 +142,7 @@ describe("Lives", () => {
   it("starts a Spanish date's title with a capital", async () => {
     history.replaceState(null, "", "?lang=es-419");
     try {
-      renderWithProviders(<Lives />);
+      renderWithProviders(<CoinStats />);
       await lives([saturday]);
 
       expect(heading()).toHaveTextContent("Sábado, 31 de octubre de 2026");
@@ -120,7 +152,7 @@ describe("Lives", () => {
   });
 
   it("shows the selected LIVE: when, how long, whose and what it counted", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
 
     await user.click(option(/^Friday/));
@@ -140,7 +172,7 @@ describe("Lives", () => {
   });
 
   it("leaves out the @username a LIVE doesn't have", async () => {
-    renderWithProviders(<Lives />);
+    renderWithProviders(<CoinStats />);
     await lives([liveSummary(SATURDAY, { username: "" })]);
 
     expect(heading()).toHaveTextContent("Saturday, October 31, 2026");
@@ -152,7 +184,7 @@ describe("Lives", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 31, 23));
     const since = new Date(2026, 9, 30, 23).getTime();
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
 
     await dates(user, "Last 24 hours");
@@ -192,7 +224,7 @@ describe("Lives", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 31, 21));
     const since = new Date(2026, 9, 30, 21).getTime();
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
 
     await dates(user, "Last 24 hours");
@@ -223,7 +255,7 @@ describe("Lives", () => {
   it("says when no LIVE or gift matches the dates", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 11, 31));
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
 
     await dates(user, "Last 7 days");
@@ -241,7 +273,7 @@ describe("Lives", () => {
     // Today, for the calendars, is October 31
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 31, 21));
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
     await dates(user, "Custom dates");
     expect(
@@ -282,7 +314,7 @@ describe("Lives", () => {
   });
 
   it("goes back to All time from a preset", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
 
     await dates(user, "Last 12 months");
@@ -295,11 +327,12 @@ describe("Lives", () => {
   });
 
   it("moves the selection with the arrow keys, Home and End", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
 
-    // After the delete button, the gifter search and the date filter, one
-    // tab stop: the selected LIVE
+    // After the back button, the delete button, the gifter search and the
+    // date filter, one tab stop: the selected LIVE
+    await user.tab();
     await user.tab();
     await user.tab();
     expect(screen.getByRole("button", { name: "Search" })).toHaveFocus();
@@ -331,7 +364,7 @@ describe("Lives", () => {
   });
 
   it("lists the LIVE's gifters, and ignores a late reply for another LIVE", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
     await user.click(option(/^Friday/));
 
@@ -348,7 +381,7 @@ describe("Lives", () => {
   });
 
   it("says when a LIVE's gifters couldn't load", async () => {
-    renderWithProviders(<Lives />);
+    renderWithProviders(<CoinStats />);
     await lives([saturday]);
 
     await send(APP_EVENTS_RESPONSE.LIVE, {
@@ -363,7 +396,7 @@ describe("Lives", () => {
   });
 
   it("searches every gifter, keeping their places", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday], [gifter("Ana", 5200), gifter("Kai", 10)]);
     await user.click(option(/^All time/));
 
@@ -404,7 +437,7 @@ describe("Lives", () => {
   });
 
   it("searches all of the selected LIVE's gifters", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
     await user.click(option(/^Friday/));
 
@@ -419,7 +452,7 @@ describe("Lives", () => {
   });
 
   it("sums every LIVE in All time, with the top gifters", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday], [gifter("Ana", 5200, 52)]);
 
     await user.click(option(/^All time/));
@@ -435,7 +468,7 @@ describe("Lives", () => {
   });
 
   it("deletes a LIVE through its modal, then selects the next one", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
 
     await user.click(screen.getByRole("button", { name: "Delete LIVE" }));
@@ -451,7 +484,7 @@ describe("Lives", () => {
   });
 
   it("clears the history through its modal", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday], [gifter("Ana", 600)]);
     await user.click(option(/^All time/));
 
@@ -471,7 +504,7 @@ describe("Lives", () => {
   });
 
   it("says what fills an empty history", async () => {
-    renderWithProviders(<Lives />);
+    renderWithProviders(<CoinStats />);
 
     await lives([]);
 
@@ -490,7 +523,7 @@ describe("Lives", () => {
   });
 
   it("says when a LIVE had no gifts", async () => {
-    renderWithProviders(<Lives />);
+    renderWithProviders(<CoinStats />);
     await lives([saturday]);
 
     await record(saturday, []);
@@ -499,7 +532,7 @@ describe("Lives", () => {
   });
 
   it("asks again after a profile switch, and opens on its newest LIVE", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([saturday, friday]);
     await user.click(option(/^All time/));
 
@@ -511,7 +544,7 @@ describe("Lives", () => {
   });
 
   it("keeps the selection when a LIVE that ended joins the list", async () => {
-    const { user } = renderWithProviders(<Lives />);
+    const { user } = renderWithProviders(<CoinStats />);
     await lives([friday]);
     await user.click(option(/^All time/));
 

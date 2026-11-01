@@ -642,8 +642,23 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   });
   await crop("games-test", follow, { pad: 12 });
 
+  // A tool, opened from its row on Tools. Its heading's name starts with
+  // the back button's title, so its sections are found without `exact`.
+  const tool = async (name) => {
+    await open(tr("Tools"), tr("Tools"));
+    await page
+      .getByRole("main")
+      .getByRole("link", { name, exact: true })
+      .click();
+    await page.getByRole("heading", { name }).waitFor();
+  };
+  const toolSection = (name) =>
+    page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name }) });
+
   // Countdown timer
-  await open(tr("Tools"), tr("Countdown timer"));
+  await tool(tr("Countdown timer"));
   await page
     .getByRole("group", {
       name: `${tr("Title", "tools.look.titleField")} ${tr("(optional)")}`,
@@ -651,7 +666,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     .getByRole("textbox")
     .fill("Subathon");
   await page
-    .getByRole("heading", { name: tr("Countdown timer"), exact: true })
+    .getByRole("heading", { name: tr("Countdown timer") })
     .scrollIntoViewIfNeeded();
   await page
     .getByRole("button", {
@@ -664,7 +679,9 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await shoot("countdown-timer");
   await crop("timer-preview", page.getByRole("timer").locator(".."));
   // The controls, under the preview timer-preview shows
-  const timer = body(tr("Countdown timer"));
+  const timer = toolSection(tr("Countdown timer")).locator(
+    '[class*="section_body"]',
+  );
   await crop(
     "timer-controls",
     [
@@ -680,9 +697,12 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     }),
   );
   await crop("timer-look", body(tr("Timer look")));
+
+  // Test overlays
+  await tool(tr("Test overlays"));
   await page.getByPlaceholder(tr("Overlay name")).fill(say("My overlay"));
   await page.getByTitle(tr("Create ID")).click();
-  await crop("tools-test-overlays", section(tr("Test overlays")));
+  await crop("tools-test-overlays", toolSection(tr("Test overlays")));
 
   // Settings, with a made-up network address
   await open(tr("Settings"), tr("Live profiles"));

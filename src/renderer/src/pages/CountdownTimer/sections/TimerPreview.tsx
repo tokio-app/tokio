@@ -3,8 +3,8 @@ import { formatAdded, timerTriggers } from "@/common/util";
 import { fontFamily, formatDuration } from "@/helper";
 import { useLanguage } from "@/ui/i18n";
 import { useEffect, useState } from "react";
-import { TimerPush } from "../helper";
-import styles from "../tools.module.css";
+import styles from "../countdowntimer.module.css";
+import { timeLeft, TimerPush } from "../helper";
 
 // How long added time shows under the clock, as the overlay's animation
 const SLOT_MS = 1500;
@@ -63,12 +63,7 @@ export function TimerPreview({ timer, settings }: Props) {
   const trigger = triggers[index];
 
   // Idle follows the starting time being typed, before main's echo
-  const remaining =
-    state.status === "idle"
-      ? settings.start * 60_000
-      : running
-        ? Math.max(0, state.remaining - Math.max(0, now - timer.at))
-        : state.remaining;
+  const remaining = timeLeft(timer, settings.start, now);
   const warning =
     running && look.warn_at > 0 && remaining <= look.warn_at * 60_000;
   const title = look.title.trim();

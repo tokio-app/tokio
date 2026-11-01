@@ -100,6 +100,7 @@ export enum APP_EVENTS {
   SET_TIMER_SETTINGS = "app:tools:timer:set",
   TIMER_CONTROL = "app:tools:timer:control",
   ADJUST_TIMER = "app:tools:timer:adjust",
+  GET_FANS = "app:tools:fans:get",
 
   // ALERTS
   UPDATE_ALERTS_SETTINGS = "app:alerts:update:settings",
@@ -314,6 +315,7 @@ export interface AppEventsMap {
   [APP_EVENTS.TIMER_CONTROL]: { action: TimerAction };
   // Adds the seconds to the clock, or removes them when negative
   [APP_EVENTS.ADJUST_TIMER]: { seconds: number };
+  [APP_EVENTS.GET_FANS]: void;
 
   // ALERTS
   [APP_EVENTS.UPDATE_ALERTS_SETTINGS]: {

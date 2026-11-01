@@ -122,6 +122,15 @@ describe("FansService", () => {
     expect(ids).not.toContain("1");
   });
 
+  it("lists them all for the Fans page, in the same order", async () => {
+    const fans = await loaded();
+    for (let i = 1; i <= SENT_FANS + 1; i++) fans.record(viewer(String(i), i));
+
+    const ids = fans.list(MAX_FANS).map((f) => f.userId);
+    expect(ids).toHaveLength(SENT_FANS + 1);
+    expect(ids.slice(0, 2)).toEqual([String(SENT_FANS + 1), String(SENT_FANS)]);
+  });
+
   it(`keeps ${MAX_FANS}, dropping the one not seen for the longest`, async () => {
     const fans = await loaded();
     for (let i = 0; i < MAX_FANS; i++) fans.record(viewer(String(i)));
