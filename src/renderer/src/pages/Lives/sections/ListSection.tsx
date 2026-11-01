@@ -1,19 +1,70 @@
 import { LiveSummary } from "@/common/types";
-import { EmptyState } from "@/components";
+import { EmptyState, Input, Select } from "@/components";
 import { cx, formatDate, formatDuration, formatStat } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
-import { useLanguage, useT } from "@/ui/i18n";
+import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { KeyboardEvent } from "react";
 import styles from "../lives.module.css";
+import { DATE_OPERATORS, DateFilter } from "../helper";
 
 interface Props {
-  // Newest first
+  // The ones the filter keeps, newest first
   lives: LiveSummary[];
-  // All time's
+  // The first row's: All time, or the days the filter keeps
+  title: string;
   coins: number;
-  // A LIVE's startedAt, or null for All time
+  filter: DateFilter;
+  // The filter keeps only some of the LIVEs
+  filtered: boolean;
+  // A LIVE's startedAt, or null for the first row
   selected: number | null;
   onSelect: (selected: number | null) => void;
+  onFilter: (filter: DateFilter) => void;
+}
+
+type FilterProps = {
+  filter: DateFilter;
+  onChange: (filter: DateFilter) => void;
+};
+
+// An operator and its day, or the two days of a range, like the gift picker's
+// coin filter
+function DateFilterBar({ filter, onChange }: FilterProps) {
+  const t = useT();
+  const operators = useOptions(DATE_OPERATORS);
+  const { operator } = filter;
+
+  return (
+    <div className={styles.filters}>
+      <Select
+        aria-label={t("lives.filter.label")}
+        options={operators}
+        value={operator}
+        onChange={(value) => onChange({ ...filter, operator: value })}
+      />
+      {operator !== "any" && (
+        <Input
+          type="date"
+          className={styles.day}
+          aria-label={t("lives.filter.date")}
+          value={filter.date}
+          onChange={(e) => onChange({ ...filter, date: e.target.value })}
+        />
+      )}
+      {operator === "between" && (
+        <>
+          <span className={styles.and}>{t("lives.filter.and")}</span>
+          <Input
+            type="date"
+            className={styles.day}
+            aria-label={t("lives.filter.toDate")}
+            value={filter.to}
+            onChange={(e) => onChange({ ...filter, to: e.target.value })}
+          />
+        </>
+      )}
+    </div>
+  );
 }
 
 // One tab stop for the whole list, however many LIVEs it has
@@ -24,7 +75,16 @@ const MOVES: Record<string, (index: number, last: number) => number> = {
   End: (_, last) => last,
 };
 
-export function ListSection({ lives, coins, selected, onSelect }: Props) {
+export function ListSection({
+  lives,
+  title,
+  coins,
+  filter,
+  filtered,
+  selected,
+  onSelect,
+  onFilter,
+}: Props) {
   const t = useT();
   const language = useLanguage();
   const options = [null, ...lives.map((live) => live.startedAt)];
@@ -53,6 +113,7 @@ export function ListSection({ lives, coins, selected, onSelect }: Props) {
   const total = formatStat(coins, language);
   return (
     <div className={styles.side}>
+      <DateFilterBar filter={filter} onChange={onFilter} />
       <ul
         className={styles.list}
         role="listbox"
@@ -62,11 +123,11 @@ export function ListSection({ lives, coins, selected, onSelect }: Props) {
         <li
           {...option(null)}
           aria-label={t("lives.list.option", {
-            date: t("lives.allTime.title"),
+            date: title,
             coins: coinsLabel(coins, language),
           })}
         >
-          <span className={styles.all_time}>{t("lives.allTime.title")}</span>
+          <span className={styles.all_time}>{title}</span>
           <span className={styles.coins} title={total.full}>
             {total.short}
           </span>
@@ -102,7 +163,11 @@ export function ListSection({ lives, coins, selected, onSelect }: Props) {
           );
         })}
       </ul>
-      {lives.length === 0 && <EmptyState>{t("lives.list.empty")}</EmptyState>}
+      {lives.length === 0 && (
+        <EmptyState>
+          {t(filtered ? "lives.filter.empty" : "lives.list.empty")}
+        </EmptyState>
+      )}
     </div>
   );
 }

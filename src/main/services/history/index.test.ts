@@ -413,6 +413,40 @@ describe("HistoryService", () => {
     expect((await loaded()).getHistory()).toEqual(history.getHistory());
   });
 
+  it("adds up the gifters of the LIVEs that started in a range", async () => {
+    const history = await loaded();
+    history.start("kai", 1000);
+    gifts(
+      history,
+      [1100, gift(viewer("a"), 100)],
+      [1200, gift(viewer("b"), 20)],
+    );
+    history.end(2000);
+    history.start("kai", 3000);
+    gifts(history, [3100, gift(viewer("a", "a_new"), 50)]);
+    history.end(4000);
+    await history.save();
+
+    expect(await history.getGifters({})).toEqual([
+      expect.objectContaining({ userId: "a", handle: "a_new", coins: 150 }),
+      expect.objectContaining({ userId: "b", coins: 20 }),
+    ]);
+    // From included, to left out
+    expect(await history.getGifters({ from: 3000 })).toEqual([
+      expect.objectContaining({ userId: "a", coins: 50, gifts: 1 }),
+    ]);
+    expect(await history.getGifters({ to: 3000 })).toEqual([
+      expect.objectContaining({ userId: "a", handle: "fana", coins: 100 }),
+      expect.objectContaining({ userId: "b", coins: 20 }),
+    ]);
+    expect(await history.getGifters({ from: 5000 })).toEqual([]);
+
+    await writeFile(join(dir, "a", "1000.json"), "{ broken");
+    expect(await history.getGifters({})).toEqual([
+      expect.objectContaining({ userId: "a", coins: 50 }),
+    ]);
+  });
+
   describe("deleting a LIVE", () => {
     const twoLives = async () => {
       const history = await loaded();

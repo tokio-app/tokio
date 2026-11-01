@@ -18,25 +18,44 @@ import { useLanguage, useT } from "@/ui/i18n";
 import { useEffect, useRef, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import styles from "./lives.module.css";
-import { allTime, capitalize, keepSelection } from "./helper";
+import {
+  allTime,
+  capitalize,
+  DateFilter,
+  dateRange,
+  inRange,
+  keepSelection,
+  NO_FILTER,
+  periodText,
+} from "./helper";
 import { GiftersSection } from "./sections/GiftersSection";
 import { ListSection } from "./sections/ListSection";
 import { SummarySection } from "./sections/SummarySection";
 
 type LiveReply = AppEventsResponseMap[APP_EVENTS_RESPONSE.LIVE];
+type GiftersReply = AppEventsResponseMap[APP_EVENTS_RESPONSE.GIFTERS];
 
 export function Lives() {
   const t = useT();
   const language = useLanguage();
   const [history, setHistory] = useState<LiveHistory>();
-  // A LIVE's startedAt or null for All time, undefined until LIVES comes
+  // A LIVE's startedAt or null for the totals, undefined until LIVES comes
   const [selected, setSelected] = useState<number | null>();
   // The selected LIVE's gifters come with it
   const [reply, setReply] = useState<LiveReply>();
+  const [filter, setFilter] = useState<DateFilter>(NO_FILTER);
+  // The filtered dates' gifters, which main adds up from their LIVEs
+  const [datesReply, setDatesReply] = useState<GiftersReply>();
   const [deleting, setDeleting] = useState<LiveSummary>();
   const [clearing, setClearing] = useState(false);
   // The next LIVES is another profile's, which starts from its newest LIVE
   const switched = useRef(false);
+
+  const range = dateRange(filter);
+  const visible = (lives: LiveSummary[]) =>
+    range ? lives.filter((live) => inRange(live, range)) : lives;
+  const isDates = (res?: GiftersReply) =>
+    !!range && res?.from === range.from && res?.to === range.to;
 
   useIpcRequest(APP_EVENTS.GET_LIVES);
 
@@ -48,11 +67,24 @@ export function Lives() {
     setSelected(
       keepSelection(
         fresh ? undefined : selected,
-        fresh ? [] : (history?.lives ?? []),
-        res.data.lives,
+        fresh ? [] : visible(history?.lives ?? []),
+        visible(res.data.lives),
       ),
     );
     setHistory(res.data);
+  });
+
+  // Asked again when the dates or the LIVEs change
+  const from = range?.from;
+  const to = range?.to;
+  const filtering = range !== null;
+  useEffect(() => {
+    if (filtering) window.api.emit(APP_EVENTS.GET_GIFTERS, { from, to });
+  }, [filtering, from, to, history]);
+
+  // A late reply for other dates is dropped
+  useIpcListener(APP_EVENTS_RESPONSE.GIFTERS, (res) => {
+    if (isDates(res)) setDatesReply(res);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
@@ -82,8 +114,9 @@ export function Lives() {
     );
   }
 
-  const live = history.lives.find((l) => l.startedAt === selected);
-  const total = allTime(history.lives);
+  const shown = visible(history.lives);
+  const live = shown.find((l) => l.startedAt === selected);
+  const total = allTime(shown);
 
   return (
     <>
@@ -133,47 +166,75 @@ export function Lives() {
                       ? reply.data?.gifters
                       : undefined
                   }
-                  failed={reply?.startedAt === live.startedAt && !reply.success}
+                  failed={
+                    reply?.startedAt === live.startedAt && !reply.success
+                      ? "lives.gifters.failed"
+                      : undefined
+                  }
                 />
               </>
             ) : (
               <>
                 <SummarySection
-                  title={t("lives.allTime.title")}
+                  title={periodText(filter, language)}
                   lines={[
-                    t("lives.allTime.count", { count: history.lives.length }),
+                    t("lives.allTime.count", { count: shown.length }),
                     t("lives.allTime.length", {
                       length: formatDuration(total.length),
                     }),
                   ]}
+                  // Clearing takes every LIVE, so only All time offers it
                   action={
-                    <Btn
-                      variant="icon"
-                      title={t("lives.allTime.clear")}
-                      disabled={
-                        history.lives.length === 0 &&
-                        history.gifters.length === 0
-                      }
-                      onClick={() => setClearing(true)}
-                    >
-                      <FiTrash2 size={18} />
-                    </Btn>
+                    !range && (
+                      <Btn
+                        variant="icon"
+                        title={t("lives.allTime.clear")}
+                        disabled={
+                          history.lives.length === 0 &&
+                          history.gifters.length === 0
+                        }
+                        onClick={() => setClearing(true)}
+                      >
+                        <FiTrash2 size={18} />
+                      </Btn>
+                    )
                   }
                   totals={total}
                 />
-                <GiftersSection
-                  title={t("lives.gifters.top")}
-                  gifters={history.gifters}
-                />
+                {range ? (
+                  <GiftersSection
+                    title={t("lives.gifters.top")}
+                    gifters={isDates(datesReply) ? datesReply?.data : undefined}
+                    empty="lives.gifters.emptyDates"
+                    failed={
+                      isDates(datesReply) && !datesReply?.success
+                        ? "lives.gifters.failedDates"
+                        : undefined
+                    }
+                  />
+                ) : (
+                  <GiftersSection
+                    title={t("lives.gifters.top")}
+                    gifters={history.gifters}
+                  />
+                )}
               </>
             )}
           </div>
 
           <ListSection
-            lives={history.lives}
+            lives={shown}
+            title={periodText(filter, language)}
             coins={total.coins}
+            filter={filter}
+            filtered={!!range}
             selected={live ? live.startedAt : null}
             onSelect={setSelected}
+            onFilter={(next) => {
+              setFilter(next);
+              // New dates open on their totals
+              setSelected(null);
+            }}
           />
         </div>
       </Page>

@@ -8,13 +8,16 @@ import {
 import { gifter, liveSummary, profileReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Lives } from ".";
 
 // Local times, so the dates read the same in any time zone
 const FRIDAY = new Date(2026, 9, 30, 20, 14).getTime();
 const SATURDAY = new Date(2026, 9, 31, 19, 0).getTime();
+const OCT_30 = new Date(2026, 9, 30).getTime();
+const OCT_31 = new Date(2026, 9, 31).getTime();
+const NOV_1 = new Date(2026, 10, 1).getTime();
 
 const friday = liveSummary(FRIDAY, {
   username: "kai_live",
@@ -66,6 +69,16 @@ const gifterRows = (name: string) =>
   within(screen.getByRole("list", { name }))
     .getAllByRole("listitem")
     .map((row) => row.textContent);
+// Picks a date filter, and its days
+const dates = async (
+  user: ReturnType<typeof renderWithProviders>["user"],
+  operator: string,
+) => {
+  await user.click(screen.getByRole("combobox", { name: "Dates" }));
+  await user.click(screen.getByRole("option", { name: operator }));
+};
+const pick = (field: string, day: string) =>
+  fireEvent.change(screen.getByLabelText(field), { target: { value: day } });
 
 describe("Lives", () => {
   it("asks main for the LIVEs", () => {
@@ -149,12 +162,93 @@ describe("Lives", () => {
     expect(screen.queryByText("@")).not.toBeInTheDocument();
   });
 
+  it("filters the LIVEs by date, with their totals and top gifters", async () => {
+    const { user } = renderWithProviders(<Lives />);
+    await lives([saturday, friday]);
+
+    await dates(user, "On");
+    pick("Date", "2026-10-30");
+
+    expect(options()).toEqual([
+      expect.stringMatching(/^On Oct 30, 2026, 12,400 coins$/),
+      expect.stringMatching(/^Friday/),
+    ]);
+    expect(selected()).toMatch(/^On Oct 30, 2026/);
+    expect(heading()).toHaveTextContent("On Oct 30, 2026");
+    expect(stat("Coins")).toHaveTextContent("12.4K");
+    // Clearing takes every LIVE, so only All time offers it
+    expect(
+      screen.queryByRole("button", { name: "Clear history" }),
+    ).not.toBeInTheDocument();
+    expect(sent(APP_EVENTS.GET_GIFTERS)).toEqual([
+      { from: OCT_30, to: OCT_31 },
+    ]);
+
+    // A late reply for other dates is dropped
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      to: OCT_30,
+      data: [gifter("Old", 1)],
+    });
+    expect(
+      screen.queryByRole("list", { name: "Top gifters" }),
+    ).not.toBeInTheDocument();
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      from: OCT_30,
+      to: OCT_31,
+      data: [gifter("Ana", 5200, 53)],
+    });
+    expect(gifterRows("Top gifters")).toEqual([expect.stringContaining("Ana")]);
+  });
+
+  it("says when no LIVE or gift matches the dates", async () => {
+    const { user } = renderWithProviders(<Lives />);
+    await lives([saturday, friday]);
+
+    // The day itself is left out
+    await dates(user, "After");
+    pick("Date", "2026-10-31");
+
+    expect(screen.getByText("No LIVEs on these dates.")).toBeInTheDocument();
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      from: NOV_1,
+      data: [],
+    });
+    expect(screen.getByText("No gifts on these dates.")).toBeInTheDocument();
+  });
+
+  it("takes a range in either order, and goes back to All time", async () => {
+    const { user } = renderWithProviders(<Lives />);
+    await lives([saturday, friday]);
+
+    await dates(user, "Between");
+    pick("Date", "2026-10-31");
+    // Not a range until both days are picked
+    expect(heading()).toHaveTextContent("All time");
+    pick("End date", "2026-10-30");
+
+    expect(heading()).toHaveTextContent("Oct 30, 2026 to Oct 31, 2026");
+    expect(options()).toHaveLength(3);
+    expect(sent(APP_EVENTS.GET_GIFTERS)).toEqual([{ from: OCT_30, to: NOV_1 }]);
+
+    await dates(user, "Any date");
+    expect(heading()).toHaveTextContent("All time");
+    expect(
+      screen.getByRole("button", { name: "Clear history" }),
+    ).toBeInTheDocument();
+  });
+
   it("moves the selection with the arrow keys, Home and End", async () => {
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday]);
 
-    // After the delete button, one tab stop: the selected LIVE
+    // After the delete button and the date filter, one tab stop: the
+    // selected LIVE
     await user.tab();
+    await user.tab();
+    expect(screen.getByRole("combobox", { name: "Dates" })).toHaveFocus();
     await user.tab();
     expect(option(/^Saturday/)).toHaveFocus();
     await user.tab();

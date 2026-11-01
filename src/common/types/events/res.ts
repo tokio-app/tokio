@@ -15,7 +15,7 @@ import {
 } from "../../schemas";
 import { AppNotification, Reply } from "../feedback";
 import { CommandResult, GamesData } from "../games";
-import { LiveHistory, LiveRecord, LiveSession } from "../live";
+import { Gifter, LiveHistory, LiveRecord, LiveSession } from "../live";
 import { OverlayApp } from "../server";
 import { VoiceData, VoiceEngine } from "../store";
 import { TimerData } from "../timer";
@@ -79,6 +79,7 @@ export enum APP_EVENTS_RESPONSE {
   // LIVES
   LIVES = "app:lives:res:get",
   LIVE = "app:lives:res:live",
+  GIFTERS = "app:lives:res:gifters",
 
   // OVERLAYS
   GET_OVERLAYS = "app:overlays:res:get",
@@ -259,6 +260,12 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.LIVE]: Reply<{
     startedAt: number;
     data?: LiveRecord;
+  }>;
+  // The range it was asked for, failures included
+  [APP_EVENTS_RESPONSE.GIFTERS]: Reply<{
+    from?: number;
+    to?: number;
+    data?: Gifter[];
   }>;
 
   // OVERLAYS

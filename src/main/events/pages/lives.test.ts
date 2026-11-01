@@ -112,6 +112,49 @@ describe("lives events", () => {
     });
   });
 
+  describe("GET_GIFTERS", () => {
+    it("replies the range's gifters with the range", async () => {
+      const getGifters = vi.fn(
+        async (_range: { from?: number; to?: number }) => [gifter],
+      );
+      const h = createHandler({ historyService: { getGifters } });
+
+      await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 1000 });
+
+      expect(getGifters).toHaveBeenCalledExactlyOnceWith({ from: 1000 });
+      expect(h.sent()).toEqual([
+        [
+          APP_EVENTS_RESPONSE.GIFTERS,
+          { success: true, from: 1000, to: undefined, data: [gifter] },
+        ],
+      ]);
+    });
+
+    it("keeps the range when reading throws", async () => {
+      const h = createHandler({
+        historyService: {
+          getGifters: async () => {
+            throw new Error("EBUSY");
+          },
+        },
+      });
+
+      await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 1000, to: 2000 });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GIFTERS)).toEqual([
+        {
+          success: false,
+          from: 1000,
+          to: 2000,
+          error: {
+            code: FEEDBACK_CODES.LIVE_LOAD_FAILED,
+            message: "Unable to load the gifters for those dates.",
+          },
+        },
+      ]);
+    });
+  });
+
   describe("DELETE_LIVE", () => {
     it("deletes the LIVE, replies the history and notifies", async () => {
       const deleteLive = vi.fn(async (_startedAt: number) => true);

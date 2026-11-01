@@ -1,3 +1,4 @@
+import { MessageKey } from "@/common/i18n";
 import { Gifter } from "@/common/types";
 import { Avatar, EmptyState, Section, Spinner } from "@/components";
 import { coinsLabel, giftsLabel } from "@/helper/gifts";
@@ -8,17 +9,24 @@ interface Props {
   title: string;
   // The most coins first, undefined until main sends them
   gifters?: Gifter[];
-  // Main couldn't read them, and sent the notice
-  failed?: boolean;
+  // What to say when there are none
+  empty?: MessageKey;
+  // What to say when main couldn't read them, after its notice
+  failed?: MessageKey;
 }
 
-export function GiftersSection({ title, gifters, failed }: Props) {
+export function GiftersSection({
+  title,
+  gifters,
+  empty = "lives.gifters.empty",
+  failed,
+}: Props) {
   const t = useT();
   const language = useLanguage();
 
   let content;
   if (failed) {
-    content = <EmptyState>{t("lives.gifters.failed")}</EmptyState>;
+    content = <EmptyState>{t(failed)}</EmptyState>;
   } else if (!gifters) {
     content = (
       <div className={styles.loading}>
@@ -26,7 +34,7 @@ export function GiftersSection({ title, gifters, failed }: Props) {
       </div>
     );
   } else if (gifters.length === 0) {
-    content = <EmptyState>{t("lives.gifters.empty")}</EmptyState>;
+    content = <EmptyState>{t(empty)}</EmptyState>;
   } else {
     content = (
       <ol className={styles.gifters} aria-label={title}>

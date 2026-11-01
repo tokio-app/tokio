@@ -75,6 +75,7 @@ export enum APP_EVENTS {
   // LIVES
   GET_LIVES = "app:lives:get",
   GET_LIVE = "app:lives:get:live",
+  GET_GIFTERS = "app:lives:get:gifters",
   DELETE_LIVE = "app:lives:delete",
   CLEAR_LIVES = "app:lives:clear",
 
@@ -272,6 +273,9 @@ export interface AppEventsMap {
   [APP_EVENTS.GET_LIVES]: void;
   // A finished LIVE, by when it started
   [APP_EVENTS.GET_LIVE]: { startedAt: number };
+  // The top gifters of the finished LIVEs that started from `from` (included)
+  // to `to` (left out), in ms; either end can be left out
+  [APP_EVENTS.GET_GIFTERS]: { from?: number; to?: number };
   // Both are answered with LIVES: what main holds after them
   [APP_EVENTS.DELETE_LIVE]: { startedAt: number };
   [APP_EVENTS.CLEAR_LIVES]: void;

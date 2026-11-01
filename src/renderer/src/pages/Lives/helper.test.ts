@@ -1,6 +1,92 @@
 import { liveSummary } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
-import { allTime, capitalize, keepSelection } from "./helper";
+import {
+  allTime,
+  capitalize,
+  DateFilter,
+  dateRange,
+  inRange,
+  keepSelection,
+  periodText,
+} from "./helper";
+
+// Local midnights, so the days read the same in any time zone
+const day = (date: number) => new Date(2026, 9, date).getTime();
+
+describe("dateRange", () => {
+  const filter = (patch: Partial<DateFilter>): DateFilter => ({
+    operator: "any",
+    date: "",
+    to: "",
+    ...patch,
+  });
+
+  it("keeps the LIVEs that started on, after or before a day", () => {
+    expect(dateRange(filter({ operator: "on", date: "2026-10-30" }))).toEqual({
+      from: day(30),
+      to: day(31),
+    });
+    // The day itself is left out
+    expect(
+      dateRange(filter({ operator: "after", date: "2026-10-30" })),
+    ).toEqual({ from: day(31) });
+    expect(
+      dateRange(filter({ operator: "before", date: "2026-10-30" })),
+    ).toEqual({ to: day(30) });
+  });
+
+  it("takes both days of a range, in either order", () => {
+    const range = { from: day(10), to: day(21) };
+    expect(
+      dateRange(
+        filter({ operator: "between", date: "2026-10-10", to: "2026-10-20" }),
+      ),
+    ).toEqual(range);
+    expect(
+      dateRange(
+        filter({ operator: "between", date: "2026-10-20", to: "2026-10-10" }),
+      ),
+    ).toEqual(range);
+  });
+
+  it("keeps everything until the days are picked", () => {
+    expect(dateRange(filter({}))).toBeNull();
+    expect(dateRange(filter({ operator: "on" }))).toBeNull();
+    expect(
+      dateRange(filter({ operator: "between", date: "2026-10-10" })),
+    ).toBeNull();
+  });
+
+  it("checks a LIVE by when it started", () => {
+    const evening = liveSummary(day(30) + 20 * 3_600_000);
+    expect(inRange(evening, { from: day(30), to: day(31) })).toBe(true);
+    expect(inRange(evening, { to: day(30) })).toBe(false);
+    expect(inRange(evening, {})).toBe(true);
+  });
+});
+
+describe("periodText", () => {
+  it("names the days the filter keeps, or All time", () => {
+    expect(periodText({ operator: "any", date: "", to: "" }, "en")).toBe(
+      "All time",
+    );
+    expect(periodText({ operator: "after", date: "", to: "" }, "en")).toBe(
+      "All time",
+    );
+    expect(
+      periodText({ operator: "on", date: "2026-10-30", to: "" }, "en"),
+    ).toBe("On Oct 30, 2026");
+    expect(
+      periodText(
+        { operator: "between", date: "2026-10-20", to: "2026-10-01" },
+        "en",
+      ),
+    ).toBe("Oct 1, 2026 to Oct 20, 2026");
+    expect(
+      periodText({ operator: "before", date: "2026-10-30", to: "" }, "es-419"),
+    ).toBe("Antes del 30 oct 2026");
+  });
+});
 
 describe("allTime", () => {
   it("adds up every LIVE, with the best peak and the total length", () => {

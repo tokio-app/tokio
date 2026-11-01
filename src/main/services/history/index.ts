@@ -301,6 +301,41 @@ export class HistoryService extends Service {
   }
 
   /**
+   * The top SHOWN_GIFTERS of the finished LIVEs that started from `from`
+   * (included) to `to` (left out), added up from their files. A file that
+   * doesn't load is left out.
+   */
+  public async getGifters({
+    from = -Infinity,
+    to = Infinity,
+  }: {
+    from?: number;
+    to?: number;
+  }): Promise<Gifter[]> {
+    const dir = this._dir;
+    if (dir === null) return [];
+    const lives = this._lives.filter(
+      ({ startedAt }) => startedAt >= from && startedAt < to,
+    );
+    const records = await Promise.all(
+      lives.map(({ startedAt }) => this._readLive(dir, startedAt)),
+    );
+    if (this._dir !== dir) return [];
+    const gifters = new Map<string, Gifter>();
+    // Oldest first, so the name, handle and picture end up the latest ones
+    for (const gifter of records.flatMap((record) => record?.gifters ?? [])) {
+      const past = gifters.get(gifter.userId);
+      gifters.set(gifter.userId, {
+        ...gifter,
+        picture: gifter.picture || (past?.picture ?? ""),
+        coins: (past?.coins ?? 0) + gifter.coins,
+        gifts: (past?.gifts ?? 0) + gifter.gifts,
+      });
+    }
+    return [...gifters.values()].sort(byCoins).slice(0, SHOWN_GIFTERS);
+  }
+
+  /**
    * False when the index couldn't be saved: the LIVE is gone from memory, and
    * the next save tries again.
    */
