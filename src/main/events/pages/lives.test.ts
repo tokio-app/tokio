@@ -113,19 +113,26 @@ describe("lives events", () => {
   });
 
   describe("GET_GIFTERS", () => {
-    it("replies the range's gifters with the range", async () => {
+    it("replies the range's gifters with the range and the search", async () => {
+      const found = [{ ...gifter, rank: 3 }];
       const getGifters = vi.fn(
-        async (_range: { from?: number; to?: number }) => [gifter],
+        async (_args: { from?: number; to?: number; query?: string }) => found,
       );
       const h = createHandler({ historyService: { getGifters } });
 
-      await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 1000 });
+      await h.invoke(lives, APP_EVENTS.GET_GIFTERS, {
+        from: 1000,
+        query: "ana",
+      });
 
-      expect(getGifters).toHaveBeenCalledExactlyOnceWith({ from: 1000 });
+      expect(getGifters).toHaveBeenCalledExactlyOnceWith({
+        from: 1000,
+        query: "ana",
+      });
       expect(h.sent()).toEqual([
         [
           APP_EVENTS_RESPONSE.GIFTERS,
-          { success: true, from: 1000, to: undefined, data: [gifter] },
+          { success: true, from: 1000, query: "ana", data: found },
         ],
       ]);
     });
@@ -148,7 +155,7 @@ describe("lives events", () => {
           to: 2000,
           error: {
             code: FEEDBACK_CODES.LIVE_LOAD_FAILED,
-            message: "Unable to load the gifters for those dates.",
+            message: "Unable to load the gifters.",
           },
         },
       ]);

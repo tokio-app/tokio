@@ -8,7 +8,7 @@ import {
 import { gifter, liveSummary, profileReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Lives } from ".";
 
@@ -188,7 +188,7 @@ describe("Lives", () => {
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       to: OCT_30,
-      data: [gifter("Old", 1)],
+      data: [{ ...gifter("Old", 1), rank: 1 }],
     });
     expect(
       screen.queryByRole("list", { name: "Top gifters" }),
@@ -197,7 +197,7 @@ describe("Lives", () => {
       success: true,
       from: OCT_30,
       to: OCT_31,
-      data: [gifter("Ana", 5200, 53)],
+      data: [{ ...gifter("Ana", 5200, 53), rank: 1 }],
     });
     expect(gifterRows("Top gifters")).toEqual([expect.stringContaining("Ana")]);
   });
@@ -244,9 +244,11 @@ describe("Lives", () => {
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday]);
 
-    // After the delete button and the date filter, one tab stop: the
-    // selected LIVE
+    // After the delete button, the gifter search and the date filter, one
+    // tab stop: the selected LIVE
     await user.tab();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Search" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("combobox", { name: "Dates" })).toHaveFocus();
     await user.tab();
@@ -304,6 +306,62 @@ describe("Lives", () => {
     expect(
       screen.getByText("Couldn't load this LIVE's gifters."),
     ).toBeInTheDocument();
+  });
+
+  it("searches every gifter, keeping their places", async () => {
+    const { user } = renderWithProviders(<Lives />);
+    await lives([saturday], [gifter("Ana", 5200), gifter("Kai", 10)]);
+    await user.click(option(/^All time/));
+
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    await user.type(screen.getByPlaceholderText("Name or @handle"), "ka");
+
+    // Once typing pauses, so only the last query goes
+    await waitFor(() =>
+      expect(sent(APP_EVENTS.GET_GIFTERS)).toEqual([{ query: "ka" }]),
+    );
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
+    // A late reply for an earlier search is dropped
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      query: "k",
+      data: [],
+    });
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      query: "ka",
+      data: [{ ...gifter("Kai", 10), rank: 2 }],
+    });
+    expect(gifterRows("Top gifters")).toEqual(["2KKai@kai10 coins1 gift"]);
+
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      query: "ka",
+      data: [],
+    });
+    expect(screen.getByText("No gifters match “ka”.")).toBeInTheDocument();
+
+    // Closing it clears the search
+    await user.click(screen.getByRole("button", { name: "Close search" }));
+    expect(gifterRows("Top gifters")).toEqual([
+      expect.stringMatching(/^1AAna/),
+      expect.stringMatching(/^2KKai/),
+    ]);
+  });
+
+  it("searches the selected LIVE's gifters", async () => {
+    const { user } = renderWithProviders(<Lives />);
+    await lives([saturday, friday]);
+    await user.click(option(/^Friday/));
+
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    await user.type(screen.getByPlaceholderText("Name or @handle"), "@ana");
+
+    await waitFor(() =>
+      expect(sent(APP_EVENTS.GET_GIFTERS)).toEqual([
+        { from: FRIDAY, to: FRIDAY + 1, query: "@ana" },
+      ]),
+    );
   });
 
   it("sums every LIVE in All time, with the best peak and the top gifters", async () => {

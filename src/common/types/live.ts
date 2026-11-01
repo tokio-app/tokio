@@ -78,6 +78,10 @@ export type LiveSummary = {
 // A LIVE with every viewer who sent gifts in it, the most coins first
 export type LiveRecord = LiveSummary & { gifters: Gifter[] };
 
+// A gifter found by a search, with their place among all of them (1, the
+// most coins)
+export type RankedGifter = Gifter & { rank: number };
+
 // For the LIVEs page: the finished LIVEs, newest first, and all time's top
 // gifters
 export type LiveHistory = { lives: LiveSummary[]; gifters: Gifter[] };

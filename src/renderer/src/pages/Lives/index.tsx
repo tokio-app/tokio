@@ -22,18 +22,23 @@ import {
   allTime,
   capitalize,
   DateFilter,
+  DateRange,
   dateRange,
   inRange,
   keepSelection,
   NO_FILTER,
   periodText,
 } from "./helper";
-import { GiftersSection } from "./sections/GiftersSection";
+import { GiftersList, GiftersSection } from "./sections/GiftersSection";
 import { ListSection } from "./sections/ListSection";
 import { SummarySection } from "./sections/SummarySection";
 
 type LiveReply = AppEventsResponseMap[APP_EVENTS_RESPONSE.LIVE];
 type GiftersReply = AppEventsResponseMap[APP_EVENTS_RESPONSE.GIFTERS];
+
+// A search goes this long after the last key, since a wide range of dates
+// reads many LIVEs' files
+const SEARCH_DELAY_MS = 250;
 
 export function Lives() {
   const t = useT();
@@ -46,6 +51,9 @@ export function Lives() {
   const [filter, setFilter] = useState<DateFilter>(NO_FILTER);
   // The filtered dates' gifters, which main adds up from their LIVEs
   const [datesReply, setDatesReply] = useState<GiftersReply>();
+  // The gifter search, kept while the selection and the dates change
+  const [search, setSearch] = useState("");
+  const [searchReply, setSearchReply] = useState<GiftersReply>();
   const [deleting, setDeleting] = useState<LiveSummary>();
   const [clearing, setClearing] = useState(false);
   // The next LIVES is another profile's, which starts from its newest LIVE
@@ -54,8 +62,21 @@ export function Lives() {
   const range = dateRange(filter);
   const visible = (lives: LiveSummary[]) =>
     range ? lives.filter((live) => inRange(live, range)) : lives;
+  const shown = visible(history?.lives ?? []);
+  const live = shown.find((l) => l.startedAt === selected);
+  // The LIVEs the gifters come from: the selected one, or the filter's
+  const scope: DateRange = live
+    ? { from: live.startedAt, to: live.startedAt + 1 }
+    : (range ?? {});
+  const searching = search.trim() !== "";
+  // Replies for other dates, another LIVE or another search are dropped
   const isDates = (res?: GiftersReply) =>
-    !!range && res?.from === range.from && res?.to === range.to;
+    !!range && !res?.query && res?.from === range.from && res?.to === range.to;
+  const isSearch = (res?: GiftersReply) =>
+    searching &&
+    res?.query === search &&
+    res?.from === scope.from &&
+    res?.to === scope.to;
 
   useIpcRequest(APP_EVENTS.GET_LIVES);
 
@@ -82,9 +103,25 @@ export function Lives() {
     if (filtering) window.api.emit(APP_EVENTS.GET_GIFTERS, { from, to });
   }, [filtering, from, to, history]);
 
-  // A late reply for other dates is dropped
+  // Main searches every gifter, not just the ones listed
+  const scopeFrom = scope.from;
+  const scopeTo = scope.to;
+  useEffect(() => {
+    const timer = searching
+      ? setTimeout(() => {
+          window.api.emit(APP_EVENTS.GET_GIFTERS, {
+            from: scopeFrom,
+            to: scopeTo,
+            query: search,
+          });
+        }, SEARCH_DELAY_MS)
+      : undefined;
+    return () => clearTimeout(timer);
+  }, [searching, scopeFrom, scopeTo, search, history]);
+
   useIpcListener(APP_EVENTS_RESPONSE.GIFTERS, (res) => {
-    if (isDates(res)) setDatesReply(res);
+    if (isSearch(res)) setSearchReply(res);
+    else if (isDates(res)) setDatesReply(res);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
@@ -114,9 +151,40 @@ export function Lives() {
     );
   }
 
-  const shown = visible(history.lives);
-  const live = shown.find((l) => l.startedAt === selected);
   const total = allTime(shown);
+
+  // The gifters panel: a search's matches, or the selection's gifters
+  const gifters = (): GiftersList => {
+    if (searching) {
+      const found = isSearch(searchReply) ? searchReply : undefined;
+      return {
+        gifters: found?.data,
+        empty: t("lives.gifters.noMatch", { query: search.trim() }),
+        failed:
+          found?.success === false
+            ? t("lives.gifters.failedSearch")
+            : undefined,
+      };
+    }
+    if (live) {
+      const got = reply?.startedAt === live.startedAt ? reply : undefined;
+      return {
+        gifters: got?.data?.gifters,
+        empty: t("lives.gifters.empty"),
+        failed: got?.success === false ? t("lives.gifters.failed") : undefined,
+      };
+    }
+    if (range) {
+      const got = isDates(datesReply) ? datesReply : undefined;
+      return {
+        gifters: got?.data,
+        empty: t("lives.gifters.emptyDates"),
+        failed:
+          got?.success === false ? t("lives.gifters.failedDates") : undefined,
+      };
+    }
+    return { gifters: history.gifters, empty: t("lives.gifters.empty") };
+  };
 
   return (
     <>
@@ -133,93 +201,66 @@ export function Lives() {
           {/* Swapped at once on a new selection, with no motion */}
           <div className={styles.column}>
             {live ? (
-              <>
-                <SummarySection
-                  title={capitalize(
-                    formatDate(live.startedAt, language, "long"),
-                    language,
-                  )}
-                  lines={[
-                    t("lives.live.times", {
-                      start: formatDate(live.startedAt, language, "time"),
-                      end: formatDate(live.endedAt, language, "time"),
-                    }),
-                    formatDuration(live.endedAt - live.startedAt),
-                    // Empty only for a LIVE no connect started
-                    ...(live.username ? [`@${live.username}`] : []),
-                  ]}
-                  action={
+              <SummarySection
+                title={capitalize(
+                  formatDate(live.startedAt, language, "long"),
+                  language,
+                )}
+                lines={[
+                  t("lives.live.times", {
+                    start: formatDate(live.startedAt, language, "time"),
+                    end: formatDate(live.endedAt, language, "time"),
+                  }),
+                  formatDuration(live.endedAt - live.startedAt),
+                  // Empty only for a LIVE no connect started
+                  ...(live.username ? [`@${live.username}`] : []),
+                ]}
+                action={
+                  <Btn
+                    variant="icon"
+                    title={t("lives.live.delete")}
+                    onClick={() => setDeleting(live)}
+                  >
+                    <FiTrash2 size={18} />
+                  </Btn>
+                }
+                totals={live}
+              />
+            ) : (
+              <SummarySection
+                title={periodText(filter, language)}
+                lines={[
+                  t("lives.allTime.count", { count: shown.length }),
+                  t("lives.allTime.length", {
+                    length: formatDuration(total.length),
+                  }),
+                ]}
+                // Clearing takes every LIVE, so only All time offers it
+                action={
+                  !range && (
                     <Btn
                       variant="icon"
-                      title={t("lives.live.delete")}
-                      onClick={() => setDeleting(live)}
+                      title={t("lives.allTime.clear")}
+                      disabled={
+                        history.lives.length === 0 &&
+                        history.gifters.length === 0
+                      }
+                      onClick={() => setClearing(true)}
                     >
                       <FiTrash2 size={18} />
                     </Btn>
-                  }
-                  totals={live}
-                />
-                <GiftersSection
-                  title={t("lives.gifters.title")}
-                  gifters={
-                    reply?.startedAt === live.startedAt
-                      ? reply.data?.gifters
-                      : undefined
-                  }
-                  failed={
-                    reply?.startedAt === live.startedAt && !reply.success
-                      ? "lives.gifters.failed"
-                      : undefined
-                  }
-                />
-              </>
-            ) : (
-              <>
-                <SummarySection
-                  title={periodText(filter, language)}
-                  lines={[
-                    t("lives.allTime.count", { count: shown.length }),
-                    t("lives.allTime.length", {
-                      length: formatDuration(total.length),
-                    }),
-                  ]}
-                  // Clearing takes every LIVE, so only All time offers it
-                  action={
-                    !range && (
-                      <Btn
-                        variant="icon"
-                        title={t("lives.allTime.clear")}
-                        disabled={
-                          history.lives.length === 0 &&
-                          history.gifters.length === 0
-                        }
-                        onClick={() => setClearing(true)}
-                      >
-                        <FiTrash2 size={18} />
-                      </Btn>
-                    )
-                  }
-                  totals={total}
-                />
-                {range ? (
-                  <GiftersSection
-                    title={t("lives.gifters.top")}
-                    gifters={isDates(datesReply) ? datesReply?.data : undefined}
-                    empty="lives.gifters.emptyDates"
-                    failed={
-                      isDates(datesReply) && !datesReply?.success
-                        ? "lives.gifters.failedDates"
-                        : undefined
-                    }
-                  />
-                ) : (
-                  <GiftersSection
-                    title={t("lives.gifters.top")}
-                    gifters={history.gifters}
-                  />
-                )}
-              </>
+                  )
+                }
+                totals={total}
+              />
             )}
+            {/* One in both cases, so an open search stays open */}
+            <GiftersSection
+              title={t(live ? "lives.gifters.title" : "lives.gifters.top")}
+              {...gifters()}
+              search={search}
+              onSearch={setSearch}
+            />
           </div>
 
           <ListSection

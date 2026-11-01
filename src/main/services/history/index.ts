@@ -3,6 +3,7 @@ import {
   LiveHistory,
   LiveRecord,
   LiveSummary,
+  RankedGifter,
   TOKIO_EVENTS,
   TokioEventMap,
   TopGifter,
@@ -302,37 +303,57 @@ export class HistoryService extends Service {
 
   /**
    * The top SHOWN_GIFTERS of the finished LIVEs that started from `from`
-   * (included) to `to` (left out), added up from their files. A file that
-   * doesn't load is left out.
+   * (included) to `to` (left out), each with their place among them, and with
+   * a query only the ones whose name or @handle has it. A range of every LIVE
+   * is all time's list; others are added up from their files, leaving out a
+   * file that doesn't load.
    */
   public async getGifters({
     from = -Infinity,
     to = Infinity,
+    query = "",
   }: {
     from?: number;
     to?: number;
-  }): Promise<Gifter[]> {
+    query?: string;
+  }): Promise<RankedGifter[]> {
     const dir = this._dir;
     if (dir === null) return [];
     const lives = this._lives.filter(
       ({ startedAt }) => startedAt >= from && startedAt < to,
     );
-    const records = await Promise.all(
-      lives.map(({ startedAt }) => this._readLive(dir, startedAt)),
-    );
-    if (this._dir !== dir) return [];
-    const gifters = new Map<string, Gifter>();
-    // Oldest first, so the name, handle and picture end up the latest ones
-    for (const gifter of records.flatMap((record) => record?.gifters ?? [])) {
-      const past = gifters.get(gifter.userId);
-      gifters.set(gifter.userId, {
-        ...gifter,
-        picture: gifter.picture || (past?.picture ?? ""),
-        coins: (past?.coins ?? 0) + gifter.coins,
-        gifts: (past?.gifts ?? 0) + gifter.gifts,
-      });
+    // Kept in byCoins order, and read from no file
+    let ranked = [...this._gifters.values()];
+    if (lives.length < this._lives.length) {
+      const records = await Promise.all(
+        lives.map(({ startedAt }) => this._readLive(dir, startedAt)),
+      );
+      if (this._dir !== dir) return [];
+      const gifters = new Map<string, Gifter>();
+      // Oldest first, so the name, handle and picture end up the latest ones
+      for (const gifter of records.flatMap((r) => r?.gifters ?? [])) {
+        const past = gifters.get(gifter.userId);
+        gifters.set(gifter.userId, {
+          ...gifter,
+          picture: gifter.picture || (past?.picture ?? ""),
+          coins: (past?.coins ?? 0) + gifter.coins,
+          gifts: (past?.gifts ?? 0) + gifter.gifts,
+        });
+      }
+      ranked = [...gifters.values()].sort(byCoins);
     }
-    return [...gifters.values()].sort(byCoins).slice(0, SHOWN_GIFTERS);
+
+    // "@kai" finds kai too
+    const needle = query.trim().replace(/^@/, "").toLocaleLowerCase();
+    const found: RankedGifter[] = [];
+    for (const [i, gifter] of ranked.entries()) {
+      if (found.length === SHOWN_GIFTERS) break;
+      const named =
+        gifter.username.toLocaleLowerCase().includes(needle) ||
+        gifter.handle.toLocaleLowerCase().includes(needle);
+      if (named) found.push({ ...gifter, rank: i + 1 });
+    }
+    return found;
   }
 
   /**

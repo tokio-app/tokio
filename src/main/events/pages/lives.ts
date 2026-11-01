@@ -41,24 +41,31 @@ events.push(
   },
 );
 
-// The page's totals for the dates it filters by
+// The page's totals for the dates it filters by, and its gifter search
 events.push(
   APP_EVENTS.GET_GIFTERS,
-  async ({ historyService }, e, { from, to }) => {
-    const data = await historyService.getGifters({ from, to });
-    e.reply(APP_EVENTS_RESPONSE.GIFTERS, { success: true, from, to, data });
+  async ({ historyService }, e, { from, to, query }) => {
+    const data = await historyService.getGifters({ from, to, query });
+    e.reply(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      from,
+      to,
+      query,
+      data,
+    });
   },
   {
     failure: {
       code: FEEDBACK_CODES.LIVE_LOAD_FAILED,
       message: "main.failure.getGifters",
     },
-    // So the page ignores a late failure for other dates
-    onError: (e, error, { from, to }) =>
+    // So the page ignores a late failure for other dates or another search
+    onError: (e, error, { from, to, query }) =>
       e.reply(APP_EVENTS_RESPONSE.GIFTERS, {
         success: false,
         from,
         to,
+        query,
         error,
       }),
   },

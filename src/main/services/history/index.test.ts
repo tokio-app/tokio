@@ -433,18 +433,45 @@ describe("HistoryService", () => {
     ]);
     // From included, to left out
     expect(await history.getGifters({ from: 3000 })).toEqual([
-      expect.objectContaining({ userId: "a", coins: 50, gifts: 1 }),
+      expect.objectContaining({ userId: "a", coins: 50, gifts: 1, rank: 1 }),
     ]);
     expect(await history.getGifters({ to: 3000 })).toEqual([
       expect.objectContaining({ userId: "a", handle: "fana", coins: 100 }),
-      expect.objectContaining({ userId: "b", coins: 20 }),
+      expect.objectContaining({ userId: "b", coins: 20, rank: 2 }),
     ]);
     expect(await history.getGifters({ from: 5000 })).toEqual([]);
 
     await writeFile(join(dir, "a", "1000.json"), "{ broken");
-    expect(await history.getGifters({})).toEqual([
-      expect.objectContaining({ userId: "a", coins: 50 }),
+    expect(await history.getGifters({ to: 3000 })).toEqual([]);
+    // A range of every LIVE is all time's list, read from no file
+    expect(await history.getGifters({ from: 0 })).toEqual([
+      expect.objectContaining({ userId: "a", coins: 150, rank: 1 }),
+      expect.objectContaining({ userId: "b", coins: 20, rank: 2 }),
     ]);
+  });
+
+  it("searches gifters by name or @handle, keeping their places", async () => {
+    const history = await loaded();
+    history.start("kai", 1000);
+    gifts(
+      history,
+      [1100, gift(viewer("a", "ana.bakes"), 100)],
+      [1200, gift(viewer("b", "beto"), 20)],
+    );
+    history.end(2000);
+    history.start("kai", 3000);
+    gifts(history, [3100, gift(viewer("c", "caro"), 5)]);
+    history.end(4000);
+
+    // Any case, a leading @ ignored
+    expect(await history.getGifters({ query: " @BETO " })).toEqual([
+      expect.objectContaining({ userId: "b", rank: 2 }),
+    ]);
+    // Names too ("caro name"), and within a range
+    expect(await history.getGifters({ from: 3000, query: "o na" })).toEqual([
+      expect.objectContaining({ userId: "c", rank: 1 }),
+    ]);
+    expect(await history.getGifters({ query: "nobody" })).toEqual([]);
   });
 
   describe("deleting a LIVE", () => {
