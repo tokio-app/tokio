@@ -2,6 +2,7 @@ import {
   AppEvents,
   ChatEvent,
   Emotes,
+  Fan,
   GiftEvent,
   LikeEvent,
   MusicInfo,
@@ -10,6 +11,7 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
   TokioPayload,
+  TopGifter,
   UserData,
 } from "@/common/types";
 import { ADJECTIVES, CHAT_MESSAGES, GIFTS, LANGUAGES, NOUNS } from "./data";
@@ -185,27 +187,50 @@ export const generateTikTokEventSample = <K extends AppEvents>(
 
 // The test LIVE's room fills up to this many viewers, one per press.
 const TEST_VIEWERS = 8;
+const DAY = 24 * 60 * 60 * 1000;
+
+// What a viewer gave, and when their last gift came
+type Tally = { coins: number; gifts: number; giftedAt: number };
 
 /**
  * A LIVE for overlays' Test button, played one press at a time. Each call
- * sends every live event at once and carries on from the call before: the
- * same viewers come back, likes and coins add up, and a gift streak grows over
- * a few presses before it ends, the way TikTok sends it.
+ * sends every live event at once, then the top gifters and the fans, and
+ * carries on from the call before: the same viewers come back, likes and
+ * coins add up, and a gift streak grows over a few presses before it ends, the
+ * way TikTok sends it.
  */
 export const createTestLive = () => {
   // Live, only chat says how a viewer relates to the host, the same each time.
   const cast: { viewer: UserData; chatter: UserData }[] = [];
-  const coins = new Map<UserData, number>();
+  // In the order each reached their total, so a tie goes to the first there
+  const tally = new Map<UserData, Tally>();
+  // Gifters from the profile's earlier LIVEs, for the all-time top 10
+  const past = new Map<UserData, Tally>(
+    Array.from({ length: 12 }, () => {
+      const gifts = randomInt(5, 300);
+      return [
+        userFactory(),
+        {
+          coins: gifts * randomInt(1, 60),
+          gifts,
+          giftedAt: Date.now() - randomInt(1, 90) * DAY,
+        },
+      ];
+    }),
+  );
   let viewers = randomInt(20, 200);
   let views = viewers + randomInt(50, 2000);
   let totalLikes = randomInt(500, 20000);
 
   // A viewer with a name the room doesn't have yet
   const newcomer = () => {
-    let viewer = userFactory();
-    while (cast.some((c) => c.viewer.username === viewer.username)) {
-      viewer = userFactory();
-    }
+    const taken = (user: UserData) =>
+      cast.some((c) => c.viewer.username === user.username);
+    // Some past gifters come back.
+    const back = [...past.keys()].filter((user) => !taken(user));
+    let viewer =
+      back.length && randomBool(0.3) ? pickRandom(back) : userFactory();
+    while (taken(viewer)) viewer = userFactory();
     const joined = { viewer, chatter: chatterFactory(viewer) };
     cast.push(joined);
     return joined;
@@ -241,21 +266,66 @@ export const createTestLive = () => {
       gift = giftEvent(s.viewer, s.gift, s.sent, false);
     } else {
       gift = giftEvent(s.viewer, s.gift, s.size, true);
-      coins.set(s.viewer, (coins.get(s.viewer) ?? 0) + s.size * s.gift.coins);
+      const before = tally.get(s.viewer);
+      tally.delete(s.viewer);
+      tally.set(s.viewer, {
+        coins: (before?.coins ?? 0) + s.size * s.gift.coins,
+        gifts: (before?.gifts ?? 0) + s.size,
+        giftedAt: Date.now(),
+      });
       streak = undefined;
     }
 
     // Ranks carry only these fields, from the coins of the gifts that ended.
-    const ranks = [...coins]
-      .sort(([, a], [, b]) => b - a)
-      .map(([{ username, handle, profilePictures, userId }, score], i) => ({
+    const gifters = [...tally].sort(([, a], [, b]) => b.coins - a.coins);
+    const ranks = gifters.map(
+      ([{ username, handle, profilePictures, userId }, { coins }], i) => ({
         username,
         handle,
         profilePictures,
         userId,
-        score,
+        score: coins,
         position: i + 1,
-      }));
+      }),
+    );
+
+    const topGifter = (user: UserData): TopGifter => {
+      const thisLive = tally.get(user);
+      const earlier = past.get(user);
+      return {
+        userId: user.userId ?? "",
+        username: user.username,
+        handle: user.handle,
+        picture: user.profilePictures[0] ?? "",
+        live: { coins: thisLive?.coins ?? 0, gifts: thisLive?.gifts ?? 0 },
+        allTime: {
+          coins: (thisLive?.coins ?? 0) + (earlier?.coins ?? 0),
+          gifts: (thisLive?.gifts ?? 0) + (earlier?.gifts ?? 0),
+        },
+        giftedAt: (thisLive ?? earlier)!.giftedAt,
+      };
+    };
+    const allTime = [...new Set([...tally.keys(), ...past.keys()])]
+      .map(topGifter)
+      .sort((a, b) => b.allTime.coins - a.allTime.coins);
+
+    // This LIVE's viewers were seen now, past gifters at their last gift.
+    const seen = new Map(
+      [...past].map(([user, { giftedAt }]) => [user, giftedAt]),
+    );
+    for (const { viewer } of cast) seen.set(viewer, Date.now());
+    const fans: Fan[] = [...seen]
+      .filter(([user]) => user.fanLevel)
+      .map(([{ userId, username, handle, fanLevel, fanBadge }, seenAt]) => ({
+        userId: userId ?? "",
+        username,
+        handle,
+        fanLevel: fanLevel ?? 0,
+        fanBadge: fanBadge ?? "",
+        seenAt,
+      }))
+      .sort((a, b) => b.fanLevel - a.fanLevel || b.seenAt - a.seenAt)
+      .slice(0, 100);
 
     return [
       { type: TOKIO_EVENTS.MEMBER_JOIN, data: { user: joined.viewer } },
@@ -277,6 +347,14 @@ export const createTestLive = () => {
       { type: TOKIO_EVENTS.ENVELOPE, data: undefined },
       { type: TOKIO_EVENTS.MUSIC_CHANGE, data: musicFactory() },
       { type: TOKIO_EVENTS.ROOM_USER, data: { viewers, views, ranks } },
+      {
+        type: "tokio:gifters",
+        data: {
+          live: gifters.slice(0, 10).map(([user]) => topGifter(user)),
+          allTime: allTime.slice(0, 10),
+        },
+      },
+      { type: "tokio:fans", data: { fans } },
     ];
   };
 };

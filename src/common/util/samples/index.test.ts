@@ -23,11 +23,78 @@ const viewerOf = (payload: TokioPayload): UserData | undefined => {
 const streakOf = ({ user, gift }: GiftEvent) => `${user.handle}:${gift.id}`;
 
 describe("createTestLive", () => {
-  it("sends every live event once at each press", () => {
+  it("sends every live event once at each press, then gifters and fans", () => {
     const live = Object.values(TOKIO_EVENTS).filter(isLiveEvent).sort();
 
     for (const press of lives.flat()) {
-      expect(press.map((p) => p.type).sort()).toEqual(live);
+      const types = press.map((p) => p.type);
+      expect(types.slice(0, -2).sort()).toEqual(live);
+      expect(types.slice(-2)).toEqual(["tokio:gifters", "tokio:fans"]);
+    }
+  });
+
+  it("tops this LIVE's gifters by the gifts it ended, all time on top of it", () => {
+    for (const life of lives) {
+      const given = new Map<string, { coins: number; gifts: number }>();
+
+      for (const press of life) {
+        const { user, gift } = press.find(
+          (p) => p.type === TOKIO_EVENTS.GIFT,
+        )!.data;
+        if (gift.repeatEnd) {
+          const { coins = 0, gifts = 0 } = given.get(user.handle) ?? {};
+          given.delete(user.handle);
+          given.set(user.handle, {
+            coins: coins + gift.comboCount * gift.coins,
+            gifts: gifts + gift.comboCount,
+          });
+        }
+
+        const { live, allTime } = press.find(
+          (p) => p.type === "tokio:gifters",
+        )!.data;
+        expect(live.map(({ handle, live }) => ({ handle, ...live }))).toEqual(
+          [...given]
+            .sort(([, a], [, b]) => b.coins - a.coins)
+            .slice(0, 10)
+            .map(([handle, given]) => ({ handle, ...given })),
+        );
+
+        expect(allTime.length).toBeLessThanOrEqual(10);
+        const coins = allTime.map((g) => g.allTime.coins);
+        expect(coins).toEqual([...coins].sort((a, b) => b - a));
+        for (const gifter of [...live, ...allTime]) {
+          expect(gifter.live).toEqual(
+            given.get(gifter.handle) ?? { coins: 0, gifts: 0 },
+          );
+          expect(gifter.allTime.coins).toBeGreaterThanOrEqual(
+            gifter.live.coins,
+          );
+          expect(gifter.allTime.gifts).toBeGreaterThanOrEqual(
+            gifter.live.gifts,
+          );
+        }
+        // The all-time top 10 counts this LIVE's gifts too.
+        for (const gifter of live) {
+          const ranked = allTime.find((g) => g.handle === gifter.handle);
+          if (ranked) expect(ranked).toEqual(gifter);
+          else expect(gifter.allTime.coins).toBeLessThanOrEqual(coins.at(-1)!);
+        }
+      }
+    }
+  });
+
+  it("sends the fans, highest level first, then the latest seen", () => {
+    for (const press of lives.flat()) {
+      const { fans } = press.find((p) => p.type === "tokio:fans")!.data;
+      expect(fans.length).toBeLessThanOrEqual(100);
+      fans.forEach((fan, i) => {
+        expect(fan.fanLevel).toBeGreaterThan(0);
+        const prev = fans[i - 1];
+        if (prev && prev.fanLevel === fan.fanLevel) {
+          expect(prev.seenAt).toBeGreaterThanOrEqual(fan.seenAt);
+        } else if (prev) expect(prev.fanLevel).toBeGreaterThan(fan.fanLevel);
+      });
     }
   });
 
@@ -126,10 +193,10 @@ describe("createTestLive", () => {
         )!.data;
         if (gift.repeatEnd) {
           viewers[user.handle] = user;
-          coins.set(
-            user.handle,
-            (coins.get(user.handle) ?? 0) + gift.comboCount * gift.coins,
-          );
+          const before = coins.get(user.handle) ?? 0;
+          // A tie goes to whoever got there first.
+          coins.delete(user.handle);
+          coins.set(user.handle, before + gift.comboCount * gift.coins);
         }
 
         const room = press.find((p) => p.type === TOKIO_EVENTS.ROOM_USER)!.data;
