@@ -15,3 +15,4 @@ paths:
 - The feed stays after the LIVE ends, until the next one starts. Viewers, likes, views and the totals show only while connected.
 - `settings.activityFeed` picks the kinds of events the feed keeps, for every profile, saved from Home's `FeedModal` with `SET_ACTIVITY_FEED`. `LiveService.setFeed` applies it when the app loads and on save, dropping the items it now hides.
 - Hidden events aren't kept but still count toward the totals, so the kept items are all ones the feed shows.
+- Past LIVEs are kept by `HistoryService`, which counts the same span on its own: see `.claude/rules/history.md`.

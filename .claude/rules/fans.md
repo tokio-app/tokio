@@ -29,5 +29,5 @@ paths:
 
 - `{ type: "tokio:fans", data: { fans } }` holds the `SENT_FANS` (100) highest levels, then the most recently seen.
 - Each client gets it as it connects, whatever its id (Tokio's own pages ignore it), then after each load, and on changes through a `throttle` of `FANS_PUSH_MS` (5 s) that reads the list when it fires. `ServerService.sendToAll` sends it.
-- Previews and the Test button don't get it: Test plays `createTestLive`.
+- Test sends a sample: `createTestLive` adds `tokio:fans` to every press, so previews and test overlays get it then, not when they load.
 - The SDK (`@tokioapp/overlay`) types it as `TOKIO_EVENTS.FANS`. Overlays on an older version log it as an unknown type.
