@@ -29,8 +29,9 @@ paths:
 - `index.json`: the finished LIVEs' summaries, oldest first, and all time's gifters, the most coins first with ties to the earlier `giftedAt`. Written when a LIVE ends, after a recovery or a delete, and to retry a failed save.
 - `<startedAt>.json`: one `LiveRecord` per LIVE, with all its gifters.
   - The LIVE in progress rewrites only its own file, every `HISTORY_SAVE_MS` (30 s, `registerHistory`) while it changes, with `endedAt` set to the save's time.
-  - A finished LIVE's file is never rewritten, which is why there's no LIVE limit.
+  - A finished LIVE's file is never rewritten, so a 30 s save stays small however many LIVEs there are.
 - When a LIVE ends, its file is written one last time, then the index with its summary appended and its gifters added to all time.
+- `MAX_LIVES` (1,500): past it, the oldest LIVEs go as deleting them would, gifts included, after an end (`_cap`, which reads their files after the end's save) and when a profile loads. The user's call: All time always adds up to the LIVEs kept.
 - `MAX_GIFTERS` (10,000) caps all time: the fewest coins go first, then the oldest last gift. The page shows the top `SHOWN_GIFTERS` (100) and each LIVE keeps all of its own gifters, so nobody shown is dropped.
 - No save on quit (`shortcut:`), like the fans and the timer: a quit or a crash loses at most 30 s, and the next load adds the rest from the LIVE's file.
 
@@ -72,11 +73,11 @@ paths:
 - **The left column** shows the LIVE's long date, its times, length and @username, the readout (Home's: 36px, then 24px) and its gifters, which come with `GET_LIVE` (a `Spinner` until then; a reply for another `startedAt` is dropped).
   - All time sums the LIVEs' numbers in `allTime` (`helper.ts`), with the best peak instead of a sum, and lists the top 100.
 - **Selection:** the newest LIVE, or All time when there are none. After a delete, the one that took its place, or the one before when it was the last (`keepSelection`). A LIVE that ends and joins keeps the selection; another profile's `LIVES` starts from its newest.
-- **The date filter** (`DateFilterBar`, above the list) is Any date, On, After, Before or Between, with native date fields, built like the gift picker's coin filter.
-  - `dateRange` turns the local days into a range of start times. After and Before leave the day itself out, Between takes both days in either order, and nothing is filtered until the days are picked.
+- **The date filter** (`DateFilterBar`, above the list) is a preset: All time, Last 24 hours, Last 7 days, Last 30 days, Last 12 months or Custom dates. The presets count back from `now`, which is set with the filter and again when `LIVES` comes, so it doesn't move on every render; 12 months follow the calendar.
+  - Custom dates add On, After, Before or Between with Tokio's own `DateTimePicker` (`components/DateTimePicker`), the same on every system and in the app's language. Its days take a time, to the minute, except On's.
+  - `dateRange` turns them into a range of start times. A day without a time is the whole day: After and Before leave it out, and Between takes both ends in either order. On is always a whole day. Nothing is filtered until the days are picked.
   - The list keeps the matching LIVEs, with the bars scaled to the best of them.
   - The first row becomes their totals, named by `periodText` ("Oct 1, 2026 to Oct 31, 2026"), with the top gifters main adds up (`GET_GIFTERS`, asked again when the LIVEs change). A new filter selects it.
-  - The date fields' format and calendar follow the system's language, not Tokio's (`.claude/rules/i18n.md`).
 - **The gifter search** is a `SearchToggle` on the gifters' title row.
   - Main searches (`GET_GIFTERS`, `SEARCH_DELAY_MS` after the last key), so it finds anyone, not only the 100 listed. The selected LIVE goes as a one-LIVE range, or the filter's range.
   - The rows show each match's `rank`.
