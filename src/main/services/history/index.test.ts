@@ -327,6 +327,8 @@ describe("HistoryService", () => {
 
       expect(history.top()).toEqual({ live: [], allTime: [] });
       expect(await history.save()).toBe(true);
+      // Nothing to clear either, so the page says it couldn't
+      expect(await history.clear()).toBe(false);
       expect(await readFile(path, "utf-8")).toBe(content);
       expect(await readdir(join(dir, "a"))).toEqual(["index.json"]);
       expect(warn).toHaveBeenCalledWith(
@@ -482,7 +484,9 @@ describe("HistoryService", () => {
     expect(history.getHistory()).toEqual({ lives: [], gifters: [] });
     expect(history.top().allTime.map((g) => g.userId)).toEqual(["b"]);
     expect(await readdir(dir)).toEqual(["a"]);
-    expect(await readdir(join(dir, "a"))).toEqual(["3000.json"]);
+    expect(await readdir(join(dir, "a"))).toEqual(["3000.json", "index.json"]);
+    // Empty, over anything a save racing the move wrote there
+    expect(await read("index.json")).toEqual({ lives: [], gifters: [] });
   });
 
   it("removes a folder a clear left on the next load", async () => {

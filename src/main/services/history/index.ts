@@ -341,11 +341,14 @@ export class HistoryService extends Service {
     return saved;
   }
 
-  /** False when the history couldn't be moved away, which changes nothing. */
+  /**
+   * False, changing nothing, when no history is loaded (an index that doesn't
+   * load stays as it is) or it couldn't be moved away.
+   */
   public async clear(): Promise<boolean> {
     await this._saving;
     const dir = this._dir;
-    if (dir === null) return true;
+    if (dir === null) return false;
     // Moved away in one step, so a crash can't leave half of it
     const away = `${dir}.cleared-${Date.now()}`;
     try {
@@ -370,7 +373,8 @@ export class HistoryService extends Service {
       this._gifters = new Map();
       this._best = [];
       this._ended = [];
-      this._indexUnsaved = false;
+      // An empty index, written after any save that raced the move
+      this._indexUnsaved = true;
       // Written again into a fresh folder
       this._liveUnsaved = this._live !== null;
       this._emit();
@@ -381,15 +385,15 @@ export class HistoryService extends Service {
     return true;
   }
 
+  // shortcut: there's no save on quit, so a quit or crash during a LIVE loses
+  // up to 30 s of it (the next load adds the rest from its file). Upgrade to a
+  // save on quit if streamers notice.
   /**
    * Writes what changed: the file of the LIVE in progress or of one that just
    * ended, then the index. False when a write failed; the next save retries.
    * With nothing to write, how the last save went, so a switch waits for one
    * still writing.
    */
-  // shortcut: there's no save on quit, so a quit or crash during a LIVE loses
-  // up to 30 s of it (the next load adds the rest from its file). Upgrade to a
-  // save on quit if streamers notice.
   public save(): Promise<boolean> {
     const json = this._json;
     const dir = this._dir;
