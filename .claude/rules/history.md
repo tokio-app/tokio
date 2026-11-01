@@ -56,6 +56,7 @@ paths:
 
 - `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top 100. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page asks again on each `GET_PROFILE` reply, a profile switch.
 - `GET_LIVE { startedAt }` replies `LIVE` with that LIVE's record. Failures carry the `startedAt` too.
+- `GET_GIFTERS { from?, to? }` replies `GIFTERS` with the top 100 of the finished LIVEs that started from `from` (included) to `to` (left out), added up from their files by `getGifters` (a file that doesn't load is left out). The reply carries the range, failures included.
 - `DELETE_LIVE` and `CLEAR_LIVES` reply `LIVES` with what main holds, then send `LIVE_DELETED` or `HISTORY_CLEARED`. A failed save after a delete throws `HISTORY_SAVE_FAILED`, a refused clear `HISTORY_CLEAR_FAILED`.
 
 ## The page
@@ -68,5 +69,10 @@ paths:
 - **The left column** shows the LIVE's long date, its times, length and @username, the readout (Home's: 36px, then 24px) and its gifters, which come with `GET_LIVE` (a `Spinner` until then; a reply for another `startedAt` is dropped).
   - All time sums the LIVEs' numbers in `allTime` (`helper.ts`), with the best peak instead of a sum, and lists the top 100.
 - **Selection:** the newest LIVE, or All time when there are none. After a delete, the one that took its place, or the one before when it was the last (`keepSelection`). A LIVE that ends and joins keeps the selection; another profile's `LIVES` starts from its newest.
-- Delete and Clear history are icon buttons on the left's title row, which ask first with `DeleteLiveModal` and `ClearHistoryModal` (`components/DeleteModals`). Clear is disabled while there's nothing to clear.
+- **The date filter** (`DateFilterBar`, above the list) is Any date, On, After, Before or Between, with native date fields, built like the gift picker's coin filter.
+  - `dateRange` turns the local days into a range of start times. After and Before leave the day itself out, Between takes both days in either order, and nothing is filtered until the days are picked.
+  - The list keeps the matching LIVEs, with the bars scaled to the best of them.
+  - The first row becomes their totals, named by `periodText` ("Oct 1, 2026 to Oct 31, 2026"), with the top gifters main adds up (`GET_GIFTERS`, asked again when the LIVEs change). A new filter selects it.
+  - The date fields' format and calendar follow the system's language, not Tokio's (`.claude/rules/i18n.md`).
+- Delete and Clear history are icon buttons on the left's title row, which ask first with `DeleteLiveModal` and `ClearHistoryModal` (`components/DeleteModals`). Clear history shows only on All time, since it takes every LIVE, and is disabled while there's nothing to clear.
 - Dates go through `formatDate` (`helper/format.ts`), and a Spanish long date is capitalized for the title (`capitalize`).
