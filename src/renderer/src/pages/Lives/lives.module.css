@@ -40,15 +40,8 @@
 
 .readout {
   display: grid;
-  gap: var(--space-6);
-}
-
-.big {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.small {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-6);
 }
 
 .stat {
@@ -63,16 +56,9 @@
   color: var(--font-primary);
   font-stretch: var(--stretch-readout);
   font-weight: 700;
+  font-size: var(--font-3xl);
   font-variant-numeric: tabular-nums;
   line-height: 1;
-}
-
-.big .stat_value {
-  font-size: var(--font-3xl);
-}
-
-.small .stat_value {
-  font-size: var(--font-2xl);
 }
 
 .stat_label {

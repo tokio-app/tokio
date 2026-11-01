@@ -15,7 +15,13 @@ import {
 } from "../../schemas";
 import { AppNotification, Reply } from "../feedback";
 import { CommandResult, GamesData } from "../games";
-import { LiveHistory, LiveRecord, LiveSession, RankedGifter } from "../live";
+import {
+  LiveHistory,
+  LiveRecord,
+  LiveSession,
+  LiveSummary,
+  RankedGifter,
+} from "../live";
 import { OverlayApp } from "../server";
 import { VoiceData, VoiceEngine } from "../store";
 import { TimerData } from "../timer";
@@ -261,11 +267,13 @@ export interface AppEventsResponseMap {
     startedAt: number;
     data?: LiveRecord;
   }>;
-  // The range and query it was asked for, failures included
+  // The range and query it was asked for, failures included. Dates without a
+  // query get their coins and gifts first, then again with the gifters.
   [APP_EVENTS_RESPONSE.GIFTERS]: Reply<{
     from?: number;
     to?: number;
     query?: string;
+    totals?: Pick<LiveSummary, "coins" | "gifts">;
     data?: RankedGifter[];
   }>;
 

@@ -5,6 +5,7 @@ import {
   LiveHistory,
   LiveSummary,
 } from "@/common/types";
+import { DateRange, inRange } from "@/common/util";
 import {
   Btn,
   ClearHistoryModal,
@@ -22,9 +23,7 @@ import {
   allTime,
   capitalize,
   DateFilter,
-  DateRange,
   dateRange,
-  inRange,
   keepSelection,
   NO_FILTER,
   periodText,
@@ -67,9 +66,9 @@ export function Lives() {
     range ? lives.filter((live) => inRange(live, range)) : lives;
   const shown = visible(history?.lives ?? []);
   const live = shown.find((l) => l.startedAt === selected);
-  // The LIVEs the gifters come from: the selected one, or the filter's
+  // The LIVEs the gifters come from: all of the selected one, or the filter's
   const scope: DateRange = live
-    ? { from: live.startedAt, to: live.startedAt + 1 }
+    ? { from: live.startedAt, to: live.endedAt }
     : (range ?? {});
   const searching = search.trim() !== "";
   // Replies for other dates, another LIVE or another search are dropped
@@ -155,7 +154,9 @@ export function Lives() {
     );
   }
 
-  const total = allTime(shown);
+  const dates = isDates(datesReply) ? datesReply : undefined;
+  // Main adds up the gifts in the dates of a LIVE they cut
+  const total = { ...allTime(shown, range ?? {}), ...dates?.totals };
 
   // The gifters panel: a search's matches, or the selection's gifters
   const gifters = (): GiftersList => {
@@ -179,12 +180,11 @@ export function Lives() {
       };
     }
     if (range) {
-      const got = isDates(datesReply) ? datesReply : undefined;
       return {
-        gifters: got?.data,
+        gifters: dates?.data,
         empty: t("lives.gifters.emptyDates"),
         failed:
-          got?.success === false ? t("lives.gifters.failedDates") : undefined,
+          dates?.success === false ? t("lives.gifters.failedDates") : undefined,
       };
     }
     return { gifters: history.gifters, empty: t("lives.gifters.empty") };

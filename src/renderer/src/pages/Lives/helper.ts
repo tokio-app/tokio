@@ -1,50 +1,32 @@
 import { MessageKey, translate } from "@/common/i18n";
 import { LiveSummary } from "@/common/types";
+import { allInRange, DateRange } from "@/common/util";
 import { DateTimeValue, NO_DATE } from "@/components";
 import { formatDate } from "@/helper";
 
-export type Totals = Pick<
-  LiveSummary,
-  "coins" | "gifts" | "followers" | "shares" | "likes" | "views" | "peakViewers"
->;
+export type Totals = Pick<LiveSummary, "coins" | "gifts">;
 
-// The readout's two rows, the bigger numbers first
-export const READOUT: { key: keyof Totals; label: MessageKey }[][] = [
-  [
-    { key: "coins", label: "lives.stats.coins" },
-    { key: "gifts", label: "lives.stats.gifts" },
-    { key: "followers", label: "lives.stats.followers" },
-  ],
-  [
-    { key: "shares", label: "lives.stats.shares" },
-    { key: "likes", label: "lives.stats.likes" },
-    { key: "peakViewers", label: "lives.stats.peakViewers" },
-    { key: "views", label: "lives.stats.views" },
-  ],
+export const READOUT: { key: keyof Totals; label: MessageKey }[] = [
+  { key: "coins", label: "lives.stats.coins" },
+  { key: "gifts", label: "lives.stats.gifts" },
 ];
 
-// Every LIVE's numbers added up, with the best peak instead of a sum, and how
-// long they ran in ms
-export function allTime(lives: LiveSummary[]): Totals & { length: number } {
-  const sum = {
-    coins: 0,
-    gifts: 0,
-    followers: 0,
-    shares: 0,
-    likes: 0,
-    views: 0,
-    peakViewers: 0,
-    length: 0,
-  };
+/**
+ * The LIVEs' coins and gifts added up, and how long they ran in ms. With
+ * dates, how long they ran in them, and only the coins and gifts of the LIVEs
+ * all in them: main adds up the gifts in them of a LIVE they cut.
+ */
+export function allTime(
+  lives: LiveSummary[],
+  range: DateRange = {},
+): Totals & { length: number } {
+  const { from = -Infinity, to = Infinity } = range;
+  const sum = { coins: 0, gifts: 0, length: 0 };
   for (const live of lives) {
+    sum.length += Math.min(live.endedAt, to) - Math.max(live.startedAt, from);
+    if (!allInRange(live, range)) continue;
     sum.coins += live.coins;
     sum.gifts += live.gifts;
-    sum.followers += live.followers;
-    sum.shares += live.shares;
-    sum.likes += live.likes;
-    sum.views += live.views;
-    sum.peakViewers = Math.max(sum.peakViewers, live.peakViewers);
-    sum.length += live.endedAt - live.startedAt;
   }
   return sum;
 }
@@ -108,9 +90,6 @@ export const DATE_OPERATORS: { value: DateOperator; label: MessageKey }[] = [
   { value: "between", label: "lives.filter.between" },
 ];
 
-// From `from` (included) to `to` (left out), in ms
-export type DateRange = { from?: number; to?: number };
-
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 
@@ -130,10 +109,10 @@ const momentEnd = (value: DateTimeValue) =>
 const PRESET_DAYS = { day: 1, week: 7, month: 30 };
 
 /**
- * The LIVEs a filter keeps, by when they started. The presets count back from
- * `now`. A custom day without a time is the whole day: after and before leave
- * it out, and between takes both ends, in either order. On is always a whole
- * day. Null while it keeps them all, or a day isn't picked yet.
+ * The dates a filter takes. The presets count back from `now`. A custom day
+ * without a time is the whole day: after and before leave it out, and between
+ * takes both ends, in either order. On is always a whole day. Null while it
+ * takes everything, or a day isn't picked yet.
  */
 export function dateRange(
   { preset, operator, from, to }: DateFilter,
@@ -160,11 +139,6 @@ export function dateRange(
     to: Math.max(momentEnd(from), momentEnd(to)),
   };
 }
-
-export const inRange = (
-  { startedAt }: LiveSummary,
-  { from = -Infinity, to = Infinity }: DateRange,
-) => startedAt >= from && startedAt < to;
 
 // The totals' name: All time, the preset, or the custom dates
 export function periodText(

@@ -144,11 +144,6 @@ export const liveSummary = (
   endedAt: startedAt + 3_600_000,
   coins: 0,
   gifts: 0,
-  followers: 0,
-  shares: 0,
-  likes: 0,
-  views: 0,
-  peakViewers: 0,
   ...patch,
 });
 

@@ -1,4 +1,5 @@
 import {
+  GiftMinute,
   Gifter,
   LiveHistory,
   LiveRecord,
@@ -8,7 +9,7 @@ import {
   TokioEventMap,
   TopGifter,
 } from "@/common/types";
-import { formatError } from "@/common/util";
+import { allInRange, DateRange, formatError, inRange } from "@/common/util";
 import { renameWithRetry } from "@/helper/fs";
 import { GiftStreaks } from "@/helper/streaks";
 import Logger from "@/logger";
@@ -18,14 +19,8 @@ import { z } from "zod";
 import type { JSONManagerService } from "../json";
 import { Service } from "../shared";
 
-// The live events a LIVE's record counts
-export const HISTORY_EVENTS = [
-  TOKIO_EVENTS.GIFT,
-  TOKIO_EVENTS.FOLLOW,
-  TOKIO_EVENTS.SHARE,
-  TOKIO_EVENTS.LIKE,
-  TOKIO_EVENTS.ROOM_USER,
-] as const;
+// The live events a LIVE's record counts: only gifts (the user's call)
+export const HISTORY_EVENTS = [TOKIO_EVENTS.GIFT] as const;
 
 export type HistoryEvent = (typeof HISTORY_EVENTS)[number];
 
@@ -55,15 +50,16 @@ const LiveSummarySchema = z.object({
   endedAt: z.number(),
   coins: z.number(),
   gifts: z.number(),
-  followers: z.number(),
-  shares: z.number(),
-  likes: z.number(),
-  views: z.number(),
-  peakViewers: z.number(),
 }) satisfies z.ZodType<LiveSummary>;
+
+const GiftMinuteSchema = z.object({
+  minute: z.number(),
+  gifters: z.record(z.string(), z.tuple([z.number(), z.number()])),
+}) satisfies z.ZodType<GiftMinute>;
 
 const LiveRecordSchema: z.ZodType<LiveRecord> = LiveSummarySchema.extend({
   gifters: z.array(GifterSchema),
+  minutes: z.array(GiftMinuteSchema).default([]),
 });
 
 // The LIVEs oldest first, and all time's gifters the most coins first
@@ -86,11 +82,45 @@ const byCoins = (a: Gifter, b: Gifter) =>
   b.coins - a.coins || a.giftedAt - b.giftedAt;
 
 const LIVE_FILE = /^(\d+)\.json$/;
+const MINUTE = 60_000;
+
+// A LIVE's gift minutes that start in the dates, each with when it starts
+const minutesIn = (
+  record: LiveRecord | null,
+  { from = -Infinity, to = Infinity }: DateRange,
+) => {
+  const first = Math.floor((record?.startedAt ?? 0) / MINUTE);
+  return (record?.minutes ?? [])
+    .map((minute) => ({ ...minute, at: (first + minute.minute) * MINUTE }))
+    .filter(({ at }) => at >= from && at < to);
+};
+
+// A LIVE's gifters with only what they sent in the dates' minutes
+const giftersIn = (record: LiveRecord, range: DateRange): Gifter[] => {
+  const known = new Map(record.gifters.map((g) => [g.userId, g]));
+  const sent = new Map<string, Gifter>();
+  for (const { at, gifters } of minutesIn(record, range)) {
+    for (const [userId, [coins, gifts]] of Object.entries(gifters)) {
+      const gifter = known.get(userId);
+      if (!gifter) continue;
+      const past = sent.get(userId);
+      sent.set(userId, {
+        ...gifter,
+        coins: (past?.coins ?? 0) + coins,
+        gifts: (past?.gifts ?? 0) + gifts,
+        // Their last gift in them, to the minute
+        giftedAt: at,
+      });
+    }
+  }
+  return [...sent.values()];
+};
 
 /**
  * Each profile's LIVEs and the viewers who sent gifts in them, in
  * history/<profile name>/: index.json with the finished LIVEs' summaries and
- * all time's gifters, and a <startedAt>.json per LIVE with all its gifters.
+ * all time's gifters, and a <startedAt>.json per LIVE with all its gifters
+ * and what each sent in each minute.
  */
 export class HistoryService extends Service {
   private _json: Json | null = null;
@@ -107,6 +137,8 @@ export class HistoryService extends Service {
   private _best: Gifter[] = [];
   private _live: LiveSummary | null = null;
   private _liveGifters = new Map<string, Gifter>();
+  // The minutes the LIVE in progress's gifts came in, oldest first
+  private _minutes: GiftMinute[] = [];
   private _streaks = new GiftStreaks();
   // Final records of LIVEs that ended, until their file is written
   private _ended: LiveRecord[] = [];
@@ -123,6 +155,11 @@ export class HistoryService extends Service {
       const coins = added * Math.max(0, gift.coins);
       live.gifts += added;
       live.coins += coins;
+      // A gift without a user id counts in its minute's totals only
+      const id = user.userId ?? "";
+      const { gifters } = this._minute(live);
+      const [sent, count] = gifters[id] ?? [0, 0];
+      gifters[id] = [sent + coins, count + added];
       if (user.userId) {
         const last = this._liveGifters.get(user.userId);
         this._liveGifters.set(user.userId, {
@@ -137,25 +174,6 @@ export class HistoryService extends Service {
       }
       this._emit();
       return true;
-    },
-    [TOKIO_EVENTS.FOLLOW]: (live) => {
-      live.followers++;
-      return true;
-    },
-    [TOKIO_EVENTS.SHARE]: (live) => {
-      live.shares++;
-      return true;
-    },
-    [TOKIO_EVENTS.LIKE]: (live, { totalLikes }) => {
-      if (totalLikes <= live.likes) return false;
-      live.likes = totalLikes;
-      return true;
-    },
-    [TOKIO_EVENTS.ROOM_USER]: (live, { views, viewers }) => {
-      const changed = views > live.views || viewers > live.peakViewers;
-      live.views = Math.max(live.views, views);
-      live.peakViewers = Math.max(live.peakViewers, viewers);
-      return changed;
     },
   };
 
@@ -175,6 +193,7 @@ export class HistoryService extends Service {
     this._best = [];
     this._live = null;
     this._liveGifters = new Map();
+    this._minutes = [];
     this._streaks.clear();
     this._ended = [];
     this._liveUnsaved = false;
@@ -232,19 +251,9 @@ export class HistoryService extends Service {
   public start(username: string, now = Date.now()) {
     if (this._dir === null) return;
     this.end(now);
-    this._live = {
-      username,
-      startedAt: now,
-      endedAt: now,
-      coins: 0,
-      gifts: 0,
-      followers: 0,
-      shares: 0,
-      likes: 0,
-      views: 0,
-      peakViewers: 0,
-    };
+    this._live = { username, startedAt: now, endedAt: now, coins: 0, gifts: 0 };
     this._liveGifters = new Map();
+    this._minutes = [];
     this._streaks.clear();
     this._liveUnsaved = true;
     this._emit();
@@ -265,6 +274,7 @@ export class HistoryService extends Service {
     this._rank();
     this._live = null;
     this._liveGifters = new Map();
+    this._minutes = [];
     this._streaks.clear();
     this._liveUnsaved = false;
     this._indexUnsaved = true;
@@ -309,43 +319,75 @@ export class HistoryService extends Service {
   }
 
   /**
-   * The top SHOWN_GIFTERS of the finished LIVEs that started from `from`
-   * (included) to `to` (left out), each with their place among them, and with
-   * a query only the ones whose name or @handle has it. A range of every LIVE
-   * is all time's list; others are added up from their files, leaving out a
-   * file that doesn't load.
+   * The finished LIVEs' coins and gifts in some dates: a LIVE all in them
+   * counts whole, and one they cut only its gifts in them, so only those take
+   * reading a file.
+   */
+  public async getTotals(
+    range: DateRange,
+  ): Promise<Pick<LiveSummary, "coins" | "gifts">> {
+    const dir = this._dir;
+    const totals = { coins: 0, gifts: 0 };
+    if (dir === null) return totals;
+    for (const live of this._lives.filter((l) => inRange(l, range))) {
+      if (allInRange(live, range)) {
+        totals.coins += live.coins;
+        totals.gifts += live.gifts;
+        continue;
+      }
+      const record = await this._readLive(dir, live.startedAt);
+      for (const { gifters } of minutesIn(record, range)) {
+        for (const [coins, gifts] of Object.values(gifters)) {
+          totals.coins += coins;
+          totals.gifts += gifts;
+        }
+      }
+    }
+    return this._dir === dir ? totals : { coins: 0, gifts: 0 };
+  }
+
+  /**
+   * The top SHOWN_GIFTERS of the finished LIVEs in some dates, counting only
+   * the gifts in them of a LIVE they cut, each with their place among them, and
+   * with a query only the ones whose name or @handle has it. Every LIVE whole
+   * is all time's list; other dates are added up from the LIVEs' files,
+   * leaving out a file that doesn't load.
    */
   public async getGifters({
-    from = -Infinity,
-    to = Infinity,
+    from,
+    to,
     query = "",
-  }: {
-    from?: number;
-    to?: number;
-    query?: string;
-  }): Promise<RankedGifter[]> {
+  }: DateRange & { query?: string }): Promise<RankedGifter[]> {
     const dir = this._dir;
     if (dir === null) return [];
-    const lives = this._lives.filter(
-      ({ startedAt }) => startedAt >= from && startedAt < to,
-    );
+    const range = { from, to };
+    const lives = this._lives.filter((l) => inRange(l, range));
     // Kept in byCoins order, and read from no file
     let ranked = [...this._gifters.values()];
-    if (lives.length < this._lives.length) {
+    if (
+      lives.length < this._lives.length ||
+      !lives.every((l) => allInRange(l, range))
+    ) {
       const records = await Promise.all(
         lives.map(({ startedAt }) => this._readLive(dir, startedAt)),
       );
       if (this._dir !== dir) return [];
       const gifters = new Map<string, Gifter>();
       // Oldest first, so the name, handle and picture end up the latest ones
-      for (const gifter of records.flatMap((r) => r?.gifters ?? [])) {
-        const past = gifters.get(gifter.userId);
-        gifters.set(gifter.userId, {
-          ...gifter,
-          picture: gifter.picture || (past?.picture ?? ""),
-          coins: (past?.coins ?? 0) + gifter.coins,
-          gifts: (past?.gifts ?? 0) + gifter.gifts,
-        });
+      for (const record of records) {
+        if (!record) continue;
+        const sent = allInRange(record, range)
+          ? record.gifters
+          : giftersIn(record, range);
+        for (const gifter of sent) {
+          const past = gifters.get(gifter.userId);
+          gifters.set(gifter.userId, {
+            ...gifter,
+            picture: gifter.picture || (past?.picture ?? ""),
+            coins: (past?.coins ?? 0) + gifter.coins,
+            gifts: (past?.gifts ?? 0) + gifter.gifts,
+          });
+        }
       }
       ranked = [...gifters.values()].sort(byCoins);
     }
@@ -476,11 +518,25 @@ export class HistoryService extends Service {
       ...live,
       endedAt: now,
       gifters: [...this._liveGifters.values()].sort(byCoins),
+      // Copies, since the minute now still changes
+      minutes: this._minutes.map((m) => ({ ...m, gifters: { ...m.gifters } })),
     };
   }
 
-  // Adds a finished LIVE to the list and its gifters to all time
-  private _finish({ gifters, ...summary }: LiveRecord) {
+  // The LIVE in progress's minute now, added when it's new
+  private _minute(live: LiveSummary): GiftMinute {
+    const minute =
+      Math.floor(Date.now() / MINUTE) - Math.floor(live.startedAt / MINUTE);
+    const last = this._minutes.at(-1);
+    if (last?.minute === minute) return last;
+    const next = { minute, gifters: {} };
+    this._minutes.push(next);
+    return next;
+  }
+
+  // Adds a finished LIVE to the list and its gifters to all time. Its
+  // minutes stay in its file.
+  private _finish({ gifters, minutes: _minutes, ...summary }: LiveRecord) {
     this._lives.push(summary);
     for (const gifter of gifters) {
       const past = this._gifters.get(gifter.userId);

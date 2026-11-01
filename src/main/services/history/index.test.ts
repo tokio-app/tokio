@@ -29,6 +29,8 @@ const viewer = (userId: string, handle = `fan${userId}`) =>
     profilePictures: [`https://p16/${handle}.jpg`, `https://p19/${handle}.jpg`],
   }) satisfies UserData;
 
+const MINUTE = 60_000;
+
 const gift = (
   user: UserData,
   coins: number,
@@ -85,7 +87,7 @@ describe("HistoryService", () => {
   const read = async <T>(file: string): Promise<T> =>
     JSON.parse(await readFile(join(dir, "a", file), "utf-8"));
 
-  it("counts a LIVE's events, a combo once", async () => {
+  it("counts a LIVE's gifts, a combo once", async () => {
     const history = await loaded();
     history.start("kai", 1000);
     const ana = viewer("1", "ana");
@@ -98,24 +100,6 @@ describe("HistoryService", () => {
       // No id: the totals only
       [1500, gift({ ...viewer("2"), userId: "" }, 100)],
     );
-    history.record(TOKIO_EVENTS.FOLLOW, { user: ana });
-    history.record(TOKIO_EVENTS.SHARE, { user: ana, shareCount: 1 });
-    history.record(TOKIO_EVENTS.LIKE, {
-      user: ana,
-      likeCount: 5,
-      totalLikes: 50,
-    });
-    history.record(TOKIO_EVENTS.LIKE, {
-      user: ana,
-      likeCount: 5,
-      totalLikes: 40,
-    });
-    for (const [views, viewers] of [
-      [100, 12],
-      [90, 30],
-      [120, 20],
-    ])
-      history.record(TOKIO_EVENTS.ROOM_USER, { ranks: [], views, viewers });
     history.end(2000);
 
     expect(history.getHistory()).toEqual({
@@ -126,11 +110,6 @@ describe("HistoryService", () => {
           endedAt: 2000,
           coins: 115,
           gifts: 4,
-          followers: 1,
-          shares: 1,
-          likes: 50,
-          views: 120,
-          peakViewers: 30,
         },
       ],
       gifters: [
@@ -257,7 +236,8 @@ describe("HistoryService", () => {
       lives: LiveSummary[];
       gifters: { userId: string }[];
     }>("index.json");
-    const { gifters, ...summary } = record;
+    const { gifters, minutes, ...summary } = record;
+    expect(minutes).toEqual([expect.objectContaining({ minute: 0 })]);
     expect(index.lives).toEqual([summary]);
     const ids = index.gifters.map((g) => g.userId);
     expect(ids).toHaveLength(MAX_GIFTERS);
@@ -413,7 +393,87 @@ describe("HistoryService", () => {
     expect((await loaded()).getHistory()).toEqual(history.getHistory());
   });
 
-  it("adds up the gifters of the LIVEs that started in a range", async () => {
+  it("keeps the minutes a LIVE's gifts came in, in its file and not the index", async () => {
+    const history = await loaded();
+    // 30 s into the clock's minute 10
+    const start = 10 * MINUTE + 30_000;
+    history.start("kai", start);
+    gifts(
+      history,
+      [start + 10_000, gift(viewer("1"), 5)],
+      [start + 20_000, gift(viewer("1"), 5)],
+      [start + 40_000, gift(viewer("2"), 100)],
+      // No id: the minute's totals only
+      [start + 50_000, gift({ ...viewer("3"), userId: "" }, 1)],
+      [start + 100_000, gift(viewer("1"), 2)],
+    );
+    history.end(start + 120_000);
+    await history.save();
+
+    expect((await read<LiveRecord>(`${start}.json`)).minutes).toEqual([
+      { minute: 0, gifters: { 1: [10, 2] } },
+      { minute: 1, gifters: { 2: [100, 1], "": [1, 1] } },
+      { minute: 2, gifters: { 1: [2, 1] } },
+    ]);
+    const { lives } = await read<{ lives: LiveSummary[] }>("index.json");
+    expect(lives).toEqual([
+      {
+        username: "kai",
+        startedAt: start,
+        endedAt: start + 120_000,
+        coins: 113,
+        gifts: 5,
+      },
+    ]);
+  });
+
+  it("counts only the gifts in the dates of a LIVE they cut", async () => {
+    const history = await loaded();
+    // From 10:30 to 12:30 into the clock's minutes, then from 20 to 21
+    const start = 10 * MINUTE + 30_000;
+    history.start("kai", start);
+    gifts(
+      history,
+      [start + 10_000, gift(viewer("1"), 5)],
+      [start + 40_000, gift(viewer("2"), 100)],
+      [start + 50_000, gift(viewer("1"), 7)],
+      [start + 55_000, gift({ ...viewer("3"), userId: "" }, 3)],
+    );
+    history.end(start + 120_000);
+    history.start("kai", 20 * MINUTE);
+    gifts(history, [20 * MINUTE + 1000, gift(viewer("2"), 1)]);
+    history.end(21 * MINUTE);
+
+    // The first LIVE from its second minute, and all of the second
+    const since = { from: 11 * MINUTE };
+    expect(await history.getTotals(since)).toEqual({ coins: 111, gifts: 4 });
+    expect(await history.getGifters(since)).toEqual([
+      expect.objectContaining({ userId: "2", coins: 101, gifts: 2, rank: 1 }),
+      expect.objectContaining({ userId: "1", coins: 7, gifts: 1, rank: 2 }),
+    ]);
+
+    // The first LIVE's first minute
+    const until = { to: 11 * MINUTE };
+    expect(await history.getTotals(until)).toEqual({ coins: 5, gifts: 1 });
+    expect(await history.getGifters(until)).toEqual([
+      expect.objectContaining({ userId: "1", coins: 5, rank: 1 }),
+    ]);
+
+    // Whole LIVEs come from the list, as do the dates of one LIVE
+    expect(await history.getTotals({})).toEqual({ coins: 116, gifts: 5 });
+    expect(
+      await history.getGifters({ from: start, to: start + 120_000 }),
+    ).toEqual([
+      expect.objectContaining({ userId: "2", coins: 100, rank: 1 }),
+      expect.objectContaining({ userId: "1", coins: 12, rank: 2 }),
+    ]);
+    expect(await history.getTotals({ from: 30 * MINUTE })).toEqual({
+      coins: 0,
+      gifts: 0,
+    });
+  });
+
+  it("adds up the gifters of the LIVEs in some dates", async () => {
     const history = await loaded();
     history.start("kai", 1000);
     gifts(
@@ -493,11 +553,6 @@ describe("HistoryService", () => {
         endedAt: (i + 1) * HOUR + 60_000,
         coins: 0,
         gifts: 0,
-        followers: 0,
-        shares: 0,
-        likes: 0,
-        views: 0,
-        peakViewers: 0,
       }));
       await mkdir(join(dir, "a"));
       await writeFile(
@@ -641,9 +696,8 @@ describe("HistoryService", () => {
     history.onChange(listener);
     history.start("kai", 1000);
     history.record(TOKIO_EVENTS.GIFT, gift(viewer("1"), 5, 1, false));
-    // A combo's end that adds nothing, and events that don't touch the lists
+    // A combo's end that adds nothing
     history.record(TOKIO_EVENTS.GIFT, gift(viewer("1"), 5, 1, true));
-    history.record(TOKIO_EVENTS.FOLLOW, { user: viewer("1") });
     expect(listener).toHaveBeenCalledTimes(2);
 
     history.end(2000);

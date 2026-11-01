@@ -1,5 +1,5 @@
 import { Section } from "@/components";
-import { cx, formatStat } from "@/helper";
+import { formatStat } from "@/helper";
 import { useLanguage, useT } from "@/ui/i18n";
 import { ReactNode } from "react";
 import styles from "../lives.module.css";
@@ -28,24 +28,19 @@ export function SummarySection({ title, lines, action, totals }: Props) {
       ))}
       actions={action}
     >
-      {READOUT.map((row, i) => (
-        <div
-          key={i}
-          className={cx(styles.readout, i === 0 ? styles.big : styles.small)}
-        >
-          {row.map(({ key, label }) => {
-            const { short, full } = formatStat(totals[key], language);
-            return (
-              <div key={key} className={styles.stat}>
-                <span className={styles.stat_value} title={full}>
-                  {short}
-                </span>
-                <span className={styles.stat_label}>{t(label)}</span>
-              </div>
-            );
-          })}
-        </div>
-      ))}
+      <div className={styles.readout}>
+        {READOUT.map(({ key, label }) => {
+          const { short, full } = formatStat(totals[key], language);
+          return (
+            <div key={key} className={styles.stat}>
+              <span className={styles.stat_value} title={full}>
+                {short}
+              </span>
+              <span className={styles.stat_label}>{t(label)}</span>
+            </div>
+          );
+        })}
+      </div>
     </Section>
   );
 }

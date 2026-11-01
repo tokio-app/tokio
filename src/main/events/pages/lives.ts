@@ -41,16 +41,30 @@ events.push(
   },
 );
 
-// The page's totals for the dates it filters by, and its gifter search
+// The page's totals and top gifters for the dates it filters by, and its
+// gifter search. Dates get their totals first, which read at most the LIVEs
+// they cut, then again with the gifters, which read every LIVE in them.
 events.push(
   APP_EVENTS.GET_GIFTERS,
   async ({ historyService }, e, { from, to, query }) => {
+    const totals = query
+      ? undefined
+      : await historyService.getTotals({ from, to });
+    if (totals) {
+      e.reply(APP_EVENTS_RESPONSE.GIFTERS, {
+        success: true,
+        from,
+        to,
+        totals,
+      });
+    }
     const data = await historyService.getGifters({ from, to, query });
     e.reply(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       from,
       to,
       query,
+      totals,
       data,
     });
   },

@@ -66,17 +66,22 @@ export type LiveSummary = {
   // Counted since Tokio connected
   coins: number;
   gifts: number;
-  followers: number;
-  shares: number;
-  // TikTok's numbers for the whole LIVE, as it last sent them
-  likes: number;
-  views: number;
-  // The most viewers at once
-  peakViewers: number;
 };
 
-// A LIVE with every viewer who sent gifts in it, the most coins first
-export type LiveRecord = LiveSummary & { gifters: Gifter[] };
+// A clock minute of a LIVE in which gifts came
+export type GiftMinute = {
+  // Counted from the minute the LIVE started in
+  minute: number;
+  // What each gifter sent in it, by user id ("" for gifts without one)
+  gifters: Record<string, [coins: number, gifts: number]>;
+};
+
+// A LIVE with every viewer who sent gifts in it, the most coins first, and
+// the minutes its gifts came in, so dates that cut it take only those
+export type LiveRecord = LiveSummary & {
+  gifters: Gifter[];
+  minutes: GiftMinute[];
+};
 
 // A gifter found by a search, with their place among all of them (1, the
 // most coins)

@@ -21,22 +21,12 @@ const friday = liveSummary(FRIDAY, {
   endedAt: FRIDAY + (2 * 3600 + 14 * 60 + 5) * 1000,
   coins: 12_400,
   gifts: 1203,
-  followers: 87,
-  shares: 24,
-  likes: 18_200,
-  peakViewers: 312,
-  views: 5100,
 });
 const saturday = liveSummary(SATURDAY, {
   username: "kai_live",
   endedAt: SATURDAY + 30 * 60 * 1000,
   coins: 600,
   gifts: 40,
-  followers: 3,
-  shares: 1,
-  likes: 900,
-  peakViewers: 40,
-  views: 300,
 });
 
 const lives = (list: LiveSummary[], gifters: Gifter[] = []) =>
@@ -46,7 +36,7 @@ const record = (live: LiveSummary, gifters: Gifter[]) =>
   send(APP_EVENTS_RESPONSE.LIVE, {
     success: true,
     startedAt: live.startedAt,
-    data: { ...live, gifters },
+    data: { ...live, gifters, minutes: [] },
   });
 
 const list = () => screen.getByRole("listbox", { name: "Your LIVEs" });
@@ -143,11 +133,6 @@ describe("Lives", () => {
     expect(stat("Coins")).toHaveTextContent("12.4K");
     expect(stat("Coins")).toHaveAttribute("title", "12,400");
     expect(stat("Gifts")).toHaveTextContent("1.2K");
-    expect(stat("New followers")).toHaveTextContent("87");
-    expect(stat("Shares")).toHaveTextContent("24");
-    expect(stat("Likes")).toHaveTextContent("18.2K");
-    expect(stat("Peak viewers")).toHaveTextContent("312");
-    expect(stat("Views")).toHaveTextContent("5.1K");
     expect(sent(APP_EVENTS.GET_LIVE)).toEqual([
       { startedAt: SATURDAY },
       { startedAt: FRIDAY },
@@ -163,10 +148,10 @@ describe("Lives", () => {
   });
 
   it("filters the LIVEs by date, with their totals and top gifters", async () => {
-    // A day back reaches Saturday's LIVE, not Friday's
+    // A day back reaches Saturday's LIVE, not Friday's, over by 10:28 PM
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date(2026, 9, 31, 21));
-    const since = new Date(2026, 9, 30, 21).getTime();
+    vi.setSystemTime(new Date(2026, 9, 31, 23));
+    const since = new Date(2026, 9, 30, 23).getTime();
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday]);
 
@@ -200,6 +185,39 @@ describe("Lives", () => {
       data: [{ ...gifter("Ana", 5200, 53), rank: 1 }],
     });
     expect(gifterRows("Top gifters")).toEqual([expect.stringContaining("Ana")]);
+  });
+
+  it("counts only the gifts in the dates of a LIVE they cut, as main adds them up", async () => {
+    // A day back cuts Friday's LIVE, on until 10:28 PM
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 31, 21));
+    const since = new Date(2026, 9, 30, 21).getTime();
+    const { user } = renderWithProviders(<Lives />);
+    await lives([saturday, friday]);
+
+    await dates(user, "Last 24 hours");
+
+    expect(options()).toEqual([
+      "Last 24 hours, 600 coins",
+      expect.stringMatching(/^Saturday/),
+      expect.stringMatching(/^Friday/),
+    ]);
+    expect(screen.getByText("2 LIVEs")).toBeInTheDocument();
+    // Saturday's 30 minutes, and Friday's from 9:00 to 10:28:05 PM
+    expect(screen.getByText("01:58:05 in total")).toBeInTheDocument();
+    // Saturday's alone until main adds Friday's gifts from 9:00 PM
+    expect(stat("Coins")).toHaveTextContent("600");
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      from: since,
+      totals: { coins: 900, gifts: 70 },
+    });
+
+    expect(stat("Coins")).toHaveTextContent("900");
+    expect(stat("Gifts")).toHaveTextContent("70");
+    expect(options()[0]).toBe("Last 24 hours, 900 coins");
+    // The gifters come after
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
   });
 
   it("says when no LIVE or gift matches the dates", async () => {
@@ -385,7 +403,7 @@ describe("Lives", () => {
     ]);
   });
 
-  it("searches the selected LIVE's gifters", async () => {
+  it("searches all of the selected LIVE's gifters", async () => {
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday]);
     await user.click(option(/^Friday/));
@@ -395,12 +413,12 @@ describe("Lives", () => {
 
     await waitFor(() =>
       expect(sent(APP_EVENTS.GET_GIFTERS)).toEqual([
-        { from: FRIDAY, to: FRIDAY + 1, query: "@ana" },
+        { from: FRIDAY, to: friday.endedAt, query: "@ana" },
       ]),
     );
   });
 
-  it("sums every LIVE in All time, with the best peak and the top gifters", async () => {
+  it("sums every LIVE in All time, with the top gifters", async () => {
     const { user } = renderWithProviders(<Lives />);
     await lives([saturday, friday], [gifter("Ana", 5200, 52)]);
 
@@ -411,11 +429,6 @@ describe("Lives", () => {
     expect(screen.getByText("02:44:05 in total")).toBeInTheDocument();
     expect(stat("Coins")).toHaveAttribute("title", "13,000");
     expect(stat("Gifts")).toHaveAttribute("title", "1,243");
-    expect(stat("New followers")).toHaveTextContent("90");
-    expect(stat("Shares")).toHaveTextContent("25");
-    expect(stat("Likes")).toHaveAttribute("title", "19,100");
-    expect(stat("Peak viewers")).toHaveTextContent("312");
-    expect(stat("Views")).toHaveAttribute("title", "5,400");
     expect(gifterRows("Top gifters")).toEqual(["1AAna@ana5,200 coins52 gifts"]);
     // All time comes with LIVES, nothing more to ask for
     expect(sent(APP_EVENTS.GET_LIVE)).toEqual([{ startedAt: SATURDAY }]);

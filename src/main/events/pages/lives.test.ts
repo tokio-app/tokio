@@ -16,11 +16,6 @@ const summary: LiveSummary = {
   endedAt: 5000,
   coins: 10,
   gifts: 2,
-  followers: 1,
-  shares: 0,
-  likes: 30,
-  views: 12,
-  peakViewers: 4,
 };
 const gifter = {
   userId: "42",
@@ -31,7 +26,8 @@ const gifter = {
   gifts: 2,
   giftedAt: 2000,
 };
-const record: LiveRecord = { ...summary, gifters: [gifter] };
+const record: LiveRecord = { ...summary, gifters: [gifter], minutes: [] };
+const totals = { coins: 10, gifts: 2 };
 const history: LiveHistory = { lives: [summary], gifters: [gifter] };
 const empty: LiveHistory = { lives: [], gifters: [] };
 
@@ -113,6 +109,27 @@ describe("lives events", () => {
   });
 
   describe("GET_GIFTERS", () => {
+    it("replies the dates' totals first, then again with their gifters", async () => {
+      const found = [{ ...gifter, rank: 1 }];
+      const getTotals = vi.fn(
+        async (_range: { from?: number; to?: number }) => totals,
+      );
+      const h = createHandler({
+        historyService: { getTotals, getGifters: async () => found },
+      });
+
+      await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 1000, to: 2000 });
+
+      expect(getTotals).toHaveBeenCalledExactlyOnceWith({
+        from: 1000,
+        to: 2000,
+      });
+      expect(h.replies(APP_EVENTS_RESPONSE.GIFTERS)).toEqual([
+        { success: true, from: 1000, to: 2000, totals },
+        { success: true, from: 1000, to: 2000, totals, data: found },
+      ]);
+    });
+
     it("replies the range's gifters with the range and the search", async () => {
       const found = [{ ...gifter, rank: 3 }];
       const getGifters = vi.fn(
@@ -140,6 +157,7 @@ describe("lives events", () => {
     it("keeps the range when reading throws", async () => {
       const h = createHandler({
         historyService: {
+          getTotals: async () => totals,
           getGifters: async () => {
             throw new Error("EBUSY");
           },
@@ -149,6 +167,7 @@ describe("lives events", () => {
       await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 1000, to: 2000 });
 
       expect(h.replies(APP_EVENTS_RESPONSE.GIFTERS)).toEqual([
+        { success: true, from: 1000, to: 2000, totals },
         {
           success: false,
           from: 1000,

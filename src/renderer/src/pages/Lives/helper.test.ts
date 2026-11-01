@@ -5,7 +5,6 @@ import {
   capitalize,
   DateFilter,
   dateRange,
-  inRange,
   keepSelection,
   periodText,
 } from "./helper";
@@ -85,13 +84,6 @@ describe("dateRange", () => {
     expect(dateRange(custom({ operator: "on" }), NOW)).toBeNull();
     expect(dateRange(custom({ from: at("2026-10-10") }), NOW)).toBeNull();
   });
-
-  it("checks a LIVE by when it started", () => {
-    const evening = liveSummary(day(30, 20));
-    expect(inRange(evening, { from: day(30), to: day(31) })).toBe(true);
-    expect(inRange(evening, { to: day(30) })).toBe(false);
-    expect(inRange(evening, {})).toBe(true);
-  });
 });
 
 describe("periodText", () => {
@@ -127,53 +119,30 @@ describe("periodText", () => {
 });
 
 describe("allTime", () => {
-  it("adds up every LIVE, with the best peak and the total length", () => {
-    const lives = [
-      liveSummary(3000, {
-        coins: 100,
-        gifts: 10,
-        followers: 3,
-        shares: 2,
-        likes: 500,
-        views: 80,
-        peakViewers: 30,
-        endedAt: 3000 + 60_000,
-      }),
-      liveSummary(1000, {
-        coins: 25,
-        gifts: 5,
-        followers: 1,
-        shares: 0,
-        likes: 120,
-        views: 20,
-        peakViewers: 12,
-        endedAt: 1000 + 30_000,
-      }),
-    ];
+  const lives = [
+    liveSummary(day(30, 20), { coins: 100, gifts: 10, endedAt: day(30, 22) }),
+    liveSummary(day(29, 20), { coins: 25, gifts: 5, endedAt: day(29, 21) }),
+  ];
 
+  it("adds up every LIVE's coins, gifts and length", () => {
     expect(allTime(lives)).toEqual({
       coins: 125,
       gifts: 15,
-      followers: 4,
-      shares: 2,
-      likes: 620,
-      views: 100,
-      peakViewers: 30,
-      length: 90_000,
+      length: 3 * HOUR,
+    });
+  });
+
+  it("takes the time in the dates, and the coins of the LIVEs all in them", () => {
+    // From 8:30 PM on the 29th: half an hour of one LIVE, all of the other
+    expect(allTime(lives, { from: day(29, 20, 30) })).toEqual({
+      coins: 100,
+      gifts: 10,
+      length: 2 * HOUR + HOUR / 2,
     });
   });
 
   it("is all zeros without LIVEs", () => {
-    expect(allTime([])).toEqual({
-      coins: 0,
-      gifts: 0,
-      followers: 0,
-      shares: 0,
-      likes: 0,
-      views: 0,
-      peakViewers: 0,
-      length: 0,
-    });
+    expect(allTime([])).toEqual({ coins: 0, gifts: 0, length: 0 });
   });
 });
 

@@ -2,6 +2,7 @@ export * from "./alerts";
 export * from "./catalog";
 export * from "./constants";
 export * from "./games";
+export * from "./history";
 export * from "./samples";
 export * from "./timer";
 
