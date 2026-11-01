@@ -914,8 +914,10 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       gift: gift("Finger Heart", 3),
     },
   ].map((item, id) => ({ ...item, id: 100 - id }));
+  // live: without it, Home shows a connect still in progress
   await push("app:home:res:connect", {
     success: true,
+    live: true,
     stats: { views: 18250, viewers: 342, likes: 52410 },
   });
   await push("app:home:res:session", {

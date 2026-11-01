@@ -36,8 +36,10 @@ The website is in English and Spanish, so retake both:
 - `push(channel, data)` sends what main would push, on an `APP_EVENTS_RESPONSE` channel (`src/common/types/events/res.ts`). It shows LIVE-only UI without a LIVE:
 
   ```js
+  // Without live: true, Home shows a connect still in progress
   await push("app:home:res:connect", {
     success: true,
+    live: true,
     stats: { views: 1200, viewers: 85, likes: 3400 },
   });
   await push("app:home:res:session", { data: session }); // a LiveSession, src/common/types/live.ts
