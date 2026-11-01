@@ -114,7 +114,7 @@ export function DateTimePicker({
             ref={popoverRef}
             role="dialog"
             aria-label={label}
-            className={cx(elements.popover, styles.popover)}
+            className={cx(elements.popover, styles.dialog)}
             style={{
               top: position.top,
               bottom: position.bottom,

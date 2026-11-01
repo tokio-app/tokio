@@ -10,7 +10,7 @@
 }
 
 /* On the shared .popover */
-.popover {
+.dialog {
   gap: var(--space-3);
   padding: var(--space-3);
 }
