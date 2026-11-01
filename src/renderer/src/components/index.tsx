@@ -1,4 +1,5 @@
 export * from "./AlertItem";
+export * from "./Avatar";
 export * from "./CopyField";
 export * from "./DeleteModals";
 export * from "./Elements";

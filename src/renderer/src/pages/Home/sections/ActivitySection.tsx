@@ -1,6 +1,6 @@
 import { MessageKey } from "@/common/i18n";
-import { ActivityItem, ActivityUser } from "@/common/types";
-import { Btn, EmptyState, Section } from "@/components";
+import { ActivityItem } from "@/common/types";
+import { Avatar, Btn, EmptyState, Section } from "@/components";
 import { cx } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
 import { rich, useLanguage, useT } from "@/ui/i18n";
@@ -17,23 +17,6 @@ interface Props {
   // Every kind of event is hidden
   feedOff: boolean;
   onFeedSettings: () => void;
-}
-
-// Splits a name into what shows as one character, a flag or emoji included
-const characters = new Intl.Segmenter();
-
-function Avatar({ user }: { user: ActivityUser }) {
-  if (user.picture) {
-    return (
-      <img className={styles.avatar} src={user.picture} alt="" loading="lazy" />
-    );
-  }
-  const [initial] = characters.segment(user.name);
-  return (
-    <span className={styles.avatar} aria-hidden="true">
-      {initial?.segment.toUpperCase()}
-    </span>
-  );
 }
 
 const DID: Record<"follow" | "share" | "superfan", MessageKey> = {
@@ -90,14 +73,14 @@ function Event({ item }: { item: ActivityItem }) {
   if (item.type === "join") {
     return (
       <li className={cx(styles.event, styles.event_quiet)}>
-        <Avatar user={item.users[0]} />
+        <Avatar name={item.users[0].name} picture={item.users[0].picture} />
         {joinedText(item.users, item.count, language)}
       </li>
     );
   }
   return (
     <li className={styles.event}>
-      <Avatar user={item.user} />
+      <Avatar name={item.user.name} picture={item.user.picture} />
       <div className={styles.event_body}>
         <Action item={item} />
       </div>

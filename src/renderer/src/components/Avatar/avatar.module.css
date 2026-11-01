@@ -1,0 +1,14 @@
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background-color: var(--border);
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  object-fit: cover;
+}
