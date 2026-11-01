@@ -22,10 +22,12 @@ import {
   Gift,
   GiftEvent,
   LikeEvent,
+  LiveHistory,
   MusicInfo,
   RoomUserEvent,
   TOKIO_EVENTS,
   TokioPayload,
+  TopGifter,
   UserData,
 } from "@/common/types";
 import {
@@ -41,6 +43,7 @@ import type { AlertsService } from "@/services/alerts";
 import type { ReconnectState } from "@/services/connector/common";
 import { FAN_EVENTS, type FansService } from "@/services/fans";
 import type { GamesService } from "@/services/games";
+import { HISTORY_EVENTS, type HistoryService } from "@/services/history";
 import { LiveService } from "@/services/live";
 import type { MusicService } from "@/services/music";
 import type { OverlayService } from "@/services/overlay";
@@ -212,6 +215,7 @@ function setup() {
   };
   const connectorService = {
     ...conn,
+    username: "streamer",
     setLogFile: vi.fn(),
     onReconnect: vi.fn((_listener: (state: ReconnectState) => void) => {}),
     fetchGifts: vi.fn(
@@ -328,6 +332,23 @@ function setup() {
     save: vi.fn(async () => true),
     onChange: vi.fn((_listener: () => void) => {}),
   };
+  const historyService = {
+    setLogFile: vi.fn(),
+    initialize: vi.fn(
+      (..._args: Parameters<HistoryService["initialize"]>) => {},
+    ),
+    load: vi.fn(async (_file: string) => {}),
+    start: vi.fn((_username: string) => {}),
+    record: vi.fn((..._args: Parameters<HistoryService["record"]>) => {}),
+    end: vi.fn(() => {}),
+    top: vi.fn((): { live: TopGifter[]; allTime: TopGifter[] } => ({
+      live: [],
+      allTime: [],
+    })),
+    getHistory: vi.fn((): LiveHistory => ({ lives: [], gifters: [] })),
+    save: vi.fn(async () => true),
+    onChange: vi.fn((_listener: () => void) => {}),
+  };
   const gamesService = {
     setLogFile: vi.fn(),
     configure: vi.fn(
@@ -357,6 +378,7 @@ function setup() {
     liveService,
     timerService,
     fansService,
+    historyService,
     gamesService,
     trayService,
     yamlManagerService: {},
@@ -384,6 +406,7 @@ function setup() {
     timer,
     timerService,
     fansService,
+    historyService,
     gamesService,
     trayService,
   };
@@ -1378,9 +1401,11 @@ describe("init events", () => {
 
       for (const listener of connected) listener("gift-jar");
 
-      expect(s.serverService.sendToClient.mock.calls).toEqual([
-        ["gift-jar", message([fan])],
-      ]);
+      expect(
+        s.serverService.sendToClient.mock.calls.filter(
+          ([, sent]) => sent.type === "tokio:fans",
+        ),
+      ).toEqual([["gift-jar", message([fan])]]);
     });
 
     it("pushes their changes at most every 5 s, with the list when it goes", async () => {
@@ -1453,6 +1478,154 @@ describe("init events", () => {
       await load(s);
 
       expect(s.fansService.load).toHaveBeenCalledExactlyOnceWith("stream.json");
+    });
+  });
+
+  describe("history", () => {
+    const gifter: TopGifter = {
+      userId: "42",
+      username: "Ana",
+      handle: "ana",
+      picture: "ana.png",
+      live: { coins: 5, gifts: 5 },
+      allTime: { coins: 105, gifts: 6 },
+      giftedAt: 1000,
+    };
+    const top = (live: TopGifter[] = [], allTime: TopGifter[] = []) => ({
+      live,
+      allTime,
+    });
+    const message = (data = top()) => ({ type: "tokio:gifters", data });
+    const change = (s: Setup) => s.historyService.onChange.mock.calls[0][0]();
+
+    it("starts a LIVE on the connected username", async () => {
+      const s = await live();
+
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+
+      expect(s.historyService.start).toHaveBeenCalledExactlyOnceWith(
+        "streamer",
+      );
+    });
+
+    it.each(HISTORY_EVENTS)("records %s", async (event) => {
+      const s = await live();
+      const { data } = generateTikTokEventSample(event);
+
+      emitLive(s.conn, event, data);
+
+      expect(s.historyService.record).toHaveBeenCalledExactlyOnceWith(
+        event,
+        data,
+      );
+    });
+
+    it("ends the LIVE, pushes the LIVEs and saves when the connection stops", async () => {
+      const s = await live();
+      const history: LiveHistory = { lives: [], gifters: [] };
+      s.historyService.getHistory.mockReturnValue(history);
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVES)).toEqual([
+        { data: history },
+      ]);
+      const [ended] = s.historyService.end.mock.invocationCallOrder;
+      const [read] = s.historyService.getHistory.mock.invocationCallOrder;
+      const [saved] = s.historyService.save.mock.invocationCallOrder;
+      expect(ended).toBeLessThan(read);
+      expect(read).toBeLessThan(saved);
+    });
+
+    it("still saves when the window closed", async () => {
+      const s = await live();
+      s.h.win.close();
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVES)).toEqual([]);
+      expect(s.historyService.save).toHaveBeenCalledOnce();
+    });
+
+    it("sends the top gifters to each overlay as it connects", async () => {
+      const s = await live();
+      s.historyService.top.mockReturnValue(top([gifter], [gifter]));
+      s.serverService.sendToClient.mockClear();
+      const connected = s.serverService.onConnect.mock.calls.map(
+        ([listener]) => listener,
+      );
+
+      for (const listener of connected) listener("gift-jar");
+
+      expect(
+        s.serverService.sendToClient.mock.calls.filter(
+          ([, sent]) => sent.type === "tokio:gifters",
+        ),
+      ).toEqual([["gift-jar", message(top([gifter], [gifter]))]]);
+    });
+
+    it("pushes their changes at most every second, with the lists when it goes", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+
+      change(s);
+      s.historyService.top.mockReturnValue(top([gifter]));
+      change(s);
+      change(s);
+      expect(s.serverService.sendToAll.mock.calls).toEqual([[message()]]);
+
+      vi.advanceTimersByTime(1000);
+
+      expect(s.serverService.sendToAll.mock.calls).toEqual([
+        [message()],
+        [message(top([gifter]))],
+      ]);
+    });
+
+    it("saves the LIVE in progress every 30 s", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+
+      vi.advanceTimersByTime(30_000);
+      expect(s.historyService.save).toHaveBeenCalledOnce();
+      vi.advanceTimersByTime(30_000);
+      expect(s.historyService.save).toHaveBeenCalledTimes(2);
+    });
+
+    it("warns once in 30 s when it can't be saved", async () => {
+      const s = await live();
+      s.historyService.save.mockResolvedValue(false);
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+      await flushPromises();
+
+      expect(s.historyService.save).toHaveBeenCalledTimes(2);
+      expect(noticesFor(s, FEEDBACK_CODES.HISTORY_SAVE_FAILED)).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "system",
+          message: "Unable to save the LIVE history.",
+        }),
+      ]);
+    });
+
+    it("loads the active profile's history at startup, after the fans", async () => {
+      const s = setup();
+
+      await load(s);
+
+      expect(s.historyService.setLogFile).toHaveBeenCalledWith("system.log");
+      expect(s.historyService.initialize).toHaveBeenCalledExactlyOnceWith({
+        json: s.h.handler.jsonManagerService,
+        folder: "app/history",
+      });
+      expect(s.historyService.load).toHaveBeenCalledExactlyOnceWith(
+        "stream.json",
+      );
+      expect(s.fansService.load.mock.invocationCallOrder[0]).toBeLessThan(
+        s.historyService.load.mock.invocationCallOrder[0],
+      );
     });
   });
 
