@@ -29,6 +29,9 @@ export const HISTORY_EVENTS = [
 
 export type HistoryEvent = (typeof HISTORY_EVENTS)[number];
 
+// A profile keeps this many LIVEs. Past it, the oldest go as deleting them
+// would, gifts included.
+export const MAX_LIVES = 1500;
 // All time keeps this many gifters, the fewest coins dropped first
 export const MAX_GIFTERS = 10_000;
 // Overlays get this many of each list
@@ -214,13 +217,15 @@ export class HistoryService extends Service {
     for (const record of recovered) this._finish(record);
     this._rank();
     this._emit();
-    if (!recovered.length) return;
-    Logger.info(
-      `<History> Added ${recovered.length} LIVE(s) left in ${dir}`,
-      this._logFile,
-    );
-    this._indexUnsaved = true;
-    await this.save();
+    if (recovered.length) {
+      Logger.info(
+        `<History> Added ${recovered.length} LIVE(s) left in ${dir}`,
+        this._logFile,
+      );
+      this._indexUnsaved = true;
+      await this.save();
+    }
+    await this._cap();
   }
 
   /** Starts a LIVE on @username, ending one still open first. */
@@ -264,6 +269,8 @@ export class HistoryService extends Service {
     this._liveUnsaved = false;
     this._indexUnsaved = true;
     this._emit();
+    // It reads the oldest LIVE's file, so its save comes after the end's
+    void this._cap();
   }
 
   /** The top 10s overlays get, with both numbers on everyone. */
@@ -360,41 +367,8 @@ export class HistoryService extends Service {
    * False when the index couldn't be saved: the LIVE is gone from memory, and
    * the next save tries again.
    */
-  public async deleteLive(startedAt: number): Promise<boolean> {
-    const dir = this._dir;
-    if (dir === null || !this._lives.some((l) => l.startedAt === startedAt))
-      return true;
-    const file = join(dir, `${startedAt}.json`);
-    const record = await this._readLive(dir, startedAt);
-    if (this._dir !== dir) return true;
-
-    if (record) {
-      for (const { userId, coins, gifts } of record.gifters) {
-        // Gone when the cap dropped them
-        const gifter = this._gifters.get(userId);
-        if (!gifter) continue;
-        const left = {
-          ...gifter,
-          coins: gifter.coins - coins,
-          gifts: gifter.gifts - gifts,
-        };
-        if (left.coins <= 0 && left.gifts <= 0) this._gifters.delete(userId);
-        else this._gifters.set(userId, left);
-      }
-    } else {
-      Logger.warn(
-        `<History> Deleting LIVE ${file}, all time keeps its gifts`,
-        this._logFile,
-      );
-    }
-    this._lives = this._lives.filter((l) => l.startedAt !== startedAt);
-    this._ended = this._ended.filter((r) => r.startedAt !== startedAt);
-    this._rank();
-    this._indexUnsaved = true;
-    this._emit();
-    const saved = await this.save();
-    await this._remove(file);
-    return saved;
+  public deleteLive(startedAt: number): Promise<boolean> {
+    return this._drop([startedAt]);
   }
 
   /**
@@ -516,6 +490,68 @@ export class HistoryService extends Service {
         gifts: (past?.gifts ?? 0) + gifter.gifts,
       });
     }
+  }
+
+  /**
+   * Takes LIVEs off the list and their gifts off all time, read from their
+   * files, then removes the files. A file that can't be read still leaves the
+   * list. False when the index couldn't be saved.
+   */
+  private async _drop(startedAts: number[]): Promise<boolean> {
+    const dir = this._dir;
+    const listed = (startedAt: number) =>
+      this._lives.some((live) => live.startedAt === startedAt);
+    const asked = startedAts.filter(listed);
+    if (dir === null || !asked.length) return true;
+    const records = await Promise.all(
+      asked.map((startedAt) => this._readLive(dir, startedAt)),
+    );
+    if (this._dir !== dir) return true;
+
+    // Another drop may have taken some while the files were read
+    const gone = new Set<number>();
+    asked.forEach((startedAt, i) => {
+      if (!listed(startedAt)) return;
+      gone.add(startedAt);
+      const record = records[i];
+      if (!record) {
+        Logger.warn(
+          `<History> Deleting LIVE ${join(dir, `${startedAt}.json`)}, all time keeps its gifts`,
+          this._logFile,
+        );
+        return;
+      }
+      for (const { userId, coins, gifts } of record.gifters) {
+        // Gone when the cap dropped them
+        const gifter = this._gifters.get(userId);
+        if (!gifter) continue;
+        const left = {
+          ...gifter,
+          coins: gifter.coins - coins,
+          gifts: gifter.gifts - gifts,
+        };
+        if (left.coins <= 0 && left.gifts <= 0) this._gifters.delete(userId);
+        else this._gifters.set(userId, left);
+      }
+    });
+    if (!gone.size) return true;
+    this._lives = this._lives.filter((l) => !gone.has(l.startedAt));
+    this._ended = this._ended.filter((r) => !gone.has(r.startedAt));
+    this._rank();
+    this._indexUnsaved = true;
+    this._emit();
+    const saved = await this.save();
+    for (const startedAt of gone) {
+      await this._remove(join(dir, `${startedAt}.json`));
+    }
+    return saved;
+  }
+
+  // Past MAX_LIVES, the oldest go
+  private _cap(): Promise<boolean> {
+    const over = this._lives.length - MAX_LIVES;
+    if (over <= 0) return Promise.resolve(true);
+    return this._drop(this._lives.slice(0, over).map((l) => l.startedAt));
   }
 
   // Sorts all time and caps it, after it changes

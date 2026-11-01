@@ -19,7 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HistoryService, MAX_GIFTERS, TOP_GIFTERS } from "./index";
+import { HistoryService, MAX_GIFTERS, MAX_LIVES, TOP_GIFTERS } from "./index";
 
 const viewer = (userId: string, handle = `fan${userId}`) =>
   ({
@@ -472,6 +472,82 @@ describe("HistoryService", () => {
       expect.objectContaining({ userId: "c", rank: 1 }),
     ]);
     expect(await history.getGifters({ query: "nobody" })).toEqual([]);
+  });
+
+  describe(`past ${MAX_LIVES} LIVEs`, () => {
+    const HOUR = 3_600_000;
+    const ana = {
+      userId: "a",
+      username: "Ana",
+      handle: "ana",
+      picture: "",
+      coins: 150,
+      gifts: 2,
+      giftedAt: 1,
+    };
+    // LIVEs an hour apart, the oldest with 100 of Ana's coins in its file
+    const seed = async (count: number) => {
+      const lives = Array.from({ length: count }, (_, i) => ({
+        username: "kai",
+        startedAt: (i + 1) * HOUR,
+        endedAt: (i + 1) * HOUR + 60_000,
+        coins: 0,
+        gifts: 0,
+        followers: 0,
+        shares: 0,
+        likes: 0,
+        views: 0,
+        peakViewers: 0,
+      }));
+      await mkdir(join(dir, "a"));
+      await writeFile(
+        join(dir, "a", "index.json"),
+        JSON.stringify({ lives, gifters: [ana] }),
+      );
+      await writeFile(
+        join(dir, "a", `${HOUR}.json`),
+        JSON.stringify({
+          ...lives[0],
+          gifters: [{ ...ana, coins: 100, gifts: 1 }],
+        }),
+      );
+      return lives;
+    };
+
+    it("drops the oldest when a new one ends, as a delete would", async () => {
+      const lives = await seed(MAX_LIVES);
+      const history = await loaded();
+      expect(history.getHistory().lives).toHaveLength(MAX_LIVES);
+
+      history.start("kai", (MAX_LIVES + 1) * HOUR);
+      history.end((MAX_LIVES + 1) * HOUR + 60_000);
+
+      await vi.waitFor(() =>
+        expect(history.getHistory().lives).toHaveLength(MAX_LIVES),
+      );
+      expect(history.getHistory().lives.at(-1)?.startedAt).toBe(
+        lives[1].startedAt,
+      );
+      expect(history.getHistory().gifters).toEqual([
+        expect.objectContaining({ userId: "a", coins: 50, gifts: 1 }),
+      ]);
+      await vi.waitFor(() =>
+        expect(existsSync(join(dir, "a", `${HOUR}.json`))).toBe(false),
+      );
+    });
+
+    it("drops the oldest when a history loads with more", async () => {
+      const lives = await seed(MAX_LIVES + 2);
+      const history = await loaded();
+
+      expect(history.getHistory().lives).toHaveLength(MAX_LIVES);
+      expect(history.getHistory().lives.at(-1)?.startedAt).toBe(
+        lives[2].startedAt,
+      );
+      expect(
+        (await read<{ lives: unknown[] }>("index.json")).lives,
+      ).toHaveLength(MAX_LIVES);
+    });
   });
 
   describe("deleting a LIVE", () => {
