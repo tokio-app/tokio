@@ -27,11 +27,11 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
 6. The countdown timer, when viewers doing it should add time:
    - its trigger in `TIMER_EVENTS` (`src/main/services/timer/index.ts`)
    - a field in the `seconds` and `names` groups of `TimerSettingsSchema` (`src/common/schemas/timer.ts`), its automatic name as `timer.names.<field>` in the locale files, and its carousel item in `timerTriggers` (`src/common/util/timer.ts`)
-   - its row in `TRIGGERS` (`src/renderer/src/pages/Tools/helper.ts`)
+   - its row in `TRIGGERS` (`src/renderer/src/pages/CountdownTimer/helper.ts`)
 
    See `.claude/rules/timer.md`.
 
-7. A LIVE's record on the LIVEs page keeps only gifts (the user's call). An event that sends coins goes in `HISTORY_EVENTS` with its recorder in `src/main/services/history/index.ts`, which adds it to the LIVE and to its minute. See `.claude/rules/history.md`.
+7. A LIVE's record in Coin stats keeps only gifts (the user's call). An event that sends coins goes in `HISTORY_EVENTS` with its recorder in `src/main/services/history/index.ts`, which adds it to the LIVE and to its minute. See `.claude/rules/history.md`.
 8. Overlays get every live event on their own: `ServerService` broadcasts each one `isLiveEvent` lets through. An event whose payload has a `user` also goes in `FAN_EVENTS` (`src/main/services/fans/index.ts`), so the profile keeps its viewers' fan levels for `tokio:fans` (`.claude/rules/fans.md`).
 9. Tests next to each file you changed: the connector mapping, alerts, the live session, the timer and the history.
 
@@ -41,7 +41,7 @@ Tell the user which of these need a change and a release:
 
 - The overlay SDK, `../tokio-event-loader` (`@tokioapp/overlay`): `src/types/index.ts` copies `TOKIO_EVENTS` and the payload types. Overlays get the new type once a new version is published; ask before publishing.
 - The overlays repo, `../tokio-overlays`: the event list in `.github/ISSUE_TEMPLATE/overlay_request.yml`.
-- The website, `../tokio-web`: `src/content/docs/docs/developers/events.md`, in its LIVE events and Data sections, and the events `features/alerts.md`, `features/games.md` and `features/countdown-timer.md` list.
+- The website, `../tokio-web`: `src/content/docs/docs/developers/events.md`, in its LIVE events and Data sections, and the events `features/alerts.mdx`, `features/games.mdx` and `features/countdown-timer.mdx` list.
 
 ## Done when
 

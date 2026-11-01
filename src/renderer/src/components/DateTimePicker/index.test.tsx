@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Modal } from "../Modal";
 import { DateTimePicker, DateTimeValue, NO_DATE } from ".";
 
-// Holds the value, as the LIVEs page does
+// Holds the value, as Coin stats does
 function Form({
   initial = NO_DATE,
   withTime,

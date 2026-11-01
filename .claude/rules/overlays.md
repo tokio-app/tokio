@@ -42,7 +42,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
   - A task holding the lock must not call a method that takes it (`_prepare` uses `_readConfig`), or it waits on itself.
   - An install downloads before taking it.
   - `writeFileAtomic` also runs writes to one file in the order they came.
-- Import, remove, install and the Tools page's test overlays keep their change when the store file can't be written (`OverlayResult.saved: false`): the handler replies with the list main holds, then throws `saveFailure()`, with no success notice.
+- Import, remove, install and Tools → Test overlays keep their change when the store file can't be written (`OverlayResult.saved: false`): the handler replies with the list main holds, then throws `saveFailure()`, with no success notice.
 
 ## Settings fields
 

@@ -20,7 +20,8 @@ const OverlayMeta = {
 
 export const OverlayMetaSchema = z.object(OverlayMeta);
 
-// An ID handed out on the Tools page, for overlays tested without importing them.
+// An ID handed out in Tools → Test overlays, for overlays tested without
+// importing them.
 const TestOverlaySchema = z.object({
   id: z.string(),
   name: z.string(),

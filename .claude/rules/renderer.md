@@ -12,7 +12,8 @@ Profile sections save through `useEditableSettings`, single fields through `useA
 
 - Each page is a folder `src/renderer/src/pages/<Page>/` with `index.tsx`, `<page>.module.css`, an optional `helper.ts` and `sections/*Section.tsx`. The router uses hash history. The `new-page` skill has the steps.
 - The router's `defaultErrorComponent` keeps a page's render error inside the page, with the title bar and sidebar.
-- A page opened from another page instead of the sidebar (Official overlays) gets a path under its parent's (`/overlays/official`), which keeps the parent's sidebar item active, and a back button in its header (`Section`'s `icon`).
+- A page opened from another page instead of the sidebar (Official overlays, the tools) gets a path under its parent's (`/overlays/official`, `/tools/fans`), which keeps the parent's sidebar item active, and a `BackButton` (`components/BackButton`) before its first heading (`Section`'s `icon`).
+- Tools is a list of its tools, one row each (Countdown timer, Coin stats, Fans, Test overlays): a link named by the tool, with what the tool holds now on the right in the readout. No icons, chevrons or cards, the user's pick. A new tool gets a page under `/tools/` and a row there.
 - Build pages from `components/Page` (`Page`, `Section`, `Field`, `FormGrid`, `EmptyState`); a page module only holds page-specific layout.
 - Every text on screen comes from the locale files through `useT()`, and lint fails on text written into JSX: see `.claude/rules/i18n.md`. Leave room for Spanish, which runs about 25% longer.
 - Components are folders with `index.tsx` and `<name>.module.css`, re-exported from `components/index.tsx`. Use the primitives in `components/Elements` before creating new ones; they take colors from the tokens, not props.

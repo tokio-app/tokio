@@ -1201,7 +1201,7 @@ describe("init events", () => {
   });
 
   describe("countdown timer", () => {
-    // What the Tools page and the overlay got, oldest first
+    // What the window and the overlay got, oldest first
     const windowPushes = (s: Setup) => s.h.pushed(APP_EVENTS_RESPONSE.TIMER);
     const overlayPushes = (s: Setup) =>
       s.serverService.sendToClient.mock.calls

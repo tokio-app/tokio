@@ -7,7 +7,7 @@ export interface TimerState {
   remaining: number;
 }
 
-// What main sends the Tools page about the active profile's timer
+// What main sends the window about the active profile's timer
 export interface TimerData {
   settings: TimerSettings;
   state: TimerState;

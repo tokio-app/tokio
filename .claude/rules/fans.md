@@ -1,11 +1,12 @@
 ---
 paths:
   - "src/main/services/fans/**"
+  - "src/renderer/src/pages/Fans/**"
 ---
 
 # Fans
 
-`FansService` (`src/main/services/fans`) keeps the fans the active profile has seen in its LIVEs, and overlays get them as `tokio:fans`. TikTok sends a viewer's fan level only when they do something in the LIVE, so an overlay learns from here about fans it hasn't seen since it loaded.
+`FansService` (`src/main/services/fans`) keeps the fans the active profile has seen in its LIVEs. Overlays get them as `tokio:fans`, and **Tools → Fans** lists them. TikTok sends a viewer's fan level only when they do something in the LIVE, so an overlay learns from here about fans it hasn't seen since it loaded.
 
 ## Recording
 
@@ -31,3 +32,11 @@ paths:
 - Each client gets it as it connects, whatever its id (Tokio's own pages ignore it), then after each load, and on changes through a `throttle` of `FANS_PUSH_MS` (5 s) that reads the list when it fires. `ServerService.sendToAll` sends it.
 - Test sends a sample: `createTestLive` adds `tokio:fans` to every press, so previews and test overlays get it then, not when they load.
 - The SDK (`@tokioapp/overlay`) types it as `TOKIO_EVENTS.FANS`. Overlays on an older version log it as an unknown type.
+
+## The Fans page
+
+- `GET_FANS` replies `FANS` with every fan (`list(MAX_FANS)`), the highest levels first, then the most recently seen. Nothing is pushed: the page and Tools' list (its Fans row counts them) ask on mount and again on each `GET_PROFILE` reply, a profile switch.
+- `pages/Fans` (`/tools/fans`), opened from Tools' list with a `BackButton`. Its header and the list share the window's height, and the list scrolls inside. Rows out of view skip layout (`content-visibility`), so 5,000 fans stay cheap.
+- Each row: the badge's picture before the level in the readout, the page's one bold element (no picture, or one that fails, leaves the level alone), the name and @handle, and when Tokio last saw them.
+- The search runs in the window over every fan, by name or @handle, with the gifter search's rule (`viewerMatcher`, `src/common/util/history.ts`).
+- Fans can't be removed from the page.

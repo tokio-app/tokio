@@ -559,7 +559,7 @@ const registerGames = (handler: AppHandlerVariables) => {
 };
 
 // The countdown timer takes time from live events whatever features are on.
-// The Tools page and the timer's overlay follow it.
+// Tools and the timer's overlay follow it.
 const registerTimer = ({
   connectorService: conn,
   timerService: timer,
@@ -705,7 +705,7 @@ const registerHistory = ({
   };
   conn.on(TOKIO_EVENTS.DISCONNECTED, () => {
     history.end();
-    // The LIVEs page lists the LIVE that just ended
+    // Coin stats lists the LIVE that just ended
     if (!win.isDestroyed()) {
       win.webContents.send(APP_EVENTS_RESPONSE.LIVES, {
         data: history.getHistory(),

@@ -2,12 +2,12 @@
 paths:
   - "src/main/services/history/**"
   - "src/main/events/pages/lives.ts"
-  - "src/renderer/src/pages/Lives/**"
+  - "src/renderer/src/pages/CoinStats/**"
 ---
 
 # LIVE history
 
-`HistoryService` (`src/main/services/history`) keeps each profile's LIVEs and the viewers who sent gifts in them, for the LIVEs page (`/lives`) and the top gifters overlays get as `tokio:gifters`.
+`HistoryService` (`src/main/services/history`) keeps each profile's LIVEs and the viewers who sent gifts in them, for Coin stats (`/tools/coin-stats`, in Tools) and the top gifters overlays get as `tokio:gifters`.
 
 ## Recording
 
@@ -52,11 +52,11 @@ paths:
 
 ## The page's data
 
-- `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top 100. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page asks again on each `GET_PROFILE` reply, a profile switch.
+- `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top 100. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page asks again on each `GET_PROFILE` reply, a profile switch, and so does Tools' list, whose Coin stats row shows the newest LIVE's coins.
 - `GET_LIVE { startedAt }` replies `LIVE` with that LIVE's record. Failures carry the `startedAt` too.
 - `GET_GIFTERS { from?, to?, query? }` replies `GIFTERS` with the top 100 of the finished LIVEs in the dates from `from` (included) to `to` (left out), each with their `rank` among them (`RankedGifter`).
   - A LIVE is in them when it starts in them or runs into them (`inRange`, `src/common/util/history.ts`). One they cut (not `allInRange`) counts only its gifts in them, from its minutes.
-  - With a query, only the ones whose name or @handle has it, in any case, with a leading @ ignored.
+  - With a query, only the ones whose name or @handle has it, in any case, with a leading @ ignored (`viewerMatcher`, shared with the Fans page).
   - Every LIVE whole reads all time's list. Other dates are added up from the LIVEs' files by `getGifters`, leaving out a file that doesn't load.
   - Dates without a query get their coins and gifts (`totals`, from `getTotals`, which reads only the files of the LIVEs they cut) in a first reply, then again with the gifters.
   - The reply carries the range and the query, failures included.
@@ -64,8 +64,8 @@ paths:
 
 ## The page
 
-- `pages/Lives`, second in the sidebar (`LuHistory`), on Home's grid. The layout the user picked: the selected LIVE on the left as Home showed it when it ended, the list on the right.
-- The dashboard is as tall as the window leaves it (`--title-bar-height`), and both lists scroll inside it, so picking a LIVE with more gifters doesn't move the list.
+- `pages/CoinStats`, a row in Tools' list rather than a sidebar entry (the user's call), on Home's grid. The layout the user picked: the selected LIVE on the left as Home showed it when it ended, the list on the right.
+- Its header (a `BackButton` to Tools and "Coin stats") and the dashboard share the height the window leaves (`--title-bar-height`), and both lists scroll inside the dashboard, so picking a LIVE with more gifters doesn't move the list. The header shows while `LIVES` loads.
 - **The list** is a `listbox` with one tab stop (a roving `tabIndex`): Up, Down, Home and End move the selection and the focus, and each option is named by its date, time and coins. All time comes first, then the LIVEs, newest first.
   - Under each LIVE, a 2px coin bar in Iron is scaled to the best LIVE, the page's one bold element. The selected one gets the rose edge, bar and `--accent-soft` wash.
   - Hovered rows use Field (`--background-secondary`), since Iron would hide the bars.

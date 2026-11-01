@@ -3,7 +3,7 @@ import { z } from "zod";
 // What the countdown timer is doing, see TimerService
 const TIMER_STATUSES = ["idle", "running", "paused", "stopped"] as const;
 
-// Its buttons on Tools
+// Its buttons on the timer's page
 export const TIMER_ACTIONS = ["start", "pause", "stop", "reset"] as const;
 
 // What Color gives: #rrggbb, or #rrggbbaa with alpha

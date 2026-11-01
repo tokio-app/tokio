@@ -459,7 +459,7 @@ export const ProfileSchema = z.object({
   // TikTok can't list a LIVE's emotes, so they're collected as viewers use
   // them, in the order they first appeared.
   emotes: z.array(SavedEmoteSchema).default([]),
-  // The countdown timer on Tools, its settings and clock. Profiles saved
+  // The countdown timer in Tools, its settings and clock. Profiles saved
   // before it existed start from the defaults.
   timer: TimerProfileSchema.prefault({}),
   // What LIVE events do in Minecraft, on Games, and their overlay's look.

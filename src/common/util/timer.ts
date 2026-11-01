@@ -24,7 +24,7 @@ export interface TimerTrigger {
 }
 
 /**
- * The triggers that add time, in Tools' order, as the carousel shows them:
+ * The triggers that add time, in the timer page's order, as the carousel shows them:
  * the streamer's name for each (the language's when blank), counted for coins
  * and likes, and the time it adds with the multiplier. Triggers that add
  * nothing are left out.

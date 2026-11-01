@@ -42,7 +42,7 @@ export const SAVE_INTERVAL_MS = 5000;
 
 /**
  * The active profile's countdown timer. It lives in main, so it runs with
- * the Tools page closed: Start, Pause, Stop and Reset, time added by live
+ * its page closed: Start, Pause, Stop and Reset, time added by live
  * events and by hand, and saving it into the profile it was loaded from.
  */
 export class TimerService extends Service {

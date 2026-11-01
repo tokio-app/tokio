@@ -87,6 +87,6 @@ export type LiveRecord = LiveSummary & {
 // most coins)
 export type RankedGifter = Gifter & { rank: number };
 
-// For the LIVEs page: the finished LIVEs, newest first, and all time's top
+// For Coin stats: the finished LIVEs, newest first, and all time's top
 // gifters
 export type LiveHistory = { lives: LiveSummary[]; gifters: Gifter[] };

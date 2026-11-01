@@ -74,9 +74,9 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `live-session.md`: the LIVE session and activity feed on Home
 - `overlays.md`: overlay previews and official overlays
 - `updates.md`: the auto-updater
-- `timer.md`: the countdown timer, its overlay and the Tools page
-- `fans.md`: the fans each profile keeps, sent to overlays
-- `history.md`: each profile's past LIVEs and gifters, the LIVEs page and the top gifters overlays get
+- `timer.md`: the countdown timer, its overlay and its page in Tools
+- `fans.md`: the fans each profile keeps, sent to overlays and listed in Tools → Fans
+- `history.md`: each profile's past LIVEs and gifters, Coin stats in Tools, and the top gifters overlays get
 - `i18n.md`: the locale files, translating in the windows and main, and the language setting
 
 When a change alters what a rule says, update the rule with it. A new area gets its own rule with `paths`.

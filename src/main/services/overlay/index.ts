@@ -491,7 +491,7 @@ export class OverlayService extends Service {
     return live();
   }
 
-  // IDs for overlays tested without importing them, see the Tools page.
+  // IDs for overlays tested without importing them, see Tools → Test overlays.
   public getTestOverlays(): TestOverlay[] {
     return this._store.getSettings().testOverlays;
   }
