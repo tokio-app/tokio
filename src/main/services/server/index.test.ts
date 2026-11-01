@@ -701,6 +701,17 @@ describe("ServerService", () => {
       expect(onB).not.toHaveBeenCalled();
     });
 
+    it("sends to every overlay, whatever its id", async () => {
+      const a = await connect("a");
+      const b = await connect("b");
+      const messages = Promise.all([nextMessage(a), nextMessage(b)]);
+      const payload = { type: "tokio:fans" as const, data: { fans: [] } };
+
+      server.sendToAll(payload);
+
+      expect(await messages).toEqual([payload, payload]);
+    });
+
     it("sends to every overlay connected with the same id", async () => {
       const first = await connect("a");
       const second = await connect("a");

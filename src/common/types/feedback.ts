@@ -85,6 +85,7 @@ export enum FEEDBACK_CODES {
   OVERLAY_SEND_FAILED = "overlay_send_failed",
   GIFTS_FETCH_FAILED = "gifts_fetch_failed",
   TEST_OVERLAY_FAILED = "test_overlay_failed",
+  FANS_SAVE_FAILED = "fans_save_failed",
 
   // TIMER
   TIMER_PAUSED = "timer_paused",

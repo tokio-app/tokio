@@ -22,6 +22,7 @@ export interface Folders {
   mediaFolder: string;
   // Each game's own folder sits in games/
   minecraftFolder: string;
+  fansFolder: string;
 }
 
 export interface Files {

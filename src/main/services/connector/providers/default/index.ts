@@ -262,6 +262,7 @@ export class TikTokLiveConnector extends ConnectorProvider {
         username: rank.user?.nickname ?? "",
         handle: rank.user?.displayId ?? "",
         profilePictures: rank.user?.avatarThumb?.urlList ?? [],
+        userId: rank.user?.userId ?? "",
         score: rank.score,
         position: rank.rank,
       }));
@@ -276,14 +277,13 @@ export class TikTokLiveConnector extends ConnectorProvider {
 
 // --- HELPERS ---
 
-function getFanLevel(badgeList: Badge[] = []): number {
-  const fanBadge = badgeList.find((b) =>
-    b.combine?.icon?.uri.includes("fans_badge"),
-  );
-  return Number(fanBadge?.privilegeLogExtra?.level || 0);
+// The fan club's badge, with the fan level and its picture
+function getFanBadge(badgeList: Badge[] = []): Badge | undefined {
+  return badgeList.find((b) => b.combine?.icon?.uri.includes("fans_badge"));
 }
 
 function getUserData(user?: User, userIdentity?: UserIdentity): UserData {
+  const fanBadge = getFanBadge(user?.badgeList);
   return {
     username: user?.nickname ?? "",
     handle: user?.displayId ?? "",
@@ -291,7 +291,9 @@ function getUserData(user?: User, userIdentity?: UserIdentity): UserData {
     superfan: userIdentity?.isSubscriberOfAnchor ?? false,
     follower: userIdentity?.isFollowerOfAnchor ?? false,
     moderator: userIdentity?.isModeratorOfAnchor ?? false,
-    fanLevel: getFanLevel(user?.badgeList),
+    fanLevel: Number(fanBadge?.privilegeLogExtra?.level || 0),
+    fanBadge: fanBadge?.combine?.icon?.urlList[0] ?? "",
+    userId: user?.userId ?? "",
   };
 }
 

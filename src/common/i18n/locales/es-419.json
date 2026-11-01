@@ -843,6 +843,7 @@
   "main.spotify.unknownTrack": "Canción desconocida",
   "main.spotify.unknownArtist": "Artista desconocido",
   "main.licenses.noFile": "Este paquete no incluye un archivo de licencia. Su package.json declara la licencia: {license}.",
+  "main.init.fansSaveFailed": "No se pudieron guardar los fans del LIVE.",
   "minecraft.weather.clear": "Despejado",
   "minecraft.weather.rain": "Lluvia",
   "minecraft.weather.thunder": "Tormenta",

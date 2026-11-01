@@ -43,6 +43,7 @@ describe("PathManagerService", () => {
     }
     expect(service.folders.soundsFolder).toBe(join(home, ".tokio", "sounds"));
     expect(service.folders.mediaFolder).toBe(join(home, ".tokio", "media"));
+    expect(service.folders.fansFolder).toBe(join(home, ".tokio", "fans"));
     expect(callback).toHaveBeenCalledWith({
       files: service.files,
       folders: service.folders,

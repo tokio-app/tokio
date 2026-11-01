@@ -1,5 +1,10 @@
 import GAMES_STYLES from "@/common/games/overlay.css?raw";
-import { isLiveEvent, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import {
+  isLiveEvent,
+  TOKIO_EVENTS,
+  TokioEventMap,
+  TokioPayload,
+} from "@/common/types";
 import {
   ALERTS_PATH,
   formatError,
@@ -254,6 +259,11 @@ export class ServerService extends Service {
   // Whether an overlay connected with the id got the payload.
   public sendToClient(id: string, payload: any): boolean {
     return this._wss?.sendToClient(id, payload) ?? false;
+  }
+
+  // Every overlay connected gets it, as they get the live events.
+  public sendToAll(payload: TokioPayload) {
+    this._wss?.broadcast(payload);
   }
 
   private broadcast<T extends TOKIO_EVENTS>(type: T, data: TokioEventMap[T]) {

@@ -28,6 +28,8 @@ export class PathManagerService {
       mediaFolder: join(appFolder, "media"),
       // Later games get their folders next to it
       minecraftFolder: join(appFolder, "games", "minecraft"),
+      // Each profile's fans, under the profile's file name
+      fansFolder: join(appFolder, "fans"),
     };
 
     this.files = {

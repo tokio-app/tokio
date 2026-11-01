@@ -143,6 +143,7 @@ describe("createTestLive", () => {
               username: viewers[handle].username,
               handle,
               profilePictures: viewers[handle].profilePictures,
+              userId: viewers[handle].userId,
               score,
               position: i + 1,
             })),

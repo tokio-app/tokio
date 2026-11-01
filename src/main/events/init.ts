@@ -13,6 +13,7 @@ import {
   MINECRAFT_EDITION_NAMES,
   TOKIO_EVENTS,
   TokioEventMap,
+  TokioPayload,
 } from "@/common/types";
 import {
   ALERTS_PATH,
@@ -32,12 +33,18 @@ import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
 import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
+import { FAN_EVENTS } from "@/services/fans";
 import { MAX_BACKLOG } from "@/services/games";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { TIMER_EVENTS } from "@/services/timer";
 import { AppHandlerVariables } from "@/types";
 
 const STATS_THROTTLE_MS = 250;
+
+// Overlays get the fans at most this often while a LIVE adds them
+const FANS_PUSH_MS = 5000;
+// And they're saved this often while they change
+const FANS_SAVE_MS = 30_000;
 
 // Failures that repeat on every chat or event are sent at most this often.
 const REPEAT_NOTICE_MS = 30_000;
@@ -605,6 +612,51 @@ const registerTimer = ({
   onLanguage(() => server.sendToClient(TIMER_PATH, overlayMessage(0)));
 };
 
+// The profile keeps the fans its LIVEs show, whatever features are on.
+// Overlays get them as they connect, and again when they change.
+const registerFans = ({
+  connectorService: conn,
+  fansService: fans,
+  serverService: server,
+  notifier,
+}: AppHandlerVariables) => {
+  for (const type of FAN_EVENTS) {
+    conn.on(type, (d) => fans.record(d.user));
+  }
+
+  const message = (): TokioPayload => ({
+    type: "tokio:fans",
+    data: { fans: fans.list() },
+  });
+  // The list is read when the push goes, so it's never an old one.
+  const push = throttle(() => server.sendToAll(message()), FANS_PUSH_MS);
+  fans.onChange(push);
+  server.onConnect((id) => server.sendToClient(id, message()));
+
+  const save = () => {
+    fans
+      .save()
+      .then((saved) => {
+        // Saving logged it. The fans are tried again on the next save.
+        if (saved) return;
+        notifier.warn(
+          "overlays",
+          FEEDBACK_CODES.FANS_SAVE_FAILED,
+          t("main.init.fansSaveFailed"),
+          { key: "fans", windowMs: REPEAT_NOTICE_MS },
+        );
+      })
+      .catch((error) => {
+        notifier.report({ source: "overlays", error });
+      });
+  };
+  conn.on(TOKIO_EVENTS.DISCONNECTED, save);
+  // shortcut: a quit or crash during a LIVE loses up to 30 s of fans, upgrade
+  // to a save on quit if streamers notice. The updater's install can't wait
+  // for one.
+  setInterval(save, FANS_SAVE_MS).unref();
+};
+
 events.push(
   APP_EVENTS.GET_PROFILE,
   async ({ storeManagerService }, e) => {
@@ -655,6 +707,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     updaterService,
     liveService,
     timerService,
+    fansService,
     gamesService,
     notifier,
   } = handler;
@@ -676,6 +729,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       updaterService.setLogFile(files.logs.system);
       liveService.setLogFile(files.logs.connector);
       timerService.setLogFile(files.logs.system);
+      fansService.setLogFile(files.logs.system);
       gamesService.setLogFile(files.logs.games);
       notifier.setLogFiles(files.logs);
       alertsService.setSoundsFolder(folders.soundsFolder);
@@ -701,6 +755,10 @@ const startApp = async (handler: AppHandlerVariables) => {
   // Before any notice, so they're all in the user's language
   setLanguage(storeManagerService.getSettings().language);
   timerService.initialize({ store: storeManagerService });
+  fansService.initialize({
+    json: jsonManagerService,
+    folder: pathManagerService.folders.fansFolder,
+  });
   overlayService.initialize(
     {
       folder: pathManagerService.folders.overlaysFolder,
@@ -725,12 +783,15 @@ const startApp = async (handler: AppHandlerVariables) => {
     registerConnectorEvents(handler);
     registerTimer(handler);
     registerGames(handler);
+    registerFans(handler);
   }
 
   const settings = storeManagerService.getSettings();
   liveService.setFeed(settings.activityFeed);
   const profile = await storeManagerService.getProfileData();
   if (profile) timerService.load(profile.timer, settings.activeProfile.file);
+  // Its own file, so the fans load even when the profile doesn't
+  await fansService.load(settings.activeProfile.file);
 
   // Before the server starts, so it serves the overlays right away. The
   // gifts saved last time are used when there are any, so startup doesn't

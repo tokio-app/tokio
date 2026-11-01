@@ -10,6 +10,7 @@ import {
 } from "@/helper/network";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
+import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
 import { JSONManagerService } from "@/services/json";
 import { LicensesService } from "@/services/licenses";
@@ -63,6 +64,7 @@ export class AppHandler implements AppHandlerVariables {
   public readonly updaterService: UpdaterService;
   public readonly liveService: LiveService;
   public readonly timerService: TimerService;
+  public readonly fansService: FansService;
   public readonly gamesService: GamesService;
   public readonly trayService: TrayService;
   public readonly notifier: Notifier;

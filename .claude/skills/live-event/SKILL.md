@@ -31,7 +31,7 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
 
    See `.claude/rules/timer.md`.
 
-7. Overlays get every live event on their own: `ServerService` broadcasts each one `isLiveEvent` lets through.
+7. Overlays get every live event on their own: `ServerService` broadcasts each one `isLiveEvent` lets through. An event whose payload has a `user` also goes in `FAN_EVENTS` (`src/main/services/fans/index.ts`), so the profile keeps its viewers' fan levels for `tokio:fans` (`.claude/rules/fans.md`).
 8. Tests next to each file you changed: the connector mapping, alerts, the live session and the timer.
 
 ## Other repos

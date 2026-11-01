@@ -14,6 +14,7 @@ import {
   CustomGift,
   EMOTE_TRIGGER,
   Emotes,
+  Fan,
   FEEDBACK_CODES,
   Files,
   Folders,
@@ -24,6 +25,7 @@ import {
   MusicInfo,
   RoomUserEvent,
   TOKIO_EVENTS,
+  TokioPayload,
   UserData,
 } from "@/common/types";
 import {
@@ -37,6 +39,7 @@ import { language, setLanguage } from "@/helper/i18n";
 import Logger from "@/logger";
 import type { AlertsService } from "@/services/alerts";
 import type { ReconnectState } from "@/services/connector/common";
+import { FAN_EVENTS, type FansService } from "@/services/fans";
 import type { GamesService } from "@/services/games";
 import { LiveService } from "@/services/live";
 import type { MusicService } from "@/services/music";
@@ -84,6 +87,7 @@ const folders: Folders = {
   soundsFolder: "app/sounds",
   mediaFolder: "app/media",
   minecraftFolder: "app/games/minecraft",
+  fansFolder: "app/fans",
 };
 
 const noStats = { likes: 0, viewers: 0, views: 0 };
@@ -244,6 +248,7 @@ function setup() {
     sendToClient: vi.fn(
       (_id: string, _payload: { type: string; data?: unknown }) => true,
     ),
+    sendToAll: vi.fn((_payload: TokioPayload) => {}),
   };
   const overlayService = {
     setLogFile: vi.fn(),
@@ -313,6 +318,15 @@ function setup() {
     get: vi.fn(() => timer),
     onChange: vi.fn((_listener: (deltaMs: number) => void) => {}),
   };
+  const fansService = {
+    setLogFile: vi.fn(),
+    initialize: vi.fn((..._args: Parameters<FansService["initialize"]>) => {}),
+    load: vi.fn(async (_file: string) => {}),
+    record: vi.fn((_user: UserData) => {}),
+    list: vi.fn((): Fan[] => []),
+    save: vi.fn(async () => true),
+    onChange: vi.fn((_listener: () => void) => {}),
+  };
   const gamesService = {
     setLogFile: vi.fn(),
     configure: vi.fn(
@@ -341,6 +355,7 @@ function setup() {
     licensesService,
     liveService,
     timerService,
+    fansService,
     gamesService,
     trayService,
     yamlManagerService: {},
@@ -367,6 +382,7 @@ function setup() {
     liveService,
     timer,
     timerService,
+    fansService,
     gamesService,
     trayService,
   };
@@ -914,30 +930,25 @@ describe("init events", () => {
         s.serverService.sendToClient.mockClear();
         for (const listener of connected) listener("games");
 
+        // The fans go to every overlay that connects
         await vi.waitFor(() => {
-          expect(s.serverService.sendToClient.mock.calls).toEqual([
-            [
-              "games",
-              {
-                type: "tokio:games",
-                data: {
-                  look: profile.games.overlay,
-                  rows: [
-                    {
-                      id: "action-1",
-                      pictures: ["rose.png"],
-                      event: "Rose",
-                      withText: false,
-                      eventCount: 0,
-                      image: "/games/minecraft/pictures/my%20tnt.png",
-                      name: "Boom",
-                      count: 0,
-                      column: 1,
-                    },
-                  ],
+          expect(gamesSent(s, "tokio:games")).toEqual([
+            {
+              look: profile.games.overlay,
+              rows: [
+                {
+                  id: "action-1",
+                  pictures: ["rose.png"],
+                  event: "Rose",
+                  withText: false,
+                  eventCount: 0,
+                  image: "/games/minecraft/pictures/my%20tnt.png",
+                  name: "Boom",
+                  count: 0,
+                  column: 1,
                 },
-              },
-            ],
+              ],
+            },
           ]);
         });
       });
@@ -1332,6 +1343,115 @@ describe("init events", () => {
       await load(s);
 
       expect(s.timerService.load).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("fans", () => {
+    const fan: Fan = {
+      userId: "42",
+      username: "Ana",
+      handle: "ana",
+      fanLevel: 12,
+      fanBadge: "lv10.png",
+      seenAt: 1000,
+    };
+    const message = (fans: Fan[]) => ({ type: "tokio:fans", data: { fans } });
+    const change = (s: Setup) => s.fansService.onChange.mock.calls[0][0]();
+
+    it.each(FAN_EVENTS)("records the viewer of %s", async (event) => {
+      const s = await live();
+      const { data } = generateTikTokEventSample(event);
+
+      emitLive(s.conn, event, data);
+
+      expect(s.fansService.record).toHaveBeenCalledExactlyOnceWith(data.user);
+    });
+
+    it("sends the fans to each overlay as it connects", async () => {
+      const s = await live();
+      s.fansService.list.mockReturnValue([fan]);
+      s.serverService.sendToClient.mockClear();
+      const connected = s.serverService.onConnect.mock.calls.map(
+        ([listener]) => listener,
+      );
+
+      for (const listener of connected) listener("gift-jar");
+
+      expect(s.serverService.sendToClient.mock.calls).toEqual([
+        ["gift-jar", message([fan])],
+      ]);
+    });
+
+    it("pushes their changes at most every 5 s, with the list when it goes", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+
+      change(s);
+      s.fansService.list.mockReturnValue([fan]);
+      change(s);
+      change(s);
+      expect(s.serverService.sendToAll.mock.calls).toEqual([[message([])]]);
+
+      vi.advanceTimersByTime(5000);
+
+      expect(s.serverService.sendToAll.mock.calls).toEqual([
+        [message([])],
+        [message([fan])],
+      ]);
+    });
+
+    it("saves them when the connection stops, and every 30 s", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+      expect(s.fansService.save).toHaveBeenCalledOnce();
+
+      vi.advanceTimersByTime(30_000);
+      expect(s.fansService.save).toHaveBeenCalledTimes(2);
+    });
+
+    it("warns once in 30 s when they can't be saved", async () => {
+      const s = await live();
+      s.fansService.save.mockResolvedValue(false);
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+      await flushPromises();
+
+      expect(s.fansService.save).toHaveBeenCalledTimes(2);
+      expect(noticesFor(s, FEEDBACK_CODES.FANS_SAVE_FAILED)).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "overlays",
+          message: "Unable to save the LIVE's fans.",
+        }),
+      ]);
+    });
+
+    it("loads the active profile's fans at startup, after the store", async () => {
+      const s = setup();
+
+      await load(s);
+
+      expect(s.fansService.setLogFile).toHaveBeenCalledWith("system.log");
+      expect(s.fansService.initialize).toHaveBeenCalledExactlyOnceWith({
+        json: s.h.handler.jsonManagerService,
+        folder: "app/fans",
+      });
+      expect(
+        s.storeManagerService.initialize.mock.invocationCallOrder[0],
+      ).toBeLessThan(s.fansService.initialize.mock.invocationCallOrder[0]);
+      expect(s.fansService.load).toHaveBeenCalledExactlyOnceWith("stream.json");
+    });
+
+    it("loads the fans even when the profile didn't load", async () => {
+      const s = setup();
+      s.storeManagerService.getProfileData.mockResolvedValue(null);
+
+      await load(s);
+
+      expect(s.fansService.load).toHaveBeenCalledExactlyOnceWith("stream.json");
     });
   });
 

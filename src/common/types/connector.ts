@@ -9,6 +9,23 @@ export interface UserData {
   follower?: boolean;
   moderator?: boolean;
   fanLevel?: number;
+  // The picture of the fan level's badge, a heart that changes every 10
+  // levels, without the number
+  fanBadge?: string;
+  // TikTok's id for the account, which stays when the handle changes
+  userId?: string;
+}
+
+// A fan the active profile keeps, sent to overlays with tokio:fans. No
+// profile picture: TikTok's links expire within days. The badge's don't.
+export interface Fan {
+  userId: string;
+  username: string;
+  handle: string;
+  fanLevel: number;
+  fanBadge: string;
+  // When they were last seen in a LIVE, in ms since the epoch
+  seenAt: number;
 }
 
 export interface ChatEvent {
@@ -183,6 +200,10 @@ export type TokioPayload =
   | {
       type: "tokio:config";
       data: OverlayConfigRedux;
+    }
+  | {
+      type: "tokio:fans";
+      data: { fans: Fan[] };
     };
 
 export interface TokioPreviewMessage {

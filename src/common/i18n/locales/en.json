@@ -843,6 +843,7 @@
   "main.spotify.unknownTrack": "Unknown track",
   "main.spotify.unknownArtist": "Unknown artist",
   "main.licenses.noFile": "This package doesn't include a license file. Its package.json declares the license: {license}.",
+  "main.init.fansSaveFailed": "Unable to save the LIVE's fans.",
   "minecraft.weather.clear": "Clear",
   "minecraft.weather.rain": "Rain",
   "minecraft.weather.thunder": "Thunder",

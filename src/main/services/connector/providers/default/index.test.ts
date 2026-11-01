@@ -97,7 +97,12 @@ const rawUser = {
   badgeList: [
     {
       sceneType: 10,
-      combine: { icon: { uri: "webcast/fans_badge_12", urlList: [] } },
+      combine: {
+        icon: {
+          uri: "webcast-va/fans_badge_icon_lv10_v4.png",
+          urlList: ["https://img/lv10.png", "https://img2/lv10.png"],
+        },
+      },
       privilegeLogExtra: { level: "12" },
     },
   ],
@@ -111,6 +116,8 @@ const mappedUser = {
   follower: false,
   moderator: false,
   fanLevel: 12,
+  fanBadge: "https://img/lv10.png",
+  userId: "1",
 };
 
 describe("TikTokLiveConnector", () => {
@@ -546,6 +553,8 @@ describe("TikTokLiveConnector", () => {
           follower: false,
           moderator: false,
           fanLevel: 0,
+          fanBadge: "",
+          userId: "",
         },
       });
     });
@@ -567,6 +576,7 @@ describe("TikTokLiveConnector", () => {
             username: "Viewer",
             handle: "viewer",
             profilePictures: ["https://img/1.png"],
+            userId: "1",
             score: 300,
             position: 1,
           },

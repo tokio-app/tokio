@@ -39,6 +39,10 @@ const musicFactory = (): MusicInfo[] => {
   }));
 };
 
+// TikTok's picture of a fan level's badge, a new one every 10 levels
+const fanBadgeOf = (level: number) =>
+  `https://p16-webcast.tiktokcdn.com/webcast-va/fans_badge_icon_lv${Math.max(1, Math.floor(level / 10) * 10)}_v4.png~tplv-obj.image`;
+
 // Live, only chat messages say how a viewer relates to the host.
 const userFactory = (): UserData => {
   const adjective = pickRandom(ADJECTIVES);
@@ -47,6 +51,7 @@ const userFactory = (): UserData => {
   const username = `${adjective} ${noun}`;
   const handle = `${adjective.toLowerCase()}${noun.toLowerCase()}${numberSuffix}`;
   const profilePictures = [`https://picsum.photos/seed/${handle}/200/200`];
+  const fanLevel = randomBool(0.4) ? randomInt(1, 50) : 0;
 
   return {
     username,
@@ -55,7 +60,9 @@ const userFactory = (): UserData => {
     follower: false,
     superfan: false,
     moderator: false,
-    fanLevel: randomBool(0.4) ? randomInt(1, 50) : 0,
+    fanLevel,
+    fanBadge: fanLevel ? fanBadgeOf(fanLevel) : "",
+    userId: String(randomInt(1e9, 9e9)),
   };
 };
 
@@ -241,10 +248,11 @@ export const createTestLive = () => {
     // Ranks carry only these fields, from the coins of the gifts that ended.
     const ranks = [...coins]
       .sort(([, a], [, b]) => b - a)
-      .map(([{ username, handle, profilePictures }, score], i) => ({
+      .map(([{ username, handle, profilePictures, userId }, score], i) => ({
         username,
         handle,
         profilePictures,
+        userId,
         score,
         position: i + 1,
       }));

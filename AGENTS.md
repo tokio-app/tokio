@@ -75,6 +75,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `overlays.md`: overlay previews and official overlays
 - `updates.md`: the auto-updater
 - `timer.md`: the countdown timer, its overlay and the Tools page
+- `fans.md`: the fans each profile keeps, sent to overlays
 - `i18n.md`: the locale files, translating in the windows and main, and the language setting
 
 When a change alters what a rule says, update the rule with it. A new area gets its own rule with `paths`.
@@ -155,6 +156,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 - When you change a schema, update its defaults in `src/common/util/constants`. Give every new saved field a `.default(...)` so older files still load.
 - Store mutators return whether the store file was written (see Feedback for a false).
 - `updateProfileData` throws until the store has loaded. It writes the active profile unless given a file: a service that keeps a profile's data in memory, like the countdown timer, passes the file it loaded from.
+- What a profile collects that isn't settings, like its fans, goes in its own file named after the profile's (`fans/<profile file>`): exports, clones and `GET_PROFILE` carry the whole profile.
 - Provider keys (the Euler key, voice engine keys) are saved encrypted with `safeStorage`'s async calls. The store decrypts them once at startup and reads them from memory, so `getSettings` stays synchronous. Never log a provider key, and never ship a shared one.
 - Quitting waits up to 3s for IPC handlers and file writes still running (`track`/`settle`, `src/main/helper/quit.ts`).
 - Write files through `writeFileAtomic` (`src/main/helper/fs.ts`) or the file managers, so a quit waits for them and a quit or crash midway leaves the old file whole. `writeFileAtomic` flushes the temp file to disk before the rename, so a power cut can't leave a file of NULs.
@@ -193,7 +195,7 @@ To release, use the `release` skill (`/release`). A release reaches auto-updates
 The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../tokio-web`) has its own `AGENTS.md`. Update it when any of these change:
 
 - features, settings, chat commands or install steps (its docs describe them in full; the README only sums them up)
-- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, the alerts' overlay URL (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`) or what it does, Minecraft's overlay's (`getMinecraftOverlayURL`) or what it does, or `TOKIO_EVENTS` names and payloads
+- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, the alerts' overlay URL (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`) or what it does, Minecraft's overlay's (`getMinecraftOverlayURL`) or what it does, `TOKIO_EVENTS` names and payloads, or the other messages overlays get (`TokioPayload`)
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
