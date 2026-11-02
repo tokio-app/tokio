@@ -1302,7 +1302,17 @@ describe("Games overlay", () => {
     await user.click(
       screen.getByRole("checkbox", { name: "Text below pictures" }),
     );
-    await user.click(screen.getByRole("radio", { name: "Large" }));
+    await user.click(
+      within(screen.getByRole("group", { name: "Event pictures" })).getByRole(
+        "radio",
+        { name: "Large" },
+      ),
+    );
+    await user.click(
+      within(screen.getByRole("group", { name: "Counts" })).getByRole("radio", {
+        name: "Medium",
+      }),
+    );
     await user.click(
       within(screen.getByRole("group", { name: "Font" })).getByRole("button"),
     );
@@ -1317,6 +1327,7 @@ describe("Games overlay", () => {
       pictures_only: true,
       text_below: true,
       event_size: "large",
+      count_size: "medium",
       font: "Minecrafter",
     });
     const games = preview()!.parentElement!;
@@ -1326,6 +1337,7 @@ describe("Games overlay", () => {
       "games-pictures-only",
       "games-text-below",
       "games-event-large",
+      "games-count-medium",
     );
     expect(games.style.fontFamily).toBe(
       '"Minecrafter", "Archivo Variable", sans-serif',

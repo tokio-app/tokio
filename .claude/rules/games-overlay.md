@@ -90,6 +90,8 @@ In `src/main/helper/games.ts`:
 - **Event pictures** sizes the gifts, emotes and Tokio's sprites, not the action's picture: `games-event-medium` or `games-event-large` (Small has none) set `--games-event-scale`.
 - Every size that follows from the event's picture is a `calc` of it (`--games-line`, `--games-sticker`, `--games-overhang`, `--games-square`, Arrow's slot), so a larger sticker hangs further off and the row grows with it.
 - The variables hold `em`s, which resolve where they're used: every element using them has the overlay's font size.
+- **Counts** sizes both `games-count`s (the action's amount and the likes') the same way: `count_size`, `games-count-medium` or `games-count-large`, `--games-count-scale` on the count's font size. Its offsets are in its own `em`, so a larger count keeps to its picture's corner in every format.
+- `fit` measures `.games`, not the count's overhang, so Medium and Large pad `.games` to keep room for it. Small has none, so older profiles look the same.
 
 ## Builder
 

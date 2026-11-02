@@ -715,6 +715,7 @@
   "games.overlay.copyRowURL": "Copy row {row}'s URL",
   "games.preview.row": "Row {row} of the overlay preview",
   "games.overlay.move": "Drag to reorder, or use the arrow keys",
+  "games.overlay.counts": "Counts",
   "main.tray.open": "Open Tokio",
   "main.tray.quit": "Quit Tokio",
   "main.failure.getAbout": "Unable to load the open-source licenses.",

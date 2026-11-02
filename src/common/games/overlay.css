@@ -28,6 +28,8 @@
   color: var(--games-text);
   /* The event's pictures, Small's size times this */
   --games-event-scale: 1;
+  /* The counts on the pictures' corners, the same way */
+  --games-count-scale: 1;
 }
 
 .games.games-event-medium {
@@ -36,6 +38,18 @@
 
 .games.games-event-large {
   --games-event-scale: 1.5;
+}
+
+/* A larger count hangs further off its picture's corner, which fitting
+   doesn't measure, so the overlay keeps room around it */
+.games.games-count-medium {
+  --games-count-scale: 1.25;
+  padding: 0.2em;
+}
+
+.games.games-count-large {
+  --games-count-scale: 1.5;
+  padding: 0.3em;
 }
 
 /* The spine: events right-aligned on the arrows' left, results left-aligned
@@ -157,7 +171,8 @@
   position: absolute;
   right: -0.15em;
   bottom: -0.2em;
-  font-size: 0.8em;
+  /* The offsets are in its own em, so a larger count keeps to the corner */
+  font-size: calc(0.8em * var(--games-count-scale));
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;

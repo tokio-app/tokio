@@ -357,7 +357,8 @@ const GAMES_OVERLAY_LAYOUTS = ["list", "horizontal", "carousel"] as const;
 // the corner of the action's, like a sticker
 const GAMES_OVERLAY_FORMATS = ["arrow", "sticker"] as const;
 
-// How large the event's pictures (gifts, emotes, Tokio's own) show
+// How large the event's pictures (gifts, emotes, Tokio's own) or the counts
+// on the pictures' corners show
 const GAMES_OVERLAY_SIZES = ["small", "medium", "large"] as const;
 
 // How the games overlay looks
@@ -372,6 +373,8 @@ export const GamesOverlaySchema = z.object({
   // The texts under the pictures instead of beside them
   text_below: z.boolean().default(false),
   event_size: z.enum(GAMES_OVERLAY_SIZES).default("small"),
+  // The action's amount and the likes' count
+  count_size: z.enum(GAMES_OVERLAY_SIZES).default("small"),
   // A font installed where the streaming app runs, Archivo when empty
   font: z.string().max(FONT_MAX_LENGTH).default(""),
   text_color: ColorSchema.default("#f1f5f9"),
