@@ -1082,6 +1082,30 @@ describe("init events", () => {
       ]);
     });
 
+    it("keeps the likes from going down until the LIVE disconnects", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      const likes = () => s.h.pushed(APP_EVENTS_RESPONSE.LIKES).at(-1);
+
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(100));
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(50));
+      vi.advanceTimersByTime(250);
+
+      expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith({
+        likes: 100,
+      });
+      expect(likes()).toEqual({ likes: 100 });
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(50));
+      vi.advanceTimersByTime(250);
+
+      expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith({
+        likes: 50,
+      });
+      expect(likes()).toEqual({ likes: 50 });
+    });
+
     it("doesn't push throttled views or likes to a closed window", async () => {
       vi.useFakeTimers();
       const s = await live();

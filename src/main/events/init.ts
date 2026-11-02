@@ -261,9 +261,12 @@ const registerConnectorEvents = ({
     store.updateLiveStats({ viewers: d.viewers, views: d.views });
     sendViews(d.views, d.viewers);
   });
+  // TikTok sometimes lowers the total for a while, so the most seen is kept
+  let likes = 0;
   conn.on(TOKIO_EVENTS.LIKE, (d) => {
-    store.updateLiveStats({ likes: d.totalLikes });
-    sendLikes(d.totalLikes);
+    likes = Math.max(likes, d.totalLikes);
+    store.updateLiveStats({ likes });
+    sendLikes(likes);
   });
 
   // The Home page's feed and totals, throttled like the stats.
@@ -311,6 +314,7 @@ const registerConnectorEvents = ({
     sendViews.cancel();
     sendLikes.cancel();
     sendSession.cancel();
+    likes = 0;
     store.updateLiveStats({ likes: 0, viewers: 0, views: 0 });
     live.end();
     pushSession();
