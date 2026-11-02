@@ -133,6 +133,17 @@ describe("Overlays", () => {
     expect(page().queryByRole("heading", { level: 3 })).toBeNull();
   });
 
+  it("ignores spaces around the search", async () => {
+    const { user } = await renderApp("/overlays");
+    await overlays(GIFT_JAR, TOP_LIKES);
+
+    await user.click(page().getByRole("button", { name: "Search" }));
+    await user.type(search(), "  jar  ");
+
+    expect(page().getByRole("heading", { name: "Gift Jar" })).toBeVisible();
+    expect(page().queryByRole("heading", { name: "Top Likes" })).toBeNull();
+  });
+
   it("puts the focus in the search when it opens", async () => {
     const { user } = await renderApp("/overlays");
 
