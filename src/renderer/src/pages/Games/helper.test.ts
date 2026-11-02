@@ -49,6 +49,7 @@ describe("Games helper", () => {
       ...createAction("bedrock"),
       steps: [
         spawn("creeper"),
+        spawn("chicken_jockey"),
         give("totem_of_undying"),
         { type: "weather", weather: "rain" } as const,
       ],
@@ -172,12 +173,24 @@ describe("Games helper", () => {
       "end_crystal",
       "experience_orb",
       "firework_rocket",
+      "chicken_jockey",
     ]) {
       expect(MOBS.java.map((o) => o.value)).toContain(id);
       expect(ids).not.toContain(id);
     }
     expect(ids).toContain("zombie");
-    expect(ids.length).toBe(MOBS.java.length - 5);
+    expect(ids.length).toBe(MOBS.java.length - 6);
+  });
+
+  it("offers the chicken jockey right after the chicken", () => {
+    for (const edition of MINECRAFT_EDITIONS) {
+      const mobs = MOBS[edition];
+      const at = mobs.findIndex((o) => o.value === "chicken");
+      expect(mobs[at + 1]).toEqual({
+        value: "chicken_jockey",
+        label: "Chicken Jockey",
+      });
+    }
   });
 
   it("creates a valid step of every kind", () => {

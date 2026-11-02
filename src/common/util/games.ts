@@ -23,12 +23,25 @@ type Time = Extract<GameStep, { type: "time" }>["time"];
 type Hazard = Extract<GameStep, { type: "hazard" }>["hazard"];
 type Help = Extract<GameStep, { type: "help" }>["help"];
 
+// Tokio's own mob in both editions, a baby zombie riding a chicken (see
+// gameCommands), listed after the chicken
+const withJockey = ({ mobs, items }: { mobs: Names; items: Names }) => ({
+  mobs: Object.fromEntries(
+    Object.entries(mobs).flatMap((entry) =>
+      entry[0] === "chicken"
+        ? [entry, ["chicken_jockey", "Chicken Jockey"]]
+        : [entry],
+    ),
+  ),
+  items,
+});
+
 // Every mob and item each edition's summon and give take, id → the name the
 // game gives it in English (see .claude/skills/minecraft-lists/SKILL.md)
 export const MINECRAFT_NAMES: Record<
   MinecraftEdition,
   { mobs: Names; items: Names }
-> = { bedrock, java };
+> = { bedrock: withJockey(bedrock), java: withJockey(java) };
 
 // Keys of the names Tokio gives its own steps, translated where they show
 export const WEATHER_NAMES: Record<Weather, MessageKey> = {

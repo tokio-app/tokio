@@ -191,6 +191,14 @@ describe("gameStepsText", () => {
         { type: "time", time: "night" },
       ),
     ).toBe("Zombie ×5, Diamond, Thunder, Night");
+    expect(
+      steps("bedrock", {
+        type: "spawn",
+        mob: "chicken_jockey",
+        amount: 3,
+        name: "",
+      }),
+    ).toBe("Chicken Jockey ×3");
     // Bedrock's id for Java's cobweb
     expect(steps("bedrock", { type: "give", item: "web", amount: 1 })).toBe(
       "Cobweb",

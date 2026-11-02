@@ -51,14 +51,15 @@ export const ITEMS: Record<MinecraftEdition, SelectOption<string>[]> = {
   java: options(MINECRAFT_NAMES.java.items),
 };
 
-// What Java summons but isn't a living mob, which the mod can't turn the
-// player into
+// What Java summons but isn't a living mob, and Tokio's chicken jockey (two
+// mobs), which the mod can't turn the player into
 const NOT_MOBS = [
   "tnt",
   "lightning_bolt",
   "end_crystal",
   "experience_orb",
   "firework_rocket",
+  "chicken_jockey",
 ];
 export const MORPH_MOBS = MOBS.java.filter(
   ({ value }) => !NOT_MOBS.includes(value),

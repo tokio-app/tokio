@@ -36,15 +36,44 @@ describe("gameCommands in Bedrock", () => {
     gameCommands(step(input), fill, "bedrock");
 
   it("spawns where the player stands, named and repeated", () => {
-    expect(run({ type: "spawn", mob: "zombie" })).toEqual([
-      "summon zombie ~ ~ ~",
-    ]);
+    expect(run({ type: "spawn", mob: "cow" })).toEqual(["summon cow ~ ~ ~"]);
     expect(
       run(
         { type: "spawn", mob: "chicken", amount: 2, name: "{username}" },
         () => 'Aku"} @e',
       ),
     ).toEqual(['summon chicken "Aku e" ~ ~ ~', 'summon chicken "Aku e" ~ ~ ~']);
+  });
+
+  it("keeps mobs that burn in daylight out of the sun's fire", () => {
+    expect(run({ type: "spawn", mob: "zombie", amount: 2 })).toEqual([
+      "summon zombie ~ ~ ~",
+      "summon zombie ~ ~ ~",
+      "effect @e[type=zombie,r=2,c=2] fire_resistance infinite 0 true",
+    ]);
+  });
+
+  it("spawns neutral hostiles angry", () => {
+    expect(run({ type: "spawn", mob: "cave_spider", name: "Lucia" })).toEqual([
+      'summon cave_spider ~ ~ ~ 0 0 minecraft:become_angry "Lucia"',
+    ]);
+    expect(run({ type: "spawn", mob: "zombie_pigman" })).toEqual([
+      "summon zombie_pigman ~ ~ ~",
+    ]);
+  });
+
+  it("spawns chicken jockeys as baby zombies given chickens", () => {
+    expect(
+      run({ type: "spawn", mob: "chicken_jockey", amount: 2, name: "Lucia" }),
+    ).toEqual([
+      'summon zombie ~ ~ ~ 0 0 minecraft:as_baby "Lucia"',
+      'summon zombie ~ ~ ~ 0 0 minecraft:as_baby "Lucia"',
+      "ride @e[type=zombie,r=2,c=2] summon_ride chicken no_ride_change minecraft:spawn_adult",
+      "effect @e[type=zombie,r=2,c=2] fire_resistance infinite 0 true",
+    ]);
+    expect(run({ type: "spawn", mob: "chicken_jockey" })[0]).toBe(
+      "summon zombie ~ ~ ~ 0 0 minecraft:as_baby",
+    );
   });
 
   it("escapes the whole name, not only its variables", () => {
@@ -96,6 +125,31 @@ describe("gameCommands in Java Edition", () => {
       'summon minecraft:chicken ~ ~ ~ {CustomName:"Aku"}',
       'summon minecraft:chicken ~ ~ ~ {CustomName:"Aku"}',
     ]);
+  });
+
+  it("leaves the sun and the anger to the Tokio mod", () => {
+    expect(run({ type: "spawn", mob: "zombie" })).toEqual([
+      "summon minecraft:zombie ~ ~ ~",
+    ]);
+    expect(run({ type: "spawn", mob: "cave_spider" })).toEqual([
+      "summon minecraft:cave_spider ~ ~ ~",
+    ]);
+  });
+
+  it("spawns chicken jockeys, the name on the baby zombie", () => {
+    expect(run({ type: "spawn", mob: "chicken_jockey" })).toEqual([
+      'summon minecraft:chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b}]}',
+    ]);
+    expect(
+      run(
+        { type: "spawn", mob: "chicken_jockey", amount: 3, name: "{username}" },
+        () => 'Lu"cia}',
+      ),
+    ).toEqual(
+      Array(3).fill(
+        'summon minecraft:chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b,CustomName:"Lucia"}]}',
+      ),
+    );
   });
 
   it("keeps a nickname inside the name's string", () => {

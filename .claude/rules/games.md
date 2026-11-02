@@ -62,6 +62,12 @@ The rest is Bedrock's.
 - `Profile.games.actions` holds `GameActionSchema`. `edition` defaults to `"bedrock"`, so actions saved before Java are Bedrock's. The trigger is `TriggerSchema`, shared with alerts.
 - `settings.games` (the connections' switches) is in the store, the same for every profile; the actions belong to the profile.
 - `gameCommands(step, fill, edition)` (`commands.ts`) turns a step into commands in the edition's syntax: Java's ids take `minecraft:` and its `give` targets `@s`, Bedrock's `@p`. A mob or item id that isn't `/^[a-z0-9_]+$/` runs nothing.
+- **Chicken Jockey** (`chicken_jockey`) is Tokio's own mob in both editions: `MINECRAFT_NAMES` adds it after Chicken to the generated lists (`withJockey`), so the picker, the overlay's name and `withEdition` have it. Java runs `summon minecraft:chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b}]}`, a name as the baby zombie's `CustomName` (the mod's tests check these forms).
+- **Java leaves the rest to the mod:** it keeps every mob Tokio's commands spawn, passengers included, from burning in daylight, and sets hostiles on the player at once. Tokio sends nothing extra.
+- **Bedrock** does it with commands (`bedrockSpawn`), checked against bedrock-samples' `mojang-commands.json` and `behavior_pack/entities`:
+  - A jockey is the amount of `summon zombie ~ ~ ~ 0 0 minecraft:as_baby [name]`, then `ride @e[type=zombie,r=2,c=<amount>] summon_ride chicken no_ride_change minecraft:spawn_adult`. Summoning the riders leaves chickens already nearby alone; `spawn_adult` because a baby chicken has no seat (its `rideable` is in `chicken_adult`, for `baby_undead` only).
+  - After the summons, mobs with `minecraft:burns_in_daylight` (`DAYLIGHT_BURNERS`, without the fire-immune magma cube; the jockey's zombie counts) get `effect @e[type=<mob>,r=2,c=<amount>] fire_resistance infinite 0 true`.
+  - `ANGER_EVENTS` are the spawn events that set a neutral hostile on the player, passed as summon's event (a name goes after it). Only the cave spider's `minecraft:become_angry` adds a player target. The zombie pigman's and enderman's anger has no target until hit, the spider's `become_hostile` ends in daylight (its brightness sensor), and piglins and brutes already attack. A spawn event replaces `minecraft:entity_spawned`, so it's no use where that sets the mob up (the zombie pigman's adult group).
 - Variables are `ALERT_MESSAGE_VARIABLES` per trigger, filled by `formatAlertMessage(text, payload, commandValue)`. `commandValue` strips `" ' \ { } [ ] § @` and control characters, so a nickname can't inject NBT or selectors. A spawn name goes through it whole, then `JSON.stringify`. The command step's template is the user's own and isn't escaped.
 
 ### Hazards and helps
@@ -119,7 +125,7 @@ The rest is Bedrock's.
 - `MOBS[edition]` and `ITEMS[edition]` (`helper.ts`) come from `src/common/games/minecraft-bedrock.json` and `minecraft-java.json` (`MINECRAFT_NAMES`, in common so main can name the overlay's rows). The `minecraft-lists` skill regenerates them.
 - `withEdition(action, edition)` moves an action's mobs and items to the other edition's ids (`idIn`): the same id, else `PAIRS` (ids that differ and whose names differ too), else the id with the same English name (Bedrock's `web` is Java's `cobweb`), else a zombie or a diamond.
 - To Bedrock, it also drops the morph and unmorph steps and gives each Tokio mod hazard its stand-in in `JAVA_ONLY_HAZARDS` (the meteor Falling TNT, the lasers lightning), keeping the step's other fields (the user's call).
-- The step kind and hazard pickers (`STEP_KINDS[edition]`, `HAZARDS[edition]`) offer the Tokio mod's only on Java actions. Turn into mob lists `MORPH_MOBS`: Java's mobs without what summons but isn't a living mob (`NOT_MOBS`: TNT, lightning bolt, end crystal, experience orb, firework rocket).
+- The step kind and hazard pickers (`STEP_KINDS[edition]`, `HAZARDS[edition]`) offer the Tokio mod's only on Java actions. Turn into mob lists `MORPH_MOBS`: Java's mobs without what summons but isn't a living mob (`NOT_MOBS`: TNT, lightning bolt, end crystal, experience orb, firework rocket) and the chicken jockey.
 - **Test** results show the last `RESULTS_SHOWN`, so an earlier failure shows only in the summary (`testSummary`).
 
 ## Tests

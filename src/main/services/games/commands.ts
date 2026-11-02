@@ -160,6 +160,56 @@ function hazardCommands(
   }
 }
 
+// Bedrock's mobs with minecraft:burns_in_daylight (bedrock-samples'
+// behavior_pack/entities), but the fire-immune magma cube: spawned in the
+// day, the sun would kill them before they did anything. The Tokio mod keeps
+// Java's out of the sun itself.
+const DAYLIGHT_BURNERS = [
+  "bogged",
+  "drowned",
+  "phantom",
+  "skeleton",
+  "stray",
+  "zombie",
+  "zombie_horse",
+  "zombie_nautilus",
+  "zombie_villager",
+];
+
+// Bedrock's spawn events that set a mob neutral until provoked on the player
+// at once (bedrock-samples' entities). Only the cave spider's anger brings a
+// player target: the zombie pigman's and enderman's has none until hit, the
+// spider's hostility ends in daylight, and piglins already attack. The Tokio
+// mod sets Java's hostiles on the player itself.
+const ANGER_EVENTS = new Map([["cave_spider", "minecraft:become_angry"]]);
+
+// Bedrock's spawn of `amount` mobs, `name` the quoted name or "". Its summon
+// takes no NBT, so a chicken jockey is baby zombies that each get a new adult
+// chicken under them (a chicken can be a baby, which has no seat). Summoning
+// the riders, not the chickens, keeps chickens already nearby out of it, and
+// c= picks the ones just spawned, nearest the player.
+function bedrockSpawn(mob: string, name: string, amount: number) {
+  const jockey = mob === "chicken_jockey";
+  const summoned = jockey ? "zombie" : mob;
+  const event = jockey ? "minecraft:as_baby" : ANGER_EVENTS.get(mob);
+  const spawned = `@e[type=${summoned},r=2,c=${amount}]`;
+  const commands = Array.from({ length: amount }, () =>
+    event
+      ? `summon ${summoned} ~ ~ ~ 0 0 ${event}${name}`
+      : `summon ${summoned}${name} ~ ~ ~`,
+  );
+  if (jockey) {
+    commands.push(
+      `ride ${spawned} summon_ride chicken no_ride_change minecraft:spawn_adult`,
+    );
+  }
+  if (DAYLIGHT_BURNERS.includes(summoned)) {
+    // For good, without the particles
+    commands.push(`effect ${spawned} fire_resistance infinite 0 true`);
+  }
+  return commands;
+}
+
 type Help = Extract<GameStep, { type: "help" }>["help"];
 
 // The effect each potion-like help puts on, and its amplifier: Regeneration
@@ -250,11 +300,15 @@ export function gameCommands(
       if (!ID.test(step.mob)) return [];
       const name = commandValue(fill(step.name));
       const quoted = JSON.stringify(name);
+      if (!java) {
+        return bedrockSpawn(step.mob, name ? ` ${quoted}` : "", step.amount);
+      }
       // ~ is where the player stands. Java's SNBT reads a plain string as a
-      // text component.
-      const command = java
-        ? `summon minecraft:${step.mob} ~ ~ ~${name ? ` {CustomName:${quoted}}` : ""}`
-        : `summon ${step.mob}${name ? ` ${quoted}` : ""} ~ ~ ~`;
+      // text component. A jockey's name goes on its baby zombie.
+      const command =
+        step.mob === "chicken_jockey"
+          ? `summon minecraft:chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b${name ? `,CustomName:${quoted}` : ""}}]}`
+          : `summon minecraft:${step.mob} ~ ~ ~${name ? ` {CustomName:${quoted}}` : ""}`;
       return Array.from({ length: step.amount }, () => command);
     }
     // The Tokio mod's: for seconds, or until an unmorph
