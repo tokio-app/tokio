@@ -53,6 +53,8 @@ export class ServerService extends Service {
   constructor(port: number = SERVER_PORT) {
     super();
     this._app = express();
+    // NODE_ENV isn't set, and in development error pages show the stack.
+    this._app.set("env", "production");
     this._dynamicRouter = express.Router();
     this._port = port;
 
