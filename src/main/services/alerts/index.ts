@@ -27,7 +27,8 @@ import {
 import { writeFileAtomic } from "@/helper/fs";
 import { hash, importFile, isSaved } from "@/helper/library";
 import { GiftStreaks } from "@/helper/streaks";
-import { matchesTrigger, streakOf } from "@/helper/triggers";
+import { isBlocked } from "@/helper/permissions";
+import { eventUser, matchesTrigger, streakOf } from "@/helper/triggers";
 import Logger from "@/logger";
 import type { ServerService } from "@/services/server";
 import type { TTSService } from "@/services/tts";
@@ -376,6 +377,11 @@ export class AlertsService extends Service {
         ? `alerts:${alert.trigger.type}`
         : "alerts";
       const { tts, sound, media } = alert;
+      // A viewer on the TTS block list loses only the message
+      const speak =
+        tts && !isBlocked(profile.tts.permissions, eventUser(payload))
+          ? tts
+          : null;
       // Sent once, and the window queues its copies
       const play = (
         data?: Uint8Array,
@@ -389,22 +395,24 @@ export class AlertsService extends Service {
           maxQueueLength: settings.queue_length,
           id: alert.id,
           key,
-          filters: tts ? { speed: tts.speed, pitch: tts.pitch } : undefined,
+          filters: speak
+            ? { speed: speak.speed, pitch: speak.pitch }
+            : undefined,
           media: media ?? undefined,
           repeat: times,
           ...cut,
         });
 
       // A message is spoken instead of the sound.
-      if (tts) {
-        this._queueSpeech(tts, speech, profile.tts, play, (error) =>
+      if (speak) {
+        this._queueSpeech(speak, speech, profile.tts, play, (error) =>
           onError?.(alert, error),
         );
         continue;
       }
       // Media alone still takes its turn in the window's queue.
       if (!sound) {
-        play();
+        if (media) play();
         continue;
       }
 

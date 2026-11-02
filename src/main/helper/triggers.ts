@@ -5,6 +5,7 @@ import {
   GiftEvent,
   TOKIO_EVENTS,
   TokioEventMap,
+  UserData,
 } from "@/common/types";
 import { takesRoles } from "@/common/util";
 import { hasKeyword, isUser } from "@/helper/chat";
@@ -24,10 +25,7 @@ export function matchesTrigger(
   added: number,
   total: number,
 ) {
-  const user =
-    typeof payload === "object" && payload !== null && "user" in payload
-      ? payload.user
-      : null;
+  const user = eventUser(payload);
   const { roles } = trigger;
   const narrowed = roles.length > 0 && takesRoles(trigger.type);
   if (user && narrowed && !roles.some((role) => user[role])) return false;
@@ -74,6 +72,16 @@ export function matchesTrigger(
   }
 
   return true;
+}
+
+/**
+ * The viewer a live event came from, null for the ones without one (a music
+ * change, an envelope, a super fan box).
+ */
+export function eventUser(payload: TokioEventMap[AppEvents]): UserData | null {
+  return typeof payload === "object" && payload !== null && "user" in payload
+    ? payload.user
+    : null;
 }
 
 /**
