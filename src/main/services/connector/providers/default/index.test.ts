@@ -343,13 +343,14 @@ describe("TikTokLiveConnector", () => {
 
       await connector.disconnect();
       await connector.disconnect();
+      await new Promise(setImmediate);
 
       expect(onDisconnected).toHaveBeenCalledExactlyOnceWith(undefined);
       expect(closed.listenerCount("chat")).toBe(0);
       expect(connector.isConnected()).toBe(false);
     });
 
-    it("says the LIVE ended", () => {
+    it("says the LIVE ended", async () => {
       const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
 
       connection().state = "disconnected";
@@ -357,6 +358,7 @@ describe("TikTokLiveConnector", () => {
         reason: "streamEnd",
         willReconnect: false,
       });
+      await new Promise(setImmediate);
 
       expect(onDisconnected).toHaveBeenCalledExactlyOnceWith({
         reason: "ended",
@@ -367,11 +369,12 @@ describe("TikTokLiveConnector", () => {
 
     it.each(["giveUp", "signError", "wsClose"])(
       "says the connection was lost (%s)",
-      (reason) => {
+      async (reason) => {
         const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
 
         connection().state = "disconnected";
         connection().emit("disconnected", { reason, willReconnect: false });
+        await new Promise(setImmediate);
 
         expect(onDisconnected).toHaveBeenCalledExactlyOnceWith({
           reason: "lost",
@@ -379,6 +382,30 @@ describe("TikTokLiveConnector", () => {
         expect(connection().listenerCount("chat")).toBe(0);
       },
     );
+
+    it("ends the LIVE after the events that came with its end", async () => {
+      const order: string[] = [];
+      const profile = async () => {};
+      connector.on(TOKIO_EVENTS.CHAT, async () => {
+        await profile();
+        order.push("chat");
+      });
+      connector.on(TOKIO_EVENTS.DISCONNECTED, () => order.push("end"));
+
+      connection().emit("chat", {
+        user: rawUser,
+        content: "hello",
+        contentLanguage: "en",
+        emotes: [],
+      });
+      connection().state = "disconnected";
+      connection().emit("disconnected", {
+        reason: "streamEnd",
+        willReconnect: false,
+      });
+
+      await vi.waitFor(() => expect(order).toEqual(["chat", "end"]));
+    });
 
     it("stays connected while it reconnects", () => {
       const onReconnect = vi.fn();
