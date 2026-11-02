@@ -361,6 +361,7 @@ function setup() {
     handle: vi.fn(async (..._args: Parameters<GamesService["handle"]>) => {}),
     clear: vi.fn(),
   };
+  const yamlManagerService = { setLogFile: vi.fn() };
 
   const h = createHandler({
     pathManagerService,
@@ -381,7 +382,7 @@ function setup() {
     historyService,
     gamesService,
     trayService,
-    yamlManagerService: {},
+    yamlManagerService,
   });
 
   return {
@@ -409,6 +410,7 @@ function setup() {
     historyService,
     gamesService,
     trayService,
+    yamlManagerService,
   };
 }
 
@@ -2222,6 +2224,10 @@ describe("init events", () => {
       expect(s.ttsService.setLogFile).toHaveBeenCalledWith("tts.log");
       expect(s.serverService.setLogFile).toHaveBeenCalledWith("server.log");
       expect(s.overlayService.setLogFile).toHaveBeenCalledWith("overlays.log");
+      // Why an overlay's YAML was refused
+      expect(s.yamlManagerService.setLogFile).toHaveBeenCalledWith(
+        "overlays.log",
+      );
       expect(s.alertsService.setLogFile).toHaveBeenCalledWith("alerts.log");
       expect(s.musicService.setLogFile).toHaveBeenCalledWith("music.log");
       expect(s.gamesService.setLogFile).toHaveBeenCalledWith("games.log");

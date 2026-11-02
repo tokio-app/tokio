@@ -783,6 +783,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       ttsService.setLogFile(files.logs.tts);
       serverService.setLogFile(files.logs.server);
       overlayService.setLogFile(files.logs.overlays);
+      yamlManagerService.setLogFile(files.logs.overlays);
       urlManagerService.setLogFile(files.logs.system);
       storeManagerService.setLogFile(files.logs.system);
       jsonManagerService.setLogFile(files.logs.system);
