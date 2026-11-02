@@ -444,6 +444,35 @@ describe("TikTokLiveConnector", () => {
       });
     });
 
+    it("maps a comment made of emotes only as a chat message", () => {
+      const onChat = capture(TOKIO_EVENTS.CHAT);
+
+      connection().emit("emote", {
+        user: rawUser,
+        userIdentity: {
+          isSubscriberOfAnchor: true,
+          isFollowerOfAnchor: false,
+          isModeratorOfAnchor: false,
+        },
+        emoteList: [
+          { emoteId: "e1", image: { urlList: ["u"], uri: "" } },
+          { emoteId: "e2" },
+        ],
+      });
+
+      expect(onChat).toHaveBeenCalledExactlyOnceWith({
+        user: { ...mappedUser, superfan: true },
+        comment: {
+          content: "",
+          lang: "",
+          emotes: [
+            { emoteID: "e1", images: ["u"], index: 0 },
+            { emoteID: "e2", images: [], index: 0 },
+          ],
+        },
+      });
+    });
+
     it("maps gifts and marks the end of a combo", () => {
       const onGift = capture(TOKIO_EVENTS.GIFT);
       const gift = {

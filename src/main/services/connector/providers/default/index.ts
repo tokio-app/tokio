@@ -209,6 +209,23 @@ export class TikTokLiveConnector extends ConnectorProvider {
       this.emit(TOKIO_EVENTS.CHAT, data);
     });
 
+    // A comment made of emotes only, so Emote alerts and actions see it too
+    connection.on(WebcastEvent.EMOTE, (tdata) => {
+      this.emit(TOKIO_EVENTS.CHAT, {
+        user: getUserData(tdata.user, tdata.userIdentity),
+        comment: {
+          content: "",
+          // index is a place in content, which is empty
+          emotes: tdata.emoteList.map((emote) => ({
+            emoteID: emote.emoteId,
+            images: emote.image?.urlList ?? [],
+            index: 0,
+          })),
+          lang: "",
+        },
+      });
+    });
+
     connection.on(WebcastEvent.GIFT, (tdata) => {
       const data: GiftEvent = {
         user: getUserData(tdata.user, tdata.userIdentity),
