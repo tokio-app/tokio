@@ -396,13 +396,14 @@
 }
 
 /* One row per action, each read like the overlay's: the event, an arrow,
-   then the picture and name. The rows share these columns, so the arrows
-   line up, and the event's is as wide as its widest: one picture when every
-   event is a gift, a text field when one isn't. */
+   then the picture and name, after the handle it's dragged by. The rows
+   share these columns, so the arrows line up, and the event's is as wide as
+   its widest: one picture when every event is a gift, a text field when one
+   isn't. */
 .recipes {
   display: grid;
   grid-template-columns:
-    16px auto 14px var(--control-height)
+    auto 16px auto 14px var(--control-height)
     minmax(10rem, 1fr);
   column-gap: var(--space-3);
   padding: var(--space-1) var(--space-3);
@@ -415,8 +416,14 @@
 /* With columns, each row's column picker comes last */
 .recipes_columns {
   grid-template-columns:
-    16px auto 14px var(--control-height)
+    auto 16px auto 14px var(--control-height)
     minmax(10rem, 1fr) 120px;
+}
+
+/* Narrow, as its dots are */
+.grip {
+  padding: 6px 2px;
+  cursor: grab;
 }
 
 .recipe {
@@ -434,6 +441,20 @@
 /* A disabled action doesn't run, so it never lights up */
 .recipe_off {
   opacity: 0.5;
+}
+
+/* Lifted while it's dragged */
+.recipe_dragged {
+  opacity: 0.4;
+}
+
+/* The line where the dragged row lands, drawn inside so nothing shifts */
+.recipe_before {
+  box-shadow: inset 0 2px var(--accent-primary);
+}
+
+.recipe_after {
+  box-shadow: inset 0 -2px var(--accent-primary);
 }
 
 /* The gifts' or emotes' pictures, right by the check, as big as the

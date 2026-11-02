@@ -16,7 +16,7 @@ import {
 import { send, sent } from "@test/ipc";
 import { inList, section } from "@test/queries";
 import { renderWithProviders } from "@test/render";
-import { act, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Games } from ".";
 import styles from "./games.module.css";
@@ -989,6 +989,67 @@ describe("Games overlay", () => {
       { show: true, image: null, event: "", name: "TNT", column: 1 },
       { show: false, image: null, event: "Tap tap", name: "", column: 1 },
     ]);
+  });
+
+  it("moves a row by its handle, dragged or with the arrow keys", async () => {
+    const { user } = await load([
+      action("a1", { overlay: { ...overlay, name: "TNT" } }),
+      action("a2", { overlay: { ...overlay, name: "Creeper" } }),
+      action("a3", { overlay: { ...overlay, name: "Zombie" } }),
+    ]);
+    const handles = () =>
+      screen.getAllByRole("button", {
+        name: "Drag to reorder, or use the arrow keys",
+      });
+    const savedIds = () =>
+      saves()
+        .at(-1)!
+        .actions.map((a) => a.id);
+    const names = () =>
+      [...preview()!.querySelectorAll(".games-name")].map(
+        (name) => name.textContent,
+      );
+    // jsdom has no DataTransfer
+    const dataTransfer = { setDragImage: vi.fn() };
+
+    // Files or text dragged over the list aren't taken
+    expect(fireEvent.dragOver(recipeElements()[0])).toBe(true);
+
+    // The last row, dropped on the first, lands before it
+    fireEvent.dragStart(handles()[2], { dataTransfer });
+    const dragged = recipeElements()[2];
+    expect(dataTransfer.setDragImage).toHaveBeenCalledWith(
+      dragged,
+      expect.any(Number),
+      expect.any(Number),
+    );
+    fireEvent.dragEnter(recipeElements()[0], { dataTransfer });
+    expect(dragged).toHaveClass(styles.recipe_dragged);
+    expect(recipeElements()[0]).toHaveClass(styles.recipe_before);
+    expect(fireEvent.dragOver(recipeElements()[0], { dataTransfer })).toBe(
+      false,
+    );
+    fireEvent.drop(recipeElements()[0], { dataTransfer });
+    fireEvent.dragEnd(handles()[0], { dataTransfer });
+    await wait(300);
+
+    expect(savedIds()).toEqual(["a3", "a1", "a2"]);
+    expect(names()).toEqual(["Zombie", "TNT", "Creeper"]);
+    expect(recipeElements()[0]).toBe(dragged);
+    expect(dragged).not.toHaveClass(styles.recipe_dragged);
+
+    // A step down keeps the focus on the handle
+    act(() => handles()[0].focus());
+    await user.keyboard("{ArrowDown}");
+    await wait(300);
+    expect(savedIds()).toEqual(["a1", "a3", "a2"]);
+    expect(handles()[1]).toHaveFocus();
+
+    // Nothing is above the top
+    await user.keyboard("{ArrowUp}{ArrowUp}");
+    await wait(300);
+    expect(savedIds()).toEqual(["a3", "a1", "a2"]);
+    expect(handles()[0]).toHaveFocus();
   });
 
   it("turns an event's gifts in one place, every 2 s, in the row and the preview", async () => {

@@ -42,7 +42,9 @@ import { cx } from "@/helper/cx";
 import { scopeUpdater, Updater } from "@/hooks";
 import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import { FiPlay, FiPlus } from "react-icons/fi";
+import { LuGripVertical } from "react-icons/lu";
 import styles from "../games.module.css";
 import { OverlayPreview, PixelArrow, usePictureTurn } from "./OverlayPreview";
 
@@ -113,6 +115,9 @@ export function OverlaySection({
   // How many times Test was pressed, and the row it lit last
   const [tests, setTests] = useState(0);
   const [run, setRun] = useState<{ id: string } | null>(null);
+  // The row being dragged, and the row it's over
+  const [drag, setDrag] = useState<{ id: string; over?: string } | null>(null);
+  const from = actions.findIndex((a) => a.id === drag?.id);
   const setLook = scopeUpdater(update, "overlay");
   // Which of a row's gifts shows, all rows in step
   const pictureTurn = usePictureTurn();
@@ -124,6 +129,15 @@ export function OverlaySection({
     update((s) => {
       const action = s.actions.find((a) => a.id === id);
       if (action) Object.assign(action.overlay, patch);
+    });
+
+  // Puts an action at `to`: dropped on a row, it lands after it when moving
+  // down and before it when moving up
+  const move = (id: string, to: number) =>
+    update((s) => {
+      const at = s.actions.findIndex((a) => a.id === id);
+      if (at === -1 || at === to || to < 0 || to >= s.actions.length) return;
+      s.actions.splice(to, 0, ...s.actions.splice(at, 1));
     });
 
   return (
@@ -187,8 +201,23 @@ export function OverlaySection({
                 look.columns > 1 && styles.recipes_columns,
               )}
               aria-label={t("games.overlay.rows")}
+              // Only a row's own drag drops here, not files or text
+              onDragOver={(e) => {
+                if (drag) e.preventDefault();
+              }}
+              onDrop={(e) => {
+                if (!drag) return;
+                e.preventDefault();
+                move(
+                  drag.id,
+                  actions.findIndex((a) => a.id === drag.over),
+                );
+                setDrag(null);
+              }}
+              // Also when it's cancelled or dropped elsewhere: nothing moves
+              onDragEnd={() => setDrag(null)}
             >
-              {actions.map((action) => (
+              {actions.map((action, index) => (
                 <RecipeRow
                   key={action.id}
                   action={action}
@@ -197,8 +226,22 @@ export function OverlaySection({
                   pictureTurn={pictureTurn}
                   gifts={gifts}
                   emotes={emotes}
+                  dragged={index === from}
+                  drop={
+                    from === -1 || index === from || action.id !== drag?.over
+                      ? undefined
+                      : index > from
+                        ? "after"
+                        : "before"
+                  }
                   onChange={(patch) => setItem(action.id, patch)}
                   onPickPicture={() => onPickPicture(action.id)}
+                  onDragStart={() => setDrag({ id: action.id })}
+                  onDragEnter={() => {
+                    if (drag && drag.over !== action.id)
+                      setDrag({ ...drag, over: action.id });
+                  }}
+                  onStep={(by) => move(action.id, index + by)}
                 />
               ))}
             </ul>
@@ -328,8 +371,15 @@ type RowProps = {
   pictureTurn: number;
   gifts: CustomGift[];
   emotes: SavedEmote[];
+  // Being dragged, and where the dragged row lands if dropped on this one
+  dragged: boolean;
+  drop?: "before" | "after";
   onChange: (patch: Partial<GameOverlayItem>) => void;
   onPickPicture: () => void;
+  // Its handle drags it, or moves it a step with the arrow keys
+  onDragStart: () => void;
+  onDragEnter: () => void;
+  onStep: (by: number) => void;
 };
 
 // An action's row, read like the overlay's: the event, an arrow, then the
@@ -341,8 +391,13 @@ function RecipeRow({
   pictureTurn,
   gifts,
   emotes,
+  dragged,
+  drop,
   onChange,
   onPickPicture,
+  onDragStart,
+  onDragEnter,
+  onStep,
 }: RowProps) {
   const t = useT();
   const language = useLanguage();
@@ -354,6 +409,7 @@ function RecipeRow({
   const pick = t(
     overlay.image ? "games.overlay.changePicture" : "games.overlay.pickPicture",
   );
+  const reorder = t("games.overlay.move");
   // On the pictures' corners, as on the overlay
   const count = overlay.image ? gameCount(action) : 0;
   const likes = gameEventCount(action);
@@ -397,7 +453,48 @@ function RecipeRow({
   );
 
   return (
-    <li className={cx(styles.recipe, !action.enabled && styles.recipe_off)}>
+    <li
+      className={cx(
+        styles.recipe,
+        !action.enabled && styles.recipe_off,
+        dragged && styles.recipe_dragged,
+        drop === "before" && styles.recipe_before,
+        drop === "after" && styles.recipe_after,
+      )}
+      onDragEnter={onDragEnter}
+    >
+      <Btn
+        variant="icon"
+        className={styles.grip}
+        title={reorder}
+        aria-label={reorder}
+        aria-keyshortcuts="ArrowUp ArrowDown"
+        draggable
+        onDragStart={(e) => {
+          // The whole row follows the pointer, held where it was grabbed
+          const row = e.currentTarget.closest("li")!;
+          const box = row.getBoundingClientRect();
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setDragImage(
+            row,
+            e.clientX - box.left,
+            e.clientY - box.top,
+          );
+          onDragStart();
+        }}
+        onKeyDown={(e) => {
+          const by = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+          if (!by) return;
+          e.preventDefault();
+          const handle = e.currentTarget;
+          // Synchronous, so the handle takes the focus back: moving its row
+          // drops it on <body>
+          flushSync(() => onStep(by));
+          handle.focus();
+        }}
+      >
+        <LuGripVertical size={16} />
+      </Btn>
       <Check
         aria-label={t("games.overlay.show")}
         checked={overlay.show}

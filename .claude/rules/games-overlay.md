@@ -94,6 +94,8 @@ In `src/main/helper/games.ts`:
 ## Builder
 
 - The rows panel is as wide as its rows need (`.overlay`'s `auto` track). The rows share one grid (each `li` a `subgrid`), so arrows line up while the event column is only as wide as its widest content.
+- Each row starts with a grip handle that moves its action in `games.actions`, the order of the overlay and of the Actions list. Dragged (native drag and drop, the row as the drag image), it lands where the rose line shows: after the row it's dropped on when moving down, before it when moving up. Only a row's own drag drops there, and a cancelled one moves nothing. A row changes column only through its picker (the user's call).
+- The handle's ArrowUp and ArrowDown move it a step. Moving the `li` drops the focus on `<body>` in Chromium, so the handle takes it back after a `flushSync`, as `TableField` does. jsdom keeps the focus, so only the real app shows that.
 - With more than one column, each row gets a **Column** picker and the section gives one URL per column.
 - Horizontal calls them rows (**Rows**, a **Row** picker, "Copy row N's URL"). The saved `columns` and `column` and the URLs stay the same, so column 2 becomes row 2.
 - `OverlayPreview` draws the columns side by side, each shrunk to fit its share as the page fits its source (`--fit`, written to the style in a layout effect, so measuring doesn't render again).
