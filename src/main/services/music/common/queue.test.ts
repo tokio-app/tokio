@@ -520,6 +520,22 @@ describe("MusicQueue", () => {
 
       expect(titles(queue)).toEqual(["a"]);
     });
+
+    it("tells overlays when a trim drops songs", () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a"), () => {});
+      queue.enqueue("b", song("b"), () => {});
+      const changes = vi.fn();
+      queue.on(TOKIO_EVENTS.MUSIC_CHANGE, changes);
+
+      queue.setMaxSize(2);
+      expect(changes).not.toHaveBeenCalled();
+
+      queue.setMaxSize(1);
+      expect(changes).toHaveBeenCalledExactlyOnceWith([
+        expect.objectContaining({ title: "a" }),
+      ]);
+    });
   });
 
   describe("revoke", () => {
@@ -704,12 +720,16 @@ describe("MusicQueue", () => {
       const b = vi.fn();
       queue.enqueue("a", song("a"), () => {});
       queue.enqueue("b", song("b"), b);
+      const changes = vi.fn();
+      queue.on(TOKIO_EVENTS.MUSIC_CHANGE, changes);
 
       queue.clear();
       await vi.advanceTimersByTimeAsync(1000);
+      queue.clear();
 
       expect(titles(queue)).toEqual([]);
       expect(b).not.toHaveBeenCalled();
+      expect(changes).toHaveBeenCalledExactlyOnceWith([]);
     });
   });
 });
