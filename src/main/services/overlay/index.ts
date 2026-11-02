@@ -183,6 +183,9 @@ export class OverlayService extends Service {
   ): Promise<OverlayResult> {
     const id = randomUUID();
     const dir = this._dir(id);
+    // Copied and checked here first, so a quit midway leaves only a folder
+    // load() deletes.
+    const staging = join(this._folder, `.install-${randomUUID()}`);
     try {
       // A link picked as the folder is copied as the folder it points to.
       const source = await realpath(basedir);
@@ -192,7 +195,7 @@ export class OverlayService extends Service {
 
       // A link could point anywhere on the computer, and the previews and
       // the server would serve its target.
-      await cp(source, dir, {
+      await cp(source, staging, {
         recursive: true,
         filter: async (src) => !(await lstat(src)).isSymbolicLink(),
       });
@@ -200,18 +203,20 @@ export class OverlayService extends Service {
       // Checked on the copy, without its links: an overlay that needs a
       // linked file is refused. It gets its ID through the block, settings
       // or not.
-      const res = await processOverlay(dir, this._yaml, true);
+      const res = await processOverlay(staging, this._yaml, true);
       if (!res.success || !hasSetupBlock(res.data!.htmlContent)) {
-        await rm(dir, { recursive: true, force: true });
+        await rm(staging, { recursive: true, force: true });
         return { success: false };
       }
       const { config, htmlContent, info } = res.data!;
 
-      const html = await processHTML(id, htmlContent, dir, config, gifts);
+      // The HTML holds no folder path, so the folder can move after.
+      const html = await processHTML(id, htmlContent, staging, config, gifts);
       if (!html.success) {
-        await rm(dir, { recursive: true, force: true });
+        await rm(staging, { recursive: true, force: true });
         return { success: false };
       }
+      await renameWithRetry(staging, dir);
 
       this._register({ ...info, id, path: dir }, true);
       const saved = await this._store.addOverlayInfo({ ...info, id });
@@ -222,7 +227,7 @@ export class OverlayService extends Service {
         this._logFile,
         error,
       );
-      await rm(dir, { recursive: true, force: true }).catch(() => {});
+      await rm(staging, { recursive: true, force: true }).catch(() => {});
       return { success: false };
     }
   }
@@ -302,20 +307,31 @@ export class OverlayService extends Service {
       return { success: false };
     }
 
+    // Moved out first, so a folder another program holds stays whole. load()
+    // deletes the .old-* folder if the rm below can't.
+    const old = join(this._folder, `.old-${randomUUID()}`);
     try {
-      await rm(this._dir(id), { recursive: true, force: true });
+      await renameWithRetry(this._dir(id), old);
     } catch (error) {
-      Logger.error(
-        `<Overlays> Unable to remove overlay ${id} -- ${formatError(error)}`,
-        this._logFile,
-        error,
-      );
-      return { success: false };
+      if (!(
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "ENOENT"
+      )) {
+        Logger.error(
+          `<Overlays> Unable to remove overlay ${id} -- ${formatError(error)}`,
+          this._logFile,
+          error,
+        );
+        return { success: false };
+      }
     }
 
     this._server.unmount(id);
     this._overlays = this._overlays.filter((o) => o.id !== id);
-    return { success: true, saved: await this._store.removeOverlayInfo(id) };
+    const saved = await this._store.removeOverlayInfo(id);
+    await rm(old, { recursive: true, force: true }).catch(() => {});
+    return { success: true, saved };
   }
 
   // Only stored ids, so the renderer's id can't point outside the folder.
