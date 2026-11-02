@@ -350,6 +350,8 @@ export class GamesService extends Service {
     try {
       for (let first = true; backlog.length > 0; first = false) {
         if (!first) await new Promise((r) => setTimeout(r, RUN_GAP_MS));
+        // A Bedrock game that took over in the gap is still in its handshake
+        await this._minecraft.settled();
         // Stopped when the latest profile removed or disabled the action; runs
         // it accepted keep their commands if only steps changed
         const action = this._games.actions.find((a) => a.id === id);

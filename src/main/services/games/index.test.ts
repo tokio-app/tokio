@@ -585,7 +585,8 @@ describe("GamesService", () => {
           };
         });
         const states: GameStatus[] = [];
-        minecraft.settled.mockImplementationOnce(async () => {
+        minecraft.settled.mockImplementation(async () => {
+          if (minecraft.status.state !== "waiting") return;
           states.push(minecraft.status);
           minecraft.set({ state: "connected", edition: "bedrock" });
         });
@@ -598,6 +599,32 @@ describe("GamesService", () => {
         await vi.runAllTimersAsync();
         await run;
         expect(states).toEqual([{ state: "waiting" }]);
+        expect(minecraft.sent).toEqual(["each 3", "each 3", "each 3"]);
+        expect(onError).not.toHaveBeenCalled();
+      });
+
+      it("waits for a Bedrock game that took over between two runs", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        // The first run is answered, then another game takes over
+        minecraft.send.mockImplementationOnce(async (command) => {
+          minecraft.sent.push(command);
+          minecraft.set({ state: "waiting" });
+          return { command, ok: true, message: "" };
+        });
+        minecraft.settled.mockImplementation(async () => {
+          if (minecraft.status.state === "waiting") {
+            minecraft.set({ state: "connected", edition: "bedrock" });
+          }
+        });
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(3), {
+          actions: [everyGift()],
+        });
+        await vi.runAllTimersAsync();
+        await run;
         expect(minecraft.sent).toEqual(["each 3", "each 3", "each 3"]);
         expect(onError).not.toHaveBeenCalled();
       });
