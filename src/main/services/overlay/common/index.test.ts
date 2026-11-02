@@ -91,6 +91,18 @@ describe("findOverlays", () => {
     ]);
   });
 
+  it("leaves out folders Tokio didn't name", async () => {
+    // Express can't mount these paths, and /alerts/ is Tokio's own.
+    for (const id of ["gift-jar - Copy (2)", "alerts"]) {
+      await overlay(id, {
+        "info.yaml": info("Copy"),
+        "index.html": "<p></p>",
+      });
+    }
+
+    expect(await findOverlays(folder, new YAMLManagerService())).toEqual([]);
+  });
+
   it("finds nothing in a missing folder", async () => {
     expect(
       await findOverlays(join(folder, "missing"), new YAMLManagerService()),

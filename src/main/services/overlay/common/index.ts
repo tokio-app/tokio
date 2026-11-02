@@ -1,4 +1,5 @@
 import {
+  CatalogOverlaySchema,
   getOverlayConfig,
   OverlayConfig,
   OverlayConfigSchema,
@@ -50,8 +51,9 @@ export const hasSetupBlock = (html: string) => SCRIPT_REGEX.test(html);
 
 /**
  * Overlays installed in the overlays folder, each in a folder named by its id.
- * Lets a rebuilt store get its overlay list back. Folders starting with a dot
- * are installs in progress.
+ * Lets a rebuilt store get its overlay list back. Other folders (installs in
+ * progress, copies the user made) are left out: their names may not be paths
+ * the server can mount.
  */
 export async function findOverlays(
   folder: string,
@@ -62,8 +64,10 @@ export async function findOverlays(
   );
   const overlays: (OverlayMetadata & { id: string })[] = [];
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
     const external = IMPORTED_ID.test(entry.name);
+    const named =
+      external || CatalogOverlaySchema.shape.id.safeParse(entry.name).success;
+    if (!entry.isDirectory() || !named) continue;
     const res = await processOverlay(join(folder, entry.name), yaml, external);
     if (res.success && res.data) {
       overlays.push({ ...res.data.info, id: entry.name, external });
