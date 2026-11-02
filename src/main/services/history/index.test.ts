@@ -699,6 +699,22 @@ describe("HistoryService", () => {
       expect(await history.deleteLive(1000)).toBe(true);
     });
 
+    it("keeps its file until the index is saved", async () => {
+      const history = await twoLives();
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      // The newest: a load would take its file back as a crash's leftover
+      expect(await history.deleteLive(3000)).toBe(false);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(true);
+
+      // The retry saves the index, then the file goes
+      expect(await history.save()).toBe(true);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
+      expect((await loaded()).getHistory().lives).toEqual([
+        expect.objectContaining({ startedAt: 1000 }),
+      ]);
+    });
+
     it("leaves the index when its file doesn't load, keeping all time's gifts", async () => {
       const history = await twoLives();
       await writeFile(join(dir, "a", "1000.json"), "{ broken");
