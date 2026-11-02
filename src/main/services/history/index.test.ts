@@ -534,6 +534,28 @@ describe("HistoryService", () => {
     expect(await history.getGifters({ query: "nobody" })).toEqual([]);
   });
 
+  it("gives null for dates still read when another profile loads", async () => {
+    const history = await loaded();
+    history.start("kai", 10 * MINUTE);
+    gifts(history, [10 * MINUTE + 1000, gift(viewer("1"), 5)]);
+    history.end(12 * MINUTE);
+    history.start("kai", 20 * MINUTE);
+    history.end(21 * MINUTE);
+    await history.save();
+
+    // Both cut or leave out a LIVE, so they read its file
+    const range = { from: 11 * MINUTE };
+    const totals = history.getTotals(range);
+    const gifters = history.getGifters(range);
+    await history.load("b.json");
+
+    expect(await totals).toBeNull();
+    expect(await gifters).toBeNull();
+    // Nothing loaded still gives a reply
+    expect(await service().getTotals(range)).toEqual({ coins: 0, gifts: 0 });
+    expect(await service().getGifters(range)).toEqual([]);
+  });
+
   describe(`past ${MAX_LIVES} LIVEs`, () => {
     const HOUR = 3_600_000;
     const ana = {

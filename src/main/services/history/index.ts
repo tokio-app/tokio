@@ -327,11 +327,11 @@ export class HistoryService extends Service {
   /**
    * The finished LIVEs' coins and gifts in some dates: a LIVE all in them
    * counts whole, and one they cut only its gifts in them, so only those take
-   * reading a file.
+   * reading a file. Null when another profile loaded while they were read.
    */
   public async getTotals(
     range: DateRange,
-  ): Promise<Pick<LiveSummary, "coins" | "gifts">> {
+  ): Promise<Pick<LiveSummary, "coins" | "gifts"> | null> {
     const dir = this._dir;
     const totals = { coins: 0, gifts: 0 };
     if (dir === null) return totals;
@@ -349,7 +349,7 @@ export class HistoryService extends Service {
         }
       }
     }
-    return this._dir === dir ? totals : { coins: 0, gifts: 0 };
+    return this._dir === dir ? totals : null;
   }
 
   /**
@@ -357,13 +357,14 @@ export class HistoryService extends Service {
    * the gifts in them of a LIVE they cut, each with their place among them, and
    * with a query only the ones whose name or @handle has it. Every LIVE whole
    * is all time's list; other dates are added up from the LIVEs' files,
-   * leaving out a file that doesn't load.
+   * leaving out a file that doesn't load. Null when another profile loaded
+   * while they were read.
    */
   public async getGifters({
     from,
     to,
     query = "",
-  }: DateRange & { query?: string }): Promise<RankedGifter[]> {
+  }: DateRange & { query?: string }): Promise<RankedGifter[] | null> {
     const dir = this._dir;
     if (dir === null) return [];
     const range = { from, to };
@@ -379,7 +380,7 @@ export class HistoryService extends Service {
       // the name, handle and picture end up the latest ones.
       for (const { startedAt } of lives) {
         const record = await this._readLive(dir, startedAt);
-        if (this._dir !== dir) return [];
+        if (this._dir !== dir) return null;
         if (!record) continue;
         const sent = allInRange(record, range)
           ? record.gifters

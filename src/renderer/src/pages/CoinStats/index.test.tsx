@@ -543,6 +543,30 @@ describe("Coin stats", () => {
     expect(selected()).toMatch(/^Friday/);
   });
 
+  it("drops the last profile's totals and gifters after a switch", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 31, 21));
+    const since = new Date(2026, 9, 30, 21).getTime();
+    const { user } = renderWithProviders(<CoinStats />);
+    await lives([saturday, friday]);
+    await dates(user, "Last 24 hours");
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      from: since,
+      totals: { coins: 900, gifts: 70 },
+      data: [{ ...gifter("Ana", 300, 30), rank: 1 }],
+    });
+    expect(stat("Coins")).toHaveTextContent("900");
+
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
+    await lives([saturday]);
+    await user.click(option(/^Last 24 hours/));
+
+    expect(stat("Coins")).toHaveTextContent("600");
+    expect(screen.queryByText("Ana")).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
+  });
+
   it("keeps the selection when a LIVE that ended joins the list", async () => {
     const { user } = renderWithProviders(<CoinStats />);
     await lives([friday]);
