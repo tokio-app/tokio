@@ -757,6 +757,39 @@ describe("AlertsService", () => {
         expect(onError).not.toHaveBeenCalled();
       });
 
+      describe("for a viewer on the TTS block list", () => {
+        const blocking = (items: Alert[]): AlertProfile => {
+          const alerts = withTts(items);
+          alerts.tts.permissions.list = {
+            enabled: true,
+            white: [],
+            black: ["@viewer"],
+          };
+          return alerts;
+        };
+
+        it("shows the media without the message", async () => {
+          await speak(
+            gift("5655", true),
+            blocking([{ ...speaking("Thanks"), media: picture }]),
+          );
+
+          expect(generateBuffer).not.toHaveBeenCalled();
+          expect(sent).toHaveLength(1);
+          expect(sent[0]).toMatchObject({ id: "alert-1", media: picture });
+          expect(sent[0].data).toBeUndefined();
+          expect(sent[0].key).toBeUndefined();
+          expect(sent[0].filters).toBeUndefined();
+        });
+
+        it("plays nothing for a message alone", async () => {
+          await speak(gift("5655", true), blocking([speaking("Thanks")]));
+
+          expect(generateBuffer).not.toHaveBeenCalled();
+          expect(sent).toEqual([]);
+        });
+      });
+
       it("checks banned words in the event's values, not the message's own", async () => {
         const tts = new TTSService();
         service.setSpeaker({

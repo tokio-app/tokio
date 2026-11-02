@@ -9,6 +9,10 @@ import { ActionsSection } from "./sections/ActionsSection";
 import { MinecraftSection } from "./sections/MinecraftSection";
 import { OverlaySection } from "./sections/OverlaySection";
 
+// Numbers the browses, kept while the page is away so a browse made on its
+// return can't get an older one's number
+let requests = 0;
+
 export function Games() {
   // Until main's first push
   const [games, setGames] = useState<GamesData | null>(null);
@@ -19,9 +23,8 @@ export function Games() {
   // Actions waiting for main to save browsed pictures. A pick made since
   // drops the action, so a slow dialog can't replace it.
   const asked = useRef(new Set<string>());
-  // Numbers the browses, and the newest one applied per action, so a late
-  // reply to an older browse can't replace a newer one
-  const counter = useRef(0);
+  // The newest browse applied per action, so a late reply to an older
+  // browse can't replace a newer one
   const applied = useRef(new Map<string, number>());
   // Each profile loaded, which the actions open on, on the tab of an
   // edition that has some
@@ -127,7 +130,7 @@ export function Games() {
           picture={pictureAction.overlay.image}
           onRequest={() => {
             asked.current.add(pictureAction.id);
-            return ++counter.current;
+            return ++requests;
           }}
           onSelect={(picture) => {
             asked.current.delete(pictureAction.id);

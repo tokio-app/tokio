@@ -19,7 +19,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GamesService, MAX_BACKLOG, RUN_GAP_MS } from "./index";
-import { DISCONNECTED } from "./minecraft";
 
 // Stands in for the game's WebSocket: records the commands, answers each
 // with `answer`. Connected, it's the edition's game.
@@ -27,7 +26,7 @@ const fakeMinecraft = (
   state: GameStatus["state"] = "connected",
   edition: MinecraftEdition = "bedrock",
 ) => {
-  let listener: ((status: GameStatus) => void) | undefined;
+  let listener: ((status: GameStatus, cause?: string) => void) | undefined;
   const fake = {
     status: (state === "connected"
       ? { state, edition }
@@ -38,7 +37,8 @@ const fakeMinecraft = (
       ok: true,
       message: "",
     }),
-    onStatus: (l: (status: GameStatus) => void) => (listener = l),
+    onStatus: (l: (status: GameStatus, cause?: string) => void) =>
+      (listener = l),
     setEnabled: vi.fn(async (enabled: boolean) => {
       fake.set({ state: enabled ? "waiting" : "off" });
       return true;
@@ -47,9 +47,10 @@ const fakeMinecraft = (
       fake.sent.push(command);
       return fake.answer(command);
     }),
-    set: (status: GameStatus) => {
+    settled: vi.fn(async () => {}),
+    set: (status: GameStatus, cause?: string) => {
       fake.status = status;
-      listener?.(status);
+      listener?.(status, cause);
     },
   };
   return fake;
@@ -114,7 +115,7 @@ describe("GamesService", () => {
     expect(minecraft.setEnabled).toHaveBeenCalledWith(true);
   });
 
-  it("passes on every status and logs it", () => {
+  it("passes on every status and logs it in English", () => {
     const info = vi.spyOn(Logger, "info");
     const minecraft = fakeMinecraft("off");
     const games = service(minecraft);
@@ -125,22 +126,32 @@ describe("GamesService", () => {
     minecraft.set({ state: "waiting" });
     minecraft.set({ state: "connected", edition: "bedrock" });
     minecraft.set({ state: "connected", edition: "java" });
-    minecraft.set({ state: "error", error: "Port 37892 is in use." });
+    minecraft.set(
+      { state: "error", error: "El puerto 37892 está en uso." },
+      "listen EADDRINUSE: address already in use :::37892",
+    );
 
     expect(listener.mock.calls).toEqual([
       [{ minecraft: { state: "waiting" } }],
       [{ minecraft: { state: "connected", edition: "bedrock" } }],
       [{ minecraft: { state: "connected", edition: "java" } }],
-      [{ minecraft: { state: "error", error: "Port 37892 is in use." } }],
+      [
+        {
+          minecraft: { state: "error", error: "El puerto 37892 está en uso." },
+        },
+      ],
     ]);
     expect(info.mock.calls).toEqual([
       ["<Games> Minecraft is waiting for the game.", "games.log"],
       ["<Games> Minecraft is connected (Bedrock Edition).", "games.log"],
       ["<Games> Minecraft is connected (Java Edition).", "games.log"],
-      ["<Games> Minecraft can't work: Port 37892 is in use.", "games.log"],
+      [
+        "<Games> Minecraft can't work: listen EADDRINUSE: address already in use :::37892",
+        "games.log",
+      ],
     ]);
     expect(games.status()).toEqual({
-      minecraft: { state: "error", error: "Port 37892 is in use." },
+      minecraft: { state: "error", error: "El puerto 37892 está en uso." },
     });
   });
 
@@ -249,7 +260,12 @@ describe("GamesService", () => {
       const minecraft = fakeMinecraft();
       minecraft.send.mockImplementation(async (command) => {
         minecraft.set({ state: "waiting" });
-        return { command, ok: false, message: "Minecraft disconnected." };
+        return {
+          command,
+          ok: false,
+          message: "Minecraft disconnected.",
+          dropped: true,
+        };
       });
       const games = service(minecraft);
       const onError = vi.fn();
@@ -535,7 +551,12 @@ describe("GamesService", () => {
         // by the time it fails
         minecraft.send.mockImplementationOnce(async (command) => {
           minecraft.sent.push(command);
-          return { command, ok: false, message: DISCONNECTED };
+          return {
+            command,
+            ok: false,
+            message: "Minecraft se desconectó.",
+            dropped: true,
+          };
         });
         const games = service(minecraft);
         const onError = vi.fn();
@@ -549,13 +570,77 @@ describe("GamesService", () => {
         expect(onError).not.toHaveBeenCalled();
       });
 
+      it("waits for a Bedrock game that replaced one to be ready, then goes on", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        // The new game is still in its handshake when the first run fails
+        minecraft.send.mockImplementationOnce(async (command) => {
+          minecraft.sent.push(command);
+          minecraft.set({ state: "waiting" });
+          return {
+            command,
+            ok: false,
+            message: "Minecraft se desconectó.",
+            dropped: true,
+          };
+        });
+        const states: GameStatus[] = [];
+        minecraft.settled.mockImplementation(async () => {
+          if (minecraft.status.state !== "waiting") return;
+          states.push(minecraft.status);
+          minecraft.set({ state: "connected", edition: "bedrock" });
+        });
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(3), {
+          actions: [everyGift()],
+        });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(states).toEqual([{ state: "waiting" }]);
+        expect(minecraft.sent).toEqual(["each 3", "each 3", "each 3"]);
+        expect(onError).not.toHaveBeenCalled();
+      });
+
+      it("waits for a Bedrock game that took over between two runs", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        // The first run is answered, then another game takes over
+        minecraft.send.mockImplementationOnce(async (command) => {
+          minecraft.sent.push(command);
+          minecraft.set({ state: "waiting" });
+          return { command, ok: true, message: "" };
+        });
+        minecraft.settled.mockImplementation(async () => {
+          if (minecraft.status.state === "waiting") {
+            minecraft.set({ state: "connected", edition: "bedrock" });
+          }
+        });
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(3), {
+          actions: [everyGift()],
+        });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toEqual(["each 3", "each 3", "each 3"]);
+        expect(onError).not.toHaveBeenCalled();
+      });
+
       it("drops the rest quietly when Minecraft is turned off midway", async () => {
         vi.useFakeTimers();
         const minecraft = fakeMinecraft();
         minecraft.send.mockImplementation(async (command) => {
           minecraft.sent.push(command);
           minecraft.set({ state: "off" });
-          return { command, ok: false, message: "Minecraft disconnected." };
+          return {
+            command,
+            ok: false,
+            message: "Minecraft disconnected.",
+            dropped: true,
+          };
         });
         const games = service(minecraft);
         const onError = vi.fn();

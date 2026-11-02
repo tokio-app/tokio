@@ -534,6 +534,28 @@ describe("HistoryService", () => {
     expect(await history.getGifters({ query: "nobody" })).toEqual([]);
   });
 
+  it("gives null for dates still read when another profile loads", async () => {
+    const history = await loaded();
+    history.start("kai", 10 * MINUTE);
+    gifts(history, [10 * MINUTE + 1000, gift(viewer("1"), 5)]);
+    history.end(12 * MINUTE);
+    history.start("kai", 20 * MINUTE);
+    history.end(21 * MINUTE);
+    await history.save();
+
+    // Both cut or leave out a LIVE, so they read its file
+    const range = { from: 11 * MINUTE };
+    const totals = history.getTotals(range);
+    const gifters = history.getGifters(range);
+    await history.load("b.json");
+
+    expect(await totals).toBeNull();
+    expect(await gifters).toBeNull();
+    // Nothing loaded still gives a reply
+    expect(await service().getTotals(range)).toEqual({ coins: 0, gifts: 0 });
+    expect(await service().getGifters(range)).toEqual([]);
+  });
+
   describe(`past ${MAX_LIVES} LIVEs`, () => {
     const HOUR = 3_600_000;
     const ana = {
@@ -591,6 +613,39 @@ describe("HistoryService", () => {
       );
     });
 
+    it("saves the drop's index after the end's", async () => {
+      const lives = await seed(MAX_LIVES);
+      const history = await loaded();
+      const startedAt = (MAX_LIVES + 1) * HOUR;
+      // The new LIVE's file waits, so the drop's index could pass the end's
+      let open = () => {};
+      const gate = new Promise<void>((resolve) => (open = resolve));
+      const original = json.saveFile.bind(json);
+      const saveFile = vi
+        .spyOn(json, "saveFile")
+        .mockImplementation(async (file, schema, data) => {
+          if (file.endsWith(`${startedAt}.json`)) await gate;
+          return original(file, schema, data);
+        });
+
+      history.start("kai", startedAt);
+      history.record(TOKIO_EVENTS.GIFT, gift(viewer("1"), 5));
+      history.end(startedAt + 60_000);
+      void history.save();
+      await vi.waitFor(() =>
+        expect(history.getHistory().lives).toHaveLength(MAX_LIVES),
+      );
+      open();
+      const indexes = () =>
+        saveFile.mock.calls.filter(([file]) => file.endsWith("index.json"));
+      await vi.waitFor(() => expect(indexes()).toHaveLength(2));
+      await Promise.all(saveFile.mock.results.map((r) => r.value));
+
+      const saved = await read<{ lives: LiveSummary[] }>("index.json");
+      expect(saved.lives).toHaveLength(MAX_LIVES);
+      expect(saved.lives[0].startedAt).toBe(lives[1].startedAt);
+    });
+
     it("drops the oldest when a history loads with more", async () => {
       const lives = await seed(MAX_LIVES + 2);
       const history = await loaded();
@@ -642,6 +697,22 @@ describe("HistoryService", () => {
         expect.objectContaining({ coins: 50 }),
       );
       expect(await history.deleteLive(1000)).toBe(true);
+    });
+
+    it("keeps its file until the index is saved", async () => {
+      const history = await twoLives();
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      // The newest: a load would take its file back as a crash's leftover
+      expect(await history.deleteLive(3000)).toBe(false);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(true);
+
+      // The retry saves the index, then the file goes
+      expect(await history.save()).toBe(true);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
+      expect((await loaded()).getHistory().lives).toEqual([
+        expect.objectContaining({ startedAt: 1000 }),
+      ]);
     });
 
     it("leaves the index when its file doesn't load, keeping all time's gifts", async () => {

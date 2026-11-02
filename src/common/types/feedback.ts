@@ -89,6 +89,7 @@ export enum FEEDBACK_CODES {
 
   // TIMER
   TIMER_PAUSED = "timer_paused",
+  TIMER_SAVE_FAILED = "timer_save_failed",
   TIMER_FAILED = "timer_failed",
 
   // LIVES

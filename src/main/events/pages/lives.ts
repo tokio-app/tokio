@@ -50,6 +50,8 @@ events.push(
     const totals = query
       ? undefined
       : await historyService.getTotals({ from, to });
+    // Another profile loaded meanwhile, whose reply the page asks for
+    if (totals === null) return;
     if (totals) {
       e.reply(APP_EVENTS_RESPONSE.GIFTERS, {
         success: true,
@@ -59,6 +61,7 @@ events.push(
       });
     }
     const data = await historyService.getGifters({ from, to, query });
+    if (data === null) return;
     e.reply(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       from,

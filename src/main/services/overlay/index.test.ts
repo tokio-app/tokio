@@ -696,6 +696,25 @@ describe("OverlayService", () => {
       expect(stored).toEqual([]);
     });
 
+    it("keeps the overlay whole when its folder stays held", async () => {
+      const source = join(root, "source");
+      await configurable(source);
+      await service.import(source, gifts);
+      const [id] = await readdir(folder);
+      const files = await readdir(join(folder, id));
+      // renameWithRetry's 5 retries and its last try
+      const busy = Object.assign(new Error("EBUSY"), { code: "EBUSY" });
+      for (let i = 0; i < 6; i++) vi.mocked(rename).mockRejectedValueOnce(busy);
+
+      expect(await service.remove(id)).toEqual({ success: false });
+
+      expect(stored).toMatchObject([{ id }]);
+      expect(unmount).not.toHaveBeenCalled();
+      expect(service.getOverlays()).toMatchObject([{ id }]);
+      expect(await readdir(folder)).toEqual([id]);
+      expect(await readdir(join(folder, id))).toEqual(files);
+    });
+
     it("deletes an official overlay", async () => {
       await configurable(join(folder, "title"));
       stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];

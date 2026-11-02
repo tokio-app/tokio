@@ -65,6 +65,13 @@ describe("Layout", () => {
     );
   });
 
+  // A page that doesn't ask, as after a reload, still gets the LIVE state
+  it("asks whether a LIVE is on from any page", async () => {
+    await renderApp("/tts");
+
+    expect(sent(APP_EVENTS.IS_CONNECTED)).toHaveLength(1);
+  });
+
   it("hides the sidebar's names on Escape until another link is hovered", async () => {
     const { user } = await renderApp();
     const nav = screen.getByRole("navigation");

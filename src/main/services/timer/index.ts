@@ -66,6 +66,7 @@ export class TimerService extends Service {
   // the end, a pause on disconnect
   private _unsaved = false;
   private _listeners: ((deltaMs: number) => void)[] = [];
+  private _onSaveFailed?: () => void;
 
   private readonly _triggers: Triggers = {
     [TOKIO_EVENTS.GIFT]: (event) => {
@@ -217,6 +218,11 @@ export class TimerService extends Service {
     this._listeners.push(listener);
   }
 
+  // Called when an interval save fails.
+  public onSaveFailed(listener: () => void) {
+    this._onSaveFailed = listener;
+  }
+
   private _tick() {
     this._settle();
     const now = performance.now();
@@ -224,13 +230,17 @@ export class TimerService extends Service {
       if (until <= now) this._cooldowns.delete(key);
     }
     if (!this._unsaved && this._status !== "running") return;
-    this.save().catch((error) => {
-      Logger.error(
-        `<Timer> Unable to save the timer -- ${formatError(error)}`,
-        this._logFile,
-        error,
-      );
-    });
+    this.save()
+      .then((saved) => {
+        if (!saved) this._onSaveFailed?.();
+      })
+      .catch((error) => {
+        Logger.error(
+          `<Timer> Unable to save the timer -- ${formatError(error)}`,
+          this._logFile,
+          error,
+        );
+      });
   }
 
   private _seconds() {

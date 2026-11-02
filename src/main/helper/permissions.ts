@@ -2,18 +2,25 @@ import { Permissions } from "@/common/schemas";
 import { UserData } from "@/common/types";
 import { sameHandle } from "./chat";
 
+const listed = (handles: string[], user: UserData) =>
+  handles.some((handle) => sameHandle(handle, user.handle));
+
+/**
+ * Whether the viewer's handle is on the block list, while the lists are on.
+ */
+export function isBlocked(permissions: Permissions, user: UserData | null) {
+  const { list } = permissions;
+  return Boolean(user && list.enabled && listed(list.black, user));
+}
+
 /**
  * Whether a chat user may use a feature (TTS, music requests) under its
  * permission settings.
  */
 export function hasPermission(permissions: Permissions, user: UserData) {
   const { list, level } = permissions;
-  if (list.enabled) {
-    const listed = (handles: string[]) =>
-      handles.some((handle) => sameHandle(handle, user.handle));
-    if (listed(list.black)) return false;
-    if (list.white.length > 0) return listed(list.white);
-  }
+  if (isBlocked(permissions, user)) return false;
+  if (list.enabled && list.white.length > 0) return listed(list.white, user);
 
   if (permissions.all) return true;
 

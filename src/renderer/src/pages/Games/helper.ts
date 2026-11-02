@@ -9,6 +9,7 @@ import {
 import {
   CommandResult,
   GameStatus,
+  MINECRAFT_CONNECT_COMMANDS,
   MINECRAFT_EDITION_NAMES,
   TOKIO_EVENTS,
 } from "@/common/types";
@@ -30,10 +31,9 @@ export const EDITIONS: SelectOption<MinecraftEdition>[] = [
   { value: "java", label: "Java" },
 ];
 
-// What each edition's chat takes to join Tokio, from this PC or another
-// device. Java's command comes from the Tokio mod.
+// What each edition's chat takes to join Tokio, from this PC or another device
 export const connectCommand = (host: string, edition: MinecraftEdition) =>
-  `${edition === "java" ? "/tokio connect" : "/connect"} ${host}:${MINECRAFT_PORT}`;
+  `${MINECRAFT_CONNECT_COMMANDS[edition]} ${host}:${MINECRAFT_PORT}`;
 
 // Every mob and item each edition's summon and give take, named as the game
 // names them in English (see .claude/skills/minecraft-lists/SKILL.md)

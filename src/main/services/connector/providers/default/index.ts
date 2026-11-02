@@ -172,13 +172,16 @@ export class TikTokLiveConnector extends ConnectorProvider {
         }
         connection.removeAllListeners();
         if (this._connection === connection) this._connection = null;
-        if (why === "user") {
-          this.emit(TOKIO_EVENTS.DISCONNECTED);
-        } else {
-          // streamEnd comes first when the LIVE ended
-          const reason = why === "streamEnd" ? "ended" : "lost";
-          this.emit(TOKIO_EVENTS.DISCONNECTED, { reason });
-        }
+        // Later, so the handlers of the batch it ended with finish first
+        setImmediate(() => {
+          if (why === "user") {
+            this.emit(TOKIO_EVENTS.DISCONNECTED);
+          } else {
+            // streamEnd comes first when the LIVE ended
+            const reason = why === "streamEnd" ? "ended" : "lost";
+            this.emit(TOKIO_EVENTS.DISCONNECTED, { reason });
+          }
+        });
       },
     );
 
@@ -207,6 +210,23 @@ export class TikTokLiveConnector extends ConnectorProvider {
         },
       };
       this.emit(TOKIO_EVENTS.CHAT, data);
+    });
+
+    // A comment made of emotes only, so Emote alerts and actions see it too
+    connection.on(WebcastEvent.EMOTE, (tdata) => {
+      this.emit(TOKIO_EVENTS.CHAT, {
+        user: getUserData(tdata.user, tdata.userIdentity),
+        comment: {
+          content: "",
+          // index is a place in content, which is empty
+          emotes: tdata.emoteList.map((emote) => ({
+            emoteID: emote.emoteId,
+            images: emote.image?.urlList ?? [],
+            index: 0,
+          })),
+          lang: "",
+        },
+      });
     });
 
     connection.on(WebcastEvent.GIFT, (tdata) => {

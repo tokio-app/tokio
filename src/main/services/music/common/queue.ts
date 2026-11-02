@@ -80,7 +80,11 @@ export class MusicQueue extends TokioEmitter {
    */
   public setMaxSize(size: number) {
     this._maxSize = Math.max(1, size); // Ensure size is at least 1
+    const length = this._queue.length;
     this._trimQueue();
+    if (this._queue.length < length) {
+      this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
+    }
   }
 
   /**
@@ -135,8 +139,11 @@ export class MusicQueue extends TokioEmitter {
 
   public clear() {
     this.pause();
+    // It runs on every chat while music is off, so only a change is sent
+    const had = this._queue.length > 0;
     this._queue = [];
     this._currentIndex = 0;
+    if (had) this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
   }
 
   // Removes every request for the song that's still waiting, by its request

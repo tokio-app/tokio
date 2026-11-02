@@ -31,13 +31,15 @@ paths:
 - `MAX_LIVES` (1,500): past it, the oldest LIVEs go as deleting them would, gifts included, after an end (`_cap`, which reads their files after the end's save) and when a profile loads. The user's call: All time always adds up to the LIVEs kept.
 - `MAX_GIFTERS` (10,000) caps all time: the fewest coins go first, then the oldest last gift. The page shows the top `SHOWN_GIFTERS` (100) and each LIVE keeps all of its own gifters, so nobody shown is dropped.
 - No save on quit (`shortcut:`), like the fans and the timer: a quit or a crash loses at most 30 s, and the next load adds the rest from the LIVE's file.
+- Saves run one after another: each waits for the one before (`_saving`), so an older index can't land after a newer one, as when a LIVE's end races the cap's drop.
 
 ## Loading, recovery, deleting and clearing
 
 - `load(file)` runs at startup and on `SET_PROFILE`, which saves first and refuses the switch when that fails. A later load wins over an earlier one still reading.
 - A missing index is an empty history. One that's there but doesn't load is left as it is, nothing is recorded, and the log has a warning.
 - A LIVE file the index doesn't list, newer than every LIVE it does, was left by a quit or a crash: it's added, ending at its last save, and the index is saved at once. An unlisted older one is a delete's leftover and is removed, and so are `<name>.cleared-<digits>` folders, a clear's leftovers.
-- `deleteLive` subtracts the LIVE's gifters, read from its file, from all time, dropping a gifter left with nothing. Then it saves the index and removes the file. An unreadable file still leaves the index, and all time keeps its gifts (logged).
+- `deleteLive` subtracts the LIVE's gifters, read from its file, from all time, dropping a gifter left with nothing. Then it saves the index. An unreadable file still leaves the index, and all time keeps its gifts (logged).
+- A dropped LIVE's file (a delete's or the cap's) waits in `_dropped` until an index without it is written, by that save or the 30 s retry. A load would take back a file newer than every listed LIVE as a crash's leftover, and an index on disk must never list a LIVE whose file is gone.
 - `clear` renames the profile's folder away in one step (`renameWithRetry`), then removes it.
   - A LIVE in progress carries on. Its file and an empty index are written at once, the index over anything a save racing the move wrote.
   - It refuses, changing nothing, when no history is loaded or the rename fails.
@@ -52,12 +54,13 @@ paths:
 
 ## The page's data
 
-- `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top 100. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page asks again on each `GET_PROFILE` reply, a profile switch, and so does Tools' list, whose Coin stats row shows the newest LIVE's coins.
+- `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top 100. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page asks again on each `GET_PROFILE` reply, a profile switch, and so does Tools' list, whose Coin stats row shows the newest LIVE's coins. The page also drops its dates' and search's `GIFTERS` replies then, which the same range would still match.
 - `GET_LIVE { startedAt }` replies `LIVE` with that LIVE's record. Failures carry the `startedAt` too.
 - `GET_GIFTERS { from?, to?, query? }` replies `GIFTERS` with the top 100 of the finished LIVEs in the dates from `from` (included) to `to` (left out), each with their `rank` among them (`RankedGifter`).
   - A LIVE is in them when it starts in them or runs into them (`inRange`, `src/common/util/history.ts`). One they cut (not `allInRange`) counts only its gifts in them, from its minutes.
   - With a query, only the ones whose name or @handle has it, in any case, with a leading @ ignored (`viewerMatcher`, shared with the Fans page).
-  - Every LIVE whole reads all time's list. Other dates are added up from the LIVEs' files by `getGifters`, leaving out a file that doesn't load.
+  - Every LIVE whole reads all time's list. Other dates are added up from the LIVEs' files by `getGifters`, one file at a time so a year of LIVEs isn't held at once, leaving out a file that doesn't load.
+  - When another profile loads while `getTotals` or `getGifters` reads, they give null and the handler sends nothing more: the page asks again for the new profile. With nothing loaded they still give zeros and `[]`.
   - Dates without a query get their coins and gifts (`totals`, from `getTotals`, which reads only the files of the LIVEs they cut) in a first reply, then again with the gifters.
   - The reply carries the range and the query, failures included.
 - `DELETE_LIVE` and `CLEAR_LIVES` reply `LIVES` with what main holds, then send `LIVE_DELETED` or `HISTORY_CLEARED`. A failed save after a delete throws `HISTORY_SAVE_FAILED`, a refused clear `HISTORY_CLEAR_FAILED`.

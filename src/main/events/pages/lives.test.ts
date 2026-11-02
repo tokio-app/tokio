@@ -154,6 +154,29 @@ describe("lives events", () => {
       ]);
     });
 
+    it("replies nothing more once another profile loaded", async () => {
+      const after = createHandler({
+        historyService: {
+          getTotals: async () => totals,
+          getGifters: async () => null,
+        },
+      });
+      const before = createHandler({
+        historyService: {
+          getTotals: async () => null,
+          getGifters: async () => [],
+        },
+      });
+
+      await after.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 1000 });
+      await before.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 1000 });
+
+      expect(after.replies(APP_EVENTS_RESPONSE.GIFTERS)).toEqual([
+        { success: true, from: 1000, totals },
+      ]);
+      expect(before.sent()).toEqual([]);
+    });
+
     it("keeps the range when reading throws", async () => {
       const h = createHandler({
         historyService: {

@@ -10,6 +10,7 @@ import {
   EMOTE_TRIGGER,
   FEEDBACK_CODES,
   GiftEvent,
+  MINECRAFT_CONNECT_COMMANDS,
   MINECRAFT_EDITION_NAMES,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -261,9 +262,12 @@ const registerConnectorEvents = ({
     store.updateLiveStats({ viewers: d.viewers, views: d.views });
     sendViews(d.views, d.viewers);
   });
+  // TikTok sometimes lowers the total for a while, so the most seen is kept
+  let likes = 0;
   conn.on(TOKIO_EVENTS.LIKE, (d) => {
-    store.updateLiveStats({ likes: d.totalLikes });
-    sendLikes(d.totalLikes);
+    likes = Math.max(likes, d.totalLikes);
+    store.updateLiveStats({ likes });
+    sendLikes(likes);
   });
 
   // The Home page's feed and totals, throttled like the stats.
@@ -311,6 +315,7 @@ const registerConnectorEvents = ({
     sendViews.cancel();
     sendLikes.cancel();
     sendSession.cancel();
+    likes = 0;
     store.updateLiveStats({ likes: 0, viewers: 0, views: 0 });
     live.end();
     pushSession();
@@ -415,8 +420,17 @@ const registerConnectorEvents = ({
         t("main.init.emotesSaveFailed"),
         { key: "emotes", windowMs: REPEAT_NOTICE_MS },
       );
-    } else if (res.data && !win.isDestroyed()) {
-      win.webContents.send(APP_EVENTS_RESPONSE.EMOTES, { data: res.data });
+    } else if (res.data) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(APP_EVENTS_RESPONSE.EMOTES, { data: res.data });
+      }
+      // The games overlay's rows with that emote get its picture
+      await sendGamesOverlay({
+        storeManagerService: store,
+        overlayService: overlays,
+        serverService: server,
+        pathManagerService: paths,
+      });
     }
   };
   conn.on(TOKIO_EVENTS.CHAT, (d) => {
@@ -511,10 +525,9 @@ const registerGames = (handler: AppHandlerVariables) => {
         );
       }
     } else if (offline) {
-      // Named by edition: the other one may be connected. Java Edition joins
-      // through the Tokio mod's command.
+      // Named by edition: the other one may be connected
       const game = `Minecraft ${MINECRAFT_EDITION_NAMES[action.edition]}`;
-      const connect = action.edition === "java" ? "/tokio connect" : "/connect";
+      const connect = MINECRAFT_CONNECT_COMMANDS[action.edition];
       if (
         notifier.warn(
           "games",
@@ -579,6 +592,15 @@ const registerTimer = ({
       );
     }
   });
+  // Saving logged it. The timer is tried again on the next interval.
+  timer.onSaveFailed(() =>
+    notifier.warn(
+      "system",
+      FEEDBACK_CODES.TIMER_SAVE_FAILED,
+      t("main.init.timerSaveFailed"),
+      { key: "timer", windowMs: REPEAT_NOTICE_MS },
+    ),
+  );
 
   const overlayMessage = (added: number) => {
     const { settings, state } = timer.get();
@@ -783,6 +805,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       ttsService.setLogFile(files.logs.tts);
       serverService.setLogFile(files.logs.server);
       overlayService.setLogFile(files.logs.overlays);
+      yamlManagerService.setLogFile(files.logs.overlays);
       urlManagerService.setLogFile(files.logs.system);
       storeManagerService.setLogFile(files.logs.system);
       jsonManagerService.setLogFile(files.logs.system);

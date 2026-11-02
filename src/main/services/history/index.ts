@@ -148,6 +148,9 @@ export class HistoryService extends Service {
   private _streaks = new GiftStreaks();
   // Final records of LIVEs that ended, until their file is written
   private _ended: LiveRecord[] = [];
+  // Files of LIVEs a delete or the cap dropped, until an index without them
+  // is saved: a load takes a file newer than every listed LIVE back
+  private _dropped: string[] = [];
   private _liveUnsaved = false;
   private _indexUnsaved = false;
   private _saving: Promise<boolean> = Promise.resolve(true);
@@ -202,6 +205,8 @@ export class HistoryService extends Service {
     this._minutes = [];
     this._streaks.clear();
     this._ended = [];
+    // Their LIVEs are still in the index on disk, which keeps the files
+    this._dropped = [];
     this._liveUnsaved = false;
     this._indexUnsaved = false;
 
@@ -327,11 +332,11 @@ export class HistoryService extends Service {
   /**
    * The finished LIVEs' coins and gifts in some dates: a LIVE all in them
    * counts whole, and one they cut only its gifts in them, so only those take
-   * reading a file.
+   * reading a file. Null when another profile loaded while they were read.
    */
   public async getTotals(
     range: DateRange,
-  ): Promise<Pick<LiveSummary, "coins" | "gifts">> {
+  ): Promise<Pick<LiveSummary, "coins" | "gifts"> | null> {
     const dir = this._dir;
     const totals = { coins: 0, gifts: 0 };
     if (dir === null) return totals;
@@ -349,7 +354,7 @@ export class HistoryService extends Service {
         }
       }
     }
-    return this._dir === dir ? totals : { coins: 0, gifts: 0 };
+    return this._dir === dir ? totals : null;
   }
 
   /**
@@ -357,13 +362,14 @@ export class HistoryService extends Service {
    * the gifts in them of a LIVE they cut, each with their place among them, and
    * with a query only the ones whose name or @handle has it. Every LIVE whole
    * is all time's list; other dates are added up from the LIVEs' files,
-   * leaving out a file that doesn't load.
+   * leaving out a file that doesn't load. Null when another profile loaded
+   * while they were read.
    */
   public async getGifters({
     from,
     to,
     query = "",
-  }: DateRange & { query?: string }): Promise<RankedGifter[]> {
+  }: DateRange & { query?: string }): Promise<RankedGifter[] | null> {
     const dir = this._dir;
     if (dir === null) return [];
     const range = { from, to };
@@ -374,13 +380,12 @@ export class HistoryService extends Service {
       lives.length < this._lives.length ||
       !lives.every((l) => allInRange(l, range))
     ) {
-      const records = await Promise.all(
-        lives.map(({ startedAt }) => this._readLive(dir, startedAt)),
-      );
-      if (this._dir !== dir) return [];
       const gifters = new Map<string, Gifter>();
-      // Oldest first, so the name, handle and picture end up the latest ones
-      for (const record of records) {
+      // One at a time, so big LIVEs don't all sit in memory. Oldest first, so
+      // the name, handle and picture end up the latest ones.
+      for (const { startedAt } of lives) {
+        const record = await this._readLive(dir, startedAt);
+        if (this._dir !== dir) return null;
         if (!record) continue;
         const sent = allInRange(record, range)
           ? record.gifters
@@ -447,6 +452,7 @@ export class HistoryService extends Service {
       this._gifters = new Map();
       this._best = [];
       this._ended = [];
+      this._dropped = [];
       // An empty index, written after any save that raced the move
       this._indexUnsaved = true;
       // Written again into a fresh folder
@@ -464,7 +470,8 @@ export class HistoryService extends Service {
   // save on quit if streamers notice.
   /**
    * Writes what changed: the file of the LIVE in progress or of one that just
-   * ended, then the index. False when a write failed; the next save retries.
+   * ended, then the index, after which the dropped LIVEs' files go. False
+   * when a write failed; the next save retries.
    * With nothing to write, how the last save went, so a switch waits for one
    * still writing.
    */
@@ -482,8 +489,13 @@ export class HistoryService extends Service {
     this._ended = [];
     this._liveUnsaved = false;
     this._indexUnsaved = false;
+    // This index leaves their LIVEs out, so their files go once it's written
+    const dropped = index ? this._dropped.splice(0) : [];
 
+    const previous = this._saving;
     this._saving = (async () => {
+      // After the save before, so an older index can't land last
+      await previous;
       // saveFile doesn't make folders. If this fails, the writes log why.
       await mkdir(dir, { recursive: true }).catch(() => {});
       let ok = true;
@@ -499,9 +511,14 @@ export class HistoryService extends Service {
       }
       if (index) {
         const file = join(dir, "index.json");
-        if (!(await json.saveFile(file, IndexSchema, index))) {
+        if (await json.saveFile(file, IndexSchema, index)) {
+          for (const path of dropped) await this._remove(path);
+        } else {
           ok = false;
-          if (this._dir === dir) this._indexUnsaved = true;
+          if (this._dir === dir) {
+            this._indexUnsaved = true;
+            this._dropped.push(...dropped);
+          }
         }
       }
       return ok;
@@ -552,8 +569,9 @@ export class HistoryService extends Service {
 
   /**
    * Takes LIVEs off the list and their gifts off all time, read from their
-   * files, then removes the files. A file that can't be read still leaves the
-   * list. False when the index couldn't be saved.
+   * files. Their files go once an index without them is saved, by this save or
+   * a later one. A file that can't be read still leaves the list. False when
+   * the index couldn't be saved.
    */
   private async _drop(startedAts: number[]): Promise<boolean> {
     const dir = this._dir;
@@ -597,12 +615,11 @@ export class HistoryService extends Service {
     this._ended = this._ended.filter((r) => !gone.has(r.startedAt));
     this._rank();
     this._indexUnsaved = true;
-    this._emit();
-    const saved = await this.save();
     for (const startedAt of gone) {
-      await this._remove(join(dir, `${startedAt}.json`));
+      this._dropped.push(join(dir, `${startedAt}.json`));
     }
-    return saved;
+    this._emit();
+    return this.save();
   }
 
   // Past MAX_LIVES, the oldest go

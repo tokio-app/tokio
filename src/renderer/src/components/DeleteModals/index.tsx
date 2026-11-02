@@ -8,15 +8,16 @@ type Props<T> = {
   // The item waiting for the user to confirm it's deleted
   item: T;
   onClose: () => void;
-  // Runs before the request, e.g. to stop the item's test
-  onDelete?: (item: T) => void;
 };
 
 export function DeleteSoundModal({
   item,
   onClose,
   onDelete,
-}: Props<AlertSound>) {
+}: Props<AlertSound> & {
+  // Runs before the request, e.g. to stop the sound's test
+  onDelete?: (item: AlertSound) => void;
+}) {
   const t = useT();
   return (
     <Modal
@@ -35,11 +36,7 @@ export function DeleteSoundModal({
   );
 }
 
-export function DeleteMediaModal({
-  item,
-  onClose,
-  onDelete,
-}: Props<MediaFile>) {
+export function DeleteMediaModal({ item, onClose }: Props<MediaFile>) {
   const t = useT();
   return (
     <Modal
@@ -50,7 +47,6 @@ export function DeleteMediaModal({
       confirmText={t("common.delete")}
       onClose={onClose}
       onConfirm={() => {
-        onDelete?.(item);
         window.api.emit(APP_EVENTS.REMOVE_MEDIA, { file: item.file });
         onClose();
       }}
@@ -59,11 +55,7 @@ export function DeleteMediaModal({
 }
 
 // A picture in the Minecraft library, which the games overlay shows
-export function DeletePictureModal({
-  item,
-  onClose,
-  onDelete,
-}: Props<MediaFile>) {
+export function DeletePictureModal({ item, onClose }: Props<MediaFile>) {
   const t = useT();
   return (
     <Modal
@@ -74,7 +66,6 @@ export function DeletePictureModal({
       confirmText={t("common.delete")}
       onClose={onClose}
       onConfirm={() => {
-        onDelete?.(item);
         window.api.emit(APP_EVENTS.REMOVE_MINECRAFT_PICTURE, {
           file: item.file,
         });
@@ -88,7 +79,6 @@ export function DeletePictureModal({
 export function DeleteLiveModal({
   item,
   onClose,
-  onDelete,
 }: Props<Pick<LiveSummary, "startedAt">>) {
   const t = useT();
   const language = useLanguage();
@@ -101,7 +91,6 @@ export function DeleteLiveModal({
       confirmText={t("common.delete")}
       onClose={onClose}
       onConfirm={() => {
-        onDelete?.(item);
         window.api.emit(APP_EVENTS.DELETE_LIVE, { startedAt: item.startedAt });
         onClose();
       }}
@@ -129,7 +118,6 @@ export function ClearHistoryModal({ onClose }: { onClose: () => void }) {
 export function RemoveOverlayModal({
   item,
   onClose,
-  onDelete,
 }: Props<Pick<OverlayApp, "id" | "name">>) {
   const t = useT();
   return (
@@ -141,7 +129,6 @@ export function RemoveOverlayModal({
       confirmText={t("common.remove")}
       onClose={onClose}
       onConfirm={() => {
-        onDelete?.(item);
         window.api.emit(APP_EVENTS.REMOVE_OVERLAY, { id: item.id });
         onClose();
       }}

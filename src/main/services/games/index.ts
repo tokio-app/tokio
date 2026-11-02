@@ -34,7 +34,7 @@ import { basename, join } from "node:path";
 import { MEDIA_MAX_BYTES } from "../alerts";
 import { Service, type ServiceResult } from "../shared";
 import { commandValue, GameCommand, gameCommands } from "./commands";
-import { DISCONNECTED, MinecraftConnection } from "./minecraft";
+import { MinecraftConnection } from "./minecraft";
 
 /**
  * Why an action's commands didn't all run: offline when no game of the
@@ -63,7 +63,7 @@ type Batch = {
 // What the service uses of the game's connection
 type Connection = Pick<
   MinecraftConnection,
-  "status" | "onStatus" | "setEnabled" | "send"
+  "status" | "onStatus" | "setEnabled" | "send" | "settled"
 >;
 
 const STATES: Record<GameStatus["state"], string> = {
@@ -97,9 +97,9 @@ export class GamesService extends Service {
   ) {
     super();
     // The connection tells only changes
-    _minecraft.onStatus((status) => {
-      const why = status.error
-        ? `: ${status.error}`
+    _minecraft.onStatus((status, cause) => {
+      const why = cause
+        ? `: ${cause}`
         : status.edition
           ? ` (${MINECRAFT_EDITION_NAMES[status.edition]}).`
           : ".";
@@ -350,6 +350,8 @@ export class GamesService extends Service {
     try {
       for (let first = true; backlog.length > 0; first = false) {
         if (!first) await new Promise((r) => setTimeout(r, RUN_GAP_MS));
+        // A Bedrock game that took over in the gap is still in its handshake
+        await this._minecraft.settled();
         // Stopped when the latest profile removed or disabled the action; runs
         // it accepted keep their commands if only steps changed
         const action = this._games.actions.find((a) => a.id === id);
@@ -371,13 +373,15 @@ export class GamesService extends Service {
         this._onRun?.(action);
         const failed = (await this._send(batch.commands)).find((r) => !r.ok);
         if (failed) {
+          // A Bedrock game that took over is connected once its handshake ends
+          if (failed.dropped) await this._minecraft.settled();
           // Turned off midway, which failed what the game hadn't answered
           if (["off", "error"].includes(this._minecraft.status.state)) break;
           // A game that left or was replaced midway fails the commands it
           // hadn't answered, and drops the rest. Replaced by a game of its
           // edition, the run counts as done and the rest go to the new one.
           const offline = this._unreachable(action.edition) !== undefined;
-          if (offline || failed.message !== DISCONNECTED) {
+          if (offline || !failed.dropped) {
             this._onError?.(action, { offline, message: failed.message });
           }
           if (offline) break;

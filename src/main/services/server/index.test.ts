@@ -276,6 +276,13 @@ describe("ServerService", () => {
       }
     });
 
+    it("leaves the stack out of the error page for a bad URL", async () => {
+      const res = await fetch(url("/alerts/%E0"));
+
+      expect(res.status).toBe(400);
+      expect(await res.text()).not.toContain("node_modules");
+    });
+
     it("serves the alerts' media in parts, as videos ask", async () => {
       const res = await fetch(url("/alerts/media/a.webm"), {
         headers: { Range: "bytes=2-4" },

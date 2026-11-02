@@ -1,7 +1,11 @@
 import { MinecraftEdition } from "@/common/schemas";
 import { CommandResult, GameStatus } from "@/common/types";
 import type { MessageKey } from "@/common/i18n";
-import { MINECRAFT_JAVA_PROTOCOL, MINECRAFT_PORT } from "@/common/util";
+import {
+  formatError,
+  MINECRAFT_JAVA_PROTOCOL,
+  MINECRAFT_PORT,
+} from "@/common/util";
 import { t } from "@/helper/i18n";
 import {
   Cipheriv,
@@ -65,9 +69,6 @@ export const MAX_IN_FLIGHT = 50;
 // Only a safety net: GamesService spaces out each action's runs, so this
 // fills only with many actions firing at once on a game that stopped answering
 export const MAX_WAITING = 10_000;
-// What the pending commands of a game that left or was replaced fail with.
-// English: GamesService compares it.
-export const DISCONNECTED = "Minecraft disconnected.";
 // Body version 42 parses today's syntax (execute … run); 1 doesn't
 const COMMAND_VERSION = 42;
 const REPLACED: Close = {
@@ -110,7 +111,7 @@ const failed = (command: string, message: string): CommandResult => ({
  */
 export class MinecraftConnection {
   private _status: GameStatus = { state: "off" };
-  private _listener?: (status: GameStatus) => void;
+  private _listener?: (status: GameStatus, cause?: string) => void;
   private readonly _port: number;
   private readonly _timeoutMs: number;
   private readonly _handshakeMs: number;
@@ -119,6 +120,8 @@ export class MinecraftConnection {
   private _game: Game | null = null;
   private readonly _inFlight = new Map<string, Command>();
   private readonly _waiting: Command[] = [];
+  // Waiting for the game to be ready or gone, see settled
+  private readonly _settling: (() => void)[] = [];
 
   constructor(
     port: number = MINECRAFT_PORT,
@@ -139,8 +142,8 @@ export class MinecraftConnection {
     return typeof address === "object" && address ? address.port : this._port;
   }
 
-  // One listener, GamesService
-  public onStatus(listener: (status: GameStatus) => void) {
+  // One listener, GamesService. cause says why in English, for the log.
+  public onStatus(listener: (status: GameStatus, cause?: string) => void) {
     this._listener = listener;
   }
 
@@ -154,19 +157,26 @@ export class MinecraftConnection {
   }
 
   /** Runs a command as the connected player, and resolves with its answer. */
-  public send(command: string): Promise<CommandResult> {
+  public async send(command: string): Promise<CommandResult> {
+    // A game that took over during a launch's wait can still be in its handshake
+    if (this._game && !this._game.ready) await this.settled();
     if (!this._game?.ready) {
-      return Promise.resolve(failed(command, t("main.minecraft.notConnected")));
+      return failed(command, t("main.minecraft.notConnected"));
     }
     if (this._waiting.length >= MAX_WAITING) {
-      return Promise.resolve(
-        failed(command, t("main.minecraft.tooManyWaiting")),
-      );
+      return failed(command, t("main.minecraft.tooManyWaiting"));
     }
     return new Promise((resolve) => {
       this._waiting.push({ command, resolve });
       this._pump();
     });
+  }
+
+  /** Waits for a game still in Bedrock's handshake to be ready or gone. */
+  public async settled() {
+    while (this._game && !this._game.ready) {
+      await new Promise<void>((resolve) => this._settling.push(resolve));
+    }
   }
 
   private _listen(): Promise<boolean> {
@@ -196,13 +206,18 @@ export class MinecraftConnection {
         this._wss = null;
         this._listening = null;
         wss.close();
-        this._set({
-          state: "error",
-          error:
-            err.code === "EADDRINUSE"
-              ? t("main.minecraft.portInUse", { port: String(this._port) })
-              : t("main.minecraft.listenFailed", { port: String(this._port) }),
-        });
+        this._set(
+          {
+            state: "error",
+            error:
+              err.code === "EADDRINUSE"
+                ? t("main.minecraft.portInUse", { port: String(this._port) })
+                : t("main.minecraft.listenFailed", {
+                    port: String(this._port),
+                  }),
+          },
+          formatError(err),
+        );
         resolve(false);
       });
       // Stopped before it listened
@@ -290,6 +305,7 @@ export class MinecraftConnection {
     clearTimeout(game.handshake);
     if (this._game !== game || game.ready) return;
     game.ready = true;
+    for (const resolve of this._settling.splice(0)) resolve();
     this._set({ state: "connected", edition: game.edition });
   }
 
@@ -299,6 +315,7 @@ export class MinecraftConnection {
     const game = this._game;
     if (!game) return;
     this._game = null;
+    for (const resolve of this._settling.splice(0)) resolve();
     clearTimeout(game.handshake);
     if (close) game.socket.close(close.code, t(close.reason));
     else game.socket.terminate();
@@ -307,7 +324,10 @@ export class MinecraftConnection {
     this._waiting.length = 0;
     for (const { command, resolve, timer } of commands) {
       clearTimeout(timer);
-      resolve(failed(command, DISCONNECTED));
+      resolve({
+        ...failed(command, t("main.minecraft.disconnected")),
+        dropped: true,
+      });
     }
   }
 
@@ -369,7 +389,7 @@ export class MinecraftConnection {
     }
   }
 
-  private _set(status: GameStatus) {
+  private _set(status: GameStatus, cause?: string) {
     if (
       this._status.state === status.state &&
       this._status.error === status.error &&
@@ -378,6 +398,6 @@ export class MinecraftConnection {
       return;
     }
     this._status = status;
-    this._listener?.(status);
+    this._listener?.(status, cause);
   }
 }

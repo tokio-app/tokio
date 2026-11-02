@@ -149,6 +149,9 @@ export function CoinStats() {
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
     if (!res?.success) return;
     switched.current = true;
+    // The last profile's, which the same dates or search would still match
+    setDatesReply(undefined);
+    setSearchReply(undefined);
     window.api.emit(APP_EVENTS.GET_LIVES);
   });
 

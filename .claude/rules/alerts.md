@@ -25,7 +25,7 @@ paths:
 - `AlertTriggerSchema` (`src/common/schemas/profile.ts`) derives the triggers from `TOKIO_EVENTS` (for a new event, see the `live-event` skill). `ROOM_USER` is excluded there and from the `AlertTrigger` type: it comes every few seconds and is meant for overlays.
 - Migration: `AlertItemsSchema`'s preprocess drops saved Room Users alerts, then names alerts saved without a name by their place.
 - `registerConnectorEvents` (`src/main/events/init.ts`) passes every trigger to `AlertsService.handle` while `activeFeatures.alerts` is on.
-- Music change alerts come from `MusicService.onSongChange`: once each time a song starts, not for one that fails to start, is skipped while it loads, or was already playing when a request came. `MUSIC_CHANGE` also fires when the queue changes, and overlays get every one through `ServerService.initEvents`.
+- Music change alerts come from `MusicService.onSongChange`: once each time a song starts, not for one that fails to start, is skipped while it loads, or was already playing when a request came. `MUSIC_CHANGE` also fires when the queue changes, and overlays get every one through `ServerService.initEvents`. That includes the queue emptied by `MusicQueue.clear`, only when it held songs (it runs on every chat while music is off), and songs dropped by a lower queue length.
 - Gift alerts fire once per combo, on `repeatEnd`, or with `trigger.every_gift` (**Every gift**) once per gift sent, at most `queue_length` times per event.
 - `GiftStreaks` (`src/main/helper/streaks.ts`, also used by `LiveService`, `GamesService` and the timer) counts what each gift event adds to its sender's streak, like the gift jar overlay's `Tally`. `AlertsService` runs it once per event, even with no alert on every gift, but only while alerts are on: alerts turned on mid-streak play the whole count so far.
 - Matching is `matchesTrigger` (`src/main/helper/triggers.ts`), shared with `GamesService` (see `.claude/rules/games.md`). Both callers get `added` and `total` from `streakOf` (same file), which counts the event in their `GiftStreaks` once and gives the streak's total as `{count}`. `AlertsService` keeps `enabled` and the sound, message or media check.
@@ -33,7 +33,7 @@ paths:
 - Two conditions only the Alerts editor offers (game actions keep the defaults, which match everything):
   - `min_coins`: the streak's worth when it ends (`gift.coins × total`), or each gift's `coins` with `every_gift`. Only for any gift: picked gifts are the alert's choice, so `matchesTrigger` ignores it then, and the editor and the summary leave it out.
   - `roles` (`VIEWER_ROLES`; `[]` is anyone): only Chat, Emote and Gift carry the viewer's roles (the connector maps `userIdentity` for chat and gifts), so `takesRoles` (`src/common/util/alerts.ts`), shared by the matcher, the editor and the summary, allows only them. Other triggers' saved roles are ignored.
-- The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: the loop skips it and `matchesTrigger` matches it on `CHAT`. TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`, and main pushes the list with `EMOTES`.
+- The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: the loop skips it and `matchesTrigger` matches it on `CHAT`. TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`, and main pushes the list with `EMOTES`. A comment made only of emotes comes as a `CHAT` with an empty `content` (see `.claude/rules/connector.md`).
 - Chat alerts filter on `trigger.keyword` through `hasKeyword`, Member join and Super Fan join alerts on `trigger.user` through `isUser` (both `src/main/helper/chat.ts`). Keywords match whole words (`wholeWord`), except next to scripts written without spaces (Chinese, Japanese, Thai); an emoji between words counts as a space.
 
 ## Gifts
@@ -82,6 +82,7 @@ paths:
 - Request numbering:
   - The page applies a `SET_ALERT_SOUND` reply only while it waits for one for that alert (`asked`, set by `onRequest` from a Browse or MyInstants download), even after the picker closed. A library or TTS pick made since wins over a late reply.
   - `onRequest` numbers each request: `DOWNLOAD_SOUND`/`IMPORT_SOUND` carry it as `request` and `SET_ALERT_SOUND` echoes it. A reply applies only if it's newer than the last one applied for that alert (`applied`), and the picker shows only the newest request's failure.
+  - The counter is module-level (`requests` in `pages/Alerts`), so the numbers keep growing when the page opens again, and a reply from before leaving can't beat a newer request.
   - `asked` and `askedMedia` are cleared when another profile loads (`useEditableSettings`'s `switched`), since a clone has the same alert ids.
   - `useAlertTest` numbers tests the same way: `TEST_ALERT` carries `request` and its reply echoes it, failures included, so a late reply for a test stopped and started again on the same id (which also keys its gain, `lengths` and `PlayButton`) is dropped. Callers pass `AlertTestRequest` without it; the hook adds it.
 
@@ -103,6 +104,9 @@ paths:
 
 - An alert plays `sound` or speaks `tts` (a message with its own voice, speed and pitch). `tts` wins if both are set, and the picker clears one when the other is picked.
 - `AlertsService.speak` fills the message with `formatAlertMessage` (variables per trigger in `ALERT_MESSAGE_VARIABLES`, `src/common/util/alerts.ts`) and runs it through `TTSService.prepareText`, whose third argument limits banned words to the event's values, as chat TTS does. It generates with the speaker from `setSpeaker` and caches it in the sound LRU under a `tts:` key.
+- A viewer on the TTS page's block list loses only the message (the user's call). The check is `isBlocked` (`src/main/helper/permissions.ts`), on the viewer from `eventUser` (`src/main/helper/triggers.ts`).
+  - The alert plays its sound, or its media alone, without the message's speed and pitch. An alert with only a message plays nothing.
+  - Banned words still skip the whole alert. The allow list and the roles stay chat-only.
 - Alert queues are shared, so speed and pitch travel per sound on `ALERT_AUDIO.filters`, and `AudioQueue` items can override the queue's filters.
 - `{count}` in a gift alert's message is the streak's total from `GiftStreaks`, not TikTok's `comboCount`. `TtsTab` doesn't offer it on every gift; a message that has it still gets the count so far. One event that adds several gifts makes the message once and sends one `ALERT_AUDIO` with `repeat`.
 - A live alert's failed message isn't logged by `AlertsService` (`_generate(..., false)`): `init.ts` logs it to `alerts.log` only when its notice goes out, like a missing sound. Previews (`speak`) log their own failures, which `speakTest` counts on.
@@ -124,9 +128,14 @@ paths:
 - A video is muted if the browser refuses sound. One removed before its play started (its `play()` aborted) isn't replayed muted.
 - `AlertMediaSchema.volume` is the video's, apart from the alert's `volume`. Another file keeps it, as it keeps the duration.
 - Migration: `withSavedMedia` (a preprocess on `AlertSchema`) gives media saved without a volume the alert's, and cuts a video saved before cuts (no `start`) at its old `duration` unless its `match_video` was on. The schema no longer has `match_video`.
-- Media rides on the alert's audio: a missing sound or a blocked or failed message skips it too. A file missing on disk (a profile imported from another computer) shows nothing, with no notice.
+- Media rides on the alert's audio: a missing sound, or a message that banned words block or that fails, skips it too. A viewer on the TTS block list still gets it (see Text-to-speech). A file missing on disk (a profile imported from another computer) shows nothing, with no notice.
 - Request numbering: the page applies a `SET_ALERT_MEDIA` reply only while that alert waits for one (`askedMedia`). `IMPORT_MEDIA` carries `request` (one counter with the sounds') and `SET_ALERT_MEDIA` echoes it, failures included: the page applies only a reply newer than the last applied for that alert (`appliedMedia`), and the picker shows only the newest request's failure. `IMPORT_MEDIA` also replies `GET_MEDIA`.
 - The `MediaPicker` only picks: it closes after a pick, and once a browsed file for its alert arrives.
+- It's the shared `LibraryPicker` (`components/MediaPicker/LibraryPicker.tsx`, which holds both pickers' library, search, listeners, failure check and delete flow), with:
+  - the media events and texts;
+  - `DeleteMediaModal`;
+  - a tile of `MediaThumbnail` and `SoundLength`.
+- Without `stays` its footer is Clear · Cancel · Browse.
 - The windows load thumbnails from `tokio-media:///<file>` (`getMediaPreviewURL`). Main registers `MEDIA_SCHEME` with `stream` for videos and serves only images and videos right in the media folder (`mediaFile`, `src/main/helper/preview.ts`). The CSP allows it in `img-src` and `media-src`.
 - Chromium and `tokio-media:`:
   - Every video player loads its own URL, `useVideoURL(file)` (`components/MediaPicker`, a `?player=` query from `useId`, which `mediaFile` ignores). Chromium fails every player that loads one `tokio-media:` URL at once (error 4), and the URL stays failed. A row's thumbnail and the editor's preview, or a Media library row and its **Full size**, load together.

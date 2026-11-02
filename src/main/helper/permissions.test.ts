@@ -1,7 +1,7 @@
 import { Permissions } from "@/common/schemas";
 import { UserData } from "@/common/types";
 import { describe, expect, it } from "vitest";
-import { hasPermission } from "./permissions";
+import { hasPermission, isBlocked } from "./permissions";
 
 const permissions = (overrides: Partial<Permissions> = {}): Permissions => ({
   all: false,
@@ -100,5 +100,20 @@ describe("hasPermission", () => {
         ),
       ).toBe(true);
     });
+  });
+});
+
+describe("isBlocked", () => {
+  const list = (enabled: boolean, black: string[]) =>
+    permissions({ list: { enabled, white: ["other"], black } });
+
+  it("is true for a handle on the block list while the lists are on", () => {
+    expect(isBlocked(list(true, ["@Viewer"]), user())).toBe(true);
+    expect(isBlocked(list(true, ["other"]), user())).toBe(false);
+    expect(isBlocked(list(false, ["viewer"]), user())).toBe(false);
+  });
+
+  it("is false without a user", () => {
+    expect(isBlocked(list(true, ["viewer"]), null)).toBe(false);
   });
 });

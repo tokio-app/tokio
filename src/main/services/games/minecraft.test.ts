@@ -1,6 +1,7 @@
 import { MESSAGES, translate } from "@/common/i18n";
 import { CommandResult, GameStatus } from "@/common/types";
 import { MINECRAFT_JAVA_PROTOCOL } from "@/common/util";
+import { setLanguage } from "@/helper/i18n";
 import {
   Cipheriv,
   createCipheriv,
@@ -347,9 +348,29 @@ describe("MinecraftConnection", () => {
       expect(result).toMatchObject({
         ok: false,
         message: "Minecraft disconnected.",
+        dropped: true,
       });
     }
     expect(connection.status.state).toBe("waiting");
+  });
+
+  it("fails dropped commands in the app's language", async () => {
+    setLanguage("es-419");
+    const { connection } = await listen();
+    const fake = await game(connection.port, {
+      protocols: [MINECRAFT_JAVA_PROTOCOL],
+    });
+    await connected(connection);
+    fake.reply = () => null;
+    const result = connection.send("say hi");
+    await vi.waitFor(() => expect(fake.requests).toHaveLength(1));
+    fake.socket.close();
+    expect(await result).toEqual({
+      command: "say hi",
+      ok: false,
+      message: "Minecraft se desconectó.",
+      dropped: true,
+    });
   });
 
   it("refuses commands with no game", async () => {
@@ -377,10 +398,42 @@ describe("MinecraftConnection", () => {
     expect(await pending).toMatchObject({
       ok: false,
       message: "Minecraft disconnected.",
+      dropped: true,
     });
     await connected(connection);
     expect((await connection.send("say hi")).ok).toBe(true);
     expect(second.requests).toHaveLength(1);
+  });
+
+  it("waits for the handshake of a Bedrock game that took over", async () => {
+    const { connection } = await listen();
+    await game(connection.port);
+    await connected(connection);
+    const second = await game(connection.port);
+    expect(connection.status.state).toBe("waiting");
+
+    // Sent during the handshake, it goes once the new game is ready
+    const result = connection.send("say hi");
+    await connection.settled();
+    expect(connection.status).toEqual({
+      state: "connected",
+      edition: "bedrock",
+    });
+    expect((await result).ok).toBe(true);
+    expect(second.requests).toEqual([
+      expect.objectContaining({ commandLine: "say hi", binary: true }),
+    ]);
+  });
+
+  it("settles after handshakeMs when the game doesn't answer the encryption request", async () => {
+    const { connection } = await listen({ handshakeMs: 30 });
+    await game(connection.port, { encrypt: false });
+    expect(connection.status.state).toBe("waiting");
+    await connection.settled();
+    expect(connection.status).toEqual({
+      state: "connected",
+      edition: "bedrock",
+    });
   });
 
   it("goes from one edition to the other when Java replaces Bedrock", async () => {
@@ -485,6 +538,7 @@ describe("MinecraftConnection", () => {
     expect(await result).toMatchObject({
       ok: false,
       message: "Minecraft disconnected.",
+      dropped: true,
     });
     expect(connection.status).toEqual({ state: "off" });
     // The port is free again

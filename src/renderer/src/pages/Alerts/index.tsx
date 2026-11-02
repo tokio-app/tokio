@@ -18,6 +18,10 @@ import { HeaderSection } from "./sections/HeaderSection";
 import { ItemsSection } from "./sections/ItemsSection";
 import { useTriggerChoices } from "./useTriggerChoices";
 
+// Numbers the sound and media requests, kept while the page is away so a
+// request made on its return can't get an older one's number
+let requests = 0;
+
 export function Alerts() {
   const t = useT();
   const { giftChoices, emoteChoices, setEmotes } = useTriggerChoices();
@@ -32,9 +36,8 @@ export function Alerts() {
   // Alerts waiting for main to save a sound. A pick made since drops the
   // alert, so a slow download can't replace it.
   const asked = useRef(new Set<string>());
-  // Numbers the sound and media requests, and the newest one applied per
-  // alert, so a late reply to an older request can't replace a newer pick
-  const counter = useRef(0);
+  // The newest request applied per alert, so a late reply to an older
+  // request can't replace a newer pick
   const applied = useRef(new Map<string, number>());
   // Id of the alert whose image or video is being picked
   const [mediaFor, setMediaFor] = useState<string | null>(null);
@@ -228,7 +231,7 @@ export function Alerts() {
           onTest={test.toggle}
           onRequest={() => {
             asked.current.add(pickerAlert.id);
-            return ++counter.current;
+            return ++requests;
           }}
           onSelect={(sound) => pick(pickerAlert.id, { sound, tts: null })}
           onSelectTts={(tts) => pick(pickerAlert.id, { sound: null, tts })}
@@ -242,7 +245,7 @@ export function Alerts() {
           alert={mediaAlert}
           onRequest={() => {
             askedMedia.current.add(mediaAlert.id);
-            return ++counter.current;
+            return ++requests;
           }}
           onSelect={(file) => pickMedia(mediaAlert.id, file)}
           onClose={() => setMediaFor(null)}

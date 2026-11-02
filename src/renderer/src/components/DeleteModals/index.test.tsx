@@ -56,13 +56,8 @@ describe("ClearHistoryModal", () => {
 describe("DeletePictureModal", () => {
   it("says what deleting a Minecraft picture does, and asks main to", async () => {
     const onClose = vi.fn();
-    const onDelete = vi.fn();
     const { user } = renderWithProviders(
-      <DeletePictureModal
-        item={mediaFile("TNT")}
-        onClose={onClose}
-        onDelete={onDelete}
-      />,
+      <DeletePictureModal item={mediaFile("TNT")} onClose={onClose} />,
     );
 
     expect(
@@ -72,7 +67,6 @@ describe("DeletePictureModal", () => {
     );
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
-    expect(onDelete).toHaveBeenCalledExactlyOnceWith(mediaFile("TNT"));
     expect(sent(APP_EVENTS.REMOVE_MINECRAFT_PICTURE)).toEqual([
       { file: "tnt.png" },
     ]);

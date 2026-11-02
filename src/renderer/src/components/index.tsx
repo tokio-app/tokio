@@ -10,6 +10,7 @@ export * from "./FontSelect";
 export * from "./GiftSelect";
 export * from "./Iframe";
 export * from "./MediaPicker";
+export * from "./MediaPicker/LibraryPicker";
 export * from "./Modal";
 export * from "./NotificationBell";
 export * from "./OverlayModal";

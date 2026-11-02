@@ -27,7 +27,7 @@ export function GallerySection({ overlays, onTest, onCustomize }: Props) {
   const [search, setSearch] = useState("");
 
   const shown = useMemo(() => {
-    const needle = search.toLowerCase();
+    const needle = search.trim().toLowerCase();
     return overlays.filter((o) => o.name.toLowerCase().includes(needle));
   }, [overlays, search]);
 

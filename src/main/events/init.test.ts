@@ -322,6 +322,7 @@ function setup() {
     disconnected: vi.fn(() => false),
     get: vi.fn(() => timer),
     onChange: vi.fn((_listener: (deltaMs: number) => void) => {}),
+    onSaveFailed: vi.fn((_listener: () => void) => {}),
   };
   const fansService = {
     setLogFile: vi.fn(),
@@ -361,6 +362,7 @@ function setup() {
     handle: vi.fn(async (..._args: Parameters<GamesService["handle"]>) => {}),
     clear: vi.fn(),
   };
+  const yamlManagerService = { setLogFile: vi.fn() };
 
   const h = createHandler({
     pathManagerService,
@@ -381,7 +383,7 @@ function setup() {
     historyService,
     gamesService,
     trayService,
-    yamlManagerService: {},
+    yamlManagerService,
   });
 
   return {
@@ -409,6 +411,7 @@ function setup() {
     historyService,
     gamesService,
     trayService,
+    yamlManagerService,
   };
 }
 
@@ -1080,6 +1083,30 @@ describe("init events", () => {
       ]);
     });
 
+    it("keeps the likes from going down until the LIVE disconnects", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      const likes = () => s.h.pushed(APP_EVENTS_RESPONSE.LIKES).at(-1);
+
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(100));
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(50));
+      vi.advanceTimersByTime(250);
+
+      expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith({
+        likes: 100,
+      });
+      expect(likes()).toEqual({ likes: 100 });
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, undefined);
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(50));
+      vi.advanceTimersByTime(250);
+
+      expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith({
+        likes: 50,
+      });
+      expect(likes()).toEqual({ likes: 50 });
+    });
+
     it("doesn't push throttled views or likes to a closed window", async () => {
       vi.useFakeTimers();
       const s = await live();
@@ -1341,6 +1368,22 @@ describe("init events", () => {
         );
       },
     );
+
+    it("warns once in 30 s when it can't be saved", async () => {
+      const s = await live();
+      const failed = s.timerService.onSaveFailed.mock.calls[0][0];
+
+      failed();
+      failed();
+
+      expect(noticesFor(s, FEEDBACK_CODES.TIMER_SAVE_FAILED)).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "system",
+          message: "Unable to save the countdown timer.",
+        }),
+      ]);
+    });
 
     it("loads the active profile's timer at startup, after the store", async () => {
       const s = setup();
@@ -1921,6 +1964,7 @@ describe("init events", () => {
 
     it("records the emotes of a chat and pushes the new list", async () => {
       const s = await live({ alerts: false });
+      s.serverService.sendToClient.mockClear();
       const saved = [{ id: "wave", image: "wave.png" }];
       s.storeManagerService.recordEmotes.mockResolvedValue({
         success: true,
@@ -1938,10 +1982,15 @@ describe("init events", () => {
           { data: saved },
         ]);
       });
+      // Its picture, for the games overlay's rows
+      await vi.waitFor(() => {
+        expect(gamesSent(s, "tokio:games")).toHaveLength(1);
+      });
     });
 
     it("pushes nothing when the chat brought no new emotes", async () => {
       const s = await live({ alerts: false });
+      s.serverService.sendToClient.mockClear();
 
       s.conn.emit(TOKIO_EVENTS.CHAT, chat("hi", [emote("wave")]));
       s.conn.emit(TOKIO_EVENTS.CHAT, chat("hi again", [emote("wave")]));
@@ -1949,6 +1998,7 @@ describe("init events", () => {
       expect(s.storeManagerService.recordEmotes).toHaveBeenCalledTimes(2);
       await flushPromises();
       expect(s.h.pushed(APP_EVENTS_RESPONSE.EMOTES)).toEqual([]);
+      expect(gamesSent(s, "tokio:games")).toEqual([]);
       expect(s.h.notices).toEqual([]);
     });
 
@@ -1978,8 +2028,9 @@ describe("init events", () => {
       expect(s.h.pushed(APP_EVENTS_RESPONSE.EMOTES)).toEqual([]);
     });
 
-    it("records the new emotes when the window is closed, pushing nothing", async () => {
+    it("records the new emotes when the window is closed, sending only the games overlay", async () => {
       const s = await live({ alerts: false });
+      s.serverService.sendToClient.mockClear();
       s.storeManagerService.recordEmotes.mockResolvedValue({
         success: true,
         data: [{ id: "wave", image: "wave.png" }],
@@ -1989,7 +2040,9 @@ describe("init events", () => {
       s.conn.emit(TOKIO_EVENTS.CHAT, chat("hi", [emote("wave")]));
 
       expect(s.storeManagerService.recordEmotes).toHaveBeenCalledOnce();
-      await flushPromises();
+      await vi.waitFor(() => {
+        expect(gamesSent(s, "tokio:games")).toHaveLength(1);
+      });
       expect(s.h.pushed(APP_EVENTS_RESPONSE.EMOTES)).toEqual([]);
       expect(s.h.notices).toEqual([]);
     });
@@ -2222,6 +2275,10 @@ describe("init events", () => {
       expect(s.ttsService.setLogFile).toHaveBeenCalledWith("tts.log");
       expect(s.serverService.setLogFile).toHaveBeenCalledWith("server.log");
       expect(s.overlayService.setLogFile).toHaveBeenCalledWith("overlays.log");
+      // Why an overlay's YAML was refused
+      expect(s.yamlManagerService.setLogFile).toHaveBeenCalledWith(
+        "overlays.log",
+      );
       expect(s.alertsService.setLogFile).toHaveBeenCalledWith("alerts.log");
       expect(s.musicService.setLogFile).toHaveBeenCalledWith("music.log");
       expect(s.gamesService.setLogFile).toHaveBeenCalledWith("games.log");
