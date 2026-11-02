@@ -374,13 +374,12 @@ export class HistoryService extends Service {
       lives.length < this._lives.length ||
       !lives.every((l) => allInRange(l, range))
     ) {
-      const records = await Promise.all(
-        lives.map(({ startedAt }) => this._readLive(dir, startedAt)),
-      );
-      if (this._dir !== dir) return [];
       const gifters = new Map<string, Gifter>();
-      // Oldest first, so the name, handle and picture end up the latest ones
-      for (const record of records) {
+      // One at a time, so big LIVEs don't all sit in memory. Oldest first, so
+      // the name, handle and picture end up the latest ones.
+      for (const { startedAt } of lives) {
+        const record = await this._readLive(dir, startedAt);
+        if (this._dir !== dir) return [];
         if (!record) continue;
         const sent = allInRange(record, range)
           ? record.gifters
