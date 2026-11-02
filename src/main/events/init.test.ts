@@ -322,6 +322,7 @@ function setup() {
     disconnected: vi.fn(() => false),
     get: vi.fn(() => timer),
     onChange: vi.fn((_listener: (deltaMs: number) => void) => {}),
+    onSaveFailed: vi.fn((_listener: () => void) => {}),
   };
   const fansService = {
     setLogFile: vi.fn(),
@@ -1367,6 +1368,22 @@ describe("init events", () => {
         );
       },
     );
+
+    it("warns once in 30 s when it can't be saved", async () => {
+      const s = await live();
+      const failed = s.timerService.onSaveFailed.mock.calls[0][0];
+
+      failed();
+      failed();
+
+      expect(noticesFor(s, FEEDBACK_CODES.TIMER_SAVE_FAILED)).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "system",
+          message: "Unable to save the countdown timer.",
+        }),
+      ]);
+    });
 
     it("loads the active profile's timer at startup, after the store", async () => {
       const s = setup();

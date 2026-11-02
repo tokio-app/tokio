@@ -592,6 +592,15 @@ const registerTimer = ({
       );
     }
   });
+  // Saving logged it. The timer is tried again on the next interval.
+  timer.onSaveFailed(() =>
+    notifier.warn(
+      "system",
+      FEEDBACK_CODES.TIMER_SAVE_FAILED,
+      t("main.init.timerSaveFailed"),
+      { key: "timer", windowMs: REPEAT_NOTICE_MS },
+    ),
+  );
 
   const overlayMessage = (added: number) => {
     const { settings, state } = timer.get();

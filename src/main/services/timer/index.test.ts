@@ -487,6 +487,18 @@ describe("TimerService", () => {
       expect(await timer.save()).toBe(false);
     });
 
+    it("tells its listener when an interval save fails", async () => {
+      const failed = vi.fn();
+      timer.onSaveFailed(failed);
+      ready();
+      updateProfileData.mockResolvedValueOnce(false);
+
+      await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
+      expect(failed).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
+      expect(failed).toHaveBeenCalledOnce();
+    });
+
     it("saves on the interval only when time was added or the clock runs", async () => {
       ready(settings({}, { follow: 30 }), false);
       await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);

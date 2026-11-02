@@ -902,6 +902,7 @@
   "main.init.gameNotConnected": "{game} no está conectado, así que la acción “{label}” no se ejecutó. Escribe en el chat del juego el comando {connect} que aparece en {games}.",
   "main.init.gameCommandFailed": "Un comando de la acción “{label}” falló en Minecraft: {message}",
   "main.init.timerPaused": "El temporizador se pausó porque Tokio ya no está conectado al LIVE.",
+  "main.init.timerSaveFailed": "No se pudo guardar el temporizador.",
   "main.init.giftsRefreshFailed": "No se pudieron actualizar los regalos desde TikTok. Los overlays usan los que se guardaron la última vez.",
   "main.init.giftsFetchFailed": "No se pudieron obtener los regalos de TikTok. Las opciones de regalos de los overlays quedan vacías hasta el próximo inicio.",
   "main.init.serverStartFailed": "El servidor de overlays no pudo iniciarse, así que Tokio lo apagó. Puede que el puerto {port} esté en uso.",

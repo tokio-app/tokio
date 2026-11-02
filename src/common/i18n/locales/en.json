@@ -902,6 +902,7 @@
   "main.init.gameNotConnected": "{game} isn't connected, so the {label} action didn't run. Type the {connect} command from {games} in the game's chat.",
   "main.init.gameCommandFailed": "A command of the {label} action failed in Minecraft: {message}",
   "main.init.timerPaused": "The countdown timer paused, since Tokio is no longer connected to the LIVE.",
+  "main.init.timerSaveFailed": "Unable to save the countdown timer.",
   "main.init.giftsRefreshFailed": "Unable to update the gifts from TikTok. Overlays use the ones saved last time.",
   "main.init.giftsFetchFailed": "Unable to get the gifts from TikTok. Overlay gift options stay empty until the next start.",
   "main.init.serverStartFailed": "The overlay server couldn't start, so Tokio turned it off. Port {port} may be in use.",
