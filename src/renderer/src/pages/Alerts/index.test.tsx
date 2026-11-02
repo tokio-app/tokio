@@ -664,7 +664,8 @@ describe("Alerts", () => {
     await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
       ...failure(),
       id: "alert-1",
-      request: 1,
+      // The picker shows only its latest request's failure
+      request: sent(APP_EVENTS.IMPORT_SOUND).at(-1)!.request,
     });
 
     expect(dialogs().at(-1)).toHaveTextContent("Couldn't save that sound.");
@@ -742,6 +743,32 @@ describe("Alerts", () => {
     expect(saves().at(-1)?.items[0]).toEqual(
       alert("alert-1", { sound: whole(alertSound("Bruh")) }),
     );
+  });
+
+  it("uses the later of two browses made before and after the page opened again", async () => {
+    const before = await load([alert("alert-1")]);
+    await pickSound(before.user, 0);
+    await before.user.click(browse());
+    before.unmount();
+    const { user } = await load([alert("alert-1")]);
+    await pickSound(user, 0);
+    await user.click(browse());
+    const [old, latest] = sent(APP_EVENTS.IMPORT_SOUND);
+
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+      success: true,
+      id: "alert-1",
+      request: old.request,
+      sound: bell,
+    });
+    await send(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
+      success: true,
+      id: "alert-1",
+      request: latest.request,
+      sound: alertSound("Bruh"),
+    });
+
+    expect(summary(0)).toHaveTextContent("Bruh");
   });
 
   it("still uses a download after a browse was cancelled", async () => {

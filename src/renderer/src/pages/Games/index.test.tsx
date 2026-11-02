@@ -1125,7 +1125,7 @@ describe("Games overlay", () => {
     );
     await user.click(screen.getByRole("button", { name: "Browse files..." }));
     expect(sent(APP_EVENTS.IMPORT_MINECRAFT_PICTURE)).toEqual([
-      { id: "a1", request: 1 },
+      { id: "a1", request: expect.any(Number) },
     ]);
     await user.click(screen.getByRole("button", { name: "Done" }));
 
@@ -1193,6 +1193,37 @@ describe("Games overlay", () => {
     await wait(300);
 
     expect(savedOverlays()[0].image).toEqual(CREEPER);
+  });
+
+  it("keeps a browse made after the page opened again over an older one", async () => {
+    const before = await load([action("a1")]);
+    await before.user.click(
+      screen.getByRole("button", { name: "Pick a picture" }),
+    );
+    await before.user.click(
+      screen.getByRole("button", { name: "Browse files..." }),
+    );
+    before.unmount();
+    const { user } = await load([action("a1")]);
+    await user.click(screen.getByRole("button", { name: "Pick a picture" }));
+    await user.click(screen.getByRole("button", { name: "Browse files..." }));
+    const [old, latest] = sent(APP_EVENTS.IMPORT_MINECRAFT_PICTURE);
+
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      request: old.request,
+      picture: TNT,
+    });
+    await send(APP_EVENTS_RESPONSE.SET_MINECRAFT_PICTURE, {
+      success: true,
+      id: "a1",
+      request: latest.request,
+      picture: CREEPER,
+    });
+    await wait(300);
+
+    expect(savedOverlays().at(-1)!.image).toEqual(CREEPER);
   });
 
   it("drops a browse made in another profile", async () => {
