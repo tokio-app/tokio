@@ -14,6 +14,12 @@ export const MINECRAFT_EDITION_NAMES: Record<MinecraftEdition, string> = {
   java: "Java Edition",
 };
 
+// What each edition's chat types to join Tokio. Java's is the Tokio mod's.
+export const MINECRAFT_CONNECT_COMMANDS: Record<MinecraftEdition, string> = {
+  bedrock: "/connect",
+  java: "/tokio connect",
+};
+
 // Keyed by game, like the settings
 export type GamesStatus = Record<keyof GamesSettings, GameStatus>;
 

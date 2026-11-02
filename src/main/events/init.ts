@@ -10,6 +10,7 @@ import {
   EMOTE_TRIGGER,
   FEEDBACK_CODES,
   GiftEvent,
+  MINECRAFT_CONNECT_COMMANDS,
   MINECRAFT_EDITION_NAMES,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -524,10 +525,9 @@ const registerGames = (handler: AppHandlerVariables) => {
         );
       }
     } else if (offline) {
-      // Named by edition: the other one may be connected. Java Edition joins
-      // through the Tokio mod's command.
+      // Named by edition: the other one may be connected
       const game = `Minecraft ${MINECRAFT_EDITION_NAMES[action.edition]}`;
-      const connect = action.edition === "java" ? "/tokio connect" : "/connect";
+      const connect = MINECRAFT_CONNECT_COMMANDS[action.edition];
       if (
         notifier.warn(
           "games",
