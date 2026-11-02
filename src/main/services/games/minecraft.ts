@@ -119,6 +119,8 @@ export class MinecraftConnection {
   private _game: Game | null = null;
   private readonly _inFlight = new Map<string, Command>();
   private readonly _waiting: Command[] = [];
+  // Waiting for the game to be ready or gone, see settled
+  private readonly _settling: (() => void)[] = [];
 
   constructor(
     port: number = MINECRAFT_PORT,
@@ -154,19 +156,26 @@ export class MinecraftConnection {
   }
 
   /** Runs a command as the connected player, and resolves with its answer. */
-  public send(command: string): Promise<CommandResult> {
+  public async send(command: string): Promise<CommandResult> {
+    // A game that took over during a launch's wait can still be in its handshake
+    if (this._game && !this._game.ready) await this.settled();
     if (!this._game?.ready) {
-      return Promise.resolve(failed(command, t("main.minecraft.notConnected")));
+      return failed(command, t("main.minecraft.notConnected"));
     }
     if (this._waiting.length >= MAX_WAITING) {
-      return Promise.resolve(
-        failed(command, t("main.minecraft.tooManyWaiting")),
-      );
+      return failed(command, t("main.minecraft.tooManyWaiting"));
     }
     return new Promise((resolve) => {
       this._waiting.push({ command, resolve });
       this._pump();
     });
+  }
+
+  /** Waits for a game still in Bedrock's handshake to be ready or gone. */
+  public async settled() {
+    while (this._game && !this._game.ready) {
+      await new Promise<void>((resolve) => this._settling.push(resolve));
+    }
   }
 
   private _listen(): Promise<boolean> {
@@ -290,6 +299,7 @@ export class MinecraftConnection {
     clearTimeout(game.handshake);
     if (this._game !== game || game.ready) return;
     game.ready = true;
+    for (const resolve of this._settling.splice(0)) resolve();
     this._set({ state: "connected", edition: game.edition });
   }
 
@@ -299,6 +309,7 @@ export class MinecraftConnection {
     const game = this._game;
     if (!game) return;
     this._game = null;
+    for (const resolve of this._settling.splice(0)) resolve();
     clearTimeout(game.handshake);
     if (close) game.socket.close(close.code, t(close.reason));
     else game.socket.terminate();

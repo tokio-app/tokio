@@ -63,7 +63,7 @@ type Batch = {
 // What the service uses of the game's connection
 type Connection = Pick<
   MinecraftConnection,
-  "status" | "onStatus" | "setEnabled" | "send"
+  "status" | "onStatus" | "setEnabled" | "send" | "settled"
 >;
 
 const STATES: Record<GameStatus["state"], string> = {
@@ -371,6 +371,8 @@ export class GamesService extends Service {
         this._onRun?.(action);
         const failed = (await this._send(batch.commands)).find((r) => !r.ok);
         if (failed) {
+          // A Bedrock game that took over is connected once its handshake ends
+          if (failed.message === DISCONNECTED) await this._minecraft.settled();
           // Turned off midway, which failed what the game hadn't answered
           if (["off", "error"].includes(this._minecraft.status.state)) break;
           // A game that left or was replaced midway fails the commands it

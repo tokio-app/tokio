@@ -383,6 +383,37 @@ describe("MinecraftConnection", () => {
     expect(second.requests).toHaveLength(1);
   });
 
+  it("waits for the handshake of a Bedrock game that took over", async () => {
+    const { connection } = await listen();
+    await game(connection.port);
+    await connected(connection);
+    const second = await game(connection.port);
+    expect(connection.status.state).toBe("waiting");
+
+    // Sent during the handshake, it goes once the new game is ready
+    const result = connection.send("say hi");
+    await connection.settled();
+    expect(connection.status).toEqual({
+      state: "connected",
+      edition: "bedrock",
+    });
+    expect((await result).ok).toBe(true);
+    expect(second.requests).toEqual([
+      expect.objectContaining({ commandLine: "say hi", binary: true }),
+    ]);
+  });
+
+  it("settles after handshakeMs when the game doesn't answer the encryption request", async () => {
+    const { connection } = await listen({ handshakeMs: 30 });
+    await game(connection.port, { encrypt: false });
+    expect(connection.status.state).toBe("waiting");
+    await connection.settled();
+    expect(connection.status).toEqual({
+      state: "connected",
+      edition: "bedrock",
+    });
+  });
+
   it("goes from one edition to the other when Java replaces Bedrock", async () => {
     const { connection, statuses } = await listen();
     await game(connection.port);
