@@ -483,7 +483,10 @@ export class HistoryService extends Service {
     this._liveUnsaved = false;
     this._indexUnsaved = false;
 
+    const previous = this._saving;
     this._saving = (async () => {
+      // After the save before, so an older index can't land last
+      await previous;
       // saveFile doesn't make folders. If this fails, the writes log why.
       await mkdir(dir, { recursive: true }).catch(() => {});
       let ok = true;

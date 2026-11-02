@@ -591,6 +591,39 @@ describe("HistoryService", () => {
       );
     });
 
+    it("saves the drop's index after the end's", async () => {
+      const lives = await seed(MAX_LIVES);
+      const history = await loaded();
+      const startedAt = (MAX_LIVES + 1) * HOUR;
+      // The new LIVE's file waits, so the drop's index could pass the end's
+      let open = () => {};
+      const gate = new Promise<void>((resolve) => (open = resolve));
+      const original = json.saveFile.bind(json);
+      const saveFile = vi
+        .spyOn(json, "saveFile")
+        .mockImplementation(async (file, schema, data) => {
+          if (file.endsWith(`${startedAt}.json`)) await gate;
+          return original(file, schema, data);
+        });
+
+      history.start("kai", startedAt);
+      history.record(TOKIO_EVENTS.GIFT, gift(viewer("1"), 5));
+      history.end(startedAt + 60_000);
+      void history.save();
+      await vi.waitFor(() =>
+        expect(history.getHistory().lives).toHaveLength(MAX_LIVES),
+      );
+      open();
+      const indexes = () =>
+        saveFile.mock.calls.filter(([file]) => file.endsWith("index.json"));
+      await vi.waitFor(() => expect(indexes()).toHaveLength(2));
+      await Promise.all(saveFile.mock.results.map((r) => r.value));
+
+      const saved = await read<{ lives: LiveSummary[] }>("index.json");
+      expect(saved.lives).toHaveLength(MAX_LIVES);
+      expect(saved.lives[0].startedAt).toBe(lives[1].startedAt);
+    });
+
     it("drops the oldest when a history loads with more", async () => {
       const lives = await seed(MAX_LIVES + 2);
       const history = await loaded();
