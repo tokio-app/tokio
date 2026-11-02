@@ -845,6 +845,7 @@
   "main.minecraft.portInUse": "El puerto {port} está en uso.",
   "main.minecraft.listenFailed": "No se pudo escuchar en el puerto {port}.",
   "main.minecraft.noAnswer": "Minecraft no respondió.",
+  "main.minecraft.disconnected": "Minecraft se desconectó.",
   "main.music.disconnected": "Desconectado de {name}.",
   "main.music.connectFailed": "No se pudo conectar a {name}.",
   "main.music.connected": "Conectado a {name}.",

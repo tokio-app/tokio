@@ -34,7 +34,7 @@ import { basename, join } from "node:path";
 import { MEDIA_MAX_BYTES } from "../alerts";
 import { Service, type ServiceResult } from "../shared";
 import { commandValue, GameCommand, gameCommands } from "./commands";
-import { DISCONNECTED, MinecraftConnection } from "./minecraft";
+import { MinecraftConnection } from "./minecraft";
 
 /**
  * Why an action's commands didn't all run: offline when no game of the
@@ -97,9 +97,9 @@ export class GamesService extends Service {
   ) {
     super();
     // The connection tells only changes
-    _minecraft.onStatus((status) => {
-      const why = status.error
-        ? `: ${status.error}`
+    _minecraft.onStatus((status, cause) => {
+      const why = cause
+        ? `: ${cause}`
         : status.edition
           ? ` (${MINECRAFT_EDITION_NAMES[status.edition]}).`
           : ".";
@@ -372,14 +372,14 @@ export class GamesService extends Service {
         const failed = (await this._send(batch.commands)).find((r) => !r.ok);
         if (failed) {
           // A Bedrock game that took over is connected once its handshake ends
-          if (failed.message === DISCONNECTED) await this._minecraft.settled();
+          if (failed.dropped) await this._minecraft.settled();
           // Turned off midway, which failed what the game hadn't answered
           if (["off", "error"].includes(this._minecraft.status.state)) break;
           // A game that left or was replaced midway fails the commands it
           // hadn't answered, and drops the rest. Replaced by a game of its
           // edition, the run counts as done and the rest go to the new one.
           const offline = this._unreachable(action.edition) !== undefined;
-          if (offline || failed.message !== DISCONNECTED) {
+          if (offline || !failed.dropped) {
             this._onError?.(action, { offline, message: failed.message });
           }
           if (offline) break;

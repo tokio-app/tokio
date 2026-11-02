@@ -29,6 +29,8 @@ export type CommandResult = {
   ok: boolean;
   // The game's reply, or why the command didn't run
   message: string;
+  // The game left or was replaced before it answered
+  dropped?: true;
 };
 
 // One action on the games overlay: its event, an arrow, then its picture and

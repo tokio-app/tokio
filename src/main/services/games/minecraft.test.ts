@@ -1,6 +1,7 @@
 import { MESSAGES, translate } from "@/common/i18n";
 import { CommandResult, GameStatus } from "@/common/types";
 import { MINECRAFT_JAVA_PROTOCOL } from "@/common/util";
+import { setLanguage } from "@/helper/i18n";
 import {
   Cipheriv,
   createCipheriv,
@@ -347,9 +348,29 @@ describe("MinecraftConnection", () => {
       expect(result).toMatchObject({
         ok: false,
         message: "Minecraft disconnected.",
+        dropped: true,
       });
     }
     expect(connection.status.state).toBe("waiting");
+  });
+
+  it("fails dropped commands in the app's language", async () => {
+    setLanguage("es-419");
+    const { connection } = await listen();
+    const fake = await game(connection.port, {
+      protocols: [MINECRAFT_JAVA_PROTOCOL],
+    });
+    await connected(connection);
+    fake.reply = () => null;
+    const result = connection.send("say hi");
+    await vi.waitFor(() => expect(fake.requests).toHaveLength(1));
+    fake.socket.close();
+    expect(await result).toEqual({
+      command: "say hi",
+      ok: false,
+      message: "Minecraft se desconectó.",
+      dropped: true,
+    });
   });
 
   it("refuses commands with no game", async () => {
@@ -377,6 +398,7 @@ describe("MinecraftConnection", () => {
     expect(await pending).toMatchObject({
       ok: false,
       message: "Minecraft disconnected.",
+      dropped: true,
     });
     await connected(connection);
     expect((await connection.send("say hi")).ok).toBe(true);
@@ -516,6 +538,7 @@ describe("MinecraftConnection", () => {
     expect(await result).toMatchObject({
       ok: false,
       message: "Minecraft disconnected.",
+      dropped: true,
     });
     expect(connection.status).toEqual({ state: "off" });
     // The port is free again
