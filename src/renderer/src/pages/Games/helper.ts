@@ -16,6 +16,8 @@ import {
 import {
   HAZARD_NAMES,
   HELP_NAMES,
+  JAVA_ONLY_HAZARDS,
+  JAVA_ONLY_STEPS,
   MINECRAFT_NAMES,
   MINECRAFT_PORT,
   TIME_NAMES,
@@ -49,6 +51,19 @@ export const ITEMS: Record<MinecraftEdition, SelectOption<string>[]> = {
   java: options(MINECRAFT_NAMES.java.items),
 };
 
+// What Java summons but isn't a living mob, which the mod can't turn the
+// player into
+const NOT_MOBS = [
+  "tnt",
+  "lightning_bolt",
+  "end_crystal",
+  "experience_orb",
+  "firework_rocket",
+];
+export const MORPH_MOBS = MOBS.java.filter(
+  ({ value }) => !NOT_MOBS.includes(value),
+);
+
 // The events an action can run on: the alerts' but the joins, envelopes,
 // Super Fan Boxes and song changes
 const LEFT_OUT: string[] = [
@@ -63,14 +78,33 @@ export const GAME_TRIGGERS = TRIGGER_OPTIONS.filter(
 );
 
 // The first words of each step's sentence
-export const STEP_KINDS: { value: StepKind; label: MessageKey }[] = [
+const ALL_STEP_KINDS: { value: StepKind; label: MessageKey }[] = [
   { value: "spawn", label: "games.steps.spawn" },
+  { value: "morph", label: "games.steps.morph" },
+  { value: "unmorph", label: "games.steps.unmorph" },
   { value: "give", label: "games.steps.give" },
   { value: "weather", label: "games.steps.weather" },
   { value: "time", label: "games.steps.time" },
   { value: "hazard", label: "games.steps.hazard" },
   { value: "help", label: "games.steps.help" },
   { value: "command", label: "games.steps.command" },
+];
+
+// Each edition's step kinds: Bedrock has none of the Tokio mod's
+export const STEP_KINDS: Record<
+  MinecraftEdition,
+  { value: StepKind; label: MessageKey }[]
+> = {
+  bedrock: ALL_STEP_KINDS.filter(
+    ({ value }) => !JAVA_ONLY_STEPS.includes(value),
+  ),
+  java: ALL_STEP_KINDS,
+};
+
+// How long a morph lasts: until a Back to normal step, or for its seconds
+export const MORPH_LENGTHS: { value: "until" | "for"; label: MessageKey }[] = [
+  { value: "until", label: "games.step.untilBack" },
+  { value: "for", label: "games.step.for" },
 ];
 
 export const WEATHERS = (["clear", "rain", "thunder"] as const).map(
@@ -81,10 +115,18 @@ export const TIMES = (["day", "noon", "night", "midnight"] as const).map(
   (value) => ({ value, label: TIME_NAMES[value] }),
 );
 
-export const HAZARDS = GAME_HAZARDS.map((value) => ({
+const ALL_HAZARDS = GAME_HAZARDS.map((value) => ({
   value,
   label: HAZARD_NAMES[value],
 }));
+
+// Each edition's hazards: Bedrock has none of the Tokio mod's
+export const HAZARDS: Record<MinecraftEdition, typeof ALL_HAZARDS> = {
+  bedrock: ALL_HAZARDS.filter(
+    ({ value }) => !Object.hasOwn(JAVA_ONLY_HAZARDS, value),
+  ),
+  java: ALL_HAZARDS,
+};
 
 export const HELPS = GAME_HELPS.map((value) => ({
   value,
@@ -93,6 +135,9 @@ export const HELPS = GAME_HELPS.map((value) => ({
 
 const NEW_STEPS: { [K in StepKind]: Step<K> } = {
   spawn: { type: "spawn", mob: "zombie", amount: 1, name: "" },
+  // Until turned back, the user's call
+  morph: { type: "morph", mob: "zombie", seconds: null },
+  unmorph: { type: "unmorph" },
   give: { type: "give", item: "diamond", amount: 1 },
   weather: { type: "weather", weather: "clear" },
   time: { type: "time", time: "day" },
@@ -172,14 +217,20 @@ function idIn(
   return same ?? fallback;
 }
 
-// The action for another edition, with its mobs and items moved over
+// The action for another edition, with its mobs and items moved over. On
+// Bedrock the Tokio mod's hazards become the closest Bedrock one, and its
+// other steps go, as Bedrock has nothing like them.
 export function withEdition(
   action: GameAction,
   edition: MinecraftEdition,
 ): GameAction {
   const from = action.edition;
   if (from === edition) return action;
-  const steps = action.steps.map((step): GameStep => {
+  const kept =
+    edition === "bedrock"
+      ? action.steps.filter((step) => !JAVA_ONLY_STEPS.includes(step.type))
+      : action.steps;
+  const steps = kept.map((step): GameStep => {
     if (step.type === "spawn")
       return { ...step, mob: idIn(from, edition, "mobs", step.mob, "zombie") };
     if (step.type === "give")
@@ -187,6 +238,8 @@ export function withEdition(
         ...step,
         item: idIn(from, edition, "items", step.item, "diamond"),
       };
+    if (step.type === "hazard" && edition === "bedrock")
+      return { ...step, hazard: JAVA_ONLY_HAZARDS[step.hazard] ?? step.hazard };
     return step;
   });
   return { ...action, edition, steps };

@@ -140,6 +140,16 @@ function hazardCommands(
       return [effect(java, "nausea", step.duration)];
     case "turn_around":
       return [`teleport ${java ? "@s" : "@p"} ~ ~ ~ ~180 ~`];
+    // The Tokio mod's own commands, which Bedrock has nothing like. The mod
+    // drops every meteor around the player itself.
+    case "meteor":
+      return java ? [`tokio meteor ${step.amount}`] : [];
+    case "laser":
+      return java ? ["tokio laser"] : [];
+    case "super_laser":
+      return java ? ["tokio laser super"] : [];
+    case "super_duper_laser":
+      return java ? ["tokio laser super duper"] : [];
     default:
       // A random teleport, anywhere within the distance
       return [
@@ -247,6 +257,14 @@ export function gameCommands(
         : `summon ${step.mob}${name ? ` ${quoted}` : ""} ~ ~ ~`;
       return Array.from({ length: step.amount }, () => command);
     }
+    // The Tokio mod's: for seconds, or until an unmorph
+    case "morph": {
+      if (!java || !ID.test(step.mob)) return [];
+      const seconds = step.seconds === null ? "" : ` ${step.seconds}`;
+      return [`tokio morph minecraft:${step.mob}${seconds}`];
+    }
+    case "unmorph":
+      return java ? ["tokio unmorph"] : [];
     case "give": {
       if (!ID.test(step.item)) return [];
       return [give(java, step.item, step.amount)];

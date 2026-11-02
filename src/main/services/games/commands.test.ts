@@ -260,6 +260,51 @@ describe("gameCommands for hazards", () => {
     expect(run("tnt_ring", "java", { amount: 3 })).toHaveLength(8);
     expect(run("launch_water", "bedrock", { amount: 3 })).toHaveLength(4);
   });
+
+  it("drops the meteors in one command, and fires the lasers, in Java", () => {
+    expect(run("meteor", "java", { amount: 5 })).toEqual(["tokio meteor 5"]);
+    expect(run("meteor", "java")).toEqual(["tokio meteor 1"]);
+    expect(run("laser", "java", { amount: 3 })).toEqual(["tokio laser"]);
+    expect(run("super_laser", "java")).toEqual(["tokio laser super"]);
+    expect(run("super_duper_laser", "java")).toEqual([
+      "tokio laser super duper",
+    ]);
+  });
+
+  it("runs none of the Tokio mod's hazards in Bedrock", () => {
+    for (const hazard of [
+      "meteor",
+      "laser",
+      "super_laser",
+      "super_duper_laser",
+    ]) {
+      expect(run(hazard, "bedrock", { amount: 5 })).toEqual([]);
+    }
+  });
+});
+
+describe("gameCommands for morphs", () => {
+  const run = (input: Record<string, unknown>, edition: "bedrock" | "java") =>
+    gameCommands(step(input), none, edition);
+
+  it("turns the player into the mob until turned back, or for seconds", () => {
+    expect(run({ type: "morph", mob: "zombie" }, "java")).toEqual([
+      "tokio morph minecraft:zombie",
+    ]);
+    expect(run({ type: "morph", mob: "creeper", seconds: 30 }, "java")).toEqual(
+      ["tokio morph minecraft:creeper 30"],
+    );
+  });
+
+  it("turns the player back", () => {
+    expect(run({ type: "unmorph" }, "java")).toEqual(["tokio unmorph"]);
+  });
+
+  it("runs nothing for a bad mob id, or in Bedrock", () => {
+    expect(run({ type: "morph", mob: "zombie ~ ~ ~" }, "java")).toEqual([]);
+    expect(run({ type: "morph", mob: "zombie" }, "bedrock")).toEqual([]);
+    expect(run({ type: "unmorph" }, "bedrock")).toEqual([]);
+  });
 });
 
 describe("gameCommands for helps", () => {

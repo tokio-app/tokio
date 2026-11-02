@@ -10,8 +10,10 @@ import {
   connectCommand,
   createAction,
   createStep,
+  HAZARDS,
   ITEMS,
   MOBS,
+  MORPH_MOBS,
   STEP_KINDS,
   statusText,
   stepText,
@@ -109,8 +111,77 @@ describe("Games helper", () => {
     ]);
   });
 
+  it("keeps Java's hazards and drops its morphs on Bedrock", () => {
+    const hazard = (type: string): GameStep =>
+      GameStepSchema.parse({ type: "hazard", hazard: type, amount: 3 });
+    const action = {
+      ...createAction("java"),
+      steps: [
+        hazard("meteor"),
+        GameStepSchema.parse({ type: "morph", mob: "creeper" }),
+        hazard("laser"),
+        hazard("super_laser"),
+        { type: "unmorph" } as const,
+        hazard("super_duper_laser"),
+        hazard("anvil"),
+      ],
+    };
+
+    expect(withEdition(action, "bedrock").steps).toEqual([
+      hazard("tnt"),
+      hazard("lightning"),
+      hazard("lightning"),
+      hazard("lightning"),
+      hazard("anvil"),
+    ]);
+    // Back on Java nothing new changes
+    const back = withEdition(withEdition(action, "bedrock"), "java");
+    expect(back.steps.map((step) => step.type)).toEqual(
+      Array(5).fill("hazard"),
+    );
+  });
+
+  it("offers the Tokio mod's steps and hazards only on Java", () => {
+    const javaOnly = ["morph", "unmorph"];
+    const modHazards = ["meteor", "laser", "super_laser", "super_duper_laser"];
+    const kinds = (edition: "bedrock" | "java") =>
+      STEP_KINDS[edition].map((o) => o.value);
+    const hazards = (edition: "bedrock" | "java") =>
+      HAZARDS[edition].map((o) => o.value);
+
+    expect(kinds("java").slice(0, 4)).toEqual([
+      "spawn",
+      "morph",
+      "unmorph",
+      "give",
+    ]);
+    expect(kinds("bedrock")).toEqual(
+      kinds("java").filter((kind) => !javaOnly.includes(kind)),
+    );
+    expect(hazards("java")).toEqual(expect.arrayContaining(modHazards));
+    expect(hazards("bedrock")).toEqual(
+      hazards("java").filter((h) => !modHazards.includes(h)),
+    );
+  });
+
+  it("turns the player into living mobs only", () => {
+    const ids = MORPH_MOBS.map((o) => o.value);
+    for (const id of [
+      "tnt",
+      "lightning_bolt",
+      "end_crystal",
+      "experience_orb",
+      "firework_rocket",
+    ]) {
+      expect(MOBS.java.map((o) => o.value)).toContain(id);
+      expect(ids).not.toContain(id);
+    }
+    expect(ids).toContain("zombie");
+    expect(ids.length).toBe(MOBS.java.length - 5);
+  });
+
   it("creates a valid step of every kind", () => {
-    for (const { value } of STEP_KINDS) {
+    for (const { value } of STEP_KINDS.java) {
       const step = createStep(value);
       expect(step.type).toBe(value);
       expect(GameStepSchema.parse(step)).toEqual(step);

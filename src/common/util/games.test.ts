@@ -216,6 +216,37 @@ describe("gameStepsText", () => {
     ).toBe("Lightning bolt ×5, Falling TNT, Launch + water");
   });
 
+  it("names the Tokio mod's hazards, counting the meteors", () => {
+    const hazard = {
+      type: "hazard",
+      fuse: 4,
+      height: 50,
+      seconds: 1,
+      duration: 10,
+      distance: 1000,
+    } as const;
+    expect(
+      steps(
+        "java",
+        { ...hazard, hazard: "meteor", amount: 5 },
+        { ...hazard, hazard: "laser", amount: 3 },
+        { ...hazard, hazard: "super_laser", amount: 1 },
+        { ...hazard, hazard: "super_duper_laser", amount: 1 },
+      ),
+    ).toBe("Meteor ×5, Laser, Super laser, Super duper laser");
+  });
+
+  it("names a morph by its mob, and the way back", () => {
+    expect(
+      steps(
+        "java",
+        { type: "morph", mob: "zombie", seconds: 30 },
+        { type: "unmorph" },
+        { type: "morph", mob: "not_a_mob", seconds: null },
+      ),
+    ).toBe("Zombie form, Back to normal");
+  });
+
   it("names helps", () => {
     expect(
       steps(

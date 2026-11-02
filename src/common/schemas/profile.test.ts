@@ -249,6 +249,33 @@ describe("ProfileSchema", () => {
     ]);
   });
 
+  it("lasts a morph until turned back unless saved with its seconds", () => {
+    const step = GameStepSchema.parse({ type: "morph", mob: "zombie" });
+
+    expect(step).toEqual({ type: "morph", mob: "zombie", seconds: null });
+    for (const seconds of [0, 601, 1.5]) {
+      const saved = { type: "morph", mob: "zombie", seconds };
+      expect(GameStepSchema.safeParse(saved).success).toBe(false);
+    }
+    expect(GameStepSchema.parse({ type: "unmorph" })).toEqual({
+      type: "unmorph",
+    });
+  });
+
+  it("takes the Tokio mod's hazards", () => {
+    for (const hazard of [
+      "meteor",
+      "laser",
+      "super_laser",
+      "super_duper_laser",
+    ]) {
+      expect(GameStepSchema.parse({ type: "hazard", hazard })).toMatchObject({
+        hazard,
+        amount: 1,
+      });
+    }
+  });
+
   it("refuses a hazard Tokio doesn't have", () => {
     const step = { type: "hazard", hazard: "lava" };
 

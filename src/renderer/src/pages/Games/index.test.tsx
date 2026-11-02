@@ -406,6 +406,95 @@ describe("Games", () => {
     expect(saves().at(-1)!.actions[0].steps[0]).toMatchObject({ height: 300 });
   });
 
+  it("offers the Tokio mod's steps and hazards only on Java actions", async () => {
+    const { user } = await load([
+      action("b1"),
+      action("j1", { edition: "java" }),
+    ]);
+    const modOnly = [
+      "Turn into mob",
+      "Back to normal",
+      "Meteor",
+      "Laser",
+      "Super laser",
+      "Super duper laser",
+    ];
+    // What the panel's kind and hazard pickers offer of them
+    const offered = async () => {
+      const element = panelElements()[0];
+      const panel = within(element);
+      await user.click(panel.getByText("Spawn mob"));
+      const found = modOnly.slice(0, 2).filter((t) => inList(element, t));
+      await user.click(inList(element, "Hazard")!);
+      await user.click(panel.getByText("Falling TNT"));
+      found.push(...modOnly.slice(2).filter((t) => inList(element, t)));
+      await user.keyboard("{Escape}");
+      return found;
+    };
+
+    expect(await offered()).toEqual([]);
+    await user.click(screen.getByRole("tab", { name: "Java" }));
+    expect(await offered()).toEqual(modOnly);
+  });
+
+  it("turns into a mob until turned back, or for its seconds", async () => {
+    const { user } = await load([action("j1", { edition: "java" })]);
+    const panel = panels()[0];
+    const seconds = () =>
+      panel.queryByRole("spinbutton", { name: "Duration in seconds" });
+
+    await user.click(panel.getByText("Spawn mob"));
+    await user.click(inList(panelElements()[0], "Turn into mob")!);
+    expect(panel.getByText("Zombie")).toBeInTheDocument();
+    expect(seconds()).toBeNull();
+
+    await user.click(panel.getByText("until turned back"));
+    await user.click(inList(panelElements()[0], "for")!);
+    expect(seconds()).toHaveValue(30);
+    await wait(300);
+    expect(saves().at(-1)!.actions[0].steps).toEqual([
+      { type: "morph", mob: "zombie", seconds: 30 },
+    ]);
+
+    await user.click(panel.getByText("for"));
+    await user.click(inList(panelElements()[0], "until turned back")!);
+    expect(seconds()).toBeNull();
+    await wait(300);
+    expect(saves().at(-1)!.actions[0].steps).toEqual([
+      { type: "morph", mob: "zombie", seconds: null },
+    ]);
+  });
+
+  it("drops Java's meteor for Falling TNT on Bedrock", async () => {
+    const meteor: GameStep = {
+      type: "hazard",
+      hazard: "meteor",
+      amount: 5,
+      fuse: 4,
+      height: 50,
+      seconds: 1,
+      duration: 10,
+      distance: 1000,
+    };
+    const { user } = await load([
+      action("j1", {
+        edition: "java",
+        steps: [meteor, { type: "unmorph" }],
+      }),
+    ]);
+    const panel = panels()[0];
+    expect(panel.getByText("Meteor")).toBeInTheDocument();
+
+    await user.click(panel.getByText("Java"));
+    await user.click(screen.getByRole("option", { name: "Bedrock" }));
+    await wait(300);
+
+    expect(panel.getByText("Falling TNT")).toBeInTheDocument();
+    expect(saves().at(-1)!.actions[0].steps).toEqual([
+      { ...meteor, hazard: "tnt" },
+    ]);
+  });
+
   it("picks a help, with a duration only for effects", async () => {
     const { user } = await load([action("a1")]);
     const panel = panels()[0];

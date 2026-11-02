@@ -186,7 +186,8 @@ const GameAmountSchema = z
   .default(1);
 
 // Built-in ways to try to kill the player, each with its own commands for
-// both editions (see gameCommands)
+// both editions (see gameCommands). The meteor and lasers are the Tokio mod's,
+// so Java's only.
 export const GAME_HAZARDS = [
   "tnt",
   "tnt_ring",
@@ -202,6 +203,10 @@ export const GAME_HAZARDS = [
   "dizzy",
   "turn_around",
   "random_teleport",
+  "meteor",
+  "laser",
+  "super_laser",
+  "super_duper_laser",
 ] as const;
 
 // Built-in ways to help the player survive: netherite armor, a full heal and
@@ -235,6 +240,14 @@ export const GameStepSchema = z.discriminatedUnion("type", [
     amount: GameAmountSchema,
     name: z.string().default(""),
   }),
+  // The Tokio mod's, so Java's only: the player turns into the mob, for
+  // seconds or, with null, until an unmorph step
+  z.object({
+    type: z.literal("morph"),
+    mob: z.string(),
+    seconds: z.number().int().min(1).max(600).nullable().default(null),
+  }),
+  z.object({ type: z.literal("unmorph") }),
   z.object({
     type: z.literal("give"),
     item: z.string(),
