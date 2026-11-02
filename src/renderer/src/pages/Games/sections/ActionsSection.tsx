@@ -501,7 +501,10 @@ function StepFields({
             options={lengths}
             value={step.seconds === null ? "until" : "for"}
             onChange={(length) =>
-              onChange({ ...step, seconds: length === "for" ? 30 : null })
+              onChange({
+                ...step,
+                seconds: length === "for" ? (step.seconds ?? 30) : null,
+              })
             }
           />
           {step.seconds !== null &&
