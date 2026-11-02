@@ -419,8 +419,17 @@ const registerConnectorEvents = ({
         t("main.init.emotesSaveFailed"),
         { key: "emotes", windowMs: REPEAT_NOTICE_MS },
       );
-    } else if (res.data && !win.isDestroyed()) {
-      win.webContents.send(APP_EVENTS_RESPONSE.EMOTES, { data: res.data });
+    } else if (res.data) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(APP_EVENTS_RESPONSE.EMOTES, { data: res.data });
+      }
+      // The games overlay's rows with that emote get its picture
+      await sendGamesOverlay({
+        storeManagerService: store,
+        overlayService: overlays,
+        serverService: server,
+        pathManagerService: paths,
+      });
     }
   };
   conn.on(TOKIO_EVENTS.CHAT, (d) => {

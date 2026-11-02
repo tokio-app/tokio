@@ -1947,6 +1947,7 @@ describe("init events", () => {
 
     it("records the emotes of a chat and pushes the new list", async () => {
       const s = await live({ alerts: false });
+      s.serverService.sendToClient.mockClear();
       const saved = [{ id: "wave", image: "wave.png" }];
       s.storeManagerService.recordEmotes.mockResolvedValue({
         success: true,
@@ -1964,10 +1965,15 @@ describe("init events", () => {
           { data: saved },
         ]);
       });
+      // Its picture, for the games overlay's rows
+      await vi.waitFor(() => {
+        expect(gamesSent(s, "tokio:games")).toHaveLength(1);
+      });
     });
 
     it("pushes nothing when the chat brought no new emotes", async () => {
       const s = await live({ alerts: false });
+      s.serverService.sendToClient.mockClear();
 
       s.conn.emit(TOKIO_EVENTS.CHAT, chat("hi", [emote("wave")]));
       s.conn.emit(TOKIO_EVENTS.CHAT, chat("hi again", [emote("wave")]));
@@ -1975,6 +1981,7 @@ describe("init events", () => {
       expect(s.storeManagerService.recordEmotes).toHaveBeenCalledTimes(2);
       await flushPromises();
       expect(s.h.pushed(APP_EVENTS_RESPONSE.EMOTES)).toEqual([]);
+      expect(gamesSent(s, "tokio:games")).toEqual([]);
       expect(s.h.notices).toEqual([]);
     });
 
@@ -2004,8 +2011,9 @@ describe("init events", () => {
       expect(s.h.pushed(APP_EVENTS_RESPONSE.EMOTES)).toEqual([]);
     });
 
-    it("records the new emotes when the window is closed, pushing nothing", async () => {
+    it("records the new emotes when the window is closed, sending only the games overlay", async () => {
       const s = await live({ alerts: false });
+      s.serverService.sendToClient.mockClear();
       s.storeManagerService.recordEmotes.mockResolvedValue({
         success: true,
         data: [{ id: "wave", image: "wave.png" }],
@@ -2015,7 +2023,9 @@ describe("init events", () => {
       s.conn.emit(TOKIO_EVENTS.CHAT, chat("hi", [emote("wave")]));
 
       expect(s.storeManagerService.recordEmotes).toHaveBeenCalledOnce();
-      await flushPromises();
+      await vi.waitFor(() => {
+        expect(gamesSent(s, "tokio:games")).toHaveLength(1);
+      });
       expect(s.h.pushed(APP_EVENTS_RESPONSE.EMOTES)).toEqual([]);
       expect(s.h.notices).toEqual([]);
     });
