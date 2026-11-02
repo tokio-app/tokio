@@ -48,7 +48,8 @@ The rest is Bedrock's.
 - Commands: body `version: 42` (1 fails on `execute … run`), `commandLine`, `origin: { type: "player" }`. They run as the connected player, so `~` is where they stand.
 - A reply is a `commandResponse` or an `error`; `statusCode >= 0` is ok. Replies are in the game's language (`statusMessage`, or `message`, or nothing).
 - The game allows 100 commands in flight. Tokio keeps `MAX_IN_FLIGHT` in flight and `MAX_WAITING` waiting, and fails the rest. `MAX_WAITING` is only a safety net: `GamesService` paces each action's runs.
-- A command with no answer fails after `timeoutMs`. A game that leaves fails every pending command with "Minecraft disconnected."
+- A command with no answer fails after `timeoutMs`. A game that leaves or is replaced fails every pending command with `main.minecraft.disconnected` ("Minecraft disconnected.", in the app's language) and `dropped: true` on its `CommandResult`.
+- `settled()` waits while a game is still in Bedrock's handshake, until it's ready or gone (`handshakeMs` or the socket's close end it). `send()` waits on it when a game is there but not ready, so the commands after a launch's `{ wait }` reach a game that took over. With no game it fails at once.
 
 ## Statuses
 
@@ -88,7 +89,8 @@ The rest is Bedrock's.
 - Each action has a FIFO backlog (`_backlogs`) of batches (one run's filled commands, `times` left) that `_pump` serves: one run's commands at once, then `RUN_GAP_MS` after their answers before the next run. A lone run goes out at once, and actions pump side by side.
 - An action on any other trigger takes no new runs while its backlog holds `MAX_BACKLOG` (the `times` left of every batch, the one being sent included): `_queue` reports `full` and resolves the skipped batch at once.
 - Before each run, `_pump` checks the latest `games` (given to `handle`, and to `setGames`, which `UPDATE_GAMES_SETTINGS` calls after a save and `SET_PROFILE` after a switch) and the game; its comments say when the rest drop. Filled commands stay as they were accepted.
-- A game replaced midway by another of its edition fails only the commands it hadn't answered (`DISCONNECTED`), with no notice: the run counts as done and the backlog goes on in the new game.
+- A game replaced midway by another of its edition fails only the commands it hadn't answered (`dropped`), with no notice: the run counts as done and the backlog goes on in the new game.
+- `_pump` awaits `settled()` after a dropped run and before each run. So a Bedrock game still in its handshake, or one that took over between runs, gets the backlog once it's ready. A run that comes during a first connect's handshake waits for it too.
 - `handle` resolves once its own batches are served or dropped. `dispatchGames` isn't awaited, so a backlog never holds up other events.
 - The connector's `DISCONNECTED` calls `clear` (`registerGames`), which forgets the streaks and the likes counted, not the backlogs.
 - An action runs only while a game of its edition is connected (`GamesService._unreachable`): `handle` and `test` use the action's `edition`, and a game of the other edition counts as not connected.
@@ -96,16 +98,16 @@ The rest is Bedrock's.
 
 ## Notices and logs
 
-- Logs go to `games.log` (`Files.logs.games`); the feedback source is `games`. A status change is logged once, never per command.
+- Logs go to `games.log` (`Files.logs.games`); the feedback source is `games`. A status change is logged once, never per command. `MinecraftConnection.onStatus` passes an English `cause` with an error status (the listen error's `formatError`), and `GamesService` logs it, never the translated `status.error`.
 - `registerGames` (`src/main/events/init.ts`) turns `GamesService.onError` into notices, and logs only when the notice goes out:
-  - `GAME_NOT_CONNECTED`, key `game:minecraft:offline`, 60 s: an action ran while the toggle is on and no game of its edition is connected. It names the edition and its connect command;
+  - `GAME_NOT_CONNECTED`, key `game:minecraft:offline`, 60 s: an action ran while the toggle is on and no game of its edition is connected. It names the edition and its connect command (`MINECRAFT_CONNECT_COMMANDS`, `src/common/types/games.ts`);
   - `GAME_COMMAND_FAILED`, key `game:<action id>`, `REPEAT_NOTICE_MS`: the game refused a command, with its reply;
   - `GAME_BACKLOG_FULL`, key `game:<action id>:full`, `REPEAT_NOTICE_MS`: an action had `MAX_BACKLOG` runs waiting, so an event's were skipped.
 - `GAME_ACTION_FAILED` reports an unexpected throw from `dispatchGames`. The toggle, the actions' autosave and Test send no success notices.
 
 ## Renderer
 
-- `MinecraftSection` shows, until a game connects, both editions' setup side by side, with a command per address of this PC (`connectCommand(host, edition)`). The Java steps link to `MINECRAFT_MOD_DOCS_URL`, the website's `#java-edition` anchor: keep that heading there.
+- `MinecraftSection` shows, until a game connects, both editions' setup side by side, with a command per address of this PC (`connectCommand(host, edition)`, from `MINECRAFT_CONNECT_COMMANDS` like the notice's). The Java steps link to `MINECRAFT_MOD_DOCS_URL`, the website's `#java-edition` anchor: keep that heading there.
 - Actions save through `useEditableSettings("games")`; the toggle emits `SET_GAMES_SETTINGS` at once.
 - The trigger picker offers `GAME_TRIGGERS` (`helper.ts`): `TRIGGER_OPTIONS` without Super Fan join, Member join, Envelope, Super Fan Box and Music change (the user's call). The schema still takes them, so an action saved with one keeps running, its picker empty until another is picked.
 - `TriggerFilter` comes from `components/AlertItem`; gifts and emotes load as on Alerts, through `useTriggerChoices`. Like shows its own `likes_every` field in the filter's place.

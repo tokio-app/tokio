@@ -21,6 +21,9 @@ paths:
 - `CONNECTED` comes only for a connect that worked. The `CONNECTED` reply's `success` is that profile lock; its `live` is true once the LIVE session has started (see `.claude/rules/live-session.md`).
 - It reconnects on its own: a drop it recovers from calls `onReconnect` and keeps the LIVE session.
 - `DISCONNECTED` only comes once the connection stops: `reason: "ended"`, `"lost"`, or none when the user disconnected.
+  - It's emitted on `setImmediate`. The library emits the stream's end right after the events of its last batch, whose handlers first await the profile, so the end's cleanup comes after them.
+  - The listeners are removed and `_connection` cleared at once.
+- A comment made only of emotes is its own TikTok message (`emote`, never also a `chat`). `_listen` maps it to `CHAT` with an empty `content` and `lang`, each emote at `index` 0, so Emote alerts and game actions fire and its emotes are saved.
 - A failed connect's `error.kind` (`ConnectErrorKind`, `services/connector/common`) picks the message `home.ts` shows.
 - The library's warnings and errors go to `connector.log` through its `logger` option, with the error they carry; its info and debug lines are dropped. An error with the same code is logged once per `LOG_REPEAT_MS`.
 - A new live event is mapped in `_listen`: see the `live-event` skill.

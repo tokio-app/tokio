@@ -53,7 +53,7 @@ The **Overlay** section on the Games page builds the games overlay: each shown a
 In `src/main/helper/games.ts`:
 
 - `sendGamesOverlay(services)` sends `tokio:games` `{ look, rows }` to `GAMES_PATH` clients, from the active profile, `overlayService.getGifts()` and `getCustomGifts()`. It logs a failure and never throws, so it can't fail the change that called it.
-- It runs when a games page connects (`serverService.onConnect` in `registerGames`), after `refreshGifts` at startup, after `recordGift` saved a custom gift, after `UPDATE_GAMES_SETTINGS` saved (none after a failed save), after `SET_PROFILE` and after `REMOVE_MINECRAFT_PICTURE`.
+- It runs when a games page connects (`serverService.onConnect` in `registerGames`), after `refreshGifts` at startup, after `recordGift` saved a custom gift, after `recordEmotes` saved an emote, after `UPDATE_GAMES_SETTINGS` saved (none after a failed save), after `SET_PROFILE` and after `REMOVE_MINECRAFT_PICTURE`.
 - `sendGamesRun(services, id)` sends `tokio:games:run` `{ id }`, which lights the row for `LIT_MS` after its last run, so a burst glows steadily.
 - One at a time jumps to the lit row and holds it, unless the row it shows is still lit: otherwise two actions on one gift would flip between their rows every run. The preview does the same, and keeps the row it shows by id (`shownId`), so it stays on it when the rows change, the first when it's gone.
 - `GamesService.onRun(listener)` (one listener, set in `registerGames`) is called in `_pump` right before each run's `_send`: once per run, never for an action's **Test** or an offline drop.
@@ -120,7 +120,10 @@ In `src/main/events/pages/games.ts`:
 
 ### Picker
 
-- `PicturePicker` imports the media picker's CSS; its Delete is `DeletePictureModal` (`components/DeleteModals`).
-- The page numbers each browse (`onRequest` returns it). It applies a `SET_MINECRAFT_PICTURE` reply only to the action that asked (`asked`), and only if it's newer than the last applied for it (`applied`). The picker shows only the newest request's failure.
+- `PicturePicker` is the shared `LibraryPicker` (`components/MediaPicker/LibraryPicker.tsx`, see the media picker in `.claude/rules/alerts.md`), with:
+  - `stays`: Clear · Browse · Done, and it stays open after a pick;
+  - `DeletePictureModal` (`components/DeleteModals`) for Delete;
+  - a tile of the picture and its name, styled by the media picker's CSS.
+- The page numbers each browse (`onRequest` returns it), from a module-level counter (`requests`), so the numbers keep growing when the page opens again. It applies a `SET_MINECRAFT_PICTURE` reply only to the action that asked (`asked`), and only if it's newer than the last applied for it (`applied`). The picker shows only the newest request's failure.
 - `asked` is cleared when another profile loads (`useEditableSettings`'s `switched`), since a clone has the same action ids.
 - `MINECRAFT_PICTURE_REMOVED` clears the picture from the actions the page shows, so the next save doesn't bring it back.

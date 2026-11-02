@@ -32,7 +32,11 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 
 ## Files
 
-- An import copies the folder a picked link points to (`realpath`), leaving out every link inside, then checks the copy (`processOverlay` and the setup block) and removes it if that fails.
+- An import copies the folder a picked link points to (`realpath`), leaving out every link inside, into `.install-<uuid>` inside the overlays folder.
+  - It checks the copy there (`processOverlay`, the setup block, then `processHTML`, which writes no folder path), then renames it into its UUID folder (`renameWithRetry`).
+  - A failure deletes the staging folder. One a quit leaves behind, `load` deletes.
+- A remove first renames the overlay's folder to `.old-<uuid>` (`renameWithRetry`; a missing folder counts as gone), so a folder another program holds stays whole and stored. Only then does it stop serving it, forget it and delete `.old-*`, which `load` deletes if that fails.
+- `YAMLManagerService` logs to `overlays.log`, so a refused `info.yaml` or `config.yaml` says why there.
 - Imports, saves, updates and every start write the settings `config.yaml` holds into the HTML (`processHTML`). It writes only an HTML that changed, through `writeFileAtomic` (`src/main/helper/fs.ts`).
 - At each start `load` checks every stored overlay. One that fails isn't served but stays stored, so fixing it keeps its id and OBS link; only an overlay whose folder is gone is forgotten.
 - Saving settings writes `config.yaml` first, so settings the schema refuses change nothing, then the HTML with the gifts main keeps; the renderer doesn't send gifts.
@@ -56,6 +60,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 ## Another computer
 
 - The server listens on every interface on purpose (see Conventions in `AGENTS.md`). A streaming app on another computer opens overlays through `tokio-app.local` pointed at this PC's address in that computer's hosts file or a DNS entry (as the website's docs describe), or at the address itself. Tokio's own hosts-file entry (`services/url`) is only for this PC.
+- `ServerService` sets Express's `env` to `production` (`NODE_ENV` isn't set), so an error page for a bad URL shows no stack, and no paths with the account's name.
 - `processHTML` appends `REMOTE_SOCKET` (`services/overlay/common`) to every setup block. On a page opened on port 37891 from a host other than `localhost`, `127.0.0.1` or `[::1]`, it wraps `WebSocket` so sockets to a loopback host on that port go to `location.host`.
 - Previews (`local-resource:`) and pages opened at `localhost` are left alone. A page Tokio doesn't serve gets no setup block, so it must connect to the Tokio PC's address itself.
 - **Settings → Overlay server** lists `ServerService.networkAddresses()` (`GET_NETWORK_ADDRESSES`, `notify: false`, `[]` on failure), each a `CopyField` of the IP alone, what a hosts file or a DNS entry needs.
@@ -70,6 +75,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 - `installFromCatalog` downloads the zip, checks its size and SHA-256 against the catalog, and extracts it (`extractZip`, refusing paths outside the folder) into `.install-<uuid>` inside the overlays folder. It's then checked like an import.
 - Renaming it into place (`renameWithRetry`, which retries for about a second while Windows antivirus or indexers hold the folder) keeps it on the same drive and the old version whole until the new one is in. `load` deletes `.install-*` and `.old-*` leftovers, so a rollback that fails is logged with the `.old-*` folder holding the old version.
 - An official overlay's folder, id and URL path are its catalog id (`http://tokio-app.local:37891/gift-jar/`), and it's stored with `external: false`. Imported overlays get a random UUID, which is how `findOverlays` tells them apart when the store is rebuilt.
+- A rebuilt store takes back only folders named the way Tokio names them: a UUID, or an id `CatalogOverlaySchema` accepts. Express 5 can't mount a copy like `gift-jar - Copy (2)`, which stopped the server's start, and `alerts`, `timer` and `games` are Tokio's own paths.
 - Keeping the catalog id over generated ids is the user's call: readable URLs survive removing and reinstalling, so OBS links keep working. A random id adds no security, since the socket accepts any id and every client gets the LIVE events. Don't propose switching.
 - `CatalogOverlaySchema` refuses the ids `alerts`, `timer` and `games`: `/alerts/` serves each alert's own overlay, `/timer/` the countdown timer's and `/games/` the games' overlays. None is stored or in the gallery (see `.claude/rules/alerts.md`, `.claude/rules/timer.md` and `.claude/rules/games-overlay.md`).
 - An update keeps the saved settings that still fit the new `config.yaml` (`mergeOverlayConfig`, `src/common/schemas/overlay.ts`) and replaces the store entry in place. Streaming apps keep the old page until refreshed, as the success notice says. The gallery keys cards by id and version, so previews reload.
