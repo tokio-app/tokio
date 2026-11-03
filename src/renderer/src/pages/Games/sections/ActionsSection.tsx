@@ -12,7 +12,7 @@ import {
   CustomGift,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { ALERT_MESSAGE_VARIABLES, REPEATED_HAZARDS } from "@/common/util";
+import { ALERT_MESSAGE_VARIABLES, COUNTED_HAZARDS } from "@/common/util";
 import {
   Btn,
   EmoteOption,
@@ -49,6 +49,8 @@ import {
   HELPS,
   ITEMS,
   MOBS,
+  MORPH_LENGTHS,
+  MORPH_MOBS,
   STEP_KINDS,
   stepText,
   testSummary,
@@ -207,7 +209,7 @@ function ActionItem({
   const t = useT();
   const language = useLanguage();
   const triggers = useOptions(GAME_TRIGGERS);
-  const kinds = useOptions(STEP_KINDS);
+  const kinds = useOptions(STEP_KINDS[action.edition]);
   const { trigger, steps } = action;
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
@@ -451,8 +453,9 @@ function StepFields({
   const t = useT();
   const weathers = useOptions(WEATHERS);
   const times = useOptions(TIMES);
-  const hazards = useOptions(HAZARDS);
+  const hazards = useOptions(HAZARDS[edition]);
   const helps = useOptions(HELPS);
+  const lengths = useOptions(MORPH_LENGTHS);
   switch (step.type) {
     case "spawn":
       return (
@@ -481,6 +484,47 @@ function StepFields({
           />
         </>
       );
+    case "morph":
+      return (
+        <>
+          <Select
+            searchable
+            className={styles.thing}
+            aria-label={t("games.step.mob")}
+            options={MORPH_MOBS}
+            value={step.mob}
+            onChange={(mob) => onChange({ ...step, mob })}
+          />
+          <Select
+            className={styles.thing}
+            aria-label={t("games.step.morphLength")}
+            options={lengths}
+            value={step.seconds === null ? "until" : "for"}
+            onChange={(length) =>
+              onChange({
+                ...step,
+                seconds: length === "for" ? (step.seconds ?? 30) : null,
+              })
+            }
+          />
+          {step.seconds !== null &&
+            sentence(t("games.step.seconds"), {
+              seconds: (
+                <NumberInput
+                  className={styles.amount}
+                  aria-label={t("common.durationSeconds")}
+                  integer
+                  min={1}
+                  max={600}
+                  value={step.seconds}
+                  onChange={(seconds) => onChange({ ...step, seconds })}
+                />
+              ),
+            })}
+        </>
+      );
+    case "unmorph":
+      return null;
     case "give":
       return (
         <>
@@ -528,7 +572,7 @@ function StepFields({
             value={step.hazard}
             onChange={(hazard) => onChange({ ...step, hazard })}
           />
-          {REPEATED_HAZARDS.includes(step.hazard) && (
+          {COUNTED_HAZARDS.includes(step.hazard) && (
             <Amount
               value={step.amount}
               onChange={(amount) => onChange({ ...step, amount })}
@@ -598,6 +642,20 @@ function StepFields({
                   max={10_000}
                   value={step.distance}
                   onChange={(distance) => onChange({ ...step, distance })}
+                />
+              ),
+            })}
+          {step.hazard === "hole" &&
+            sentence(t("games.step.hole"), {
+              depth: (
+                <NumberInput
+                  className={styles.amount}
+                  aria-label={t("games.step.depthLabel")}
+                  integer
+                  min={1}
+                  max={64}
+                  value={step.depth}
+                  onChange={(depth) => onChange({ ...step, depth })}
                 />
               ),
             })}

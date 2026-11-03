@@ -76,6 +76,52 @@ const effect = (java: boolean, id: string, seconds: number, amplifier = 0) =>
     ? `effect give @s minecraft:${id} ${seconds} ${amplifier}`
     : `effect @p ${id} ${seconds} ${amplifier}`;
 
+// A block id in the edition's syntax: Java's take a "minecraft:" in front
+const block = (java: boolean, id: string) => (java ? `minecraft:${id}` : id);
+
+// Both editions refuse a fill that changes nothing, as over a clear sky or
+// around a trap already there. A structure void set first at `at`, a cell the
+// fill writes, gives it a change; before a keep fill, which writes only air,
+// it's made air again. The marker sits on the fill's farthest row, so it fails
+// with a fill that reaches out of the world and is never left behind.
+function sureFill(
+  java: boolean,
+  [from, to]: [string, string],
+  id: string,
+  at: string,
+  mode?: "keep" | "outline",
+) {
+  const set = (marker: string) => `setblock ${at} ${block(java, marker)}`;
+  const fill = `fill ${from} ${to} ${block(java, id)}${mode ? ` ${mode}` : ""}`;
+  return mode === "keep"
+    ? [set("structure_void"), set("air"), fill]
+    : [set("structure_void"), fill];
+}
+
+// The rows of the column a launch clears in one fill. A fill past the world's
+// top fails whole, so the clearing goes in pieces and only those up there fail.
+const SHAFT_ROWS = 32;
+
+// Empties the 3×3 column over the player's head, any 0.6-wide player's,
+// up to where it is at the top of a climb of `height` blocks. A fill drops
+// nothing (replace), and takes bedrock too, so from under the Nether's roof
+// the player goes through it.
+function clearUp(java: boolean, height: number) {
+  const commands: string[] = [];
+  for (let bottom = 2; bottom <= height + 2; bottom += SHAFT_ROWS) {
+    const top = Math.min(bottom + SHAFT_ROWS - 1, height + 2);
+    commands.push(
+      ...sureFill(
+        java,
+        [`~-1 ~${bottom} ~-1`, `~1 ~${top} ~1`],
+        "air",
+        `~ ~${top} ~`,
+      ),
+    );
+  }
+  return commands;
+}
+
 // What a hazard runs where the player stands. No NBT but the creeper's and
 // the fuse, so they hold across game versions.
 function hazardCommands(
@@ -93,6 +139,7 @@ function hazardCommands(
   const launch = () => {
     const { level, stopMs } = launchPlan(step.height, step.seconds);
     return [
+      ...clearUp(java, step.height),
       effect(java, "levitation", step.seconds, level - 1),
       { wait: stopMs },
       `teleport ${java ? "@s" : "@p"} ~ ~ ~`,
@@ -124,7 +171,7 @@ function hazardCommands(
     case "anvil":
       // Bedrock can't summon a falling block, so the anvil is set in the air,
       // only where there's room (keep), and falls
-      return [`setblock ~ ~20 ~ ${java ? "minecraft:" : ""}anvil keep`];
+      return [`setblock ~ ~20 ~ ${block(java, "anvil")} keep`];
     case "harming":
       return [effect(java, "instant_damage", 1, 1)];
     case "launch":
@@ -140,6 +187,69 @@ function hazardCommands(
       return [effect(java, "nausea", step.duration)];
     case "turn_around":
       return [`teleport ${java ? "@s" : "@p"} ~ ~ ~ ~180 ~`];
+    // Only into air, so nothing breaks: around the player, in their own
+    // cells and over them
+    case "cobweb_trap":
+      return sureFill(
+        java,
+        ["~-1 ~ ~-1", "~1 ~2 ~1"],
+        java ? "cobweb" : "web",
+        "~ ~1 ~",
+        "keep",
+      );
+    // A 5×5×5 shell around the 3×3 space the player stands in, under them too;
+    // what's inside stays. Honey can't be in the player's cells as webs are
+    // (they'd choke), so its floor slows them and stops their jumps.
+    case "honey_trap":
+    case "obsidian_prison":
+      return sureFill(
+        java,
+        ["~-2 ~-1 ~-2", "~2 ~3 ~2"],
+        step.hazard === "honey_trap" ? "honey_block" : "obsidian",
+        "~ ~3 ~",
+        "outline",
+      );
+    case "lava_lake":
+      // The ground around the player turns to lava, a ring two blocks wide,
+      // and the block they stand on to obsidian, an island to jump or build
+      // off. The fill takes the island too, so a lake already there changes.
+      return [
+        `fill ~-2 ~-1 ~-2 ~2 ~-1 ~2 ${block(java, "lava")}`,
+        `setblock ~ ~-1 ~ ${block(java, "obsidian")}`,
+      ];
+    case "hole": {
+      // From the feet's own row (a slab, a carpet) down. One whose bottom is
+      // bedrock, the world's floor, digs nothing, so it never opens the void.
+      const bottom = `~ ~-${step.depth} ~`;
+      const guard = `execute unless block ${bottom} ${block(java, "bedrock")} run`;
+      return sureFill(
+        java,
+        ["~-1 ~ ~-1", `~1 ~-${step.depth} ~1`],
+        "air",
+        bottom,
+      ).map((command) => `${guard} ${command}`);
+    }
+    case "clear_inventory": {
+      // Both editions refuse to clear an empty inventory, so a stick goes in
+      // first, over whatever the first hotbar slot holds
+      const target = java ? "@s" : "@p";
+      return [
+        java
+          ? "item replace entity @s hotbar.0 with minecraft:stick"
+          : "replaceitem entity @p slot.hotbar 0 stick",
+        `clear ${target}`,
+      ];
+    }
+    // The Tokio mod's own commands, which Bedrock has nothing like. The mod
+    // drops every meteor around the player itself.
+    case "meteor":
+      return java ? [`tokio meteor ${step.amount}`] : [];
+    case "laser":
+      return java ? ["tokio laser"] : [];
+    case "super_laser":
+      return java ? ["tokio laser super"] : [];
+    case "super_duper_laser":
+      return java ? ["tokio laser super duper"] : [];
     default:
       // A random teleport, anywhere within the distance
       return [
@@ -148,6 +258,56 @@ function hazardCommands(
           : `spreadplayers ~ ~ 0 ${step.distance} @p`,
       ];
   }
+}
+
+// Bedrock's mobs with minecraft:burns_in_daylight (bedrock-samples'
+// behavior_pack/entities), but the fire-immune magma cube: spawned in the
+// day, the sun would kill them before they did anything. The Tokio mod keeps
+// Java's out of the sun itself.
+const DAYLIGHT_BURNERS = [
+  "bogged",
+  "drowned",
+  "phantom",
+  "skeleton",
+  "stray",
+  "zombie",
+  "zombie_horse",
+  "zombie_nautilus",
+  "zombie_villager",
+];
+
+// Bedrock's spawn events that set a mob neutral until provoked on the player
+// at once (bedrock-samples' entities). Only the cave spider's anger brings a
+// player target: the zombie pigman's and enderman's has none until hit, the
+// spider's hostility ends in daylight, and piglins already attack. The Tokio
+// mod sets Java's hostiles on the player itself.
+const ANGER_EVENTS = new Map([["cave_spider", "minecraft:become_angry"]]);
+
+// Bedrock's spawn of `amount` mobs, `name` the quoted name or "". Its summon
+// takes no NBT, so a chicken jockey is baby zombies that each get a new adult
+// chicken under them (a chicken can be a baby, which has no seat). Summoning
+// the riders, not the chickens, keeps chickens already nearby out of it, and
+// c= picks the ones just spawned, nearest the player.
+function bedrockSpawn(mob: string, name: string, amount: number) {
+  const jockey = mob === "chicken_jockey";
+  const summoned = jockey ? "zombie" : mob;
+  const event = jockey ? "minecraft:as_baby" : ANGER_EVENTS.get(mob);
+  const spawned = `@e[type=${summoned},r=2,c=${amount}]`;
+  const commands = Array.from({ length: amount }, () =>
+    event
+      ? `summon ${summoned} ~ ~ ~ 0 0 ${event}${name}`
+      : `summon ${summoned}${name} ~ ~ ~`,
+  );
+  if (jockey) {
+    commands.push(
+      `ride ${spawned} summon_ride chicken no_ride_change minecraft:spawn_adult`,
+    );
+  }
+  if (DAYLIGHT_BURNERS.includes(summoned)) {
+    // For good, without the particles
+    commands.push(`effect ${spawned} fire_resistance infinite 0 true`);
+  }
+  return commands;
 }
 
 type Help = Extract<GameStep, { type: "help" }>["help"];
@@ -240,13 +400,25 @@ export function gameCommands(
       if (!ID.test(step.mob)) return [];
       const name = commandValue(fill(step.name));
       const quoted = JSON.stringify(name);
+      if (!java) {
+        return bedrockSpawn(step.mob, name ? ` ${quoted}` : "", step.amount);
+      }
       // ~ is where the player stands. Java's SNBT reads a plain string as a
-      // text component.
-      const command = java
-        ? `summon minecraft:${step.mob} ~ ~ ~${name ? ` {CustomName:${quoted}}` : ""}`
-        : `summon ${step.mob}${name ? ` ${quoted}` : ""} ~ ~ ~`;
+      // text component. A jockey's name goes on its baby zombie.
+      const command =
+        step.mob === "chicken_jockey"
+          ? `summon minecraft:chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b${name ? `,CustomName:${quoted}` : ""}}]}`
+          : `summon minecraft:${step.mob} ~ ~ ~${name ? ` {CustomName:${quoted}}` : ""}`;
       return Array.from({ length: step.amount }, () => command);
     }
+    // The Tokio mod's: for seconds, or until an unmorph
+    case "morph": {
+      if (!java || !ID.test(step.mob)) return [];
+      const seconds = step.seconds === null ? "" : ` ${step.seconds}`;
+      return [`tokio morph minecraft:${step.mob}${seconds}`];
+    }
+    case "unmorph":
+      return java ? ["tokio unmorph"] : [];
     case "give": {
       if (!ID.test(step.item)) return [];
       return [give(java, step.item, step.amount)];

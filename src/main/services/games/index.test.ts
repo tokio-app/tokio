@@ -856,13 +856,13 @@ describe("GamesService", () => {
         steps: [GameStepSchema.parse({ type: "hazard", hazard: "launch" })],
       });
       await vi.advanceTimersByTimeAsync(999);
-      expect(minecraft.sent).toEqual([
-        expect.stringMatching(/^effect @p levitation 1 \d+$/),
-      ]);
+      // The way up cleared first, in two fills, each after its marker
+      expect(minecraft.sent).toHaveLength(5);
+      expect(minecraft.sent.at(-1)).toMatch(/^effect @p levitation 1 \d+$/);
       await vi.advanceTimersByTimeAsync(1);
       expect(minecraft.sent.at(-1)).toBe("teleport @p ~ ~ ~");
       // The wait isn't a command, so it has no result
-      expect((await done).data).toHaveLength(2);
+      expect((await done).data).toHaveLength(6);
       vi.useRealTimers();
     });
 

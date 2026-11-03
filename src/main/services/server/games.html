@@ -277,6 +277,14 @@
           "games-event-large",
           look.event_size === "large",
         );
+        games.classList.toggle(
+          "games-count-medium",
+          look.count_size === "medium",
+        );
+        games.classList.toggle(
+          "games-count-large",
+          look.count_size === "large",
+        );
         // Only when they changed, so a lit row keeps its flash going
         if (JSON.stringify(changed) !== JSON.stringify(rows)) {
           // One at a time stays on the row it shows, if it's still there

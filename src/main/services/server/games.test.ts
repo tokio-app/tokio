@@ -305,6 +305,27 @@ describe("games overlay", () => {
       );
     });
 
+    it("sizes the counts", async () => {
+      send([row("a")], { count_size: "large" });
+      const games = document().getElementById("games")!;
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-count-large")).toBe(true),
+      );
+      // The event's pictures keep their own size
+      expect(games.classList.contains("games-event-large")).toBe(false);
+
+      send([row("a")], { count_size: "medium" });
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-count-medium")).toBe(true),
+      );
+      expect(games.classList.contains("games-count-large")).toBe(false);
+
+      send([row("a")], { count_size: "small" });
+      await vi.waitFor(() =>
+        expect(games.classList.contains("games-count-medium")).toBe(false),
+      );
+    });
+
     it("hides a picture that doesn't load, and shows its side's text", async () => {
       send([row("a", { pictures: ["https://cdn/rose.png"] })]);
       await vi.waitFor(() => expect(rowElements()).toHaveLength(1));

@@ -23,12 +23,25 @@ type Time = Extract<GameStep, { type: "time" }>["time"];
 type Hazard = Extract<GameStep, { type: "hazard" }>["hazard"];
 type Help = Extract<GameStep, { type: "help" }>["help"];
 
+// Tokio's own mob in both editions, a baby zombie riding a chicken (see
+// gameCommands), listed after the chicken
+const withJockey = ({ mobs, items }: { mobs: Names; items: Names }) => ({
+  mobs: Object.fromEntries(
+    Object.entries(mobs).flatMap((entry) =>
+      entry[0] === "chicken"
+        ? [entry, ["chicken_jockey", "Chicken Jockey"]]
+        : [entry],
+    ),
+  ),
+  items,
+});
+
 // Every mob and item each edition's summon and give take, id → the name the
 // game gives it in English (see .claude/skills/minecraft-lists/SKILL.md)
 export const MINECRAFT_NAMES: Record<
   MinecraftEdition,
   { mobs: Names; items: Names }
-> = { bedrock, java };
+> = { bedrock: withJockey(bedrock), java: withJockey(java) };
 
 // Keys of the names Tokio gives its own steps, translated where they show
 export const WEATHER_NAMES: Record<Weather, MessageKey> = {
@@ -59,6 +72,16 @@ export const HAZARD_NAMES: Record<Hazard, MessageKey> = {
   dizzy: "minecraft.hazard.dizzy",
   turn_around: "minecraft.hazard.turn_around",
   random_teleport: "minecraft.hazard.random_teleport",
+  cobweb_trap: "minecraft.hazard.cobweb_trap",
+  honey_trap: "minecraft.hazard.honey_trap",
+  obsidian_prison: "minecraft.hazard.obsidian_prison",
+  lava_lake: "minecraft.hazard.lava_lake",
+  hole: "minecraft.hazard.hole",
+  clear_inventory: "minecraft.hazard.clear_inventory",
+  meteor: "minecraft.hazard.meteor",
+  laser: "minecraft.hazard.laser",
+  super_laser: "minecraft.hazard.super_laser",
+  super_duper_laser: "minecraft.hazard.super_duper_laser",
 };
 
 export const HELP_NAMES: Record<Help, MessageKey> = {
@@ -84,6 +107,28 @@ export const REPEATED_HAZARDS: readonly Hazard[] = [
   "charged_creeper",
   "evoker_fangs",
 ];
+
+// The hazards whose amount shows: the repeated ones, and the meteor, whose
+// mod drops that many in one command
+export const COUNTED_HAZARDS: readonly Hazard[] = [
+  ...REPEATED_HAZARDS,
+  "meteor",
+];
+
+// The Tokio mod's own steps, which Bedrock has nothing like
+export const JAVA_ONLY_STEPS: readonly GameStep["type"][] = [
+  "morph",
+  "unmorph",
+];
+
+// The Tokio mod's own hazards, each with the Bedrock one closest to it, which
+// an action switched to Bedrock takes
+export const JAVA_ONLY_HAZARDS: Partial<Record<Hazard, Hazard>> = {
+  meteor: "tnt",
+  laser: "lightning",
+  super_laser: "lightning",
+  super_duper_laser: "lightning",
+};
 
 /**
  * The gifts' names as the language lists them with "or", at most `max` of
@@ -186,14 +231,21 @@ export function gameStepsText(
       if (step.type === "give") {
         return named(step, listed(items, step.item), step.amount);
       }
+      if (step.type === "morph") {
+        const mob = listed(mobs, step.mob);
+        return mob === undefined
+          ? []
+          : translate(language, "minecraft.morph", { mob });
+      }
+      if (step.type === "unmorph") return t("minecraft.unmorph");
       if (step.type === "weather") return t(WEATHER_NAMES[step.weather]);
       if (step.type === "time") return t(TIME_NAMES[step.time]);
       if (step.type === "hazard") {
-        const repeated = REPEATED_HAZARDS.includes(step.hazard);
+        const counted = COUNTED_HAZARDS.includes(step.hazard);
         return named(
           step,
           t(HAZARD_NAMES[step.hazard]),
-          repeated ? step.amount : 1,
+          counted ? step.amount : 1,
         );
       }
       if (step.type === "help") return t(HELP_NAMES[step.help]);

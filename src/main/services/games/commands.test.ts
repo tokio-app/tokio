@@ -36,15 +36,44 @@ describe("gameCommands in Bedrock", () => {
     gameCommands(step(input), fill, "bedrock");
 
   it("spawns where the player stands, named and repeated", () => {
-    expect(run({ type: "spawn", mob: "zombie" })).toEqual([
-      "summon zombie ~ ~ ~",
-    ]);
+    expect(run({ type: "spawn", mob: "cow" })).toEqual(["summon cow ~ ~ ~"]);
     expect(
       run(
         { type: "spawn", mob: "chicken", amount: 2, name: "{username}" },
         () => 'Aku"} @e',
       ),
     ).toEqual(['summon chicken "Aku e" ~ ~ ~', 'summon chicken "Aku e" ~ ~ ~']);
+  });
+
+  it("keeps mobs that burn in daylight out of the sun's fire", () => {
+    expect(run({ type: "spawn", mob: "zombie", amount: 2 })).toEqual([
+      "summon zombie ~ ~ ~",
+      "summon zombie ~ ~ ~",
+      "effect @e[type=zombie,r=2,c=2] fire_resistance infinite 0 true",
+    ]);
+  });
+
+  it("spawns neutral hostiles angry", () => {
+    expect(run({ type: "spawn", mob: "cave_spider", name: "Lucia" })).toEqual([
+      'summon cave_spider ~ ~ ~ 0 0 minecraft:become_angry "Lucia"',
+    ]);
+    expect(run({ type: "spawn", mob: "zombie_pigman" })).toEqual([
+      "summon zombie_pigman ~ ~ ~",
+    ]);
+  });
+
+  it("spawns chicken jockeys as baby zombies given chickens", () => {
+    expect(
+      run({ type: "spawn", mob: "chicken_jockey", amount: 2, name: "Lucia" }),
+    ).toEqual([
+      'summon zombie ~ ~ ~ 0 0 minecraft:as_baby "Lucia"',
+      'summon zombie ~ ~ ~ 0 0 minecraft:as_baby "Lucia"',
+      "ride @e[type=zombie,r=2,c=2] summon_ride chicken no_ride_change minecraft:spawn_adult",
+      "effect @e[type=zombie,r=2,c=2] fire_resistance infinite 0 true",
+    ]);
+    expect(run({ type: "spawn", mob: "chicken_jockey" })[0]).toBe(
+      "summon zombie ~ ~ ~ 0 0 minecraft:as_baby",
+    );
   });
 
   it("escapes the whole name, not only its variables", () => {
@@ -96,6 +125,31 @@ describe("gameCommands in Java Edition", () => {
       'summon minecraft:chicken ~ ~ ~ {CustomName:"Aku"}',
       'summon minecraft:chicken ~ ~ ~ {CustomName:"Aku"}',
     ]);
+  });
+
+  it("leaves the sun and the anger to the Tokio mod", () => {
+    expect(run({ type: "spawn", mob: "zombie" })).toEqual([
+      "summon minecraft:zombie ~ ~ ~",
+    ]);
+    expect(run({ type: "spawn", mob: "cave_spider" })).toEqual([
+      "summon minecraft:cave_spider ~ ~ ~",
+    ]);
+  });
+
+  it("spawns chicken jockeys, the name on the baby zombie", () => {
+    expect(run({ type: "spawn", mob: "chicken_jockey" })).toEqual([
+      'summon minecraft:chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b}]}',
+    ]);
+    expect(
+      run(
+        { type: "spawn", mob: "chicken_jockey", amount: 3, name: "{username}" },
+        () => 'Lu"cia}',
+      ),
+    ).toEqual(
+      Array(3).fill(
+        'summon minecraft:chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b,CustomName:"Lucia"}]}',
+      ),
+    );
   });
 
   it("keeps a nickname inside the name's string", () => {
@@ -215,7 +269,7 @@ describe("gameCommands for hazards", () => {
 
   it("launches as high and as fast as asked, then stops at the top", () => {
     const { level, stopMs } = launchPlan(50, 1);
-    expect(run("launch", "java")).toEqual([
+    expect(run("launch", "java").slice(4)).toEqual([
       `effect give @s minecraft:levitation 1 ${level - 1}`,
       { wait: stopMs },
       "teleport @s ~ ~ ~",
@@ -223,7 +277,9 @@ describe("gameCommands for hazards", () => {
     // Stopped as the push ends
     expect(stopMs).toBe(1000);
     const slow = launchPlan(100, 3);
-    expect(run("launch", "bedrock", { height: 100, seconds: 3 })).toEqual([
+    expect(
+      run("launch", "bedrock", { height: 100, seconds: 3 }).slice(8),
+    ).toEqual([
       `effect @p levitation 3 ${slow.level - 1}`,
       { wait: 3000 },
       "teleport @p ~ ~ ~",
@@ -242,15 +298,37 @@ describe("gameCommands for hazards", () => {
     expect(launchPlan(300, 2)).toMatchObject({ stopMs: 2000 });
   });
 
+  it("clears the way up first, in 32-block fills that change something", () => {
+    expect(run("launch", "java").slice(0, 4)).toEqual([
+      "setblock ~ ~33 ~ minecraft:structure_void",
+      "fill ~-1 ~2 ~-1 ~1 ~33 ~1 minecraft:air",
+      "setblock ~ ~52 ~ minecraft:structure_void",
+      "fill ~-1 ~34 ~-1 ~1 ~52 ~1 minecraft:air",
+    ]);
+    expect(run("launch", "bedrock", { height: 5 }).slice(0, 2)).toEqual([
+      "setblock ~ ~7 ~ structure_void",
+      "fill ~-1 ~2 ~-1 ~1 ~7 ~1 air",
+    ]);
+    // Up to where the head is at the top: 302 blocks in 10 fills
+    const high = run("launch", "bedrock", { height: 300 });
+    expect(
+      high.filter((c) => typeof c === "string" && c.startsWith("fill")),
+    ).toHaveLength(10);
+    expect(high[19]).toBe("fill ~-1 ~290 ~-1 ~1 ~302 ~1 air");
+  });
+
   it("gives the water bucket before the launch", () => {
-    expect(run("launch_water", "bedrock")).toEqual([
-      "give @p water_bucket 1",
+    expect(run("launch_water", "bedrock").slice(5)).toEqual([
       `effect @p levitation 1 ${launchPlan(50, 1).level - 1}`,
       { wait: 1000 },
       "teleport @p ~ ~ ~",
     ]);
+    expect(run("launch_water", "bedrock")[0]).toBe("give @p water_bucket 1");
     expect(run("launch_water", "java")[0]).toBe(
       "give @s minecraft:water_bucket 1",
+    );
+    expect(run("launch_water", "java")[1]).toBe(
+      "setblock ~ ~33 ~ minecraft:structure_void",
     );
   });
 
@@ -258,7 +336,110 @@ describe("gameCommands for hazards", () => {
     expect(run("lightning", "java", { amount: 3 })).toHaveLength(3);
     expect(run("tnt", "java", { amount: 3 })).toHaveLength(1);
     expect(run("tnt_ring", "java", { amount: 3 })).toHaveLength(8);
-    expect(run("launch_water", "bedrock", { amount: 3 })).toHaveLength(4);
+    expect(run("launch_water", "bedrock", { amount: 3 })).toHaveLength(8);
+    expect(run("hole", "bedrock", { amount: 3 })).toHaveLength(2);
+  });
+
+  it("traps the player in cobwebs, only where there's air", () => {
+    expect(run("cobweb_trap", "bedrock")).toEqual([
+      "setblock ~ ~1 ~ structure_void",
+      "setblock ~ ~1 ~ air",
+      "fill ~-1 ~ ~-1 ~1 ~2 ~1 web keep",
+    ]);
+    expect(run("cobweb_trap", "java")).toEqual([
+      "setblock ~ ~1 ~ minecraft:structure_void",
+      "setblock ~ ~1 ~ minecraft:air",
+      "fill ~-1 ~ ~-1 ~1 ~2 ~1 minecraft:cobweb keep",
+    ]);
+  });
+
+  it("shuts the player in honey or obsidian, leaving what's inside", () => {
+    expect(run("honey_trap", "bedrock")).toEqual([
+      "setblock ~ ~3 ~ structure_void",
+      "fill ~-2 ~-1 ~-2 ~2 ~3 ~2 honey_block outline",
+    ]);
+    expect(run("obsidian_prison", "java")).toEqual([
+      "setblock ~ ~3 ~ minecraft:structure_void",
+      "fill ~-2 ~-1 ~-2 ~2 ~3 ~2 minecraft:obsidian outline",
+    ]);
+  });
+
+  it("rings the player with lava, on an obsidian island", () => {
+    expect(run("lava_lake", "bedrock")).toEqual([
+      "fill ~-2 ~-1 ~-2 ~2 ~-1 ~2 lava",
+      "setblock ~ ~-1 ~ obsidian",
+    ]);
+    expect(run("lava_lake", "java")).toEqual([
+      "fill ~-2 ~-1 ~-2 ~2 ~-1 ~2 minecraft:lava",
+      "setblock ~ ~-1 ~ minecraft:obsidian",
+    ]);
+  });
+
+  it("digs a hole as deep as set, never on the world's bedrock floor", () => {
+    expect(run("hole", "bedrock", { depth: 20 })).toEqual([
+      "execute unless block ~ ~-20 ~ bedrock run setblock ~ ~-20 ~ structure_void",
+      "execute unless block ~ ~-20 ~ bedrock run fill ~-1 ~ ~-1 ~1 ~-20 ~1 air",
+    ]);
+    expect(run("hole", "java")).toEqual([
+      "execute unless block ~ ~-10 ~ minecraft:bedrock run setblock ~ ~-10 ~ minecraft:structure_void",
+      "execute unless block ~ ~-10 ~ minecraft:bedrock run fill ~-1 ~ ~-1 ~1 ~-10 ~1 minecraft:air",
+    ]);
+  });
+
+  it("clears the inventory, with a stick in it so it's never empty", () => {
+    expect(run("clear_inventory", "bedrock")).toEqual([
+      "replaceitem entity @p slot.hotbar 0 stick",
+      "clear @p",
+    ]);
+    expect(run("clear_inventory", "java")).toEqual([
+      "item replace entity @s hotbar.0 with minecraft:stick",
+      "clear @s",
+    ]);
+  });
+
+  it("drops the meteors in one command, and fires the lasers, in Java", () => {
+    expect(run("meteor", "java", { amount: 5 })).toEqual(["tokio meteor 5"]);
+    expect(run("meteor", "java")).toEqual(["tokio meteor 1"]);
+    expect(run("laser", "java", { amount: 3 })).toEqual(["tokio laser"]);
+    expect(run("super_laser", "java")).toEqual(["tokio laser super"]);
+    expect(run("super_duper_laser", "java")).toEqual([
+      "tokio laser super duper",
+    ]);
+  });
+
+  it("runs none of the Tokio mod's hazards in Bedrock", () => {
+    for (const hazard of [
+      "meteor",
+      "laser",
+      "super_laser",
+      "super_duper_laser",
+    ]) {
+      expect(run(hazard, "bedrock", { amount: 5 })).toEqual([]);
+    }
+  });
+});
+
+describe("gameCommands for morphs", () => {
+  const run = (input: Record<string, unknown>, edition: "bedrock" | "java") =>
+    gameCommands(step(input), none, edition);
+
+  it("turns the player into the mob until turned back, or for seconds", () => {
+    expect(run({ type: "morph", mob: "zombie" }, "java")).toEqual([
+      "tokio morph minecraft:zombie",
+    ]);
+    expect(run({ type: "morph", mob: "creeper", seconds: 30 }, "java")).toEqual(
+      ["tokio morph minecraft:creeper 30"],
+    );
+  });
+
+  it("turns the player back", () => {
+    expect(run({ type: "unmorph" }, "java")).toEqual(["tokio unmorph"]);
+  });
+
+  it("runs nothing for a bad mob id, or in Bedrock", () => {
+    expect(run({ type: "morph", mob: "zombie ~ ~ ~" }, "java")).toEqual([]);
+    expect(run({ type: "morph", mob: "zombie" }, "bedrock")).toEqual([]);
+    expect(run({ type: "unmorph" }, "bedrock")).toEqual([]);
   });
 });
 

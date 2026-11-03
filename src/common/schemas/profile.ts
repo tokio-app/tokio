@@ -185,8 +185,9 @@ const GameAmountSchema = z
   .max(GAME_STEP_MAX_AMOUNT)
   .default(1);
 
-// Built-in ways to try to kill the player, each with its own commands for
-// both editions (see gameCommands)
+// Built-in ways to try to kill or trap the player, each with its own commands
+// for both editions (see gameCommands). The meteor and lasers are the Tokio
+// mod's, so Java's only.
 export const GAME_HAZARDS = [
   "tnt",
   "tnt_ring",
@@ -202,6 +203,16 @@ export const GAME_HAZARDS = [
   "dizzy",
   "turn_around",
   "random_teleport",
+  "cobweb_trap",
+  "honey_trap",
+  "obsidian_prison",
+  "lava_lake",
+  "hole",
+  "clear_inventory",
+  "meteor",
+  "laser",
+  "super_laser",
+  "super_duper_laser",
 ] as const;
 
 // Built-in ways to help the player survive: netherite armor, a full heal and
@@ -235,6 +246,14 @@ export const GameStepSchema = z.discriminatedUnion("type", [
     amount: GameAmountSchema,
     name: z.string().default(""),
   }),
+  // The Tokio mod's, so Java's only: the player turns into the mob, for
+  // seconds or, with null, until an unmorph step
+  z.object({
+    type: z.literal("morph"),
+    mob: z.string(),
+    seconds: z.number().int().min(1).max(600).nullable().default(null),
+  }),
+  z.object({ type: z.literal("unmorph") }),
   z.object({
     type: z.literal("give"),
     item: z.string(),
@@ -261,6 +280,8 @@ export const GameStepSchema = z.discriminatedUnion("type", [
     duration: z.number().int().min(1).max(120).default(10),
     // How far a random teleport can take the player, in blocks
     distance: z.number().int().min(10).max(10_000).default(1000),
+    // How deep a hole goes under the player's feet, in blocks
+    depth: z.number().int().min(1).max(64).default(10),
   }),
   z.object({
     type: z.literal("help"),
@@ -357,7 +378,8 @@ const GAMES_OVERLAY_LAYOUTS = ["list", "horizontal", "carousel"] as const;
 // the corner of the action's, like a sticker
 const GAMES_OVERLAY_FORMATS = ["arrow", "sticker"] as const;
 
-// How large the event's pictures (gifts, emotes, Tokio's own) show
+// How large the event's pictures (gifts, emotes, Tokio's own) or the counts
+// on the pictures' corners show
 const GAMES_OVERLAY_SIZES = ["small", "medium", "large"] as const;
 
 // How the games overlay looks
@@ -372,6 +394,8 @@ export const GamesOverlaySchema = z.object({
   // The texts under the pictures instead of beside them
   text_below: z.boolean().default(false),
   event_size: z.enum(GAMES_OVERLAY_SIZES).default("small"),
+  // The action's amount and the likes' count
+  count_size: z.enum(GAMES_OVERLAY_SIZES).default("small"),
   // A font installed where the streaming app runs, Archivo when empty
   font: z.string().max(FONT_MAX_LENGTH).default(""),
   text_color: ColorSchema.default("#f1f5f9"),

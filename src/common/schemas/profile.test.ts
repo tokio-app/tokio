@@ -60,6 +60,7 @@ describe("ProfileSchema", () => {
       pictures_only: false,
       text_below: false,
       event_size: "small",
+      count_size: "small",
       font: "",
       text_color: "#f1f5f9",
       accent_color: "#f43f5e",
@@ -247,6 +248,43 @@ describe("ProfileSchema", () => {
     expect(action.steps).toEqual([
       { type: "help", help: "netherite_armor", duration: 30 },
     ]);
+  });
+
+  it("lasts a morph until turned back unless saved with its seconds", () => {
+    const step = GameStepSchema.parse({ type: "morph", mob: "zombie" });
+
+    expect(step).toEqual({ type: "morph", mob: "zombie", seconds: null });
+    for (const seconds of [0, 601, 1.5]) {
+      const saved = { type: "morph", mob: "zombie", seconds };
+      expect(GameStepSchema.safeParse(saved).success).toBe(false);
+    }
+    expect(GameStepSchema.parse({ type: "unmorph" })).toEqual({
+      type: "unmorph",
+    });
+  });
+
+  it("takes the Tokio mod's hazards", () => {
+    for (const hazard of [
+      "meteor",
+      "laser",
+      "super_laser",
+      "super_duper_laser",
+    ]) {
+      expect(GameStepSchema.parse({ type: "hazard", hazard })).toMatchObject({
+        hazard,
+        amount: 1,
+      });
+    }
+  });
+
+  it("digs holes 10 blocks deep unless saved deeper, up to 64", () => {
+    expect(
+      GameStepSchema.parse({ type: "hazard", hazard: "hole" }),
+    ).toMatchObject({ depth: 10 });
+    for (const depth of [0, 65, 2.5]) {
+      const saved = { type: "hazard", hazard: "hole", depth };
+      expect(GameStepSchema.safeParse(saved).success).toBe(false);
+    }
   });
 
   it("refuses a hazard Tokio doesn't have", () => {
