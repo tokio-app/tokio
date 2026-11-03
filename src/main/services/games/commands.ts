@@ -76,6 +76,52 @@ const effect = (java: boolean, id: string, seconds: number, amplifier = 0) =>
     ? `effect give @s minecraft:${id} ${seconds} ${amplifier}`
     : `effect @p ${id} ${seconds} ${amplifier}`;
 
+// A block id in the edition's syntax: Java's take a "minecraft:" in front
+const block = (java: boolean, id: string) => (java ? `minecraft:${id}` : id);
+
+// Both editions refuse a fill that changes nothing, as over a clear sky or
+// around a trap already there. A structure void set first at `at`, a cell the
+// fill writes, gives it a change; before a keep fill, which writes only air,
+// it's made air again. The marker sits on the fill's farthest row, so it fails
+// with a fill that reaches out of the world and is never left behind.
+function sureFill(
+  java: boolean,
+  [from, to]: [string, string],
+  id: string,
+  at: string,
+  mode?: "keep" | "outline",
+) {
+  const set = (marker: string) => `setblock ${at} ${block(java, marker)}`;
+  const fill = `fill ${from} ${to} ${block(java, id)}${mode ? ` ${mode}` : ""}`;
+  return mode === "keep"
+    ? [set("structure_void"), set("air"), fill]
+    : [set("structure_void"), fill];
+}
+
+// The rows of the column a launch clears in one fill. A fill past the world's
+// top fails whole, so the clearing goes in pieces and only those up there fail.
+const SHAFT_ROWS = 32;
+
+// Empties the 3×3 column over the player's head, any 0.6-wide player's,
+// up to where it is at the top of a climb of `height` blocks. A fill drops
+// nothing (replace), and takes bedrock too, so from under the Nether's roof
+// the player goes through it.
+function clearUp(java: boolean, height: number) {
+  const commands: string[] = [];
+  for (let bottom = 2; bottom <= height + 2; bottom += SHAFT_ROWS) {
+    const top = Math.min(bottom + SHAFT_ROWS - 1, height + 2);
+    commands.push(
+      ...sureFill(
+        java,
+        [`~-1 ~${bottom} ~-1`, `~1 ~${top} ~1`],
+        "air",
+        `~ ~${top} ~`,
+      ),
+    );
+  }
+  return commands;
+}
+
 // What a hazard runs where the player stands. No NBT but the creeper's and
 // the fuse, so they hold across game versions.
 function hazardCommands(
@@ -93,6 +139,7 @@ function hazardCommands(
   const launch = () => {
     const { level, stopMs } = launchPlan(step.height, step.seconds);
     return [
+      ...clearUp(java, step.height),
       effect(java, "levitation", step.seconds, level - 1),
       { wait: stopMs },
       `teleport ${java ? "@s" : "@p"} ~ ~ ~`,
@@ -124,7 +171,7 @@ function hazardCommands(
     case "anvil":
       // Bedrock can't summon a falling block, so the anvil is set in the air,
       // only where there's room (keep), and falls
-      return [`setblock ~ ~20 ~ ${java ? "minecraft:" : ""}anvil keep`];
+      return [`setblock ~ ~20 ~ ${block(java, "anvil")} keep`];
     case "harming":
       return [effect(java, "instant_damage", 1, 1)];
     case "launch":
@@ -140,6 +187,59 @@ function hazardCommands(
       return [effect(java, "nausea", step.duration)];
     case "turn_around":
       return [`teleport ${java ? "@s" : "@p"} ~ ~ ~ ~180 ~`];
+    // Only into air, so nothing breaks: around the player, in their own
+    // cells and over them
+    case "cobweb_trap":
+      return sureFill(
+        java,
+        ["~-1 ~ ~-1", "~1 ~2 ~1"],
+        java ? "cobweb" : "web",
+        "~ ~1 ~",
+        "keep",
+      );
+    // A 5×5×5 shell around the 3×3 space the player stands in, under them too;
+    // what's inside stays. Honey can't be in the player's cells as webs are
+    // (they'd choke), so its floor slows them and stops their jumps.
+    case "honey_trap":
+    case "obsidian_prison":
+      return sureFill(
+        java,
+        ["~-2 ~-1 ~-2", "~2 ~3 ~2"],
+        step.hazard === "honey_trap" ? "honey_block" : "obsidian",
+        "~ ~3 ~",
+        "outline",
+      );
+    case "lava_lake":
+      // The ground around the player turns to lava, a ring two blocks wide,
+      // and the block they stand on to obsidian, an island to jump or build
+      // off. The fill takes the island too, so a lake already there changes.
+      return [
+        `fill ~-2 ~-1 ~-2 ~2 ~-1 ~2 ${block(java, "lava")}`,
+        `setblock ~ ~-1 ~ ${block(java, "obsidian")}`,
+      ];
+    case "hole": {
+      // From the feet's own row (a slab, a carpet) down. One whose bottom is
+      // bedrock, the world's floor, digs nothing, so it never opens the void.
+      const bottom = `~ ~-${step.depth} ~`;
+      const guard = `execute unless block ${bottom} ${block(java, "bedrock")} run`;
+      return sureFill(
+        java,
+        ["~-1 ~ ~-1", `~1 ~-${step.depth} ~1`],
+        "air",
+        bottom,
+      ).map((command) => `${guard} ${command}`);
+    }
+    case "clear_inventory": {
+      // Both editions refuse to clear an empty inventory, so a stick goes in
+      // first, over whatever the first hotbar slot holds
+      const target = java ? "@s" : "@p";
+      return [
+        java
+          ? "item replace entity @s hotbar.0 with minecraft:stick"
+          : "replaceitem entity @p slot.hotbar 0 stick",
+        `clear ${target}`,
+      ];
+    }
     // The Tokio mod's own commands, which Bedrock has nothing like. The mod
     // drops every meteor around the player itself.
     case "meteor":

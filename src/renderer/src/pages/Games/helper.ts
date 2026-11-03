@@ -151,6 +151,7 @@ const NEW_STEPS: { [K in StepKind]: Step<K> } = {
     seconds: 1,
     duration: 10,
     distance: 1000,
+    depth: 10,
   },
   help: { type: "help", help: "netherite_armor", duration: 30 },
   command: { type: "command", command: "" },

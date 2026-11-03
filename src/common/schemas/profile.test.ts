@@ -276,6 +276,16 @@ describe("ProfileSchema", () => {
     }
   });
 
+  it("digs holes 10 blocks deep unless saved deeper, up to 64", () => {
+    expect(
+      GameStepSchema.parse({ type: "hazard", hazard: "hole" }),
+    ).toMatchObject({ depth: 10 });
+    for (const depth of [0, 65, 2.5]) {
+      const saved = { type: "hazard", hazard: "hole", depth };
+      expect(GameStepSchema.safeParse(saved).success).toBe(false);
+    }
+  });
+
   it("refuses a hazard Tokio doesn't have", () => {
     const step = { type: "hazard", hazard: "lava" };
 

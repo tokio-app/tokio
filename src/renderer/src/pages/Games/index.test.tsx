@@ -373,18 +373,26 @@ describe("Games", () => {
     await user.click(panel.getByText("Lights out"));
     await user.click(inList(panelElements()[0], "Random teleport")!);
     expect(field("Distance in blocks")).toHaveValue(1000);
+
+    await user.click(panel.getByText("Random teleport"));
+    await user.click(inList(panelElements()[0], "Hole below")!);
+    expect(field("Distance in blocks")).toBeNull();
+    expect(panel.getByText(/blocks deep/)).toBeInTheDocument();
+    await user.clear(field("Depth in blocks")!);
+    await user.type(field("Depth in blocks")!, "20");
     await wait(300);
 
     expect(saves().at(-1)!.actions[0].steps).toEqual([
       {
         type: "hazard",
-        hazard: "random_teleport",
+        hazard: "hole",
         amount: 1,
         fuse: 4,
         height: 80,
         seconds: 2,
         duration: 30,
         distance: 1000,
+        depth: 20,
       },
     ]);
   });
@@ -427,6 +435,10 @@ describe("Games", () => {
       const found = modOnly.slice(0, 2).filter((t) => inList(element, t));
       await user.click(inList(element, "Hazard")!);
       await user.click(panel.getByText("Falling TNT"));
+      // They're last, past the rows the list draws until it scrolls
+      const list = screen.getByRole("listbox");
+      list.scrollTop = 10_000;
+      fireEvent.scroll(list);
       found.push(...modOnly.slice(2).filter((t) => inList(element, t)));
       await user.keyboard("{Escape}");
       return found;
@@ -475,6 +487,7 @@ describe("Games", () => {
       seconds: 1,
       duration: 10,
       distance: 1000,
+      depth: 10,
     };
     const { user } = await load([
       action("j1", {

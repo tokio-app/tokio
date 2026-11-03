@@ -213,6 +213,7 @@ describe("gameStepsText", () => {
       seconds: 1,
       duration: 10,
       distance: 1000,
+      depth: 10,
     } as const;
     expect(
       steps(
@@ -224,6 +225,37 @@ describe("gameStepsText", () => {
     ).toBe("Lightning bolt ×5, Falling TNT, Launch + water");
   });
 
+  it("names the traps and the ground's hazards, in the language", () => {
+    const hazard = {
+      type: "hazard",
+      amount: 3,
+      fuse: 4,
+      height: 50,
+      seconds: 1,
+      duration: 10,
+      distance: 1000,
+      depth: 10,
+    } as const;
+    const hazards = [
+      "cobweb_trap",
+      "honey_trap",
+      "obsidian_prison",
+      "lava_lake",
+      "hole",
+      "clear_inventory",
+    ] as const;
+    const all = hazards.map((name) => ({ ...hazard, hazard: name }));
+    expect(steps("java", ...all)).toBe(
+      "Cobweb trap, Honey trap, Obsidian prison, Lava lake, Hole below, Clear inventory",
+    );
+    const spanish = action((a) => {
+      a.steps = all;
+    });
+    expect(gameStepsText(spanish, "es-419")).toBe(
+      "Trampa de telarañas, Trampa de miel, Prisión de obsidiana, Lago de lava, Hoyo debajo, Vaciar el inventario",
+    );
+  });
+
   it("names the Tokio mod's hazards, counting the meteors", () => {
     const hazard = {
       type: "hazard",
@@ -232,6 +264,7 @@ describe("gameStepsText", () => {
       seconds: 1,
       duration: 10,
       distance: 1000,
+      depth: 10,
     } as const;
     expect(
       steps(

@@ -645,6 +645,20 @@ function StepFields({
                 />
               ),
             })}
+          {step.hazard === "hole" &&
+            sentence(t("games.step.hole"), {
+              depth: (
+                <NumberInput
+                  className={styles.amount}
+                  aria-label={t("games.step.depthLabel")}
+                  integer
+                  min={1}
+                  max={64}
+                  value={step.depth}
+                  onChange={(depth) => onChange({ ...step, depth })}
+                />
+              ),
+            })}
         </>
       );
     case "help":

@@ -185,9 +185,9 @@ const GameAmountSchema = z
   .max(GAME_STEP_MAX_AMOUNT)
   .default(1);
 
-// Built-in ways to try to kill the player, each with its own commands for
-// both editions (see gameCommands). The meteor and lasers are the Tokio mod's,
-// so Java's only.
+// Built-in ways to try to kill or trap the player, each with its own commands
+// for both editions (see gameCommands). The meteor and lasers are the Tokio
+// mod's, so Java's only.
 export const GAME_HAZARDS = [
   "tnt",
   "tnt_ring",
@@ -203,6 +203,12 @@ export const GAME_HAZARDS = [
   "dizzy",
   "turn_around",
   "random_teleport",
+  "cobweb_trap",
+  "honey_trap",
+  "obsidian_prison",
+  "lava_lake",
+  "hole",
+  "clear_inventory",
   "meteor",
   "laser",
   "super_laser",
@@ -274,6 +280,8 @@ export const GameStepSchema = z.discriminatedUnion("type", [
     duration: z.number().int().min(1).max(120).default(10),
     // How far a random teleport can take the player, in blocks
     distance: z.number().int().min(10).max(10_000).default(1000),
+    // How deep a hole goes under the player's feet, in blocks
+    depth: z.number().int().min(1).max(64).default(10),
   }),
   z.object({
     type: z.literal("help"),
