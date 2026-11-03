@@ -723,6 +723,7 @@
   "games.overlay.move": "Arrastra para reordenar o usa las teclas de flecha",
   "games.step.hole": "{depth} bloques de profundidad",
   "games.step.depthLabel": "Profundidad en bloques",
+  "games.overlay.counts": "Cantidades",
   "main.tray.open": "Abrir Tokio",
   "main.tray.quit": "Salir de Tokio",
   "main.failure.getAbout": "No se pudieron cargar las licencias de código abierto.",

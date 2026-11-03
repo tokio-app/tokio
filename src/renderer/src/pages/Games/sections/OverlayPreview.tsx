@@ -226,6 +226,7 @@ function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
           look.format === "sticker" && "games-sticker",
           look.text_below && "games-text-below",
           look.event_size !== "small" && `games-event-${look.event_size}`,
+          look.count_size !== "small" && `games-count-${look.count_size}`,
         )}
         style={style}
       >

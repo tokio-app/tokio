@@ -723,6 +723,7 @@
   "games.overlay.move": "Drag to reorder, or use the arrow keys",
   "games.step.hole": "{depth} blocks deep",
   "games.step.depthLabel": "Depth in blocks",
+  "games.overlay.counts": "Counts",
   "main.tray.open": "Open Tokio",
   "main.tray.quit": "Quit Tokio",
   "main.failure.getAbout": "Unable to load the open-source licenses.",

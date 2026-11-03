@@ -308,6 +308,18 @@ export function OverlaySection({
                 }
               />
             </Field>
+            <Field label={t("games.overlay.counts")} className={styles.layouts}>
+              <RadioGroup
+                name="games-overlay-count-size"
+                value={look.count_size}
+                options={sizes}
+                onChange={(size) =>
+                  setLook((l) => {
+                    l.count_size = size;
+                  })
+                }
+              />
+            </Field>
           </div>
           <Check
             label={t("games.overlay.picturesOnly")}
