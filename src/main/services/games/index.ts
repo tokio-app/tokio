@@ -288,22 +288,35 @@ export class GamesService extends Service {
   }
 
   // Sent at once, in order, as the connection queues them, up to a wait: the
-  // rest go once those are answered and the wait is over
+  // rest go once those are answered and the wait is over. A oneOf is picked
+  // here, so each run of a batch gets its own.
   private async _send(commands: GameCommand[]) {
     const results: CommandResult[] = [];
-    let sending: string[] = [];
+    let sending: { command: string; mayFail?: boolean }[] = [];
     const answers = async () => {
-      const sent = sending.map((command) => this._minecraft.send(command));
+      const sent = sending.map(async ({ command, mayFail }) => {
+        const result = await this._minecraft.send(command);
+        // A clear that found nothing to take did its job; a game that left
+        // still fails it
+        return mayFail && !result.dropped ? { ...result, ok: true } : result;
+      });
       sending = [];
       results.push(...(await Promise.all(sent)));
     };
     for (const command of commands) {
       if (typeof command === "string") {
-        sending.push(command);
-        continue;
+        sending.push({ command });
+      } else if ("mayFail" in command) {
+        sending.push({ command: command.mayFail, mayFail: true });
+      } else if ("oneOf" in command) {
+        const { oneOf } = command;
+        sending.push({
+          command: oneOf[Math.floor(Math.random() * oneOf.length)],
+        });
+      } else {
+        await answers();
+        await delay(command.wait);
       }
-      await answers();
-      await delay(command.wait);
     }
     await answers();
     return results;

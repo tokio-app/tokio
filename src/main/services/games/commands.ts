@@ -1,5 +1,6 @@
+import { bestEnchantments } from "@/common/games/enchantments";
 import { GameStep, MinecraftEdition } from "@/common/schemas";
-import { REPEATED_HAZARDS } from "@/common/util";
+import { NETHERITE_KIT, REPEATED_HAZARDS } from "@/common/util";
 
 // The longest a viewer's text gets inside a command
 const MAX_VALUE_LENGTH = 100;
@@ -21,8 +22,11 @@ const RING = [
 ];
 
 // A command for the game, or a wait before the rest: they go once the
-// commands before it are answered and its milliseconds have passed
-export type GameCommand = string | { wait: number };
+// commands before it are answered and its milliseconds have passed. A
+// mayFail's failure counts as done (a clear that found nothing to take), and
+// a oneOf sends one of its commands, picked as it's sent.
+export type GameCommand =
+  string | { wait: number } | { mayFail: string } | { oneOf: string[] };
 
 // The strongest levitation the effect command takes (amplifier 255). Both
 // editions send it to the game whole.
@@ -66,9 +70,33 @@ export function launchPlan(height: number, seconds: number) {
   };
 }
 
-// Into the player's inventory, or at their feet when it's full
-const give = (java: boolean, item: string, amount: number) =>
-  java ? `give @s minecraft:${item} ${amount}` : `give @p ${item} ${amount}`;
+// A Java item, enchanted with the best it takes: its enchantments component
+// (Java 26.3's ItemEnchantments, a map of levels)
+function javaItem(item: string, enchanted: boolean) {
+  const levels = enchanted ? bestEnchantments(item) : [];
+  const list = levels.map(([id, level]) => `${id}:${level}`).join(",");
+  return `minecraft:${item}${list ? `[enchantments={${list}}]` : ""}`;
+}
+
+// Into the player's inventory, or at their feet when it's full. Bedrock's
+// give takes no enchantments, and its enchant only works on the held item.
+// Replacing, the player's own of that item go first, enchanted or not.
+function give(
+  java: boolean,
+  item: string,
+  amount: number,
+  { enchanted = false, replace = false } = {},
+): GameCommand[] {
+  const command = java
+    ? `give @s ${javaItem(item, enchanted)} ${amount}`
+    : `give @p ${item} ${amount}`;
+  if (!replace) return [command];
+  // Both editions fail a clear that finds none, which is fine here
+  return [
+    { mayFail: java ? `clear @s minecraft:${item}` : `clear @p ${item}` },
+    command,
+  ];
+}
 
 // On the player, at its level minus one, as the game counts it
 const effect = (java: boolean, id: string, seconds: number, amplifier = 0) =>
@@ -121,6 +149,17 @@ function clearUp(java: boolean, height: number) {
   }
   return commands;
 }
+
+// The bosses a random boss is one of, as Java and Bedrock name them: the
+// deadliest next to the player. A summoned Ender Dragon circles the world's
+// center (its fight origin) and an Elder Guardian can't move on land, so
+// they're left out.
+const BOSSES = [
+  ["warden", "warden"],
+  ["wither", "wither"],
+  ["ravager", "ravager"],
+  ["evoker", "evocation_illager"],
+];
 
 // What a hazard runs where the player stands. No NBT but the creeper's and
 // the fuse, so they hold across game versions.
@@ -178,7 +217,7 @@ function hazardCommands(
       return launch();
     case "launch_water":
       // In the inventory before the fall, for the player to save themselves
-      return [give(java, "water_bucket", 1), ...launch()];
+      return [...give(java, "water_bucket", 1), ...launch()];
     case "freeze":
       return [effect(java, "slowness", step.duration, 255)];
     case "lights_out":
@@ -240,6 +279,17 @@ function hazardCommands(
         `clear ${target}`,
       ];
     }
+    case "random_boss":
+      // A new one each run, picked as it's sent
+      return [
+        {
+          oneOf: BOSSES.map(([javaId, bedrockId]) =>
+            java
+              ? `summon minecraft:${javaId} ~ ~ ~`
+              : `summon ${bedrockId} ~ ~ ~`,
+          ),
+        },
+      ];
     // The Tokio mod's own commands, which Bedrock has nothing like. The mod
     // drops every meteor around the player itself.
     case "meteor":
@@ -343,13 +393,22 @@ function helpCommands(
   java: boolean,
 ): GameCommand[] {
   const { help } = step;
-  if (help === "netherite_armor") {
+  if (help === "netherite_armor" || help === "netherite_kit") {
+    // The kit's are always enchanted, on Java
+    const enchanted = help === "netherite_kit" || step.enchanted;
     // Put on at once, replacing what the player wears (the user's call)
-    return ARMOR.map(([javaSlot, bedrockSlot, item]) =>
+    const armor = ARMOR.map(([javaSlot, bedrockSlot, item]) =>
       java
-        ? `item replace entity @s ${javaSlot} with minecraft:${item}`
+        ? `item replace entity @s ${javaSlot} with ${javaItem(item, enchanted)}`
         : `replaceitem entity @p ${bedrockSlot} 0 ${item}`,
     );
+    if (help === "netherite_armor") return armor;
+    return [
+      ...armor,
+      ...NETHERITE_KIT.flatMap(([item, amount]) =>
+        give(java, item, amount, { enchanted, replace: step.replace }),
+      ),
+    ];
   }
   if (help === "heal") {
     // Health and hunger full; more than they hold is capped
@@ -421,7 +480,7 @@ export function gameCommands(
       return java ? ["tokio unmorph"] : [];
     case "give": {
       if (!ID.test(step.item)) return [];
-      return [give(java, step.item, step.amount)];
+      return give(java, step.item, step.amount, step);
     }
     case "weather":
       return [`weather ${step.weather}`];

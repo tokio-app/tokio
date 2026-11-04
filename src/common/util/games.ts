@@ -78,6 +78,7 @@ export const HAZARD_NAMES: Record<Hazard, MessageKey> = {
   lava_lake: "minecraft.hazard.lava_lake",
   hole: "minecraft.hazard.hole",
   clear_inventory: "minecraft.hazard.clear_inventory",
+  random_boss: "minecraft.hazard.random_boss",
   meteor: "minecraft.hazard.meteor",
   laser: "minecraft.hazard.laser",
   super_laser: "minecraft.hazard.super_laser",
@@ -86,6 +87,7 @@ export const HAZARD_NAMES: Record<Hazard, MessageKey> = {
 
 export const HELP_NAMES: Record<Help, MessageKey> = {
   netherite_armor: "minecraft.help.netherite_armor",
+  netherite_kit: "minecraft.help.netherite_kit",
   heal: "minecraft.help.heal",
   regeneration: "minecraft.help.regeneration",
   absorption: "minecraft.help.absorption",
@@ -99,6 +101,16 @@ export const HELP_NAMES: Record<Help, MessageKey> = {
   night_vision: "minecraft.help.night_vision",
   invisibility: "minecraft.help.invisibility",
 };
+
+// What the Netherite kit help gives, besides the armor it puts on, and how
+// many. On Java the bow has Infinity, but a plain Bedrock bow needs arrows.
+export const NETHERITE_KIT: readonly (readonly [string, number])[] = [
+  ["netherite_sword", 1],
+  ["bow", 1],
+  ["arrow", 64],
+  ["netherite_pickaxe", 1],
+  ["netherite_axe", 1],
+];
 
 // The hazards an amount repeats; the rest run once, as a second anvil has no
 // room and a second effect does nothing

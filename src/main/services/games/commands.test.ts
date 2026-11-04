@@ -86,6 +86,14 @@ describe("gameCommands in Bedrock", () => {
     expect(run({ type: "give", item: "diamond", amount: 5 })).toEqual([
       "give @p diamond 5",
     ]);
+    // Bedrock's give takes no enchantments
+    expect(
+      run({ type: "give", item: "netherite_sword", enchanted: true }),
+    ).toEqual(["give @p netherite_sword 1"]);
+    // Replacing, the player's own go first, if they have any
+    expect(
+      run({ type: "give", item: "diamond", amount: 5, replace: true }),
+    ).toEqual([{ mayFail: "clear @p diamond" }, "give @p diamond 5"]);
     expect(run({ type: "weather", weather: "thunder" })).toEqual([
       "weather thunder",
     ]);
@@ -172,6 +180,33 @@ describe("gameCommands in Java Edition", () => {
     ]);
     expect(run({ type: "time", time: "midnight" })).toEqual([
       "time set midnight",
+    ]);
+  });
+
+  it("gives an item with the best enchantments it takes", () => {
+    const enchanted = (item: string) =>
+      run({ type: "give", item, amount: 2, enchanted: true });
+    expect(enchanted("netherite_sword")).toEqual([
+      "give @s minecraft:netherite_sword[enchantments={sharpness:5,sweeping_edge:3,fire_aspect:2,knockback:2,looting:3,unbreaking:3,mending:1}] 2",
+    ]);
+    // Infinity, which can't go with Mending
+    expect(enchanted("bow")).toEqual([
+      "give @s minecraft:bow[enchantments={power:5,flame:1,punch:2,unbreaking:3,infinity:1}] 2",
+    ]);
+    expect(enchanted("turtle_helmet")).toEqual([
+      "give @s minecraft:turtle_helmet[enchantments={protection:4,respiration:3,aqua_affinity:1,thorns:3,unbreaking:3,mending:1}] 2",
+    ]);
+    // Replacing, the player's own go first, enchanted or not
+    expect(
+      run({ type: "give", item: "bow", enchanted: true, replace: true }),
+    ).toEqual([
+      { mayFail: "clear @s minecraft:bow" },
+      "give @s minecraft:bow[enchantments={power:5,flame:1,punch:2,unbreaking:3,infinity:1}] 1",
+    ]);
+    // Nothing to enchant
+    expect(enchanted("diamond")).toEqual(["give @s minecraft:diamond 2"]);
+    expect(enchanted("constructor")).toEqual([
+      "give @s minecraft:constructor 2",
     ]);
   });
 
@@ -407,6 +442,29 @@ describe("gameCommands for hazards", () => {
     ]);
   });
 
+  it("summons one of the bosses, picked as it's sent", () => {
+    expect(run("random_boss", "java")).toEqual([
+      {
+        oneOf: [
+          "summon minecraft:warden ~ ~ ~",
+          "summon minecraft:wither ~ ~ ~",
+          "summon minecraft:ravager ~ ~ ~",
+          "summon minecraft:evoker ~ ~ ~",
+        ],
+      },
+    ]);
+    expect(run("random_boss", "bedrock")).toEqual([
+      {
+        oneOf: [
+          "summon warden ~ ~ ~",
+          "summon wither ~ ~ ~",
+          "summon ravager ~ ~ ~",
+          "summon evocation_illager ~ ~ ~",
+        ],
+      },
+    ]);
+  });
+
   it("runs none of the Tokio mod's hazards in Bedrock", () => {
     for (const hazard of [
       "meteor",
@@ -462,6 +520,44 @@ describe("gameCommands for helps", () => {
       "item replace entity @s armor.chest with minecraft:netherite_chestplate",
       "item replace entity @s armor.legs with minecraft:netherite_leggings",
       "item replace entity @s armor.feet with minecraft:netherite_boots",
+    ]);
+  });
+
+  it("puts the armor on enchanted in Java only", () => {
+    const enchanted = { enchanted: true };
+    expect(run("netherite_armor", "java", enchanted)).toEqual([
+      "item replace entity @s armor.head with minecraft:netherite_helmet[enchantments={protection:4,respiration:3,aqua_affinity:1,thorns:3,unbreaking:3,mending:1}]",
+      "item replace entity @s armor.chest with minecraft:netherite_chestplate[enchantments={protection:4,thorns:3,unbreaking:3,mending:1}]",
+      "item replace entity @s armor.legs with minecraft:netherite_leggings[enchantments={protection:4,swift_sneak:3,thorns:3,unbreaking:3,mending:1}]",
+      "item replace entity @s armor.feet with minecraft:netherite_boots[enchantments={protection:4,feather_falling:4,soul_speed:3,depth_strider:3,thorns:3,unbreaking:3,mending:1}]",
+    ]);
+    expect(run("netherite_armor", "bedrock", enchanted)).toEqual(
+      run("netherite_armor", "bedrock"),
+    );
+  });
+
+  it("puts the kit's armor on and gives its weapons and tools, enchanted in Java", () => {
+    expect(run("netherite_kit", "java")).toEqual([
+      ...run("netherite_armor", "java", { enchanted: true }),
+      "give @s minecraft:netherite_sword[enchantments={sharpness:5,sweeping_edge:3,fire_aspect:2,knockback:2,looting:3,unbreaking:3,mending:1}] 1",
+      "give @s minecraft:bow[enchantments={power:5,flame:1,punch:2,unbreaking:3,infinity:1}] 1",
+      "give @s minecraft:arrow 64",
+      "give @s minecraft:netherite_pickaxe[enchantments={fortune:3,efficiency:5,unbreaking:3,mending:1}] 1",
+      "give @s minecraft:netherite_axe[enchantments={sharpness:5,fortune:3,efficiency:5,unbreaking:3,mending:1}] 1",
+    ]);
+    // Replacing, the player's own of each go first
+    expect(run("netherite_kit", "bedrock", { replace: true })).toEqual([
+      ...run("netherite_armor", "bedrock"),
+      { mayFail: "clear @p netherite_sword" },
+      "give @p netherite_sword 1",
+      { mayFail: "clear @p bow" },
+      "give @p bow 1",
+      { mayFail: "clear @p arrow" },
+      "give @p arrow 64",
+      { mayFail: "clear @p netherite_pickaxe" },
+      "give @p netherite_pickaxe 1",
+      { mayFail: "clear @p netherite_axe" },
+      "give @p netherite_axe 1",
     ]);
   });
 

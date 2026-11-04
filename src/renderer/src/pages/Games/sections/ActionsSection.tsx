@@ -1,3 +1,4 @@
+import { bestEnchantments } from "@/common/games/enchantments";
 import {
   GAME_STEP_MAX_AMOUNT,
   GameAction,
@@ -15,6 +16,7 @@ import {
 import { ALERT_MESSAGE_VARIABLES, COUNTED_HAZARDS } from "@/common/util";
 import {
   Btn,
+  Check,
   EmoteOption,
   EmptyState,
   Input,
@@ -44,6 +46,7 @@ import {
   createAction,
   createStep,
   EDITIONS,
+  enchantmentsText,
   GAME_TRIGGERS,
   HAZARDS,
   HELPS,
@@ -51,6 +54,8 @@ import {
   MOBS,
   MORPH_LENGTHS,
   MORPH_MOBS,
+  NETHERITE_ARMOR,
+  NETHERITE_KIT_ITEMS,
   STEP_KINDS,
   stepText,
   testSummary,
@@ -408,8 +413,10 @@ function ActionItem({
                         size={16}
                       />
                     )}
-                    <code className={styles.result_command}>{r.command}</code>
-                    <span className={styles.result_message}>{r.message}</span>
+                    <div className={styles.result_text}>
+                      <code className={styles.result_command}>{r.command}</code>
+                      <span className={styles.result_message}>{r.message}</span>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -456,6 +463,7 @@ function StepFields({
   const hazards = useOptions(HAZARDS[edition]);
   const helps = useOptions(HELPS);
   const lengths = useOptions(MORPH_LENGTHS);
+  const language = useLanguage();
   switch (step.type) {
     case "spawn":
       return (
@@ -539,6 +547,17 @@ function StepFields({
           <Amount
             value={step.amount}
             onChange={(amount) => onChange({ ...step, amount })}
+          />
+          {edition === "java" && bestEnchantments(step.item).length > 0 && (
+            <Enchanted
+              items={[step.item]}
+              checked={step.enchanted}
+              onChange={(enchanted) => onChange({ ...step, enchanted })}
+            />
+          )}
+          <Replace
+            checked={step.replace}
+            onChange={(replace) => onChange({ ...step, replace })}
           />
         </>
       );
@@ -671,9 +690,30 @@ function StepFields({
             value={step.help}
             onChange={(help) => onChange({ ...step, help })}
           />
-          {/* Armor and the heal are given at once; the rest are effects */}
-          {step.help !== "netherite_armor" &&
-            step.help !== "heal" &&
+          {edition === "java" && step.help === "netherite_armor" && (
+            <Enchanted
+              items={NETHERITE_ARMOR}
+              checked={step.enchanted}
+              onChange={(enchanted) => onChange({ ...step, enchanted })}
+            />
+          )}
+          {step.help === "netherite_kit" && (
+            <>
+              <Replace
+                checked={step.replace}
+                onChange={(replace) => onChange({ ...step, replace })}
+              />
+              {/* Always enchanted, on Java */}
+              {edition === "java" && (
+                <p className={styles.enchantments}>
+                  {enchantmentsText(NETHERITE_KIT_ITEMS, language)}
+                </p>
+              )}
+            </>
+          )}
+          {/* Armor, the kit and the heal are given at once; the rest are
+              effects */}
+          {!["netherite_armor", "netherite_kit", "heal"].includes(step.help) &&
             sentence(t("games.step.duration"), {
               duration: (
                 <NumberInput
@@ -703,6 +743,56 @@ function StepFields({
         />
       );
   }
+}
+
+// Java's only: Bedrock can't enchant what it gives. Checked, the
+// enchantments the items get show on their own line under the step.
+function Enchanted({
+  items,
+  checked,
+  onChange,
+}: {
+  items: string[];
+  checked: boolean;
+  onChange: (enchanted: boolean) => void;
+}) {
+  const t = useT();
+  const language = useLanguage();
+  const list = useId();
+  return (
+    <>
+      <Check
+        label={t("games.step.enchanted")}
+        checked={checked}
+        aria-describedby={checked ? list : undefined}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {checked && (
+        <p id={list} className={styles.enchantments}>
+          {enchantmentsText(items, language)}
+        </p>
+      )}
+    </>
+  );
+}
+
+// Takes the player's own of the items first, so gifts don't fill their
+// inventory
+function Replace({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (replace: boolean) => void;
+}) {
+  const t = useT();
+  return (
+    <Check
+      label={t("games.step.replace")}
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+    />
+  );
 }
 
 function Amount({

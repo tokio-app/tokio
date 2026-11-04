@@ -261,6 +261,14 @@
   margin-left: auto;
 }
 
+/* A step's enchantments, on a line of their own under it */
+.enchantments {
+  flex-basis: 100%;
+  order: 1;
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
 .action_footer {
   display: flex;
   flex-wrap: wrap;
@@ -324,14 +332,23 @@
 .result,
 .result_failed {
   display: grid;
-  grid-template-columns: 16px minmax(0, max-content) minmax(0, 1fr);
-  align-items: baseline;
+  grid-template-columns: 16px minmax(0, 1fr);
   gap: var(--space-3);
 }
 
+/* On the first line, however many the command and its answer take */
 .result svg,
 .result_failed svg {
-  align-self: center;
+  height: 1lh;
+}
+
+/* The game's answer beside its command, or under it when a long one (an
+   enchanted item's) leaves it no room */
+.result_text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
 }
 
 .result svg {
@@ -350,6 +367,7 @@
 }
 
 .result_message {
+  flex: 1 1 16rem;
   color: var(--font-secondary);
   overflow-wrap: anywhere;
 }

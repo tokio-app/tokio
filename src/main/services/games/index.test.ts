@@ -210,7 +210,15 @@ describe("GamesService", () => {
       games.onError(onError);
       const bedrock = action({
         id: "bedrock",
-        steps: [{ type: "give", item: "diamond", amount: 1 }],
+        steps: [
+          {
+            type: "give",
+            item: "diamond",
+            amount: 1,
+            enchanted: false,
+            replace: false,
+          },
+        ],
       });
       await games.handle(
         TOKIO_EVENTS.FOLLOW,
@@ -221,7 +229,15 @@ describe("GamesService", () => {
             action({
               id: "java",
               edition: "java",
-              steps: [{ type: "give", item: "diamond", amount: 1 }],
+              steps: [
+                {
+                  type: "give",
+                  item: "diamond",
+                  amount: 1,
+                  enchanted: false,
+                  replace: false,
+                },
+              ],
             }),
           ],
         },
@@ -235,6 +251,68 @@ describe("GamesService", () => {
             message: "Connect Minecraft Bedrock Edition first.",
           },
         ],
+      ]);
+    });
+
+    it("counts a clear that found nothing to replace as done", async () => {
+      const minecraft = fakeMinecraft();
+      minecraft.answer = (command) =>
+        command.startsWith("clear")
+          ? { command, ok: false, message: "No items to remove" }
+          : { command, ok: true, message: "" };
+      const games = service(minecraft);
+      const onError = vi.fn();
+      games.onError(onError);
+      const steps = [
+        GameStepSchema.parse({ type: "give", item: "diamond", replace: true }),
+      ];
+      await games.handle(
+        TOKIO_EVENTS.FOLLOW,
+        { user },
+        { actions: [action({ steps })] },
+      );
+      expect(minecraft.sent).toEqual(["clear @p diamond", "give @p diamond 1"]);
+      expect(onError).not.toHaveBeenCalled();
+
+      const test: Parameters<GamesService["test"]>[0] = {
+        edition: "bedrock",
+        trigger: TOKIO_EVENTS.FOLLOW,
+        steps,
+      };
+      expect((await games.test(test)).data?.[0]).toEqual({
+        command: "clear @p diamond",
+        ok: true,
+        message: "No items to remove",
+      });
+      // A game that left still fails it
+      minecraft.answer = (command) => ({
+        command,
+        ok: false,
+        message: "Minecraft disconnected.",
+        dropped: true,
+      });
+      expect((await games.test(test)).data?.[0].ok).toBe(false);
+    });
+
+    it("picks a random boss again for each run of a streak", async () => {
+      vi.spyOn(Math, "random")
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(0.3)
+        .mockReturnValueOnce(0.99);
+      const minecraft = fakeMinecraft();
+      const boss = action({
+        trigger: trigger(TOKIO_EVENTS.GIFT, { every_gift: true }),
+        steps: [
+          GameStepSchema.parse({ type: "hazard", hazard: "random_boss" }),
+        ],
+      });
+      await service(minecraft).handle(TOKIO_EVENTS.GIFT, gift(3), {
+        actions: [boss],
+      });
+      expect(minecraft.sent).toEqual([
+        "summon warden ~ ~ ~",
+        "summon wither ~ ~ ~",
+        "summon evocation_illager ~ ~ ~",
       ]);
     });
 
