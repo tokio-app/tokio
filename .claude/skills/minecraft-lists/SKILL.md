@@ -45,5 +45,6 @@ The current list is 26.3: 95 mobs, 1,645 items. It comes from Mojang's own data,
 
 - Both JSON files hold `{ mobs, items }` sorted by name, and the version and counts above are updated.
 - The help steps' ids (`helpCommands`, `src/main/services/games/commands.ts`) are still in both lists.
+- For Java, `bestEnchantments` (`src/common/games/enchantments.ts`) still matches the version's data in the client jar: for each item in `data/minecraft/tags/item/enchantable/*`, every enchantment in `data/minecraft/enchantment/` whose `supported_items` holds it, curses aside, at its `max_level`, minus the ones its `exclusive_set` rules out (the file's comment says which stay), in `tags/enchantment/tooltip_order`'s order. New enchantments get their names in both locale files, from the client's `en_us.json` and Java's `es_mx.json`.
 - `PAIRS` covers every new id that has a counterpart under another name.
 - `yarn test src/renderer/src/pages/Games src/common/util/games.test.ts` passes, then `yarn typecheck` and `yarn lint`.

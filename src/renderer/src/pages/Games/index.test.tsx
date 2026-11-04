@@ -526,8 +526,107 @@ describe("Games", () => {
     await wait(300);
 
     expect(saves().at(-1)!.actions[0].steps).toEqual([
-      { type: "help", help: "regeneration", duration: 90 },
+      {
+        type: "help",
+        help: "regeneration",
+        duration: 90,
+        enchanted: false,
+        replace: false,
+      },
     ]);
+  });
+
+  it("enchants a Java action's item or armor, and lists what it gets", async () => {
+    const sword: GameStep = {
+      type: "give",
+      item: "netherite_sword",
+      amount: 1,
+      enchanted: false,
+      replace: false,
+    };
+    const diamond: GameStep = { ...sword, item: "diamond" };
+    const armor: GameStep = {
+      type: "help",
+      help: "netherite_armor",
+      duration: 30,
+      enchanted: false,
+      replace: false,
+    };
+    const { user } = await load([
+      action("b1", { steps: [sword, armor] }),
+      action("j1", { edition: "java", steps: [sword, diamond, armor] }),
+    ]);
+    const boxes = () =>
+      screen.queryAllByRole("checkbox", { name: "enchanted" });
+
+    // Bedrock can't enchant what it gives
+    expect(boxes()).toHaveLength(0);
+
+    await user.click(screen.getByRole("tab", { name: "Java" }));
+    // Nothing for the diamond
+    expect(boxes()).toHaveLength(2);
+    const [swordBox, armorBox] = boxes();
+    expect(screen.queryByText(/Sharpness/)).toBeNull();
+    await user.click(swordBox);
+    await user.click(armorBox);
+    await wait(300);
+
+    expect(swordBox).toHaveAccessibleDescription(
+      "Sharpness V, Sweeping Edge III, Fire Aspect II, Knockback II, Looting III, Unbreaking III, and Mending",
+    );
+    // What the four pieces get between them
+    expect(armorBox).toHaveAccessibleDescription(
+      "Protection IV, Feather Falling IV, Respiration III, Aqua Affinity, Soul Speed III, Swift Sneak III, Depth Strider III, Thorns III, Unbreaking III, and Mending",
+    );
+    expect(saves().at(-1)!.actions[1].steps).toEqual([
+      { ...sword, enchanted: true },
+      diamond,
+      { ...armor, enchanted: true },
+    ]);
+  });
+
+  it("replaces the player's own items, and enchants the kit on Java", async () => {
+    const give: GameStep = {
+      type: "give",
+      item: "diamond",
+      amount: 1,
+      enchanted: false,
+      replace: false,
+    };
+    const kit: GameStep = {
+      type: "help",
+      help: "netherite_kit",
+      duration: 30,
+      enchanted: false,
+      replace: false,
+    };
+    const { user } = await load([
+      action("b1", { steps: [give, kit] }),
+      action("j1", { edition: "java", steps: [kit] }),
+    ]);
+    const boxes = () =>
+      screen.getAllByRole("checkbox", { name: "replacing yours" });
+
+    // A give's and the kit's, in both editions
+    expect(boxes()).toHaveLength(2);
+    // The kit lasts no time, and Bedrock can't enchant it
+    expect(
+      screen.queryByRole("spinbutton", { name: "Duration in seconds" }),
+    ).toBeNull();
+    expect(screen.queryByText(/Sharpness/)).toBeNull();
+    for (const box of boxes()) await user.click(box);
+    await wait(300);
+    expect(saves().at(-1)!.actions[0].steps).toEqual([
+      { ...give, replace: true },
+      { ...kit, replace: true },
+    ]);
+
+    await user.click(screen.getByRole("tab", { name: "Java" }));
+    expect(
+      screen.getByText(
+        "Sharpness V, Power V, Sweeping Edge III, Fire Aspect II, Flame, Knockback II, Punch II, Protection IV, Feather Falling IV, Fortune III, Looting III, Efficiency V, Respiration III, Aqua Affinity, Soul Speed III, Swift Sneak III, Depth Strider III, Thorns III, Unbreaking III, Infinity, and Mending",
+      ),
+    ).toBeVisible();
   });
 
   it("puts variables in the step's text field last focused", async () => {
@@ -710,12 +809,28 @@ describe("Games", () => {
 
   it("lists the mobs and items of the action's edition", async () => {
     const { user } = await load([
-      action("b1", { steps: [{ type: "give", item: "diamond", amount: 1 }] }),
+      action("b1", {
+        steps: [
+          {
+            type: "give",
+            item: "diamond",
+            amount: 1,
+            enchanted: false,
+            replace: false,
+          },
+        ],
+      }),
       action("j1", {
         edition: "java",
         steps: [
           { type: "spawn", mob: "zombie", amount: 1, name: "" },
-          { type: "give", item: "diamond", amount: 1 },
+          {
+            type: "give",
+            item: "diamond",
+            amount: 1,
+            enchanted: false,
+            replace: false,
+          },
         ],
       }),
     ]);
@@ -746,7 +861,13 @@ describe("Games", () => {
 
     expect(saves().at(-1)!.actions[1].steps).toEqual([
       { type: "spawn", mob: "creeper", amount: 1, name: "" },
-      { type: "give", item: "totem_of_undying", amount: 1 },
+      {
+        type: "give",
+        item: "totem_of_undying",
+        amount: 1,
+        enchanted: false,
+        replace: false,
+      },
     ]);
   });
 

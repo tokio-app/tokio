@@ -28,7 +28,13 @@ const spawn = (mob: string): GameStep => ({
   amount: 2,
   name: "{username}",
 });
-const give = (item: string): GameStep => ({ type: "give", item, amount: 3 });
+const give = (item: string): GameStep => ({
+  type: "give",
+  item,
+  amount: 3,
+  enchanted: false,
+  replace: false,
+});
 
 describe("Games helper", () => {
   it("creates a follow action that spawns a zombie", () => {

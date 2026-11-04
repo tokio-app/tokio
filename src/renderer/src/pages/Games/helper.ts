@@ -1,4 +1,5 @@
-import { MessageKey, translate } from "@/common/i18n";
+import { bestEnchantments } from "@/common/games/enchantments";
+import { listOf, MessageKey, translate } from "@/common/i18n";
 import {
   GAME_HAZARDS,
   GAME_HELPS,
@@ -20,6 +21,7 @@ import {
   JAVA_ONLY_STEPS,
   MINECRAFT_NAMES,
   MINECRAFT_PORT,
+  NETHERITE_KIT,
   TIME_NAMES,
   WEATHER_NAMES,
 } from "@/common/util";
@@ -139,7 +141,13 @@ const NEW_STEPS: { [K in StepKind]: Step<K> } = {
   // Until turned back, the user's call
   morph: { type: "morph", mob: "zombie", seconds: null },
   unmorph: { type: "unmorph" },
-  give: { type: "give", item: "diamond", amount: 1 },
+  give: {
+    type: "give",
+    item: "diamond",
+    amount: 1,
+    enchanted: false,
+    replace: false,
+  },
   weather: { type: "weather", weather: "clear" },
   time: { type: "time", time: "day" },
   hazard: {
@@ -153,7 +161,13 @@ const NEW_STEPS: { [K in StepKind]: Step<K> } = {
     distance: 1000,
     depth: 10,
   },
-  help: { type: "help", help: "netherite_armor", duration: 30 },
+  help: {
+    type: "help",
+    help: "netherite_armor",
+    duration: 30,
+    enchanted: false,
+    replace: false,
+  },
   command: { type: "command", command: "" },
 };
 
@@ -245,6 +259,33 @@ export function withEdition(
     return step;
   });
   return { ...action, edition, steps };
+}
+
+// What the Netherite armor help puts on
+export const NETHERITE_ARMOR = [
+  "netherite_helmet",
+  "netherite_chestplate",
+  "netherite_leggings",
+  "netherite_boots",
+];
+
+// What the Netherite kit help puts on and gives
+export const NETHERITE_KIT_ITEMS = [
+  ...NETHERITE_ARMOR,
+  ...NETHERITE_KIT.map(([item]) => item),
+];
+
+// A level as the game writes it after the name, none for 1
+const NUMERALS = ["", "", " II", " III", " IV", " V"];
+
+// The enchantments the items get between them, named as the game names
+// them: "Sharpness V, Sweeping Edge III, …, and Mending"
+export function enchantmentsText(items: string[], language: string) {
+  const names = bestEnchantments(...items).map(
+    ([id, level]) =>
+      translate(language, `minecraft.enchantment.${id}`) + NUMERALS[level],
+  );
+  return listOf(language, names);
 }
 
 // The text a step's variables go into, if it has one

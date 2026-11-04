@@ -246,7 +246,13 @@ describe("ProfileSchema", () => {
     });
 
     expect(action.steps).toEqual([
-      { type: "help", help: "netherite_armor", duration: 30 },
+      {
+        type: "help",
+        help: "netherite_armor",
+        duration: 30,
+        enchanted: false,
+        replace: false,
+      },
     ]);
   });
 

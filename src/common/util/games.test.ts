@@ -186,7 +186,13 @@ describe("gameStepsText", () => {
       steps(
         "java",
         { type: "spawn", mob: "zombie", amount: 5, name: "" },
-        { type: "give", item: "diamond", amount: 1 },
+        {
+          type: "give",
+          item: "diamond",
+          amount: 1,
+          enchanted: false,
+          replace: false,
+        },
         { type: "weather", weather: "thunder" },
         { type: "time", time: "night" },
       ),
@@ -200,9 +206,15 @@ describe("gameStepsText", () => {
       }),
     ).toBe("Chicken Jockey ×3");
     // Bedrock's id for Java's cobweb
-    expect(steps("bedrock", { type: "give", item: "web", amount: 1 })).toBe(
-      "Cobweb",
-    );
+    expect(
+      steps("bedrock", {
+        type: "give",
+        item: "web",
+        amount: 1,
+        enchanted: false,
+        replace: false,
+      }),
+    ).toBe("Cobweb");
   });
 
   it("names hazards, counted only when they repeat", () => {
@@ -292,8 +304,20 @@ describe("gameStepsText", () => {
     expect(
       steps(
         "java",
-        { type: "help", help: "netherite_armor", duration: 30 },
-        { type: "help", help: "heal", duration: 30 },
+        {
+          type: "help",
+          help: "netherite_armor",
+          duration: 30,
+          enchanted: false,
+          replace: false,
+        },
+        {
+          type: "help",
+          help: "heal",
+          duration: 30,
+          enchanted: false,
+          replace: false,
+        },
       ),
     ).toBe("Netherite armor, Full heal");
   });
@@ -304,7 +328,13 @@ describe("gameStepsText", () => {
         "java",
         { type: "command", command: "say hi" },
         { type: "spawn", mob: "constructor", amount: 1, name: "" },
-        { type: "give", item: "web", amount: 1 },
+        {
+          type: "give",
+          item: "web",
+          amount: 1,
+          enchanted: false,
+          replace: false,
+        },
       ),
     ).toBe("");
   });
@@ -314,7 +344,13 @@ describe("gameStepsText", () => {
       a.steps = [
         { type: "weather", weather: "thunder" },
         { type: "spawn", mob: "zombie", amount: 5, name: "" },
-        { type: "give", item: "diamond", amount: 3 },
+        {
+          type: "give",
+          item: "diamond",
+          amount: 3,
+          enchanted: false,
+          replace: false,
+        },
       ];
     });
 
@@ -358,7 +394,13 @@ describe("gameStepsText", () => {
       a.steps = [
         { type: "spawn", mob: "zombie", amount: 2, name: "" },
         { type: "time", time: "night" },
-        { type: "help", help: "heal", duration: 30 },
+        {
+          type: "help",
+          help: "heal",
+          duration: 30,
+          enchanted: false,
+          replace: false,
+        },
       ];
     });
 

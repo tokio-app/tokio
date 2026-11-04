@@ -209,16 +209,19 @@ export const GAME_HAZARDS = [
   "lava_lake",
   "hole",
   "clear_inventory",
+  "random_boss",
   "meteor",
   "laser",
   "super_laser",
   "super_duper_laser",
 ] as const;
 
-// Built-in ways to help the player survive: netherite armor, a full heal and
-// potion effects, the same in both editions (see gameCommands)
+// Built-in ways to help the player survive: netherite armor, a kit of it with
+// weapons and tools, a full heal and potion effects, the same in both
+// editions (see gameCommands)
 export const GAME_HELPS = [
   "netherite_armor",
+  "netherite_kit",
   "heal",
   "regeneration",
   "absorption",
@@ -258,6 +261,12 @@ export const GameStepSchema = z.discriminatedUnion("type", [
     type: z.literal("give"),
     item: z.string(),
     amount: GameAmountSchema,
+    // Java's only: with the best enchantments the item takes
+    // (bestEnchantments). Bedrock can't enchant what it gives.
+    enchanted: z.boolean().default(false),
+    // Takes the player's own of that item first, so gifts don't fill their
+    // inventory
+    replace: z.boolean().default(false),
   }),
   z.object({
     type: z.literal("weather"),
@@ -288,6 +297,10 @@ export const GameStepSchema = z.discriminatedUnion("type", [
     help: z.enum(GAME_HELPS),
     // How long an effect lasts, in seconds; armor and the heal have none
     duration: z.number().int().min(1).max(600).default(30),
+    // The armor's, Java's only, as a give's. The kit's always are.
+    enchanted: z.boolean().default(false),
+    // The kit's, as a give's
+    replace: z.boolean().default(false),
   }),
 ]);
 
