@@ -8,6 +8,7 @@ import {
 import {
   EulerSigner,
   isConnectorError,
+  isStreakable,
   isStreakEnd,
   TikTokLiveConnection,
   WebcastEvent,
@@ -33,6 +34,10 @@ import config from "./config";
 // A message type TikTok changed fails on every message, so an error code is
 // logged at most this often.
 const LOG_REPEAT_MS = 30_000;
+
+// TikTok ends a streak 3 to 4 s after its last gift, so a combo it never ends
+// ends this long after its last one.
+const COMBO_END_MS = 4000;
 
 export class TikTokLiveConnector extends ConnectorProvider {
   private _connection: TikTokLiveConnection | null = null;
@@ -229,6 +234,28 @@ export class TikTokLiveConnector extends ConnectorProvider {
       });
     });
 
+    // A combo of a gift that isn't streakable (Hand Heart) comes as one
+    // message per gift, each with repeatCount 1, and TikTok never ends it.
+    // Its gifts are added up here, by sender and gift, so it reaches listeners
+    // like a streak: a growing comboCount, then one end.
+    const combos = new Map<
+      string,
+      { group: string; event: GiftEvent; timer: NodeJS.Timeout }
+    >();
+    const endCombo = (key: string) => {
+      const combo = combos.get(key);
+      if (!combo) return;
+      clearTimeout(combo.timer);
+      combos.delete(key);
+      // Listeners forget their streaks once the connection stops
+      if (this._connection !== connection) return;
+      const { event } = combo;
+      this.emit(TOKIO_EVENTS.GIFT, {
+        ...event,
+        gift: { ...event.gift, repeatEnd: true },
+      });
+    };
+
     connection.on(WebcastEvent.GIFT, (tdata) => {
       const data: GiftEvent = {
         user: getUserData(tdata.user, tdata.userIdentity),
@@ -243,7 +270,28 @@ export class TikTokLiveConnector extends ConnectorProvider {
           image: tdata.gift?.image?.urlList[0] ?? "",
         },
       };
-      this.emit(TOKIO_EVENTS.GIFT, data);
+      if (!tdata.gift?.combo || isStreakable(tdata)) {
+        this.emit(TOKIO_EVENTS.GIFT, data);
+        return;
+      }
+
+      const key = `${data.user.userId}:${data.gift.id}`;
+      // TikTok's group id tells a new combo from the last one
+      if (combos.get(key)?.group !== tdata.groupId) endCombo(key);
+      const last = combos.get(key);
+      clearTimeout(last?.timer);
+      const comboCount =
+        (last?.event.gift.comboCount ?? 0) + Math.max(1, tdata.repeatCount);
+      const event = {
+        ...data,
+        gift: { ...data.gift, repeatEnd: false, comboCount },
+      };
+      combos.set(key, {
+        group: tdata.groupId,
+        event,
+        timer: setTimeout(() => endCombo(key), COMBO_END_MS),
+      });
+      this.emit(TOKIO_EVENTS.GIFT, event);
     });
 
     connection.on(WebcastEvent.LIKE, (tdata) => {

@@ -557,6 +557,99 @@ describe("TikTokLiveConnector", () => {
       });
     });
 
+    describe("a combo of a gift that isn't streakable", () => {
+      // As TikTok sends one: a message per gift, each with repeatCount 1 and
+      // the combo's group id, and no end
+      const heart = (groupId = "7") => ({
+        user: rawUser,
+        giftId: "5660",
+        groupId,
+        gift: { type: 2, combo: true, name: "Hand Heart", diamondCount: 100 },
+        repeatCount: 1,
+        repeatEnd: false,
+      });
+      const counts = (onGift: ReturnType<typeof capture>) =>
+        onGift.mock.calls.map(([e]) => [e.gift.comboCount, e.gift.repeatEnd]);
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      it("adds up its gifts and ends it 4 s after the last one", () => {
+        const onGift = capture(TOKIO_EVENTS.GIFT);
+
+        connection().emit("gift", heart());
+        connection().emit("gift", heart());
+        vi.advanceTimersByTime(3999);
+        connection().emit("gift", heart());
+        vi.advanceTimersByTime(3999);
+
+        expect(counts(onGift)).toEqual([
+          [1, false],
+          [2, false],
+          [3, false],
+        ]);
+
+        vi.advanceTimersByTime(1);
+
+        expect(onGift).toHaveBeenCalledTimes(4);
+        expect(onGift).toHaveBeenLastCalledWith({
+          user: mappedUser,
+          gift: {
+            id: "5660",
+            type: 2,
+            name: "Hand Heart",
+            repeatEnd: true,
+            coins: 100,
+            comboCount: 3,
+            image: "",
+          },
+        });
+      });
+
+      it("ends the last combo when a new one starts", () => {
+        const onGift = capture(TOKIO_EVENTS.GIFT);
+
+        connection().emit("gift", heart("7"));
+        connection().emit("gift", heart("7"));
+        connection().emit("gift", heart("8"));
+        vi.advanceTimersByTime(4000);
+
+        expect(counts(onGift)).toEqual([
+          [1, false],
+          [2, false],
+          [2, true],
+          [1, false],
+          [1, true],
+        ]);
+      });
+
+      it("keeps each sender's combo apart", () => {
+        const onGift = capture(TOKIO_EVENTS.GIFT);
+
+        connection().emit("gift", heart());
+        connection().emit("gift", {
+          ...heart(),
+          user: { ...rawUser, userId: "2" },
+        });
+
+        expect(counts(onGift)).toEqual([
+          [1, false],
+          [1, false],
+        ]);
+      });
+
+      it("drops its end once the connection stops", async () => {
+        const onGift = capture(TOKIO_EVENTS.GIFT);
+
+        connection().emit("gift", heart());
+        await connector.disconnect();
+        vi.advanceTimersByTime(4000);
+
+        expect(counts(onGift)).toEqual([[1, false]]);
+      });
+    });
+
     it("maps likes, follows, shares and members", () => {
       const onLike = capture(TOKIO_EVENTS.LIKE);
       const onFollow = capture(TOKIO_EVENTS.FOLLOW);
