@@ -1,10 +1,17 @@
 import { GAME_HELPS, GameStep, GameStepSchema } from "@/common/schemas";
 import { describe, expect, it } from "vitest";
-import { commandValue, gameCommands, launchPlan } from "./commands";
+import {
+  commandValue,
+  gameCommands,
+  launchPlan,
+  SPAWN_GAP_MS,
+} from "./commands";
 
 const step = (input: Record<string, unknown>): GameStep =>
   GameStepSchema.parse(input);
 const none = (text: string) => text;
+// Between two mobs of a step
+const gap = { wait: SPAWN_GAP_MS };
 
 describe("commandValue", () => {
   it("drops what could break out of a command", () => {
@@ -42,14 +49,22 @@ describe("gameCommands in Bedrock", () => {
         { type: "spawn", mob: "chicken", amount: 2, name: "{username}" },
         () => 'Aku"} @e',
       ),
-    ).toEqual(['summon chicken "Aku e" ~ ~ ~', 'summon chicken "Aku e" ~ ~ ~']);
+    ).toEqual([
+      'summon chicken "Aku e" ~ ~ ~',
+      gap,
+      'summon chicken "Aku e" ~ ~ ~',
+    ]);
   });
 
-  it("keeps mobs that burn in daylight out of the sun's fire", () => {
+  it("keeps mobs that burn in daylight out of the sun's fire, each as it comes", () => {
+    const zombie = [
+      "summon zombie ~ ~ ~",
+      "effect @e[type=zombie,r=2,c=1] fire_resistance infinite 0 true",
+    ];
     expect(run({ type: "spawn", mob: "zombie", amount: 2 })).toEqual([
-      "summon zombie ~ ~ ~",
-      "summon zombie ~ ~ ~",
-      "effect @e[type=zombie,r=2,c=2] fire_resistance infinite 0 true",
+      ...zombie,
+      gap,
+      ...zombie,
     ]);
   });
 
@@ -63,14 +78,14 @@ describe("gameCommands in Bedrock", () => {
   });
 
   it("spawns chicken jockeys as baby zombies given chickens", () => {
+    const jockey = [
+      'summon zombie ~ ~ ~ 0 0 minecraft:as_baby "Lucia"',
+      "ride @e[type=zombie,r=2,c=1] summon_ride chicken no_ride_change minecraft:spawn_adult",
+      "effect @e[type=zombie,r=2,c=1] fire_resistance infinite 0 true",
+    ];
     expect(
       run({ type: "spawn", mob: "chicken_jockey", amount: 2, name: "Lucia" }),
-    ).toEqual([
-      'summon zombie ~ ~ ~ 0 0 minecraft:as_baby "Lucia"',
-      'summon zombie ~ ~ ~ 0 0 minecraft:as_baby "Lucia"',
-      "ride @e[type=zombie,r=2,c=2] summon_ride chicken no_ride_change minecraft:spawn_adult",
-      "effect @e[type=zombie,r=2,c=2] fire_resistance infinite 0 true",
-    ]);
+    ).toEqual([...jockey, gap, ...jockey]);
     expect(run({ type: "spawn", mob: "chicken_jockey" })[0]).toBe(
       "summon zombie ~ ~ ~ 0 0 minecraft:as_baby",
     );
@@ -131,6 +146,7 @@ describe("gameCommands in Java Edition", () => {
       ),
     ).toEqual([
       'summon minecraft:chicken ~ ~ ~ {CustomName:"Aku"}',
+      gap,
       'summon minecraft:chicken ~ ~ ~ {CustomName:"Aku"}',
     ]);
   });
@@ -154,9 +170,10 @@ describe("gameCommands in Java Edition", () => {
         () => 'Lu"cia}',
       ),
     ).toEqual(
-      Array(3).fill(
+      [1, 2, 3].flatMap((n) => [
+        ...(n > 1 ? [gap] : []),
         'summon minecraft:chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b,CustomName:"Lucia"}]}',
-      ),
+      ]),
     );
   });
 
@@ -369,6 +386,15 @@ describe("gameCommands for hazards", () => {
 
   it("repeats only the hazards an amount counts", () => {
     expect(run("lightning", "java", { amount: 3 })).toHaveLength(3);
+    // Mobs come one at a time
+    const creeper = "summon minecraft:creeper ~ ~ ~ {powered:1b}";
+    expect(run("charged_creeper", "java", { amount: 3 })).toEqual([
+      creeper,
+      gap,
+      creeper,
+      gap,
+      creeper,
+    ]);
     expect(run("tnt", "java", { amount: 3 })).toHaveLength(1);
     expect(run("tnt_ring", "java", { amount: 3 })).toHaveLength(8);
     expect(run("launch_water", "bedrock", { amount: 3 })).toHaveLength(8);

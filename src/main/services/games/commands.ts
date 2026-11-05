@@ -28,6 +28,15 @@ const RING = [
 export type GameCommand =
   string | { wait: number } | { mayFail: string } | { oneOf: string[] };
 
+// The time between the mobs of a step, so they come one at a time
+export const SPAWN_GAP_MS = 250;
+
+// The groups' commands, a wait apart
+const spaced = (groups: GameCommand[][]): GameCommand[] =>
+  groups.flatMap((group, i) =>
+    i === 0 ? group : [{ wait: SPAWN_GAP_MS }, ...group],
+  );
+
 // The strongest levitation the effect command takes (amplifier 255). Both
 // editions send it to the game whole.
 const MAX_LEVEL = 256;
@@ -333,21 +342,21 @@ const DAYLIGHT_BURNERS = [
 // mod sets Java's hostiles on the player itself.
 const ANGER_EVENTS = new Map([["cave_spider", "minecraft:become_angry"]]);
 
-// Bedrock's spawn of `amount` mobs, `name` the quoted name or "". Its summon
-// takes no NBT, so a chicken jockey is baby zombies that each get a new adult
-// chicken under them (a chicken can be a baby, which has no seat). Summoning
-// the riders, not the chickens, keeps chickens already nearby out of it, and
-// c= picks the ones just spawned, nearest the player.
-function bedrockSpawn(mob: string, name: string, amount: number) {
+// One of Bedrock's mobs, `name` the quoted name or "". Its summon takes no
+// NBT, so a chicken jockey is a baby zombie that gets a new adult chicken
+// under it (a chicken can be a baby, which has no seat). Summoning the rider,
+// not the chicken, keeps chickens already nearby out of it, and c=1 picks the
+// one just spawned at the player's feet, before it moves.
+function bedrockMob(mob: string, name: string) {
   const jockey = mob === "chicken_jockey";
   const summoned = jockey ? "zombie" : mob;
   const event = jockey ? "minecraft:as_baby" : ANGER_EVENTS.get(mob);
-  const spawned = `@e[type=${summoned},r=2,c=${amount}]`;
-  const commands = Array.from({ length: amount }, () =>
+  const spawned = `@e[type=${summoned},r=2,c=1]`;
+  const commands = [
     event
       ? `summon ${summoned} ~ ~ ~ 0 0 ${event}${name}`
       : `summon ${summoned}${name} ~ ~ ~`,
-  );
+  ];
   if (jockey) {
     commands.push(
       `ride ${spawned} summon_ride chicken no_ride_change minecraft:spawn_adult`,
@@ -459,16 +468,17 @@ export function gameCommands(
       if (!ID.test(step.mob)) return [];
       const name = commandValue(fill(step.name));
       const quoted = JSON.stringify(name);
-      if (!java) {
-        return bedrockSpawn(step.mob, name ? ` ${quoted}` : "", step.amount);
-      }
+      // One at a time, SPAWN_GAP_MS apart
+      const each = (commands: string[]) =>
+        spaced(Array.from({ length: step.amount }, () => commands));
+      if (!java) return each(bedrockMob(step.mob, name ? ` ${quoted}` : ""));
       // ~ is where the player stands. Java's SNBT reads a plain string as a
       // text component. A jockey's name goes on its baby zombie.
       const command =
         step.mob === "chicken_jockey"
           ? `summon minecraft:chicken ~ ~ ~ {Passengers:[{id:"minecraft:zombie",IsBaby:1b${name ? `,CustomName:${quoted}` : ""}}]}`
           : `summon minecraft:${step.mob} ~ ~ ~${name ? ` {CustomName:${quoted}}` : ""}`;
-      return Array.from({ length: step.amount }, () => command);
+      return each([command]);
     }
     // The Tokio mod's: for seconds, or until an unmorph
     case "morph": {
@@ -489,7 +499,9 @@ export function gameCommands(
     case "hazard": {
       const commands = hazardCommands(step, java);
       const times = REPEATED_HAZARDS.includes(step.hazard) ? step.amount : 1;
-      return Array.from({ length: times }, () => commands).flat();
+      const runs = Array.from({ length: times }, () => commands);
+      // Mobs, which come one at a time as a spawn's do
+      return step.hazard === "charged_creeper" ? spaced(runs) : runs.flat();
     }
     case "help":
       return helpCommands(step, java);
