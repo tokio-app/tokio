@@ -4,6 +4,7 @@ import {
   GameAction,
   Profile,
   SavedEmote,
+  StudioElementSchema,
   StudioLayerSchema,
   StudioOverlay,
   TimerSettingsSchema,
@@ -1058,8 +1059,8 @@ describe("init events", () => {
   describe("studio", () => {
     const ID = "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f";
     const SOCKET = `studio:${ID}`;
-    const layer = (id: string, patch: object) =>
-      StudioLayerSchema.parse({
+    const element = (id: string, patch: object) =>
+      StudioElementSchema.parse({
         id,
         x: 0,
         y: 0,
@@ -1068,8 +1069,17 @@ describe("init events", () => {
         kind: "shape",
         ...patch,
       });
-    const withOverlay = (s: Setup, layers: ReturnType<typeof layer>[]) => {
-      s.studio.push({ id: ID, name: "Main", size: "portrait", layers });
+    // One layer holding the elements
+    const layersOf = (elements: ReturnType<typeof element>[]) => [
+      StudioLayerSchema.parse({ id: "L1", elements }),
+    ];
+    const withOverlay = (s: Setup, elements: ReturnType<typeof element>[]) => {
+      s.studio.push({
+        id: ID,
+        name: "Main",
+        size: "portrait",
+        layers: layersOf(elements),
+      });
     };
     // What the studio overlay's page got of a kind of message, in order
     const studioSent = (s: Setup, type: string) =>
@@ -1078,7 +1088,10 @@ describe("init events", () => {
       );
     const texts = (s: Setup) =>
       studioSent(s, "tokio:studio").map(
-        (data: any) => data.view?.layers.map((l: any) => l.text) ?? null,
+        (data: any) =>
+          data.view?.layers.flatMap((l: any) =>
+            l.elements.map((e: any) => e.text),
+          ) ?? null,
       );
     const connect = (s: Setup, id: string) => {
       for (const [listener] of s.serverService.onConnect.mock.calls) {
@@ -1088,7 +1101,7 @@ describe("init events", () => {
 
     it("sends a studio overlay's view when its page connects, null when it's gone", async () => {
       const s = await live();
-      withOverlay(s, [layer("t", { kind: "text", text: "Hi" })]);
+      withOverlay(s, [element("t", { kind: "text", text: "Hi" })]);
       s.serverService.sendToClient.mockClear();
 
       connect(s, SOCKET);
@@ -1104,7 +1117,7 @@ describe("init events", () => {
     it("plays a layer's react on its page, after the stats hold the event", async () => {
       const s = await live();
       withOverlay(s, [
-        layer("t", {
+        element("t", {
           kind: "text",
           when: "event",
           trigger: { type: TOKIO_EVENTS.LIKE, gifts: [] },
@@ -1120,18 +1133,18 @@ describe("init events", () => {
       s.conn.emit(TOKIO_EVENTS.LIKE, like(2500));
 
       expect(studioSent(s, "tokio:studio:react")).toEqual([
-        { layer: "t", text: "Viewer: 2.5K" },
+        { element: "t", text: "Viewer: 2.5K" },
       ]);
     });
 
     it("plays an emote layer on a chat, and a Music layer on a song change", async () => {
       const s = await live();
       withOverlay(s, [
-        layer("e", {
+        element("e", {
           when: "animate",
           trigger: { type: EMOTE_TRIGGER, gifts: [] },
         }),
-        layer("m", {
+        element("m", {
           when: "animate",
           trigger: { type: TOKIO_EVENTS.MUSIC_CHANGE, gifts: [] },
         }),
@@ -1142,8 +1155,8 @@ describe("init events", () => {
       songChange([]);
 
       expect(studioSent(s, "tokio:studio:react")).toEqual([
-        { layer: "e" },
-        { layer: "m" },
+        { element: "e" },
+        { element: "m" },
       ]);
     });
 
@@ -1167,13 +1180,13 @@ describe("init events", () => {
       vi.useFakeTimers();
       const s = await live();
       withOverlay(s, [
-        layer("t", { kind: "text", text: "{viewers} watching" }),
+        element("t", { kind: "text", text: "{viewers} watching" }),
       ]);
       s.studio.push({
         id: "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60",
         name: "Plain",
         size: "portrait",
-        layers: [layer("p", { kind: "text", text: "Hi" })],
+        layers: layersOf([element("p", { kind: "text", text: "Hi" })]),
       });
       s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>
         Object.assign(s.stats, data),
@@ -1199,7 +1212,7 @@ describe("init events", () => {
 
     it("counts the session's followers while LIVE", async () => {
       const s = await live();
-      withOverlay(s, [layer("t", { kind: "text", text: "{followers} new" })]);
+      withOverlay(s, [element("t", { kind: "text", text: "{followers} new" })]);
       s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
       await flushPromises();
       s.serverService.sendToClient.mockClear();
@@ -1212,7 +1225,7 @@ describe("init events", () => {
     it("sends zeros when the LIVE ends, after any push waiting", async () => {
       vi.useFakeTimers();
       const s = await live();
-      withOverlay(s, [layer("t", { kind: "text", text: "{likes}" })]);
+      withOverlay(s, [element("t", { kind: "text", text: "{likes}" })]);
       s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>
         Object.assign(s.stats, data),
       );
@@ -1231,7 +1244,7 @@ describe("init events", () => {
 
     it("sends the views again once a custom gift is saved", async () => {
       const s = await live();
-      withOverlay(s, [layer("g", { kind: "gift", gift: lion.value })]);
+      withOverlay(s, [element("g", { kind: "gift", gift: lion.value })]);
       s.overlayService.recordGift.mockResolvedValue({
         success: true,
         data: [lion],
@@ -1243,7 +1256,7 @@ describe("init events", () => {
 
       await vi.waitFor(() =>
         expect(studioSent(s, "tokio:studio")).toMatchObject([
-          { view: { layers: [{ src: "lion.png" }] } },
+          { view: { layers: [{ elements: [{ src: "lion.png" }] }] } },
         ]),
       );
     });
@@ -1258,7 +1271,7 @@ describe("init events", () => {
 
     it("sends the views again in a new language", async () => {
       const s = await live();
-      withOverlay(s, [layer("t", { kind: "text", text: "{likes}" })]);
+      withOverlay(s, [element("t", { kind: "text", text: "{likes}" })]);
       s.stats.likes = 1500;
       s.serverService.sendToClient.mockClear();
 

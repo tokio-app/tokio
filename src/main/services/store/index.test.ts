@@ -4,6 +4,7 @@ import {
   Profile,
   ProfileSchema,
   StoreSchema,
+  StudioElementSchema,
   StudioLayerSchema,
   StudioOverlaySchema,
 } from "@/common/schemas";
@@ -1604,9 +1605,9 @@ describe("StoreManagerService", () => {
   describe("studio", () => {
     const id = "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f";
     const other = "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60";
-    const media = (layerId: string, file: string) =>
-      StudioLayerSchema.parse({
-        id: layerId,
+    const media = (elementId: string, file: string) =>
+      StudioElementSchema.parse({
+        id: elementId,
         kind: "media",
         x: 0,
         y: 0,
@@ -1615,6 +1616,8 @@ describe("StoreManagerService", () => {
         file,
         name: "Confetti",
       });
+    const layer = (layerId: string, ...elements: ReturnType<typeof media>[]) =>
+      StudioLayerSchema.parse({ id: layerId, elements });
 
     it("adds an empty Portrait overlay and reads it back", async () => {
       const store = await init();
@@ -1643,7 +1646,7 @@ describe("StoreManagerService", () => {
         id,
         name: "Main",
         size: "landscape",
-        layers: [media("a", "c0ffee.png")],
+        layers: [layer("L1", media("a", "c0ffee.png"))],
       });
 
       expect(await store.saveStudioOverlay(saved)).toBe(true);
@@ -1662,7 +1665,11 @@ describe("StoreManagerService", () => {
       await store.addStudioOverlay(id, "One");
 
       await expect(
-        store.saveStudioOverlay({ id, name: "One", layers: [{ kind: "x" }] }),
+        store.saveStudioOverlay({
+          id,
+          name: "One",
+          layers: [{ id: "L1", elements: [{ kind: "x" }] }],
+        }),
       ).rejects.toThrow();
 
       expect(store.getStudio()[0].layers).toEqual([]);
@@ -1686,23 +1693,29 @@ describe("StoreManagerService", () => {
       expect((await init()).getStudio()).toEqual([]);
     });
 
-    it("takes a deleted media file off every layer, keeping the layers", async () => {
+    it("takes a deleted media file off every element in any layer, keeping them", async () => {
       const store = await init();
       await store.addStudioOverlay(id, "One");
       await store.saveStudioOverlay({
         id,
         name: "One",
-        layers: [media("a", "c0ffee.png"), media("b", "tea.png")],
+        layers: [
+          layer("L1", media("a", "c0ffee.png"), media("b", "tea.png")),
+          layer("L2", media("c", "c0ffee.png")),
+        ],
       });
 
       expect(await store.removeFromStudio("c0ffee.png")).toBe(true);
 
-      const [a, b] = (await init()).getStudio()[0].layers;
-      expect(a).toMatchObject({ id: "a", file: "", name: "" });
-      expect(b).toMatchObject({ id: "b", file: "tea.png", name: "Confetti" });
+      const [one, two] = (await init()).getStudio()[0].layers;
+      expect(one.elements).toMatchObject([
+        { id: "a", file: "", name: "" },
+        { id: "b", file: "tea.png", name: "Confetti" },
+      ]);
+      expect(two.elements).toMatchObject([{ id: "c", file: "", name: "" }]);
     });
 
-    it("saves nothing when no layer has the file", async () => {
+    it("saves nothing when no element has the file", async () => {
       const store = await init();
       const save = vi.spyOn(json, "saveFile");
 

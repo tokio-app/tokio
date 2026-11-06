@@ -1,6 +1,11 @@
 import STYLES from "@/common/studio/overlay.css?raw";
 import STAGE from "@/common/studio/stage.ts?script";
-import type { StudioLayerView, StudioReact, StudioView } from "@/common/types";
+import type {
+  StudioElementView,
+  StudioLayerView,
+  StudioReact,
+  StudioView,
+} from "@/common/types";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ServerService } from "./index";
@@ -21,15 +26,15 @@ const BASE = {
   animation: "bounce",
 } as const;
 
-// A layer of the kind, with its own fields
-type Own<L> = L extends StudioLayerView
-  ? Omit<L, keyof typeof BASE | "id">
+// An element of the kind, with its own fields
+type Own<E> = E extends StudioElementView
+  ? Omit<E, keyof typeof BASE | "id">
   : never;
-const layer = (
+const element = (
   id: string,
-  fields: Own<StudioLayerView>,
-  base: { when?: StudioLayerView["when"]; x?: number } = {},
-): StudioLayerView => ({ ...BASE, ...base, id, ...fields });
+  fields: Own<StudioElementView>,
+  base: { when?: StudioElementView["when"]; x?: number } = {},
+): StudioElementView => ({ ...BASE, ...base, id, ...fields });
 
 const TEXT = {
   kind: "text",
@@ -42,11 +47,15 @@ const TEXT = {
   halo: true,
 } as const;
 
-const view = (...layers: StudioLayerView[]): StudioView => ({
+const viewOf = (...layers: StudioLayerView[]): StudioView => ({
   width: 1080,
   height: 1920,
   layers,
 });
+
+// The elements in one layer
+const view = (...elements: StudioElementView[]) =>
+  viewOf({ id: "L1", z: 0, elements });
 
 describe("studio overlay page", () => {
   let server: ServerService;
@@ -91,7 +100,7 @@ describe("studio overlay page", () => {
     const react = (r: StudioReact) =>
       server.sendToClient(SOCKET, { type: "tokio:studio:react", data: r });
     const el = (id: string) =>
-      document().querySelector<HTMLElement>(`[data-layer="${id}"]`);
+      document().querySelector<HTMLElement>(`[data-element="${id}"]`);
     const body = (id: string) =>
       el(id)!.querySelector<HTMLElement>(".studio-body")!;
 
@@ -116,25 +125,52 @@ describe("studio overlay page", () => {
       dom.window.close();
     });
 
-    it("draws every kind of layer", async () => {
+    it("draws each layer over the ones before, with its elements inside", async () => {
+      send(
+        viewOf(
+          { id: "back", z: 0, elements: [element("t", TEXT)] },
+          {
+            id: "front",
+            z: 1,
+            elements: [
+              element("s", { kind: "shape", color: "#18181b", radius: 0 }),
+            ],
+          },
+        ),
+      );
+
+      await vi.waitFor(() => expect(el("s")).not.toBeNull());
+      const layers = [
+        ...document().querySelectorAll<HTMLElement>(".studio-layer"),
+      ];
+      expect(layers.map((l) => [l.dataset.layer, l.style.zIndex])).toEqual([
+        ["back", "0"],
+        ["front", "1"],
+      ]);
+      expect(el("t")!.closest(".studio-layer")).toBe(layers[0]);
+      expect(el("s")!.closest(".studio-layer")).toBe(layers[1]);
+      expect(el("s")!.classList.contains("studio-element")).toBe(true);
+    });
+
+    it("draws every kind of element", async () => {
       send(
         view(
-          layer("t", TEXT),
-          layer("m", {
+          element("t", TEXT),
+          element("m", {
             kind: "media",
             src: "/alerts/media/a.png",
             video: false,
           }),
-          layer("v", {
+          element("v", {
             kind: "media",
             src: "/alerts/media/a.webm",
             video: true,
           }),
-          layer("g", { kind: "gift", src: "https://cdn/rose.png" }),
-          layer("e", { kind: "emote", src: "https://cdn/emote.png" }),
-          layer("s", { kind: "shape", color: "#18181b", radius: 24 }),
-          layer("w", { kind: "viewer", src: "", name: "ana" }),
-          layer("o", {
+          element("g", { kind: "gift", src: "https://cdn/rose.png" }),
+          element("e", { kind: "emote", src: "https://cdn/emote.png" }),
+          element("s", { kind: "shape", color: "#18181b", radius: 24 }),
+          element("w", { kind: "viewer", src: "", name: "ana" }),
+          element("o", {
             kind: "overlay",
             source: { type: "timer" },
             src: "/timer/",
@@ -165,11 +201,11 @@ describe("studio overlay page", () => {
     });
 
     it("shows a layer on its react, and a second one starts it again", async () => {
-      send(view(layer("t", TEXT, { when: "event" })));
+      send(view(element("t", TEXT, { when: "event" })));
       await vi.waitFor(() => expect(el("t")).not.toBeNull());
       expect(body("t").classList.contains("studio-hidden")).toBe(true);
 
-      react({ layer: "t", text: "Thanks Ana" });
+      react({ element: "t", text: "Thanks Ana" });
       await vi.waitFor(() =>
         expect(body("t").classList.contains("studio-hidden")).toBe(false),
       );
@@ -177,7 +213,7 @@ describe("studio overlay page", () => {
       expect(body("t").classList.contains("studio-enter-pop")).toBe(true);
 
       body("t").classList.remove("studio-enter-pop");
-      react({ layer: "t", text: "Thanks Bo" });
+      react({ element: "t", text: "Thanks Bo" });
       await vi.waitFor(() => expect(body("t").textContent).toBe("Thanks Bo"));
       expect(body("t").classList.contains("studio-enter-pop")).toBe(true);
     });
@@ -185,7 +221,7 @@ describe("studio overlay page", () => {
     it("plays an animate layer's animation on each react", async () => {
       send(
         view(
-          layer(
+          element(
             "s",
             { kind: "shape", color: "#18181b", radius: 0 },
             { when: "animate" },
@@ -195,12 +231,12 @@ describe("studio overlay page", () => {
       await vi.waitFor(() => expect(el("s")).not.toBeNull());
       expect(body("s").classList.contains("studio-hidden")).toBe(false);
 
-      react({ layer: "s" });
+      react({ element: "s" });
       await vi.waitFor(() =>
         expect(body("s").classList.contains("studio-play-bounce")).toBe(true),
       );
       body("s").classList.remove("studio-play-bounce");
-      react({ layer: "s" });
+      react({ element: "s" });
       await vi.waitFor(() =>
         expect(body("s").classList.contains("studio-play-bounce")).toBe(true),
       );
@@ -208,7 +244,7 @@ describe("studio overlay page", () => {
 
     it("keeps an embed's iframe through an update", async () => {
       const embed = (x: number) =>
-        layer(
+        element(
           "o",
           {
             kind: "overlay",
@@ -224,7 +260,7 @@ describe("studio overlay page", () => {
       );
       const frame = el("o")!.querySelector("iframe");
 
-      send(view(embed(50), layer("t", TEXT)));
+      send(view(embed(50), element("t", TEXT)));
 
       await vi.waitFor(() => expect(el("t")).not.toBeNull());
       expect(el("o")!.style.left).toBe("50px");
@@ -232,7 +268,9 @@ describe("studio overlay page", () => {
     });
 
     it("hides a picture that fails to load", async () => {
-      send(view(layer("g", { kind: "gift", src: "https://cdn/missing.png" })));
+      send(
+        view(element("g", { kind: "gift", src: "https://cdn/missing.png" })),
+      );
       await vi.waitFor(() => expect(el("g")).not.toBeNull());
       const img = el("g")!.querySelector("img")!;
 
@@ -242,7 +280,7 @@ describe("studio overlay page", () => {
     });
 
     it("clears everything on a null view", async () => {
-      send(view(layer("t", TEXT)));
+      send(view(element("t", TEXT)));
       await vi.waitFor(() => expect(el("t")).not.toBeNull());
 
       send(null);
@@ -251,14 +289,14 @@ describe("studio overlay page", () => {
     });
 
     it("ignores the live events every client gets", async () => {
-      send(view(layer("t", TEXT)));
+      send(view(element("t", TEXT)));
       await vi.waitFor(() => expect(el("t")).not.toBeNull());
 
       server.sendToClient(SOCKET, {
         type: "tokio:event:follow",
         data: { user: { username: "Ana" } },
       });
-      send(view(layer("t", { ...TEXT, text: "Later" })));
+      send(view(element("t", { ...TEXT, text: "Later" })));
 
       await vi.waitFor(() => expect(body("t").textContent).toBe("Later"));
     });

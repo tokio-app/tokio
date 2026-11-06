@@ -1,4 +1,8 @@
-import { StudioLayerSchema, StudioOverlay } from "@/common/schemas";
+import {
+  StudioElementSchema,
+  StudioLayerSchema,
+  StudioOverlay,
+} from "@/common/schemas";
 import { STUDIO_MESSAGE, StudioMessage, TOKIO_EVENTS } from "@/common/types";
 import Logger from "@/logger";
 import { StudioService } from "@/services/studio";
@@ -14,8 +18,8 @@ import {
 const ID = "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f";
 const OTHER = "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60";
 
-const layer = (id: string, patch: object) =>
-  StudioLayerSchema.parse({
+const element = (id: string, patch: object) =>
+  StudioElementSchema.parse({
     id,
     x: 0,
     y: 0,
@@ -24,10 +28,16 @@ const layer = (id: string, patch: object) =>
     ...patch,
   });
 
+// One layer holding the elements
 const overlay = (
   id: string,
-  layers: ReturnType<typeof layer>[],
-): StudioOverlay => ({ id, name: "", size: "portrait", layers });
+  elements: ReturnType<typeof element>[],
+): StudioOverlay => ({
+  id,
+  name: "",
+  size: "portrait",
+  layers: [StudioLayerSchema.parse({ id: "L1", elements })],
+});
 
 const session = (startedAt: number | null) => ({
   startedAt,
@@ -80,24 +90,24 @@ describe("sendStudioOverlays", () => {
   it("sends each overlay's page its view, with the server's paths", async () => {
     const { handler, views } = setup([
       overlay(ID, [
-        layer("m", { kind: "media", file: "my clip.webm" }),
-        layer("g", { kind: "gift", gift: 1 }),
-        layer("c", { kind: "gift", gift: 2 }),
-        layer("i", {
+        element("m", { kind: "media", file: "my clip.webm" }),
+        element("g", { kind: "gift", gift: 1 }),
+        element("c", { kind: "gift", gift: 2 }),
+        element("i", {
           kind: "overlay",
           source: { type: "installed", id: "gift jar" },
         }),
-        layer("x", {
+        element("x", {
           kind: "overlay",
           source: { type: "installed", id: "removed" },
         }),
-        layer("a", { kind: "overlay", source: { type: "alert", id: "a/1" } }),
-        layer("t", { kind: "overlay", source: { type: "timer" } }),
-        layer("k", {
+        element("a", { kind: "overlay", source: { type: "alert", id: "a/1" } }),
+        element("t", { kind: "overlay", source: { type: "timer" } }),
+        element("k", {
           kind: "overlay",
           source: { type: "games", column: null },
         }),
-        layer("2", { kind: "overlay", source: { type: "games", column: 2 } }),
+        element("2", { kind: "overlay", source: { type: "games", column: 2 } }),
       ]),
       overlay(OTHER, []),
     ]);
@@ -108,7 +118,8 @@ describe("sendStudioOverlays", () => {
     expect(id).toBe(`studio:${ID}`);
     expect(other).toBe(`studio:${OTHER}`);
     expect(view?.width).toBe(1080);
-    expect(view?.layers.map((l) => ("src" in l ? l.src : null))).toEqual([
+    const elements = view?.layers[0].elements;
+    expect(elements?.map((e) => ("src" in e ? e.src : null))).toEqual([
       "/alerts/media/my%20clip.webm",
       "tiktok-rose.png",
       "mystery.png",
@@ -120,24 +131,24 @@ describe("sendStudioOverlays", () => {
       // One column's page
       "/games/minecraft/2/",
     ]);
-    expect(view?.layers[0]).toMatchObject({ kind: "media", video: true });
+    expect(elements?.[0]).toMatchObject({ kind: "media", video: true });
   });
 
-  it("fills texts with the live numbers and each layer's last event", async () => {
+  it("fills texts with the live numbers and each element's last event", async () => {
     const studio = new StudioService();
-    const thanks = layer("t", {
+    const thanks = element("t", {
       kind: "text",
       when: "animate",
       text: "Last: {username} · {likes}",
     });
-    const viewer = layer("v", { kind: "viewer", when: "event" });
-    const waiting = layer("w", {
+    const viewer = element("v", { kind: "viewer", when: "event" });
+    const waiting = element("w", {
       kind: "text",
       when: "event",
       trigger: { type: TOKIO_EVENTS.SHARE, gifts: [] },
       text: "[{username}] {coins} {followers}",
     });
-    const always = layer("a", { kind: "text", text: "{username} {viewers}" });
+    const always = element("a", { kind: "text", text: "{username} {viewers}" });
     const overlays = [overlay(ID, [thanks, viewer, waiting, always])];
     studio.handle(
       TOKIO_EVENTS.FOLLOW,
@@ -152,7 +163,7 @@ describe("sendStudioOverlays", () => {
     await sendStudioOverlays(handler);
 
     const [[, view]] = views();
-    expect(view?.layers).toMatchObject([
+    expect(view?.layers[0].elements).toMatchObject([
       { text: "Last: Ana · 12.8K" },
       { src: "ana.png", name: "Ana" },
       { text: "[] 1.5K 4" },
@@ -174,9 +185,9 @@ describe("sendStudioOverlays", () => {
 
   it("sends only the overlays it's asked for", async () => {
     const counts = overlay(ID, [
-      layer("t", { kind: "text", text: "{likes} likes" }),
+      element("t", { kind: "text", text: "{likes} likes" }),
     ]);
-    const plain = overlay(OTHER, [layer("t2", { kind: "text", text: "Hi" })]);
+    const plain = overlay(OTHER, [element("t2", { kind: "text", text: "Hi" })]);
     const { handler, views } = setup([counts, plain]);
 
     await sendStudioOverlays(handler, showsNumbers);
@@ -191,7 +202,14 @@ describe("sendStudioOverlays", () => {
     await sendStudioOverlay(handler, "gone");
 
     expect(views()).toEqual([
-      [`studio:${OTHER}`, { width: 1080, height: 1920, layers: [] }],
+      [
+        `studio:${OTHER}`,
+        {
+          width: 1080,
+          height: 1920,
+          layers: [{ id: "L1", z: 0, elements: [] }],
+        },
+      ],
       ["studio:gone", null],
     ]);
   });

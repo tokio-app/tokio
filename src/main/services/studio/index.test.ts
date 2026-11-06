@@ -1,4 +1,8 @@
-import { StudioLayerSchema, StudioOverlay } from "@/common/schemas";
+import {
+  StudioElementSchema,
+  StudioLayerSchema,
+  StudioOverlay,
+} from "@/common/schemas";
 import {
   EMOTE_TRIGGER,
   GiftEvent,
@@ -23,8 +27,8 @@ const user = (name: string, picture = `https://cdn/${name}.png`): UserData => ({
   profilePictures: picture ? [picture] : [],
 });
 
-const layer = (id: string, patch: object) =>
-  StudioLayerSchema.parse({
+const element = (id: string, patch: object) =>
+  StudioElementSchema.parse({
     id,
     x: 0,
     y: 0,
@@ -35,11 +39,17 @@ const layer = (id: string, patch: object) =>
     ...patch,
   });
 
-const overlayOf = (...layers: ReturnType<typeof layer>[]): StudioOverlay => ({
+const layerOf = (id: string, patch: object = {}) =>
+  StudioLayerSchema.parse({ id, ...patch });
+
+// One layer holding the elements
+const overlayOf = (
+  ...elements: ReturnType<typeof element>[]
+): StudioOverlay => ({
   id: "o1",
   name: "Main",
   size: "portrait",
-  layers,
+  layers: [layerOf("L1", { elements })],
 });
 
 const gift = (count: number, repeatEnd: boolean, id = "5655"): GiftEvent => ({
@@ -66,7 +76,7 @@ const setup = () => {
 describe("StudioService", () => {
   it("fills a text layer's text with the event and the live numbers", () => {
     const { studio, onReact, numbers } = setup();
-    const text = layer("t", {
+    const text = element("t", {
       kind: "text",
       text: "Thanks {username}! {likes} likes",
       trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
@@ -80,14 +90,14 @@ describe("StudioService", () => {
     );
 
     expect(onReact).toHaveBeenCalledWith("o1", {
-      layer: "t",
+      element: "t",
       text: "Thanks Ana! 1.2K likes",
     });
   });
 
   it("sends a viewer layer the viewer's picture and name", () => {
     const { studio, onReact, numbers } = setup();
-    const viewer = layer("v", { kind: "viewer" });
+    const viewer = element("v", { kind: "viewer" });
 
     studio.handle(
       TOKIO_EVENTS.FOLLOW,
@@ -103,17 +113,17 @@ describe("StudioService", () => {
     );
 
     expect(onReact.mock.calls).toEqual([
-      ["o1", { layer: "v", picture: "https://cdn/Ana.png", name: "Ana" }],
-      ["o1", { layer: "v", picture: "", name: "bo" }],
+      ["o1", { element: "v", picture: "https://cdn/Ana.png", name: "Ana" }],
+      ["o1", { element: "v", picture: "", name: "bo" }],
     ]);
-    // Only text layers read the numbers
+    // Only text elements read the numbers
     expect(numbers).not.toHaveBeenCalled();
   });
 
   it("leaves layers that are always on screen and other triggers alone", () => {
     const { studio, onReact, numbers } = setup();
-    const always = layer("a", { when: "always" });
-    const share = layer("s", {
+    const always = element("a", { when: "always" });
+    const share = element("s", {
       trigger: { type: TOKIO_EVENTS.SHARE, gifts: [] },
     });
 
@@ -129,7 +139,7 @@ describe("StudioService", () => {
 
   it("reacts animate layers too, and matches emotes on chats", () => {
     const { studio, onReact, numbers } = setup();
-    const animate = layer("m", {
+    const animate = element("m", {
       when: "animate",
       trigger: { type: EMOTE_TRIGGER, gifts: [] },
     });
@@ -149,12 +159,12 @@ describe("StudioService", () => {
     studio.handle(TOKIO_EVENTS.CHAT, chat(0), [overlayOf(animate)], numbers);
     studio.handle(TOKIO_EVENTS.CHAT, chat(1), [overlayOf(animate)], numbers);
 
-    expect(onReact.mock.calls).toEqual([["o1", { layer: "m" }]]);
+    expect(onReact.mock.calls).toEqual([["o1", { element: "m" }]]);
   });
 
   it("reacts to a streak once, as it ends, with its total for every gift", () => {
     const { studio, onReact, numbers } = setup();
-    const text = layer("t", {
+    const text = element("t", {
       kind: "text",
       text: "{count}x {gift}",
       trigger: { type: TOKIO_EVENTS.GIFT, gifts: [] },
@@ -166,7 +176,7 @@ describe("StudioService", () => {
     studio.handle(TOKIO_EVENTS.GIFT, gift(3, true), overlays, numbers);
 
     expect(onReact.mock.calls).toEqual([
-      ["o1", { layer: "t", text: "3x Rose" }],
+      ["o1", { element: "t", text: "3x Rose" }],
     ]);
     expect(studio.kept(text)?.values).toMatchObject({
       gift: { comboCount: 3 },
@@ -175,7 +185,7 @@ describe("StudioService", () => {
 
   it("reacts on Like each time the likes pass another likes_every, once per event", () => {
     const { studio, onReact, numbers } = setup();
-    const like = layer("l", {
+    const like = element("l", {
       trigger: { type: TOKIO_EVENTS.LIKE, gifts: [] },
       likes_every: 10,
     });
@@ -196,7 +206,7 @@ describe("StudioService", () => {
 
   it("keeps each layer's last event until its trigger changes", () => {
     const { studio, numbers } = setup();
-    const text = layer("t", {
+    const text = element("t", {
       kind: "text",
       text: "{username}",
       trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
@@ -215,7 +225,7 @@ describe("StudioService", () => {
       name: "Ana",
       values: { user: { username: "Ana" } },
     });
-    const shared = StudioLayerSchema.parse({
+    const shared = StudioElementSchema.parse({
       ...text,
       trigger: { ...text.trigger, type: TOKIO_EVENTS.SHARE },
     });
@@ -224,7 +234,7 @@ describe("StudioService", () => {
 
   it("clears the streaks and like counts but keeps the values", () => {
     const { studio, onReact, numbers } = setup();
-    const like = layer("l", {
+    const like = element("l", {
       trigger: { type: TOKIO_EVENTS.LIKE, gifts: [] },
       likes_every: 10,
     });
@@ -245,10 +255,57 @@ describe("StudioService", () => {
     expect(studio.kept(like)).not.toBeNull();
   });
 
-  it("forgets a removed overlay's layers", () => {
+  it("reacts an element in a later layer", () => {
+    const { studio, onReact, numbers } = setup();
+    const back = element("b", {
+      trigger: { type: TOKIO_EVENTS.SHARE, gifts: [] },
+    });
+    const front = element("f", {});
+    const overlay: StudioOverlay = {
+      ...overlayOf(),
+      layers: [
+        layerOf("L1", { elements: [back] }),
+        layerOf("L2", { elements: [front] }),
+      ],
+    };
+
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user("Ana") },
+      [overlay],
+      numbers,
+    );
+
+    expect(onReact.mock.calls).toEqual([["o1", { element: "f" }]]);
+  });
+
+  it("reacts a hidden layer's elements and keeps their values", () => {
+    const { studio, onReact, numbers } = setup();
+    const text = element("t", {
+      kind: "text",
+      text: "{username}",
+      trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+    });
+    const overlay: StudioOverlay = {
+      ...overlayOf(),
+      layers: [layerOf("L1", { hidden: true, elements: [text] })],
+    };
+
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user("Ana") },
+      [overlay],
+      numbers,
+    );
+
+    expect(onReact).toHaveBeenCalledWith("o1", { element: "t", text: "Ana" });
+    expect(studio.kept(text)).toMatchObject({ name: "Ana" });
+  });
+
+  it("forgets a removed overlay's elements", () => {
     const { studio, numbers } = setup();
-    const a = layer("a", {});
-    const b = layer("b", {});
+    const a = element("a", {});
+    const b = element("b", {});
     const follow = { user: user("Ana") };
 
     studio.handle(TOKIO_EVENTS.FOLLOW, follow, [overlayOf(a)], numbers);
@@ -264,25 +321,25 @@ describe("StudioService", () => {
     expect(studio.kept(b)).not.toBeNull();
   });
 
-  it("tests every layer that reacts with samples, keeping none", () => {
+  it("tests every element that reacts with samples, keeping none", () => {
     const { studio, onReact } = setup();
-    const text = layer("t", {
+    const text = element("t", {
       kind: "text",
       text: "{username} {viewers}",
       trigger: { type: EMOTE_TRIGGER, gifts: [] },
     });
-    const viewer = layer("v", { kind: "viewer" });
-    const always = layer("a", { when: "always" });
+    const viewer = element("v", { kind: "viewer" });
+    const always = element("a", { when: "always" });
 
     const reacts = studio.test(overlayOf(text, viewer, always), NUMBERS);
 
     expect(reacts).toHaveLength(2);
     expect(reacts[0]).toEqual({
-      layer: "t",
+      element: "t",
       text: expect.stringMatching(/^\S.* 30$/),
     });
     expect(reacts[1]).toMatchObject({
-      layer: "v",
+      element: "v",
       picture: expect.stringMatching(/^https:/),
       name: expect.any(String),
     });

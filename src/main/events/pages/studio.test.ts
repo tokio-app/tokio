@@ -1,4 +1,5 @@
 import {
+  StudioElementSchema,
   StudioLayerSchema,
   StudioOverlay,
   StudioOverlaySchema,
@@ -179,12 +180,17 @@ describe("studio events", () => {
       name: "Main",
       layers: [
         StudioLayerSchema.parse({
-          id: "s",
-          kind: "shape",
-          x: 1,
-          y: 2,
-          width: 3,
-          height: 4,
+          id: "L1",
+          elements: [
+            StudioElementSchema.parse({
+              id: "s",
+              kind: "shape",
+              x: 1,
+              y: 2,
+              width: 3,
+              height: 4,
+            }),
+          ],
         }),
       ],
     });
@@ -209,7 +215,15 @@ describe("studio events", () => {
           view: {
             width: 1080,
             height: 1920,
-            layers: [expect.objectContaining({ id: "s", kind: "shape", z: 0 })],
+            layers: [
+              {
+                id: "L1",
+                z: 0,
+                elements: [
+                  expect.objectContaining({ id: "s", kind: "shape", z: 0 }),
+                ],
+              },
+            ],
           },
         },
       });
@@ -302,7 +316,7 @@ describe("studio events", () => {
   describe("TEST_STUDIO_OVERLAY", () => {
     it("plays the test's reacts on its page", async () => {
       const services = viewServices();
-      const reacts = [{ layer: "t", text: "Hi Ana" }, { layer: "s" }];
+      const reacts = [{ element: "t", text: "Hi Ana" }, { element: "s" }];
       services.studioService.test.mockReturnValue(reacts);
       const h = createHandler({
         ...services,

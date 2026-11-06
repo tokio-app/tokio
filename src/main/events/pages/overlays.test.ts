@@ -1,6 +1,7 @@
 import {
   CatalogOverlay,
   OverlayConfig,
+  StudioElementSchema,
   StudioLayerSchema,
   StudioOverlay,
 } from "@/common/schemas";
@@ -68,13 +69,18 @@ const studio: StudioOverlay = {
   size: "portrait",
   layers: [
     StudioLayerSchema.parse({
-      id: "jar",
-      kind: "overlay",
-      x: 0,
-      y: 0,
-      width: 10,
-      height: 10,
-      source: { type: "installed", id: "gift-jar" },
+      id: "L1",
+      elements: [
+        StudioElementSchema.parse({
+          id: "jar",
+          kind: "overlay",
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+          source: { type: "installed", id: "gift-jar" },
+        }),
+      ],
     }),
   ],
 };
@@ -98,7 +104,9 @@ const studioServices = () => ({
 
 // Where the studio overlay's embed loads from, in each view sent
 const embedSrcs = (sendToClient: ReturnType<typeof vi.fn>) =>
-  sendToClient.mock.calls.map(([, message]) => message.data.view.layers[0].src);
+  sendToClient.mock.calls.map(
+    ([, message]) => message.data.view.layers[0].elements[0].src,
+  );
 
 // The change is made, but the store file wasn't written.
 const saveError = {
