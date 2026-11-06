@@ -196,6 +196,24 @@ describe("studioView", () => {
     expect(embedPath).toHaveBeenCalledTimes(2);
   });
 
+  it("leaves hidden elements out, the others keeping their place", () => {
+    const {
+      layers: [{ elements }],
+    } = studioView(
+      overlay([
+        element("back", { kind: "shape" }),
+        element("hidden", { kind: "shape", hidden: true }),
+        element("front", { kind: "shape", rotation: -45 }),
+      ]),
+      deps(),
+    );
+
+    expect(elements).toMatchObject([
+      { id: "back", z: 0, rotation: 0 },
+      { id: "front", z: 2, rotation: -45 },
+    ]);
+  });
+
   it("leaves hidden layers out, the others keeping their place", () => {
     const layer = (id: string, hidden = false) =>
       StudioLayerSchema.parse({

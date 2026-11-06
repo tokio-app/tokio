@@ -246,6 +246,10 @@ export function createStage(
     el.style.height = `${element.height}px`;
     el.style.zIndex = String(element.z);
     el.style.opacity = String(element.opacity);
+    // Around its center, entrances and animations with it
+    el.style.transform = element.rotation
+      ? `rotate(${element.rotation}deg)`
+      : "";
 
     switch (element.kind) {
       case "text": {

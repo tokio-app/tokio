@@ -252,10 +252,22 @@ export type Point = { x: number; y: number };
 export const CORNERS = ["nw", "ne", "sw", "se"] as const;
 export type Corner = (typeof CORNERS)[number];
 
+// A box turned clockwise around its center, in degrees
+export type Turned = Box & { rotation: number };
+
+// A point (from the center) turned by the angle, clockwise on screen
+const turn = ({ x, y }: Point, degrees: number): Point => {
+  const rad = (degrees * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return { x: x * cos - y * sin, y: x * sin + y * cos };
+};
+
 /**
  * The box with a corner dragged by (dx, dy) px of the canvas, the opposite
- * corner kept: whole px, at least 1 wide and `minHeight(width)` tall, the
- * height a text's words take at that width.
+ * corner kept where it is on the canvas: whole width and height, at least 1
+ * wide and `minHeight(width)` tall, the height a text's words take at that
+ * width. A turned box resizes along its own sides.
  */
 export function resizeBox(
   box: Box,
@@ -263,21 +275,69 @@ export function resizeBox(
   dx: number,
   dy: number,
   minHeight: (width: number) => number = () => 1,
+  rotation = 0,
 ): Box {
   const west = corner.endsWith("w");
   const north = corner.startsWith("n");
-  const width = Math.max(1, Math.round(box.width + (west ? -dx : dx)));
+  // The pointer's move along the box's own sides
+  const along = turn({ x: dx, y: dy }, -rotation);
+  const width = Math.max(
+    1,
+    Math.round(box.width + (west ? -along.x : along.x)),
+  );
   const height = Math.max(
     minHeight(width),
-    Math.round(box.height + (north ? -dy : dy)),
+    Math.round(box.height + (north ? -along.y : along.y)),
   );
+  // The opposite corner, from the center, stays put on the canvas
+  const side = (w: number, h: number) =>
+    turn({ x: (west ? w : -w) / 2, y: (north ? h : -h) / 2 }, rotation);
+  const was = side(box.width, box.height);
+  const now = side(width, height);
   return {
-    x: west ? box.x + box.width - width : box.x,
-    y: north ? box.y + box.height - height : box.y,
+    x: box.x + box.width / 2 + was.x - now.x - width / 2,
+    y: box.y + box.height / 2 + was.y - now.y - height / 2,
     width,
     height,
   };
 }
+
+/**
+ * The turn that points a box's top at the point, as its rotate handle
+ * drags it, in whole degrees from -180 to 180: steps of 15 with `snap`.
+ */
+export function turnTo(center: Point, point: Point, snap = false): number {
+  const angle =
+    (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI + 90;
+  const step = snap ? 15 : 1;
+  const rounded = Math.round(angle / step) * step;
+  // Never -0: saved as JSON, it comes back as 0
+  return (rounded > 180 ? rounded - 360 : rounded) || 0;
+}
+
+/** The smallest unturned box around a turned one. */
+export function extent({ x, y, width, height, rotation }: Turned): Box {
+  if (!rotation) return { x, y, width, height };
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  const w = width * cos + height * sin;
+  const h = width * sin + height * cos;
+  return {
+    x: x + (width - w) / 2,
+    y: y + (height - h) / 2,
+    width: w,
+    height: h,
+  };
+}
+
+// Whether a turned box holds a point: the point turned back into its sides
+const holdsTurned = (box: Turned, point: Point) => {
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const local = turn({ x: point.x - cx, y: point.y - cy }, -box.rotation);
+  return holds(box, { x: local.x + cx, y: local.y + cy });
+};
 
 // Whole px, the size at least 1, as the schema keeps them
 export const roundBox = ({ x, y, width, height }: Box): Box => ({
@@ -317,9 +377,9 @@ export function bounds(boxes: Box[]): Box | null {
 }
 
 /**
- * What a click on the canvas picks: the front-most element whose box holds
- * the point, skipping the locked layers, null for none. Hidden layers aren't
- * in the view.
+ * What a click on the canvas picks: the front-most element whose box, turned,
+ * holds the point, skipping the locked layers and elements (`locked` holds
+ * both ids), null for none. Hidden ones aren't in the view.
  */
 export function pickElement(
   view: StudioView,
@@ -328,7 +388,9 @@ export function pickElement(
 ): string | null {
   for (const layer of [...view.layers].reverse()) {
     if (locked.has(layer.id)) continue;
-    const element = [...layer.elements].reverse().find((e) => holds(e, point));
+    const element = [...layer.elements]
+      .reverse()
+      .find((e) => !locked.has(e.id) && holdsTurned(e, point));
     if (element) return element.id;
   }
   return null;

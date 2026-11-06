@@ -390,7 +390,7 @@ describe("StudioEditor", () => {
       Array.from(canvas().querySelectorAll<HTMLElement>("[data-handle]")).map(
         (h) => h.dataset.handle,
       ),
-    ).toEqual(["nw", "ne", "sw", "se"]);
+    ).toEqual(["nw", "ne", "sw", "se", "rotate"]);
     fireEvent.pointerDown(handle("nw"), { button: 0, clientX: 0, clientY: 0 });
     fireEvent.pointerMove(canvas(), { clientX: 10, clientY: 5 });
     fireEvent.pointerUp(canvas());
@@ -403,6 +403,93 @@ describe("StudioEditor", () => {
         height: 90,
       }),
     );
+  });
+
+  it("rotates an element with its handle, Shift in steps of 15", async () => {
+    const shape = elementOf("shape", {
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 100,
+    });
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+    sized();
+
+    // Its center is at 125, 125 on screen: the pointer goes to its right
+    fireEvent.pointerDown(handle("rotate"), {
+      button: 0,
+      clientX: 125,
+      clientY: 75,
+    });
+    fireEvent.pointerMove(canvas(), { clientX: 225, clientY: 125 });
+    await waitFor(() => expect(savedElement()?.rotation).toBe(90));
+    expect(drawn(shape.id).style.transform).toBe("rotate(90deg)");
+    expect(
+      canvas().querySelector<HTMLElement>("[class*=selection]")!.style
+        .transform,
+    ).toBe("rotate(90deg)");
+
+    // 50 degrees, snapped to 45
+    fireEvent.pointerMove(canvas(), {
+      clientX: 125 + 100 * Math.cos((-40 * Math.PI) / 180),
+      clientY: 125 + 100 * Math.sin((-40 * Math.PI) / 180),
+      shiftKey: true,
+    });
+    fireEvent.pointerUp(canvas());
+    await waitFor(() => expect(savedElement()?.rotation).toBe(45));
+    expect(field("Rotation (°)").getByRole("spinbutton")).toHaveValue(45);
+  });
+
+  it("sets the rotation by number", async () => {
+    const shape = elementOf("shape");
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+
+    const input = field("Rotation (°)").getByRole("spinbutton");
+    await user.clear(input);
+    await user.type(input, "-30");
+
+    await waitFor(() => expect(savedElement()?.rotation).toBe(-30));
+  });
+
+  it("locks an element: a click goes through it, and its row says so", async () => {
+    const back = elementOf("shape", { x: 0, y: 0, width: 400, height: 400 });
+    const front = text({ text: "Hello", x: 0, y: 0, width: 400, height: 400 });
+    const { user } = await open(scene(back, front));
+    sized();
+
+    await user.click(
+      rowOf(/^Hello/).getByRole("button", { name: "Lock element" }),
+    );
+    await waitFor(() =>
+      expect(lastSave()?.layers[0].elements[1].locked).toBe(true),
+    );
+    expect(
+      rowOf(/^Hello/).getByRole("button", { name: "Lock element" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    press(100, 100);
+    expect(page().getByRole("heading", { name: "Shape" })).toBeVisible();
+
+    // Picked from the list, it has no handles
+    await user.click(row(/^Hello/));
+    expect(canvas().querySelector("[data-handle]")).toBeNull();
+  });
+
+  it("hides an element from the canvas, its eye pressed", async () => {
+    const shape = elementOf("shape");
+    const { user } = await open(scene(shape));
+
+    await user.click(
+      rowOf(/^Shape/).getByRole("button", { name: "Hide element" }),
+    );
+
+    await waitFor(() => expect(savedElement()?.hidden).toBe(true));
+    expect(drawn(shape.id)).toBeNull();
+    expect(
+      rowOf(/^Shape/).getByRole("button", { name: "Hide element" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps a text's box as tall as its words", async () => {

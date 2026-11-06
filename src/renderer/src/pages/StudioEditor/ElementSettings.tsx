@@ -236,15 +236,17 @@ export function ElementSettings({
   }
 
   const box = (
-    key: "x" | "y" | "width" | "height",
+    key: "x" | "y" | "width" | "height" | "rotation",
     label: MessageKey,
     min?: number,
+    max?: number,
   ) => (
     <Field label={t(label)}>
       <NumberInput
         className={styles.number}
         integer
         min={min}
+        max={max}
         value={element[key]}
         onChange={(value) => {
           const next = { ...element };
@@ -268,6 +270,8 @@ export function ElementSettings({
           {box("y", "studio.fields.y")}
           {box("width", "studio.fields.width", 1)}
           {box("height", "studio.fields.height", 1)}
+          {/* On its own row, in degrees as the handle turns it */}
+          {box("rotation", "studio.fields.rotation", -180, 180)}
         </div>
       </Field>
       <Field label={t("studio.fields.opacity", { opacity: String(opacity) })}>

@@ -62,7 +62,13 @@ const ELEMENT = {
   y: z.number(),
   width: z.number().min(1),
   height: z.number().min(1),
+  // Degrees clockwise, around its center
+  rotation: z.number().min(-180).max(180).default(0),
   opacity: z.number().min(0).max(1).default(1),
+  // The editor's canvas can't pick, move, resize or rotate it
+  locked: z.boolean().default(false),
+  // Off the canvas and the stream
+  hidden: z.boolean().default(false),
   when: z.enum(STUDIO_WHEN).default("always"),
   // Its type and gifts have no defaults
   trigger: TriggerSchema.prefault({ type: TOKIO_EVENTS.FOLLOW, gifts: [] }),
@@ -162,7 +168,7 @@ const LAYER = {
   id: z.string().min(1),
   // Empty while it's retyped
   name: z.string().max(STUDIO_NAME_MAX_LENGTH).default(""),
-  // The editor's canvas can't pick, move or resize its elements
+  // The editor's canvas can't pick, move, resize or rotate its elements
   locked: z.boolean().default(false),
   // Off the canvas and the stream
   hidden: z.boolean().default(false),

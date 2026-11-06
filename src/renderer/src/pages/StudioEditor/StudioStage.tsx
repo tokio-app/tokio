@@ -21,12 +21,14 @@ import {
   Box,
   Corner,
   CORNERS,
+  extent,
   holds,
   pickElement,
   Point,
   resizeBox,
   roundBox,
   toCanvas,
+  turnTo,
 } from "./helper";
 import styles from "./studioeditor.module.css";
 
@@ -44,11 +46,14 @@ type Props = {
   stageRef: RefObject<Stage | null>;
   // A layer's id or an element's
   selected: string | null;
-  // The layers whose elements the canvas can't pick, move or resize
+  // The locked layers and elements, which the canvas can't pick, move,
+  // resize or rotate
   locked: ReadonlySet<string>;
   onSelect: (id: string | null) => void;
   // An element moved or resized, rounded to whole px
   onBox: (id: string, box: Box) => void;
+  // An element turned, in whole degrees
+  onRotate: (id: string, rotation: number) => void;
   // Every element of a layer moved by whole px
   onShift: (layerId: string, dx: number, dy: number) => void;
   // An embed's preview, portaled into its slot
@@ -61,11 +66,18 @@ type Drag =
       id: string;
       // The corner it resizes from, none to move it
       corner: Corner | null;
-      // Where the pointer went down, and the box then
+      // Where the pointer went down, and the box and turn then
       x: number;
       y: number;
       box: Box;
+      rotation: number;
       scale: number;
+    }
+  | {
+      kind: "rotate";
+      id: string;
+      // The element's center on screen
+      center: Point;
     }
   | {
       kind: "layer";
@@ -120,6 +132,7 @@ export function StudioStage({
   locked,
   onSelect,
   onBox,
+  onRotate,
   onShift,
   embed,
 }: Props) {
@@ -182,22 +195,28 @@ export function StudioStage({
     ).find((n) => n.dataset.element === id);
     const text = node?.querySelector(".studio-text");
     if (!node || !text || !scale) return 1;
-    const kept = node.style.width;
+    // Unturned, so the range's box is the words' own height
+    const { width: keptWidth, transform } = node.style;
     node.style.width = `${width}px`;
+    node.style.transform = "";
     const range = document.createRange();
     range.selectNodeContents(text);
     const { height } = range.getBoundingClientRect();
-    node.style.width = kept;
+    node.style.width = keptWidth;
+    node.style.transform = transform;
     return Math.max(1, Math.ceil(height / scale));
   };
 
   const chosen = elements.find(({ element }) => element.id === selected);
   const chosenLayer = view.layers.find((layer) => layer.id === selected);
-  // The selection's outline: an element's box, or around a layer's elements
+  // The selection's outline: an element's box, turned with it, or around a
+  // layer's elements
   const frame = chosen
     ? boxOf(chosen.element)
-    : chosenLayer && bounds(chosenLayer.elements);
-  const stuck = locked.has(chosen?.layer ?? chosenLayer?.id ?? "");
+    : chosenLayer && bounds(chosenLayer.elements.map(extent));
+  const stuck = chosen
+    ? locked.has(chosen.layer) || locked.has(chosen.element.id)
+    : locked.has(chosenLayer?.id ?? "");
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -214,23 +233,35 @@ export function StudioStage({
     const handle = target.closest<HTMLElement>("[data-handle]");
     const corner = CORNERS.find((c) => c === handle?.dataset.handle);
     if (chosen && !stuck && corner) {
-      const box = boxOf(chosen.element);
+      const { element } = chosen;
       drag.current = {
         kind: "element",
-        id: chosen.element.id,
+        id: element.id,
         corner,
-        box,
+        box: boxOf(element),
+        rotation: element.rotation,
         ...at,
       };
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
 
-    const point = toCanvas(
-      { x: e.clientX, y: e.clientY },
-      root.current!.getBoundingClientRect(),
-      fitted,
-    );
+    const rect = root.current!.getBoundingClientRect();
+    if (chosen && !stuck && handle?.dataset.handle === "rotate") {
+      const { x, y, width, height } = chosen.element;
+      drag.current = {
+        kind: "rotate",
+        id: chosen.element.id,
+        center: {
+          x: rect.left + fitted.left + (x + width / 2) * scale,
+          y: rect.top + fitted.top + (y + height / 2) * scale,
+        },
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    const point = toCanvas({ x: e.clientX, y: e.clientY }, rect, fitted);
     if (chosenLayer && frame && !stuck && holds(frame, point)) {
       // A click until it moves
       drag.current = {
@@ -249,12 +280,12 @@ export function StudioStage({
     onSelect(id);
     const picked = elements.find(({ element }) => element.id === id);
     if (!picked) return;
-    const box = boxOf(picked.element);
     drag.current = {
       kind: "element",
       id: picked.element.id,
       corner: null,
-      box,
+      box: boxOf(picked.element),
+      rotation: picked.element.rotation,
       ...at,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -263,6 +294,12 @@ export function StudioStage({
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) return;
+    if (d.kind === "rotate") {
+      // Shift turns it in steps of 15 degrees
+      const pointer = { x: e.clientX, y: e.clientY };
+      onRotate(d.id, turnTo(d.center, pointer, e.shiftKey));
+      return;
+    }
     if (d.kind === "layer") {
       const sx = e.clientX - d.x;
       const sy = e.clientY - d.y;
@@ -285,7 +322,7 @@ export function StudioStage({
       d.id,
       roundBox(
         d.corner
-          ? resizeBox(d.box, d.corner, dx, dy, minHeight)
+          ? resizeBox(d.box, d.corner, dx, dy, minHeight, d.rotation)
           : { ...d.box, x: d.box.x + dx, y: d.box.y + dy },
       ),
     );
@@ -325,12 +362,14 @@ export function StudioStage({
     );
   };
 
+  const rotation = chosen?.element.rotation ?? 0;
   const outline: CSSProperties | undefined = frame
     ? {
         left: fit.left + frame.x * fit.scale,
         top: fit.top + frame.y * fit.scale,
         width: frame.width * fit.scale,
         height: frame.height * fit.scale,
+        transform: rotation ? `rotate(${rotation}deg)` : undefined,
       }
     : undefined;
 
@@ -351,16 +390,23 @@ export function StudioStage({
       <div ref={root} className={styles.stage_root} />
       {outline && (
         <div className={styles.selection} style={outline}>
-          {chosen &&
-            !stuck &&
-            CORNERS.map((corner) => (
+          {chosen && !stuck && (
+            <>
+              {CORNERS.map((corner) => (
+                <span
+                  key={corner}
+                  className={cx(styles.handle, HANDLES[corner])}
+                  data-handle={corner}
+                  title={t("studio.editor.resize")}
+                />
+              ))}
               <span
-                key={corner}
-                className={cx(styles.handle, HANDLES[corner])}
-                data-handle={corner}
-                title={t("studio.editor.resize")}
+                className={styles.rotate}
+                data-handle="rotate"
+                title={t("studio.editor.rotate")}
               />
-            ))}
+            </>
+          )}
         </div>
       )}
       {elements.map(({ element }) => {

@@ -22,6 +22,7 @@ const BASE: Omit<TextView, "id" | "kind" | keyof typeof TEXT> = {
   y: 20,
   width: 300,
   height: 200,
+  rotation: 0,
   z: 0,
   opacity: 1,
   when: "always",
@@ -112,6 +113,14 @@ describe("on stream", () => {
     expect(words.textContent).toBe("<b>{username}</b>");
     expect(words.querySelector("b")).toBeNull();
     expect(words.className).toBe("studio-text studio-bold studio-halo");
+  });
+
+  it("turns an element around its center, and back", () => {
+    draw(view(text("t", { rotation: 30 })));
+    expect(el("t").style.transform).toBe("rotate(30deg)");
+
+    draw(view(text("t")));
+    expect(el("t").style.transform).toBe("");
   });
 
   it("sets a font as one quoted name, Archivo for none", () => {

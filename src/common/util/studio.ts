@@ -123,6 +123,7 @@ function elementView(
     y: element.y,
     width: element.width,
     height: element.height,
+    rotation: element.rotation,
     z,
     opacity: element.opacity,
     when: element.when,
@@ -188,8 +189,8 @@ function elementView(
 
 /**
  * The overlay as its page draws it, for main to send and the editor to show:
- * the canvas, and the layers that aren't hidden with their elements
- * resolved, back to front. A layer's z is its place among all of them, so
+ * the canvas, and the layers and elements that aren't hidden, resolved, back
+ * to front. A z is the place among all of them, hidden ones included, so
  * hiding one doesn't renumber the rest.
  */
 export function studioView(
@@ -205,8 +206,8 @@ export function studioView(
             {
               id: layer.id,
               z,
-              elements: layer.elements.map((element, at) =>
-                elementView(element, at, deps),
+              elements: layer.elements.flatMap((element, at) =>
+                element.hidden ? [] : [elementView(element, at, deps)],
               ),
             },
           ],

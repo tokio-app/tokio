@@ -14,6 +14,8 @@ type StudioElementViewBase = {
   y: number;
   width: number;
   height: number;
+  // Degrees clockwise, around its center
+  rotation: number;
   z: number;
   opacity: number;
   when: StudioWhen;

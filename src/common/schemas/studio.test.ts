@@ -21,7 +21,10 @@ describe("StudioElementSchema", () => {
       id: "a",
       kind: "text",
       ...box,
+      rotation: 0,
       opacity: 1,
+      locked: false,
+      hidden: false,
       when: "always",
       trigger: expect.objectContaining({
         type: TOKIO_EVENTS.FOLLOW,
@@ -124,6 +127,8 @@ describe("StudioElementSchema", () => {
     expect(text({ width: 0 })).toBe(false);
     expect(text({ seconds: 61 })).toBe(false);
     expect(text({ opacity: 1.5 })).toBe(false);
+    expect(text({ rotation: -180 })).toBe(true);
+    expect(text({ rotation: 181 })).toBe(false);
   });
 
   it("sends back what it got, untrimmed and unrounded", () => {

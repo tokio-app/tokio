@@ -13,9 +13,11 @@ import {
   elementName,
   findElement,
   moveElement,
+  extent,
   pickElement,
   resizeBox,
   stepElement,
+  turnTo,
   toCanvas,
   moveLayer,
   roundBox,
@@ -165,6 +167,19 @@ describe("resizeBox", () => {
     });
   });
 
+  it("resizes a turned box along its own sides, its opposite corner kept", () => {
+    // A quarter turn: the pointer going down stretches its width
+    const turned = roundBox(resizeBox(box, "se", 0, 50, undefined, 90));
+
+    expect(turned).toEqual({ x: 75, y: 225, width: 350, height: 100 });
+    // Its own top left corner is where it was on the canvas: 300, 100
+    const corner = (b: typeof turned) => ({
+      x: b.x + b.width / 2 + b.height / 2,
+      y: b.y + b.height / 2 - b.width / 2,
+    });
+    expect(corner(turned)).toEqual(corner(box));
+  });
+
   it("stops at the least size, the dragged corner held there", () => {
     // Past the opposite corner: 1 px wide, and as tall as the text
     const heights: number[] = [];
@@ -185,6 +200,38 @@ describe("resizeBox", () => {
     });
     // Asked at the width it gets
     expect(heights).toEqual([1]);
+  });
+});
+
+describe("turnTo and extent", () => {
+  const center = { x: 0, y: 0 };
+
+  it("turns a box's top toward the pointer, in whole degrees", () => {
+    expect(turnTo(center, { x: 0, y: -10 })).toBe(0);
+    expect(turnTo(center, { x: 10, y: 0 })).toBe(90);
+    expect(turnTo(center, { x: 0, y: 10 })).toBe(180);
+    expect(turnTo(center, { x: -10, y: 0 })).toBe(-90);
+    expect(turnTo(center, { x: 10, y: -10.4 })).toBe(44);
+  });
+
+  it("snaps to steps of 15", () => {
+    expect(turnTo(center, { x: 10, y: -10.4 }, true)).toBe(45);
+    // Never -0, which main would save as 0
+    expect(turnTo(center, { x: -1, y: -10 }, true)).toBe(0);
+  });
+
+  it("boxes a turned box", () => {
+    expect(
+      roundBox(
+        extent({ x: 100, y: 200, width: 300, height: 100, rotation: 90 }),
+      ),
+    ).toEqual({ x: 200, y: 100, width: 100, height: 300 });
+    expect(extent({ x: 1, y: 2, width: 3, height: 4, rotation: 0 })).toEqual({
+      x: 1,
+      y: 2,
+      width: 3,
+      height: 4,
+    });
   });
 });
 
@@ -314,6 +361,20 @@ describe("the canvas's geometry", () => {
         { scale: 0.5, left: 50, top: 0 },
       ),
     ).toEqual({ x: 100, y: 100 });
+  });
+
+  it("picks a turned element where it shows, and goes through a locked one", () => {
+    // A bar 200 wide and 20 tall, turned upright around its center (100, 10)
+    const [under] = view.layers[0].elements;
+    const bar = { ...under, id: "bar", width: 200, height: 20, rotation: 90 };
+    const turned = {
+      ...view,
+      layers: [{ id: "only", z: 0, elements: [bar] }],
+    };
+
+    expect(pickElement(turned, new Set(), { x: 100, y: 80 })).toBe("bar");
+    expect(pickElement(turned, new Set(), { x: 150, y: 10 })).toBeNull();
+    expect(pickElement(view, new Set(["high"]), { x: 65, y: 65 })).toBe("low");
   });
 
   it("picks the front-most element under the point", () => {

@@ -2,6 +2,7 @@ import {
   STUDIO_KINDS,
   STUDIO_MAX_ELEMENTS,
   STUDIO_MAX_LAYERS,
+  StudioElement,
   StudioElementKind,
   StudioLayer,
 } from "@/common/schemas";
@@ -28,6 +29,7 @@ import styles from "./studioeditor.module.css";
 export type LayerFlags = Partial<
   Pick<StudioLayer, "folded" | "locked" | "hidden">
 >;
+export type ElementFlags = Partial<Pick<StudioElement, "locked" | "hidden">>;
 
 type Props = {
   // Back to front, as the overlay keeps them, and so are their elements
@@ -44,6 +46,7 @@ type Props = {
   // Deletes a layer with its elements, or an element
   onDelete: (id: string) => void;
   onFlags: (layerId: string, flags: LayerFlags) => void;
+  onElementFlags: (elementId: string, flags: ElementFlags) => void;
   // Moves a layer to `to`, an index of the layers back to front
   onMoveLayer: (id: string, to: number) => void;
   // Moves an element into a layer at `at`, an index of its elements back to
@@ -79,6 +82,7 @@ export function LayersPanel({
   onAdd,
   onDelete,
   onFlags,
+  onElementFlags,
   onMoveLayer,
   onMoveElement,
   onStepElement,
@@ -115,6 +119,38 @@ export function LayersPanel({
   const fold = t("studio.editor.fold");
   const lock = t("studio.editor.lock");
   const hide = t("studio.editor.hide");
+  const lockElement = t("studio.editor.lockElement");
+  const hideElement = t("studio.editor.hideElement");
+
+  // A lock and an eye, Paper when on and muted when off
+  const toggles = (
+    flags: { locked: boolean; hidden: boolean },
+    labels: { lock: string; hide: string },
+    set: (flags: ElementFlags) => void,
+  ) => (
+    <>
+      <Btn
+        variant="icon"
+        className={cx(styles.toggle, flags.locked && styles.toggle_on)}
+        title={labels.lock}
+        aria-label={labels.lock}
+        aria-pressed={flags.locked}
+        onClick={() => set({ locked: !flags.locked })}
+      >
+        {flags.locked ? <FiLock size={16} /> : <FiUnlock size={16} />}
+      </Btn>
+      <Btn
+        variant="icon"
+        className={cx(styles.toggle, flags.hidden && styles.toggle_on)}
+        title={labels.hide}
+        aria-label={labels.hide}
+        aria-pressed={flags.hidden}
+        onClick={() => set({ hidden: !flags.hidden })}
+      >
+        {flags.hidden ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+      </Btn>
+    </>
+  );
 
   const selectedLayer = layers.find((l) => l.id === selected);
   const selectedElement =
@@ -382,40 +418,9 @@ export function LayersPanel({
                       })}
                     </span>
                   </button>
-                  <Btn
-                    variant="icon"
-                    className={cx(
-                      styles.toggle,
-                      layer.locked && styles.toggle_on,
-                    )}
-                    title={lock}
-                    aria-label={lock}
-                    aria-pressed={layer.locked}
-                    onClick={() => onFlags(layer.id, { locked: !layer.locked })}
-                  >
-                    {layer.locked ? (
-                      <FiLock size={16} />
-                    ) : (
-                      <FiUnlock size={16} />
-                    )}
-                  </Btn>
-                  <Btn
-                    variant="icon"
-                    className={cx(
-                      styles.toggle,
-                      layer.hidden && styles.toggle_on,
-                    )}
-                    title={hide}
-                    aria-label={hide}
-                    aria-pressed={layer.hidden}
-                    onClick={() => onFlags(layer.id, { hidden: !layer.hidden })}
-                  >
-                    {layer.hidden ? (
-                      <FiEyeOff size={16} />
-                    ) : (
-                      <FiEye size={16} />
-                    )}
-                  </Btn>
+                  {toggles(layer, { lock, hide }, (flags) =>
+                    onFlags(layer.id, flags),
+                  )}
                 </div>
 
                 {shown && (
@@ -429,6 +434,7 @@ export function LayersPanel({
                           className={cx(
                             styles.layer,
                             styles.element_row,
+                            element.hidden && styles.element_hidden,
                             element.id === selected && styles.layer_selected,
                             drag?.id === element.id && styles.layer_dragged,
                             lineOf(element.id, drag?.layer === false),
@@ -450,6 +456,11 @@ export function LayersPanel({
                             {/* Read as two phrases, not one run-on word */}{" "}
                             <span className={styles.layer_meta}>{meta}</span>
                           </button>
+                          {toggles(
+                            element,
+                            { lock: lockElement, hide: hideElement },
+                            (flags) => onElementFlags(element.id, flags),
+                          )}
                         </li>
                       );
                     })}

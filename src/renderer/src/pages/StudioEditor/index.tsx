@@ -71,7 +71,7 @@ import {
   whenText,
 } from "./helper";
 import { LayerSettings } from "./LayerSettings";
-import { LayerFlags, LayersPanel } from "./LayersPanel";
+import { ElementFlags, LayerFlags, LayersPanel } from "./LayersPanel";
 import { OverlaySettings } from "./OverlaySettings";
 import { StudioStage } from "./StudioStage";
 import styles from "./studioeditor.module.css";
@@ -370,9 +370,15 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   // the front one
   const target =
     layer ?? (at ? overlay.layers[at.layer] : overlay.layers.at(-1));
+  // The locked layers' and elements' ids: unique across both
   const locked = useMemo(
-    () => new Set(overlay.layers.filter((l) => l.locked).map((l) => l.id)),
-    [overlay.layers],
+    () =>
+      new Set(
+        [...overlay.layers, ...studioElements(overlay)]
+          .filter((item) => item.locked)
+          .map((item) => item.id),
+      ),
+    [overlay],
   );
 
   // "Layer N", the first number no layer's name uses
@@ -490,6 +496,9 @@ function Editor({ saved }: { saved: StudioOverlay }) {
             onFlags={(id, flags: LayerFlags) =>
               changeLayer(id, (l) => ({ ...l, ...flags }))
             }
+            onElementFlags={(id, flags: ElementFlags) =>
+              changeElement(id, (e) => ({ ...e, ...flags }))
+            }
             onMoveLayer={(id, to) =>
               setLayers((layers) =>
                 moveLayer(
@@ -518,6 +527,9 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               locked={locked}
               onSelect={select}
               onBox={setBox}
+              onRotate={(id, rotation) =>
+                changeElement(id, (e) => ({ ...e, rotation }))
+              }
               onShift={shift}
               embed={(embed) => (
                 <Embed

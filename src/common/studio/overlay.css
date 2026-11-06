@@ -11,6 +11,7 @@
  *         .studio-element.studio-<kind>
  *                                    one per element, data-element its id:
  *                                    its box, z-index in the layer, opacity,
+ *                                    rotation (a transform),
  *                                    --studio-color and --studio-radius;
  *                                    .studio-waits in the editor on one that
  *                                    waits for an event

@@ -15,10 +15,10 @@
 }
 
 /* Layers, the canvas, settings. Wide enough on the sides for Spanish's
-   longer labels, and for a layer's row with its four buttons. */
+   longer labels, and for the rows' lock and eye buttons. */
 .panes {
   display: grid;
-  grid-template-columns: 296px minmax(0, 1fr) 336px;
+  grid-template-columns: 320px minmax(0, 1fr) 336px;
   gap: var(--space-6);
   flex: 1;
   min-height: 0;
@@ -144,7 +144,7 @@
 
 /* Under the fold button, with a hairline that ties them to their layer */
 .elements {
-  margin-left: 42px;
+  margin-left: 32px;
   padding-left: var(--space-1);
   border-left: 1px solid var(--border);
 }
@@ -166,9 +166,14 @@
   grid-template-columns: auto auto minmax(0, 1fr) auto auto;
 }
 
-/* Grip, name */
+/* Grip, name, lock, eye */
 .element_row {
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+/* A hidden element: its name dimmed, its buttons as they are */
+.element_hidden .layer_select {
+  opacity: 0.5;
 }
 
 /* The fold button's place on an empty layer */
@@ -338,6 +343,30 @@
   right: -6px;
   bottom: -6px;
   cursor: nwse-resize;
+}
+
+/* Above the top's middle, on a stem: drag it around the center to turn */
+.rotate {
+  position: absolute;
+  top: -32px;
+  left: calc(50% - 7px);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--font-primary);
+  border-radius: 50%;
+  background-color: var(--accent-primary);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.rotate::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 18px;
+  background-color: var(--accent-primary);
 }
 
 .canvas_size {
