@@ -10,7 +10,7 @@ import { LibraryPicker } from "./LibraryPicker";
 import styles from "./mediapicker.module.css";
 
 type Props = {
-  // What the image or video is for, an alert's or a studio layer's id, which
+  // What the image or video is for, an alert's or a studio element's id, which
   // SET_ALERT_MEDIA echoes
   id: string;
   // Its file now
@@ -65,7 +65,7 @@ export function MediaThumbnail({
 }
 
 /**
- * Picks the image or video an alert or an Overlay Studio layer shows. The
+ * Picks the image or video an alert or an Overlay Studio element shows. The
  * alert's editor sets how long it shows.
  */
 export function MediaPicker({

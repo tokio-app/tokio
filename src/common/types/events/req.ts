@@ -333,7 +333,7 @@ export interface AppEventsMap {
   // The editor's autosave
   [APP_EVENTS.SAVE_STUDIO_OVERLAY]: { overlay: StudioOverlay };
   [APP_EVENTS.REMOVE_STUDIO_OVERLAY]: { id: string };
-  // Plays every layer that reacts once, with sample values, on stream
+  // Plays every element that reacts once, with sample values, on stream
   [APP_EVENTS.TEST_STUDIO_OVERLAY]: { id: string };
 
   // ALERTS

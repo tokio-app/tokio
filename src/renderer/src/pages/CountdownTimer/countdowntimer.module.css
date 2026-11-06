@@ -29,7 +29,7 @@
     color-mix(in srgb, var(--background-primary) 55%, transparent);
 }
 
-/* Only the overlay, for a layer in Overlay Studio's canvas */
+/* Only the overlay, for an element in Overlay Studio's canvas */
 .preview_bare {
   padding: 0;
   border: 0;

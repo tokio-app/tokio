@@ -116,7 +116,7 @@ describe("MediaPicker", () => {
     await user.click(tile("Confetti").getByRole("button", { name: "Delete" }));
     const confirm = screen.getByRole("dialog", { name: "Delete media?" });
     expect(confirm).toHaveTextContent(
-      '"Confetti" will be deleted from your computer and from every alert and Overlay Studio layer that shows it, in all your profiles.',
+      '"Confetti" will be deleted from your computer and from every alert and Overlay Studio element that shows it, in all your profiles.',
     );
     expect(sent(APP_EVENTS.REMOVE_MEDIA)).toEqual([]);
 
