@@ -13,7 +13,7 @@ import { EmbedView } from "./StudioStage";
  * Scales its content's own size to fit the box, centered, as a browser
  * source fits an overlay: close to the stream, not exact.
  */
-export function FitBox({ children }: { children: ReactNode }) {
+function FitBox({ children }: { children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
 

@@ -23,7 +23,7 @@ import {
 import { formatStat } from "./format";
 
 // The live numbers any text can show, as {likes}
-export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
+const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
   "likes",
   "viewers",
   "followers",

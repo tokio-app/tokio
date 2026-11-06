@@ -20,7 +20,7 @@
   border-top: 1px solid var(--border);
 }
 
-.name {
+.overlay_name {
   overflow: hidden;
   color: var(--font-primary);
   font-size: var(--font-lg);
@@ -30,7 +30,7 @@
   white-space: nowrap;
 }
 
-.name:hover {
+.overlay_name:hover {
   text-decoration: underline;
 }
 

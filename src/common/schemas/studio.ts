@@ -22,16 +22,16 @@ export const STUDIO_KINDS = [
 
 // Always on screen, shows on its trigger for `seconds`, or always on screen
 // and plays its animation on its trigger
-export const STUDIO_WHEN = ["always", "event", "animate"] as const;
+const STUDIO_WHEN = ["always", "event", "animate"] as const;
 
 // How a layer that shows on an event comes in
-export const STUDIO_ENTRANCES = ["fade", "pop", "slide"] as const;
+const STUDIO_ENTRANCES = ["fade", "pop", "slide"] as const;
 
 // What a layer that moves on an event plays, once per event
-export const STUDIO_ANIMATIONS = ["bounce", "shake", "pulse"] as const;
+const STUDIO_ANIMATIONS = ["bounce", "shake", "pulse"] as const;
 
 // A text layer's alignment in its box
-export const STUDIO_ALIGNS = ["left", "center", "right"] as const;
+const STUDIO_ALIGNS = ["left", "center", "right"] as const;
 
 // The most layers an overlay holds; each autosave rewrites the whole store
 export const STUDIO_MAX_LAYERS = 100;

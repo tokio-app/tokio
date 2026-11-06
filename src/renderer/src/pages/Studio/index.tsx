@@ -84,7 +84,7 @@ export function Studio() {
               <Link
                 to="/tools/studio/$id"
                 params={{ id: overlay.id }}
-                className={styles.name}
+                className={styles.overlay_name}
               >
                 {name}
               </Link>
