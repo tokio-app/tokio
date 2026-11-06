@@ -101,7 +101,7 @@ In `src/main/helper/games.ts`:
 - With more than one column, each row gets a **Column** picker and the section gives one URL per column.
 - Horizontal calls them rows (**Rows**, a **Row** picker, "Copy row N's URL"). The saved `columns` and `column` and the URLs stay the same, so column 2 becomes row 2.
 - `OverlayPreview` draws the columns side by side, each shrunk to fit its share as the page fits its source (`--fit`, written to the style in a layout effect, so measuring doesn't render again).
-- `bare` draws only the overlay, with no frame, column labels or empty state, for an embed in Overlay Studio's editor, which scales it to the layer's box.
+- `bare` draws only the overlay, with no frame, column labels or empty state, for an embed in Overlay Studio's editor, which scales it to the element's box.
 - Horizontal stacks the rows (`preview_rows`), and the section puts the preview above the builder's rows instead of in the side column, so a strip previews near its size on stream.
 
 ## Minecraft pictures library
