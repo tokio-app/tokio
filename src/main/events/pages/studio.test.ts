@@ -120,7 +120,7 @@ describe("studio events", () => {
         {
           level: "success",
           code: FEEDBACK_CODES.STUDIO_OVERLAY_ADDED,
-          message: 'Overlay "Overlay 1" added.',
+          message: '"Overlay 1" created.',
         },
       ]);
     });
@@ -164,7 +164,7 @@ describe("studio events", () => {
 
         const failure = {
           code: FEEDBACK_CODES.STUDIO_FAILED,
-          message: "Unable to add the overlay.",
+          message: "Unable to create the overlay.",
         };
         expect(h.replies(APP_EVENTS_RESPONSE.STUDIO)).toEqual([
           { success: false, data: [overlay()], error: failure },

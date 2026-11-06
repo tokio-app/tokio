@@ -1158,7 +1158,7 @@ describe("init events", () => {
       expect(noticesFor(s, FEEDBACK_CODES.STUDIO_FAILED)).toMatchObject([
         {
           message:
-            "Unable to show the Follow event on Overlay Studio's overlays.",
+            "Unable to show the Follow event in your Overlay Studio overlays.",
         },
       ]);
     });
