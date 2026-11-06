@@ -1,6 +1,6 @@
 import {
   StudioElementSchema,
-  StudioLayerSchema,
+  StudioGroupSchema,
   StudioOverlay,
   StudioOverlaySchema,
 } from "@/common/schemas";
@@ -23,7 +23,7 @@ const overlay = (patch: Partial<StudioOverlay> = {}): StudioOverlay => ({
   id: ID,
   name: "Overlay 1",
   size: "portrait",
-  layers: [],
+  items: [],
   ...patch,
 });
 
@@ -178,8 +178,9 @@ describe("studio events", () => {
   describe("SAVE_STUDIO_OVERLAY", () => {
     const saved = overlay({
       name: "Main",
-      layers: [
-        StudioLayerSchema.parse({
+      items: [
+        StudioGroupSchema.parse({
+          kind: "group",
           id: "L1",
           elements: [
             StudioElementSchema.parse({
@@ -270,7 +271,7 @@ describe("studio events", () => {
   });
 
   describe("REMOVE_STUDIO_OVERLAY", () => {
-    it("clears its page, forgets its layers and notifies", async () => {
+    it("clears its page, forgets its elements and notifies", async () => {
       const services = viewServices();
       const h = createHandler({
         ...services,

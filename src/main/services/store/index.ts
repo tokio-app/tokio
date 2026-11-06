@@ -402,8 +402,9 @@ export class StoreManagerService extends Service {
   }
 
   /**
-   * Takes a deleted media file off every studio element that shows it, in
-   * any layer; the elements stay, empty. Saves nothing when none has it.
+   * Takes a deleted media file off every studio element that shows it, in a
+   * group or on its own; the elements stay, empty. Saves nothing when none
+   * has it.
    */
   public async removeFromStudio(file: string): Promise<boolean> {
     this._ensureInitialized();
@@ -411,14 +412,17 @@ export class StoreManagerService extends Service {
     const has = (element: StudioElement) =>
       element.kind === "media" && element.file === file;
     if (!settings.studio.some((o) => studioElements(o).some(has))) return true;
+    const clear = (element: StudioElement): StudioElement =>
+      element.kind === "media" && element.file === file
+        ? { ...element, file: "", name: "" }
+        : element;
     settings.studio = settings.studio.map((o) => ({
       ...o,
-      layers: o.layers.map((layer) => ({
-        ...layer,
-        elements: layer.elements.map((element) =>
-          has(element) ? { ...element, file: "", name: "" } : element,
-        ),
-      })),
+      items: o.items.map((item) =>
+        item.kind === "group"
+          ? { ...item, elements: item.elements.map(clear) }
+          : clear(item),
+      ),
     }));
     return this._queueSave();
   }

@@ -5,7 +5,7 @@ import {
   ProfileSchema,
   StoreSchema,
   StudioElementSchema,
-  StudioLayerSchema,
+  StudioGroupSchema,
   StudioOverlaySchema,
 } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
@@ -1616,15 +1616,15 @@ describe("StoreManagerService", () => {
         file,
         name: "Confetti",
       });
-    const layer = (layerId: string, ...elements: ReturnType<typeof media>[]) =>
-      StudioLayerSchema.parse({ id: layerId, elements });
+    const group = (groupId: string, ...elements: ReturnType<typeof media>[]) =>
+      StudioGroupSchema.parse({ kind: "group", id: groupId, elements });
 
     it("adds an empty Portrait overlay and reads it back", async () => {
       const store = await init();
 
       expect(await store.addStudioOverlay(id, "Overlay 1")).toBe(true);
 
-      const added = { id, name: "Overlay 1", size: "portrait", layers: [] };
+      const added = { id, name: "Overlay 1", size: "portrait", items: [] };
       expect(store.getStudio()).toEqual([added]);
       expect((await init()).getStudio()).toEqual([added]);
     });
@@ -1646,7 +1646,7 @@ describe("StoreManagerService", () => {
         id,
         name: "Main",
         size: "landscape",
-        layers: [layer("L1", media("a", "c0ffee.png"))],
+        items: [group("L1", media("a", "c0ffee.png")), media("d", "tea.png")],
       });
 
       expect(await store.saveStudioOverlay(saved)).toBe(true);
@@ -1656,7 +1656,7 @@ describe("StoreManagerService", () => {
 
       expect((await init()).getStudio()).toEqual([
         saved,
-        { id: other, name: "Two", size: "portrait", layers: [] },
+        { id: other, name: "Two", size: "portrait", items: [] },
       ]);
     });
 
@@ -1668,11 +1668,11 @@ describe("StoreManagerService", () => {
         store.saveStudioOverlay({
           id,
           name: "One",
-          layers: [{ id: "L1", elements: [{ kind: "x" }] }],
+          items: [{ kind: "group", id: "L1", elements: [{ kind: "x" }] }],
         }),
       ).rejects.toThrow();
 
-      expect(store.getStudio()[0].layers).toEqual([]);
+      expect(store.getStudio()[0].items).toEqual([]);
       // Later saves still pass the store's schema
       expect(await store.updateTraySettings(false)).toBe(true);
     });
@@ -1693,26 +1693,31 @@ describe("StoreManagerService", () => {
       expect((await init()).getStudio()).toEqual([]);
     });
 
-    it("takes a deleted media file off every element in any layer, keeping them", async () => {
+    it("takes a deleted media file off every element, in a group or not, keeping them", async () => {
       const store = await init();
       await store.addStudioOverlay(id, "One");
       await store.saveStudioOverlay({
         id,
         name: "One",
-        layers: [
-          layer("L1", media("a", "c0ffee.png"), media("b", "tea.png")),
-          layer("L2", media("c", "c0ffee.png")),
+        items: [
+          group("L1", media("a", "c0ffee.png"), media("b", "tea.png")),
+          group("L2", media("c", "c0ffee.png")),
+          media("d", "c0ffee.png"),
         ],
       });
 
       expect(await store.removeFromStudio("c0ffee.png")).toBe(true);
 
-      const [one, two] = (await init()).getStudio()[0].layers;
-      expect(one.elements).toMatchObject([
-        { id: "a", file: "", name: "" },
-        { id: "b", file: "tea.png", name: "Confetti" },
+      expect((await init()).getStudio()[0].items).toMatchObject([
+        {
+          elements: [
+            { id: "a", file: "", name: "" },
+            { id: "b", file: "tea.png", name: "Confetti" },
+          ],
+        },
+        { elements: [{ id: "c", file: "", name: "" }] },
+        { id: "d", file: "", name: "" },
       ]);
-      expect(two.elements).toMatchObject([{ id: "c", file: "", name: "" }]);
     });
 
     it("saves nothing when no element has the file", async () => {

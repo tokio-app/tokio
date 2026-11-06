@@ -7,7 +7,7 @@
   list-style: none;
 }
 
-/* The name takes what the size, the layers and the actions leave */
+/* The name takes what the size, the element count and the actions leave */
 .row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto 7.5rem auto;
@@ -43,7 +43,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.layers {
+.element_count {
   color: var(--font-secondary);
   font-size: var(--font-sm);
   font-weight: 500;

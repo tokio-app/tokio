@@ -4,10 +4,10 @@ import { defaultStoreData } from "../util/constants/store";
 import { StoreZodSchema } from "./store";
 import {
   STUDIO_MAX_ELEMENTS,
-  STUDIO_MAX_LAYERS,
+  STUDIO_MAX_GROUPS,
   StoredStudioOverlaysSchema,
   StudioElementSchema,
-  StudioLayerSchema,
+  StudioGroupSchema,
   StudioOverlaySchema,
 } from "./studio";
 
@@ -20,6 +20,7 @@ describe("StudioElementSchema", () => {
     expect(StudioElementSchema.parse(element({ kind: "text" }))).toEqual({
       id: "a",
       kind: "text",
+      label: "",
       ...box,
       rotation: 0,
       flip_x: false,
@@ -131,6 +132,8 @@ describe("StudioElementSchema", () => {
     expect(text({ opacity: 1.5 })).toBe(false);
     expect(text({ rotation: -180 })).toBe(true);
     expect(text({ rotation: 181 })).toBe(false);
+    expect(text({ label: "a".repeat(60) })).toBe(true);
+    expect(text({ label: "a".repeat(61) })).toBe(false);
   });
 
   it("sends back what it got, untrimmed and unrounded", () => {
@@ -143,10 +146,11 @@ describe("StudioElementSchema", () => {
   });
 });
 
-describe("StudioLayerSchema", () => {
-  it("makes a shown, unlocked, unfolded layer without elements", () => {
-    expect(StudioLayerSchema.parse({ id: "l" })).toEqual({
-      id: "l",
+describe("StudioGroupSchema", () => {
+  it("makes a shown, unlocked, unfolded group without elements", () => {
+    expect(StudioGroupSchema.parse({ kind: "group", id: "g" })).toEqual({
+      kind: "group",
+      id: "g",
       name: "",
       locked: false,
       hidden: false,
@@ -156,87 +160,114 @@ describe("StudioLayerSchema", () => {
   });
 
   it("refuses a long name or an element it can't parse", () => {
-    expect(
-      StudioLayerSchema.safeParse({ id: "l", name: "a".repeat(61) }).success,
-    ).toBe(false);
-    expect(
-      StudioLayerSchema.safeParse({
-        id: "l",
-        elements: [element({ kind: "hologram" })],
-      }).success,
-    ).toBe(false);
+    const group = (fields: object) =>
+      StudioGroupSchema.safeParse({ kind: "group", id: "g", ...fields })
+        .success;
+
+    expect(group({ name: "a".repeat(61) })).toBe(false);
+    expect(group({ elements: [element({ kind: "hologram" })] })).toBe(false);
   });
 });
 
 describe("StudioOverlaySchema", () => {
-  it("makes a portrait overlay without layers", () => {
+  const group = (id: string, elements: object[] = []) => ({
+    kind: "group",
+    id,
+    elements,
+  });
+
+  it("makes a portrait overlay without items", () => {
     expect(StudioOverlaySchema.parse({ id: ID })).toEqual({
       id: ID,
       name: "",
       size: "portrait",
-      layers: [],
+      items: [],
     });
   });
 
+  it("holds groups and elements on their own, but no group in a group", () => {
+    const parsed = StudioOverlaySchema.parse({
+      id: ID,
+      items: [
+        element({ kind: "shape" }),
+        group("g", [element({ id: "b", kind: "text" })]),
+      ],
+    });
+
+    expect(parsed.items).toMatchObject([
+      { id: "a", kind: "shape" },
+      { id: "g", kind: "group", elements: [{ id: "b", kind: "text" }] },
+    ]);
+    expect(
+      StudioOverlaySchema.safeParse({
+        id: ID,
+        items: [group("g", [group("h")])],
+      }).success,
+    ).toBe(false);
+  });
+
   it("refuses an id that isn't a UUID, a long name, or one id used twice", () => {
-    const parses = (layers: object[]) =>
-      StudioOverlaySchema.safeParse({ id: ID, layers }).success;
+    const parses = (items: object[]) =>
+      StudioOverlaySchema.safeParse({ id: ID, items }).success;
     const shape = element({ kind: "shape" });
 
     expect(StudioOverlaySchema.safeParse({ id: "../x" }).success).toBe(false);
     expect(
       StudioOverlaySchema.safeParse({ id: ID, name: "a".repeat(61) }).success,
     ).toBe(false);
-    expect(parses([{ id: "l", elements: [shape] }])).toBe(true);
-    // Two elements, in one layer or two
-    expect(parses([{ id: "l", elements: [shape, shape] }])).toBe(false);
-    expect(
-      parses([
-        { id: "l", elements: [shape] },
-        { id: "m", elements: [shape] },
-      ]),
-    ).toBe(false);
-    // Two layers, or a layer and an element
-    expect(parses([{ id: "l" }, { id: "l" }])).toBe(false);
-    expect(parses([{ id: "a", elements: [shape] }])).toBe(false);
+    expect(parses([group("g", [shape])])).toBe(true);
+    // Two elements: in a group, on their own, or one of each
+    expect(parses([group("g", [shape, shape])])).toBe(false);
+    expect(parses([shape, shape])).toBe(false);
+    expect(parses([shape, group("g", [shape])])).toBe(false);
+    // Two groups, or a group and an element
+    expect(parses([group("g"), group("g")])).toBe(false);
+    expect(parses([group("a", [shape])])).toBe(false);
   });
 
-  it(`holds at most ${STUDIO_MAX_LAYERS} layers and ${STUDIO_MAX_ELEMENTS} elements in all`, () => {
-    const layers = (count: number) =>
-      Array.from({ length: count }, (_, i) => ({ id: `l${i}` }));
-    // Spread over two layers
-    const elements = (count: number) =>
-      [0, 1].map((half) => ({
-        id: `l${half}`,
-        elements: Array.from({ length: count / 2 }, (_, i) =>
-          element({ id: `e${half}-${i}`, kind: "shape" }),
+  it(`holds at most ${STUDIO_MAX_GROUPS} groups and ${STUDIO_MAX_ELEMENTS} elements in all`, () => {
+    const groups = (count: number) =>
+      Array.from({ length: count }, (_, i) => group(`g${i}`));
+    // Half on their own, half in a group
+    const elements = (count: number) => [
+      ...Array.from({ length: count / 2 }, (_, i) =>
+        element({ id: `e${i}`, kind: "shape" }),
+      ),
+      group(
+        "g",
+        Array.from({ length: count / 2 }, (_, i) =>
+          element({ id: `f${i}`, kind: "shape" }),
         ),
-      }));
-    const parses = (all: object[]) =>
-      StudioOverlaySchema.safeParse({ id: ID, layers: all }).success;
+      ),
+    ];
+    const parses = (items: object[]) =>
+      StudioOverlaySchema.safeParse({ id: ID, items }).success;
 
-    expect(parses(layers(100))).toBe(true);
-    expect(parses(layers(101))).toBe(false);
+    expect(parses(groups(100))).toBe(true);
+    expect(parses(groups(101))).toBe(false);
     expect(parses(elements(100))).toBe(true);
     expect(parses(elements(102))).toBe(false);
   });
 });
 
 describe("StoredStudioOverlaysSchema", () => {
-  it("drops the elements, layers and overlays that don't parse, keeping the rest", () => {
+  it("drops the elements, groups and overlays that don't parse, keeping the rest", () => {
     const stored = StoredStudioOverlaysSchema.parse([
       {
         id: ID,
-        layers: [
+        items: [
           {
-            id: "l",
+            kind: "group",
+            id: "g",
             elements: [
               element({ kind: "shape" }),
               element({ id: "b", kind: "hologram" }),
               element({ id: "c", kind: "text", text: 4 }),
             ],
           },
-          { id: "m", name: 4 },
+          { kind: "group", id: "m", name: 4 },
+          element({ id: "d", kind: "hologram" }),
+          element({ id: "e", kind: "shape" }),
         ],
       },
       { id: "not-a-uuid" },
@@ -248,14 +279,43 @@ describe("StoredStudioOverlaysSchema", () => {
         id: ID,
         name: "",
         size: "portrait",
-        layers: [
+        items: [
           expect.objectContaining({
-            id: "l",
+            kind: "group",
+            id: "g",
             elements: [expect.objectContaining({ id: "a", kind: "shape" })],
           }),
+          expect.objectContaining({ id: "e", kind: "shape" }),
         ],
       },
     ]);
+  });
+
+  it("makes each layer of an overlay saved before groups a group", () => {
+    const [stored] = StoredStudioOverlaysSchema.parse([
+      {
+        id: ID,
+        layers: [
+          {
+            id: "l",
+            name: "Intro",
+            locked: true,
+            elements: [element({ kind: "shape" })],
+          },
+        ],
+      },
+    ]);
+
+    expect(stored.items).toEqual([
+      expect.objectContaining({
+        kind: "group",
+        id: "l",
+        name: "Intro",
+        locked: true,
+        elements: [expect.objectContaining({ id: "a", kind: "shape" })],
+      }),
+    ]);
+    expect(stored).not.toHaveProperty("layers");
   });
 
   it("loads a store saved before Overlay Studio, with no overlays", () => {
@@ -269,7 +329,11 @@ describe("StoredStudioOverlaysSchema", () => {
     const saved = structuredClone(defaultStoreData) as {
       settings: Record<string, unknown>;
     };
-    saved.settings.studio = [{ id: ID, layers: "lots" }];
+    // Saved now, and before groups
+    saved.settings.studio = [
+      { id: ID, items: "lots" },
+      { id: ID, layers: "lots" },
+    ];
 
     expect(StoreZodSchema.parse(saved).settings.studio).toEqual([]);
   });

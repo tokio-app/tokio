@@ -944,7 +944,7 @@ describe("alerts events", () => {
       id: "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f",
       name: "Main",
       size: "portrait" as const,
-      layers: [],
+      items: [],
     };
     const setup = (cleared = true) => {
       const deleteMedia = vi.fn(async (_file: string) => ({ success: true }));
@@ -980,7 +980,7 @@ describe("alerts events", () => {
       return { h, deleteMedia, sendToClient, storeManagerService };
     };
 
-    it("takes the file off studio layers and sends their views, then deletes it", async () => {
+    it("takes the file off studio elements and sends their views, then deletes it", async () => {
       const { h, deleteMedia, sendToClient, storeManagerService } = setup();
 
       await h.invoke(alerts, APP_EVENTS.REMOVE_MEDIA, { file: party.file });

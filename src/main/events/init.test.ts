@@ -5,7 +5,7 @@ import {
   Profile,
   SavedEmote,
   StudioElementSchema,
-  StudioLayerSchema,
+  StudioGroupSchema,
   StudioOverlay,
   TimerSettingsSchema,
 } from "@/common/schemas";
@@ -1069,16 +1069,16 @@ describe("init events", () => {
         kind: "shape",
         ...patch,
       });
-    // One layer holding the elements
-    const layersOf = (elements: ReturnType<typeof element>[]) => [
-      StudioLayerSchema.parse({ id: "L1", elements }),
+    // One group holding the elements
+    const itemsOf = (elements: ReturnType<typeof element>[]) => [
+      StudioGroupSchema.parse({ kind: "group", id: "L1", elements }),
     ];
     const withOverlay = (s: Setup, elements: ReturnType<typeof element>[]) => {
       s.studio.push({
         id: ID,
         name: "Main",
         size: "portrait",
-        layers: layersOf(elements),
+        items: itemsOf(elements),
       });
     };
     // What the studio overlay's page got of a kind of message, in order
@@ -1186,7 +1186,7 @@ describe("init events", () => {
         id: "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60",
         name: "Plain",
         size: "portrait",
-        layers: layersOf([element("p", { kind: "text", text: "Hi" })]),
+        items: itemsOf([element("p", { kind: "text", text: "Hi" })]),
       });
       s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>
         Object.assign(s.stats, data),

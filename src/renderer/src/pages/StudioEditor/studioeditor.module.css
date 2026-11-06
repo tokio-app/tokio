@@ -142,14 +142,14 @@
   padding: 0 var(--space-2) var(--space-2);
 }
 
-/* Under the fold button, with a hairline that ties them to their layer */
+/* Under the fold button, with a hairline that ties them to their group */
 .elements {
   margin-left: 32px;
   padding-left: var(--space-1);
   border-left: 1px solid var(--border);
 }
 
-.layer_group {
+.group_item {
   border-radius: var(--radius-md);
 }
 
@@ -161,12 +161,12 @@
   border-radius: var(--radius-md);
 }
 
-/* Grip, fold, name, lock, eye */
-.layer_row {
+/* A group: grip, fold, name, lock, eye */
+.group_row {
   grid-template-columns: auto auto minmax(0, 1fr) auto auto;
 }
 
-/* Grip, name, lock, eye */
+/* An element, in a group or on its own: grip, name, lock, eye */
 .element_row {
   grid-template-columns: auto minmax(0, 1fr) auto auto;
 }
@@ -176,7 +176,7 @@
   opacity: 0.5;
 }
 
-/* The fold button's place on an empty layer */
+/* The fold button's place on an empty group */
 .fold_space {
   width: 28px;
 }
@@ -191,8 +191,8 @@
 }
 
 /* Hidden: its name and elements dimmed, its buttons as they are */
-.layer_hidden .layer_select,
-.layer_hidden .elements {
+.group_hidden .layer_select,
+.group_hidden .elements {
   opacity: 0.5;
 }
 

@@ -2,7 +2,7 @@ import {
   CatalogOverlay,
   OverlayConfig,
   StudioElementSchema,
-  StudioLayerSchema,
+  StudioGroupSchema,
   StudioOverlay,
 } from "@/common/schemas";
 import {
@@ -67,8 +67,9 @@ const studio: StudioOverlay = {
   id: "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f",
   name: "Main",
   size: "portrait",
-  layers: [
-    StudioLayerSchema.parse({
+  items: [
+    StudioGroupSchema.parse({
+      kind: "group",
       id: "L1",
       elements: [
         StudioElementSchema.parse({

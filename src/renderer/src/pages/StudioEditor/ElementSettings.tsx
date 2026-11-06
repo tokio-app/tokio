@@ -2,6 +2,7 @@ import { MessageKey } from "@/common/i18n";
 import {
   STUDIO_MAX_FONT_SIZE,
   STUDIO_MAX_SECONDS,
+  STUDIO_NAME_MAX_LENGTH,
   STUDIO_TEXT_MAX_LENGTH,
   StudioAlign,
   StudioAnimation,
@@ -97,6 +98,8 @@ const ALIGNS_TO: { to: AlignTo; label: MessageKey; Icon: IconType }[][] = [
 
 type Props = {
   element: StudioElement;
+  // What its row calls it with no label
+  autoName: string;
   // The overlay's size, which the element lines up with
   canvas: { width: number; height: number };
   onChange: (element: StudioElement) => void;
@@ -109,11 +112,12 @@ type Props = {
 };
 
 /**
- * The selected element's own fields, its box, flips and opacity, and its
- * When.
+ * The selected element's name, its own fields, its box, flips and opacity,
+ * and its When.
  */
 export function ElementSettings({
   element,
+  autoName,
   canvas,
   onChange,
   gifts,
@@ -339,6 +343,14 @@ export function ElementSettings({
   return (
     <div className={styles.settings}>
       <h3 className={styles.panel_title}>{t(KIND_NAMES[element.kind])}</h3>
+      <Field label={t("common.name")}>
+        <Input
+          maxLength={STUDIO_NAME_MAX_LENGTH}
+          placeholder={autoName}
+          value={element.label}
+          onChange={(e) => onChange({ ...element, label: e.target.value })}
+        />
+      </Field>
       {own}
 
       <Field label={t("studio.fields.box")}>

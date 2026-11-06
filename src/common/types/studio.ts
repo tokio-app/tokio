@@ -61,14 +61,16 @@ export type StudioElementView = StudioElementViewBase &
       }
   );
 
-// A layer as the stage draws it, over the layers with a lower z
+// A group's elements, or an element on its own, as the stage draws them,
+// over the layers with a lower z
 export type StudioLayerView = {
   id: string;
   z: number;
   elements: StudioElementView[];
 };
 
-// A studio overlay's canvas and the layers it shows, as its page draws them
+// A studio overlay's canvas and the layers it shows, as its page draws them:
+// one per group or standalone element
 export type StudioView = {
   width: number;
   height: number;

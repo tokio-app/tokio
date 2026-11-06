@@ -4,8 +4,8 @@ import {
   StudioElementKind,
   StudioElementOf,
   StudioElementSchema,
-  StudioLayer,
-  StudioLayerSchema,
+  StudioGroup,
+  StudioGroupSchema,
   StudioOverlay,
   StudioSize,
   StudioSource,
@@ -49,7 +49,9 @@ export const studioEventVariables = (element: StudioElement): string[] =>
 
 // Every element of the overlay, its layers' in order
 export const studioElements = (overlay: StudioOverlay): StudioElement[] =>
-  overlay.layers.flatMap((layer) => layer.elements);
+  overlay.items.flatMap((item) =>
+    item.kind === "group" ? item.elements : [item],
+  );
 
 // Own keys only, so {constructor} isn't a number
 const isNumber = (
@@ -185,9 +187,10 @@ function elementView(
 
 /**
  * The overlay as its page draws it, for main to send and the editor to show:
- * the canvas, and the layers and elements that aren't hidden, resolved, back
- * to front. A z is the place among all of them, hidden ones included, so
- * hiding one doesn't renumber the rest.
+ * the canvas, and one stage layer per group or standalone element that isn't
+ * hidden, with the elements that aren't, resolved, back to front. A z is the
+ * place among all of them, hidden ones included, so hiding one doesn't
+ * renumber the rest.
  */
 export function studioView(
   overlay: StudioOverlay,
@@ -195,19 +198,20 @@ export function studioView(
 ): StudioView {
   return {
     ...STUDIO_SIZES[overlay.size],
-    layers: overlay.layers.flatMap((layer, z) =>
-      layer.hidden
-        ? []
-        : [
-            {
-              id: layer.id,
-              z,
-              elements: layer.elements.flatMap((element, at) =>
-                element.hidden ? [] : [elementView(element, at, deps)],
-              ),
-            },
-          ],
-    ),
+    layers: overlay.items.flatMap((item, z) => {
+      if (item.hidden) return [];
+      // An element on its own is a stage layer of its own
+      const elements = item.kind === "group" ? item.elements : [item];
+      return [
+        {
+          id: item.id,
+          z,
+          elements: elements.flatMap((element, at) =>
+            element.hidden ? [] : [elementView(element, at, deps)],
+          ),
+        },
+      ];
+    }),
   };
 }
 
@@ -243,6 +247,6 @@ export function newStudioElement(
   });
 }
 
-/** A new, empty layer with the name, shown and unlocked. */
-export const newStudioLayer = (name: string): StudioLayer =>
-  StudioLayerSchema.parse({ id: crypto.randomUUID(), name });
+/** A new, empty group with the name, shown and unlocked. */
+export const newStudioGroup = (name: string): StudioGroup =>
+  StudioGroupSchema.parse({ kind: "group", id: crypto.randomUUID(), name });

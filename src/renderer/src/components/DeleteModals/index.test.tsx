@@ -23,7 +23,7 @@ describe("DeleteStudioOverlayModal", () => {
     expect(
       screen.getByRole("dialog", { name: "Delete overlay?" }),
     ).toHaveTextContent(
-      "Main and its layers will be deleted. Streaming apps using its URL will stop showing it.",
+      "Main and its elements will be deleted. Streaming apps using its URL will stop showing it.",
     );
     await user.click(screen.getByRole("button", { name: "Delete" }));
 

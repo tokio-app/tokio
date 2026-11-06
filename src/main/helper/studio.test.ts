@@ -1,6 +1,6 @@
 import {
   StudioElementSchema,
-  StudioLayerSchema,
+  StudioGroupSchema,
   StudioOverlay,
 } from "@/common/schemas";
 import { STUDIO_MESSAGE, StudioMessage, TOKIO_EVENTS } from "@/common/types";
@@ -28,7 +28,7 @@ const element = (id: string, patch: object) =>
     ...patch,
   });
 
-// One layer holding the elements
+// One group holding the elements
 const overlay = (
   id: string,
   elements: ReturnType<typeof element>[],
@@ -36,7 +36,7 @@ const overlay = (
   id,
   name: "",
   size: "portrait",
-  layers: [StudioLayerSchema.parse({ id: "L1", elements })],
+  items: [StudioGroupSchema.parse({ kind: "group", id: "L1", elements })],
 });
 
 const session = (startedAt: number | null) => ({

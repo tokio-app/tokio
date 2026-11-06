@@ -1,6 +1,6 @@
 import { StudioOverlay } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { getStudioOverlayURL } from "@/common/util";
+import { getStudioOverlayURL, studioElements } from "@/common/util";
 import {
   BackButton,
   Btn,
@@ -89,8 +89,10 @@ export function Studio() {
                 {name}
               </Link>
               <span className={styles.size}>{sizeText(overlay.size)}</span>
-              <span className={styles.layers}>
-                {t("studio.layers", { count: overlay.layers.length })}
+              <span className={styles.element_count}>
+                {t("studio.elements", {
+                  count: studioElements(overlay).length,
+                })}
               </span>
               <span className={styles.actions}>
                 <CopyButton

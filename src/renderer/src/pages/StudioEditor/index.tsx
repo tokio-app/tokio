@@ -2,12 +2,13 @@ import {
   Alert,
   Profile,
   STUDIO_MAX_ELEMENTS,
-  STUDIO_MAX_LAYERS,
+  STUDIO_MAX_GROUPS,
   STUDIO_SIZES,
   StudioElement,
   StudioElementKind,
   StudioElementOf,
-  StudioLayer,
+  StudioGroup,
+  StudioItem,
   StudioOverlay,
   StudioSource,
 } from "@/common/schemas";
@@ -24,7 +25,7 @@ import {
   getStudioOverlayURL,
   mediaKind,
   newStudioElement,
-  newStudioLayer,
+  newStudioGroup,
   studioElements,
   studioView,
   TIMER_PATH,
@@ -60,9 +61,9 @@ import { Embed } from "./Embed";
 import {
   Box,
   elementName,
-  findElement,
+  mapElements,
   moveElement,
-  moveLayer,
+  moveItem,
   sampleReact,
   Samples,
   sampleText,
@@ -71,8 +72,8 @@ import {
   stepElement,
   whenText,
 } from "./helper";
-import { LayerSettings } from "./LayerSettings";
-import { ElementFlags, LayerFlags, LayersPanel } from "./LayersPanel";
+import { GroupSettings } from "./GroupSettings";
+import { ElementFlags, GroupFlags, LayersPanel } from "./LayersPanel";
 import { OverlaySettings } from "./OverlaySettings";
 import { StudioStage } from "./StudioStage";
 import styles from "./studioeditor.module.css";
@@ -82,7 +83,7 @@ import styles from "./studioeditor.module.css";
 let requests = 0;
 
 /**
- * An Overlay Studio overlay's editor: its layers and their elements, the
+ * An Overlay Studio overlay's editor: its groups and elements, the
  * canvas, and the selection's settings (the overlay's, with none). It opens
  * once main's list holds the overlay.
  */
@@ -173,32 +174,25 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     }
   });
 
-  const setLayers = (change: (layers: StudioLayer[]) => StudioLayer[]) =>
-    setOverlay((o) => ({ ...o, layers: change(o.layers) }));
+  const setItems = (change: (items: StudioItem[]) => StudioItem[]) =>
+    setOverlay((o) => ({ ...o, items: change(o.items) }));
 
-  const changeLayer = (
+  const changeGroup = (
     id: string,
-    change: (layer: StudioLayer) => StudioLayer,
+    change: (group: StudioGroup) => StudioGroup,
   ) =>
-    setLayers((layers) =>
-      layers.map((layer) => (layer.id === id ? change(layer) : layer)),
+    setItems((items) =>
+      items.map((item) =>
+        item.kind === "group" && item.id === id ? change(item) : item,
+      ),
     );
 
   const changeElement = (
     id: string,
     change: (element: StudioElement) => StudioElement,
   ) =>
-    setLayers((layers) =>
-      layers.map((layer) =>
-        layer.elements.some((e) => e.id === id)
-          ? {
-              ...layer,
-              elements: layer.elements.map((e) =>
-                e.id === id ? change(e) : e,
-              ),
-            }
-          : layer,
-      ),
+    setItems((items) =>
+      mapElements(items, (e) => (e.id === id ? change(e) : e)),
     );
 
   const setMedia = (id: string, file: { file: string; name: string } | null) =>
@@ -226,12 +220,9 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       studioElements(o).some(shows)
         ? {
             ...o,
-            layers: o.layers.map((layer) => ({
-              ...layer,
-              elements: layer.elements.map((e) =>
-                shows(e) ? { ...e, file: "", name: "" } : e,
-              ),
-            })),
+            items: mapElements(o.items, (e) =>
+              shows(e) ? { ...e, file: "", name: "" } : e,
+            ),
           }
         : o,
     );
@@ -345,14 +336,21 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     ),
   ];
 
-  const names = Object.fromEntries(
-    elements.map((element) => {
-      const name = elementName(element, {
+  // What each element's row calls it with no label
+  const autoNames = Object.fromEntries(
+    elements.map((element) => [
+      element.id,
+      elementName(element, {
         gifts: giftChoices,
         emotes: emoteChoices,
         label,
         t,
-      });
+      }),
+    ]),
+  );
+  const names = Object.fromEntries(
+    elements.map((element) => {
+      const name = element.label.trim() || autoNames[element.id];
       const kind = t(`studio.kinds.${element.kind}`);
       const when = whenText(element, t);
       // An element named after its kind doesn't say its kind twice
@@ -364,82 +362,82 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     }),
   );
 
-  const layer = overlay.layers.find((l) => l.id === selected);
-  const at = selected === null ? null : findElement(overlay.layers, selected);
-  const element = at && overlay.layers[at.layer].elements[at.index];
-  // Where the menu adds: the selected layer, the selected element's, else
-  // the front one
-  const target =
-    layer ?? (at ? overlay.layers[at.layer] : overlay.layers.at(-1));
-  // The locked layers' and elements' ids: unique across both
+  const groups = overlay.items.filter((item) => item.kind === "group");
+  const group = groups.find((g) => g.id === selected);
+  const element = elements.find((e) => e.id === selected);
+  // The group an element is in, none on its own
+  const holderOf = (id: string | null) =>
+    groups.find((g) => g.elements.some((e) => e.id === id));
+  // Where the menu adds: the selected group, the selected element's, else
+  // on its own
+  const target = group ?? holderOf(selected);
+  // The locked groups' and elements' ids: unique across both
   const locked = useMemo(
     () =>
       new Set(
-        [...overlay.layers, ...studioElements(overlay)]
+        [...overlay.items, ...studioElements(overlay)]
           .filter((item) => item.locked)
           .map((item) => item.id),
       ),
     [overlay],
   );
 
-  // "Layer N", the first number no layer's name uses
-  const layerName = () =>
-    newOverlayName(overlay.layers, (number) =>
-      t("studio.editor.layerName", { number: String(number) }),
-    );
-
-  // An element picked in a folded layer unfolds it
+  // An element picked in a folded group unfolds it
   const select = (id: string | null) => {
     setSelected(id);
-    const found = id === null ? null : findElement(overlay.layers, id);
-    const holder = found && overlay.layers[found.layer];
+    const holder = holderOf(id);
     if (holder?.folded) {
-      changeLayer(holder.id, (l) => ({ ...l, folded: false }));
+      changeGroup(holder.id, (g) => ({ ...g, folded: false }));
     }
   };
 
-  const addLayer = () => {
-    if (overlay.layers.length >= STUDIO_MAX_LAYERS) return;
-    const added = newStudioLayer(layerName());
+  const addGroup = () => {
+    if (groups.length >= STUDIO_MAX_GROUPS) return;
+    // "Group N", the first number no group's name uses
+    const added = newStudioGroup(
+      newOverlayName(groups, (number) =>
+        t("studio.editor.groupName", { number: String(number) }),
+      ),
+    );
     // In front of the rest
-    setLayers((layers) => [...layers, added]);
+    setItems((items) => [...items, added]);
     setSelected(added.id);
   };
 
   const add = (kind: StudioElementKind) => {
     if (elements.length >= STUDIO_MAX_ELEMENTS) return;
     const added = newStudioElement(kind, overlay.size);
-    // In front in its layer, which unfolds to show it
+    // In front in its group, which unfolds to show it, else in front of all
     if (target) {
-      changeLayer(target.id, (l) => ({
-        ...l,
+      changeGroup(target.id, (g) => ({
+        ...g,
         folded: false,
-        elements: [...l.elements, added],
+        elements: [...g.elements, added],
       }));
     } else {
-      setLayers(() => [{ ...newStudioLayer(layerName()), elements: [added] }]);
+      setItems((items) => [...items, added]);
     }
     setSelected(added.id);
   };
 
-  // A layer with its elements, or one element
+  // A group with its elements, or one element
   const remove = (id: string) => {
-    setLayers((layers) =>
-      layers
-        .filter((l) => l.id !== id)
-        .map((l) =>
-          l.elements.some((e) => e.id === id)
-            ? { ...l, elements: l.elements.filter((e) => e.id !== id) }
-            : l,
+    setItems((items) =>
+      items
+        .filter((item) => item.id !== id)
+        .map((item) =>
+          item.kind === "group" && item.elements.some((e) => e.id === id)
+            ? { ...item, elements: item.elements.filter((e) => e.id !== id) }
+            : item,
         ),
     );
     setSelected((current) => (current === id ? null : current));
   };
 
   const shift = (id: string, dx: number, dy: number) =>
-    changeLayer(id, (l) => ({
-      ...l,
-      elements: l.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })),
+    changeGroup(id, (g) => ({
+      ...g,
+      elements: g.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })),
     }));
 
   const setBox = (id: string, box: Box) =>
@@ -486,34 +484,34 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       >
         <div className={styles.panes}>
           <LayersPanel
-            layers={overlay.layers}
+            items={overlay.items}
             selected={selected}
             names={names}
             target={target}
             onSelect={select}
-            onAddLayer={addLayer}
+            onAddGroup={addGroup}
             onAdd={add}
             onDelete={remove}
-            onFlags={(id, flags: LayerFlags) =>
-              changeLayer(id, (l) => ({ ...l, ...flags }))
+            onFlags={(id, flags: GroupFlags) =>
+              changeGroup(id, (g) => ({ ...g, ...flags }))
             }
             onElementFlags={(id, flags: ElementFlags) =>
               changeElement(id, (e) => ({ ...e, ...flags }))
             }
-            onMoveLayer={(id, to) =>
-              setLayers((layers) =>
-                moveLayer(
-                  layers,
-                  layers.findIndex((l) => l.id === id),
+            onMoveItem={(id, to) =>
+              setItems((items) =>
+                moveItem(
+                  items,
+                  items.findIndex((item) => item.id === id),
                   to,
                 ),
               )
             }
-            onMoveElement={(id, layerId, to) =>
-              setLayers((layers) => moveElement(layers, id, layerId, to))
+            onMoveElement={(id, groupId, to) =>
+              setItems((items) => moveElement(items, id, groupId, to))
             }
             onStepElement={(id, by) =>
-              setLayers((layers) => stepElement(layers, id, by))
+              setItems((items) => stepElement(items, id, by))
             }
           />
 
@@ -545,16 +543,17 @@ function Editor({ saved }: { saved: StudioOverlay }) {
           </div>
 
           <div className={styles.panel}>
-            {layer ? (
-              <LayerSettings
-                key={layer.id}
-                layer={layer}
-                onChange={(changed) => changeLayer(changed.id, () => changed)}
+            {group ? (
+              <GroupSettings
+                key={group.id}
+                group={group}
+                onChange={(changed) => changeGroup(changed.id, () => changed)}
               />
             ) : element ? (
               <ElementSettings
                 key={element.id}
                 element={element}
+                autoName={autoNames[element.id]}
                 canvas={STUDIO_SIZES[overlay.size]}
                 onChange={(changed) => changeElement(changed.id, () => changed)}
                 gifts={giftChoices}

@@ -2,10 +2,11 @@ import { translate } from "@/common/i18n";
 import {
   StudioElement,
   StudioElementSchema,
-  StudioLayer,
+  StudioGroup,
+  StudioItem,
 } from "@/common/schemas";
 import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
-import { newStudioElement, newStudioLayer, studioView } from "@/common/util";
+import { newStudioElement, newStudioGroup, studioView } from "@/common/util";
 import { gift } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
@@ -20,7 +21,7 @@ import {
   stepElement,
   turnTo,
   toCanvas,
-  moveLayer,
+  moveItem,
   roundBox,
   sampleReact,
   Samples,
@@ -117,13 +118,13 @@ describe("sourceValue and sourceOf", () => {
   });
 });
 
-describe("moveLayer", () => {
+describe("moveItem", () => {
   it("moves one item, and nothing out of range", () => {
-    expect(moveLayer(["a", "b", "c"], 0, 2)).toEqual(["b", "c", "a"]);
-    expect(moveLayer(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]);
+    expect(moveItem(["a", "b", "c"], 0, 2)).toEqual(["b", "c", "a"]);
+    expect(moveItem(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]);
     const same = ["a", "b"];
-    expect(moveLayer(same, 1, 2)).toBe(same);
-    expect(moveLayer(same, 0, -1)).toBe(same);
+    expect(moveItem(same, 1, 2)).toBe(same);
+    expect(moveItem(same, 0, -1)).toBe(same);
   });
 });
 
@@ -308,54 +309,91 @@ describe("Samples", () => {
   });
 });
 
-// A layer holding shapes with these ids, back to front
-const layerOf = (id: string, ...ids: string[]): StudioLayer => ({
-  ...newStudioLayer(id),
+// A group holding shapes with these ids, back to front
+const groupOf = (id: string, ...ids: string[]): StudioGroup => ({
+  ...newStudioGroup(id),
   id,
-  elements: ids.map((e) => ({ ...element("shape"), id: e })),
+  elements: ids.map(shapeOf),
 });
-const ids = (layers: StudioLayer[]) =>
-  layers.map((l) => [l.id, ...l.elements.map((e) => e.id)]);
+const shapeOf = (id: string): StudioElement => ({ ...element("shape"), id });
+// Each item's id, a group's with its elements'
+const ids = (items: StudioItem[]) =>
+  items.map((item) =>
+    item.kind === "group"
+      ? [item.id, ...item.elements.map((e) => e.id)]
+      : item.id,
+  );
 
 describe("moveElement and stepElement", () => {
-  const layers = [layerOf("back", "a", "b"), layerOf("front", "c")];
+  const items: StudioItem[] = [
+    groupOf("back", "a", "b"),
+    shapeOf("alone"),
+    groupOf("front", "c"),
+  ];
 
-  it("finds an element's layer and place", () => {
-    expect(findElement(layers, "b")).toEqual({ layer: 0, index: 1 });
-    expect(findElement(layers, "back")).toBeNull();
+  it("finds an element in its group, or on its own", () => {
+    expect(findElement(items, "b")).toEqual({ group: 0, index: 1 });
+    expect(findElement(items, "alone")).toEqual({ group: null, index: 1 });
+    expect(findElement(items, "back")).toBeNull();
   });
 
-  it("moves an element into another layer, which unfolds", () => {
-    const folded = [layers[0], { ...layers[1], folded: true }];
+  it("moves an element into another group, which unfolds, or on its own", () => {
+    const folded = [items[0], items[1], { ...items[2], folded: true }];
     const moved = moveElement(folded, "a", "front", 1);
 
-    expect(ids(moved)).toEqual([
-      ["back", "b"],
-      ["front", "c", "a"],
+    expect(ids(moved)).toEqual([["back", "b"], "alone", ["front", "c", "a"]]);
+    expect(moved[2]).toMatchObject({ folded: false });
+    expect(ids(moveElement(items, "b", null, 3))).toEqual([
+      ["back", "a"],
+      "alone",
+      ["front", "c"],
+      "b",
     ]);
-    expect(moved[1].folded).toBe(false);
-    // Nowhere to go
-    expect(moveElement(layers, "a", "gone", 0)).toBe(layers);
-  });
-
-  it("steps within its layer, then across the edge into the next", () => {
-    expect(ids(stepElement(layers, "a", 1))).toEqual([
-      ["back", "b", "a"],
+    expect(ids(moveElement(items, "alone", "back", 0))).toEqual([
+      ["back", "alone", "a", "b"],
       ["front", "c"],
     ]);
-    // Toward the front, it's the next layer's back-most
-    expect(ids(stepElement(layers, "b", 1))).toEqual([
-      ["back", "a"],
-      ["front", "b", "c"],
+    // Nowhere to go
+    expect(moveElement(items, "a", "gone", 0)).toBe(items);
+    expect(moveElement(items, "a", "alone", 0)).toBe(items);
+  });
+
+  it("steps within its group, then out of it, right next to it", () => {
+    expect(ids(stepElement(items, "a", 1))).toEqual([
+      ["back", "b", "a"],
+      "alone",
+      ["front", "c"],
     ]);
-    // Toward the back, the next layer's front-most
-    expect(ids(stepElement(layers, "c", -1))).toEqual([
-      ["back", "a", "b", "c"],
+    expect(ids(stepElement(items, "b", 1))).toEqual([
+      ["back", "a"],
+      "b",
+      "alone",
+      ["front", "c"],
+    ]);
+    expect(ids(stepElement(items, "c", -1))).toEqual([
+      ["back", "a", "b"],
+      "alone",
+      "c",
       ["front"],
     ]);
-    // Past the last layer, nothing moves
-    expect(stepElement(layers, "c", 1)).toBe(layers);
-    expect(stepElement(layers, "a", -1)).toBe(layers);
+  });
+
+  it("steps on its own past an element, and into a group at its near edge", () => {
+    // Toward the front, the group's back-most
+    expect(ids(stepElement(items, "alone", 1))).toEqual([
+      ["back", "a", "b"],
+      ["front", "alone", "c"],
+    ]);
+    // Toward the back, its front-most
+    expect(ids(stepElement(items, "alone", -1))).toEqual([
+      ["back", "a", "b", "alone"],
+      ["front", "c"],
+    ]);
+    const two = [shapeOf("x"), shapeOf("y")];
+    expect(ids(stepElement(two, "x", 1))).toEqual(["y", "x"]);
+    // Past the edge, nothing moves
+    expect(stepElement(two, "y", 1)).toBe(two);
+    expect(stepElement(two, "x", -1)).toBe(two);
   });
 });
 
@@ -372,24 +410,30 @@ describe("the canvas's geometry", () => {
     id: "o",
     name: "",
     size: "portrait" as const,
-    layers: [
-      { ...newStudioLayer("Back"), id: "back", elements: [box("under", 0, 0)] },
+    items: [
+      { ...newStudioGroup("Back"), id: "back", elements: [box("under", 0, 0)] },
       {
-        ...newStudioLayer("Front"),
+        ...newStudioGroup("Front"),
         id: "front",
         elements: [box("low", 50, 50), box("high", 60, 60, 20)],
       },
     ],
   };
-  const view = studioView(overlay, {
+  // A shape on its own in front of both groups
+  const alone = {
+    ...overlay,
+    items: [...overlay.items, box("alone", 0, 0, 30)],
+  };
+  const deps = {
     gifts: [],
     served: () => true,
-    mediaURL: (file) => file,
+    mediaURL: (file: string) => file,
     embedPath: () => "",
     text: () => "",
     viewer: () => ({ src: "", name: "" }),
     label: () => "",
-  });
+  };
+  const view = studioView(overlay, deps);
 
   it("turns screen px into the canvas's", () => {
     expect(
@@ -422,14 +466,22 @@ describe("the canvas's geometry", () => {
     expect(pickElement(view, new Set(), { x: 500, y: 500 })).toBeNull();
   });
 
-  it("goes through a locked layer to what's under it", () => {
+  it("goes through a locked group to what's under it", () => {
     expect(pickElement(view, new Set(["front"]), { x: 65, y: 65 })).toBe(
       "under",
     );
   });
 
-  it("boxes a layer's elements", () => {
-    expect(bounds(overlay.layers[1].elements)).toEqual({
+  it("picks an element on its own, and goes through it locked", () => {
+    const shown = studioView(alone, deps);
+    expect(pickElement(shown, new Set(), { x: 10, y: 10 })).toBe("alone");
+    expect(pickElement(shown, new Set(["alone"]), { x: 10, y: 10 })).toBe(
+      "under",
+    );
+  });
+
+  it("boxes a group's elements", () => {
+    expect(bounds(overlay.items[1].elements)).toEqual({
       x: 50,
       y: 50,
       width: 100,

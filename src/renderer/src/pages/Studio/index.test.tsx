@@ -1,19 +1,25 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { newStudioLayer } from "@/common/util";
+import { newStudioElement, newStudioGroup } from "@/common/util";
 import { failure, settingsReply, studioOverlay } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+const shape = () => newStudioElement("shape", "portrait");
+// Two elements in a group, one on its own and an empty group: 3 elements
 const MAIN = studioOverlay("Main scene", {
   id: "1b4e28ba-2fa1-41d2-883f-0016d3cca427",
-  layers: [newStudioLayer("Layer 1"), newStudioLayer("Layer 2")],
+  items: [
+    { ...newStudioGroup("Group 1"), elements: [shape(), shape()] },
+    shape(),
+    newStudioGroup("Group 2"),
+  ],
 });
 const CHAT = studioOverlay("", {
   id: "6fa459ea-ee8a-4ca4-894e-db77e160355e",
   size: "landscape",
-  layers: [newStudioLayer("Layer 1")],
+  items: [shape()],
 });
 
 const studio = (...data: ReturnType<typeof studioOverlay>[]) =>
@@ -42,15 +48,15 @@ describe("Studio", () => {
     expect(page().getByText(/^No overlays yet\./)).toBeVisible();
   });
 
-  it("lists each overlay's name, size and layers, an empty name as untitled", async () => {
+  it("lists each overlay's name, size and number of elements, an empty name as untitled", async () => {
     await renderApp("/tools/studio");
 
     await studio(MAIN, CHAT);
 
     expect(row("Main scene").getByText("1080 × 1920")).toBeVisible();
-    expect(row("Main scene").getByText("2 layers")).toBeVisible();
+    expect(row("Main scene").getByText("3 elements")).toBeVisible();
     expect(row("Untitled overlay").getByText("1920 × 1080")).toBeVisible();
-    expect(row("Untitled overlay").getByText("1 layer")).toBeVisible();
+    expect(row("Untitled overlay").getByText("1 element")).toBeVisible();
   });
 
   it("opens an overlay's editor from its name", async () => {
@@ -101,7 +107,7 @@ describe("Studio", () => {
     await send(APP_EVENTS_RESPONSE.STUDIO, { ...failure(), data: [MAIN] });
 
     expect(router.state.location.pathname).toBe("/tools/studio");
-    expect(row("Main scene").getByText("2 layers")).toBeVisible();
+    expect(row("Main scene").getByText("3 elements")).toBeVisible();
   });
 
   it("asks before deleting an overlay", async () => {
@@ -113,7 +119,7 @@ describe("Studio", () => {
     );
     const dialog = screen.getByRole("dialog", { name: "Delete overlay?" });
     expect(dialog).toHaveTextContent(
-      "Main scene and its layers will be deleted. Streaming apps using its URL will stop showing it.",
+      "Main scene and its elements will be deleted. Streaming apps using its URL will stop showing it.",
     );
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 

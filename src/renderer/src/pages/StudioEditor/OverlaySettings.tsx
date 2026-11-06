@@ -10,7 +10,7 @@ type Props = {
   onChange: (overlay: StudioOverlay) => void;
 };
 
-/** With no layer selected: the overlay's name, canvas and URL. */
+/** With nothing selected: the overlay's name, canvas and URL. */
 export function OverlaySettings({ overlay, onChange }: Props) {
   const t = useT();
   return (

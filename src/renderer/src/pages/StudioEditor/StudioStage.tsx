@@ -51,9 +51,9 @@ type Props = {
   view: StudioView;
   // The stage, for Test to play its elements
   stageRef: RefObject<Stage | null>;
-  // A layer's id or an element's
+  // A group's id or an element's
   selected: string | null;
-  // The locked layers and elements, which the canvas can't pick, move,
+  // The locked groups and elements, which the canvas can't pick, move,
   // resize or rotate
   locked: ReadonlySet<string>;
   onSelect: (id: string | null) => void;
@@ -61,8 +61,8 @@ type Props = {
   onBox: (id: string, box: Box) => void;
   // An element turned, in whole degrees
   onRotate: (id: string, rotation: number) => void;
-  // Every element of a layer moved by whole px
-  onShift: (layerId: string, dx: number, dy: number) => void;
+  // Every element of a group moved by whole px
+  onShift: (groupId: string, dx: number, dy: number) => void;
   // An embed's preview, portaled into its slot
   embed: (element: EmbedView) => ReactNode;
 };
@@ -87,7 +87,7 @@ type Drag =
       center: Point;
     }
   | {
-      kind: "layer";
+      kind: "group";
       id: string;
       x: number;
       y: number;
@@ -109,7 +109,7 @@ const HANDLES: Record<Corner, string> = {
   se: styles.handle_se,
 };
 
-// Screen px a press inside a layer's outline moves before it drags the layer
+// Screen px a press inside a group's outline moves before it drags the group
 const DRAG_START = 3;
 
 const sameFit = (a: StageFit, b: StageFit) =>
@@ -128,7 +128,7 @@ const NUDGES: Record<string, [number, number]> = {
 /**
  * The overlay drawn by the stream's own renderer (stage.ts), with what the
  * editor adds over it: the selection's outline and resize handle, dragging,
- * and the arrows. A selected layer moves as one. Embeds are React's
+ * and the arrows. A selected group moves as one. Embeds are React's
  * previews, portaled into the stage's slots, which stay put so iframes don't
  * reload.
  */
@@ -244,15 +244,19 @@ export function StudioStage({
   };
 
   const chosen = elements.find(({ element }) => element.id === selected);
-  const chosenLayer = view.layers.find((layer) => layer.id === selected);
+  // A group's layer only: an element on its own has its layer's id, and
+  // stays an element
+  const chosenGroup = chosen
+    ? undefined
+    : view.layers.find((layer) => layer.id === selected);
   // The selection's outline: an element's box, turned with it, or around a
-  // layer's elements
+  // group's elements
   const frame = chosen
     ? boxOf(chosen.element)
-    : chosenLayer && bounds(chosenLayer.elements.map(extent));
+    : chosenGroup && bounds(chosenGroup.elements.map(extent));
   const stuck = chosen
     ? locked.has(chosen.layer) || locked.has(chosen.element.id)
-    : locked.has(chosenLayer?.id ?? "");
+    : locked.has(chosenGroup?.id ?? "");
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -301,11 +305,11 @@ export function StudioStage({
     }
 
     const point = toCanvas({ x: e.clientX, y: e.clientY }, rect, fitted);
-    if (chosenLayer && frame && !stuck && holds(frame, point)) {
+    if (chosenGroup && frame && !stuck && holds(frame, point)) {
       // A click until it moves
       drag.current = {
-        kind: "layer",
-        id: chosenLayer.id,
+        kind: "group",
+        id: chosenGroup.id,
         point,
         moved: false,
         sent: [0, 0],
@@ -339,7 +343,7 @@ export function StudioStage({
       onRotate(d.id, turnTo(d.center, pointer, e.shiftKey));
       return;
     }
-    if (d.kind === "layer") {
+    if (d.kind === "group") {
       const sx = e.clientX - d.x;
       const sy = e.clientY - d.y;
       if (!d.moved && Math.hypot(sx, sy) < DRAG_START) return;
@@ -375,7 +379,7 @@ export function StudioStage({
     const d = drag.current;
     drag.current = null;
     setTurning(false);
-    if (d?.kind === "layer" && !d.moved) {
+    if (d?.kind === "group" && !d.moved) {
       onSelect(pickElement(view, locked, d.point));
     }
   };
@@ -392,8 +396,8 @@ export function StudioStage({
     e.preventDefault();
     if (stuck) return;
     const step = e.shiftKey ? 10 : 1;
-    if (chosenLayer) {
-      onShift(chosenLayer.id, nudge[0] * step, nudge[1] * step);
+    if (chosenGroup) {
+      onShift(chosenGroup.id, nudge[0] * step, nudge[1] * step);
       return;
     }
     onBox(

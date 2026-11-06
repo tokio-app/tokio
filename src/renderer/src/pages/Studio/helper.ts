@@ -1,7 +1,7 @@
 import { STUDIO_SIZES, StudioOverlay } from "@/common/schemas";
 
 /**
- * A new name: "Overlay N" (or "Layer N"), N the first number that no item's
+ * A new name: "Overlay N" (or "Group N"), N the first number that no item's
  * name uses. `name(n)` writes it in the window's language.
  */
 export function newOverlayName(

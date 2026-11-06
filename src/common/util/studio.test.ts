@@ -2,14 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   StudioElement,
   StudioElementSchema,
-  StudioLayerSchema,
+  StudioGroupSchema,
   StudioOverlay,
 } from "../schemas/studio";
 import { ChatEvent, TOKIO_EVENTS } from "../types/connector";
 import {
   fillStudioText,
   newStudioElement,
-  newStudioLayer,
+  newStudioGroup,
   SAMPLE_NUMBERS,
   studioEventVariables,
   studioView,
@@ -115,12 +115,12 @@ describe("studioView", () => {
     ...changes,
   });
 
-  // One layer holding the elements
+  // One group holding the elements
   const overlay = (elements: StudioElement[]): StudioOverlay => ({
     id: ID,
     name: "",
     size: "landscape",
-    layers: [StudioLayerSchema.parse({ id: "l", elements })],
+    items: [StudioGroupSchema.parse({ kind: "group", id: "l", elements })],
   });
 
   it("resolves each kind, back to front", () => {
@@ -220,9 +220,10 @@ describe("studioView", () => {
     ]);
   });
 
-  it("leaves hidden layers out, the others keeping their place", () => {
-    const layer = (id: string, hidden = false) =>
-      StudioLayerSchema.parse({
+  it("leaves hidden groups out, the others keeping their place", () => {
+    const group = (id: string, hidden = false) =>
+      StudioGroupSchema.parse({
+        kind: "group",
         id,
         hidden,
         elements: [element(`${id}-shape`, { kind: "shape" })],
@@ -230,7 +231,7 @@ describe("studioView", () => {
     const { layers } = studioView(
       {
         ...overlay([]),
-        layers: [layer("back"), layer("middle", true), layer("front")],
+        items: [group("back"), group("middle", true), group("front")],
       },
       deps(),
     );
@@ -240,6 +241,30 @@ describe("studioView", () => {
       ["front", 2],
     ]);
     expect(layers[1].elements).toMatchObject([{ id: "front-shape", z: 0 }]);
+  });
+
+  it("draws an element on its own as a layer of its own, between groups", () => {
+    const { layers } = studioView(
+      {
+        ...overlay([]),
+        items: [
+          StudioGroupSchema.parse({
+            kind: "group",
+            id: "g",
+            elements: [element("in", { kind: "shape" })],
+          }),
+          element("alone", { kind: "shape" }),
+          element("hidden", { kind: "shape", hidden: true }),
+        ],
+      },
+      deps(),
+    );
+
+    expect(layers).toMatchObject([
+      { id: "g", z: 0, elements: [{ id: "in", z: 0 }] },
+      { id: "alone", z: 1, elements: [{ id: "alone", z: 0 }] },
+    ]);
+    expect(layers).toHaveLength(2);
   });
 });
 
@@ -262,16 +287,17 @@ describe("newStudioElement", () => {
   });
 });
 
-describe("newStudioLayer", () => {
-  it("makes an empty layer with the name and its own id", () => {
-    const a = newStudioLayer("Layer 1");
+describe("newStudioGroup", () => {
+  it("makes an empty group with the name and its own id", () => {
+    const a = newStudioGroup("Group 1");
 
     expect(a).toMatchObject({
-      name: "Layer 1",
+      kind: "group",
+      name: "Group 1",
       locked: false,
       hidden: false,
       elements: [],
     });
-    expect(a.id).not.toBe(newStudioLayer("Layer 1").id);
+    expect(a.id).not.toBe(newStudioGroup("Group 1").id);
   });
 });

@@ -33,14 +33,14 @@ const STUDIO_ANIMATIONS = ["bounce", "shake", "pulse"] as const;
 // A text's alignment in its box
 const STUDIO_ALIGNS = ["left", "center", "right"] as const;
 
-// The most layers an overlay holds
-export const STUDIO_MAX_LAYERS = 100;
-// The most elements an overlay holds, in all its layers: each autosave
-// rewrites the whole store
+// The most groups an overlay holds
+export const STUDIO_MAX_GROUPS = 100;
+// The most elements an overlay holds, in groups or on their own: each
+// autosave rewrites the whole store
 export const STUDIO_MAX_ELEMENTS = 100;
 // The longest text a text element holds
 export const STUDIO_TEXT_MAX_LENGTH = 500;
-// The longest overlay or layer name
+// The longest overlay, group or element name
 export const STUDIO_NAME_MAX_LENGTH = 60;
 // The most seconds an element that shows on an event stays
 export const STUDIO_MAX_SECONDS = 60;
@@ -57,6 +57,9 @@ const LibraryFileSchema = z
 // useAutosave settles a save only when main's echo deep-equals what it sent.
 const ELEMENT = {
   id: z.string().min(1),
+  // Its name in the editor, empty for what it shows. Not `name`, which is a
+  // media element's file name.
+  label: z.string().max(STUDIO_NAME_MAX_LENGTH).default(""),
   // The box, in px of the canvas, from its top left corner
   x: z.number(),
   y: z.number(),
@@ -83,7 +86,7 @@ const ELEMENT = {
   animation: z.enum(STUDIO_ANIMATIONS).default("bounce"),
 };
 
-// One element of a layer, by kind
+// One element, by kind
 export const StudioElementSchema = z.discriminatedUnion("kind", [
   // Can hold the live numbers (STUDIO_NUMBERS) and, when it reacts, its
   // trigger's variables (ALERT_MESSAGE_VARIABLES)
@@ -165,9 +168,10 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
-// What a layer holds besides its elements, which go back to front: the
+// What a group holds besides its elements, which go back to front: the
 // first is the back
-const LAYER = {
+const GROUP = {
+  kind: z.literal("group"),
   id: z.string().min(1),
   // Empty while it's retyped
   name: z.string().max(STUDIO_NAME_MAX_LENGTH).default(""),
@@ -179,34 +183,49 @@ const LAYER = {
   folded: z.boolean().default(false),
 };
 
-// A layer of a studio overlay: elements that stack, hide and lock together
-export const StudioLayerSchema = z.object({
-  ...LAYER,
+// A group of elements that stack, hide, lock and move together. Groups
+// don't hold groups.
+export const StudioGroupSchema = z.object({
+  ...GROUP,
   elements: z.array(StudioElementSchema).default([]),
 });
 
-// The caps, and every id in the overlay unique, its layers' and their
-// elements' both: the stage and the reactions find them by id
-const fits = (layers: z.infer<typeof StudioLayerSchema>[]) => {
-  const ids = layers.flatMap((l) => [l.id, ...l.elements.map((e) => e.id)]);
+// What an overlay stacks: a group, or an element on its own
+const StudioItemSchema = z.discriminatedUnion("kind", [
+  StudioGroupSchema,
+  StudioElementSchema,
+]);
+
+type Item = z.infer<typeof StudioItemSchema>;
+
+// The caps, and every id in the overlay unique, its groups' and every
+// element's both: the stage and the reactions find them by id
+const fits = (items: Item[]) => {
+  const groups = items.filter((item) => item.kind === "group");
+  const elements = items.flatMap((item) =>
+    item.kind === "group" ? item.elements : [item],
+  );
+  const ids = [...groups, ...elements].map((item) => item.id);
   return (
-    ids.length - layers.length <= STUDIO_MAX_ELEMENTS &&
+    groups.length <= STUDIO_MAX_GROUPS &&
+    elements.length <= STUDIO_MAX_ELEMENTS &&
     new Set(ids).size === ids.length
   );
 };
 
-// A studio overlay, served at getStudioOverlayURL(id). Layers go back to
-// front: the first is the back. The strict schema, for IPC and the store's
-// mutators.
+// A studio overlay, served at getStudioOverlayURL(id). The strict schema,
+// for IPC and the store's mutators.
 export const StudioOverlaySchema = z.object({
   // Its URL path and socket id
   id: z.uuid(),
   // Empty while it's retyped
   name: z.string().max(STUDIO_NAME_MAX_LENGTH).default(""),
   size: z.enum(["portrait", "landscape"]).default("portrait"),
-  layers: z
-    .array(StudioLayerSchema)
-    .max(STUDIO_MAX_LAYERS)
+  // Its groups and the elements in none, back to front: the first is the
+  // back
+  items: z
+    .array(StudioItemSchema)
+    .max(STUDIO_MAX_GROUPS + STUDIO_MAX_ELEMENTS)
     .refine(fits)
     .default([]),
 });
@@ -219,24 +238,53 @@ const parsing =
       ? items.filter((item) => schema.safeParse(item).success)
       : items;
 
-// The store's layer: drops an element that doesn't parse (a newer Tokio's
-// kind after a downgrade, a hand edit) instead of the layer
-const StoredStudioLayerSchema = z.object({
-  ...LAYER,
+// The store's group: drops an element that doesn't parse (a newer Tokio's
+// kind after a downgrade, a hand edit) instead of the group
+const StoredStudioGroupSchema = z.object({
+  ...GROUP,
   elements: z
     .preprocess(parsing(StudioElementSchema), z.array(StudioElementSchema))
     .default([]),
 });
 
-// Drops a layer that still doesn't parse instead of the overlay
-const StoredStudioOverlaySchema = StudioOverlaySchema.extend({
-  layers: z
-    .preprocess(
-      parsing(StoredStudioLayerSchema),
-      z.array(StoredStudioLayerSchema).max(STUDIO_MAX_LAYERS).refine(fits),
-    )
-    .default([]),
-});
+const StoredStudioItemSchema = z.discriminatedUnion("kind", [
+  StoredStudioGroupSchema,
+  StudioElementSchema,
+]);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+// An overlay saved before groups held its elements in layers: each layer
+// is a group now, with its id, name, flags and elements. Layers that aren't
+// a list stay what they were, so the overlay is dropped as before.
+const withItems = (overlay: unknown): unknown =>
+  isRecord(overlay) && !("items" in overlay) && "layers" in overlay
+    ? {
+        ...overlay,
+        items: Array.isArray(overlay.layers)
+          ? overlay.layers.map((layer) =>
+              isRecord(layer) ? { ...layer, kind: "group" } : layer,
+            )
+          : overlay.layers,
+      }
+    : overlay;
+
+// Drops an item that still doesn't parse instead of the overlay
+const StoredStudioOverlaySchema = z.preprocess(
+  withItems,
+  StudioOverlaySchema.extend({
+    items: z
+      .preprocess(
+        parsing(StoredStudioItemSchema),
+        z
+          .array(StoredStudioItemSchema)
+          .max(STUDIO_MAX_GROUPS + STUDIO_MAX_ELEMENTS)
+          .refine(fits),
+      )
+      .default([]),
+  }),
+);
 
 // settings.studio: drops an overlay that still doesn't parse instead of
 // failing the store, which would reset every setting
@@ -246,7 +294,8 @@ export const StoredStudioOverlaysSchema = z.preprocess(
 );
 
 export type StudioOverlay = z.infer<typeof StudioOverlaySchema>;
-export type StudioLayer = z.infer<typeof StudioLayerSchema>;
+export type StudioGroup = z.infer<typeof StudioGroupSchema>;
+export type StudioItem = z.infer<typeof StudioItemSchema>;
 export type StudioElement = z.infer<typeof StudioElementSchema>;
 export type StudioElementKind = StudioElement["kind"];
 // The element of one kind

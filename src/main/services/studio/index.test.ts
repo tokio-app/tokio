@@ -1,6 +1,6 @@
 import {
   StudioElementSchema,
-  StudioLayerSchema,
+  StudioGroupSchema,
   StudioOverlay,
 } from "@/common/schemas";
 import {
@@ -39,17 +39,17 @@ const element = (id: string, patch: object) =>
     ...patch,
   });
 
-const layerOf = (id: string, patch: object = {}) =>
-  StudioLayerSchema.parse({ id, ...patch });
+const groupOf = (id: string, patch: object = {}) =>
+  StudioGroupSchema.parse({ kind: "group", id, ...patch });
 
-// One layer holding the elements
+// One group holding the elements
 const overlayOf = (
   ...elements: ReturnType<typeof element>[]
 ): StudioOverlay => ({
   id: "o1",
   name: "Main",
   size: "portrait",
-  layers: [layerOf("L1", { elements })],
+  items: [groupOf("L1", { elements })],
 });
 
 const gift = (count: number, repeatEnd: boolean, id = "5655"): GiftEvent => ({
@@ -120,7 +120,7 @@ describe("StudioService", () => {
     expect(numbers).not.toHaveBeenCalled();
   });
 
-  it("leaves layers that are always on screen and other triggers alone", () => {
+  it("leaves elements that are always on screen and other triggers alone", () => {
     const { studio, onReact, numbers } = setup();
     const always = element("a", { when: "always" });
     const share = element("s", {
@@ -137,7 +137,7 @@ describe("StudioService", () => {
     expect(onReact).not.toHaveBeenCalled();
   });
 
-  it("reacts animate layers too, and matches emotes on chats", () => {
+  it("reacts animate elements too, and matches emotes on chats", () => {
     const { studio, onReact, numbers } = setup();
     const animate = element("m", {
       when: "animate",
@@ -263,10 +263,7 @@ describe("StudioService", () => {
     const front = element("f", {});
     const overlay: StudioOverlay = {
       ...overlayOf(),
-      layers: [
-        layerOf("L1", { elements: [back] }),
-        layerOf("L2", { elements: [front] }),
-      ],
+      items: [groupOf("L1", { elements: [back] }), front],
     };
 
     studio.handle(
@@ -279,7 +276,7 @@ describe("StudioService", () => {
     expect(onReact.mock.calls).toEqual([["o1", { element: "f" }]]);
   });
 
-  it("reacts a hidden layer's elements and keeps their values", () => {
+  it("reacts a hidden group's elements and keeps their values", () => {
     const { studio, onReact, numbers } = setup();
     const text = element("t", {
       kind: "text",
@@ -288,7 +285,7 @@ describe("StudioService", () => {
     });
     const overlay: StudioOverlay = {
       ...overlayOf(),
-      layers: [layerOf("L1", { hidden: true, elements: [text] })],
+      items: [groupOf("L1", { hidden: true, elements: [text] })],
     };
 
     studio.handle(

@@ -3,7 +3,7 @@ import {
   StudioElement,
   StudioElementKind,
   StudioElementOf,
-  StudioLayer,
+  StudioItem,
   StudioSource,
   Trigger,
 } from "@/common/schemas";
@@ -136,8 +136,8 @@ type NameContext = {
 };
 
 /**
- * What the layers list calls an element: what it shows (its text, file,
- * gift, emote or embed), else its kind.
+ * What the layers list calls an element with no label: what it shows (its
+ * text, file, gift, emote or embed), else its kind.
  */
 export function elementName(
   element: StudioElement,
@@ -179,70 +179,105 @@ export function whenText(
  * The items with one moved from `from` to `to`, both indexes back to front.
  * Out of range moves nothing.
  */
-export function moveLayer<T>(layers: T[], from: number, to: number): T[] {
-  if (from === to || from < 0 || to < 0 || to >= layers.length) return layers;
-  const next = [...layers];
+export function moveItem<T>(items: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || to >= items.length) return items;
+  const next = [...items];
   next.splice(to, 0, ...next.splice(from, 1));
   return next;
 }
 
-/** Where an element is: its layer's index and its own, back to front. */
-export function findElement(layers: StudioLayer[], id: string) {
-  for (const [layer, { elements }] of layers.entries()) {
-    const index = elements.findIndex((e) => e.id === id);
-    if (index !== -1) return { layer, index };
+/**
+ * Where an element is, back to front: its group's index and its own in it,
+ * or its own among the items (`group` null) when it stands on its own.
+ */
+export function findElement(items: StudioItem[], id: string) {
+  for (const [at, item] of items.entries()) {
+    if (item.kind !== "group") {
+      if (item.id === id) return { group: null, index: at };
+      continue;
+    }
+    const index = item.elements.findIndex((e) => e.id === id);
+    if (index !== -1) return { group: at, index };
   }
   return null;
 }
 
+/** The items with every element, grouped or not, changed. */
+export const mapElements = (
+  items: StudioItem[],
+  change: (element: StudioElement) => StudioElement,
+): StudioItem[] =>
+  items.map((item) =>
+    item.kind === "group"
+      ? { ...item, elements: item.elements.map(change) }
+      : change(item),
+  );
+
 /**
- * The layers with an element moved into the layer `to` (its id), at `at`:
- * an index of that layer's elements back to front, once the element is
- * taken out. The layer it goes into unfolds.
+ * The items with an element moved into the group `to` (its id), or to the
+ * top level with `to` null, at `at`: an index back to front of that group's
+ * elements, or of the items, once the element is taken out. The group it
+ * goes into unfolds.
  */
 export function moveElement(
-  layers: StudioLayer[],
+  items: StudioItem[],
   id: string,
-  to: string,
+  to: string | null,
   at: number,
-): StudioLayer[] {
-  const from = findElement(layers, id);
-  if (!from || !layers.some((l) => l.id === to)) return layers;
-  const element = layers[from.layer].elements[from.index];
-  return layers
-    .map((layer, i) =>
-      i === from.layer
-        ? { ...layer, elements: layer.elements.filter((e) => e.id !== id) }
-        : layer,
-    )
-    .map((layer) => {
-      if (layer.id !== to) return layer;
-      const elements = [...layer.elements];
-      elements.splice(Math.max(0, at), 0, element);
-      return { ...layer, folded: false, elements };
-    });
+): StudioItem[] {
+  const element = items
+    .flatMap((item) => (item.kind === "group" ? item.elements : [item]))
+    .find((e) => e.id === id);
+  if (!element) return items;
+  if (to !== null && !items.some((i) => i.kind === "group" && i.id === to)) {
+    return items;
+  }
+  const rest = items.flatMap((item): StudioItem[] => {
+    if (item.id === id) return [];
+    return item.kind === "group" && item.elements.some((e) => e.id === id)
+      ? [{ ...item, elements: item.elements.filter((e) => e.id !== id) }]
+      : [item];
+  });
+  const place = Math.max(0, at);
+  if (to === null) {
+    rest.splice(place, 0, element);
+    return rest;
+  }
+  return rest.map((item) => {
+    if (item.kind !== "group" || item.id !== to) return item;
+    const elements = [...item.elements];
+    elements.splice(place, 0, element);
+    return { ...item, folded: false, elements };
+  });
 }
 
 /**
- * The layers with an element one step toward the front (`by` 1) or the back
- * (-1). Past its layer's edge it goes into the next layer that way, at the
- * edge it comes in from: the back going toward the front.
+ * The items with an element one step toward the front (`by` 1) or the back
+ * (-1). Past its group's edge it stands right in front of or behind the
+ * group. On its own, it steps past an element, or into a group at the edge
+ * it comes in from: the back going toward the front.
  */
 export function stepElement(
-  layers: StudioLayer[],
+  items: StudioItem[],
   id: string,
   by: 1 | -1,
-): StudioLayer[] {
-  const from = findElement(layers, id);
-  if (!from) return layers;
-  const own = layers[from.layer];
-  const to = from.index + by;
-  if (to >= 0 && to < own.elements.length) {
-    return moveElement(layers, id, own.id, to);
+): StudioItem[] {
+  const from = findElement(items, id);
+  if (!from) return items;
+  const group = from.group === null ? null : items[from.group];
+  if (from.group !== null && group?.kind === "group") {
+    const to = from.index + by;
+    if (to >= 0 && to < group.elements.length) {
+      return moveElement(items, id, group.id, to);
+    }
+    return moveElement(items, id, null, by === 1 ? from.group + 1 : from.group);
   }
-  const next = layers[from.layer + by] as StudioLayer | undefined;
-  if (!next) return layers;
-  return moveElement(layers, id, next.id, by === 1 ? 0 : next.elements.length);
+  const next = items[from.index + by] as StudioItem | undefined;
+  if (!next) return items;
+  if (next.kind === "group") {
+    return moveElement(items, id, next.id, by === 1 ? 0 : next.elements.length);
+  }
+  return moveItem(items, from.index, from.index + by);
 }
 
 export type Box = Pick<StudioElement, "x" | "y" | "width" | "height">;
@@ -424,7 +459,7 @@ export function bounds(boxes: Box[]): Box | null {
 
 /**
  * What a click on the canvas picks: the front-most element whose box, turned,
- * holds the point, skipping the locked layers and elements (`locked` holds
+ * holds the point, skipping the locked groups and elements (`locked` holds
  * both ids), null for none. Hidden ones aren't in the view.
  */
 export function pickElement(

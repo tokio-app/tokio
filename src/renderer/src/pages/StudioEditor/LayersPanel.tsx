@@ -1,10 +1,11 @@
 import {
   STUDIO_KINDS,
   STUDIO_MAX_ELEMENTS,
-  STUDIO_MAX_LAYERS,
+  STUDIO_MAX_GROUPS,
   StudioElement,
   StudioElementKind,
-  StudioLayer,
+  StudioGroup,
+  StudioItem,
 } from "@/common/schemas";
 import { Btn, Modal } from "@/components";
 import { cx } from "@/helper/cx";
@@ -26,41 +27,44 @@ import { LuGripVertical } from "react-icons/lu";
 import { findElement, KIND_NAMES } from "./helper";
 import styles from "./studioeditor.module.css";
 
-export type LayerFlags = Partial<
-  Pick<StudioLayer, "folded" | "locked" | "hidden">
+export type GroupFlags = Partial<
+  Pick<StudioGroup, "folded" | "locked" | "hidden">
 >;
 export type ElementFlags = Partial<Pick<StudioElement, "locked" | "hidden">>;
 
 type Props = {
-  // Back to front, as the overlay keeps them, and so are their elements
-  layers: StudioLayer[];
-  // A layer's id or an element's
+  // Back to front, as the overlay keeps them, and so are groups' elements
+  items: StudioItem[];
+  // A group's id or an element's
   selected: string | null;
   // What each element's row says: its name, and its kind and When
   names: Record<string, { name: string; meta: string }>;
-  // The layer the menu adds to, none to add to a new one
-  target: StudioLayer | undefined;
+  // The group the menu adds to, none to add on its own
+  target: StudioGroup | undefined;
   onSelect: (id: string) => void;
-  onAddLayer: () => void;
+  onAddGroup: () => void;
   onAdd: (kind: StudioElementKind) => void;
-  // Deletes a layer with its elements, or an element
+  // Deletes a group with its elements, or an element
   onDelete: (id: string) => void;
-  onFlags: (layerId: string, flags: LayerFlags) => void;
+  onFlags: (groupId: string, flags: GroupFlags) => void;
   onElementFlags: (elementId: string, flags: ElementFlags) => void;
-  // Moves a layer to `to`, an index of the layers back to front
-  onMoveLayer: (id: string, to: number) => void;
-  // Moves an element into a layer at `at`, an index of its elements back to
-  // front once the element is taken out
-  onMoveElement: (id: string, layerId: string, at: number) => void;
-  // One step toward the front (1) or the back (-1), into the next layer
-  // past its own's edge
+  // Moves a group or an element on its own to `to`, an index of the items
+  // back to front
+  onMoveItem: (id: string, to: number) => void;
+  // Moves an element into a group, or on its own with null, at `at`: an
+  // index back to front of that group's elements, or of the items, once the
+  // element is taken out
+  onMoveElement: (id: string, groupId: string | null, at: number) => void;
+  // One step toward the front (1) or the back (-1), in or out of groups
   onStepElement: (id: string, by: 1 | -1) => void;
 };
 
-// The row the dragged one is over: a layer's, or an element's in it
-type Over = { layer: string; element?: string };
+// The row the dragged one is over: an item's (a group's, or an element's
+// on its own), or an element's in a group. `edge` is a group row's top
+// quarter, which drops in front of the group instead of into it.
+type Over = { item: string; element?: string; edge?: boolean };
 
-// Where a drop lands: the line on a row or a layer's group, and the move
+// Where a drop lands: the line on a row or a group's item, and the move
 type Plan = { on: string; line: "before" | "after"; run: () => void };
 
 // Up the list is toward the front
@@ -68,22 +72,23 @@ const stepOf = (e: KeyboardEvent) =>
   e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
 
 /**
- * The overlay's layers as a tree, the front on top, each with its elements
- * under it: select one, fold, lock or hide a layer, drag a grip or use its
- * arrows to reorder, and add or delete from the header.
+ * The overlay's groups and the elements on their own as a tree, the front
+ * on top, each group with its elements under it: select one, fold, lock or
+ * hide a group, lock or hide an element, drag a grip or use its arrows to
+ * reorder, and add or delete from the header.
  */
 export function LayersPanel({
-  layers,
+  items,
   selected,
   names,
   target,
   onSelect,
-  onAddLayer,
+  onAddGroup,
   onAdd,
   onDelete,
   onFlags,
   onElementFlags,
-  onMoveLayer,
+  onMoveItem,
   onMoveElement,
   onStepElement,
 }: Props) {
@@ -91,30 +96,35 @@ export function LayersPanel({
   const menu = useMenu();
   const caption = useId();
   const list = useRef<HTMLUListElement>(null);
-  // The row being dragged, whether it's a layer's, and the row it's over
+  // The row being dragged, whether it's a group's, and the row it's over
   const [drag, setDrag] = useState<{
     id: string;
-    layer: boolean;
+    group: boolean;
     over?: Over;
   } | null>(null);
-  // A layer that still holds elements, waiting to be confirmed
-  const [confirm, setConfirm] = useState<StudioLayer | null>(null);
+  // A group that still holds elements, waiting to be confirmed
+  const [confirm, setConfirm] = useState<StudioGroup | null>(null);
 
   // Top = front
-  const rows = [...layers].reverse();
-  const layerName = (layer: StudioLayer) =>
-    layer.name.trim() || t("studio.editor.untitledLayer");
+  const rows = [...items].reverse();
+  const groups = items.filter((item) => item.kind === "group");
+  const groupName = (group: StudioGroup) =>
+    group.name.trim() || t("studio.editor.untitledGroup");
   // Every row in the list's order, to tell which way a drag goes
-  const order = rows.flatMap((layer) => [
-    layer.id,
-    ...(layer.folded ? [] : [...layer.elements].reverse().map((e) => e.id)),
+  const order = rows.flatMap((item) => [
+    item.id,
+    ...(item.kind === "group" && !item.folded
+      ? [...item.elements].reverse().map((e) => e.id)
+      : []),
   ]);
 
-  const layersFull = layers.length >= STUDIO_MAX_LAYERS;
+  const groupsFull = groups.length >= STUDIO_MAX_GROUPS;
   const elementsFull =
-    layers.reduce((n, layer) => n + layer.elements.length, 0) >=
-    STUDIO_MAX_ELEMENTS;
-  const add = t("studio.editor.addLayer");
+    items.reduce(
+      (n, item) => n + (item.kind === "group" ? item.elements.length : 1),
+      0,
+    ) >= STUDIO_MAX_ELEMENTS;
+  const add = t("studio.editor.addGroup");
   const reorder = t("studio.editor.move");
   const fold = t("studio.editor.fold");
   const lock = t("studio.editor.lock");
@@ -152,11 +162,11 @@ export function LayersPanel({
     </>
   );
 
-  const selectedLayer = layers.find((l) => l.id === selected);
+  const selectedGroup = groups.find((g) => g.id === selected);
   const selectedElement =
-    !selectedLayer && selected !== null && findElement(layers, selected);
-  const remove = selectedLayer
-    ? t("studio.editor.deleteLayer")
+    !selectedGroup && selected !== null && findElement(items, selected);
+  const remove = selectedGroup
+    ? t("studio.editor.deleteGroup")
     : selectedElement
       ? t("studio.editor.deleteElement")
       : t("studio.editor.deleteNone");
@@ -164,36 +174,62 @@ export function LayersPanel({
   const plan = ((): Plan | null => {
     const over = drag?.over;
     if (!drag || !over) return null;
-    if (drag.layer) {
-      const from = layers.findIndex((l) => l.id === drag.id);
-      const to = layers.findIndex((l) => l.id === over.layer);
+    const to = items.findIndex((i) => i.id === over.item);
+    const item = items[to];
+    if (drag.group) {
+      const from = items.findIndex((i) => i.id === drag.id);
       if (from === to) return null;
       return {
-        on: over.layer,
-        // It takes that layer's place, from below or above
+        on: over.item,
+        // It takes that item's place, from below or above
         line: to > from ? "before" : "after",
-        run: () => onMoveLayer(drag.id, to),
+        run: () => onMoveItem(drag.id, to),
       };
     }
-    const layer = layers.find((l) => l.id === over.layer)!;
-    const rest = layer.elements.filter((e) => e.id !== drag.id);
-    if (over.element === undefined) {
-      // In front in that layer, unless it's there already
-      if (layer.elements.at(-1)?.id === drag.id) return null;
+    const down = (id: string) => order.indexOf(drag.id) < order.indexOf(id);
+    if (item.kind === "group" && over.element !== undefined) {
+      if (over.element === drag.id) return null;
+      const rest = item.elements.filter((e) => e.id !== drag.id);
+      const at = rest.findIndex((e) => e.id === over.element);
+      const below = down(over.element);
       return {
-        on: layer.id,
-        line: "after",
-        run: () => onMoveElement(drag.id, layer.id, rest.length),
+        on: over.element,
+        line: below ? "after" : "before",
+        // Below it is behind it
+        run: () => onMoveElement(drag.id, item.id, below ? at : at + 1),
       };
     }
-    if (over.element === drag.id) return null;
-    const at = rest.findIndex((e) => e.id === over.element);
-    const down = order.indexOf(drag.id) < order.indexOf(over.element);
+    if (item.kind === "group" && !over.edge) {
+      // In front in that group, unless it's there already
+      if (item.elements.at(-1)?.id === drag.id) return null;
+      return {
+        on: item.id,
+        line: "after",
+        run: () =>
+          onMoveElement(
+            drag.id,
+            item.id,
+            item.elements.filter((e) => e.id !== drag.id).length,
+          ),
+      };
+    }
+    // On its own: in front of a group, or in an element's place
+    if (item.id === drag.id) return null;
+    const rest = items.filter((i) => i.id !== drag.id);
+    const at = rest.indexOf(item);
+    if (item.kind === "group") {
+      if (items[to + 1]?.id === drag.id) return null;
+      return {
+        on: item.id,
+        line: "before",
+        run: () => onMoveElement(drag.id, null, at + 1),
+      };
+    }
+    const below = down(item.id);
     return {
-      on: over.element,
-      line: down ? "after" : "before",
-      // Below it is behind it
-      run: () => onMoveElement(drag.id, layer.id, down ? at : at + 1),
+      on: item.id,
+      line: below ? "after" : "before",
+      run: () => onMoveElement(drag.id, null, below ? at : at + 1),
     };
   })();
 
@@ -204,22 +240,28 @@ export function LayersPanel({
         : styles.layer_after
       : undefined;
 
-  const enter = (over: Over) => {
+  const dragOver = (e: DragEvent<HTMLElement>, over: Omit<Over, "edge">) => {
+    if (!drag) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    const edge =
+      over.element === undefined && e.clientY < box.top + box.height / 4;
+    const was = drag.over;
     if (
-      drag &&
-      (drag.over?.layer !== over.layer || drag.over.element !== over.element)
+      was?.item !== over.item ||
+      was.element !== over.element ||
+      !!was.edge !== edge
     ) {
-      setDrag({ ...drag, over });
+      setDrag({ ...drag, over: { ...over, edge } });
     }
   };
 
-  const startDrag = (e: DragEvent<HTMLElement>, id: string, layer: boolean) => {
+  const startDrag = (e: DragEvent<HTMLElement>, id: string, group: boolean) => {
     // The whole row follows the pointer, held where it was grabbed
     const row = e.currentTarget.closest<HTMLElement>("[data-row]")!;
     const box = row.getBoundingClientRect();
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setDragImage(row, e.clientX - box.left, e.clientY - box.top);
-    setDrag({ id, layer });
+    setDrag({ id, group });
   };
 
   const step = (e: KeyboardEvent, id: string, move: (by: 1 | -1) => void) => {
@@ -227,12 +269,12 @@ export function LayersPanel({
     if (!by) return;
     e.preventDefault();
     // Synchronous, so its grip takes the focus back: a row that moves drops
-    // it on <body>, and one that changes layers is a new row
+    // it on <body>, and one that goes in or out of a group is a new row
     flushSync(() => move(by));
     list.current?.querySelector<HTMLElement>(`[data-grip="${id}"]`)?.focus();
   };
 
-  const grip = (id: string, layer: boolean, move: (by: 1 | -1) => void) => (
+  const grip = (id: string, group: boolean, move: (by: 1 | -1) => void) => (
     <Btn
       variant="icon"
       className={styles.grip}
@@ -241,12 +283,119 @@ export function LayersPanel({
       aria-keyshortcuts="ArrowUp ArrowDown"
       data-grip={id}
       draggable
-      onDragStart={(e) => startDrag(e, id, layer)}
+      onDragStart={(e) => startDrag(e, id, group)}
       onKeyDown={(e) => step(e, id, move)}
     >
       <LuGripVertical size={16} />
     </Btn>
   );
+
+  // An element's row, in its group's list or on its own in the top one
+  const elementRow = (element: StudioElement, item: string) => {
+    const { name, meta } = names[element.id];
+    const inGroup = item !== element.id;
+    return (
+      <li
+        key={element.id}
+        data-row
+        className={cx(
+          styles.layer,
+          styles.element_row,
+          element.hidden && styles.element_hidden,
+          element.id === selected && styles.layer_selected,
+          drag?.id === element.id && styles.layer_dragged,
+          // A group's drag lines up with what stands on its own
+          lineOf(element.id, !drag?.group || !inGroup),
+        )}
+        onDragOver={(e) =>
+          dragOver(e, inGroup ? { item, element: element.id } : { item })
+        }
+      >
+        {grip(element.id, false, (by) => onStepElement(element.id, by))}
+        <button
+          type="button"
+          className={styles.layer_select}
+          aria-pressed={element.id === selected}
+          onClick={() => onSelect(element.id)}
+        >
+          <span className={styles.layer_name}>{name}</span>
+          {/* Read as two phrases, not one run-on word */}{" "}
+          <span className={styles.layer_meta}>{meta}</span>
+        </button>
+        {toggles(element, { lock: lockElement, hide: hideElement }, (flags) =>
+          onElementFlags(element.id, flags),
+        )}
+      </li>
+    );
+  };
+
+  const groupItem = (group: StudioGroup) => {
+    const index = items.indexOf(group);
+    const name = groupName(group);
+    const shown = !group.folded && group.elements.length > 0;
+    return (
+      <li
+        key={group.id}
+        className={cx(
+          styles.group_item,
+          group.hidden && styles.group_hidden,
+          drag?.id === group.id && styles.layer_dragged,
+          lineOf(group.id, !!drag?.group),
+        )}
+      >
+        <div
+          data-row
+          className={cx(
+            styles.layer,
+            styles.group_row,
+            group.id === selected && styles.layer_selected,
+            lineOf(group.id, drag?.group === false),
+          )}
+          onDragOver={(e) => dragOver(e, { item: group.id })}
+        >
+          {grip(group.id, true, (by) => onMoveItem(group.id, index + by))}
+          {group.elements.length > 0 ? (
+            <Btn
+              variant="icon"
+              title={fold}
+              aria-label={fold}
+              aria-expanded={!group.folded}
+              onClick={() => onFlags(group.id, { folded: !group.folded })}
+            >
+              {group.folded ? (
+                <FiChevronRight size={16} />
+              ) : (
+                <FiChevronDown size={16} />
+              )}
+            </Btn>
+          ) : (
+            <span className={styles.fold_space} aria-hidden />
+          )}
+          <button
+            type="button"
+            className={styles.layer_select}
+            aria-pressed={group.id === selected}
+            onClick={() => onSelect(group.id)}
+          >
+            <span className={styles.layer_name}>{name}</span>
+            {/* Read as two phrases, not one run-on word */}{" "}
+            <span className={styles.layer_meta}>
+              {t("studio.editor.elements", { count: group.elements.length })}
+            </span>
+          </button>
+          {toggles(group, { lock, hide }, (flags) => onFlags(group.id, flags))}
+        </div>
+
+        {shown && (
+          <ul className={styles.elements} aria-label={name}>
+            {[...group.elements]
+              .reverse()
+              .map((element) => elementRow(element, group.id))}
+          </ul>
+        )}
+      </li>
+    );
+  };
 
   return (
     <div className={styles.panel}>
@@ -275,13 +424,13 @@ export function LayersPanel({
                   type="button"
                   role="menuitem"
                   className={styles.menu_item}
-                  disabled={layersFull}
+                  disabled={groupsFull}
                   onClick={() => {
                     menu.close();
-                    onAddLayer();
+                    onAddGroup();
                   }}
                 >
-                  {t("studio.editor.newLayer")}
+                  {t("studio.editor.newGroup")}
                 </button>
                 <div
                   role="group"
@@ -290,8 +439,8 @@ export function LayersPanel({
                 >
                   <span id={caption} className={styles.menu_caption}>
                     {target
-                      ? t("studio.editor.addTo", { layer: layerName(target) })
-                      : t("studio.editor.addToNew")}
+                      ? t("studio.editor.addTo", { group: groupName(target) })
+                      : t("studio.editor.addElement")}
                   </span>
                   {STUDIO_KINDS.map((kind) => (
                     <button
@@ -309,14 +458,14 @@ export function LayersPanel({
                     </button>
                   ))}
                 </div>
-                {(elementsFull || layersFull) && (
+                {(elementsFull || groupsFull) && (
                   <p className={styles.menu_note}>
                     {elementsFull
                       ? t("studio.editor.fullElements", {
                           max: String(STUDIO_MAX_ELEMENTS),
                         })
                       : t("studio.editor.full", {
-                          max: String(STUDIO_MAX_LAYERS),
+                          max: String(STUDIO_MAX_GROUPS),
                         })}
                   </p>
                 )}
@@ -329,7 +478,7 @@ export function LayersPanel({
             aria-label={remove}
             disabled={selected === null}
             onClick={() => {
-              if (selectedLayer?.elements.length) setConfirm(selectedLayer);
+              if (selectedGroup?.elements.length) setConfirm(selectedGroup);
               else if (selected !== null) onDelete(selected);
             }}
           >
@@ -339,7 +488,7 @@ export function LayersPanel({
       </div>
 
       {rows.length === 0 ? (
-        <p className={styles.panel_empty}>{t("studio.editor.noLayers")}</p>
+        <p className={styles.panel_empty}>{t("studio.editor.noElements")}</p>
       ) : (
         <ul
           ref={list}
@@ -358,117 +507,9 @@ export function LayersPanel({
           // Also when it's cancelled or dropped elsewhere: nothing moves
           onDragEnd={() => setDrag(null)}
         >
-          {rows.map((layer) => {
-            const index = layers.indexOf(layer);
-            const name = layerName(layer);
-            const shown = !layer.folded && layer.elements.length > 0;
-            return (
-              <li
-                key={layer.id}
-                className={cx(
-                  styles.layer_group,
-                  layer.hidden && styles.layer_hidden,
-                  drag?.id === layer.id && styles.layer_dragged,
-                  lineOf(layer.id, !!drag?.layer),
-                )}
-              >
-                <div
-                  data-row
-                  className={cx(
-                    styles.layer,
-                    styles.layer_row,
-                    layer.id === selected && styles.layer_selected,
-                    lineOf(layer.id, drag?.layer === false),
-                  )}
-                  onDragEnter={() => enter({ layer: layer.id })}
-                >
-                  {grip(layer.id, true, (by) =>
-                    onMoveLayer(layer.id, index + by),
-                  )}
-                  {layer.elements.length > 0 ? (
-                    <Btn
-                      variant="icon"
-                      title={fold}
-                      aria-label={fold}
-                      aria-expanded={!layer.folded}
-                      onClick={() =>
-                        onFlags(layer.id, { folded: !layer.folded })
-                      }
-                    >
-                      {layer.folded ? (
-                        <FiChevronRight size={16} />
-                      ) : (
-                        <FiChevronDown size={16} />
-                      )}
-                    </Btn>
-                  ) : (
-                    <span className={styles.fold_space} aria-hidden />
-                  )}
-                  <button
-                    type="button"
-                    className={styles.layer_select}
-                    aria-pressed={layer.id === selected}
-                    onClick={() => onSelect(layer.id)}
-                  >
-                    <span className={styles.layer_name}>{name}</span>
-                    {/* Read as two phrases, not one run-on word */}{" "}
-                    <span className={styles.layer_meta}>
-                      {t("studio.editor.elements", {
-                        count: layer.elements.length,
-                      })}
-                    </span>
-                  </button>
-                  {toggles(layer, { lock, hide }, (flags) =>
-                    onFlags(layer.id, flags),
-                  )}
-                </div>
-
-                {shown && (
-                  <ul className={styles.elements} aria-label={name}>
-                    {[...layer.elements].reverse().map((element) => {
-                      const { name: label, meta } = names[element.id];
-                      return (
-                        <li
-                          key={element.id}
-                          data-row
-                          className={cx(
-                            styles.layer,
-                            styles.element_row,
-                            element.hidden && styles.element_hidden,
-                            element.id === selected && styles.layer_selected,
-                            drag?.id === element.id && styles.layer_dragged,
-                            lineOf(element.id, drag?.layer === false),
-                          )}
-                          onDragEnter={() =>
-                            enter({ layer: layer.id, element: element.id })
-                          }
-                        >
-                          {grip(element.id, false, (by) =>
-                            onStepElement(element.id, by),
-                          )}
-                          <button
-                            type="button"
-                            className={styles.layer_select}
-                            aria-pressed={element.id === selected}
-                            onClick={() => onSelect(element.id)}
-                          >
-                            <span className={styles.layer_name}>{label}</span>
-                            {/* Read as two phrases, not one run-on word */}{" "}
-                            <span className={styles.layer_meta}>{meta}</span>
-                          </button>
-                          {toggles(
-                            element,
-                            { lock: lockElement, hide: hideElement },
-                            (flags) => onElementFlags(element.id, flags),
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </li>
-            );
-          })}
+          {rows.map((item) =>
+            item.kind === "group" ? groupItem(item) : elementRow(item, item.id),
+          )}
         </ul>
       )}
 
@@ -476,7 +517,7 @@ export function LayersPanel({
         <Modal
           title={t("studio.editor.deleteTitle")}
           description={t("studio.editor.deleteText", {
-            name: layerName(confirm),
+            name: groupName(confirm),
             count: confirm.elements.length,
           })}
           confirmText={t("common.delete")}

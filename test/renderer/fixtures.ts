@@ -285,7 +285,7 @@ export const socialsTable = (
   },
 });
 
-/** An Overlay Studio overlay, Portrait with no layers unless patched. */
+/** An Overlay Studio overlay, Portrait and empty unless patched. */
 export const studioOverlay = (
   name: string,
   patch: Partial<StudioOverlay> = {},
@@ -293,7 +293,7 @@ export const studioOverlay = (
   id: crypto.randomUUID(),
   name,
   size: "portrait",
-  layers: [],
+  items: [],
   ...patch,
 });
 
