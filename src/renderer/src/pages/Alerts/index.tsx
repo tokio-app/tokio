@@ -242,7 +242,8 @@ export function Alerts() {
 
       {mediaAlert && (
         <MediaPicker
-          alert={mediaAlert}
+          id={mediaAlert.id}
+          chosen={mediaAlert.media}
           onRequest={() => {
             askedMedia.current.add(mediaAlert.id);
             return ++requests;

@@ -580,6 +580,16 @@
   width: 100%;
 }
 
+/* Only the overlay, for a layer in Overlay Studio's canvas, which scales it
+   to fit */
+.preview_bare {
+  --games-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+}
+
 /* The two layouts side by side */
 /* Layout and Columns, side by side when there's room */
 .look_choices {

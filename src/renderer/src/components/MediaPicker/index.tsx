@@ -1,4 +1,4 @@
-import { Alert, MediaFile } from "@/common/schemas";
+import { MediaFile } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { getMediaPreviewURL, mediaKind } from "@/common/util";
 import { releaseOnUnmount } from "@/helper/media";
@@ -10,12 +10,15 @@ import { LibraryPicker } from "./LibraryPicker";
 import styles from "./mediapicker.module.css";
 
 type Props = {
-  // The alert the image or video is for
-  alert: Alert;
-  // Asks main to save a file for the alert, which replies SET_ALERT_MEDIA
-  // with the request number this returns
+  // What the image or video is for, an alert's or a studio layer's id, which
+  // SET_ALERT_MEDIA echoes
+  id: string;
+  // Its file now
+  chosen: Pick<MediaFile, "file"> | null;
+  // Asks main to save a file for it, which replies SET_ALERT_MEDIA with the
+  // request number this returns
   onRequest: () => number;
-  // Picks a file from the library, or takes the alert's off it
+  // Picks a file from the library, or takes its own off it
   onSelect: (media: MediaFile | null) => void;
   onClose: () => void;
 };
@@ -62,17 +65,23 @@ export function MediaThumbnail({
 }
 
 /**
- * Picks the image or video an alert shows on its overlay. The alert's
- * editor sets how long it shows.
+ * Picks the image or video an alert or an Overlay Studio layer shows. The
+ * alert's editor sets how long it shows.
  */
-export function MediaPicker({ alert, onRequest, onSelect, onClose }: Props) {
+export function MediaPicker({
+  id,
+  chosen,
+  onRequest,
+  onSelect,
+  onClose,
+}: Props) {
   // The videos' lengths in seconds, read by their thumbnails
   const [lengths, setLengths] = useState<Record<string, number>>({});
 
   return (
     <LibraryPicker
-      id={alert.id}
-      chosen={alert.media}
+      id={id}
+      chosen={chosen}
       events={{
         get: APP_EVENTS.GET_MEDIA,
         library: APP_EVENTS_RESPONSE.GET_MEDIA,

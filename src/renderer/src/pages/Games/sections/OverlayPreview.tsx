@@ -79,25 +79,38 @@ type Props = {
 /**
  * The games overlay as it shows on stream, each column side by side (each
  * row under the last, when horizontal), in the markup of its page
- * (src/main/services/server/games.html): keep the two in step.
+ * (src/main/services/server/games.html): keep the two in step. Bare, for
+ * Overlay Studio's canvas, it has no frame, column labels or empty state.
  */
-export function OverlayPreview({ look, rows, run }: Props) {
+export function OverlayPreview({
+  look,
+  rows,
+  run,
+  bare,
+}: Props & { bare?: boolean }) {
   const t = useT();
   if (rows.length === 0) {
-    return <EmptyState>{t("games.preview.empty")}</EmptyState>;
+    return bare ? null : <EmptyState>{t("games.preview.empty")}</EmptyState>;
   }
   const horizontal = look.layout === "horizontal";
   return (
-    <div className={cx(styles.preview, horizontal && styles.preview_rows)}>
+    <div
+      className={cx(
+        bare ? styles.preview_bare : styles.preview,
+        horizontal && styles.preview_rows,
+      )}
+    >
       {Array.from({ length: look.columns }, (_, i) => (
         <PreviewColumn
           key={i}
           label={
-            look.columns === 1
-              ? t("games.preview.label")
-              : horizontal
-                ? t("games.preview.row", { row: String(i + 1) })
-                : t("games.preview.column", { column: String(i + 1) })
+            bare
+              ? undefined
+              : look.columns === 1
+                ? t("games.preview.label")
+                : horizontal
+                  ? t("games.preview.row", { row: String(i + 1) })
+                  : t("games.preview.column", { column: String(i + 1) })
           }
           look={look}
           rows={rows.filter((row) => row.column === i + 1)}
@@ -110,7 +123,7 @@ export function OverlayPreview({ look, rows, run }: Props) {
 
 // One column's overlay (a row's, when horizontal), at
 // /games/minecraft/<column>/
-function PreviewColumn({ label, look, rows, run }: Props & { label: string }) {
+function PreviewColumn({ label, look, rows, run }: Props & { label?: string }) {
   const carousel = look.layout === "carousel";
   const [lit, setLit] = useState<string[]>([]);
   // The row one at a time shows, by id, so it stays on it when the rows

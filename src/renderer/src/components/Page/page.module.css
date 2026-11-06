@@ -11,6 +11,10 @@
   max-width: 1040px;
 }
 
+.page_full {
+  max-width: none;
+}
+
 /* SECTION */
 
 .section {

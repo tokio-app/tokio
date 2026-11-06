@@ -91,4 +91,28 @@ describe("Iframe", () => {
 
     expect(ref.current).toBe(frame());
   });
+
+  it("asks main to leave out the preview's background when transparent", () => {
+    render(
+      <Iframe name="gift-jar" source="C:\overlays\index.html" transparent />,
+    );
+
+    expect(src()).toBe("local-resource:///C:/overlays/index.html?transparent");
+  });
+
+  it("keeps a ? in the path apart from the transparent query", () => {
+    render(
+      <Iframe
+        name="gift-jar"
+        source="/home/what?/overlays/index.html"
+        transparent
+      />,
+    );
+
+    const url = new URL(src()!);
+    expect(url.search).toBe("?transparent");
+    expect(decodeURIComponent(url.pathname)).toBe(
+      "/home/what?/overlays/index.html",
+    );
+  });
 });

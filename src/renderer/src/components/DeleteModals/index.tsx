@@ -1,4 +1,4 @@
-import { AlertSound, MediaFile } from "@/common/schemas";
+import { AlertSound, MediaFile, StudioOverlay } from "@/common/schemas";
 import { APP_EVENTS, LiveSummary, OverlayApp } from "@/common/types";
 import { formatDate } from "@/helper/format";
 import { useLanguage, useT } from "@/ui/i18n";
@@ -109,6 +109,28 @@ export function ClearHistoryModal({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       onConfirm={() => {
         window.api.emit(APP_EVENTS.CLEAR_LIVES);
+        onClose();
+      }}
+    />
+  );
+}
+
+// An Overlay Studio overlay, by its name as the list shows it
+export function DeleteStudioOverlayModal({
+  item,
+  onClose,
+}: Props<Pick<StudioOverlay, "id" | "name">>) {
+  const t = useT();
+  return (
+    <Modal
+      title={t("components.deleteModals.studioTitle")}
+      description={t("components.deleteModals.studioDescription", {
+        name: item.name,
+      })}
+      confirmText={t("common.delete")}
+      onClose={onClose}
+      onConfirm={() => {
+        window.api.emit(APP_EVENTS.REMOVE_STUDIO_OVERLAY, { id: item.id });
         onClose();
       }}
     />

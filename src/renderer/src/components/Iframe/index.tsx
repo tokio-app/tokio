@@ -7,10 +7,19 @@ interface IframeProps {
   source: string;
   name: string;
   ref?: Ref<HTMLIFrameElement>;
+  // Without the app's background behind it, for an overlay drawn over
+  // others in Overlay Studio: main skips it for ?transparent
+  transparent?: boolean;
   onLoad?: () => void;
 }
 
-export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
+export const Iframe = ({
+  source,
+  name,
+  ref,
+  transparent,
+  onLoad,
+}: IframeProps) => {
   const t = useT();
   const [loading, setLoading] = useState(true);
 
@@ -26,8 +35,8 @@ export const Iframe = ({ source, name, ref, onLoad }: IframeProps) => {
       /[#?]/g,
       encodeURIComponent,
     );
-    return `local-resource://${encoded}`;
-  }, [source]);
+    return `local-resource://${encoded}${transparent ? "?transparent" : ""}`;
+  }, [source, transparent]);
 
   return (
     <>
