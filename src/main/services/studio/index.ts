@@ -127,13 +127,20 @@ export class StudioService extends Service {
    * trigger's event. Nothing is kept, so a reload shows the real last event.
    */
   public test(overlay: StudioOverlay, numbers: StudioNumbers): StudioReact[] {
+    // One sample per trigger, so the elements one event sets off show the
+    // same viewer, as a real event does: a follow alert's picture and text
+    const samples = new Map<AlertTrigger, TokioEventMap[AppEvents]>();
     return studioElements(overlay)
       .filter((element) => element.when !== "always")
       .map((element) => {
         const { type } = element.trigger;
-        // Emote triggers match chats
-        const event = type === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : type;
-        const values = generateTikTokEventSample(event).data;
+        let values = samples.get(type);
+        if (!values) {
+          // Emote triggers match chats
+          const event = type === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : type;
+          values = generateTikTokEventSample(event).data;
+          samples.set(type, values);
+        }
         const sample: StudioKept = {
           trigger: type,
           values,

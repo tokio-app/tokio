@@ -330,10 +330,17 @@ describe("StudioService", () => {
     });
     const viewer = element("v", { kind: "viewer" });
     const always = element("a", { when: "always" });
+    // On the viewer's trigger, as a follow alert's picture and text are
+    const thanks = element("f", { kind: "text", text: "{username}" });
 
-    const reacts = studio.test(overlayOf(text, viewer, always), NUMBERS);
+    const reacts = studio.test(
+      overlayOf(text, viewer, always, thanks),
+      NUMBERS,
+    );
 
-    expect(reacts).toHaveLength(2);
+    expect(reacts).toHaveLength(3);
+    // One sample per trigger: the same viewer
+    expect(reacts[2]).toEqual({ element: "f", text: reacts[1].name });
     expect(reacts[0]).toEqual({
       element: "t",
       text: expect.stringMatching(/^\S.* 30$/),
