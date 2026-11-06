@@ -1,0 +1,364 @@
+/* The header and the three panes, as tall as the window leaves them, like
+   Coin stats: the panels scroll inside and the canvas fits what's left */
+.frame {
+  display: flex;
+  flex-direction: column;
+  height: calc(
+    100vh - var(--title-bar-height) - 2 * var(--space-8) - var(--space-12)
+  );
+}
+
+/* The header's section, its only child, so it has no divider */
+.frame > section {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Layers, the canvas, settings. Wide enough on the sides for Spanish's
+   longer labels. */
+.panes {
+  display: grid;
+  grid-template-columns: 272px minmax(0, 1fr) 336px;
+  gap: var(--space-6);
+  flex: 1;
+  min-height: 0;
+}
+
+/* PANELS */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
+}
+
+.panel_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
+}
+
+.panel_title {
+  color: var(--font-primary);
+  font-size: var(--font-lg);
+  font-weight: 600;
+}
+
+.panel_empty {
+  padding: var(--space-2) var(--space-4) var(--space-4);
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+}
+
+/* The Add menu, under its button */
+.menu_anchor {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 220px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-secondary);
+  box-shadow: var(--shadow-popover);
+}
+
+.menu_item {
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--font-primary);
+  font: inherit;
+  font-size: var(--font-md);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu_item:hover {
+  background-color: var(--background-secondary-hover);
+}
+
+/* LAYERS: the front on top */
+
+.layers {
+  padding: 0 var(--space-2) var(--space-2);
+  list-style: none;
+}
+
+.layer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+}
+
+.layer:hover {
+  background-color: var(--background-secondary);
+}
+
+/* The selection, also outlined on the canvas */
+.layer_selected,
+.layer_selected:hover {
+  background-color: var(--accent-soft);
+}
+
+/* Lifted while it's dragged */
+.layer_dragged {
+  opacity: 0.4;
+}
+
+/* The line where the dragged row lands, drawn inside so nothing shifts */
+.layer_before {
+  box-shadow: inset 0 2px var(--accent-primary);
+}
+
+.layer_after {
+  box-shadow: inset 0 -2px var(--accent-primary);
+}
+
+/* Narrow, as its dots are */
+.grip {
+  padding: 6px 2px;
+  cursor: grab;
+}
+
+.layer_select {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.layer_name,
+.layer_meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer_name {
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-weight: 500;
+}
+
+.layer_meta {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+/* THE CANVAS */
+
+.canvas_column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
+
+.canvas_column > p {
+  margin-bottom: 0;
+}
+
+/* Focusable for the arrows; the canvas is scaled to fit inside it */
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-md);
+  touch-action: none;
+  user-select: none;
+}
+
+.stage_root {
+  position: absolute;
+  inset: 0;
+}
+
+/* The overlay's area: Field with a hairline edge, no checkerboard */
+.stage_root :global(.studio-canvas) {
+  background-color: var(--background-secondary);
+  outline: calc(1px / var(--canvas-scale)) solid var(--border);
+}
+
+/* A layer that waits for an event on stream, placed where it will show */
+.stage_root :global(.studio-waits) {
+  outline: calc(1px / var(--canvas-scale)) dashed var(--font-secondary);
+}
+
+/* Over the canvas, in its root's px */
+.selection {
+  position: absolute;
+  outline: 2px solid var(--accent-primary);
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--font-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--accent-primary);
+  cursor: nwse-resize;
+  pointer-events: auto;
+}
+
+.canvas_size {
+  align-self: center;
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* EMBEDS, in the canvas's px: sizes are tokens times the canvas's usual
+   scale, about a third */
+
+.embed {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.fit {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.fit_content {
+  width: max-content;
+  transform: scale(var(--fit, 1));
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--space-2) * 3);
+  height: 100%;
+  padding: calc(var(--space-4) * 3);
+  border: calc(1px / var(--canvas-scale)) dashed var(--font-muted);
+  border-radius: calc(var(--radius-lg) * 3);
+  color: var(--font-secondary);
+  font-family: var(--font-family);
+  font-size: calc(var(--font-md) * 3);
+  line-height: 1.3;
+  text-align: center;
+}
+
+.placeholder_title {
+  color: var(--font-primary);
+  font-weight: 600;
+}
+
+/* SETTINGS */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4);
+}
+
+/* Two fields side by side, like size and color */
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+/* X, Y, W and H on one line */
+.box {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.box label {
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
+}
+
+.number {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.likes .number {
+  width: 88px;
+}
+
+/* A choice's options on one line */
+.inline > div {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-6);
+}
+
+/* Like's "every 100 likes" */
+.likes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+}
+
+.file {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.file_name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}

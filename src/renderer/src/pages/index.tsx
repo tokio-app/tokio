@@ -9,6 +9,8 @@ export * from "./Music";
 export * from "./OfficialOverlays";
 export * from "./Overlays";
 export * from "./Settings";
+export * from "./Studio";
+export * from "./StudioEditor";
 export * from "./TestOverlays";
 export * from "./Tools";
 export * from "./TTS";

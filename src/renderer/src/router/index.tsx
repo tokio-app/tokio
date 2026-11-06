@@ -21,6 +21,8 @@ import {
   OfficialOverlays,
   Overlays,
   Settings,
+  Studio,
+  StudioEditor,
   TestOverlays,
   Tools,
   TTS,
@@ -121,6 +123,19 @@ const countdownTimerRoute = createRoute({
   component: CountdownTimer,
 });
 
+const studioRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tools/studio",
+  component: Studio,
+});
+
+// Flat like the others, so the list doesn't stay mounted under the editor
+const studioEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tools/studio/$id",
+  component: StudioEditor,
+});
+
 const coinStatsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tools/coin-stats",
@@ -161,6 +176,8 @@ const routeTree = rootRoute.addChildren([
   gamesRoute,
   toolsRoute,
   countdownTimerRoute,
+  studioRoute,
+  studioEditorRoute,
   coinStatsRoute,
   fansRoute,
   testOverlaysRoute,
