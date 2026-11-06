@@ -51,15 +51,18 @@ const ROLE_TRIGGERS: AlertTrigger[] = [
 export const takesRoles = (trigger: AlertTrigger) =>
   ROLE_TRIGGERS.includes(trigger);
 
-// What a TTS alert's message can say, by trigger. Typed as a Record so a new
-// trigger can't be left out.
+// What a TTS alert's message, a game action and an Overlay Studio text can
+// say, by trigger. Typed as a Record so a new trigger can't be left out.
 export const ALERT_MESSAGE_VARIABLES: Record<AlertTrigger, string[]> = {
   [TOKIO_EVENTS.CHAT]: CHAT,
   [EMOTE_TRIGGER]: CHAT,
   [TOKIO_EVENTS.SHARE]: USER,
   [TOKIO_EVENTS.FOLLOW]: USER,
   [TOKIO_EVENTS.GIFT]: [...USER, "gift", "count"],
-  [TOKIO_EVENTS.LIKE]: [...USER, "count"],
+  // None (the user's call): game actions and Overlay Studio count likes from
+  // every viewer, so no one viewer or count is theirs. A text that already
+  // has them still gets the last batch's (messageValues).
+  [TOKIO_EVENTS.LIKE]: [],
   [TOKIO_EVENTS.ENVELOPE]: [],
   [TOKIO_EVENTS.SUPER_FAN]: USER,
   [TOKIO_EVENTS.SUPER_FAN_BOX]: [],

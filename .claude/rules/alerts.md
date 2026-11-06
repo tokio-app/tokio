@@ -109,6 +109,7 @@ paths:
   - The alert plays its sound, or its media alone, without the message's speed and pitch. An alert with only a message plays nothing.
   - Banned words still skip the whole alert. The allow list and the roles stay chat-only.
 - Alert queues are shared, so speed and pitch travel per sound on `ALERT_AUDIO.filters`, and `AudioQueue` items can override the queue's filters.
+- Like offers no variables (the user's call): game actions and Overlay Studio count likes from every viewer, so no one viewer or count is theirs. Alerts follow the same list. A message that already has `{username}` or `{count}` still gets the last batch's, since `messageValues` reads the payload.
 - `{count}` in a gift alert's message is the streak's total from `GiftStreaks`, not TikTok's `comboCount`. `TtsTab` doesn't offer it on every gift; a message that has it still gets the count so far. One event that adds several gifts makes the message once and sends one `ALERT_AUDIO` with `repeat`.
 - A live alert's failed message isn't logged by `AlertsService` (`_generate(..., false)`): `init.ts` logs it to `alerts.log` only when its notice goes out, like a missing sound. Previews (`speak`) log their own failures, which `speakTest` counts on.
 - Like chat TTS, live alerts make their messages through a `TaskQueue` with the TTS page's cooldown and queue length: blocked messages never enter it, and the ones past the length are dropped.

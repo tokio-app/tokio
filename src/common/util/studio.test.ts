@@ -92,6 +92,18 @@ describe("usesNumbers and studioVariables", () => {
       }),
     ).toEqual(expect.arrayContaining(["coins", "username", "gift", "count"]));
   });
+
+  it("gives a Like no viewer or count, its likes coming from every viewer", () => {
+    const text = element("t", { kind: "text" });
+
+    expect(
+      studioVariables({
+        ...text,
+        when: "event",
+        trigger: { ...text.trigger, type: TOKIO_EVENTS.LIKE },
+      }),
+    ).toEqual(["likes", "viewers", "followers", "shares", "coins"]);
+  });
 });
 
 describe("studioView", () => {
