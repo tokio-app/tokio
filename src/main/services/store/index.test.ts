@@ -4,6 +4,8 @@ import {
   Profile,
   ProfileSchema,
   StoreSchema,
+  StudioLayerSchema,
+  StudioOverlaySchema,
 } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
 import { safeStorage } from "@test/electron";
@@ -23,6 +25,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1595,6 +1598,124 @@ describe("StoreManagerService", () => {
 
       await store.removeTestOverlay("a");
       expect((await init()).getSettings().testOverlays).toEqual([]);
+    });
+  });
+
+  describe("studio", () => {
+    const id = "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f";
+    const other = "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60";
+    const media = (layerId: string, file: string) =>
+      StudioLayerSchema.parse({
+        id: layerId,
+        kind: "media",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        file,
+        name: "Confetti",
+      });
+
+    it("adds an empty Portrait overlay and reads it back", async () => {
+      const store = await init();
+
+      expect(await store.addStudioOverlay(id, "Overlay 1")).toBe(true);
+
+      const added = { id, name: "Overlay 1", size: "portrait", layers: [] };
+      expect(store.getStudio()).toEqual([added]);
+      expect((await init()).getStudio()).toEqual([added]);
+    });
+
+    it("refuses an id that isn't a UUID or is taken", async () => {
+      const store = await init();
+      await store.addStudioOverlay(id, "Overlay 1");
+
+      await expect(store.addStudioOverlay("../x", "Bad")).rejects.toThrow();
+      expect(await store.addStudioOverlay(id, "Again")).toBeNull();
+      expect(store.getStudio().map((o) => o.name)).toEqual(["Overlay 1"]);
+    });
+
+    it("saves an overlay in its place, and refuses one it doesn't hold", async () => {
+      const store = await init();
+      await store.addStudioOverlay(id, "One");
+      await store.addStudioOverlay(other, "Two");
+      const saved = StudioOverlaySchema.parse({
+        id,
+        name: "Main",
+        size: "landscape",
+        layers: [media("a", "c0ffee.png")],
+      });
+
+      expect(await store.saveStudioOverlay(saved)).toBe(true);
+      expect(
+        await store.saveStudioOverlay({ ...saved, id: randomUUID() }),
+      ).toBeNull();
+
+      expect((await init()).getStudio()).toEqual([
+        saved,
+        { id: other, name: "Two", size: "portrait", layers: [] },
+      ]);
+    });
+
+    it("refuses an overlay the schema refuses, before memory changes", async () => {
+      const store = await init();
+      await store.addStudioOverlay(id, "One");
+
+      await expect(
+        store.saveStudioOverlay({ id, name: "One", layers: [{ kind: "x" }] }),
+      ).rejects.toThrow();
+
+      expect(store.getStudio()[0].layers).toEqual([]);
+      // Later saves still pass the store's schema
+      expect(await store.updateTraySettings(false)).toBe(true);
+    });
+
+    it("says when the store file wasn't written, keeping the change", async () => {
+      const store = await init();
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      expect(await store.addStudioOverlay(id, "One")).toBe(false);
+      expect(store.getStudio()).toHaveLength(1);
+    });
+
+    it("removes an overlay", async () => {
+      const store = await init();
+      await store.addStudioOverlay(id, "One");
+
+      expect(await store.removeStudioOverlay(id)).toBe(true);
+      expect((await init()).getStudio()).toEqual([]);
+    });
+
+    it("takes a deleted media file off every layer, keeping the layers", async () => {
+      const store = await init();
+      await store.addStudioOverlay(id, "One");
+      await store.saveStudioOverlay({
+        id,
+        name: "One",
+        layers: [media("a", "c0ffee.png"), media("b", "tea.png")],
+      });
+
+      expect(await store.removeFromStudio("c0ffee.png")).toBe(true);
+
+      const [a, b] = (await init()).getStudio()[0].layers;
+      expect(a).toMatchObject({ id: "a", file: "", name: "" });
+      expect(b).toMatchObject({ id: "b", file: "tea.png", name: "Confetti" });
+    });
+
+    it("saves nothing when no layer has the file", async () => {
+      const store = await init();
+      const save = vi.spyOn(json, "saveFile");
+
+      expect(await store.removeFromStudio("c0ffee.png")).toBe(true);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("reads the live stats without a copy", async () => {
+      const store = await init();
+
+      store.updateLiveStats({ likes: 12, viewers: 3 });
+
+      expect(store.getLiveStats()).toMatchObject({ likes: 12, viewers: 3 });
     });
   });
 });
