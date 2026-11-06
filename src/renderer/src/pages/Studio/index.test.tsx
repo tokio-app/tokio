@@ -8,15 +8,12 @@ import { describe, expect, it } from "vitest";
 
 const MAIN = studioOverlay("Main scene", {
   id: "1b4e28ba-2fa1-41d2-883f-0016d3cca427",
-  layers: [
-    newStudioLayer("text", "portrait"),
-    newStudioLayer("gift", "portrait"),
-  ],
+  layers: [newStudioLayer("Layer 1"), newStudioLayer("Layer 2")],
 });
 const CHAT = studioOverlay("", {
   id: "6fa459ea-ee8a-4ca4-894e-db77e160355e",
   size: "landscape",
-  layers: [newStudioLayer("shape", "landscape")],
+  layers: [newStudioLayer("Layer 1")],
 });
 
 const studio = (...data: ReturnType<typeof studioOverlay>[]) =>

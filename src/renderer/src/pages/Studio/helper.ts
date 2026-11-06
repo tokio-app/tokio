@@ -1,14 +1,14 @@
 import { STUDIO_SIZES, StudioOverlay } from "@/common/schemas";
 
 /**
- * A new overlay's name: "Overlay N", N the first number that no overlay's
+ * A new name: "Overlay N" (or "Layer N"), N the first number that no item's
  * name uses. `name(n)` writes it in the window's language.
  */
 export function newOverlayName(
-  overlays: StudioOverlay[],
+  items: { name: string }[],
   name: (number: number) => string,
 ): string {
-  const taken = new Set(overlays.map((overlay) => overlay.name.trim()));
+  const taken = new Set(items.map((item) => item.name.trim()));
   let number = 1;
   while (taken.has(name(number))) number++;
   return name(number);

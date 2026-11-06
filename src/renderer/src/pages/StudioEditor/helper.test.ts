@@ -1,11 +1,21 @@
 import { translate } from "@/common/i18n";
-import { StudioLayer, StudioLayerSchema } from "@/common/schemas";
+import {
+  StudioElement,
+  StudioElementSchema,
+  StudioLayer,
+} from "@/common/schemas";
 import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
-import { newStudioLayer } from "@/common/util";
+import { newStudioElement, newStudioLayer, studioView } from "@/common/util";
 import { gift } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
-  layerName,
+  bounds,
+  elementName,
+  findElement,
+  moveElement,
+  pickElement,
+  stepElement,
+  toCanvas,
   moveLayer,
   roundBox,
   sampleReact,
@@ -25,51 +35,60 @@ const context = {
   label: () => "Gift jar",
   t,
 };
-const layer = <K extends StudioLayer["kind"]>(
+const element = <K extends StudioElement["kind"]>(
   kind: K,
-  patch: Partial<Extract<StudioLayer, { kind: K }>> = {},
-) => StudioLayerSchema.parse({ ...newStudioLayer(kind, "portrait"), ...patch });
+  patch: Partial<Extract<StudioElement, { kind: K }>> = {},
+) =>
+  StudioElementSchema.parse({
+    ...newStudioElement(kind, "portrait"),
+    ...patch,
+  });
 
-describe("layerName", () => {
-  it("names a layer by what it shows", () => {
+describe("elementName", () => {
+  it("names an element by what it shows", () => {
     expect(
-      layerName(layer("text", { text: " Thanks\nfor the follow" }), context),
+      elementName(
+        element("text", { text: " Thanks\nfor the follow" }),
+        context,
+      ),
     ).toBe("Thanks");
-    expect(layerName(layer("media", { name: "Party" }), context)).toBe("Party");
-    expect(layerName(layer("gift", { gift: 5655 }), context)).toBe("Rose");
+    expect(elementName(element("media", { name: "Party" }), context)).toBe(
+      "Party",
+    );
+    expect(elementName(element("gift", { gift: 5655 }), context)).toBe("Rose");
     expect(
-      layerName(
-        layer("emote", { emote: { id: "e1", image: "https://x/e1.png" } }),
+      elementName(
+        element("emote", { emote: { id: "e1", image: "https://x/e1.png" } }),
         context,
       ),
     ).toBe("Emote 1");
     expect(
-      layerName(
-        layer("overlay", { source: { type: "games", column: null } }),
+      elementName(
+        element("overlay", { source: { type: "games", column: null } }),
         context,
       ),
     ).toBe("Gift jar");
   });
 
   it("falls back to its kind", () => {
-    expect(layerName(layer("text"), context)).toBe("Text");
-    expect(layerName(layer("gift", { gift: 1 }), context)).toBe("Gift");
-    expect(layerName(layer("shape"), context)).toBe("Shape");
-    expect(layerName(layer("viewer"), context)).toBe("Viewer's picture");
-    expect(layerName(layer("overlay"), context)).toBe("Overlay");
+    expect(elementName(element("text"), context)).toBe("Text");
+    expect(elementName(element("gift", { gift: 1 }), context)).toBe("Gift");
+    expect(elementName(element("shape"), context)).toBe("Shape");
+    expect(elementName(element("viewer"), context)).toBe("Viewer's picture");
+    expect(elementName(element("overlay"), context)).toBe("Overlay");
   });
 });
 
 describe("whenText", () => {
-  it("says when a layer shows, with its trigger", () => {
-    expect(whenText(layer("shape"), t)).toBe("always on screen");
-    expect(whenText(layer("viewer"), t)).toBe("shows on Follow");
+  it("says when an element shows, with its trigger", () => {
+    expect(whenText(element("shape"), t)).toBe("always on screen");
+    expect(whenText(element("viewer"), t)).toBe("shows on Follow");
     expect(
       whenText(
-        layer("shape", {
+        element("shape", {
           when: "animate",
           trigger: {
-            ...newStudioLayer("shape", "portrait").trigger,
+            ...newStudioElement("shape", "portrait").trigger,
             type: TOKIO_EVENTS.GIFT,
           },
         }),
@@ -127,8 +146,8 @@ describe("Samples", () => {
 
   it("plays a text with its trigger's values and a viewer with its picture", () => {
     const samples = new Samples();
-    const text = layer("text", { text: "Hi {username}", when: "event" });
-    const viewer = layer("viewer");
+    const text = element("text", { text: "Hi {username}", when: "event" });
+    const viewer = element("viewer");
     const follow = samples.of(TOKIO_EVENTS.FOLLOW);
     const username =
       typeof follow === "object" && follow && "user" in follow
@@ -137,15 +156,138 @@ describe("Samples", () => {
 
     expect(username).not.toBe("");
     expect(sampleReact(text, samples, "en")).toEqual({
-      layer: text.id,
+      element: text.id,
       text: `Hi ${username}`,
     });
     expect(sampleReact(viewer, samples, "en")).toMatchObject({
-      layer: viewer.id,
+      element: viewer.id,
       name: username,
     });
-    expect(sampleReact(layer("shape"), samples, "en")).toEqual({
-      layer: expect.any(String),
+    expect(sampleReact(element("shape"), samples, "en")).toEqual({
+      element: expect.any(String),
     });
+  });
+});
+
+// A layer holding shapes with these ids, back to front
+const layerOf = (id: string, ...ids: string[]): StudioLayer => ({
+  ...newStudioLayer(id),
+  id,
+  elements: ids.map((e) => ({ ...element("shape"), id: e })),
+});
+const ids = (layers: StudioLayer[]) =>
+  layers.map((l) => [l.id, ...l.elements.map((e) => e.id)]);
+
+describe("moveElement and stepElement", () => {
+  const layers = [layerOf("back", "a", "b"), layerOf("front", "c")];
+
+  it("finds an element's layer and place", () => {
+    expect(findElement(layers, "b")).toEqual({ layer: 0, index: 1 });
+    expect(findElement(layers, "back")).toBeNull();
+  });
+
+  it("moves an element into another layer, which unfolds", () => {
+    const folded = [layers[0], { ...layers[1], folded: true }];
+    const moved = moveElement(folded, "a", "front", 1);
+
+    expect(ids(moved)).toEqual([
+      ["back", "b"],
+      ["front", "c", "a"],
+    ]);
+    expect(moved[1].folded).toBe(false);
+    // Nowhere to go
+    expect(moveElement(layers, "a", "gone", 0)).toBe(layers);
+  });
+
+  it("steps within its layer, then across the edge into the next", () => {
+    expect(ids(stepElement(layers, "a", 1))).toEqual([
+      ["back", "b", "a"],
+      ["front", "c"],
+    ]);
+    // Toward the front, it's the next layer's back-most
+    expect(ids(stepElement(layers, "b", 1))).toEqual([
+      ["back", "a"],
+      ["front", "b", "c"],
+    ]);
+    // Toward the back, the next layer's front-most
+    expect(ids(stepElement(layers, "c", -1))).toEqual([
+      ["back", "a", "b", "c"],
+      ["front"],
+    ]);
+    // Past the last layer, nothing moves
+    expect(stepElement(layers, "c", 1)).toBe(layers);
+    expect(stepElement(layers, "a", -1)).toBe(layers);
+  });
+});
+
+describe("the canvas's geometry", () => {
+  const box = (id: string, x: number, y: number, size = 100) => ({
+    ...element("shape"),
+    id,
+    x,
+    y,
+    width: size,
+    height: size,
+  });
+  const overlay = {
+    id: "o",
+    name: "",
+    size: "portrait" as const,
+    layers: [
+      { ...newStudioLayer("Back"), id: "back", elements: [box("under", 0, 0)] },
+      {
+        ...newStudioLayer("Front"),
+        id: "front",
+        elements: [box("low", 50, 50), box("high", 60, 60, 20)],
+      },
+    ],
+  };
+  const view = studioView(overlay, {
+    gifts: [],
+    served: () => true,
+    mediaURL: (file) => file,
+    embedPath: () => "",
+    text: () => "",
+    viewer: () => ({ src: "", name: "" }),
+    label: () => "",
+  });
+
+  it("turns screen px into the canvas's", () => {
+    expect(
+      toCanvas(
+        { x: 110, y: 70 },
+        { left: 10, top: 20 },
+        { scale: 0.5, left: 50, top: 0 },
+      ),
+    ).toEqual({ x: 100, y: 100 });
+  });
+
+  it("picks the front-most element under the point", () => {
+    expect(pickElement(view, new Set(), { x: 65, y: 65 })).toBe("high");
+    expect(pickElement(view, new Set(), { x: 90, y: 90 })).toBe("low");
+    expect(pickElement(view, new Set(), { x: 10, y: 10 })).toBe("under");
+    expect(pickElement(view, new Set(), { x: 500, y: 500 })).toBeNull();
+  });
+
+  it("goes through a locked layer to what's under it", () => {
+    expect(pickElement(view, new Set(["front"]), { x: 65, y: 65 })).toBe(
+      "under",
+    );
+  });
+
+  it("boxes a layer's elements", () => {
+    expect(bounds(overlay.layers[1].elements)).toEqual({
+      x: 50,
+      y: 50,
+      width: 100,
+      height: 100,
+    });
+    expect(bounds([box("a", -10, 5, 10), box("b", 30, 40, 10)])).toEqual({
+      x: -10,
+      y: 5,
+      width: 50,
+      height: 45,
+    });
+    expect(bounds([])).toBeNull();
   });
 });
