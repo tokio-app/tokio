@@ -60,7 +60,9 @@ paths:
 
 ## Embeds
 
-- On stream each is an iframe at its real path: `/<id>/` for an installed overlay, `/alerts/<id>/`, `/timer/`, `/games/minecraft/`. An installed overlay that isn't served gets `src: null` and draws nothing; reinstalling it (official overlays keep their id) re-sends the views and it shows again.
+- On stream each is an iframe at its real path: `/<id>/` for an installed overlay, `/alerts/<id>/`, `/timer/`, `/games/minecraft/`, or one column's `/games/minecraft/<column>/`. An installed overlay that isn't served gets `src: null` and draws nothing; reinstalling it (official overlays keep their id) re-sends the views and it shows again.
+- A games embed's `column` (1 to `GAMES_OVERLAY_MAX_COLUMNS`) places one column on its own, `null` all of them (layers saved before columns load as `null`). The picker offers each column once the games overlay has more than one, "row" when its layout is horizontal as the Games page says it, plus one a layer kept after the columns dropped. The editor's preview then draws only that column's rows, as its only column.
+- `StudioSource` has one union member per `type`, so a chain of `if`s on `type` narrows to the last.
 - In the editor (`Embed.tsx`): an installed overlay previews from disk in a named `Iframe` with `transparent` (`?transparent`, see `.claude/rules/overlays.md`), with its own sample data. The countdown timer and the games overlay show their pages' previews (`TimerPreview` and `OverlayPreview` with `bare`) in a `FitBox` scaled to the layer's box. An alert's overlay is a labeled box, since it shows media only while its alert plays.
 - Previews can't frame the real pages live: the app's session cancels every WebSocket to the overlay server (`initSession` in `src/main/handler/app.ts`, `URL_FILTER`).
 - An overlay embedded twice, in one studio overlay or two, shares its settings and saved state, as two browser sources of it do.
