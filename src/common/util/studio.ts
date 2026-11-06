@@ -51,6 +51,12 @@ export const studioVariables = (layer: StudioLayer): string[] =>
     ? [...STUDIO_NUMBERS]
     : [...STUDIO_NUMBERS, ...ALERT_MESSAGE_VARIABLES[layer.trigger.type]];
 
+// Own keys only, so {constructor} isn't a number
+const isNumber = (
+  numbers: StudioNumbers,
+  name: string,
+): name is keyof StudioNumbers => Object.hasOwn(numbers, name);
+
 type FillOptions = {
   numbers: StudioNumbers;
   // The event that set the layer off, null before the first
@@ -70,8 +76,8 @@ export function fillStudioText(
   { numbers, values, variables, language }: FillOptions,
 ): string {
   const text = template.replace(/\{(\w+)\}/g, (match, name: string) => {
-    if (Object.hasOwn(numbers, name)) {
-      return formatStat(numbers[name as keyof StudioNumbers], language).short;
+    if (isNumber(numbers, name)) {
+      return formatStat(numbers[name], language).short;
     }
     return values === null && variables.includes(name) ? "" : match;
   });
@@ -97,7 +103,11 @@ export type StudioViewDeps = {
   label: (source: StudioSource) => string;
 };
 
-function layerView(layer: StudioLayer, z: number, deps: StudioViewDeps) {
+function layerView(
+  layer: StudioLayer,
+  z: number,
+  deps: StudioViewDeps,
+): StudioLayerView {
   const base = {
     id: layer.id,
     x: layer.x,
@@ -150,7 +160,8 @@ function layerView(layer: StudioLayer, z: number, deps: StudioViewDeps) {
       };
     case "viewer":
       return { ...base, kind: layer.kind, ...deps.viewer(layer) };
-    case "overlay": {
+    // overlay
+    default: {
       const { source } = layer;
       const loads =
         source !== null &&
