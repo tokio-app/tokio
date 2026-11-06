@@ -41,6 +41,7 @@ import {
   useIpcRequest,
 } from "@/hooks";
 import { useTriggerChoices } from "@/pages/Alerts/useTriggerChoices";
+import { capitalize } from "@/pages/CoinStats/helper";
 import { TimerPush } from "@/pages/CountdownTimer/helper";
 import { sizeText } from "@/pages/Studio/helper";
 import toolsStyles from "@/pages/Tools/tools.module.css";
@@ -290,21 +291,22 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   ];
 
   const names = Object.fromEntries(
-    overlay.layers.map((layer) => [
-      layer.id,
-      {
-        name: layerName(layer, {
-          gifts: giftChoices,
-          emotes: emoteChoices,
-          label,
-          t,
-        }),
-        meta: t("studio.editor.rowMeta", {
-          kind: t(`studio.kinds.${layer.kind}`),
-          when: whenText(layer, t),
-        }),
-      },
-    ]),
+    overlay.layers.map((layer) => {
+      const name = layerName(layer, {
+        gifts: giftChoices,
+        emotes: emoteChoices,
+        label,
+        t,
+      });
+      const kind = t(`studio.kinds.${layer.kind}`);
+      const when = whenText(layer, t);
+      // A layer named after its kind doesn't say its kind twice
+      const meta =
+        name === kind
+          ? capitalize(when, language)
+          : t("studio.editor.rowMeta", { kind, when });
+      return [layer.id, { name, meta }];
+    }),
   );
 
   const add = (kind: StudioLayerKind) => {
