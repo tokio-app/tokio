@@ -137,7 +137,7 @@ describe("Tools", () => {
       data: [studioOverlay("Main scene"), studioOverlay("Just chatting")],
     });
     expect(row("Overlay Studio")).toHaveAccessibleDescription(
-      "Make your own overlays with text, images and layers that react to your LIVE. 2 overlays",
+      "Make your own overlays from text, images and other overlays, and have them react to your LIVE. 2 overlays",
     );
 
     await send(APP_EVENTS_RESPONSE.STUDIO, failure());

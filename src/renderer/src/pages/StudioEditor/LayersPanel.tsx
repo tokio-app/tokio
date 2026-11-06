@@ -1,100 +1,304 @@
 import {
   STUDIO_KINDS,
+  STUDIO_MAX_ELEMENTS,
   STUDIO_MAX_LAYERS,
+  StudioElementKind,
   StudioLayer,
-  StudioLayerKind,
 } from "@/common/schemas";
-import { Btn } from "@/components";
+import { Btn, Modal } from "@/components";
 import { cx } from "@/helper/cx";
 import { useMenu } from "@/hooks";
 import { useT } from "@/ui/i18n";
-import { useState } from "react";
+import { DragEvent, KeyboardEvent, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { FiPlus, FiTrash2 } from "react-icons/fi";
+import {
+  FiChevronDown,
+  FiChevronRight,
+  FiEye,
+  FiEyeOff,
+  FiLock,
+  FiPlus,
+  FiTrash2,
+  FiUnlock,
+} from "react-icons/fi";
 import { LuGripVertical } from "react-icons/lu";
-import { KIND_NAMES } from "./helper";
+import { findElement, KIND_NAMES } from "./helper";
 import styles from "./studioeditor.module.css";
 
+export type LayerFlags = Partial<
+  Pick<StudioLayer, "folded" | "locked" | "hidden">
+>;
+
 type Props = {
-  // Back to front, as the overlay keeps them
+  // Back to front, as the overlay keeps them, and so are their elements
   layers: StudioLayer[];
+  // A layer's id or an element's
   selected: string | null;
-  // What each layer's row says: its name, and its kind and When
+  // What each element's row says: its name, and its kind and When
   names: Record<string, { name: string; meta: string }>;
+  // The layer the menu adds to, none to add to a new one
+  target: StudioLayer | undefined;
   onSelect: (id: string) => void;
-  onAdd: (kind: StudioLayerKind) => void;
+  onAddLayer: () => void;
+  onAdd: (kind: StudioElementKind) => void;
+  // Deletes a layer with its elements, or an element
   onDelete: (id: string) => void;
+  onFlags: (layerId: string, flags: LayerFlags) => void;
   // Moves a layer to `to`, an index of the layers back to front
-  onMove: (id: string, to: number) => void;
+  onMoveLayer: (id: string, to: number) => void;
+  // Moves an element into a layer at `at`, an index of its elements back to
+  // front once the element is taken out
+  onMoveElement: (id: string, layerId: string, at: number) => void;
+  // One step toward the front (1) or the back (-1), into the next layer
+  // past its own's edge
+  onStepElement: (id: string, by: 1 | -1) => void;
 };
 
+// The row the dragged one is over: a layer's, or an element's in it
+type Over = { layer: string; element?: string };
+
+// Where a drop lands: the line on a row or a layer's group, and the move
+type Plan = { on: string; line: "before" | "after"; run: () => void };
+
+// Up the list is toward the front
+const stepOf = (e: KeyboardEvent) =>
+  e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
+
 /**
- * The overlay's layers, the front on top: select one, drag its grip or use
- * its arrows to reorder, delete it, or add one from the menu.
+ * The overlay's layers as a tree, the front on top, each with its elements
+ * under it: select one, fold, lock or hide a layer, drag a grip or use its
+ * arrows to reorder, and add or delete from the header.
  */
 export function LayersPanel({
   layers,
   selected,
   names,
+  target,
   onSelect,
+  onAddLayer,
   onAdd,
   onDelete,
-  onMove,
+  onFlags,
+  onMoveLayer,
+  onMoveElement,
+  onStepElement,
 }: Props) {
   const t = useT();
   const menu = useMenu();
-  // The row being dragged, and the row it's over
-  const [drag, setDrag] = useState<{ id: string; over?: string } | null>(null);
+  const caption = useId();
+  const list = useRef<HTMLUListElement>(null);
+  // The row being dragged, whether it's a layer's, and the row it's over
+  const [drag, setDrag] = useState<{
+    id: string;
+    layer: boolean;
+    over?: Over;
+  } | null>(null);
+  // A layer that still holds elements, waiting to be confirmed
+  const [confirm, setConfirm] = useState<StudioLayer | null>(null);
+
   // Top = front
   const rows = [...layers].reverse();
-  const from = rows.findIndex((l) => l.id === drag?.id);
-  const full = layers.length >= STUDIO_MAX_LAYERS;
-  const add = full
-    ? t("studio.editor.full", { max: String(STUDIO_MAX_LAYERS) })
-    : t("studio.editor.addLayer");
+  const layerName = (layer: StudioLayer) =>
+    layer.name.trim() || t("studio.editor.untitledLayer");
+  // Every row in the list's order, to tell which way a drag goes
+  const order = rows.flatMap((layer) => [
+    layer.id,
+    ...(layer.folded ? [] : [...layer.elements].reverse().map((e) => e.id)),
+  ]);
+
+  const layersFull = layers.length >= STUDIO_MAX_LAYERS;
+  const elementsFull =
+    layers.reduce((n, layer) => n + layer.elements.length, 0) >=
+    STUDIO_MAX_ELEMENTS;
+  const add = t("studio.editor.addLayer");
   const reorder = t("studio.editor.move");
-  // A row's place in the list, as an index of the layers back to front
-  const toLayers = (row: number) => layers.length - 1 - row;
+  const fold = t("studio.editor.fold");
+  const lock = t("studio.editor.lock");
+  const hide = t("studio.editor.hide");
+
+  const selectedLayer = layers.find((l) => l.id === selected);
+  const selectedElement =
+    !selectedLayer && selected !== null && findElement(layers, selected);
+  const remove = selectedLayer
+    ? t("studio.editor.deleteLayer")
+    : selectedElement
+      ? t("studio.editor.deleteElement")
+      : t("studio.editor.deleteNone");
+
+  const plan = ((): Plan | null => {
+    const over = drag?.over;
+    if (!drag || !over) return null;
+    if (drag.layer) {
+      const from = layers.findIndex((l) => l.id === drag.id);
+      const to = layers.findIndex((l) => l.id === over.layer);
+      if (from === to) return null;
+      return {
+        on: over.layer,
+        // It takes that layer's place, from below or above
+        line: to > from ? "before" : "after",
+        run: () => onMoveLayer(drag.id, to),
+      };
+    }
+    const layer = layers.find((l) => l.id === over.layer)!;
+    const rest = layer.elements.filter((e) => e.id !== drag.id);
+    if (over.element === undefined) {
+      // In front in that layer, unless it's there already
+      if (layer.elements.at(-1)?.id === drag.id) return null;
+      return {
+        on: layer.id,
+        line: "after",
+        run: () => onMoveElement(drag.id, layer.id, rest.length),
+      };
+    }
+    if (over.element === drag.id) return null;
+    const at = rest.findIndex((e) => e.id === over.element);
+    const down = order.indexOf(drag.id) < order.indexOf(over.element);
+    return {
+      on: over.element,
+      line: down ? "after" : "before",
+      // Below it is behind it
+      run: () => onMoveElement(drag.id, layer.id, down ? at : at + 1),
+    };
+  })();
+
+  const lineOf = (on: string, applies: boolean) =>
+    applies && plan?.on === on
+      ? plan.line === "before"
+        ? styles.layer_before
+        : styles.layer_after
+      : undefined;
+
+  const enter = (over: Over) => {
+    if (
+      drag &&
+      (drag.over?.layer !== over.layer || drag.over.element !== over.element)
+    ) {
+      setDrag({ ...drag, over });
+    }
+  };
+
+  const startDrag = (e: DragEvent<HTMLElement>, id: string, layer: boolean) => {
+    // The whole row follows the pointer, held where it was grabbed
+    const row = e.currentTarget.closest<HTMLElement>("[data-row]")!;
+    const box = row.getBoundingClientRect();
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setDragImage(row, e.clientX - box.left, e.clientY - box.top);
+    setDrag({ id, layer });
+  };
+
+  const step = (e: KeyboardEvent, id: string, move: (by: 1 | -1) => void) => {
+    const by = stepOf(e);
+    if (!by) return;
+    e.preventDefault();
+    // Synchronous, so its grip takes the focus back: a row that moves drops
+    // it on <body>, and one that changes layers is a new row
+    flushSync(() => move(by));
+    list.current?.querySelector<HTMLElement>(`[data-grip="${id}"]`)?.focus();
+  };
+
+  const grip = (id: string, layer: boolean, move: (by: 1 | -1) => void) => (
+    <Btn
+      variant="icon"
+      className={styles.grip}
+      title={reorder}
+      aria-label={reorder}
+      aria-keyshortcuts="ArrowUp ArrowDown"
+      data-grip={id}
+      draggable
+      onDragStart={(e) => startDrag(e, id, layer)}
+      onKeyDown={(e) => step(e, id, move)}
+    >
+      <LuGripVertical size={16} />
+    </Btn>
+  );
 
   return (
     <div className={styles.panel}>
       <div className={styles.panel_header}>
         <h3 className={styles.panel_title}>{t("studio.editor.layers")}</h3>
-        <div
-          className={styles.menu_anchor}
-          ref={menu.ref}
-          onKeyDown={menu.onKeyDown}
-        >
-          <Btn
-            ref={menu.toggleRef}
-            variant="icon"
-            title={add}
-            aria-label={add}
-            aria-haspopup="menu"
-            aria-expanded={menu.open}
-            disabled={full}
-            onClick={menu.toggle}
+        <div className={styles.panel_actions}>
+          <div
+            className={styles.menu_anchor}
+            ref={menu.ref}
+            onKeyDown={menu.onKeyDown}
           >
-            <FiPlus size={20} />
-          </Btn>
-          {menu.open && (
-            <div className={styles.menu} role="menu" aria-label={add}>
-              {STUDIO_KINDS.map((kind) => (
+            <Btn
+              ref={menu.toggleRef}
+              variant="icon"
+              title={add}
+              aria-label={add}
+              aria-haspopup="menu"
+              aria-expanded={menu.open}
+              onClick={menu.toggle}
+            >
+              <FiPlus size={20} />
+            </Btn>
+            {menu.open && (
+              <div className={styles.menu} role="menu" aria-label={add}>
                 <button
-                  key={kind}
                   type="button"
                   role="menuitem"
                   className={styles.menu_item}
+                  disabled={layersFull}
                   onClick={() => {
                     menu.close();
-                    onAdd(kind);
+                    onAddLayer();
                   }}
                 >
-                  {t(KIND_NAMES[kind])}
+                  {t("studio.editor.newLayer")}
                 </button>
-              ))}
-            </div>
-          )}
+                <div
+                  role="group"
+                  aria-labelledby={caption}
+                  className={styles.menu_group}
+                >
+                  <span id={caption} className={styles.menu_caption}>
+                    {target
+                      ? t("studio.editor.addTo", { layer: layerName(target) })
+                      : t("studio.editor.addToNew")}
+                  </span>
+                  {STUDIO_KINDS.map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      role="menuitem"
+                      className={styles.menu_item}
+                      disabled={elementsFull}
+                      onClick={() => {
+                        menu.close();
+                        onAdd(kind);
+                      }}
+                    >
+                      {t(KIND_NAMES[kind])}
+                    </button>
+                  ))}
+                </div>
+                {(elementsFull || layersFull) && (
+                  <p className={styles.menu_note}>
+                    {elementsFull
+                      ? t("studio.editor.fullElements", {
+                          max: String(STUDIO_MAX_ELEMENTS),
+                        })
+                      : t("studio.editor.full", {
+                          max: String(STUDIO_MAX_LAYERS),
+                        })}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          <Btn
+            variant="icon"
+            title={remove}
+            aria-label={remove}
+            disabled={selected === null}
+            onClick={() => {
+              if (selectedLayer?.elements.length) setConfirm(selectedLayer);
+              else if (selected !== null) onDelete(selected);
+            }}
+          >
+            <FiTrash2 size={18} />
+          </Btn>
         </div>
       </div>
 
@@ -102,6 +306,7 @@ export function LayersPanel({
         <p className={styles.panel_empty}>{t("studio.editor.noLayers")}</p>
       ) : (
         <ul
+          ref={list}
           className={styles.layers}
           aria-label={t("studio.editor.layers")}
           // Only a row's own drag drops here, not files or text
@@ -111,94 +316,165 @@ export function LayersPanel({
           onDrop={(e) => {
             if (!drag) return;
             e.preventDefault();
-            const over = rows.findIndex((l) => l.id === drag.over);
-            if (over !== -1) onMove(drag.id, toLayers(over));
+            plan?.run();
             setDrag(null);
           }}
           // Also when it's cancelled or dropped elsewhere: nothing moves
           onDragEnd={() => setDrag(null)}
         >
-          {rows.map((layer, index) => {
-            const { name, meta } = names[layer.id];
-            const drop =
-              from === -1 || index === from || layer.id !== drag?.over
-                ? undefined
-                : index > from
-                  ? "after"
-                  : "before";
+          {rows.map((layer) => {
+            const index = layers.indexOf(layer);
+            const name = layerName(layer);
+            const shown = !layer.folded && layer.elements.length > 0;
             return (
               <li
                 key={layer.id}
                 className={cx(
-                  styles.layer,
-                  layer.id === selected && styles.layer_selected,
-                  index === from && styles.layer_dragged,
-                  drop === "before" && styles.layer_before,
-                  drop === "after" && styles.layer_after,
+                  styles.layer_group,
+                  layer.hidden && styles.layer_hidden,
+                  drag?.id === layer.id && styles.layer_dragged,
+                  lineOf(layer.id, !!drag?.layer),
                 )}
-                onDragEnter={() => {
-                  if (drag && drag.over !== layer.id) {
-                    setDrag({ ...drag, over: layer.id });
-                  }
-                }}
               >
-                <Btn
-                  variant="icon"
-                  className={styles.grip}
-                  title={reorder}
-                  aria-label={reorder}
-                  aria-keyshortcuts="ArrowUp ArrowDown"
-                  draggable
-                  onDragStart={(e) => {
-                    // The whole row follows the pointer, held where it was
-                    // grabbed
-                    const row = e.currentTarget.closest("li")!;
-                    const box = row.getBoundingClientRect();
-                    e.dataTransfer.effectAllowed = "move";
-                    e.dataTransfer.setDragImage(
-                      row,
-                      e.clientX - box.left,
-                      e.clientY - box.top,
-                    );
-                    setDrag({ id: layer.id });
-                  }}
-                  onKeyDown={(e) => {
-                    // Up the list is toward the front
-                    const by =
-                      e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
-                    if (!by) return;
-                    e.preventDefault();
-                    const handle = e.currentTarget;
-                    // Synchronous, so the handle takes the focus back: moving
-                    // its row drops it on <body>
-                    flushSync(() => onMove(layer.id, toLayers(index + by)));
-                    handle.focus();
-                  }}
+                <div
+                  data-row
+                  className={cx(
+                    styles.layer,
+                    styles.layer_row,
+                    layer.id === selected && styles.layer_selected,
+                    lineOf(layer.id, drag?.layer === false),
+                  )}
+                  onDragEnter={() => enter({ layer: layer.id })}
                 >
-                  <LuGripVertical size={16} />
-                </Btn>
-                <button
-                  type="button"
-                  className={styles.layer_select}
-                  aria-pressed={layer.id === selected}
-                  onClick={() => onSelect(layer.id)}
-                >
-                  <span className={styles.layer_name}>{name}</span>
-                  {/* Read as two phrases, not one run-on word */}{" "}
-                  <span className={styles.layer_meta}>{meta}</span>
-                </button>
-                <Btn
-                  variant="icon"
-                  title={t("studio.editor.deleteLayer")}
-                  aria-label={t("studio.editor.deleteLayer")}
-                  onClick={() => onDelete(layer.id)}
-                >
-                  <FiTrash2 size={16} />
-                </Btn>
+                  {grip(layer.id, true, (by) =>
+                    onMoveLayer(layer.id, index + by),
+                  )}
+                  {layer.elements.length > 0 ? (
+                    <Btn
+                      variant="icon"
+                      title={fold}
+                      aria-label={fold}
+                      aria-expanded={!layer.folded}
+                      onClick={() =>
+                        onFlags(layer.id, { folded: !layer.folded })
+                      }
+                    >
+                      {layer.folded ? (
+                        <FiChevronRight size={16} />
+                      ) : (
+                        <FiChevronDown size={16} />
+                      )}
+                    </Btn>
+                  ) : (
+                    <span className={styles.fold_space} aria-hidden />
+                  )}
+                  <button
+                    type="button"
+                    className={styles.layer_select}
+                    aria-pressed={layer.id === selected}
+                    onClick={() => onSelect(layer.id)}
+                  >
+                    <span className={styles.layer_name}>{name}</span>
+                    {/* Read as two phrases, not one run-on word */}{" "}
+                    <span className={styles.layer_meta}>
+                      {t("studio.editor.elements", {
+                        count: layer.elements.length,
+                      })}
+                    </span>
+                  </button>
+                  <Btn
+                    variant="icon"
+                    className={cx(
+                      styles.toggle,
+                      layer.locked && styles.toggle_on,
+                    )}
+                    title={lock}
+                    aria-label={lock}
+                    aria-pressed={layer.locked}
+                    onClick={() => onFlags(layer.id, { locked: !layer.locked })}
+                  >
+                    {layer.locked ? (
+                      <FiLock size={16} />
+                    ) : (
+                      <FiUnlock size={16} />
+                    )}
+                  </Btn>
+                  <Btn
+                    variant="icon"
+                    className={cx(
+                      styles.toggle,
+                      layer.hidden && styles.toggle_on,
+                    )}
+                    title={hide}
+                    aria-label={hide}
+                    aria-pressed={layer.hidden}
+                    onClick={() => onFlags(layer.id, { hidden: !layer.hidden })}
+                  >
+                    {layer.hidden ? (
+                      <FiEyeOff size={16} />
+                    ) : (
+                      <FiEye size={16} />
+                    )}
+                  </Btn>
+                </div>
+
+                {shown && (
+                  <ul className={styles.elements} aria-label={name}>
+                    {[...layer.elements].reverse().map((element) => {
+                      const { name: label, meta } = names[element.id];
+                      return (
+                        <li
+                          key={element.id}
+                          data-row
+                          className={cx(
+                            styles.layer,
+                            styles.element_row,
+                            element.id === selected && styles.layer_selected,
+                            drag?.id === element.id && styles.layer_dragged,
+                            lineOf(element.id, drag?.layer === false),
+                          )}
+                          onDragEnter={() =>
+                            enter({ layer: layer.id, element: element.id })
+                          }
+                        >
+                          {grip(element.id, false, (by) =>
+                            onStepElement(element.id, by),
+                          )}
+                          <button
+                            type="button"
+                            className={styles.layer_select}
+                            aria-pressed={element.id === selected}
+                            onClick={() => onSelect(element.id)}
+                          >
+                            <span className={styles.layer_name}>{label}</span>
+                            {/* Read as two phrases, not one run-on word */}{" "}
+                            <span className={styles.layer_meta}>{meta}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </li>
             );
           })}
         </ul>
+      )}
+
+      {confirm && (
+        <Modal
+          title={t("studio.editor.deleteTitle")}
+          description={t("studio.editor.deleteText", {
+            name: layerName(confirm),
+            count: confirm.elements.length,
+          })}
+          confirmText={t("common.delete")}
+          onClose={() => setConfirm(null)}
+          onConfirm={() => {
+            onDelete(confirm.id);
+            setConfirm(null);
+          }}
+        />
       )}
     </div>
   );

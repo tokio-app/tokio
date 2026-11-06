@@ -15,10 +15,10 @@
 }
 
 /* Layers, the canvas, settings. Wide enough on the sides for Spanish's
-   longer labels. */
+   longer labels, and for a layer's row with its four buttons. */
 .panes {
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr) 336px;
+  grid-template-columns: 296px minmax(0, 1fr) 336px;
   gap: var(--space-6);
   flex: 1;
   min-height: 0;
@@ -90,24 +90,105 @@
   cursor: pointer;
 }
 
-.menu_item:hover {
+.menu_item:hover:not(:disabled) {
   background-color: var(--background-secondary-hover);
 }
 
-/* LAYERS: the front on top */
+.menu_item:disabled {
+  color: var(--font-muted);
+  cursor: default;
+}
+
+.panel_actions {
+  display: flex;
+  align-items: center;
+}
+
+/* The kinds, under the layer they go in */
+.menu_group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
+}
+
+.menu_caption,
+.menu_note {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.menu_caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu_note {
+  padding-bottom: var(--space-2);
+}
+
+/* LAYERS: a tree, the front on top */
+
+.layers,
+.elements {
+  list-style: none;
+}
 
 .layers {
   padding: 0 var(--space-2) var(--space-2);
-  list-style: none;
+}
+
+/* Under the fold button, with a hairline that ties them to their layer */
+.elements {
+  margin-left: 42px;
+  padding-left: var(--space-1);
+  border-left: 1px solid var(--border);
+}
+
+.layer_group {
+  border-radius: var(--radius-md);
 }
 
 .layer {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-1);
   border-radius: var(--radius-md);
+}
+
+/* Grip, fold, name, lock, eye */
+.layer_row {
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+}
+
+/* Grip, name */
+.element_row {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+/* The fold button's place on an empty layer */
+.fold_space {
+  width: 28px;
+}
+
+/* Lock and hide: Paper when on, muted when off */
+.layer .toggle {
+  color: var(--font-muted);
+}
+
+.layer .toggle_on {
+  color: var(--font-primary);
+}
+
+/* Hidden: its name and elements dimmed, its buttons as they are */
+.layer_hidden .layer_select,
+.layer_hidden .elements {
+  opacity: 0.5;
 }
 
 .layer:hover {
