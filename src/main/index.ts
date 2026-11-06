@@ -24,6 +24,7 @@ import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
+import { StudioService } from "@/services/studio";
 import { TimerService } from "@/services/timer";
 import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
@@ -100,6 +101,7 @@ const services: AppServices = {
   fansService: new FansService(),
   historyService: new HistoryService(),
   gamesService: new GamesService(),
+  studioService: new StudioService(),
   trayService: new TrayService(),
 };
 

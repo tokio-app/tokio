@@ -21,6 +21,7 @@ import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
+import { StudioService } from "@/services/studio";
 import { TimerService } from "@/services/timer";
 import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
@@ -68,6 +69,7 @@ export class AppHandler implements AppHandlerVariables {
   public readonly fansService: FansService;
   public readonly historyService: HistoryService;
   public readonly gamesService: GamesService;
+  public readonly studioService: StudioService;
   public readonly trayService: TrayService;
   public readonly notifier: Notifier;
 

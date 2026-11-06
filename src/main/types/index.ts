@@ -21,6 +21,7 @@ import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
+import { StudioService } from "@/services/studio";
 import { TimerService } from "@/services/timer";
 import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
@@ -67,6 +68,7 @@ export interface AppServices {
   readonly fansService: FansService;
   readonly historyService: HistoryService;
   readonly gamesService: GamesService;
+  readonly studioService: StudioService;
   readonly trayService: TrayService;
 }
 
