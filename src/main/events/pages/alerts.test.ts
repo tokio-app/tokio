@@ -844,6 +844,8 @@ describe("alerts events", () => {
         removeFromAlerts: vi.fn(
           async (_field: "sound" | "media", _file: string) => cleared,
         ),
+        removeFromStudio: vi.fn(async (_file: string) => true),
+        getStudio: () => [],
         getSounds: () => [ding],
         getMedia: () => [],
       };
@@ -929,6 +931,82 @@ describe("alerts events", () => {
         {
           success: false,
           data: left(storeManagerService),
+          error: expect.objectContaining({
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+    });
+  });
+
+  describe("REMOVE_MEDIA in Overlay Studio", () => {
+    const studio = {
+      id: "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f",
+      name: "Main",
+      size: "portrait" as const,
+      layers: [],
+    };
+    const setup = (cleared = true) => {
+      const deleteMedia = vi.fn(async (_file: string) => ({ success: true }));
+      const sendToClient = vi.fn((_id: string, _data: unknown) => true);
+      const storeManagerService = {
+        removeMedia: vi.fn(async (_file: string) => true),
+        removeFromAlerts: vi.fn(
+          async (_field: "sound" | "media", _file: string) => true,
+        ),
+        removeFromStudio: vi.fn(async (_file: string) => cleared),
+        getStudio: () => [studio],
+        getLiveStats: () => ({ likes: 0, viewers: 0, views: 0 }),
+        getMedia: () => [],
+      };
+      const h = createHandler({
+        alertsService: { deleteMedia },
+        storeManagerService,
+        overlayService: {
+          getGifts: async () => [],
+          getCustomGifts: async () => [],
+          getOverlays: () => [],
+        },
+        liveService: {
+          getSession: () => ({
+            startedAt: null,
+            totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
+            activity: [],
+          }),
+        },
+        studioService: { kept: () => null },
+        serverService: { sendToClient },
+      });
+      return { h, deleteMedia, sendToClient, storeManagerService };
+    };
+
+    it("takes the file off studio layers and sends their views, then deletes it", async () => {
+      const { h, deleteMedia, sendToClient, storeManagerService } = setup();
+
+      await h.invoke(alerts, APP_EVENTS.REMOVE_MEDIA, { file: party.file });
+
+      expect(
+        storeManagerService.removeFromStudio,
+      ).toHaveBeenCalledExactlyOnceWith(party.file);
+      expect(sendToClient).toHaveBeenCalledWith(`studio:${studio.id}`, {
+        type: "tokio:studio",
+        data: { view: { width: 1080, height: 1920, layers: [] } },
+      });
+      expect(deleteMedia).toHaveBeenCalledExactlyOnceWith(party.file);
+    });
+
+    it("keeps the file when the studio overlays couldn't be saved", async () => {
+      const { h, deleteMedia, sendToClient } = setup(false);
+
+      await h.invoke(alerts, APP_EVENTS.REMOVE_MEDIA, { file: party.file });
+
+      expect(deleteMedia).not.toHaveBeenCalled();
+      // Main holds the change, so the pages show it
+      expect(sendToClient).toHaveBeenCalledOnce();
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
+        {
+          success: false,
+          data: [],
           error: expect.objectContaining({
             code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
           }),

@@ -8,6 +8,7 @@ import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
+import { sendStudioOverlays } from "@/helper/studio";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("overlays");
@@ -62,7 +63,8 @@ events.push(
 
 events.push(
   APP_EVENTS.REMOVE_OVERLAY,
-  async ({ overlayService, notifier }, e, { id }) => {
+  async (handler, e, { id }) => {
+    const { overlayService, notifier } = handler;
     const res = await overlayService.remove(id);
     if (!res.success) throw new LoggedError(`Unable to remove overlay ${id}.`);
 
@@ -70,6 +72,8 @@ events.push(
       success: true,
       data: overlayService.getOverlays(),
     });
+    // Studio overlays that embed it stop showing it
+    await sendStudioOverlays(handler);
     if (res.saved === false) throw saveFailure();
     notifier.success(
       "overlays",
@@ -109,7 +113,8 @@ events.push(
 
 events.push(
   APP_EVENTS.INSTALL_OVERLAY,
-  async ({ overlayService, notifier }, e, { id }) => {
+  async (handler, e, { id }) => {
+    const { overlayService, notifier } = handler;
     const updating = overlayService
       .getOverlays()
       .some((o) => o.id === id && !o.external);
@@ -131,6 +136,8 @@ events.push(
       success: true,
       data: overlayService.getOverlays(),
     });
+    // Studio overlays that embedded it before a remove show it again
+    await sendStudioOverlays(handler);
     if (res.saved === false) throw saveFailure();
     e.reply(APP_EVENTS_RESPONSE.INSTALL_OVERLAY, { success: true, id });
     if (updating) {
