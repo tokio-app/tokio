@@ -246,10 +246,14 @@ export function createStage(
     el.style.height = `${element.height}px`;
     el.style.zIndex = String(element.z);
     el.style.opacity = String(element.opacity);
-    // Around its center, entrances and animations with it
-    el.style.transform = element.rotation
-      ? `rotate(${element.rotation}deg)`
-      : "";
+    // Around its center, entrances and animations with it. The flip comes
+    // first, along its own sides, and turns with it.
+    const turn = element.rotation ? `rotate(${element.rotation}deg)` : "";
+    const flip =
+      element.flip_x || element.flip_y
+        ? `scale(${element.flip_x ? -1 : 1}, ${element.flip_y ? -1 : 1})`
+        : "";
+    el.style.transform = turn && flip ? `${turn} ${flip}` : turn || flip;
 
     switch (element.kind) {
       case "text": {

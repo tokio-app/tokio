@@ -9,6 +9,7 @@ import { newStudioElement, newStudioLayer, studioView } from "@/common/util";
 import { gift } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
+  alignTo,
   bounds,
   elementName,
   findElement,
@@ -214,6 +215,29 @@ describe("resizeBox", () => {
       resizeBox(box, "sw", 500, 0, { minWidth: 120, minHeight: words }),
     ).toEqual({ x: 280, y: 200, width: 120, height: 150 });
     expect(heights).toEqual([120]);
+  });
+});
+
+describe("alignTo", () => {
+  const canvas = { width: 1080, height: 1920 };
+  const box = { x: 100, y: 200, width: 300, height: 100, rotation: 0 };
+
+  it("lines a box up with each edge and middle, the other way kept", () => {
+    expect(alignTo(box, canvas, "left")).toEqual({ x: 0, y: 200 });
+    expect(alignTo(box, canvas, "center")).toEqual({ x: 390, y: 200 });
+    expect(alignTo(box, canvas, "right")).toEqual({ x: 780, y: 200 });
+    expect(alignTo(box, canvas, "top")).toEqual({ x: 100, y: 0 });
+    expect(alignTo(box, canvas, "middle")).toEqual({ x: 100, y: 910 });
+    expect(alignTo(box, canvas, "bottom")).toEqual({ x: 100, y: 1820 });
+  });
+
+  it("lines a turned box up by how it shows", () => {
+    // A quarter turn: it shows 100 wide and 300 tall, from 200, 100
+    const turned = { ...box, rotation: 90 };
+
+    expect(alignTo(turned, canvas, "left")).toEqual({ x: -100, y: 200 });
+    expect(alignTo(turned, canvas, "top")).toEqual({ x: 100, y: 100 });
+    expect(alignTo(turned, canvas, "bottom")).toEqual({ x: 100, y: 1720 });
   });
 });
 

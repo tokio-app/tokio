@@ -22,6 +22,8 @@ describe("StudioElementSchema", () => {
       kind: "text",
       ...box,
       rotation: 0,
+      flip_x: false,
+      flip_y: false,
       opacity: 1,
       locked: false,
       hidden: false,

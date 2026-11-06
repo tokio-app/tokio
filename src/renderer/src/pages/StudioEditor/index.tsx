@@ -3,6 +3,7 @@ import {
   Profile,
   STUDIO_MAX_ELEMENTS,
   STUDIO_MAX_LAYERS,
+  STUDIO_SIZES,
   StudioElement,
   StudioElementKind,
   StudioElementOf,
@@ -554,6 +555,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               <ElementSettings
                 key={element.id}
                 element={element}
+                canvas={STUDIO_SIZES[overlay.size]}
                 onChange={(changed) => changeElement(changed.id, () => changed)}
                 gifts={giftChoices}
                 emotes={emoteChoices}

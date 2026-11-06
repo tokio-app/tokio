@@ -339,6 +339,44 @@ export function extent({ x, y, width, height, rotation }: Turned): Box {
   };
 }
 
+// The canvas's edges and middles an element lines up with
+export type AlignTo = "left" | "center" | "right" | "top" | "middle" | "bottom";
+
+/**
+ * Where a box goes, in whole px, to line up with an edge of the canvas or
+ * its middle: a turned box by how it shows, its extent.
+ */
+export function alignTo(
+  box: Turned,
+  canvas: { width: number; height: number },
+  to: AlignTo,
+): Point {
+  const shown = extent(box);
+  const across = canvas.width - shown.width;
+  const down = canvas.height - shown.height;
+  // Where what shows goes, its top left corner
+  const x =
+    to === "left"
+      ? 0
+      : to === "center"
+        ? across / 2
+        : to === "right"
+          ? across
+          : shown.x;
+  const y =
+    to === "top"
+      ? 0
+      : to === "middle"
+        ? down / 2
+        : to === "bottom"
+          ? down
+          : shown.y;
+  return {
+    x: Math.round(box.x + x - shown.x),
+    y: Math.round(box.y + y - shown.y),
+  };
+}
+
 // Whether a turned box holds a point: the point turned back into its sides
 const holdsTurned = (box: Turned, point: Point) => {
   const cx = box.x + box.width / 2;

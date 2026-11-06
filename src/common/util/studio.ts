@@ -124,6 +124,8 @@ function elementView(
     width: element.width,
     height: element.height,
     rotation: element.rotation,
+    flip_x: element.flip_x,
+    flip_y: element.flip_y,
     z,
     opacity: element.opacity,
     when: element.when,

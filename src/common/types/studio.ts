@@ -16,6 +16,9 @@ type StudioElementViewBase = {
   height: number;
   // Degrees clockwise, around its center
   rotation: number;
+  // Mirrored left to right, and top to bottom, before it turns
+  flip_x: boolean;
+  flip_y: boolean;
   z: number;
   opacity: number;
   when: StudioWhen;

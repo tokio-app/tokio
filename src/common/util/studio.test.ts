@@ -203,14 +203,14 @@ describe("studioView", () => {
       overlay([
         element("back", { kind: "shape" }),
         element("hidden", { kind: "shape", hidden: true }),
-        element("front", { kind: "shape", rotation: -45 }),
+        element("front", { kind: "shape", rotation: -45, flip_x: true }),
       ]),
       deps(),
     );
 
     expect(elements).toMatchObject([
-      { id: "back", z: 0, rotation: 0 },
-      { id: "front", z: 2, rotation: -45 },
+      { id: "back", z: 0, rotation: 0, flip_x: false, flip_y: false },
+      { id: "front", z: 2, rotation: -45, flip_x: true, flip_y: false },
     ]);
   });
 

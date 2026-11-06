@@ -64,6 +64,9 @@ const ELEMENT = {
   height: z.number().min(1),
   // Degrees clockwise, around its center
   rotation: z.number().min(-180).max(180).default(0),
+  // Mirrored left to right, and top to bottom, along its own sides
+  flip_x: z.boolean().default(false),
+  flip_y: z.boolean().default(false),
   opacity: z.number().min(0).max(1).default(1),
   // The editor's canvas can't pick, move, resize or rotate it
   locked: z.boolean().default(false),

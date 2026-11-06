@@ -31,7 +31,18 @@ import {
 } from "@/components";
 import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
-import { KIND_NAMES, sourceOf, sourceValue } from "./helper";
+import { IconType } from "react-icons";
+import {
+  LuAlignCenterHorizontal,
+  LuAlignCenterVertical,
+  LuAlignEndHorizontal,
+  LuAlignEndVertical,
+  LuAlignStartHorizontal,
+  LuAlignStartVertical,
+  LuFlipHorizontal2,
+  LuFlipVertical2,
+} from "react-icons/lu";
+import { AlignTo, alignTo, KIND_NAMES, sourceOf, sourceValue } from "./helper";
 import styles from "./studioeditor.module.css";
 
 const WHENS: { value: StudioWhen; label: MessageKey }[] = [
@@ -58,8 +69,36 @@ const ALIGNS: { value: StudioAlign; label: MessageKey }[] = [
   { value: "right", label: "studio.aligns.right" },
 ];
 
+// The canvas's edges and middles, across then down
+const ALIGNS_TO: { to: AlignTo; label: MessageKey; Icon: IconType }[][] = [
+  [
+    { to: "left", label: "studio.alignTo.left", Icon: LuAlignStartVertical },
+    {
+      to: "center",
+      label: "studio.alignTo.center",
+      Icon: LuAlignCenterVertical,
+    },
+    { to: "right", label: "studio.alignTo.right", Icon: LuAlignEndVertical },
+  ],
+  [
+    { to: "top", label: "studio.alignTo.top", Icon: LuAlignStartHorizontal },
+    {
+      to: "middle",
+      label: "studio.alignTo.middle",
+      Icon: LuAlignCenterHorizontal,
+    },
+    {
+      to: "bottom",
+      label: "studio.alignTo.bottom",
+      Icon: LuAlignEndHorizontal,
+    },
+  ],
+];
+
 type Props = {
   element: StudioElement;
+  // The overlay's size, which the element lines up with
+  canvas: { width: number; height: number };
   onChange: (element: StudioElement) => void;
   gifts: CustomGift[];
   emotes: EmoteOption[];
@@ -69,9 +108,13 @@ type Props = {
   onPickMedia: () => void;
 };
 
-/** The selected element's own fields, its box and opacity, and its When. */
+/**
+ * The selected element's own fields, its box, flips and opacity, and its
+ * When.
+ */
 export function ElementSettings({
   element,
+  canvas,
   onChange,
   gifts,
   emotes,
@@ -257,6 +300,27 @@ export function ElementSettings({
     </Field>
   );
 
+  const flip = (
+    key: "flip_x" | "flip_y",
+    label: MessageKey,
+    icon: ReactNode,
+  ) => (
+    <Btn
+      variant="icon"
+      title={t(label)}
+      aria-label={t(label)}
+      aria-pressed={element[key]}
+      active={element[key]}
+      onClick={() => {
+        const next = { ...element };
+        next[key] = !element[key];
+        onChange(next);
+      }}
+    >
+      {icon}
+    </Btn>
+  );
+
   const opacity = Math.round(element.opacity * 100);
 
   return (
@@ -272,6 +336,44 @@ export function ElementSettings({
           {box("height", "studio.fields.height", 1)}
           {/* On its own row, in degrees as the handle turns it */}
           {box("rotation", "studio.fields.rotation", -180, 180)}
+          <Field label={t("studio.fields.flip")} className={styles.flips}>
+            <div className={styles.tools}>
+              {flip(
+                "flip_x",
+                "studio.fields.flipX",
+                <LuFlipHorizontal2 size={16} />,
+              )}
+              {flip(
+                "flip_y",
+                "studio.fields.flipY",
+                <LuFlipVertical2 size={16} />,
+              )}
+            </div>
+          </Field>
+          <Field label={t("studio.fields.alignTo")} className={styles.align_to}>
+            <div className={styles.tool_groups}>
+              {ALIGNS_TO.map((group) => (
+                <div key={group[0].to} className={styles.tools}>
+                  {group.map(({ to, label, Icon }) => (
+                    <Btn
+                      key={to}
+                      variant="icon"
+                      title={t(label)}
+                      aria-label={t(label)}
+                      onClick={() =>
+                        onChange({
+                          ...element,
+                          ...alignTo(element, canvas, to),
+                        })
+                      }
+                    >
+                      <Icon size={16} />
+                    </Btn>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </Field>
         </div>
       </Field>
       <Field label={t("studio.fields.opacity", { opacity: String(opacity) })}>

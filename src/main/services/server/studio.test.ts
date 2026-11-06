@@ -19,6 +19,8 @@ const BASE = {
   width: 300,
   height: 200,
   rotation: 0,
+  flip_x: false,
+  flip_y: false,
   z: 0,
   opacity: 1,
   when: "always",

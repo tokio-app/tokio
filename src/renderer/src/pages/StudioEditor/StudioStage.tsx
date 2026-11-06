@@ -40,6 +40,13 @@ declare module "react" {
   }
 }
 
+declare global {
+  // Chromium takes it; TypeScript's DOM types don't have it yet
+  interface FocusOptions {
+    focusVisible?: boolean;
+  }
+}
+
 type Props = {
   view: StudioView;
   // The stage, for Test to play its elements
@@ -251,8 +258,10 @@ export function StudioStage({
     if (e.button !== 0) return;
     const target = e.target;
     if (!(target instanceof Element)) return;
-    // The keys go on from where it was clicked
-    e.currentTarget.focus();
+    // The keys go on from where it was clicked. No ring around the whole
+    // canvas for a click: Chromium would ring it after a field had the focus.
+    // Tab still rings it.
+    e.currentTarget.focus({ focusVisible: false });
     e.preventDefault();
     const fitted = stageRef.current?.fit() ?? NO_FIT;
     const { scale } = fitted;

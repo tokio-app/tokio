@@ -444,6 +444,51 @@ describe("StudioEditor", () => {
     expect(canvas().className).not.toMatch(/turning/);
   });
 
+  it("flips an element from its settings, the canvas drawing it", async () => {
+    const shape = elementOf("shape");
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+    const flipX = page().getByRole("button", { name: "Flip horizontally" });
+    expect(flipX).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(flipX);
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ flip_x: true, flip_y: false }),
+    );
+    expect(flipX).toHaveAttribute("aria-pressed", "true");
+    expect(drawn(shape.id).style.transform).toBe("scale(-1, 1)");
+
+    await user.click(page().getByRole("button", { name: "Flip vertically" }));
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ flip_x: true, flip_y: true }),
+    );
+    expect(drawn(shape.id).style.transform).toBe("scale(-1, -1)");
+  });
+
+  it("aligns an element to the canvas's edges and middles", async () => {
+    const shape = elementOf("shape", {
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 100,
+    });
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+    const align = within(
+      page().getByRole("group", { name: "Align to the canvas" }),
+    );
+
+    await user.click(align.getByRole("button", { name: "Align right" }));
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ x: 780, y: 200 }),
+    );
+    await user.click(align.getByRole("button", { name: "Center vertically" }));
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ x: 780, y: 910 }),
+    );
+    expect(field("X").getByRole("spinbutton")).toHaveValue(780);
+  });
+
   it("sets the rotation by number", async () => {
     const shape = elementOf("shape");
     const { user } = await open(scene(shape));

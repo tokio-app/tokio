@@ -471,6 +471,30 @@
   font-size: var(--font-xs);
 }
 
+/* Beside the rotation, which turns the element as the flips mirror it */
+.flips {
+  grid-column: span 3;
+}
+
+/* The canvas's edges and middles, on their own row */
+.align_to {
+  grid-column: 1 / -1;
+}
+
+/* Across, then down */
+.tool_groups {
+  display: flex;
+  gap: var(--space-4);
+}
+
+/* Icon buttons side by side, as tall as the fields next to them */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--control-height);
+}
+
 .number {
   width: 100%;
   font-variant-numeric: tabular-nums;

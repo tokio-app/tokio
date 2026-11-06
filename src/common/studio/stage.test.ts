@@ -23,6 +23,8 @@ const BASE: Omit<TextView, "id" | "kind" | keyof typeof TEXT> = {
   width: 300,
   height: 200,
   rotation: 0,
+  flip_x: false,
+  flip_y: false,
   z: 0,
   opacity: 1,
   when: "always",
@@ -118,6 +120,17 @@ describe("on stream", () => {
   it("turns an element around its center, and back", () => {
     draw(view(text("t", { rotation: 30 })));
     expect(el("t").style.transform).toBe("rotate(30deg)");
+
+    draw(view(text("t")));
+    expect(el("t").style.transform).toBe("");
+  });
+
+  it("flips an element along its own sides, before it turns", () => {
+    draw(view(text("t", { flip_x: true })));
+    expect(el("t").style.transform).toBe("scale(-1, 1)");
+
+    draw(view(text("t", { flip_y: true, rotation: 30 })));
+    expect(el("t").style.transform).toBe("rotate(30deg) scale(1, -1)");
 
     draw(view(text("t")));
     expect(el("t").style.transform).toBe("");
