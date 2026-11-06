@@ -193,6 +193,18 @@ describe("withPreviewStyles", () => {
     expect(await res.text()).toContain("html,body{overflow:hidden!important}");
   });
 
+  it("keeps a transparent preview's own background, still without scrollbars", async () => {
+    const res = await withPreviewStyles(
+      new Response(page),
+      "C:/overlays/a/index.html",
+      true,
+    );
+
+    const html = await res.text();
+    expect(html).not.toContain("background-color");
+    expect(html).toContain("html,body{overflow:hidden!important}");
+  });
+
   it("leaves other files and failed reads alone", async () => {
     const script = new Response("console.log(1)");
     expect(await withPreviewStyles(script, "/overlays/a/app.js")).toBe(script);

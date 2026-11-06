@@ -213,7 +213,9 @@ app.whenReady().then(async () => {
     if (!file) return new Response(null, { status: 404 });
 
     const res = await net.fetch(pathToFileURL(file).href);
-    return withPreviewCORS(await withPreviewStyles(res, file));
+    const transparent =
+      URL.parse(request.url)?.searchParams.has("transparent") ?? false;
+    return withPreviewCORS(await withPreviewStyles(res, file, transparent));
   });
 
   // The media library, for the alerts' thumbnails, the sound library, for

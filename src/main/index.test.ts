@@ -220,6 +220,27 @@ describe("main process entry", () => {
       expect(await res.text()).toBe("export {}");
     });
 
+    it("leaves the background out of a transparent preview", async () => {
+      await start();
+      mocks.services.path.folders = {
+        overlaysFolder: join(folder, "overlays"),
+      };
+      const [, handle] = protocol.handle.mock.calls[0];
+      const file = join(folder, "overlays", "gift-jar", "index.html");
+      const url = pathToFileURL(file).href.replace(/^file:/, "local-resource:");
+
+      net.fetch.mockResolvedValueOnce(new Response("<p>Jar</p>"));
+      const opaque = await (await handle(new Request(url))).text();
+      net.fetch.mockResolvedValueOnce(new Response("<p>Jar</p>"));
+      const clear = await (
+        await handle(new Request(`${url}?transparent`))
+      ).text();
+
+      expect(opaque).toContain("background-color");
+      expect(clear).not.toContain("background-color");
+      expect(clear).toContain("overflow:hidden");
+    });
+
     it("refuses anything outside it", async () => {
       await start();
       mocks.services.path.folders = {
