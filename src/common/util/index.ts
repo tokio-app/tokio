@@ -5,6 +5,7 @@ export * from "./format";
 export * from "./games";
 export * from "./history";
 export * from "./samples";
+export * from "./studio";
 export * from "./timer";
 
 export function formatError(error: unknown): string {

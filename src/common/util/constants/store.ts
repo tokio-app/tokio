@@ -24,6 +24,7 @@ export const defaultStoreData: StoreSchema = {
     sounds: [],
     media: [],
     minecraftPictures: [],
+    studio: [],
     activeFeatures: {
       tts: false,
       music: false,
