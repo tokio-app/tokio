@@ -57,7 +57,7 @@ function Placeholder({ title, text }: { title?: string; text: string }) {
 }
 
 type Props = {
-  layer: EmbedView;
+  element: EmbedView;
   installed: OverlayApp[];
   timer: TimerPush | null;
   games: { look: GamesOverlay; rows: GameOverlayRow[] } | null;
@@ -68,14 +68,14 @@ type Props = {
  * own sample data, the timer's and games' previews scaled to the box, and an
  * alert's name, since its overlay shows media only while it plays.
  */
-export function Embed({ layer, installed, timer, games }: Props) {
+export function Embed({ element, installed, timer, games }: Props) {
   const t = useT();
-  const { source } = layer;
+  const { source } = element;
   let content: ReactNode;
   if (!source) {
     content = <Placeholder text={t("studio.embed.none")} />;
   } else if (source.type === "installed") {
-    const app = layer.src && installed.find((o) => o.id === source.id);
+    const app = element.src && installed.find((o) => o.id === source.id);
     // Named, so the overlay shows its own samples instead of trying a socket
     content = app ? (
       <Iframe source={app.path} name={app.id} transparent />
@@ -84,7 +84,7 @@ export function Embed({ layer, installed, timer, games }: Props) {
     );
   } else if (source.type === "alert") {
     content = (
-      <Placeholder title={layer.label} text={t("studio.embed.alertPlays")} />
+      <Placeholder title={element.label} text={t("studio.embed.alertPlays")} />
     );
   } else if (source.type === "timer") {
     content = timer && (

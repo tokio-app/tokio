@@ -2,7 +2,7 @@
 // overlay's preview: the canvas can't drift from what's on stream
 import "@/common/studio/overlay.css";
 import { createStage, Stage, StageFit } from "@/common/studio/stage";
-import { StudioLayerView, StudioView } from "@/common/types";
+import { StudioElementView, StudioView } from "@/common/types";
 import { useT } from "@/ui/i18n";
 import {
   CSSProperties,
@@ -15,10 +15,18 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Box, roundBox } from "./helper";
+import {
+  bounds,
+  Box,
+  holds,
+  pickElement,
+  Point,
+  roundBox,
+  toCanvas,
+} from "./helper";
 import styles from "./studioeditor.module.css";
 
-export type EmbedView = Extract<StudioLayerView, { kind: "overlay" }>;
+export type EmbedView = Extract<StudioElementView, { kind: "overlay" }>;
 
 declare module "react" {
   interface CSSProperties {
@@ -28,27 +36,49 @@ declare module "react" {
 
 type Props = {
   view: StudioView;
-  // The stage, for Test to play its layers
+  // The stage, for Test to play its elements
   stageRef: RefObject<Stage | null>;
+  // A layer's id or an element's
   selected: string | null;
+  // The layers whose elements the canvas can't pick, move or resize
+  locked: ReadonlySet<string>;
   onSelect: (id: string | null) => void;
-  // A layer moved or resized, rounded to whole px
+  // An element moved or resized, rounded to whole px
   onBox: (id: string, box: Box) => void;
+  // Every element of a layer moved by whole px
+  onShift: (layerId: string, dx: number, dy: number) => void;
   // An embed's preview, portaled into its slot
-  embed: (layer: EmbedView) => ReactNode;
+  embed: (element: EmbedView) => ReactNode;
 };
 
-type Drag = {
-  id: string;
-  resize: boolean;
-  // Where the pointer went down, and the box then
-  x: number;
-  y: number;
-  box: Box;
-  scale: number;
-};
+type Drag =
+  | {
+      kind: "element";
+      id: string;
+      resize: boolean;
+      // Where the pointer went down, and the box then
+      x: number;
+      y: number;
+      box: Box;
+      scale: number;
+    }
+  | {
+      kind: "layer";
+      id: string;
+      x: number;
+      y: number;
+      scale: number;
+      // Where it went down on the canvas, picked from if it doesn't move
+      point: Point;
+      moved: boolean;
+      // The whole px already sent
+      sent: [number, number];
+    };
 
 const NO_FIT: StageFit = { scale: 0, left: 0, top: 0 };
+
+// Screen px a press inside a layer's outline moves before it drags the layer
+const DRAG_START = 3;
 
 const sameFit = (a: StageFit, b: StageFit) =>
   a.scale === b.scale && a.left === b.left && a.top === b.top;
@@ -66,21 +96,24 @@ const NUDGES: Record<string, [number, number]> = {
 /**
  * The overlay drawn by the stream's own renderer (stage.ts), with what the
  * editor adds over it: the selection's outline and resize handle, dragging,
- * and the arrows. Embeds are React's previews, portaled into the stage's
- * slots, which stay put so iframes don't reload.
+ * and the arrows. A selected layer moves as one. Embeds are React's
+ * previews, portaled into the stage's slots, which stay put so iframes don't
+ * reload.
  */
 export function StudioStage({
   view,
   stageRef,
   selected,
+  locked,
   onSelect,
   onBox,
+  onShift,
   embed,
 }: Props) {
   const t = useT();
   const root = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState(NO_FIT);
-  // Each embed's slot, which exists only once the stage drew its layer
+  // Each embed's slot, which exists only once the stage drew its element
   const [slots, setSlots] = useState<ReadonlyMap<string, HTMLElement>>(
     new Map(),
   );
@@ -101,6 +134,10 @@ export function StudioStage({
     };
   }, [stageRef]);
 
+  const elements = view.layers.flatMap((layer) =>
+    layer.elements.map((element) => ({ element, layer: layer.id })),
+  );
+
   useLayoutEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -109,8 +146,10 @@ export function StudioStage({
     setSlots((last) => {
       const next = new Map<string, HTMLElement>();
       for (const layer of view.layers) {
-        const slot = layer.kind === "overlay" && stage.slot(layer.id);
-        if (slot) next.set(layer.id, slot);
+        for (const element of layer.elements) {
+          const slot = element.kind === "overlay" && stage.slot(element.id);
+          if (slot) next.set(element.id, slot);
+        }
       }
       const same =
         next.size === last.size &&
@@ -119,31 +158,69 @@ export function StudioStage({
     });
   }, [view, stageRef]);
 
-  const chosen = view.layers.find((layer) => layer.id === selected);
+  const chosen = elements.find(({ element }) => element.id === selected);
+  const chosenLayer = view.layers.find((layer) => layer.id === selected);
+  // The selection's outline: an element's box, or around a layer's elements
+  const frame = chosen
+    ? boxOf(chosen.element)
+    : chosenLayer && bounds(chosenLayer.elements);
+  const stuck = locked.has(chosen?.layer ?? chosenLayer?.id ?? "");
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const target = e.target;
     if (!(target instanceof Element)) return;
-    const resize = !!target.closest("[data-handle]");
-    // Previews ignore the pointer, so it lands on their layer's element
-    const id = resize
-      ? (chosen?.id ?? null)
-      : (target.closest<HTMLElement>("[data-layer]")?.dataset.layer ?? null);
-    const layer = view.layers.find((l) => l.id === id);
-    onSelect(layer?.id ?? null);
     // The keys go on from where it was clicked
     e.currentTarget.focus();
     e.preventDefault();
-    const scale = stageRef.current?.fit().scale ?? 0;
-    if (!layer || !scale) return;
+    const fitted = stageRef.current?.fit() ?? NO_FIT;
+    const { scale } = fitted;
+    if (!scale) return;
+    const at = { x: e.clientX, y: e.clientY, scale };
+
+    if (chosen && !stuck && target.closest("[data-handle]")) {
+      const box = boxOf(chosen.element);
+      drag.current = {
+        kind: "element",
+        id: chosen.element.id,
+        resize: true,
+        box,
+        ...at,
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    const point = toCanvas(
+      { x: e.clientX, y: e.clientY },
+      root.current!.getBoundingClientRect(),
+      fitted,
+    );
+    if (chosenLayer && frame && !stuck && holds(frame, point)) {
+      // A click until it moves
+      drag.current = {
+        kind: "layer",
+        id: chosenLayer.id,
+        point,
+        moved: false,
+        sent: [0, 0],
+        ...at,
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    const id = pickElement(view, locked, point);
+    onSelect(id);
+    const picked = elements.find(({ element }) => element.id === id);
+    if (!picked) return;
+    const box = boxOf(picked.element);
     drag.current = {
-      id: layer.id,
-      resize,
-      x: e.clientX,
-      y: e.clientY,
-      box: boxOf(layer),
-      scale,
+      kind: "element",
+      id: picked.element.id,
+      resize: false,
+      box,
+      ...at,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -151,6 +228,19 @@ export function StudioStage({
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) return;
+    if (d.kind === "layer") {
+      const sx = e.clientX - d.x;
+      const sy = e.clientY - d.y;
+      if (!d.moved && Math.hypot(sx, sy) < DRAG_START) return;
+      d.moved = true;
+      // Rounded once for all of them, so they keep their spacing
+      const dx = Math.round(sx / d.scale);
+      const dy = Math.round(sy / d.scale);
+      if (dx === d.sent[0] && dy === d.sent[1]) return;
+      onShift(d.id, dx - d.sent[0], dy - d.sent[1]);
+      d.sent = [dx, dy];
+      return;
+    }
     // Screen px to the canvas's
     const dx = (e.clientX - d.x) / d.scale;
     const dy = (e.clientY - d.y) / d.scale;
@@ -164,33 +254,48 @@ export function StudioStage({
     );
   };
 
+  const onPointerUp = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (d?.kind === "layer" && !d.moved) {
+      onSelect(pickElement(view, locked, d.point));
+    }
+  };
+
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (!chosen) return;
+    if (!selected) return;
     if (e.key === "Escape") {
       e.stopPropagation();
       onSelect(null);
       return;
     }
     const nudge = NUDGES[e.key];
-    if (!nudge) return;
+    if (!nudge || !frame) return;
     e.preventDefault();
+    if (stuck) return;
     const step = e.shiftKey ? 10 : 1;
+    if (chosenLayer) {
+      onShift(chosenLayer.id, nudge[0] * step, nudge[1] * step);
+      return;
+    }
     onBox(
-      chosen.id,
+      selected,
       roundBox({
-        ...boxOf(chosen),
-        x: chosen.x + nudge[0] * step,
-        y: chosen.y + nudge[1] * step,
+        ...frame,
+        x: frame.x + nudge[0] * step,
+        y: frame.y + nudge[1] * step,
       }),
     );
   };
 
-  const outline: CSSProperties | undefined = chosen && {
-    left: fit.left + chosen.x * fit.scale,
-    top: fit.top + chosen.y * fit.scale,
-    width: chosen.width * fit.scale,
-    height: chosen.height * fit.scale,
-  };
+  const outline: CSSProperties | undefined = frame
+    ? {
+        left: fit.left + frame.x * fit.scale,
+        top: fit.top + frame.y * fit.scale,
+        width: frame.width * fit.scale,
+        height: frame.height * fit.scale,
+      }
+    : undefined;
 
   return (
     <div
@@ -202,24 +307,26 @@ export function StudioStage({
       style={{ "--canvas-scale": fit.scale || 1 }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={() => (drag.current = null)}
+      onPointerUp={onPointerUp}
       onPointerCancel={() => (drag.current = null)}
       onKeyDown={onKeyDown}
     >
       <div ref={root} className={styles.stage_root} />
       {outline && (
         <div className={styles.selection} style={outline}>
-          <span
-            className={styles.handle}
-            data-handle
-            title={t("studio.editor.resize")}
-          />
+          {chosen && !stuck && (
+            <span
+              className={styles.handle}
+              data-handle
+              title={t("studio.editor.resize")}
+            />
+          )}
         </div>
       )}
-      {view.layers.map((layer) => {
-        if (layer.kind !== "overlay") return null;
-        const slot = slots.get(layer.id);
-        return slot ? createPortal(embed(layer), slot, layer.id) : null;
+      {elements.map(({ element }) => {
+        if (element.kind !== "overlay") return null;
+        const slot = slots.get(element.id);
+        return slot ? createPortal(embed(element), slot, element.id) : null;
       })}
     </div>
   );
