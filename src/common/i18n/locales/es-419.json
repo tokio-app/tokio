@@ -94,7 +94,7 @@
   "components.deleteModals.soundTitle": "¿Eliminar el sonido?",
   "components.deleteModals.soundDescription": "\"{name}\" se eliminará de tu computadora y de todas las alertas que lo reproducen, en todos tus perfiles.",
   "components.deleteModals.mediaTitle": "¿Eliminar el archivo?",
-  "components.deleteModals.mediaDescription": "\"{name}\" se eliminará de tu computadora y de todas las alertas y capas de Overlay Studio que lo muestran, en todos tus perfiles.",
+  "components.deleteModals.mediaDescription": "\"{name}\" se eliminará de tu computadora y de todas las alertas y de todos los elementos de Overlay Studio que lo muestran, en todos tus perfiles.",
   "components.deleteModals.pictureTitle": "¿Eliminar la imagen?",
   "components.deleteModals.pictureDescription": "\"{name}\" se eliminará de tu computadora y de todas las acciones de juego que la muestran, en todos tus perfiles.",
   "components.deleteModals.overlayTitle": "¿Quitar el overlay?",

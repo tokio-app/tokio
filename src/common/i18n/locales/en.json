@@ -94,7 +94,7 @@
   "components.deleteModals.soundTitle": "Delete sound?",
   "components.deleteModals.soundDescription": "\"{name}\" will be deleted from your computer and from every alert that plays it, in all your profiles.",
   "components.deleteModals.mediaTitle": "Delete media?",
-  "components.deleteModals.mediaDescription": "\"{name}\" will be deleted from your computer and from every alert and Overlay Studio layer that shows it, in all your profiles.",
+  "components.deleteModals.mediaDescription": "\"{name}\" will be deleted from your computer and from every alert and Overlay Studio element that shows it, in all your profiles.",
   "components.deleteModals.pictureTitle": "Delete picture?",
   "components.deleteModals.pictureDescription": "\"{name}\" will be deleted from your computer and from every game action that shows it, in all your profiles.",
   "components.deleteModals.overlayTitle": "Remove overlay?",

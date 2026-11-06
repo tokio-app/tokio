@@ -1,11 +1,13 @@
 import {
+  StudioElement,
+  StudioElementKind,
+  StudioElementOf,
+  StudioElementSchema,
   StudioLayer,
-  StudioLayerOf,
-  StudioLayerSchema,
   StudioOverlay,
 } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, TOKIO_EVENTS } from "@/common/types";
-import { newStudioLayer } from "@/common/util";
+import { newStudioElement, newStudioLayer } from "@/common/util";
 import { createAction } from "@/pages/Games/helper";
 import { createAlert } from "@/pages/Alerts/helper";
 import {
@@ -19,16 +21,29 @@ import { send, sent } from "@test/ipc";
 import { inList } from "@test/queries";
 import { renderApp } from "@test/render";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const ID = "1b4e28ba-2fa1-41d2-883f-0016d3cca427";
 
-const text = (patch: Partial<StudioLayerOf<"text">> = {}) =>
-  StudioLayerSchema.parse({ ...newStudioLayer("text", "portrait"), ...patch });
-const layerOf = <K extends StudioLayer["kind"]>(
+const elementOf = <K extends StudioElementKind>(
   kind: K,
-  patch: Partial<StudioLayerOf<K>> = {},
-) => StudioLayerSchema.parse({ ...newStudioLayer(kind, "portrait"), ...patch });
+  patch: Partial<StudioElementOf<K>> = {},
+) =>
+  StudioElementSchema.parse({
+    ...newStudioElement(kind, "portrait"),
+    ...patch,
+  });
+const text = (patch: Partial<StudioElementOf<"text">> = {}) =>
+  elementOf("text", patch);
+// A layer holding the elements, back to front
+const layer = (
+  name: string,
+  elements: StudioElement[] = [],
+  patch: Partial<StudioLayer> = {},
+): StudioLayer => ({ ...newStudioLayer(name), elements, ...patch });
+// The overlay with one layer holding the elements
+const scene = (...elements: StudioElement[]) =>
+  studioOverlay("Main", { id: ID, layers: [layer("Layer 1", elements)] });
 
 const studio = (...data: StudioOverlay[]) =>
   send(APP_EVENTS_RESPONSE.STUDIO, { success: true, data });
@@ -45,16 +60,48 @@ const saved = async () => {
   await waitFor(() => expect(lastSave()).toBeDefined());
   return lastSave()!;
 };
+// The first layer's first element, as last saved
+const savedElement = () => lastSave()?.layers[0].elements[0];
+// Each layer's id and its elements', as last saved
+const savedIds = () =>
+  lastSave()?.layers.map((l) => [l.id, ...l.elements.map((e) => e.id)]);
 
 const page = () => within(screen.getByRole("main"));
 const layers = () => within(page().getByRole("list", { name: "Layers" }));
 const row = (name: RegExp) => layers().getByRole("button", { name });
+// The row a layer's or an element's select button is in
+const rowOf = (name: RegExp) =>
+  within(row(name).closest<HTMLElement>("[data-row]")!);
+const grip = (id: string) =>
+  document.querySelector<HTMLElement>(`[data-grip="${id}"]`)!;
 const canvas = () => page().getByLabelText(/^Canvas./);
 const drawn = (id: string) =>
-  canvas().querySelector<HTMLElement>(`[data-layer="${id}"]`)!;
+  canvas().querySelector<HTMLElement>(`[data-element="${id}"]`)!;
 const field = (name: string) => within(page().getByRole("group", { name }));
+const addMenu = () =>
+  page().getByRole("button", { name: "Add a layer or an element" });
+const deleteButton = (name: string) => page().getByRole("button", { name });
+
+// The canvas at half size on screen, 540 × 960 from the root's top left
+// (jsdom's getBoundingClientRect is all zeros)
+function sized() {
+  const root = canvas().querySelector<HTMLElement>(".studio-stage")!;
+  vi.spyOn(root, "clientWidth", "get").mockReturnValue(540);
+  vi.spyOn(root, "clientHeight", "get").mockReturnValue(960);
+}
+// A press on the canvas at a point of it, in its px
+const press = (x: number, y: number) =>
+  fireEvent.pointerDown(canvas(), {
+    button: 0,
+    clientX: x / 2,
+    clientY: y / 2,
+  });
 
 describe("StudioEditor", () => {
+  beforeEach(() => {
+    Element.prototype.setPointerCapture = vi.fn();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -122,7 +169,7 @@ describe("StudioEditor", () => {
     );
   });
 
-  it("adds each kind of layer from the menu, in front, and selects it", async () => {
+  it("adds each kind of element to a new layer, then in front in it, and selects it", async () => {
     const { user } = await open(studioOverlay("Main", { id: ID }));
     const kinds = [
       "Text",
@@ -134,18 +181,25 @@ describe("StudioEditor", () => {
       "Overlay",
     ];
 
+    await user.click(addMenu());
+    expect(screen.getByRole("group", { name: "Add to a new layer" })).toBe(
+      screen.getByText("Add to a new layer").parentElement,
+    );
+    await user.keyboard("{Escape}");
     for (const kind of kinds) {
-      await user.click(page().getByRole("button", { name: "Add a layer" }));
+      await user.click(addMenu());
       await user.click(screen.getByRole("menuitem", { name: kind }));
       expect(page().getByRole("heading", { name: kind })).toBeVisible();
     }
 
     const overlay = await waitFor(() => {
       const last = lastSave();
-      expect(last?.layers).toHaveLength(7);
+      expect(last?.layers[0]?.elements).toHaveLength(7);
       return last!;
     });
-    expect(overlay.layers.map((l) => l.kind)).toEqual([
+    expect(overlay.layers).toHaveLength(1);
+    expect(overlay.layers[0].name).toBe("Layer 1");
+    expect(overlay.layers[0].elements.map((e) => e.kind)).toEqual([
       "text",
       "media",
       "gift",
@@ -154,29 +208,116 @@ describe("StudioEditor", () => {
       "viewer",
       "overlay",
     ]);
-    // Front on top
-    const names = layers()
+    // Front on top, under their layer
+    const names = within(layers().getByRole("list", { name: "Layer 1" }))
       .getAllByRole("listitem")
       .map((li) => li.querySelector("[class*=layer_name]")!.textContent);
     expect(names).toEqual([...kinds].reverse());
     // A viewer's picture waits for an event
-    expect(overlay.layers[5].when).toBe("event");
+    expect(overlay.layers[0].elements[5].when).toBe("event");
+    await user.click(addMenu());
+    expect(screen.getByText("Add to Layer 1")).toBeVisible();
   });
 
-  it("selects a layer from the list or the canvas, and Escape deselects", async () => {
-    const back = layerOf("shape");
-    const front = text({ text: "Hello" });
+  it("adds to the selected layer", async () => {
+    const back = layer("Back");
+    const front = layer("Front");
     const { user } = await open(
       studioOverlay("Main", { id: ID, layers: [back, front] }),
     );
+
+    await user.click(row(/^Back/));
+    await user.click(addMenu());
+    expect(screen.getByText("Add to Back")).toBeVisible();
+    await user.click(screen.getByRole("menuitem", { name: "Text" }));
+
+    await waitFor(() =>
+      expect(lastSave()?.layers.map((l) => l.elements.length)).toEqual([1, 0]),
+    );
+    expect(page().getByRole("heading", { name: "Text" })).toBeVisible();
+  });
+
+  it("names a new layer after the first free number, in front, and selects it", async () => {
+    const { user } = await open(
+      studioOverlay("Main", {
+        id: ID,
+        layers: [layer("Layer 1"), layer("Layer 3")],
+      }),
+    );
+
+    await user.click(addMenu());
+    await user.click(screen.getByRole("menuitem", { name: "New layer" }));
+
+    await waitFor(() =>
+      expect(lastSave()?.layers.map((l) => l.name)).toEqual([
+        "Layer 1",
+        "Layer 3",
+        "Layer 2",
+      ]),
+    );
+    expect(page().getByRole("heading", { name: "Layer" })).toBeVisible();
+    expect(field("Name").getByRole("textbox")).toHaveValue("Layer 2");
+    expect(row(/^Layer 2/)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("lists layers front on top, each with its elements under it", async () => {
+    const back = layer("Back", [text({ text: "B1" }), text({ text: "B2" })]);
+    const front = layer("Front", [text({ text: "F1" }), text({ text: "F2" })]);
+    await open(studioOverlay("Main", { id: ID, layers: [back, front] }));
+
+    const names = [
+      ...layers()
+        .getAllByRole("listitem")[0]
+        .closest("ul")!
+        .querySelectorAll("[class*=layer_name]"),
+    ].map((name) => name.textContent);
+    expect(names).toEqual(["Front", "F2", "F1", "Back", "B2", "B1"]);
+    // Each layer's elements in their own list, under its row
+    const nested = within(layers().getByRole("list", { name: "Front" }));
+    expect(nested.getAllByRole("button", { name: /^F\d/ })).toHaveLength(2);
+    expect(row(/^Front/)).toHaveTextContent("2 elements");
+  });
+
+  it("folds a layer, and a pick on the canvas unfolds it", async () => {
+    const shape = elementOf("shape", { x: 0, y: 0, width: 100, height: 100 });
+    const { user } = await open(scene(shape));
+
+    const fold = rowOf(/^Layer 1/).getByRole("button", {
+      name: "Elements in this layer",
+    });
+    expect(fold).toHaveAttribute("aria-expanded", "true");
+    await user.click(fold);
+
+    await waitFor(() => expect(lastSave()?.layers[0].folded).toBe(true));
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+    expect(layers().queryByRole("button", { name: /^Shape/ })).toBeNull();
+    // Main's echo, so unfolding it again is a change to save
+    await studio(lastSave()!);
+
+    sized();
+    press(50, 50);
+    fireEvent.pointerUp(canvas());
+
+    await waitFor(() => expect(lastSave()?.layers[0].folded).toBe(false));
+    expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("selects an element from the list or the canvas, and Escape deselects", async () => {
+    const back = elementOf("shape", { x: 0, y: 0, width: 400, height: 400 });
+    const front = text({ text: "Hello", x: 300, y: 300 });
+    const { user } = await open(scene(back, front));
 
     await user.click(row(/^Hello/));
     expect(page().getByRole("heading", { name: "Text" })).toBeVisible();
     expect(row(/^Hello/)).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.pointerDown(drawn(back.id), { button: 0 });
+    sized();
+    press(100, 100);
     expect(page().getByRole("heading", { name: "Shape" })).toBeVisible();
     expect(canvas()).toHaveFocus();
+    // Where they overlap, the front one
+    press(350, 350);
+    expect(page().getByRole("heading", { name: "Text" })).toBeVisible();
 
     await user.keyboard("{Escape}");
     expect(
@@ -184,38 +325,33 @@ describe("StudioEditor", () => {
     ).toBeVisible();
   });
 
-  it("nudges the selected layer with the arrows, Shift ten px", async () => {
-    const shape = layerOf("shape", { x: 100, y: 200 });
-    const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [shape] }),
-    );
+  it("nudges the selected element with the arrows, Shift ten px", async () => {
+    const shape = elementOf("shape", { x: 100, y: 200 });
+    const { user } = await open(scene(shape));
 
     await user.click(row(/^Shape/));
     canvas().focus();
     await user.keyboard("{ArrowRight}{ArrowRight}{Shift>}{ArrowDown}{/Shift}");
 
     await waitFor(() =>
-      expect(lastSave()?.layers[0]).toMatchObject({ x: 102, y: 210 }),
+      expect(savedElement()).toMatchObject({ x: 102, y: 210 }),
     );
     expect(drawn(shape.id).style.left).toBe("102px");
     expect(field("X").getByRole("spinbutton")).toHaveValue(102);
   });
 
-  it("drags a layer and its corner, in the canvas's px", async () => {
-    Element.prototype.setPointerCapture = vi.fn();
-    const shape = layerOf("shape", { x: 100, y: 200, width: 300, height: 100 });
-    await open(studioOverlay("Main", { id: ID, layers: [shape] }));
-    // Half size: 540 × 960 on screen
-    const root = canvas().querySelector<HTMLElement>(".studio-stage")!;
-    vi.spyOn(root, "clientWidth", "get").mockReturnValue(540);
-    vi.spyOn(root, "clientHeight", "get").mockReturnValue(960);
-
-    fireEvent.pointerDown(drawn(shape.id), {
-      button: 0,
-      clientX: 10,
-      clientY: 10,
+  it("drags an element and its corner, in the canvas's px", async () => {
+    const shape = elementOf("shape", {
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 100,
     });
-    fireEvent.pointerMove(canvas(), { clientX: 20, clientY: 15.4 });
+    await open(scene(shape));
+    sized();
+
+    fireEvent.pointerDown(canvas(), { button: 0, clientX: 60, clientY: 110 });
+    fireEvent.pointerMove(canvas(), { clientX: 70, clientY: 115.4 });
     fireEvent.pointerUp(canvas());
     fireEvent.pointerDown(canvas().querySelector("[data-handle]")!, {
       button: 0,
@@ -226,7 +362,7 @@ describe("StudioEditor", () => {
     fireEvent.pointerUp(canvas());
 
     await waitFor(() =>
-      expect(lastSave()?.layers[0]).toMatchObject({
+      expect(savedElement()).toMatchObject({
         x: 120,
         y: 211,
         // Never under 1
@@ -236,64 +372,262 @@ describe("StudioEditor", () => {
     );
   });
 
-  it("reorders layers from the keyboard, up the list toward the front", async () => {
-    const a = text({ text: "Back" });
-    const b = text({ text: "Front" });
-    const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [a, b] }),
+  it("moves a selected layer's elements as one, and a click without moving picks", async () => {
+    const big = elementOf("shape", { x: 100, y: 100, width: 100, height: 100 });
+    const small = elementOf("shape", { x: 300, y: 300, width: 50, height: 50 });
+    const { user } = await open(scene(big, small));
+    await user.click(row(/^Layer 1/));
+    expect(page().getByRole("heading", { name: "Layer" })).toBeVisible();
+    expect(canvas().querySelector("[data-handle]")).toBeNull();
+    sized();
+
+    // Inside the outline, between the two
+    press(250, 250);
+    // Under 3 screen px, nothing yet
+    fireEvent.pointerMove(canvas(), { clientX: 126, clientY: 126 });
+    fireEvent.pointerMove(canvas(), { clientX: 135, clientY: 130.2 });
+    fireEvent.pointerUp(canvas());
+
+    await waitFor(() =>
+      expect(lastSave()?.layers[0].elements).toMatchObject([
+        { x: 120, y: 110, width: 100, height: 100 },
+        { x: 320, y: 310, width: 50, height: 50 },
+      ]),
+    );
+    expect(page().getByRole("heading", { name: "Layer" })).toBeVisible();
+
+    canvas().focus();
+    await user.keyboard("{Shift>}{ArrowLeft}{/Shift}");
+    await waitFor(() =>
+      expect(lastSave()?.layers[0].elements).toMatchObject([
+        { x: 110, y: 110 },
+        { x: 310, y: 310 },
+      ]),
     );
 
-    const grips = layers().getAllByRole("button", {
-      name: "Drag to reorder, or use the arrow keys",
-    });
-    grips[1].focus();
+    // A click inside the outline, on the small one
+    press(320, 320);
+    fireEvent.pointerUp(canvas());
+    expect(page().getByRole("heading", { name: "Shape" })).toBeVisible();
+    expect(
+      layers().getAllByRole("button", { name: /^Shape/ })[0],
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("locks a layer: the canvas skips it, and the list and settings still change it", async () => {
+    const under = text({ text: "Under", x: 0, y: 0, width: 500, height: 500 });
+    const top = elementOf("shape", { x: 0, y: 0, width: 500, height: 500 });
+    const { user } = await open(
+      studioOverlay("Main", {
+        id: ID,
+        layers: [layer("Back", [under]), layer("Front", [top])],
+      }),
+    );
+
+    const lock = rowOf(/^Front/).getByRole("button", { name: "Lock layer" });
+    expect(lock).toHaveAttribute("aria-pressed", "false");
+    await user.click(lock);
+    await waitFor(() => expect(lastSave()?.layers[1].locked).toBe(true));
+    expect(lock).toHaveAttribute("aria-pressed", "true");
+
+    // Through to what's under it
+    sized();
+    press(100, 100);
+    fireEvent.pointerUp(canvas());
+    expect(page().getByRole("heading", { name: "Text" })).toBeVisible();
+
+    // Its outline shows, without the handle, and nothing moves it
+    await user.click(row(/^Shape/));
+    expect(canvas().querySelector("[class*=selection]")).not.toBeNull();
+    expect(canvas().querySelector("[data-handle]")).toBeNull();
+    canvas().focus();
+    await user.keyboard("{ArrowRight}");
+    expect(field("X").getByRole("spinbutton")).toHaveValue(0);
+
+    const x = field("X").getByRole("spinbutton");
+    await user.clear(x);
+    await user.type(x, "40");
+    await waitFor(() =>
+      expect(lastSave()?.layers[1].elements[0]).toMatchObject({ x: 40 }),
+    );
+  });
+
+  it("hides a layer from the canvas", async () => {
+    const shape = elementOf("shape");
+    const { user } = await open(scene(shape));
+
+    const eye = rowOf(/^Layer 1/).getByRole("button", { name: "Hide layer" });
+    await user.click(eye);
+
+    await waitFor(() => expect(lastSave()?.layers[0].hidden).toBe(true));
+    expect(eye).toHaveAttribute("aria-pressed", "true");
+    expect(drawn(shape.id)).toBeNull();
+  });
+
+  it("reorders layers from the keyboard, up the list toward the front", async () => {
+    const back = layer("Back", [text({ text: "B" })]);
+    const front = layer("Front", [text({ text: "F" })]);
+    const { user } = await open(
+      studioOverlay("Main", { id: ID, layers: [back, front] }),
+    );
+
+    grip(back.id).focus();
     await user.keyboard("{ArrowUp}");
 
     await waitFor(() =>
-      expect(lastSave()?.layers.map((l) => l.id)).toEqual([b.id, a.id]),
+      expect(lastSave()?.layers.map((l) => l.id)).toEqual([front.id, back.id]),
     );
-    expect(drawn(a.id).style.zIndex).toBe("1");
+    expect(
+      canvas().querySelector<HTMLElement>(`[data-layer="${back.id}"]`)!.style
+        .zIndex,
+    ).toBe("1");
+    expect(grip(back.id)).toHaveFocus();
   });
 
-  it("deletes a layer", async () => {
-    const shape = layerOf("shape");
+  it("moves an element across a layer's edge from the keyboard", async () => {
+    const a = text({ text: "A" });
+    const b = text({ text: "B" });
+    const back = layer("Back", [a]);
+    const front = layer("Front", [b], { folded: true });
     const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [shape] }),
+      studioOverlay("Main", { id: ID, layers: [back, front] }),
     );
 
-    await user.click(layers().getByRole("button", { name: "Delete layer" }));
+    grip(a.id).focus();
+    await user.keyboard("{ArrowUp}");
 
-    expect((await saved()).layers).toEqual([]);
-    expect(canvas().querySelector("[data-layer]")).toBeNull();
+    // The back of the layer in front, which unfolds
+    await waitFor(() =>
+      expect(savedIds()).toEqual([[back.id], [front.id, a.id, b.id]]),
+    );
+    expect(lastSave()?.layers[1].folded).toBe(false);
+    expect(grip(a.id)).toHaveFocus();
+
+    await user.keyboard("{ArrowDown}");
+    await waitFor(() =>
+      expect(savedIds()).toEqual([
+        [back.id, a.id],
+        [front.id, b.id],
+      ]),
+    );
+    expect(grip(a.id)).toHaveFocus();
+  });
+
+  it("drops an element on a layer, in front in it, or next to another element", async () => {
+    const x = text({ text: "X" });
+    const a = text({ text: "A" });
+    const b = text({ text: "B" });
+    const back = layer("Back", [x], { folded: true });
+    const front = layer("Front", [a, b]);
+    await open(studioOverlay("Main", { id: ID, layers: [back, front] }));
+    const dataTransfer = { setDragImage: vi.fn() };
+    const drop = (id: string, on: HTMLElement) => {
+      fireEvent.dragStart(grip(id), { dataTransfer });
+      fireEvent.dragEnter(on, { dataTransfer });
+      fireEvent.dragOver(on, { dataTransfer });
+      fireEvent.drop(on, { dataTransfer });
+      fireEvent.dragEnd(grip(id), { dataTransfer });
+    };
+
+    drop(a.id, row(/^Back/).closest("[data-row]")!);
+    await waitFor(() =>
+      expect(savedIds()).toEqual([
+        [back.id, x.id, a.id],
+        [front.id, b.id],
+      ]),
+    );
+    expect(lastSave()?.layers[0].folded).toBe(false);
+
+    // Up the list, so above it: in front of it
+    drop(x.id, row(/^B Text/).closest("[data-row]")!);
+    await waitFor(() =>
+      expect(savedIds()).toEqual([
+        [back.id, a.id],
+        [front.id, b.id, x.id],
+      ]),
+    );
+  });
+
+  it("deletes an element, an empty layer at once, and a full one once confirmed", async () => {
+    const a = text({ text: "A" });
+    const b = text({ text: "B" });
+    const c = elementOf("shape");
+    const full = layer("Full", [a, b]);
+    const empty = layer("Empty");
+    const { user } = await open(
+      studioOverlay("Main", {
+        id: ID,
+        layers: [full, empty, layer("Last", [c])],
+      }),
+    );
+    expect(
+      deleteButton("Select a layer or an element to delete it"),
+    ).toBeDisabled();
+
+    await user.click(row(/^Shape/));
+    await user.click(deleteButton("Delete element"));
+    await waitFor(() => expect(lastSave()?.layers[2].elements).toEqual([]));
+    expect(drawn(c.id)).toBeNull();
+
+    await user.click(row(/^Empty/));
+    await user.click(deleteButton("Delete layer"));
+    await waitFor(() => expect(lastSave()?.layers).toHaveLength(2));
+
+    await user.click(row(/^Full/));
+    await user.click(deleteButton("Delete layer"));
+    const dialog = within(
+      screen.getByRole("dialog", { name: "Delete layer?" }),
+    );
+    expect(
+      dialog.getByText(
+        "Full and the 2 elements in it will be deleted. There's no undo.",
+      ),
+    ).toBeVisible();
+    await user.click(dialog.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(lastSave()?.layers.map((l) => l.name)).toEqual(["Last"]),
+    );
+    expect(drawn(a.id)).toBeNull();
+  });
+
+  it("names a layer in its settings", async () => {
+    const { user } = await open(scene(elementOf("shape")));
+
+    await user.click(row(/^Layer 1/));
+    const name = field("Name").getByRole("textbox");
+    await user.clear(name);
+
+    await waitFor(() => expect(lastSave()?.layers[0].name).toBe(""));
+    expect(row(/^Untitled layer/)).toBeVisible();
+    expect(name).toHaveAttribute("placeholder", "Untitled layer");
+    await user.type(name, "Intro");
+    await waitFor(() => expect(lastSave()?.layers[0].name).toBe("Intro"));
   });
 
   it("fills a text's numbers with samples, and saves its text", async () => {
-    const layer = text({ text: "{likes} likes" });
-    const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [layer] }),
-    );
+    const element = text({ text: "{likes} likes" });
+    const { user } = await open(scene(element));
 
-    expect(drawn(layer.id)).toHaveTextContent("12.8K likes");
+    expect(drawn(element.id)).toHaveTextContent("12.8K likes");
 
     await user.click(row(/likes/));
     await user.click(page().getByTitle("Insert {viewers}"));
 
-    expect((await saved()).layers[0]).toMatchObject({
+    expect((await saved()).layers[0].elements[0]).toMatchObject({
       text: "{likes} likes{viewers}",
     });
   });
 
-  it("makes a layer show on an event, with its trigger, seconds and entrance", async () => {
-    const layer = text({ text: "Thanks {username}" });
-    const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [layer] }),
-    );
+  it("makes an element show on an event, with its trigger, seconds and entrance", async () => {
+    const element = text({ text: "Thanks {username}" });
+    const { user } = await open(scene(element));
     await user.click(row(/^Thanks/));
 
     await user.click(page().getByRole("radio", { name: "Shows on an event" }));
     // A sample viewer's name
-    expect(drawn(layer.id)).not.toHaveTextContent("{username}");
-    expect(drawn(layer.id).className).toMatch(/studio-waits/);
+    expect(drawn(element.id)).not.toHaveTextContent("{username}");
+    expect(drawn(element.id).className).toMatch(/studio-waits/);
     expect(row(/^Thanks/)).toHaveTextContent("Text, shows on Follow");
 
     const trigger = page().getByRole("group", { name: "Trigger" });
@@ -306,7 +640,7 @@ describe("StudioEditor", () => {
     await user.type(likes, "50");
 
     await waitFor(() =>
-      expect(lastSave()?.layers[0]).toMatchObject({
+      expect(savedElement()).toMatchObject({
         when: "event",
         trigger: { type: TOKIO_EVENTS.LIKE },
         likes_every: 50,
@@ -316,9 +650,7 @@ describe("StudioEditor", () => {
   });
 
   it("offers a viewer's picture only the event Whens", async () => {
-    const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [layerOf("viewer")] }),
-    );
+    const { user } = await open(scene(elementOf("viewer")));
 
     await user.click(row(/^Viewer's picture/));
 
@@ -330,35 +662,41 @@ describe("StudioEditor", () => {
     ).toBeChecked();
   });
 
-  it("tests: saves what's waiting, plays the event layers and asks main to", async () => {
+  it("tests: saves what's waiting, plays the event elements and asks main to", async () => {
     const shows = text({ text: "Hi {username}", when: "event" });
     const always = text({ text: "Always" });
+    const other = text({ text: "Other", when: "event" });
     const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [shows, always] }),
+      studioOverlay("Main", {
+        id: ID,
+        layers: [layer("Layer 1", [shows, always]), layer("Layer 2", [other])],
+      }),
     );
     await user.click(row(/^Always/));
     await user.type(field("Text").getByRole("textbox"), "!");
 
     await user.click(
       page().getByRole("button", {
-        name: "Test the layers that react to events",
+        name: "Test the elements that react to events",
       }),
     );
 
-    expect(lastSave()?.layers[1]).toMatchObject({ text: "Always!" });
+    expect(lastSave()?.layers[0].elements[1]).toMatchObject({
+      text: "Always!",
+    });
     expect(sent(APP_EVENTS.TEST_STUDIO_OVERLAY)).toEqual([{ id: ID }]);
-    const body = drawn(shows.id).querySelector(".studio-body")!;
-    expect(body.className).toMatch(/studio-enter-pop/);
+    for (const reacts of [shows, other]) {
+      const body = drawn(reacts.id).querySelector(".studio-body")!;
+      expect(body.className).toMatch(/studio-enter-pop/);
+    }
     expect(
       drawn(always.id).querySelector(".studio-body")!.className,
     ).not.toMatch(/studio-enter/);
   });
 
-  it("clears a deleted file from its media layers", async () => {
-    const media = layerOf("media", { file: "party.png", name: "Party" });
-    const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [media] }),
-    );
+  it("clears a deleted file from its media elements", async () => {
+    const media = elementOf("media", { file: "party.png", name: "Party" });
+    const { user } = await open(scene(media));
     await user.click(row(/^Party/));
 
     await send(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, {
@@ -366,21 +704,22 @@ describe("StudioEditor", () => {
       file: "party.png",
     });
 
-    expect((await saved()).layers[0]).toMatchObject({ file: "", name: "" });
+    expect((await saved()).layers[0].elements[0]).toMatchObject({
+      file: "",
+      name: "",
+    });
     expect(page().getByRole("button", { name: "Pick a file" })).toBeVisible();
   });
 
-  it("takes a browsed file only while its layer waits for one", async () => {
-    const media = layerOf("media");
-    const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [media] }),
-    );
+  it("takes a browsed file only while its element waits for one", async () => {
+    const media = elementOf("media");
+    const { user } = await open(scene(media));
     await user.click(row(/^Image or video/));
     await user.click(page().getByRole("button", { name: "Pick a file" }));
     await user.click(screen.getByRole("button", { name: "Browse file..." }));
     const [{ request }] = sent(APP_EVENTS.IMPORT_MEDIA);
 
-    // Another layer's reply, and one for a request not made
+    // Another element's reply, and one for a request not made
     await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
       success: true,
       id: "other",
@@ -394,7 +733,7 @@ describe("StudioEditor", () => {
       media: { name: "Party", file: "party.png" },
     });
 
-    expect((await saved()).layers[0]).toMatchObject({
+    expect((await saved()).layers[0].elements[0]).toMatchObject({
       file: "party.png",
       name: "Party",
     });
@@ -402,13 +741,13 @@ describe("StudioEditor", () => {
   });
 
   it("frames an installed overlay from disk, transparent, and says when it's gone", async () => {
-    const jar = layerOf("overlay", {
+    const jar = elementOf("overlay", {
       source: { type: "installed", id: "gift-jar" },
     });
-    const gone = layerOf("overlay", {
+    const gone = elementOf("overlay", {
       source: { type: "installed", id: "old" },
     });
-    await open(studioOverlay("Main", { id: ID, layers: [jar, gone] }));
+    await open(scene(jar, gone));
 
     await send(APP_EVENTS_RESPONSE.GET_OVERLAYS, {
       success: true,
@@ -422,11 +761,11 @@ describe("StudioEditor", () => {
   });
 
   it("draws the timer's and the games overlay's previews without their panels", async () => {
-    const timer = layerOf("overlay", { source: { type: "timer" } });
-    const games = layerOf("overlay", {
+    const timer = elementOf("overlay", { source: { type: "timer" } });
+    const games = elementOf("overlay", {
       source: { type: "games", column: null },
     });
-    await open(studioOverlay("Main", { id: ID, layers: [timer, games] }));
+    await open(scene(timer, games));
 
     await send(APP_EVENTS_RESPONSE.TIMER, timerReply());
     await send(
@@ -460,12 +799,10 @@ describe("StudioEditor", () => {
   });
 
   it("places one column of the games overlay on its own", async () => {
-    const column = layerOf("overlay", {
+    const column = elementOf("overlay", {
       source: { type: "games", column: 2 },
     });
-    const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [column] }),
-    );
+    const { user } = await open(scene(column));
     const action = (name: string, n: number) => ({
       ...createAction("bedrock"),
       overlay: { show: true, image: null, event: "", name, column: n },
@@ -487,7 +824,7 @@ describe("StudioEditor", () => {
     await user.click(screen.getByText("Games overlay, column 1"));
 
     await waitFor(() =>
-      expect(lastSave()?.layers[0]).toMatchObject({
+      expect(savedElement()).toMatchObject({
         source: { type: "games", column: 1 },
       }),
     );
@@ -508,12 +845,10 @@ describe("StudioEditor", () => {
         end: null,
       },
     };
-    const embed = layerOf("overlay", {
+    const embed = elementOf("overlay", {
       source: { type: "alert", id: "party" },
     });
-    const { user } = await open(
-      studioOverlay("Main", { id: ID, layers: [embed] }),
-    );
+    const { user } = await open(scene(embed));
     await send(
       APP_EVENTS_RESPONSE.GET_PROFILE,
       profileReply((p) => {

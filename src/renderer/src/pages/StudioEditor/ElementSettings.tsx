@@ -6,7 +6,7 @@ import {
   StudioAlign,
   StudioAnimation,
   StudioEntrance,
-  StudioLayer,
+  StudioElement,
   StudioWhen,
 } from "@/common/schemas";
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
@@ -59,19 +59,19 @@ const ALIGNS: { value: StudioAlign; label: MessageKey }[] = [
 ];
 
 type Props = {
-  layer: StudioLayer;
-  onChange: (layer: StudioLayer) => void;
+  element: StudioElement;
+  onChange: (element: StudioElement) => void;
   gifts: CustomGift[];
   emotes: EmoteOption[];
-  // What an overlay layer can frame
+  // What an overlay element can frame
   sources: SelectOption<string>[];
-  // Opens the media library for a media layer
+  // Opens the media library for a media element
   onPickMedia: () => void;
 };
 
-/** The selected layer's own fields, its box and opacity, and its When. */
-export function LayerSettings({
-  layer,
+/** The selected element's own fields, its box and opacity, and its When. */
+export function ElementSettings({
+  element,
   onChange,
   gifts,
   emotes,
@@ -87,13 +87,13 @@ export function LayerSettings({
   const triggers = useOptions(TRIGGER_OPTIONS);
   // A viewer's picture needs the viewer an event brings
   const whens =
-    layer.kind === "viewer"
+    element.kind === "viewer"
       ? allWhens.filter((w) => w.value !== "always")
       : allWhens;
-  const { trigger } = layer;
+  const { trigger } = element;
 
   let own: ReactNode = null;
-  switch (layer.kind) {
+  switch (element.kind) {
     case "text":
       own = (
         <>
@@ -101,21 +101,21 @@ export function LayerSettings({
             <Input
               ref={textRef}
               maxLength={STUDIO_TEXT_MAX_LENGTH}
-              value={layer.text}
-              onChange={(e) => onChange({ ...layer, text: e.target.value })}
+              value={element.text}
+              onChange={(e) => onChange({ ...element, text: e.target.value })}
             />
             <VariableList
-              variables={studioVariables(layer)}
+              variables={studioVariables(element)}
               inputRef={textRef}
-              value={layer.text}
-              onChange={(text) => onChange({ ...layer, text })}
+              value={element.text}
+              onChange={(text) => onChange({ ...element, text })}
             />
           </Field>
           <Field label={t("studio.fields.font")}>
             <FontSelect
-              value={layer.font}
+              value={element.font}
               defaultLabel={t("common.defaultFont")}
-              onChange={(font) => onChange({ ...layer, font })}
+              onChange={(font) => onChange({ ...element, font })}
             />
           </Field>
           <div className={styles.pair}>
@@ -123,35 +123,35 @@ export function LayerSettings({
               <NumberInput
                 min={1}
                 max={STUDIO_MAX_FONT_SIZE}
-                value={layer.size}
-                onChange={(size) => onChange({ ...layer, size })}
+                value={element.size}
+                onChange={(size) => onChange({ ...element, size })}
               />
             </Field>
             <Field label={t("studio.fields.color")}>
               <Color
-                value={layer.color}
-                onChange={(color) => onChange({ ...layer, color })}
+                value={element.color}
+                onChange={(color) => onChange({ ...element, color })}
               />
             </Field>
           </div>
           <Field label={t("studio.fields.align")} className={styles.inline}>
             <RadioGroup
-              name={`studio-align-${layer.id}`}
-              value={layer.align}
+              name={`studio-align-${element.id}`}
+              value={element.align}
               options={aligns}
-              onChange={(align) => onChange({ ...layer, align })}
+              onChange={(align) => onChange({ ...element, align })}
             />
           </Field>
           <div className={styles.checks}>
             <Check
               label={t("studio.fields.bold")}
-              checked={layer.bold}
-              onChange={(e) => onChange({ ...layer, bold: e.target.checked })}
+              checked={element.bold}
+              onChange={(e) => onChange({ ...element, bold: e.target.checked })}
             />
             <Check
               label={t("studio.fields.halo")}
-              checked={layer.halo}
-              onChange={(e) => onChange({ ...layer, halo: e.target.checked })}
+              checked={element.halo}
+              onChange={(e) => onChange({ ...element, halo: e.target.checked })}
             />
           </div>
         </>
@@ -162,7 +162,7 @@ export function LayerSettings({
         <Field label={t("studio.fields.file")}>
           <Btn className={styles.file} onClick={onPickMedia}>
             <span className={styles.file_name}>
-              {layer.file ? layer.name : t("studio.fields.pickFile")}
+              {element.file ? element.name : t("studio.fields.pickFile")}
             </span>
           </Btn>
         </Field>
@@ -173,8 +173,8 @@ export function LayerSettings({
         <Field label={t("studio.fields.gift")}>
           <GiftSelect
             gifts={gifts}
-            value={layer.gift ?? undefined}
-            onChange={(gift) => onChange({ ...layer, gift })}
+            value={element.gift ?? undefined}
+            onChange={(gift) => onChange({ ...element, gift })}
           />
         </Field>
       );
@@ -188,11 +188,11 @@ export function LayerSettings({
             <Select
               placeholder={t("studio.fields.pickEmote")}
               options={emotes}
-              value={layer.emote?.id}
+              value={element.emote?.id}
               onChange={(id) => {
                 const emote = emotes.find((e) => e.value === id);
                 if (emote) {
-                  onChange({ ...layer, emote: { id, image: emote.img } });
+                  onChange({ ...element, emote: { id, image: emote.img } });
                 }
               }}
             />
@@ -205,15 +205,15 @@ export function LayerSettings({
         <div className={styles.pair}>
           <Field label={t("studio.fields.color")}>
             <Color
-              value={layer.color}
-              onChange={(color) => onChange({ ...layer, color })}
+              value={element.color}
+              onChange={(color) => onChange({ ...element, color })}
             />
           </Field>
           <Field label={t("studio.fields.radius")}>
             <NumberInput
               min={0}
-              value={layer.radius}
-              onChange={(radius) => onChange({ ...layer, radius })}
+              value={element.radius}
+              onChange={(radius) => onChange({ ...element, radius })}
             />
           </Field>
         </div>
@@ -225,9 +225,9 @@ export function LayerSettings({
           <Select
             placeholder={t("studio.fields.pickOverlay")}
             options={sources}
-            value={sourceValue(layer.source)}
+            value={sourceValue(element.source)}
             onChange={(value) =>
-              onChange({ ...layer, source: sourceOf(value) })
+              onChange({ ...element, source: sourceOf(value) })
             }
           />
         </Field>
@@ -245,9 +245,9 @@ export function LayerSettings({
         className={styles.number}
         integer
         min={min}
-        value={layer[key]}
+        value={element[key]}
         onChange={(value) => {
-          const next = { ...layer };
+          const next = { ...element };
           next[key] = value;
           onChange(next);
         }}
@@ -255,11 +255,11 @@ export function LayerSettings({
     </Field>
   );
 
-  const opacity = Math.round(layer.opacity * 100);
+  const opacity = Math.round(element.opacity * 100);
 
   return (
     <div className={styles.settings}>
-      <h3 className={styles.panel_title}>{t(KIND_NAMES[layer.kind])}</h3>
+      <h3 className={styles.panel_title}>{t(KIND_NAMES[element.kind])}</h3>
       {own}
 
       <Field label={t("studio.fields.box")}>
@@ -276,20 +276,20 @@ export function LayerSettings({
           min={0}
           max={100}
           value={opacity}
-          onChange={(value) => onChange({ ...layer, opacity: value / 100 })}
+          onChange={(value) => onChange({ ...element, opacity: value / 100 })}
         />
       </Field>
 
       <Field label={t("studio.when.title")}>
         <RadioGroup
-          name={`studio-when-${layer.id}`}
-          value={layer.when}
+          name={`studio-when-${element.id}`}
+          value={element.when}
           options={whens}
-          onChange={(when) => onChange({ ...layer, when })}
+          onChange={(when) => onChange({ ...element, when })}
         />
       </Field>
 
-      {layer.when !== "always" && (
+      {element.when !== "always" && (
         <>
           <Field label={t("studio.fields.trigger")}>
             <Select
@@ -297,7 +297,7 @@ export function LayerSettings({
               options={triggers}
               value={trigger.type}
               onChange={(type) =>
-                onChange({ ...layer, trigger: { ...trigger, type } })
+                onChange({ ...element, trigger: { ...trigger, type } })
               }
             />
             {trigger.type === TOKIO_EVENTS.LIKE ? (
@@ -310,9 +310,9 @@ export function LayerSettings({
                       aria-label={t("studio.fields.likesPerReaction")}
                       integer
                       min={1}
-                      value={layer.likes_every}
+                      value={element.likes_every}
                       onChange={(likes_every) =>
-                        onChange({ ...layer, likes_every })
+                        onChange({ ...element, likes_every })
                       }
                     />
                   ),
@@ -323,26 +323,28 @@ export function LayerSettings({
                 trigger={trigger}
                 gifts={gifts}
                 emotes={emotes}
-                onChange={(changed) => onChange({ ...layer, trigger: changed })}
+                onChange={(changed) =>
+                  onChange({ ...element, trigger: changed })
+                }
               />
             )}
           </Field>
-          {layer.when === "event" ? (
+          {element.when === "event" ? (
             <div className={styles.pair}>
               <Field label={t("studio.fields.seconds")}>
                 <NumberInput
                   min={1}
                   max={STUDIO_MAX_SECONDS}
-                  value={layer.seconds}
-                  onChange={(seconds) => onChange({ ...layer, seconds })}
+                  value={element.seconds}
+                  onChange={(seconds) => onChange({ ...element, seconds })}
                 />
               </Field>
               <Field label={t("studio.fields.entrance")}>
                 <Select
                   aria-label={t("studio.fields.entrance")}
                   options={entrances}
-                  value={layer.entrance}
-                  onChange={(entrance) => onChange({ ...layer, entrance })}
+                  value={element.entrance}
+                  onChange={(entrance) => onChange({ ...element, entrance })}
                 />
               </Field>
             </div>
@@ -351,8 +353,8 @@ export function LayerSettings({
               <Select
                 aria-label={t("studio.fields.animation")}
                 options={animations}
-                value={layer.animation}
-                onChange={(animation) => onChange({ ...layer, animation })}
+                value={element.animation}
+                onChange={(animation) => onChange({ ...element, animation })}
               />
             </Field>
           )}

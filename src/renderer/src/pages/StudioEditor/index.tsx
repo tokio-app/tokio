@@ -1,9 +1,12 @@
 import {
   Alert,
   Profile,
+  STUDIO_MAX_ELEMENTS,
   STUDIO_MAX_LAYERS,
+  StudioElement,
+  StudioElementKind,
+  StudioElementOf,
   StudioLayer,
-  StudioLayerKind,
   StudioOverlay,
   StudioSource,
 } from "@/common/schemas";
@@ -19,7 +22,9 @@ import {
   getPicturePreviewURL,
   getStudioOverlayURL,
   mediaKind,
+  newStudioElement,
   newStudioLayer,
+  studioElements,
   studioView,
   TIMER_PATH,
 } from "@/common/util";
@@ -43,26 +48,30 @@ import {
 import { useTriggerChoices } from "@/pages/Alerts/useTriggerChoices";
 import { capitalize } from "@/pages/CoinStats/helper";
 import { TimerPush } from "@/pages/CountdownTimer/helper";
-import { sizeText } from "@/pages/Studio/helper";
+import { newOverlayName, sizeText } from "@/pages/Studio/helper";
 import toolsStyles from "@/pages/Tools/tools.module.css";
 import { useLanguage, useT } from "@/ui/i18n";
 import { useParams } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { FiPlay } from "react-icons/fi";
+import { ElementSettings } from "./ElementSettings";
 import { Embed } from "./Embed";
 import {
   Box,
-  layerName,
+  elementName,
+  findElement,
+  moveElement,
   moveLayer,
   sampleReact,
   Samples,
   sampleText,
   sampleViewerOf,
   sourceValue,
+  stepElement,
   whenText,
 } from "./helper";
 import { LayerSettings } from "./LayerSettings";
-import { LayersPanel } from "./LayersPanel";
+import { LayerFlags, LayersPanel } from "./LayersPanel";
 import { OverlaySettings } from "./OverlaySettings";
 import { StudioStage } from "./StudioStage";
 import styles from "./studioeditor.module.css";
@@ -72,8 +81,8 @@ import styles from "./studioeditor.module.css";
 let requests = 0;
 
 /**
- * An Overlay Studio overlay's editor: its layers, the canvas, and the
- * selected layer's settings (the overlay's, with none selected). It opens
+ * An Overlay Studio overlay's editor: its layers and their elements, the
+ * canvas, and the selection's settings (the overlay's, with none). It opens
  * once main's list holds the overlay.
  */
 export function StudioEditor() {
@@ -129,9 +138,9 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const { giftChoices, emoteChoices, emotes, setEmotes } = useTriggerChoices();
   // A new one per Test, so its samples are fresh
   const [samples, setSamples] = useState(() => new Samples());
-  // The layer whose image or video is being picked
+  // The element whose image or video is being picked
   const [mediaFor, setMediaFor] = useState<string | null>(null);
-  // Layers waiting for main to save a browsed file, and the newest request
+  // Elements waiting for main to save a browsed file, and the newest request
   // applied to each, as on the Alerts page
   const asked = useRef(new Set<string>());
   const applied = useRef(new Map<string, number>());
@@ -163,22 +172,39 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     }
   });
 
+  const setLayers = (change: (layers: StudioLayer[]) => StudioLayer[]) =>
+    setOverlay((o) => ({ ...o, layers: change(o.layers) }));
+
   const changeLayer = (
     id: string,
     change: (layer: StudioLayer) => StudioLayer,
   ) =>
-    setOverlay((o) => ({
-      ...o,
-      layers: o.layers.map((layer) =>
-        layer.id === id ? change(layer) : layer,
+    setLayers((layers) =>
+      layers.map((layer) => (layer.id === id ? change(layer) : layer)),
+    );
+
+  const changeElement = (
+    id: string,
+    change: (element: StudioElement) => StudioElement,
+  ) =>
+    setLayers((layers) =>
+      layers.map((layer) =>
+        layer.elements.some((e) => e.id === id)
+          ? {
+              ...layer,
+              elements: layer.elements.map((e) =>
+                e.id === id ? change(e) : e,
+              ),
+            }
+          : layer,
       ),
-    }));
+    );
 
   const setMedia = (id: string, file: { file: string; name: string } | null) =>
-    changeLayer(id, (layer) =>
-      layer.kind === "media"
-        ? { ...layer, file: file?.file ?? "", name: file?.name ?? "" }
-        : layer,
+    changeElement(id, (element) =>
+      element.kind === "media"
+        ? { ...element, file: file?.file ?? "", name: file?.name ?? "" }
+        : element,
     );
 
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, (res) => {
@@ -189,19 +215,22 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     setMediaFor((current) => (current === res.id ? null : current));
   });
 
-  // Main took a deleted file off every layer, so the next save can't bring
-  // it back
+  // Main took a deleted file off every element, so the next save can't
+  // bring it back
   useIpcListener(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, (res) => {
     if (res?.field !== "media") return;
+    const shows = (e: StudioElement): e is StudioElementOf<"media"> =>
+      e.kind === "media" && e.file === res.file;
     setOverlay((o) =>
-      o.layers.some((l) => l.kind === "media" && l.file === res.file)
+      studioElements(o).some(shows)
         ? {
             ...o,
-            layers: o.layers.map((l) =>
-              l.kind === "media" && l.file === res.file
-                ? { ...l, file: "", name: "" }
-                : l,
-            ),
+            layers: o.layers.map((layer) => ({
+              ...layer,
+              elements: layer.elements.map((e) =>
+                shows(e) ? { ...e, file: "", name: "" } : e,
+              ),
+            })),
           }
         : o,
     );
@@ -246,9 +275,9 @@ function Editor({ saved }: { saved: StudioOverlay }) {
         gifts: giftChoices,
         served: (id) => installed.some((o) => o.id === id),
         // Each video its own player URL: Chromium fails players sharing one
-        mediaURL: (file, layerId) =>
+        mediaURL: (file, elementId) =>
           mediaKind(file) === "video"
-            ? `${getMediaPreviewURL(file)}?player=${encodeURIComponent(layerId)}`
+            ? `${getMediaPreviewURL(file)}?player=${encodeURIComponent(elementId)}`
             : getMediaPreviewURL(file),
         embedPath: (source) =>
           source.type === "installed"
@@ -258,8 +287,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               : source.type === "timer"
                 ? getOverlayURL(TIMER_PATH)
                 : getMinecraftOverlayURL(source.column ?? undefined),
-        text: (layer) => sampleText(layer, samples, language),
-        viewer: (layer) => sampleViewerOf(layer, samples),
+        text: (element) => sampleText(element, samples, language),
+        viewer: (element) => sampleViewerOf(element, samples),
         label,
       }),
     // label reads installed, alerts, the games layout and t
@@ -281,12 +310,13 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   );
 
   // Each column of the games overlay can be placed on its own, and so can one
-  // a layer kept after the games overlay lost it
+  // an element kept after the games overlay lost it
+  const elements = studioElements(overlay);
   const gameColumns = Math.max(
     games?.overlay.columns ?? 1,
-    ...overlay.layers.map((l) =>
-      l.kind === "overlay" && l.source?.type === "games"
-        ? (l.source.column ?? 1)
+    ...elements.map((e) =>
+      e.kind === "overlay" && e.source?.type === "games"
+        ? (e.source.column ?? 1)
         : 1,
     ),
   );
@@ -315,66 +345,114 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   ];
 
   const names = Object.fromEntries(
-    overlay.layers.map((layer) => {
-      const name = layerName(layer, {
+    elements.map((element) => {
+      const name = elementName(element, {
         gifts: giftChoices,
         emotes: emoteChoices,
         label,
         t,
       });
-      const kind = t(`studio.kinds.${layer.kind}`);
-      const when = whenText(layer, t);
-      // A layer named after its kind doesn't say its kind twice
+      const kind = t(`studio.kinds.${element.kind}`);
+      const when = whenText(element, t);
+      // An element named after its kind doesn't say its kind twice
       const meta =
         name === kind
           ? capitalize(when, language)
           : t("studio.editor.rowMeta", { kind, when });
-      return [layer.id, { name, meta }];
+      return [element.id, { name, meta }];
     }),
   );
 
-  const add = (kind: StudioLayerKind) => {
-    if (overlay.layers.length >= STUDIO_MAX_LAYERS) return;
-    const layer = newStudioLayer(kind, overlay.size);
-    // In front of the rest
-    setOverlay((o) => ({ ...o, layers: [...o.layers, layer] }));
-    setSelected(layer.id);
+  const layer = overlay.layers.find((l) => l.id === selected);
+  const at = selected === null ? null : findElement(overlay.layers, selected);
+  const element = at && overlay.layers[at.layer].elements[at.index];
+  // Where the menu adds: the selected layer, the selected element's, else
+  // the front one
+  const target =
+    layer ?? (at ? overlay.layers[at.layer] : overlay.layers.at(-1));
+  const locked = useMemo(
+    () => new Set(overlay.layers.filter((l) => l.locked).map((l) => l.id)),
+    [overlay.layers],
+  );
+
+  // "Layer N", the first number no layer's name uses
+  const layerName = () =>
+    newOverlayName(overlay.layers, (number) =>
+      t("studio.editor.layerName", { number: String(number) }),
+    );
+
+  // An element picked in a folded layer unfolds it
+  const select = (id: string | null) => {
+    setSelected(id);
+    const found = id === null ? null : findElement(overlay.layers, id);
+    const holder = found && overlay.layers[found.layer];
+    if (holder?.folded) {
+      changeLayer(holder.id, (l) => ({ ...l, folded: false }));
+    }
   };
 
+  const addLayer = () => {
+    if (overlay.layers.length >= STUDIO_MAX_LAYERS) return;
+    const added = newStudioLayer(layerName());
+    // In front of the rest
+    setLayers((layers) => [...layers, added]);
+    setSelected(added.id);
+  };
+
+  const add = (kind: StudioElementKind) => {
+    if (elements.length >= STUDIO_MAX_ELEMENTS) return;
+    const added = newStudioElement(kind, overlay.size);
+    // In front in its layer, which unfolds to show it
+    if (target) {
+      changeLayer(target.id, (l) => ({
+        ...l,
+        folded: false,
+        elements: [...l.elements, added],
+      }));
+    } else {
+      setLayers(() => [{ ...newStudioLayer(layerName()), elements: [added] }]);
+    }
+    setSelected(added.id);
+  };
+
+  // A layer with its elements, or one element
   const remove = (id: string) => {
-    setOverlay((o) => ({ ...o, layers: o.layers.filter((l) => l.id !== id) }));
+    setLayers((layers) =>
+      layers
+        .filter((l) => l.id !== id)
+        .map((l) =>
+          l.elements.some((e) => e.id === id)
+            ? { ...l, elements: l.elements.filter((e) => e.id !== id) }
+            : l,
+        ),
+    );
     setSelected((current) => (current === id ? null : current));
   };
 
-  const move = (id: string, to: number) =>
-    setOverlay((o) => ({
-      ...o,
-      layers: moveLayer(
-        o.layers,
-        o.layers.findIndex((l) => l.id === id),
-        to,
-      ),
+  const shift = (id: string, dx: number, dy: number) =>
+    changeLayer(id, (l) => ({
+      ...l,
+      elements: l.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })),
     }));
 
   const setBox = (id: string, box: Box) =>
-    changeLayer(id, (layer) => ({ ...layer, ...box }));
+    changeElement(id, (e) => ({ ...e, ...box }));
 
-  // Plays every layer that reacts, with fresh samples, here and on stream
+  // Plays every element that reacts, with fresh samples, here and on stream
   const test = () => {
     flushSettings();
     const fresh = new Samples();
     setSamples(fresh);
-    for (const layer of overlay.layers) {
-      if (layer.when !== "always") {
-        stage.current?.react(sampleReact(layer, fresh, language));
+    for (const reacts of elements) {
+      if (reacts.when !== "always") {
+        stage.current?.react(sampleReact(reacts, fresh, language));
       }
     }
     window.api.emit(APP_EVENTS.TEST_STUDIO_OVERLAY, { id: overlay.id });
   };
 
-  const layer = overlay.layers.find((l) => l.id === selected);
-  const mediaLayer = overlay.layers.find(
-    (l) => l.id === mediaFor && l.kind === "media",
+  const mediaElement = elements.find(
+    (e) => e.id === mediaFor && e.kind === "media",
   );
 
   return (
@@ -404,10 +482,29 @@ function Editor({ saved }: { saved: StudioOverlay }) {
             layers={overlay.layers}
             selected={selected}
             names={names}
-            onSelect={setSelected}
+            target={target}
+            onSelect={select}
+            onAddLayer={addLayer}
             onAdd={add}
             onDelete={remove}
-            onMove={move}
+            onFlags={(id, flags: LayerFlags) =>
+              changeLayer(id, (l) => ({ ...l, ...flags }))
+            }
+            onMoveLayer={(id, to) =>
+              setLayers((layers) =>
+                moveLayer(
+                  layers,
+                  layers.findIndex((l) => l.id === id),
+                  to,
+                ),
+              )
+            }
+            onMoveElement={(id, layerId, to) =>
+              setLayers((layers) => moveElement(layers, id, layerId, to))
+            }
+            onStepElement={(id, by) =>
+              setLayers((layers) => stepElement(layers, id, by))
+            }
           />
 
           <div className={styles.canvas_column}>
@@ -418,11 +515,13 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               view={view}
               stageRef={stage}
               selected={selected}
-              onSelect={setSelected}
+              locked={locked}
+              onSelect={select}
               onBox={setBox}
+              onShift={shift}
               embed={(embed) => (
                 <Embed
-                  layer={embed}
+                  element={embed}
                   installed={installed}
                   timer={timer}
                   games={gamesPreview ?? null}
@@ -438,10 +537,16 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 key={layer.id}
                 layer={layer}
                 onChange={(changed) => changeLayer(changed.id, () => changed)}
+              />
+            ) : element ? (
+              <ElementSettings
+                key={element.id}
+                element={element}
+                onChange={(changed) => changeElement(changed.id, () => changed)}
                 gifts={giftChoices}
                 emotes={emoteChoices}
                 sources={sources}
-                onPickMedia={() => setMediaFor(layer.id)}
+                onPickMedia={() => setMediaFor(element.id)}
               />
             ) : (
               <OverlaySettings overlay={overlay} onChange={setOverlay} />
@@ -450,17 +555,17 @@ function Editor({ saved }: { saved: StudioOverlay }) {
         </div>
       </Section>
 
-      {mediaLayer?.kind === "media" && (
+      {mediaElement?.kind === "media" && (
         <MediaPicker
-          id={mediaLayer.id}
-          chosen={mediaLayer.file ? mediaLayer : null}
+          id={mediaElement.id}
+          chosen={mediaElement.file ? mediaElement : null}
           onRequest={() => {
-            asked.current.add(mediaLayer.id);
+            asked.current.add(mediaElement.id);
             return ++requests;
           }}
           onSelect={(file) => {
-            asked.current.delete(mediaLayer.id);
-            setMedia(mediaLayer.id, file);
+            asked.current.delete(mediaElement.id);
+            setMedia(mediaElement.id, file);
             setMediaFor(null);
           }}
           onClose={() => setMediaFor(null)}
