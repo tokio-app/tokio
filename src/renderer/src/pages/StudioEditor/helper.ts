@@ -265,24 +265,32 @@ const turn = ({ x, y }: Point, degrees: number): Point => {
 
 /**
  * The box with a corner dragged by (dx, dy) px of the canvas, the opposite
- * corner kept where it is on the canvas: whole width and height, at least 1
- * wide and `minHeight(width)` tall, the height a text's words take at that
- * width. A turned box resizes along its own sides.
+ * corner kept where it is on the canvas: whole width and height, at least
+ * `minWidth` wide (a text's longest word) and `minHeight(width)` tall (the
+ * height its words take at that width). A turned box resizes along its own
+ * sides.
  */
 export function resizeBox(
   box: Box,
   corner: Corner,
   dx: number,
   dy: number,
-  minHeight: (width: number) => number = () => 1,
-  rotation = 0,
+  {
+    minWidth = 1,
+    minHeight = () => 1,
+    rotation = 0,
+  }: {
+    minWidth?: number;
+    minHeight?: (width: number) => number;
+    rotation?: number;
+  } = {},
 ): Box {
   const west = corner.endsWith("w");
   const north = corner.startsWith("n");
   // The pointer's move along the box's own sides
   const along = turn({ x: dx, y: dy }, -rotation);
   const width = Math.max(
-    1,
+    minWidth,
     Math.round(box.width + (west ? -along.x : along.x)),
   );
   const height = Math.max(

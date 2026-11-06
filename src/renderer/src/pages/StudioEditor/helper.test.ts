@@ -169,7 +169,7 @@ describe("resizeBox", () => {
 
   it("resizes a turned box along its own sides, its opposite corner kept", () => {
     // A quarter turn: the pointer going down stretches its width
-    const turned = roundBox(resizeBox(box, "se", 0, 50, undefined, 90));
+    const turned = roundBox(resizeBox(box, "se", 0, 50, { rotation: 90 }));
 
     expect(turned).toEqual({ x: 75, y: 225, width: 350, height: 100 });
     // Its own top left corner is where it was on the canvas: 300, 100
@@ -188,7 +188,7 @@ describe("resizeBox", () => {
       return 60;
     };
 
-    expect(resizeBox(box, "nw", 500, 500, words)).toEqual({
+    expect(resizeBox(box, "nw", 500, 500, { minHeight: words })).toEqual({
       x: 399,
       y: 240,
       width: 1,
@@ -200,6 +200,20 @@ describe("resizeBox", () => {
     });
     // Asked at the width it gets
     expect(heights).toEqual([1]);
+  });
+
+  it("stops at the least width, a text's longest word, its height asked there", () => {
+    const heights: number[] = [];
+    const words = (width: number) => {
+      heights.push(width);
+      return 150;
+    };
+
+    // From the left, the right side kept at 400
+    expect(
+      resizeBox(box, "sw", 500, 0, { minWidth: 120, minHeight: words }),
+    ).toEqual({ x: 280, y: 200, width: 120, height: 150 });
+    expect(heights).toEqual([120]);
   });
 });
 

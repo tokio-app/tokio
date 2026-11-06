@@ -422,6 +422,8 @@ describe("StudioEditor", () => {
       clientX: 125,
       clientY: 75,
     });
+    // The rotate cursor stays on the whole canvas while it turns
+    expect(canvas().className).toMatch(/turning/);
     fireEvent.pointerMove(canvas(), { clientX: 225, clientY: 125 });
     await waitFor(() => expect(savedElement()?.rotation).toBe(90));
     expect(drawn(shape.id).style.transform).toBe("rotate(90deg)");
@@ -439,6 +441,7 @@ describe("StudioEditor", () => {
     fireEvent.pointerUp(canvas());
     await waitFor(() => expect(savedElement()?.rotation).toBe(45));
     expect(field("Rotation (°)").getByRole("spinbutton")).toHaveValue(45);
+    expect(canvas().className).not.toMatch(/turning/);
   });
 
   it("sets the rotation by number", async () => {
@@ -523,6 +526,44 @@ describe("StudioEditor", () => {
       expect(savedElement()).toMatchObject({ y: 200, height: 120 }),
     );
     expect(measured).toHaveBeenCalled();
+  });
+
+  it("keeps a text's box as wide as its longest word", async () => {
+    const words = text({
+      text: "Hello This is a test aaaaaaaaaaaaaaaaaa",
+      x: 100,
+      y: 200,
+      width: 600,
+      height: 300,
+    });
+    const { user } = await open(scene(words));
+    await user.click(row(/^Hello/));
+    sized();
+    const shown = drawn(words.id).querySelector<HTMLElement>(".studio-text")!;
+    // Its longest word, 150 px on screen at half size, measured as narrow
+    // as the words let it be, with no word broken
+    const asked: string[] = [];
+    vi.spyOn(shown, "getBoundingClientRect").mockImplementation(() => {
+      asked.push(`${shown.style.width} ${shown.style.overflowWrap}`);
+      return new DOMRect(0, 0, 150, 30);
+    });
+
+    fireEvent.pointerDown(handle("se"), { button: 0, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(canvas(), { clientX: -500, clientY: 0 });
+    fireEvent.pointerUp(canvas());
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        x: 100,
+        y: 200,
+        width: 300,
+        height: 300,
+      }),
+    );
+    expect(asked).toEqual(["min-content normal"]);
+    // Put back for the stream's own wrapping
+    expect(shown.style.width).toBe("");
+    expect(shown.style.overflowWrap).toBe("");
   });
 
   it("moves a selected layer's elements as one, and a click without moving picks", async () => {

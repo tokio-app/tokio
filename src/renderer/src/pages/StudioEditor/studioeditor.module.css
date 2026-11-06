@@ -274,14 +274,25 @@
   margin-bottom: 0;
 }
 
-/* Focusable for the arrows; the canvas is scaled to fit inside it */
+/* Focusable for the arrows; the canvas is scaled to fit inside it. A
+   selection past the canvas is cut at its edges, so it can't stretch the
+   page. */
 .stage {
   position: relative;
   flex: 1;
   min-height: 0;
+  overflow: clip;
   border-radius: var(--radius-md);
   touch-action: none;
   user-select: none;
+}
+
+/* The canvas's room, and the selection's, short of the stage's edges: the
+   handles of an element at the canvas's edge stay inside the cut, the rotate
+   handle 32px past its side */
+.stage_area {
+  position: absolute;
+  inset: var(--space-10);
 }
 
 /* Two classes, so it wins over the stream stylesheet's .studio-stage on the
@@ -355,8 +366,17 @@
   border: 2px solid var(--font-primary);
   border-radius: 50%;
   background-color: var(--accent-primary);
-  cursor: grab;
+  cursor:
+    url("../../assets/rotate-cursor.svg") 12 12,
+    grab;
   pointer-events: auto;
+}
+
+/* The stage while an element turns: the pointer leaves the handle */
+.turning {
+  cursor:
+    url("../../assets/rotate-cursor.svg") 12 12,
+    grab;
 }
 
 .rotate::after {

@@ -144,6 +144,9 @@ export function StudioStage({
     new Map(),
   );
   const drag = useRef<Drag | null>(null);
+  // The rotate cursor stays on while an element turns, wherever the pointer
+  // goes
+  const [turning, setTurning] = useState(false);
 
   useLayoutEffect(() => {
     const stage = createStage(root.current!, { slots: true, editing: true });
@@ -184,15 +187,18 @@ export function StudioStage({
     });
   }, [view, stageRef]);
 
+  const nodeOf = (id: string) =>
+    Array.from(
+      root.current?.querySelectorAll<HTMLElement>("[data-element]") ?? [],
+    ).find((n) => n.dataset.element === id);
+
   /**
    * The height an element's text takes at that width, in px of the canvas,
    * 1 for one without text: the least its box can have. Measured on the
    * stage at that width, which the next update puts back.
    */
   const textHeight = (id: string, width: number, scale: number) => {
-    const node = Array.from(
-      root.current?.querySelectorAll<HTMLElement>("[data-element]") ?? [],
-    ).find((n) => n.dataset.element === id);
+    const node = nodeOf(id);
     const text = node?.querySelector(".studio-text");
     if (!node || !text || !scale) return 1;
     // Unturned, so the range's box is the words' own height
@@ -205,6 +211,29 @@ export function StudioStage({
     node.style.width = keptWidth;
     node.style.transform = transform;
     return Math.max(1, Math.ceil(height / scale));
+  };
+
+  /**
+   * The width of an element's longest word, in px of the canvas, 1 for one
+   * without text: the least its box can have, so its words never break and
+   * its height can't run away. Measured on the stage, unturned, with the text
+   * as narrow as its words let it be.
+   */
+  const textWidth = (id: string, scale: number) => {
+    const node = nodeOf(id);
+    const text = node?.querySelector<HTMLElement>(".studio-text");
+    if (!node || !text || !scale) return 1;
+    const { transform } = node.style;
+    const { width, overflowWrap } = text.style;
+    node.style.transform = "";
+    text.style.width = "min-content";
+    // On stream a word too long for its box breaks anywhere
+    text.style.overflowWrap = "normal";
+    const measured = text.getBoundingClientRect().width;
+    node.style.transform = transform;
+    text.style.width = width;
+    text.style.overflowWrap = overflowWrap;
+    return Math.max(1, Math.ceil(measured / scale));
   };
 
   const chosen = elements.find(({ element }) => element.id === selected);
@@ -257,6 +286,7 @@ export function StudioStage({
           y: rect.top + fitted.top + (y + height / 2) * scale,
         },
       };
+      setTurning(true);
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -316,13 +346,17 @@ export function StudioStage({
     // Screen px to the canvas's
     const dx = (e.clientX - d.x) / d.scale;
     const dy = (e.clientY - d.y) / d.scale;
-    // A text's box can't get shorter than its words
-    const minHeight = (width: number) => textHeight(d.id, width, d.scale);
+    // A text's box can't get narrower than its longest word, nor shorter
+    // than its words
     onBox(
       d.id,
       roundBox(
         d.corner
-          ? resizeBox(d.box, d.corner, dx, dy, minHeight, d.rotation)
+          ? resizeBox(d.box, d.corner, dx, dy, {
+              minWidth: textWidth(d.id, d.scale),
+              minHeight: (width) => textHeight(d.id, width, d.scale),
+              rotation: d.rotation,
+            })
           : { ...d.box, x: d.box.x + dx, y: d.box.y + dy },
       ),
     );
@@ -331,6 +365,7 @@ export function StudioStage({
   const onPointerUp = () => {
     const d = drag.current;
     drag.current = null;
+    setTurning(false);
     if (d?.kind === "layer" && !d.moved) {
       onSelect(pickElement(view, locked, d.point));
     }
@@ -375,7 +410,7 @@ export function StudioStage({
 
   return (
     <div
-      className={styles.stage}
+      className={cx(styles.stage, turning && styles.turning)}
       tabIndex={0}
       aria-label={t("studio.editor.canvas")}
       aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
@@ -384,31 +419,36 @@ export function StudioStage({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={() => (drag.current = null)}
+      onPointerCancel={() => {
+        drag.current = null;
+        setTurning(false);
+      }}
       onKeyDown={onKeyDown}
     >
-      <div ref={root} className={styles.stage_root} />
-      {outline && (
-        <div className={styles.selection} style={outline}>
-          {chosen && !stuck && (
-            <>
-              {CORNERS.map((corner) => (
+      <div className={styles.stage_area}>
+        <div ref={root} className={styles.stage_root} />
+        {outline && (
+          <div className={styles.selection} style={outline}>
+            {chosen && !stuck && (
+              <>
+                {CORNERS.map((corner) => (
+                  <span
+                    key={corner}
+                    className={cx(styles.handle, HANDLES[corner])}
+                    data-handle={corner}
+                    title={t("studio.editor.resize")}
+                  />
+                ))}
                 <span
-                  key={corner}
-                  className={cx(styles.handle, HANDLES[corner])}
-                  data-handle={corner}
-                  title={t("studio.editor.resize")}
+                  className={styles.rotate}
+                  data-handle="rotate"
+                  title={t("studio.editor.rotate")}
                 />
-              ))}
-              <span
-                className={styles.rotate}
-                data-handle="rotate"
-                title={t("studio.editor.rotate")}
-              />
-            </>
-          )}
-        </div>
-      )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
       {elements.map(({ element }) => {
         if (element.kind !== "overlay") return null;
         const slot = slots.get(element.id);
