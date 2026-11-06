@@ -215,10 +215,10 @@ describe("StudioService", () => {
       name: "Ana",
       values: { user: { username: "Ana" } },
     });
-    const shared = {
+    const shared = StudioLayerSchema.parse({
       ...text,
       trigger: { ...text.trigger, type: TOKIO_EVENTS.SHARE },
-    };
+    });
     expect(studio.kept(shared)).toBeNull();
   });
 

@@ -96,7 +96,7 @@ export class StudioService extends Service {
           continue;
         }
         if (!this._passes(layer, payload)) continue;
-        const kept = {
+        const kept: StudioKept = {
           trigger: layer.trigger.type,
           values,
           ...viewerOf(payload),
@@ -128,7 +128,11 @@ export class StudioService extends Service {
         // Emote triggers match chats
         const event = type === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : type;
         const values = generateTikTokEventSample(event).data;
-        const sample = { trigger: type, values, ...viewerOf(values) };
+        const sample: StudioKept = {
+          trigger: type,
+          values,
+          ...viewerOf(values),
+        };
         return this._react(layer, sample, () => numbers);
       });
   }

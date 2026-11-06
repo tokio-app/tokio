@@ -19,6 +19,7 @@ import {
 import {
   ALERTS_PATH,
   formatError,
+  STUDIO_SOCKET_PREFIX,
   GAMES_PATH,
   MINECRAFT_PICTURES_PATH,
   MINECRAFT_PORT,
@@ -31,6 +32,13 @@ import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
+import {
+  liveNumbers,
+  sendStudioOverlay,
+  sendStudioOverlays,
+  sendStudioReact,
+  showsNumbers,
+} from "@/helper/studio";
 import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
@@ -129,6 +137,7 @@ const registerConnectorEvents = ({
   musicService: music,
   alertsService: alerts,
   gamesService: games,
+  studioService: studio,
   overlayService: overlays,
   liveService: live,
   pathManagerService: paths,
@@ -466,6 +475,15 @@ const registerConnectorEvents = ({
         serverService: server,
         pathManagerService: paths,
       });
+      // And so do studio layers that show it
+      await sendStudioOverlays({
+        storeManagerService: store,
+        overlayService: overlays,
+        serverService: server,
+        pathManagerService: paths,
+        liveService: live,
+        studioService: studio,
+      });
     }
   };
   conn.on(TOKIO_EVENTS.GIFT, (d) => {
@@ -640,6 +658,82 @@ const registerTimer = ({
   onLanguage(() => server.sendToClient(TIMER_PATH, overlayMessage(0)));
 };
 
+// Overlay Studio's layers react to live events whatever features are on,
+// and its texts follow the live numbers. Registered after
+// registerConnectorEvents: the connector runs its listeners in order, so the
+// stats and the LIVE session already hold an event when these read them.
+const registerStudio = (handler: AppHandlerVariables) => {
+  const {
+    connectorService: conn,
+    musicService: music,
+    storeManagerService: store,
+    studioService: studio,
+    serverService: server,
+    notifier,
+  } = handler;
+
+  // Busy lives change them many times a second; the views are made when the
+  // push goes, so they're never old ones
+  const sendNumbers = throttle(
+    () => void sendStudioOverlays(handler, showsNumbers),
+    STATS_THROTTLE_MS,
+  );
+  const changesNumbers = new Set<TOKIO_EVENTS>([
+    TOKIO_EVENTS.LIKE,
+    ...ACTIVITY_EVENTS,
+  ]);
+
+  for (const trigger of ALERT_TRIGGERS) {
+    // Not a live event, the service matches emote triggers on chat events.
+    if (trigger === EMOTE_TRIGGER) continue;
+    // One listener for both: GIFT and CHAT have many already
+    const listener = (d: TokioEventMap[typeof trigger]) => {
+      try {
+        studio.handle(trigger, d, store.getStudio(), () =>
+          liveNumbers(handler),
+        );
+      } catch (error) {
+        notifier.report({
+          source: "overlays",
+          error,
+          fallback: {
+            code: FEEDBACK_CODES.STUDIO_FAILED,
+            message: t("main.init.studioFailed", {
+              label: t(ALERT_TRIGGER_LABELS[trigger]),
+            }),
+          },
+          context: trigger,
+        });
+      }
+      if (changesNumbers.has(trigger)) sendNumbers();
+    };
+    // Once per song, as alerts take it
+    if (trigger === TOKIO_EVENTS.MUSIC_CHANGE) {
+      music.onSongChange(listener);
+    } else {
+      conn.on(trigger, listener);
+    }
+  }
+  conn.on(TOKIO_EVENTS.ROOM_USER, () => sendNumbers());
+  conn.on(TOKIO_EVENTS.CONNECTED, () => sendNumbers());
+  conn.on(TOKIO_EVENTS.DISCONNECTED, () => {
+    // Gift streaks' ends may be missed
+    studio.clear();
+    // A late push would show the LIVE's numbers over the zeros
+    sendNumbers.cancel();
+    void sendStudioOverlays(handler, showsNumbers);
+  });
+
+  studio.onReact((id, react) => sendStudioReact(handler, id, react));
+  server.onConnect((id) => {
+    if (id.startsWith(STUDIO_SOCKET_PREFIX)) {
+      void sendStudioOverlay(handler, id.slice(STUDIO_SOCKET_PREFIX.length));
+    }
+  });
+  // Their numbers are in the app's language
+  onLanguage(() => void sendStudioOverlays(handler));
+};
+
 // The profile keeps the fans its LIVEs show, whatever features are on.
 // Overlays get them as they connect, and again when they change.
 const registerFans = ({
@@ -794,6 +888,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     fansService,
     historyService,
     gamesService,
+    studioService,
     notifier,
   } = handler;
 
@@ -818,6 +913,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       fansService.setLogFile(files.logs.system);
       historyService.setLogFile(files.logs.system);
       gamesService.setLogFile(files.logs.games);
+      studioService.setLogFile(files.logs.overlays);
       notifier.setLogFiles(files.logs);
       alertsService.setSoundsFolder(folders.soundsFolder);
       alertsService.setMediaFolder(folders.mediaFolder);
@@ -876,6 +972,8 @@ const startApp = async (handler: AppHandlerVariables) => {
     registerGames(handler);
     registerFans(handler);
     registerHistory(handler);
+    // After registerConnectorEvents, see registerStudio
+    registerStudio(handler);
   }
 
   const settings = storeManagerService.getSettings();
@@ -896,9 +994,10 @@ const startApp = async (handler: AppHandlerVariables) => {
       .then(async (gifts) => {
         if (gifts.length === 0) return;
         await overlayService.refreshGifts(gifts);
-        // Gift pictures may have changed. Before this, the games overlay
-        // gets the saved ones when it connects.
+        // Gift pictures may have changed. Before this, the games and studio
+        // overlays get the saved ones when they connect.
         await sendGamesOverlay(handler);
+        await sendStudioOverlays(handler);
       })
       .catch((error) => {
         notifier.report({
