@@ -7,6 +7,7 @@ import {
   MinecraftEdition,
   OverlayConfig,
   Profile,
+  StudioOverlay,
   TimerAction,
   TimerSettings,
 } from "../../schemas";
@@ -101,6 +102,13 @@ export enum APP_EVENTS {
   TIMER_CONTROL = "app:tools:timer:control",
   ADJUST_TIMER = "app:tools:timer:adjust",
   GET_FANS = "app:tools:fans:get",
+
+  // OVERLAY STUDIO
+  GET_STUDIO = "app:studio:get",
+  ADD_STUDIO_OVERLAY = "app:studio:add",
+  SAVE_STUDIO_OVERLAY = "app:studio:save",
+  REMOVE_STUDIO_OVERLAY = "app:studio:remove",
+  TEST_STUDIO_OVERLAY = "app:studio:test",
 
   // ALERTS
   UPDATE_ALERTS_SETTINGS = "app:alerts:update:settings",
@@ -316,6 +324,17 @@ export interface AppEventsMap {
   // Adds the seconds to the clock, or removes them when negative
   [APP_EVENTS.ADJUST_TIMER]: { seconds: number };
   [APP_EVENTS.GET_FANS]: void;
+
+  // OVERLAY STUDIO
+  // Each is answered by STUDIO, failures included
+  [APP_EVENTS.GET_STUDIO]: void;
+  // The page picks the id (a new UUID) and the name ("Overlay N")
+  [APP_EVENTS.ADD_STUDIO_OVERLAY]: { id: string; name: string };
+  // The editor's autosave
+  [APP_EVENTS.SAVE_STUDIO_OVERLAY]: { overlay: StudioOverlay };
+  [APP_EVENTS.REMOVE_STUDIO_OVERLAY]: { id: string };
+  // Plays every layer that reacts once, with sample values, on stream
+  [APP_EVENTS.TEST_STUDIO_OVERLAY]: { id: string };
 
   // ALERTS
   [APP_EVENTS.UPDATE_ALERTS_SETTINGS]: {

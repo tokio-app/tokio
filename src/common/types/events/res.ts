@@ -11,6 +11,7 @@ import {
   Profile,
   SavedEmote,
   StoreSchema,
+  StudioOverlay,
   TestOverlay,
 } from "../../schemas";
 import { AppNotification, Reply } from "../feedback";
@@ -101,6 +102,9 @@ export enum APP_EVENTS_RESPONSE {
   SEND_TEST_EVENTS = "app:tools:res:overlays:test",
   TIMER = "app:tools:res:timer",
   FANS = "app:tools:res:fans:get",
+
+  // OVERLAY STUDIO
+  STUDIO = "app:studio:res:list",
 
   // ALERTS
   ALERT_AUDIO = "app:alerts:audio",
@@ -324,6 +328,13 @@ export interface AppEventsResponseMap {
   // Every fan the active profile keeps, the highest levels first, then the
   // most recently seen. Not pushed: the Fans page asks again on a switch.
   [APP_EVENTS_RESPONSE.FANS]: { data: Fan[] };
+
+  // OVERLAY STUDIO
+  // Every studio overlay main holds: the reply to each Overlay Studio
+  // request, failures included, and a save's echo
+  [APP_EVENTS_RESPONSE.STUDIO]: Reply<{
+    data?: StudioOverlay[];
+  }>;
 
   // ALERTS
   [APP_EVENTS_RESPONSE.ALERT_AUDIO]: {
