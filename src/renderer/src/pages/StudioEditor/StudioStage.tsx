@@ -3,6 +3,7 @@
 import "@/common/studio/overlay.css";
 import { createStage, Stage, StageFit } from "@/common/studio/stage";
 import { StudioElementView, StudioView } from "@/common/types";
+import { cx } from "@/helper/cx";
 import { useT } from "@/ui/i18n";
 import {
   CSSProperties,
@@ -18,9 +19,12 @@ import { createPortal } from "react-dom";
 import {
   bounds,
   Box,
+  Corner,
+  CORNERS,
   holds,
   pickElement,
   Point,
+  resizeBox,
   roundBox,
   toCanvas,
 } from "./helper";
@@ -55,7 +59,8 @@ type Drag =
   | {
       kind: "element";
       id: string;
-      resize: boolean;
+      // The corner it resizes from, none to move it
+      corner: Corner | null;
       // Where the pointer went down, and the box then
       x: number;
       y: number;
@@ -76,6 +81,14 @@ type Drag =
     };
 
 const NO_FIT: StageFit = { scale: 0, left: 0, top: 0 };
+
+// Each corner's handle, where it sits and its cursor
+const HANDLES: Record<Corner, string> = {
+  nw: styles.handle_nw,
+  ne: styles.handle_ne,
+  sw: styles.handle_sw,
+  se: styles.handle_se,
+};
 
 // Screen px a press inside a layer's outline moves before it drags the layer
 const DRAG_START = 3;
@@ -158,6 +171,26 @@ export function StudioStage({
     });
   }, [view, stageRef]);
 
+  /**
+   * The height an element's text takes at that width, in px of the canvas,
+   * 1 for one without text: the least its box can have. Measured on the
+   * stage at that width, which the next update puts back.
+   */
+  const textHeight = (id: string, width: number, scale: number) => {
+    const node = Array.from(
+      root.current?.querySelectorAll<HTMLElement>("[data-element]") ?? [],
+    ).find((n) => n.dataset.element === id);
+    const text = node?.querySelector(".studio-text");
+    if (!node || !text || !scale) return 1;
+    const kept = node.style.width;
+    node.style.width = `${width}px`;
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    const { height } = range.getBoundingClientRect();
+    node.style.width = kept;
+    return Math.max(1, Math.ceil(height / scale));
+  };
+
   const chosen = elements.find(({ element }) => element.id === selected);
   const chosenLayer = view.layers.find((layer) => layer.id === selected);
   // The selection's outline: an element's box, or around a layer's elements
@@ -178,12 +211,14 @@ export function StudioStage({
     if (!scale) return;
     const at = { x: e.clientX, y: e.clientY, scale };
 
-    if (chosen && !stuck && target.closest("[data-handle]")) {
+    const handle = target.closest<HTMLElement>("[data-handle]");
+    const corner = CORNERS.find((c) => c === handle?.dataset.handle);
+    if (chosen && !stuck && corner) {
       const box = boxOf(chosen.element);
       drag.current = {
         kind: "element",
         id: chosen.element.id,
-        resize: true,
+        corner,
         box,
         ...at,
       };
@@ -218,7 +253,7 @@ export function StudioStage({
     drag.current = {
       kind: "element",
       id: picked.element.id,
-      resize: false,
+      corner: null,
       box,
       ...at,
     };
@@ -244,11 +279,13 @@ export function StudioStage({
     // Screen px to the canvas's
     const dx = (e.clientX - d.x) / d.scale;
     const dy = (e.clientY - d.y) / d.scale;
+    // A text's box can't get shorter than its words
+    const minHeight = (width: number) => textHeight(d.id, width, d.scale);
     onBox(
       d.id,
       roundBox(
-        d.resize
-          ? { ...d.box, width: d.box.width + dx, height: d.box.height + dy }
+        d.corner
+          ? resizeBox(d.box, d.corner, dx, dy, minHeight)
           : { ...d.box, x: d.box.x + dx, y: d.box.y + dy },
       ),
     );
@@ -314,13 +351,16 @@ export function StudioStage({
       <div ref={root} className={styles.stage_root} />
       {outline && (
         <div className={styles.selection} style={outline}>
-          {chosen && !stuck && (
-            <span
-              className={styles.handle}
-              data-handle
-              title={t("studio.editor.resize")}
-            />
-          )}
+          {chosen &&
+            !stuck &&
+            CORNERS.map((corner) => (
+              <span
+                key={corner}
+                className={cx(styles.handle, HANDLES[corner])}
+                data-handle={corner}
+                title={t("studio.editor.resize")}
+              />
+            ))}
         </div>
       )}
       {elements.map(({ element }) => {

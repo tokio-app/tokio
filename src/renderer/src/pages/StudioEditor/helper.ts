@@ -248,6 +248,37 @@ export function stepElement(
 export type Box = Pick<StudioElement, "x" | "y" | "width" | "height">;
 export type Point = { x: number; y: number };
 
+// The selection's corners, each a handle that resizes from there
+export const CORNERS = ["nw", "ne", "sw", "se"] as const;
+export type Corner = (typeof CORNERS)[number];
+
+/**
+ * The box with a corner dragged by (dx, dy) px of the canvas, the opposite
+ * corner kept: whole px, at least 1 wide and `minHeight(width)` tall, the
+ * height a text's words take at that width.
+ */
+export function resizeBox(
+  box: Box,
+  corner: Corner,
+  dx: number,
+  dy: number,
+  minHeight: (width: number) => number = () => 1,
+): Box {
+  const west = corner.endsWith("w");
+  const north = corner.startsWith("n");
+  const width = Math.max(1, Math.round(box.width + (west ? -dx : dx)));
+  const height = Math.max(
+    minHeight(width),
+    Math.round(box.height + (north ? -dy : dy)),
+  );
+  return {
+    x: west ? box.x + box.width - width : box.x,
+    y: north ? box.y + box.height - height : box.y,
+    width,
+    height,
+  };
+}
+
 // Whole px, the size at least 1, as the schema keeps them
 export const roundBox = ({ x, y, width, height }: Box): Box => ({
   x: Math.round(x),

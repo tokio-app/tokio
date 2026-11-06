@@ -89,6 +89,9 @@ function sized() {
   vi.spyOn(root, "clientWidth", "get").mockReturnValue(540);
   vi.spyOn(root, "clientHeight", "get").mockReturnValue(960);
 }
+// A corner's resize handle on the canvas
+const handle = (corner: string) =>
+  canvas().querySelector<HTMLElement>(`[data-handle="${corner}"]`)!;
 // A press on the canvas at a point of it, in its px
 const press = (x: number, y: number) =>
   fireEvent.pointerDown(canvas(), {
@@ -353,7 +356,7 @@ describe("StudioEditor", () => {
     fireEvent.pointerDown(canvas(), { button: 0, clientX: 60, clientY: 110 });
     fireEvent.pointerMove(canvas(), { clientX: 70, clientY: 115.4 });
     fireEvent.pointerUp(canvas());
-    fireEvent.pointerDown(canvas().querySelector("[data-handle]")!, {
+    fireEvent.pointerDown(handle("se"), {
       button: 0,
       clientX: 0,
       clientY: 0,
@@ -370,6 +373,69 @@ describe("StudioEditor", () => {
         height: 1,
       }),
     );
+  });
+
+  it("resizes from any corner, the opposite one kept", async () => {
+    const shape = elementOf("shape", {
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 100,
+    });
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+    sized();
+
+    expect(
+      Array.from(canvas().querySelectorAll<HTMLElement>("[data-handle]")).map(
+        (h) => h.dataset.handle,
+      ),
+    ).toEqual(["nw", "ne", "sw", "se"]);
+    fireEvent.pointerDown(handle("nw"), { button: 0, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(canvas(), { clientX: 10, clientY: 5 });
+    fireEvent.pointerUp(canvas());
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        x: 120,
+        y: 210,
+        width: 280,
+        height: 90,
+      }),
+    );
+  });
+
+  it("keeps a text's box as tall as its words", async () => {
+    const words = text({
+      text: "Hello This is a test aaaaaaaaaaaaaaaaaa",
+      x: 100,
+      y: 200,
+      width: 600,
+      height: 300,
+    });
+    const { user } = await open(scene(words));
+    await user.click(row(/^Hello/));
+    sized();
+    // Two lines, 60 px on screen at half size
+    const measured = vi
+      .spyOn(Range.prototype, "getBoundingClientRect")
+      .mockReturnValue(new DOMRect(0, 0, 300, 60));
+
+    fireEvent.pointerDown(handle("se"), { button: 0, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(canvas(), { clientX: 0, clientY: -500 });
+    fireEvent.pointerUp(canvas());
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ y: 200, height: 120 }),
+    );
+
+    // From the top it stops there too, its bottom kept
+    fireEvent.pointerDown(handle("nw"), { button: 0, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(canvas(), { clientX: 0, clientY: 500 });
+    fireEvent.pointerUp(canvas());
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ y: 200, height: 120 }),
+    );
+    expect(measured).toHaveBeenCalled();
   });
 
   it("moves a selected layer's elements as one, and a click without moving picks", async () => {

@@ -14,6 +14,7 @@ import {
   findElement,
   moveElement,
   pickElement,
+  resizeBox,
   stepElement,
   toCanvas,
   moveLayer,
@@ -131,6 +132,59 @@ describe("roundBox", () => {
       width: 1,
       height: 1,
     });
+  });
+});
+
+describe("resizeBox", () => {
+  const box = { x: 100, y: 200, width: 300, height: 100 };
+
+  it("resizes from each corner, keeping the opposite one", () => {
+    expect(resizeBox(box, "se", 20.4, -10)).toEqual({
+      x: 100,
+      y: 200,
+      width: 320,
+      height: 90,
+    });
+    expect(resizeBox(box, "nw", 20, 10)).toEqual({
+      x: 120,
+      y: 210,
+      width: 280,
+      height: 90,
+    });
+    expect(resizeBox(box, "ne", 20, 10)).toEqual({
+      x: 100,
+      y: 210,
+      width: 320,
+      height: 90,
+    });
+    expect(resizeBox(box, "sw", -20, 10)).toEqual({
+      x: 80,
+      y: 200,
+      width: 320,
+      height: 110,
+    });
+  });
+
+  it("stops at the least size, the dragged corner held there", () => {
+    // Past the opposite corner: 1 px wide, and as tall as the text
+    const heights: number[] = [];
+    const words = (width: number) => {
+      heights.push(width);
+      return 60;
+    };
+
+    expect(resizeBox(box, "nw", 500, 500, words)).toEqual({
+      x: 399,
+      y: 240,
+      width: 1,
+      height: 60,
+    });
+    expect(resizeBox(box, "se", -500, -500)).toMatchObject({
+      width: 1,
+      height: 1,
+    });
+    // Asked at the width it gets
+    expect(heights).toEqual([1]);
   });
 });
 

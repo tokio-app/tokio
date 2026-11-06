@@ -293,7 +293,7 @@
   outline: calc(1px / var(--canvas-scale)) solid var(--border);
 }
 
-/* A layer that waits for an event on stream, placed where it will show */
+/* An element that waits for an event on stream, placed where it shows */
 .stage_root :global(.studio-waits) {
   outline: calc(1px / var(--canvas-scale)) dashed var(--font-secondary);
 }
@@ -305,17 +305,39 @@
   pointer-events: none;
 }
 
+/* One on each corner, centered on it */
 .handle {
   position: absolute;
-  right: -6px;
-  bottom: -6px;
   width: 12px;
   height: 12px;
   border: 2px solid var(--font-primary);
   border-radius: var(--radius-sm);
   background-color: var(--accent-primary);
-  cursor: nwse-resize;
   pointer-events: auto;
+}
+
+.handle_nw {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+
+.handle_ne {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+
+.handle_sw {
+  bottom: -6px;
+  left: -6px;
+  cursor: nesw-resize;
+}
+
+.handle_se {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
 }
 
 .canvas_size {

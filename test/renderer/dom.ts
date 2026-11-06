@@ -13,6 +13,10 @@ Object.defineProperties(HTMLElement.prototype, {
 Element.prototype.scrollTo = () => {};
 globalThis.scrollTo = () => {};
 
+// Overlay Studio measures a text's words with a range, which jsdom can't lay
+// out: a test spies on it for a size.
+Range.prototype.getBoundingClientRect = () => new DOMRect();
+
 // jsdom doesn't play media, and logs an error for each player that
 // releaseOnUnmount frees.
 HTMLMediaElement.prototype.load = () => {};
