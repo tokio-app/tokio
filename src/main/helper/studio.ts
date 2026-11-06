@@ -53,16 +53,13 @@ export function liveNumbers({
 
 // Where the overlay server serves an embed
 const embedPath = (source: StudioSource) => {
-  switch (source.type) {
-    case "installed":
-      return `/${encodeURIComponent(source.id)}/`;
-    case "alert":
-      return `/${ALERTS_PATH}/${encodeURIComponent(source.id)}/`;
-    case "timer":
-      return `/${TIMER_PATH}/`;
-    case "games":
-      return `/${MINECRAFT_OVERLAY_PATH}/`;
+  if (source.type === "installed") return `/${encodeURIComponent(source.id)}/`;
+  if (source.type === "alert") {
+    return `/${ALERTS_PATH}/${encodeURIComponent(source.id)}/`;
   }
+  return source.type === "timer"
+    ? `/${TIMER_PATH}/`
+    : `/${MINECRAFT_OVERLAY_PATH}/`;
 };
 
 // The media library, as the server mounts it for the alerts' pages

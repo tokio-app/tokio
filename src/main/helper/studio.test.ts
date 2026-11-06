@@ -37,7 +37,10 @@ const session = (startedAt: number | null) => ({
 
 const setup = (
   overlays: StudioOverlay[],
-  { startedAt = 1 as number | null, studio = new StudioService() } = {},
+  {
+    startedAt = 1,
+    studio = new StudioService(),
+  }: { startedAt?: number | null; studio?: StudioService } = {},
 ) => {
   const sendToClient = vi.fn((_id: string, _data: unknown) => true);
   const h = createHandler({

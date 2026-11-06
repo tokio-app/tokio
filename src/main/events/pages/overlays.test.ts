@@ -98,9 +98,7 @@ const studioServices = () => ({
 
 // Where the studio overlay's embed loads from, in each view sent
 const embedSrcs = (sendToClient: ReturnType<typeof vi.fn>) =>
-  sendToClient.mock.calls.map(
-    ([, message]) => (message as any).data.view.layers[0].src,
-  );
+  sendToClient.mock.calls.map(([, message]) => message.data.view.layers[0].src);
 
 // The change is made, but the store file wasn't written.
 const saveError = {

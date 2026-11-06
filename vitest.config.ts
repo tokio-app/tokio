@@ -2,6 +2,7 @@ import react from "@vitejs/plugin-react";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { defineConfig } from "vitest/config";
+import { inlineScript } from "./electron.vite.config";
 
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 
@@ -20,6 +21,8 @@ export default defineConfig({
     projects: [
       {
         extends: true,
+        // The served pages' ?script imports, as main builds them
+        plugins: [inlineScript()],
         resolve: {
           // Same aliases as the main process in electron.vite.config.ts
           alias: {

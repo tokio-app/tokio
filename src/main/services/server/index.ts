@@ -1,4 +1,6 @@
 import GAMES_STYLES from "@/common/games/overlay.css?raw";
+import STUDIO_STYLES from "@/common/studio/overlay.css?raw";
+import STAGE from "@/common/studio/stage.ts?script";
 import {
   isLiveEvent,
   TOKIO_EVENTS,
@@ -10,6 +12,7 @@ import {
   formatError,
   MINECRAFT_OVERLAY_PATH,
   SERVER_PORT,
+  STUDIO_PATH,
   TIMER_PATH,
 } from "@/common/util";
 import ARCHIVO from "@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2?inline";
@@ -23,6 +26,7 @@ import { MusicService } from "../music";
 import { Service } from "../shared";
 import ALERT_PAGE from "./alert.html?raw";
 import GAMES_HTML from "./games.html?raw";
+import STUDIO_HTML from "./studio.html?raw";
 import TIMER_HTML from "./timer.html?raw";
 import { CustomWebSocketServer } from "./websocket";
 
@@ -34,6 +38,11 @@ const GAMES_PAGE = GAMES_HTML.replace("__ARCHIVO__", () => ARCHIVO).replace(
   "/* __STYLES__ */",
   () => GAMES_STYLES,
 );
+
+// With the look and the renderer it shares with Overlay Studio's editor
+const STUDIO_PAGE = STUDIO_HTML.replace("__ARCHIVO__", () => ARCHIVO)
+  .replace("/* __STYLES__ */", () => STUDIO_STYLES)
+  .replace("/* __STAGE__ */", () => STAGE);
 
 // Adapter names that are usually virtual: Hyper-V, WSL, VMs, Docker, bridges.
 // A real network card can have them too, with Hyper-V or a bridge set up.
@@ -66,6 +75,11 @@ export class ServerService extends Service {
     // The countdown timer's overlay. Express 5 matches /timer/ too.
     this._app.get(`/${TIMER_PATH}`, (_req, res) => {
       res.type("html").send(TIMER_PAGE);
+    });
+    // Each Overlay Studio overlay, the same page: it reads its id from its
+    // path.
+    this._app.get(`/${STUDIO_PATH}/:id`, (_req, res) => {
+      res.type("html").send(STUDIO_PAGE);
     });
     // Minecraft's overlay, every column or one: the page reads its column
     // from its path. Other names there, like its pictures' folder, pass on.
