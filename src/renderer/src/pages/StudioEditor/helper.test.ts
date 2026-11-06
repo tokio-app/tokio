@@ -44,7 +44,10 @@ describe("layerName", () => {
       ),
     ).toBe("Emote 1");
     expect(
-      layerName(layer("overlay", { source: { type: "games" } }), context),
+      layerName(
+        layer("overlay", { source: { type: "games", column: null } }),
+        context,
+      ),
     ).toBe("Gift jar");
   });
 
@@ -82,7 +85,8 @@ describe("sourceValue and sourceOf", () => {
       { type: "installed", id: "gift-jar" },
       { type: "alert", id: "a:1" },
       { type: "timer" },
-      { type: "games" },
+      { type: "games", column: null },
+      { type: "games", column: 2 },
     ] as const) {
       expect(sourceOf(sourceValue(source)!)).toEqual(source);
     }

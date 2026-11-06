@@ -583,6 +583,8 @@
   "studio.settings.canvas": "Canvas",
   "studio.settings.portrait": "Portrait",
   "studio.settings.landscape": "Landscape",
+  "studio.embed.gamesColumn": "Games overlay, column {column}",
+  "studio.embed.gamesRow": "Games overlay, row {row}",
   "alerts.editor.title": "{trigger} alert",
   "tts.voice.title": "Voice",
   "tts.voice.description": "The voice that reads chat aloud.",

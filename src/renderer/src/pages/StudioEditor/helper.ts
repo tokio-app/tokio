@@ -99,19 +99,26 @@ export function sampleReact(
   return { layer: layer.id };
 }
 
-// An embed's source as a Select's value, and back
-export const sourceValue = (source: StudioSource | null) =>
-  !source
-    ? undefined
-    : "id" in source
-      ? `${source.type}:${source.id}`
-      : source.type;
+// An embed's source as a Select's value ("games:2" for one column), and back
+export function sourceValue(source: StudioSource | null) {
+  if (!source) return undefined;
+  if ("id" in source) return `${source.type}:${source.id}`;
+  if (source.type === "games" && source.column !== null) {
+    return `games:${source.column}`;
+  }
+  return source.type;
+}
 
 export function sourceOf(value: string): StudioSource {
-  if (value === "timer" || value === "games") return { type: value };
+  if (value === "timer") return { type: value };
+  if (value === "games") return { type: value, column: null };
   const at = value.indexOf(":");
+  const type = value.slice(0, at);
+  if (type === "games") {
+    return { type, column: Number(value.slice(at + 1)) };
+  }
   return {
-    type: value.slice(0, at) === "alert" ? "alert" : "installed",
+    type: type === "alert" ? "alert" : "installed",
     id: value.slice(at + 1),
   };
 }

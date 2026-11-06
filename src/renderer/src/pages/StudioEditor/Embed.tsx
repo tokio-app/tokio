@@ -93,9 +93,20 @@ export function Embed({ layer, installed, timer, games }: Props) {
       </FitBox>
     );
   } else {
-    content = games && (
+    const { column } = source;
+    // One column's page shows only that column's rows, as its only column
+    const shown =
+      games && column !== null
+        ? {
+            look: { ...games.look, columns: 1 },
+            rows: games.rows
+              .filter((row) => row.column === column)
+              .map((row) => ({ ...row, column: 1 })),
+          }
+        : games;
+    content = shown && (
       <FitBox>
-        <OverlayPreview look={games.look} rows={games.rows} run={null} bare />
+        <OverlayPreview look={shown.look} rows={shown.rows} run={null} bare />
       </FitBox>
     );
   }

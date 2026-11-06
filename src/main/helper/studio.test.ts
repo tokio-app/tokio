@@ -93,7 +93,11 @@ describe("sendStudioOverlays", () => {
         }),
         layer("a", { kind: "overlay", source: { type: "alert", id: "a/1" } }),
         layer("t", { kind: "overlay", source: { type: "timer" } }),
-        layer("k", { kind: "overlay", source: { type: "games" } }),
+        layer("k", {
+          kind: "overlay",
+          source: { type: "games", column: null },
+        }),
+        layer("2", { kind: "overlay", source: { type: "games", column: 2 } }),
       ]),
       overlay(OTHER, []),
     ]);
@@ -113,6 +117,8 @@ describe("sendStudioOverlays", () => {
       "/alerts/a%2F1/",
       "/timer/",
       "/games/minecraft/",
+      // One column's page
+      "/games/minecraft/2/",
     ]);
     expect(view?.layers[0]).toMatchObject({ kind: "media", video: true });
   });

@@ -583,6 +583,8 @@
   "studio.settings.canvas": "Lienzo",
   "studio.settings.portrait": "Vertical",
   "studio.settings.landscape": "Horizontal",
+  "studio.embed.gamesColumn": "Overlay de juegos, columna {column}",
+  "studio.embed.gamesRow": "Overlay de juegos, fila {row}",
   "alerts.editor.title": "Alerta: {trigger}",
   "tts.voice.title": "Voz",
   "tts.voice.description": "La voz que lee el chat en voz alta.",

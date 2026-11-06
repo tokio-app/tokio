@@ -90,6 +90,19 @@ describe("StudioLayerSchema", () => {
     expect(embed({ type: "page", id: "x" })).toBe(false);
   });
 
+  it("takes one of the games overlay's columns, or all of them", () => {
+    const embed = (source: unknown) =>
+      StudioLayerSchema.safeParse(layer({ kind: "overlay", source }));
+
+    // Layers saved before columns frame them all
+    expect(embed({ type: "games" }).data).toMatchObject({
+      source: { type: "games", column: null },
+    });
+    expect(embed({ type: "games", column: 4 }).success).toBe(true);
+    expect(embed({ type: "games", column: 5 }).success).toBe(false);
+    expect(embed({ type: "games", column: 1.5 }).success).toBe(false);
+  });
+
   it("keeps the caps", () => {
     const text = (fields: object) =>
       StudioLayerSchema.safeParse(layer({ kind: "text", ...fields })).success;

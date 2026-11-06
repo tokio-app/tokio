@@ -58,6 +58,7 @@ import {
   Samples,
   sampleText,
   sampleViewerOf,
+  sourceValue,
   whenText,
 } from "./helper";
 import { LayerSettings } from "./LayerSettings";
@@ -208,6 +209,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
 
   const alerts = profile?.alerts.items;
   const games = profile?.games;
+  // The games page calls its columns rows when they sit side by side
+  const gamesRows = games?.overlay.layout === "horizontal";
 
   // An embed's name, for its box and its row
   const label = (source: StudioSource): string => {
@@ -227,8 +230,13 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       }
       case "timer":
         return t("tools.countdown.title");
-      default:
-        return t("studio.embed.games");
+      default: {
+        if (source.column === null) return t("studio.embed.games");
+        const n = String(source.column);
+        return gamesRows
+          ? t("studio.embed.gamesRow", { row: n })
+          : t("studio.embed.gamesColumn", { column: n });
+      }
     }
   };
 
@@ -249,13 +257,13 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               ? getAlertOverlayURL(source.id)
               : source.type === "timer"
                 ? getOverlayURL(TIMER_PATH)
-                : getMinecraftOverlayURL(),
+                : getMinecraftOverlayURL(source.column ?? undefined),
         text: (layer) => sampleText(layer, samples, language),
         viewer: (layer) => sampleViewerOf(layer, samples),
         label,
       }),
-    // label reads installed, alerts and t
-    [overlay, giftChoices, installed, alerts, samples, language, t],
+    // label reads installed, alerts, the games layout and t
+    [overlay, giftChoices, installed, alerts, gamesRows, samples, language, t],
   );
 
   const gamesPreview = useMemo(
@@ -272,10 +280,26 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     [games, giftChoices, emotes, language],
   );
 
+  // Each column of the games overlay can be placed on its own, and so can one
+  // a layer kept after the games overlay lost it
+  const gameColumns = Math.max(
+    games?.overlay.columns ?? 1,
+    ...overlay.layers.map((l) =>
+      l.kind === "overlay" && l.source?.type === "games"
+        ? (l.source.column ?? 1)
+        : 1,
+    ),
+  );
   const sources: SelectOption<string>[] = [
     ...installed.map((o) => ({ value: `installed:${o.id}`, label: o.name })),
     { value: "timer", label: t("tools.countdown.title") },
     { value: "games", label: t("studio.embed.games") },
+    ...(gameColumns > 1
+      ? Array.from({ length: gameColumns }, (_, i) => {
+          const source = { type: "games", column: i + 1 } as const;
+          return { value: sourceValue(source)!, label: label(source) };
+        })
+      : []),
     ...(alerts ?? []).flatMap((alert: Alert, index) =>
       alert.media
         ? [

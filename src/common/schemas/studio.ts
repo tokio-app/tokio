@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TOKIO_EVENTS } from "../types/connector";
-import { TriggerSchema } from "./profile";
+import { GAMES_OVERLAY_MAX_COLUMNS, TriggerSchema } from "./profile";
 import { ColorSchema, FONT_MAX_LENGTH } from "./timer";
 
 // Overlay Studio's canvases, in px: one browser source each
@@ -130,12 +130,23 @@ export const StudioLayerSchema = z.discriminatedUnion("kind", [
     ...LAYER,
     kind: z.literal("overlay"),
     source: z
+      // One member per type, so a chain of ifs on type narrows to the last
       .discriminatedUnion("type", [
+        z.object({ type: z.literal("installed"), id: z.string().min(1) }),
+        z.object({ type: z.literal("alert"), id: z.string().min(1) }),
+        z.object({ type: z.literal("timer") }),
         z.object({
-          type: z.enum(["installed", "alert"]),
-          id: z.string().min(1),
+          type: z.literal("games"),
+          // One column of the games overlay (a row when it's horizontal),
+          // null for all of them, as layers saved before columns have
+          column: z
+            .number()
+            .int()
+            .min(1)
+            .max(GAMES_OVERLAY_MAX_COLUMNS)
+            .nullable()
+            .default(null),
         }),
-        z.object({ type: z.enum(["timer", "games"]) }),
       ])
       .nullable()
       .default(null),

@@ -423,7 +423,9 @@ describe("StudioEditor", () => {
 
   it("draws the timer's and the games overlay's previews without their panels", async () => {
     const timer = layerOf("overlay", { source: { type: "timer" } });
-    const games = layerOf("overlay", { source: { type: "games" } });
+    const games = layerOf("overlay", {
+      source: { type: "games", column: null },
+    });
     await open(studioOverlay("Main", { id: ID, layers: [timer, games] }));
 
     await send(APP_EVENTS_RESPONSE.TIMER, timerReply());
@@ -455,6 +457,40 @@ describe("StudioEditor", () => {
     expect(
       drawn(games.id).querySelector("[class*=preview_bare]"),
     ).not.toBeNull();
+  });
+
+  it("places one column of the games overlay on its own", async () => {
+    const column = layerOf("overlay", {
+      source: { type: "games", column: 2 },
+    });
+    const { user } = await open(
+      studioOverlay("Main", { id: ID, layers: [column] }),
+    );
+    const action = (name: string, n: number) => ({
+      ...createAction("bedrock"),
+      overlay: { show: true, image: null, event: "", name, column: n },
+    });
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.games.overlay.columns = 2;
+        p.games.actions = [action("TNT rain", 1), action("Creeper party", 2)];
+      }),
+    );
+
+    // Only its column's rows, as /games/minecraft/2/ draws them
+    expect(drawn(column.id)).toHaveTextContent("Creeper party");
+    expect(drawn(column.id)).not.toHaveTextContent("TNT rain");
+
+    await user.click(row(/^Games overlay, column 2/));
+    await user.click(field("Overlay").getByText("Games overlay, column 2"));
+    await user.click(screen.getByText("Games overlay, column 1"));
+
+    await waitFor(() =>
+      expect(lastSave()?.layers[0]).toMatchObject({
+        source: { type: "games", column: 1 },
+      }),
+    );
   });
 
   it("names an alert's embed, and offers only alerts with media", async () => {

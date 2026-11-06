@@ -57,9 +57,11 @@ const embedPath = (source: StudioSource) => {
   if (source.type === "alert") {
     return `/${ALERTS_PATH}/${encodeURIComponent(source.id)}/`;
   }
-  return source.type === "timer"
-    ? `/${TIMER_PATH}/`
-    : `/${MINECRAFT_OVERLAY_PATH}/`;
+  if (source.type === "timer") return `/${TIMER_PATH}/`;
+  // One column's page, or every column's
+  return source.column === null
+    ? `/${MINECRAFT_OVERLAY_PATH}/`
+    : `/${MINECRAFT_OVERLAY_PATH}/${source.column}/`;
 };
 
 // The media library, as the server mounts it for the alerts' pages
