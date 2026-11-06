@@ -198,7 +198,10 @@
   user-select: none;
 }
 
-.stage_root {
+/* Two classes, so it wins over the stream stylesheet's .studio-stage on the
+   same element, whatever order the two load in: its position: relative left
+   the root as tall as its absolute canvas, 0, and the canvas scaled to 0 */
+.stage .stage_root {
   position: absolute;
   inset: 0;
 }
