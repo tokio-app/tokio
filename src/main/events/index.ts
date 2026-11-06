@@ -8,6 +8,7 @@ import lives from "./pages/lives";
 import music from "./pages/music";
 import overlays from "./pages/overlays";
 import settings from "./pages/settings";
+import studio from "./pages/studio";
 import tools from "./pages/tools";
 import tts from "./pages/tts";
 import updates from "./pages/updates";
@@ -23,6 +24,7 @@ export default mergeStacks(
   alerts,
   games,
   tools,
+  studio,
   about,
   updates,
 );

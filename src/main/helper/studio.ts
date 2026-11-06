@@ -2,8 +2,10 @@ import { StudioOverlay, StudioSource } from "@/common/schemas";
 import {
   CustomGift,
   STUDIO_MESSAGE,
+  STUDIO_REACT_MESSAGE,
   StudioMessage,
   StudioNumbers,
+  StudioReact,
   StudioView,
 } from "@/common/types";
 import {
@@ -100,6 +102,17 @@ export const sendStudioMessage = (
   serverService.sendToClient(studioSocketId(id), {
     type: STUDIO_MESSAGE,
     data: message,
+  });
+
+/** Plays a layer's reaction on its overlay's page. */
+export const sendStudioReact = (
+  { serverService }: Pick<Services, "serverService">,
+  id: string,
+  react: StudioReact,
+) =>
+  serverService.sendToClient(studioSocketId(id), {
+    type: STUDIO_REACT_MESSAGE,
+    data: react,
   });
 
 // Whether one of its texts shows a live number, sent again as they change
