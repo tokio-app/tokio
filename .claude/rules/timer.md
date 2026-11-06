@@ -53,7 +53,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
   - The title wraps instead of clipping, which would cut its halo into a box.
   - The carousel is one line that a long name cuts short. The padding inside its clipping box, taken back by negative margins, keeps the halo from being cut into a box.
 - The slot under the clock shows `×N` or `added`, summed until `LABEL_MS` after the last change. Times read like `formatAdded` (`src/common/util/timer.ts`), which the page's `changeText` repeats in plain JS.
-- The page's preview (`TimerPreview`, `SLOT_MS`, `TURN_MS`) does the same as the slot and the carousel, so keep the two in step.
+- The page's preview (`TimerPreview`, `SLOT_MS`, `TURN_MS`) does the same as the slot and the carousel, so keep the two in step. Its `bare` drops the panel's border, wash and padding, for an embed in Overlay Studio's editor.
 - **Fonts and colors:** a font goes in with `style.fontFamily = JSON.stringify(name.trim())` plus the fallbacks. It's one CSSOM property, so a name can't add styles. Colors are CSS variables, which the schema keeps to hex.
 
 ## The page

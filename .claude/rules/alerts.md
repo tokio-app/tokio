@@ -65,7 +65,8 @@ paths:
 - Deleting a sound or media file (`REMOVE_SOUND`, `REMOVE_MEDIA`):
   - takes it out of its library, then off every alert in every profile (`StoreManagerService.removeFromAlerts`, which shares `_updateProfiles` with `removeFromGames`), then deletes the file;
   - a profile that can't be saved keeps the file, for its alerts, and fails with `saveFailure()`;
-  - main sends `ALERT_FILE_REMOVED`, and the Alerts page clears the file from the alerts it shows, so its next save doesn't bring it back;
+  - `REMOVE_MEDIA` also clears the file from every Overlay Studio media layer (`removeFromStudio`, the layer stays empty) and re-sends the studio views; a store it can't write keeps the file too (see `.claude/rules/studio.md`);
+  - main sends `ALERT_FILE_REMOVED`, and the Alerts page (and Overlay Studio's editor, for media) clears the file from what it shows, so its next save doesn't bring it back;
   - a sound whose file can't be deleted still leaves the library, with a warning (`SOUND_REMOVE_FAILED`).
 - **Clear** in the pickers takes the sound, message or media off the alert and keeps the file.
 - Upload counts only sounds new to the library: one already in `settings.sounds`, or picked twice, isn't counted.
@@ -130,7 +131,7 @@ paths:
 - Migration: `withSavedMedia` (a preprocess on `AlertSchema`) gives media saved without a volume the alert's, and cuts a video saved before cuts (no `start`) at its old `duration` unless its `match_video` was on. The schema no longer has `match_video`.
 - Media rides on the alert's audio: a missing sound, or a message that banned words block or that fails, skips it too. A viewer on the TTS block list still gets it (see Text-to-speech). A file missing on disk (a profile imported from another computer) shows nothing, with no notice.
 - Request numbering: the page applies a `SET_ALERT_MEDIA` reply only while that alert waits for one (`askedMedia`). `IMPORT_MEDIA` carries `request` (one counter with the sounds') and `SET_ALERT_MEDIA` echoes it, failures included: the page applies only a reply newer than the last applied for that alert (`appliedMedia`), and the picker shows only the newest request's failure. `IMPORT_MEDIA` also replies `GET_MEDIA`.
-- The `MediaPicker` only picks: it closes after a pick, and once a browsed file for its alert arrives.
+- The `MediaPicker` only picks: it closes after a pick, and once a browsed file for its alert arrives. It takes `{ id, chosen }` (an alert's or an Overlay Studio layer's id, and its file), not an alert.
 - It's the shared `LibraryPicker` (`components/MediaPicker/LibraryPicker.tsx`, which holds both pickers' library, search, listeners, failure check and delete flow), with:
   - the media events and texts;
   - `DeleteMediaModal`;
