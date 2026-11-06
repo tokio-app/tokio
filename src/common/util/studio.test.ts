@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  StudioLayer,
+  StudioElement,
+  StudioElementSchema,
   StudioLayerSchema,
   StudioOverlay,
 } from "../schemas/studio";
 import { ChatEvent, TOKIO_EVENTS } from "../types/connector";
 import {
   fillStudioText,
+  newStudioElement,
   newStudioLayer,
   SAMPLE_NUMBERS,
   studioVariables,
@@ -17,8 +19,8 @@ import {
 
 const ID = "8f14e45f-ceea-4672-9a8e-1b2c3d4e5f60";
 const box = { x: 0, y: 0, width: 100, height: 100 };
-const layer = (id: string, fields: object): StudioLayer =>
-  StudioLayerSchema.parse({ id, ...box, ...fields });
+const element = (id: string, fields: object): StudioElement =>
+  StudioElementSchema.parse({ id, ...box, ...fields });
 
 const chat = (content: string): ChatEvent => ({
   user: { username: "Sora", handle: "sora", profilePictures: [] },
@@ -72,8 +74,8 @@ describe("usesNumbers and studioVariables", () => {
     expect(usesNumbers("Thanks {username}")).toBe(false);
   });
 
-  it("adds the trigger's variables only to a layer that reacts", () => {
-    const text = layer("t", { kind: "text" });
+  it("adds the trigger's variables only to an element that reacts", () => {
+    const text = element("t", { kind: "text" });
 
     expect(studioVariables(text)).toEqual([
       "likes",
@@ -107,27 +109,32 @@ describe("studioView", () => {
     ...changes,
   });
 
-  const overlay = (layers: StudioLayer[]): StudioOverlay => ({
+  // One layer holding the elements
+  const overlay = (elements: StudioElement[]): StudioOverlay => ({
     id: ID,
     name: "",
     size: "landscape",
-    layers,
+    layers: [StudioLayerSchema.parse({ id: "l", elements })],
   });
 
   it("resolves each kind, back to front", () => {
-    const { width, height, layers } = studioView(
+    const {
+      width,
+      height,
+      layers: [{ elements: layers }],
+    } = studioView(
       overlay([
-        layer("shape", { kind: "shape" }),
-        layer("text", { kind: "text", text: "hi" }),
-        layer("clip", { kind: "media", file: "a.MP4" }),
-        layer("still", { kind: "media", file: "b.png" }),
-        layer("rose", { kind: "gift", gift: 5655 }),
-        layer("unknown", { kind: "gift", gift: 1 }),
-        layer("emote", {
+        element("shape", { kind: "shape" }),
+        element("text", { kind: "text", text: "hi" }),
+        element("clip", { kind: "media", file: "a.MP4" }),
+        element("still", { kind: "media", file: "b.png" }),
+        element("rose", { kind: "gift", gift: 5655 }),
+        element("unknown", { kind: "gift", gift: 1 }),
+        element("emote", {
           kind: "emote",
           emote: { id: "1", image: "https://e/1.webp" },
         }),
-        layer("viewer", { kind: "viewer", when: "event" }),
+        element("viewer", { kind: "viewer", when: "event" }),
       ]),
       deps(),
     );
@@ -158,19 +165,21 @@ describe("studioView", () => {
 
   it("keeps an embed that can't load in its place, with no src", () => {
     const embedPath = vi.fn((source) => `/${source.id ?? source.type}/`);
-    const { layers } = studioView(
+    const {
+      layers: [{ elements: layers }],
+    } = studioView(
       overlay([
-        layer("jar", {
+        element("jar", {
           kind: "overlay",
           source: { type: "installed", id: "gift-jar" },
         }),
-        layer("gone", {
+        element("gone", {
           kind: "overlay",
           source: { type: "installed", id: "removed" },
         }),
-        layer("timer", { kind: "overlay", source: { type: "timer" } }),
-        layer("none", { kind: "overlay" }),
-        layer("empty", { kind: "media" }),
+        element("timer", { kind: "overlay", source: { type: "timer" } }),
+        element("none", { kind: "overlay" }),
+        element("empty", { kind: "media" }),
       ]),
       deps({ embedPath }),
     );
@@ -186,23 +195,59 @@ describe("studioView", () => {
     expect(layers[3]).toMatchObject({ source: null, label: "" });
     expect(embedPath).toHaveBeenCalledTimes(2);
   });
+
+  it("leaves hidden layers out, the others keeping their place", () => {
+    const layer = (id: string, hidden = false) =>
+      StudioLayerSchema.parse({
+        id,
+        hidden,
+        elements: [element(`${id}-shape`, { kind: "shape" })],
+      });
+    const { layers } = studioView(
+      {
+        ...overlay([]),
+        layers: [layer("back"), layer("middle", true), layer("front")],
+      },
+      deps(),
+    );
+
+    expect(layers.map((l) => [l.id, l.z])).toEqual([
+      ["back", 0],
+      ["front", 2],
+    ]);
+    expect(layers[1].elements).toMatchObject([{ id: "front-shape", z: 0 }]);
+  });
 });
 
-describe("newStudioLayer", () => {
-  it("centers a new layer on the canvas, with its own id", () => {
-    const a = newStudioLayer("text", "portrait");
-    const b = newStudioLayer("text", "portrait");
+describe("newStudioElement", () => {
+  it("centers a new element on the canvas, with its own id", () => {
+    const a = newStudioElement("text", "portrait");
+    const b = newStudioElement("text", "portrait");
 
     expect(a).toMatchObject({ x: 180, y: 880, width: 720, height: 160 });
     expect(a.id).not.toBe(b.id);
-    expect(StudioLayerSchema.parse(a)).toEqual(a);
+    expect(StudioElementSchema.parse(a)).toEqual(a);
   });
 
   it("makes a viewer's picture wait for an event", () => {
-    expect(newStudioLayer("viewer", "landscape")).toMatchObject({
+    expect(newStudioElement("viewer", "landscape")).toMatchObject({
       when: "event",
       trigger: { type: TOKIO_EVENTS.FOLLOW },
     });
-    expect(newStudioLayer("gift", "landscape").when).toBe("always");
+    expect(newStudioElement("gift", "landscape").when).toBe("always");
+  });
+});
+
+describe("newStudioLayer", () => {
+  it("makes an empty layer with the name and its own id", () => {
+    const a = newStudioLayer("Layer 1");
+
+    expect(a).toMatchObject({
+      name: "Layer 1",
+      locked: false,
+      hidden: false,
+      elements: [],
+    });
+    expect(a.id).not.toBe(newStudioLayer("Layer 1").id);
   });
 });

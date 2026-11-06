@@ -8,10 +8,14 @@ import {
   MockInstance,
   vi,
 } from "vitest";
-import type { StudioLayerView, StudioView } from "../types/studio";
+import type {
+  StudioElementView,
+  StudioLayerView,
+  StudioView,
+} from "../types/studio";
 import { createStage, Stage } from "./stage";
 
-type TextView = Extract<StudioLayerView, { kind: "text" }>;
+type TextView = Extract<StudioElementView, { kind: "text" }>;
 
 const BASE: Omit<TextView, "id" | "kind" | keyof typeof TEXT> = {
   x: 10,
@@ -44,15 +48,22 @@ const text = (id: string, fields: Partial<TextView> = {}): TextView => ({
   ...fields,
 });
 
-const view = (...layers: StudioLayerView[]): StudioView => ({
+// A canvas of layers, back to front
+const layered = (...layers: StudioLayerView[]): StudioView => ({
   width: 1080,
   height: 1920,
   layers,
 });
 
+// A canvas of one layer holding the elements
+const view = (...elements: StudioElementView[]): StudioView =>
+  layered({ id: "l", z: 0, elements });
+
 let root: HTMLElement;
 let stage: Stage;
 const el = (id: string) =>
+  root.querySelector<HTMLElement>(`[data-element="${id}"]`)!;
+const layerNode = (id: string) =>
   root.querySelector<HTMLElement>(`[data-layer="${id}"]`)!;
 const draw = (v: StudioView | null) => stage.update(v);
 
@@ -82,7 +93,7 @@ describe("on stream", () => {
     stage = createStage(root);
   });
 
-  it("draws each layer in its box, stacked by z", () => {
+  it("draws each element in its box, stacked by z", () => {
     draw(
       view(
         { ...BASE, id: "shape", kind: "shape", color: "#18181b", radius: 24 },
@@ -91,7 +102,7 @@ describe("on stream", () => {
     );
 
     const shape = el("shape");
-    expect(shape).toHaveProperty("className", "studio-layer studio-shape");
+    expect(shape).toHaveProperty("className", "studio-element studio-shape");
     expect(shape.style.left).toBe("10px");
     expect(shape.style.getPropertyValue("--studio-radius")).toBe("24px");
     const label = el("text");
@@ -112,8 +123,57 @@ describe("on stream", () => {
     expect(font("plain")).toContain("Archivo Variable");
   });
 
+  it("stacks each layer over the whole canvas, its elements inside it", () => {
+    draw(
+      layered(
+        { id: "back", z: 0, elements: [text("a")] },
+        { id: "front", z: 2, elements: [text("b"), text("c", { z: 1 })] },
+      ),
+    );
+
+    expect(layerNode("back").style.zIndex).toBe("0");
+    expect(layerNode("front").style.zIndex).toBe("2");
+    expect(layerNode("front").className).toBe("studio-layer");
+    expect(el("a").parentElement).toBe(layerNode("back"));
+    expect(el("c").parentElement).toBe(layerNode("front"));
+    expect(el("c").style.zIndex).toBe("1");
+  });
+
+  it("moves an element into its new layer, and a layer that goes takes its elements", () => {
+    const clip: StudioElementView = {
+      ...BASE,
+      id: "clip",
+      kind: "media",
+      src: "/m/a.mp4",
+      video: true,
+    };
+    draw(
+      layered(
+        { id: "back", z: 0, elements: [text("a")] },
+        { id: "front", z: 1, elements: [clip] },
+      ),
+    );
+    const a = el("a");
+
+    draw(
+      layered(
+        { id: "back", z: 0, elements: [] },
+        { id: "front", z: 1, elements: [clip, text("a")] },
+      ),
+    );
+    expect(el("a")).toBe(a);
+    expect(a.parentElement).toBe(layerNode("front"));
+
+    const video = root.querySelector("video")!;
+    draw(layered({ id: "back", z: 0, elements: [] }));
+
+    expect(root.querySelector("[data-layer='front']")).toBeNull();
+    expect(root.querySelectorAll(".studio-element")).toHaveLength(0);
+    expect(video.hasAttribute("src")).toBe(false);
+  });
+
   it("keeps each element and an embed's iframe through updates and reorders", () => {
-    const jar: StudioLayerView = {
+    const jar: StudioElementView = {
       ...BASE,
       id: "jar",
       kind: "overlay",
@@ -149,8 +209,8 @@ describe("on stream", () => {
 
     draw(view(text("a")));
 
-    expect(root.querySelector(".studio-layer")).not.toBe(before);
-    expect(root.querySelectorAll(".studio-layer")).toHaveLength(1);
+    expect(root.querySelector(".studio-element")).not.toBe(before);
+    expect(root.querySelectorAll(".studio-element")).toHaveLength(1);
   });
 
   it("hides a picture that fails, and shows a new one", () => {
@@ -166,7 +226,7 @@ describe("on stream", () => {
   });
 
   it("shows a viewer's initial without a picture or once it fails", () => {
-    const viewer = (src: string, name = "🌸sora"): StudioLayerView => ({
+    const viewer = (src: string, name = "🌸sora"): StudioElementView => ({
       ...BASE,
       id: "v",
       kind: "viewer",
@@ -190,7 +250,7 @@ describe("on stream", () => {
     expect(avatar.querySelector(".studio-initial")!.textContent).toBe("S");
   });
 
-  it("frees a video's player when its layer goes", () => {
+  it("frees a video's player when its element goes", () => {
     draw(
       view({
         ...BASE,
@@ -209,18 +269,18 @@ describe("on stream", () => {
     expect(load).toHaveBeenCalled();
   });
 
-  it("shows a layer on its event for its seconds, then hides it", () => {
+  it("shows an element on its event for its seconds, then hides it", () => {
     vi.useFakeTimers();
     draw(view(text("t", { when: "event", seconds: 3, entrance: "slide" })));
     expect(body("t").classList).toContain("studio-hidden");
 
-    stage.react({ layer: "t", text: "Thanks Sora" });
+    stage.react({ element: "t", text: "Thanks Sora" });
     expect(body("t").className).toBe("studio-body studio-enter-slide");
     expect(el("t").textContent).toBe("Thanks Sora");
 
     // Another event restarts its time, with the new text
     vi.advanceTimersByTime(2000);
-    stage.react({ layer: "t", text: "Thanks Kai" });
+    stage.react({ element: "t", text: "Thanks Kai" });
     vi.advanceTimersByTime(2000);
     expect(body("t").classList).not.toContain("studio-hidden");
     expect(el("t").textContent).toBe("Thanks Kai");
@@ -233,7 +293,7 @@ describe("on stream", () => {
     expect(body("t").className).toBe("studio-body studio-hidden");
   });
 
-  it("starts a video over each time its layer shows", () => {
+  it("starts a video over each time its element shows", () => {
     draw(
       view({
         ...BASE,
@@ -247,13 +307,13 @@ describe("on stream", () => {
     const video = root.querySelector("video")!;
     video.currentTime = 4;
 
-    stage.react({ layer: "clip" });
+    stage.react({ element: "clip" });
 
     expect(video.currentTime).toBe(0);
     expect(play).toHaveBeenCalled();
   });
 
-  it("plays a moving layer's animation again on each event, with the new picture", () => {
+  it("plays a moving element's animation again on each event, with the new picture", () => {
     draw(
       view({
         ...BASE,
@@ -266,14 +326,14 @@ describe("on stream", () => {
       }),
     );
 
-    stage.react({ layer: "v", picture: "https://p/kai.webp", name: "Kai" });
+    stage.react({ element: "v", picture: "https://p/kai.webp", name: "Kai" });
     expect(body("v").className).toBe("studio-body studio-play-shake");
     expect(root.querySelector("img")!.getAttribute("src")).toBe(
       "https://p/kai.webp",
     );
 
     body("v").classList.add("studio-enter-pop");
-    stage.react({ layer: "v" });
+    stage.react({ element: "v" });
     expect(body("v").className).toBe("studio-body studio-play-shake");
     expect(body("v").classList).not.toContain("studio-hidden");
   });
@@ -302,6 +362,7 @@ describe("on stream", () => {
     draw(view(text("t")));
     draw(null);
     expect(root.querySelectorAll(".studio-layer")).toHaveLength(0);
+    expect(root.querySelectorAll(".studio-element")).toHaveLength(0);
 
     stage.destroy();
     expect(root.innerHTML).toBe("");
@@ -315,7 +376,7 @@ describe("in the editor", () => {
   });
 
   it("gives every embed a stable slot, and no iframe", () => {
-    const embed = (src: string | null): StudioLayerView => ({
+    const embed = (src: string | null): StudioElementView => ({
       ...BASE,
       id: "timer",
       kind: "overlay",
@@ -334,14 +395,14 @@ describe("in the editor", () => {
     expect(stage.slot("nope")).toBeNull();
   });
 
-  it("keeps a layer that waits for an event on screen, marked, and replays it in place", () => {
+  it("keeps an element that waits for an event on screen, marked, and replays it in place", () => {
     vi.useFakeTimers();
     draw(view(text("t", { when: "event", entrance: "fade" })));
 
     expect(el("t").classList).toContain("studio-waits");
     expect(body("t").classList).not.toContain("studio-hidden");
 
-    stage.react({ layer: "t", text: "Thanks Sora" });
+    stage.react({ element: "t", text: "Thanks Sora" });
     expect(body("t").className).toBe("studio-body studio-enter-fade");
 
     vi.advanceTimersByTime(60_000);

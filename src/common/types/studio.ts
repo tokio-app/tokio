@@ -6,9 +6,9 @@ import type {
   StudioWhen,
 } from "../schemas/studio";
 
-// What every resolved layer has. Its box is in px of the canvas, and z goes
-// back to front: 0 is the back.
-type StudioLayerViewBase = {
+// What every resolved element has. Its box is in px of the canvas, and z goes
+// back to front in its layer: 0 is the back.
+type StudioElementViewBase = {
   id: string;
   x: number;
   y: number;
@@ -23,10 +23,10 @@ type StudioLayerViewBase = {
 };
 
 /**
- * One layer as the stage draws it (studioView), everything resolved. A
- * `src: null` draws nothing on stream but keeps the layer's place.
+ * One element as the stage draws it (studioView), everything resolved. A
+ * `src: null` draws nothing on stream but keeps the element's place.
  */
-export type StudioLayerView = StudioLayerViewBase &
+export type StudioElementView = StudioElementViewBase &
   (
     | {
         kind: "text";
@@ -56,7 +56,14 @@ export type StudioLayerView = StudioLayerViewBase &
       }
   );
 
-// A studio overlay's canvas and layers, as its page draws them
+// A layer as the stage draws it, over the layers with a lower z
+export type StudioLayerView = {
+  id: string;
+  z: number;
+  elements: StudioElementView[];
+};
+
+// A studio overlay's canvas and the layers it shows, as its page draws them
 export type StudioView = {
   width: number;
   height: number;
@@ -80,10 +87,10 @@ export const STUDIO_REACT_MESSAGE = "tokio:studio:react";
 // tokio:studio: the overlay to draw, null when it was removed
 export type StudioMessage = { view: StudioView | null };
 
-// tokio:studio:react: a layer's trigger fired. The text (a text layer's) and
+// tokio:studio:react: an element's trigger fired. The text (a text's) and
 // the picture and name (a viewer's) replace what it shows.
 export type StudioReact = {
-  layer: string;
+  element: string;
   text?: string;
   picture?: string;
   name?: string;

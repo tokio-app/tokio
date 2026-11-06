@@ -6,25 +6,28 @@
  *
  *   .studio-stage                    the root given to createStage
  *     .studio-canvas                 the canvas at its px size, scaled to fit
- *       .studio-layer.studio-<kind>  one per layer, data-layer its id: its box,
- *                                    z-index, opacity,
+ *       .studio-layer                one per layer shown, data-layer its id:
+ *                                    the whole canvas, its z-index
+ *         .studio-element.studio-<kind>
+ *                                    one per element, data-element its id:
+ *                                    its box, z-index in the layer, opacity,
  *                                    --studio-color and --studio-radius;
- *                                    .studio-waits in the editor on a layer
- *                                    that waits for an event
- *         .studio-body               what moves: .studio-hidden,
+ *                                    .studio-waits in the editor on one that
+ *                                    waits for an event
+ *           .studio-body             what moves: .studio-hidden,
  *                                    .studio-enter-<fade|pop|slide>,
  *                                    .studio-play-<bounce|shake|pulse>
- *           text     .studio-text (.studio-bold, .studio-halo), its font,
- *                    size and alignment inline
- *           media    img.studio-fill or video.studio-fill
- *           gift     img.studio-fill
- *           emote    img.studio-fill
- *           shape    nothing: the body is painted
- *           viewer   .studio-avatar (.studio-has-picture), sized inline,
- *                    holding an img and .studio-initial
- *           overlay  iframe.studio-embed on stream, .studio-slot in the
- *                    editor, nothing when it can't load
- *         A picture that fails to load gets .studio-failed.
+ *             text     .studio-text (.studio-bold, .studio-halo), its font,
+ *                      size and alignment inline
+ *             media    img.studio-fill or video.studio-fill
+ *             gift     img.studio-fill
+ *             emote    img.studio-fill
+ *             shape    nothing: the body is painted
+ *             viewer   .studio-avatar (.studio-has-picture), sized inline,
+ *                      holding an img and .studio-initial
+ *             overlay  iframe.studio-embed on stream, .studio-slot in the
+ *                      editor, nothing when it can't load
+ *           A picture that fails to load gets .studio-failed.
  *
  * It must work in OBS 30's browser (Chromium 103): no :has(), nesting,
  * subgrid, container queries or color-mix(). Every class starts with studio-,
@@ -51,8 +54,17 @@
   --studio-halo: rgb(18 18 18 / 55%);
 }
 
+/* Over the whole canvas, so only its elements catch the pointer, as an
+   embed's page may want it */
 .studio-layer {
   position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.studio-element {
+  position: absolute;
+  pointer-events: auto;
   --studio-color: #f1f5f9;
   --studio-radius: 0px;
 }
@@ -167,8 +179,9 @@
   display: none;
 }
 
-/* Entrances, for a layer that shows on an event. backwards only, so a
-   finished one leaves the layer's own opacity and the hidden fade alone. */
+/* Entrances, for an element that shows on an event. backwards only, so a
+   finished one leaves the element's own opacity and the hidden fade
+   alone. */
 
 .studio-enter-fade {
   animation: studio-fade 0.4s ease-out backwards;
@@ -205,7 +218,7 @@
   }
 }
 
-/* Animations, for a layer that moves on an event, once each */
+/* Animations, for an element that moves on an event, once each */
 
 .studio-play-bounce {
   animation: studio-bounce 0.8s ease-out;
