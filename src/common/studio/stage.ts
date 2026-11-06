@@ -153,7 +153,9 @@ const setViewer = (avatar: HTMLElement, src: string, name: string) => {
     img.removeAttribute("src");
     avatar.classList.remove("studio-has-picture");
   } else if (img.getAttribute("src") !== src) {
-    avatar.classList.add("studio-has-picture");
+    // The new viewer's initial shows until their picture loads, not an
+    // empty circle
+    avatar.classList.remove("studio-has-picture");
     img.src = src;
   }
 };
@@ -161,6 +163,9 @@ const setViewer = (avatar: HTMLElement, src: string, name: string) => {
 const newAvatar = () => {
   const avatar = div("studio-avatar");
   const img = picture("");
+  img.addEventListener("load", () =>
+    avatar.classList.add("studio-has-picture"),
+  );
   img.addEventListener("error", () =>
     avatar.classList.remove("studio-has-picture"),
   );

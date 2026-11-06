@@ -181,6 +181,9 @@ describe("on stream", () => {
     expect(avatar.style.width).toBe("200px");
 
     draw(view(viewer("https://p/sora.webp", "sora")));
+    // The initial until the picture loads
+    expect(avatar.classList).not.toContain("studio-has-picture");
+    avatar.querySelector("img")!.dispatchEvent(new Event("load"));
     expect(avatar.classList).toContain("studio-has-picture");
     avatar.querySelector("img")!.dispatchEvent(new Event("error"));
     expect(avatar.classList).not.toContain("studio-has-picture");
