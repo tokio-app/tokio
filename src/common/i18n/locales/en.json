@@ -619,6 +619,8 @@
   "studio.alignTo.top": "Align top",
   "studio.alignTo.middle": "Center vertically",
   "studio.alignTo.bottom": "Align bottom",
+  "studio.variables.live": "LIVE numbers:",
+  "studio.variables.event": "From the event:",
   "alerts.editor.title": "{trigger} alert",
   "tts.voice.title": "Voice",
   "tts.voice.description": "The voice that reads chat aloud.",

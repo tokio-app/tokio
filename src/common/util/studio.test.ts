@@ -11,7 +11,7 @@ import {
   newStudioElement,
   newStudioLayer,
   SAMPLE_NUMBERS,
-  studioVariables,
+  studioEventVariables,
   studioView,
   StudioViewDeps,
   usesNumbers,
@@ -68,41 +68,35 @@ describe("fillStudioText", () => {
   });
 });
 
-describe("usesNumbers and studioVariables", () => {
+describe("usesNumbers and studioEventVariables", () => {
   it("spots a live number", () => {
     expect(usesNumbers("Goal: {coins}/5000")).toBe(true);
     expect(usesNumbers("Thanks {username}")).toBe(false);
   });
 
-  it("adds the trigger's variables only to an element that reacts", () => {
+  it("gives an element its trigger's variables only while it reacts", () => {
     const text = element("t", { kind: "text" });
 
-    expect(studioVariables(text)).toEqual([
-      "likes",
-      "viewers",
-      "followers",
-      "shares",
-      "coins",
-    ]);
+    expect(studioEventVariables(text)).toEqual([]);
     expect(
-      studioVariables({
+      studioEventVariables({
         ...text,
         when: "event",
         trigger: { ...text.trigger, type: TOKIO_EVENTS.GIFT },
       }),
-    ).toEqual(expect.arrayContaining(["coins", "username", "gift", "count"]));
+    ).toEqual(["username", "handle", "gift", "count"]);
   });
 
   it("gives a Like no viewer or count, its likes coming from every viewer", () => {
     const text = element("t", { kind: "text" });
 
     expect(
-      studioVariables({
+      studioEventVariables({
         ...text,
         when: "event",
         trigger: { ...text.trigger, type: TOKIO_EVENTS.LIKE },
       }),
-    ).toEqual(["likes", "viewers", "followers", "shares", "coins"]);
+    ).toEqual([]);
   });
 });
 

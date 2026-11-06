@@ -21,7 +21,7 @@ import { countedVariables, formatAlertMessage, mediaKind } from "./alerts";
 import { formatStat } from "./format";
 
 // The live numbers any text can show, as {likes}
-const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
+export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
   "likes",
   "viewers",
   "followers",
@@ -42,12 +42,10 @@ export const SAMPLE_NUMBERS: StudioNumbers = {
 export const usesNumbers = (text: string) =>
   STUDIO_NUMBERS.some((name) => text.includes(`{${name}}`));
 
-// The variables a text element can use: the live numbers, plus its
-// trigger's values when it reacts to one
-export const studioVariables = (element: StudioElement): string[] =>
-  element.when === "always"
-    ? [...STUDIO_NUMBERS]
-    : [...STUDIO_NUMBERS, ...countedVariables(element.trigger.type)];
+// The variables a text element gets from its trigger, none while it's
+// always on screen. The live numbers (STUDIO_NUMBERS) go in any text.
+export const studioEventVariables = (element: StudioElement): string[] =>
+  element.when === "always" ? [] : countedVariables(element.trigger.type);
 
 // Every element of the overlay, its layers' in order
 export const studioElements = (overlay: StudioOverlay): StudioElement[] =>

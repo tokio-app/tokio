@@ -858,6 +858,29 @@ describe("StudioEditor", () => {
     });
   });
 
+  it("lists the LIVE numbers, then the event's variables while it reacts", async () => {
+    const element = text({ text: "Welcome" });
+    const { user } = await open(scene(element));
+    await user.click(row(/^Welcome/));
+    const rowOf = (label: string) =>
+      within(page().getByText(label).closest("p")!);
+
+    expect(rowOf("LIVE numbers:").getByTitle("Insert {likes}")).toBeVisible();
+    expect(page().queryByText("From the event:")).toBeNull();
+
+    await user.click(page().getByRole("radio", { name: "Shows on an event" }));
+    const event = rowOf("From the event:");
+    expect(event.getByTitle("Insert {username}")).toBeVisible();
+    expect(event.queryByTitle("Insert {likes}")).toBeNull();
+    expect(rowOf("LIVE numbers:").queryByTitle("Insert {username}")).toBeNull();
+
+    // Like's come from every viewer: nothing of the event's to say
+    const trigger = page().getByRole("group", { name: "Trigger" });
+    await user.click(within(trigger).getByText("Follow"));
+    await user.click(inList(trigger, "Like")!);
+    expect(page().getByText("This event has no variables.")).toBeVisible();
+  });
+
   it("makes an element show on an event, with its trigger, seconds and entrance", async () => {
     const element = text({ text: "Thanks {username}" });
     const { user } = await open(scene(element));

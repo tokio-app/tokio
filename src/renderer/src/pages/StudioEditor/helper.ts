@@ -22,7 +22,7 @@ import {
   fillStudioText,
   generateTikTokEventSample,
   SAMPLE_NUMBERS,
-  studioVariables,
+  studioEventVariables,
 } from "@/common/util";
 import { EmoteOption } from "@/components";
 
@@ -78,7 +78,7 @@ export const sampleText = (
   fillStudioText(element.text, {
     numbers: SAMPLE_NUMBERS,
     values: sampleOf(element, samples),
-    variables: studioVariables(element),
+    variables: studioEventVariables(element),
     language,
   });
 

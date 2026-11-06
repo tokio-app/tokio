@@ -107,5 +107,6 @@ paths:
 - Elements flip horizontally and vertically, and line up with the canvas's edges and middles.
 - No ring around the whole canvas when it's clicked.
 - A Like offers no viewer or count: its likes come from every viewer (`countedVariables`). Alerts keep them, as they play each viewer's batch.
+- A text's variables are in two rows under it: **LIVE numbers** (`STUDIO_NUMBERS`), always, and **From the event** (`studioEventVariables`), only while it reacts to one.
 - Lock blocks only the canvas, clicks going through to what's under, as OBS's lock does.
 - The editor's timer and games previews are close to the stream, not exact.

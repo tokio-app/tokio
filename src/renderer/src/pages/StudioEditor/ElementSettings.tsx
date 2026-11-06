@@ -10,7 +10,7 @@ import {
   StudioWhen,
 } from "@/common/schemas";
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
-import { studioVariables } from "@/common/util";
+import { STUDIO_NUMBERS, studioEventVariables } from "@/common/util";
 import {
   Btn,
   Check,
@@ -147,12 +147,25 @@ export function ElementSettings({
               value={element.text}
               onChange={(e) => onChange({ ...element, text: e.target.value })}
             />
+            {/* The LIVE's numbers go in any text, the event's values only
+                while it reacts to one */}
             <VariableList
-              variables={studioVariables(element)}
+              label={t("studio.variables.live")}
+              variables={STUDIO_NUMBERS}
               inputRef={textRef}
               value={element.text}
               onChange={(text) => onChange({ ...element, text })}
             />
+            {element.when !== "always" && (
+              <VariableList
+                label={t("studio.variables.event")}
+                variables={studioEventVariables(element)}
+                empty={t("common.noVariables")}
+                inputRef={textRef}
+                value={element.text}
+                onChange={(text) => onChange({ ...element, text })}
+              />
+            )}
           </Field>
           <Field label={t("studio.fields.font")}>
             <FontSelect
@@ -337,7 +350,7 @@ export function ElementSettings({
           {/* On its own row, in degrees as the handle turns it */}
           {box("rotation", "studio.fields.rotation", -180, 180)}
           <Field label={t("studio.fields.flip")} className={styles.flips}>
-            <div className={styles.tools}>
+            <div className={styles.icon_buttons}>
               {flip(
                 "flip_x",
                 "studio.fields.flipX",
@@ -351,9 +364,9 @@ export function ElementSettings({
             </div>
           </Field>
           <Field label={t("studio.fields.alignTo")} className={styles.align_to}>
-            <div className={styles.tool_groups}>
+            <div className={styles.icon_groups}>
               {ALIGNS_TO.map((group) => (
-                <div key={group[0].to} className={styles.tools}>
+                <div key={group[0].to} className={styles.icon_buttons}>
                   {group.map(({ to, label, Icon }) => (
                     <Btn
                       key={to}

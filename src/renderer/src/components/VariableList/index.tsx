@@ -3,7 +3,9 @@ import { RefObject } from "react";
 import styles from "./variablelist.module.css";
 
 type Props = {
-  variables: string[];
+  variables: readonly string[];
+  // What the row says before them, "Variables:" by default
+  label?: string;
   // The input the variables go into, at its cursor
   inputRef: RefObject<HTMLInputElement | null>;
   value: string;
@@ -43,6 +45,7 @@ export function VariableList({
   value,
   onChange,
   empty,
+  label,
 }: Props) {
   const t = useT();
   if (variables.length === 0) {
@@ -73,7 +76,9 @@ export function VariableList({
 
   return (
     <p className={styles.list}>
-      <span className={styles.label}>{t("components.variables.label")}</span>
+      <span className={styles.label}>
+        {label ?? t("components.variables.label")}
+      </span>
       {variables.map((name) => (
         <button
           key={name}

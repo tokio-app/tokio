@@ -13,10 +13,10 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import {
-  countedVariables,
   fillStudioText,
   generateTikTokEventSample,
   studioElements,
+  studioEventVariables,
 } from "@/common/util";
 import { language } from "@/helper/i18n";
 import { GiftStreaks } from "@/helper/streaks";
@@ -47,7 +47,7 @@ export function studioText(
   return fillStudioText(element.text, {
     numbers,
     values: reacts ? values : null,
-    variables: reacts ? countedVariables(element.trigger.type) : [],
+    variables: studioEventVariables(element),
     language: language(),
   });
 }

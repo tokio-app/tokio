@@ -482,13 +482,13 @@
 }
 
 /* Across, then down */
-.tool_groups {
+.icon_groups {
   display: flex;
   gap: var(--space-4);
 }
 
 /* Icon buttons side by side, as tall as the fields next to them */
-.tools {
+.icon_buttons {
   display: flex;
   align-items: center;
   gap: var(--space-1);
