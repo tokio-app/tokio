@@ -12,6 +12,7 @@ import {
   ALERTS_PATH,
   formatError,
   MINECRAFT_OVERLAY_PATH,
+  studioElements,
   studioSocketId,
   studioView,
   TIMER_PATH,
@@ -81,10 +82,10 @@ function viewOf(
     served: (id) => served.has(id),
     mediaURL,
     embedPath,
-    text: (layer) =>
-      studioText(layer, numbers, studio.kept(layer)?.values ?? null),
-    viewer: (layer) => {
-      const kept = studio.kept(layer);
+    text: (element) =>
+      studioText(element, numbers, studio.kept(element)?.values ?? null),
+    viewer: (element) => {
+      const kept = studio.kept(element);
       return { src: kept?.picture ?? "", name: kept?.name ?? "" };
     },
     // The page doesn't show it; the editor names embeds itself
@@ -103,7 +104,7 @@ export const sendStudioMessage = (
     data: message,
   });
 
-/** Plays a layer's reaction on its overlay's page. */
+/** Plays an element's reaction on its overlay's page. */
 export const sendStudioReact = (
   { serverService }: Pick<Services, "serverService">,
   id: string,
@@ -116,7 +117,7 @@ export const sendStudioReact = (
 
 // Whether one of its texts shows a live number, sent again as they change
 export const showsNumbers = (overlay: StudioOverlay) =>
-  overlay.layers.some((l) => l.kind === "text" && usesNumbers(l.text));
+  studioElements(overlay).some((e) => e.kind === "text" && usesNumbers(e.text));
 
 /**
  * Sends the studio overlays' pages what to draw: every overlay, or those

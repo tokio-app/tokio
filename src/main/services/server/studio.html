@@ -34,7 +34,7 @@
     </script>
     <script>
       // One Overlay Studio overlay, at /studio/<overlay id>/. Main sends what
-      // to draw (tokio:studio) and each layer's reaction to the LIVE
+      // to draw (tokio:studio) and each element's reaction to the LIVE
       // (tokio:studio:react); the stage draws them, scaled to the source.
       const id = decodeURIComponent(location.pathname.split("/")[2] ?? "");
       const stage = TokioStage.createStage(document.getElementById("stage"), {

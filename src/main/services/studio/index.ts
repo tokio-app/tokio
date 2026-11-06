@@ -1,4 +1,8 @@
-import { StudioLayer, StudioOverlay } from "@/common/schemas";
+import {
+  StudioElement,
+  StudioElementOf,
+  StudioOverlay,
+} from "@/common/schemas";
 import {
   AlertTrigger,
   AppEvents,
@@ -12,13 +16,14 @@ import {
   ALERT_MESSAGE_VARIABLES,
   fillStudioText,
   generateTikTokEventSample,
+  studioElements,
 } from "@/common/util";
 import { language } from "@/helper/i18n";
 import { GiftStreaks } from "@/helper/streaks";
 import { eventUser, matchesTrigger, streakOf } from "@/helper/triggers";
 import { Service } from "../shared";
 
-// What a layer that reacted shows until its next event: the event's values
+// What an element that reacted shows until its next event: the event's values
 // and its viewer
 export type StudioKept = {
   trigger: AlertTrigger;
@@ -30,24 +35,24 @@ export type StudioKept = {
 type Kept = StudioKept & { overlay: string };
 
 /**
- * A text layer's text: the live numbers, and the event's values when it
+ * A text element's text: the live numbers, and the event's values when it
  * reacts (its trigger's variables read "" before its first event).
  */
 export function studioText(
-  layer: Extract<StudioLayer, { kind: "text" }>,
+  element: StudioElementOf<"text">,
   numbers: StudioNumbers,
   values: TokioEventMap[AppEvents] | null,
 ) {
-  const reacts = layer.when !== "always";
-  return fillStudioText(layer.text, {
+  const reacts = element.when !== "always";
+  return fillStudioText(element.text, {
     numbers,
     values: reacts ? values : null,
-    variables: reacts ? ALERT_MESSAGE_VARIABLES[layer.trigger.type] : [],
+    variables: reacts ? ALERT_MESSAGE_VARIABLES[element.trigger.type] : [],
     language: language(),
   });
 }
 
-// The viewer an event came from, as a viewer layer shows them
+// The viewer an event came from, as a viewer element shows them
 const viewerOf = (payload: TokioEventMap[AppEvents]) => {
   const user = eventUser(payload);
   return {
@@ -57,15 +62,16 @@ const viewerOf = (payload: TokioEventMap[AppEvents]) => {
 };
 
 /**
- * Plays Overlay Studio's layers that react to live events: it matches their
+ * Plays Overlay Studio's elements that react to live events: it matches their
  * triggers, keeps each one's last event for its page, and tells onReact.
  */
 export class StudioService extends Service {
   // Each viewer's streak of a gift, see GiftStreaks
   private _streaks = new GiftStreaks();
-  // Likes toward each Like layer's next react, by layer id
+  // Likes toward each Like element's next react, by element id
   private _likes = new Map<string, number>();
-  // Each layer's last event, by layer id, until Tokio quits
+  // Each element's last event, by element id, until Tokio quits. A hidden
+  // layer's elements react too, so the layer shows the latest when shown
   private _kept = new Map<string, Kept>();
   private _onReact?: (overlay: string, react: StudioReact) => void;
 
@@ -75,8 +81,8 @@ export class StudioService extends Service {
   }
 
   /**
-   * Reacts every layer whose trigger the event sets off. numbers is read
-   * only when a text layer reacts.
+   * Reacts every element whose trigger the event sets off. numbers is read
+   * only when a text element reacts.
    */
   public handle<K extends AppEvents>(
     type: K,
@@ -84,47 +90,47 @@ export class StudioService extends Service {
     overlays: readonly StudioOverlay[],
     numbers: () => StudioNumbers,
   ) {
-    // Once per event, whichever layers it sets off
+    // Once per event, whichever elements it sets off
     const { added, total, values } = streakOf(this._streaks, type, payload);
     let read: StudioNumbers | undefined;
     const now = () => (read ??= numbers());
 
     for (const overlay of overlays) {
-      for (const layer of overlay.layers) {
-        if (layer.when === "always") continue;
-        if (!matchesTrigger(layer.trigger, type, payload, added, total)) {
+      for (const element of studioElements(overlay)) {
+        if (element.when === "always") continue;
+        if (!matchesTrigger(element.trigger, type, payload, added, total)) {
           continue;
         }
-        if (!this._passes(layer, payload)) continue;
+        if (!this._passes(element, payload)) continue;
         const kept: StudioKept = {
-          trigger: layer.trigger.type,
+          trigger: element.trigger.type,
           values,
           ...viewerOf(payload),
         };
-        this._kept.set(layer.id, { ...kept, overlay: overlay.id });
-        this._onReact?.(overlay.id, this._react(layer, kept, now));
+        this._kept.set(element.id, { ...kept, overlay: overlay.id });
+        this._onReact?.(overlay.id, this._react(element, kept, now));
       }
     }
   }
 
   /**
-   * What a layer shows from its last event, none before its first or once
-   * its trigger changed.
+   * What an element shows from its last event, none before its first or
+   * once its trigger changed.
    */
-  public kept(layer: StudioLayer): StudioKept | null {
-    const kept = this._kept.get(layer.id);
-    return kept && kept.trigger === layer.trigger.type ? kept : null;
+  public kept(element: StudioElement): StudioKept | null {
+    const kept = this._kept.get(element.id);
+    return kept && kept.trigger === element.trigger.type ? kept : null;
   }
 
   /**
-   * Every layer of the overlay that reacts, once, with a sample of its
+   * Every element of the overlay that reacts, once, with a sample of its
    * trigger's event. Nothing is kept, so a reload shows the real last event.
    */
   public test(overlay: StudioOverlay, numbers: StudioNumbers): StudioReact[] {
-    return overlay.layers
-      .filter((layer) => layer.when !== "always")
-      .map((layer) => {
-        const { type } = layer.trigger;
+    return studioElements(overlay)
+      .filter((element) => element.when !== "always")
+      .map((element) => {
+        const { type } = element.trigger;
         // Emote triggers match chats
         const event = type === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : type;
         const values = generateTikTokEventSample(event).data;
@@ -133,11 +139,11 @@ export class StudioService extends Service {
           values,
           ...viewerOf(values),
         };
-        return this._react(layer, sample, () => numbers);
+        return this._react(element, sample, () => numbers);
       });
   }
 
-  /** Forgets what a removed overlay's layers kept. */
+  /** Forgets what a removed overlay's elements kept. */
   public forget(overlay: string) {
     for (const [id, kept] of this._kept) {
       if (kept.overlay !== overlay) continue;
@@ -148,19 +154,19 @@ export class StudioService extends Service {
 
   /**
    * Forgets the gift streaks, as their ends may be missed, and the likes
-   * counted toward each Like layer. What the layers kept stays.
+   * counted toward each Like element. What the elements kept stays.
    */
   public clear() {
     this._streaks.clear();
     this._likes.clear();
   }
 
-  // Whether a matching layer reacts: on Like, once the likes from every
+  // Whether a matching element reacts: on Like, once the likes from every
   // viewer pass another likes_every (the rest count toward the next), at
   // most once per event
-  private _passes(layer: StudioLayer, payload: TokioEventMap[AppEvents]) {
+  private _passes(element: StudioElement, payload: TokioEventMap[AppEvents]) {
     if (
-      layer.trigger.type !== TOKIO_EVENTS.LIKE ||
+      element.trigger.type !== TOKIO_EVENTS.LIKE ||
       typeof payload !== "object" ||
       payload === null ||
       !("likeCount" in payload)
@@ -168,20 +174,21 @@ export class StudioService extends Service {
       return true;
     }
     const likes =
-      (this._likes.get(layer.id) ?? 0) + Math.max(0, payload.likeCount);
-    this._likes.set(layer.id, likes % layer.likes_every);
-    return likes >= layer.likes_every;
+      (this._likes.get(element.id) ?? 0) + Math.max(0, payload.likeCount);
+    this._likes.set(element.id, likes % element.likes_every);
+    return likes >= element.likes_every;
   }
 
   private _react(
-    layer: StudioLayer,
+    element: StudioElement,
     { values, picture, name }: StudioKept,
     numbers: () => StudioNumbers,
   ): StudioReact {
-    if (layer.kind === "text") {
-      return { layer: layer.id, text: studioText(layer, numbers(), values) };
+    const { id } = element;
+    if (element.kind === "text") {
+      return { element: id, text: studioText(element, numbers(), values) };
     }
-    if (layer.kind === "viewer") return { layer: layer.id, picture, name };
-    return { layer: layer.id };
+    if (element.kind === "viewer") return { element: id, picture, name };
+    return { element: id };
   }
 }

@@ -577,7 +577,7 @@ events.push(
     const { alertsService, storeManagerService, notifier } = services;
     if (!(await storeManagerService.removeMedia(file))) throw saveFailure();
     const deleted = await deleteFile(services, e, "media", file, async (f) => {
-      // Studio layers that show it stay, empty. Like the alerts, they keep
+      // Studio elements that show it stay, empty. Like the alerts, they keep
       // the file when the store can't be saved.
       const cleared = await storeManagerService.removeFromStudio(f);
       await sendStudioOverlays(services);

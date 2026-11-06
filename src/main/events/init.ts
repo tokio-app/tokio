@@ -475,7 +475,7 @@ const registerConnectorEvents = ({
         serverService: server,
         pathManagerService: paths,
       });
-      // And so do studio layers that show it
+      // And so do studio elements that show it
       await sendStudioOverlays({
         storeManagerService: store,
         overlayService: overlays,
@@ -658,7 +658,7 @@ const registerTimer = ({
   onLanguage(() => server.sendToClient(TIMER_PATH, overlayMessage(0)));
 };
 
-// Overlay Studio's layers react to live events whatever features are on,
+// Overlay Studio's elements react to live events whatever features are on,
 // and its texts follow the live numbers. Registered after
 // registerConnectorEvents: the connector runs its listeners in order, so the
 // stats and the LIVE session already hold an event when these read them.

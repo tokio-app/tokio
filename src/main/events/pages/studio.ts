@@ -104,7 +104,7 @@ events.push(
   options("main.failure.removeStudioOverlay"),
 );
 
-// Plays every layer that reacts on stream, with samples it doesn't keep. No
+// Plays every element that reacts on stream, with samples it doesn't keep. No
 // page connected isn't a failure: the editor plays it on its own stage.
 events.push(
   APP_EVENTS.TEST_STUDIO_OVERLAY,

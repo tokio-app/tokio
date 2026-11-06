@@ -13,7 +13,7 @@ import {
   SavedEmote,
   StoreSchema,
   StoreZodSchema,
-  StudioLayer,
+  StudioElement,
   StudioOverlay,
   StudioOverlaySchema,
   TestOverlay,
@@ -26,6 +26,7 @@ import {
   formatError,
   IMAGE_EXTENSIONS,
   MEDIA_EXTENSIONS,
+  studioElements,
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
@@ -401,20 +402,23 @@ export class StoreManagerService extends Service {
   }
 
   /**
-   * Takes a deleted media file off every studio layer that shows it; the
-   * layers stay, empty. Saves nothing when none has it.
+   * Takes a deleted media file off every studio element that shows it, in
+   * any layer; the elements stay, empty. Saves nothing when none has it.
    */
   public async removeFromStudio(file: string): Promise<boolean> {
     this._ensureInitialized();
     const { settings } = this._storeData!;
-    const has = (layer: StudioLayer) =>
-      layer.kind === "media" && layer.file === file;
-    if (!settings.studio.some((o) => o.layers.some(has))) return true;
+    const has = (element: StudioElement) =>
+      element.kind === "media" && element.file === file;
+    if (!settings.studio.some((o) => studioElements(o).some(has))) return true;
     settings.studio = settings.studio.map((o) => ({
       ...o,
-      layers: o.layers.map((layer) =>
-        has(layer) ? { ...layer, file: "", name: "" } : layer,
-      ),
+      layers: o.layers.map((layer) => ({
+        ...layer,
+        elements: layer.elements.map((element) =>
+          has(element) ? { ...element, file: "", name: "" } : element,
+        ),
+      })),
     }));
     return this._queueSave();
   }
