@@ -16,6 +16,20 @@ export const getAlertOverlayURL = (id: string) =>
 // connects with this id, and browser sources point at it.
 export const TIMER_PATH = "timer";
 
+// NOTE: DO NOT CHANGE. Each Overlay Studio overlay is served at
+// /studio/<overlay id>/, connects with studio:<overlay id>, and browser
+// sources point at it.
+export const STUDIO_PATH = "studio";
+
+export const getStudioOverlayURL = (id: string) =>
+  `http://${APP_HOSTNAME}:${SERVER_PORT}/${STUDIO_PATH}/${encodeURIComponent(id)}/`;
+
+// What a studio overlay's socket id starts with, for onConnect to spot it
+export const STUDIO_SOCKET_PREFIX = `${STUDIO_PATH}:`;
+
+// The socket id a studio overlay's page connects with
+export const studioSocketId = (id: string) => `${STUDIO_SOCKET_PREFIX}${id}`;
+
 // NOTE: DO NOT CHANGE. Each game's overlay is served under /games/<game>/
 // and connects with this id.
 export const GAMES_PATH = "games";
