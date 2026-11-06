@@ -106,6 +106,6 @@ paths:
 - Elements lock and hide like layers, and turn by a handle on the canvas or the Rotation field, like their size.
 - Elements flip horizontally and vertically, and line up with the canvas's edges and middles.
 - No ring around the whole canvas when it's clicked.
-- A Like offers no viewer or count: its likes come from every viewer (`ALERT_MESSAGE_VARIABLES`).
+- A Like offers no viewer or count: its likes come from every viewer (`countedVariables`). Alerts keep them, as they play each viewer's batch.
 - Lock blocks only the canvas, clicks going through to what's under, as OBS's lock does.
 - The editor's timer and games previews are close to the stream, not exact.

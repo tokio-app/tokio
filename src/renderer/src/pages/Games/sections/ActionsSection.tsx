@@ -13,7 +13,7 @@ import {
   CustomGift,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { ALERT_MESSAGE_VARIABLES, COUNTED_HAZARDS } from "@/common/util";
+import { COUNTED_HAZARDS, countedVariables } from "@/common/util";
 import {
   Btn,
   Check,
@@ -228,8 +228,8 @@ function ActionItem({
   // A gift on every gift runs once for each, it has no count to say.
   const variables =
     trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
-      ? ALERT_MESSAGE_VARIABLES[trigger.type].filter((name) => name !== "count")
-      : ALERT_MESSAGE_VARIABLES[trigger.type];
+      ? countedVariables(trigger.type).filter((name) => name !== "count")
+      : countedVariables(trigger.type);
 
   useIpcListener(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, (res) => {
     if (!res || res.id !== action.id) return;

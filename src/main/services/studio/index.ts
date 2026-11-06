@@ -13,7 +13,7 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import {
-  ALERT_MESSAGE_VARIABLES,
+  countedVariables,
   fillStudioText,
   generateTikTokEventSample,
   studioElements,
@@ -47,7 +47,7 @@ export function studioText(
   return fillStudioText(element.text, {
     numbers,
     values: reacts ? values : null,
-    variables: reacts ? ALERT_MESSAGE_VARIABLES[element.trigger.type] : [],
+    variables: reacts ? countedVariables(element.trigger.type) : [],
     language: language(),
   });
 }

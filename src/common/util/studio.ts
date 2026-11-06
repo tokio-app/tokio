@@ -17,11 +17,7 @@ import type {
   StudioNumbers,
   StudioView,
 } from "../types/studio";
-import {
-  ALERT_MESSAGE_VARIABLES,
-  formatAlertMessage,
-  mediaKind,
-} from "./alerts";
+import { countedVariables, formatAlertMessage, mediaKind } from "./alerts";
 import { formatStat } from "./format";
 
 // The live numbers any text can show, as {likes}
@@ -51,7 +47,7 @@ export const usesNumbers = (text: string) =>
 export const studioVariables = (element: StudioElement): string[] =>
   element.when === "always"
     ? [...STUDIO_NUMBERS]
-    : [...STUDIO_NUMBERS, ...ALERT_MESSAGE_VARIABLES[element.trigger.type]];
+    : [...STUDIO_NUMBERS, ...countedVariables(element.trigger.type)];
 
 // Every element of the overlay, its layers' in order
 export const studioElements = (overlay: StudioOverlay): StudioElement[] =>
