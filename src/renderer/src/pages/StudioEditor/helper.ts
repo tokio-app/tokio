@@ -1,6 +1,7 @@
 import { MessageKey } from "@/common/i18n";
 import {
   StudioAlign,
+  StudioCrop,
   StudioElement,
   StudioElementKind,
   StudioElementOf,
@@ -999,3 +1000,195 @@ export function withGuide(
  */
 export const guideAt = (value: number, lines: SnapLine[], reach: number) =>
   Math.round(value + stick([value], lines, reach)) || 0;
+
+// A picture's own size
+export type Size = { width: number; height: number };
+// Mirrored left to right, and top to bottom
+type Flips = { flip_x: boolean; flip_y: boolean };
+// An element with a picture, as far as cropping it goes
+type Pictured = Turned & Flips & { crop: StudioCrop };
+// Where a crop is: all of the picture and the part it keeps, in its
+// element's box's own px from its top left corner, unturned
+export type CropFrames = { picture: Box; frame: Box };
+
+// A crop that keeps all of the picture
+export const WHOLE: StudioCrop = { left: 0, top: 0, right: 0, bottom: 0 };
+
+/**
+ * Where a picture shows in its element's box: all of it, and the part its
+ * crop keeps, which fits the box as contain fits a whole picture. A flip
+ * shows a crop's left side on the right.
+ */
+export function pictureFrames(element: Pictured, own: Size): CropFrames {
+  const { left, top, right, bottom } = element.crop;
+  const kept = {
+    width: (1 - left - right) * own.width,
+    height: (1 - top - bottom) * own.height,
+  };
+  const scale = Math.min(
+    element.width / kept.width,
+    element.height / kept.height,
+  );
+  const frame = {
+    x: (element.width - kept.width * scale) / 2,
+    y: (element.height - kept.height * scale) / 2,
+    width: kept.width * scale,
+    height: kept.height * scale,
+  };
+  const width = own.width * scale;
+  const height = own.height * scale;
+  return {
+    picture: {
+      x: frame.x - (element.flip_x ? right : left) * width,
+      y: frame.y - (element.flip_y ? bottom : top) * height,
+      width,
+      height,
+    },
+    frame,
+  };
+}
+
+/** The part of the picture a crop keeps, wherever the picture is. */
+export function frameOf(picture: Box, crop: StudioCrop, flips: Flips): Box {
+  return {
+    x: picture.x + (flips.flip_x ? crop.right : crop.left) * picture.width,
+    y: picture.y + (flips.flip_y ? crop.bottom : crop.top) * picture.height,
+    width: (1 - crop.left - crop.right) * picture.width,
+    height: (1 - crop.top - crop.bottom) * picture.height,
+  };
+}
+
+// A share to 4 decimals, between 0 and 1, never -0
+const share = (n: number) =>
+  Math.min(1, Math.max(0, Math.round(n * 10000) / 10000)) || 0;
+
+/** The crop that keeps a frame of the picture, its sides to 4 decimals. */
+export function cropOf(picture: Box, frame: Box, flips: Flips): StudioCrop {
+  const before = {
+    x: (frame.x - picture.x) / picture.width,
+    y: (frame.y - picture.y) / picture.height,
+  };
+  const after = {
+    x: (picture.x + picture.width - frame.x - frame.width) / picture.width,
+    y: (picture.y + picture.height - frame.y - frame.height) / picture.height,
+  };
+  return {
+    left: share(flips.flip_x ? after.x : before.x),
+    top: share(flips.flip_y ? after.y : before.y),
+    right: share(flips.flip_x ? before.x : after.x),
+    bottom: share(flips.flip_y ? before.y : after.y),
+  };
+}
+
+/**
+ * A rect in an element's box's own px, unturned, as a box on the canvas: its
+ * middle turned with the element around the box's middle.
+ */
+export function boxOn(element: Turned, local: Box): Turned {
+  const middle = turn(
+    {
+      x: local.x + local.width / 2 - element.width / 2,
+      y: local.y + local.height / 2 - element.height / 2,
+    },
+    element.rotation,
+  );
+  return {
+    x: element.x + element.width / 2 + middle.x - local.width / 2,
+    y: element.y + element.height / 2 + middle.y - local.height / 2,
+    width: local.width,
+    height: local.height,
+    rotation: element.rotation,
+  };
+}
+
+/**
+ * An element's box and crop for a new crop, its picture kept where it shows
+ * and as big: the box, in whole px, becomes the part the crop keeps.
+ */
+export function recrop(
+  element: Pictured,
+  own: Size,
+  crop: StudioCrop,
+): Box & { crop: StudioCrop } {
+  const { picture } = pictureFrames(element, own);
+  return { ...roundBox(boxOn(element, frameOf(picture, crop, element))), crop };
+}
+
+// The crop frame's handles: its corners and its sides' middles
+export const CROP_SIDES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+export type CropSide = (typeof CROP_SIDES)[number];
+
+// The least a crop keeps across and down, in px of the canvas
+const CROP_MIN = 8;
+
+const clamp = (n: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, n));
+
+/**
+ * A crop dragged by (dx, dy) px of the canvas from where it began, the move
+ * turned back into its box's own axes. A side or corner moves the frame's
+ * sides, within the picture and at least CROP_MIN apart; none, a press inside
+ * the frame, moves the picture under it, which keeps the frame inside.
+ */
+export function cropDrag(
+  from: CropFrames,
+  side: CropSide | null,
+  dx: number,
+  dy: number,
+  rotation: number,
+): CropFrames {
+  const along = turn({ x: dx, y: dy }, -rotation);
+  const { picture, frame } = from;
+  if (side === null) {
+    return {
+      picture: {
+        ...picture,
+        x: clamp(
+          picture.x + along.x,
+          frame.x + frame.width - picture.width,
+          frame.x,
+        ),
+        y: clamp(
+          picture.y + along.y,
+          frame.y + frame.height - picture.height,
+          frame.y,
+        ),
+      },
+      frame,
+    };
+  }
+  let left = frame.x;
+  let top = frame.y;
+  let right = frame.x + frame.width;
+  let bottom = frame.y + frame.height;
+  if (side.includes("w")) {
+    left = clamp(left + along.x, picture.x, right - CROP_MIN);
+  }
+  if (side.includes("e")) {
+    right = clamp(right + along.x, left + CROP_MIN, picture.x + picture.width);
+  }
+  if (side.includes("n")) {
+    top = clamp(top + along.y, picture.y, bottom - CROP_MIN);
+  }
+  if (side.includes("s")) {
+    bottom = clamp(
+      bottom + along.y,
+      top + CROP_MIN,
+      picture.y + picture.height,
+    );
+  }
+  return {
+    picture,
+    frame: { x: left, y: top, width: right - left, height: bottom - top },
+  };
+}
+
+/** What a picture element shows, which a new one of resets its crop. */
+export const pictureSource = (element: StudioElement) =>
+  element.kind === "media"
+    ? element.file
+    : element.kind === "gift"
+      ? element.gift
+      : element.kind === "emote"
+        ? (element.emote?.id ?? null)
+        : null;

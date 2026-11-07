@@ -132,9 +132,9 @@ function Guides({
   const middle = { x: canvas.width / 2, y: canvas.height / 2 };
 
   return (
-    <div className={styles.guides} role="group" aria-labelledby={title}>
-      <div className={styles.guides_head}>
-        <span id={title} className={styles.guides_title}>
+    <div className={styles.titled} role="group" aria-labelledby={title}>
+      <div className={styles.titled_head}>
+        <span id={title} className={styles.titled_name}>
           {t("studio.guides.title")}
         </span>
         <div className={styles.icon_buttons}>

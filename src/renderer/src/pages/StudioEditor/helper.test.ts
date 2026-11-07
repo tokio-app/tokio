@@ -13,7 +13,15 @@ import {
   alignTo,
   bounds,
   copyItem,
+  boxOn,
   cornerOf,
+  cropDrag,
+  cropOf,
+  frameOf,
+  pictureFrames,
+  pictureSource,
+  recrop,
+  WHOLE,
   elementName,
   guideAt,
   metLines,
@@ -928,5 +936,140 @@ describe("sticking and guides", () => {
     expect(guideAt(537.6, lines.x, 6)).toBe(540);
     expect(guideAt(620.4, lines.x, 6)).toBe(620);
     expect(Object.is(guideAt(-0.4, [], 6), 0)).toBe(true);
+  });
+});
+
+describe("cropping", () => {
+  // A 300 × 200 box, unturned, unflipped
+  const pictured = (crop = WHOLE, patch = {}) => ({
+    x: 0,
+    y: 0,
+    width: 300,
+    height: 200,
+    rotation: 0,
+    flip_x: false,
+    flip_y: false,
+    crop,
+    ...patch,
+  });
+  // A tenth off the left, three tenths off the right, the bottom half off
+  const CROP = { left: 0.1, top: 0, right: 0.3, bottom: 0.5 };
+  // A rect's numbers without floating point's last digits
+  const near = (rect: Record<string, number>) =>
+    Object.fromEntries(
+      Object.entries(rect).map(([key, n]) => [key, Math.round(n * 1e6) / 1e6]),
+    );
+
+  it("finds a picture and the part it keeps in its box, as contain fits it", () => {
+    // 400 × 200 whole: at 0.75 to fit 300 wide, 25 down
+    expect(pictureFrames(pictured(), { width: 400, height: 200 })).toEqual({
+      picture: { x: 0, y: 25, width: 300, height: 150 },
+      frame: { x: 0, y: 25, width: 300, height: 150 },
+    });
+    // 240 × 100 kept, at 1.25: all of it 500 × 250, its left tenth past the
+    // box's edge
+    const frames = pictureFrames(pictured(CROP), { width: 400, height: 200 });
+    expect(near(frames.frame)).toEqual({
+      x: 0,
+      y: 37.5,
+      width: 300,
+      height: 125,
+    });
+    expect(near(frames.picture)).toEqual({
+      x: -50,
+      y: 37.5,
+      width: 500,
+      height: 250,
+    });
+    // Flipped, its right side shows on the left
+    expect(
+      pictureFrames(pictured(CROP, { flip_x: true }), {
+        width: 400,
+        height: 200,
+      }).picture.x,
+    ).toBeCloseTo(-150);
+  });
+
+  it("turns a crop into the part it keeps and back, flipped too", () => {
+    const picture = { x: -50, y: 10, width: 500, height: 250 };
+    for (const flips of [
+      { flip_x: false, flip_y: false },
+      { flip_x: true, flip_y: true },
+    ]) {
+      const frame = frameOf(picture, CROP, flips);
+      expect(frame.width).toBeCloseTo(300);
+      expect(frame.height).toBeCloseTo(125);
+      expect(cropOf(picture, frame, flips)).toEqual(CROP);
+    }
+    expect(
+      near(frameOf(picture, CROP, { flip_x: true, flip_y: true })),
+    ).toEqual({ x: 100, y: 135, width: 300, height: 125 });
+  });
+
+  it("puts a rect of a turned box on the canvas around the box's middle", () => {
+    // The left half of a 200 × 100 box turned a quarter, which shows on top
+    const left = boxOn(
+      { x: 100, y: 100, width: 200, height: 100, rotation: 90 },
+      { x: 0, y: 0, width: 100, height: 100 },
+    );
+    expect(left.x).toBeCloseTo(150);
+    expect(left.y).toBeCloseTo(50);
+    expect(left).toMatchObject({ width: 100, height: 100, rotation: 90 });
+  });
+
+  it("trims a box to a new crop, the picture kept in place", () => {
+    const own = { width: 400, height: 200 };
+    // The right half kept: the box loses its left half and its empty bands
+    expect(recrop(pictured(), own, { ...WHOLE, left: 0.5 })).toEqual({
+      x: 150,
+      y: 25,
+      width: 150,
+      height: 150,
+      crop: { ...WHOLE, left: 0.5 },
+    });
+    // And all of it back, as big as it was
+    const right = { ...pictured({ ...WHOLE, left: 0.5 }), x: 150, y: 25 };
+    expect(recrop({ ...right, width: 150, height: 150 }, own, WHOLE)).toEqual({
+      x: 0,
+      y: 25,
+      width: 300,
+      height: 150,
+      crop: WHOLE,
+    });
+  });
+
+  it("drags a crop's sides within the picture, and the picture under it", () => {
+    const frames = {
+      picture: { x: -50, y: 0, width: 500, height: 250 },
+      frame: { x: 0, y: 0, width: 300, height: 125 },
+    };
+    // Its right side out, no further than the picture
+    expect(cropDrag(frames, "e", 500, 0, 0).frame).toEqual({
+      x: 0,
+      y: 0,
+      width: 450,
+      height: 125,
+    });
+    // Its top left corner in, never closer than 8 to its other sides
+    expect(cropDrag(frames, "nw", 400, 400, 0).frame).toEqual({
+      x: 292,
+      y: 117,
+      width: 8,
+      height: 8,
+    });
+    // Turned a half turn, a drag left moves its left side right
+    expect(cropDrag(frames, "w", -20, 0, 180).frame.x).toBeCloseTo(20);
+    // The picture moves, as far as the frame stays in it
+    expect(cropDrag(frames, null, 30, -500, 0)).toEqual({
+      picture: { x: -20, y: -125, width: 500, height: 250 },
+      frame: frames.frame,
+    });
+  });
+
+  it("knows what a picture shows, to reset its crop when it changes", () => {
+    expect(pictureSource(element("media", { file: "a.png" }))).toBe("a.png");
+    expect(pictureSource(element("gift", { gift: 5655 }))).toBe(5655);
+    expect(pictureSource(element("emote"))).toBeNull();
+    expect(pictureSource(element("shape"))).toBeNull();
   });
 });

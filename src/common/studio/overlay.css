@@ -29,7 +29,8 @@
  *                      holding an img and .studio-initial
  *             overlay  iframe.studio-embed on stream, .studio-slot in the
  *                      editor, nothing when it can't load
- *           A picture that fails to load gets .studio-failed.
+ *           A picture that fails to load gets .studio-failed. One that's
+ *           cropped or rounded gets .studio-cut, its place and clip inline.
  *
  * It must work in OBS 30's browser (Chromium 103): no :has(), nesting,
  * subgrid, container queries or color-mix(). Every class starts with studio-,
@@ -121,6 +122,14 @@
 
 .studio-failed {
   visibility: hidden;
+}
+
+/* Cropped or rounded: all of the picture, placed inline around the part it
+   keeps, which its clip-path or its circle leaves */
+.studio-cut {
+  position: absolute;
+  max-width: none;
+  object-fit: fill;
 }
 
 /* The border inside the box, so it keeps its size */

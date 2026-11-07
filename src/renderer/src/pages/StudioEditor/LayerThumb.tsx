@@ -1,7 +1,8 @@
-import { StudioElement } from "@/common/schemas";
+import { StudioCrop, StudioElement } from "@/common/schemas";
 import { CustomGift } from "@/common/types";
 import { MediaThumbnail } from "@/components";
 import { useT } from "@/ui/i18n";
+import { CSSProperties } from "react";
 import { IconType } from "react-icons";
 import {
   LuAppWindow,
@@ -34,9 +35,16 @@ export function LayerThumb({
       <Icon size={16} />
     </span>
   );
-  const picture = (src: string) => (
+  // A picture's part it keeps, as its thumbnail shows it
+  const kept = (crop: StudioCrop): CSSProperties | undefined =>
+    crop.left || crop.top || crop.right || crop.bottom
+      ? {
+          objectViewBox: `inset(${crop.top * 100}% ${crop.right * 100}% ${crop.bottom * 100}% ${crop.left * 100}%)`,
+        }
+      : undefined;
+  const picture = (src: string, crop: StudioCrop) => (
     <span className={styles.thumb} aria-hidden>
-      <img src={src} alt="" loading="lazy" />
+      <img src={src} alt="" loading="lazy" style={kept(crop)} />
     </span>
   );
 
@@ -77,17 +85,19 @@ export function LayerThumb({
     case "media":
       return element.file ? (
         <span className={styles.thumb} aria-hidden>
-          <MediaThumbnail file={element.file} />
+          <MediaThumbnail file={element.file} style={kept(element.crop)} />
         </span>
       ) : (
         icon(LuImage)
       );
     case "gift": {
       const image = gifts.find((gift) => gift.value === element.gift)?.img;
-      return image ? picture(image) : icon(LuGift);
+      return image ? picture(image, element.crop) : icon(LuGift);
     }
     case "emote":
-      return element.emote ? picture(element.emote.image) : icon(LuSmile);
+      return element.emote
+        ? picture(element.emote.image, element.crop)
+        : icon(LuSmile);
     case "viewer":
       return icon(LuCircleUserRound);
     // An embedded overlay

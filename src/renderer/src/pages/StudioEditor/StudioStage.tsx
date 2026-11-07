@@ -1,7 +1,7 @@
 // The stream's own stylesheet, global as on its page, like the games
 // overlay's preview: the canvas can't drift from what's on stream
 import "@/common/studio/overlay.css";
-import { STUDIO_MAX_GUIDES, StudioGuides } from "@/common/schemas";
+import { STUDIO_MAX_GUIDES, StudioCrop, StudioGuides } from "@/common/schemas";
 import { createStage, Stage, StageFit } from "@/common/studio/stage";
 import { StudioElementView, StudioView } from "@/common/types";
 import { Btn } from "@/components";
@@ -11,6 +11,7 @@ import isEqual from "fast-deep-equal";
 import {
   CSSProperties,
   KeyboardEvent,
+  MouseEvent,
   PointerEvent,
   ReactNode,
   RefObject,
@@ -26,9 +27,15 @@ import { LuMaximize, LuRuler, LuZoomIn, LuZoomOut } from "react-icons/lu";
 import {
   Axis,
   Box,
+  boxOn,
   clampZoom,
   Corner,
   CORNERS,
+  CROP_SIDES,
+  cropDrag,
+  CropFrames,
+  cropOf,
+  CropSide,
   fitText,
   guideAt,
   holdsTurned,
@@ -36,6 +43,7 @@ import {
   metLines,
   nearGuide,
   pickElement,
+  pictureFrames,
   Point,
   resizeBox,
   rotateCursor,
@@ -48,6 +56,7 @@ import {
   toCanvas,
   turnTo,
   Turned,
+  WHOLE,
   withGuide,
   Words,
   zoomStep,
@@ -109,6 +118,12 @@ type Props = {
   onHold: (held: boolean) => void;
   // Deletes a group with its elements, or an element
   onDelete: (id: string) => void;
+  // The element being cropped on the canvas, and a double-click asking to
+  // crop one
+  cropping: string | null;
+  onCropStart: (id: string) => void;
+  // A crop kept, as its element's new box and crop, or canceled (null)
+  onCrop: (id: string, kept: (Box & { crop: StudioCrop }) | null) => void;
   // An embed's preview, portaled into its slot
   embed: (element: EmbedView) => ReactNode;
   // The bar under the canvas, beside its zoom: its size
@@ -182,10 +197,38 @@ type Drag =
       at: number | null;
       // What it sticks to on its axis
       lines: SnapLine[];
+    }
+  | {
+      kind: "crop";
+      // The crop frame's handle it drags, null to move the picture under it
+      side: CropSide | null;
+      x: number;
+      y: number;
+      scale: number;
+      rotation: number;
+      // Where the crop was when the press began
+      from: CropFrames;
     };
 
-// The cursor a drag keeps on the whole stage: a guide's is its axis's
-type Held = "rotate" | "move" | "pan" | Axis | Corner;
+// The cursor a drag keeps on the whole stage: a guide's is its axis's, a
+// crop frame's handle's its side's or corner's
+type Held = "rotate" | "move" | "pan" | Axis | CropSide;
+
+// The kinds a double-click crops on the canvas: not a viewer's picture,
+// which fills its circle, so only its fields crop it
+const CANVAS_CROPS = new Set(["media", "gift", "emote"]);
+
+// Each crop handle's place on the frame
+const CROP_HANDLES: Record<CropSide, string> = {
+  nw: styles.crop_nw,
+  n: styles.crop_n,
+  ne: styles.crop_ne,
+  e: styles.crop_e,
+  se: styles.crop_se,
+  s: styles.crop_s,
+  sw: styles.crop_sw,
+  w: styles.crop_w,
+};
 
 // What a press where the pointer is would drag, for its cursor
 type Over = "move" | Axis | null;
@@ -214,6 +257,10 @@ const CURSORS: Record<Exclude<Held, "rotate">, string> = {
   ne: "nesw-resize",
   sw: "nesw-resize",
   se: "nwse-resize",
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+  w: "ew-resize",
 };
 
 // Screen px a press inside a group's outline moves before it drags the group
@@ -266,6 +313,9 @@ export function StudioStage({
   onGuides,
   onHold,
   onDelete,
+  cropping,
+  onCropStart,
+  onCrop,
   embed,
   children,
 }: Props) {
@@ -297,6 +347,10 @@ export function StudioStage({
   // The guide being dragged, and the rose lines of what a drag lines up with
   const [moving, setMoving] = useState<Moving | null>(null);
   const [met, setMet] = useState<MetLine[]>([]);
+  // The crop being made on the canvas, in its element's box's own px
+  const [draft, setDraft] = useState<(CropFrames & { id: string }) | null>(
+    null,
+  );
   const percent = useMemo(
     () => new Intl.NumberFormat(language, { style: "percent" }),
     [language],
@@ -323,14 +377,36 @@ export function StudioStage({
     layer.elements.map((element) => ({ element, layer: layer.id })),
   );
 
+  // While cropping, its element drawn whole and unrounded, where all of its
+  // picture is, under the crop frame
+  const shownView = useMemo((): StudioView => {
+    if (!draft) return view;
+    return {
+      ...view,
+      layers: view.layers.map((layer) => ({
+        ...layer,
+        elements: layer.elements.map((element) =>
+          element.id === draft.id && "crop" in element
+            ? {
+                ...element,
+                ...boxOn(element, draft.picture),
+                crop: null,
+                rounding: 0,
+              }
+            : element,
+        ),
+      })),
+    };
+  }, [view, draft]);
+
   useLayoutEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
-    stage.update(view);
+    stage.update(shownView);
     setFit((last) => (sameFit(last, stage.fit()) ? last : stage.fit()));
     setSlots((last) => {
       const next = new Map<string, HTMLElement>();
-      for (const layer of view.layers) {
+      for (const layer of shownView.layers) {
         for (const element of layer.elements) {
           const slot = element.kind === "overlay" && stage.slot(element.id);
           if (slot) next.set(element.id, slot);
@@ -341,7 +417,58 @@ export function StudioStage({
         [...next].every(([id, slot]) => last.get(id) === slot);
       return same ? last : next;
     });
-  }, [view, stageRef]);
+  }, [shownView, stageRef]);
+
+  // The element being cropped, as the overlay has it
+  const croppedOf = (id: string) => {
+    const found = elements.find(({ element }) => element.id === id)?.element;
+    return found && "crop" in found ? found : undefined;
+  };
+
+  // Cropping starts from where its element's picture shows, once the stage
+  // read the picture's own size: without it, it doesn't start
+  const startCrop = useEffectEvent((id: string | null) => {
+    if (id === null) {
+      setDraft(null);
+      return;
+    }
+    if (draft?.id === id) return;
+    const found = croppedOf(id);
+    const own = stageRef.current?.picture(id);
+    if (!found || !CANVAS_CROPS.has(found.kind) || !own) {
+      onCrop(id, null);
+      return;
+    }
+    setDraft({
+      id,
+      ...pictureFrames({ ...found, crop: found.crop ?? WHOLE }, own),
+    });
+    // Enter and Escape, from the button that started it too
+    stageEl.current?.focus({ focusVisible: false });
+  });
+  useLayoutEffect(() => startCrop(cropping), [cropping]);
+
+  // The crop kept: its element's box becomes the frame, its crop the part of
+  // the picture the frame holds
+  const keepCrop = () => {
+    if (!draft) return;
+    const found = croppedOf(draft.id);
+    onCrop(
+      draft.id,
+      found
+        ? {
+            ...roundBox(boxOn(found, draft.frame)),
+            crop: cropOf(draft.picture, draft.frame, found),
+          }
+        : null,
+    );
+  };
+
+  // Selecting something else keeps it too
+  const keepOnSelect = useEffectEvent(() => {
+    if (draft && selected !== draft.id) keepCrop();
+  });
+  useEffect(() => keepOnSelect(), [selected]);
 
   // After a zoom: the outline at once, not a frame late, and the canvas point
   // the zoom kept back where it was on screen
@@ -635,6 +762,32 @@ export function StudioStage({
     const rect = root.current!.getBoundingClientRect();
     const point = toCanvas({ x: e.clientX, y: e.clientY }, rect, fitted);
 
+    // Cropping: a handle drags its side or corner, a press inside the frame
+    // the picture under it, and one past it keeps the crop and picks nothing
+    if (draft) {
+      const found = croppedOf(draft.id);
+      const handle = target.closest<HTMLElement>("[data-crop]");
+      const side = CROP_SIDES.find((s) => s === handle?.dataset.crop) ?? null;
+      if (found && (side || holdsTurned(boxOn(found, draft.frame), point))) {
+        start(
+          e,
+          {
+            kind: "crop",
+            side,
+            x: e.clientX,
+            y: e.clientY,
+            scale,
+            rotation: found.rotation,
+            from: draft,
+          },
+          side ?? "move",
+        );
+      } else {
+        keepCrop();
+      }
+      return;
+    }
+
     // Ctrl or Cmd takes a guide it's on, before what's under it
     const guide =
       rulers && !guides.locked && (e.ctrlKey || e.metaKey)
@@ -775,6 +928,13 @@ export function StudioStage({
         root.current!.getBoundingClientRect(),
         fitted,
       );
+      if (draft) {
+        // Inside the crop frame, what a press moves is the picture
+        const found = croppedOf(draft.id);
+        const inside = !!found && holdsTurned(boxOn(found, draft.frame), point);
+        if ((inside ? "move" : null) !== over) setOver(inside ? "move" : null);
+        return;
+      }
       const guide =
         rulers && !guides.locked && (e.ctrlKey || e.metaKey)
           ? nearGuide(point, guides, GUIDE_REACH / fitted.scale)
@@ -824,6 +984,17 @@ export function StudioStage({
       const pane = scroller.current!;
       pane.scrollLeft = d.left - (e.clientX - d.x);
       pane.scrollTop = d.top - (e.clientY - d.y);
+      return;
+    }
+    if (d.kind === "crop") {
+      const next = cropDrag(
+        d.from,
+        d.side,
+        (e.clientX - d.x) / d.scale,
+        (e.clientY - d.y) / d.scale,
+        d.rotation,
+      );
+      setDraft((last) => (last ? { ...last, ...next } : last));
       return;
     }
     if (d.kind === "rotate") {
@@ -946,7 +1117,37 @@ export function StudioStage({
     }
   };
 
+  // A double-click on a picture crops it on the canvas, unless it's locked
+  const onDoubleClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (draft || space) return;
+    const fitted = stageRef.current?.fit() ?? NO_FIT;
+    if (!fitted.scale) return;
+    const id = pickElement(
+      view,
+      locked,
+      toCanvas(
+        { x: e.clientX, y: e.clientY },
+        root.current!.getBoundingClientRect(),
+        fitted,
+      ),
+    );
+    const found = id === null ? undefined : croppedOf(id);
+    if (found && CANVAS_CROPS.has(found.kind)) onCropStart(found.id);
+  };
+
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    // While cropping, only Enter, which keeps it, and Escape, which doesn't
+    if (draft) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        keepCrop();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onCrop(draft.id, null);
+      }
+      return;
+    }
     if (!selected) return;
     if (e.key === "Escape") {
       e.stopPropagation();
@@ -988,6 +1189,27 @@ export function StudioStage({
         transform: rotation ? `rotate(${rotation}deg)` : undefined,
       }
     : undefined;
+
+  // The crop frame while cropping, turned with its element and rounded as
+  // its picture will be
+  const cropped = draft ? croppedOf(draft.id) : undefined;
+  const cropBox = draft && cropped ? boxOn(cropped, draft.frame) : null;
+  const cropFrame: CSSProperties | undefined =
+    cropBox && cropped
+      ? {
+          left: fit.left + cropBox.x * fit.scale,
+          top: fit.top + cropBox.y * fit.scale,
+          width: cropBox.width * fit.scale,
+          height: cropBox.height * fit.scale,
+          transform: cropBox.rotation
+            ? `rotate(${cropBox.rotation}deg)`
+            : undefined,
+          borderRadius:
+            (cropped.rounding / 100) *
+            Math.min(cropBox.width, cropBox.height) *
+            fit.scale,
+        }
+      : undefined;
 
   const zoomOut = zoomStep(level, -1);
   const zoomIn = zoomStep(level, 1);
@@ -1033,7 +1255,9 @@ export function StudioStage({
           ref={stageEl}
           className={cx(styles.stage, space && styles.spaced)}
           tabIndex={0}
-          aria-label={t("studio.editor.canvas")}
+          aria-label={t(
+            draft ? "studio.editor.cropping" : "studio.editor.canvas",
+          )}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape Delete Backspace Space Control+C Control+X Control+V"
           style={{
             // Hairlines drawn inside the scaled canvas stay one screen px
@@ -1056,6 +1280,7 @@ export function StudioStage({
           onLostPointerCapture={end}
           onPointerLeave={() => setOver(null)}
           onKeyDown={onKeyDown}
+          onDoubleClick={onDoubleClick}
         >
           <div ref={scroller} className={styles.stage_scroll}>
             <div className={styles.stage_sizer}>
@@ -1106,7 +1331,22 @@ export function StudioStage({
                     aria-hidden
                   />
                 ))}
-                {outline && (
+                {cropFrame && (
+                  <div
+                    className={styles.crop_frame}
+                    style={cropFrame}
+                    data-cropping
+                  >
+                    {CROP_SIDES.map((side) => (
+                      <span
+                        key={side}
+                        className={cx(styles.crop_handle, CROP_HANDLES[side])}
+                        data-crop={side}
+                      />
+                    ))}
+                  </div>
+                )}
+                {outline && !draft && (
                   <div className={styles.selection} style={outline}>
                     {!stuck && (chosen || groupFrame) && (
                       <>

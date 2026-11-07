@@ -7,6 +7,7 @@ import {
   StudioGroup,
   StudioGroupSchema,
   StudioOverlay,
+  StudioPictureKind,
   StudioSize,
   StudioSource,
 } from "../schemas/studio";
@@ -137,6 +138,15 @@ function elementView(
     entrance: element.entrance,
     animation: element.animation,
   };
+  // A picture's crop, null when it keeps all of itself, and its rounding
+  const picture = (shown: StudioElementOf<StudioPictureKind>) => {
+    const { left, top, right, bottom } = shown.crop;
+    return {
+      crop:
+        left || top || right || bottom ? { left, top, right, bottom } : null,
+      rounding: shown.rounding,
+    };
+  };
   switch (element.kind) {
     case "text": {
       const { font, size, color, align, bold, halo } = element;
@@ -156,6 +166,7 @@ function elementView(
       const kind = element.file ? mediaKind(element.file) : null;
       return {
         ...base,
+        ...picture(element),
         kind: element.kind,
         src: kind ? deps.mediaURL(element.file, element.id) : null,
         video: kind === "video",
@@ -166,16 +177,23 @@ function elementView(
       if (element.gift === null) {
         return {
           ...base,
+          ...picture(element),
           kind: element.kind,
           src: deps.sent(element) || null,
         };
       }
       const gift = deps.gifts.find((g) => g.value === element.gift);
-      return { ...base, kind: element.kind, src: gift?.img || null };
+      return {
+        ...base,
+        ...picture(element),
+        kind: element.kind,
+        src: gift?.img || null,
+      };
     }
     case "emote":
       return {
         ...base,
+        ...picture(element),
         kind: element.kind,
         // No emote picked: the one its event sent
         src: element.emote ? element.emote.image : deps.sent(element) || null,
@@ -191,7 +209,12 @@ function elementView(
           : null,
       };
     case "viewer":
-      return { ...base, kind: element.kind, ...deps.viewer(element) };
+      return {
+        ...base,
+        ...picture(element),
+        kind: element.kind,
+        ...deps.viewer(element),
+      };
     // overlay
     default: {
       const { source } = element;

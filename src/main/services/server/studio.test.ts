@@ -60,6 +60,9 @@ const viewOf = (...layers: StudioLayerView[]): StudioView => ({
 const view = (...elements: StudioElementView[]) =>
   viewOf({ id: "L1", z: 0, opacity: 1, elements });
 
+// What a picture element draws when it keeps all of itself
+const PICTURE = { crop: null, rounding: 0 };
+
 describe("studio overlay page", () => {
   let server: ServerService;
   const url = (path: string) => `http://127.0.0.1:${server.getPort()}${path}`;
@@ -167,23 +170,33 @@ describe("studio overlay page", () => {
           element("t", TEXT),
           element("m", {
             kind: "media",
+            ...PICTURE,
             src: "/alerts/media/a.png",
             video: false,
           }),
           element("v", {
             kind: "media",
+            ...PICTURE,
             src: "/alerts/media/a.webm",
             video: true,
           }),
-          element("g", { kind: "gift", src: "https://cdn/rose.png" }),
-          element("e", { kind: "emote", src: "https://cdn/emote.png" }),
+          element("g", {
+            kind: "gift",
+            ...PICTURE,
+            src: "https://cdn/rose.png",
+          }),
+          element("e", {
+            kind: "emote",
+            ...PICTURE,
+            src: "https://cdn/emote.png",
+          }),
           element("s", {
             kind: "shape",
             color: "#18181b",
             radius: 24,
             border: null,
           }),
-          element("w", { kind: "viewer", src: "", name: "ana" }),
+          element("w", { kind: "viewer", ...PICTURE, src: "", name: "ana" }),
           element("o", {
             kind: "overlay",
             source: { type: "timer" },
@@ -283,7 +296,13 @@ describe("studio overlay page", () => {
 
     it("hides a picture that fails to load", async () => {
       send(
-        view(element("g", { kind: "gift", src: "https://cdn/missing.png" })),
+        view(
+          element("g", {
+            kind: "gift",
+            ...PICTURE,
+            src: "https://cdn/missing.png",
+          }),
+        ),
       );
       await vi.waitFor(() => expect(el("g")).not.toBeNull());
       const img = el("g")!.querySelector("img")!;

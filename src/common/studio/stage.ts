@@ -33,9 +33,16 @@ export type Stage = {
   slot(elementId: string): HTMLElement | null;
   // Where the canvas sits in the root now
   fit(): StageFit;
+  // An element's picture's own size, null until it's read or for none
+  picture(elementId: string): { width: number; height: number } | null;
   // Removes everything it drew and frees its players
   destroy(): void;
 };
+
+// What a picture keeps of itself: fractions cut from each side
+type Crop = { left: number; top: number; right: number; bottom: number };
+
+const NO_CROP: Crop = { left: 0, top: 0, right: 0, bottom: 0 };
 
 type Entry = {
   element: StudioElementView;
@@ -180,6 +187,91 @@ const newAvatar = () => {
   return avatar;
 };
 
+// A picture's own size, 0 by 0 until it's read
+const ownSize = (media: HTMLImageElement | HTMLVideoElement) =>
+  media instanceof HTMLVideoElement
+    ? { width: media.videoWidth, height: media.videoHeight }
+    : { width: media.naturalWidth, height: media.naturalHeight };
+
+// Hidden until its own size is read, so it never shows uncut; false then
+const sized = (media: HTMLImageElement | HTMLVideoElement) => {
+  const own = ownSize(media);
+  if (own.width && own.height) return own;
+  media.style.visibility = "hidden";
+  return null;
+};
+
+/**
+ * A cropped or rounded media, gift or emote picture: the part it keeps fits
+ * its box as contain fits a whole one, all of it placed around that part and
+ * clipped to it, its corners rounded by a share of what shows. A plain one
+ * keeps the stylesheet's contain.
+ */
+const layoutPicture = (
+  media: HTMLImageElement | HTMLVideoElement,
+  box: { width: number; height: number },
+  crop: Crop | null,
+  rounding: number,
+) => {
+  const cut = crop !== null || rounding > 0;
+  media.classList.toggle("studio-cut", cut);
+  if (!cut) {
+    media.removeAttribute("style");
+    return;
+  }
+  const own = sized(media);
+  if (!own) return;
+  const { left, top, right, bottom } = crop ?? NO_CROP;
+  const kept = {
+    width: (1 - left - right) * own.width,
+    height: (1 - top - bottom) * own.height,
+  };
+  const scale = Math.min(box.width / kept.width, box.height / kept.height);
+  const width = own.width * scale;
+  const height = own.height * scale;
+  // The part it keeps, centered in the box
+  const x = (box.width - kept.width * scale) / 2;
+  const y = (box.height - kept.height * scale) / 2;
+  const round = (rounding / 100) * Math.min(kept.width, kept.height) * scale;
+  media.style.visibility = "";
+  media.style.left = `${x - left * width}px`;
+  media.style.top = `${y - top * height}px`;
+  media.style.width = `${width}px`;
+  media.style.height = `${height}px`;
+  media.style.clipPath = `inset(${top * height}px ${right * width}px ${bottom * height}px ${left * width}px round ${round}px)`;
+};
+
+/**
+ * A viewer's cropped picture: the part it keeps covers the circle as cover
+ * fits a whole one, which the circle clips. An uncropped one keeps the
+ * stylesheet's cover.
+ */
+const layoutAvatar = (
+  img: HTMLImageElement,
+  side: number,
+  crop: Crop | null,
+) => {
+  img.classList.toggle("studio-cut", crop !== null);
+  if (!crop) {
+    img.removeAttribute("style");
+    return;
+  }
+  const own = sized(img);
+  if (!own) return;
+  const kept = {
+    width: (1 - crop.left - crop.right) * own.width,
+    height: (1 - crop.top - crop.bottom) * own.height,
+  };
+  const scale = Math.max(side / kept.width, side / kept.height);
+  const width = own.width * scale;
+  const height = own.height * scale;
+  img.style.visibility = "";
+  img.style.left = `${(side - kept.width * scale) / 2 - crop.left * width}px`;
+  img.style.top = `${(side - kept.height * scale) / 2 - crop.top * height}px`;
+  img.style.width = `${width}px`;
+  img.style.height = `${height}px`;
+};
+
 /**
  * Draws studio overlays into root, its canvas scaled to fit and centered. It
  * keeps one node per layer and per element id, and never moves, re-inserts
@@ -226,6 +318,31 @@ export function createStage(
   const hidden = (entry: Entry) =>
     entry.body.classList.contains("studio-hidden");
 
+  // Draws its element again once its picture's own size is read, so a
+  // cropped or rounded one is laid out: a gift a viewer sends, a new file
+  const relayout = (event: Event) => {
+    const media = event.currentTarget;
+    if (!(media instanceof HTMLElement)) return;
+    const id = media.closest<HTMLElement>("[data-element]")?.dataset.element;
+    const entry = id === undefined ? undefined : entries.get(id);
+    if (entry) fill(entry);
+  };
+  const makePicture = () => {
+    const img = newPicture();
+    img.addEventListener("load", relayout);
+    return img;
+  };
+  const makeVideo = () => {
+    const video = newVideo();
+    video.addEventListener("loadedmetadata", relayout);
+    return video;
+  };
+  const makeAvatar = () => {
+    const avatar = newAvatar();
+    avatar.querySelector("img")!.addEventListener("load", relayout);
+    return avatar;
+  };
+
   // Videos play only while their element shows
   const playback = (entry: Entry, fromStart = false) => {
     const video = entry.body.querySelector("video");
@@ -267,17 +384,25 @@ export function createStage(
         el.style.setProperty("--studio-color", element.color);
         break;
       }
-      case "media":
+      case "media": {
+        let media: HTMLImageElement | HTMLVideoElement;
         if (element.video) {
-          setVideo(only(body, HTMLVideoElement, newVideo), element.src);
+          media = only(body, HTMLVideoElement, makeVideo);
+          setVideo(media, element.src);
         } else {
-          setPicture(only(body, HTMLImageElement, newPicture), element.src);
+          media = only(body, HTMLImageElement, makePicture);
+          setPicture(media, element.src);
         }
+        layoutPicture(media, element, element.crop, element.rounding);
         break;
+      }
       case "gift":
-      case "emote":
-        setPicture(only(body, HTMLImageElement, newPicture), element.src);
+      case "emote": {
+        const img = only(body, HTMLImageElement, makePicture);
+        setPicture(img, element.src);
+        layoutPicture(img, element, element.crop, element.rounding);
         break;
+      }
       case "shape":
         el.style.setProperty("--studio-color", element.color ?? "transparent");
         el.style.setProperty("--studio-radius", `${element.radius}px`);
@@ -289,12 +414,15 @@ export function createStage(
         );
         break;
       case "viewer": {
-        const avatar = only(body, HTMLDivElement, newAvatar);
+        const avatar = only(body, HTMLDivElement, makeAvatar);
         const side = Math.min(element.width, element.height);
         avatar.style.width = `${side}px`;
         avatar.style.height = `${side}px`;
         avatar.style.fontSize = `${side * 0.45}px`;
+        // Half its side at 50: a circle
+        avatar.style.borderRadius = `${(element.rounding / 100) * side}px`;
         setViewer(avatar, element.src, element.name);
+        layoutAvatar(avatar.querySelector("img")!, side, element.crop);
         break;
       }
       case "overlay":
@@ -459,6 +587,13 @@ export function createStage(
         .get(elementId)
         ?.body.querySelector<HTMLElement>(":scope > .studio-slot") ?? null,
     fit,
+    picture: (elementId) => {
+      const media = entries
+        .get(elementId)
+        ?.body.querySelector<HTMLImageElement | HTMLVideoElement>("img, video");
+      const own = media ? ownSize(media) : null;
+      return own?.width && own.height ? own : null;
+    },
     destroy: () => {
       if (observer) observer.disconnect();
       else window.removeEventListener("resize", refit);

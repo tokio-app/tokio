@@ -1,6 +1,7 @@
 import type {
   StudioAlign,
   StudioAnimation,
+  StudioCrop,
   StudioEntrance,
   StudioSource,
   StudioWhen,
@@ -27,6 +28,10 @@ type StudioElementViewBase = {
   animation: StudioAnimation;
 };
 
+// A picture's part it keeps, null for all of it, and its corners' rounding,
+// a % of the shorter side of what shows
+type StudioPictureView = { crop: StudioCrop | null; rounding: number };
+
 /**
  * One element as the stage draws it (studioView), everything resolved. A
  * `src: null` draws nothing on stream but keeps the element's place.
@@ -44,9 +49,13 @@ export type StudioElementView = StudioElementViewBase &
         bold: boolean;
         halo: boolean;
       }
-    | { kind: "media"; src: string | null; video: boolean }
-    | { kind: "gift"; src: string | null }
-    | { kind: "emote"; src: string | null }
+    | ({
+        kind: "media";
+        src: string | null;
+        video: boolean;
+      } & StudioPictureView)
+    | ({ kind: "gift"; src: string | null } & StudioPictureView)
+    | ({ kind: "emote"; src: string | null } & StudioPictureView)
     // color null without a fill, border null without one
     | {
         kind: "shape";
@@ -55,7 +64,7 @@ export type StudioElementView = StudioElementViewBase &
         border: { color: string; width: number } | null;
       }
     // src is "" without a picture, which shows the name's initial
-    | { kind: "viewer"; src: string; name: string }
+    | ({ kind: "viewer"; src: string; name: string } & StudioPictureView)
     | {
         kind: "overlay";
         source: StudioSource | null;

@@ -90,6 +90,27 @@ const ELEMENT = {
   animation: z.enum(STUDIO_ANIMATIONS).default("bounce"),
 };
 
+// What a picture keeps of itself: fractions of its own width and height cut
+// from each side, which can't meet
+const StudioCropSchema = z
+  .object({
+    left: z.number().min(0).max(1).default(0),
+    top: z.number().min(0).max(1).default(0),
+    right: z.number().min(0).max(1).default(0),
+    bottom: z.number().min(0).max(1).default(0),
+  })
+  .refine((crop) => crop.left + crop.right < 1 && crop.top + crop.bottom < 1);
+
+// The kinds that draw a picture, which they crop and round
+export type StudioPictureKind = "media" | "gift" | "emote" | "viewer";
+
+// A picture's crop, and its corners' rounding as a % of the shorter side of
+// what shows: at 50 it's round
+const PICTURE = {
+  crop: StudioCropSchema.prefault({}),
+  rounding: z.number().min(0).max(50).default(0),
+};
+
 // One element, by kind
 export const StudioElementSchema = z.discriminatedUnion("kind", [
   // Can hold the live numbers (STUDIO_NUMBERS) and, when it reacts, its
@@ -111,6 +132,7 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
   // An image or video from the media library; a video loops muted
   z.object({
     ...ELEMENT,
+    ...PICTURE,
     kind: z.literal("media"),
     file: LibraryFileSchema,
     name: z.string().default(""),
@@ -118,12 +140,14 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
   // A gift's picture, by its id in TikTok's or the custom gift list
   z.object({
     ...ELEMENT,
+    ...PICTURE,
     kind: z.literal("gift"),
     gift: z.number().nullable().default(null),
   }),
   // A saved emote's picture
   z.object({
     ...ELEMENT,
+    ...PICTURE,
     kind: z.literal("emote"),
     emote: z
       .object({
@@ -147,8 +171,15 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     // px of the canvas
     radius: z.number().min(0).default(24),
   }),
-  // The picture of the viewer who set off its trigger, or their initial
-  z.object({ ...ELEMENT, kind: z.literal("viewer") }),
+  // The picture of the viewer who set off its trigger, or their initial: its
+  // crop is the part of each viewer's picture that fills its circle, which
+  // is round until its rounding says otherwise
+  z.object({
+    ...ELEMENT,
+    ...PICTURE,
+    kind: z.literal("viewer"),
+    rounding: z.number().min(0).max(50).default(50),
+  }),
   // An installed overlay, an alert's overlay, the countdown timer or the
   // games overlay, framed at its own path
   z.object({
@@ -331,6 +362,7 @@ export const StoredStudioOverlaysSchema = z.preprocess(
 
 export type StudioOverlay = z.infer<typeof StudioOverlaySchema>;
 export type StudioGuides = z.infer<typeof StudioGuidesSchema>;
+export type StudioCrop = z.infer<typeof StudioCropSchema>;
 export type StudioGroup = z.infer<typeof StudioGroupSchema>;
 export type StudioItem = z.infer<typeof StudioItemSchema>;
 export type StudioElement = z.infer<typeof StudioElementSchema>;

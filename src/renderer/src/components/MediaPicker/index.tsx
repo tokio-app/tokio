@@ -2,7 +2,7 @@ import { MediaFile } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { getMediaPreviewURL, mediaKind } from "@/common/util";
 import { releaseOnUnmount } from "@/helper/media";
-import { useId, useState } from "react";
+import { CSSProperties, useId, useState } from "react";
 import { FiFilm } from "react-icons/fi";
 import { DeleteMediaModal } from "../DeleteModals";
 import { SoundLength } from "../SoundPicker/SoundLength";
@@ -40,15 +40,19 @@ export function useVideoURL(file: string) {
 export function MediaThumbnail({
   file,
   onLength,
+  style,
 }: {
   file: string;
   onLength?: (seconds: number) => void;
+  // Overlay Studio's crop, through object-view-box
+  style?: CSSProperties;
 }) {
   const video = useVideoURL(file);
   return mediaKind(file) === "video" ? (
     <video
       ref={releaseOnUnmount}
       className={styles.thumb}
+      style={style}
       src={`${video}#t=0.1`}
       muted
       preload="metadata"
@@ -57,6 +61,7 @@ export function MediaThumbnail({
   ) : (
     <img
       className={styles.thumb}
+      style={style}
       src={getMediaPreviewURL(file)}
       alt=""
       loading="lazy"

@@ -6,6 +6,7 @@ import {
   STUDIO_SIZES,
   StudioElement,
   StudioElementKind,
+  StudioCrop,
   StudioElementOf,
   StudioGroup,
   StudioItem,
@@ -71,6 +72,8 @@ import {
   mapElements,
   moveElement,
   moveItem,
+  pictureSource,
+  recrop,
   sampleReact,
   Samples,
   sampleText,
@@ -79,6 +82,7 @@ import {
   sourceValue,
   stepElement,
   whenText,
+  WHOLE,
   Words,
 } from "./helper";
 import { GroupSettings } from "./GroupSettings";
@@ -176,6 +180,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   // Width and height change together, in the fields and on the canvas, for
   // every element and group until the editor closes
   const [linked, setLinked] = useState(false);
+  // The picture element being cropped on the canvas
+  const [cropping, setCropping] = useState<string | null>(null);
   // Elements waiting for main to save a browsed file, and the newest request
   // applied to each, as on the Alerts page
   const asked = useRef(new Set<string>());
@@ -234,12 +240,30 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       mapElements(items, (e) => (e.id === id ? change(e) : e)),
     );
 
+  // Another file starts uncropped
   const setMedia = (id: string, file: { file: string; name: string } | null) =>
     changeElement(id, (element) =>
       element.kind === "media"
-        ? { ...element, file: file?.file ?? "", name: file?.name ?? "" }
+        ? {
+            ...element,
+            file: file?.file ?? "",
+            name: file?.name ?? "",
+            crop: file?.file === element.file ? element.crop : WHOLE,
+          }
         : element,
     );
+
+  // A crop typed in: a picture keeps its place and size, its box trimmed to
+  // what it keeps, once the stage has read its own size. A viewer's picture
+  // fills its circle, so only its crop changes.
+  const cropElement = (id: string, crop: StudioCrop) =>
+    changeElement(id, (element) => {
+      if (!("crop" in element)) return element;
+      const own = element.kind === "viewer" ? null : stage.current?.picture(id);
+      return own
+        ? { ...element, ...recrop(element, own, crop) }
+        : { ...element, crop };
+    });
 
   useIpcListener(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, (res) => {
     if (!res?.success || !res.media || !asked.current.has(res.id)) return;
@@ -578,7 +602,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   // and Ctrl+V pastes, Cmd too. Not in a field that keeps its own, nor in a
   // dialog. Electron's Edit menu only gets the keys the page didn't take.
   const onKey = useEffectEvent((e: KeyboardEvent) => {
-    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    // A crop on the canvas ends with Enter or Escape first
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || cropping) return;
     const key = e.key.toLowerCase();
     const target = e.target instanceof Element ? e.target : null;
     if (target?.closest("[role=dialog]")) return;
@@ -619,7 +644,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               title={t("studio.editor.undo")}
               aria-label={t("studio.editor.undo")}
               aria-keyshortcuts="Control+Z Meta+Z"
-              disabled={!history.canUndo}
+              disabled={!history.canUndo || cropping !== null}
               onClick={history.undo}
             >
               <LuUndo2 size={20} />
@@ -629,7 +654,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               title={t("studio.editor.redo")}
               aria-label={t("studio.editor.redo")}
               aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z"
-              disabled={!history.canRedo}
+              disabled={!history.canRedo || cropping !== null}
               onClick={history.redo}
             >
               <LuRedo2 size={20} />
@@ -711,6 +736,20 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               onGuides={(guides) => setOverlay((o) => ({ ...o, guides }))}
               onHold={history.hold}
               onDelete={remove}
+              cropping={cropping}
+              onCropStart={(id) => {
+                select(id);
+                setCropping(id);
+              }}
+              // Kept, one step of the history
+              onCrop={(id, kept) => {
+                setCropping(null);
+                if (kept) {
+                  changeElement(id, (e) =>
+                    "crop" in e ? { ...e, ...kept } : e,
+                  );
+                }
+              }}
               embed={(embed) => (
                 <Embed
                   element={embed}
@@ -764,12 +803,20 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                   ) {
                     fitting.current = changed.id;
                   }
-                  changeElement(changed.id, () => changed);
+                  // Another gift or emote starts uncropped
+                  const other =
+                    "crop" in changed &&
+                    pictureSource(changed) !== pictureSource(element);
+                  changeElement(changed.id, () =>
+                    other ? { ...changed, crop: WHOLE } : changed,
+                  );
                 }}
                 gifts={giftChoices}
                 emotes={emoteChoices}
                 sources={sources}
                 onPickMedia={() => setMediaFor(element.id)}
+                onCrop={(crop) => cropElement(element.id, crop)}
+                onCropCanvas={() => setCropping(element.id)}
               />
             ) : (
               <OverlaySettings overlay={overlay} onChange={setOverlay} />

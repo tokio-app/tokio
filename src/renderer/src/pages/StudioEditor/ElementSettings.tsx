@@ -7,6 +7,7 @@ import {
   STUDIO_TEXT_MAX_LENGTH,
   StudioAlign,
   StudioAnimation,
+  StudioCrop,
   StudioEntrance,
   StudioElement,
   StudioWhen,
@@ -35,6 +36,7 @@ import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
 import { BoxFields } from "./BoxFields";
 import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
+import { PictureFields } from "./PictureFields";
 import styles from "./studioeditor.module.css";
 
 const WHENS: { value: StudioWhen; label: MessageKey }[] = [
@@ -97,6 +99,9 @@ type Props = {
   sources: SelectOption<string>[];
   // Opens the media library for a media element
   onPickMedia: () => void;
+  // A picture's crop typed in, and cropping it on the canvas
+  onCrop: (crop: StudioCrop) => void;
+  onCropCanvas: () => void;
 };
 
 /**
@@ -115,6 +120,8 @@ export function ElementSettings({
   emotes,
   sources,
   onPickMedia,
+  onCrop,
+  onCropCanvas,
 }: Props) {
   const t = useT();
   const textRef = useRef<HTMLInputElement>(null);
@@ -406,6 +413,15 @@ export function ElementSettings({
         />
       </Field>
       {own}
+      {"crop" in element && (
+        <PictureFields
+          crop={element.crop}
+          rounding={element.rounding}
+          onCropCanvas={element.kind === "viewer" ? null : onCropCanvas}
+          onCrop={onCrop}
+          onRounding={(rounding) => onChange({ ...element, rounding })}
+        />
+      )}
 
       <BoxFields
         box={element}

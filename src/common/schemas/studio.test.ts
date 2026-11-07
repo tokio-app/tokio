@@ -48,6 +48,36 @@ describe("StudioElementSchema", () => {
     });
   });
 
+  it("keeps all of a picture with square corners, a viewer's round", () => {
+    const whole = { left: 0, top: 0, right: 0, bottom: 0 };
+    for (const kind of ["media", "gift", "emote"]) {
+      expect(StudioElementSchema.parse(element({ kind }))).toMatchObject({
+        crop: whole,
+        rounding: 0,
+      });
+    }
+    expect(
+      StudioElementSchema.parse(element({ kind: "viewer" })),
+    ).toMatchObject({ crop: whole, rounding: 50 });
+    // A shape or a text has neither
+    expect(
+      StudioElementSchema.parse(element({ kind: "shape" })),
+    ).not.toHaveProperty("crop");
+  });
+
+  it("refuses a crop whose sides meet, and a rounding past round", () => {
+    const parses = (fields: object) =>
+      StudioElementSchema.safeParse(element({ kind: "media", ...fields }))
+        .success;
+
+    expect(parses({ crop: { left: 0.4, right: 0.5, top: 0.9 } })).toBe(true);
+    expect(parses({ crop: { left: 0.5, right: 0.5 } })).toBe(false);
+    expect(parses({ crop: { top: 0.7, bottom: 0.4 } })).toBe(false);
+    expect(parses({ crop: { left: -0.1 } })).toBe(false);
+    expect(parses({ rounding: 50 })).toBe(true);
+    expect(parses({ rounding: 51 })).toBe(false);
+  });
+
   it("gives shapes Panel and the other kinds nothing to show", () => {
     expect(StudioElementSchema.parse(element({ kind: "shape" }))).toMatchObject(
       {

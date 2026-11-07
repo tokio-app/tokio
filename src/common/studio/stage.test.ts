@@ -43,6 +43,9 @@ const TEXT = {
   halo: true,
 } as const;
 
+// What a picture element draws when it keeps all of itself
+const PICTURE = { crop: null, rounding: 0 };
+
 const text = (id: string, fields: Partial<TextView> = {}): TextView => ({
   ...BASE,
   ...TEXT,
@@ -178,6 +181,7 @@ describe("on stream", () => {
       ...BASE,
       id: "clip",
       kind: "media",
+      ...PICTURE,
       src: "/m/a.mp4",
       video: true,
     };
@@ -248,13 +252,29 @@ describe("on stream", () => {
   });
 
   it("hides a picture that fails, and shows a new one", () => {
-    draw(view({ ...BASE, id: "g", kind: "gift", src: "https://g/rose.png" }));
+    draw(
+      view({
+        ...BASE,
+        id: "g",
+        kind: "gift",
+        ...PICTURE,
+        src: "https://g/rose.png",
+      }),
+    );
     const img = root.querySelector("img")!;
 
     img.dispatchEvent(new Event("error"));
     expect(img.classList).toContain("studio-failed");
 
-    draw(view({ ...BASE, id: "g", kind: "gift", src: "https://g/lion.png" }));
+    draw(
+      view({
+        ...BASE,
+        id: "g",
+        kind: "gift",
+        ...PICTURE,
+        src: "https://g/lion.png",
+      }),
+    );
     expect(img.classList).not.toContain("studio-failed");
     expect(img.getAttribute("src")).toBe("https://g/lion.png");
   });
@@ -264,6 +284,7 @@ describe("on stream", () => {
       ...BASE,
       id: "v",
       kind: "viewer",
+      ...PICTURE,
       src,
       name,
     });
@@ -290,6 +311,7 @@ describe("on stream", () => {
         ...BASE,
         id: "clip",
         kind: "media",
+        ...PICTURE,
         src: "/m/a.mp4",
         video: true,
       }),
@@ -333,6 +355,7 @@ describe("on stream", () => {
         ...BASE,
         id: "clip",
         kind: "media",
+        ...PICTURE,
         src: "/m/a.mp4",
         video: true,
         when: "event",
@@ -353,6 +376,7 @@ describe("on stream", () => {
         ...BASE,
         id: "v",
         kind: "viewer",
+        ...PICTURE,
         src: "",
         name: "",
         when: "animate",
@@ -399,7 +423,16 @@ describe("on stream", () => {
   });
 
   it("shows on an emote element the emote its event sent", () => {
-    draw(view({ ...BASE, id: "e", kind: "emote", src: null, when: "event" }));
+    draw(
+      view({
+        ...BASE,
+        id: "e",
+        kind: "emote",
+        ...PICTURE,
+        src: null,
+        when: "event",
+      }),
+    );
 
     stage.react({ element: "e", picture: "https://e/1.png" });
     expect(root.querySelector("img")!.getAttribute("src")).toBe(
@@ -408,7 +441,16 @@ describe("on stream", () => {
   });
 
   it("shows on a gift element the gift its event sent", () => {
-    draw(view({ ...BASE, id: "g", kind: "gift", src: null, when: "event" }));
+    draw(
+      view({
+        ...BASE,
+        id: "g",
+        kind: "gift",
+        ...PICTURE,
+        src: null,
+        when: "event",
+      }),
+    );
 
     stage.react({ element: "g", picture: "https://g/lion.png" });
     expect(root.querySelector("img")!.getAttribute("src")).toBe(
@@ -445,6 +487,155 @@ describe("on stream", () => {
     stage.destroy();
     expect(root.innerHTML).toBe("");
     expect(root.classList).not.toContain("studio-stage");
+  });
+});
+
+describe("cropped and rounded pictures", () => {
+  beforeEach(() => {
+    stage = createStage(root);
+  });
+
+  // A picture's own size, as it reads once it loads
+  const ownSize = (media: Element, width: number, height: number) => {
+    const [w, h] =
+      media instanceof HTMLVideoElement
+        ? ["videoWidth", "videoHeight"]
+        : ["naturalWidth", "naturalHeight"];
+    Object.defineProperty(media, w, { value: width, configurable: true });
+    Object.defineProperty(media, h, { value: height, configurable: true });
+  };
+  // Its left half and its bottom half cut away, in a 300 × 200 box
+  const CROP = { left: 0.25, top: 0, right: 0.25, bottom: 0.5 };
+  const placed = (media: HTMLElement) => {
+    const { left, top, width, height, clipPath, visibility } = media.style;
+    return { left, top, width, height, clipPath, visibility };
+  };
+
+  it("lays a cropped picture out once its size is read, clipped to what it keeps", () => {
+    draw(
+      view({
+        ...BASE,
+        id: "m",
+        kind: "media",
+        src: "/media/m.png",
+        video: false,
+        crop: CROP,
+        rounding: 10,
+      }),
+    );
+    const img = el("m").querySelector("img")!;
+
+    // Never uncut, not even before it loads
+    expect(img.classList).toContain("studio-cut");
+    expect(img.style.visibility).toBe("hidden");
+    expect(stage.picture("m")).toBeNull();
+
+    ownSize(img, 400, 200);
+    img.dispatchEvent(new Event("load"));
+    // The 200 × 100 it keeps, at 1.5 to fit 300 wide, 25 down to center it
+    expect(placed(img)).toEqual({
+      left: "-150px",
+      top: "25px",
+      width: "600px",
+      height: "300px",
+      clipPath: "inset(0px 150px 150px 150px round 15px)",
+      visibility: "",
+    });
+    expect(stage.picture("m")).toEqual({ width: 400, height: 200 });
+
+    // Uncut again, the stylesheet's contain
+    draw(
+      view({
+        ...BASE,
+        id: "m",
+        kind: "media",
+        src: "/media/m.png",
+        video: false,
+        ...PICTURE,
+      }),
+    );
+    expect(img.classList).not.toContain("studio-cut");
+    expect(img.hasAttribute("style")).toBe(false);
+  });
+
+  it("rounds a whole picture's corners, and lays out a video once it knows its size", () => {
+    draw(
+      view({
+        ...BASE,
+        id: "v",
+        kind: "media",
+        src: "/media/v.webm",
+        video: true,
+        crop: null,
+        rounding: 50,
+      }),
+    );
+    const video = el("v").querySelector("video")!;
+    ownSize(video, 200, 200);
+    video.dispatchEvent(new Event("loadedmetadata"));
+
+    // Square in a 300 × 200 box: 200 wide, 50 in, a circle
+    expect(placed(video)).toMatchObject({
+      left: "50px",
+      top: "0px",
+      width: "200px",
+      clipPath: "inset(0px 0px 0px 0px round 100px)",
+    });
+  });
+
+  it("lays a gift out again when the one a viewer sends loads", () => {
+    draw(
+      view({
+        ...BASE,
+        id: "g",
+        kind: "gift",
+        src: null,
+        when: "event",
+        crop: CROP,
+        rounding: 0,
+      }),
+    );
+    const img = el("g").querySelector("img")!;
+    stage.react({ element: "g", picture: "https://g/lion.png" });
+    expect(img.style.visibility).toBe("hidden");
+
+    ownSize(img, 200, 200);
+    img.dispatchEvent(new Event("load"));
+    // 100 × 100 kept, at 2 to fit 200 tall, centered 50 in
+    expect(placed(img)).toMatchObject({
+      left: "-50px",
+      top: "0px",
+      width: "400px",
+      height: "400px",
+    });
+  });
+
+  it("rounds a viewer's circle by its rounding, and covers it with what it keeps", () => {
+    draw(
+      view({
+        ...BASE,
+        id: "v",
+        kind: "viewer",
+        src: "https://p/sora.webp",
+        name: "sora",
+        crop: { left: 0.5, top: 0, right: 0, bottom: 0 },
+        rounding: 25,
+      }),
+    );
+    const avatar = root.querySelector<HTMLElement>(".studio-avatar")!;
+    const img = avatar.querySelector("img")!;
+    // A quarter of its 200 px side
+    expect(avatar.style.borderRadius).toBe("50px");
+
+    ownSize(img, 100, 100);
+    img.dispatchEvent(new Event("load"));
+    // Its right half, 50 × 100, covering 200 × 200 at 4
+    expect(placed(img)).toMatchObject({
+      left: "-200px",
+      top: "-100px",
+      width: "400px",
+      height: "400px",
+    });
   });
 });
 

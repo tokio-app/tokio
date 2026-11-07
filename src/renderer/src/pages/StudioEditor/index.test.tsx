@@ -2774,4 +2774,215 @@ describe("StudioEditor", () => {
       );
     });
   });
+
+  describe("cropping", () => {
+    const WHOLE = { left: 0, top: 0, right: 0, bottom: 0 };
+    // A 400 × 200 picture element at 100, 100
+    const pic = (patch: Partial<StudioElementOf<"media">> = {}) =>
+      elementOf("media", {
+        label: "Pic",
+        file: "pic.png",
+        name: "pic.png",
+        x: 100,
+        y: 100,
+        width: 400,
+        height: 200,
+        ...patch,
+      });
+    // The canvas, named for cropping while it crops
+    const stage = () => page().getByLabelText(/^(Canvas|Cropping)\./);
+    // The stage read the picture's own size
+    const loaded = (id: string, width: number, height: number) => {
+      const img = drawn(id).querySelector("img")!;
+      Object.defineProperty(img, "naturalWidth", { value: width });
+      Object.defineProperty(img, "naturalHeight", { value: height });
+      act(() => {
+        img.dispatchEvent(new Event("load"));
+      });
+    };
+    const side = (name: string) => field(name).getByRole("spinbutton");
+    const cropHandle = (at: string) =>
+      document.querySelector<HTMLElement>(`[data-crop="${at}"]`)!;
+
+    it("crops a picture from its fields, its box trimmed so it stays put", async () => {
+      const shown = pic();
+      const { user } = await open(holding(shown));
+      await user.click(row(/^Pic/));
+      // Twice the box's size, so at half size and no empty bands
+      loaded(shown.id, 800, 400);
+
+      await user.clear(side("Left"));
+      await user.type(side("Left"), "25");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          crop: { ...WHOLE, left: 0.25 },
+          x: 200,
+          y: 100,
+          width: 300,
+          height: 200,
+        }),
+      );
+
+      // All of it back, where it was: main holds the crop first, or the
+      // autosave would see nothing new to send
+      await studio(lastSave()!);
+      await user.click(page().getByRole("button", { name: "Reset the crop" }));
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          crop: WHOLE,
+          x: 100,
+          width: 400,
+        }),
+      );
+      expect(
+        page().getByRole("button", { name: "Reset the crop" }),
+      ).toBeDisabled();
+
+      fireEvent.change(
+        page().getByRole("slider", { name: "Round corners (0%)" }),
+        { target: { value: "50" } },
+      );
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ rounding: 50 }),
+      );
+    });
+
+    it("crops a viewer's picture from its fields only, its box kept", async () => {
+      const viewer = elementOf("viewer", { label: "Fan", x: 100, y: 100 });
+      const { user } = await open(holding(viewer));
+      await user.click(row(/^Fan/));
+
+      expect(
+        page().queryByRole("button", {
+          name: "Crop on the canvas (double-click)",
+        }),
+      ).not.toBeInTheDocument();
+      expect(
+        page().getByRole("slider", { name: "Round corners (50%)" }),
+      ).toBeVisible();
+      await user.clear(side("Top"));
+      await user.type(side("Top"), "20");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          crop: { ...WHOLE, top: 0.2 },
+          x: 100,
+          y: 100,
+          width: viewer.width,
+          height: viewer.height,
+        }),
+      );
+    });
+
+    it("crops on the canvas from a double-click, kept with Enter as one step", async () => {
+      const shown = pic();
+      const { user } = await open(holding(shown));
+      sized();
+      loaded(shown.id, 800, 400);
+
+      // Its middle, (300, 200) on the canvas
+      fireEvent.doubleClick(stage(), { clientX: 150, clientY: 100 });
+      expect(stage()).toHaveAccessibleName(/^Cropping\./);
+      expect(document.querySelectorAll("[data-crop]")).toHaveLength(8);
+      expect(undo()).toBeDisabled();
+
+      // Its right side 100 in
+      fireEvent.pointerDown(cropHandle("e"), {
+        button: 0,
+        clientX: 250,
+        clientY: 100,
+      });
+      fireEvent.pointerMove(stage(), { clientX: 200, clientY: 100 });
+      fireEvent.pointerUp(stage());
+      fireEvent.keyDown(stage(), { key: "Enter" });
+
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          crop: { ...WHOLE, right: 0.25 },
+          x: 100,
+          y: 100,
+          width: 300,
+          height: 200,
+        }),
+      );
+      expect(stage()).toHaveAccessibleName(/^Canvas\./);
+      expect(document.querySelector("[data-crop]")).toBeNull();
+
+      await studio(lastSave()!);
+      await user.click(undo());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ crop: WHOLE, width: 400 }),
+      );
+    });
+
+    it("cancels a canvas crop with Escape, and keeps one with a click past it", async () => {
+      const shown = pic();
+      const { user } = await open(holding(shown));
+      await user.click(row(/^Pic/));
+      sized();
+      loaded(shown.id, 800, 400);
+      const drag = () => {
+        fireEvent.pointerDown(cropHandle("w"), {
+          button: 0,
+          clientX: 50,
+          clientY: 100,
+        });
+        fireEvent.pointerMove(stage(), { clientX: 100, clientY: 100 });
+        fireEvent.pointerUp(stage());
+      };
+
+      await user.click(
+        page().getByRole("button", {
+          name: "Crop on the canvas (double-click)",
+        }),
+      );
+      drag();
+      fireEvent.keyDown(stage(), { key: "Escape" });
+      expect(document.querySelector("[data-crop]")).toBeNull();
+      expect(lastSave()).toBeUndefined();
+
+      fireEvent.doubleClick(stage(), { clientX: 150, clientY: 100 });
+      drag();
+      // Far past the frame, on the empty canvas
+      fireEvent.pointerDown(stage(), { button: 0, clientX: 20, clientY: 400 });
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          crop: { ...WHOLE, left: 0.25 },
+          x: 200,
+          width: 300,
+        }),
+      );
+      // Still selected, and nothing else picked
+      expect(row(/^Pic/)).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("crops no locked picture on the canvas", async () => {
+      const shown = pic({ locked: true });
+      await open(holding(shown));
+      sized();
+      loaded(shown.id, 800, 400);
+
+      fireEvent.doubleClick(stage(), { clientX: 150, clientY: 100 });
+      expect(document.querySelector("[data-crop]")).toBeNull();
+    });
+
+    it("starts another emote uncropped", async () => {
+      const emote = elementOf("emote", {
+        label: "Wave",
+        emote: { id: "e1", image: "https://x/e1.png" },
+        crop: { ...WHOLE, left: 0.25 },
+      });
+      const { user } = await open(holding(emote));
+      await user.click(row(/^Wave/));
+
+      await user.click(
+        page().getByRole("radio", { name: "The emote a viewer sends" }),
+      );
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          emote: null,
+          crop: WHOLE,
+        }),
+      );
+    });
+  });
 });

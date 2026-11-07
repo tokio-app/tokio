@@ -612,6 +612,87 @@
   background-color: var(--accent-primary);
 }
 
+/* Cropping: the frame around the part of the picture it keeps, rounded as
+   the picture will be, everything past it dimmed */
+.crop_frame {
+  position: absolute;
+  outline: 2px solid var(--accent-primary);
+  box-shadow: 0 0 0 100vmax
+    color-mix(in srgb, var(--background-primary) 60%, transparent);
+  pointer-events: none;
+}
+
+/* Its corners like the resize handles, its sides' middles short bars */
+.crop_handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--font-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--accent-primary);
+  pointer-events: auto;
+}
+
+.crop_nw {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+
+.crop_ne {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+
+.crop_se {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+
+.crop_sw {
+  bottom: -6px;
+  left: -6px;
+  cursor: nesw-resize;
+}
+
+.crop_n,
+.crop_s {
+  left: calc(50% - 14px);
+  width: 24px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.crop_n {
+  top: -6px;
+}
+
+.crop_s {
+  bottom: -6px;
+}
+
+.crop_e,
+.crop_w {
+  top: calc(50% - 14px);
+  width: 8px;
+  height: 24px;
+  cursor: ew-resize;
+}
+
+.crop_e {
+  right: -6px;
+}
+
+.crop_w {
+  left: -6px;
+}
+
+.spaced .crop_handle {
+  cursor: inherit;
+}
+
 /* Under the canvas: its size, then the rulers' toggle and the zoom */
 .canvas_bar {
   display: flex;
@@ -866,22 +947,23 @@
   font-size: var(--font-sm);
 }
 
-/* The overlay's guides, while the rulers show them: plain rows like the box
-   fields, under a label like a field's with the lock and Remove all */
-.guides {
+/* A block under a label like a field's, with its actions on the label's
+   row: the overlay's guides with their lock and Remove all, a picture's crop
+   with Crop and Reset */
+.titled {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
-.guides_head {
+.titled_head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
 }
 
-.guides_title {
+.titled_name {
   color: var(--font-primary);
   font-size: var(--font-sm);
   font-weight: 500;
@@ -909,6 +991,22 @@
   font-size: var(--font-xs);
   font-stretch: var(--stretch-readout);
   font-weight: 700;
+}
+
+/* A picture's crop: the % off each side, in one row like the box's fields */
+.crop {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.crop .number {
+  padding: 0 var(--space-2);
+}
+
+.crop label {
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
 }
 
 /* Side by side, or one under the other when the Spanish runs long, each as
