@@ -79,6 +79,49 @@ describe("NumberInput", () => {
     expect(onChange).toHaveBeenLastCalledWith(1.5);
   });
 
+  it("drags its value while pressed, a px a step, ten with Shift", () => {
+    Element.prototype.setPointerCapture = vi.fn();
+    const onChange = vi.fn();
+    render(<Field onChange={onChange} scrub integer min={0} max={40} />);
+
+    fireEvent.pointerDown(field(), { button: 0, clientX: 100 });
+    // Not in the field yet, its cursor a double arrow
+    expect(fireEvent.mouseDown(field())).toBe(false);
+    expect(field().className).toMatch(/scrubbing/);
+    // A click until it moves 3 px
+    fireEvent.pointerMove(field(), { clientX: 102 });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.pointerMove(field(), { clientX: 125 });
+    expect(field()).toHaveValue(35);
+    // Held at its max, and back down from there at once
+    fireEvent.pointerMove(field(), { clientX: 126, shiftKey: true });
+    expect(field()).toHaveValue(40);
+    fireEvent.pointerMove(field(), { clientX: 120 });
+    expect(field()).toHaveValue(34);
+    fireEvent.pointerUp(field());
+
+    expect(onChange.mock.calls).toEqual([[35], [40], [34]]);
+    expect(field().className).not.toMatch(/scrubbing/);
+    expect(field()).not.toHaveFocus();
+  });
+
+  it("types in a dragged field after a click, and drags nothing while typed in", () => {
+    Element.prototype.setPointerCapture = vi.fn();
+    const onChange = vi.fn();
+    render(<Field onChange={onChange} scrub />);
+
+    fireEvent.pointerDown(field(), { button: 0, clientX: 100 });
+    fireEvent.pointerUp(field());
+    expect(field()).toHaveFocus();
+
+    // Pressed again, it selects text as any field does
+    fireEvent.pointerDown(field(), { button: 0, clientX: 100 });
+    expect(fireEvent.mouseDown(field())).toBe(true);
+    fireEvent.pointerMove(field(), { clientX: 150 });
+    fireEvent.pointerUp(field());
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("shows a value set from outside", async () => {
     const user = userEvent.setup();
     render(<Field />);

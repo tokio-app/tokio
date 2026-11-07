@@ -53,6 +53,7 @@ import { TimerPush } from "@/pages/CountdownTimer/helper";
 import { newOverlayName, sizeText } from "@/pages/Studio/helper";
 import toolsStyles from "@/pages/Tools/tools.module.css";
 import { useLanguage, useT } from "@/ui/i18n";
+import isEqual from "fast-deep-equal";
 import { useParams } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { FiPlay } from "react-icons/fi";
@@ -148,6 +149,9 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const [samples, setSamples] = useState(() => new Samples());
   // The element whose image or video is being picked
   const [mediaFor, setMediaFor] = useState<string | null>(null);
+  // Width and height change together, in the fields and on the canvas, for
+  // every element and group until the editor closes
+  const [linked, setLinked] = useState(false);
   // Elements waiting for main to save a browsed file, and the newest request
   // applied to each, as on the Alerts page
   const asked = useRef(new Set<string>());
@@ -456,19 +460,29 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const frame = group ? frameOf(group) : null;
   const canvas = STUDIO_SIZES[overlay.size];
 
-  // A group's elements when a change to its frame began: a drag's every
-  // move goes from them, so rounding doesn't add up
-  const reframing = useRef<{ from: Turned; elements: StudioElement[] }>(null);
+  // A group's elements and frame when changes to its frame began, and the
+  // elements they last made: while the group still has those, the next
+  // change goes on from the first, so rounding doesn't add up over a drag or
+  // a dragged field
+  const reframing = useRef<{
+    from: Turned;
+    elements: StudioElement[];
+    made: StudioElement[];
+  }>(null);
   const reframeGroup = (id: string, from: Turned, to: Turned) =>
     changeGroup(id, (g) => {
-      if (reframing.current?.from !== from) {
-        reframing.current = { from, elements: g.elements };
-      }
-      return {
-        ...g,
-        rotation: to.rotation,
-        elements: reframe(reframing.current.elements, from, to),
+      const last = reframing.current;
+      const base =
+        last && isEqual(last.made, g.elements)
+          ? last
+          : { from, elements: g.elements };
+      const elements = reframe(base.elements, base.from, to);
+      reframing.current = {
+        from: base.from,
+        elements: base.elements,
+        made: elements,
       };
+      return { ...g, rotation: to.rotation, elements };
     });
 
   const flipGroup = (id: string, key: "flip_x" | "flip_y") =>
@@ -566,6 +580,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               locked={locked}
               groupFrame={group && !group.hidden ? frame : null}
               onGroupFrame={reframeGroup}
+              linked={linked}
               onSelect={select}
               onBox={setBox}
               onRotate={(id, rotation) =>
@@ -590,6 +605,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 key={group.id}
                 group={group}
                 frame={frame}
+                linked={linked}
+                onLinked={setLinked}
                 onChange={(changed) => changeGroup(changed.id, () => changed)}
                 onFrame={(to) => frame && reframeGroup(group.id, frame, to)}
                 onFlip={(key) => flipGroup(group.id, key)}
@@ -609,6 +626,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 element={element}
                 autoName={autoNames[element.id]}
                 canvas={canvas}
+                linked={linked}
+                onLinked={setLinked}
                 onChange={(changed) => changeElement(changed.id, () => changed)}
                 gifts={giftChoices}
                 emotes={emoteChoices}

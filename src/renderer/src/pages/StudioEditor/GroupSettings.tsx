@@ -9,6 +9,9 @@ type Props = {
   group: StudioGroup;
   // Around its elements as they show, null with none
   frame: Turned | null;
+  // Its frame's width and height change together, in proportion
+  linked: boolean;
+  onLinked: (linked: boolean) => void;
   onChange: (group: StudioGroup) => void;
   // Moves, scales or turns its elements into the new frame
   onFrame: (frame: Turned) => void;
@@ -23,6 +26,8 @@ type Props = {
 export function GroupSettings({
   group,
   frame,
+  linked,
+  onLinked,
   onChange,
   onFrame,
   onFlip,
@@ -62,6 +67,8 @@ export function GroupSettings({
           box={shown}
           flips={group}
           opacity={group.opacity}
+          linked={linked}
+          onLinked={onLinked}
           // The field that changed; the others keep the frame as it is
           onBox={(box) =>
             onFrame({

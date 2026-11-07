@@ -316,7 +316,7 @@ const turn = ({ x, y }: Point, degrees: number): Point => {
  * corner kept where it is on the canvas: whole width and height, at least
  * `minWidth` wide (a text's longest word) and `minHeight(width)` tall (the
  * height its words take at that width). A turned box resizes along its own
- * sides.
+ * sides, and an `even` one keeps its proportions.
  */
 export function resizeBox(
   box: Box,
@@ -327,24 +327,31 @@ export function resizeBox(
     minWidth = 1,
     minHeight = () => 1,
     rotation = 0,
+    even = false,
   }: {
     minWidth?: number;
     minHeight?: (width: number) => number;
     rotation?: number;
+    even?: boolean;
   } = {},
 ): Box {
   const west = corner.endsWith("w");
   const north = corner.startsWith("n");
-  // The pointer's move along the box's own sides
+  // The pointer's move along the box's own sides, out from the corner
   const along = turn({ x: dx, y: dy }, -rotation);
-  const width = Math.max(
-    minWidth,
-    Math.round(box.width + (west ? -along.x : along.x)),
-  );
-  const height = Math.max(
-    minHeight(width),
-    Math.round(box.height + (north ? -along.y : along.y)),
-  );
+  let grow = { x: west ? -along.x : along.x, y: north ? -along.y : along.y };
+  if (even) {
+    // Along its diagonal, as far as it can shrink
+    const scale = Math.max(
+      (grow.x * box.width + grow.y * box.height) /
+        (box.width ** 2 + box.height ** 2),
+      minWidth / box.width - 1,
+      1 / box.height - 1,
+    );
+    grow = { x: box.width * scale, y: box.height * scale };
+  }
+  const width = Math.max(minWidth, Math.round(box.width + grow.x));
+  const height = Math.max(minHeight(width), Math.round(box.height + grow.y));
   // The opposite corner, from the center, stays put on the canvas
   const side = (w: number, h: number) =>
     turn({ x: (west ? w : -w) / 2, y: (north ? h : -h) / 2 }, rotation);

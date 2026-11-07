@@ -185,6 +185,29 @@ describe("resizeBox", () => {
     expect(corner(turned)).toEqual(corner(box));
   });
 
+  it("keeps an even box's proportions, along its diagonal", () => {
+    expect(resizeBox(box, "se", 30, 0, { even: true })).toEqual({
+      x: 100,
+      y: 200,
+      width: 327,
+      height: 109,
+    });
+    expect(resizeBox(box, "nw", 60, 20, { even: true })).toEqual({
+      x: 160,
+      y: 220,
+      width: 240,
+      height: 80,
+    });
+    // As small as it gets, still three times as wide
+    expect(resizeBox(box, "se", -1000, -1000, { even: true })).toMatchObject({
+      width: 3,
+      height: 1,
+    });
+    expect(
+      resizeBox(box, "se", -1000, -1000, { even: true, minWidth: 150 }),
+    ).toMatchObject({ width: 150, height: 50 });
+  });
+
   it("stops at the least size, the dragged corner held there", () => {
     // Past the opposite corner: 1 px wide, and as tall as the text
     const heights: number[] = [];

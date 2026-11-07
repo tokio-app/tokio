@@ -543,6 +543,66 @@ describe("StudioEditor", () => {
     await waitFor(() => expect(savedElement()?.rotation).toBe(-30));
   });
 
+  it("links the width and the height, a dragged field keeping their proportions", async () => {
+    const shape = elementOf("shape", { width: 200, height: 150 });
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+    const link = page().getByRole("button", { name: "Link width and height" });
+    const width = field("Width").getByRole("spinbutton");
+
+    await user.click(link);
+    expect(link).toHaveAttribute("aria-pressed", "true");
+    await user.clear(width);
+    await user.type(width, "400");
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ width: 400, height: 300 }),
+    );
+    await user.tab();
+
+    // A px at a time, from the proportions it had, not each step's rounding
+    fireEvent.pointerDown(width, { button: 0, clientX: 0 });
+    for (let x = 1; x <= 101; x++) fireEvent.pointerMove(width, { clientX: x });
+    fireEvent.pointerUp(width);
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ width: 501, height: 376 }),
+    );
+
+    await user.click(link);
+    await user.clear(width);
+    await user.type(width, "100");
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ width: 100, height: 376 }),
+    );
+  });
+
+  it("keeps the proportions on the canvas's corners while linked", async () => {
+    const shape = elementOf("shape", {
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 100,
+    });
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+    await user.click(
+      page().getByRole("button", { name: "Link width and height" }),
+    );
+    sized();
+
+    fireEvent.pointerDown(handle("se"), { button: 0, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(canvas(), { clientX: 15, clientY: 0 });
+    fireEvent.pointerUp(canvas());
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        x: 100,
+        y: 200,
+        width: 327,
+        height: 109,
+      }),
+    );
+  });
+
   it("locks an element: a click goes through it, and its row says so", async () => {
     const back = elementOf("shape", { x: 0, y: 0, width: 400, height: 400 });
     const front = text({ text: "Hello", x: 0, y: 0, width: 400, height: 400 });
@@ -699,6 +759,34 @@ describe("StudioEditor", () => {
         elements: [{ x: 400 }, { x: 0 }],
       }),
     );
+  });
+
+  it("drags a group's width from its field, its elements scaling as one", async () => {
+    const big = elementOf("shape", { x: 100, y: 100, width: 100, height: 100 });
+    const small = elementOf("shape", {
+      x: 300,
+      y: 300,
+      width: 100,
+      height: 100,
+    });
+    const { user } = await open(scene(big, small));
+    await user.click(row(/^Group 1/));
+    const width = field("Width").getByRole("spinbutton");
+
+    // From 300 to 150 a px at a time: each step from where it began, so the
+    // elements' rounding doesn't stall them
+    fireEvent.pointerDown(width, { button: 0, clientX: 0 });
+    for (let x = 1; x <= 150; x++)
+      fireEvent.pointerMove(width, { clientX: -x });
+    fireEvent.pointerUp(width);
+
+    await waitFor(() =>
+      expect(savedGroup(0)?.elements).toMatchObject([
+        { x: 100, width: 50, height: 100 },
+        { x: 200, width: 50, height: 100 },
+      ]),
+    );
+    expect(width).toHaveValue(150);
   });
 
   it("moves a selected group's elements as one, and a click without moving picks", async () => {

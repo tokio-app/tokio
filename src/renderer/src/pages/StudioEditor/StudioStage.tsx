@@ -66,6 +66,8 @@ type Props = {
   groupFrame: Turned | null;
   // A group resized or turned from the frame it had when the drag began
   onGroupFrame: (groupId: string, from: Turned, to: Turned) => void;
+  // The corners keep the width and height in proportion
+  linked: boolean;
   // An embed's preview, portaled into its slot
   embed: (element: EmbedView) => ReactNode;
 };
@@ -158,6 +160,7 @@ export function StudioStage({
   onShift,
   groupFrame,
   onGroupFrame,
+  linked,
   embed,
 }: Props) {
   const t = useT();
@@ -412,7 +415,7 @@ export function StudioStage({
         d.corner,
         (e.clientX - d.x) / d.scale,
         (e.clientY - d.y) / d.scale,
-        { rotation: d.frame.rotation },
+        { rotation: d.frame.rotation, even: linked },
       );
       onGroupFrame(d.id, d.frame, { ...box, rotation: d.frame.rotation });
       return;
@@ -443,6 +446,7 @@ export function StudioStage({
               minWidth: textWidth(d.id, d.scale),
               minHeight: (width) => textHeight(d.id, width, d.scale),
               rotation: d.rotation,
+              even: linked,
             })
           : { ...d.box, x: d.box.x + dx, y: d.box.y + dy },
       ),

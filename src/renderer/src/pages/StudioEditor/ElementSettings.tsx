@@ -85,6 +85,9 @@ type Props = {
   autoName: string;
   // The overlay's size, which the element lines up with
   canvas: { width: number; height: number };
+  // Its width and height change together, in proportion
+  linked: boolean;
+  onLinked: (linked: boolean) => void;
   onChange: (element: StudioElement) => void;
   gifts: CustomGift[];
   emotes: EmoteOption[];
@@ -102,6 +105,8 @@ export function ElementSettings({
   element,
   autoName,
   canvas,
+  linked,
+  onLinked,
   onChange,
   gifts,
   emotes,
@@ -188,6 +193,7 @@ export function ElementSettings({
           <div className={styles.pair}>
             <Field label={t("studio.fields.size")}>
               <NumberInput
+                scrub
                 min={1}
                 max={STUDIO_MAX_FONT_SIZE}
                 value={element.size}
@@ -344,6 +350,7 @@ export function ElementSettings({
                   />
                   <NumberInput
                     className={styles.number}
+                    scrub
                     aria-label={t("studio.fields.borderWidth")}
                     integer
                     min={1}
@@ -359,6 +366,7 @@ export function ElementSettings({
           </div>
           <Field label={t("studio.fields.radius")}>
             <NumberInput
+              scrub
               min={0}
               value={element.radius}
               onChange={(radius) => onChange({ ...element, radius })}
@@ -400,6 +408,8 @@ export function ElementSettings({
         box={element}
         flips={element}
         opacity={element.opacity}
+        linked={linked}
+        onLinked={onLinked}
         onBox={(box) => onChange({ ...element, ...box })}
         onFlip={(key) => {
           const next = { ...element };
@@ -439,6 +449,7 @@ export function ElementSettings({
                   likes: (
                     <NumberInput
                       className={styles.number}
+                      scrub
                       aria-label={t("studio.fields.likesPerReaction")}
                       integer
                       min={1}
@@ -465,6 +476,7 @@ export function ElementSettings({
             <div className={styles.pair}>
               <Field label={t("studio.fields.seconds")}>
                 <NumberInput
+                  scrub
                   min={1}
                   max={STUDIO_MAX_SECONDS}
                   value={element.seconds}

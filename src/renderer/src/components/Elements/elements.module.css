@@ -180,6 +180,11 @@
   pointer-events: all;
 }
 
+/* A number field pressed to drag its value */
+.scrubbing {
+  cursor: ew-resize;
+}
+
 /* INPUT END */
 
 /* CHECK & TOGGLE START */

@@ -63,6 +63,6 @@ The look follows the `frontend-design` skill. The palette's values and the logos
 - Known limit: a media element's controls live in its shadow DOM, so Tab from a video moves on to the next control rather than through them.
 - Don't remove focus outlines. Anything without its own focus style gets `base.css`'s rose `:focus-visible` ring, drawn inset on the title bar's controls and in the sidebar. Inputs show a rose border. `Toggle` draws the ring on its track.
 - `Select` is a combobox with a listbox. Its `OPTION_HEIGHT` is the item's `--control-height` plus the row's 2px padding on each side, so change them together.
-- Number fields use `NumberInput`, which can be emptied while typing and reports only valid numbers. It compares values with `Object.is`, so NaN (an overlay number setting saved as text) shows an empty field.
+- Number fields use `NumberInput`, which can be emptied while typing and reports only valid numbers. With `scrub` (Overlay Studio's editor) it also drags its value while pressed. It compares values with `Object.is`, so NaN (an overlay number setting saved as text) shows an empty field.
 - Something hidden only by CSS also needs `tabIndex={-1}` and `aria-hidden`.
 - A menu under a toggle button (`ProfileDropdown`, `NotificationBell`) takes its state from `useMenu`: it closes on a click outside its `ref`, and on Escape, which gives the focus back to `toggleRef`.

@@ -476,10 +476,21 @@
 }
 
 /* X, Y, W and H on one line */
+/* X, Y, the width, its link to the height, then the height */
 .box {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto minmax(0, 1fr);
   gap: var(--space-2);
+}
+
+/* Room for a minus and four digits next to the link */
+.box .number {
+  padding: 0 var(--space-2);
+}
+
+/* Level with the fields, under their labels */
+.link {
+  align-self: end;
 }
 
 .box label {
@@ -487,9 +498,14 @@
   font-size: var(--font-xs);
 }
 
+/* Two columns, so its label stays on one line next to the link's column */
+.rotation {
+  grid-column: span 2;
+}
+
 /* Beside the rotation, which turns the element as the flips mirror it */
 .flips {
-  grid-column: span 3;
+  grid-column: 3 / -1;
 }
 
 /* The canvas's edges and middles, on their own row */

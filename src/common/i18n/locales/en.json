@@ -572,6 +572,7 @@
   "studio.fields.y": "Y",
   "studio.fields.width": "Width",
   "studio.fields.height": "Height",
+  "studio.fields.linkSize": "Link width and height",
   "studio.fields.opacity": "Opacity ({opacity}%)",
   "studio.embed.games": "Games overlay",
   "studio.embed.alert": "Alert: {name}",
