@@ -350,6 +350,19 @@ describe("StudioEditor", () => {
     expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("takes a double click on a group's arrow, lock or eye as one click", async () => {
+    const { user } = await open(scene(elementOf("shape")));
+    const button = (name: string) =>
+      rowOf(/^Group 1/).getByRole("button", { name });
+
+    await user.dblClick(button("Elements in this group"));
+    await waitFor(() => expect(savedGroup(0)?.folded).toBe(true));
+    await user.dblClick(button("Lock group"));
+    await waitFor(() => expect(savedGroup(0)?.locked).toBe(true));
+    await user.dblClick(button("Hide group"));
+    await waitFor(() => expect(savedGroup(0)?.hidden).toBe(true));
+  });
+
   it("folds and unfolds a group with a double click on its name, not an empty one", async () => {
     const shape = elementOf("shape");
     const { user } = await open(
