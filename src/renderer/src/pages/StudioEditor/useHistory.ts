@@ -1,7 +1,7 @@
 import { StudioOverlay } from "@/common/schemas";
 import isEqual from "fast-deep-equal";
 import { Dispatch, SetStateAction, useRef, useState } from "react";
-import { withFolds } from "./helper";
+import { withView } from "./helper";
 
 // Changes from one control less than this apart are one step: a number
 // typed, a field dragged, a text growing to its words
@@ -19,8 +19,8 @@ type Steps = {
 /**
  * The editor's undo and redo. A step is a press on the canvas, from its
  * press to its release, or a run of changes from one control with one
- * selection. Folding a group isn't one, and an undo or redo leaves every
- * group folded as it is.
+ * selection. Folding a group or showing the rulers isn't one, and an undo or
+ * redo leaves both as they are.
  */
 export function useHistory(
   overlay: StudioOverlay,
@@ -71,14 +71,14 @@ export function useHistory(
     if (holding.current) return;
     const { past, future } = steps;
     let i = past.length - 1;
-    while (i >= 0 && isEqual(withFolds(past[i], overlay), overlay)) i--;
+    while (i >= 0 && isEqual(withView(past[i], overlay), overlay)) i--;
     if (i < 0) {
       if (past.length > 0) setSteps({ past: [], future });
       return;
     }
     setSteps({ past: past.slice(0, i), future: [...future, overlay] });
     fresh.current = true;
-    setOverlay(withFolds(past[i], overlay));
+    setOverlay(withView(past[i], overlay));
   };
 
   const redo = () => {
@@ -88,7 +88,7 @@ export function useHistory(
     if (!next) return;
     setSteps({ past: [...past, overlay], future: future.slice(0, -1) });
     fresh.current = true;
-    setOverlay(withFolds(next, overlay));
+    setOverlay(withView(next, overlay));
   };
 
   // A change to the overlay and every step, which isn't one itself: a file

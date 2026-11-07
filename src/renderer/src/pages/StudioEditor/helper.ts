@@ -4,6 +4,7 @@ import {
   StudioElement,
   StudioElementKind,
   StudioElementOf,
+  StudioGuides,
   StudioItem,
   StudioOverlay,
   StudioSource,
@@ -693,10 +694,11 @@ export function pickElement(
 }
 
 /**
- * The overlay as a step of the history had it, with each of its groups
- * folded as it is now: folding is the list's view, which Undo leaves alone.
+ * The overlay as a step of the history had it, with the editor's view as it
+ * is now, which Undo leaves alone: each of its groups folded as now, and its
+ * rulers shown or not as now.
  */
-export function withFolds(
+export function withView(
   overlay: StudioOverlay,
   now: StudioOverlay,
 ): StudioOverlay {
@@ -707,6 +709,7 @@ export function withFolds(
   );
   return {
     ...overlay,
+    rulers: now.rulers,
     items: overlay.items.map((item) => {
       if (item.kind !== "group") return item;
       const fold = folded.get(item.id) ?? item.folded;
@@ -790,3 +793,209 @@ export function rulerTicks(
   }
   return ticks;
 }
+
+// A guide's axis: a vertical guide sits at an x, a horizontal one at a y
+export type Axis = "x" | "y";
+export const AXES = ["x", "y"] as const;
+
+// A line a drag can stick to, in px of the canvas: where it crosses its
+// axis, and how far it runs along the other one, for the rose line that
+// shows it. A guide runs the whole view.
+export type SnapLine = { at: number; from: number; to: number };
+export type SnapLines = Record<Axis, SnapLine[]>;
+// A rose line on the canvas: a line a box meets, across the box too
+export type MetLine = SnapLine & { axis: Axis };
+
+// A box's edges and middle on an axis, each running along the box
+const linesOf = (box: Box, axis: Axis): SnapLine[] => {
+  const [start, size, from, length] =
+    axis === "x"
+      ? [box.x, box.width, box.y, box.height]
+      : [box.y, box.height, box.x, box.width];
+  return [start, start + size / 2, start + size].map((at) => ({
+    at,
+    from,
+    to: from + length,
+  }));
+};
+
+/**
+ * What a drag can stick to: the canvas's edges and middle, each box's as it
+ * shows (a turned one by its extent), and the guides, null for none.
+ */
+export function snapLines(
+  canvas: { width: number; height: number },
+  boxes: Turned[],
+  guides: StudioGuides | null,
+): SnapLines {
+  const shown = [{ x: 0, y: 0, ...canvas }, ...boxes.map(extent)];
+  const lines = (axis: Axis) => [
+    ...shown.flatMap((box) => linesOf(box, axis)),
+    ...(guides?.[axis] ?? []).map((at) => ({
+      at,
+      from: -Infinity,
+      to: Infinity,
+    })),
+  ];
+  return { x: lines("x"), y: lines("y") };
+}
+
+// How far to move so the nearest of the points meets the nearest line, 0
+// when none is within reach
+function stick(points: number[], lines: SnapLine[], reach: number): number {
+  let shift = 0;
+  let nearest = reach;
+  for (const { at } of lines) {
+    for (const point of points) {
+      const gap = Math.abs(at - point);
+      if (gap <= nearest) {
+        nearest = gap;
+        shift = at - point;
+      }
+    }
+  }
+  return shift;
+}
+
+/**
+ * How far to move a box, on each axis, for its nearest edge or middle as it
+ * shows to meet a line within reach.
+ */
+export function snapBox(box: Turned, lines: SnapLines, reach: number): Point {
+  const shown = extent(box);
+  const at = (axis: Axis) => linesOf(shown, axis).map((line) => line.at);
+  return {
+    x: stick(at("x"), lines.x, reach),
+    y: stick(at("y"), lines.y, reach),
+  };
+}
+
+/** How far to move a point, on each axis, to meet a line within reach. */
+export const snapPoint = (
+  point: Point,
+  lines: SnapLines,
+  reach: number,
+): Point => ({
+  x: stick([point.x], lines.x, reach),
+  y: stick([point.y], lines.y, reach),
+});
+
+/**
+ * The rose lines for a box: each of its edges and middle, as it shows, that
+ * meets a line within half a px, across the box and everything it meets
+ * there.
+ */
+export function metLines(box: Turned, lines: SnapLines): MetLine[] {
+  const shown = extent(box);
+  return AXES.flatMap((axis) =>
+    linesOf(shown, axis).flatMap((own) => {
+      const met = lines[axis].filter(
+        (line) => Math.abs(line.at - own.at) < 0.5,
+      );
+      if (met.length === 0) return [];
+      return [
+        {
+          axis,
+          at: own.at,
+          from: Math.min(own.from, ...met.map((line) => line.from)),
+          to: Math.max(own.to, ...met.map((line) => line.to)),
+        },
+      ];
+    }),
+  );
+}
+
+/** Where a corner of a box is on the canvas, turned with it. */
+export function cornerOf(box: Turned, corner: Corner): Point {
+  const { x, y } = turn(
+    {
+      x: (corner.endsWith("w") ? -box.width : box.width) / 2,
+      y: (corner.startsWith("n") ? -box.height : box.height) / 2,
+    },
+    box.rotation,
+  );
+  return { x: box.x + box.width / 2 + x, y: box.y + box.height / 2 + y };
+}
+
+const OPPOSITE: Record<Corner, Corner> = {
+  nw: "se",
+  ne: "sw",
+  sw: "ne",
+  se: "nw",
+};
+
+/**
+ * A corner drag's move (dx, dy), in px of the canvas, changed so the corner
+ * sticks to a line within reach: `resized` is the box the drag gives as it
+ * is. With `even` (Link on) the corner keeps to the box's diagonal, so it
+ * sticks on the nearer axis only.
+ */
+export function stickCorner(
+  box: Turned,
+  resized: Turned,
+  corner: Corner,
+  move: Point,
+  lines: SnapLines,
+  reach: number,
+  even: boolean,
+): Point {
+  const shift = snapPoint(cornerOf(resized, corner), lines, reach);
+  if (!even) return { x: move.x + shift.x, y: move.y + shift.y };
+  const far = cornerOf(box, corner);
+  const near = cornerOf(box, OPPOSITE[corner]);
+  const diagonal = { x: far.x - near.x, y: far.y - near.y };
+  const axis =
+    !shift.y || (shift.x && Math.abs(shift.x) <= Math.abs(shift.y)) ? "x" : "y";
+  if (!shift[axis] || !diagonal[axis]) return move;
+  // Along the diagonal, as far as it takes the corner to the line
+  const along = shift[axis] / diagonal[axis];
+  return { x: move.x + along * diagonal.x, y: move.y + along * diagonal.y };
+}
+
+/** The guide nearest a point within reach, by its axis and place. */
+export function nearGuide(
+  point: Point,
+  guides: StudioGuides,
+  reach: number,
+): { axis: Axis; index: number } | null {
+  let found: { axis: Axis; index: number } | null = null;
+  let nearest = reach;
+  for (const axis of AXES) {
+    for (const [index, at] of guides[axis].entries()) {
+      const gap = Math.abs(point[axis] - at);
+      if (gap <= nearest) {
+        nearest = gap;
+        found = { axis, index };
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * The guides with one moved to `at`, added (`index` null) or taken away
+ * (`at` null).
+ */
+export function withGuide(
+  guides: StudioGuides,
+  axis: Axis,
+  index: number | null,
+  at: number | null,
+): StudioGuides {
+  const lines = [...guides[axis]];
+  if (index === null) {
+    if (at !== null) lines.push(at);
+  } else if (at === null) {
+    lines.splice(index, 1);
+  } else {
+    lines[index] = at;
+  }
+  return axis === "x" ? { ...guides, x: lines } : { ...guides, y: lines };
+}
+
+/**
+ * Where a dragged guide goes: whole px, on the nearest line within reach.
+ * Never -0, which JSON brings back as 0.
+ */
+export const guideAt = (value: number, lines: SnapLine[], reach: number) =>
+  Math.round(value + stick([value], lines, reach)) || 0;

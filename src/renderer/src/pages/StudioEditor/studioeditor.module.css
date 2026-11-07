@@ -503,6 +503,50 @@
   outline: calc(1px / var(--canvas-scale)) dashed var(--font-secondary);
 }
 
+/* The streamer's guides, a screen px of Info across the whole view, cut at
+   the sizer's edges, under the rose lines and the selection */
+.guide_x,
+.guide_y,
+.met_x,
+.met_y {
+  position: absolute;
+  pointer-events: none;
+}
+
+.guide_x,
+.met_x {
+  width: 1px;
+}
+
+.guide_y,
+.met_y {
+  height: 1px;
+}
+
+.guide_x,
+.met_whole.met_x {
+  top: -100vh;
+  bottom: -100vh;
+}
+
+.guide_y,
+.met_whole.met_y {
+  right: -100vw;
+  left: -100vw;
+}
+
+.guide_x,
+.guide_y {
+  background-color: var(--info);
+}
+
+/* What a drag lines up with, in the selection's rose: across the boxes it
+   meets, the canvas, or along a guide */
+.met_x,
+.met_y {
+  background-color: var(--accent-primary);
+}
+
 /* Over the canvas, in its root's px */
 .selection {
   position: absolute;
@@ -633,6 +677,17 @@
   fill: none;
   stroke: var(--font-muted);
   stroke-width: 1;
+}
+
+/* A dragged guide's place on the ruler that measures it, Ink on Info */
+.ruler_mark rect {
+  fill: var(--info);
+}
+
+.ruler_mark text {
+  fill: var(--background-primary);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
 }
 
 /* EMBEDS, in the canvas's px: sizes are tokens times the canvas's usual
@@ -809,4 +864,61 @@
 .note {
   color: var(--font-secondary);
   font-size: var(--font-sm);
+}
+
+/* The overlay's guides, while the rulers show them: plain rows like the box
+   fields, under a label like a field's with the lock and Remove all */
+.guides {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.guides_head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.guides_title {
+  color: var(--font-primary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+.guide_list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Its axis's letter, where it is, and its remove button */
+.guide_row {
+  display: grid;
+  grid-template-columns: 2ch minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.guide_axis {
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
+}
+
+/* Side by side, or one under the other when the Spanish runs long, each as
+   wide as its row */
+.guide_adds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.guide_adds > button {
+  flex: 1 1 auto;
 }

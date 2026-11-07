@@ -49,6 +49,8 @@ const overlayOf = (
   id: "o1",
   name: "Main",
   size: "portrait",
+  rulers: false,
+  guides: { x: [], y: [], locked: false },
   items: [groupOf("L1", { elements })],
 });
 

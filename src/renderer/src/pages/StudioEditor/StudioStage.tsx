@@ -1,11 +1,13 @@
 // The stream's own stylesheet, global as on its page, like the games
 // overlay's preview: the canvas can't drift from what's on stream
 import "@/common/studio/overlay.css";
+import { STUDIO_MAX_GUIDES, StudioGuides } from "@/common/schemas";
 import { createStage, Stage, StageFit } from "@/common/studio/stage";
 import { StudioElementView, StudioView } from "@/common/types";
 import { Btn } from "@/components";
 import { cx } from "@/helper/cx";
 import { useLanguage, useT } from "@/ui/i18n";
+import isEqual from "fast-deep-equal";
 import {
   CSSProperties,
   KeyboardEvent,
@@ -22,20 +24,31 @@ import {
 import { createPortal, flushSync } from "react-dom";
 import { LuMaximize, LuRuler, LuZoomIn, LuZoomOut } from "react-icons/lu";
 import {
+  Axis,
   Box,
   clampZoom,
   Corner,
   CORNERS,
   fitText,
+  guideAt,
   holdsTurned,
+  MetLine,
+  metLines,
+  nearGuide,
   pickElement,
   Point,
   resizeBox,
   rotateCursor,
   roundBox,
+  snapBox,
+  SnapLine,
+  SnapLines,
+  snapLines,
+  stickCorner,
   toCanvas,
   turnTo,
   Turned,
+  withGuide,
   Words,
   zoomStep,
 } from "./helper";
@@ -84,6 +97,13 @@ type Props = {
   onGroupFrame: (groupId: string, from: Turned, to: Turned) => void;
   // The corners keep the width and height in proportion
   linked: boolean;
+  // The rulers show, with the guides, and the overlay saves whether they do
+  rulers: boolean;
+  onRulers: (on: boolean) => void;
+  // The overlay's guides, which a drag sticks to while they show
+  guides: StudioGuides;
+  // A guide added, moved or taken away on the canvas
+  onGuides: (guides: StudioGuides) => void;
   // A drag on the canvas begins (true) and ends: every change in between is
   // one step of the history
   onHold: (held: boolean) => void;
@@ -107,6 +127,8 @@ type Drag =
       box: Box;
       rotation: number;
       scale: number;
+      // What it sticks to
+      lines: SnapLines;
     }
   | {
       kind: "rotate";
@@ -125,6 +147,7 @@ type Drag =
       y: number;
       frame: Turned;
       scale: number;
+      lines: SnapLines;
     }
   | {
       kind: "group";
@@ -137,6 +160,9 @@ type Drag =
       moved: boolean;
       // The whole px already sent
       sent: [number, number];
+      // Its frame when it began, and what that sticks to
+      frame: Turned;
+      lines: SnapLines;
     }
   | {
       kind: "pan";
@@ -145,10 +171,27 @@ type Drag =
       y: number;
       left: number;
       top: number;
+    }
+  | {
+      kind: "guide";
+      axis: Axis;
+      // Its place among that axis's guides, null for one from a ruler
+      index: number | null;
+      // Where it is, in whole px of the canvas, null while the pointer is
+      // off the view: let go there, it goes
+      at: number | null;
+      // What it sticks to on its axis
+      lines: SnapLine[];
     };
 
-// The cursor a drag keeps on the whole stage
-type Held = "rotate" | "move" | "pan" | Corner;
+// The cursor a drag keeps on the whole stage: a guide's is its axis's
+type Held = "rotate" | "move" | "pan" | Axis | Corner;
+
+// What a press where the pointer is would drag, for its cursor
+type Over = "move" | Axis | null;
+
+// A guide being dragged, drawn where it is
+type Moving = { axis: Axis; index: number | null; at: number | null };
 
 const NO_FIT: StageFit = { scale: 0, left: 0, top: 0 };
 
@@ -160,8 +203,13 @@ const HANDLES: Record<Corner, string> = {
   se: styles.handle_se,
 };
 
-// Each corner's resize cursor, which the stage keeps while it drags
-const RESIZE_CURSORS: Record<Corner, string> = {
+// The cursor of each drag, which the stage keeps while it lasts, and of
+// what a press would drag. Turning has its own, along its circle.
+const CURSORS: Record<Exclude<Held, "rotate">, string> = {
+  move: "move",
+  pan: "grabbing",
+  x: "col-resize",
+  y: "row-resize",
   nw: "nwse-resize",
   ne: "nesw-resize",
   sw: "nesw-resize",
@@ -170,6 +218,10 @@ const RESIZE_CURSORS: Record<Corner, string> = {
 
 // Screen px a press inside a group's outline moves before it drags the group
 const DRAG_START = 3;
+// Screen px within which a dragged edge, middle or corner sticks to a line
+const SNAP_REACH = 6;
+// Screen px from a guide that Ctrl and a press take it
+const GUIDE_REACH = 4;
 
 const sameFit = (a: StageFit, b: StageFit) =>
   a.scale === b.scale && a.left === b.left && a.top === b.top;
@@ -189,8 +241,10 @@ const NUDGES: Record<string, [number, number]> = {
  * editor adds over it: the selection's outline and resize handle, dragging,
  * the arrows and Delete. A selected group moves as one. Embeds are React's
  * previews, portaled into the stage's slots, which stay put so iframes don't
- * reload. It zooms and scrolls, with rulers while they're on, and its bar
- * under it holds the zoom.
+ * reload. It zooms and scrolls, with rulers and guides while they're on, and
+ * its bar under it holds the zoom. A drag sticks to the canvas's edges and
+ * middle, the other elements' and the guides, with rose lines for what it
+ * lines up with, unless Alt is down.
  */
 export function StudioStage({
   view,
@@ -206,6 +260,10 @@ export function StudioStage({
   groupFrame,
   onGroupFrame,
   linked,
+  rulers,
+  onRulers,
+  guides,
+  onGuides,
   onHold,
   onDelete,
   embed,
@@ -227,17 +285,18 @@ export function StudioStage({
   // the rotate cursor while it turns, the move cursor, a corner's resize, or
   // the closed hand while it pans
   const [held, setHeld] = useState<Held | null>(null);
-  // The pointer is over what a drag moves: an element, or the selected
-  // group's outline
-  const [movable, setMovable] = useState(false);
+  // What the pointer is over that a press would drag: an element or the
+  // selected group's outline, or a guide while Ctrl or Cmd is down
+  const [over, setOver] = useState<Over>(null);
   // The canvas's scale, null while it fits the stage
   const [zoom, setZoom] = useState<number | null>(null);
   // A canvas point to keep where it is on screen across a zoom
   const anchor = useRef<{ point: Point; x: number; y: number } | null>(null);
   // Space is down, with the canvas focused or nothing: a drag pans
   const [space, setSpace] = useState(false);
-  // Off at first, then on until the editor closes, as Link is
-  const [rulers, setRulers] = useState(false);
+  // The guide being dragged, and the rose lines of what a drag lines up with
+  const [moving, setMoving] = useState<Moving | null>(null);
+  const [met, setMet] = useState<MetLine[]>([]);
   const percent = useMemo(
     () => new Intl.NumberFormat(language, { style: "percent" }),
     [language],
@@ -350,9 +409,9 @@ export function StudioStage({
   }, []);
 
   // Ctrl or Cmd with = or + zooms in, with - out, and with 0 fits, in place
-  // of the window's own zoom, anywhere in the editor but a dialog. Space,
-  // with the canvas focused or nothing, lets a drag pan: a field or a button
-  // keeps its own.
+  // of the window's own zoom, and with R shows or hides the rulers, in place
+  // of a reload, anywhere in the editor but a dialog. Space, with the canvas
+  // focused or nothing, lets a drag pan: a field or a button keeps its own.
   const onKey = useEffectEvent((e: globalThis.KeyboardEvent, down: boolean) => {
     const target = e.target instanceof Element ? e.target : null;
     if (e.key === " ") {
@@ -368,6 +427,8 @@ export function StudioStage({
     if (e.key === "=" || e.key === "+") stepZoom(1);
     else if (e.key === "-") stepZoom(-1);
     else if (e.key === "0") zoomTo(null);
+    // Not with Shift, which still reloads the window from scratch
+    else if (e.key.toLowerCase() === "r" && !e.shiftKey) onRulers(!rulers);
     else return;
     e.preventDefault();
   });
@@ -493,19 +554,52 @@ export function StudioStage({
     : locked.has(chosenGroup?.id ?? "");
 
   // A drag from a press, its cursor kept on the whole stage until it ends,
-  // and one step of the history
-  const start = (e: PointerEvent<HTMLDivElement>, d: Drag, cursor: Held) => {
+  // and one step of the history. The stage takes the pointer, so a press on
+  // a ruler drags on it too.
+  const start = (e: PointerEvent, d: Drag, cursor: Held) => {
     drag.current = d;
     setHeld(cursor);
     onHold(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
+    stageEl.current!.setPointerCapture(e.pointerId);
   };
 
   const end = () => {
     if (!drag.current) return;
     drag.current = null;
     setHeld(null);
+    setMoving(null);
+    setMet([]);
     onHold(false);
+  };
+
+  // What a drag sticks to: the canvas, the elements it doesn't move, and the
+  // guides while they show
+  const linesBut = (moves: (layer: string, id: string) => boolean) =>
+    snapLines(
+      view,
+      elements
+        .filter(({ element, layer }) => !moves(layer, element.id))
+        .map(({ element }) => element),
+      rulers ? guides : null,
+    );
+
+  const showMet = (next: MetLine[]) =>
+    setMet((last) => (isEqual(last, next) ? last : next));
+
+  // A guide dragged from a ruler (`index` null) or from where it is, unless
+  // they're locked. It sticks to the canvas and every element.
+  const startGuide = (e: PointerEvent, axis: Axis, index: number | null) => {
+    if (guides.locked) return;
+    if (index === null && guides[axis].length >= STUDIO_MAX_GUIDES) return;
+    e.preventDefault();
+    const at = index === null ? null : guides[axis][index];
+    const lines = snapLines(
+      view,
+      elements.map(({ element }) => element),
+      null,
+    )[axis];
+    start(e, { kind: "guide", axis, index, at, lines }, axis);
+    setMoving({ axis, index, at });
   };
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
@@ -538,13 +632,33 @@ export function StudioStage({
     const { scale } = fitted;
     if (!scale) return;
     const at = { x: e.clientX, y: e.clientY, scale };
+    const rect = root.current!.getBoundingClientRect();
+    const point = toCanvas({ x: e.clientX, y: e.clientY }, rect, fitted);
+
+    // Ctrl or Cmd takes a guide it's on, before what's under it
+    const guide =
+      rulers && !guides.locked && (e.ctrlKey || e.metaKey)
+        ? nearGuide(point, guides, GUIDE_REACH / scale)
+        : null;
+    if (guide) {
+      startGuide(e, guide.axis, guide.index);
+      return;
+    }
 
     const handle = target.closest<HTMLElement>("[data-handle]");
     const corner = CORNERS.find((c) => c === handle?.dataset.handle);
     if (chosenGroup && groupFrame && !stuck && corner) {
+      const group = chosenGroup.id;
       start(
         e,
-        { kind: "frame", id: chosenGroup.id, corner, frame: groupFrame, ...at },
+        {
+          kind: "frame",
+          id: group,
+          corner,
+          frame: groupFrame,
+          lines: linesBut((layer) => layer === group),
+          ...at,
+        },
         corner,
       );
       return;
@@ -559,6 +673,7 @@ export function StudioStage({
           corner,
           box: boxOf(element),
           rotation: element.rotation,
+          lines: linesBut((_, id) => id === element.id),
           ...at,
         },
         corner,
@@ -566,7 +681,6 @@ export function StudioStage({
       return;
     }
 
-    const rect = root.current!.getBoundingClientRect();
     if (chosen && !stuck && handle?.dataset.handle === "rotate") {
       const { x, y, width, height } = chosen.element;
       start(
@@ -606,7 +720,6 @@ export function StudioStage({
       return;
     }
 
-    const point = toCanvas({ x: e.clientX, y: e.clientY }, rect, fitted);
     if (
       chosenGroup &&
       frame &&
@@ -614,14 +727,17 @@ export function StudioStage({
       holdsTurned({ ...frame, rotation }, point)
     ) {
       // A click until it moves
+      const group = chosenGroup.id;
       start(
         e,
         {
           kind: "group",
-          id: chosenGroup.id,
+          id: group,
           point,
           moved: false,
           sent: [0, 0],
+          frame: { ...frame, rotation },
+          lines: linesBut((layer) => layer === group),
           ...at,
         },
         "move",
@@ -641,6 +757,7 @@ export function StudioStage({
         corner: null,
         box: boxOf(picked.element),
         rotation: picked.element.rotation,
+        lines: linesBut((_, other) => other === id),
         ...at,
       },
       "move",
@@ -650,7 +767,7 @@ export function StudioStage({
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) {
-      // What a press here would drag shows the move cursor
+      // What a press here would drag shows its cursor
       const fitted = stageRef.current?.fit() ?? NO_FIT;
       if (!fitted.scale) return;
       const point = toCanvas(
@@ -658,13 +775,48 @@ export function StudioStage({
         root.current!.getBoundingClientRect(),
         fitted,
       );
-      const moves =
-        pickElement(view, locked, point) !== null ||
-        (!!chosenGroup &&
-          !!frame &&
-          !stuck &&
-          holdsTurned({ ...frame, rotation }, point));
-      if (moves !== movable) setMovable(moves);
+      const guide =
+        rulers && !guides.locked && (e.ctrlKey || e.metaKey)
+          ? nearGuide(point, guides, GUIDE_REACH / fitted.scale)
+          : null;
+      const next: Over = guide
+        ? guide.axis
+        : pickElement(view, locked, point) !== null ||
+            (!!chosenGroup &&
+              !!frame &&
+              !stuck &&
+              holdsTurned({ ...frame, rotation }, point))
+          ? "move"
+          : null;
+      if (next !== over) setOver(next);
+      return;
+    }
+    if (d.kind === "guide") {
+      // On the view it stays where it's let go, off it it goes
+      const pane = scroller.current!;
+      const seen = pane.getBoundingClientRect();
+      const inside =
+        e.clientX >= seen.left &&
+        e.clientX < seen.left + pane.clientWidth &&
+        e.clientY >= seen.top &&
+        e.clientY < seen.top + pane.clientHeight;
+      const fitted = stageRef.current?.fit();
+      let at: number | null = null;
+      if (inside && fitted?.scale) {
+        const point = toCanvas(
+          { x: e.clientX, y: e.clientY },
+          root.current!.getBoundingClientRect(),
+          fitted,
+        );
+        at = guideAt(
+          point[d.axis],
+          e.altKey ? [] : d.lines,
+          SNAP_REACH / fitted.scale,
+        );
+      }
+      if (at === d.at) return;
+      d.at = at;
+      setMoving({ axis: d.axis, index: d.index, at });
       return;
     }
     if (d.kind === "pan") {
@@ -685,49 +837,100 @@ export function StudioStage({
       }
       return;
     }
+    // Alt drags freely: nothing sticks, and no rose lines
+    const free = e.altKey;
+    // Screen px to the canvas's
+    const reach = SNAP_REACH / d.scale;
+    const pointer = {
+      x: (e.clientX - d.x) / d.scale,
+      y: (e.clientY - d.y) / d.scale,
+    };
     if (d.kind === "frame") {
       // Its elements scale with it, along its own sides
-      const box = resizeBox(
-        d.frame,
-        d.corner,
-        (e.clientX - d.x) / d.scale,
-        (e.clientY - d.y) / d.scale,
-        { rotation: d.frame.rotation, even: linked },
-      );
-      onGroupFrame(d.id, d.frame, { ...box, rotation: d.frame.rotation });
+      const options = { rotation: d.frame.rotation, even: linked };
+      const turned = (box: Box) => ({ ...box, rotation: d.frame.rotation });
+      const resize = ({ x, y }: Point) =>
+        turned(resizeBox(d.frame, d.corner, x, y, options));
+      const move = free
+        ? pointer
+        : stickCorner(
+            d.frame,
+            resize(pointer),
+            d.corner,
+            pointer,
+            d.lines,
+            reach,
+            linked,
+          );
+      const box = resize(move);
+      showMet(free ? [] : metLines(box, d.lines));
+      onGroupFrame(d.id, d.frame, box);
       return;
     }
     if (d.kind === "group") {
-      const sx = e.clientX - d.x;
-      const sy = e.clientY - d.y;
-      if (!d.moved && Math.hypot(sx, sy) < DRAG_START) return;
+      const far = Math.hypot(e.clientX - d.x, e.clientY - d.y) >= DRAG_START;
+      if (!d.moved && !far) return;
       d.moved = true;
+      const moved = {
+        ...d.frame,
+        x: d.frame.x + pointer.x,
+        y: d.frame.y + pointer.y,
+      };
+      const by = free ? { x: 0, y: 0 } : snapBox(moved, d.lines, reach);
       // Rounded once for all of them, so they keep their spacing
-      const dx = Math.round(sx / d.scale);
-      const dy = Math.round(sy / d.scale);
+      const dx = Math.round(pointer.x + by.x);
+      const dy = Math.round(pointer.y + by.y);
+      showMet(
+        free
+          ? []
+          : metLines(
+              { ...d.frame, x: d.frame.x + dx, y: d.frame.y + dy },
+              d.lines,
+            ),
+      );
       if (dx === d.sent[0] && dy === d.sent[1]) return;
       onShift(d.id, dx - d.sent[0], dy - d.sent[1]);
       d.sent = [dx, dy];
       return;
     }
-    // Screen px to the canvas's
-    const dx = (e.clientX - d.x) / d.scale;
-    const dy = (e.clientY - d.y) / d.scale;
-    // A text's box can't get narrower than its longest word, nor shorter
-    // than its words
-    onBox(
-      d.id,
-      roundBox(
-        d.corner
-          ? resizeBox(d.box, d.corner, dx, dy, {
-              minWidth: textWidth(d.id, d.scale),
-              minHeight: (width) => textHeight(d.id, width, d.scale),
-              rotation: d.rotation,
-              even: linked,
-            })
-          : { ...d.box, x: d.box.x + dx, y: d.box.y + dy },
-      ),
-    );
+    let box: Box;
+    const { corner } = d;
+    if (corner) {
+      // A text's box can't get narrower than its longest word, nor shorter
+      // than its words
+      const options = {
+        minWidth: textWidth(d.id, d.scale),
+        minHeight: (width: number) => textHeight(d.id, width, d.scale),
+        rotation: d.rotation,
+        even: linked,
+      };
+      const resize = ({ x, y }: Point) =>
+        resizeBox(d.box, corner, x, y, options);
+      const move = free
+        ? pointer
+        : stickCorner(
+            { ...d.box, rotation: d.rotation },
+            { ...resize(pointer), rotation: d.rotation },
+            corner,
+            pointer,
+            d.lines,
+            reach,
+            linked,
+          );
+      box = roundBox(resize(move));
+    } else {
+      const moved = {
+        ...d.box,
+        x: d.box.x + pointer.x,
+        y: d.box.y + pointer.y,
+      };
+      const by = free
+        ? { x: 0, y: 0 }
+        : snapBox({ ...moved, rotation: d.rotation }, d.lines, reach);
+      box = roundBox({ ...moved, x: moved.x + by.x, y: moved.y + by.y });
+    }
+    showMet(free ? [] : metLines({ ...box, rotation: d.rotation }, d.lines));
+    onBox(d.id, box);
   };
 
   const onPointerUp = () => {
@@ -735,6 +938,11 @@ export function StudioStage({
     end();
     if (d?.kind === "group" && !d.moved) {
       onSelect(pickElement(view, locked, d.point));
+    }
+    // Saved once, where it was let go: nothing for one that didn't move
+    if (d?.kind === "guide") {
+      const was = d.index === null ? null : guides[d.axis][d.index];
+      if (d.at !== was) onGuides(withGuide(guides, d.axis, d.index, d.at));
     }
   };
 
@@ -784,10 +992,43 @@ export function StudioStage({
   const zoomOut = zoomStep(level, -1);
   const zoomIn = zoomStep(level, 1);
 
+  // The guides as they show, the dragged one where it is, in the area's px
+  const shown = moving
+    ? withGuide(guides, moving.axis, moving.index, moving.at)
+    : guides;
+  const across = (at: number) => Math.round(fit.left + at * fit.scale);
+  const down = (at: number) => Math.round(fit.top + at * fit.scale);
+  // A rose line: across the view along a guide, else along what it meets
+  const metStyle = ({ axis, at, from, to }: MetLine): CSSProperties => {
+    const whole = !Number.isFinite(from);
+    if (axis === "x") {
+      return whole
+        ? { left: across(at) }
+        : {
+            left: across(at),
+            top: down(from),
+            height: (to - from) * fit.scale,
+          };
+    }
+    return whole
+      ? { top: down(at) }
+      : { top: down(at), left: across(from), width: (to - from) * fit.scale };
+  };
+
   return (
     <>
       <div className={cx(styles.stage_frame, rulers && styles.with_rulers)}>
-        {rulers && <Rulers scroller={scroller} root={root} fit={fit} />}
+        {rulers && (
+          <Rulers
+            scroller={scroller}
+            root={root}
+            fit={fit}
+            onGuide={(e, axis) => startGuide(e, axis, null)}
+            mark={
+              moving?.at != null ? { axis: moving.axis, at: moving.at } : null
+            }
+          />
+        )}
         <div
           ref={stageEl}
           className={cx(styles.stage, space && styles.spaced)}
@@ -798,24 +1039,22 @@ export function StudioStage({
             // Hairlines drawn inside the scaled canvas stay one screen px
             "--canvas-scale": fit.scale || 1,
             cursor:
-              held === "pan"
-                ? "grabbing"
-                : space && !held
-                  ? "grab"
-                  : held === "rotate"
-                    ? rotateCursor(rotation)
-                    : held === "move" || (!held && movable)
-                      ? "move"
-                      : held
-                        ? RESIZE_CURSORS[held]
-                        : undefined,
+              held === "rotate"
+                ? rotateCursor(rotation)
+                : held
+                  ? CURSORS[held]
+                  : space
+                    ? "grab"
+                    : over
+                      ? CURSORS[over]
+                      : undefined,
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={end}
           onLostPointerCapture={end}
-          onPointerLeave={() => setMovable(false)}
+          onPointerLeave={() => setOver(null)}
           onKeyDown={onKeyDown}
         >
           <div ref={scroller} className={styles.stage_scroll}>
@@ -835,6 +1074,38 @@ export function StudioStage({
                 }
               >
                 <div ref={root} className={styles.stage_root} />
+                {rulers &&
+                  shown.x.map((at, i) => (
+                    <span
+                      key={`x${i}`}
+                      className={styles.guide_x}
+                      style={{ left: across(at) }}
+                      data-guide="x"
+                      aria-hidden
+                    />
+                  ))}
+                {rulers &&
+                  shown.y.map((at, i) => (
+                    <span
+                      key={`y${i}`}
+                      className={styles.guide_y}
+                      style={{ top: down(at) }}
+                      data-guide="y"
+                      aria-hidden
+                    />
+                  ))}
+                {met.map((line) => (
+                  <span
+                    key={`${line.axis}${line.at}`}
+                    className={cx(
+                      line.axis === "x" ? styles.met_x : styles.met_y,
+                      !Number.isFinite(line.from) && styles.met_whole,
+                    )}
+                    style={metStyle(line)}
+                    data-met={line.axis}
+                    aria-hidden
+                  />
+                ))}
                 {outline && (
                   <div className={styles.selection} style={outline}>
                     {!stuck && (chosen || groupFrame) && (
@@ -881,9 +1152,10 @@ export function StudioStage({
             variant="icon"
             title={t("studio.editor.rulers")}
             aria-label={t("studio.editor.rulers")}
+            aria-keyshortcuts="Control+R"
             aria-pressed={rulers}
             active={rulers}
-            onClick={() => setRulers((on) => !on)}
+            onClick={() => onRulers(!rulers)}
           >
             <LuRuler size={16} />
           </Btn>

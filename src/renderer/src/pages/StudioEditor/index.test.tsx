@@ -2198,7 +2198,9 @@ describe("StudioEditor", () => {
       sized();
       vi.spyOn(scroller(), "clientWidth", "get").mockReturnValue(540);
       vi.spyOn(scroller(), "clientHeight", "get").mockReturnValue(960);
-      const rulers = page().getByRole("button", { name: "Rulers" });
+      const rulers = page().getByRole("button", {
+        name: "Rulers and guides (Ctrl+R)",
+      });
       const drawnRulers = () => document.querySelectorAll("[data-ruler]");
       expect(rulers).toHaveAttribute("aria-pressed", "false");
       expect(drawnRulers()).toHaveLength(0);
@@ -2317,6 +2319,459 @@ describe("StudioEditor", () => {
       expect(key("v", x)).toBe(true);
       expect(key("x", field("Name").getByRole("textbox"))).toBe(true);
       expect(lastSave()).toBeUndefined();
+    });
+  });
+
+  describe("guides and sticking", () => {
+    const toggle = () =>
+      page().getByRole("button", { name: "Rulers and guides (Ctrl+R)" });
+    const ruler = (side: "top" | "left") =>
+      document.querySelector<HTMLElement>(`[data-ruler=${side}]`)!;
+    const guideLines = (axis: "x" | "y") =>
+      canvas().querySelectorAll<HTMLElement>(`[data-guide=${axis}]`);
+    const roseLines = () => canvas().querySelectorAll("[data-met]");
+    // The dragged guide's place on its ruler
+    const mark = (side: "top" | "left") =>
+      ruler(side).querySelector("[data-mark]")?.getAttribute("data-mark");
+    const guidesList = () =>
+      within(page().getByRole("group", { name: "Guides" }));
+    // The overlay with its rulers on, these guides and items
+    const ruled = (
+      guides: Partial<StudioOverlay["guides"]>,
+      ...items: StudioItem[]
+    ) =>
+      studioOverlay("Main", {
+        id: ID,
+        rulers: true,
+        guides: { x: [], y: [], locked: false, ...guides },
+        items,
+      });
+    // The canvas at half size, its view as big
+    function viewSized() {
+      sized();
+      vi.spyOn(scroller(), "clientWidth", "get").mockReturnValue(540);
+      vi.spyOn(scroller(), "clientHeight", "get").mockReturnValue(960);
+    }
+    // A drag on the canvas from one point of it to another, in its px
+    const drag = (
+      from: [number, number],
+      to: [number, number],
+      keys: { altKey?: boolean; ctrlKey?: boolean } = {},
+    ) => {
+      fireEvent.pointerDown(canvas(), {
+        button: 0,
+        clientX: from[0] / 2,
+        clientY: from[1] / 2,
+        ...keys,
+      });
+      fireEvent.pointerMove(canvas(), {
+        clientX: to[0] / 2,
+        clientY: to[1] / 2,
+        ...keys,
+      });
+      fireEvent.pointerUp(canvas());
+    };
+
+    it("shows and hides the rulers with Ctrl+R, saved with the overlay and left by Undo", async () => {
+      const { user } = await open(holding(elementOf("shape")));
+      expect(toggle()).toHaveAttribute("aria-pressed", "false");
+
+      await user.type(field("Name").getByRole("textbox"), "x");
+      expect(
+        fireEvent.keyDown(document.body, { key: "r", ctrlKey: true }),
+      ).toBe(false);
+      expect(toggle()).toHaveAttribute("aria-pressed", "true");
+      expect(document.querySelectorAll("[data-ruler]")).toHaveLength(2);
+      await waitFor(() =>
+        expect(lastSave()).toMatchObject({ name: "Mainx", rulers: true }),
+      );
+      // With Shift it's the window's reload still
+      expect(
+        fireEvent.keyDown(document.body, {
+          key: "R",
+          ctrlKey: true,
+          shiftKey: true,
+        }),
+      ).toBe(true);
+
+      await user.click(undo());
+      await waitFor(() =>
+        expect(lastSave()).toMatchObject({ name: "Main", rulers: true }),
+      );
+      expect(toggle()).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("opens an overlay saved with its rulers on with them on", async () => {
+      await open(ruled({ x: [200] }));
+
+      expect(toggle()).toHaveAttribute("aria-pressed", "true");
+      expect(document.querySelectorAll("[data-ruler]")).toHaveLength(2);
+      expect(guideLines("x")).toHaveLength(1);
+    });
+
+    it("adds a guide with Ctrl and a drag from a ruler, where it's let go", async () => {
+      await open(ruled({}));
+      viewSized();
+      const fromTop = (to: number, keys = { ctrlKey: true }) => {
+        fireEvent.pointerDown(ruler("top"), {
+          button: 0,
+          clientX: 100,
+          clientY: -10,
+          ...keys,
+        });
+        fireEvent.pointerMove(canvas(), { clientX: 100, clientY: to, ...keys });
+      };
+
+      // A plain press is the ruler's
+      fromTop(150, { ctrlKey: false });
+      fireEvent.pointerUp(canvas());
+      expect(guideLines("y")).toHaveLength(0);
+
+      // Drawn while it's dragged, then back on the ruler: none
+      fromTop(150.3);
+      expect(guideLines("y")).toHaveLength(1);
+      expect(mark("left")).toBe("301");
+      fireEvent.pointerMove(canvas(), { clientX: 100, clientY: -5 });
+      expect(guideLines("y")).toHaveLength(0);
+      fireEvent.pointerUp(canvas());
+      expect(lastSave()).toBeUndefined();
+
+      fromTop(150.3);
+      fireEvent.pointerUp(canvas());
+      await waitFor(() =>
+        expect(lastSave()?.guides).toEqual({ x: [], y: [301], locked: false }),
+      );
+      expect(guideLines("y")[0].style.top).toBe("151px");
+      expect(mark("left")).toBeUndefined();
+    });
+
+    it("moves a guide with Ctrl and a drag, takes it away off the view, and Undo brings it back", async () => {
+      const { user } = await open(ruled({ x: [200] }));
+      viewSized();
+
+      // With Ctrl over it, the cursor to move it
+      fireEvent.pointerMove(canvas(), { clientX: 101, clientY: 300 });
+      expect(canvas().style.cursor).toBe("");
+      fireEvent.pointerMove(canvas(), {
+        clientX: 101,
+        clientY: 300,
+        ctrlKey: true,
+      });
+      expect(canvas().style.cursor).toBe("col-resize");
+
+      // A plain press there is the canvas's
+      drag([202, 600], [320, 600]);
+      expect(lastSave()).toBeUndefined();
+
+      drag([202, 600], [320, 600], { ctrlKey: true });
+      await waitFor(() => expect(lastSave()?.guides.x).toEqual([320]));
+      expect(guideLines("x")[0].style.left).toBe("160px");
+      drag([320, 600], [-20, 600], { ctrlKey: true });
+      await waitFor(() => expect(lastSave()?.guides.x).toEqual([]));
+
+      await user.click(undo());
+      await waitFor(() => expect(lastSave()?.guides.x).toEqual([320]));
+    });
+
+    it("sticks a dragged guide to the canvas's middle and an element's edge, but not with Alt", async () => {
+      const shape = elementOf("shape", { x: 100, y: 400, width: 200 });
+      await open(ruled({}, shape));
+      viewSized();
+      const fromLeft = (to: number, keys = {}) => {
+        fireEvent.pointerDown(ruler("left"), {
+          button: 0,
+          clientX: -10,
+          clientY: 300,
+          ctrlKey: true,
+        });
+        fireEvent.pointerMove(canvas(), {
+          clientX: to / 2,
+          clientY: 300,
+          ctrlKey: true,
+          ...keys,
+        });
+      };
+
+      // 534, 6 from the middle
+      fromLeft(534);
+      expect(mark("top")).toBe("540");
+      fireEvent.pointerUp(canvas());
+      await waitFor(() => expect(lastSave()?.guides.x).toEqual([540]));
+      // 294, 6 from the shape's right edge
+      fromLeft(294);
+      fireEvent.pointerUp(canvas());
+      await waitFor(() => expect(lastSave()?.guides.x).toEqual([540, 300]));
+      fromLeft(294, { altKey: true });
+      fireEvent.pointerUp(canvas());
+      await waitFor(() =>
+        expect(lastSave()?.guides.x).toEqual([540, 300, 294]),
+      );
+    });
+
+    it("adds and moves no guide on the canvas while they're locked", async () => {
+      await open(ruled({ x: [200], locked: true }));
+      viewSized();
+
+      fireEvent.pointerDown(ruler("top"), {
+        button: 0,
+        clientX: 100,
+        clientY: -10,
+        ctrlKey: true,
+      });
+      fireEvent.pointerMove(canvas(), {
+        clientX: 100,
+        clientY: 150,
+        ctrlKey: true,
+      });
+      fireEvent.pointerUp(canvas());
+      drag([200, 600], [320, 600], { ctrlKey: true });
+
+      expect(lastSave()).toBeUndefined();
+      expect(guideLines("x")).toHaveLength(1);
+      expect(guideLines("y")).toHaveLength(0);
+    });
+
+    it("lists the guides in the overlay's settings while the rulers show", async () => {
+      const { user } = await open(
+        studioOverlay("Main", {
+          id: ID,
+          guides: { x: [200], y: [400], locked: false },
+        }),
+      );
+      expect(
+        page().queryByRole("group", { name: "Guides" }),
+      ).not.toBeInTheDocument();
+      await user.click(toggle());
+
+      const vertical = guidesList().getByRole("spinbutton", {
+        name: "Vertical guide 1",
+      });
+      expect(vertical).toHaveValue(200);
+      expect(
+        guidesList().getByRole("spinbutton", { name: "Horizontal guide 1" }),
+      ).toHaveValue(400);
+      await user.clear(vertical);
+      await user.type(vertical, "250");
+      await waitFor(() => expect(lastSave()?.guides.x).toEqual([250]));
+
+      // At the canvas's middle
+      await user.click(
+        guidesList().getByRole("button", { name: "Add horizontal" }),
+      );
+      await waitFor(() => expect(lastSave()?.guides.y).toEqual([400, 960]));
+      await user.click(
+        guidesList().getByRole("button", { name: "Remove vertical guide 1" }),
+      );
+      await waitFor(() => expect(lastSave()?.guides.x).toEqual([]));
+
+      const lock = guidesList().getByRole("button", { name: "Lock guides" });
+      await user.click(lock);
+      expect(lock).toHaveAttribute("aria-pressed", "true");
+      await waitFor(() => expect(lastSave()?.guides.locked).toBe(true));
+
+      await user.click(
+        guidesList().getByRole("button", { name: "Remove all guides" }),
+      );
+      await waitFor(() =>
+        expect(lastSave()?.guides).toEqual({ x: [], y: [], locked: true }),
+      );
+      expect(guidesList().getByText(/^No guides yet/)).toBeVisible();
+      expect(
+        guidesList().getByRole("button", { name: "Remove all guides" }),
+      ).toBeDisabled();
+    });
+
+    it("adds no guide past 50 on an axis", async () => {
+      const fifty = Array.from({ length: 50 }, (_, i) => i * 10);
+      await open(ruled({ x: fifty }));
+      viewSized();
+
+      expect(
+        guidesList().getByRole("button", { name: "Add vertical" }),
+      ).toBeDisabled();
+      expect(
+        guidesList().getByRole("button", { name: "Add horizontal" }),
+      ).toBeEnabled();
+      fireEvent.pointerDown(ruler("left"), {
+        button: 0,
+        clientX: -10,
+        clientY: 300,
+        ctrlKey: true,
+      });
+      fireEvent.pointerMove(canvas(), {
+        clientX: 300,
+        clientY: 300,
+        ctrlKey: true,
+      });
+      fireEvent.pointerUp(canvas());
+      expect(lastSave()).toBeUndefined();
+    });
+
+    it("sticks a dragged element to the canvas's edges and middle, within 6 screen px", async () => {
+      const shape = elementOf("shape", {
+        x: 100,
+        y: 200,
+        width: 200,
+        height: 100,
+      });
+      await open(holding(shape));
+      viewSized();
+
+      // Its left edge 4 from the canvas's: there, with a rose line until
+      // it's let go
+      fireEvent.pointerDown(canvas(), { button: 0, clientX: 75, clientY: 125 });
+      fireEvent.pointerMove(canvas(), { clientX: 27, clientY: 125 });
+      expect(roseLines().length).toBeGreaterThan(0);
+      fireEvent.pointerUp(canvas());
+      expect(roseLines()).toHaveLength(0);
+      await waitFor(() => expect(lastSave()?.items[0]).toMatchObject({ x: 0 }));
+
+      // 14 away, past 6 screen px: where it's let go
+      drag([50, 250], [64, 250]);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 14, y: 200 }),
+      );
+      // Its middle 5 from the canvas's
+      drag([64, 250], [485, 250]);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 440, y: 200 }),
+      );
+      // With Alt, nothing sticks and no rose line shows
+      fireEvent.pointerDown(canvas(), {
+        button: 0,
+        clientX: 245,
+        clientY: 125,
+      });
+      fireEvent.pointerMove(canvas(), {
+        clientX: 242,
+        clientY: 125,
+        altKey: true,
+      });
+      expect(roseLines()).toHaveLength(0);
+      fireEvent.pointerUp(canvas());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 434 }),
+      );
+    });
+
+    it("sticks a dragged element to other elements, and to guides while they show", async () => {
+      const shape = elementOf("shape", {
+        x: 100,
+        y: 200,
+        width: 200,
+        height: 100,
+      });
+      const other = elementOf("shape", {
+        x: 600,
+        y: 1000,
+        width: 100,
+        height: 100,
+      });
+      const { user } = await open(ruled({ y: [700] }, shape, other));
+      viewSized();
+
+      // Its left edge 4 from the other's, its top 5 from the other's
+      drag([150, 250], [646, 1045]);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 600, y: 1000 }),
+      );
+      // Its top 5 from the guide, pressed where the other isn't in front
+      drag([750, 1050], [750, 745]);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 600, y: 700 }),
+      );
+      // The rulers off, the guide isn't there to stick to
+      await user.click(toggle());
+      drag([750, 750], [750, 745]);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 600, y: 695 }),
+      );
+    });
+
+    it("sticks a dragged group to other elements, never its own", async () => {
+      const left = elementOf("shape", {
+        x: 100,
+        y: 100,
+        width: 100,
+        height: 100,
+      });
+      const right = elementOf("shape", {
+        x: 300,
+        y: 100,
+        width: 100,
+        height: 100,
+      });
+      const apart = elementOf("shape", {
+        x: 500,
+        y: 600,
+        width: 100,
+        height: 100,
+      });
+      const { user } = await open(holding(group("Pair", [left, right]), apart));
+      await user.click(row(/^Pair/));
+      viewSized();
+
+      // 10 from its own elements' lines, which it never sticks to
+      drag([250, 150], [260, 150]);
+      await waitFor(() =>
+        expect(groupIn(lastSave(), 0)?.elements[0]).toMatchObject({ x: 110 }),
+      );
+      // Its right edge 4 from the other element's left
+      drag([260, 150], [346, 150]);
+      await waitFor(() =>
+        expect(groupIn(lastSave(), 0)?.elements).toMatchObject([
+          { x: 200 },
+          { x: 400 },
+        ]),
+      );
+    });
+
+    it("sticks a dragged corner, on the diagonal with Link on", async () => {
+      const shape = elementOf("shape", {
+        label: "Box",
+        x: 100,
+        y: 100,
+        width: 100,
+        height: 100,
+      });
+      const other = elementOf("shape", {
+        label: "Other",
+        x: 400,
+        y: 600,
+        width: 100,
+        height: 100,
+      });
+      const { user } = await open(holding(shape, other));
+      await user.click(row(/^Box/));
+      viewSized();
+
+      // The corner at 394 across, 6 from the other's left edge
+      fireEvent.pointerDown(handle("se"), {
+        button: 0,
+        clientX: 0,
+        clientY: 0,
+      });
+      fireEvent.pointerMove(canvas(), { clientX: 97, clientY: 50 });
+      fireEvent.pointerUp(canvas());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ width: 300, height: 200 }),
+      );
+
+      await user.click(
+        page().getByRole("button", { name: "Link width and height" }),
+      );
+      // Linked, 4 short of the other's right edge across: along the
+      // diagonal to it
+      fireEvent.pointerDown(handle("se"), {
+        button: 0,
+        clientX: 0,
+        clientY: 0,
+      });
+      fireEvent.pointerMove(canvas(), { clientX: 48, clientY: 32 });
+      fireEvent.pointerUp(canvas());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ width: 400, height: 267 }),
+      );
     });
   });
 });

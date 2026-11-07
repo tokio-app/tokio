@@ -293,6 +293,8 @@ export const studioOverlay = (
   id: crypto.randomUUID(),
   name,
   size: "portrait",
+  rulers: false,
+  guides: { x: [], y: [], locked: false },
   items: [],
   ...patch,
 });

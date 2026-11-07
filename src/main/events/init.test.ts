@@ -1078,6 +1078,8 @@ describe("init events", () => {
         id: ID,
         name: "Main",
         size: "portrait",
+        rulers: false,
+        guides: { x: [], y: [], locked: false },
         items: itemsOf(elements),
       });
     };
@@ -1186,6 +1188,8 @@ describe("init events", () => {
         id: "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60",
         name: "Plain",
         size: "portrait",
+        rulers: false,
+        guides: { x: [], y: [], locked: false },
         items: itemsOf([element("p", { kind: "text", text: "Hi" })]),
       });
       s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>

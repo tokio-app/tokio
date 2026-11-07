@@ -944,6 +944,8 @@ describe("alerts events", () => {
       id: "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f",
       name: "Main",
       size: "portrait" as const,
+      rulers: false,
+      guides: { x: [], y: [], locked: false },
       items: [],
     };
     const setup = (cleared = true) => {

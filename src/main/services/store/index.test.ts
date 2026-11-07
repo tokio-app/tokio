@@ -1624,7 +1624,14 @@ describe("StoreManagerService", () => {
 
       expect(await store.addStudioOverlay(id, "Overlay 1")).toBe(true);
 
-      const added = { id, name: "Overlay 1", size: "portrait", items: [] };
+      const added = {
+        id,
+        name: "Overlay 1",
+        size: "portrait",
+        rulers: false,
+        guides: { x: [], y: [], locked: false },
+        items: [],
+      };
       expect(store.getStudio()).toEqual([added]);
       expect((await init()).getStudio()).toEqual([added]);
     });
@@ -1656,7 +1663,7 @@ describe("StoreManagerService", () => {
 
       expect((await init()).getStudio()).toEqual([
         saved,
-        { id: other, name: "Two", size: "portrait", items: [] },
+        StudioOverlaySchema.parse({ id: other, name: "Two" }),
       ]);
     });
 

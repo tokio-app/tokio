@@ -704,6 +704,11 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 changeElement(id, (e) => ({ ...e, rotation }))
               }
               onShift={shift}
+              rulers={overlay.rulers}
+              // The editor's view, which Undo leaves alone, as folding
+              onRulers={(rulers) => setSaved((o) => ({ ...o, rulers }))}
+              guides={overlay.guides}
+              onGuides={(guides) => setOverlay((o) => ({ ...o, guides }))}
               onHold={history.hold}
               onDelete={remove}
               embed={(embed) => (

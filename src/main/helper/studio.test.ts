@@ -36,6 +36,8 @@ const overlay = (
   id,
   name: "",
   size: "portrait",
+  rulers: false,
+  guides: { x: [], y: [], locked: false },
   items: [StudioGroupSchema.parse({ kind: "group", id: "L1", elements })],
 });
 

@@ -123,6 +123,8 @@ describe("studioView", () => {
     id: ID,
     name: "",
     size: "landscape",
+    rulers: false,
+    guides: { x: [], y: [], locked: false },
     items: [StudioGroupSchema.parse({ kind: "group", id: "l", elements })],
   });
 

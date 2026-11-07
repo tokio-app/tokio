@@ -48,6 +48,8 @@ export const STUDIO_MAX_SECONDS = 60;
 export const STUDIO_MAX_FONT_SIZE = 400;
 // The widest shape border, in px of the canvas
 export const STUDIO_MAX_BORDER = 100;
+// The most guides an overlay keeps across, and as many down
+export const STUDIO_MAX_GUIDES = 50;
 
 // A media library file's basename, "" for none: never a path
 const LibraryFileSchema = z
@@ -228,6 +230,16 @@ const fits = (items: Item[]) => {
   );
 };
 
+// The editor's guides, in px of the canvas, in the order they were added:
+// where each vertical one crosses the top edge (x), and each horizontal one
+// the left edge (y). Locked, the canvas can't add, move or remove them. The
+// stream never shows them.
+const StudioGuidesSchema = z.object({
+  x: z.array(z.number()).max(STUDIO_MAX_GUIDES).default([]),
+  y: z.array(z.number()).max(STUDIO_MAX_GUIDES).default([]),
+  locked: z.boolean().default(false),
+});
+
 // A studio overlay, served at getStudioOverlayURL(id). The strict schema,
 // for IPC and the store's mutators.
 export const StudioOverlaySchema = z.object({
@@ -236,6 +248,9 @@ export const StudioOverlaySchema = z.object({
   // Empty while it's retyped
   name: z.string().max(STUDIO_NAME_MAX_LENGTH).default(""),
   size: z.enum(["portrait", "landscape"]).default("portrait"),
+  // The editor shows its rulers, and the guides with them
+  rulers: z.boolean().default(false),
+  guides: StudioGuidesSchema.prefault({}),
   // Its groups and the elements in none, back to front: the first is the
   // back
   items: z
@@ -285,10 +300,16 @@ const withItems = (overlay: unknown): unknown =>
       }
     : overlay;
 
-// Drops an item that still doesn't parse instead of the overlay
+// Drops an item that still doesn't parse instead of the overlay, and the
+// guides too
 const StoredStudioOverlaySchema = z.preprocess(
   withItems,
   StudioOverlaySchema.extend({
+    guides: StudioGuidesSchema.prefault({}).catch(() => ({
+      x: [],
+      y: [],
+      locked: false,
+    })),
     items: z
       .preprocess(
         parsing(StoredStudioItemSchema),
@@ -309,6 +330,7 @@ export const StoredStudioOverlaysSchema = z.preprocess(
 );
 
 export type StudioOverlay = z.infer<typeof StudioOverlaySchema>;
+export type StudioGuides = z.infer<typeof StudioGuidesSchema>;
 export type StudioGroup = z.infer<typeof StudioGroupSchema>;
 export type StudioItem = z.infer<typeof StudioItemSchema>;
 export type StudioElement = z.infer<typeof StudioElementSchema>;

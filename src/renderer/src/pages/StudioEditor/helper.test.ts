@@ -13,7 +13,16 @@ import {
   alignTo,
   bounds,
   copyItem,
+  cornerOf,
   elementName,
+  guideAt,
+  metLines,
+  nearGuide,
+  snapBox,
+  snapLines,
+  snapPoint,
+  stickCorner,
+  withGuide,
   findElement,
   moveElement,
   extent,
@@ -35,7 +44,7 @@ import {
   sourceValue,
   rulerTicks,
   whenText,
-  withFolds,
+  withView,
   zoomStep,
 } from "./helper";
 
@@ -581,6 +590,8 @@ describe("the canvas's geometry", () => {
     id: "o",
     name: "",
     size: "portrait" as const,
+    rulers: false,
+    guides: { x: [], y: [], locked: false },
     items: [
       { ...newStudioGroup("Back"), id: "back", elements: [box("under", 0, 0)] },
       {
@@ -681,10 +692,17 @@ describe("the history and the view", () => {
       items: [{ ...open, folded: true, name: "Renamed" }],
     });
 
-    const back = withFolds(was, now);
+    const back = withView(was, now);
     expect(back.items).toEqual([{ ...open, folded: true }, shut]);
     // Nothing to change, the same overlay's items
-    expect(withFolds(was, was).items[1]).toBe(shut);
+    expect(withView(was, was).items[1]).toBe(shut);
+  });
+
+  it("keeps the rulers as they are now, in a step it goes back to", () => {
+    const was = studioOverlay("Main", { rulers: false, name: "Old" });
+    const now = studioOverlay("Main", { rulers: true });
+
+    expect(withView(was, now)).toMatchObject({ rulers: true, name: "Old" });
   });
 
   it("copies an element or a group with new ids, moved down and right", () => {
@@ -759,5 +777,156 @@ describe("the history and the view", () => {
       rulerTicks(-500, 1, 100).find((t) => t.size === "number")?.value,
     ).toBe(500);
     expect(rulerTicks(0, 0, 100)).toEqual([]);
+  });
+});
+
+describe("sticking and guides", () => {
+  const canvas = { width: 1080, height: 1920 };
+  const turned = (x: number, y: number, width: number, height: number) => ({
+    x,
+    y,
+    width,
+    height,
+    rotation: 0,
+  });
+  // A box at 100–300 across and 200–300 down, and a guide at x 700
+  const lines = snapLines(canvas, [turned(100, 200, 200, 100)], {
+    x: [700],
+    y: [],
+    locked: false,
+  });
+
+  it("lines up the canvas's edges and middle, each box's, and the guides", () => {
+    expect(lines.x.map((line) => line.at)).toEqual([
+      0, 540, 1080, 100, 200, 300, 700,
+    ]);
+    expect(lines.y.map((line) => line.at)).toEqual([
+      0, 960, 1920, 200, 250, 300,
+    ]);
+    // Each runs along what it's from, a guide across everything
+    expect(lines.x[0]).toEqual({ at: 0, from: 0, to: 1920 });
+    expect(lines.x[3]).toEqual({ at: 100, from: 200, to: 300 });
+    expect(lines.x[6]).toEqual({ at: 700, from: -Infinity, to: Infinity });
+  });
+
+  it("moves a box to the nearest line its edges or middle are near", () => {
+    // Its left edge 7 from the guide
+    expect(snapBox(turned(693, 1000, 100, 50), lines, 10)).toEqual({
+      x: 7,
+      y: 0,
+    });
+    expect(snapBox(turned(693, 1000, 100, 50), lines, 5)).toEqual({
+      x: 0,
+      y: 0,
+    });
+    // Its middle, 535, to the canvas's
+    expect(snapBox(turned(485, 1000, 100, 50), lines, 6).x).toBe(5);
+    // Of its left edge 4 away and its right edge 2 away, the right one
+    expect(snapBox(turned(104, 1000, 594, 50), lines, 6).x).toBe(2);
+    // Down, its top to the canvas's middle
+    expect(snapBox(turned(600, 963, 10, 10), lines, 6).y).toBe(-3);
+  });
+
+  it("goes by how a turned box shows", () => {
+    // Upright, it shows 102–122 across: its left edge 2 from the line at 100
+    const bar = { ...turned(12, 500, 200, 20), rotation: 90 };
+    expect(snapBox(bar, lines, 5).x).toBeCloseTo(-2);
+  });
+
+  it("moves a point to the nearest line on each axis", () => {
+    expect(snapPoint({ x: 538, y: 1915 }, lines, 6)).toEqual({ x: 2, y: 5 });
+    expect(snapPoint({ x: 620, y: 600 }, lines, 6)).toEqual({ x: 0, y: 0 });
+  });
+
+  it("draws a line where a box meets others, across all of them", () => {
+    const met = snapLines(
+      canvas,
+      [turned(100, 200, 200, 100), turned(100, 1000, 50, 50)],
+      { x: [], y: [450], locked: false },
+    );
+    // Its left edge on both boxes', its middle down on the guide
+    expect(metLines(turned(100, 400, 80, 100), met)).toEqual([
+      { axis: "x", at: 100, from: 200, to: 1050 },
+      { axis: "y", at: 450, from: -Infinity, to: Infinity },
+    ]);
+    expect(metLines(turned(400, 600, 80, 100), met)).toEqual([]);
+  });
+
+  it("finds a corner where it shows, turned too", () => {
+    const box = turned(10, 20, 100, 50);
+    expect(cornerOf(box, "nw")).toEqual({ x: 10, y: 20 });
+    expect(cornerOf(box, "se")).toEqual({ x: 110, y: 70 });
+    // A quarter turn clockwise around its middle (60, 45)
+    const nw = cornerOf({ ...box, rotation: 90 }, "nw");
+    expect(nw.x).toBeCloseTo(85);
+    expect(nw.y).toBeCloseTo(-5);
+  });
+
+  it("sticks a dragged corner, along the diagonal with Link on", () => {
+    const near = snapLines(canvas, [turned(200, 600, 10, 10)], null);
+    const box = turned(0, 0, 100, 100);
+    const resized = { ...resizeBox(box, "se", 95, 40), rotation: 0 };
+    // Its corner at 195 across, 5 from the box at 200
+    expect(
+      stickCorner(box, resized, "se", { x: 95, y: 40 }, near, 6, false),
+    ).toEqual({ x: 100, y: 40 });
+
+    const wide = turned(0, 0, 100, 50);
+    const linked = {
+      ...resizeBox(wide, "se", 96, 48, { even: true }),
+      rotation: 0,
+    };
+    // At 196 × 98, 4 short of 200 across: the diagonal takes it there
+    const move = stickCorner(
+      wide,
+      linked,
+      "se",
+      { x: 96, y: 48 },
+      near,
+      6,
+      true,
+    );
+    expect(move.x).toBeCloseTo(100);
+    expect(move.y).toBeCloseTo(50);
+    expect(resizeBox(wide, "se", move.x, move.y, { even: true })).toEqual({
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    });
+  });
+
+  it("finds the guide nearest a point", () => {
+    const guides = { x: [100, 300], y: [205], locked: false };
+    expect(nearGuide({ x: 103, y: 200 }, guides, 4)).toEqual({
+      axis: "x",
+      index: 0,
+    });
+    expect(nearGuide({ x: 290, y: 204 }, guides, 4)).toEqual({
+      axis: "y",
+      index: 0,
+    });
+    expect(nearGuide({ x: 500, y: 500 }, guides, 4)).toBeNull();
+  });
+
+  it("moves, adds and removes a guide", () => {
+    const guides = { x: [100, 300], y: [205], locked: true };
+    expect(withGuide(guides, "x", 1, 320)).toEqual({
+      ...guides,
+      x: [100, 320],
+    });
+    expect(withGuide(guides, "y", null, 960)).toEqual({
+      ...guides,
+      y: [205, 960],
+    });
+    expect(withGuide(guides, "x", 0, null)).toEqual({ ...guides, x: [300] });
+    // Off the view before it was ever dropped: nothing
+    expect(withGuide(guides, "y", null, null)).toEqual(guides);
+  });
+
+  it("places a dragged guide on whole px, stuck to a line near it", () => {
+    expect(guideAt(537.6, lines.x, 6)).toBe(540);
+    expect(guideAt(620.4, lines.x, 6)).toBe(620);
+    expect(Object.is(guideAt(-0.4, [], 6), 0)).toBe(true);
   });
 });

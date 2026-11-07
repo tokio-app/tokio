@@ -5,6 +5,7 @@ import { StoreZodSchema } from "./store";
 import {
   STUDIO_MAX_ELEMENTS,
   STUDIO_MAX_GROUPS,
+  STUDIO_MAX_GUIDES,
   StoredStudioOverlaysSchema,
   StudioElementSchema,
   StudioGroupSchema,
@@ -180,13 +181,27 @@ describe("StudioOverlaySchema", () => {
     elements,
   });
 
-  it("makes a portrait overlay without items", () => {
+  it("makes a portrait overlay without items, guides or its rulers", () => {
     expect(StudioOverlaySchema.parse({ id: ID })).toEqual({
       id: ID,
       name: "",
       size: "portrait",
+      rulers: false,
+      guides: { x: [], y: [], locked: false },
       items: [],
     });
+  });
+
+  it(`keeps at most ${STUDIO_MAX_GUIDES} guides across and as many down`, () => {
+    const parses = (x: number[], y: number[] = []) =>
+      StudioOverlaySchema.safeParse({ id: ID, guides: { x, y } }).success;
+    const guides = (count: number) =>
+      Array.from({ length: count }, (_, i) => i);
+
+    expect(parses(guides(50), guides(50))).toBe(true);
+    expect(parses(guides(51))).toBe(false);
+    expect(parses([], guides(51))).toBe(false);
+    expect(parses([Infinity])).toBe(false);
   });
 
   it("holds groups and elements on their own, but no group in a group", () => {
@@ -283,6 +298,8 @@ describe("StoredStudioOverlaysSchema", () => {
         id: ID,
         name: "",
         size: "portrait",
+        rulers: false,
+        guides: { x: [], y: [], locked: false },
         items: [
           expect.objectContaining({
             kind: "group",
@@ -293,6 +310,21 @@ describe("StoredStudioOverlaysSchema", () => {
         ],
       },
     ]);
+  });
+
+  it("keeps an overlay whose guides it can't read, without them", () => {
+    const [stored] = StoredStudioOverlaysSchema.parse([
+      {
+        id: ID,
+        rulers: true,
+        guides: { x: "540", y: [960] },
+        items: [element({ kind: "shape" })],
+      },
+    ]);
+
+    expect(stored.guides).toEqual({ x: [], y: [], locked: false });
+    expect(stored.rulers).toBe(true);
+    expect(stored.items).toHaveLength(1);
   });
 
   it("makes each layer of an overlay saved before groups a group", () => {

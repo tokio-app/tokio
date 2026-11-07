@@ -23,6 +23,8 @@ const overlay = (patch: Partial<StudioOverlay> = {}): StudioOverlay => ({
   id: ID,
   name: "Overlay 1",
   size: "portrait",
+  rulers: false,
+  guides: { x: [], y: [], locked: false },
   items: [],
   ...patch,
 });
