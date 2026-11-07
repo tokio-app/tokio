@@ -164,35 +164,6 @@
   margin: 0 3px;
 }
 
-/* A group's elements, folding away under its row and back */
-.fold {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: grid-template-rows var(--transition-fast);
-}
-
-.fold_closed {
-  grid-template-rows: 0fr;
-}
-
-/* Cut to the fold as it moves, with room for a focus ring while it's open */
-.fold > .elements {
-  min-height: 0;
-  overflow: clip;
-  overflow-clip-margin: var(--space-1);
-}
-
-/* Folded, nothing past it: the margin's 4 px would show the row under it */
-.fold_closed > .elements {
-  overflow: hidden;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fold {
-    transition: none;
-  }
-}
-
 /* A group's elements, set in from its row: their rows still reach its
    tray's sides, so a drop anywhere on one lands on it */
 .elements > .layer {

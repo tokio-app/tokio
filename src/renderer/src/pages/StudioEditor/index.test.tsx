@@ -350,40 +350,6 @@ describe("StudioEditor", () => {
     expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("takes a double click on a group's arrow, lock or eye as one click", async () => {
-    const { user } = await open(scene(elementOf("shape")));
-    const button = (name: string) =>
-      rowOf(/^Group 1/).getByRole("button", { name });
-
-    await user.dblClick(button("Elements in this group"));
-    await waitFor(() => expect(savedGroup(0)?.folded).toBe(true));
-    await user.dblClick(button("Lock group"));
-    await waitFor(() => expect(savedGroup(0)?.locked).toBe(true));
-    await user.dblClick(button("Hide group"));
-    await waitFor(() => expect(savedGroup(0)?.hidden).toBe(true));
-  });
-
-  it("folds and unfolds a group with a double click on its name, not an empty one", async () => {
-    const shape = elementOf("shape");
-    const { user } = await open(
-      holding(group("Group 1", [shape]), group("Empty")),
-    );
-
-    await user.dblClick(row(/^Group 1/));
-    await waitFor(() => expect(savedGroup(0)?.folded).toBe(true));
-    expect(layers().queryByRole("button", { name: /^Shape/ })).toBeNull();
-    // Main's echo, so unfolding it again is a change to save
-    await studio(lastSave()!);
-
-    await user.dblClick(row(/^Group 1/));
-    await waitFor(() => expect(savedGroup(0)?.folded).toBe(false));
-    expect(row(/^Shape/)).toBeInTheDocument();
-
-    await user.dblClick(row(/^Empty/));
-    expect(row(/^Empty/)).toHaveAttribute("aria-pressed", "true");
-    expect(savedGroup(1)?.folded).toBe(false);
-  });
-
   it("selects an element from the list or the canvas, and Escape deselects", async () => {
     const back = elementOf("shape", { x: 0, y: 0, width: 400, height: 400 });
     const front = text({ text: "Hello", x: 300, y: 300 });

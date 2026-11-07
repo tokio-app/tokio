@@ -157,9 +157,7 @@ export function LayersPanel({
   const lockElement = t("studio.editor.lockElement");
   const hideElement = t("studio.editor.hideElement");
 
-  // A lock and an eye, Paper when on and muted when off. Like the fold
-  // arrow, they take a double click as one click: its second click would
-  // undo the first.
+  // A lock and an eye, Paper when on and muted when off
   const toggles = (
     flags: { locked: boolean; hidden: boolean },
     labels: { lock: string; hide: string },
@@ -172,7 +170,7 @@ export function LayersPanel({
         title={labels.lock}
         aria-label={labels.lock}
         aria-pressed={flags.locked}
-        onClick={(e) => e.detail < 2 && set({ locked: !flags.locked })}
+        onClick={() => set({ locked: !flags.locked })}
       >
         {flags.locked ? <FiLock size={16} /> : <FiUnlock size={16} />}
       </Btn>
@@ -182,7 +180,7 @@ export function LayersPanel({
         title={labels.hide}
         aria-label={labels.hide}
         aria-pressed={flags.hidden}
-        onClick={(e) => e.detail < 2 && set({ hidden: !flags.hidden })}
+        onClick={() => set({ hidden: !flags.hidden })}
       >
         {flags.hidden ? <FiEyeOff size={16} /> : <FiEye size={16} />}
       </Btn>
@@ -425,9 +423,7 @@ export function LayersPanel({
               title={fold}
               aria-label={fold}
               aria-expanded={!group.folded}
-              onClick={(e) =>
-                e.detail < 2 && onFlags(group.id, { folded: !group.folded })
-              }
+              onClick={() => onFlags(group.id, { folded: !group.folded })}
             >
               {group.folded ? (
                 <FiChevronRight size={16} />
@@ -443,12 +439,6 @@ export function LayersPanel({
             className={styles.layer_select}
             aria-pressed={group.id === selected}
             onClick={() => onSelect(group.id)}
-            // As its arrow does, for a group with elements to fold
-            onDoubleClick={() => {
-              if (group.elements.length > 0) {
-                onFlags(group.id, { folded: !group.folded });
-              }
-            }}
           >
             <span className={styles.layer_text}>
               <span className={styles.layer_name}>{name}</span>
@@ -462,20 +452,12 @@ export function LayersPanel({
           {toggles(group, { lock, hide }, (flags) => onFlags(group.id, flags))}
         </div>
 
-        {group.elements.length > 0 && (
-          // Folded, its elements tuck away under its row, out of reach and
-          // out of screen readers' until it opens
-          <div
-            className={cx(styles.fold, group.folded && styles.fold_closed)}
-            inert={group.folded}
-            aria-hidden={group.folded || undefined}
-          >
-            <ul className={styles.elements} aria-label={name}>
-              {[...group.elements]
-                .reverse()
-                .map((element) => elementRow(element, group.id))}
-            </ul>
-          </div>
+        {shown && (
+          <ul className={styles.elements} aria-label={name}>
+            {[...group.elements]
+              .reverse()
+              .map((element) => elementRow(element, group.id))}
+          </ul>
         )}
       </li>
     );
