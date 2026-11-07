@@ -89,6 +89,9 @@ import styles from "./studioeditor.module.css";
 // its return can't get an older one's number, as on the Alerts page
 let requests = 0;
 
+// A text's fields that change how much room its words take
+const WORDS = ["text", "font", "size", "bold"] as const;
+
 /**
  * An Overlay Studio overlay's editor: its groups and elements, the
  * canvas, and the selection's settings (the overlay's, with none). It opens
@@ -157,6 +160,9 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const asked = useRef(new Set<string>());
   const applied = useRef(new Map<string, number>());
   const stage = useRef<Stage | null>(null);
+  // A text whose words its settings just changed: the canvas grows its box
+  // to them once it has drawn them
+  const fitting = useRef<string | null>(null);
 
   useIpcRequest(APP_EVENTS.GET_OVERLAYS);
   useIpcRequest(APP_EVENTS.GET_PROFILE);
@@ -576,6 +582,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
             <StudioStage
               view={view}
               stageRef={stage}
+              fitting={fitting}
               selected={selected}
               locked={locked}
               groupFrame={group && !group.hidden ? frame : null}
@@ -628,7 +635,16 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 canvas={canvas}
                 linked={linked}
                 onLinked={setLinked}
-                onChange={(changed) => changeElement(changed.id, () => changed)}
+                onChange={(changed) => {
+                  if (
+                    changed.kind === "text" &&
+                    element.kind === "text" &&
+                    WORDS.some((key) => changed[key] !== element[key])
+                  ) {
+                    fitting.current = changed.id;
+                  }
+                  changeElement(changed.id, () => changed);
+                }}
                 gifts={giftChoices}
                 emotes={emoteChoices}
                 sources={sources}

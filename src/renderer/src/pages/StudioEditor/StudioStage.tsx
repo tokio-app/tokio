@@ -20,6 +20,7 @@ import {
   Box,
   Corner,
   CORNERS,
+  fitText,
   holdsTurned,
   pickElement,
   Point,
@@ -50,6 +51,8 @@ type Props = {
   view: StudioView;
   // The stage, for Test to play its elements
   stageRef: RefObject<Stage | null>;
+  // A text whose words its settings just changed, grown to them once drawn
+  fitting: RefObject<string | null>;
   // A group's id or an element's
   selected: string | null;
   // The locked groups and elements, which the canvas can't pick, move,
@@ -152,6 +155,7 @@ const NUDGES: Record<string, [number, number]> = {
 export function StudioStage({
   view,
   stageRef,
+  fitting,
   selected,
   locked,
   onSelect,
@@ -262,6 +266,21 @@ export function StudioStage({
     text.style.overflowWrap = overflowWrap;
     return Math.max(1, Math.ceil(measured / scale));
   };
+
+  // As a corner drag stops at them: a bigger size, another font or more
+  // words would spill out of the box, which only a drag set right before
+  useLayoutEffect(() => {
+    const id = fitting.current;
+    if (!id) return;
+    fitting.current = null;
+    const text = elements.find(({ element }) => element.id === id)?.element;
+    const scale = stageRef.current?.fit().scale;
+    if (text?.kind !== "text" || !scale) return;
+    const fitted = fitText(text, text.align, textWidth(id, scale), (width) =>
+      textHeight(id, width, scale),
+    );
+    if (fitted) onBox(id, fitted);
+  });
 
   const chosen = elements.find(({ element }) => element.id === selected);
   // A group's layer only: an element on its own has its layer's id, and

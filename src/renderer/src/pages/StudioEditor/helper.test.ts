@@ -20,6 +20,7 @@ import {
   groupFrame,
   reframe,
   pickElement,
+  fitText,
   resizeBox,
   stepElement,
   turnTo,
@@ -139,6 +140,65 @@ describe("roundBox", () => {
       width: 1,
       height: 1,
     });
+  });
+});
+
+describe("fitText", () => {
+  const box = { x: 100, y: 200, width: 300, height: 100, rotation: 0 };
+  const lines = (height: number) => () => height;
+
+  it("leaves a box its words fit", () => {
+    expect(fitText(box, "center", 200, lines(100))).toBeNull();
+  });
+
+  it("grows around where its words show: across from their side, from the middle", () => {
+    expect(fitText(box, "center", 400, lines(160))).toEqual({
+      x: 50,
+      y: 170,
+      width: 400,
+      height: 160,
+    });
+    expect(fitText(box, "left", 400, lines(160))).toMatchObject({
+      x: 100,
+      y: 170,
+    });
+    expect(fitText(box, "right", 400, lines(160))).toMatchObject({
+      x: 0,
+      y: 170,
+    });
+  });
+
+  it("grows from the middle by whole px on each side", () => {
+    expect(fitText(box, "center", 301, lines(101))).toEqual({
+      x: 99,
+      y: 199,
+      width: 302,
+      height: 102,
+    });
+    expect(fitText(box, "left", 301, lines(100))).toEqual({
+      x: 100,
+      y: 200,
+      width: 301,
+      height: 100,
+    });
+  });
+
+  it("asks the height at the width it gets", () => {
+    const asked: number[] = [];
+    fitText(box, "center", 500, (width) => {
+      asked.push(width);
+      return 1;
+    });
+
+    expect(asked).toEqual([500]);
+  });
+
+  it("keeps a turned box's own side where it was", () => {
+    // A quarter turn: its left side is its top on the canvas, at 250, 100
+    const grown = fitText({ ...box, rotation: 90 }, "left", 400, lines(100))!;
+
+    expect(grown).toEqual({ x: 50, y: 250, width: 400, height: 100 });
+    expect(grown.y + grown.height / 2 - grown.width / 2).toBe(100);
   });
 });
 

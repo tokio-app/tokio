@@ -1,5 +1,6 @@
 import { MessageKey } from "@/common/i18n";
 import {
+  StudioAlign,
   StudioElement,
   StudioElementKind,
   StudioElementOf,
@@ -363,6 +364,38 @@ export function resizeBox(
     width,
     height,
   };
+}
+
+/**
+ * A text's box grown to its words: at least `minWidth` wide (its longest
+ * word) and `minHeight(width)` tall (its words at that width), around where
+ * they show so they stay put: across from the side they line up with, and
+ * from the middle down and up, where they sit. Null when they fit.
+ */
+export function fitText(
+  box: Turned,
+  align: StudioAlign,
+  minWidth: number,
+  minHeight: (width: number) => number,
+): Box | null {
+  // By whole px on each side where it grows from the middle, so a size
+  // dragged up a step at a time doesn't creep half a px a step
+  const even = (px: number) => 2 * Math.ceil(px / 2);
+  const short = Math.max(0, minWidth - box.width);
+  const wider = align === "center" ? even(short) : short;
+  const width = box.width + wider;
+  const taller = even(Math.max(0, minHeight(width) - box.height));
+  if (!wider && !taller) return null;
+  // Its middle moves along its own width, away from the side it keeps
+  const along =
+    align === "left" ? wider / 2 : align === "right" ? -wider / 2 : 0;
+  const moved = turn({ x: along, y: 0 }, box.rotation);
+  return roundBox({
+    x: box.x + moved.x - wider / 2,
+    y: box.y + moved.y - taller / 2,
+    width,
+    height: box.height + taller,
+  });
 }
 
 /**

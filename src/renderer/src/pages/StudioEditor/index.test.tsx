@@ -711,6 +711,49 @@ describe("StudioEditor", () => {
     expect(shown.style.overflowWrap).toBe("");
   });
 
+  it("grows a text's box to its words when its size changes, not when its box does", async () => {
+    const words = text({
+      text: "Hello",
+      align: "center",
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 100,
+    });
+    const { user } = await open(scene(words));
+    await user.click(row(/^Hello/));
+    sized();
+    // At half size on screen: its longest word 200 px, its lines 120 px tall
+    const shown = drawn(words.id).querySelector<HTMLElement>(".studio-text")!;
+    vi.spyOn(shown, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(0, 0, 200, 60),
+    );
+    vi.spyOn(Range.prototype, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(0, 0, 200, 120),
+    );
+
+    const size = field("Size").getByRole("spinbutton");
+    await user.clear(size);
+    await user.type(size, "200");
+    // Around its middle, as it's centered
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        size: 200,
+        x: 50,
+        y: 130,
+        width: 400,
+        height: 240,
+      }),
+    );
+
+    const width = field("Width").getByRole("spinbutton");
+    await user.clear(width);
+    await user.type(width, "150");
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ width: 150, height: 240 }),
+    );
+  });
+
   it("resizes, turns, flips and fades a group from its fields", async () => {
     const big = elementOf("shape", { x: 100, y: 100, width: 100, height: 100 });
     const small = elementOf("shape", {
