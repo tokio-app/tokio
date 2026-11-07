@@ -46,6 +46,8 @@ export const STUDIO_NAME_MAX_LENGTH = 60;
 export const STUDIO_MAX_SECONDS = 60;
 // The largest text size, in px of the canvas
 export const STUDIO_MAX_FONT_SIZE = 400;
+// The widest shape border, in px of the canvas
+export const STUDIO_MAX_BORDER = 100;
 
 // A media library file's basename, "" for none: never a path
 const LibraryFileSchema = z
@@ -133,7 +135,13 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
   z.object({
     ...ELEMENT,
     kind: z.literal("shape"),
+    // Painted inside, unless fill is off
+    fill: z.boolean().default(true),
     color: ColorSchema.default("#18181b"),
+    // A line inside its edge, px of the canvas
+    border: z.boolean().default(false),
+    border_color: ColorSchema.default("#f1f5f9"),
+    border_width: z.number().min(1).max(STUDIO_MAX_BORDER).default(4),
     // px of the canvas
     radius: z.number().min(0).default(24),
   }),

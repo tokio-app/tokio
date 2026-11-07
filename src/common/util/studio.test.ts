@@ -5,12 +5,12 @@ import {
   StudioGroupSchema,
   StudioOverlay,
 } from "../schemas/studio";
-import { ChatEvent, TOKIO_EVENTS } from "../types/connector";
+import { ChatEvent, EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
 import {
   fillStudioText,
   newStudioElement,
   newStudioGroup,
-  sentGiftPicture,
+  sentPicture,
   SAMPLE_NUMBERS,
   studioEventVariables,
   studioView,
@@ -113,7 +113,7 @@ describe("studioView", () => {
     embedPath: (source) => `/${source.type}/`,
     text: (l) => l.text.toUpperCase(),
     viewer: () => ({ src: "", name: "Sora" }),
-    sentGift: () => "",
+    sent: () => "",
     label: (source) => source.type,
     ...changes,
   });
@@ -231,11 +231,36 @@ describe("studioView", () => {
         element("picked", { kind: "gift", gift: 5655 }),
         element("sent", { kind: "gift" }),
       ]),
-      deps({ sentGift: (e) => `https://g/${e.id}.png` }),
+      deps({ sent: (e) => `https://g/${e.id}.png` }),
     );
 
     expect(elements[0]).not.toMatchObject({ src: "https://g/picked.png" });
     expect(elements[1]).toMatchObject({ src: "https://g/sent.png" });
+  });
+
+  it("shows the emote its event sent, and a shape's fill and border or none", () => {
+    const {
+      layers: [{ elements }],
+    } = studioView(
+      overlay([
+        element("sent", { kind: "emote" }),
+        element("plain", { kind: "shape", color: "#112233" }),
+        element("outline", {
+          kind: "shape",
+          fill: false,
+          border: true,
+          border_color: "#445566",
+          border_width: 8,
+        }),
+      ]),
+      deps({ sent: () => "https://e/1.png" }),
+    );
+
+    expect(elements).toMatchObject([
+      { src: "https://e/1.png" },
+      { color: "#112233", border: null },
+      { color: null, border: { color: "#445566", width: 8 } },
+    ]);
   });
 
   it("leaves hidden groups out, the others keeping their place", () => {
@@ -307,19 +332,47 @@ describe("newStudioElement", () => {
       when: "event",
       trigger: { type: TOKIO_EVENTS.GIFT },
     });
+    expect(newStudioElement("emote", "landscape")).toMatchObject({
+      emote: null,
+      when: "event",
+      trigger: { type: EMOTE_TRIGGER },
+    });
     expect(newStudioElement("shape", "landscape").when).toBe("always");
   });
 });
 
-describe("sentGiftPicture", () => {
+describe("sentPicture", () => {
+  const gift = element("g", { kind: "gift" });
+  const emote = (emotes: string[] = []) =>
+    element("e", {
+      kind: "emote",
+      trigger: { type: EMOTE_TRIGGER, gifts: [], emotes },
+    });
+  const chat = (...ids: string[]): ChatEvent => ({
+    user: { username: "Ana", handle: "ana", profilePictures: [] },
+    comment: {
+      content: "",
+      lang: "en",
+      emotes: ids.map((id, index) => ({
+        emoteID: id,
+        index,
+        images: [`https://e/${id}.png`],
+      })),
+    },
+  });
+
   it("reads the picture of the gift an event sent", () => {
     const sent = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
 
-    expect(sentGiftPicture(sent)).toBe(sent.gift.image);
-    expect(
-      sentGiftPicture(generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data),
-    ).toBe("");
-    expect(sentGiftPicture(null)).toBe("");
+    expect(sentPicture(gift, sent)).toBe(sent.gift.image);
+    expect(sentPicture(gift, chat("1"))).toBe("");
+    expect(sentPicture(gift, null)).toBe("");
+  });
+
+  it("reads the emote its trigger names, else the message's first", () => {
+    expect(sentPicture(emote(["2"]), chat("1", "2"))).toBe("https://e/2.png");
+    expect(sentPicture(emote(), chat("1", "2"))).toBe("https://e/1.png");
+    expect(sentPicture(emote(), chat())).toBe("");
   });
 });
 

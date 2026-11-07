@@ -99,7 +99,14 @@ describe("on stream", () => {
   it("draws each element in its box, stacked by z", () => {
     draw(
       view(
-        { ...BASE, id: "shape", kind: "shape", color: "#18181b", radius: 24 },
+        {
+          ...BASE,
+          id: "shape",
+          kind: "shape",
+          color: "#18181b",
+          radius: 24,
+          border: null,
+        },
         text("text", { z: 1, opacity: 0.5, text: "<b>{username}</b>" }),
       ),
     );
@@ -358,6 +365,35 @@ describe("on stream", () => {
     stage.react({ element: "v" });
     expect(body("v").className).toBe("studio-body studio-play-shake");
     expect(body("v").classList).not.toContain("studio-hidden");
+  });
+
+  it("draws a shape's border inside it, and no fill when it has none", () => {
+    draw(
+      view({
+        ...BASE,
+        id: "s",
+        kind: "shape",
+        color: null,
+        radius: 0,
+        border: { color: "#445566", width: 8 },
+      }),
+    );
+
+    expect(el("s").style.getPropertyValue("--studio-color")).toBe(
+      "transparent",
+    );
+    expect(el("s").style.getPropertyValue("--studio-border")).toBe(
+      "8px solid #445566",
+    );
+  });
+
+  it("shows on an emote element the emote its event sent", () => {
+    draw(view({ ...BASE, id: "e", kind: "emote", src: null, when: "event" }));
+
+    stage.react({ element: "e", picture: "https://e/1.png" });
+    expect(root.querySelector("img")!.getAttribute("src")).toBe(
+      "https://e/1.png",
+    );
   });
 
   it("shows on a gift element the gift its event sent", () => {

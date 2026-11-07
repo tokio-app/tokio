@@ -14,8 +14,9 @@ import {
 } from "@/common/types";
 import {
   fillStudioText,
+  generateEmoteChatSample,
   generateTikTokEventSample,
-  sentGiftPicture,
+  sentPicture,
   studioElements,
   studioEventVariables,
 } from "@/common/util";
@@ -137,9 +138,11 @@ export class StudioService extends Service {
         const { type } = element.trigger;
         let values = samples.get(type);
         if (!values) {
-          // Emote triggers match chats
-          const event = type === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : type;
-          values = generateTikTokEventSample(event).data;
+          // Emote triggers match chats with an emote
+          values =
+            type === EMOTE_TRIGGER
+              ? generateEmoteChatSample()
+              : generateTikTokEventSample(type).data;
           samples.set(type, values);
         }
         const sample: StudioKept = {
@@ -197,8 +200,11 @@ export class StudioService extends Service {
       return { element: id, text: studioText(element, numbers(), values) };
     }
     if (element.kind === "viewer") return { element: id, picture, name };
-    if (element.kind === "gift" && element.gift === null) {
-      return { element: id, picture: sentGiftPicture(values) };
+    if (
+      (element.kind === "gift" && element.gift === null) ||
+      (element.kind === "emote" && element.emote === null)
+    ) {
+      return { element: id, picture: sentPicture(element, values) };
     }
     return { element: id };
   }

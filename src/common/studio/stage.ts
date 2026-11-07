@@ -279,8 +279,14 @@ export function createStage(
         setPicture(only(body, HTMLImageElement, newPicture), element.src);
         break;
       case "shape":
-        el.style.setProperty("--studio-color", element.color);
+        el.style.setProperty("--studio-color", element.color ?? "transparent");
         el.style.setProperty("--studio-radius", `${element.radius}px`);
+        el.style.setProperty(
+          "--studio-border",
+          element.border
+            ? `${element.border.width}px solid ${element.border.color}`
+            : "none",
+        );
         break;
       case "viewer": {
         const avatar = only(body, HTMLDivElement, newAvatar);
@@ -430,8 +436,11 @@ export function createStage(
         src: r.picture ?? element.src,
         name: r.name ?? element.name,
       };
-    } else if (element.kind === "gift" && r.picture !== undefined) {
-      // The gift the event sent
+    } else if (
+      (element.kind === "gift" || element.kind === "emote") &&
+      r.picture !== undefined
+    ) {
+      // The gift or emote the event sent
       entry.element = { ...element, src: r.picture || null };
     }
     fill(entry);

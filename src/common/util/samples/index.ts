@@ -80,10 +80,11 @@ const chatterFactory = (user = userFactory()): UserData => ({
   moderator: randomBool(0.05),
 });
 
-const chatEventFactory = (user = chatterFactory()): ChatEvent => {
+const chatEventFactory = (
+  user = chatterFactory(),
+  numEmotes = randomBool(0.4) ? randomInt(1, 3) : 0,
+): ChatEvent => {
   const content = pickRandom(CHAT_MESSAGES);
-  const hasEmotes = randomBool(0.4);
-  const numEmotes = hasEmotes ? randomInt(1, 3) : 0;
   const emotes = Array.from({ length: numEmotes }, () =>
     emoteFactory(content.length),
   );
@@ -176,6 +177,10 @@ const TIKTOK_EVENT_SAMPLES: {
   [TOKIO_EVENTS.GIFT]: giftEventFactory,
   [TOKIO_EVENTS.MUSIC_CHANGE]: musicFactory,
 };
+
+/** A chat message with at least one emote, as an emote trigger needs. */
+export const generateEmoteChatSample = (): ChatEvent =>
+  chatEventFactory(chatterFactory(), randomInt(1, 3));
 
 // One payload type per event, so a union of events gives a union of payloads.
 export const generateTikTokEventSample = <K extends AppEvents>(

@@ -1,5 +1,6 @@
 import { MessageKey } from "@/common/i18n";
 import {
+  STUDIO_MAX_BORDER,
   STUDIO_MAX_FONT_SIZE,
   STUDIO_MAX_SECONDS,
   STUDIO_NAME_MAX_LENGTH,
@@ -11,7 +12,7 @@ import {
   StudioWhen,
   Trigger,
 } from "@/common/schemas";
-import { CustomGift, TOKIO_EVENTS } from "@/common/types";
+import { CustomGift, EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import { STUDIO_NUMBERS, studioEventVariables } from "@/common/util";
 import {
   Btn,
@@ -65,10 +66,15 @@ const ANIMATIONS: { value: StudioAnimation; label: MessageKey }[] = [
   { value: "pulse", label: "studio.animations.pulse" },
 ];
 
-// A gift element's picture: the gift its event sent, or one picked
-const GIFT_PICTURES: { value: "sent" | "picked"; label: MessageKey }[] = [
+// A gift or emote element's picture: what its event sent, or one picked
+type Picture = { value: "sent" | "picked"; label: MessageKey }[];
+const GIFT_PICTURES: Picture = [
   { value: "sent", label: "studio.fields.giftSent" },
   { value: "picked", label: "studio.fields.giftPicked" },
+];
+const EMOTE_PICTURES: Picture = [
+  { value: "sent", label: "studio.fields.emoteSent" },
+  { value: "picked", label: "studio.fields.emotePicked" },
 ];
 
 // Events no viewer sends, so a viewer's picture can't react to them
@@ -147,19 +153,34 @@ export function ElementSettings({
   const animations = useOptions(ANIMATIONS);
   const allTriggers = useOptions(TRIGGER_OPTIONS);
   const giftPictures = useOptions(GIFT_PICTURES);
-  const sentGift = element.kind === "gift" && element.gift === null;
-  // A viewer's picture needs the viewer an event brings, and the gift sent
-  // a Gift event
+  const emotePictures = useOptions(EMOTE_PICTURES);
+  // The trigger that sends what the element shows: the gift or the emote sent
+  const sends =
+    element.kind === "gift" && element.gift === null
+      ? TOKIO_EVENTS.GIFT
+      : element.kind === "emote" && element.emote === null
+        ? EMOTE_TRIGGER
+        : null;
+  // A viewer's picture needs the viewer an event brings
   const triggers =
     element.kind === "viewer"
       ? allTriggers.filter((o) => !NO_VIEWER.includes(o.value))
-      : sentGift
-        ? allTriggers.filter((o) => o.value === TOKIO_EVENTS.GIFT)
+      : sends
+        ? allTriggers.filter((o) => o.value === sends)
         : allTriggers;
   const whens =
-    element.kind === "viewer" || sentGift
+    element.kind === "viewer" || sends
       ? allWhens.filter((w) => w.value !== "always")
       : allWhens;
+  // What the event sends shows: on that event, never always
+  const onSent = <E extends StudioElement>(
+    changed: E,
+    type: Trigger["type"],
+  ) => ({
+    ...changed,
+    when: changed.when === "always" ? "event" : changed.when,
+    trigger: { ...changed.trigger, type },
+  });
   const { trigger } = element;
 
   let own: ReactNode = null;
@@ -261,13 +282,7 @@ export function ElementSettings({
             onChange={(picture) =>
               onChange(
                 picture === "sent"
-                  ? {
-                      ...element,
-                      gift: null,
-                      // The gift comes with a Gift event
-                      when: element.when === "always" ? "event" : element.when,
-                      trigger: { ...trigger, type: TOKIO_EVENTS.GIFT },
-                    }
+                  ? onSent({ ...element, gift: null }, TOKIO_EVENTS.GIFT)
                   : { ...element, gift: gifts[0]?.value ?? null },
               )
             }
@@ -285,9 +300,26 @@ export function ElementSettings({
     case "emote":
       own = (
         <Field label={t("studio.fields.emote")}>
+          <RadioGroup
+            name={`studio-emote-${element.id}`}
+            value={element.emote === null ? "sent" : "picked"}
+            options={emotePictures}
+            onChange={(picture) => {
+              const first = emotes[0];
+              if (picture === "sent") {
+                onChange(onSent({ ...element, emote: null }, EMOTE_TRIGGER));
+              } else if (first) {
+                onChange({
+                  ...element,
+                  emote: { id: first.value, image: first.img },
+                });
+              }
+            }}
+          />
           {emotes.length === 0 ? (
+            // Nothing to pick until viewers use emotes in chat
             <p className={styles.note}>{t("studio.fields.noEmotes")}</p>
-          ) : (
+          ) : element.emote === null ? null : (
             <Select
               placeholder={t("studio.fields.pickEmote")}
               options={emotes}
@@ -305,13 +337,63 @@ export function ElementSettings({
       break;
     case "shape":
       own = (
-        <div className={styles.pair}>
-          <Field label={t("studio.fields.color")}>
-            <Color
-              value={element.color}
-              onChange={(color) => onChange({ ...element, color })}
-            />
-          </Field>
+        <>
+          {/* Each on or off, its color beside it */}
+          <div className={styles.paint}>
+            <div
+              role="group"
+              aria-label={t("studio.fields.fill")}
+              className={styles.paint_row}
+            >
+              <Check
+                label={t("studio.fields.fill")}
+                checked={element.fill}
+                onChange={(e) =>
+                  onChange({ ...element, fill: e.target.checked })
+                }
+              />
+              {element.fill && (
+                <Color
+                  value={element.color}
+                  onChange={(color) => onChange({ ...element, color })}
+                />
+              )}
+            </div>
+            <div
+              role="group"
+              aria-label={t("studio.fields.border")}
+              className={styles.paint_row}
+            >
+              <Check
+                label={t("studio.fields.border")}
+                checked={element.border}
+                onChange={(e) =>
+                  onChange({ ...element, border: e.target.checked })
+                }
+              />
+              {element.border && (
+                <>
+                  <Color
+                    value={element.border_color}
+                    onChange={(border_color) =>
+                      onChange({ ...element, border_color })
+                    }
+                  />
+                  <NumberInput
+                    className={styles.number}
+                    aria-label={t("studio.fields.borderWidth")}
+                    integer
+                    min={1}
+                    max={STUDIO_MAX_BORDER}
+                    value={element.border_width}
+                    onChange={(border_width) =>
+                      onChange({ ...element, border_width })
+                    }
+                  />
+                </>
+              )}
+            </div>
+          </div>
           <Field label={t("studio.fields.radius")}>
             <NumberInput
               min={0}
@@ -319,7 +401,7 @@ export function ElementSettings({
               onChange={(radius) => onChange({ ...element, radius })}
             />
           </Field>
-        </div>
+        </>
       );
       break;
     case "overlay":

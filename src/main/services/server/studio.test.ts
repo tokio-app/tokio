@@ -136,7 +136,12 @@ describe("studio overlay page", () => {
             id: "front",
             z: 1,
             elements: [
-              element("s", { kind: "shape", color: "#18181b", radius: 0 }),
+              element("s", {
+                kind: "shape",
+                color: "#18181b",
+                radius: 0,
+                border: null,
+              }),
             ],
           },
         ),
@@ -171,7 +176,12 @@ describe("studio overlay page", () => {
           }),
           element("g", { kind: "gift", src: "https://cdn/rose.png" }),
           element("e", { kind: "emote", src: "https://cdn/emote.png" }),
-          element("s", { kind: "shape", color: "#18181b", radius: 24 }),
+          element("s", {
+            kind: "shape",
+            color: "#18181b",
+            radius: 24,
+            border: null,
+          }),
           element("w", { kind: "viewer", src: "", name: "ana" }),
           element("o", {
             kind: "overlay",
@@ -226,7 +236,7 @@ describe("studio overlay page", () => {
         view(
           element(
             "s",
-            { kind: "shape", color: "#18181b", radius: 0 },
+            { kind: "shape", color: "#18181b", radius: 0, border: null },
             { when: "animate" },
           ),
         ),

@@ -11,6 +11,7 @@ import {
   StudioSource,
 } from "../schemas/studio";
 import {
+  EMOTE_TRIGGER,
   TOKIO_EVENTS,
   type AppEvents,
   type TokioEventMap,
@@ -108,8 +109,9 @@ export type StudioViewDeps = {
     src: string;
     name: string;
   };
-  // The picture of the gift a gift element's last event sent, "" for none
-  sentGift: (element: StudioElementOf<"gift">) => string;
+  // The picture of the gift or emote a gift or emote element's last event
+  // sent, "" for none (sentPicture)
+  sent: (element: StudioElementOf<"gift" | "emote">) => string;
   // An embed's name, for the editor
   label: (source: StudioSource) => string;
 };
@@ -165,20 +167,28 @@ function elementView(
         return {
           ...base,
           kind: element.kind,
-          src: deps.sentGift(element) || null,
+          src: deps.sent(element) || null,
         };
       }
       const gift = deps.gifts.find((g) => g.value === element.gift);
       return { ...base, kind: element.kind, src: gift?.img || null };
     }
     case "emote":
-      return { ...base, kind: element.kind, src: element.emote?.image ?? null };
+      return {
+        ...base,
+        kind: element.kind,
+        // No emote picked: the one its event sent
+        src: element.emote ? element.emote.image : deps.sent(element) || null,
+      };
     case "shape":
       return {
         ...base,
         kind: element.kind,
-        color: element.color,
+        color: element.fill ? element.color : null,
         radius: element.radius,
+        border: element.border
+          ? { color: element.border_color, width: element.border_width }
+          : null,
       };
     case "viewer":
       return { ...base, kind: element.kind, ...deps.viewer(element) };
@@ -243,8 +253,8 @@ const NEW_BOXES: Record<StudioElementKind, { width: number; height: number }> =
 
 /**
  * A new element of the kind, centered on the canvas, with the defaults. A
- * viewer's picture shows on an event, since it needs one, and a gift shows
- * the one a viewer sends.
+ * viewer's picture shows on an event, since it needs one, and a gift or an
+ * emote shows the one a viewer sends.
  */
 export function newStudioElement(
   kind: StudioElementKind,
@@ -263,14 +273,31 @@ export function newStudioElement(
       when: "event",
       trigger: { type: TOKIO_EVENTS.GIFT, gifts: [] },
     }),
+    ...(kind === "emote" && {
+      when: "event",
+      trigger: { type: EMOTE_TRIGGER, gifts: [] },
+    }),
   });
 }
 
-/** The picture of the gift an event sent, "" for one with no gift. */
-export const sentGiftPicture = (values: TokioEventMap[AppEvents] | null) =>
-  typeof values === "object" && values !== null && "gift" in values
-    ? values.gift.image
-    : "";
+/**
+ * The picture of what an event sent for a gift or emote element: the gift,
+ * or the message's emote its trigger names (the first, for any emote). ""
+ * for none.
+ */
+export function sentPicture(
+  element: StudioElement,
+  values: TokioEventMap[AppEvents] | null,
+): string {
+  if (typeof values !== "object" || values === null) return "";
+  if (element.kind === "gift" && "gift" in values) return values.gift.image;
+  if (element.kind !== "emote" || !("comment" in values)) return "";
+  const { emotes } = values.comment;
+  const named = element.trigger.emotes;
+  // A sample's emotes aren't the ones named: it shows its first
+  const emote = emotes.find((e) => named.includes(e.emoteID)) ?? emotes[0];
+  return emote?.images[0] ?? "";
+}
 
 /** A new, empty group with the name, shown and unlocked. */
 export const newStudioGroup = (name: string): StudioGroup =>

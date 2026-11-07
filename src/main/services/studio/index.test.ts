@@ -111,6 +111,32 @@ describe("StudioService", () => {
     ]);
   });
 
+  it("sends an emote element with none picked the emote in the chat", () => {
+    const { studio, onReact, numbers } = setup();
+    const sent = element("e", {
+      kind: "emote",
+      trigger: { type: EMOTE_TRIGGER, gifts: [] },
+    });
+
+    studio.handle(
+      TOKIO_EVENTS.CHAT,
+      {
+        user: user("Ana"),
+        comment: {
+          content: "",
+          lang: "en",
+          emotes: [{ emoteID: "7", index: 0, images: ["https://e/7.png"] }],
+        },
+      },
+      [overlayOf(sent)],
+      numbers,
+    );
+
+    expect(onReact.mock.calls).toEqual([
+      ["o1", { element: "e", picture: "https://e/7.png" }],
+    ]);
+  });
+
   it("sends a viewer layer the viewer's picture and name", () => {
     const { studio, onReact, numbers } = setup();
     const viewer = element("v", { kind: "viewer" });

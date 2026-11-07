@@ -459,6 +459,22 @@
   gap: var(--space-4);
 }
 
+/* A shape's fill and border, the colors lined up past the checkboxes */
+.paint {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.paint_row {
+  display: grid;
+  grid-template-columns: 7rem auto 88px;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+}
+
 /* X, Y, W and H on one line */
 .box {
   display: grid;

@@ -12,7 +12,8 @@
  *                                    one per element, data-element its id:
  *                                    its box, z-index in the layer, opacity,
  *                                    rotation (a transform),
- *                                    --studio-color and --studio-radius;
+ *                                    --studio-color, --studio-radius and
+ *                                    a shape's --studio-border;
  *                                    .studio-waits in the editor on one that
  *                                    waits for an event
  *           .studio-body             what moves: .studio-hidden,
@@ -122,7 +123,10 @@
   visibility: hidden;
 }
 
+/* The border inside the box, so it keeps its size */
 .studio-shape > .studio-body {
+  box-sizing: border-box;
+  border: var(--studio-border, none);
   background: var(--studio-color);
   border-radius: var(--studio-radius);
 }

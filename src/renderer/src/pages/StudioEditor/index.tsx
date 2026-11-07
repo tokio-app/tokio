@@ -67,7 +67,7 @@ import {
   sampleReact,
   Samples,
   sampleText,
-  sampleGiftOf,
+  sampleSentOf,
   sampleViewerOf,
   sourceValue,
   stepElement,
@@ -282,7 +282,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 : getMinecraftOverlayURL(source.column ?? undefined),
         text: (element) => sampleText(element, samples, language),
         viewer: (element) => sampleViewerOf(element, samples),
-        sentGift: (element) => sampleGiftOf(element, samples),
+        sent: (element) => sampleSentOf(element, samples),
         label,
       }),
     // label reads installed, alerts, the games layout and t

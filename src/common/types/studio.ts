@@ -47,7 +47,13 @@ export type StudioElementView = StudioElementViewBase &
     | { kind: "media"; src: string | null; video: boolean }
     | { kind: "gift"; src: string | null }
     | { kind: "emote"; src: string | null }
-    | { kind: "shape"; color: string; radius: number }
+    // color null without a fill, border null without one
+    | {
+        kind: "shape";
+        color: string | null;
+        radius: number;
+        border: { color: string; width: number } | null;
+      }
     // src is "" without a picture, which shows the name's initial
     | { kind: "viewer"; src: string; name: string }
     | {

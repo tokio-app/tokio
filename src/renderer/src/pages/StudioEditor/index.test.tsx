@@ -1177,6 +1177,41 @@ describe("StudioEditor", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows the emote a viewer sends, or one picked from the saved ones", async () => {
+    const element = elementOf("emote");
+    const { user } = await open(scene(element));
+    await user.click(row(/^Emote/));
+
+    // None saved yet: nothing to pick
+    expect(
+      page().getByRole("radio", { name: "The emote a viewer sends" }),
+    ).toBeChecked();
+    expect(page().getByText(/once viewers use them/)).toBeVisible();
+  });
+
+  it("turns a shape's fill off and a border on", async () => {
+    const shape = elementOf("shape");
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+
+    await user.click(page().getByRole("checkbox", { name: "Fill" }));
+    await user.click(page().getByRole("checkbox", { name: "Border" }));
+    const width = page().getByRole("spinbutton", { name: "Border width" });
+    await user.clear(width);
+    await user.type(width, "12");
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        fill: false,
+        border: true,
+        border_width: 12,
+      }),
+    );
+    expect(drawn(shape.id).style.getPropertyValue("--studio-border")).toMatch(
+      /^12px solid/,
+    );
+  });
+
   it("offers a viewer's picture only the event Whens", async () => {
     const { user } = await open(scene(elementOf("viewer")));
 

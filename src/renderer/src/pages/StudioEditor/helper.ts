@@ -15,14 +15,14 @@ import {
   EMOTE_TRIGGER,
   StudioReact,
   StudioView,
-  TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
 import {
   fillStudioText,
+  generateEmoteChatSample,
   generateTikTokEventSample,
   SAMPLE_NUMBERS,
-  sentGiftPicture,
+  sentPicture,
   studioEventVariables,
 } from "@/common/util";
 import { EmoteOption } from "@/components";
@@ -50,8 +50,10 @@ export class Samples {
     let sample = this.made.get(type);
     if (!sample) {
       // An emote comes in a chat message
-      const event = type === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : type;
-      sample = generateTikTokEventSample(event).data;
+      sample =
+        type === EMOTE_TRIGGER
+          ? generateEmoteChatSample()
+          : generateTikTokEventSample(type).data;
       this.made.set(type, sample);
     }
     return sample;
@@ -70,9 +72,9 @@ function sampleViewer(sample: Sample) {
 const sampleOf = (element: StudioElement, samples: Samples) =>
   element.when === "always" ? null : samples.of(element.trigger.type);
 
-/** The picture of the gift its trigger's sample sent, "" for none. */
-export const sampleGiftOf = (element: StudioElement, samples: Samples) =>
-  sentGiftPicture(sampleOf(element, samples));
+/** The picture of the gift or emote its trigger's sample sent, "" for none. */
+export const sampleSentOf = (element: StudioElement, samples: Samples) =>
+  sentPicture(element, sampleOf(element, samples));
 
 /** A text element's text with the sample numbers and its trigger's sample. */
 export const sampleText = (
@@ -105,8 +107,11 @@ export function sampleReact(
     const { src, name } = sampleViewerOf(element, samples);
     return { element: element.id, picture: src, name };
   }
-  if (element.kind === "gift" && element.gift === null) {
-    return { element: element.id, picture: sampleGiftOf(element, samples) };
+  if (
+    (element.kind === "gift" && element.gift === null) ||
+    (element.kind === "emote" && element.emote === null)
+  ) {
+    return { element: element.id, picture: sampleSentOf(element, samples) };
   }
   return { element: element.id };
 }
