@@ -793,7 +793,7 @@ export function StudioStage({
           className={cx(styles.stage, space && styles.spaced)}
           tabIndex={0}
           aria-label={t("studio.editor.canvas")}
-          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape Delete Backspace Space"
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape Delete Backspace Space Control+C Control+X Control+V"
           style={{
             // Hairlines drawn inside the scaled canvas stay one screen px
             "--canvas-scale": fit.scale || 1,

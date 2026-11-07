@@ -62,6 +62,7 @@ import { Embed } from "./Embed";
 import {
   alignTo,
   Box,
+  copyItem,
   flipInFrame,
   groupFrame,
   reframe,
@@ -98,6 +99,16 @@ const WORDS = ["text", "font", "size", "bold"] as const;
 // editor's, like checkboxes, radios and sliders.
 const TEXT_FIELDS =
   "textarea, input:not([type=number]):not([type=checkbox]):not([type=radio]):not([type=range])";
+// And their own copy, cut and paste, number fields too
+const TYPED_FIELDS =
+  "textarea, input:not([type=checkbox]):not([type=radio]):not([type=range])";
+
+// What Ctrl+C or Ctrl+X took, kept until Tokio quits so it pastes into
+// another overlay too, and how many steps down and right the next paste goes:
+// each one lands a step further, the first after a cut where it was
+let clipboard: { item: StudioItem; steps: number } | null = null;
+// A paste's step, in px of the canvas
+const PASTE_STEP = 20;
 
 /**
  * An Overlay Studio overlay's editor: its groups and elements, the
@@ -474,6 +485,37 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     setSelected((current) => (current === id ? null : current));
   };
 
+  // The selected group, or element wherever it is, to copy or cut
+  const copy = (cut: boolean) => {
+    const item = group ?? element;
+    if (!item) return;
+    clipboard = { item, steps: cut ? 0 : 1 };
+    if (cut) remove(item.id);
+  };
+
+  // A copy with new ids where the + menu adds: an element into the selected
+  // group or the selected element's group, which unfolds, else on its own in
+  // front, and a group on its own in front. Not past the caps.
+  const paste = () => {
+    if (!clipboard) return;
+    const { item } = clipboard;
+    const count = item.kind === "group" ? item.elements.length : 1;
+    if (elements.length + count > STUDIO_MAX_ELEMENTS) return;
+    if (item.kind === "group" && groups.length >= STUDIO_MAX_GROUPS) return;
+    const pasted = copyItem(item, PASTE_STEP * clipboard.steps);
+    clipboard.steps += 1;
+    if (pasted.kind !== "group" && target) {
+      changeGroup(target.id, (g) => ({
+        ...g,
+        folded: false,
+        elements: [...g.elements, pasted],
+      }));
+    } else {
+      setItems((items) => [...items, pasted]);
+    }
+    setSelected(pasted.id);
+  };
+
   const shift = (id: string, dx: number, dy: number) =>
     changeGroup(id, (g) => ({
       ...g,
@@ -532,23 +574,31 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     window.api.emit(APP_EVENTS.TEST_STUDIO_OVERLAY, { id: overlay.id });
   };
 
-  // Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo, Cmd too. Not in a text
-  // field, which keeps its own, nor in a dialog. Electron's Edit menu only
-  // gets the keys the page didn't take.
-  const onUndoKey = useEffectEvent((e: KeyboardEvent) => {
+  // Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo, Ctrl+C copies, Ctrl+X cuts
+  // and Ctrl+V pastes, Cmd too. Not in a field that keeps its own, nor in a
+  // dialog. Electron's Edit menu only gets the keys the page didn't take.
+  const onKey = useEffectEvent((e: KeyboardEvent) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     const key = e.key.toLowerCase();
-    if (key !== "z" && key !== "y") return;
     const target = e.target instanceof Element ? e.target : null;
-    if (target?.matches(TEXT_FIELDS) || target?.closest("[role=dialog]")) {
+    if (target?.closest("[role=dialog]")) return;
+    if (key === "z" || key === "y") {
+      if (target?.matches(TEXT_FIELDS)) return;
+      e.preventDefault();
+      if (key === "y" || e.shiftKey) history.redo();
+      else history.undo();
       return;
     }
+    if (key !== "c" && key !== "x" && key !== "v") return;
+    if (target?.matches(TYPED_FIELDS)) return;
+    // Text selected on the page copies as text
+    if (key !== "v" && document.getSelection()?.toString()) return;
     e.preventDefault();
-    if (key === "y" || e.shiftKey) history.redo();
-    else history.undo();
+    if (key === "v") paste();
+    else copy(key === "x");
   });
   useEffect(() => {
-    const listener = (e: KeyboardEvent) => onUndoKey(e);
+    const listener = (e: KeyboardEvent) => onKey(e);
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
   }, []);

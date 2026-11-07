@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   alignTo,
   bounds,
+  copyItem,
   elementName,
   findElement,
   moveElement,
@@ -684,6 +685,29 @@ describe("the history and the view", () => {
     expect(back.items).toEqual([{ ...open, folded: true }, shut]);
     // Nothing to change, the same overlay's items
     expect(withFolds(was, was).items[1]).toBe(shut);
+  });
+
+  it("copies an element or a group with new ids, moved down and right", () => {
+    const shape = StudioElementSchema.parse({
+      ...newStudioElement("shape", "portrait"),
+      x: 100,
+      y: 50,
+      label: "Badge",
+    });
+    const copy = copyItem(shape, 20);
+    expect(copy).toEqual({ ...shape, id: copy.id, x: 120, y: 70 });
+    expect(copy.id).not.toBe(shape.id);
+
+    const group = { ...newStudioGroup("Frame"), elements: [shape] };
+    const pasted = copyItem(group, 0);
+    if (pasted.kind !== "group") throw new Error("not a group");
+    expect(pasted).toMatchObject({ name: "Frame", rotation: group.rotation });
+    expect(pasted.id).not.toBe(group.id);
+    expect(pasted.elements[0]).toEqual({
+      ...shape,
+      id: pasted.elements[0].id,
+    });
+    expect(pasted.elements[0].id).not.toBe(shape.id);
   });
 
   it("steps the zoom through its stops, from wherever it is", () => {

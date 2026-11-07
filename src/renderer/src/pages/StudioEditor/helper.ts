@@ -715,6 +715,22 @@ export function withFolds(
   };
 }
 
+/**
+ * A copy of a group or an element to paste, with new ids (they're unique
+ * across both), moved `by` px right and down: a group's elements with it.
+ */
+export function copyItem(item: StudioItem, by: number): StudioItem {
+  const moved = (element: StudioElement): StudioElement => ({
+    ...element,
+    id: crypto.randomUUID(),
+    x: element.x + by,
+    y: element.y + by,
+  });
+  return item.kind === "group"
+    ? { ...item, id: crypto.randomUUID(), elements: item.elements.map(moved) }
+    : moved(item);
+}
+
 // The canvas's zooms, in screen px per canvas px, that its buttons and keys
 // step through. Ctrl and the wheel go anywhere between the first and last.
 const ZOOMS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];

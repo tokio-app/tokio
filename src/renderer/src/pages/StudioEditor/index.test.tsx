@@ -24,6 +24,7 @@ import { send, sent } from "@test/ipc";
 import { inList } from "@test/queries";
 import { renderApp } from "@test/render";
 import {
+  act,
   createEvent,
   fireEvent,
   screen,
@@ -2220,6 +2221,102 @@ describe("StudioEditor", () => {
 
       await user.click(rulers);
       expect(drawnRulers()).toHaveLength(0);
+    });
+  });
+  describe("copy and paste", () => {
+    const key = (key: string, target: Element = document.body) =>
+      fireEvent.keyDown(target, { key, ctrlKey: true });
+
+    it("pastes a copy of an element a step further each time, in its group", async () => {
+      const shape = elementOf("shape", { x: 100, y: 100, label: "Badge" });
+      const { user } = await open(scene(shape));
+      await user.click(row(/^Badge/));
+
+      expect(key("c")).toBe(false);
+      key("v");
+      await waitFor(() => expect(savedGroup(0)?.elements).toHaveLength(2));
+      const first = savedGroup(0)!.elements[1];
+      expect(first).toEqual({ ...shape, id: first.id, x: 120, y: 120 });
+      expect(first.id).not.toBe(shape.id);
+      // The copy is the selection, so the next one goes in its group too
+      expect(
+        document.querySelector(`[data-select="${first.id}"]`),
+      ).toHaveAttribute("aria-pressed", "true");
+
+      fireEvent.keyDown(document.body, { key: "v", metaKey: true });
+      await waitFor(() => expect(savedGroup(0)?.elements).toHaveLength(3));
+      expect(savedGroup(0)!.elements[2]).toMatchObject({ x: 140, y: 140 });
+    });
+
+    it("pastes a copied group as a new one, its elements with new ids", async () => {
+      const a = elementOf("shape", { x: 10, y: 10 });
+      const frame = group("Frame", [a]);
+      const { user } = await open(holding(frame));
+      await user.click(row(/^Frame/));
+
+      key("c");
+      key("v");
+      await waitFor(() => expect(lastSave()?.items).toHaveLength(2));
+      const copy = groupIn(lastSave(), 1)!;
+      expect(copy).toMatchObject({ name: "Frame" });
+      expect(copy.id).not.toBe(frame.id);
+      expect(copy.elements).toEqual([
+        { ...a, id: copy.elements[0].id, x: 30, y: 30 },
+      ]);
+      expect(copy.elements[0].id).not.toBe(a.id);
+    });
+
+    it("cuts the selection, and pastes it back where it was", async () => {
+      const shape = elementOf("shape", { x: 100, y: 100 });
+      const { user } = await open(holding(shape));
+      await user.click(row(/^Shape/));
+
+      expect(key("x")).toBe(false);
+      await waitFor(() => expect(lastSave()?.items).toEqual([]));
+      await studio(lastSave()!);
+      key("v");
+      await waitFor(() => expect(lastSave()?.items).toHaveLength(1));
+      expect(lastSave()!.items[0]).toMatchObject({ x: 100, y: 100 });
+      expect(lastSave()!.items[0].id).not.toBe(shape.id);
+
+      // Each its own step
+      await studio(lastSave()!);
+      await user.click(undo());
+      await waitFor(() => expect(lastSave()?.items).toEqual([]));
+    });
+
+    it("pastes into another overlay", async () => {
+      const shape = elementOf("shape", { x: 100, y: 100 });
+      const main = holding(shape);
+      const other = studioOverlay("Other");
+      const { user, router } = await open(main);
+      await user.click(row(/^Shape/));
+      key("c");
+
+      await studio(main, other);
+      await act(() =>
+        router.navigate({
+          to: "/tools/studio/$id",
+          params: { id: other.id },
+        }),
+      );
+      expect(
+        await page().findByRole("heading", { name: "Other" }),
+      ).toBeVisible();
+      key("v");
+      await waitFor(() => expect(lastSave()?.id).toBe(other.id));
+      expect(lastSave()!.items).toMatchObject([{ x: 120, y: 120 }]);
+    });
+
+    it("leaves copy, cut and paste to a field", async () => {
+      const { user } = await open(holding(elementOf("shape")));
+      await user.click(row(/^Shape/));
+
+      const x = field("X").getByRole("spinbutton");
+      expect(key("c", x)).toBe(true);
+      expect(key("v", x)).toBe(true);
+      expect(key("x", field("Name").getByRole("textbox"))).toBe(true);
+      expect(lastSave()).toBeUndefined();
     });
   });
 });
