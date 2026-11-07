@@ -705,13 +705,14 @@ describe("StudioEditor", () => {
         height: 300,
       }),
     );
-    expect(asked).toEqual(["min-content normal"]);
+    // Each time as narrow as its words let it be, no word broken
+    expect(new Set(asked)).toEqual(new Set(["min-content normal"]));
     // Put back for the stream's own wrapping
     expect(shown.style.width).toBe("");
     expect(shown.style.overflowWrap).toBe("");
   });
 
-  it("grows a text's box to its words when its size changes, not when its box does", async () => {
+  it("grows a text's box to its words when its size changes", async () => {
     const words = text({
       text: "Hello",
       align: "center",
@@ -745,13 +746,55 @@ describe("StudioEditor", () => {
         height: 240,
       }),
     );
+  });
 
-    const width = field("Width").getByRole("spinbutton");
-    await user.clear(width);
-    await user.type(width, "150");
-    await waitFor(() =>
-      expect(savedElement()).toMatchObject({ width: 150, height: 240 }),
+  it("keeps a text's box fields to its words, its height following its width", async () => {
+    const words = text({
+      text: "Hello there",
+      x: 100,
+      y: 200,
+      width: 600,
+      height: 300,
+    });
+    const { user } = await open(scene(words));
+    sized();
+    // At half size on screen: its longest word 150 px, and its words 200 px
+    // tall in a box under 400 px of the canvas, 100 px in a wider one
+    const node = drawn(words.id);
+    vi.spyOn(
+      node.querySelector<HTMLElement>(".studio-text")!,
+      "getBoundingClientRect",
+    ).mockReturnValue(new DOMRect(0, 0, 150, 30));
+    vi.spyOn(Range.prototype, "getBoundingClientRect").mockImplementation(
+      () => {
+        const at = parseFloat(node.style.width);
+        return new DOMRect(0, 0, at / 2, at < 400 ? 200 : 100);
+      },
     );
+    await user.click(row(/^Hello/));
+    const width = field("Width").getByRole("spinbutton");
+    const height = field("Height").getByRole("spinbutton");
+
+    // Stopped at its longest word, taller there for its words
+    fireEvent.pointerDown(width, { button: 0, clientX: 0 });
+    fireEvent.pointerMove(width, { clientX: -400 });
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ width: 300, height: 400 }),
+    );
+    await studio(lastSave()!);
+    // Wide again, the height it had before
+    fireEvent.pointerMove(width, { clientX: -100 });
+    fireEvent.pointerUp(width);
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ width: 600, height: 300 }),
+    );
+
+    // Under its words' 200 px, a typed height isn't taken
+    await user.clear(height);
+    await user.type(height, "150");
+    await user.tab();
+    expect(height).toHaveValue(300);
+    expect(savedElement()?.height).toBe(300);
   });
 
   it("resizes, turns, flips and fades a group from its fields", async () => {

@@ -34,7 +34,7 @@ import {
 import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
 import { BoxFields } from "./BoxFields";
-import { alignTo, KIND_NAMES, sourceOf, sourceValue } from "./helper";
+import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
 import styles from "./studioeditor.module.css";
 
 const WHENS: { value: StudioWhen; label: MessageKey }[] = [
@@ -88,6 +88,8 @@ type Props = {
   // Its width and height change together, in proportion
   linked: boolean;
   onLinked: (linked: boolean) => void;
+  // A text's words, which its box keeps room for
+  words?: Words;
   onChange: (element: StudioElement) => void;
   gifts: CustomGift[];
   emotes: EmoteOption[];
@@ -107,6 +109,7 @@ export function ElementSettings({
   canvas,
   linked,
   onLinked,
+  words,
   onChange,
   gifts,
   emotes,
@@ -410,6 +413,7 @@ export function ElementSettings({
         opacity={element.opacity}
         linked={linked}
         onLinked={onLinked}
+        words={words}
         onBox={(box) => onChange({ ...element, ...box })}
         onFlip={(key) => {
           const next = { ...element };

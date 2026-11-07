@@ -15,7 +15,7 @@ import {
   LuFlipVertical2,
   LuLink2,
 } from "react-icons/lu";
-import { AlignTo, Box, Turned } from "./helper";
+import { AlignTo, Box, Turned, Words } from "./helper";
 import styles from "./studioeditor.module.css";
 
 // The canvas's edges and middles, across then down
@@ -59,6 +59,9 @@ type Props = {
   // The width and the height change together, in proportion
   linked: boolean;
   onLinked: (linked: boolean) => void;
+  // A text's: its box stays as wide as its longest word and as tall as its
+  // words, as on the canvas
+  words?: Words;
   onBox: (box: Turned) => void;
   onFlip: (key: Flip) => void;
   onAlign: (to: AlignTo) => void;
@@ -75,30 +78,40 @@ export function BoxFields({
   opacity,
   linked,
   onLinked,
+  words,
   onBox,
   onFlip,
   onAlign,
   onOpacity,
 }: Props) {
   const t = useT();
-  // While linked, the size the proportions come from and the last one the
-  // fields made from it: a field dragged goes on from the first, so rounding
-  // doesn't add up. A size they didn't make, like a drag's, starts over.
-  const linking = useRef<{ from: Size; made: Size } | null>(null);
+  // The size a run of changes to one field began from, and the last size it
+  // made: the next change goes on from the first, so rounding doesn't add up
+  // in proportion, and the height a narrower width gave a text comes back
+  // with a wider one. Another field, or a size the fields didn't make (a
+  // drag, another element), starts over.
+  const sizing = useRef<{ key: keyof Size; from: Size; made: Size } | null>(
+    null,
+  );
   const resized = (key: keyof Size, value: number): Size => {
-    const last = linking.current;
-    const from = last && near(last.made, box) ? last.from : box;
-    const made =
-      key === "width"
-        ? {
-            width: value,
-            height: Math.max(1, Math.round((value * from.height) / from.width)),
-          }
-        : {
-            width: Math.max(1, Math.round((value * from.width) / from.height)),
-            height: value,
-          };
-    linking.current = {
+    const last = sizing.current;
+    const from = last?.key === key && near(last.made, box) ? last.from : box;
+    const ratio = from.width / from.height;
+    let width =
+      key === "width" ? value : linked ? Math.round(value * ratio) : box.width;
+    let height =
+      key === "height"
+        ? value
+        : linked
+          ? Math.round(value / ratio)
+          : from.height;
+    if (words) {
+      width = Math.max(width, words.width);
+      height = Math.max(height, words.heightAt(width));
+    }
+    const made = { width: Math.max(1, width), height: Math.max(1, height) };
+    sizing.current = {
+      key,
       from: { width: from.width, height: from.height },
       made,
     };
@@ -124,7 +137,7 @@ export function BoxFields({
           const { x, y, width, height, rotation } = box;
           const next = { x, y, width, height, rotation, [key]: value };
           onBox(
-            linked && (key === "width" || key === "height")
+            key === "width" || key === "height"
               ? { ...next, ...resized(key, value) }
               : next,
           );
@@ -154,7 +167,7 @@ export function BoxFields({
         <div className={styles.box}>
           {field("x", "studio.fields.x")}
           {field("y", "studio.fields.y")}
-          {field("width", "studio.fields.width", 1)}
+          {field("width", "studio.fields.width", words?.width ?? 1)}
           {/* Between the two it links */}
           <div className={cx(styles.icon_buttons, styles.link)}>
             <Btn
@@ -164,14 +177,14 @@ export function BoxFields({
               aria-pressed={linked}
               active={linked}
               onClick={() => {
-                linking.current = null;
+                sizing.current = null;
                 onLinked(!linked);
               }}
             >
               <LuLink2 size={16} />
             </Btn>
           </div>
-          {field("height", "studio.fields.height", 1)}
+          {field("height", "studio.fields.height", words?.height ?? 1)}
           {/* On its own row, in degrees as the handle turns it */}
           {field(
             "rotation",

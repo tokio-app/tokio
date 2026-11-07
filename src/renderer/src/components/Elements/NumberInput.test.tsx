@@ -105,6 +105,16 @@ describe("NumberInput", () => {
     expect(field()).not.toHaveFocus();
   });
 
+  it("stops a drag at its least value with no most", () => {
+    Element.prototype.setPointerCapture = vi.fn();
+    render(<Field scrub integer min={5} />);
+
+    fireEvent.pointerDown(field(), { button: 0, clientX: 100 });
+    fireEvent.pointerMove(field(), { clientX: 50 });
+
+    expect(field()).toHaveValue(5);
+  });
+
   it("types in a dragged field after a click, and drags nothing while typed in", () => {
     Element.prototype.setPointerCapture = vi.fn();
     const onChange = vi.fn();

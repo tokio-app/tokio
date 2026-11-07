@@ -304,6 +304,15 @@ export type Corner = (typeof CORNERS)[number];
 // A box turned clockwise around its center, in degrees
 export type Turned = Box & { rotation: number };
 
+// The room a text's words take, measured on the stage in px of the canvas:
+// its longest word's width, and their height at its width or at another
+export type Words = {
+  id: string;
+  width: number;
+  height: number;
+  heightAt: (width: number) => number;
+};
+
 // A point (from the center) turned by the angle, clockwise on screen
 const turn = ({ x, y }: Point, degrees: number): Point => {
   const rad = (degrees * Math.PI) / 180;

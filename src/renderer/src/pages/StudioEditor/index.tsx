@@ -78,6 +78,7 @@ import {
   sourceValue,
   stepElement,
   whenText,
+  Words,
 } from "./helper";
 import { GroupSettings } from "./GroupSettings";
 import { ElementFlags, GroupFlags, LayersPanel } from "./LayersPanel";
@@ -163,6 +164,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   // A text whose words its settings just changed: the canvas grows its box
   // to them once it has drawn them
   const fitting = useRef<string | null>(null);
+  // The selected text's words, as the canvas measured them
+  const [words, setWords] = useState<Words | null>(null);
 
   useIpcRequest(APP_EVENTS.GET_OVERLAYS);
   useIpcRequest(APP_EVENTS.GET_PROFILE);
@@ -583,6 +586,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               view={view}
               stageRef={stage}
               fitting={fitting}
+              onWords={setWords}
               selected={selected}
               locked={locked}
               groupFrame={group && !group.hidden ? frame : null}
@@ -635,6 +639,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 canvas={canvas}
                 linked={linked}
                 onLinked={setLinked}
+                words={words?.id === element.id ? words : undefined}
                 onChange={(changed) => {
                   if (
                     changed.kind === "text" &&

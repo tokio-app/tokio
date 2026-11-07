@@ -29,6 +29,7 @@ import {
   toCanvas,
   turnTo,
   Turned,
+  Words,
 } from "./helper";
 import styles from "./studioeditor.module.css";
 
@@ -53,6 +54,9 @@ type Props = {
   stageRef: RefObject<Stage | null>;
   // A text whose words its settings just changed, grown to them once drawn
   fitting: RefObject<string | null>;
+  // The selected text's words, measured each time they change, null for
+  // none
+  onWords: (words: Words | null) => void;
   // A group's id or an element's
   selected: string | null;
   // The locked groups and elements, which the canvas can't pick, move,
@@ -156,6 +160,7 @@ export function StudioStage({
   view,
   stageRef,
   fitting,
+  onWords,
   selected,
   locked,
   onSelect,
@@ -280,6 +285,30 @@ export function StudioStage({
       textHeight(id, width, scale),
     );
     if (fitted) onBox(id, fitted);
+  });
+
+  // For its fields, which keep to them as a corner drag does
+  const measured = useRef<{ key: string } | null>(null);
+  useLayoutEffect(() => {
+    const text = elements.find(
+      ({ element }) => element.id === selected,
+    )?.element;
+    const scale = stageRef.current?.fit().scale;
+    const words: Words | null =
+      text?.kind === "text" && scale
+        ? {
+            id: text.id,
+            width: textWidth(text.id, scale),
+            height: textHeight(text.id, text.width, scale),
+            heightAt: (width) => textHeight(text.id, width, scale),
+          }
+        : null;
+    const key = words
+      ? [words.id, words.width, words.height, scale].join(" ")
+      : "";
+    if (measured.current?.key === key) return;
+    measured.current = { key };
+    onWords(words);
   });
 
   const chosen = elements.find(({ element }) => element.id === selected);

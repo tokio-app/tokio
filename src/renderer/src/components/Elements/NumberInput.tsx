@@ -99,7 +99,10 @@ export function NumberInput({
           if (!p.moved && Math.abs(e.clientX - p.start) < SCRUB_START) return;
           p.moved = true;
           const raw = p.from + Math.round(p.steps) * step;
-          const next = Math.min(max ?? raw, Math.max(min ?? raw, raw));
+          const next = Math.min(
+            max ?? Infinity,
+            Math.max(min ?? -Infinity, raw),
+          );
           // At a limit, turning back changes it at once
           if (next !== raw) p.steps = (next - p.from) / step;
           if (next === p.sent || !valid(next)) return;
