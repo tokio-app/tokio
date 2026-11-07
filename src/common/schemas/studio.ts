@@ -189,6 +189,13 @@ const GROUP = {
   hidden: z.boolean().default(false),
   // Its elements folded away in the editor's list
   folded: z.boolean().default(false),
+  // The turn of its frame in the editor, which turns its elements with it,
+  // and whether they were mirrored: the elements keep the result
+  rotation: z.number().min(-180).max(180).default(0),
+  flip_x: z.boolean().default(false),
+  flip_y: z.boolean().default(false),
+  // Over its elements' own, on stream too
+  opacity: z.number().min(0).max(1).default(1),
 };
 
 // A group of elements that stack, hide, lock and move together. Groups

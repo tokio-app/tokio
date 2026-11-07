@@ -17,18 +17,17 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
-  bounds,
   Box,
   Corner,
   CORNERS,
-  extent,
-  holds,
+  holdsTurned,
   pickElement,
   Point,
   resizeBox,
   roundBox,
   toCanvas,
   turnTo,
+  Turned,
 } from "./helper";
 import styles from "./studioeditor.module.css";
 
@@ -63,6 +62,10 @@ type Props = {
   onRotate: (id: string, rotation: number) => void;
   // Every element of a group moved by whole px
   onShift: (groupId: string, dx: number, dy: number) => void;
+  // The selected group's frame, around its elements as they show
+  groupFrame: Turned | null;
+  // A group resized or turned from the frame it had when the drag began
+  onGroupFrame: (groupId: string, from: Turned, to: Turned) => void;
   // An embed's preview, portaled into its slot
   embed: (element: EmbedView) => ReactNode;
 };
@@ -83,8 +86,20 @@ type Drag =
   | {
       kind: "rotate";
       id: string;
-      // The element's center on screen
+      // The element's or group's center on screen
       center: Point;
+      // A group's frame when it began
+      frame?: Turned;
+    }
+  | {
+      kind: "frame";
+      id: string;
+      corner: Corner;
+      // Where the pointer went down, and the group's frame then
+      x: number;
+      y: number;
+      frame: Turned;
+      scale: number;
     }
   | {
       kind: "group";
@@ -141,6 +156,8 @@ export function StudioStage({
   onBox,
   onRotate,
   onShift,
+  groupFrame,
+  onGroupFrame,
   embed,
 }: Props) {
   const t = useT();
@@ -249,11 +266,15 @@ export function StudioStage({
   const chosenGroup = chosen
     ? undefined
     : view.layers.find((layer) => layer.id === selected);
-  // The selection's outline: an element's box, turned with it, or around a
-  // group's elements
+  // The selection's outline: an element's box, or a group's frame, turned
   const frame = chosen
     ? boxOf(chosen.element)
-    : chosenGroup && bounds(chosenGroup.elements.map(extent));
+    : chosenGroup && groupFrame
+      ? boxOf(groupFrame)
+      : undefined;
+  const rotation = chosen
+    ? chosen.element.rotation
+    : (groupFrame?.rotation ?? 0);
   const stuck = chosen
     ? locked.has(chosen.layer) || locked.has(chosen.element.id)
     : locked.has(chosenGroup?.id ?? "");
@@ -274,6 +295,17 @@ export function StudioStage({
 
     const handle = target.closest<HTMLElement>("[data-handle]");
     const corner = CORNERS.find((c) => c === handle?.dataset.handle);
+    if (chosenGroup && groupFrame && !stuck && corner) {
+      drag.current = {
+        kind: "frame",
+        id: chosenGroup.id,
+        corner,
+        frame: groupFrame,
+        ...at,
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
     if (chosen && !stuck && corner) {
       const { element } = chosen;
       drag.current = {
@@ -303,9 +335,34 @@ export function StudioStage({
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
+    if (
+      chosenGroup &&
+      groupFrame &&
+      !stuck &&
+      handle?.dataset.handle === "rotate"
+    ) {
+      const { x, y, width, height } = groupFrame;
+      drag.current = {
+        kind: "rotate",
+        id: chosenGroup.id,
+        center: {
+          x: rect.left + fitted.left + (x + width / 2) * scale,
+          y: rect.top + fitted.top + (y + height / 2) * scale,
+        },
+        frame: groupFrame,
+      };
+      setTurning(true);
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
 
     const point = toCanvas({ x: e.clientX, y: e.clientY }, rect, fitted);
-    if (chosenGroup && frame && !stuck && holds(frame, point)) {
+    if (
+      chosenGroup &&
+      frame &&
+      !stuck &&
+      holdsTurned({ ...frame, rotation }, point)
+    ) {
       // A click until it moves
       drag.current = {
         kind: "group",
@@ -340,7 +397,24 @@ export function StudioStage({
     if (d.kind === "rotate") {
       // Shift turns it in steps of 15 degrees
       const pointer = { x: e.clientX, y: e.clientY };
-      onRotate(d.id, turnTo(d.center, pointer, e.shiftKey));
+      const turned = turnTo(d.center, pointer, e.shiftKey);
+      if (d.frame) {
+        onGroupFrame(d.id, d.frame, { ...d.frame, rotation: turned });
+      } else {
+        onRotate(d.id, turned);
+      }
+      return;
+    }
+    if (d.kind === "frame") {
+      // Its elements scale with it, along its own sides
+      const box = resizeBox(
+        d.frame,
+        d.corner,
+        (e.clientX - d.x) / d.scale,
+        (e.clientY - d.y) / d.scale,
+        { rotation: d.frame.rotation },
+      );
+      onGroupFrame(d.id, d.frame, { ...box, rotation: d.frame.rotation });
       return;
     }
     if (d.kind === "group") {
@@ -410,7 +484,6 @@ export function StudioStage({
     );
   };
 
-  const rotation = chosen?.element.rotation ?? 0;
   const outline: CSSProperties | undefined = frame
     ? {
         left: fit.left + frame.x * fit.scale,
@@ -442,7 +515,7 @@ export function StudioStage({
         <div ref={root} className={styles.stage_root} />
         {outline && (
           <div className={styles.selection} style={outline}>
-            {chosen && !stuck && (
+            {!stuck && (chosen || groupFrame) && (
               <>
                 {CORNERS.map((corner) => (
                   <span

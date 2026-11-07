@@ -16,6 +16,9 @@ import {
   findElement,
   moveElement,
   extent,
+  flipInFrame,
+  groupFrame,
+  reframe,
   pickElement,
   resizeBox,
   stepElement,
@@ -242,6 +245,70 @@ describe("alignTo", () => {
   });
 });
 
+describe("groupFrame, reframe and flipInFrame", () => {
+  const a = { x: 0, y: 0, width: 100, height: 50, rotation: 0 };
+  const b = { x: 200, y: 100, width: 100, height: 100, rotation: 0 };
+
+  it("frames the elements, turned by the group's rotation", () => {
+    expect(groupFrame([a, b], 0)).toEqual({
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 200,
+      rotation: 0,
+    });
+    expect(groupFrame([], 0)).toBeNull();
+    // A quarter turn: its sides swap
+    const turned = groupFrame([a, b], 90)!;
+    expect(roundBox(turned)).toEqual({
+      x: 50,
+      y: -50,
+      width: 200,
+      height: 300,
+    });
+    expect(turned.rotation).toBe(90);
+  });
+
+  it("scales the elements with the frame, each in its place", () => {
+    const from = groupFrame([a, b], 0)!;
+
+    expect(reframe([a, b], from, { ...from, width: 600, height: 400 })).toEqual(
+      [
+        { x: 0, y: 0, width: 200, height: 100, rotation: 0 },
+        { x: 400, y: 200, width: 200, height: 200, rotation: 0 },
+      ],
+    );
+  });
+
+  it("turns the elements around the frame's center", () => {
+    const from = groupFrame([a, b], 0)!;
+
+    // Around (150, 100): a's center (50, 25) goes to (225, 0)
+    expect(reframe([a], from, { ...from, rotation: 90 })).toEqual([
+      { x: 175, y: -25, width: 100, height: 50, rotation: 90 },
+    ]);
+  });
+
+  it("mirrors the elements across the frame, flipping each", () => {
+    const from = groupFrame([a, b], 0)!;
+    const flips = { flip_x: false, flip_y: false };
+
+    expect(
+      flipInFrame(
+        [
+          { ...a, ...flips },
+          { ...b, ...flips },
+        ],
+        from,
+        "flip_x",
+      ),
+    ).toEqual([
+      { ...a, x: 200, flip_x: true, flip_y: false },
+      { ...b, x: 0, flip_x: true, flip_y: false },
+    ]);
+  });
+});
+
 describe("turnTo and extent", () => {
   const center = { x: 0, y: 0 };
 
@@ -452,7 +519,7 @@ describe("the canvas's geometry", () => {
     const bar = { ...under, id: "bar", width: 200, height: 20, rotation: 90 };
     const turned = {
       ...view,
-      layers: [{ id: "only", z: 0, elements: [bar] }],
+      layers: [{ id: "only", z: 0, opacity: 1, elements: [bar] }],
     };
 
     expect(pickElement(turned, new Set(), { x: 100, y: 80 })).toBe("bar");

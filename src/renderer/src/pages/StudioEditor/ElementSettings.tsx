@@ -27,25 +27,14 @@ import {
   RadioGroup,
   Select,
   SelectOption,
-  Slider,
   TRIGGER_OPTIONS,
   TriggerFilter,
   VariableList,
 } from "@/components";
 import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
-import { IconType } from "react-icons";
-import {
-  LuAlignCenterHorizontal,
-  LuAlignCenterVertical,
-  LuAlignEndHorizontal,
-  LuAlignEndVertical,
-  LuAlignStartHorizontal,
-  LuAlignStartVertical,
-  LuFlipHorizontal2,
-  LuFlipVertical2,
-} from "react-icons/lu";
-import { AlignTo, alignTo, KIND_NAMES, sourceOf, sourceValue } from "./helper";
+import { BoxFields } from "./BoxFields";
+import { alignTo, KIND_NAMES, sourceOf, sourceValue } from "./helper";
 import styles from "./studioeditor.module.css";
 
 const WHENS: { value: StudioWhen; label: MessageKey }[] = [
@@ -88,32 +77,6 @@ const ALIGNS: { value: StudioAlign; label: MessageKey }[] = [
   { value: "left", label: "studio.aligns.left" },
   { value: "center", label: "studio.aligns.center" },
   { value: "right", label: "studio.aligns.right" },
-];
-
-// The canvas's edges and middles, across then down
-const ALIGNS_TO: { to: AlignTo; label: MessageKey; Icon: IconType }[][] = [
-  [
-    { to: "left", label: "studio.alignTo.left", Icon: LuAlignStartVertical },
-    {
-      to: "center",
-      label: "studio.alignTo.center",
-      Icon: LuAlignCenterVertical,
-    },
-    { to: "right", label: "studio.alignTo.right", Icon: LuAlignEndVertical },
-  ],
-  [
-    { to: "top", label: "studio.alignTo.top", Icon: LuAlignStartHorizontal },
-    {
-      to: "middle",
-      label: "studio.alignTo.middle",
-      Icon: LuAlignCenterHorizontal,
-    },
-    {
-      to: "bottom",
-      label: "studio.alignTo.bottom",
-      Icon: LuAlignEndHorizontal,
-    },
-  ],
 ];
 
 type Props = {
@@ -420,51 +383,6 @@ export function ElementSettings({
       break;
   }
 
-  const box = (
-    key: "x" | "y" | "width" | "height" | "rotation",
-    label: MessageKey,
-    min?: number,
-    max?: number,
-  ) => (
-    <Field label={t(label)}>
-      <NumberInput
-        className={styles.number}
-        integer
-        min={min}
-        max={max}
-        value={element[key]}
-        onChange={(value) => {
-          const next = { ...element };
-          next[key] = value;
-          onChange(next);
-        }}
-      />
-    </Field>
-  );
-
-  const flip = (
-    key: "flip_x" | "flip_y",
-    label: MessageKey,
-    icon: ReactNode,
-  ) => (
-    <Btn
-      variant="icon"
-      title={t(label)}
-      aria-label={t(label)}
-      aria-pressed={element[key]}
-      active={element[key]}
-      onClick={() => {
-        const next = { ...element };
-        next[key] = !element[key];
-        onChange(next);
-      }}
-    >
-      {icon}
-    </Btn>
-  );
-
-  const opacity = Math.round(element.opacity * 100);
-
   return (
     <div className={styles.settings}>
       <h3 className={styles.panel_title}>{t(KIND_NAMES[element.kind])}</h3>
@@ -478,63 +396,21 @@ export function ElementSettings({
       </Field>
       {own}
 
-      <Field label={t("studio.fields.box")}>
-        <div className={styles.box}>
-          {box("x", "studio.fields.x")}
-          {box("y", "studio.fields.y")}
-          {box("width", "studio.fields.width", 1)}
-          {box("height", "studio.fields.height", 1)}
-          {/* On its own row, in degrees as the handle turns it */}
-          {box("rotation", "studio.fields.rotation", -180, 180)}
-          <Field label={t("studio.fields.flip")} className={styles.flips}>
-            <div className={styles.icon_buttons}>
-              {flip(
-                "flip_x",
-                "studio.fields.flipX",
-                <LuFlipHorizontal2 size={16} />,
-              )}
-              {flip(
-                "flip_y",
-                "studio.fields.flipY",
-                <LuFlipVertical2 size={16} />,
-              )}
-            </div>
-          </Field>
-          <Field label={t("studio.fields.alignTo")} className={styles.align_to}>
-            <div className={styles.icon_groups}>
-              {ALIGNS_TO.map((group) => (
-                <div key={group[0].to} className={styles.icon_buttons}>
-                  {group.map(({ to, label, Icon }) => (
-                    <Btn
-                      key={to}
-                      variant="icon"
-                      title={t(label)}
-                      aria-label={t(label)}
-                      onClick={() =>
-                        onChange({
-                          ...element,
-                          ...alignTo(element, canvas, to),
-                        })
-                      }
-                    >
-                      <Icon size={16} />
-                    </Btn>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </Field>
-        </div>
-      </Field>
-      <Field label={t("studio.fields.opacity", { opacity: String(opacity) })}>
-        <Slider
-          aria-label={t("studio.fields.opacity", { opacity: String(opacity) })}
-          min={0}
-          max={100}
-          value={opacity}
-          onChange={(value) => onChange({ ...element, opacity: value / 100 })}
-        />
-      </Field>
+      <BoxFields
+        box={element}
+        flips={element}
+        opacity={element.opacity}
+        onBox={(box) => onChange({ ...element, ...box })}
+        onFlip={(key) => {
+          const next = { ...element };
+          next[key] = !element[key];
+          onChange(next);
+        }}
+        onAlign={(to) =>
+          onChange({ ...element, ...alignTo(element, canvas, to) })
+        }
+        onOpacity={(opacity) => onChange({ ...element, opacity })}
+      />
 
       <Field label={t("studio.when.title")}>
         <RadioGroup

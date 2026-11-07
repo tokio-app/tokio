@@ -230,6 +230,7 @@ export function studioView(
         {
           id: item.id,
           z,
+          opacity: item.kind === "group" ? item.opacity : 1,
           elements: elements.flatMap((element, at) =>
             element.hidden ? [] : [elementView(element, at, deps)],
           ),

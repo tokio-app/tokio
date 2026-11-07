@@ -359,7 +359,7 @@ export function createStage(
   };
 
   // The layer's node, made on first use and appended: z-index stacks them
-  const layerNode = (id: string, z: number) => {
+  const layerNode = (id: string, z: number, opacity: number) => {
     let node = layers.get(id);
     if (!node) {
       node = div("studio-layer");
@@ -368,6 +368,7 @@ export function createStage(
       layers.set(id, node);
     }
     node.style.zIndex = String(z);
+    node.style.opacity = String(opacity);
     return node;
   };
 
@@ -394,7 +395,7 @@ export function createStage(
     }
 
     for (const layer of shown) {
-      const parent = layerNode(layer.id, layer.z);
+      const parent = layerNode(layer.id, layer.z, layer.opacity);
       for (const element of layer.elements) {
         let entry = entries.get(element.id);
         if (entry && entry.element.kind !== element.kind) {

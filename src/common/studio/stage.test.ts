@@ -60,7 +60,7 @@ const layered = (...layers: StudioLayerView[]): StudioView => ({
 
 // A canvas of one layer holding the elements
 const view = (...elements: StudioElementView[]): StudioView =>
-  layered({ id: "l", z: 0, elements });
+  layered({ id: "l", z: 0, opacity: 1, elements });
 
 let root: HTMLElement;
 let stage: Stage;
@@ -155,8 +155,13 @@ describe("on stream", () => {
   it("stacks each layer over the whole canvas, its elements inside it", () => {
     draw(
       layered(
-        { id: "back", z: 0, elements: [text("a")] },
-        { id: "front", z: 2, elements: [text("b"), text("c", { z: 1 })] },
+        { id: "back", z: 0, opacity: 1, elements: [text("a")] },
+        {
+          id: "front",
+          z: 2,
+          opacity: 1,
+          elements: [text("b"), text("c", { z: 1 })],
+        },
       ),
     );
 
@@ -178,23 +183,23 @@ describe("on stream", () => {
     };
     draw(
       layered(
-        { id: "back", z: 0, elements: [text("a")] },
-        { id: "front", z: 1, elements: [clip] },
+        { id: "back", z: 0, opacity: 1, elements: [text("a")] },
+        { id: "front", z: 1, opacity: 1, elements: [clip] },
       ),
     );
     const a = el("a");
 
     draw(
       layered(
-        { id: "back", z: 0, elements: [] },
-        { id: "front", z: 1, elements: [clip, text("a")] },
+        { id: "back", z: 0, opacity: 1, elements: [] },
+        { id: "front", z: 1, opacity: 1, elements: [clip, text("a")] },
       ),
     );
     expect(el("a")).toBe(a);
     expect(a.parentElement).toBe(layerNode("front"));
 
     const video = root.querySelector("video")!;
-    draw(layered({ id: "back", z: 0, elements: [] }));
+    draw(layered({ id: "back", z: 0, opacity: 1, elements: [] }));
 
     expect(root.querySelector("[data-layer='front']")).toBeNull();
     expect(root.querySelectorAll(".studio-element")).toHaveLength(0);
@@ -365,6 +370,12 @@ describe("on stream", () => {
     stage.react({ element: "v" });
     expect(body("v").className).toBe("studio-body studio-play-shake");
     expect(body("v").classList).not.toContain("studio-hidden");
+  });
+
+  it("fades a group's layer by its opacity", () => {
+    draw(layered({ id: "g", z: 0, opacity: 0.5, elements: [text("t")] }));
+
+    expect(layerNode("g").style.opacity).toBe("0.5");
   });
 
   it("draws a shape's border inside it, and no fill when it has none", () => {

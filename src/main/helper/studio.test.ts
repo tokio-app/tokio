@@ -207,7 +207,7 @@ describe("sendStudioOverlays", () => {
         {
           width: 1080,
           height: 1920,
-          layers: [{ id: "L1", z: 0, elements: [] }],
+          layers: [{ id: "L1", z: 0, opacity: 1, elements: [] }],
         },
       ],
       ["studio:gone", null],

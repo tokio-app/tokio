@@ -651,13 +651,68 @@ describe("StudioEditor", () => {
     expect(shown.style.overflowWrap).toBe("");
   });
 
+  it("resizes, turns, flips and fades a group from its fields", async () => {
+    const big = elementOf("shape", { x: 100, y: 100, width: 100, height: 100 });
+    const small = elementOf("shape", {
+      x: 300,
+      y: 300,
+      width: 100,
+      height: 100,
+    });
+    const { user } = await open(scene(big, small));
+    await user.click(row(/^Group 1/));
+    const elements = () => lastSave()!.items[0];
+    const typeInto = async (name: string, value: string) => {
+      const input = field(name).getByRole("spinbutton");
+      await user.clear(input);
+      await user.type(input, value);
+    };
+
+    // The frame: 100, 100, 300 by 300
+    expect(field("Width").getByRole("spinbutton")).toHaveValue(300);
+    await typeInto("Width", "600");
+    await waitFor(() =>
+      expect(elements()).toMatchObject({
+        elements: [
+          { x: 100, width: 200 },
+          { x: 500, width: 200 },
+        ],
+      }),
+    );
+    await studio(lastSave()!);
+
+    await user.click(page().getByRole("button", { name: "Flip horizontally" }));
+    await waitFor(() =>
+      expect(elements()).toMatchObject({
+        flip_x: true,
+        elements: [
+          { x: 500, flip_x: true },
+          { x: 100, flip_x: true },
+        ],
+      }),
+    );
+    await studio(lastSave()!);
+
+    await user.click(page().getByRole("button", { name: "Align left" }));
+    await waitFor(() =>
+      expect(elements()).toMatchObject({
+        elements: [{ x: 400 }, { x: 0 }],
+      }),
+    );
+  });
+
   it("moves a selected group's elements as one, and a click without moving picks", async () => {
     const big = elementOf("shape", { x: 100, y: 100, width: 100, height: 100 });
     const small = elementOf("shape", { x: 300, y: 300, width: 50, height: 50 });
     const { user } = await open(scene(big, small));
     await user.click(row(/^Group 1/));
     expect(page().getByRole("heading", { name: "Group" })).toBeVisible();
-    expect(canvas().querySelector("[data-handle]")).toBeNull();
+    // Its frame resizes and turns like an element
+    expect(
+      Array.from(canvas().querySelectorAll<HTMLElement>("[data-handle]")).map(
+        (h) => h.dataset.handle,
+      ),
+    ).toEqual(["nw", "ne", "sw", "se", "rotate"]);
     sized();
 
     // Inside the outline, between the two

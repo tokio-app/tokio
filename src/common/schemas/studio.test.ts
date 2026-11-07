@@ -155,6 +155,10 @@ describe("StudioGroupSchema", () => {
       locked: false,
       hidden: false,
       folded: false,
+      rotation: 0,
+      flip_x: false,
+      flip_y: false,
+      opacity: 1,
       elements: [],
     });
   });

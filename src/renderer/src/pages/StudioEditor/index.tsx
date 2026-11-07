@@ -59,7 +59,12 @@ import { FiPlay } from "react-icons/fi";
 import { ElementSettings } from "./ElementSettings";
 import { Embed } from "./Embed";
 import {
+  alignTo,
   Box,
+  flipInFrame,
+  groupFrame,
+  reframe,
+  Turned,
   elementName,
   mapElements,
   moveElement,
@@ -442,6 +447,39 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       elements: g.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })),
     }));
 
+  // A group's frame, around its elements as they show
+  const frameOf = (g: StudioGroup) =>
+    groupFrame(
+      g.elements.filter((e) => !e.hidden),
+      g.rotation,
+    );
+  const frame = group ? frameOf(group) : null;
+  const canvas = STUDIO_SIZES[overlay.size];
+
+  // A group's elements when a change to its frame began: a drag's every
+  // move goes from them, so rounding doesn't add up
+  const reframing = useRef<{ from: Turned; elements: StudioElement[] }>(null);
+  const reframeGroup = (id: string, from: Turned, to: Turned) =>
+    changeGroup(id, (g) => {
+      if (reframing.current?.from !== from) {
+        reframing.current = { from, elements: g.elements };
+      }
+      return {
+        ...g,
+        rotation: to.rotation,
+        elements: reframe(reframing.current.elements, from, to),
+      };
+    });
+
+  const flipGroup = (id: string, key: "flip_x" | "flip_y") =>
+    changeGroup(id, (g) => {
+      const f = frameOf(g);
+      if (!f) return g;
+      const next = { ...g, elements: flipInFrame(g.elements, f, key) };
+      next[key] = !g[key];
+      return next;
+    });
+
   const setBox = (id: string, box: Box) =>
     changeElement(id, (e) => ({ ...e, ...box }));
 
@@ -526,6 +564,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               stageRef={stage}
               selected={selected}
               locked={locked}
+              groupFrame={group && !group.hidden ? frame : null}
+              onGroupFrame={reframeGroup}
               onSelect={select}
               onBox={setBox}
               onRotate={(id, rotation) =>
@@ -549,14 +589,26 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               <GroupSettings
                 key={group.id}
                 group={group}
+                frame={frame}
                 onChange={(changed) => changeGroup(changed.id, () => changed)}
+                onFrame={(to) => frame && reframeGroup(group.id, frame, to)}
+                onFlip={(key) => flipGroup(group.id, key)}
+                onAlign={(to) => {
+                  if (!frame) return;
+                  const at = alignTo(frame, canvas, to);
+                  shift(
+                    group.id,
+                    at.x - Math.round(frame.x),
+                    at.y - Math.round(frame.y),
+                  );
+                }}
               />
             ) : element ? (
               <ElementSettings
                 key={element.id}
                 element={element}
                 autoName={autoNames[element.id]}
-                canvas={STUDIO_SIZES[overlay.size]}
+                canvas={canvas}
                 onChange={(changed) => changeElement(changed.id, () => changed)}
                 gifts={giftChoices}
                 emotes={emoteChoices}

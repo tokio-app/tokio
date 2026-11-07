@@ -58,7 +58,7 @@ const viewOf = (...layers: StudioLayerView[]): StudioView => ({
 
 // The elements in one layer
 const view = (...elements: StudioElementView[]) =>
-  viewOf({ id: "L1", z: 0, elements });
+  viewOf({ id: "L1", z: 0, opacity: 1, elements });
 
 describe("studio overlay page", () => {
   let server: ServerService;
@@ -131,10 +131,11 @@ describe("studio overlay page", () => {
     it("draws each layer over the ones before, with its elements inside", async () => {
       send(
         viewOf(
-          { id: "back", z: 0, elements: [element("t", TEXT)] },
+          { id: "back", z: 0, opacity: 1, elements: [element("t", TEXT)] },
           {
             id: "front",
             z: 1,
+            opacity: 1,
             elements: [
               element("s", {
                 kind: "shape",

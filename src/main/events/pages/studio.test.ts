@@ -220,6 +220,7 @@ describe("studio events", () => {
               {
                 id: "L1",
                 z: 0,
+                opacity: 1,
                 elements: [
                   expect.objectContaining({ id: "s", kind: "shape", z: 0 }),
                 ],

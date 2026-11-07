@@ -426,7 +426,7 @@ export function alignTo(
 }
 
 // Whether a turned box holds a point: the point turned back into its sides
-const holdsTurned = (box: Turned, point: Point) => {
+export const holdsTurned = (box: Turned, point: Point) => {
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
   const local = turn({ x: point.x - cx, y: point.y - cy }, -box.rotation);
@@ -454,7 +454,7 @@ export const toCanvas = (
   y: (client.y - root.top - fit.top) / fit.scale,
 });
 
-export const holds = (box: Box, { x, y }: Point) =>
+const holds = (box: Box, { x, y }: Point) =>
   x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height;
 
 /** The smallest box around the boxes, null for none. */
@@ -468,6 +468,127 @@ export function bounds(boxes: Box[]): Box | null {
     width: Math.max(...boxes.map((b) => b.x + b.width)) - x,
     height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
   };
+}
+
+// Whole degrees from -180 to 180, never -0
+const angle = (degrees: number) =>
+  Math.round(((((degrees + 180) % 360) + 360) % 360) - 180) || 0;
+
+const centerOf = (box: Box): Point => ({
+  x: box.x + box.width / 2,
+  y: box.y + box.height / 2,
+});
+
+/**
+ * A group's frame: the smallest box, turned by the group's rotation, around
+ * its elements as they show. Null without any.
+ */
+export function groupFrame(
+  elements: Turned[],
+  rotation: number,
+): Turned | null {
+  if (elements.length === 0) return null;
+  // Every element's corners, turned back into the frame's sides
+  const corners = elements.flatMap((e) => {
+    const center = centerOf(e);
+    return [-1, 1].flatMap((sx) =>
+      [-1, 1].map((sy) => {
+        const p = turn(
+          { x: (sx * e.width) / 2, y: (sy * e.height) / 2 },
+          e.rotation,
+        );
+        return turn({ x: center.x + p.x, y: center.y + p.y }, -rotation);
+      }),
+    );
+  });
+  const xs = corners.map((p) => p.x);
+  const ys = corners.map((p) => p.y);
+  const [left, right] = [Math.min(...xs), Math.max(...xs)];
+  const [top, bottom] = [Math.min(...ys), Math.max(...ys)];
+  const center = turn(
+    { x: (left + right) / 2, y: (top + bottom) / 2 },
+    rotation,
+  );
+  const width = right - left;
+  const height = bottom - top;
+  return {
+    x: center.x - width / 2,
+    y: center.y - height / 2,
+    width,
+    height,
+    rotation,
+  };
+}
+
+/**
+ * The elements moved, scaled and turned from one frame of their group to
+ * another, in whole px and degrees: each keeps its place in the frame, and
+ * its sides scale as much as the frame's do along them.
+ */
+export function reframe<E extends Turned>(
+  elements: E[],
+  from: Turned,
+  to: Turned,
+): E[] {
+  const sx = from.width ? to.width / from.width : 1;
+  const sy = from.height ? to.height / from.height : 1;
+  const was = centerOf(from);
+  const now = centerOf(to);
+  return elements.map((e) => {
+    const center = centerOf(e);
+    const local = turn(
+      { x: center.x - was.x, y: center.y - was.y },
+      -from.rotation,
+    );
+    const at = turn({ x: local.x * sx, y: local.y * sy }, to.rotation);
+    // Its own sides, turned in the frame
+    const own = ((e.rotation - from.rotation) * Math.PI) / 180;
+    const cos = Math.cos(own);
+    const sin = Math.sin(own);
+    const width = e.width * Math.hypot(sx * cos, sy * sin);
+    const height = e.height * Math.hypot(sx * sin, sy * cos);
+    return {
+      ...e,
+      ...roundBox({
+        x: now.x + at.x - width / 2,
+        y: now.y + at.y - height / 2,
+        width,
+        height,
+      }),
+      rotation: angle(e.rotation + to.rotation - from.rotation),
+    };
+  });
+}
+
+/**
+ * The elements mirrored across their group's frame, left to right or top to
+ * bottom along its sides: each flips that way, and turns the other way.
+ */
+export function flipInFrame<
+  E extends Turned & { flip_x: boolean; flip_y: boolean },
+>(elements: E[], frame: Turned, key: "flip_x" | "flip_y"): E[] {
+  const middle = centerOf(frame);
+  return elements.map((e) => {
+    const center = centerOf(e);
+    const local = turn(
+      { x: center.x - middle.x, y: center.y - middle.y },
+      -frame.rotation,
+    );
+    const at = turn(
+      key === "flip_x"
+        ? { x: -local.x, y: local.y }
+        : { x: local.x, y: -local.y },
+      frame.rotation,
+    );
+    const next = {
+      ...e,
+      x: Math.round(middle.x + at.x - e.width / 2),
+      y: Math.round(middle.y + at.y - e.height / 2),
+      rotation: angle(2 * frame.rotation - e.rotation),
+    };
+    next[key] = !e[key];
+    return next;
+  });
 }
 
 /**

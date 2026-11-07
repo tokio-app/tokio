@@ -72,6 +72,8 @@ export type StudioElementView = StudioElementViewBase &
 export type StudioLayerView = {
   id: string;
   z: number;
+  // A group's, over its elements' own; 1 for an element on its own
+  opacity: number;
   elements: StudioElementView[];
 };
 
