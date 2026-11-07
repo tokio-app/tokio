@@ -53,7 +53,6 @@ import { TimerPush } from "@/pages/CountdownTimer/helper";
 import { newOverlayName, sizeText } from "@/pages/Studio/helper";
 import toolsStyles from "@/pages/Tools/tools.module.css";
 import { useLanguage, useT } from "@/ui/i18n";
-import isEqual from "fast-deep-equal";
 import { useParams } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { FiPlay } from "react-icons/fi";
@@ -469,29 +468,22 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const frame = group ? frameOf(group) : null;
   const canvas = STUDIO_SIZES[overlay.size];
 
-  // A group's elements and frame when changes to its frame began, and the
-  // elements they last made: while the group still has those, the next
-  // change goes on from the first, so rounding doesn't add up over a drag or
-  // a dragged field
-  const reframing = useRef<{
-    from: Turned;
-    elements: StudioElement[];
-    made: StudioElement[];
-  }>(null);
+  // A group's elements when a change to its frame began, by the frame it
+  // began from: every step of a drag, or of a run of changes in its fields,
+  // goes from them, so rounding doesn't add up. A step run again, as React
+  // does in development, finds the same elements, so a turn can't add to
+  // the last one.
+  const reframing = useRef<{ from: Turned; elements: StudioElement[] }>(null);
   const reframeGroup = (id: string, from: Turned, to: Turned) =>
     changeGroup(id, (g) => {
-      const last = reframing.current;
-      const base =
-        last && isEqual(last.made, g.elements)
-          ? last
-          : { from, elements: g.elements };
-      const elements = reframe(base.elements, base.from, to);
-      reframing.current = {
-        from: base.from,
-        elements: base.elements,
-        made: elements,
+      if (reframing.current?.from !== from) {
+        reframing.current = { from, elements: g.elements };
+      }
+      return {
+        ...g,
+        rotation: to.rotation,
+        elements: reframe(reframing.current.elements, from, to),
       };
-      return { ...g, rotation: to.rotation, elements };
     });
 
   const flipGroup = (id: string, key: "flip_x" | "flip_y") =>
@@ -619,7 +611,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 linked={linked}
                 onLinked={setLinked}
                 onChange={(changed) => changeGroup(changed.id, () => changed)}
-                onFrame={(to) => frame && reframeGroup(group.id, frame, to)}
+                onFrame={(from, to) => reframeGroup(group.id, from, to)}
                 onFlip={(key) => flipGroup(group.id, key)}
                 onAlign={(to) => {
                   if (!frame) return;

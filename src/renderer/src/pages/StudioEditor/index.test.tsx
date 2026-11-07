@@ -59,8 +59,11 @@ const scene = (...elements: StudioElement[]) =>
 const studio = (...data: StudioOverlay[]) =>
   send(APP_EVENTS_RESPONSE.STUDIO, { success: true, data });
 
-async function open(overlay: StudioOverlay) {
-  const view = await renderApp(`/tools/studio/${overlay.id}`);
+async function open(
+  overlay: StudioOverlay,
+  options?: Parameters<typeof renderApp>[1],
+) {
+  const view = await renderApp(`/tools/studio/${overlay.id}`, options);
   await studio(overlay);
   return view;
 }
@@ -855,7 +858,8 @@ describe("StudioEditor", () => {
       width: 100,
       height: 100,
     });
-    const { user } = await open(scene(big, small));
+    // As in development, where React runs each state update twice
+    const { user } = await open(scene(big, small), { reactStrictMode: true });
     await user.click(row(/^Group 1/));
     const width = field("Width").getByRole("spinbutton");
 
@@ -873,6 +877,47 @@ describe("StudioEditor", () => {
       ]),
     );
     expect(width).toHaveValue(150);
+  });
+
+  it("turns a group by its handle as far as the pointer, step after step", async () => {
+    const big = elementOf("shape", { x: 100, y: 100, width: 100, height: 100 });
+    const small = elementOf("shape", {
+      x: 300,
+      y: 300,
+      width: 100,
+      height: 100,
+    });
+    // As in development, where React runs each state update twice
+    const { user } = await open(scene(big, small), { reactStrictMode: true });
+    await user.click(row(/^Group 1/));
+    sized();
+
+    // Its frame's middle is at 125, 125 on screen: the pointer goes around
+    // it clockwise from above, to 30, 60, then 90 degrees
+    fireEvent.pointerDown(handle("rotate"), {
+      button: 0,
+      clientX: 125,
+      clientY: 25,
+    });
+    for (const degrees of [30, 60, 90]) {
+      const rad = (degrees * Math.PI) / 180;
+      fireEvent.pointerMove(canvas(), {
+        clientX: 125 + 100 * Math.sin(rad),
+        clientY: 125 - 100 * Math.cos(rad),
+      });
+    }
+    fireEvent.pointerUp(canvas());
+
+    // A quarter turn around 250, 250 of the canvas
+    await waitFor(() =>
+      expect(savedGroup(0)).toMatchObject({
+        rotation: 90,
+        elements: [
+          { x: 300, y: 100, rotation: 90 },
+          { x: 100, y: 300, rotation: 90 },
+        ],
+      }),
+    );
   });
 
   it("moves a selected group's elements as one, and a click without moving picks", async () => {

@@ -36,6 +36,7 @@ paths:
 
 - Each test gets a fresh fake `window.api` (`test/renderer/setup.ts`). `send` from `@test/ipc` pushes a reply from main inside `act` (await it). `sent(event)` lists the payloads the renderer emitted for an event, and `sentEvents()` the events in order.
 - Render with `renderWithProviders` (`@test/render`), which adds the language provider, fake audio queues, the real notifications provider, and a `user`. jsdom's page has no `?lang`, so it's English, as is plain `render()` with no provider. A test of the Spanish sets `?lang=es-419` with `history.replaceState` before rendering, or sends `LANGUAGE`. Pages that navigate use `renderApp(path)`: the real routes in memory history, built from `routerOptions` (`@/router`), so the app's error component applies.
+- Tests and built apps run each state update once; `yarn dev` runs them twice (`StrictMode` in `main.tsx`). Code that keeps a ref across updates, like Overlay Studio's group frame, gets a test with `{ reactStrictMode: true }` (`renderApp`'s and `render`'s option), as an impure updater only breaks there.
   - Components never reach Tone.js; `audio.queue(name)` is the fake queue they got, and `audio.value.decode` gives a 2 second sound of 8 samples.
   - Builders and replies are in `@test/fixtures`.
   - Entry points (`main.tsx`) run with `runEntry` from `@test/entry`, which gives them the `#root` their `index.html` has.
