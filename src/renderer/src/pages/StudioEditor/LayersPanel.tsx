@@ -7,6 +7,7 @@ import {
   StudioGroup,
   StudioItem,
 } from "@/common/schemas";
+import { CustomGift } from "@/common/types";
 import { Btn, Modal } from "@/components";
 import { cx } from "@/helper/cx";
 import { useMenu } from "@/hooks";
@@ -25,6 +26,7 @@ import {
 } from "react-icons/fi";
 import { LuGripVertical } from "react-icons/lu";
 import { findElement, KIND_NAMES } from "./helper";
+import { LayerThumb } from "./LayerThumb";
 import styles from "./studioeditor.module.css";
 
 export type GroupFlags = Partial<
@@ -37,8 +39,11 @@ type Props = {
   items: StudioItem[];
   // A group's id or an element's
   selected: string | null;
-  // What each element's row says: its name, and its kind and When
-  names: Record<string, { name: string; meta: string }>;
+  // What each element's row says: its name, its kind and When for screen
+  // readers, and the event it reacts to, null when it's always on screen
+  names: Record<string, { name: string; meta: string; when: string | null }>;
+  // For the pictures of the gifts elements show
+  gifts: CustomGift[];
   // The group the menu adds to, none to add on its own
   target: StudioGroup | undefined;
   onSelect: (id: string) => void;
@@ -61,11 +66,30 @@ type Props = {
 
 // The row the dragged one is over: an item's (a group's, or an element's
 // on its own), or an element's in a group. `edge` is a group row's top
-// quarter, which drops in front of the group instead of into it.
-type Over = { item: string; element?: string; edge?: boolean };
+// quarter, which drops in front of the group instead of into it. Off the
+// rows, it's between items, in front of the one `between` names, or past
+// the last with null: on its own there, out of any group.
+type Over =
+  | { item: string; element?: string; edge?: boolean }
+  | { between: string | null };
 
-// Where a drop lands: the line on a row or a group's item, and the move
-type Plan = { on: string; line: "before" | "after"; run: () => void };
+// Tells two of them apart
+const overKey = (over: Over | undefined) =>
+  !over
+    ? ""
+    : "between" in over
+      ? `between ${over.between}`
+      : `${over.item} ${over.element} ${!!over.edge}`;
+
+// Where a drop lands: the line on what it lands next to, and the move. The
+// line is `outer` when the drop lands among the items: around a group's
+// tray rather than on its row.
+type Plan = {
+  on: string;
+  line: "before" | "after";
+  outer?: boolean;
+  run: () => void;
+};
 
 // Up the list is toward the front
 const stepOf = (e: KeyboardEvent) =>
@@ -81,6 +105,7 @@ export function LayersPanel({
   items,
   selected,
   names,
+  gifts,
   target,
   onSelect,
   onAddGroup,
@@ -174,6 +199,24 @@ export function LayersPanel({
   const plan = ((): Plan | null => {
     const over = drag?.over;
     if (!drag || !over) return null;
+    if ("between" in over) {
+      // In front of the item under the pointer's gap, or past the last: the
+      // back. Positions count back to front, without the one dragged.
+      const below = items.find((i) => i.id === over.between);
+      if (below?.id === drag.id) return null;
+      const rest = items.filter((i) => i.id !== drag.id);
+      const at = below ? rest.indexOf(below) + 1 : 0;
+      if (items.findIndex((i) => i.id === drag.id) === at) return null;
+      return {
+        on: below?.id ?? rows[rows.length - 1].id,
+        line: below ? "before" : "after",
+        outer: true,
+        run: () =>
+          drag.group
+            ? onMoveItem(drag.id, at)
+            : onMoveElement(drag.id, null, at),
+      };
+    }
     const to = items.findIndex((i) => i.id === over.item);
     const item = items[to];
     if (drag.group) {
@@ -183,6 +226,7 @@ export function LayersPanel({
         on: over.item,
         // It takes that item's place, from below or above
         line: to > from ? "before" : "after",
+        outer: true,
         run: () => onMoveItem(drag.id, to),
       };
     }
@@ -222,6 +266,7 @@ export function LayersPanel({
       return {
         on: item.id,
         line: "before",
+        outer: true,
         run: () => onMoveElement(drag.id, null, at + 1),
       };
     }
@@ -229,30 +274,37 @@ export function LayersPanel({
     return {
       on: item.id,
       line: below ? "after" : "before",
+      outer: true,
       run: () => onMoveElement(drag.id, null, below ? at : at + 1),
     };
   })();
 
-  const lineOf = (on: string, applies: boolean) =>
-    applies && plan?.on === on
-      ? plan.line === "before"
-        ? styles.layer_before
-        : styles.layer_after
-      : undefined;
+  // The line where the drop lands: on a row, or when it lands among the
+  // items, in the gap by a group's tray or an element's row on its own, so
+  // it's plain the drop leaves any group
+  const lineOf = (on: string, outer: boolean) => {
+    if (plan?.on !== on || !!plan.outer !== outer) return undefined;
+    if (outer) {
+      return plan.line === "before" ? styles.drop_before : styles.drop_after;
+    }
+    return plan.line === "before" ? styles.layer_before : styles.layer_after;
+  };
 
-  const dragOver = (e: DragEvent<HTMLElement>, over: Omit<Over, "edge">) => {
+  const changeOver = (over: Over) => {
+    if (drag && overKey(drag.over) !== overKey(over)) {
+      setDrag({ ...drag, over });
+    }
+  };
+
+  const dragOver = (
+    e: DragEvent<HTMLElement>,
+    over: { item: string; element?: string },
+  ) => {
     if (!drag) return;
     const box = e.currentTarget.getBoundingClientRect();
     const edge =
       over.element === undefined && e.clientY < box.top + box.height / 4;
-    const was = drag.over;
-    if (
-      was?.item !== over.item ||
-      was.element !== over.element ||
-      !!was.edge !== edge
-    ) {
-      setDrag({ ...drag, over: { ...over, edge } });
-    }
+    changeOver({ ...over, edge });
   };
 
   const startDrag = (e: DragEvent<HTMLElement>, id: string, group: boolean) => {
@@ -292,7 +344,7 @@ export function LayersPanel({
 
   // An element's row, in its group's list or on its own in the top one
   const elementRow = (element: StudioElement, item: string) => {
-    const { name, meta } = names[element.id];
+    const { name, meta, when } = names[element.id];
     const inGroup = item !== element.id;
     return (
       <li
@@ -304,9 +356,9 @@ export function LayersPanel({
           element.hidden && styles.element_hidden,
           element.id === selected && styles.layer_selected,
           drag?.id === element.id && styles.layer_dragged,
-          // A group's drag lines up with what stands on its own
-          lineOf(element.id, !drag?.group || !inGroup),
+          lineOf(element.id, !inGroup),
         )}
+        data-item={inGroup ? undefined : element.id}
         onDragOver={(e) =>
           dragOver(e, inGroup ? { item, element: element.id } : { item })
         }
@@ -318,9 +370,18 @@ export function LayersPanel({
           aria-pressed={element.id === selected}
           onClick={() => onSelect(element.id)}
         >
-          <span className={styles.layer_name}>{name}</span>
-          {/* Read as two phrases, not one run-on word */}{" "}
-          <span className={styles.layer_meta}>{meta}</span>
+          <LayerThumb element={element} gifts={gifts} />
+          <span className={styles.layer_text}>
+            <span className={styles.layer_name}>{name}</span>
+            {/* Read as two phrases, not one run-on word */}{" "}
+            {/* The picture says the kind, so its words are for screen readers */}
+            <span className={styles.sr_only}>{meta}</span>
+            {when && (
+              <span className={styles.layer_when} aria-hidden>
+                {when}
+              </span>
+            )}
+          </span>
         </button>
         {toggles(element, { lock: lockElement, hide: hideElement }, (flags) =>
           onElementFlags(element.id, flags),
@@ -338,10 +399,12 @@ export function LayersPanel({
         key={group.id}
         className={cx(
           styles.group_item,
+          group.id === selected && styles.group_selected,
           group.hidden && styles.group_hidden,
           drag?.id === group.id && styles.layer_dragged,
-          lineOf(group.id, !!drag?.group),
+          lineOf(group.id, true),
         )}
+        data-item={group.id}
       >
         <div
           data-row
@@ -349,7 +412,7 @@ export function LayersPanel({
             styles.layer,
             styles.group_row,
             group.id === selected && styles.layer_selected,
-            lineOf(group.id, drag?.group === false),
+            lineOf(group.id, false),
           )}
           onDragOver={(e) => dragOver(e, { item: group.id })}
         >
@@ -377,10 +440,13 @@ export function LayersPanel({
             aria-pressed={group.id === selected}
             onClick={() => onSelect(group.id)}
           >
-            <span className={styles.layer_name}>{name}</span>
-            {/* Read as two phrases, not one run-on word */}{" "}
-            <span className={styles.layer_meta}>
-              {t("studio.editor.elements", { count: group.elements.length })}
+            <span className={styles.layer_text}>
+              <span className={styles.layer_name}>{name}</span>
+              {/* Read as two phrases, not one run-on word */}{" "}
+              {/* Shown while its elements aren't under it */}
+              <span className={shown ? styles.sr_only : styles.layer_count}>
+                {t("studio.editor.elements", { count: group.elements.length })}
+              </span>
             </span>
           </button>
           {toggles(group, { lock, hide }, (flags) => onFlags(group.id, flags))}
@@ -400,7 +466,7 @@ export function LayersPanel({
   return (
     <div className={styles.panel}>
       <div className={styles.panel_header}>
-        <h3 className={styles.panel_title}>{t("studio.editor.layers")}</h3>
+        <h3 className={styles.panel_title}>{t("studio.editor.elementList")}</h3>
         <div className={styles.panel_actions}>
           <div
             className={styles.menu_anchor}
@@ -493,10 +559,22 @@ export function LayersPanel({
         <ul
           ref={list}
           className={styles.layers}
-          aria-label={t("studio.editor.layers")}
+          aria-label={t("studio.editor.elementList")}
           // Only a row's own drag drops here, not files or text
           onDragOver={(e) => {
-            if (drag) e.preventDefault();
+            if (!drag) return;
+            e.preventDefault();
+            if (e.target instanceof Element && e.target.closest("[data-row]")) {
+              return;
+            }
+            // Off the rows: in front of the first item below the pointer
+            const items = list.current?.querySelectorAll<HTMLElement>(
+              ":scope > [data-item]",
+            );
+            const below = Array.from(items ?? []).find(
+              (node) => node.getBoundingClientRect().top >= e.clientY,
+            );
+            changeOver({ between: below?.dataset.item ?? null });
           }}
           onDrop={(e) => {
             if (!drag) return;

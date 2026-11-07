@@ -138,26 +138,44 @@
   list-style: none;
 }
 
+/* As tall as the panel, so the room under the last item takes a drop */
 .layers {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
   padding: 0 var(--space-2) var(--space-2);
 }
 
-/* Under the fold button, with a hairline that ties them to their group */
-.elements {
-  margin-left: 32px;
-  padding-left: var(--space-1);
-  border-left: 1px solid var(--border);
+/* A group is a tray around its elements, outlined in rose while it's
+   selected, as the canvas outlines its frame */
+.group_item {
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
-.group_item {
-  border-radius: var(--radius-md);
+.group_selected {
+  border-color: var(--accent-primary);
+}
+
+/* An element on its own lines up with a group's row */
+.layers > .layer {
+  margin: 0 3px;
+}
+
+/* A group's elements, set in from its row: their rows still reach its
+   tray's sides, so a drop anywhere on one lands on it */
+.elements > .layer {
+  padding-left: var(--space-5);
 }
 
 .layer {
   display: grid;
   align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1);
+  gap: 2px;
+  min-height: 40px;
+  padding: 2px var(--space-1) 2px 0;
   border-radius: var(--radius-md);
 }
 
@@ -166,19 +184,31 @@
   grid-template-columns: auto auto minmax(0, 1fr) auto auto;
 }
 
-/* An element, in a group or on its own: grip, name, lock, eye */
+/* An element, in a group or on its own: grip, picture and name, lock, eye */
 .element_row {
   grid-template-columns: auto minmax(0, 1fr) auto auto;
-}
-
-/* A hidden element: its name dimmed, its buttons as they are */
-.element_hidden .layer_select {
-  opacity: 0.5;
 }
 
 /* The fold button's place on an empty group */
 .fold_space {
   width: 28px;
+}
+
+/* The grip, lock and eye show on the row under the pointer or with the
+   focus, and on the selection; a lock or an eye that's on always shows */
+.layer .grip,
+.layer .toggle {
+  opacity: 0;
+}
+
+.layer:hover .grip,
+.layer:hover .toggle,
+.layer:focus-within .grip,
+.layer:focus-within .toggle,
+.layer_selected .grip,
+.layer_selected .toggle,
+.layer .toggle_on {
+  opacity: 1;
 }
 
 /* Lock and hide: Paper when on, muted when off */
@@ -190,8 +220,10 @@
   color: var(--font-primary);
 }
 
-/* Hidden: its name and elements dimmed, its buttons as they are */
-.group_hidden .layer_select,
+/* Hidden: its picture and name dimmed, and a group's elements, its buttons
+   as they are */
+.element_hidden .layer_select,
+.group_hidden > .group_row .layer_select,
 .group_hidden .elements {
   opacity: 0.5;
 }
@@ -220,18 +252,46 @@
   box-shadow: inset 0 -2px var(--accent-primary);
 }
 
+/* Where it lands among the items, out of any group: a line in the gap above
+   or below a tray or an element on its own */
+.drop_before,
+.drop_after {
+  position: relative;
+}
+
+.drop_before::before,
+.drop_after::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  background-color: var(--accent-primary);
+  pointer-events: none;
+}
+
+.drop_before::before {
+  top: -5px;
+}
+
+.drop_after::after {
+  bottom: -5px;
+}
+
 /* Narrow, as its dots are */
 .grip {
   padding: 6px 2px;
   cursor: grab;
 }
 
+/* Names line up past the fold button and the pictures, both 28 px */
 .layer_select {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) 0;
   border: none;
   border-radius: var(--radius-sm);
   background: none;
@@ -241,8 +301,20 @@
   cursor: pointer;
 }
 
+.group_row .layer_select {
+  padding-left: 10px;
+}
+
+/* Its name, and on an element that reacts, the event it waits for */
+.layer_text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .layer_name,
-.layer_meta {
+.layer_when {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -254,9 +326,73 @@
   font-weight: 500;
 }
 
-.layer_meta {
+.group_row .layer_name {
+  font-weight: 600;
+}
+
+/* It comes alive on the LIVE: the tally's rose, as a dot */
+.layer_when {
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
+}
+
+.layer_when::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-primary);
+  vertical-align: 1px;
+}
+
+/* A folded or empty group's count, under its name */
+.layer_count {
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* For screen readers only */
+.sr_only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A layer's picture, on the canvas's own color */
+.thumb {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--background-secondary);
   color: var(--font-secondary);
   font-size: var(--font-sm);
+  line-height: 1;
+}
+
+.thumb > img,
+.thumb > video {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  background: none;
+  object-fit: contain;
+}
+
+.thumb_shape {
+  box-sizing: border-box;
 }
 
 /* THE CANVAS */

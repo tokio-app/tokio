@@ -377,7 +377,11 @@ function Editor({ saved }: { saved: StudioOverlay }) {
         name === kind
           ? capitalize(when, language)
           : t("studio.editor.rowMeta", { kind, when });
-      return [element.id, { name, meta }];
+      const reacts = element.when !== "always";
+      return [
+        element.id,
+        { name, meta, when: reacts ? capitalize(when, language) : null },
+      ];
     }),
   );
 
@@ -542,6 +546,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
             items={overlay.items}
             selected={selected}
             names={names}
+            gifts={giftChoices}
             target={target}
             onSelect={select}
             onAddGroup={addGroup}

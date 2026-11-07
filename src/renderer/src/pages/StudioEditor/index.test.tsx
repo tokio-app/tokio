@@ -97,7 +97,7 @@ const savedNames = () =>
   );
 
 const page = () => within(screen.getByRole("main"));
-const layers = () => within(page().getByRole("list", { name: "Layers" }));
+const layers = () => within(page().getByRole("list", { name: "Elements" }));
 const row = (name: RegExp) => layers().getByRole("button", { name });
 // The row a group's or an element's select button is in
 const rowOf = (name: RegExp) =>
@@ -1224,6 +1224,47 @@ describe("StudioEditor", () => {
         alone.id,
         [front.id, b.id],
       ]),
+    );
+  });
+
+  it("drags an element out of its group, between items or past the last", async () => {
+    const a = text({ text: "A" });
+    const b = text({ text: "B" });
+    const c = text({ text: "C" });
+    const back = group("Back", [a]);
+    const front = group("Front", [b, c]);
+    await open(holding(back, front));
+    const dataTransfer = { setDragImage: vi.fn() };
+    const list = page().getByRole("list", { name: "Elements" });
+    // Off the rows, on the list itself
+    const drop = (id: string, clientY: number) => {
+      fireEvent.dragStart(grip(id), { dataTransfer });
+      const over = createEvent.dragOver(list, { dataTransfer });
+      Object.defineProperty(over, "clientY", { value: clientY });
+      fireEvent(list, over);
+      fireEvent.drop(list, { dataTransfer });
+      fireEvent.dragEnd(grip(id), { dataTransfer });
+    };
+    // On screen, front on top: Front's tray from 0 to 100, Back's from 108
+    const item = (id: string) =>
+      list.querySelector<HTMLElement>(`[data-item="${id}"]`)!;
+    vi.spyOn(item(front.id), "getBoundingClientRect").mockReturnValue(
+      new DOMRect(0, 0, 300, 100),
+    );
+    vi.spyOn(item(back.id), "getBoundingClientRect").mockReturnValue(
+      new DOMRect(0, 108, 300, 52),
+    );
+
+    // Under the last item: on its own, at the back
+    drop(c.id, 400);
+    await waitFor(() =>
+      expect(savedIds()).toEqual([c.id, [back.id, a.id], [front.id, b.id]]),
+    );
+
+    // In the gap between the groups: on its own, in front of Back
+    drop(b.id, 104);
+    await waitFor(() =>
+      expect(savedIds()).toEqual([c.id, [back.id, a.id], b.id, [front.id]]),
     );
   });
 
