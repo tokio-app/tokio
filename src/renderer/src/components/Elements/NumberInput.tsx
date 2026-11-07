@@ -20,6 +20,9 @@ type Props = {
 
 // Screen px a press moves before it changes the value, so a click doesn't
 const SCRUB_START = 3;
+// How long a press is held before its double arrow shows, unless it drags
+// first, so a click doesn't flash it
+const SCRUB_HOLD_MS = 250;
 
 /**
  * A number field that can be emptied while typing. The text is kept as typed
@@ -50,6 +53,7 @@ export function NumberInput({
     moved: boolean;
   } | null>(null);
   const [pressed, setPressed] = useState(false);
+  const holding = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // A value from outside replaces the text, the field's own doesn't
   // Object.is, as NaN !== NaN would set the state on every render
@@ -66,6 +70,7 @@ export function NumberInput({
 
   const step = integer ? 1 : Number(rest.step) || 1;
   const release = () => {
+    clearTimeout(holding.current);
     press.current = null;
     setPressed(false);
   };
@@ -85,7 +90,7 @@ export function NumberInput({
             moved: false,
           };
           e.currentTarget.setPointerCapture(e.pointerId);
-          setPressed(true);
+          holding.current = setTimeout(() => setPressed(true), SCRUB_HOLD_MS);
         },
         // Not focused yet, nor its text selected: a click does that
         onMouseDown: (e) => {
@@ -98,6 +103,7 @@ export function NumberInput({
           p.x = e.clientX;
           if (!p.moved && Math.abs(e.clientX - p.start) < SCRUB_START) return;
           p.moved = true;
+          setPressed(true);
           const raw = p.from + Math.round(p.steps) * step;
           const next = Math.min(
             max ?? Infinity,

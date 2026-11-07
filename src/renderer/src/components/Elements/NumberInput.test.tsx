@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ComponentProps, useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NumberInput } from "./NumberInput";
 
 // Holds the value, like a settings page does
@@ -30,6 +30,10 @@ function Field({
 const field = () => screen.getByRole("spinbutton", { name: "Cooldown" });
 
 describe("NumberInput", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("can be emptied and typed again", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -85,14 +89,16 @@ describe("NumberInput", () => {
     render(<Field onChange={onChange} scrub integer min={0} max={40} />);
 
     fireEvent.pointerDown(field(), { button: 0, clientX: 100 });
-    // Not in the field yet, its cursor a double arrow
+    // Not in the field yet
     expect(fireEvent.mouseDown(field())).toBe(false);
-    expect(field().className).toMatch(/scrubbing/);
     // A click until it moves 3 px
     fireEvent.pointerMove(field(), { clientX: 102 });
     expect(onChange).not.toHaveBeenCalled();
+    expect(field().className).not.toMatch(/scrubbing/);
     fireEvent.pointerMove(field(), { clientX: 125 });
     expect(field()).toHaveValue(35);
+    // Dragging, its cursor a double arrow at once
+    expect(field().className).toMatch(/scrubbing/);
     // Held at its max, and back down from there at once
     fireEvent.pointerMove(field(), { clientX: 126, shiftKey: true });
     expect(field()).toHaveValue(40);
@@ -103,6 +109,23 @@ describe("NumberInput", () => {
     expect(onChange.mock.calls).toEqual([[35], [40], [34]]);
     expect(field().className).not.toMatch(/scrubbing/);
     expect(field()).not.toHaveFocus();
+  });
+
+  it("shows the double arrow on a press held a moment, not on a click", () => {
+    vi.useFakeTimers();
+    Element.prototype.setPointerCapture = vi.fn();
+    render(<Field scrub />);
+
+    fireEvent.pointerDown(field(), { button: 0, clientX: 100 });
+    act(() => vi.advanceTimersByTime(150));
+    fireEvent.pointerUp(field());
+    act(() => vi.advanceTimersByTime(500));
+    expect(field().className).not.toMatch(/scrubbing/);
+
+    act(() => field().blur());
+    fireEvent.pointerDown(field(), { button: 0, clientX: 100 });
+    act(() => vi.advanceTimersByTime(250));
+    expect(field().className).toMatch(/scrubbing/);
   });
 
   it("stops a drag at its least value with no most", () => {
