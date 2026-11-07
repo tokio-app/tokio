@@ -14,6 +14,7 @@ import {
   MINECRAFT_OVERLAY_PATH,
   studioElements,
   studioSocketId,
+  sentGiftPicture,
   studioView,
   TIMER_PATH,
   usesNumbers,
@@ -88,6 +89,8 @@ function viewOf(
       const kept = studio.kept(element);
       return { src: kept?.picture ?? "", name: kept?.name ?? "" };
     },
+    sentGift: (element) =>
+      sentGiftPicture(studio.kept(element)?.values ?? null),
     // The page doesn't show it; the editor names embeds itself
     label: () => "",
   });

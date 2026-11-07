@@ -9,6 +9,7 @@ import {
   StudioEntrance,
   StudioElement,
   StudioWhen,
+  Trigger,
 } from "@/common/schemas";
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
 import { STUDIO_NUMBERS, studioEventVariables } from "@/common/util";
@@ -62,6 +63,19 @@ const ANIMATIONS: { value: StudioAnimation; label: MessageKey }[] = [
   { value: "bounce", label: "studio.animations.bounce" },
   { value: "shake", label: "studio.animations.shake" },
   { value: "pulse", label: "studio.animations.pulse" },
+];
+
+// A gift element's picture: the gift its event sent, or one picked
+const GIFT_PICTURES: { value: "sent" | "picked"; label: MessageKey }[] = [
+  { value: "sent", label: "studio.fields.giftSent" },
+  { value: "picked", label: "studio.fields.giftPicked" },
+];
+
+// Events no viewer sends, so a viewer's picture can't react to them
+const NO_VIEWER: Trigger["type"][] = [
+  TOKIO_EVENTS.ENVELOPE,
+  TOKIO_EVENTS.SUPER_FAN_BOX,
+  TOKIO_EVENTS.MUSIC_CHANGE,
 ];
 
 const ALIGNS: { value: StudioAlign; label: MessageKey }[] = [
@@ -131,10 +145,19 @@ export function ElementSettings({
   const allWhens = useOptions(WHENS);
   const entrances = useOptions(ENTRANCES);
   const animations = useOptions(ANIMATIONS);
-  const triggers = useOptions(TRIGGER_OPTIONS);
-  // A viewer's picture needs the viewer an event brings
-  const whens =
+  const allTriggers = useOptions(TRIGGER_OPTIONS);
+  const giftPictures = useOptions(GIFT_PICTURES);
+  const sentGift = element.kind === "gift" && element.gift === null;
+  // A viewer's picture needs the viewer an event brings, and the gift sent
+  // a Gift event
+  const triggers =
     element.kind === "viewer"
+      ? allTriggers.filter((o) => !NO_VIEWER.includes(o.value))
+      : sentGift
+        ? allTriggers.filter((o) => o.value === TOKIO_EVENTS.GIFT)
+        : allTriggers;
+  const whens =
+    element.kind === "viewer" || sentGift
       ? allWhens.filter((w) => w.value !== "always")
       : allWhens;
   const { trigger } = element;
@@ -231,11 +254,31 @@ export function ElementSettings({
     case "gift":
       own = (
         <Field label={t("studio.fields.gift")}>
-          <GiftSelect
-            gifts={gifts}
-            value={element.gift ?? undefined}
-            onChange={(gift) => onChange({ ...element, gift })}
+          <RadioGroup
+            name={`studio-gift-${element.id}`}
+            value={element.gift === null ? "sent" : "picked"}
+            options={giftPictures}
+            onChange={(picture) =>
+              onChange(
+                picture === "sent"
+                  ? {
+                      ...element,
+                      gift: null,
+                      // The gift comes with a Gift event
+                      when: element.when === "always" ? "event" : element.when,
+                      trigger: { ...trigger, type: TOKIO_EVENTS.GIFT },
+                    }
+                  : { ...element, gift: gifts[0]?.value ?? null },
+              )
+            }
           />
+          {element.gift !== null && (
+            <GiftSelect
+              gifts={gifts}
+              value={element.gift}
+              onChange={(gift) => onChange({ ...element, gift })}
+            />
+          )}
         </Field>
       );
       break;

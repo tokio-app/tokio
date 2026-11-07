@@ -22,6 +22,7 @@ import {
   fillStudioText,
   generateTikTokEventSample,
   SAMPLE_NUMBERS,
+  sentGiftPicture,
   studioEventVariables,
 } from "@/common/util";
 import { EmoteOption } from "@/components";
@@ -69,6 +70,10 @@ function sampleViewer(sample: Sample) {
 const sampleOf = (element: StudioElement, samples: Samples) =>
   element.when === "always" ? null : samples.of(element.trigger.type);
 
+/** The picture of the gift its trigger's sample sent, "" for none. */
+export const sampleGiftOf = (element: StudioElement, samples: Samples) =>
+  sentGiftPicture(sampleOf(element, samples));
+
 /** A text element's text with the sample numbers and its trigger's sample. */
 export const sampleText = (
   element: StudioElementOf<"text">,
@@ -99,6 +104,9 @@ export function sampleReact(
   if (element.kind === "viewer") {
     const { src, name } = sampleViewerOf(element, samples);
     return { element: element.id, picture: src, name };
+  }
+  if (element.kind === "gift" && element.gift === null) {
+    return { element: element.id, picture: sampleGiftOf(element, samples) };
   }
   return { element: element.id };
 }

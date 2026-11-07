@@ -15,6 +15,7 @@ import {
 import {
   fillStudioText,
   generateTikTokEventSample,
+  sentGiftPicture,
   studioElements,
   studioEventVariables,
 } from "@/common/util";
@@ -196,6 +197,9 @@ export class StudioService extends Service {
       return { element: id, text: studioText(element, numbers(), values) };
     }
     if (element.kind === "viewer") return { element: id, picture, name };
+    if (element.kind === "gift" && element.gift === null) {
+      return { element: id, picture: sentGiftPicture(values) };
+    }
     return { element: id };
   }
 }

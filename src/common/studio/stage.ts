@@ -430,6 +430,9 @@ export function createStage(
         src: r.picture ?? element.src,
         name: r.name ?? element.name,
       };
+    } else if (element.kind === "gift" && r.picture !== undefined) {
+      // The gift the event sent
+      entry.element = { ...element, src: r.picture || null };
     }
     fill(entry);
     if (element.when === "event") show(entry);

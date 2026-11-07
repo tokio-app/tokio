@@ -431,6 +431,7 @@ describe("the canvas's geometry", () => {
     embedPath: () => "",
     text: () => "",
     viewer: () => ({ src: "", name: "" }),
+    sentGift: () => "",
     label: () => "",
   };
   const view = studioView(overlay, deps);

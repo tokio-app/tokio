@@ -10,12 +10,14 @@ import {
   fillStudioText,
   newStudioElement,
   newStudioGroup,
+  sentGiftPicture,
   SAMPLE_NUMBERS,
   studioEventVariables,
   studioView,
   StudioViewDeps,
   usesNumbers,
 } from "./studio";
+import { generateTikTokEventSample } from "./samples";
 
 const ID = "8f14e45f-ceea-4672-9a8e-1b2c3d4e5f60";
 const box = { x: 0, y: 0, width: 100, height: 100 };
@@ -111,6 +113,7 @@ describe("studioView", () => {
     embedPath: (source) => `/${source.type}/`,
     text: (l) => l.text.toUpperCase(),
     viewer: () => ({ src: "", name: "Sora" }),
+    sentGift: () => "",
     label: (source) => source.type,
     ...changes,
   });
@@ -220,6 +223,21 @@ describe("studioView", () => {
     ]);
   });
 
+  it("shows the gift its event sent on a gift element with none picked", () => {
+    const {
+      layers: [{ elements }],
+    } = studioView(
+      overlay([
+        element("picked", { kind: "gift", gift: 5655 }),
+        element("sent", { kind: "gift" }),
+      ]),
+      deps({ sentGift: (e) => `https://g/${e.id}.png` }),
+    );
+
+    expect(elements[0]).not.toMatchObject({ src: "https://g/picked.png" });
+    expect(elements[1]).toMatchObject({ src: "https://g/sent.png" });
+  });
+
   it("leaves hidden groups out, the others keeping their place", () => {
     const group = (id: string, hidden = false) =>
       StudioGroupSchema.parse({
@@ -278,12 +296,30 @@ describe("newStudioElement", () => {
     expect(StudioElementSchema.parse(a)).toEqual(a);
   });
 
-  it("makes a viewer's picture wait for an event", () => {
+  it("makes a viewer's picture and a gift wait for an event", () => {
     expect(newStudioElement("viewer", "landscape")).toMatchObject({
       when: "event",
       trigger: { type: TOKIO_EVENTS.FOLLOW },
     });
-    expect(newStudioElement("gift", "landscape").when).toBe("always");
+    // The gift a viewer sends
+    expect(newStudioElement("gift", "landscape")).toMatchObject({
+      gift: null,
+      when: "event",
+      trigger: { type: TOKIO_EVENTS.GIFT },
+    });
+    expect(newStudioElement("shape", "landscape").when).toBe("always");
+  });
+});
+
+describe("sentGiftPicture", () => {
+  it("reads the picture of the gift an event sent", () => {
+    const sent = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
+
+    expect(sentGiftPicture(sent)).toBe(sent.gift.image);
+    expect(
+      sentGiftPicture(generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data),
+    ).toBe("");
+    expect(sentGiftPicture(null)).toBe("");
   });
 });
 

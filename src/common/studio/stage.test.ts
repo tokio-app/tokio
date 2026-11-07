@@ -360,6 +360,15 @@ describe("on stream", () => {
     expect(body("v").classList).not.toContain("studio-hidden");
   });
 
+  it("shows on a gift element the gift its event sent", () => {
+    draw(view({ ...BASE, id: "g", kind: "gift", src: null, when: "event" }));
+
+    stage.react({ element: "g", picture: "https://g/lion.png" });
+    expect(root.querySelector("img")!.getAttribute("src")).toBe(
+      "https://g/lion.png",
+    );
+  });
+
   it("scales the canvas to fit the root, centered, and again on resize", () => {
     const size = { width: 540, height: 1080 };
     Object.defineProperty(root, "clientWidth", { get: () => size.width });

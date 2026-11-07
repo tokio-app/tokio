@@ -41,6 +41,7 @@ paths:
 
 - Each element reacts on its own: its `when` is `always`, `event` (hidden until its trigger, then `seconds` with its `entrance`) or `animate` (always on screen, plays its `animation` on each trigger). A group doesn't react; it only groups.
 - `StudioService.handle` runs `streakOf` once per event, then `matchesTrigger` per element that reacts, both from `@/helper/triggers` like alerts. On Like an element reacts each time the likes from every viewer pass another `likes_every` (default 100, the rest carried over, at most once per event), counted per element.
+- A gift element with no gift picked (`gift: null`, a new one's default, on a Gift trigger) shows the gift its event sent: `sentGiftPicture` reads the event's `gift.image` for the react's `picture` and, from what it kept, for its view (`sentGift` in `StudioViewDeps`).
 - It keeps each element's last event values and viewer (picture, name) until Tokio quits, so a reloaded page shows them. `kept(element)` returns them only while the element's trigger type is the one they came from. Before the first event, the trigger's variables read `""`.
 - Hidden elements, and those of a hidden group, still react and keep their values: their page ignores reacts for elements it doesn't draw, and they have the latest event when they show again.
 - `forget(id)` on remove; `clear()` on `DISCONNECTED` drops the gift streaks and like counts, not the kept values.
@@ -110,6 +111,7 @@ paths:
 - Elements flip horizontally and vertically, and line up with the canvas's edges and middles.
 - No ring around the whole canvas when it's clicked.
 - A Like offers no viewer or count: its likes come from every viewer (`countedVariables`). Alerts keep them, as they play each viewer's batch.
+- A viewer's picture offers only the triggers a viewer sends (not Envelope, Super Fan Box or Music change) and the event Whens. A gift element shows **The gift a viewer sends** or **A gift you pick**; the first offers only the Gift trigger and the event Whens, and choosing it sets both.
 - A text's variables are in two rows under it: **LIVE numbers** (`STUDIO_NUMBERS`), always, and **From the event** (`studioEventVariables`), only while it reacts to one.
 - Lock blocks only the canvas, clicks going through to what's under, as OBS's lock does.
 - The editor's timer and games previews are close to the stream, not exact.

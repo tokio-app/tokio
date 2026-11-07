@@ -95,6 +95,22 @@ describe("StudioService", () => {
     });
   });
 
+  it("sends a gift element with none picked the gift the viewer sent", () => {
+    const { studio, onReact, numbers } = setup();
+    const trigger = { type: TOKIO_EVENTS.GIFT, gifts: [] };
+    const sent = element("s", { kind: "gift", trigger });
+    const picked = element("p", { kind: "gift", gift: 5655, trigger });
+    const lion = gift(1, true);
+    lion.gift.image = "https://g/lion.png";
+
+    studio.handle(TOKIO_EVENTS.GIFT, lion, [overlayOf(sent, picked)], numbers);
+
+    expect(onReact.mock.calls).toEqual([
+      ["o1", { element: "s", picture: "https://g/lion.png" }],
+      ["o1", { element: "p" }],
+    ]);
+  });
+
   it("sends a viewer layer the viewer's picture and name", () => {
     const { studio, onReact, numbers } = setup();
     const viewer = element("v", { kind: "viewer" });

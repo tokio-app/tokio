@@ -10,7 +10,11 @@ import {
   StudioSize,
   StudioSource,
 } from "../schemas/studio";
-import type { AppEvents, TokioEventMap } from "../types/connector";
+import {
+  TOKIO_EVENTS,
+  type AppEvents,
+  type TokioEventMap,
+} from "../types/connector";
 import type { CustomGift } from "../types/overlay";
 import type {
   StudioElementView,
@@ -104,6 +108,8 @@ export type StudioViewDeps = {
     src: string;
     name: string;
   };
+  // The picture of the gift a gift element's last event sent, "" for none
+  sentGift: (element: StudioElementOf<"gift">) => string;
   // An embed's name, for the editor
   label: (source: StudioSource) => string;
 };
@@ -154,6 +160,14 @@ function elementView(
       };
     }
     case "gift": {
+      // No gift picked: the one its event sent
+      if (element.gift === null) {
+        return {
+          ...base,
+          kind: element.kind,
+          src: deps.sentGift(element) || null,
+        };
+      }
       const gift = deps.gifts.find((g) => g.value === element.gift);
       return { ...base, kind: element.kind, src: gift?.img || null };
     }
@@ -229,7 +243,8 @@ const NEW_BOXES: Record<StudioElementKind, { width: number; height: number }> =
 
 /**
  * A new element of the kind, centered on the canvas, with the defaults. A
- * viewer's picture shows on an event, since it needs one.
+ * viewer's picture shows on an event, since it needs one, and a gift shows
+ * the one a viewer sends.
  */
 export function newStudioElement(
   kind: StudioElementKind,
@@ -244,8 +259,18 @@ export function newStudioElement(
     x: Math.round((canvas.width - box.width) / 2),
     y: Math.round((canvas.height - box.height) / 2),
     ...(kind === "viewer" && { when: "event" }),
+    ...(kind === "gift" && {
+      when: "event",
+      trigger: { type: TOKIO_EVENTS.GIFT, gifts: [] },
+    }),
   });
 }
+
+/** The picture of the gift an event sent, "" for one with no gift. */
+export const sentGiftPicture = (values: TokioEventMap[AppEvents] | null) =>
+  typeof values === "object" && values !== null && "gift" in values
+    ? values.gift.image
+    : "";
 
 /** A new, empty group with the name, shown and unlocked. */
 export const newStudioGroup = (name: string): StudioGroup =>

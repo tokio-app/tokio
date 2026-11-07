@@ -12,6 +12,7 @@ import { newStudioElement, newStudioGroup } from "@/common/util";
 import { createAction } from "@/pages/Games/helper";
 import { createAlert } from "@/pages/Alerts/helper";
 import {
+  gift,
   overlayApp,
   profileReply,
   settingsReply,
@@ -1126,6 +1127,54 @@ describe("StudioEditor", () => {
       }),
     );
     expect(field("Seconds on screen").getByRole("spinbutton")).toHaveValue(5);
+  });
+
+  it("offers a viewer's picture only the events a viewer sends", async () => {
+    const { user } = await open(scene(elementOf("viewer")));
+    await user.click(row(/^Viewer's picture/));
+
+    const trigger = page().getByRole("group", { name: "Trigger" });
+    await user.click(within(trigger).getByText("Follow"));
+
+    expect(inList(trigger, "Gift")).not.toBeNull();
+    expect(inList(trigger, "Envelope")).toBeNull();
+    expect(inList(trigger, "Super Fan Box")).toBeNull();
+    expect(inList(trigger, "Music change")).toBeNull();
+  });
+
+  it("shows the gift a viewer sends, or one picked", async () => {
+    const element = elementOf("gift");
+    const { user } = await open(scene(element));
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
+      data: [gift(5655, "Rose")],
+    });
+    await user.click(row(/^Gift/));
+
+    const sent = page().getByRole("radio", { name: "The gift a viewer sends" });
+    expect(sent).toBeChecked();
+    // A sample's gift, while the editor waits for a real one
+    expect(drawn(element.id).querySelector("img")?.getAttribute("src")).toMatch(
+      /^https:/,
+    );
+
+    await user.click(page().getByRole("radio", { name: "A gift you pick" }));
+    await waitFor(() => expect(savedElement()).toMatchObject({ gift: 5655 }));
+    // Main's echo, so going back to the start is a change to save
+    await studio(lastSave()!);
+
+    await user.click(
+      page().getByRole("radio", { name: "The gift a viewer sends" }),
+    );
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        gift: null,
+        when: "event",
+        trigger: { type: TOKIO_EVENTS.GIFT },
+      }),
+    );
+    expect(
+      page().queryByRole("radio", { name: "Always on screen" }),
+    ).not.toBeInTheDocument();
   });
 
   it("offers a viewer's picture only the event Whens", async () => {
