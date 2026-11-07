@@ -46,7 +46,8 @@ type Props = {
   gifts: CustomGift[];
   // The group the menu adds to, none to add on its own
   target: StudioGroup | undefined;
-  onSelect: (id: string) => void;
+  // A group's id or an element's, null to let go of the selection
+  onSelect: (id: string | null) => void;
   onAddGroup: () => void;
   onAdd: (kind: StudioElementKind) => void;
   // Deletes a group with its elements, or an element
@@ -584,6 +585,16 @@ export function LayersPanel({
           }}
           // Also when it's cancelled or dropped elsewhere: nothing moves
           onDragEnd={() => setDrag(null)}
+          // A click past the items, under them or between them, lets go of
+          // the selection, as a click on the empty canvas does
+          onClick={(e) => {
+            if (
+              e.target instanceof Element &&
+              !e.target.closest("[data-item]")
+            ) {
+              onSelect(null);
+            }
+          }}
         >
           {rows.map((item) =>
             item.kind === "group" ? groupItem(item) : elementRow(item, item.id),

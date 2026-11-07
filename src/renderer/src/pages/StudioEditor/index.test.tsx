@@ -351,6 +351,25 @@ describe("StudioEditor", () => {
     expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("lets go of the selection on a click in the list past the items", async () => {
+    const shape = elementOf("shape");
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+    expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
+
+    // On the group's tray, past its rows, it stays
+    await user.click(
+      page().getByRole("list", { name: "Group 1" }).closest("li")!,
+    );
+    expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(page().getByRole("list", { name: "Elements" }));
+    expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "false");
+    expect(
+      page().getByRole("heading", { name: "Overlay settings" }),
+    ).toBeVisible();
+  });
+
   it("selects an element from the list or the canvas, and Escape deselects", async () => {
     const back = elementOf("shape", { x: 0, y: 0, width: 400, height: 400 });
     const front = text({ text: "Hello", x: 300, y: 300 });
