@@ -439,6 +439,12 @@ export function LayersPanel({
             className={styles.layer_select}
             aria-pressed={group.id === selected}
             onClick={() => onSelect(group.id)}
+            // As its arrow does, for a group with elements to fold
+            onDoubleClick={() => {
+              if (group.elements.length > 0) {
+                onFlags(group.id, { folded: !group.folded });
+              }
+            }}
           >
             <span className={styles.layer_text}>
               <span className={styles.layer_name}>{name}</span>
