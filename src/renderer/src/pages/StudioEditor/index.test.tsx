@@ -9,6 +9,7 @@ import {
 } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, TOKIO_EVENTS } from "@/common/types";
 import { newStudioElement, newStudioGroup } from "@/common/util";
+import { rotateCursor } from "./helper";
 import { createAction } from "@/pages/Games/helper";
 import { createAlert } from "@/pages/Alerts/helper";
 import {
@@ -467,9 +468,11 @@ describe("StudioEditor", () => {
       clientX: 125,
       clientY: 75,
     });
-    // The rotate cursor stays on the whole canvas while it turns
-    expect(canvas().className).toMatch(/turning/);
+    // The rotate cursor stays on the whole canvas while it turns, along the
+    // circle at its turn
+    expect(canvas().style.cursor).toBe(rotateCursor(0));
     fireEvent.pointerMove(canvas(), { clientX: 225, clientY: 125 });
+    await waitFor(() => expect(canvas().style.cursor).toBe(rotateCursor(90)));
     await waitFor(() => expect(savedElement()?.rotation).toBe(90));
     expect(drawn(shape.id).style.transform).toBe("rotate(90deg)");
     expect(
@@ -486,7 +489,33 @@ describe("StudioEditor", () => {
     fireEvent.pointerUp(canvas());
     await waitFor(() => expect(savedElement()?.rotation).toBe(45));
     expect(field("Rotation (°)").getByRole("spinbutton")).toHaveValue(45);
-    expect(canvas().className).not.toMatch(/turning/);
+    expect(canvas().style.cursor).toBe("");
+    expect(handle("rotate").style.cursor).toBe(rotateCursor(45));
+  });
+
+  it("shows the move cursor over what a drag moves, and keeps a drag's cursor", async () => {
+    const shape = elementOf("shape", {
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 100,
+    });
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Shape/));
+    sized();
+
+    // Over the shape, at 125, 125 on screen; past it, nothing to move
+    fireEvent.pointerMove(canvas(), { clientX: 125, clientY: 125 });
+    expect(canvas().style.cursor).toBe("move");
+    fireEvent.pointerMove(canvas(), { clientX: 400, clientY: 400 });
+    expect(canvas().style.cursor).toBe("");
+
+    // A corner's resize cursor, wherever the pointer goes while it drags
+    fireEvent.pointerDown(handle("se"), { button: 0, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(canvas(), { clientX: 300, clientY: 300 });
+    expect(canvas().style.cursor).toBe("nwse-resize");
+    fireEvent.pointerUp(canvas());
+    expect(canvas().style.cursor).not.toBe("nwse-resize");
   });
 
   it("flips an element from its settings, the canvas drawing it", async () => {

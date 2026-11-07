@@ -25,6 +25,7 @@ import {
   pickElement,
   Point,
   resizeBox,
+  rotateCursor,
   roundBox,
   toCanvas,
   turnTo,
@@ -133,6 +134,14 @@ const HANDLES: Record<Corner, string> = {
   se: styles.handle_se,
 };
 
+// Each corner's resize cursor, which the stage keeps while it drags
+const RESIZE_CURSORS: Record<Corner, string> = {
+  nw: "nwse-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  se: "nwse-resize",
+};
+
 // Screen px a press inside a group's outline moves before it drags the group
 const DRAG_START = 3;
 
@@ -180,9 +189,12 @@ export function StudioStage({
     new Map(),
   );
   const drag = useRef<Drag | null>(null);
-  // The rotate cursor stays on while an element turns, wherever the pointer
-  // goes
-  const [turning, setTurning] = useState(false);
+  // The cursor a drag keeps on the whole stage, wherever the pointer goes:
+  // the rotate cursor while it turns, the move cursor, or a corner's resize
+  const [held, setHeld] = useState<"rotate" | "move" | Corner | null>(null);
+  // The pointer is over what a drag moves: an element, or the selected
+  // group's outline
+  const [movable, setMovable] = useState(false);
 
   useLayoutEffect(() => {
     const stage = createStage(root.current!, { slots: true, editing: true });
@@ -354,6 +366,7 @@ export function StudioStage({
         frame: groupFrame,
         ...at,
       };
+      setHeld(corner);
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -367,6 +380,7 @@ export function StudioStage({
         rotation: element.rotation,
         ...at,
       };
+      setHeld(corner);
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -382,7 +396,7 @@ export function StudioStage({
           y: rect.top + fitted.top + (y + height / 2) * scale,
         },
       };
-      setTurning(true);
+      setHeld("rotate");
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -402,7 +416,7 @@ export function StudioStage({
         },
         frame: groupFrame,
       };
-      setTurning(true);
+      setHeld("rotate");
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -423,6 +437,7 @@ export function StudioStage({
         sent: [0, 0],
         ...at,
       };
+      setHeld("move");
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
@@ -439,12 +454,30 @@ export function StudioStage({
       rotation: picked.element.rotation,
       ...at,
     };
+    setHeld("move");
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
-    if (!d) return;
+    if (!d) {
+      // What a press here would drag shows the move cursor
+      const fitted = stageRef.current?.fit() ?? NO_FIT;
+      if (!fitted.scale) return;
+      const point = toCanvas(
+        { x: e.clientX, y: e.clientY },
+        root.current!.getBoundingClientRect(),
+        fitted,
+      );
+      const moves =
+        pickElement(view, locked, point) !== null ||
+        (!!chosenGroup &&
+          !!frame &&
+          !stuck &&
+          holdsTurned({ ...frame, rotation }, point));
+      if (moves !== movable) setMovable(moves);
+      return;
+    }
     if (d.kind === "rotate") {
       // Shift turns it in steps of 15 degrees
       const pointer = { x: e.clientX, y: e.clientY };
@@ -504,7 +537,7 @@ export function StudioStage({
   const onPointerUp = () => {
     const d = drag.current;
     drag.current = null;
-    setTurning(false);
+    setHeld(null);
     if (d?.kind === "group" && !d.moved) {
       onSelect(pickElement(view, locked, d.point));
     }
@@ -548,19 +581,30 @@ export function StudioStage({
 
   return (
     <div
-      className={cx(styles.stage, turning && styles.turning)}
+      className={styles.stage}
       tabIndex={0}
       aria-label={t("studio.editor.canvas")}
       aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
-      // Hairlines drawn inside the scaled canvas stay one screen px
-      style={{ "--canvas-scale": fit.scale || 1 }}
+      style={{
+        // Hairlines drawn inside the scaled canvas stay one screen px
+        "--canvas-scale": fit.scale || 1,
+        cursor:
+          held === "rotate"
+            ? rotateCursor(rotation)
+            : held === "move" || (!held && movable)
+              ? "move"
+              : held
+                ? RESIZE_CURSORS[held]
+                : undefined,
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={() => {
         drag.current = null;
-        setTurning(false);
+        setHeld(null);
       }}
+      onPointerLeave={() => setMovable(false)}
       onKeyDown={onKeyDown}
     >
       <div className={styles.stage_area}>
@@ -581,6 +625,8 @@ export function StudioStage({
                   className={styles.rotate}
                   data-handle="rotate"
                   title={t("studio.editor.rotate")}
+                  // Along the circle it turns on
+                  style={{ cursor: rotateCursor(rotation) }}
                 />
               </>
             )}

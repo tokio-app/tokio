@@ -22,6 +22,7 @@ import {
   pickElement,
   fitText,
   resizeBox,
+  rotateCursor,
   stepElement,
   turnTo,
   toCanvas,
@@ -140,6 +141,22 @@ describe("roundBox", () => {
       width: 1,
       height: 1,
     });
+  });
+});
+
+describe("rotateCursor", () => {
+  it("turns the cursor in steps of 5 degrees, around its middle", () => {
+    expect(rotateCursor(-90)).toContain(
+      encodeURIComponent("rotate(270 16 16)"),
+    );
+    expect(rotateCursor(362)).toBe(rotateCursor(0));
+    expect(rotateCursor(43)).toBe(rotateCursor(45));
+  });
+
+  it("draws it at 1x and 2x, held at its middle, grab without it", () => {
+    expect(rotateCursor(0)).toMatch(
+      /^image-set\(url\("data:image\/svg\+xml,.+"\) 1x, url\(".+"\) 2x\) 16 16, grab$/,
+    );
   });
 });
 

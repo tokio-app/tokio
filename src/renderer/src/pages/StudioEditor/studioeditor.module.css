@@ -502,17 +502,7 @@
   border: 2px solid var(--font-primary);
   border-radius: 50%;
   background-color: var(--accent-primary);
-  cursor:
-    url("../../assets/rotate-cursor.svg") 12 12,
-    grab;
   pointer-events: auto;
-}
-
-/* The stage while an element turns: the pointer leaves the handle */
-.turning {
-  cursor:
-    url("../../assets/rotate-cursor.svg") 12 12,
-    grab;
 }
 
 .rotate::after {

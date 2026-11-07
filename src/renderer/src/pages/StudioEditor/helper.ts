@@ -407,6 +407,37 @@ export function fitText(
   });
 }
 
+// The rotate cursor: a curved arrow with a head at each end, black on a white
+// halo like the system's cursors, in a 32 px box around its hotspot (16, 16)
+const ROTATE_GLYPH =
+  '<path d="M8.3 17.41A8.5 8.5 0 0 1 23.7 17.41" fill="none" stroke="#fff" stroke-width="5.6" stroke-linecap="round"/>' +
+  '<path d="M5.93 22.48L4.92 15.17L12.18 18.55ZM26.07 22.48L19.82 18.55L27.08 15.17Z" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>' +
+  '<path d="M8.3 17.41A8.5 8.5 0 0 1 23.7 17.41" fill="none" stroke="#000" stroke-width="2.4"/>' +
+  '<path d="M5.93 22.48L4.92 15.17L12.18 18.55ZM26.07 22.48L19.82 18.55L27.08 15.17Z" fill="#000" stroke="#000" stroke-width="0.6" stroke-linejoin="round"/>';
+
+// Each turn's cursor, made once
+const rotateCursors = new Map<number, string>();
+
+/**
+ * The rotate cursor turned by `degrees`, in steps of 5, as a CSS cursor: at an
+ * element's or a group's turn, it lies along the circle around its middle,
+ * where the rotate handle is. Drawn at 1x and 2x, so it stays sharp on a dense
+ * screen.
+ */
+export function rotateCursor(degrees: number): string {
+  const step = (((Math.round(degrees / 5) * 5) % 360) + 360) % 360;
+  let cursor = rotateCursors.get(step);
+  if (!cursor) {
+    const url = (px: number) =>
+      `url("data:image/svg+xml,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 32 32"><g transform="rotate(${step} 16 16)">${ROTATE_GLYPH}</g></svg>`,
+      )}")`;
+    cursor = `image-set(${url(32)} 1x, ${url(64)} 2x) 16 16, grab`;
+    rotateCursors.set(step, cursor);
+  }
+  return cursor;
+}
+
 /**
  * The turn that points a box's top at the point, as its rotate handle
  * drags it, in whole degrees from -180 to 180: steps of 15 with `snap`.
