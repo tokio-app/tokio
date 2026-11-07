@@ -76,6 +76,11 @@ type Props = {
   onGroupFrame: (groupId: string, from: Turned, to: Turned) => void;
   // The corners keep the width and height in proportion
   linked: boolean;
+  // A drag on the canvas begins (true) and ends: every change in between is
+  // one step of the history
+  onHold: (held: boolean) => void;
+  // Deletes a group with its elements, or an element
+  onDelete: (id: string) => void;
   // An embed's preview, portaled into its slot
   embed: (element: EmbedView) => ReactNode;
 };
@@ -124,6 +129,9 @@ type Drag =
       sent: [number, number];
     };
 
+// The cursor a drag keeps on the whole stage
+type Held = "rotate" | "move" | Corner;
+
 const NO_FIT: StageFit = { scale: 0, left: 0, top: 0 };
 
 // Each corner's handle, where it sits and its cursor
@@ -161,7 +169,7 @@ const NUDGES: Record<string, [number, number]> = {
 /**
  * The overlay drawn by the stream's own renderer (stage.ts), with what the
  * editor adds over it: the selection's outline and resize handle, dragging,
- * and the arrows. A selected group moves as one. Embeds are React's
+ * the arrows and Delete. A selected group moves as one. Embeds are React's
  * previews, portaled into the stage's slots, which stay put so iframes don't
  * reload.
  */
@@ -179,6 +187,8 @@ export function StudioStage({
   groupFrame,
   onGroupFrame,
   linked,
+  onHold,
+  onDelete,
   embed,
 }: Props) {
   const t = useT();
@@ -191,7 +201,7 @@ export function StudioStage({
   const drag = useRef<Drag | null>(null);
   // The cursor a drag keeps on the whole stage, wherever the pointer goes:
   // the rotate cursor while it turns, the move cursor, or a corner's resize
-  const [held, setHeld] = useState<"rotate" | "move" | Corner | null>(null);
+  const [held, setHeld] = useState<Held | null>(null);
   // The pointer is over what a drag moves: an element, or the selected
   // group's outline
   const [movable, setMovable] = useState(false);
@@ -342,6 +352,22 @@ export function StudioStage({
     ? locked.has(chosen.layer) || locked.has(chosen.element.id)
     : locked.has(chosenGroup?.id ?? "");
 
+  // A drag from a press, its cursor kept on the whole stage until it ends,
+  // and one step of the history
+  const start = (e: PointerEvent<HTMLDivElement>, d: Drag, cursor: Held) => {
+    drag.current = d;
+    setHeld(cursor);
+    onHold(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const end = () => {
+    if (!drag.current) return;
+    drag.current = null;
+    setHeld(null);
+    onHold(false);
+  };
+
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const target = e.target;
@@ -359,45 +385,45 @@ export function StudioStage({
     const handle = target.closest<HTMLElement>("[data-handle]");
     const corner = CORNERS.find((c) => c === handle?.dataset.handle);
     if (chosenGroup && groupFrame && !stuck && corner) {
-      drag.current = {
-        kind: "frame",
-        id: chosenGroup.id,
+      start(
+        e,
+        { kind: "frame", id: chosenGroup.id, corner, frame: groupFrame, ...at },
         corner,
-        frame: groupFrame,
-        ...at,
-      };
-      setHeld(corner);
-      e.currentTarget.setPointerCapture(e.pointerId);
+      );
       return;
     }
     if (chosen && !stuck && corner) {
       const { element } = chosen;
-      drag.current = {
-        kind: "element",
-        id: element.id,
+      start(
+        e,
+        {
+          kind: "element",
+          id: element.id,
+          corner,
+          box: boxOf(element),
+          rotation: element.rotation,
+          ...at,
+        },
         corner,
-        box: boxOf(element),
-        rotation: element.rotation,
-        ...at,
-      };
-      setHeld(corner);
-      e.currentTarget.setPointerCapture(e.pointerId);
+      );
       return;
     }
 
     const rect = root.current!.getBoundingClientRect();
     if (chosen && !stuck && handle?.dataset.handle === "rotate") {
       const { x, y, width, height } = chosen.element;
-      drag.current = {
-        kind: "rotate",
-        id: chosen.element.id,
-        center: {
-          x: rect.left + fitted.left + (x + width / 2) * scale,
-          y: rect.top + fitted.top + (y + height / 2) * scale,
+      start(
+        e,
+        {
+          kind: "rotate",
+          id: chosen.element.id,
+          center: {
+            x: rect.left + fitted.left + (x + width / 2) * scale,
+            y: rect.top + fitted.top + (y + height / 2) * scale,
+          },
         },
-      };
-      setHeld("rotate");
-      e.currentTarget.setPointerCapture(e.pointerId);
+        "rotate",
+      );
       return;
     }
     if (
@@ -407,17 +433,19 @@ export function StudioStage({
       handle?.dataset.handle === "rotate"
     ) {
       const { x, y, width, height } = groupFrame;
-      drag.current = {
-        kind: "rotate",
-        id: chosenGroup.id,
-        center: {
-          x: rect.left + fitted.left + (x + width / 2) * scale,
-          y: rect.top + fitted.top + (y + height / 2) * scale,
+      start(
+        e,
+        {
+          kind: "rotate",
+          id: chosenGroup.id,
+          center: {
+            x: rect.left + fitted.left + (x + width / 2) * scale,
+            y: rect.top + fitted.top + (y + height / 2) * scale,
+          },
+          frame: groupFrame,
         },
-        frame: groupFrame,
-      };
-      setHeld("rotate");
-      e.currentTarget.setPointerCapture(e.pointerId);
+        "rotate",
+      );
       return;
     }
 
@@ -429,16 +457,18 @@ export function StudioStage({
       holdsTurned({ ...frame, rotation }, point)
     ) {
       // A click until it moves
-      drag.current = {
-        kind: "group",
-        id: chosenGroup.id,
-        point,
-        moved: false,
-        sent: [0, 0],
-        ...at,
-      };
-      setHeld("move");
-      e.currentTarget.setPointerCapture(e.pointerId);
+      start(
+        e,
+        {
+          kind: "group",
+          id: chosenGroup.id,
+          point,
+          moved: false,
+          sent: [0, 0],
+          ...at,
+        },
+        "move",
+      );
       return;
     }
 
@@ -446,16 +476,18 @@ export function StudioStage({
     onSelect(id);
     const picked = elements.find(({ element }) => element.id === id);
     if (!picked) return;
-    drag.current = {
-      kind: "element",
-      id: picked.element.id,
-      corner: null,
-      box: boxOf(picked.element),
-      rotation: picked.element.rotation,
-      ...at,
-    };
-    setHeld("move");
-    e.currentTarget.setPointerCapture(e.pointerId);
+    start(
+      e,
+      {
+        kind: "element",
+        id: picked.element.id,
+        corner: null,
+        box: boxOf(picked.element),
+        rotation: picked.element.rotation,
+        ...at,
+      },
+      "move",
+    );
   };
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -536,8 +568,7 @@ export function StudioStage({
 
   const onPointerUp = () => {
     const d = drag.current;
-    drag.current = null;
-    setHeld(null);
+    end();
     if (d?.kind === "group" && !d.moved) {
       onSelect(pickElement(view, locked, d.point));
     }
@@ -548,6 +579,13 @@ export function StudioStage({
     if (e.key === "Escape") {
       e.stopPropagation();
       onSelect(null);
+      return;
+    }
+    // Backspace too, a Mac's delete key. Not a locked one, as the arrows
+    // leave it: the list's Delete and the trash still take it.
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      if (!stuck) onDelete(selected);
       return;
     }
     const nudge = NUDGES[e.key];
@@ -584,7 +622,7 @@ export function StudioStage({
       className={styles.stage}
       tabIndex={0}
       aria-label={t("studio.editor.canvas")}
-      aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
+      aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape Delete Backspace"
       style={{
         // Hairlines drawn inside the scaled canvas stay one screen px
         "--canvas-scale": fit.scale || 1,
@@ -600,10 +638,8 @@ export function StudioStage({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={() => {
-        drag.current = null;
-        setHeld(null);
-      }}
+      onPointerCancel={end}
+      onLostPointerCapture={end}
       onPointerLeave={() => setMovable(false)}
       onKeyDown={onKeyDown}
     >

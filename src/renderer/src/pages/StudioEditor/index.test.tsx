@@ -112,6 +112,8 @@ const field = (name: string) => within(page().getByRole("group", { name }));
 const addMenu = () =>
   page().getByRole("button", { name: "Add a group or an element" });
 const deleteButton = (name: string) => page().getByRole("button", { name });
+const undo = () => page().getByRole("button", { name: "Undo (Ctrl+Z)" });
+const redo = () => page().getByRole("button", { name: "Redo (Ctrl+Y)" });
 
 // The canvas at half size on screen, 540 × 960 from the root's top left
 // (jsdom's getBoundingClientRect is all zeros)
@@ -1341,7 +1343,7 @@ describe("StudioEditor", () => {
     expect(savedGroup(2)?.elements.map((e) => e.id)).toEqual([a.id]);
   });
 
-  it("deletes an element, an empty group at once, and a full one once confirmed", async () => {
+  it("deletes an element or a group at once, a full one too, which Undo brings back", async () => {
     const a = text({ text: "A" });
     const b = text({ text: "B" });
     const c = elementOf("shape");
@@ -1369,20 +1371,18 @@ describe("StudioEditor", () => {
     await user.click(deleteButton("Delete group"));
     await waitFor(() => expect(lastSave()?.items).toHaveLength(2));
 
+    // No dialog for one with elements: Undo is there
     await user.click(row(/^Full/));
     await user.click(deleteButton("Delete group"));
-    const dialog = within(
-      screen.getByRole("dialog", { name: "Delete group?" }),
-    );
-    expect(
-      dialog.getByText(
-        "Full and the 2 elements in it will be deleted. There's no undo.",
-      ),
-    ).toBeVisible();
-    await user.click(dialog.getByRole("button", { name: "Delete" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     await waitFor(() => expect(savedNames()).toEqual(["Last"]));
     expect(drawn(a.id)).toBeNull();
+    await studio(lastSave()!);
+    await user.click(undo());
+    await waitFor(() => expect(savedNames()).toEqual(["Full", "Last"]));
+    expect(savedGroup(0)?.elements).toEqual([a, b]);
+    expect(drawn(a.id)).not.toBeNull();
   });
 
   it("names a group in its settings", async () => {
@@ -1801,5 +1801,283 @@ describe("StudioEditor", () => {
     );
 
     expect(page().getByText(/^The overlay server is off\./)).toBeVisible();
+  });
+
+  describe("undo and redo", () => {
+    // setSystemTime moves Date alone, the history's clock
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("undoes and redoes from the header and with the keys, Cmd too", async () => {
+      const shape = elementOf("shape", { x: 100 });
+      const { user } = await open(holding(shape));
+      expect(undo()).toBeDisabled();
+      expect(redo()).toBeDisabled();
+
+      await user.click(row(/^Shape/));
+      const x = field("X").getByRole("spinbutton");
+      await user.clear(x);
+      await user.type(x, "300");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 300 }),
+      );
+      await studio(lastSave()!);
+      expect(redo()).toBeDisabled();
+
+      // The whole number typed is one step
+      await user.click(undo());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 100 }),
+      );
+      expect(x).toHaveValue(100);
+      expect(undo()).toBeDisabled();
+      await studio(lastSave()!);
+      await user.click(redo());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 300 }),
+      );
+      await studio(lastSave()!);
+
+      // A number field takes the editor's keys, prevented so Electron's
+      // Edit menu never sees them
+      x.focus();
+      expect(fireEvent.keyDown(x, { key: "z", ctrlKey: true })).toBe(false);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 100 }),
+      );
+      await studio(lastSave()!);
+      expect(
+        fireEvent.keyDown(x, { key: "Z", ctrlKey: true, shiftKey: true }),
+      ).toBe(false);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 300 }),
+      );
+      await studio(lastSave()!);
+      fireEvent.keyDown(document.body, { key: "z", metaKey: true });
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 100 }),
+      );
+      await studio(lastSave()!);
+      fireEvent.keyDown(document.body, { key: "y", ctrlKey: true });
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 300 }),
+      );
+    });
+
+    it("leaves Ctrl+Z to a text field, and takes it on a checkbox", async () => {
+      const words = text({ text: "Thanks", bold: false });
+      const { user } = await open(holding(words));
+      await user.click(row(/^Thanks/));
+      const name = field("Name").getByRole("textbox");
+      await user.type(name, "Intro");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ label: "Intro" }),
+      );
+      await studio(lastSave()!);
+
+      // Its own undo, not the editor's
+      expect(fireEvent.keyDown(name, { key: "z", ctrlKey: true })).toBe(true);
+
+      const bold = page().getByRole("checkbox", { name: "Bold" });
+      await user.click(bold);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ bold: true }),
+      );
+      await studio(lastSave()!);
+      expect(fireEvent.keyDown(bold, { key: "z", ctrlKey: true })).toBe(false);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          label: "Intro",
+          bold: false,
+        }),
+      );
+    });
+
+    it("takes a whole drag on the canvas as one step, a pause in it too", async () => {
+      const shape = elementOf("shape", {
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 200,
+      });
+      // A ref across updates, so under StrictMode too
+      const { user } = await open(holding(shape), { reactStrictMode: true });
+      sized();
+
+      vi.setSystemTime(10_000);
+      press(200, 200);
+      fireEvent.pointerMove(canvas(), { clientX: 130, clientY: 100 });
+      vi.setSystemTime(12_000);
+      fireEvent.pointerMove(canvas(), { clientX: 160, clientY: 110 });
+      fireEvent.pointerUp(canvas());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 220, y: 120 }),
+      );
+      await studio(lastSave()!);
+
+      await user.click(undo());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 100, y: 100 }),
+      );
+      expect(undo()).toBeDisabled();
+    });
+
+    it("takes a burst of changes to one field as one step, and a pause or another field as the next", async () => {
+      const shape = elementOf("shape", { x: 100, y: 100 });
+      const { user } = await open(holding(shape));
+      await user.click(row(/^Shape/));
+      const x = field("X").getByRole("spinbutton");
+      const y = field("Y").getByRole("spinbutton");
+
+      vi.setSystemTime(10_000);
+      x.focus();
+      for (const value of ["2", "25", "250"]) {
+        fireEvent.change(x, { target: { value } });
+      }
+      vi.setSystemTime(10_600);
+      fireEvent.change(x, { target: { value: "260" } });
+      y.focus();
+      fireEvent.change(y, { target: { value: "50" } });
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 260, y: 50 }),
+      );
+      await studio(lastSave()!);
+
+      for (const was of [
+        { x: 260, y: 100 },
+        { x: 250, y: 100 },
+        { x: 100, y: 100 },
+      ]) {
+        await user.click(undo());
+        await waitFor(() => expect(lastSave()?.items[0]).toMatchObject(was));
+        await studio(lastSave()!);
+      }
+      expect(undo()).toBeDisabled();
+    });
+
+    it("drops what Redo would bring back once something else changes", async () => {
+      const shape = elementOf("shape", { x: 100, y: 100 });
+      const { user } = await open(holding(shape));
+      await user.click(row(/^Shape/));
+      canvas().focus();
+      await user.keyboard("{ArrowRight}");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 101 }),
+      );
+      await studio(lastSave()!);
+
+      await user.click(undo());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 100 }),
+      );
+      expect(redo()).toBeEnabled();
+      canvas().focus();
+      await user.keyboard("{ArrowDown}");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 100, y: 101 }),
+      );
+      expect(redo()).toBeDisabled();
+    });
+
+    it("leaves a group folded as it is now when it undoes", async () => {
+      const shape = elementOf("shape", { x: 100 });
+      const { user } = await open(scene(shape));
+      await user.click(row(/^Shape/));
+      canvas().focus();
+      await user.keyboard("{ArrowRight}");
+      await waitFor(() => expect(savedElement()).toMatchObject({ x: 101 }));
+      await studio(lastSave()!);
+
+      // Not a step
+      await user.click(
+        layers().getByRole("button", { name: "Elements in this group" }),
+      );
+      await waitFor(() => expect(savedGroup(0)?.folded).toBe(true));
+      await studio(lastSave()!);
+
+      await user.click(undo());
+      await waitFor(() => expect(savedElement()).toMatchObject({ x: 100 }));
+      expect(savedGroup(0)?.folded).toBe(true);
+      expect(undo()).toBeDisabled();
+    });
+
+    it("doesn't bring back a file deleted from the library", async () => {
+      const media = elementOf("media", {
+        file: "party.png",
+        name: "Party",
+        x: 100,
+      });
+      const { user } = await open(holding(media));
+      await user.click(row(/^Party/));
+      canvas().focus();
+      await user.keyboard("{ArrowRight}");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ x: 101 }),
+      );
+      await studio(lastSave()!);
+      await send(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, {
+        field: "media",
+        file: "party.png",
+      });
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ file: "" }),
+      );
+      await studio(lastSave()!);
+
+      await user.click(undo());
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          x: 100,
+          file: "",
+          name: "",
+        }),
+      );
+    });
+
+    it("deletes the selection with Delete or Backspace, on the canvas and in the list", async () => {
+      const inside = elementOf("shape", { label: "Inside" });
+      const g = group("Group 1", [inside]);
+      const a = elementOf("shape");
+      const b = text({ text: "Bee" });
+      const locked = elementOf("emote", { locked: true });
+      const { user } = await open(holding(g, a, b, locked));
+
+      await user.click(row(/^Shape/));
+      canvas().focus();
+      await user.keyboard("{Delete}");
+      await waitFor(() =>
+        expect(savedIds()).toEqual([[g.id, inside.id], b.id, locked.id]),
+      );
+
+      // A number field keeps its keys
+      await user.click(row(/^Bee/));
+      const x = field("X").getByRole("spinbutton");
+      expect(fireEvent.keyDown(x, { key: "Delete" })).toBe(true);
+      canvas().focus();
+      await user.keyboard("{Backspace}");
+      await waitFor(() =>
+        expect(savedIds()).toEqual([[g.id, inside.id], locked.id]),
+      );
+
+      // Locked, it stays on the canvas, and goes from the list
+      await user.click(row(/^Emote/));
+      canvas().focus();
+      await user.keyboard("{Delete}");
+      expect(row(/^Emote/)).toBeVisible();
+      await user.click(row(/^Emote/));
+      await user.keyboard("{Delete}");
+      await waitFor(() => expect(savedIds()).toEqual([[g.id, inside.id]]));
+      // The next row's name takes the focus
+      expect(row(/^Group 1/)).toHaveFocus();
+
+      await user.click(row(/^Group 1/));
+      await user.keyboard("{Delete}");
+      await waitFor(() => expect(lastSave()?.items).toEqual([]));
+
+      await studio(lastSave()!);
+      await user.click(undo());
+      await waitFor(() => expect(savedIds()).toEqual([[g.id, inside.id]]));
+    });
   });
 });

@@ -8,7 +8,7 @@ import {
   StudioItem,
 } from "@/common/schemas";
 import { CustomGift } from "@/common/types";
-import { Btn, Modal } from "@/components";
+import { Btn } from "@/components";
 import { cx } from "@/helper/cx";
 import { useMenu } from "@/hooks";
 import { useT } from "@/ui/i18n";
@@ -29,9 +29,7 @@ import { findElement, KIND_NAMES } from "./helper";
 import { LayerThumb } from "./LayerThumb";
 import styles from "./studioeditor.module.css";
 
-export type GroupFlags = Partial<
-  Pick<StudioGroup, "folded" | "locked" | "hidden">
->;
+export type GroupFlags = Partial<Pick<StudioGroup, "locked" | "hidden">>;
 export type ElementFlags = Partial<Pick<StudioElement, "locked" | "hidden">>;
 
 type Props = {
@@ -52,6 +50,8 @@ type Props = {
   onAdd: (kind: StudioElementKind) => void;
   // Deletes a group with its elements, or an element
   onDelete: (id: string) => void;
+  // The list's view, which Undo leaves alone
+  onFold: (groupId: string, folded: boolean) => void;
   onFlags: (groupId: string, flags: GroupFlags) => void;
   onElementFlags: (elementId: string, flags: ElementFlags) => void;
   // Moves a group or an element on its own to `to`, an index of the items
@@ -112,6 +112,7 @@ export function LayersPanel({
   onAddGroup,
   onAdd,
   onDelete,
+  onFold,
   onFlags,
   onElementFlags,
   onMoveItem,
@@ -128,8 +129,6 @@ export function LayersPanel({
     group: boolean;
     over?: Over;
   } | null>(null);
-  // A group that still holds elements, waiting to be confirmed
-  const [confirm, setConfirm] = useState<StudioGroup | null>(null);
 
   // Top = front
   const rows = [...items].reverse();
@@ -327,6 +326,35 @@ export function LayersPanel({
     list.current?.querySelector<HTMLElement>(`[data-grip="${id}"]`)?.focus();
   };
 
+  // Delete, and Backspace (a Mac's delete key), remove the selection as the
+  // trash does. The focus goes on to the row after it, or before it at the
+  // end, so the keyboard can go on.
+  const removeByKey = (e: KeyboardEvent) => {
+    if (e.key !== "Delete" && e.key !== "Backspace") return;
+    if (selected === null) return;
+    e.preventDefault();
+    const gone = new Set([
+      selected,
+      ...(selectedGroup?.elements.map((element) => element.id) ?? []),
+    ]);
+    const ids = Array.from(
+      list.current?.querySelectorAll<HTMLElement>("[data-select]") ?? [],
+    ).map((button) => button.dataset.select!);
+    const at = ids.indexOf(selected);
+    const next =
+      ids.slice(at + 1).find((id) => !gone.has(id)) ??
+      ids
+        .slice(0, Math.max(at, 0))
+        .reverse()
+        .find((id) => !gone.has(id));
+    flushSync(() => onDelete(selected));
+    if (next) {
+      list.current
+        ?.querySelector<HTMLElement>(`[data-select="${next}"]`)
+        ?.focus();
+    }
+  };
+
   const grip = (id: string, group: boolean, move: (by: 1 | -1) => void) => (
     <Btn
       variant="icon"
@@ -369,6 +397,7 @@ export function LayersPanel({
           type="button"
           className={styles.layer_select}
           aria-pressed={element.id === selected}
+          data-select={element.id}
           onClick={() => onSelect(element.id)}
         >
           <LayerThumb element={element} gifts={gifts} />
@@ -424,7 +453,7 @@ export function LayersPanel({
               title={fold}
               aria-label={fold}
               aria-expanded={!group.folded}
-              onClick={() => onFlags(group.id, { folded: !group.folded })}
+              onClick={() => onFold(group.id, !group.folded)}
             >
               {group.folded ? (
                 <FiChevronRight size={16} />
@@ -439,6 +468,7 @@ export function LayersPanel({
             type="button"
             className={styles.layer_select}
             aria-pressed={group.id === selected}
+            data-select={group.id}
             onClick={() => onSelect(group.id)}
           >
             <span className={styles.layer_text}>
@@ -544,9 +574,9 @@ export function LayersPanel({
             title={remove}
             aria-label={remove}
             disabled={selected === null}
+            // At once, a group with its elements too: Undo brings it back
             onClick={() => {
-              if (selectedGroup?.elements.length) setConfirm(selectedGroup);
-              else if (selected !== null) onDelete(selected);
+              if (selected !== null) onDelete(selected);
             }}
           >
             <FiTrash2 size={18} />
@@ -585,6 +615,7 @@ export function LayersPanel({
           }}
           // Also when it's cancelled or dropped elsewhere: nothing moves
           onDragEnd={() => setDrag(null)}
+          onKeyDown={removeByKey}
           // A click past the items, under them or between them, lets go of
           // the selection, as a click on the empty canvas does
           onClick={(e) => {
@@ -600,22 +631,6 @@ export function LayersPanel({
             item.kind === "group" ? groupItem(item) : elementRow(item, item.id),
           )}
         </ul>
-      )}
-
-      {confirm && (
-        <Modal
-          title={t("studio.editor.deleteTitle")}
-          description={t("studio.editor.deleteText", {
-            name: groupName(confirm),
-            count: confirm.elements.length,
-          })}
-          confirmText={t("common.delete")}
-          onClose={() => setConfirm(null)}
-          onConfirm={() => {
-            onDelete(confirm.id);
-            setConfirm(null);
-          }}
-        />
       )}
     </div>
   );

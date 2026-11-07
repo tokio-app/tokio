@@ -7,7 +7,7 @@ import {
 } from "@/common/schemas";
 import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import { newStudioElement, newStudioGroup, studioView } from "@/common/util";
-import { gift } from "@test/fixtures";
+import { gift, studioOverlay } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   alignTo,
@@ -33,6 +33,7 @@ import {
   sourceOf,
   sourceValue,
   whenText,
+  withFolds,
 } from "./helper";
 
 const t = (
@@ -662,5 +663,24 @@ describe("the canvas's geometry", () => {
       height: 45,
     });
     expect(bounds([])).toBeNull();
+  });
+});
+
+describe("the history", () => {
+  it("keeps each group folded as it is now, in a step it goes back to", () => {
+    const shape = StudioElementSchema.parse(
+      newStudioElement("shape", "portrait"),
+    );
+    const open = { ...newStudioGroup("Open"), elements: [shape] };
+    const shut = { ...newStudioGroup("Shut"), folded: true };
+    const was = studioOverlay("Main", { items: [open, shut] });
+    const now = studioOverlay("Main", {
+      items: [{ ...open, folded: true, name: "Renamed" }],
+    });
+
+    const back = withFolds(was, now);
+    expect(back.items).toEqual([{ ...open, folded: true }, shut]);
+    // Nothing to change, the same overlay's items
+    expect(withFolds(was, was).items[1]).toBe(shut);
   });
 });

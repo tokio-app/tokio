@@ -54,8 +54,9 @@ import { newOverlayName, sizeText } from "@/pages/Studio/helper";
 import toolsStyles from "@/pages/Tools/tools.module.css";
 import { useLanguage, useT } from "@/ui/i18n";
 import { useParams } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { FiPlay } from "react-icons/fi";
+import { LuRedo2, LuUndo2 } from "react-icons/lu";
 import { ElementSettings } from "./ElementSettings";
 import { Embed } from "./Embed";
 import {
@@ -84,6 +85,7 @@ import { ElementFlags, GroupFlags, LayersPanel } from "./LayersPanel";
 import { OverlaySettings } from "./OverlaySettings";
 import { StudioStage } from "./StudioStage";
 import styles from "./studioeditor.module.css";
+import { useHistory } from "./useHistory";
 
 // Numbers the media browses, kept while the page is away so a browse made on
 // its return can't get an older one's number, as on the Alerts page
@@ -91,6 +93,11 @@ let requests = 0;
 
 // A text's fields that change how much room its words take
 const WORDS = ["text", "font", "size", "bold"] as const;
+
+// Fields typed in, which keep their own Ctrl+Z. Number fields take the
+// editor's, like checkboxes, radios and sliders.
+const TEXT_FIELDS =
+  "textarea, input:not([type=number]):not([type=checkbox]):not([type=radio]):not([type=range])";
 
 /**
  * An Overlay Studio overlay's editor: its groups and elements, the
@@ -139,10 +146,13 @@ export function StudioEditor() {
 function Editor({ saved }: { saved: StudioOverlay }) {
   const t = useT();
   const language = useLanguage();
-  const [overlay, setOverlay] = useAutosave(saved, (changed) =>
+  const [overlay, setSaved] = useAutosave(saved, (changed) =>
     window.api.emit(APP_EVENTS.SAVE_STUDIO_OVERLAY, { overlay: changed }),
   );
   const [selected, setSelected] = useState<string | null>(null);
+  // Every change below goes in the history, but folding a group
+  const history = useHistory(overlay, setSaved, selected);
+  const setOverlay = history.change;
   const [installed, setInstalled] = useState<OverlayApp[]>([]);
   const [profile, setProfile] = useState<Pick<Profile, "alerts" | "games">>();
   const [timer, setTimer] = useState<TimerPush | null>(null);
@@ -229,12 +239,12 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   });
 
   // Main took a deleted file off every element, so the next save can't
-  // bring it back
+  // bring it back, nor an undo
   useIpcListener(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, (res) => {
     if (res?.field !== "media") return;
     const shows = (e: StudioElement): e is StudioElementOf<"media"> =>
       e.kind === "media" && e.file === res.file;
-    setOverlay((o) =>
+    history.sweep((o) =>
       studioElements(o).some(shows)
         ? {
             ...o,
@@ -405,13 +415,20 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     [overlay],
   );
 
+  // The list's view, which Undo leaves alone
+  const fold = (id: string, folded: boolean) =>
+    setSaved((o) => ({
+      ...o,
+      items: o.items.map((item) =>
+        item.kind === "group" && item.id === id ? { ...item, folded } : item,
+      ),
+    }));
+
   // An element picked in a folded group unfolds it
   const select = (id: string | null) => {
     setSelected(id);
     const holder = holderOf(id);
-    if (holder?.folded) {
-      changeGroup(holder.id, (g) => ({ ...g, folded: false }));
-    }
+    if (holder?.folded) fold(holder.id, false);
   };
 
   const addGroup = () => {
@@ -515,6 +532,27 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     window.api.emit(APP_EVENTS.TEST_STUDIO_OVERLAY, { id: overlay.id });
   };
 
+  // Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo, Cmd too. Not in a text
+  // field, which keeps its own, nor in a dialog. Electron's Edit menu only
+  // gets the keys the page didn't take.
+  const onUndoKey = useEffectEvent((e: KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const key = e.key.toLowerCase();
+    if (key !== "z" && key !== "y") return;
+    const target = e.target instanceof Element ? e.target : null;
+    if (target?.matches(TEXT_FIELDS) || target?.closest("[role=dialog]")) {
+      return;
+    }
+    e.preventDefault();
+    if (key === "y" || e.shiftKey) history.redo();
+    else history.undo();
+  });
+  useEffect(() => {
+    const listener = (e: KeyboardEvent) => onUndoKey(e);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, []);
+
   const mediaElement = elements.find(
     (e) => e.id === mediaFor && e.kind === "media",
   );
@@ -526,6 +564,26 @@ function Editor({ saved }: { saved: StudioOverlay }) {
         title={overlay.name.trim() || t("studio.untitled")}
         actions={
           <>
+            <Btn
+              variant="icon"
+              title={t("studio.editor.undo")}
+              aria-label={t("studio.editor.undo")}
+              aria-keyshortcuts="Control+Z Meta+Z"
+              disabled={!history.canUndo}
+              onClick={history.undo}
+            >
+              <LuUndo2 size={20} />
+            </Btn>
+            <Btn
+              variant="icon"
+              title={t("studio.editor.redo")}
+              aria-label={t("studio.editor.redo")}
+              aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z"
+              disabled={!history.canRedo}
+              onClick={history.redo}
+            >
+              <LuRedo2 size={20} />
+            </Btn>
             <Btn
               variant="icon"
               title={t("studio.editor.test")}
@@ -552,6 +610,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
             onAddGroup={addGroup}
             onAdd={add}
             onDelete={remove}
+            onFold={fold}
             onFlags={(id, flags: GroupFlags) =>
               changeGroup(id, (g) => ({ ...g, ...flags }))
             }
@@ -595,6 +654,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 changeElement(id, (e) => ({ ...e, rotation }))
               }
               onShift={shift}
+              onHold={history.hold}
+              onDelete={remove}
               embed={(embed) => (
                 <Embed
                   element={embed}

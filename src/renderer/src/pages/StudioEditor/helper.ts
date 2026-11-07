@@ -5,6 +5,7 @@ import {
   StudioElementKind,
   StudioElementOf,
   StudioItem,
+  StudioOverlay,
   StudioSource,
   Trigger,
 } from "@/common/schemas";
@@ -689,4 +690,27 @@ export function pickElement(
     if (element) return element.id;
   }
   return null;
+}
+
+/**
+ * The overlay as a step of the history had it, with each of its groups
+ * folded as it is now: folding is the list's view, which Undo leaves alone.
+ */
+export function withFolds(
+  overlay: StudioOverlay,
+  now: StudioOverlay,
+): StudioOverlay {
+  const folded = new Map(
+    now.items.flatMap((item) =>
+      item.kind === "group" ? [[item.id, item.folded] as const] : [],
+    ),
+  );
+  return {
+    ...overlay,
+    items: overlay.items.map((item) => {
+      if (item.kind !== "group") return item;
+      const fold = folded.get(item.id) ?? item.folded;
+      return fold === item.folded ? item : { ...item, folded: fold };
+    }),
+  };
 }
