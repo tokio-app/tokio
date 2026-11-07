@@ -714,3 +714,63 @@ export function withFolds(
     }),
   };
 }
+
+// The canvas's zooms, in screen px per canvas px, that its buttons and keys
+// step through. Ctrl and the wheel go anywhere between the first and last.
+const ZOOMS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+const MIN_ZOOM = ZOOMS[0];
+const MAX_ZOOM = ZOOMS[ZOOMS.length - 1];
+
+export const clampZoom = (scale: number) =>
+  Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
+
+/** The next zoom in (1) or out (-1) from a scale, null past the last. */
+export function zoomStep(scale: number, by: 1 | -1): number | null {
+  // A hair's room, so a scale on a step goes on to the next one
+  const next =
+    by > 0
+      ? ZOOMS.find((zoom) => zoom > scale * 1.001)
+      : [...ZOOMS].reverse().find((zoom) => zoom < scale / 1.001);
+  return next ?? null;
+}
+
+// Canvas px between a ruler's numbers: the first of these that leaves this
+// many screen px between them
+const RULER_STEPS = [20, 50, 100, 200, 500, 1000];
+const RULER_GAP = 60;
+
+export type RulerTick = {
+  // Screen px from the ruler's start
+  at: number;
+  // Canvas px from the canvas's edge
+  value: number;
+  // A number's tick is the longest, then the one halfway between numbers
+  size: "number" | "half" | "tick";
+};
+
+/**
+ * A ruler's ticks along its length, in screen px, with the canvas's edge
+ * `origin` px from its start (negative once it scrolled past): a number every
+ * so many canvas px, fewer the further it's zoomed out, and a tick every
+ * tenth of that.
+ */
+export function rulerTicks(
+  origin: number,
+  scale: number,
+  length: number,
+): RulerTick[] {
+  if (!(scale > 0) || length <= 0) return [];
+  const step =
+    RULER_STEPS.find((s) => s * scale >= RULER_GAP) ??
+    RULER_STEPS[RULER_STEPS.length - 1];
+  const gap = (step / 10) * scale;
+  const ticks: RulerTick[] = [];
+  for (let i = Math.ceil(-origin / gap) || 0; origin + i * gap <= length; i++) {
+    ticks.push({
+      at: origin + i * gap,
+      value: (i * step) / 10,
+      size: i % 10 === 0 ? "number" : i % 5 === 0 ? "half" : "tick",
+    });
+  }
+  return ticks;
+}

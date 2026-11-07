@@ -664,8 +664,11 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                   games={gamesPreview ?? null}
                 />
               )}
-            />
-            <span className={styles.canvas_size}>{sizeText(overlay.size)}</span>
+            >
+              <span className={styles.canvas_size}>
+                {sizeText(overlay.size)}
+              </span>
+            </StudioStage>
           </div>
 
           <div className={styles.panel}>

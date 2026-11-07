@@ -114,6 +114,11 @@ const addMenu = () =>
 const deleteButton = (name: string) => page().getByRole("button", { name });
 const undo = () => page().getByRole("button", { name: "Undo (Ctrl+Z)" });
 const redo = () => page().getByRole("button", { name: "Redo (Ctrl+Y)" });
+// The zoom's level under the canvas, its view, and the canvas's room in it
+const zoomLevel = () => page().getByRole("status", { name: "Zoom" });
+const scroller = () =>
+  canvas().querySelector<HTMLElement>("[class*=stage_scroll]")!;
+const area = () => canvas().querySelector<HTMLElement>("[class*=stage_area]")!;
 
 // The canvas at half size on screen, 540 × 960 from the root's top left
 // (jsdom's getBoundingClientRect is all zeros)
@@ -927,7 +932,9 @@ describe("StudioEditor", () => {
       ]),
     );
     expect(width).toHaveValue(150);
-  });
+    // 150 steps of the whole editor, each rendered twice: past the usual
+    // limit when the whole suite shares the machine
+  }, 30_000);
 
   it("turns a group by its handle as far as the pointer, step after step", async () => {
     const big = elementOf("shape", { x: 100, y: 100, width: 100, height: 100 });
@@ -2078,6 +2085,141 @@ describe("StudioEditor", () => {
       await studio(lastSave()!);
       await user.click(undo());
       await waitFor(() => expect(savedIds()).toEqual([[g.id, inside.id]]));
+    });
+  });
+
+  describe("zoom", () => {
+    it("zooms with its buttons, its level under the canvas", async () => {
+      const { user } = await open(studioOverlay("Main", { id: ID }));
+      sized();
+      const button = (name: string) => page().getByRole("button", { name });
+
+      await user.click(button("Zoom in (Ctrl+=)"));
+      expect(zoomLevel()).toHaveTextContent("75%");
+      expect(area().style.width).toBe("810px");
+      expect(area().style.height).toBe("1440px");
+      await user.click(button("Zoom out (Ctrl+-)"));
+      expect(zoomLevel()).toHaveTextContent("50%");
+
+      // Fitted again, at the stage's size
+      await user.click(button("Zoom to fit (Ctrl+0)"));
+      expect(zoomLevel()).toHaveTextContent("50%");
+      expect(area().style.width).toBe("");
+      await user.click(button("Zoom out (Ctrl+-)"));
+      expect(zoomLevel()).toHaveTextContent("25%");
+    });
+
+    it("zooms with Ctrl and the wheel or its keys, in place of the window's zoom", async () => {
+      await open(studioOverlay("Main", { id: ID }));
+      sized();
+
+      // The wheel alone scrolls
+      expect(fireEvent.wheel(canvas(), { deltaY: -100 })).toBe(true);
+      expect(fireEvent.wheel(canvas(), { deltaY: -100, ctrlKey: true })).toBe(
+        false,
+      );
+      expect(zoomLevel()).toHaveTextContent("60%");
+
+      expect(
+        fireEvent.keyDown(document.body, { key: "=", ctrlKey: true }),
+      ).toBe(false);
+      expect(zoomLevel()).toHaveTextContent("75%");
+      expect(
+        fireEvent.keyDown(document.body, { key: "-", metaKey: true }),
+      ).toBe(false);
+      expect(zoomLevel()).toHaveTextContent("50%");
+      fireEvent.keyDown(document.body, { key: "+", ctrlKey: true });
+      expect(zoomLevel()).toHaveTextContent("75%");
+      expect(
+        fireEvent.keyDown(document.body, { key: "0", ctrlKey: true }),
+      ).toBe(false);
+      expect(area().style.width).toBe("");
+    });
+
+    it("leaves its keys and Undo's to a dialog", async () => {
+      const media = elementOf("media");
+      const { user } = await open(holding(media));
+      sized();
+      await user.click(row(/^Image or video/));
+      await user.click(page().getByRole("button", { name: "Pick a file" }));
+      const dialog = screen.getByRole("dialog");
+
+      expect(fireEvent.keyDown(dialog, { key: "=", ctrlKey: true })).toBe(true);
+      expect(fireEvent.keyDown(dialog, { key: "z", ctrlKey: true })).toBe(true);
+      expect(area().style.width).toBe("");
+    });
+
+    it("pans with Space and a drag, and selects nothing", async () => {
+      const shape = elementOf("shape", {
+        x: 0,
+        y: 0,
+        width: 1080,
+        height: 1920,
+      });
+      const { user } = await open(holding(shape));
+      sized();
+      const left = vi.spyOn(scroller(), "scrollLeft", "set");
+      const top = vi.spyOn(scroller(), "scrollTop", "set");
+
+      canvas().focus();
+      expect(fireEvent.keyDown(canvas(), { key: " " })).toBe(false);
+      expect(canvas().style.cursor).toBe("grab");
+      // Over the shape, which a press would pick without Space
+      press(200, 200);
+      expect(canvas().style.cursor).toBe("grabbing");
+      fireEvent.pointerMove(canvas(), { clientX: 70, clientY: 80 });
+      expect(left).toHaveBeenLastCalledWith(30);
+      expect(top).toHaveBeenLastCalledWith(20);
+      fireEvent.pointerUp(canvas());
+      fireEvent.keyUp(canvas(), { key: " " });
+      expect(canvas().style.cursor).toBe("");
+      expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "false");
+      expect(lastSave()).toBeUndefined();
+
+      // A field keeps its Space
+      await user.click(row(/^Shape/));
+      const name = field("Name").getByRole("textbox");
+      expect(fireEvent.keyDown(name, { key: " " })).toBe(true);
+      expect(canvas().style.cursor).not.toBe("grab");
+    });
+
+    it("keeps the selection on a press on its scrollbars", async () => {
+      const { user } = await open(holding(elementOf("shape")));
+      sized();
+      await user.click(row(/^Shape/));
+
+      fireEvent.pointerDown(scroller(), { button: 0, clientX: 5, clientY: 5 });
+      expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("shows the rulers only while they're on", async () => {
+      const { user } = await open(studioOverlay("Main", { id: ID }));
+      sized();
+      vi.spyOn(scroller(), "clientWidth", "get").mockReturnValue(540);
+      vi.spyOn(scroller(), "clientHeight", "get").mockReturnValue(960);
+      const rulers = page().getByRole("button", { name: "Rulers" });
+      const drawnRulers = () => document.querySelectorAll("[data-ruler]");
+      expect(rulers).toHaveAttribute("aria-pressed", "false");
+      expect(drawnRulers()).toHaveLength(0);
+
+      await user.click(rulers);
+      expect(rulers).toHaveAttribute("aria-pressed", "true");
+      expect(drawnRulers()).toHaveLength(2);
+      // At half size, a number every 200 px of the canvas
+      await user.click(
+        page().getByRole("button", { name: "Zoom in (Ctrl+=)" }),
+      );
+      await user.click(
+        page().getByRole("button", { name: "Zoom out (Ctrl+-)" }),
+      );
+      const top = within(
+        document.querySelector<HTMLElement>("[data-ruler=top]")!,
+      );
+      expect(top.getByText("200")).toBeInTheDocument();
+      expect(top.getByText("1000")).toBeInTheDocument();
+
+      await user.click(rulers);
+      expect(drawnRulers()).toHaveLength(0);
     });
   });
 });

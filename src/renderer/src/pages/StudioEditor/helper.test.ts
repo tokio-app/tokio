@@ -32,8 +32,10 @@ import {
   Samples,
   sourceOf,
   sourceValue,
+  rulerTicks,
   whenText,
   withFolds,
+  zoomStep,
 } from "./helper";
 
 const t = (
@@ -666,7 +668,7 @@ describe("the canvas's geometry", () => {
   });
 });
 
-describe("the history", () => {
+describe("the history and the view", () => {
   it("keeps each group folded as it is now, in a step it goes back to", () => {
     const shape = StudioElementSchema.parse(
       newStudioElement("shape", "portrait"),
@@ -682,5 +684,56 @@ describe("the history", () => {
     expect(back.items).toEqual([{ ...open, folded: true }, shut]);
     // Nothing to change, the same overlay's items
     expect(withFolds(was, was).items[1]).toBe(shut);
+  });
+
+  it("steps the zoom through its stops, from wherever it is", () => {
+    expect(zoomStep(0.32, 1)).toBe(0.5);
+    expect(zoomStep(0.32, -1)).toBe(0.25);
+    expect(zoomStep(1, 1)).toBe(1.5);
+    expect(zoomStep(1, -1)).toBe(0.75);
+    expect(zoomStep(4, 1)).toBeNull();
+    expect(zoomStep(0.1, -1)).toBeNull();
+    // Under the first, the first; past the last, the last
+    expect(zoomStep(0.05, 1)).toBe(0.1);
+    expect(zoomStep(5, -1)).toBe(4);
+  });
+
+  it("numbers a ruler at least 60 px apart, with a tick every tenth", () => {
+    // Fitted at a third: a number every 200 canvas px, 66 screen px apart
+    const ticks = rulerTicks(40, 1 / 3, 400);
+    const numbers = ticks.filter((tick) => tick.size === "number");
+    expect(numbers.map((tick) => tick.value)).toEqual([
+      0, 200, 400, 600, 800, 1000,
+    ]);
+    expect(numbers[0].at).toBe(40);
+    expect(ticks[0].at).toBeGreaterThanOrEqual(0);
+    expect(ticks.at(-1)!.at).toBeLessThanOrEqual(400);
+    // A tick every 20 from the ruler's start, the longer one halfway
+    expect(ticks.slice(0, 7).map((tick) => [tick.value, tick.size])).toEqual([
+      [-120, "tick"],
+      [-100, "half"],
+      [-80, "tick"],
+      [-60, "tick"],
+      [-40, "tick"],
+      [-20, "tick"],
+      [0, "number"],
+    ]);
+
+    // At 400%, every 20 px; at 10%, every 1000
+    expect(
+      rulerTicks(0, 4, 200)
+        .filter((t) => t.size === "number")
+        .map((t) => t.value),
+    ).toEqual([0, 20, 40]);
+    expect(
+      rulerTicks(0, 0.1, 290)
+        .filter((t) => t.size === "number")
+        .map((t) => t.value),
+    ).toEqual([0, 1000, 2000]);
+    // Scrolled past the canvas's edge
+    expect(
+      rulerTicks(-500, 1, 100).find((t) => t.size === "number")?.value,
+    ).toBe(500);
+    expect(rulerTicks(0, 0, 100)).toEqual([]);
   });
 });

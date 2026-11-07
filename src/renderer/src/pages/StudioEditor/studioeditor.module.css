@@ -410,12 +410,25 @@
   margin-bottom: 0;
 }
 
-/* Focusable for the arrows; the canvas is scaled to fit inside it. A
-   selection past the canvas is cut at its edges, so it can't stretch the
-   page. */
+/* The stage, with the rulers along its top and left while they're on */
+.stage_frame {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.with_rulers {
+  grid-template: var(--space-5) minmax(0, 1fr) / var(--space-5) minmax(0, 1fr);
+}
+
+/* Focusable for the arrows; the canvas is scaled inside it, to fit or to
+   the zoom. A selection past the canvas is cut at its edges, so it can't
+   stretch the page. */
 .stage {
   position: relative;
-  flex: 1;
+  grid-area: -2 / -2;
+  min-width: 0;
   min-height: 0;
   overflow: clip;
   border-radius: var(--radius-md);
@@ -423,12 +436,52 @@
   user-select: none;
 }
 
-/* The canvas's room, and the selection's, short of the stage's edges: the
-   handles of an element at the canvas's edge stay inside the cut, the rotate
-   handle 32px past its side */
+/* The rulers meet it on its top left */
+.with_rulers .stage {
+  border-top-left-radius: 0;
+}
+
+/* Scrolls a canvas zoomed past the stage */
+.stage_scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+/* At least the view's size, or the zoomed canvas's with its margin: the
+   canvas and the selection sit 40px inside its edges, where what passes them
+   is cut, so the handles of an element at the canvas's edge stay inside, the
+   rotate handle 32px past its side. Cut, an element far off the canvas can't
+   stretch the scroll either. */
+.stage_sizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  box-sizing: border-box;
+  min-width: 100%;
+  min-height: 100%;
+  padding: var(--space-10);
+  overflow: clip;
+}
+
+/* The canvas's room: fitted, all of the sizer's inside its margin */
 .stage_area {
   position: absolute;
   inset: var(--space-10);
+}
+
+/* Zoomed, the canvas's size, centered while the view has room */
+.stage_area.zoomed {
+  position: relative;
+  inset: auto;
+  margin: auto;
+}
+
+/* While Space is down, the hand over the handles too */
+.spaced .handle,
+.spaced .rotate {
+  cursor: inherit;
 }
 
 /* Two classes, so it wins over the stream stylesheet's .studio-stage on the
@@ -515,13 +568,71 @@
   background-color: var(--accent-primary);
 }
 
-.canvas_size {
-  align-self: center;
+/* Under the canvas: its size, then the rulers' toggle and the zoom */
+.canvas_bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.canvas_size,
+.zoom_level {
   color: var(--font-secondary);
   font-size: var(--font-sm);
   font-stretch: var(--stretch-readout);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Wide enough for 400 %, so the buttons stay put */
+.zoom_level {
+  min-width: 6ch;
+  text-align: center;
+}
+
+/* RULERS, in canvas px: on Ink, a hairline on their inner edges */
+
+.ruler_corner {
+  grid-area: 1 / 1;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.ruler_top,
+.ruler_left {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  fill: var(--font-secondary);
+  font-size: var(--font-xs);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.ruler_top {
+  grid-area: 1 / 2;
+  border-bottom: 1px solid var(--border);
+}
+
+.ruler_left {
+  grid-area: 2 / 1;
+  border-right: 1px solid var(--border);
+}
+
+.ruler_top path,
+.ruler_left path {
+  fill: none;
+  stroke: var(--font-muted);
+  stroke-width: 1;
 }
 
 /* EMBEDS, in the canvas's px: sizes are tokens times the canvas's usual

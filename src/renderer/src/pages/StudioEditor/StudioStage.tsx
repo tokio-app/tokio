@@ -3,21 +3,27 @@
 import "@/common/studio/overlay.css";
 import { createStage, Stage, StageFit } from "@/common/studio/stage";
 import { StudioElementView, StudioView } from "@/common/types";
+import { Btn } from "@/components";
 import { cx } from "@/helper/cx";
-import { useT } from "@/ui/i18n";
+import { useLanguage, useT } from "@/ui/i18n";
 import {
   CSSProperties,
   KeyboardEvent,
   PointerEvent,
   ReactNode,
   RefObject,
+  useEffect,
+  useEffectEvent,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
+import { LuMaximize, LuRuler, LuZoomIn, LuZoomOut } from "react-icons/lu";
 import {
   Box,
+  clampZoom,
   Corner,
   CORNERS,
   fitText,
@@ -31,7 +37,9 @@ import {
   turnTo,
   Turned,
   Words,
+  zoomStep,
 } from "./helper";
+import { Rulers } from "./Rulers";
 import styles from "./studioeditor.module.css";
 
 export type EmbedView = Extract<StudioElementView, { kind: "overlay" }>;
@@ -83,6 +91,8 @@ type Props = {
   onDelete: (id: string) => void;
   // An embed's preview, portaled into its slot
   embed: (element: EmbedView) => ReactNode;
+  // The bar under the canvas, beside its zoom: its size
+  children?: ReactNode;
 };
 
 type Drag =
@@ -127,10 +137,18 @@ type Drag =
       moved: boolean;
       // The whole px already sent
       sent: [number, number];
+    }
+  | {
+      kind: "pan";
+      // Where the pointer went down, and how far the view was scrolled then
+      x: number;
+      y: number;
+      left: number;
+      top: number;
     };
 
 // The cursor a drag keeps on the whole stage
-type Held = "rotate" | "move" | Corner;
+type Held = "rotate" | "move" | "pan" | Corner;
 
 const NO_FIT: StageFit = { scale: 0, left: 0, top: 0 };
 
@@ -171,7 +189,8 @@ const NUDGES: Record<string, [number, number]> = {
  * editor adds over it: the selection's outline and resize handle, dragging,
  * the arrows and Delete. A selected group moves as one. Embeds are React's
  * previews, portaled into the stage's slots, which stay put so iframes don't
- * reload.
+ * reload. It zooms and scrolls, with rulers while they're on, and its bar
+ * under it holds the zoom.
  */
 export function StudioStage({
   view,
@@ -190,9 +209,14 @@ export function StudioStage({
   onHold,
   onDelete,
   embed,
+  children,
 }: Props) {
   const t = useT();
+  const language = useLanguage();
   const root = useRef<HTMLDivElement>(null);
+  // The focusable stage, and the view inside it that scrolls a zoomed canvas
+  const stageEl = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState(NO_FIT);
   // Each embed's slot, which exists only once the stage drew its element
   const [slots, setSlots] = useState<ReadonlyMap<string, HTMLElement>>(
@@ -200,11 +224,26 @@ export function StudioStage({
   );
   const drag = useRef<Drag | null>(null);
   // The cursor a drag keeps on the whole stage, wherever the pointer goes:
-  // the rotate cursor while it turns, the move cursor, or a corner's resize
+  // the rotate cursor while it turns, the move cursor, a corner's resize, or
+  // the closed hand while it pans
   const [held, setHeld] = useState<Held | null>(null);
   // The pointer is over what a drag moves: an element, or the selected
   // group's outline
   const [movable, setMovable] = useState(false);
+  // The canvas's scale, null while it fits the stage
+  const [zoom, setZoom] = useState<number | null>(null);
+  // A canvas point to keep where it is on screen across a zoom
+  const anchor = useRef<{ point: Point; x: number; y: number } | null>(null);
+  // Space is down, with the canvas focused or nothing: a drag pans
+  const [space, setSpace] = useState(false);
+  // Off at first, then on until the editor closes, as Link is
+  const [rulers, setRulers] = useState(false);
+  const percent = useMemo(
+    () => new Intl.NumberFormat(language, { style: "percent" }),
+    [language],
+  );
+  // The scale shown: the zoom's, or the fit's
+  const level = zoom ?? fit.scale;
 
   useLayoutEffect(() => {
     const stage = createStage(root.current!, { slots: true, editing: true });
@@ -244,6 +283,107 @@ export function StudioStage({
       return same ? last : next;
     });
   }, [view, stageRef]);
+
+  // After a zoom: the outline at once, not a frame late, and the canvas point
+  // the zoom kept back where it was on screen
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    const pane = scroller.current;
+    const kept = anchor.current;
+    anchor.current = null;
+    if (!stage || !pane) return;
+    const fitted = stage.fit();
+    setFit((last) => (sameFit(last, fitted) ? last : fitted));
+    if (!kept || !fitted.scale) return;
+    const rect = root.current!.getBoundingClientRect();
+    pane.scrollLeft +=
+      rect.left + fitted.left + kept.point.x * fitted.scale - kept.x;
+    pane.scrollTop +=
+      rect.top + fitted.top + kept.point.y * fitted.scale - kept.y;
+  }, [zoom, stageRef]);
+
+  // The scale now, for a zoom from it: the fit's from the stage itself
+  const scaleNow = () => zoom ?? stageRef.current?.fit().scale ?? 0;
+
+  /**
+   * Zooms to a scale, null to fit, keeping the canvas point under `at` on
+   * screen where it is: the pointer's, or else the stage's middle.
+   */
+  const zoomTo = (next: number | null, at?: Point) => {
+    const pane = scroller.current;
+    const fitted = stageRef.current?.fit();
+    if (!pane || !fitted?.scale) return;
+    const rect = pane.getBoundingClientRect();
+    const spot = at ?? {
+      x: rect.left + pane.clientWidth / 2,
+      y: rect.top + pane.clientHeight / 2,
+    };
+    anchor.current = {
+      point: toCanvas(spot, root.current!.getBoundingClientRect(), fitted),
+      ...spot,
+    };
+    // At once, so the wheel's next step starts from this one
+    flushSync(() => setZoom(next === null ? null : clampZoom(next)));
+  };
+
+  const stepZoom = (by: 1 | -1) => {
+    const next = zoomStep(scaleNow(), by);
+    if (next !== null) zoomTo(next);
+  };
+
+  // Ctrl or Cmd with the wheel, and a trackpad's pinch, zoom at the pointer.
+  // A native listener: React's can't keep the wheel from scrolling.
+  const onWheel = useEffectEvent((e: WheelEvent) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    if (drag.current) return;
+    zoomTo(scaleNow() * 1.2 ** (-e.deltaY / 100), {
+      x: e.clientX,
+      y: e.clientY,
+    });
+  });
+  useEffect(() => {
+    const el = stageEl.current!;
+    const listener = (e: WheelEvent) => onWheel(e);
+    el.addEventListener("wheel", listener, { passive: false });
+    return () => el.removeEventListener("wheel", listener);
+  }, []);
+
+  // Ctrl or Cmd with = or + zooms in, with - out, and with 0 fits, in place
+  // of the window's own zoom, anywhere in the editor but a dialog. Space,
+  // with the canvas focused or nothing, lets a drag pan: a field or a button
+  // keeps its own.
+  const onKey = useEffectEvent((e: globalThis.KeyboardEvent, down: boolean) => {
+    const target = e.target instanceof Element ? e.target : null;
+    if (e.key === " ") {
+      if (!down) setSpace(false);
+      else if (target === stageEl.current || target === document.body) {
+        e.preventDefault();
+        setSpace(true);
+      }
+      return;
+    }
+    if (!down || !(e.ctrlKey || e.metaKey) || e.altKey) return;
+    if (target?.closest("[role=dialog]")) return;
+    if (e.key === "=" || e.key === "+") stepZoom(1);
+    else if (e.key === "-") stepZoom(-1);
+    else if (e.key === "0") zoomTo(null);
+    else return;
+    e.preventDefault();
+  });
+  useEffect(() => {
+    const down = (e: globalThis.KeyboardEvent) => onKey(e, true);
+    const up = (e: globalThis.KeyboardEvent) => onKey(e, false);
+    const away = () => setSpace(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", away);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", away);
+    };
+  }, []);
 
   const nodeOf = (id: string) =>
     Array.from(
@@ -372,11 +512,28 @@ export function StudioStage({
     if (e.button !== 0) return;
     const target = e.target;
     if (!(target instanceof Element)) return;
+    // Its view's own scrollbars: they scroll, and pick nothing
+    if (target === scroller.current) return;
     // The keys go on from where it was clicked. No ring around the whole
     // canvas for a click: Chromium would ring it after a field had the focus.
     // Tab still rings it.
     e.currentTarget.focus({ focusVisible: false });
     e.preventDefault();
+    if (space) {
+      const pane = scroller.current!;
+      start(
+        e,
+        {
+          kind: "pan",
+          x: e.clientX,
+          y: e.clientY,
+          left: pane.scrollLeft,
+          top: pane.scrollTop,
+        },
+        "pan",
+      );
+      return;
+    }
     const fitted = stageRef.current?.fit() ?? NO_FIT;
     const { scale } = fitted;
     if (!scale) return;
@@ -510,6 +667,13 @@ export function StudioStage({
       if (moves !== movable) setMovable(moves);
       return;
     }
+    if (d.kind === "pan") {
+      // The view follows the pointer, as if the canvas were held
+      const pane = scroller.current!;
+      pane.scrollLeft = d.left - (e.clientX - d.x);
+      pane.scrollTop = d.top - (e.clientY - d.y);
+      return;
+    }
     if (d.kind === "rotate") {
       // Shift turns it in steps of 15 degrees
       const pointer = { x: e.clientX, y: e.clientY };
@@ -617,63 +781,149 @@ export function StudioStage({
       }
     : undefined;
 
+  const zoomOut = zoomStep(level, -1);
+  const zoomIn = zoomStep(level, 1);
+
   return (
-    <div
-      className={styles.stage}
-      tabIndex={0}
-      aria-label={t("studio.editor.canvas")}
-      aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape Delete Backspace"
-      style={{
-        // Hairlines drawn inside the scaled canvas stay one screen px
-        "--canvas-scale": fit.scale || 1,
-        cursor:
-          held === "rotate"
-            ? rotateCursor(rotation)
-            : held === "move" || (!held && movable)
-              ? "move"
-              : held
-                ? RESIZE_CURSORS[held]
-                : undefined,
-      }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={end}
-      onLostPointerCapture={end}
-      onPointerLeave={() => setMovable(false)}
-      onKeyDown={onKeyDown}
-    >
-      <div className={styles.stage_area}>
-        <div ref={root} className={styles.stage_root} />
-        {outline && (
-          <div className={styles.selection} style={outline}>
-            {!stuck && (chosen || groupFrame) && (
-              <>
-                {CORNERS.map((corner) => (
-                  <span
-                    key={corner}
-                    className={cx(styles.handle, HANDLES[corner])}
-                    data-handle={corner}
-                    title={t("studio.editor.resize")}
-                  />
-                ))}
-                <span
-                  className={styles.rotate}
-                  data-handle="rotate"
-                  title={t("studio.editor.rotate")}
-                  // Along the circle it turns on
-                  style={{ cursor: rotateCursor(rotation) }}
-                />
-              </>
-            )}
+    <>
+      <div className={cx(styles.stage_frame, rulers && styles.with_rulers)}>
+        {rulers && <Rulers scroller={scroller} root={root} fit={fit} />}
+        <div
+          ref={stageEl}
+          className={cx(styles.stage, space && styles.spaced)}
+          tabIndex={0}
+          aria-label={t("studio.editor.canvas")}
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Escape Delete Backspace Space"
+          style={{
+            // Hairlines drawn inside the scaled canvas stay one screen px
+            "--canvas-scale": fit.scale || 1,
+            cursor:
+              held === "pan"
+                ? "grabbing"
+                : space && !held
+                  ? "grab"
+                  : held === "rotate"
+                    ? rotateCursor(rotation)
+                    : held === "move" || (!held && movable)
+                      ? "move"
+                      : held
+                        ? RESIZE_CURSORS[held]
+                        : undefined,
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={end}
+          onLostPointerCapture={end}
+          onPointerLeave={() => setMovable(false)}
+          onKeyDown={onKeyDown}
+        >
+          <div ref={scroller} className={styles.stage_scroll}>
+            <div className={styles.stage_sizer}>
+              <div
+                className={cx(
+                  styles.stage_area,
+                  zoom !== null && styles.zoomed,
+                )}
+                style={
+                  zoom === null
+                    ? undefined
+                    : {
+                        width: Math.round(view.width * zoom),
+                        height: Math.round(view.height * zoom),
+                      }
+                }
+              >
+                <div ref={root} className={styles.stage_root} />
+                {outline && (
+                  <div className={styles.selection} style={outline}>
+                    {!stuck && (chosen || groupFrame) && (
+                      <>
+                        {CORNERS.map((corner) => (
+                          <span
+                            key={corner}
+                            className={cx(styles.handle, HANDLES[corner])}
+                            data-handle={corner}
+                            title={t("studio.editor.resize")}
+                          />
+                        ))}
+                        <span
+                          className={styles.rotate}
+                          data-handle="rotate"
+                          title={t("studio.editor.rotate")}
+                          // Along the circle it turns on, but the hand while
+                          // Space is down
+                          style={
+                            space
+                              ? undefined
+                              : { cursor: rotateCursor(rotation) }
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        )}
+          {elements.map(({ element }) => {
+            if (element.kind !== "overlay") return null;
+            const slot = slots.get(element.id);
+            return slot ? createPortal(embed(element), slot, element.id) : null;
+          })}
+        </div>
       </div>
-      {elements.map(({ element }) => {
-        if (element.kind !== "overlay") return null;
-        const slot = slots.get(element.id);
-        return slot ? createPortal(embed(element), slot, element.id) : null;
-      })}
-    </div>
+
+      <div className={styles.canvas_bar}>
+        {children}
+        <div className={styles.zoom}>
+          <Btn
+            variant="icon"
+            title={t("studio.editor.rulers")}
+            aria-label={t("studio.editor.rulers")}
+            aria-pressed={rulers}
+            active={rulers}
+            onClick={() => setRulers((on) => !on)}
+          >
+            <LuRuler size={16} />
+          </Btn>
+          <Btn
+            variant="icon"
+            title={t("studio.editor.zoomOut")}
+            aria-label={t("studio.editor.zoomOut")}
+            aria-keyshortcuts="Control+-"
+            disabled={zoomOut === null}
+            onClick={() => stepZoom(-1)}
+          >
+            <LuZoomOut size={16} />
+          </Btn>
+          <output
+            className={styles.zoom_level}
+            aria-label={t("studio.editor.zoom")}
+          >
+            {percent.format(level)}
+          </output>
+          <Btn
+            variant="icon"
+            title={t("studio.editor.zoomIn")}
+            aria-label={t("studio.editor.zoomIn")}
+            aria-keyshortcuts="Control+="
+            disabled={zoomIn === null}
+            onClick={() => stepZoom(1)}
+          >
+            <LuZoomIn size={16} />
+          </Btn>
+          <Btn
+            variant="icon"
+            title={t("studio.editor.zoomFit")}
+            aria-label={t("studio.editor.zoomFit")}
+            aria-keyshortcuts="Control+0"
+            onClick={() => zoomTo(null)}
+          >
+            <LuMaximize size={16} />
+          </Btn>
+        </div>
+      </div>
+    </>
   );
 }
