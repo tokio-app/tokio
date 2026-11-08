@@ -310,7 +310,7 @@ export class AlertsService extends Service {
         const sent = this._server?.sendToClient(id, {
           type: SHOW_MEDIA,
           data: {
-            src: `/${ALERTS_PATH}/media/${file}`,
+            src: `/${ALERTS_PATH}/media/${encodeURIComponent(file)}`,
             kind,
             duration: clamp(duration, MAX_SECONDS),
             volume: clamp(volume, 100),

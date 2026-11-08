@@ -1208,6 +1208,15 @@ describe("AlertsService", () => {
       });
     });
 
+    it("encodes the file's name in the media's link", () => {
+      service.showMedia({ ...show, file: "my clip#1.png" });
+      vi.runAllTimers();
+
+      expect(sendToClient.mock.calls[0][1].data.src).toBe(
+        "/alerts/media/my%20clip%231.png",
+      );
+    });
+
     it("refuses paths, other files and numbers that aren't", () => {
       const warn = vi.spyOn(Logger, "warn");
       const refused = [
