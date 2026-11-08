@@ -507,6 +507,19 @@ describe("MusicService", () => {
       ]);
     });
 
+    it("calls every onSongChange listener", async () => {
+      const { service, request } = setup();
+      const first = vi.fn<(songs: MusicInfo[]) => void>();
+      const second = vi.fn<(songs: MusicInfo[]) => void>();
+      service.onSongChange(first);
+      service.onSongChange(second);
+
+      await request("!play A");
+
+      expect(first).toHaveBeenCalledOnce();
+      expect(second).toHaveBeenCalledOnce();
+    });
+
     it("keeps the track the provider is playing and plays the request after it", async () => {
       const { request, provider, played, queue } = setup();
       provider.playerStatus.mockResolvedValueOnce({

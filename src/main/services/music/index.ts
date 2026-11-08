@@ -27,7 +27,7 @@ export class MusicService extends ProviderService<MusicProvider> {
   private _queue: TaskQueue;
   private _music_queue: MusicQueue;
   private _onPlaybackError?: (id: string, error: unknown) => void;
-  private _onSongChange?: (songs: MusicInfo[]) => void;
+  private _onSongChange: ((songs: MusicInfo[]) => void)[] = [];
   // When the last command was taken, for the cooldown
   private _lastCommand = -Infinity;
   // Bumped by clearHandler, so a request still searching then plays nothing
@@ -39,7 +39,7 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._queue = new TaskQueue();
     this._music_queue = new MusicQueue({
       onError: (id, error) => this._playbackFailed(id, error),
-      onStart: (songs) => this._onSongChange?.(songs),
+      onStart: (songs) => this._onSongChange.forEach((fn) => fn(songs)),
       // What's left of the song while the player plays it, after an ad
       // too. Paused, it can't tell when the song ends. Times are in ms.
       remaining: async (song) => {
@@ -101,7 +101,7 @@ export class MusicService extends ProviderService<MusicProvider> {
   // Called once when a song starts, unlike MUSIC_CHANGE, which also comes
   // when the queue changes.
   public onSongChange(listener: (songs: MusicInfo[]) => void) {
-    this._onSongChange = listener;
+    this._onSongChange.push(listener);
   }
 
   public clearHandler() {
