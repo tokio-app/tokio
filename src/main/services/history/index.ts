@@ -530,8 +530,11 @@ export class HistoryService extends Service {
       ...live,
       endedAt: now,
       gifters: [...this._liveGifters.values()].sort(byCoins),
-      // Copies, since the minute now still changes
-      minutes: this._minutes.map((m) => ({ ...m, gifters: { ...m.gifters } })),
+      // The minute now still changes before the save writes it, the others
+      // never do
+      minutes: this._minutes.map((m, i, all) =>
+        i < all.length - 1 ? m : { ...m, gifters: { ...m.gifters } },
+      ),
     };
   }
 
