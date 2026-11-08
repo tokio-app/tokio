@@ -92,11 +92,13 @@ describe("URLManagerService", () => {
       expect(exec).toHaveBeenCalledOnce();
       expect(exec).toHaveBeenCalledWith(
         [
-          `echo.>> ${hosts.path}`,
-          `echo ## Tokio App Hostname - Start ##>> ${hosts.path}`,
-          `echo ${ENTRY}>> ${hosts.path}`,
-          `echo ${ENTRY6}>> ${hosts.path}`,
-          `echo ## Tokio App Hostname - End ##>> ${hosts.path}`,
+          "(",
+          "echo.",
+          "echo ## Tokio App Hostname - Start ##",
+          `echo ${ENTRY}`,
+          `echo ${ENTRY6}`,
+          "echo ## Tokio App Hostname - End ##",
+          `)>> ${hosts.path}`,
         ].join("\n"),
         { name: "Tokio" },
         expect.any(Function),
@@ -148,13 +150,13 @@ describe("URLManagerService", () => {
 
     describe("on Linux and macOS", () => {
       const append = () =>
-        [
-          `echo >> ${hosts.path}`,
-          `echo '## Tokio App Hostname - Start ##' >> ${hosts.path}`,
-          `echo '${ENTRY}' >> ${hosts.path}`,
-          `echo '${ENTRY6}' >> ${hosts.path}`,
-          `echo '## Tokio App Hostname - End ##' >> ${hosts.path}`,
-        ].join(" && ");
+        `(${[
+          "echo",
+          "echo '## Tokio App Hostname - Start ##'",
+          `echo '${ENTRY}'`,
+          `echo '${ENTRY6}'`,
+          "echo '## Tokio App Hostname - End ##'",
+        ].join(" && ")}) >> ${hosts.path}`;
 
       it("appends the block with a shell command on Linux", async () => {
         vi.spyOn(process, "platform", "get").mockReturnValue("linux");
