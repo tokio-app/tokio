@@ -376,6 +376,45 @@ describe("ServerService", () => {
       }
     });
 
+    it("drops a removed video's source, so the browser lets it go", async () => {
+      const dom = await open();
+      const { document, HTMLMediaElement } = dom.window;
+      const pause = vi
+        .spyOn(HTMLMediaElement.prototype, "pause")
+        .mockImplementation(() => {});
+      const load = vi
+        .spyOn(HTMLMediaElement.prototype, "load")
+        .mockImplementation(() => {});
+
+      try {
+        await connected();
+        show("a.webm", "video");
+        await vi.waitFor(() =>
+          expect(document.querySelector("video")).not.toBeNull(),
+        );
+        const replaced = document.querySelector("video");
+        show("a.png", "image");
+        await vi.waitFor(() =>
+          expect(document.querySelector("img")).not.toBeNull(),
+        );
+
+        expect(replaced.hasAttribute("src")).toBe(false);
+        expect(pause.mock.contexts).toEqual([replaced]);
+        expect(load.mock.contexts).toEqual([replaced]);
+
+        show("a.webm", "video");
+        await vi.waitFor(() =>
+          expect(document.querySelector("video")).not.toBeNull(),
+        );
+        const cleared = document.querySelector("video");
+        server.sendToClient("abc", { type: "tokio:alert:clear" });
+        await vi.waitFor(() => expect(cleared.hasAttribute("src")).toBe(false));
+        expect(load.mock.contexts).toEqual([replaced, cleared]);
+      } finally {
+        dom.window.close();
+      }
+    });
+
     it("hides an image once its duration is over", async () => {
       const dom = await open();
       const { document } = dom.window;

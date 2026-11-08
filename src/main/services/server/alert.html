@@ -43,15 +43,24 @@
       const id = decodeURIComponent(location.pathname.split("/")[2] ?? "");
       let current = null;
 
+      // Chromium keeps a detached video that still has a source alive.
+      const drop = (el) => {
+        el.remove();
+        if (!(el instanceof HTMLVideoElement)) return;
+        el.pause();
+        el.removeAttribute("src");
+        el.load();
+      };
+
       // Only while it's the one on screen, a newer one stays.
       const hide = (el) => {
         if (el !== current) return;
-        el.remove();
+        drop(el);
         current = null;
       };
 
       const show = ({ src, kind, duration, volume, start, end }) => {
-        current?.remove();
+        if (current) drop(current);
         const video = kind === "video";
         const el = document.createElement(video ? "video" : "img");
         current = el;
