@@ -334,7 +334,12 @@ describe("overlays events", () => {
   });
 
   describe("INSTALL_OVERLAY", () => {
-    const setup = (installed: OverlayApp[], success = true, saved = true) => {
+    const setup = (
+      installed: OverlayApp[],
+      success = true,
+      saved = true,
+      stored = installed,
+    ) => {
       const after = [overlay({ version: "1.1.0" }), imported];
       const overlayService = {
         getOverlays: vi.fn(() => installed),
@@ -346,8 +351,12 @@ describe("overlays events", () => {
         }),
       };
       const services = studioServices();
+      const storeManagerService = {
+        ...services.storeManagerService,
+        getSettings: () => ({ overlays: stored }),
+      };
       return {
-        h: createHandler({ ...services, overlayService }),
+        h: createHandler({ ...services, storeManagerService, overlayService }),
         overlayService,
         after,
         sendToClient: services.serverService.sendToClient,
@@ -402,6 +411,16 @@ describe("overlays events", () => {
           message:
             "Overlay updated. Refresh it in your streaming app to load the new version.",
         }),
+      ]);
+    });
+
+    it("says installed for an overlay served but not in the store", async () => {
+      const { h } = setup([overlay(), imported], true, true, [imported]);
+
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+
+      expect(h.notices).toEqual([
+        expect.objectContaining({ code: FEEDBACK_CODES.OVERLAY_INSTALLED }),
       ]);
     });
 
