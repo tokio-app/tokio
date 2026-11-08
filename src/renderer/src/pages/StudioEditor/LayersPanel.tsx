@@ -67,11 +67,13 @@ type Props = {
 
 // The row the dragged one is over: an item's (a group's, or an element's
 // on its own), or an element's in a group. `edge` is a group row's top
-// quarter, which drops in front of the group instead of into it. Off the
-// rows, it's between items, in front of the one `between` names, or past
-// the last with null: on its own there, out of any group.
+// quarter, which drops in front of the group instead of into it, and
+// `lower` the lower half of an element's row in a group, which drops
+// behind it instead of in front. Off the rows, it's between items, in front
+// of the one `between` names, or past the last with null: on its own
+// there, out of any group.
 type Over =
-  | { item: string; element?: string; edge?: boolean }
+  | { item: string; element?: string; edge?: boolean; lower?: boolean }
   | { between: string | null };
 
 // Tells two of them apart
@@ -80,7 +82,7 @@ const overKey = (over: Over | undefined) =>
     ? ""
     : "between" in over
       ? `between ${over.between}`
-      : `${over.item} ${over.element} ${!!over.edge}`;
+      : `${over.item} ${over.element} ${!!over.edge} ${!!over.lower}`;
 
 // Where a drop lands: the line on what it lands next to, and the move. The
 // line is `outer` when the drop lands among the items: around a group's
@@ -233,14 +235,16 @@ export function LayersPanel({
     const down = (id: string) => order.indexOf(drag.id) < order.indexOf(id);
     if (item.kind === "group" && over.element !== undefined) {
       if (over.element === drag.id) return null;
+      // Below it, from its row's lower half, is behind it: that's how a drag
+      // from under the group gets to its back
       const rest = item.elements.filter((e) => e.id !== drag.id);
-      const at = rest.findIndex((e) => e.id === over.element);
-      const below = down(over.element);
+      const at =
+        rest.findIndex((e) => e.id === over.element) + (over.lower ? 0 : 1);
+      if (item.elements.findIndex((e) => e.id === drag.id) === at) return null;
       return {
         on: over.element,
-        line: below ? "after" : "before",
-        // Below it is behind it
-        run: () => onMoveElement(drag.id, item.id, below ? at : at + 1),
+        line: over.lower ? "after" : "before",
+        run: () => onMoveElement(drag.id, item.id, at),
       };
     }
     if (item.kind === "group" && !over.edge) {
@@ -304,7 +308,9 @@ export function LayersPanel({
     const box = e.currentTarget.getBoundingClientRect();
     const edge =
       over.element === undefined && e.clientY < box.top + box.height / 4;
-    changeOver({ ...over, edge });
+    const lower =
+      over.element !== undefined && e.clientY > box.top + box.height / 2;
+    changeOver({ ...over, edge, lower });
   };
 
   const startDrag = (e: DragEvent<HTMLElement>, id: string, group: boolean) => {

@@ -1294,6 +1294,41 @@ describe("StudioEditor", () => {
     );
   });
 
+  it("drops an element above or below one in a group, by the half of its row", async () => {
+    const a = text({ text: "A" });
+    const b = text({ text: "B" });
+    const alone = text({ text: "Alone" });
+    const front = group("Front", [a, b]);
+    await open(holding(alone, front));
+    const dataTransfer = { setDragImage: vi.fn() };
+    // Onto a row 40 px tall from 100, since jsdom lays nothing out
+    const drop = (id: string, name: RegExp, clientY: number) => {
+      const on = row(name).closest<HTMLElement>("[data-row]")!;
+      vi.spyOn(on, "getBoundingClientRect").mockReturnValue(
+        new DOMRect(0, 100, 200, 40),
+      );
+      fireEvent.dragStart(grip(id), { dataTransfer });
+      const over = createEvent.dragOver(on, { dataTransfer });
+      Object.defineProperty(over, "clientY", { value: clientY });
+      fireEvent(on, over);
+      fireEvent.drop(on, { dataTransfer });
+      fireEvent.dragEnd(grip(id), { dataTransfer });
+    };
+
+    // From under the group, onto the lower half of its last row: behind it,
+    // at the group's back
+    drop(alone.id, /^A Text/, 130);
+    await waitFor(() =>
+      expect(savedIds()).toEqual([[front.id, alone.id, a.id, b.id]]),
+    );
+
+    // From above, onto the upper half of a row: in front of it
+    drop(b.id, /^Alone/, 110);
+    await waitFor(() =>
+      expect(savedIds()).toEqual([[front.id, alone.id, b.id, a.id]]),
+    );
+  });
+
   it("drags an element out of its group, between items or past the last", async () => {
     const a = text({ text: "A" });
     const b = text({ text: "B" });
