@@ -9,7 +9,6 @@ import {
   UserData,
 } from "@/common/types";
 import { defaultProfile } from "@/common/util";
-import Logger from "@/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectionResponse, MusicProvider } from "./common";
 import { MusicService } from "./index";
@@ -880,15 +879,13 @@ describe("MusicService", () => {
   describe("errors", () => {
     const listen = () => {
       const { service, ...rest } = setup();
-      service.setLogFile("music.log");
       const onPlaybackError = vi.fn<(id: string, error: unknown) => void>();
       service.onPlaybackError(onPlaybackError);
-      const logError = vi.spyOn(Logger, "error").mockImplementation(() => {});
-      return { service, onPlaybackError, logError, ...rest };
+      return { service, onPlaybackError, ...rest };
     };
 
-    it("reports a track the provider throws on, logs it and moves on", async () => {
-      const { request, provider, onPlaybackError, logError, played } = listen();
+    it("reports a track the provider throws on and moves on", async () => {
+      const { request, provider, onPlaybackError, played } = listen();
       const error = new Error("player crashed");
       provider.play.mockImplementationOnce(() => {
         throw error;
@@ -899,16 +896,11 @@ describe("MusicService", () => {
       await vi.advanceTimersByTimeAsync(10_000);
 
       expect(onPlaybackError).toHaveBeenCalledExactlyOnceWith("A", error);
-      expect(logError).toHaveBeenCalledWith(
-        expect.stringContaining("Unable to play track [A]"),
-        "music.log",
-        error,
-      );
       expect(played()).toEqual(["A", "B"]);
     });
 
     it("reports a track the provider fails to play", async () => {
-      const { request, provider, onPlaybackError, logError } = listen();
+      const { request, provider, onPlaybackError } = listen();
       const error = new Error(
         "No active devices. Play a song on Spotify first.",
       );
@@ -917,31 +909,20 @@ describe("MusicService", () => {
       await request("!play Song");
 
       expect(onPlaybackError).toHaveBeenCalledWith("Song", error);
-      expect(logError).toHaveBeenCalledWith(
-        expect.stringContaining("<Music>"),
-        "music.log",
-        error,
-      );
     });
 
-    it("reports a failed search and logs it", async () => {
-      const { request, provider, onPlaybackError, logError } = listen();
+    it("reports a failed search", async () => {
+      const { request, provider, onPlaybackError } = listen();
       const error = new Error("search failed");
       provider.searchSong.mockImplementation(() => rejected(error));
 
       await request("!play Song");
 
       expect(onPlaybackError).toHaveBeenCalledWith("Song", error);
-      expect(logError).toHaveBeenCalledWith(
-        expect.stringContaining("<Music>"),
-        "music.log",
-        error,
-      );
     });
 
     it("doesn't report a search that fails after clearHandler", async () => {
-      const { service, request, provider, onPlaybackError, logError } =
-        listen();
+      const { service, request, provider, onPlaybackError } = listen();
       let fail = (_error: Error) => {};
       provider.searchSong.mockImplementationOnce(
         () => new Promise((_, reject) => (fail = reject)),
@@ -953,22 +934,16 @@ describe("MusicService", () => {
       await vi.advanceTimersByTimeAsync(0);
 
       expect(onPlaybackError).not.toHaveBeenCalled();
-      expect(logError).not.toHaveBeenCalled();
     });
 
-    it("reports a failed player read and logs it", async () => {
-      const { request, provider, onPlaybackError, logError } = listen();
+    it("reports a failed player read", async () => {
+      const { request, provider, onPlaybackError } = listen();
       const error = new Error("Not authenticated. Call authenticate() first.");
       provider.playerStatus.mockImplementation(() => rejected(error));
 
       await request("!play Song");
 
       expect(onPlaybackError).toHaveBeenCalledWith("Song", error);
-      expect(logError).toHaveBeenCalledWith(
-        expect.stringContaining("<Music>"),
-        "music.log",
-        error,
-      );
     });
   });
 

@@ -5,10 +5,9 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { formatError, TaskQueue } from "@/common/util";
+import { TaskQueue } from "@/common/util";
 import { sameHandle } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
-import Logger from "@/logger";
 import { ProviderService } from "@/services/shared";
 import { ConnectionResponse, MusicProvider, MusicQueue } from "./common";
 import { Spotify, YouTubeMusic } from "./providers";
@@ -38,7 +37,7 @@ export class MusicService extends ProviderService<MusicProvider> {
     super();
     this._queue = new TaskQueue();
     this._music_queue = new MusicQueue({
-      onError: (id, error) => this._playbackFailed(id, error),
+      onError: (id, error) => this._onPlaybackError?.(id, error),
       onStart: (songs) => this._onSongChange.forEach((fn) => fn(songs)),
       // What's left of the song while the player plays it, after an ad
       // too. Paused, it can't tell when the song ends. Times are in ms.
@@ -93,7 +92,7 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue.off(event, listener);
   }
 
-  // Called when a requested track can't be played.
+  // Called when a requested track can't be played. The listener logs it.
   public onPlaybackError(listener: (id: string, error: unknown) => void) {
     this._onPlaybackError = listener;
   }
@@ -183,19 +182,10 @@ export class MusicService extends ProviderService<MusicProvider> {
     try {
       await this.play(request, run);
     } catch (error) {
-      if (run === this._run) this._playbackFailed(request.query, error);
+      if (run === this._run) this._onPlaybackError?.(request.query, error);
     } finally {
       if (run === this._run) this._requesting.delete(request.by);
     }
-  }
-
-  private _playbackFailed(id: string, error: unknown) {
-    Logger.error(
-      `<Music> Unable to play track [${id}] -- ${formatError(error)}`,
-      this._logFile,
-      error,
-    );
-    this._onPlaybackError?.(id, error);
   }
 
   // Searches first, so a request that finds nothing never reads the player

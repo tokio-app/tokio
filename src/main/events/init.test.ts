@@ -2422,6 +2422,28 @@ describe("init events", () => {
       failed();
       expect(warned()).toBe(2);
     });
+
+    it("logs a failed song request once per notice", async () => {
+      const s = await live();
+      const [listener] = s.musicService.onPlaybackError.mock.calls[0];
+      vi.useFakeTimers();
+      const error = new Error("unavailable");
+
+      listener("track-1", error);
+      listener("track-1", error);
+      vi.advanceTimersByTime(30_000);
+      listener("track-1", error);
+
+      expect(noticesFor(s, FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED)).toHaveLength(
+        2,
+      );
+      const logged = [
+        "<Music> Unable to play track [track-1] -- unavailable",
+        "music.log",
+        error,
+      ];
+      expect(logError.mock.calls).toEqual([logged, logged]);
+    });
   });
 
   describe("GET_PROFILE", () => {
