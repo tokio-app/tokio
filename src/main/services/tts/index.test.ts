@@ -287,6 +287,10 @@ describe("TTSService", () => {
 
       expect(await say("you ｉｄｉｏｔ", s)).toEqual([]);
       expect(await say("you i\u200Bdiot", s)).toEqual([]);
+      expect(await say("you id\u3164iot", s)).toEqual([]);
+      expect(await say("you id\uFFA0iot", s)).toEqual([]);
+      expect(await say("you id\u115Fiot", s)).toEqual([]);
+      expect(await say("you id\u2800iot", s)).toEqual([]);
       expect(await say("you ídíot", s)).toEqual([]);
       expect(await say("mi idolo", s)).toEqual([]);
       expect(await say("you idol", s)).toHaveLength(1);
@@ -300,6 +304,7 @@ describe("TTSService", () => {
       expect(await say("you іdiot", s)).toEqual([]);
       expect(await say("you ıdiot", s)).toEqual([]);
       expect(await say("you idіоt", s)).toEqual([]);
+      expect(await say("you ɪᴅɪᴏᴛ", s)).toEqual([]);
       expect(await say("вот так", s)).toHaveLength(1);
     });
 
@@ -375,6 +380,7 @@ describe("TTSService", () => {
       expect(service.prepareText("  ", s)).toBeNull();
       expect(service.prepareText("\u3164\u200B", s)).toBeNull();
       expect(service.prepareText("Thanks SPOILER fan", s)).toBeNull();
+      expect(service.prepareText("Thanks SPOI\u3164LER fan", s)).toBeNull();
       expect(service.prepareText("Thanks fan", s)).toBe("Thanks fan");
     });
 

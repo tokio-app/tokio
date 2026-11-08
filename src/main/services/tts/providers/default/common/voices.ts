@@ -1,7 +1,7 @@
 import { ProviderVoice } from "../../../common";
 import { EnglishVoiceName, SpanishVoiceName } from "../types";
 
-export const EnglishVoicesData: Record<EnglishVoiceName, string> = {
+const EnglishVoicesData: Record<EnglishVoiceName, string> = {
   Default: "en_us_001",
   "Game On": "en_male_jomboy",
   Jessie: "en_us_002",
@@ -54,7 +54,7 @@ export const EnglishVoicesData: Record<EnglishVoiceName, string> = {
   Smooth: "en_au_002",
 } as const;
 
-export const SpanishVoicesData: Record<SpanishVoiceName, string> = {
+const SpanishVoicesData: Record<SpanishVoiceName, string> = {
   Pedro: "es_002",
   Juan: "es_mx_002",
 } as const;

@@ -257,6 +257,26 @@ describe("ServerService", () => {
     });
   });
 
+  it("skips an overlay id Express can't mount, serving the others", async () => {
+    const warn = vi.spyOn(Logger, "warn");
+    const overlay = join(dir, "clock");
+    await mkdir(overlay);
+    await writeFile(join(overlay, "index.html"), "<h1>clock</h1>");
+
+    server.mount("gift-jar - Copy (2)", overlay);
+    server.mount("clock", overlay);
+
+    expect((await server.start()).success).toBe(true);
+    expect((await fetch(url("/clock/"))).status).toBe(200);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^<Server> Unable to serve gift-jar - Copy \(2\) -- /,
+      ),
+      undefined,
+    );
+    expect(() => server.unmount("clock")).not.toThrow();
+  });
+
   describe("alert overlays", () => {
     beforeEach(async () => {
       const media = join(dir, "media");
@@ -351,6 +371,45 @@ describe("ServerService", () => {
 
         server.sendToClient("abc", { type: "tokio:alert:clear" });
         await vi.waitFor(() => expect(shown()).toEqual([]));
+      } finally {
+        dom.window.close();
+      }
+    });
+
+    it("drops a removed video's source, so the browser lets it go", async () => {
+      const dom = await open();
+      const { document, HTMLMediaElement } = dom.window;
+      const pause = vi
+        .spyOn(HTMLMediaElement.prototype, "pause")
+        .mockImplementation(() => {});
+      const load = vi
+        .spyOn(HTMLMediaElement.prototype, "load")
+        .mockImplementation(() => {});
+
+      try {
+        await connected();
+        show("a.webm", "video");
+        await vi.waitFor(() =>
+          expect(document.querySelector("video")).not.toBeNull(),
+        );
+        const replaced = document.querySelector("video");
+        show("a.png", "image");
+        await vi.waitFor(() =>
+          expect(document.querySelector("img")).not.toBeNull(),
+        );
+
+        expect(replaced.hasAttribute("src")).toBe(false);
+        expect(pause.mock.contexts).toEqual([replaced]);
+        expect(load.mock.contexts).toEqual([replaced]);
+
+        show("a.webm", "video");
+        await vi.waitFor(() =>
+          expect(document.querySelector("video")).not.toBeNull(),
+        );
+        const cleared = document.querySelector("video");
+        server.sendToClient("abc", { type: "tokio:alert:clear" });
+        await vi.waitFor(() => expect(cleared.hasAttribute("src")).toBe(false));
+        expect(load.mock.contexts).toEqual([replaced, cleared]);
       } finally {
         dom.window.close();
       }
@@ -693,6 +752,10 @@ describe("ServerService", () => {
         type: TOKIO_EVENTS.MUSIC_CHANGE,
         data: songs,
       });
+    });
+
+    it("listens to the music service only for music changes", () => {
+      expect([...musicEvents.keys()]).toEqual([TOKIO_EVENTS.MUSIC_CHANGE]);
     });
 
     it("sends to a single overlay by id", async () => {

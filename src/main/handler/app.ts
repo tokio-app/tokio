@@ -140,17 +140,14 @@ export class AppHandler implements AppHandlerVariables {
       }
     });
 
-    this.win?.on("resize", () => {
-      if (this.win?.isNormal()) {
-        this.win.webContents.send(APP_EVENTS_RESPONSE.RESIZE_WINDOW, {
-          state: "normal",
-        });
-      } else {
-        this.win?.webContents.send(APP_EVENTS_RESPONSE.RESIZE_WINDOW, {
-          state: "maximized",
-        });
-      }
-    });
+    const sendState = () => {
+      this.win.webContents.send(APP_EVENTS_RESPONSE.RESIZE_WINDOW, {
+        state: this.win.isNormal() ? "normal" : "maximized",
+      });
+    };
+    this.win.on("resize", sendState);
+    // The title bar asks when it mounts, after a reload too
+    this.ipcMain.on(APP_EVENTS.GET_WINDOW_STATE, sendState);
 
     // Every quit (the tray, Cmd+Q, an update) goes through app.quit, which
     // lets the window close

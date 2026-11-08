@@ -675,12 +675,13 @@ describe("MusicQueue", () => {
       const queue = new MusicQueue();
       queue.enqueue("a", song("a"), () => {}, "ana");
       queue.enqueue("b", song("b"), () => {});
-      expect(queue.playingBy()).toBe("ana");
+      expect(queue.playing()?.by).toBe("ana");
 
       await vi.advanceTimersByTimeAsync(1000);
-      expect(queue.playingBy()).toBeUndefined();
+      expect(queue.playing()?.id).toBe("b");
+      expect(queue.playing()?.by).toBeUndefined();
       await vi.advanceTimersByTimeAsync(1000);
-      expect(queue.playingBy()).toBeUndefined();
+      expect(queue.playing()).toBeUndefined();
     });
   });
 

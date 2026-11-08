@@ -437,9 +437,10 @@ describe("settings events", () => {
         sendToClient: vi.fn((_id: string, _data: unknown) => true),
       };
       const gamesService = { setGames: vi.fn() };
+      const connectorService = { isConnected: vi.fn(() => connected) };
       const h = createHandler({
         storeManagerService,
-        connectorService: { isConnected: () => connected },
+        connectorService,
         timerService,
         fansService,
         historyService,
@@ -458,8 +459,62 @@ describe("settings events", () => {
         historyService,
         serverService,
         gamesService,
+        connectorService,
       };
     };
+
+    it("refuses to switch when a LIVE connects while the old profile saves", async () => {
+      const { h, storeManagerService, timerService, connectorService } =
+        setup();
+      timerService.save.mockImplementationOnce(async () => {
+        connectorService.isConnected.mockReturnValue(true);
+        return true;
+      });
+
+      await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
+
+      expect(storeManagerService.updateActiveProfile).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ code: FEEDBACK_CODES.PROFILE_LOCKED }),
+      ]);
+    });
+
+    it("starts a second switch once the first has switched", async () => {
+      const { h, storeManagerService, timerService } = setup();
+      let release: (() => void) | undefined;
+      timerService.save.mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => (release = () => resolve(true))),
+      );
+
+      const first = h.invoke(settings, APP_EVENTS.SET_PROFILE, {
+        file: "stream.json",
+      });
+      const second = h.invoke(settings, APP_EVENTS.SET_PROFILE, {
+        file: "gone.json",
+      });
+      try {
+        await vi.waitFor(() => expect(release).toBeDefined());
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(timerService.save).toHaveBeenCalledOnce();
+      } finally {
+        // Always, or the next tests' switches wait behind this one
+        release?.();
+        await Promise.allSettled([first, second]);
+      }
+
+      expect(storeManagerService.updateActiveProfile.mock.calls).toEqual([
+        ["stream.json"],
+        ["gone.json"],
+      ]);
+      // The second saved the timer only after the first's switch
+      const [switched] =
+        storeManagerService.updateActiveProfile.mock.invocationCallOrder;
+      expect(timerService.save.mock.invocationCallOrder[1]).toBeGreaterThan(
+        switched,
+      );
+    });
 
     it("refuses to switch while a LIVE is connected", async () => {
       const { h, storeManagerService } = setup({ connected: true });

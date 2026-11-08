@@ -13,7 +13,7 @@ import { sendGamesOverlay } from "@/helper/games";
 import { language, setLanguage, t } from "@/helper/i18n";
 import { StoreManagerService } from "@/services/store";
 import { TTSService } from "@/services/tts";
-import { ReplyEvent } from "@/types";
+import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("system");
 
@@ -166,57 +166,80 @@ events.push(
   },
 );
 
+const assertDisconnected = (services: AppHandlerVariables) => {
+  if (services.connectorService.isConnected()) {
+    throw new AppFailure(
+      FEEDBACK_CODES.PROFILE_LOCKED,
+      t("main.settings.profileLocked"),
+      { level: "warning" },
+    );
+  }
+};
+
+const switchProfile = async (
+  services: AppHandlerVariables,
+  e: ReplyEvent,
+  file: string,
+) => {
+  const { storeManagerService, timerService, notifier } = services;
+  // The switch before this one may have made it active
+  if (file === storeManagerService.getSettings().activeProfile.file) return;
+  // The timer, the fans and the LIVE history are saved where they came from
+  // before the profile is replaced, so they're never lost
+  if (!(await timerService.save())) throw saveFailure();
+  if (!(await services.fansService.save())) throw saveFailure();
+  if (!(await services.historyService.save())) throw saveFailure();
+  // A LIVE may have connected while they saved
+  assertDisconnected(services);
+  const res = await storeManagerService.updateActiveProfile(file);
+  if (res === "unsaved") throw saveFailure();
+  if (res === "missing") {
+    throw new AppFailure(
+      FEEDBACK_CODES.PROFILE_LOAD_FAILED,
+      t("main.settings.profileMissing"),
+    );
+  }
+  const profile = await storeManagerService.getProfileData();
+  const profiles = storeManagerService.getProfiles();
+  if (!profile || !profiles) throw new Error(`Unable to load ${file}.`);
+  timerService.load(profile.timer, file);
+  // Overlays get the new profile's fans once they load
+  await services.fansService.load(file);
+  await services.historyService.load(file);
+  services.gamesService.setGames(profile.games);
+
+  e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
+    success: true,
+    profile,
+    profiles,
+  });
+  replySettings(e, storeManagerService);
+  notifier.success(
+    "system",
+    FEEDBACK_CODES.PROFILE_SWITCHED,
+    t("main.settings.profileSwitched", {
+      name: storeManagerService.getSettings().activeProfile.name,
+    }),
+  );
+  // The new profile's actions
+  await sendGamesOverlay(services);
+};
+
+// The last switch, so a second one starts once the first is done: both would
+// save the old profile's timer, fans and history, then load their own.
+let switching: Promise<unknown> = Promise.resolve();
+
 events.push(
   APP_EVENTS.SET_PROFILE,
   async (services, e, { file }) => {
-    const { storeManagerService, connectorService, timerService, notifier } =
-      services;
     // Picking the active profile again changes nothing, even during a LIVE
-    if (file === storeManagerService.getSettings().activeProfile.file) return;
-    if (connectorService.isConnected()) {
-      throw new AppFailure(
-        FEEDBACK_CODES.PROFILE_LOCKED,
-        t("main.settings.profileLocked"),
-        { level: "warning" },
-      );
-    }
-    // The timer, the fans and the LIVE history are saved where they came from
-    // before the profile is replaced, so they're never lost
-    if (!(await timerService.save())) throw saveFailure();
-    if (!(await services.fansService.save())) throw saveFailure();
-    if (!(await services.historyService.save())) throw saveFailure();
-    const res = await storeManagerService.updateActiveProfile(file);
-    if (res === "unsaved") throw saveFailure();
-    if (res === "missing") {
-      throw new AppFailure(
-        FEEDBACK_CODES.PROFILE_LOAD_FAILED,
-        t("main.settings.profileMissing"),
-      );
-    }
-    const profile = await storeManagerService.getProfileData();
-    const profiles = storeManagerService.getProfiles();
-    if (!profile || !profiles) throw new Error(`Unable to load ${file}.`);
-    timerService.load(profile.timer, file);
-    // Overlays get the new profile's fans once they load
-    await services.fansService.load(file);
-    await services.historyService.load(file);
-    services.gamesService.setGames(profile.games);
-
-    e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
-      success: true,
-      profile,
-      profiles,
-    });
-    replySettings(e, storeManagerService);
-    notifier.success(
-      "system",
-      FEEDBACK_CODES.PROFILE_SWITCHED,
-      t("main.settings.profileSwitched", {
-        name: storeManagerService.getSettings().activeProfile.name,
-      }),
-    );
-    // The new profile's actions
-    await sendGamesOverlay(services);
+    if (file === services.storeManagerService.getSettings().activeProfile.file)
+      return;
+    assertDisconnected(services);
+    const run = switching.then(() => switchProfile(services, e, file));
+    // A failed switch still reaches runEvent, and doesn't hold the next one
+    switching = run.catch(() => {});
+    await run;
   },
   {
     failure: {

@@ -492,13 +492,22 @@ const registerConnectorEvents = ({
     });
   });
 
-  music.onPlaybackError(() => {
-    notifier.warn(
-      "music",
-      FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED,
-      t("main.init.musicPlaybackFailed"),
-      { windowMs: REPEAT_NOTICE_MS },
-    );
+  music.onPlaybackError((id, error) => {
+    // Logged once per notice, so a broken player can't flood the log
+    if (
+      notifier.warn(
+        "music",
+        FEEDBACK_CODES.MUSIC_PLAYBACK_FAILED,
+        t("main.init.musicPlaybackFailed"),
+        { windowMs: REPEAT_NOTICE_MS },
+      )
+    ) {
+      Logger.error(
+        `<Music> Unable to play track [${id}] -- ${formatError(error)}`,
+        paths.files.logs.music,
+        error,
+      );
+    }
   });
 };
 
@@ -829,7 +838,8 @@ const registerHistory = ({
     }
     save();
   });
-  // shortcut: a quit or crash during a LIVE loses up to 30 s of it, upgrade
+  // shortcut: a quit or crash during a LIVE loses the time and gifts since
+  // the last save, up to 30 s, since each save writes the LIVE's file. Upgrade
   // to a save on quit if streamers notice. The updater's install can't wait
   // for one.
   setInterval(save, HISTORY_SAVE_MS).unref();

@@ -340,6 +340,12 @@ function createFakes() {
         filePath: "",
       })),
     },
+    // A 1920x1080 screen with a 40px taskbar
+    screen: {
+      getPrimaryDisplay: vi.fn(() => ({
+        workAreaSize: { width: 1920, height: 1040 },
+      })),
+    },
     net: {
       fetch: vi.fn<(url: string) => Promise<Response>>(
         async () => new Response(null),
@@ -376,6 +382,7 @@ export const {
   shell,
   dialog,
   net,
+  screen,
   safeStorage,
   Menu,
   nativeImage,

@@ -6,7 +6,13 @@ import {
   formatError,
   TaskQueue,
 } from "@/common/util";
-import { isBlank, removeEmojis, sameHandle, wholeWord } from "@/helper/chat";
+import {
+  INVISIBLE,
+  isBlank,
+  removeEmojis,
+  sameHandle,
+  wholeWord,
+} from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
@@ -20,10 +26,10 @@ const HOLD_TIMEOUT_MS = 2 * 60_000;
 // Edge sends no audio for text of only punctuation ("?", "..."), so it isn't sent
 const SPEAKABLE = /[\p{L}\p{N}\p{Extended_Pictographic}]/u;
 
-// Cyrillic, Greek and Turkish letters that look Latin, and the Latin letter
-// at the same place
-const LOOKALIKES = "авекмнорстухѕіјԁһαεικνορτυχı";
-const LATIN = "abekmhopctyxsijdhaeikvoptuxi";
+// Cyrillic, Greek and Turkish letters that look Latin, and small capitals,
+// and the Latin letter at the same place
+const LOOKALIKES = "авекмнорстухѕіјԁһαεικνορτυχıᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘꞯʀꜱᴛᴜᴠᴡʏᴢ";
+const LATIN = "abekmhopctyxsijdhaeikvoptuxiabcdefghijklmnopqrstuvwyz";
 const LOOKALIKE = new RegExp(`[${LOOKALIKES}]`, "g");
 
 // Without accents, invisible characters, styled letters ("ｉｄｉｏｔ") or
@@ -32,7 +38,8 @@ const LOOKALIKE = new RegExp(`[${LOOKALIKES}]`, "g");
 const fold = (text: string) =>
   text
     .normalize("NFKD")
-    .replace(/[\p{M}\p{Cf}]/gu, "")
+    .replace(/\p{M}/gu, "")
+    .replace(INVISIBLE, "")
     .toLowerCase()
     .replace(/\S+/g, (word) =>
       /\p{Script=Latin}/u.test(word)
@@ -255,6 +262,12 @@ export class TTSService extends ProviderService<TTSProvider> {
     // Called when the audio can't be generated
     onError?: (error?: Error) => void,
   ) {
+    this._queue.setQueueOptions({
+      gapTime: settings.protection.cooldown,
+      maxQueueLength: settings.protection.queue_length,
+    });
+    // It would be dropped, so it isn't checked
+    if (this._queue.full()) return;
     const comment = this._comment(settings, chat);
     if (!this._valid(settings, chat, comment)) return;
     const text = this._parseText(settings, chat, comment);
@@ -263,10 +276,6 @@ export class TTSService extends ProviderService<TTSProvider> {
     const voice =
       settings.user_voices.find((u) => sameHandle(u.handle, chat.user.handle))
         ?.voice ?? settings.voice;
-    this._queue.setQueueOptions({
-      gapTime: settings.protection.cooldown,
-      maxQueueLength: settings.protection.queue_length,
-    });
     const run = this._run;
     this._queue.enqueue(async () => {
       // The window gets one message to play and the next one ready. The rest

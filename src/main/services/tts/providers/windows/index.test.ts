@@ -66,6 +66,16 @@ describe("WindowsTTS", () => {
     expect(types()).toEqual(["voices", "voices"]);
   });
 
+  it("asks again after an empty list", async () => {
+    host.request.mockResolvedValueOnce([]);
+    await expect(tts.getVoices()).resolves.toEqual([]);
+
+    await tts.getVoices();
+    await tts.getVoices();
+
+    expect(types()).toEqual(["voices", "voices"]);
+  });
+
   it("speaks with an installed voice and its engine", async () => {
     const res = await tts.generateBuffer(
       "Hola",

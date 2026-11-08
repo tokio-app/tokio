@@ -17,19 +17,20 @@ type Props = {
 
 // Copies a value, and says so with a check for a moment
 function useCopied(value: string) {
-  const [copied, setCopied] = useState(false);
+  // Counted, so each copy restarts the moment
+  const [copies, setCopies] = useState(0);
 
   useEffect(() => {
-    if (!copied) return undefined;
-    const timer = setTimeout(() => setCopied(false), 1500);
+    if (!copies) return undefined;
+    const timer = setTimeout(() => setCopies(0), 1500);
     return () => clearTimeout(timer);
-  }, [copied]);
+  }, [copies]);
 
   const copy = () => {
     void navigator.clipboard.writeText(value);
-    setCopied(true);
+    setCopies((n) => n + 1);
   };
-  return { copied, copy };
+  return { copied: copies > 0, copy };
 }
 
 const CopyIcon = ({ copied, size }: { copied: boolean; size: number }) =>

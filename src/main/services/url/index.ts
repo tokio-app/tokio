@@ -88,6 +88,7 @@ export class URLManagerService extends Service {
 
   // Windows runs this as a batch file. Linux runs it inside bash -c "..." and
   // macOS as a bash script, so it must not contain $, backticks or double quotes.
+  // The block goes through one redirect, so the hosts file is opened once.
   private _appendCommand(hostsFilePath: string) {
     const lines = [
       "",
@@ -99,14 +100,13 @@ export class URLManagerService extends Service {
     ];
 
     if (process.platform === "win32") {
-      return lines
-        .map((line) => `echo${line ? ` ${line}` : "."}>> ${hostsFilePath}`)
-        .join("\n");
+      // The parentheses get lines of their own: "( echo x )" writes "x "
+      const echoes = lines.map((line) => (line ? `echo ${line}` : "echo."));
+      return ["(", ...echoes, `)>> ${hostsFilePath}`].join("\n");
     }
 
-    const append = lines
-      .map((line) => `echo${line ? ` '${line}'` : ""} >> ${hostsFilePath}`)
-      .join(" && ");
+    const echoes = lines.map((line) => (line ? `echo '${line}'` : "echo"));
+    const append = `(${echoes.join(" && ")}) >> ${hostsFilePath}`;
     // macOS caches lookups, flush it so the new name resolves right away.
     return process.platform === "darwin"
       ? `${append} && (dscacheutil -flushcache; killall -HUP mDNSResponder; true)`

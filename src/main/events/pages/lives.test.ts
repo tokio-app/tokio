@@ -133,7 +133,12 @@ describe("lives events", () => {
     it("replies the range's gifters with the range and the search", async () => {
       const found = [{ ...gifter, rank: 3 }];
       const getGifters = vi.fn(
-        async (_args: { from?: number; to?: number; query?: string }) => found,
+        async (_args: {
+          from?: number;
+          to?: number;
+          query?: string;
+          signal?: AbortSignal;
+        }) => found,
       );
       const h = createHandler({ historyService: { getGifters } });
 
@@ -145,6 +150,7 @@ describe("lives events", () => {
       expect(getGifters).toHaveBeenCalledExactlyOnceWith({
         from: 1000,
         query: "ana",
+        signal: expect.any(AbortSignal),
       });
       expect(h.sent()).toEqual([
         [
@@ -152,6 +158,30 @@ describe("lives events", () => {
           { success: true, from: 1000, query: "ana", data: found },
         ],
       ]);
+    });
+
+    it("stops the read a newer one of its kind replaces", async () => {
+      const signals: AbortSignal[] = [];
+      const h = createHandler({
+        historyService: {
+          getTotals: async () => totals,
+          getGifters: async ({ signal }) => {
+            if (signal) signals.push(signal);
+            return [];
+          },
+        },
+      });
+      const aborted = () => signals.map((s) => s.aborted);
+
+      await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 1000 });
+      // A search doesn't stop the dates' read
+      await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { query: "ana" });
+      expect(aborted()).toEqual([false, false]);
+
+      await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { from: 2000 });
+      expect(aborted()).toEqual([true, false, false]);
+      await h.invoke(lives, APP_EVENTS.GET_GIFTERS, { query: "an" });
+      expect(aborted()).toEqual([true, true, false, false]);
     });
 
     it("replies nothing more once another profile loaded", async () => {

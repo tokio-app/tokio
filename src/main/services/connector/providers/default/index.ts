@@ -352,6 +352,7 @@ function getFanBadge(badgeList: Badge[] = []): Badge | undefined {
 
 function getUserData(user?: User, userIdentity?: UserIdentity): UserData {
   const fanBadge = getFanBadge(user?.badgeList);
+  const level = Number(fanBadge?.privilegeLogExtra?.level || 0);
   return {
     username: user?.nickname ?? "",
     handle: user?.displayId ?? "",
@@ -359,7 +360,7 @@ function getUserData(user?: User, userIdentity?: UserIdentity): UserData {
     superfan: userIdentity?.isSubscriberOfAnchor ?? false,
     follower: userIdentity?.isFollowerOfAnchor ?? false,
     moderator: userIdentity?.isModeratorOfAnchor ?? false,
-    fanLevel: Number(fanBadge?.privilegeLogExtra?.level || 0),
+    fanLevel: Number.isFinite(level) ? level : 0,
     fanBadge: fanBadge?.combine?.icon?.urlList[0] ?? "",
     userId: user?.userId ?? "",
   };

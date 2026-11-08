@@ -233,7 +233,6 @@ export class AudioQueue {
   ): Promise<boolean> {
     // Before fetching, so a full queue never fetches
     if (this.pending() >= this.maxQueueLength) {
-      console.warn("AudioQueue: Max queue length reached. Ignoring input.");
       return Promise.resolve(false);
     }
 
@@ -261,7 +260,6 @@ export class AudioQueue {
    */
   wait(seconds: number, options: EnqueueOptions = {}): Promise<boolean> {
     if (this.pending() >= this.maxQueueLength) {
-      console.warn("AudioQueue: Max queue length reached. Ignoring input.");
       return Promise.resolve(false);
     }
     return this.place(() => silence(seconds), {

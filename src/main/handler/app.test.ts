@@ -156,6 +156,17 @@ describe("AppHandler", () => {
       ]);
     });
 
+    it("tells the title bar whether it's maximized when it asks", () => {
+      const h = start();
+
+      h.win.maximize();
+      send(APP_EVENTS.GET_WINDOW_STATE);
+
+      expect(h.pushed(APP_EVENTS_RESPONSE.RESIZE_WINDOW)).toEqual([
+        { state: "maximized" },
+      ]);
+    });
+
     it("stays on its page, but lets it reload", () => {
       const { win } = start();
       void win.loadURL("http://localhost:5173/index.html#/settings");

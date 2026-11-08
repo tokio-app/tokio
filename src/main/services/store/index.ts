@@ -57,6 +57,9 @@ type Providers = {
 const isEncrypted = (key: string) =>
   /^v\d\d$/.test(Buffer.from(key, "base64").subarray(0, 3).toString("latin1"));
 
+const isMissing = (error: unknown) =>
+  error instanceof Error && "code" in error && error.code === "ENOENT";
+
 // How long live events go without reading again an active profile that failed
 const LOAD_RETRY_MS = 30_000;
 
@@ -238,6 +241,7 @@ export class StoreManagerService extends Service {
   }
 
   // Profile files outlive a rebuilt store, so list the ones that still load.
+  // One that can't be read throws, so a held file isn't left out of the list.
   private async _findProfiles(): Promise<{ file: string; profile: Profile }[]> {
     const folder = this._pathManagerService.folders.profilesFolder;
     const files = (await readdir(folder))
@@ -246,7 +250,7 @@ export class StoreManagerService extends Service {
 
     const profiles: { file: string; profile: Profile }[] = [];
     for (const file of files) {
-      const profile = await this._jsonManagerService.loadFile(
+      const { data: profile } = await this._readChecked(
         join(folder, file),
         ProfileSchema,
       );
@@ -264,7 +268,7 @@ export class StoreManagerService extends Service {
 
   // Alerts keep the names of the sounds and media they use, game actions the
   // pictures'. Files nothing uses lost their name, they're listed anyway so
-  // they can be deleted.
+  // they can be deleted. A folder that's there but can't be read throws.
   private async _findFiles(
     folder: string,
     extensions: string[],
@@ -272,7 +276,12 @@ export class StoreManagerService extends Service {
     label: MessageKey,
   ): Promise<AlertSound[]> {
     const files = new Set(
-      (await readdir(folder).catch(() => []))
+      (
+        await readdir(folder).catch((error: unknown) => {
+          if (isMissing(error)) return [];
+          throw error;
+        })
+      )
         .filter((file) => extensions.includes(extname(file).slice(1)))
         .sort(),
     );
@@ -394,9 +403,11 @@ export class StoreManagerService extends Service {
     return this._queueSave();
   }
 
-  public async removeStudioOverlay(id: string): Promise<boolean> {
+  // Null when no overlay has the id, otherwise whether the store was written
+  public async removeStudioOverlay(id: string): Promise<boolean | null> {
     this._ensureInitialized();
     const { settings } = this._storeData!;
+    if (!settings.studio.some((o) => o.id === id)) return null;
     settings.studio = settings.studio.filter((o) => o.id !== id);
     return this._queueSave();
   }
@@ -596,9 +607,22 @@ export class StoreManagerService extends Service {
         profileFile,
       );
       // Fresh, so the items changed aren't older than an update still writing
-      const profile = active
-        ? await this.getProfileData({ fresh: true })
-        : await this._jsonManagerService.loadFile(path, ProfileSchema);
+      let profile: Profile | null;
+      try {
+        profile = active
+          ? await this.getProfileData({ fresh: true })
+          : (await this._readChecked(path, ProfileSchema)).data;
+      } catch (error) {
+        // A missing or broken file can't use the file, one held for a moment
+        // might.
+        Logger.error(
+          `<System> Unable to read the profile ${path} -- ${formatError(error)}`,
+          this._logFile,
+          error,
+        );
+        saved = false;
+        continue;
+      }
       const updates = profile && change(profile);
       if (!updates) continue;
 
@@ -659,6 +683,11 @@ export class StoreManagerService extends Service {
 
     const saved = [...profile.emotes];
     let changed = false;
+    // Marked once saved, so an image a failed save lost is compared again
+    const checked: string[] = [];
+    const markChecked = () => {
+      for (const id of checked) this._checkedEmotes.add(id);
+    };
     for (const { emoteID: id, images } of emotes) {
       const image = images[0];
       if (!id || !image) continue;
@@ -672,10 +701,13 @@ export class StoreManagerService extends Service {
         saved[index] = { id, image };
         changed = true;
       }
-      this._checkedEmotes.add(id);
+      checked.push(id);
     }
 
-    if (!changed) return { success: true };
+    if (!changed) {
+      markChecked();
+      return { success: true };
+    }
     const file = this._activeProfileFile();
     const failed = this._failedEmotes;
     if (
@@ -689,10 +721,12 @@ export class StoreManagerService extends Service {
       return { success: false };
     }
     this._failedEmotes = null;
+    markChecked();
     return { success: true, data: saved };
   }
 
-  // Kept in memory only, they're reset when the app loads.
+  // Not saved on their own: they ride along with the store's next save, and
+  // are reset when the app loads.
   public updateLiveStats(data: {
     likes?: number;
     viewers?: number;
@@ -738,12 +772,12 @@ export class StoreManagerService extends Service {
     // Both together, so a change made while saving reads and writes the new
     // profile, and memory after the save holds that change.
     const previous = this._storeData!.settings.activeProfile;
-    const previousProfile = this._memoryProfile;
     this._storeData!.settings.activeProfile = entity;
     this._memoryProfile = profile;
     if (!(await this._queueSave())) {
       this._storeData!.settings.activeProfile = previous;
-      this._memoryProfile = previousProfile;
+      // Read again: an update given the old profile's file may have landed.
+      this._memoryProfile = null;
       // An earlier save still queued may have written the switch.
       void this._queueSave();
       return "unsaved";
@@ -788,12 +822,12 @@ export class StoreManagerService extends Service {
   // Keys are saved with the provider list, encrypted.
   public async updateVoiceKey(engine: string, key: string): Promise<boolean> {
     this._ensureInitialized();
-    const list = this._storeData!.settings.providers.tts;
-    const index = list.findIndex((p) => p.name === engine);
     const saved = await this._encryptProviderKey({
       name: engine,
       key,
     });
+    const list = this._storeData!.settings.providers.tts;
+    const index = list.findIndex((p) => p.name === engine);
     if (index !== -1) {
       list[index] = saved;
     } else {
@@ -935,14 +969,15 @@ export class StoreManagerService extends Service {
     return true;
   }
 
-  // Copied to a free file named after its file, and listed under its own
-  // name, numbered when another profile has it. Fails as createNewProfile.
+  // Copied to a file named after its file as profileFileFor names a new one's,
+  // and listed under its own name, numbered when another profile has it.
+  // Fails as createNewProfile.
   public async importProfile(
     ref: string,
   ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
     if (!ref) return null;
-    const file = await this._freeProfileFile(basename(ref, extname(ref)));
+    const file = await this.profileFileFor(basename(ref, extname(ref)));
     const newPath = join(this._pathManagerService.folders.profilesFolder, file);
 
     const data = await this._jsonManagerService.loadFile(
@@ -1119,13 +1154,7 @@ export class StoreManagerService extends Service {
     schema: z.ZodType<T>,
   ): Promise<{ raw: Buffer | null; data: T | null }> {
     const raw = await readFile(path).catch((error: unknown) => {
-      if (
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT"
-      ) {
-        return null;
-      }
+      if (isMissing(error)) return null;
       throw error;
     });
     if (!raw) return { raw: null, data: null };

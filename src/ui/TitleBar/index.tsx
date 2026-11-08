@@ -15,12 +15,14 @@ const WINDOW_EVENTS = {
     maximize: APP_EVENTS.MAXIMIZE_WINDOW,
     close: APP_EVENTS.CLOSE_WINDOW,
     resize: APP_EVENTS_RESPONSE.RESIZE_WINDOW,
+    state: APP_EVENTS.GET_WINDOW_STATE,
   },
   music: {
     minimize: APP_EVENTS.MINIMIZE_MUSIC_WINDOW,
     maximize: APP_EVENTS.MAXIMIZE_MUSIC_WINDOW,
     close: APP_EVENTS.CLOSE_MUSIC_WINDOW,
     resize: APP_EVENTS_RESPONSE.RESIZE_MUSIC_WINDOW,
+    state: APP_EVENTS.GET_MUSIC_WINDOW_STATE,
   },
 } as const;
 
@@ -46,13 +48,14 @@ export function TitleBar({ target, logo, compact, live, children }: Props) {
   const events = WINDOW_EVENTS[target];
   const [maximized, setMaximized] = useState(false);
 
-  useEffect(
-    () =>
-      window.api.on(events.resize, (res) => {
-        if (res) setMaximized(res.state !== "normal");
-      }),
-    [events],
-  );
+  useEffect(() => {
+    const off = window.api.on(events.resize, (res) => {
+      if (res) setMaximized(res.state !== "normal");
+    });
+    // Main pushes the state only on a change, which a reloaded page missed
+    window.api.emit(events.state);
+    return off;
+  }, [events]);
 
   return (
     <header

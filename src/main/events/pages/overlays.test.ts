@@ -334,7 +334,12 @@ describe("overlays events", () => {
   });
 
   describe("INSTALL_OVERLAY", () => {
-    const setup = (installed: OverlayApp[], success = true, saved = true) => {
+    const setup = (
+      installed: OverlayApp[],
+      success = true,
+      saved = true,
+      stored = installed,
+    ) => {
       const after = [overlay({ version: "1.1.0" }), imported];
       const overlayService = {
         getOverlays: vi.fn(() => installed),
@@ -346,8 +351,12 @@ describe("overlays events", () => {
         }),
       };
       const services = studioServices();
+      const storeManagerService = {
+        ...services.storeManagerService,
+        getSettings: () => ({ overlays: stored }),
+      };
       return {
-        h: createHandler({ ...services, overlayService }),
+        h: createHandler({ ...services, storeManagerService, overlayService }),
         overlayService,
         after,
         sendToClient: services.serverService.sendToClient,
@@ -402,6 +411,16 @@ describe("overlays events", () => {
           message:
             "Overlay updated. Refresh it in your streaming app to load the new version.",
         }),
+      ]);
+    });
+
+    it("says installed for an overlay served but not in the store", async () => {
+      const { h } = setup([overlay(), imported], true, true, [imported]);
+
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+
+      expect(h.notices).toEqual([
+        expect.objectContaining({ code: FEEDBACK_CODES.OVERLAY_INSTALLED }),
       ]);
     });
 
@@ -610,9 +629,10 @@ describe("overlays events", () => {
           data: saved,
         }),
       );
-      const send = vi.fn((_id: string, _payload: TokioPayload) => {});
+      const sendToClient = vi.fn((_id: string, _payload: TokioPayload) => true);
       const h = createHandler({
-        overlayService: { getGifts: async () => gifts, saveConfig, send },
+        overlayService: { getGifts: async () => gifts, saveConfig },
+        serverService: { sendToClient },
       });
 
       await h.invoke(overlays, APP_EVENTS.SAVE_OVERLAY_CONFIG, request);
@@ -625,7 +645,7 @@ describe("overlays events", () => {
       expect(h.replies(APP_EVENTS_RESPONSE.SAVE_OVERLAY_CONFIG)).toEqual([
         { success: true, data: saved, id: "gift-jar" },
       ]);
-      expect(send).toHaveBeenCalledExactlyOnceWith("gift-jar", {
+      expect(sendToClient).toHaveBeenCalledExactlyOnceWith("gift-jar", {
         type: "tokio:config",
         data: saved,
       });
@@ -652,8 +672,8 @@ describe("overlays events", () => {
 
   describe("SEND_OVERLAY_DATA", () => {
     it("sends the payload to the overlay", async () => {
-      const send = vi.fn((_id: string, _payload: TokioPayload) => {});
-      const h = createHandler({ overlayService: { send } });
+      const sendToClient = vi.fn((_id: string, _payload: TokioPayload) => true);
+      const h = createHandler({ serverService: { sendToClient } });
       const payload: TokioPayload = {
         type: TOKIO_EVENTS.LIKE,
         data: {
@@ -668,7 +688,7 @@ describe("overlays events", () => {
         payload,
       });
 
-      expect(send).toHaveBeenCalledExactlyOnceWith("gift-jar", payload);
+      expect(sendToClient).toHaveBeenCalledExactlyOnceWith("gift-jar", payload);
       expect(h.notices).toEqual([]);
     });
   });

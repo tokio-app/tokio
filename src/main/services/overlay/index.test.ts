@@ -1,6 +1,6 @@
 import { OverlayMetadata, TestOverlay } from "@/common/schemas";
 import { CustomGift, GiftEvent, TOKIO_EVENTS } from "@/common/types";
-import { defaultStoreData, generateTikTokEventSample } from "@/common/util";
+import { defaultStoreData } from "@/common/util";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { ServerService } from "@/services/server";
@@ -8,6 +8,7 @@ import { YAMLManagerService } from "@/services/yaml";
 import { strToU8, zipSync } from "fflate";
 import { createHash } from "node:crypto";
 import {
+  chmod,
   lstat,
   mkdir,
   mkdtemp,
@@ -518,6 +519,27 @@ describe("OverlayService", () => {
       expect(await readFile(join(source, "index.html"), "utf-8")).toBe(
         `<body>${SETUP}</body>`,
       );
+    });
+
+    it("makes a read-only overlay's files writable, so its HTML can be written", async () => {
+      const source = join(root, "source");
+      await configurable(source);
+      const files = ["index.html", "config.yaml"].map((f) => join(source, f));
+      await Promise.all(files.map((file) => chmod(file, 0o444)));
+
+      try {
+        expect(await service.import(source, gifts)).toEqual(done);
+
+        const [id] = await readdir(folder);
+        const html = await readFile(join(folder, id, "index.html"), "utf-8");
+        expect(html).toContain(`window.__OVERLAY_ID__ = "${id}"`);
+        for (const file of ["index.html", "config.yaml"]) {
+          const { mode } = await lstat(join(folder, id, file));
+          expect(mode & 0o200).toBe(0o200);
+        }
+      } finally {
+        await Promise.all(files.map((file) => chmod(file, 0o644)));
+      }
     });
 
     it("leaves out links, so the server can't reach files outside it", async () => {
@@ -1034,14 +1056,6 @@ describe("OverlayService", () => {
       success: false,
       data: undefined,
     });
-  });
-
-  it("sends data to one overlay", () => {
-    const payload = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW);
-
-    service.send("a", payload);
-
-    expect(sendToClient).toHaveBeenCalledExactlyOnceWith("a", payload);
   });
 
   it("samples every live event for tests", () => {

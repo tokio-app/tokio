@@ -41,9 +41,25 @@ describe("previewFile", () => {
       previewURL(`${folder}-old${join("/", "a", "index.html")}`),
       `${previewURL(folder)}/a/%2E%2E/%2E%2E/settings/store.json`,
       previewURL(folder),
+      // A network share, as a host or after four slashes
+      "local-resource://server/share/a/index.html",
+      "local-resource:////server/share/a/index.html",
     ];
     for (const url of outside) expect(previewFile(url, folder)).toBeNull();
   });
+
+  // Elsewhere a backslash is part of a file's name.
+  it.runIf(process.platform === "win32")(
+    "refuses encoded backslashes and other drives on Windows",
+    () => {
+      const drive = folder[0].toUpperCase() === "Z" ? "Y" : "Z";
+      const outside = [
+        `${previewURL(folder)}/a/..%5C..%5Csettings%5Cstore.json`,
+        previewURL(`${drive}${folder.slice(1)}\\a\\index.html`),
+      ];
+      for (const url of outside) expect(previewFile(url, folder)).toBeNull();
+    },
+  );
 
   it("refuses everything before the folders are known", () => {
     const file = join(folder, "a", "index.html");

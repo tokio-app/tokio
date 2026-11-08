@@ -114,10 +114,12 @@ events.push(
 events.push(
   APP_EVENTS.INSTALL_OVERLAY,
   async (handler, e, { id }) => {
-    const { overlayService, notifier } = handler;
-    const updating = overlayService
-      .getOverlays()
-      .some((o) => o.id === id && !o.external);
+    const { overlayService, storeManagerService, notifier } = handler;
+    // From the store, as installFromCatalog decides it: an overlay served
+    // but never saved is installed, not updated.
+    const updating = storeManagerService
+      .getSettings()
+      .overlays.some((o) => o.id === id && !o.external);
     const gifts = await overlayService.getGifts();
     const res = await overlayService.installFromCatalog(id, gifts);
     if (!res.success) {
@@ -228,7 +230,7 @@ events.push(
 
 events.push(
   APP_EVENTS.SAVE_OVERLAY_CONFIG,
-  async ({ overlayService, notifier }, e, { config, id }) => {
+  async ({ overlayService, serverService, notifier }, e, { config, id }) => {
     const gifts = await overlayService.getGifts();
     const res = await overlayService.saveConfig(id, config, gifts);
     if (!res.success) throw new Error(`Unable to save overlay ${id}.`);
@@ -238,7 +240,7 @@ events.push(
       id,
     });
     // From here, so the live overlays get it even when the page has closed.
-    overlayService.send(id, { type: "tokio:config", data: res.data! });
+    serverService.sendToClient(id, { type: "tokio:config", data: res.data! });
     notifier.success(
       "overlays",
       FEEDBACK_CODES.OVERLAY_SAVED,
@@ -261,8 +263,8 @@ events.push(
 
 events.push(
   APP_EVENTS.SEND_OVERLAY_DATA,
-  async ({ overlayService }, _, { id, payload }) => {
-    overlayService.send(id, payload);
+  async ({ serverService }, _, { id, payload }) => {
+    serverService.sendToClient(id, payload);
   },
   {
     failure: {

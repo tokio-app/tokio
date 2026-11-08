@@ -4,6 +4,7 @@ import { Avatar, Btn, EmptyState, Section } from "@/components";
 import { cx } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
 import { rich, useLanguage, useT } from "@/ui/i18n";
+import { memo } from "react";
 import { FiSettings } from "react-icons/fi";
 import styles from "../home.module.css";
 import { joinedText, Stat, statText } from "../helper";
@@ -68,7 +69,9 @@ function Action({ item }: { item: Exclude<ActivityItem, { type: "join" }> }) {
   return rich(t(DID[item.type]), { name });
 }
 
-function Event({ item }: { item: ActivityItem }) {
+// Memoized: each viewers or likes push renders the page again, but leaves the
+// feed's items as they were
+const Event = memo(function Event({ item }: { item: ActivityItem }) {
   const language = useLanguage();
   if (item.type === "join") {
     return (
@@ -86,7 +89,7 @@ function Event({ item }: { item: ActivityItem }) {
       </div>
     </li>
   );
-}
+});
 
 function emptyText(connected: boolean, feedOff: boolean): MessageKey {
   if (feedOff) return "home.activity.feedOff";

@@ -175,7 +175,10 @@ describe("processHTML", () => {
       Object.assign(new Error("ENOSPC: no space left"), { code: "ENOSPC" }),
     );
 
-    expect(await processHTML("a", old, dir)).toEqual({ success: false });
+    expect(await processHTML("a", old, dir)).toEqual({
+      success: false,
+      error: expect.objectContaining({ code: "ENOSPC" }),
+    });
     expect(await html()).toBe(old);
     expect(await readdir(dir)).toEqual(["index.html"]);
   });

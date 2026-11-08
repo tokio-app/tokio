@@ -5,10 +5,9 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { formatError, TaskQueue } from "@/common/util";
+import { TaskQueue } from "@/common/util";
 import { sameHandle } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
-import Logger from "@/logger";
 import { ProviderService } from "@/services/shared";
 import { ConnectionResponse, MusicProvider, MusicQueue } from "./common";
 import { Spotify, YouTubeMusic } from "./providers";
@@ -27,7 +26,7 @@ export class MusicService extends ProviderService<MusicProvider> {
   private _queue: TaskQueue;
   private _music_queue: MusicQueue;
   private _onPlaybackError?: (id: string, error: unknown) => void;
-  private _onSongChange?: (songs: MusicInfo[]) => void;
+  private _onSongChange: ((songs: MusicInfo[]) => void)[] = [];
   // When the last command was taken, for the cooldown
   private _lastCommand = -Infinity;
   // Bumped by clearHandler, so a request still searching then plays nothing
@@ -38,8 +37,8 @@ export class MusicService extends ProviderService<MusicProvider> {
     super();
     this._queue = new TaskQueue();
     this._music_queue = new MusicQueue({
-      onError: (id, error) => this._playbackFailed(id, error),
-      onStart: (songs) => this._onSongChange?.(songs),
+      onError: (id, error) => this._onPlaybackError?.(id, error),
+      onStart: (songs) => this._onSongChange.forEach((fn) => fn(songs)),
       // What's left of the song while the player plays it, after an ad
       // too. Paused, it can't tell when the song ends. Times are in ms.
       remaining: async (song) => {
@@ -93,7 +92,7 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue.off(event, listener);
   }
 
-  // Called when a requested track can't be played.
+  // Called when a requested track can't be played. The listener logs it.
   public onPlaybackError(listener: (id: string, error: unknown) => void) {
     this._onPlaybackError = listener;
   }
@@ -101,7 +100,7 @@ export class MusicService extends ProviderService<MusicProvider> {
   // Called once when a song starts, unlike MUSIC_CHANGE, which also comes
   // when the queue changes.
   public onSongChange(listener: (songs: MusicInfo[]) => void) {
-    this._onSongChange = listener;
+    this._onSongChange.push(listener);
   }
 
   public clearHandler() {
@@ -140,7 +139,7 @@ export class MusicService extends ProviderService<MusicProvider> {
       limited &&
       (control === controls.last ||
         (control === controls.next &&
-          !sameHandle(handle, this._music_queue.playingBy() ?? "")))
+          !sameHandle(handle, this._music_queue.playing()?.by ?? "")))
     ) {
       return;
     }
@@ -167,7 +166,9 @@ export class MusicService extends ProviderService<MusicProvider> {
       );
       if (added && handle) this._requesting.add(handle);
     } else if (control === controls.next) {
-      this._queue.enqueue(() => this._music_queue.triggerNext());
+      // With nothing playing, there's nothing this Next was meant for
+      const from = this._music_queue.playing();
+      this._queue.enqueue(() => from && this._music_queue.triggerNext(from));
     } else if (control === controls.last) {
       this._queue.enqueue(() => this._music_queue.triggerPrevious());
     } else if (control === controls.revoke) {
@@ -183,19 +184,10 @@ export class MusicService extends ProviderService<MusicProvider> {
     try {
       await this.play(request, run);
     } catch (error) {
-      if (run === this._run) this._playbackFailed(request.query, error);
+      if (run === this._run) this._onPlaybackError?.(request.query, error);
     } finally {
       if (run === this._run) this._requesting.delete(request.by);
     }
-  }
-
-  private _playbackFailed(id: string, error: unknown) {
-    Logger.error(
-      `<Music> Unable to play track [${id}] -- ${formatError(error)}`,
-      this._logFile,
-      error,
-    );
-    this._onPlaybackError?.(id, error);
   }
 
   // Searches first, so a request that finds nothing never reads the player

@@ -259,6 +259,25 @@ describe("AlertItem", () => {
     expect(summary()).toHaveTextContent("7s");
   });
 
+  it("reads a new sound's length again", () => {
+    const { container, rerender } = setup(
+      alert({ sound: alertClip("Airhorn") }),
+    );
+    const load = (seconds: number) => {
+      const audio = container.querySelector("audio")!;
+      Object.defineProperty(audio, "duration", { value: seconds });
+      fireEvent.loadedMetadata(audio);
+    };
+    load(10);
+    expect(summary()).toHaveTextContent("10s");
+
+    rerender({ alert: alert({ sound: alertClip("Siren") }) });
+    expect(summary()).toHaveTextContent("Siren");
+    expect(summary()).not.toHaveTextContent("10s");
+    load(4);
+    expect(summary()).toHaveTextContent("4s");
+  });
+
   it("shows its name, or the one its place gives it while it has none", () => {
     const { unmount } = setup(alert({ name: "Big gifts" }));
     expect(summary()).toHaveTextContent("Big gifts");

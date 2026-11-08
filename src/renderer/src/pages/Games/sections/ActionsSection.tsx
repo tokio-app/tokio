@@ -353,7 +353,10 @@ function ActionItem({
                 variant="icon"
                 className={styles.remove_step}
                 title={t("games.actions.removeStep")}
-                onClick={() => setSteps(steps.filter((_, i) => i !== index))}
+                onClick={() => {
+                  setSteps(steps.filter((_, i) => i !== index));
+                  setFocused((f) => (f === index ? -1 : f > index ? f - 1 : f));
+                }}
               >
                 <FiX size={18} />
               </Btn>

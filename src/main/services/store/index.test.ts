@@ -190,6 +190,32 @@ describe("StoreManagerService", () => {
       expect(await readFile(defaultProfileFile, "utf-8")).toBe(custom);
     });
 
+    it("doesn't rebuild the store without a profile it can't read", async () => {
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+      const saved = JSON.stringify({ ...defaultProfile, name: "Stream" });
+      await writeFile(stream, saved);
+      await writeFile(storeFile, "{ oops");
+      busy.add(stream);
+
+      await expect(init()).rejects.toThrow("Unable to initialize store.");
+
+      expect(await readFile(stream, "utf-8")).toBe(saved);
+      expect(
+        (await init())
+          .getProfiles()
+          .map((p) => p.file)
+          .sort(),
+      ).toEqual(["default.json", "stream.json"]);
+    });
+
+    it("doesn't rebuild the store without a library folder it can't read", async () => {
+      await rm(paths.folders.soundsFolder, { recursive: true });
+      await writeFile(paths.folders.soundsFolder, "not a folder");
+      await writeFile(storeFile, "{ oops");
+
+      await expect(init()).rejects.toThrow("Unable to initialize store.");
+    });
+
     it("backs up a Default profile that can't be loaded, and replaces it", async () => {
       await writeFile(defaultProfileFile, "{ oops");
 
@@ -396,6 +422,21 @@ describe("StoreManagerService", () => {
         name: "Default",
         key: "session",
       });
+    });
+
+    it("keeps one entry, with the last key, for two keys saved at once", async () => {
+      const store = await init();
+
+      await Promise.all([
+        store.updateVoiceKey("x", "first"),
+        store.updateVoiceKey("x", "second"),
+      ]);
+
+      const saved = (await readJSON(storeFile)).settings.providers.tts;
+      expect(
+        saved.filter((p: { name: string }) => p.name === "x"),
+      ).toHaveLength(1);
+      expect(store.getVoiceKey("x")).toBe("second");
     });
   });
 
@@ -731,7 +772,7 @@ describe("StoreManagerService", () => {
       );
     });
 
-    it("keeps live stats in memory only", async () => {
+    it("updates live stats without saving the store", async () => {
       const store = await init();
       vi.useFakeTimers();
 
@@ -985,6 +1026,28 @@ describe("StoreManagerService", () => {
       expect((await store.getProfileData())?.name).toBe("Default");
     });
 
+    it("holds an update the old profile got while the switch was saving when it can't be saved", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.getProfileData();
+      const release = holdStoreSave(false);
+
+      const switching = store.updateActiveProfile("stream.json");
+      await vi.waitFor(() =>
+        expect(store.getSettings().activeProfile.file).toBe("stream.json"),
+      );
+      await store.updateProfileData(
+        { connector: { username: "streamer" } },
+        "default.json",
+      );
+      release();
+      expect(await switching).toBe("unsaved");
+
+      const active = await store.getProfileData();
+      expect(active?.name).toBe("Default");
+      expect(active?.connector.username).toBe("streamer");
+    });
+
     it("saves the undone switch over an earlier save that wrote it", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");
@@ -1201,6 +1264,19 @@ describe("StoreManagerService", () => {
       expect((await readJSON(copy)).name).toBe("Night Stream");
     });
 
+    it("names an imported profile's file in safe characters, like a new one's", async () => {
+      const store = await init();
+      const copy = await shared("stream.cleared-1730000000000.json");
+
+      expect(await store.importProfile(copy)).toEqual({
+        file: "stream-cleared-1730000000000.json",
+        name: "Shared",
+      });
+      expect(await readdir(paths.folders.profilesFolder)).toContain(
+        "stream-cleared-1730000000000.json",
+      );
+    });
+
     it("refuses a file that isn't a Tokio profile", async () => {
       vi.spyOn(Logger, "error");
       const store = await init();
@@ -1328,6 +1404,34 @@ describe("StoreManagerService", () => {
 
       expect(res.data).toEqual([{ id: "e1", image: "new" }]);
       expect(again).toEqual({ success: true });
+    });
+
+    it("updates a saved emote's image again when its save failed", async () => {
+      await writeFile(
+        defaultProfileFile,
+        JSON.stringify({
+          ...defaultProfile,
+          emotes: [{ id: "e1", image: "old" }],
+        }),
+      );
+      const store = await init();
+      vi.spyOn(json, "updateFile").mockResolvedValueOnce({
+        success: false,
+        data: null,
+      });
+      const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+
+      expect(await store.recordEmotes([emote("e1", "new")])).toEqual({
+        success: false,
+      });
+      now.mockReturnValue(31_000);
+
+      expect((await store.recordEmotes([emote("e1", "new")])).data).toEqual([
+        { id: "e1", image: "new" },
+      ]);
+      expect((await readJSON(defaultProfileFile)).emotes).toEqual([
+        { id: "e1", image: "new" },
+      ]);
     });
 
     it("tries a failed save again only after a while, for that profile", async () => {
@@ -1587,6 +1691,24 @@ describe("StoreManagerService", () => {
       // A profile without it saves nothing
       expect(await store.removeFromGames("creeper.png")).toBe(true);
     });
+
+    it("says so when another profile can't be read, but not when it's broken", async () => {
+      vi.spyOn(Logger, "error");
+      const store = await init();
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+      await store.createNewProfile("stream.json", "Stream");
+      await store.updateProfileData(
+        withActions(gameAction("a", tnt)),
+        "stream.json",
+      );
+      busy.add(stream);
+
+      expect(await store.removeFromGames("tnt.png")).toBe(false);
+      expect(images(await readJSON(stream))).toEqual([tnt]);
+
+      await writeFile(stream, "{ oops");
+      expect(await store.removeFromGames("tnt.png")).toBe(true);
+    });
   });
 
   describe("test overlays", () => {
@@ -1692,10 +1814,11 @@ describe("StoreManagerService", () => {
       expect(store.getStudio()).toHaveLength(1);
     });
 
-    it("removes an overlay", async () => {
+    it("removes an overlay, and refuses one it doesn't hold", async () => {
       const store = await init();
       await store.addStudioOverlay(id, "One");
 
+      expect(await store.removeStudioOverlay(other)).toBeNull();
       expect(await store.removeStudioOverlay(id)).toBe(true);
       expect((await init()).getStudio()).toEqual([]);
     });

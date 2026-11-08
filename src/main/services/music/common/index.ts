@@ -11,7 +11,7 @@ import {
   reloadWhenGone,
   stayOnPage,
 } from "@/helper/network";
-import { BrowserWindow, WebContentsView } from "electron";
+import { BrowserWindow, screen, WebContentsView } from "electron";
 import { join } from "node:path";
 import { TokioEmitter } from "../../shared/emitter";
 
@@ -41,11 +41,11 @@ export function createWindow(content: WebContentsView) {
   const APP_ICON = join(__dirname, "../../resources/icon.png");
   const APP_PRELOAD = join(__dirname, "../preload/index.cjs");
 
+  // No bigger than the screen, which on a 1366x768 laptop is shorter than 840
+  const { workAreaSize } = screen.getPrimaryDisplay();
   const _shellWindow = new BrowserWindow({
-    width: 1280,
-    height: 840,
-    minHeight: 840,
-    minWidth: 1280,
+    width: Math.min(1280, workAreaSize.width),
+    height: Math.min(840, workAreaSize.height),
     show: false,
     title: "Tokio",
     center: true,
@@ -123,6 +123,8 @@ export function createWindow(content: WebContentsView) {
       _shellWindow.maximize();
     }
   });
+
+  nav.ipc.on(APP_EVENTS.GET_MUSIC_WINDOW_STATE, sendWindowState);
 
   nav.ipc.on(APP_EVENTS.MINIMIZE_MUSIC_WINDOW, () => {
     if (!_shellWindow.isDestroyed()) _shellWindow.minimize();

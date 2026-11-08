@@ -22,10 +22,12 @@ export enum APP_EVENTS {
   MAXIMIZE_WINDOW = "app:window:req:maximize",
   CLOSE_WINDOW = "app:window:req:close",
   SHOW_WINDOW = "app:window:req:show",
+  GET_WINDOW_STATE = "app:window:req:state",
 
   MINIMIZE_MUSIC_WINDOW = "app:music:window:req:minimize",
   MAXIMIZE_MUSIC_WINDOW = "app:music:window:req:maximize",
   CLOSE_MUSIC_WINDOW = "app:music:window:req:close",
+  GET_MUSIC_WINDOW_STATE = "app:music:window:req:state",
 
   // PROFILE
   GET_PROFILE = "app:profile:get",
@@ -166,10 +168,12 @@ export interface AppEventsMap {
   [APP_EVENTS.MAXIMIZE_WINDOW]: void;
   [APP_EVENTS.CLOSE_WINDOW]: void;
   [APP_EVENTS.SHOW_WINDOW]: void;
+  [APP_EVENTS.GET_WINDOW_STATE]: void;
 
   [APP_EVENTS.MINIMIZE_MUSIC_WINDOW]: void;
   [APP_EVENTS.MAXIMIZE_MUSIC_WINDOW]: void;
   [APP_EVENTS.CLOSE_MUSIC_WINDOW]: void;
+  [APP_EVENTS.GET_MUSIC_WINDOW_STATE]: void;
 
   // PROFILE
   [APP_EVENTS.GET_PROFILE]: void;

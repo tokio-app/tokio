@@ -67,8 +67,13 @@ export class TaskQueue {
     this.gapTime = options.gapTime ?? 0;
   }
 
+  // As many tasks wait as it holds, so enqueue would drop a new one
+  public full(): boolean {
+    return this.queue.length >= this.maxQueueLength;
+  }
+
   public enqueue(task: Task): boolean {
-    if (this.queue.length >= this.maxQueueLength) {
+    if (this.full()) {
       return false;
     }
 

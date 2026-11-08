@@ -41,12 +41,19 @@ events.push(
   },
 );
 
+// The read of the page's dates and of its search, each stopped by the next
+// one of its kind, whose reply replaces it
+const reading: Partial<Record<"dates" | "search", AbortController>> = {};
+
 // The page's totals and top gifters for the dates it filters by, and its
 // gifter search. Dates get their totals first, which read at most the LIVEs
 // they cut, then again with the gifters, which read every LIVE in them.
 events.push(
   APP_EVENTS.GET_GIFTERS,
   async ({ historyService }, e, { from, to, query }) => {
+    const kind = query ? "search" : "dates";
+    reading[kind]?.abort();
+    const { signal } = (reading[kind] = new AbortController());
     const totals = query
       ? undefined
       : await historyService.getTotals({ from, to });
@@ -60,7 +67,7 @@ events.push(
         totals,
       });
     }
-    const data = await historyService.getGifters({ from, to, query });
+    const data = await historyService.getGifters({ from, to, query, signal });
     if (data === null) return;
     e.reply(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,

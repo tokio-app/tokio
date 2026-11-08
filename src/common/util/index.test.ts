@@ -64,6 +64,17 @@ describe("TaskQueue", () => {
     expect(console.warn).not.toHaveBeenCalled();
   });
 
+  it("is full once maxQueueLength are waiting", () => {
+    const queue = new TaskQueue();
+    queue.setQueueOptions({ maxQueueLength: 1 });
+    const running = deferred();
+
+    queue.enqueue(() => running.promise);
+    expect(queue.full()).toBe(false);
+    queue.enqueue(() => {});
+    expect(queue.full()).toBe(true);
+  });
+
   it("keeps going after a task throws", async () => {
     const queue = new TaskQueue();
     const b = vi.fn();

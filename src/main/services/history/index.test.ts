@@ -161,6 +161,23 @@ describe("HistoryService", () => {
     ]);
   });
 
+  it("keeps a gifter's picture from an earlier LIVE", async () => {
+    const history = await loaded();
+    history.start("kai", 0);
+    gifts(history, [1, gift(viewer("1", "ana"), 1)]);
+    history.end(10);
+    history.start("kai", 20);
+    gifts(history, [
+      30,
+      gift({ ...viewer("1", "ana"), profilePictures: [] }, 1),
+    ]);
+
+    expect(history.top().live[0].picture).toBe("https://p16/ana.jpg");
+    history.end(40);
+    expect(history.getHistory().gifters[0].picture).toBe("https://p16/ana.jpg");
+    expect(history.top().allTime[0].picture).toBe("https://p16/ana.jpg");
+  });
+
   it("ranks both lists by coins, ties to whoever got there first", async () => {
     const history = await loaded();
     history.start("kai", 0);
@@ -265,6 +282,22 @@ describe("HistoryService", () => {
       "index.json",
     ]);
     expect((await read<LiveRecord>("1000.json")).endedAt).toBe(6000);
+  });
+
+  it("moves a quiet LIVE's end on with each save", async () => {
+    const history = await loaded();
+    history.start("kai", 1000);
+    gifts(history, [1100, gift(viewer("1"), 5)]);
+    vi.setSystemTime(5000);
+    await history.save();
+    // Nothing came since the last save
+    vi.setSystemTime(40_000);
+
+    expect(await history.save()).toBe(true);
+    expect((await read<LiveRecord>("1000.json")).endedAt).toBe(40_000);
+    expect((await loaded()).getHistory().lives).toEqual([
+      expect.objectContaining({ startedAt: 1000, endedAt: 40_000, coins: 5 }),
+    ]);
   });
 
   it("loads a saved history back, and writes nothing when unchanged", async () => {
@@ -427,6 +460,25 @@ describe("HistoryService", () => {
     ]);
   });
 
+  it("writes a minute as it was when the save began", async () => {
+    const history = await loaded();
+    history.start("kai", 0);
+    gifts(
+      history,
+      [1000, gift(viewer("1"), 5)],
+      [MINUTE, gift(viewer("1"), 5)],
+    );
+    const saving = history.save();
+    // Lands while the save waits for the one before
+    gifts(history, [MINUTE + 1000, gift(viewer("1"), 5)]);
+    await saving;
+
+    expect((await read<LiveRecord>("0.json")).minutes).toEqual([
+      { minute: 0, gifters: { 1: [5, 1] } },
+      { minute: 1, gifters: { 1: [5, 1] } },
+    ]);
+  });
+
   it("counts only the gifts in the dates of a LIVE they cut", async () => {
     const history = await loaded();
     // From 10:30 to 12:30 into the clock's minutes, then from 20 to 21
@@ -458,6 +510,10 @@ describe("HistoryService", () => {
     expect(await history.getGifters(until)).toEqual([
       expect.objectContaining({ userId: "1", coins: 5, rank: 1 }),
     ]);
+
+    // Both minutes the dates start and end in count
+    const across = { from: 10 * MINUTE + 20_000, to: 11 * MINUTE + 20_000 };
+    expect(await history.getTotals(across)).toEqual({ coins: 115, gifts: 4 });
 
     // Whole LIVEs come from the list, as do the dates of one LIVE
     expect(await history.getTotals({})).toEqual({ coins: 116, gifts: 5 });
@@ -554,6 +610,27 @@ describe("HistoryService", () => {
     // Nothing loaded still gives a reply
     expect(await service().getTotals(range)).toEqual({ coins: 0, gifts: 0 });
     expect(await service().getGifters(range)).toEqual([]);
+  });
+
+  it("stops reading dates when their signal aborts", async () => {
+    const history = await loaded();
+    history.start("kai", 1000);
+    history.end(2000);
+    history.start("kai", 3000);
+    history.end(4000);
+    history.start("kai", 6000);
+    history.end(7000);
+    await history.save();
+    const loadFile = vi.spyOn(json, "loadFile");
+
+    // Leaves the last LIVE out, so it reads the other two's files
+    const controller = new AbortController();
+    const gifters = history.getGifters({ to: 5000, signal: controller.signal });
+    controller.abort();
+
+    expect(await gifters).toBeNull();
+    expect(loadFile).toHaveBeenCalledOnce();
+    expect(await history.getGifters({ to: 5000 })).toEqual([]);
   });
 
   describe(`past ${MAX_LIVES} LIVEs`, () => {

@@ -9,4 +9,5 @@ export * from "./useIpcListener";
 export * from "./useIpcRequest";
 export * from "./useNotifications";
 export * from "./usePopover";
+export * from "./useServerEnabled";
 export * from "./useUpdateStatus";

@@ -1,7 +1,7 @@
 import { TestOverlay } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { Page } from "@/components";
-import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useIpcListener, useIpcRequest, useServerEnabled } from "@/hooks";
 import toolsStyles from "@/pages/Tools/tools.module.css";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
@@ -12,10 +12,9 @@ export function TestOverlays() {
   const t = useT();
   const [testOverlays, setTestOverlays] = useState<TestOverlay[]>([]);
   const [statuses, setStatuses] = useState<Record<string, TestStatus>>({});
-  const [serverEnabled, setServerEnabled] = useState(true);
 
   useIpcRequest(APP_EVENTS.GET_TEST_OVERLAYS);
-  useIpcRequest(APP_EVENTS.GET_SETTINGS);
+  const serverEnabled = useServerEnabled();
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_TEST_OVERLAYS, (res) => {
     if (res?.success) setTestOverlays(res.data!);
@@ -27,10 +26,6 @@ export function TestOverlays() {
       ...s,
       [res.id]: res.success ? "sent" : "no-client",
     }));
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
-    if (res?.success) setServerEnabled(res.data!.settings.server.enabled);
   });
 
   return (

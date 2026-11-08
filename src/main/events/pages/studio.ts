@@ -43,7 +43,8 @@ const options = (message: MessageKey) => ({
     }),
 });
 
-// The editor saved or tested an overlay that was deleted meanwhile
+// The editor saved or tested, or the list deleted, an overlay that was deleted
+// meanwhile
 const missing = () =>
   new AppFailure(FEEDBACK_CODES.STUDIO_FAILED, t("main.studio.missing"), {
     level: "warning",
@@ -91,6 +92,7 @@ events.push(
   async (handler, e, { id }) => {
     const { storeManagerService, studioService, notifier } = handler;
     const saved = await storeManagerService.removeStudioOverlay(id);
+    if (saved === null) throw missing();
     replyStudio(e, handler);
     sendStudioMessage(handler, id, { view: null });
     studioService.forget(id);

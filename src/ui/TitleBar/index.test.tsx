@@ -19,6 +19,7 @@ describe("TitleBar", () => {
     await clickControls();
 
     expect(sentEvents()).toEqual([
+      APP_EVENTS.GET_WINDOW_STATE,
       APP_EVENTS.MINIMIZE_WINDOW,
       APP_EVENTS.MAXIMIZE_WINDOW,
       APP_EVENTS.CLOSE_WINDOW,
@@ -31,6 +32,7 @@ describe("TitleBar", () => {
     await clickControls();
 
     expect(sentEvents()).toEqual([
+      APP_EVENTS.GET_MUSIC_WINDOW_STATE,
       APP_EVENTS.MINIMIZE_MUSIC_WINDOW,
       APP_EVENTS.MAXIMIZE_MUSIC_WINDOW,
       APP_EVENTS.CLOSE_MUSIC_WINDOW,
@@ -52,6 +54,14 @@ describe("TitleBar", () => {
     expect(
       screen.getByRole("button", { name: "Maximize" }),
     ).toBeInTheDocument();
+  });
+
+  it("asks for the state of a window maximized before it mounted", async () => {
+    render(<TitleBar target="main" logo="logo.png" />);
+    expect(sentEvents()).toEqual([APP_EVENTS.GET_WINDOW_STATE]);
+
+    await send(APP_EVENTS_RESPONSE.RESIZE_WINDOW, { state: "maximized" });
+    expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
   });
 
   it("shows the logo, and its children before the controls", () => {
