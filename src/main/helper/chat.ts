@@ -36,7 +36,7 @@ export function removeEmojis(text: string, by = ""): string {
 
 // Format characters (zero-width spaces and joiners, bidi marks) and the
 // fillers that look blank: Hangul fillers and the empty Braille pattern.
-const INVISIBLE = /[\p{Cf}\u115F\u1160\u3164\uFFA0\u2800]/gu;
+export const INVISIBLE = /[\p{Cf}\u115F\u1160\u3164\uFFA0\u2800]/gu;
 
 /** Whether the text has nothing to read: only spaces and invisible characters. */
 export function isBlank(text: string): boolean {

@@ -6,7 +6,13 @@ import {
   formatError,
   TaskQueue,
 } from "@/common/util";
-import { isBlank, removeEmojis, sameHandle, wholeWord } from "@/helper/chat";
+import {
+  INVISIBLE,
+  isBlank,
+  removeEmojis,
+  sameHandle,
+  wholeWord,
+} from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
@@ -32,7 +38,8 @@ const LOOKALIKE = new RegExp(`[${LOOKALIKES}]`, "g");
 const fold = (text: string) =>
   text
     .normalize("NFKD")
-    .replace(/[\p{M}\p{Cf}]/gu, "")
+    .replace(/\p{M}/gu, "")
+    .replace(INVISIBLE, "")
     .toLowerCase()
     .replace(/\S+/g, (word) =>
       /\p{Script=Latin}/u.test(word)
