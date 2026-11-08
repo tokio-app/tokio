@@ -708,6 +708,22 @@ describe("TikTokLiveConnector", () => {
       });
     });
 
+    it("reads a fan level that isn't a number as 0", () => {
+      const onFollow = capture(TOKIO_EVENTS.FOLLOW);
+      const [badge] = rawUser.badgeList;
+
+      connection().emit("follow", {
+        user: {
+          ...rawUser,
+          badgeList: [{ ...badge, privilegeLogExtra: { level: "x" } }],
+        },
+      });
+
+      expect(onFollow).toHaveBeenCalledWith({
+        user: expect.objectContaining({ fanLevel: 0 }),
+      });
+    });
+
     it("maps viewer ranks like other users", () => {
       const onRoom = capture(TOKIO_EVENTS.ROOM_USER);
 
