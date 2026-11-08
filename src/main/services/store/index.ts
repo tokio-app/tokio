@@ -935,14 +935,15 @@ export class StoreManagerService extends Service {
     return true;
   }
 
-  // Copied to a free file named after its file, and listed under its own
-  // name, numbered when another profile has it. Fails as createNewProfile.
+  // Copied to a file named after its file as profileFileFor names a new one's,
+  // and listed under its own name, numbered when another profile has it.
+  // Fails as createNewProfile.
   public async importProfile(
     ref: string,
   ): Promise<EntityMetadata | "unsaved" | null> {
     this._ensureInitialized();
     if (!ref) return null;
-    const file = await this._freeProfileFile(basename(ref, extname(ref)));
+    const file = await this.profileFileFor(basename(ref, extname(ref)));
     const newPath = join(this._pathManagerService.folders.profilesFolder, file);
 
     const data = await this._jsonManagerService.loadFile(

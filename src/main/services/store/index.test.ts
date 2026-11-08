@@ -1201,6 +1201,19 @@ describe("StoreManagerService", () => {
       expect((await readJSON(copy)).name).toBe("Night Stream");
     });
 
+    it("names an imported profile's file in safe characters, like a new one's", async () => {
+      const store = await init();
+      const copy = await shared("stream.cleared-1730000000000.json");
+
+      expect(await store.importProfile(copy)).toEqual({
+        file: "stream-cleared-1730000000000.json",
+        name: "Shared",
+      });
+      expect(await readdir(paths.folders.profilesFolder)).toContain(
+        "stream-cleared-1730000000000.json",
+      );
+    });
+
     it("refuses a file that isn't a Tokio profile", async () => {
       vi.spyOn(Logger, "error");
       const store = await init();
