@@ -772,7 +772,7 @@ describe("StoreManagerService", () => {
       );
     });
 
-    it("keeps live stats in memory only", async () => {
+    it("updates live stats without saving the store", async () => {
       const store = await init();
       vi.useFakeTimers();
 

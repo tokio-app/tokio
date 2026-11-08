@@ -723,7 +723,8 @@ export class StoreManagerService extends Service {
     return { success: true, data: saved };
   }
 
-  // Kept in memory only, they're reset when the app loads.
+  // Not saved on their own: they ride along with the store's next save, and
+  // are reset when the app loads.
   public updateLiveStats(data: {
     likes?: number;
     viewers?: number;
