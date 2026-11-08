@@ -423,6 +423,21 @@ describe("StoreManagerService", () => {
         key: "session",
       });
     });
+
+    it("keeps one entry, with the last key, for two keys saved at once", async () => {
+      const store = await init();
+
+      await Promise.all([
+        store.updateVoiceKey("x", "first"),
+        store.updateVoiceKey("x", "second"),
+      ]);
+
+      const saved = (await readJSON(storeFile)).settings.providers.tts;
+      expect(
+        saved.filter((p: { name: string }) => p.name === "x"),
+      ).toHaveLength(1);
+      expect(store.getVoiceKey("x")).toBe("second");
+    });
   });
 
   describe("saving", () => {

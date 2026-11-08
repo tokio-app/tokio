@@ -797,12 +797,12 @@ export class StoreManagerService extends Service {
   // Keys are saved with the provider list, encrypted.
   public async updateVoiceKey(engine: string, key: string): Promise<boolean> {
     this._ensureInitialized();
-    const list = this._storeData!.settings.providers.tts;
-    const index = list.findIndex((p) => p.name === engine);
     const saved = await this._encryptProviderKey({
       name: engine,
       key,
     });
+    const list = this._storeData!.settings.providers.tts;
+    const index = list.findIndex((p) => p.name === engine);
     if (index !== -1) {
       list[index] = saved;
     } else {
