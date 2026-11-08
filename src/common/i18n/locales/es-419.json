@@ -1162,6 +1162,7 @@
   "minecraft.help.invisibility": "Invisibilidad",
   "minecraft.morph": "Forma de {mob}",
   "minecraft.unmorph": "Volver a la normalidad",
+  "minecraft.seconds": "{seconds} s",
   "minecraft.likes#one": "{count} Me gusta",
   "minecraft.likes#other": "{count} Me gusta",
   "minecraft.hazard.cobweb_trap": "Trampa de telarañas",

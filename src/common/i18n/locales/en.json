@@ -1162,6 +1162,7 @@
   "minecraft.help.invisibility": "Invisibility",
   "minecraft.morph": "{mob} form",
   "minecraft.unmorph": "Back to normal",
+  "minecraft.seconds": "{seconds} s",
   "minecraft.likes#one": "{count} like",
   "minecraft.likes#other": "{count} likes",
   "minecraft.hazard.cobweb_trap": "Cobweb trap",

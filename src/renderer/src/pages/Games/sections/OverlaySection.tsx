@@ -423,7 +423,7 @@ function RecipeRow({
   );
   const reorder = t("games.overlay.move");
   // On the pictures' corners, as on the overlay
-  const count = overlay.image ? gameCount(action) : 0;
+  const count = overlay.image ? gameCount(action, language) : "";
   const likes = gameEventCount(action);
 
   // The gifts', emotes' or Tokio's pictures say what they are, as on the
@@ -533,7 +533,7 @@ function RecipeRow({
         ) : (
           <FiPlus size={18} />
         )}
-        {count > 0 && (
+        {count !== "" && (
           <span className={styles.slot_count} aria-hidden>
             {count}
           </span>
@@ -544,7 +544,7 @@ function RecipeRow({
         aria-label={t("games.overlay.name")}
         maxLength={40}
         placeholder={
-          gameStepsText(action, language, count > 0) ||
+          gameStepsText(action, language, count !== "") ||
           t("games.overlay.noName")
         }
         value={overlay.name}

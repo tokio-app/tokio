@@ -92,7 +92,8 @@ describe("gameOverlayRows", () => {
         eventCount: 0,
         image: "/games/minecraft/pictures/abc.png",
         name: "TNT",
-        count: 0,
+        count: "",
+        timed: false,
         column: 1,
       },
       {
@@ -103,7 +104,8 @@ describe("gameOverlayRows", () => {
         eventCount: 0,
         image: null,
         name: "Zombie",
-        count: 0,
+        count: "",
+        timed: false,
         column: 1,
       },
     ]);
@@ -354,12 +356,31 @@ describe("gameStepsText", () => {
       ];
     });
 
-    expect(gameCount(zombies)).toBe(5);
+    expect(gameCount(zombies, "en")).toBe("5");
     expect(gameStepsText(zombies, "en", true)).toBe(
       "Thunder, Zombie, Diamond ×3",
     );
     expect(gameStepsText(zombies, "en")).toBe("Thunder, Zombie ×5, Diamond ×3");
-    expect(gameCount(action())).toBe(0);
+    expect(gameCount(action(), "en")).toBe("");
+  });
+
+  it("puts a timed morph's seconds on its picture, never in its name", () => {
+    const morph = (seconds: number | null) =>
+      action((a) => {
+        a.edition = "java";
+        a.steps = [
+          { type: "morph", mob: "zombie", seconds },
+          { type: "spawn", mob: "zombie", amount: 5, name: "" },
+        ];
+      });
+
+    expect(gameCount(morph(30), "es-419")).toBe("30 s");
+    expect(gameStepsText(morph(30), "en", true)).toBe("Zombie form, Zombie ×5");
+    // Until turned back it has no time, so the spawn's amount counts
+    expect(gameCount(morph(null), "en")).toBe("5");
+    // Sticker moves the seconds off the sticker's corner
+    expect(rows(morph(30))[0]).toMatchObject({ count: "30 s", timed: true });
+    expect(rows(morph(null))[0]).toMatchObject({ count: "5", timed: false });
   });
 
   it("counts a row on its picture, and in its name without one", () => {
@@ -372,11 +393,12 @@ describe("gameStepsText", () => {
 
     expect(rows(zombies(picture))[0]).toMatchObject({
       name: "Zombie",
-      count: 5,
+      count: "5",
     });
     expect(rows(zombies(null))[0]).toMatchObject({
       name: "Zombie ×5",
-      count: 0,
+      count: "",
+      timed: false,
     });
   });
 

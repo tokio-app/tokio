@@ -176,6 +176,8 @@
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  /* A morph's "30 s" stays on one line */
+  white-space: nowrap;
   color: var(--games-text);
   text-shadow:
     0.08em 0.08em 0 rgb(0 0 0 / 75%),
@@ -327,6 +329,13 @@
   align-self: end;
   width: var(--games-sticker);
   height: var(--games-sticker);
+}
+
+/* A morph's "30 s" is too wide for the bottom right, where it would run
+   under the sticker */
+.games-sticker .games-timed .games-slot-result .games-count {
+  top: -0.2em;
+  bottom: auto;
 }
 
 /* Without the action's picture, the event's takes its place (the page and

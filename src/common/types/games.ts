@@ -55,8 +55,12 @@ export type GameOverlayRow = {
   image: string | null;
   // Empty for none
   name: string;
-  // How many of what it makes, in the picture's corner; 0 for none
-  count: number;
+  // How many of what it makes, or its morph's seconds, in the picture's
+  // corner: "5", "30 s"; "" for none
+  count: string;
+  // Its count is a morph's seconds, which Sticker puts on the top right,
+  // clear of the sticker
+  timed: boolean;
   // The column whose overlay shows it
   column: number;
 };

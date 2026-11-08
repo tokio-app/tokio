@@ -260,6 +260,7 @@ function PreviewColumn({ label, look, rows, run }: Props & { label?: string }) {
                   lit.includes(row.id) && "games-lit",
                   index === current && "games-current",
                   image && "has-result-picture",
+                  row.timed && "games-timed",
                 )}
               >
                 <span
@@ -303,7 +304,7 @@ function PreviewColumn({ label, look, rows, run }: Props & { label?: string }) {
                         onLoad={(e) => sharpen(e.currentTarget)}
                         onError={onError(image)}
                       />
-                      {row.count > 0 && (
+                      {row.count !== "" && (
                         <span className="games-count">{row.count}</span>
                       )}
                     </span>

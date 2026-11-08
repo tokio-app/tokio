@@ -155,7 +155,7 @@
       // stack
       const counted = (sources, result, count) => {
         const box = slot(sources, result);
-        if (count > 0) box.append(text(String(count), "games-count"));
+        if (count) box.append(text(String(count), "games-count"));
         return box;
       };
 
@@ -181,6 +181,7 @@
         li.className = "games-row";
         // The sticker format puts the event's picture on its corner
         li.classList.toggle("has-result-picture", !!row.image);
+        li.classList.toggle("games-timed", row.timed);
         li.append(
           event,
           arrow.content.firstElementChild.cloneNode(true),

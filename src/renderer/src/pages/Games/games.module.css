@@ -540,6 +540,7 @@
   font-size: var(--font-xs);
   font-weight: 700;
   line-height: 1;
+  white-space: nowrap;
   color: var(--font-primary);
   text-shadow: 1px 1px 0 rgb(0 0 0 / 80%);
 }

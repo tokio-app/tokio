@@ -198,17 +198,29 @@ export function gameEventCount({ trigger, likes_every }: GameAction) {
     : 0;
 }
 
-// The first mob or item the action makes
+// The first mob or item the action makes, or its timed morph
 const firstCounted = (steps: GameStep[]) =>
-  steps.find((step) => step.type === "spawn" || step.type === "give");
+  steps.find(
+    (step) =>
+      step.type === "spawn" ||
+      step.type === "give" ||
+      (step.type === "morph" && step.seconds !== null),
+  );
 
 /**
- * How many of its first mob or item the action makes, shown in its picture's
- * corner like an inventory's stack. 0 for one, or none.
+ * How many of its first mob or item the action makes, or how long its morph
+ * lasts, shown in its picture's corner like an inventory's stack: "5",
+ * "30 s". "" for one, or none.
  */
-export function gameCount({ steps }: GameAction) {
-  const amount = firstCounted(steps)?.amount ?? 0;
-  return amount > 1 ? amount : 0;
+export function gameCount({ steps }: GameAction, language: string) {
+  const first = firstCounted(steps);
+  if (first?.type === "morph") {
+    return translate(language, "minecraft.seconds", {
+      seconds: first.seconds ?? 0,
+    });
+  }
+  const amount = first && "amount" in first ? first.amount : 0;
+  return amount > 1 ? String(amount) : "";
 }
 
 /**
@@ -309,9 +321,9 @@ export function gameOverlayRows(
   return games.actions.flatMap((action) => {
     const { overlay } = action;
     // On its picture's corner
-    const count = overlay.image ? gameCount(action) : 0;
+    const count = overlay.image ? gameCount(action, language) : "";
     const name =
-      overlay.name.trim() || gameStepsText(action, language, count > 0);
+      overlay.name.trim() || gameStepsText(action, language, count !== "");
     if (!action.enabled || !overlay.show || (!overlay.image && !name)) {
       return [];
     }
@@ -326,6 +338,7 @@ export function gameOverlayRows(
         image: overlay.image ? mediaURL(overlay.image.file) : null,
         name,
         count,
+        timed: count !== "" && firstCounted(action.steps)?.type === "morph",
         column: Math.min(overlay.column, games.overlay.columns),
       },
     ];

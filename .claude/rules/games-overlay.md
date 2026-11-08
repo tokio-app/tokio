@@ -39,6 +39,7 @@ The **Overlay** section on the Games page builds the games overlay: each shown a
 - **Texts:** the `event` and `name` overrides, else `gameEventText` and `gameStepsText` (named by the action's edition). The builder shows the automatic ones as placeholders; the event text names the pictures for screen readers there.
 - **Picture:** `mediaURL(file)`: main passes `MINECRAFT_PICTURES_PATH` plus the encoded file, the preview `getPicturePreviewURL`.
 - **Count:** with a picture, the amount of the first mob or item (`gameCount`) shows on the picture's corner (`games-count`, like an inventory's stack), and the automatic name leaves it out (`gameStepsText(action, true)`). Without a picture it stays in the name.
+- A timed morph counts too, when it comes before any mob or item: its seconds ("30 s", `minecraft.seconds`) go on the picture's corner and never in the name, so without a picture they don't show (the user's call). `count` is the badge's text, `""` for none. Too wide for the bottom right in Sticker, where they'd run under the sticker, they sit on its top right there (the row's `timed`, `games-timed` on the `li`, set by the page and the preview; the user's call). Amounts stay bottom right.
 - Rows carry both texts. **Pictures only** is the look's job: it hides a text next to a picture, and a side without a picture keeps its text.
 
 ## Page

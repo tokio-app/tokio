@@ -22,7 +22,8 @@ const row = (
   eventCount: 0,
   image: `/games/minecraft/pictures/${id}.png`,
   name: id.toUpperCase(),
-  count: 0,
+  count: "",
+  timed: false,
   column: 1,
   ...patch,
 });
@@ -175,7 +176,7 @@ describe("games overlay", () => {
     }, 6000);
 
     it("shows the count on the picture's corner, none for one", async () => {
-      send([row("a", { count: 5 }), row("b")]);
+      send([row("a", { count: "5" }), row("b")]);
       await vi.waitFor(() => expect(rowElements()).toHaveLength(2));
 
       const [five, one] = rowElements();
@@ -183,6 +184,16 @@ describe("games overlay", () => {
         five.querySelector(".games-slot-result .games-count")?.textContent,
       ).toBe("5");
       expect(one.querySelector(".games-count")).toBeNull();
+      expect(five.classList.contains("games-timed")).toBe(false);
+    });
+
+    it("marks a row whose count is a morph's seconds", async () => {
+      send([row("a", { count: "30 s", timed: true })]);
+      await vi.waitFor(() => expect(rowElements()).toHaveLength(1));
+
+      const [morph] = rowElements();
+      expect(morph.classList.contains("games-timed")).toBe(true);
+      expect(morph.querySelector(".games-count")?.textContent).toBe("30 s");
     });
 
     it("counts the likes on the heart, and shows a chat's message by its bubble", async () => {
