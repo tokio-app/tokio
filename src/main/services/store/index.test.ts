@@ -1406,6 +1406,34 @@ describe("StoreManagerService", () => {
       expect(again).toEqual({ success: true });
     });
 
+    it("updates a saved emote's image again when its save failed", async () => {
+      await writeFile(
+        defaultProfileFile,
+        JSON.stringify({
+          ...defaultProfile,
+          emotes: [{ id: "e1", image: "old" }],
+        }),
+      );
+      const store = await init();
+      vi.spyOn(json, "updateFile").mockResolvedValueOnce({
+        success: false,
+        data: null,
+      });
+      const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+
+      expect(await store.recordEmotes([emote("e1", "new")])).toEqual({
+        success: false,
+      });
+      now.mockReturnValue(31_000);
+
+      expect((await store.recordEmotes([emote("e1", "new")])).data).toEqual([
+        { id: "e1", image: "new" },
+      ]);
+      expect((await readJSON(defaultProfileFile)).emotes).toEqual([
+        { id: "e1", image: "new" },
+      ]);
+    });
+
     it("tries a failed save again only after a while, for that profile", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");

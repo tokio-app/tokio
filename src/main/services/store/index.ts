@@ -681,6 +681,11 @@ export class StoreManagerService extends Service {
 
     const saved = [...profile.emotes];
     let changed = false;
+    // Marked once saved, so an image a failed save lost is compared again
+    const checked: string[] = [];
+    const markChecked = () => {
+      for (const id of checked) this._checkedEmotes.add(id);
+    };
     for (const { emoteID: id, images } of emotes) {
       const image = images[0];
       if (!id || !image) continue;
@@ -694,10 +699,13 @@ export class StoreManagerService extends Service {
         saved[index] = { id, image };
         changed = true;
       }
-      this._checkedEmotes.add(id);
+      checked.push(id);
     }
 
-    if (!changed) return { success: true };
+    if (!changed) {
+      markChecked();
+      return { success: true };
+    }
     const file = this._activeProfileFile();
     const failed = this._failedEmotes;
     if (
@@ -711,6 +719,7 @@ export class StoreManagerService extends Service {
       return { success: false };
     }
     this._failedEmotes = null;
+    markChecked();
     return { success: true, data: saved };
   }
 
