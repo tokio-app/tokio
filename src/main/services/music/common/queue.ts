@@ -176,9 +176,9 @@ export class MusicQueue extends TokioEmitter {
     return this._queue.length - this._currentIndex >= this._maxSize;
   }
 
-  // The handle of the viewer who asked for the song playing
-  public playingBy(): string | undefined {
-    return this._queue[this._currentIndex]?.by;
+  // The song playing, with the handle of the viewer who asked for it
+  public playing(): QueueItem | undefined {
+    return this._queue[this._currentIndex];
   }
 
   // One of the viewer's requests is waiting
@@ -188,7 +188,10 @@ export class MusicQueue extends TokioEmitter {
     );
   }
 
-  public async triggerNext() {
+  // Skips `from` only while it still plays, so a Next that waited skips
+  // nothing once another song started
+  public async triggerNext(from = this.playing()) {
+    if (this.playing() !== from) return;
     if (this._currentIndex < this._queue.length - 1) {
       this.pause();
       this._currentIndex++;

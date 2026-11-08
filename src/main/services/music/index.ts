@@ -139,7 +139,7 @@ export class MusicService extends ProviderService<MusicProvider> {
       limited &&
       (control === controls.last ||
         (control === controls.next &&
-          !sameHandle(handle, this._music_queue.playingBy() ?? "")))
+          !sameHandle(handle, this._music_queue.playing()?.by ?? "")))
     ) {
       return;
     }
@@ -166,7 +166,9 @@ export class MusicService extends ProviderService<MusicProvider> {
       );
       if (added && handle) this._requesting.add(handle);
     } else if (control === controls.next) {
-      this._queue.enqueue(() => this._music_queue.triggerNext());
+      // With nothing playing, there's nothing this Next was meant for
+      const from = this._music_queue.playing();
+      this._queue.enqueue(() => from && this._music_queue.triggerNext(from));
     } else if (control === controls.last) {
       this._queue.enqueue(() => this._music_queue.triggerPrevious());
     } else if (control === controls.revoke) {

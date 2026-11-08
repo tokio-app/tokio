@@ -729,6 +729,39 @@ describe("MusicService", () => {
       expect(queue()).toEqual(["A", "B (playing)"]);
     });
 
+    // Next waits behind the searches before it
+    const slowSearch = (provider: FakeProvider, ms: number) =>
+      provider.searchSong.mockImplementationOnce(async (query) => {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+        return song(query);
+      });
+
+    it("doesn't skip a song that started after Next was sent", async () => {
+      const { request, provider, played } = setup();
+      await request("!play A");
+      await request("!play B");
+      slowSearch(provider, 11_000);
+      await request("!play C");
+      await request("!next");
+
+      // A ends at 10 s, then the search ends and Next runs
+      await vi.advanceTimersByTimeAsync(11_000);
+
+      expect(played()).toEqual(["A", "B"]);
+    });
+
+    it("skips nothing when Next came with nothing playing", async () => {
+      const { request, provider, played } = setup();
+      slowSearch(provider, 3_000);
+      await request("!play A");
+      await request("!play B");
+      await request("!next");
+
+      await vi.advanceTimersByTimeAsync(3_000);
+
+      expect(played()).toEqual(["A"]);
+    });
+
     it("goes back to the last song", async () => {
       const { request, played, queue } = setup();
       await request("!play A");
