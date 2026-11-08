@@ -795,6 +795,20 @@ describe("Spotify", () => {
       expect(refreshes(fetch)).toHaveLength(1);
     });
 
+    it("refreshes a token with no lifetime after an hour", async () => {
+      const fetch = stubFetch();
+      fetch.mockImplementationOnce(async () =>
+        json({ ...TOKENS, expires_in: undefined }),
+      );
+      await login();
+
+      await vi.advanceTimersByTimeAsync((3600 - 60) * 1000 - 1);
+      expect(refreshes(fetch)).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(refreshes(fetch)).toHaveLength(1);
+    });
+
     it("logs a refresh that fails, and ends the session when it's refused", async () => {
       stubFetch({ refresh: () => json({ error: "invalid_grant" }, 400) });
       const logError = vi.spyOn(Logger, "error").mockImplementation(() => {});

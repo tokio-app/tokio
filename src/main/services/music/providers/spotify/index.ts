@@ -307,7 +307,12 @@ export class Spotify extends MusicProvider {
   private scheduleTokenRefresh(expiresInSeconds: number) {
     if (this._refreshTimeout) clearTimeout(this._refreshTimeout);
 
-    const refreshMs = (expiresInSeconds - 60) * 1000;
+    // Without a lifetime it would refresh again at once, every time. Spotify's
+    // tokens last an hour.
+    const lifetime = Number.isFinite(expiresInSeconds)
+      ? expiresInSeconds
+      : 3600;
+    const refreshMs = (lifetime - 60) * 1000;
 
     this._refreshTimeout = setTimeout(
       () => {
