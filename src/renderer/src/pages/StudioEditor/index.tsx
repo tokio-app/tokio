@@ -240,7 +240,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       mapElements(items, (e) => (e.id === id ? change(e) : e)),
     );
 
-  // Another file starts uncropped
+  // Another file starts uncropped and uncut, with its volume and loop
   const setMedia = (id: string, file: { file: string; name: string } | null) =>
     changeElement(id, (element) =>
       element.kind === "media"
@@ -248,7 +248,11 @@ function Editor({ saved }: { saved: StudioOverlay }) {
             ...element,
             file: file?.file ?? "",
             name: file?.name ?? "",
-            crop: file?.file === element.file ? element.crop : WHOLE,
+            ...(file?.file !== element.file && {
+              crop: WHOLE,
+              start: 0,
+              end: null,
+            }),
           }
         : element,
     );
@@ -817,6 +821,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 onPickMedia={() => setMediaFor(element.id)}
                 onCrop={(crop) => cropElement(element.id, crop)}
                 onCropCanvas={() => setCropping(element.id)}
+                onSeek={(seconds) => stage.current?.hold(element.id, seconds)}
+                onPlay={() => stage.current?.replay(element.id)}
               />
             ) : (
               <OverlaySettings overlay={overlay} onChange={setOverlay} />

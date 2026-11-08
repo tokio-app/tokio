@@ -47,8 +47,8 @@ export const AlertSoundSchema = z.object({
 });
 
 // The part of a sound or video that plays, from start to end seconds. A null
-// end plays to its end.
-const CUT = {
+// end plays to its end. Overlay Studio's videos are cut the same way.
+export const CUT = {
   start: z.number().min(0).default(0),
   end: z.number().min(0).nullable().default(null),
 };

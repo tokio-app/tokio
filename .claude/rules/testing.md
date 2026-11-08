@@ -40,7 +40,7 @@ paths:
   - Components never reach Tone.js; `audio.queue(name)` is the fake queue they got, and `audio.value.decode` gives a 2 second sound of 8 samples.
   - Builders and replies are in `@test/fixtures`.
   - Entry points (`main.tsx`) run with `runEntry` from `@test/entry`, which gives them the `#root` their `index.html` has.
-- jsdom has no layout. `test/renderer/dom.ts` gives elements a size (virtualized lists like `Select` render nothing at zero), fakes the observers (`intersect()` fires `IntersectionObserver`) and `scrollTo`.
+- jsdom has no layout. `test/renderer/dom.ts` gives elements a size (virtualized lists like `Select` render nothing at zero), fakes the observers (`intersect()` fires `IntersectionObserver`) and `scrollTo`, and quiets media's `load`, `pause` and `play` (which resolves), which jsdom doesn't implement. Spy on them to test playback.
 - A `jest` shim lets Testing Library run with `vi.useFakeTimers()`; give user-event `advanceTimers: (ms) => vi.advanceTimersByTime(ms)`.
 - Query by role and visible text. `Field` (and `SettingField`) names a group after its label, not the control: use `within(getByRole("group", { name }))` or placeholders. `Select` is a clickable div whose list is portaled to the body, so use placeholders, text or `within` there. `@test/queries` has `inList` (an item of a portaled list) and `section` (queries inside a section, by its heading).
 - user-event's `setup()` stubs `navigator.clipboard`: check a copy with `navigator.clipboard.readText()`, or spy on `writeText` under fake timers, where `readText` never resolves. Spy on `window.open`.

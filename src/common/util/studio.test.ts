@@ -137,7 +137,14 @@ describe("studioView", () => {
       overlay([
         element("shape", { kind: "shape" }),
         element("text", { kind: "text", text: "hi" }),
-        element("clip", { kind: "media", file: "a.MP4" }),
+        element("clip", {
+          kind: "media",
+          file: "a.MP4",
+          start: 1,
+          end: 3,
+          loop: false,
+          volume: 40,
+        }),
         element("still", { kind: "media", file: "b.png" }),
         element("rose", { kind: "gift", gift: 5655 }),
         element("unknown", { kind: "gift", gift: 1 }),
@@ -166,6 +173,10 @@ describe("studioView", () => {
     expect(layers[2]).toMatchObject({
       src: "/alerts/media/a.MP4?clip",
       video: true,
+      start: 1,
+      end: 3,
+      loop: false,
+      volume: 40,
     });
     expect(layers[3]).toMatchObject({ video: false });
     expect(layers[4]).toMatchObject({ src: "https://gifts/rose.png" });

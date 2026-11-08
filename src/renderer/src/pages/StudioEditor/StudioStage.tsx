@@ -23,7 +23,14 @@ import {
   useState,
 } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { LuMaximize, LuRuler, LuZoomIn, LuZoomOut } from "react-icons/lu";
+import {
+  LuMaximize,
+  LuRuler,
+  LuVolume2,
+  LuVolumeX,
+  LuZoomIn,
+  LuZoomOut,
+} from "react-icons/lu";
 import {
   Axis,
   Box,
@@ -373,8 +380,18 @@ export function StudioStage({
     };
   }, [stageRef]);
 
+  // Off each time the editor opens, so a loud video can't catch anyone out
+  const [sound, setSound] = useState(false);
+  // After the stage's own effect, so a stage made again hears it too
+  useLayoutEffect(() => {
+    stageRef.current?.sound(sound);
+  }, [sound, stageRef]);
+
   const elements = view.layers.flatMap((layer) =>
     layer.elements.map((element) => ({ element, layer: layer.id })),
+  );
+  const videos = elements.some(
+    ({ element }) => element.kind === "media" && element.video,
   );
 
   // While cropping, its element drawn whole and unrounded, where all of its
@@ -1388,6 +1405,17 @@ export function StudioStage({
       <div className={styles.canvas_bar}>
         {children}
         <div className={styles.zoom}>
+          <Btn
+            variant="icon"
+            title={t("studio.editor.sound")}
+            aria-label={t("studio.editor.sound")}
+            aria-pressed={sound}
+            active={sound}
+            disabled={!videos}
+            onClick={() => setSound(!sound)}
+          >
+            {sound ? <LuVolume2 size={16} /> : <LuVolumeX size={16} />}
+          </Btn>
           <Btn
             variant="icon"
             title={t("studio.editor.rulers")}

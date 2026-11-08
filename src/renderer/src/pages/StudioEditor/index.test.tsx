@@ -106,7 +106,7 @@ const rowOf = (name: RegExp) =>
   within(row(name).closest<HTMLElement>("[data-row]")!);
 const grip = (id: string) =>
   document.querySelector<HTMLElement>(`[data-grip="${id}"]`)!;
-const canvas = () => page().getByLabelText(/^Canvas./);
+const canvas = () => page().getByLabelText(/^Canvas\./);
 const drawn = (id: string) =>
   canvas().querySelector<HTMLElement>(`[data-element="${id}"]`)!;
 const field = (name: string) => within(page().getByRole("group", { name }));
@@ -2983,6 +2983,158 @@ describe("StudioEditor", () => {
           crop: WHOLE,
         }),
       );
+    });
+  });
+
+  describe("videos", () => {
+    const clip = (patch: Partial<StudioElementOf<"media">> = {}) =>
+      elementOf("media", {
+        label: "Clip",
+        file: "clip.webm",
+        name: "clip.webm",
+        ...patch,
+      });
+    // The settings' hidden player, which reads the video's length
+    const reader = () =>
+      page()
+        .getByRole("heading", { name: "Image or video" })
+        .parentElement!.querySelector("video");
+    const measure = (seconds: number) => {
+      const video = reader()!;
+      Object.defineProperty(video, "duration", {
+        value: seconds,
+        configurable: true,
+      });
+      fireEvent.loadedMetadata(video);
+    };
+    const cut = () => within(page().getByRole("group", { name: "Cut" }));
+    const sound = () => page().getByRole("button", { name: "Canvas sound" });
+
+    it("cuts a video with the alerts' track once its length is read, the canvas showing each frame", async () => {
+      const shown = clip();
+      const { user } = await open(holding(shown));
+      await user.click(row(/^Clip/));
+      const player = () => drawn(shown.id).querySelector("video")!;
+      expect(page().queryByRole("group", { name: "Cut" })).toBeNull();
+
+      measure(10);
+      await user.clear(cut().getByRole("spinbutton", { name: "Start" }));
+      await user.type(cut().getByRole("spinbutton", { name: "Start" }), "2");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ start: 2, end: null }),
+      );
+      expect(player().currentTime).toBe(2);
+
+      await studio(lastSave()!);
+      await user.clear(cut().getByRole("spinbutton", { name: "End" }));
+      await user.type(cut().getByRole("spinbutton", { name: "End" }), "5");
+      // Held on the end's frame, then the cut plays again from its start
+      expect(player().currentTime).toBe(5);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ start: 2, end: 5 }),
+      );
+      await waitFor(() => expect(player().currentTime).toBe(2), {
+        timeout: 2000,
+      });
+
+      // The whole video again: main holds the cut first, or the autosave
+      // would see nothing new to send
+      await studio(lastSave()!);
+      await user.click(cut().getByRole("button", { name: "Reset the cut" }));
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ start: 0, end: null }),
+      );
+      expect(
+        cut().getByRole("button", { name: "Reset the cut" }),
+      ).toBeDisabled();
+    });
+
+    it("sets a video's volume and loop, and one without loop stays until it ends", async () => {
+      const shown = clip({ when: "event", start: 1 });
+      const { user } = await open(holding(shown));
+      await user.click(row(/^Clip/));
+      const seconds = () => field("Seconds on screen");
+      const again = () => page().queryByRole("button", { name: "Play again" });
+      expect(seconds().getByRole("spinbutton")).toBeVisible();
+      // It plays again on its own while it loops
+      expect(again()).toBeNull();
+
+      fireEvent.change(page().getByRole("slider", { name: "Volume (100%)" }), {
+        target: { value: "40" },
+      });
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ volume: 40 }),
+      );
+
+      await studio(lastSave()!);
+      await user.click(page().getByRole("checkbox", { name: "Loop" }));
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ loop: false }),
+      );
+      expect(seconds().queryByRole("spinbutton")).toBeNull();
+      expect(seconds().getByText("Until the video ends")).toBeVisible();
+
+      // Stopped at its end on the canvas, Play again starts its cut over
+      const player = drawn(shown.id).querySelector("video")!;
+      player.currentTime = 4;
+      await user.click(again()!);
+      expect(player.currentTime).toBe(1);
+    });
+
+    it("starts another file uncut, with its volume and loop", async () => {
+      const shown = clip({ start: 2, end: 5, volume: 40, loop: false });
+      const { user } = await open(holding(shown));
+      await user.click(row(/^Clip/));
+      await user.click(page().getByRole("button", { name: "clip.webm" }));
+      await user.click(screen.getByRole("button", { name: "Browse file..." }));
+      const [{ request }] = sent(APP_EVENTS.IMPORT_MEDIA);
+
+      await send(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
+        success: true,
+        id: shown.id,
+        request,
+        media: { name: "Party", file: "party.webm" },
+      });
+
+      expect((await saved()).items[0]).toMatchObject({
+        file: "party.webm",
+        start: 0,
+        end: null,
+        volume: 40,
+        loop: false,
+      });
+    });
+
+    it("gives an image none of a video's fields", async () => {
+      const { user } = await open(
+        holding(clip({ file: "pic.png", name: "pic.png" })),
+      );
+      await user.click(row(/^Clip/));
+
+      expect(page().queryByRole("checkbox", { name: "Loop" })).toBeNull();
+      expect(page().queryByRole("slider", { name: /^Volume/ })).toBeNull();
+      expect(reader()).toBeNull();
+    });
+
+    it("plays the canvas's videos with their sound only while Canvas sound is on", async () => {
+      const shown = clip();
+      const { user } = await open(holding(shown, text()));
+      const player = () => drawn(shown.id).querySelector("video")!;
+      expect(sound()).toHaveAttribute("aria-pressed", "false");
+      expect(player().muted).toBe(true);
+
+      await user.click(sound());
+      expect(sound()).toHaveAttribute("aria-pressed", "true");
+      expect(player().muted).toBe(false);
+
+      await user.click(sound());
+      expect(player().muted).toBe(true);
+    });
+
+    it("has no Canvas sound without a video on the canvas", async () => {
+      await open(holding(text(), clip({ file: "pic.png", name: "pic.png" })));
+
+      expect(sound()).toBeDisabled();
     });
   });
 });

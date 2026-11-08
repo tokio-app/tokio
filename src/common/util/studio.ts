@@ -170,6 +170,10 @@ function elementView(
         kind: element.kind,
         src: kind ? deps.mediaURL(element.file, element.id) : null,
         video: kind === "video",
+        start: element.start,
+        end: element.end,
+        loop: element.loop,
+        volume: element.volume,
       };
     }
     case "gift": {

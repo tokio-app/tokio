@@ -65,6 +65,20 @@ describe("StudioElementSchema", () => {
     ).not.toHaveProperty("crop");
   });
 
+  it("plays all of a video, looping at full volume, and refuses what can't play", () => {
+    expect(StudioElementSchema.parse(element({ kind: "media" }))).toMatchObject(
+      { start: 0, end: null, loop: true, volume: 100 },
+    );
+    const parses = (fields: object) =>
+      StudioElementSchema.safeParse(element({ kind: "media", ...fields }))
+        .success;
+
+    expect(parses({ start: 1.5, end: 4, volume: 0, loop: false })).toBe(true);
+    expect(parses({ start: -1 })).toBe(false);
+    expect(parses({ end: -1 })).toBe(false);
+    expect(parses({ volume: 101 })).toBe(false);
+  });
+
   it("refuses a crop whose sides meet, and a rounding past round", () => {
     const parses = (fields: object) =>
       StudioElementSchema.safeParse(element({ kind: "media", ...fields }))

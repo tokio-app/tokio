@@ -99,7 +99,7 @@ paths:
 - The overlay page loads the video at `#t=<start>` and, from its first `playing`, times it by its own clock: it hides it at `min(end, start + duration)` of `currentTime`, waking `stop − currentTime` seconds later and waiting again while the clock lags (a fragment's end is checked only every 250 ms). The page's `duration` timer hides only images and videos that aren't playing, since a video loads and starts after its turn, which ended the cut early.
 - The Sound tab's waveform (`SoundCut`) gets the bytes with `GET_SOUND_DATA { file }` (`readSound`). `SOUND_DATA` echoes the file, failures included, with `notify: false`: the tab shows the failure.
 - It decodes them with `useAudio().decode` under the file's name, the key `ALERT_AUDIO` uses, so the editor and the alert's plays share one decode. A decode that ends after the tab's sound changed is dropped, its failure too.
-- An end at the sound's end saves null. `CutTrack` (`SoundCut.tsx`) and `ResetCut` are shared with the Media tab.
+- An end at the sound's end saves null. `CutTrack` (`SoundCut.tsx`) and `ResetCut` are shared with the Media tab. Overlay Studio's video fields use `CutTrack`, and its media elements spread `CUT` (see `.claude/rules/studio.md`).
 
 ## Text-to-speech
 

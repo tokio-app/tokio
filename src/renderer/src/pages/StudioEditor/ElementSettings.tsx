@@ -14,7 +14,7 @@ import {
   Trigger,
 } from "@/common/schemas";
 import { CustomGift, EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
-import { STUDIO_NUMBERS, studioEventVariables } from "@/common/util";
+import { mediaKind, STUDIO_NUMBERS, studioEventVariables } from "@/common/util";
 import {
   Btn,
   Check,
@@ -38,6 +38,7 @@ import { BoxFields } from "./BoxFields";
 import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
 import { PictureFields } from "./PictureFields";
 import styles from "./studioeditor.module.css";
+import { VideoFields } from "./VideoFields";
 
 const WHENS: { value: StudioWhen; label: MessageKey }[] = [
   { value: "always", label: "studio.when.always" },
@@ -102,6 +103,10 @@ type Props = {
   // A picture's crop typed in, and cropping it on the canvas
   onCrop: (crop: StudioCrop) => void;
   onCropCanvas: () => void;
+  // A video's frame a cut's handle moved to, held still on the canvas
+  onSeek: (seconds: number) => void;
+  // Plays a video's cut again on the canvas
+  onPlay: () => void;
 };
 
 /**
@@ -122,6 +127,8 @@ export function ElementSettings({
   onPickMedia,
   onCrop,
   onCropCanvas,
+  onSeek,
+  onPlay,
 }: Props) {
   const t = useT();
   const textRef = useRef<HTMLInputElement>(null);
@@ -160,6 +167,12 @@ export function ElementSettings({
     trigger: { ...changed.trigger, type },
   });
   const { trigger } = element;
+  const video =
+    element.kind === "media" &&
+    !!element.file &&
+    mediaKind(element.file) === "video";
+  // On an event, a video without loop stays until it ends, not for seconds
+  const untilEnd = video && element.kind === "media" && !element.loop;
 
   let own: ReactNode = null;
   switch (element.kind) {
@@ -242,13 +255,24 @@ export function ElementSettings({
       break;
     case "media":
       own = (
-        <Field label={t("studio.fields.file")}>
-          <Btn className={styles.file} onClick={onPickMedia}>
-            <span className={styles.file_name}>
-              {element.file ? element.name : t("studio.fields.pickFile")}
-            </span>
-          </Btn>
-        </Field>
+        <>
+          <Field label={t("studio.fields.file")}>
+            <Btn className={styles.file} onClick={onPickMedia}>
+              <span className={styles.file_name}>
+                {element.file ? element.name : t("studio.fields.pickFile")}
+              </span>
+            </Btn>
+          </Field>
+          {video && (
+            <VideoFields
+              key={element.file}
+              element={element}
+              onChange={onChange}
+              onSeek={onSeek}
+              onPlay={onPlay}
+            />
+          )}
+        </>
       );
       break;
     case "gift":
@@ -495,13 +519,17 @@ export function ElementSettings({
           {element.when === "event" ? (
             <div className={styles.pair}>
               <Field label={t("studio.fields.seconds")}>
-                <NumberInput
-                  scrub
-                  min={1}
-                  max={STUDIO_MAX_SECONDS}
-                  value={element.seconds}
-                  onChange={(seconds) => onChange({ ...element, seconds })}
-                />
+                {untilEnd ? (
+                  <p className={styles.until}>{t("studio.fields.untilEnd")}</p>
+                ) : (
+                  <NumberInput
+                    scrub
+                    min={1}
+                    max={STUDIO_MAX_SECONDS}
+                    value={element.seconds}
+                    onChange={(seconds) => onChange({ ...element, seconds })}
+                  />
+                )}
               </Field>
               <Field label={t("studio.fields.entrance")}>
                 <Select

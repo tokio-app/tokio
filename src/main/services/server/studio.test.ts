@@ -62,6 +62,8 @@ const view = (...elements: StudioElementView[]) =>
 
 // What a picture element draws when it keeps all of itself
 const PICTURE = { crop: null, rounding: 0 };
+// A media element's whole video, looping at full volume
+const MEDIA = { start: 0, end: null, loop: true, volume: 100 };
 
 describe("studio overlay page", () => {
   let server: ServerService;
@@ -171,12 +173,14 @@ describe("studio overlay page", () => {
           element("m", {
             kind: "media",
             ...PICTURE,
+            ...MEDIA,
             src: "/alerts/media/a.png",
             video: false,
           }),
           element("v", {
             kind: "media",
             ...PICTURE,
+            ...MEDIA,
             src: "/alerts/media/a.webm",
             video: true,
           }),

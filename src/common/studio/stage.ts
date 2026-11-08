@@ -35,6 +35,14 @@ export type Stage = {
   fit(): StageFit;
   // An element's picture's own size, null until it's read or for none
   picture(elementId: string): { width: number; height: number } | null;
+  // The editor's: its videos play their sound, which it mutes until then
+  sound(on: boolean): void;
+  // The editor's: holds an element's video still at those seconds while a
+  // cut's handle moves, and a moment after the last, plays its part again
+  hold(elementId: string, seconds: number): void;
+  // The editor's: plays an element's video's part again from its start, as
+  // one without loop stops at its end
+  replay(elementId: string): void;
   // Removes everything it drew and frees its players
   destroy(): void;
 };
@@ -53,7 +61,21 @@ type Entry = {
   // Hides an element that shows on an event, on stream
   timer: ReturnType<typeof setTimeout> | undefined;
   shown: boolean;
+  // Wakes its video at the end of the part it plays (watch)
+  cue: ReturnType<typeof setTimeout> | undefined;
+  // Its video, without loop, played its part and stays where it stopped
+  done: boolean;
+  // The source and cut its video last started from, so a change starts it
+  // over
+  cut: string | undefined;
+  // The editor's: the seconds its video is held still at (hold), and the
+  // timer that lets it go
+  still: number | undefined;
+  letGo: ReturnType<typeof setTimeout> | undefined;
 };
+
+// How long a held video stays still after a cut's handle last moved
+const HOLD_MS = 600;
 
 const ARCHIVO = '"Archivo Variable", sans-serif';
 const MOTION = /^studio-(enter|play)-/;
@@ -84,10 +106,23 @@ const restart = (body: HTMLElement, className: string) => {
   body.classList.add(className);
 };
 
-const play = (video: HTMLVideoElement) => {
-  const playing = video.play() as Promise<void> | undefined;
-  playing?.catch(() => {});
+/**
+ * The seconds of a media element's video that play: cutPart's rule
+ * (src/common/util/alerts.ts), copied since this file imports only types. A
+ * part that doesn't fit plays the whole video, and a length not read yet, or
+ * unknown, is endless.
+ */
+const partOf = (element: StudioElementView, duration: number) => {
+  const length = Number.isFinite(duration) ? duration : Infinity;
+  const cut = element.kind === "media" ? element : { start: 0, end: null };
+  const start = Math.min(Math.max(0, cut.start), length);
+  const stop = Math.min(cut.end ?? length, length);
+  return stop > start ? { start, stop } : { start: 0, stop: length };
 };
+
+// A video that plays its part once, and stops there
+const once = (element: StudioElementView) =>
+  element.kind === "media" && !element.loop;
 
 // Chromium keeps a detached player that still has a source alive
 const release = (video: HTMLVideoElement) => {
@@ -123,14 +158,11 @@ const setVideo = (video: HTMLVideoElement, src: string | null) => {
   }
 };
 
+// The stage mutes, loops and plays it (makeVideo, fill, playback)
 const newVideo = () => {
   const video = document.createElement("video");
   video.className = "studio-fill";
-  video.muted = true;
-  video.loop = true;
-  video.autoplay = true;
   video.playsInline = true;
-  video.setAttribute("muted", "");
   video.setAttribute("playsinline", "");
   return video;
 };
@@ -332,18 +364,37 @@ export function createStage(
     img.addEventListener("load", relayout);
     return img;
   };
-  const makeVideo = () => {
-    const video = newVideo();
-    video.addEventListener("loadedmetadata", relayout);
-    return video;
-  };
   const makeAvatar = () => {
     const avatar = newAvatar();
     avatar.querySelector("img")!.addEventListener("load", relayout);
     return avatar;
   };
 
-  // Videos play only while their element shows
+  // The editor's canvas is silent until its sound is turned on
+  let silent = editing;
+  // A browser tab refuses sound before a click (OBS doesn't): its videos
+  // play muted until then
+  let quiet = false;
+
+  // Refused sound, it plays muted, and so do the videos after it
+  const play = (video: HTMLVideoElement) => {
+    const playing = video.play() as Promise<void> | undefined;
+    playing?.catch((error: unknown) => {
+      if (
+        video.muted ||
+        !(error instanceof DOMException) ||
+        error.name !== "NotAllowedError"
+      ) {
+        return;
+      }
+      quiet = true;
+      video.muted = true;
+      play(video);
+    });
+  };
+
+  // Videos play only while their element shows, from their part's start
+  // when they start over, and one that played its part once stays there
   const playback = (entry: Entry, fromStart = false) => {
     const video = entry.body.querySelector("video");
     if (!video) return;
@@ -351,12 +402,80 @@ export function createStage(
       video.pause();
       return;
     }
-    if (fromStart) video.currentTime = 0;
-    if (video.paused && video.hasAttribute("src")) play(video);
+    // Held still while a cut's handle moves (hold)
+    if (entry.still !== undefined) return;
+    if (fromStart) {
+      entry.done = false;
+      video.currentTime = partOf(entry.element, video.duration).start;
+    }
+    // An ended one would start again at 0, not at its part: `ended` does it
+    if (
+      video.paused &&
+      !video.ended &&
+      !entry.done &&
+      video.hasAttribute("src")
+    ) {
+      play(video);
+    }
+  };
+
+  // A part that stops before the video's own end is timed by the video's
+  // clock, as the alert overlay times its cut: the clock can lag behind a
+  // timer, so it waits again for the rest. The video's own end is `ended`'s.
+  const watch = (entry: Entry, video: HTMLVideoElement) => {
+    clearTimeout(entry.cue);
+    entry.cue = undefined;
+    const rate = video.playbackRate;
+    const { stop } = partOf(entry.element, video.duration);
+    if (video.paused || !(rate > 0) || !(stop < video.duration)) return;
+    const left = (stop - video.currentTime) / rate;
+    if (left <= 0.02) atEnd(entry, video);
+    else entry.cue = setTimeout(() => watch(entry, video), left * 1000);
+  };
+
+  // Its part played: it plays again from its start with loop, else it
+  // stops there, and an element that showed on an event leaves
+  const atEnd = (entry: Entry, video: HTMLVideoElement) => {
+    if (!once(entry.element)) {
+      video.currentTime = partOf(entry.element, video.duration).start;
+      playback(entry);
+      watch(entry, video);
+      return;
+    }
+    entry.done = true;
+    video.pause();
+    if (entry.shown) hide(entry);
+  };
+
+  const makeVideo = (entry: Entry) => {
+    const video = newVideo();
+    video.muted = silent || quiet;
+    // Made again (an image, then Undo), it starts its part over
+    entry.done = false;
+    entry.cut = undefined;
+    video.addEventListener("loadedmetadata", () => {
+      // A start past its length plays the whole video, as cutPart does
+      const { start, stop } = partOf(entry.element, video.duration);
+      const outside = video.currentTime < start || video.currentTime >= stop;
+      if (entry.still === undefined && outside) {
+        entry.done = false;
+        video.currentTime = start;
+      }
+      // Laid out once its size is read, if it's cropped or rounded
+      fill(entry);
+      playback(entry);
+    });
+    video.addEventListener("playing", () => watch(entry, video));
+    // Chromium can send it after a react already sought back
+    video.addEventListener("ended", () => {
+      if (video.ended) atEnd(entry, video);
+    });
+    return video;
   };
 
   // Puts the element's content in its body, made on first use
-  const fill = ({ element, el, body }: Entry) => {
+  const fill = (entry: Entry) => {
+    const { element, el, body } = entry;
     el.style.left = `${element.x}px`;
     el.style.top = `${element.y}px`;
     el.style.width = `${element.width}px`;
@@ -387,8 +506,23 @@ export function createStage(
       case "media": {
         let media: HTMLImageElement | HTMLVideoElement;
         if (element.video) {
-          media = only(body, HTMLVideoElement, makeVideo);
-          setVideo(media, element.src);
+          const video = only(body, HTMLVideoElement, () => makeVideo(entry));
+          setVideo(video, element.src);
+          video.volume = element.volume / 100;
+          // The browser's own loop goes back to 0: an uncut start's, as
+          // seamless as before
+          video.loop = element.loop && element.start === 0;
+          const cut = `${element.src} ${element.start} ${element.end} ${element.loop}`;
+          if (entry.cut !== cut) {
+            // Before it loads, Chromium keeps it as where it starts. Held,
+            // it stays on the frame a cut's handle moved to.
+            entry.cut = cut;
+            entry.done = false;
+            video.currentTime =
+              entry.still ?? partOf(element, video.duration).start;
+            watch(entry, video);
+          }
+          media = video;
         } else {
           media = only(body, HTMLImageElement, makePicture);
           setPicture(media, element.src);
@@ -457,11 +591,20 @@ export function createStage(
     if (editing) return;
     clearTimeout(entry.timer);
     entry.shown = true;
-    entry.timer = setTimeout(() => hide(entry), entry.element.seconds * 1000);
+    entry.timer = setTimeout(() => {
+      // A video that plays once leaves when its part ends, while it plays
+      const video = entry.body.querySelector("video");
+      if (once(entry.element) && video && !video.paused && !video.error) {
+        return;
+      }
+      hide(entry);
+    }, entry.element.seconds * 1000);
   };
 
   const remove = (entry: Entry) => {
     clearTimeout(entry.timer);
+    clearTimeout(entry.cue);
+    clearTimeout(entry.letGo);
     entry.body.querySelectorAll("video").forEach(release);
     entry.el.remove();
     entries.delete(entry.element.id);
@@ -481,7 +624,19 @@ export function createStage(
     });
     el.appendChild(body);
     parent.appendChild(el);
-    const entry = { element, layer, el, body, timer: undefined, shown: false };
+    const entry: Entry = {
+      element,
+      layer,
+      el,
+      body,
+      timer: undefined,
+      shown: false,
+      cue: undefined,
+      done: false,
+      cut: undefined,
+      still: undefined,
+      letGo: undefined,
+    };
     entries.set(element.id, entry);
     return entry;
   };
@@ -576,8 +731,23 @@ export function createStage(
     if (element.when === "event") show(entry);
     else if (element.when === "animate") {
       restart(entry.body, `studio-play-${element.animation}`);
+      // A video that plays once plays its part again
+      if (once(element)) playback(entry, true);
     }
   };
+
+  // Let in by a click, a browser tab plays the sound it refused
+  const hear = () => {
+    if (!quiet) return;
+    quiet = false;
+    for (const entry of Array.from(entries.values())) {
+      const video = entry.body.querySelector("video");
+      if (!video) continue;
+      video.muted = silent;
+      playback(entry);
+    }
+  };
+  if (!editing) window.addEventListener("click", hear);
 
   return {
     update,
@@ -594,9 +764,35 @@ export function createStage(
       const own = media ? ownSize(media) : null;
       return own?.width && own.height ? own : null;
     },
+    sound: (on) => {
+      silent = !on;
+      for (const entry of Array.from(entries.values())) {
+        const video = entry.body.querySelector("video");
+        if (video) video.muted = silent || quiet;
+      }
+    },
+    hold: (elementId, seconds) => {
+      const entry = entries.get(elementId);
+      const video = entry?.body.querySelector("video");
+      if (!entry || !video) return;
+      clearTimeout(entry.cue);
+      clearTimeout(entry.letGo);
+      entry.still = seconds;
+      video.pause();
+      video.currentTime = seconds;
+      entry.letGo = setTimeout(() => {
+        entry.still = undefined;
+        playback(entry, true);
+      }, HOLD_MS);
+    },
+    replay: (elementId) => {
+      const entry = entries.get(elementId);
+      if (entry) playback(entry, true);
+    },
     destroy: () => {
       if (observer) observer.disconnect();
       else window.removeEventListener("resize", refit);
+      window.removeEventListener("click", hear);
       update(null);
       canvas.remove();
       root.classList.remove("studio-stage");

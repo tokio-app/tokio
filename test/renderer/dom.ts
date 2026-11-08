@@ -18,9 +18,10 @@ globalThis.scrollTo = () => {};
 Range.prototype.getBoundingClientRect = () => new DOMRect();
 
 // jsdom doesn't play media, and logs an error for each player that
-// releaseOnUnmount frees.
+// releaseOnUnmount frees, or that Overlay Studio's stage plays.
 HTMLMediaElement.prototype.load = () => {};
 HTMLMediaElement.prototype.pause = () => {};
+HTMLMediaElement.prototype.play = () => Promise.resolve();
 
 globalThis.ResizeObserver = class {
   observe() {}

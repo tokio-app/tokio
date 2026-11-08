@@ -53,6 +53,13 @@ export type StudioElementView = StudioElementViewBase &
         kind: "media";
         src: string | null;
         video: boolean;
+        // A video's part that plays, in seconds (a null end plays to its
+        // end), whether it plays again from its start, and its volume, 0 to
+        // 100
+        start: number;
+        end: number | null;
+        loop: boolean;
+        volume: number;
       } & StudioPictureView)
     | ({ kind: "gift"; src: string | null } & StudioPictureView)
     | ({ kind: "emote"; src: string | null } & StudioPictureView)

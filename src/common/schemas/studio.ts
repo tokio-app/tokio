@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TOKIO_EVENTS } from "../types/connector";
-import { GAMES_OVERLAY_MAX_COLUMNS, TriggerSchema } from "./profile";
+import { CUT, GAMES_OVERLAY_MAX_COLUMNS, TriggerSchema } from "./profile";
 import { ColorSchema, FONT_MAX_LENGTH } from "./timer";
 
 // Overlay Studio's canvases, in px: one browser source each
@@ -129,13 +129,18 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     // A soft dark shadow that keeps it legible over bright video
     halo: z.boolean().default(true),
   }),
-  // An image or video from the media library; a video loops muted
+  // An image or video from the media library. A video plays its cut (CUT,
+  // as an alert's), at its volume, and again from its start when it ends
+  // while loop is on; an image ignores them.
   z.object({
     ...ELEMENT,
     ...PICTURE,
+    ...CUT,
     kind: z.literal("media"),
     file: LibraryFileSchema,
     name: z.string().default(""),
+    loop: z.boolean().default(true),
+    volume: z.number().min(0).max(100).default(100),
   }),
   // A gift's picture, by its id in TikTok's or the custom gift list
   z.object({

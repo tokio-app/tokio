@@ -947,6 +947,27 @@
   font-size: var(--font-sm);
 }
 
+/* A checkbox with an action at the row's end, at a field's height so the
+   row doesn't move when it comes: a video's Loop, and Play again while it's
+   off */
+.check_row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+}
+
+/* In Seconds' place, at a field's height: how long a video that plays once
+   stays */
+.until {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-height);
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
 /* A block under a label like a field's, with its actions on the label's
    row: the overlay's guides with their lock and Remove all, a picture's crop
    with Crop and Reset */

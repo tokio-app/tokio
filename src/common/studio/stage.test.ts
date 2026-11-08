@@ -46,6 +46,9 @@ const TEXT = {
 // What a picture element draws when it keeps all of itself
 const PICTURE = { crop: null, rounding: 0 };
 
+// A media element's whole video, looping at full volume
+const MEDIA = { start: 0, end: null, loop: true, volume: 100 };
+
 const text = (id: string, fields: Partial<TextView> = {}): TextView => ({
   ...BASE,
   ...TEXT,
@@ -181,6 +184,7 @@ describe("on stream", () => {
       ...BASE,
       id: "clip",
       kind: "media",
+      ...MEDIA,
       ...PICTURE,
       src: "/m/a.mp4",
       video: true,
@@ -311,13 +315,14 @@ describe("on stream", () => {
         ...BASE,
         id: "clip",
         kind: "media",
+        ...MEDIA,
         ...PICTURE,
         src: "/m/a.mp4",
         video: true,
       }),
     );
     const video = root.querySelector("video")!;
-    expect(video.muted && video.loop && video.autoplay).toBe(true);
+    expect(video.getAttribute("src")).toBe("/m/a.mp4");
 
     draw(view());
 
@@ -355,6 +360,7 @@ describe("on stream", () => {
         ...BASE,
         id: "clip",
         kind: "media",
+        ...MEDIA,
         ...PICTURE,
         src: "/m/a.mp4",
         video: true,
@@ -517,6 +523,7 @@ describe("cropped and rounded pictures", () => {
         ...BASE,
         id: "m",
         kind: "media",
+        ...MEDIA,
         src: "/media/m.png",
         video: false,
         crop: CROP,
@@ -549,6 +556,7 @@ describe("cropped and rounded pictures", () => {
         ...BASE,
         id: "m",
         kind: "media",
+        ...MEDIA,
         src: "/media/m.png",
         video: false,
         ...PICTURE,
@@ -564,6 +572,7 @@ describe("cropped and rounded pictures", () => {
         ...BASE,
         id: "v",
         kind: "media",
+        ...MEDIA,
         src: "/media/v.webm",
         video: true,
         crop: null,
@@ -639,9 +648,335 @@ describe("cropped and rounded pictures", () => {
   });
 });
 
+// What the stage reads of a video's playback, which play, pause and a seek
+// change as a browser would
+type Playback = {
+  paused: boolean;
+  ended: boolean;
+  duration: number;
+  currentTime: number;
+};
+const playbacks = new WeakMap<HTMLMediaElement, Playback>();
+const playbackOf = (media: HTMLMediaElement) => {
+  let state = playbacks.get(media);
+  if (!state) {
+    state = { paused: true, ended: false, duration: NaN, currentTime: 0 };
+    playbacks.set(media, state);
+  }
+  return state;
+};
+
+const fakePlayers = () => {
+  for (const key of ["paused", "ended", "duration"] as const) {
+    vi.spyOn(HTMLMediaElement.prototype, key, "get").mockImplementation(
+      function (this: HTMLMediaElement) {
+        return playbackOf(this)[key];
+      },
+    );
+  }
+  vi.spyOn(HTMLMediaElement.prototype, "currentTime", "get").mockImplementation(
+    function (this: HTMLMediaElement) {
+      return playbackOf(this).currentTime;
+    },
+  );
+  vi.spyOn(HTMLMediaElement.prototype, "currentTime", "set").mockImplementation(
+    function (this: HTMLMediaElement, time: number) {
+      Object.assign(playbackOf(this), { currentTime: time, ended: false });
+    },
+  );
+  play.mockImplementation(function (this: HTMLMediaElement) {
+    Object.assign(playbackOf(this), { paused: false, ended: false });
+    return Promise.resolve();
+  });
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(function (
+    this: HTMLMediaElement,
+  ) {
+    playbackOf(this).paused = true;
+  });
+};
+
+type MediaView = Extract<StudioElementView, { kind: "media" }>;
+
+// A video element, its src by its id
+const clip = (id: string, fields: Partial<MediaView> = {}): MediaView => ({
+  ...BASE,
+  ...MEDIA,
+  ...PICTURE,
+  id,
+  kind: "media",
+  src: `/m/${id}.webm`,
+  video: true,
+  ...fields,
+});
+
+const videoOf = (id: string) => el(id).querySelector("video")!;
+
+// Its length read, then playing, as the browser tells it
+const loaded = (video: HTMLVideoElement, duration: number) => {
+  playbackOf(video).duration = duration;
+  video.dispatchEvent(new Event("loadedmetadata"));
+  video.dispatchEvent(new Event("playing"));
+};
+
+// At its own end: paused there, then `ended`
+const ends = (video: HTMLVideoElement) => {
+  const state = playbackOf(video);
+  Object.assign(state, {
+    currentTime: state.duration,
+    paused: true,
+    ended: true,
+  });
+  video.dispatchEvent(new Event("ended"));
+};
+
+describe("videos", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    fakePlayers();
+    stage = createStage(root);
+  });
+
+  it("starts at its cut, and plays it again at its end, by its own clock", () => {
+    draw(view(clip("c", { start: 2, end: 5 })));
+    const video = videoOf("c");
+    expect(video.currentTime).toBe(2);
+    // The browser's own loop would go back to 0
+    expect(video.loop).toBe(false);
+
+    loaded(video, 10);
+    // Its clock lags behind the timer: it waits for the rest
+    playbackOf(video).currentTime = 4.5;
+    vi.advanceTimersByTime(3000);
+    expect(video.currentTime).toBe(4.5);
+
+    playbackOf(video).currentTime = 5;
+    vi.advanceTimersByTime(500);
+    expect(video.currentTime).toBe(2);
+    expect(video.paused).toBe(false);
+  });
+
+  it("loops an uncut video as the browser does, and a cut to its end on ended", () => {
+    draw(view(clip("c")));
+    const video = videoOf("c");
+    expect(video.loop).toBe(true);
+
+    draw(view(clip("c", { start: 3 })));
+    expect(video.loop).toBe(false);
+    loaded(video, 10);
+    // Its end is the video's own, so no timer waits for it
+    expect(vi.getTimerCount()).toBe(0);
+
+    ends(video);
+    expect(video.currentTime).toBe(3);
+    expect(video.paused).toBe(false);
+  });
+
+  it("times nothing for a video of unknown length", () => {
+    draw(view(clip("c", { start: 1 })));
+    loaded(videoOf("c"), Infinity);
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("without loop, stops at its cut's end until the cut or loop changes", () => {
+    draw(view(clip("c", { start: 1, end: 4, loop: false })));
+    const video = videoOf("c");
+    loaded(video, 10);
+    playbackOf(video).currentTime = 4;
+    vi.advanceTimersByTime(3000);
+    expect(video.paused).toBe(true);
+    expect(video.currentTime).toBe(4);
+
+    // Every update leaves it there
+    play.mockClear();
+    draw(view(clip("c", { start: 1, end: 4, loop: false })));
+    expect(play).not.toHaveBeenCalled();
+
+    draw(view(clip("c", { start: 1, end: 3, loop: false })));
+    expect(video.currentTime).toBe(1);
+    expect(play).toHaveBeenCalledTimes(1);
+
+    ends(video);
+    draw(view(clip("c", { start: 1, end: 3 })));
+    expect(video.currentTime).toBe(1);
+    expect(play).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows an event's video without loop until its cut ends, past its seconds", () => {
+    draw(view(clip("c", { when: "event", seconds: 2, end: 6, loop: false })));
+    const video = videoOf("c");
+    playbackOf(video).duration = 10;
+    video.dispatchEvent(new Event("loadedmetadata"));
+    expect(body("c").classList).toContain("studio-hidden");
+    expect(video.paused).toBe(true);
+
+    stage.react({ element: "c" });
+    video.dispatchEvent(new Event("playing"));
+    vi.advanceTimersByTime(2000);
+    expect(body("c").classList).not.toContain("studio-hidden");
+
+    playbackOf(video).currentTime = 6;
+    vi.advanceTimersByTime(4000);
+    expect(body("c").classList).toContain("studio-hidden");
+    expect(video.paused).toBe(true);
+  });
+
+  it("keeps an event's video shown when its last end arrives after a react", () => {
+    draw(view(clip("c", { when: "event", seconds: 30, loop: false })));
+    const video = videoOf("c");
+    stage.react({ element: "c" });
+    loaded(video, 10);
+
+    // At its end, a react seeks it back before `ended` arrives
+    Object.assign(playbackOf(video), { currentTime: 10, ended: true });
+    stage.react({ element: "c" });
+    video.dispatchEvent(new Event("ended"));
+
+    expect(body("c").classList).not.toContain("studio-hidden");
+    expect(video.currentTime).toBe(0);
+    expect(video.paused).toBe(false);
+  });
+
+  it("hides an event's video without loop after its seconds if it never played", () => {
+    play.mockImplementation(() => Promise.resolve());
+    draw(view(clip("c", { when: "event", seconds: 2, loop: false })));
+
+    stage.react({ element: "c" });
+    vi.advanceTimersByTime(2000);
+
+    expect(body("c").classList).toContain("studio-hidden");
+  });
+
+  it("plays a moving element's video without loop again on each event", () => {
+    draw(view(clip("c", { when: "animate", start: 2, end: 4, loop: false })));
+    const video = videoOf("c");
+    loaded(video, 10);
+    playbackOf(video).currentTime = 4;
+    vi.advanceTimersByTime(2000);
+    expect(video.paused).toBe(true);
+
+    stage.react({ element: "c" });
+
+    expect(video.currentTime).toBe(2);
+    expect(video.paused).toBe(false);
+  });
+
+  it("plays the whole video when its start is past its length", () => {
+    draw(view(clip("c", { start: 30, loop: false })));
+    const video = videoOf("c");
+    expect(video.currentTime).toBe(30);
+
+    // The browser stops the seek at its end
+    playbackOf(video).currentTime = 10;
+    loaded(video, 10);
+
+    expect(video.currentTime).toBe(0);
+    expect(video.paused).toBe(false);
+  });
+
+  it("plays its sound at its volume", () => {
+    draw(view(clip("c", { volume: 40 })));
+    const video = videoOf("c");
+
+    expect(video.volume).toBe(0.4);
+    expect(video.muted).toBe(false);
+  });
+
+  it("plays muted when the browser refuses sound, until a click", async () => {
+    play.mockRejectedValueOnce(new DOMException("", "NotAllowedError"));
+    draw(view(clip("a")));
+    const a = videoOf("a");
+    await vi.waitFor(() => expect(a.muted).toBe(true));
+    expect(play).toHaveBeenCalledTimes(2);
+
+    // The page's policy: the next one starts muted
+    draw(view(clip("a"), clip("b")));
+    expect(videoOf("b").muted).toBe(true);
+
+    window.dispatchEvent(new MouseEvent("click"));
+    expect(a.muted).toBe(false);
+    expect(videoOf("b").muted).toBe(false);
+  });
+});
+
 describe("in the editor", () => {
   beforeEach(() => {
     stage = createStage(root, { slots: true, editing: true });
+  });
+
+  it("keeps its videos silent until its sound is on", () => {
+    draw(view(clip("a")));
+    expect(videoOf("a").muted).toBe(true);
+
+    stage.sound(true);
+    expect(videoOf("a").muted).toBe(false);
+    draw(view(clip("a"), clip("b")));
+    expect(videoOf("b").muted).toBe(false);
+
+    stage.sound(false);
+    expect(videoOf("a").muted).toBe(true);
+    expect(videoOf("b").muted).toBe(true);
+  });
+
+  it("holds a video on a cut's frame while its handle moves, then plays its cut again", () => {
+    vi.useFakeTimers();
+    fakePlayers();
+    draw(view(clip("c", { start: 1, end: 3 })));
+    const video = videoOf("c");
+    loaded(video, 10);
+
+    // The end dragged to 3.5: held there, its new cut drawn on that frame
+    stage.hold("c", 3.5);
+    draw(view(clip("c", { start: 1, end: 3.5 })));
+    expect(video.paused).toBe(true);
+    expect(video.currentTime).toBe(3.5);
+
+    // Each move holds it a while longer
+    vi.advanceTimersByTime(400);
+    stage.hold("c", 3.2);
+    draw(view(clip("c", { start: 1, end: 3.2 })));
+    vi.advanceTimersByTime(400);
+    expect(video.paused).toBe(true);
+    expect(video.currentTime).toBe(3.2);
+
+    vi.advanceTimersByTime(200);
+    expect(video.currentTime).toBe(1);
+    expect(video.paused).toBe(false);
+  });
+
+  it("plays a video without loop again when asked, once it stopped at its end", () => {
+    vi.useFakeTimers();
+    fakePlayers();
+    draw(view(clip("c", { start: 1, end: 3, loop: false })));
+    const video = videoOf("c");
+    loaded(video, 10);
+    playbackOf(video).currentTime = 3;
+    vi.advanceTimersByTime(2000);
+    expect(video.paused).toBe(true);
+
+    stage.replay("c");
+
+    expect(video.currentTime).toBe(1);
+    expect(video.paused).toBe(false);
+  });
+
+  it("keeps an event's video without loop on screen at its end, and Test plays it again", () => {
+    vi.useFakeTimers();
+    fakePlayers();
+    draw(view(clip("c", { when: "event", end: 3, loop: false })));
+    const video = videoOf("c");
+    loaded(video, 10);
+
+    stage.react({ element: "c" });
+    video.dispatchEvent(new Event("playing"));
+    playbackOf(video).currentTime = 3;
+    vi.advanceTimersByTime(3000);
+    expect(video.paused).toBe(true);
+    expect(body("c").classList).not.toContain("studio-hidden");
+
+    stage.react({ element: "c" });
+    expect(video.currentTime).toBe(0);
+    expect(video.paused).toBe(false);
   });
 
   it("gives every embed a stable slot, and no iframe", () => {
