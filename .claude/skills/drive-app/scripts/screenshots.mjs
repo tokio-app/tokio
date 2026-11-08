@@ -56,6 +56,7 @@ const TYPED = {
     Regulars: "Habituales",
     "this song is a vibe 🎶": "esta canción es un temazo 🎶",
     "hi from Lisbon 👋": "saludos desde Lima 👋",
+    "{likes} likes": "{likes} me gusta",
   },
 };
 
@@ -759,6 +760,151 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     }),
   );
   await crop("timer-look", body(tr("Timer look")));
+
+  // Overlay Studio: a likes banner and a follow alert, each a group, and the
+  // logo the alerts' Media tab browsed
+  await tool(tr("Overlay Studio"));
+  await page
+    .getByRole("button", { name: tr("New overlay"), exact: true })
+    .click();
+  // An empty Elements list has no height, so the editor's + button says it's
+  // open
+  await page
+    .getByRole("button", { name: tr("Add a group or an element") })
+    .waitFor();
+  const elementList = page.getByRole("list", {
+    name: tr("Elements"),
+    exact: true,
+  });
+  const studioGroup = (name, key) =>
+    page.getByRole("group", { name: tr(name, key), exact: true });
+  const studioNumber = (name, key) =>
+    studioGroup(name, key).getByRole("spinbutton");
+  // Where the + menu puts it: into the selected group or the selected
+  // element's group, else on its own
+  const addStudio = async (item) => {
+    await page
+      .getByRole("button", { name: tr("Add a group or an element") })
+      .click();
+    await page.getByRole("menuitem", { name: tr(item), exact: true }).click();
+  };
+  // The selected element's box, in px of the canvas
+  const placeAt = async (x, y, width, height) => {
+    const box = { X: x, Y: y, Width: width, Height: height };
+    for (const [name, value] of Object.entries(box)) {
+      await studioNumber(name).fill(String(value));
+    }
+  };
+  // A color typed into one of the selected shape's swatches
+  const paint = async (scope, color) => {
+    await scope.getByRole("button", { name: tr("Choose color") }).click();
+    await page.getByPlaceholder(tr("Type a color")).fill(color);
+    await page.keyboard.press("Escape");
+  };
+  const bordered = async () => {
+    await page
+      .getByRole("checkbox", { name: tr("Border"), exact: true })
+      .check();
+  };
+  const shapeTile = (name) =>
+    studioGroup("Shape").getByRole("radio", { name: tr(name), exact: true });
+  const studioText = studioGroup("Text", "studio.fields.text");
+  const stage = page.locator('[class*="stage_frame"] > div[tabindex="0"]');
+  const studioRow = (name) => elementList.getByRole("button", { name }).first();
+
+  await addStudio("New group");
+  await addStudio("Shape");
+  await bordered();
+  await paint(studioGroup("Border"), "#f43f5e");
+  await page
+    .getByRole("spinbutton", { name: tr("Border width"), exact: true })
+    .fill("6");
+  await placeAt(90, 160, 900, 220);
+  await addStudio("Text");
+  await studioText.getByRole("textbox").fill(say("{likes} likes"));
+  await studioNumber("Size").fill("80");
+  await placeAt(90, 210, 900, 120);
+  await addStudio("Shape");
+  await shapeTile("Star").check();
+  await paint(studioGroup("Fill"), "#f43f5e");
+  await placeAt(890, 60, 150, 150);
+
+  await stage.press("Escape");
+  await addStudio("New group");
+  await addStudio("Shape");
+  await shapeTile("Speech bubble").check();
+  await bordered();
+  await placeAt(260, 1140, 740, 300);
+  await addStudio("Text");
+  await studioText
+    .getByRole("textbox")
+    .fill(say("Thanks for the follow, {username}!"));
+  await studioNumber("Size").fill("60");
+  await placeAt(300, 1170, 660, 170);
+  await page
+    .getByRole("radio", { name: tr("Shows on an event"), exact: true })
+    .check();
+  await addStudio("Viewer's picture");
+  await placeAt(60, 1400, 220, 220);
+
+  await stage.press("Escape");
+  await addStudio("Image or video");
+  await page
+    .getByRole("button", { name: tr("Pick a file"), exact: true })
+    .click();
+  await dialog.getByRole("button", { name: /tokio-logo/ }).click();
+  await dialog.waitFor({ state: "detached" });
+  await placeAt(390, 620, 300, 300);
+
+  // The editor with the star selected, its Shape picker showing
+  await studioRow(tr("Star")).click();
+  await page.waitForTimeout(500);
+  await crop("studio-editor", page.getByRole("main"), { pad: 0 });
+  // The panel the list fills
+  await crop("studio-elements", elementList.locator(".."));
+  // The follow's text, with the event's values under the LIVE numbers
+  await studioRow(say("Thanks for the follow, {username}!")).click();
+  await crop("studio-text", studioText);
+  // The logo cropped on the canvas, zoomed in on it: all of it, the parts
+  // cut away dimmed
+  await studioRow("tokio-logo").click();
+  await studioNumber("Left", "studio.fields.cropLeft").fill("18");
+  await studioNumber("Right", "studio.fields.cropRight").fill("18");
+  const zoomIn = page.getByRole("button", {
+    name: tr("Zoom in (Ctrl+=)"),
+    exact: true,
+  });
+  await zoomIn.click();
+  await zoomIn.click();
+  await page
+    .getByRole("button", {
+      name: tr("Crop on the canvas (double-click)"),
+      exact: true,
+    })
+    .click();
+  // Around its frame, centered in the view, with the parts cut away
+  await crop("studio-crop", page.locator("[data-cropping]"), { pad: 96 });
+  await stage.press("Escape");
+  await page
+    .getByRole("button", { name: tr("Zoom to fit (Ctrl+0)"), exact: true })
+    .click();
+  // Nothing selected: the rulers, and a guide across each middle
+  await stage.press("Escape");
+  await page
+    .getByRole("button", {
+      name: tr("Rulers and guides (Ctrl+R)"),
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("button", { name: tr("Add vertical"), exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: tr("Add horizontal"), exact: true })
+    .click();
+  await crop("studio-guides", page.locator('[class*="stage_frame"]'), {
+    pad: 0,
+  });
 
   // Test overlays
   await tool(tr("Test overlays"));
