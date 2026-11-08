@@ -124,6 +124,8 @@ export function createWindow(content: WebContentsView) {
     }
   });
 
+  nav.ipc.on(APP_EVENTS.GET_MUSIC_WINDOW_STATE, sendWindowState);
+
   nav.ipc.on(APP_EVENTS.MINIMIZE_MUSIC_WINDOW, () => {
     if (!_shellWindow.isDestroyed()) _shellWindow.minimize();
   });

@@ -126,6 +126,16 @@ describe("createWindow", () => {
     ]);
   });
 
+  it("sends the window state to the title bar when it asks", () => {
+    const { shell, nav } = open();
+
+    shell.maximize();
+    nav.webContents.send.mockClear();
+    nav.webContents.ipc.emit(APP_EVENTS.GET_MUSIC_WINDOW_STATE);
+
+    expect(states(nav)).toEqual([{ state: "maximized" }]);
+  });
+
   it("keeps the title bar on its page, but lets it reload", () => {
     const { nav } = open();
     const page = nav.webContents.getURL();
