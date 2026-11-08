@@ -511,6 +511,10 @@ describe("HistoryService", () => {
       expect.objectContaining({ userId: "1", coins: 5, rank: 1 }),
     ]);
 
+    // Both minutes the dates start and end in count
+    const across = { from: 10 * MINUTE + 20_000, to: 11 * MINUTE + 20_000 };
+    expect(await history.getTotals(across)).toEqual({ coins: 115, gifts: 4 });
+
     // Whole LIVEs come from the list, as do the dates of one LIVE
     expect(await history.getTotals({})).toEqual({ coins: 116, gifts: 5 });
     expect(

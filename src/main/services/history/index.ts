@@ -90,7 +90,8 @@ const byCoins = (a: Gifter, b: Gifter) =>
 const LIVE_FILE = /^(\d+)\.json$/;
 const MINUTE = 60_000;
 
-// A LIVE's gift minutes that start in the dates, each with when it starts
+// A LIVE's gift minutes that are partly in the dates, each with when it
+// starts, so the minutes the dates start and end in count alike
 const minutesIn = (
   record: LiveRecord | null,
   { from = -Infinity, to = Infinity }: DateRange,
@@ -98,7 +99,7 @@ const minutesIn = (
   const first = Math.floor((record?.startedAt ?? 0) / MINUTE);
   return (record?.minutes ?? [])
     .map((minute) => ({ ...minute, at: (first + minute.minute) * MINUTE }))
-    .filter(({ at }) => at >= from && at < to);
+    .filter(({ at }) => at + MINUTE > from && at < to);
 };
 
 // A LIVE's gifters with only what they sent in the dates' minutes
