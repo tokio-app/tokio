@@ -3,6 +3,7 @@ import { setLanguage } from "@/helper/i18n";
 import {
   cancelableEvent,
   ipcMain,
+  screen,
   shell as electronShell,
   views,
   windows,
@@ -38,6 +39,16 @@ describe("createWindow", () => {
     expect(win).toBe(shell);
     expect(shell.options).toMatchObject({ width: 1280, height: 840 });
     expect(shell.isVisible()).toBe(false);
+  });
+
+  it("opens no bigger than the screen's work area", () => {
+    screen.getPrimaryDisplay.mockReturnValue({
+      workAreaSize: { width: 1366, height: 728 },
+    });
+    const { shell } = open();
+
+    expect(shell.options).toMatchObject({ width: 1280, height: 728 });
+    expect(shell.options).not.toHaveProperty("minHeight");
   });
 
   it("adds a title bar view with the preload that loads the music UI", () => {
