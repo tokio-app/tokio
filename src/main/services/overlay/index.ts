@@ -496,10 +496,6 @@ export class OverlayService extends Service {
     return { success: true, data: saved };
   }
 
-  public send(id: string, payload: TokioPayload): void {
-    this._server.sendToClient(id, payload);
-  }
-
   // Every live event, as the next moment of the overlay's test LIVE, for its test button.
   public getTestPayloads(id: string): TokioPayload[] {
     let live = this._testLives.get(id);

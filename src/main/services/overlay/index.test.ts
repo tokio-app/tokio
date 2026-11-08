@@ -1,6 +1,6 @@
 import { OverlayMetadata, TestOverlay } from "@/common/schemas";
 import { CustomGift, GiftEvent, TOKIO_EVENTS } from "@/common/types";
-import { defaultStoreData, generateTikTokEventSample } from "@/common/util";
+import { defaultStoreData } from "@/common/util";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { ServerService } from "@/services/server";
@@ -1034,14 +1034,6 @@ describe("OverlayService", () => {
       success: false,
       data: undefined,
     });
-  });
-
-  it("sends data to one overlay", () => {
-    const payload = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW);
-
-    service.send("a", payload);
-
-    expect(sendToClient).toHaveBeenCalledExactlyOnceWith("a", payload);
   });
 
   it("samples every live event for tests", () => {
