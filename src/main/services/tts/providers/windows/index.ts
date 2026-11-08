@@ -10,8 +10,10 @@ export class WindowsTTS extends TTSProvider {
   private _voices: SapiVoice[] | null = null;
 
   private async _fetchVoices(): Promise<SapiVoice[]> {
-    this._voices = await this._host.request({ type: "voices" });
-    return this._voices;
+    const voices = await this._host.request({ type: "voices" });
+    // An empty list is asked for again, like a failed one
+    if (voices.length > 0) this._voices = voices;
+    return voices;
   }
 
   public setKey(_key: string) {}
