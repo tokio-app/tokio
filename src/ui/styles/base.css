@@ -71,6 +71,11 @@ textarea {
   background: transparent;
 }
 
+/* Where two scrollbars meet: Chromium paints it white otherwise */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 ::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: var(--radius-full);

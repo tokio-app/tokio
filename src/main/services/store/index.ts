@@ -13,6 +13,9 @@ import {
   SavedEmote,
   StoreSchema,
   StoreZodSchema,
+  StudioElement,
+  StudioOverlay,
+  StudioOverlaySchema,
   TestOverlay,
 } from "@/common/schemas";
 import type { MessageKey } from "@/common/i18n";
@@ -23,6 +26,7 @@ import {
   formatError,
   IMAGE_EXTENSIONS,
   MEDIA_EXTENSIONS,
+  studioElements,
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
@@ -339,6 +343,88 @@ export class StoreManagerService extends Service {
   public getActiveFeatures(): Readonly<AppSettings["activeFeatures"]> {
     this._ensureInitialized();
     return this._storeData!.settings.activeFeatures;
+  }
+
+  /**
+   * Overlay Studio's overlays, read on every live event. Like
+   * getActiveFeatures it doesn't clone, so don't change what it returns.
+   */
+  public getStudio(): readonly StudioOverlay[] {
+    this._ensureInitialized();
+    return this._storeData!.settings.studio;
+  }
+
+  /** The LIVE's likes and viewers, read on every live event, not cloned. */
+  public getLiveStats(): Readonly<AppSettings["liveStats"]> {
+    this._ensureInitialized();
+    return this._storeData!.settings.liveStats;
+  }
+
+  /**
+   * Adds an empty Portrait studio overlay. Null when the id is taken; throws
+   * when the schema refuses it (the id must be a UUID: it becomes the URL).
+   * Otherwise whether the store file was written.
+   */
+  public async addStudioOverlay(
+    id: string,
+    name: string,
+  ): Promise<boolean | null> {
+    this._ensureInitialized();
+    const overlay = StudioOverlaySchema.parse({ id, name });
+    const { settings } = this._storeData!;
+    if (settings.studio.some((o) => o.id === id)) return null;
+    settings.studio = [...settings.studio, overlay];
+    return this._queueSave();
+  }
+
+  /**
+   * Replaces the studio overlay with the same id, keeping its place. Null
+   * when no overlay has it; throws when the schema refuses it, before memory
+   * changes. Otherwise whether the store file was written.
+   */
+  public async saveStudioOverlay(overlay: unknown): Promise<boolean | null> {
+    this._ensureInitialized();
+    const saved = StudioOverlaySchema.parse(overlay);
+    const { settings } = this._storeData!;
+    if (!settings.studio.some((o) => o.id === saved.id)) return null;
+    // A new array, so a live event reading the old one isn't changed midway
+    settings.studio = settings.studio.map((o) =>
+      o.id === saved.id ? saved : o,
+    );
+    return this._queueSave();
+  }
+
+  public async removeStudioOverlay(id: string): Promise<boolean> {
+    this._ensureInitialized();
+    const { settings } = this._storeData!;
+    settings.studio = settings.studio.filter((o) => o.id !== id);
+    return this._queueSave();
+  }
+
+  /**
+   * Takes a deleted media file off every studio element that shows it, in a
+   * group or on its own; the elements stay, empty. Saves nothing when none
+   * has it.
+   */
+  public async removeFromStudio(file: string): Promise<boolean> {
+    this._ensureInitialized();
+    const { settings } = this._storeData!;
+    const has = (element: StudioElement) =>
+      element.kind === "media" && element.file === file;
+    if (!settings.studio.some((o) => studioElements(o).some(has))) return true;
+    const clear = (element: StudioElement): StudioElement =>
+      element.kind === "media" && element.file === file
+        ? { ...element, file: "", name: "" }
+        : element;
+    settings.studio = settings.studio.map((o) => ({
+      ...o,
+      items: o.items.map((item) =>
+        item.kind === "group"
+          ? { ...item, elements: item.elements.map(clear) }
+          : clear(item),
+      ),
+    }));
+    return this._queueSave();
   }
 
   public getProfiles(): EntityMetadata[] {

@@ -17,6 +17,7 @@ import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
+import { sendStudioOverlays } from "@/helper/studio";
 import type { ServiceResult } from "@/services/shared";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
@@ -575,9 +576,14 @@ events.push(
   async (services, e, { file }) => {
     const { alertsService, storeManagerService, notifier } = services;
     if (!(await storeManagerService.removeMedia(file))) throw saveFailure();
-    const deleted = await deleteFile(services, e, "media", file, (f) =>
-      alertsService.deleteMedia(f),
-    );
+    const deleted = await deleteFile(services, e, "media", file, async (f) => {
+      // Studio elements that show it stay, empty. Like the alerts, they keep
+      // the file when the store can't be saved.
+      const cleared = await storeManagerService.removeFromStudio(f);
+      await sendStudioOverlays(services);
+      if (!cleared) throw saveFailure();
+      return alertsService.deleteMedia(f);
+    });
 
     e.reply(APP_EVENTS_RESPONSE.GET_MEDIA, {
       success: true,

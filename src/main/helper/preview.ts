@@ -151,18 +151,25 @@ export function withPreviewCORS(res: Response): Response {
  *   scrolled (the Iframe ignores the pointer), so a page taller than the
  *   preview only showed a scrollbar that can't be used.
  *
+ * A `transparent` preview (`?transparent` on its URL: an embed in Overlay
+ * Studio's editor) keeps its own background, so what's under it shows.
+ *
  * The files and what the overlay server sends stay as they are. Other files
  * pass through.
  */
 export async function withPreviewStyles(
   res: Response,
   path: string,
+  transparent = false,
 ): Promise<Response> {
   if (!res.ok || !/\.html?$/i.test(path)) return res;
 
+  const background = transparent
+    ? ""
+    : `html{background-color:${PREVIEW_BACKGROUND}!important}`;
   // After everything else, so it wins over the overlay's own styles. Adding
   // it before the doctype would switch the page to quirks mode.
-  const html = `${await res.text()}<style>html{background-color:${PREVIEW_BACKGROUND}!important}html,body{overflow:hidden!important}</style>`;
+  const html = `${await res.text()}<style>${background}html,body{overflow:hidden!important}</style>`;
   const headers = new Headers(res.headers);
   headers.delete("content-length");
   return new Response(html, { status: res.status, headers });

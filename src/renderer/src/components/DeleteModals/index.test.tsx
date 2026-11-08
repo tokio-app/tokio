@@ -4,7 +4,43 @@ import { sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
 import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ClearHistoryModal, DeleteLiveModal, DeletePictureModal } from ".";
+import {
+  ClearHistoryModal,
+  DeleteLiveModal,
+  DeletePictureModal,
+  DeleteStudioOverlayModal,
+} from ".";
+
+describe("DeleteStudioOverlayModal", () => {
+  const item = { id: "1b4e28ba-2fa1-41d2-883f-0016d3cca427", name: "Main" };
+
+  it("says what deleting an overlay does, and asks main to", async () => {
+    const onClose = vi.fn();
+    const { user } = renderWithProviders(
+      <DeleteStudioOverlayModal item={item} onClose={onClose} />,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Delete overlay?" }),
+    ).toHaveTextContent(
+      "Main and its elements will be deleted. Streaming apps using its URL will stop showing it.",
+    );
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(sent(APP_EVENTS.REMOVE_STUDIO_OVERLAY)).toEqual([{ id: item.id }]);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("deletes nothing when canceled", async () => {
+    const { user } = renderWithProviders(
+      <DeleteStudioOverlayModal item={item} onClose={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(sent(APP_EVENTS.REMOVE_STUDIO_OVERLAY)).toEqual([]);
+  });
+});
 
 describe("DeleteLiveModal", () => {
   it("names the LIVE by when it started, and asks main to delete it", async () => {

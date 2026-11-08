@@ -5,7 +5,14 @@ import {
   Fan,
   TimerData,
 } from "@/common/types";
-import { fan, liveSummary, profileReply, timerReply } from "@test/fixtures";
+import {
+  failure,
+  fan,
+  liveSummary,
+  profileReply,
+  studioOverlay,
+  timerReply,
+} from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
 import { act, screen, waitFor, within } from "@testing-library/react";
@@ -36,12 +43,19 @@ describe("Tools", () => {
 
   it("lists the tools in order, each a link to its page", async () => {
     await renderApp("/tools");
-    const names = ["Countdown timer", "Coin stats", "Fans", "Test overlays"];
+    const names = [
+      "Countdown timer",
+      "Overlay Studio",
+      "Coin stats",
+      "Fans",
+      "Test overlays",
+    ];
 
     const links = page().getAllByRole("link");
     expect(links).toEqual(names.map(row));
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
       "/tools/timer",
+      "/tools/studio",
       "/tools/coin-stats",
       "/tools/fans",
       "/tools/test-overlays",
@@ -55,6 +69,7 @@ describe("Tools", () => {
     await renderApp("/tools");
 
     expect(sent(APP_EVENTS.GET_TIMER)).toHaveLength(1);
+    expect(sent(APP_EVENTS.GET_STUDIO)).toHaveLength(1);
     expect(sent(APP_EVENTS.GET_LIVES)).toHaveLength(1);
     expect(sent(APP_EVENTS.GET_FANS)).toHaveLength(1);
     expect(sent(APP_EVENTS.GET_TEST_OVERLAYS)).toHaveLength(1);
@@ -112,6 +127,27 @@ describe("Tools", () => {
     expect(
       within(row("Test overlays")).getByText("test overlays"),
     ).toBeVisible();
+  });
+
+  it("counts the studio overlays, keeping the count when a reply fails", async () => {
+    await renderApp("/tools");
+
+    await send(APP_EVENTS_RESPONSE.STUDIO, {
+      success: true,
+      data: [studioOverlay("Main scene"), studioOverlay("Just chatting")],
+    });
+    expect(row("Overlay Studio")).toHaveAccessibleDescription(
+      "Make your own overlays from text, images and other overlays, and have them react to your LIVE. 2 overlays",
+    );
+
+    await send(APP_EVENTS_RESPONSE.STUDIO, failure());
+    expect(within(row("Overlay Studio")).getByText("2")).toBeVisible();
+
+    await send(APP_EVENTS_RESPONSE.STUDIO, {
+      success: true,
+      data: [studioOverlay("Main scene")],
+    });
+    expect(within(row("Overlay Studio")).getByText("overlay")).toBeVisible();
   });
 
   it("says when there are no LIVEs yet, with no number", async () => {
@@ -186,6 +222,7 @@ describe("Tools", () => {
 
   it.each([
     ["Countdown timer", "/tools/timer"],
+    ["Overlay Studio", "/tools/studio"],
     ["Coin stats", "/tools/coin-stats"],
     ["Fans", "/tools/fans"],
     ["Test overlays", "/tools/test-overlays"],

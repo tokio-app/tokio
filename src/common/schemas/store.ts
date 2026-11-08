@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AlertSoundSchema } from "./profile";
+import { StoredStudioOverlaysSchema } from "./studio";
 
 const ProviderSchema = z.object({
   name: z.string(),
@@ -76,6 +77,9 @@ const AppSettingsSchema = z.object({
   // Pictures of what game actions make, for the games overlay, in their own
   // library: a name and a file in the Minecraft pictures folder
   minecraftPictures: z.array(AlertSoundSchema).default([]),
+  // Overlay Studio's overlays, the same for every profile. One that doesn't
+  // parse is dropped on load.
+  studio: StoredStudioOverlaysSchema.default([]),
   activeFeatures: z.object({
     tts: z.boolean(),
     music: z.boolean(),

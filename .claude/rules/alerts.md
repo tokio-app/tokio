@@ -65,7 +65,8 @@ paths:
 - Deleting a sound or media file (`REMOVE_SOUND`, `REMOVE_MEDIA`):
   - takes it out of its library, then off every alert in every profile (`StoreManagerService.removeFromAlerts`, which shares `_updateProfiles` with `removeFromGames`), then deletes the file;
   - a profile that can't be saved keeps the file, for its alerts, and fails with `saveFailure()`;
-  - main sends `ALERT_FILE_REMOVED`, and the Alerts page clears the file from the alerts it shows, so its next save doesn't bring it back;
+  - `REMOVE_MEDIA` also clears the file from every Overlay Studio media element (`removeFromStudio`, the element stays empty) and re-sends the studio views; a store it can't write keeps the file too (see `.claude/rules/studio.md`);
+  - main sends `ALERT_FILE_REMOVED`, and the Alerts page (and Overlay Studio's editor, for media) clears the file from what it shows, so its next save doesn't bring it back;
   - a sound whose file can't be deleted still leaves the library, with a warning (`SOUND_REMOVE_FAILED`).
 - **Clear** in the pickers takes the sound, message or media off the alert and keeps the file.
 - Upload counts only sounds new to the library: one already in `settings.sounds`, or picked twice, isn't counted.
@@ -98,7 +99,7 @@ paths:
 - The overlay page loads the video at `#t=<start>` and, from its first `playing`, times it by its own clock: it hides it at `min(end, start + duration)` of `currentTime`, waking `stop − currentTime` seconds later and waiting again while the clock lags (a fragment's end is checked only every 250 ms). The page's `duration` timer hides only images and videos that aren't playing, since a video loads and starts after its turn, which ended the cut early.
 - The Sound tab's waveform (`SoundCut`) gets the bytes with `GET_SOUND_DATA { file }` (`readSound`). `SOUND_DATA` echoes the file, failures included, with `notify: false`: the tab shows the failure.
 - It decodes them with `useAudio().decode` under the file's name, the key `ALERT_AUDIO` uses, so the editor and the alert's plays share one decode. A decode that ends after the tab's sound changed is dropped, its failure too.
-- An end at the sound's end saves null. `CutTrack` (`SoundCut.tsx`) and `ResetCut` are shared with the Media tab.
+- An end at the sound's end saves null. `CutTrack` (`SoundCut.tsx`) and `ResetCut` are shared with the Media tab. Overlay Studio's video fields use `CutTrack`, and its media elements spread `CUT` (see `.claude/rules/studio.md`).
 
 ## Text-to-speech
 
@@ -108,6 +109,7 @@ paths:
   - The alert plays its sound, or its media alone, without the message's speed and pitch. An alert with only a message plays nothing.
   - Banned words still skip the whole alert. The allow list and the roles stay chat-only.
 - Alert queues are shared, so speed and pitch travel per sound on `ALERT_AUDIO.filters`, and `AudioQueue` items can override the queue's filters.
+- A Like alert offers `{username}`, `{handle}` and `{count}` (the likes in the batch), since it plays each viewer's batch. Game actions and Overlay Studio, which count likes from every viewer, take `countedVariables` instead: the same lists with none on Like (the user's call). A text there that already has them still gets the last batch's, since `messageValues` reads the payload.
 - `{count}` in a gift alert's message is the streak's total from `GiftStreaks`, not TikTok's `comboCount`. `TtsTab` doesn't offer it on every gift; a message that has it still gets the count so far. One event that adds several gifts makes the message once and sends one `ALERT_AUDIO` with `repeat`.
 - A live alert's failed message isn't logged by `AlertsService` (`_generate(..., false)`): `init.ts` logs it to `alerts.log` only when its notice goes out, like a missing sound. Previews (`speak`) log their own failures, which `speakTest` counts on.
 - Like chat TTS, live alerts make their messages through a `TaskQueue` with the TTS page's cooldown and queue length: blocked messages never enter it, and the ones past the length are dropped.
@@ -130,7 +132,7 @@ paths:
 - Migration: `withSavedMedia` (a preprocess on `AlertSchema`) gives media saved without a volume the alert's, and cuts a video saved before cuts (no `start`) at its old `duration` unless its `match_video` was on. The schema no longer has `match_video`.
 - Media rides on the alert's audio: a missing sound, or a message that banned words block or that fails, skips it too. A viewer on the TTS block list still gets it (see Text-to-speech). A file missing on disk (a profile imported from another computer) shows nothing, with no notice.
 - Request numbering: the page applies a `SET_ALERT_MEDIA` reply only while that alert waits for one (`askedMedia`). `IMPORT_MEDIA` carries `request` (one counter with the sounds') and `SET_ALERT_MEDIA` echoes it, failures included: the page applies only a reply newer than the last applied for that alert (`appliedMedia`), and the picker shows only the newest request's failure. `IMPORT_MEDIA` also replies `GET_MEDIA`.
-- The `MediaPicker` only picks: it closes after a pick, and once a browsed file for its alert arrives.
+- The `MediaPicker` only picks: it closes after a pick, and once a browsed file for its alert arrives. It takes `{ id, chosen }` (an alert's or an Overlay Studio element's id, and its file), not an alert.
 - It's the shared `LibraryPicker` (`components/MediaPicker/LibraryPicker.tsx`, which holds both pickers' library, search, listeners, failure check and delete flow), with:
   - the media events and texts;
   - `DeleteMediaModal`;

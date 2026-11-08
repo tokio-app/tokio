@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { ALERTS_PATH, GAMES_PATH, TIMER_PATH } from "../util/constants/server";
+import {
+  ALERTS_PATH,
+  GAMES_PATH,
+  STUDIO_PATH,
+  TIMER_PATH,
+} from "../util/constants/server";
 
 /**
  * An official overlay in the catalog that tokio-app/overlays publishes with
@@ -9,12 +14,12 @@ import { ALERTS_PATH, GAMES_PATH, TIMER_PATH } from "../util/constants/server";
 export const CatalogOverlaySchema = z.object({
   // Its folder name there, and its folder and URL path here. Never changes.
   // The alerts' overlays are served under /alerts/, the countdown timer's at
-  // /timer/ and the games overlay at /games/.
+  // /timer/, the games overlay at /games/ and Overlay Studio's under /studio/.
   id: z
     .string()
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
     .refine(
-      (id) => id !== ALERTS_PATH && id !== TIMER_PATH && id !== GAMES_PATH,
+      (id) => ![ALERTS_PATH, TIMER_PATH, GAMES_PATH, STUDIO_PATH].includes(id),
     ),
   name: z.string(),
   version: z.string(),

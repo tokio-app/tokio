@@ -3,8 +3,9 @@ import { ReactNode, useId } from "react";
 import styles from "./page.module.css";
 
 type PageProps = {
-  // wide fits tables such as the alerts list
-  width?: "default" | "wide";
+  // wide fits tables such as the alerts list; full has no max width, for an
+  // editor whose canvas is the page
+  width?: "default" | "wide" | "full";
   // aside puts each section's header in a column left of its content, for
   // pages of settings
   layout?: "stack" | "aside";
@@ -24,6 +25,7 @@ export function Page({
       className={cx(
         styles.page,
         width === "wide" && styles.page_wide,
+        width === "full" && styles.page_full,
         layout === "aside" && styles.page_aside,
       )}
     >

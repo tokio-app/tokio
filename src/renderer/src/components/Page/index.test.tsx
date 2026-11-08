@@ -16,6 +16,16 @@ describe("Page", () => {
       "Queue",
     ]);
   });
+
+  it("drops the max width only when full", () => {
+    const { container, rerender } = render(<Page>{null}</Page>);
+    expect(container.firstElementChild!.className).not.toMatch(/page_full/);
+
+    rerender(<Page width="full">{null}</Page>);
+
+    expect(container.firstElementChild!.className).toMatch(/page_full/);
+    expect(container.firstElementChild!.className).not.toMatch(/page_wide/);
+  });
 });
 
 describe("Section", () => {

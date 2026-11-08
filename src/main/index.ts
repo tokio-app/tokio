@@ -24,6 +24,7 @@ import { OverlayService } from "@/services/overlay";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
+import { StudioService } from "@/services/studio";
 import { TimerService } from "@/services/timer";
 import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
@@ -100,6 +101,7 @@ const services: AppServices = {
   fansService: new FansService(),
   historyService: new HistoryService(),
   gamesService: new GamesService(),
+  studioService: new StudioService(),
   trayService: new TrayService(),
 };
 
@@ -213,7 +215,9 @@ app.whenReady().then(async () => {
     if (!file) return new Response(null, { status: 404 });
 
     const res = await net.fetch(pathToFileURL(file).href);
-    return withPreviewCORS(await withPreviewStyles(res, file));
+    const transparent =
+      URL.parse(request.url)?.searchParams.has("transparent") ?? false;
+    return withPreviewCORS(await withPreviewStyles(res, file, transparent));
   });
 
   // The media library, for the alerts' thumbnails, the sound library, for

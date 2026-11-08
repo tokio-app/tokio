@@ -59,6 +59,7 @@ export const ALERT_MESSAGE_VARIABLES: Record<AlertTrigger, string[]> = {
   [TOKIO_EVENTS.SHARE]: USER,
   [TOKIO_EVENTS.FOLLOW]: USER,
   [TOKIO_EVENTS.GIFT]: [...USER, "gift", "count"],
+  // A Like alert plays each viewer's batch, the likes in it
   [TOKIO_EVENTS.LIKE]: [...USER, "count"],
   [TOKIO_EVENTS.ENVELOPE]: [],
   [TOKIO_EVENTS.SUPER_FAN]: USER,
@@ -67,6 +68,15 @@ export const ALERT_MESSAGE_VARIABLES: Record<AlertTrigger, string[]> = {
   [TOKIO_EVENTS.MEMBER_JOIN]: USER,
   [TOKIO_EVENTS.MUSIC_CHANGE]: ["song"],
 };
+
+/**
+ * What a game action or an Overlay Studio text can say, by trigger: an
+ * alert's variables, but none on Like (the user's call). They count likes
+ * from every viewer, so no one viewer or count is theirs. A text that
+ * already has them still gets the last batch's (messageValues).
+ */
+export const countedVariables = (trigger: AlertTrigger): string[] =>
+  trigger === TOKIO_EVENTS.LIKE ? [] : ALERT_MESSAGE_VARIABLES[trigger];
 
 // Read from the payload's shape, so emote alerts get the chat's values.
 function messageValues(payload: TokioEventMap[AppEvents]) {

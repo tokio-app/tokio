@@ -1,6 +1,6 @@
 import { TimerSettings } from "@/common/schemas";
 import { formatAdded, timerTriggers } from "@/common/util";
-import { fontFamily, formatDuration } from "@/helper";
+import { cx, fontFamily, formatDuration } from "@/helper";
 import { useLanguage } from "@/ui/i18n";
 import { useEffect, useState } from "react";
 import styles from "../countdowntimer.module.css";
@@ -15,13 +15,15 @@ interface Props {
   timer: TimerPush;
   // As edited, so the preview follows them before they're saved
   settings: TimerSettings;
+  // Without the panel's border, wash and padding, for Overlay Studio
+  bare?: boolean;
 }
 
 /**
  * The timer as the overlay shows it on stream. It counts down on its own
  * between main's pushes, ticking only while the timer runs.
  */
-export function TimerPreview({ timer, settings }: Props) {
+export function TimerPreview({ timer, settings, bare }: Props) {
   const language = useLanguage();
   const { state, added } = timer.data;
   const { look } = settings;
@@ -72,7 +74,7 @@ export function TimerPreview({ timer, settings }: Props) {
   const clockFont = fontFamily(look.clock_font);
 
   return (
-    <div className={styles.preview}>
+    <div className={cx(styles.preview, bare && styles.preview_bare)}>
       {title && (
         <p
           className={styles.preview_title}

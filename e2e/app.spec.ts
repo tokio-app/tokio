@@ -216,6 +216,29 @@ test("serves the overlay once the server is on", async () => {
     .toContain(`window.__OVERLAY_ID__ = "${id}"`);
 });
 
+test("serves a new Overlay Studio overlay", async () => {
+  const id = crypto.randomUUID();
+
+  // The server is on since the test above
+  await page.evaluate(
+    (id) =>
+      Reflect.get(globalThis, "api").emit("app:studio:add", {
+        id,
+        name: "Overlay 1",
+      }),
+    id,
+  );
+
+  await expect
+    .poll(async () => {
+      const res = await fetch(`http://127.0.0.1:37891/studio/${id}/`).catch(
+        () => null,
+      );
+      return res?.ok ? await res.text() : "";
+    })
+    .toContain("TokioStage.createStage");
+});
+
 // Whether each of the app's windows is on screen
 const shown = () =>
   app.evaluate(({ BrowserWindow }) =>

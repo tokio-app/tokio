@@ -10,6 +10,7 @@ import type {
   OverlayConfigTable,
   Profile,
   StoreSchema,
+  StudioOverlay,
 } from "@/common/schemas";
 import {
   ActivityUser,
@@ -282,6 +283,20 @@ export const socialsTable = (
     value,
     default: [{ platform: "facebook", username: "", color: "ffffff" }],
   },
+});
+
+/** An Overlay Studio overlay, Portrait and empty unless patched. */
+export const studioOverlay = (
+  name: string,
+  patch: Partial<StudioOverlay> = {},
+): StudioOverlay => ({
+  id: crypto.randomUUID(),
+  name,
+  size: "portrait",
+  rulers: false,
+  guides: { x: [], y: [], locked: false },
+  items: [],
+  ...patch,
 });
 
 /** A failed reply, as main sends them. */

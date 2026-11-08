@@ -46,7 +46,7 @@ Generated, don't edit: `out/`, `music-out/`, `dist/`.
 
 - The packaged app holds only `out/`, `music-out/`, `resources/` and the production dependencies (`files` in `electron-builder.yml`), so a file the app reads at runtime must live in one of them.
 - Packages only the windows import are bundled by Vite and ship only their `package.json` and license files, through the `!node_modules/{…}` pattern in `files` (see the `add-dependency` skill). `src/main/packaging.test.ts` fails when `src/main` or `src/common` reaches one, even through a dependency.
-- A file main imports from one with a query (`?inline`, like the countdown timer's font) is bundled into `out/main` once the package is in main's `externalizeDeps.exclude` (`electron.vite.config.ts`); the test skips those imports.
+- A file main imports from one with a query (`?inline`, like the countdown timer's font) is bundled into `out/main` once the package is in main's `externalizeDeps.exclude` (`electron.vite.config.ts`); the test skips those imports. A `?script` import (`inlineScript` in `electron.vite.config.ts`, used by Overlay Studio's `stage.ts`) compiles one file alone to a classic script's text, for a served page to inline: it may import only types.
 
 ## Path aliases
 
@@ -77,6 +77,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `timer.md`: the countdown timer, its overlay and its page in Tools
 - `fans.md`: the fans each profile keeps, sent to overlays and listed in Tools → Fans
 - `history.md`: each profile's past LIVEs and gifters, Coin stats in Tools, and the top gifters overlays get
+- `studio.md`: Overlay Studio, its renderer, editor and served page
 - `i18n.md`: the locale files, translating in the windows and main, and the language setting
 
 When a change alters what a rule says, update the rule with it. A new area gets its own rule with `paths`.
@@ -196,7 +197,7 @@ To release, use the `release` skill (`/release`). A release reaches auto-updates
 The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../tokio-web`) has its own `AGENTS.md`. Update it when any of these change:
 
 - features, settings, chat commands or install steps (its docs describe them in full; the README only sums them up)
-- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, the alerts' overlay URL (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`) or what it does, Minecraft's overlay's (`getMinecraftOverlayURL`) or what it does, `TOKIO_EVENTS` names and payloads, or the other messages overlays get (`TokioPayload`)
+- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, the alerts' overlay URL (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`) or what it does, Minecraft's overlay's (`getMinecraftOverlayURL`) or what it does, Overlay Studio's overlays' (`getStudioOverlayURL`) or what they do, `TOKIO_EVENTS` names and payloads, or the other messages overlays get (`TokioPayload`)
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
@@ -208,7 +209,7 @@ The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`)
 
 - Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change.
 - Its releases publish a catalog of every overlay at `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`), which Tokio installs from (see `.claude/rules/overlays.md`). A new catalog schema (a renamed or removed field) needs `CatalogOverlaySchema` and `parseCatalog` to read both.
-- No official overlay can have the id `alerts`, `timer` or `games`, paths Tokio serves itself: it drops a catalog entry with any of them.
+- No official overlay can have the id `alerts`, `timer`, `games` or `studio`, paths Tokio serves itself: it drops a catalog entry with any of them.
 
 ## Minecraft mod repo
 
@@ -221,7 +222,7 @@ Java Edition connects through the Tokio mod, a Fabric mod in `tokio-app/minecraf
 - Pull requests: a Conventional Commits title and the sections of `.github/pull_request_template.md`.
 - Keep these stable; overlays, browser sources and saved data depend on them:
   - the server port (`37891`), the Minecraft port (`MINECRAFT_PORT`, 37892) and its Java subprotocol (`MINECRAFT_JAVA_PROTOCOL`, `tokio.java.v1`)
-  - the alerts' overlay path (`/alerts/<alert id>/`), the countdown timer's (`/timer/`), Minecraft's overlay (`/games/minecraft/` and `/games/minecraft/<column>/`, its pictures under `/games/minecraft/pictures/`)
+  - the alerts' overlay path (`/alerts/<alert id>/`), the countdown timer's (`/timer/`), Minecraft's overlay (`/games/minecraft/` and `/games/minecraft/<column>/`, its pictures under `/games/minecraft/pictures/`), Overlay Studio's (`/studio/<id>/`, socket id `studio:<id>`)
   - existing event names
 - The overlay server listens on every network interface on purpose, for streaming apps on other computers (`tokio-app.local`, `REMOTE_SOCKET`, see `.claude/rules/overlays.md`). Don't bind it to loopback or add Host/Origin checks. The Minecraft socket is the exception (`.claude/rules/games.md`).
 - Respect inline `NOTE: DO NOT CHANGE` markers.

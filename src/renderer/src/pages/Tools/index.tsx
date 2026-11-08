@@ -14,8 +14,9 @@ import { ReactNode, useEffect, useId, useState } from "react";
 import styles from "./tools.module.css";
 
 /**
- * The tools, one row each, with what each holds now: the time left, the
- * newest LIVE's coins, and how many fans and test overlays there are.
+ * The tools, one row each, with what each holds now: the time left, how
+ * many studio overlays there are, the newest LIVE's coins, and how many fans
+ * and test overlays there are.
  */
 export function Tools() {
   const t = useT();
@@ -24,11 +25,17 @@ export function Tools() {
   const [lives, setLives] = useState<LiveSummary[]>();
   const [fans, setFans] = useState<number>();
   const [testOverlays, setTestOverlays] = useState<number>();
+  const [studio, setStudio] = useState<number>();
 
   useIpcRequest(APP_EVENTS.GET_TIMER);
+  useIpcRequest(APP_EVENTS.GET_STUDIO);
   useIpcRequest(APP_EVENTS.GET_LIVES);
   useIpcRequest(APP_EVENTS.GET_FANS);
   useIpcRequest(APP_EVENTS.GET_TEST_OVERLAYS);
+
+  useIpcListener(APP_EVENTS_RESPONSE.STUDIO, (res) => {
+    if (res?.data) setStudio(res.data.length);
+  });
 
   useIpcListener(APP_EVENTS_RESPONSE.TIMER, (res) => {
     if (res?.success && res.data) {
@@ -62,6 +69,13 @@ export function Tools() {
       <Section title={t("nav.tools")}>
         <ul className={styles.tools}>
           <CountdownRow timer={timer} />
+          <ToolRow
+            to="/tools/studio"
+            name={t("studio.title")}
+            description={t("studio.description")}
+            value={studio !== undefined && formatStat(studio, language).full}
+            label={studio !== undefined && t("studio.count", { count: studio })}
+          />
           <ToolRow
             to="/tools/coin-stats"
             name={t("coinStats.title")}
@@ -146,6 +160,7 @@ function CountdownRow({ timer }: { timer?: TimerPush }) {
 interface RowProps {
   to:
     | "/tools/timer"
+    | "/tools/studio"
     | "/tools/coin-stats"
     | "/tools/fans"
     | "/tools/test-overlays";

@@ -1,0 +1,312 @@
+/*
+ * Overlay Studio's look (/studio/<id>/), shared by its page and the editor so
+ * the two can't drift: ServerService inlines it into the served page, and the
+ * editor imports it as a plain stylesheet. Both draw through stage.ts, which
+ * builds this markup:
+ *
+ *   .studio-stage                    the root given to createStage
+ *     .studio-canvas                 the canvas at its px size, scaled to fit
+ *       .studio-layer                one per layer shown, data-layer its id:
+ *                                    the whole canvas, its z-index
+ *         .studio-element.studio-<kind>
+ *                                    one per element, data-element its id:
+ *                                    its box, z-index in the layer, opacity,
+ *                                    rotation (a transform),
+ *                                    --studio-color, --studio-radius and
+ *                                    a shape's --studio-border;
+ *                                    .studio-waits in the editor on one that
+ *                                    waits for an event
+ *           .studio-body             what moves: .studio-hidden,
+ *                                    .studio-enter-<fade|pop|slide>,
+ *                                    .studio-play-<bounce|shake|pulse>
+ *             text     .studio-text (.studio-bold, .studio-halo), its font,
+ *                      size and alignment inline
+ *             media    img.studio-fill or video.studio-fill
+ *             gift     img.studio-fill
+ *             emote    img.studio-fill
+ *             shape    a rectangle or an ellipse: nothing, the body is
+ *                      painted; the others: svg.studio-figure, one path in
+ *                      px of the box, clipped to itself
+ *             viewer   .studio-avatar (.studio-has-picture), sized inline,
+ *                      holding an img and .studio-initial
+ *             overlay  iframe.studio-embed on stream, .studio-slot in the
+ *                      editor, nothing when it can't load
+ *           A picture that fails to load gets .studio-failed. One that's
+ *           cropped or rounded gets .studio-cut, its place and clip inline.
+ *
+ * It must work in OBS 30's browser (Chromium 103): no :has(), nesting,
+ * subgrid, container queries or color-mix(). Every class starts with studio-,
+ * as the app loads this stylesheet globally. Backgrounds stay transparent and
+ * nothing sets color-scheme: Chromium paints an iframe opaque when its
+ * color-scheme differs from its page's.
+ */
+
+.studio-stage {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Laid out at the canvas's own px, then scaled from its corner */
+.studio-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  transform-origin: 0 0;
+  font-family: "Archivo Variable", sans-serif;
+  line-height: 1.15;
+  /* Keeps the text legible over bright video, like the timer's */
+  --studio-halo: rgb(18 18 18 / 55%);
+}
+
+/* Over the whole canvas, so only its elements catch the pointer, as an
+   embed's page may want it */
+.studio-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.studio-element {
+  position: absolute;
+  pointer-events: auto;
+  --studio-color: #f1f5f9;
+  --studio-radius: 0px;
+}
+
+.studio-body {
+  position: absolute;
+  inset: 0;
+}
+
+/* Gone after a fade, so it can't be seen or catch the pointer */
+.studio-hidden {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s ease-in,
+    visibility 0s linear 0.3s;
+}
+
+/* Text */
+
+.studio-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  color: var(--studio-color);
+  font-weight: 400;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.studio-text.studio-bold {
+  font-weight: 700;
+}
+
+/* On the text itself: set higher up, its em would be that element's size */
+.studio-text.studio-halo {
+  text-shadow:
+    0 0 0.05em var(--studio-halo),
+    0 0.02em 0.12em var(--studio-halo),
+    0 0 0.4em rgb(18 18 18 / 30%);
+}
+
+/* Pictures, videos and embeds */
+
+.studio-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.studio-failed {
+  visibility: hidden;
+}
+
+/* Cropped or rounded: all of the picture, placed inline around the part it
+   keeps, which its clip-path or its circle leaves */
+.studio-cut {
+  position: absolute;
+  max-width: none;
+  object-fit: fill;
+}
+
+/* The border inside the box, so it keeps its size */
+.studio-shape > .studio-body {
+  box-sizing: border-box;
+  border: var(--studio-border, none);
+  background: var(--studio-color);
+  border-radius: var(--studio-radius);
+}
+
+/* A polygon, star, arrow, heart or speech bubble (shapePath): its border is
+   a stroke at twice the width, which its clip-path cuts to the inside */
+.studio-figure {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.studio-embed {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.studio-slot {
+  width: 100%;
+  height: 100%;
+}
+
+/* The viewer's picture, round, or their initial in Paper on Panel */
+
+.studio-viewer > .studio-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.studio-avatar {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #18181b;
+}
+
+.studio-avatar img {
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.studio-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.studio-has-picture img {
+  display: block;
+}
+
+.studio-has-picture .studio-initial {
+  display: none;
+}
+
+/* Entrances, for an element that shows on an event. backwards only, so a
+   finished one leaves the element's own opacity and the hidden fade
+   alone. */
+
+.studio-enter-fade {
+  animation: studio-fade 0.4s ease-out backwards;
+}
+
+.studio-enter-pop {
+  animation: studio-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+.studio-enter-slide {
+  animation: studio-slide 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes studio-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes studio-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+  }
+}
+
+@keyframes studio-slide {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+
+/* Animations, for an element that moves on an event, once each */
+
+.studio-play-bounce {
+  animation: studio-bounce 0.8s ease-out;
+}
+
+.studio-play-shake {
+  animation: studio-shake 0.6s ease-in-out;
+}
+
+.studio-play-pulse {
+  animation: studio-pulse 0.6s ease-in-out;
+}
+
+@keyframes studio-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-12%);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  70% {
+    transform: translateY(-5%);
+  }
+}
+
+@keyframes studio-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15%,
+  55% {
+    transform: translateX(-3%) rotate(-2deg);
+  }
+  35%,
+  75% {
+    transform: translateX(3%) rotate(2deg);
+  }
+}
+
+@keyframes studio-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-enter-pop,
+  .studio-enter-slide {
+    animation-name: studio-fade;
+    animation-timing-function: ease-out;
+  }
+
+  .studio-play-bounce,
+  .studio-play-shake,
+  .studio-play-pulse {
+    animation: none;
+  }
+}

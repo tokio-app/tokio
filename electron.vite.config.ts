@@ -1,8 +1,9 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "electron-vite";
 import { readFileSync } from "fs";
-import { resolve } from "path";
-import type { Plugin } from "vite";
+import { readFile } from "fs/promises";
+import { basename, extname, resolve } from "path";
+import { transformWithEsbuild, type Plugin } from "vite";
 import { CSP } from "./src/main/config/csp";
 
 // NOTE: The bundler drops file header comments, keep this notice in sync with THIRD_PARTY_NOTICES.md.
@@ -27,6 +28,37 @@ function licenseBanner(banner: string): Plugin {
           chunk.code = `${banner}\n${chunk.code}`;
         }
       }
+    },
+  };
+}
+
+/**
+ * `import CODE from "./stage.ts?script"`: the file as the text of a classic
+ * script, for a page main serves to inline. It's compiled alone, not bundled,
+ * so it may only import types; its exports land on a global named after it
+ * (stage.ts → TokioStage). Chromium 103, OBS 30's browser, runs it.
+ * Vitest's main project uses it too.
+ */
+export function inlineScript(): Plugin {
+  return {
+    name: "tokio:script",
+    enforce: "pre",
+    async load(id) {
+      const [file, query] = id.split("?");
+      if (query !== "script") return null;
+      this.addWatchFile(file);
+      const name = basename(file, extname(file));
+      const { code } = await transformWithEsbuild(
+        await readFile(file, "utf8"),
+        file,
+        {
+          loader: "ts",
+          format: "iife",
+          globalName: `Tokio${name[0].toUpperCase()}${name.slice(1)}`,
+          target: "chrome103",
+        },
+      );
+      return `export default ${JSON.stringify(code)};`;
     },
   };
 }
@@ -60,7 +92,7 @@ export default defineConfig({
       // Bundled, so the timer overlay's ?inline font import becomes a data URL
       externalizeDeps: { exclude: ["@fontsource-variable/archivo"] },
     },
-    plugins: [licenseBanner(MAIN_LICENSE_BANNER)],
+    plugins: [licenseBanner(MAIN_LICENSE_BANNER), inlineScript()],
   },
   preload: {
     // A sandboxed preload can't load ES modules.

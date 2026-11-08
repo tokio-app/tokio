@@ -92,8 +92,8 @@ describe("findOverlays", () => {
   });
 
   it("leaves out folders Tokio didn't name", async () => {
-    // Express can't mount these paths, and /alerts/ is Tokio's own.
-    for (const id of ["gift-jar - Copy (2)", "alerts"]) {
+    // Express can't mount these paths, and /alerts/ and /studio/ are Tokio's own.
+    for (const id of ["gift-jar - Copy (2)", "alerts", "studio"]) {
       await overlay(id, {
         "info.yaml": info("Copy"),
         "index.html": "<p></p>",

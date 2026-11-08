@@ -1,4 +1,10 @@
-import { CatalogOverlay, OverlayConfig } from "@/common/schemas";
+import {
+  CatalogOverlay,
+  OverlayConfig,
+  StudioElementSchema,
+  StudioGroupSchema,
+  StudioOverlay,
+} from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -55,6 +61,55 @@ const catalogEntry: CatalogOverlay = {
 };
 
 const config: OverlayConfig = { sections: [], fields: [] };
+
+// A studio overlay that embeds the gift jar
+const studio: StudioOverlay = {
+  id: "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f",
+  name: "Main",
+  size: "portrait",
+  rulers: false,
+  guides: { x: [], y: [], locked: false },
+  items: [
+    StudioGroupSchema.parse({
+      kind: "group",
+      id: "L1",
+      elements: [
+        StudioElementSchema.parse({
+          id: "jar",
+          kind: "overlay",
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+          source: { type: "installed", id: "gift-jar" },
+        }),
+      ],
+    }),
+  ],
+};
+
+// What sending the studio views reads besides the overlays
+const studioServices = () => ({
+  storeManagerService: {
+    getStudio: () => [studio],
+    getLiveStats: () => ({ likes: 0, viewers: 0, views: 0 }),
+  },
+  liveService: {
+    getSession: () => ({
+      startedAt: null,
+      totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
+      activity: [],
+    }),
+  },
+  studioService: { kept: () => null },
+  serverService: { sendToClient: vi.fn((_id: string, _data: unknown) => true) },
+});
+
+// Where the studio overlay's embed loads from, in each view sent
+const embedSrcs = (sendToClient: ReturnType<typeof vi.fn>) =>
+  sendToClient.mock.calls.map(
+    ([, message]) => message.data.view.layers[0].elements[0].src,
+  );
 
 // The change is made, but the store file wasn't written.
 const saveError = {
@@ -173,9 +228,24 @@ describe("overlays events", () => {
       const overlayService = {
         remove: vi.fn(async (_id: string) => ({ success, saved })),
         getOverlays: vi.fn(() => [imported]),
+        getGifts: async () => [],
+        getCustomGifts: async () => [],
       };
-      return { h: createHandler({ overlayService }), overlayService };
+      const services = studioServices();
+      return {
+        h: createHandler({ ...services, overlayService }),
+        overlayService,
+        sendToClient: services.serverService.sendToClient,
+      };
     };
+
+    it("stops showing it on the studio overlays that embed it", async () => {
+      const { h, sendToClient } = setup(true);
+
+      await h.invoke(overlays, APP_EVENTS.REMOVE_OVERLAY, { id: "gift-jar" });
+
+      expect(embedSrcs(sendToClient)).toEqual([null]);
+    });
 
     it("removes the overlay and answers with the rest", async () => {
       const { h, overlayService } = setup(true);
@@ -269,13 +339,28 @@ describe("overlays events", () => {
       const overlayService = {
         getOverlays: vi.fn(() => installed),
         getGifts: vi.fn(async () => gifts),
+        getCustomGifts: async () => [],
         installFromCatalog: vi.fn(async (_id: string, _gifts: CustomGift[]) => {
           if (success) overlayService.getOverlays.mockReturnValue(after);
           return { success, saved };
         }),
       };
-      return { h: createHandler({ overlayService }), overlayService, after };
+      const services = studioServices();
+      return {
+        h: createHandler({ ...services, overlayService }),
+        overlayService,
+        after,
+        sendToClient: services.serverService.sendToClient,
+      };
     };
+
+    it("shows it again on the studio overlays that embed it", async () => {
+      const { h, sendToClient } = setup([imported]);
+
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+
+      expect(embedSrcs(sendToClient)).toEqual(["/gift-jar/"]);
+    });
 
     it("installs an overlay that isn't installed", async () => {
       const { h, overlayService, after } = setup([imported]);

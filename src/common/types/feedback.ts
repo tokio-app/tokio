@@ -92,6 +92,11 @@ export enum FEEDBACK_CODES {
   TIMER_SAVE_FAILED = "timer_save_failed",
   TIMER_FAILED = "timer_failed",
 
+  // OVERLAY STUDIO
+  STUDIO_OVERLAY_ADDED = "studio_overlay_added",
+  STUDIO_OVERLAY_REMOVED = "studio_overlay_removed",
+  STUDIO_FAILED = "studio_failed",
+
   // LIVES
   LIVE_DELETED = "live_deleted",
   HISTORY_CLEARED = "history_cleared",

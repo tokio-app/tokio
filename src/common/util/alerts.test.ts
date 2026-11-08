@@ -3,6 +3,7 @@ import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import { describe, expect, it } from "vitest";
 import {
   ALERT_MESSAGE_VARIABLES,
+  countedVariables,
   cutPart,
   formatAlertMessage,
   mediaKind,
@@ -98,5 +99,19 @@ describe("cutPart", () => {
 
   it("starts a cut from before the start at the start", () => {
     expect(cutPart({ start: -2, end: 3 }, 10)).toEqual({ start: 0, stop: 3 });
+  });
+});
+
+describe("countedVariables", () => {
+  it("leaves a Like's viewer and count to alerts, which play each batch", () => {
+    expect(ALERT_MESSAGE_VARIABLES[TOKIO_EVENTS.LIKE]).toEqual([
+      "username",
+      "handle",
+      "count",
+    ]);
+    expect(countedVariables(TOKIO_EVENTS.LIKE)).toEqual([]);
+    expect(countedVariables(TOKIO_EVENTS.GIFT)).toEqual(
+      ALERT_MESSAGE_VARIABLES[TOKIO_EVENTS.GIFT],
+    );
   });
 });

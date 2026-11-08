@@ -13,7 +13,7 @@ Profile sections save through `useEditableSettings`, single fields through `useA
 - Each page is a folder `src/renderer/src/pages/<Page>/` with `index.tsx`, `<page>.module.css`, an optional `helper.ts` and `sections/*Section.tsx`. The router uses hash history. The `new-page` skill has the steps.
 - The router's `defaultErrorComponent` keeps a page's render error inside the page, with the title bar and sidebar.
 - A page opened from another page instead of the sidebar (Official overlays, the tools) gets a path under its parent's (`/overlays/official`, `/tools/fans`), which keeps the parent's sidebar item active, and a `BackButton` (`components/BackButton`) before its first heading (`Section`'s `icon`).
-- Tools is a list of its tools, one row each (Countdown timer, Coin stats, Fans, Test overlays): a link named by the tool, with what the tool holds now on the right in the readout. No icons, chevrons or cards, the user's pick. A new tool gets a page under `/tools/` and a row there.
+- Tools is a list of its tools, one row each (Countdown timer, Overlay Studio, Coin stats, Fans, Test overlays): a link named by the tool, with what the tool holds now on the right in the readout. No icons, chevrons or cards, the user's pick. A new tool gets a page under `/tools/` and a row there.
 - Build pages from `components/Page` (`Page`, `Section`, `Field`, `FormGrid`, `EmptyState`); a page module only holds page-specific layout.
 - Every text on screen comes from the locale files through `useT()`, and lint fails on text written into JSX: see `.claude/rules/i18n.md`. Leave room for Spanish, which runs about 25% longer.
 - Components are folders with `index.tsx` and `<name>.module.css`, re-exported from `components/index.tsx`. Use the primitives in `components/Elements` before creating new ones; they take colors from the tokens, not props.
@@ -48,6 +48,7 @@ The look follows the `frontend-design` skill. The palette's values and the logos
 - **Never:** shadows on cards, pills, or uppercase labels.
 - Type is Archivo (`@fontsource-variable/archivo`, imported by `base.css`), at 400 for text, 500 for labels and controls, 600 for titles. Live numbers (Home's stats and totals) use the readout: `font-stretch: var(--stretch-readout)`, 700, `tabular-nums`.
 - A page of settings uses `<Page width="wide" layout="aside">`: each section's header sits in a column beside its content. `Section` wraps the content in `.section_body`, which is `display: contents` in the stacked layout.
+- `<Page width="full">` drops the max width, for an editor whose canvas is the page (Overlay Studio's, see `.claude/rules/studio.md`).
 - Section descriptions are a few words, not explanations, and a section's actions go on the title's row as icon buttons with a `title` (text buttons don't fit there). The user's call. Fans' **Super Fans only** `Toggle` sits there too, the user's request.
 - `TitleBar`'s `live` prop (Layout passes the `CONNECTED` reply's `live`, see `.claude/rules/live-session.md`) draws the tally on every page: a rose line at the top's center, fading out to both sides, with no "LIVE" label (the user's call). "LIVE" is said only to screen readers.
 - The sidebar shows icons only. Each page's name is a span in its link, shown beside the icon on hover and keyboard focus. Opacity hides it, not `visibility`, so it still names the link. Escape hides it until the pointer or focus moves to another link (WCAG 1.4.13).
@@ -62,6 +63,6 @@ The look follows the `frontend-design` skill. The palette's values and the logos
 - Known limit: a media element's controls live in its shadow DOM, so Tab from a video moves on to the next control rather than through them.
 - Don't remove focus outlines. Anything without its own focus style gets `base.css`'s rose `:focus-visible` ring, drawn inset on the title bar's controls and in the sidebar. Inputs show a rose border. `Toggle` draws the ring on its track.
 - `Select` is a combobox with a listbox. Its `OPTION_HEIGHT` is the item's `--control-height` plus the row's 2px padding on each side, so change them together.
-- Number fields use `NumberInput`, which can be emptied while typing and reports only valid numbers. It compares values with `Object.is`, so NaN (an overlay number setting saved as text) shows an empty field.
+- Number fields use `NumberInput`, which can be emptied while typing and reports only valid numbers. With `scrub` (Overlay Studio's editor) it also drags its value while pressed. It compares values with `Object.is`, so NaN (an overlay number setting saved as text) shows an empty field.
 - Something hidden only by CSS also needs `tabIndex={-1}` and `aria-hidden`.
 - A menu under a toggle button (`ProfileDropdown`, `NotificationBell`) takes its state from `useMenu`: it closes on a click outside its `ref`, and on Escape, which gives the focus back to `toggleRef`.

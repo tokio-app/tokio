@@ -4,6 +4,9 @@ import {
   GameAction,
   Profile,
   SavedEmote,
+  StudioElementSchema,
+  StudioGroupSchema,
+  StudioOverlay,
   TimerSettingsSchema,
 } from "@/common/schemas";
 import {
@@ -33,6 +36,7 @@ import {
 import {
   defaultProfile,
   defaultStoreData,
+  formatStat,
   generateTikTokEventSample,
   timerTriggers,
 } from "@/common/util";
@@ -48,6 +52,7 @@ import { LiveService } from "@/services/live";
 import type { MusicService } from "@/services/music";
 import type { OverlayService } from "@/services/overlay";
 import type { StoreManagerService } from "@/services/store";
+import { StudioService } from "@/services/studio";
 import type { TimerService } from "@/services/timer";
 import { TIMER_EVENTS } from "@/services/timer";
 import type { TTSService } from "@/services/tts";
@@ -260,6 +265,7 @@ function setup() {
     initialize: vi.fn(),
     getGifts: vi.fn(async (): Promise<CustomGift[]> => []),
     getCustomGifts: vi.fn(async (): Promise<CustomGift[]> => []),
+    getOverlays: vi.fn((): { id: string }[] => []),
     load: vi.fn(async (_gifts: CustomGift[]) => {}),
     refreshGifts: vi.fn(async (_gifts: CustomGift[]) => {}),
     recordGift: vi.fn(
@@ -270,8 +276,12 @@ function setup() {
       }),
     ),
   };
+  const studio: StudioOverlay[] = [];
+  const stats = { ...noStats };
   const storeManagerService = {
     setLogFile: vi.fn(),
+    getStudio: () => studio,
+    getLiveStats: () => stats,
     initialize: vi.fn(
       async (..._args: Parameters<StoreManagerService["initialize"]>) => {},
     ),
@@ -363,6 +373,7 @@ function setup() {
     clear: vi.fn(),
   };
   const yamlManagerService = { setLogFile: vi.fn() };
+  const studioService = new StudioService();
 
   const h = createHandler({
     pathManagerService,
@@ -382,6 +393,7 @@ function setup() {
     fansService,
     historyService,
     gamesService,
+    studioService,
     trayService,
     yamlManagerService,
   });
@@ -410,6 +422,9 @@ function setup() {
     fansService,
     historyService,
     gamesService,
+    studioService,
+    studio,
+    stats,
     trayService,
     yamlManagerService,
   };
@@ -501,7 +516,8 @@ describe("init events", () => {
         source.on.mock.calls.map(([event]) => event);
 
       // MUSIC_CHANGE also fires when a song is queued, so it's left out
-      expect(s.musicService.onSongChange).toHaveBeenCalledOnce();
+      // Once for the alerts and games, once for Overlay Studio
+      expect(s.musicService.onSongChange).toHaveBeenCalledTimes(2);
       expect(subscribed(s.music)).toEqual([]);
       expect(subscribed(s.conn)).not.toContain(TOKIO_EVENTS.MUSIC_CHANGE);
       for (const trigger of triggers) {
@@ -763,7 +779,8 @@ describe("init events", () => {
           profile.games,
         );
       });
-      expect(s.musicService.onSongChange).toHaveBeenCalledOnce();
+      // The alerts and games share one, Overlay Studio has its own
+      expect(s.musicService.onSongChange).toHaveBeenCalledTimes(2);
     });
 
     it("reports an action that fails to run with its trigger's label", async () => {
@@ -1036,6 +1053,237 @@ describe("init events", () => {
           { id: "action-1" },
         ]);
       });
+    });
+  });
+
+  describe("studio", () => {
+    const ID = "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f";
+    const SOCKET = `studio:${ID}`;
+    const element = (id: string, patch: object) =>
+      StudioElementSchema.parse({
+        id,
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+        kind: "shape",
+        ...patch,
+      });
+    // One group holding the elements
+    const itemsOf = (elements: ReturnType<typeof element>[]) => [
+      StudioGroupSchema.parse({ kind: "group", id: "L1", elements }),
+    ];
+    const withOverlay = (s: Setup, elements: ReturnType<typeof element>[]) => {
+      s.studio.push({
+        id: ID,
+        name: "Main",
+        size: "portrait",
+        rulers: false,
+        guides: { x: [], y: [], locked: false },
+        items: itemsOf(elements),
+      });
+    };
+    // What the studio overlay's page got of a kind of message, in order
+    const studioSent = (s: Setup, type: string) =>
+      s.serverService.sendToClient.mock.calls.flatMap(([id, message]) =>
+        id === SOCKET && message.type === type ? [message.data] : [],
+      );
+    const texts = (s: Setup) =>
+      studioSent(s, "tokio:studio").map(
+        (data: any) =>
+          data.view?.layers.flatMap((l: any) =>
+            l.elements.map((e: any) => e.text),
+          ) ?? null,
+      );
+    const connect = (s: Setup, id: string) => {
+      for (const [listener] of s.serverService.onConnect.mock.calls) {
+        listener(id);
+      }
+    };
+
+    it("sends a studio overlay's view when its page connects, null when it's gone", async () => {
+      const s = await live();
+      withOverlay(s, [element("t", { kind: "text", text: "Hi" })]);
+      s.serverService.sendToClient.mockClear();
+
+      connect(s, SOCKET);
+      connect(s, "studio:gone");
+
+      await vi.waitFor(() => expect(texts(s)).toEqual([["Hi"]]));
+      expect(s.serverService.sendToClient).toHaveBeenCalledWith("studio:gone", {
+        type: "tokio:studio",
+        data: { view: null },
+      });
+    });
+
+    it("plays a layer's react on its page, after the stats hold the event", async () => {
+      const s = await live();
+      withOverlay(s, [
+        element("t", {
+          kind: "text",
+          when: "event",
+          trigger: { type: TOKIO_EVENTS.LIKE, gifts: [] },
+          likes_every: 1,
+          text: "{username}: {likes}",
+        }),
+      ]);
+      // The stats' listener comes first, as in the app
+      s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>
+        Object.assign(s.stats, data),
+      );
+
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(2500));
+
+      expect(studioSent(s, "tokio:studio:react")).toEqual([
+        { element: "t", text: "Viewer: 2.5K" },
+      ]);
+    });
+
+    it("plays an emote layer on a chat, and a Music layer on a song change", async () => {
+      const s = await live();
+      withOverlay(s, [
+        element("e", {
+          when: "animate",
+          trigger: { type: EMOTE_TRIGGER, gifts: [] },
+        }),
+        element("m", {
+          when: "animate",
+          trigger: { type: TOKIO_EVENTS.MUSIC_CHANGE, gifts: [] },
+        }),
+      ]);
+      const songChange = s.musicService.onSongChange.mock.calls.at(-1)![0];
+
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hi", [emote("1")]));
+      songChange([]);
+
+      expect(studioSent(s, "tokio:studio:react")).toEqual([
+        { element: "e" },
+        { element: "m" },
+      ]);
+    });
+
+    it("reports a layer that fails to react", async () => {
+      const s = await live();
+      vi.spyOn(s.studioService, "handle").mockImplementation(() => {
+        throw new Error("boom");
+      });
+
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+
+      expect(noticesFor(s, FEEDBACK_CODES.STUDIO_FAILED)).toMatchObject([
+        {
+          message:
+            "Unable to show the Follow event in your Overlay Studio overlays.",
+        },
+      ]);
+    });
+
+    it("sends the live numbers again, throttled, only to overlays that show one", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      withOverlay(s, [
+        element("t", { kind: "text", text: "{viewers} watching" }),
+      ]);
+      s.studio.push({
+        id: "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60",
+        name: "Plain",
+        size: "portrait",
+        rulers: false,
+        guides: { x: [], y: [], locked: false },
+        items: itemsOf([element("p", { kind: "text", text: "Hi" })]),
+      });
+      s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>
+        Object.assign(s.stats, data),
+      );
+      s.serverService.sendToClient.mockClear();
+
+      s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(100, 10));
+      await vi.advanceTimersByTimeAsync(0);
+      s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(100, 11));
+      s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(100, 12));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(texts(s)).toEqual([["10 watching"]]);
+
+      await vi.advanceTimersByTimeAsync(250);
+      expect(texts(s)).toEqual([["10 watching"], ["12 watching"]]);
+      // The plain overlay never gets one
+      expect(
+        s.serverService.sendToClient.mock.calls.every(
+          ([id]) => id === SOCKET || !id.startsWith("studio:"),
+        ),
+      ).toBe(true);
+    });
+
+    it("counts the session's followers while LIVE", async () => {
+      const s = await live();
+      withOverlay(s, [element("t", { kind: "text", text: "{followers} new" })]);
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      await flushPromises();
+      s.serverService.sendToClient.mockClear();
+
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+
+      await vi.waitFor(() => expect(texts(s)).toEqual([["1 new"]]));
+    });
+
+    it("sends zeros when the LIVE ends, after any push waiting", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      withOverlay(s, [element("t", { kind: "text", text: "{likes}" })]);
+      s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>
+        Object.assign(s.stats, data),
+      );
+      const clear = vi.spyOn(s.studioService, "clear");
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(2000));
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(3000));
+      await vi.advanceTimersByTimeAsync(0);
+      s.serverService.sendToClient.mockClear();
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(texts(s)).toEqual([["0"]]);
+      expect(clear).toHaveBeenCalled();
+    });
+
+    it("sends the views again once a custom gift is saved", async () => {
+      const s = await live();
+      withOverlay(s, [element("g", { kind: "gift", gift: lion.value })]);
+      s.overlayService.recordGift.mockResolvedValue({
+        success: true,
+        data: [lion],
+      });
+      s.overlayService.getCustomGifts.mockResolvedValue([lion]);
+      s.serverService.sendToClient.mockClear();
+
+      s.conn.emit(TOKIO_EVENTS.GIFT, giftEvent("6369", "Lion"));
+
+      await vi.waitFor(() =>
+        expect(studioSent(s, "tokio:studio")).toMatchObject([
+          { view: { layers: [{ elements: [{ src: "lion.png" }] }] } },
+        ]),
+      );
+    });
+
+    it("keeps every live event under Node's 10 listeners", async () => {
+      const s = await live();
+
+      for (const event of Object.values(TOKIO_EVENTS)) {
+        expect(s.conn.listeners(event)).toBeLessThanOrEqual(10);
+      }
+    });
+
+    it("sends the views again in a new language", async () => {
+      const s = await live();
+      withOverlay(s, [element("t", { kind: "text", text: "{likes}" })]);
+      s.stats.likes = 1500;
+      s.serverService.sendToClient.mockClear();
+
+      setLanguage("es-419");
+
+      await vi.waitFor(() =>
+        expect(texts(s)).toEqual([[formatStat(1500, "es-419").short]]),
+      );
     });
   });
 

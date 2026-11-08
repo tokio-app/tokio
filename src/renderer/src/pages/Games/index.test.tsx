@@ -674,6 +674,18 @@ describe("Games", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("offers a Like action no viewer or count", async () => {
+    const { trigger } = createAction("bedrock");
+    await load([
+      action("a1", { trigger: { ...trigger, type: TOKIO_EVENTS.LIKE } }),
+    ]);
+
+    const panel = panels()[0];
+    for (const name of ["{username}", "{handle}", "{count}"]) {
+      expect(panel.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+  });
+
   it("filters chat by keyword, joins by viewer, and counts likes", async () => {
     const { trigger } = createAction("bedrock");
     const { user } = await load([

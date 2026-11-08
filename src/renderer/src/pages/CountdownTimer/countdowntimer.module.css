@@ -29,6 +29,13 @@
     color-mix(in srgb, var(--background-primary) 55%, transparent);
 }
 
+/* Only the overlay, for an element in Overlay Studio's canvas */
+.preview_bare {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
 .preview_title {
   max-width: 100%;
   font-size: var(--font-2xl);
