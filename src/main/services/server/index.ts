@@ -268,11 +268,13 @@ export class ServerService extends Service {
     Object.values(TOKIO_EVENTS)
       .filter(isLiveEvent)
       .forEach((event: TOKIO_EVENTS) => {
-        const handler = (data: TokioEventMap[TOKIO_EVENTS]) =>
-          this.broadcast(event, data);
-        connectorService.on(event, handler);
-        musicService.on(event, handler);
+        connectorService.on(event, (data: TokioEventMap[TOKIO_EVENTS]) =>
+          this.broadcast(event, data),
+        );
       });
+    musicService.on(TOKIO_EVENTS.MUSIC_CHANGE, (data) =>
+      this.broadcast(TOKIO_EVENTS.MUSIC_CHANGE, data),
+    );
   }
 
   /** Calls the listener with each overlay's id as it connects. */

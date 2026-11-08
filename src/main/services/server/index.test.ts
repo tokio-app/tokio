@@ -715,6 +715,10 @@ describe("ServerService", () => {
       });
     });
 
+    it("listens to the music service only for music changes", () => {
+      expect([...musicEvents.keys()]).toEqual([TOKIO_EVENTS.MUSIC_CHANGE]);
+    });
+
     it("sends to a single overlay by id", async () => {
       const a = await connect("a");
       const b = await connect("b");
