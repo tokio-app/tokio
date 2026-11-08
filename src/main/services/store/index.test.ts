@@ -1011,6 +1011,28 @@ describe("StoreManagerService", () => {
       expect((await store.getProfileData())?.name).toBe("Default");
     });
 
+    it("holds an update the old profile got while the switch was saving when it can't be saved", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      await store.getProfileData();
+      const release = holdStoreSave(false);
+
+      const switching = store.updateActiveProfile("stream.json");
+      await vi.waitFor(() =>
+        expect(store.getSettings().activeProfile.file).toBe("stream.json"),
+      );
+      await store.updateProfileData(
+        { connector: { username: "streamer" } },
+        "default.json",
+      );
+      release();
+      expect(await switching).toBe("unsaved");
+
+      const active = await store.getProfileData();
+      expect(active?.name).toBe("Default");
+      expect(active?.connector.username).toBe("streamer");
+    });
+
     it("saves the undone switch over an earlier save that wrote it", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");

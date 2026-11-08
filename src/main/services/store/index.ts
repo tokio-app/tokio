@@ -747,12 +747,12 @@ export class StoreManagerService extends Service {
     // Both together, so a change made while saving reads and writes the new
     // profile, and memory after the save holds that change.
     const previous = this._storeData!.settings.activeProfile;
-    const previousProfile = this._memoryProfile;
     this._storeData!.settings.activeProfile = entity;
     this._memoryProfile = profile;
     if (!(await this._queueSave())) {
       this._storeData!.settings.activeProfile = previous;
-      this._memoryProfile = previousProfile;
+      // Read again: an update given the old profile's file may have landed.
+      this._memoryProfile = null;
       // An earlier save still queued may have written the switch.
       void this._queueSave();
       return "unsaved";
