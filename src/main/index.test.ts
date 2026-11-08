@@ -1,6 +1,6 @@
 import { APP_EVENTS_RESPONSE, FEEDBACK_CODES } from "@/common/types";
 import type { AppHandlerVariables } from "@/types";
-import { app, net, protocol, windows } from "@test/electron";
+import { app, Menu, net, protocol, windows } from "@test/electron";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,7 +24,6 @@ const mocks = vi.hoisted(() => {
 vi.mock("@electron-toolkit/utils", () => ({
   electronApp: { setAppUserModelId: vi.fn() },
   is: { dev: false },
-  optimizer: { watchWindowShortcuts: vi.fn() },
 }));
 vi.mock("@/services/alerts", () => ({
   AlertsService: mocks.service("alerts"),
@@ -125,6 +124,18 @@ describe("main process entry", () => {
     expect(
       protocol.registerSchemesAsPrivileged.mock.invocationCallOrder[0],
     ).toBeLessThan(app.whenReady.mock.invocationCallOrder[0]);
+  });
+
+  it("turns off the menu's zoom once the app is ready", async () => {
+    const zoomIn = { role: "zoomIn", enabled: true };
+    const reload = { role: "reload", enabled: true };
+    Menu.getApplicationMenu.mockReturnValue(
+      Menu.buildFromTemplate([zoomIn, reload]),
+    );
+    await start();
+
+    // Reload stays while unpackaged, for development
+    expect([zoomIn.enabled, reload.enabled]).toEqual([false, true]);
   });
 
   it("opens the splash and the main window with the preload", async () => {

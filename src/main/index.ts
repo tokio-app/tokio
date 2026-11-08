@@ -2,6 +2,7 @@ import { APP_EVENTS_RESPONSE } from "@/common/types";
 import { formatError, MEDIA_SCHEME, mediaKind } from "@/common/util";
 import { Notifier } from "@/helper/feedback";
 import { language, savedLanguage, setLanguage } from "@/helper/i18n";
+import { lockMenu } from "@/helper/menu";
 import {
   mediaFile,
   previewFile,
@@ -30,11 +31,12 @@ import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
 import { URLManagerService } from "@/services/url";
-import { electronApp, is, optimizer } from "@electron-toolkit/utils";
+import { electronApp, is } from "@electron-toolkit/utils";
 import {
   app,
   BrowserWindow,
   ipcMain,
+  Menu,
   net,
   protocol,
   session,
@@ -201,9 +203,23 @@ app.whenReady().then(async () => {
   if (!primary) return;
   electronApp.setAppUserModelId("com.ialfaro.tokio");
 
-  app.on("browser-window-created", (_, window) => {
-    optimizer.watchWindowShortcuts(window);
-  });
+  // The menu can't zoom the window, nor reload it or open DevTools once
+  // packaged, and every page still gets those keys: Overlay Studio zooms
+  // and shows its rulers with them. electron-toolkit's watchWindowShortcuts
+  // blocked the keys instead, by their place on a US keyboard, so the
+  // editor never got Ctrl+- there, and on a Spanish layout it zoomed the
+  // window.
+  lockMenu(Menu.getApplicationMenu(), app.isPackaged);
+  // DevTools on F12 in development, as electron-toolkit had it
+  if (is.dev) {
+    app.on("browser-window-created", (_, { webContents }) => {
+      webContents.on("before-input-event", (_e, input) => {
+        if (input.type !== "keyDown" || input.code !== "F12") return;
+        if (webContents.isDevToolsOpened()) webContents.closeDevTools();
+        else webContents.openDevTools({ mode: "undocked" });
+      });
+    });
+  }
 
   // Overlay previews, see previewFile and withPreviewStyles. The folders
   // are set when the app loads, before any preview.

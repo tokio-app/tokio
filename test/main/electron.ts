@@ -214,7 +214,12 @@ export class FakeBrowserWindow extends EventEmitter {
   }
 }
 
-export type FakeMenuItem = { label?: string; click?: () => void };
+export type FakeMenuItem = {
+  label?: string;
+  click?: () => void;
+  role?: string;
+  enabled?: boolean;
+};
 
 /** A tray icon: tests click it with emit("click") and read its menu. */
 export class FakeTray extends EventEmitter {
@@ -313,6 +318,8 @@ function createFakes() {
     },
     Menu: {
       buildFromTemplate: vi.fn((items: FakeMenuItem[]) => ({ items })),
+      // Electron's default menu, which a test can hand the code
+      getApplicationMenu: vi.fn((): { items: FakeMenuItem[] } | null => null),
     },
     // Images only say what they were made from
     nativeImage: {
