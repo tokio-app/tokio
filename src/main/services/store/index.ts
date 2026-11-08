@@ -605,9 +605,22 @@ export class StoreManagerService extends Service {
         profileFile,
       );
       // Fresh, so the items changed aren't older than an update still writing
-      const profile = active
-        ? await this.getProfileData({ fresh: true })
-        : await this._jsonManagerService.loadFile(path, ProfileSchema);
+      let profile: Profile | null;
+      try {
+        profile = active
+          ? await this.getProfileData({ fresh: true })
+          : (await this._readChecked(path, ProfileSchema)).data;
+      } catch (error) {
+        // A missing or broken file can't use the file, one held for a moment
+        // might.
+        Logger.error(
+          `<System> Unable to read the profile ${path} -- ${formatError(error)}`,
+          this._logFile,
+          error,
+        );
+        saved = false;
+        continue;
+      }
       const updates = profile && change(profile);
       if (!updates) continue;
 

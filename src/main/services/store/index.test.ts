@@ -1663,6 +1663,24 @@ describe("StoreManagerService", () => {
       // A profile without it saves nothing
       expect(await store.removeFromGames("creeper.png")).toBe(true);
     });
+
+    it("says so when another profile can't be read, but not when it's broken", async () => {
+      vi.spyOn(Logger, "error");
+      const store = await init();
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+      await store.createNewProfile("stream.json", "Stream");
+      await store.updateProfileData(
+        withActions(gameAction("a", tnt)),
+        "stream.json",
+      );
+      busy.add(stream);
+
+      expect(await store.removeFromGames("tnt.png")).toBe(false);
+      expect(images(await readJSON(stream))).toEqual([tnt]);
+
+      await writeFile(stream, "{ oops");
+      expect(await store.removeFromGames("tnt.png")).toBe(true);
+    });
   });
 
   describe("test overlays", () => {
