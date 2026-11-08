@@ -101,10 +101,13 @@ describe("elementName", () => {
     ).toBe("Gift jar");
   });
 
-  it("falls back to its kind", () => {
+  it("falls back to its kind, and calls a shape by its shape", () => {
     expect(elementName(element("text"), context)).toBe("Text");
     expect(elementName(element("gift", { gift: 1 }), context)).toBe("Gift");
-    expect(elementName(element("shape"), context)).toBe("Shape");
+    expect(elementName(element("shape"), context)).toBe("Rectangle");
+    expect(elementName(element("shape", { shape: "bubble" }), context)).toBe(
+      "Speech bubble",
+    );
     expect(elementName(element("viewer"), context)).toBe("Viewer's picture");
     expect(elementName(element("overlay"), context)).toBe("Overlay");
   });

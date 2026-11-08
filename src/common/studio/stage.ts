@@ -5,6 +5,7 @@
  * Type imports only: main inlines this file into its page through esbuild
  * without bundling it. Nothing newer than Chromium 103, OBS 30's browser.
  */
+import type { StudioShape } from "../schemas/studio";
 import type {
   StudioElementView,
   StudioReact,
@@ -124,6 +125,126 @@ const partOf = (element: StudioElementView, duration: number) => {
 const once = (element: StudioElementView) =>
   element.kind === "media" && !element.loop;
 
+// The shapes a body's own paint can't draw, as SVG
+export type Figure = Exclude<StudioShape, "rectangle" | "ellipse">;
+
+type Point = [number, number];
+
+const hundredths = (n: number) => Math.round(n * 100) / 100;
+
+const polygonPath = (corners: Point[]) =>
+  `M${corners.map(([x, y]) => `${hundredths(x)} ${hundredths(y)}`).join("L")}Z`;
+
+// Corners around a middle, the first pointing up, each at its distance
+const around = (count: number, distance: (i: number) => number): Point[] =>
+  Array.from({ length: count }, (_, i) => {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / count;
+    return [Math.cos(angle) * distance(i), Math.sin(angle) * distance(i)];
+  });
+
+// The corners stretched so their bounds fill the box
+const fitted = (corners: Point[], width: number, height: number): Point[] => {
+  const xs = corners.map(([x]) => x);
+  const ys = corners.map(([, y]) => y);
+  const left = Math.min(...xs);
+  const top = Math.min(...ys);
+  const across = Math.max(...xs) - left;
+  const down = Math.max(...ys) - top;
+  return corners.map(([x, y]) => [
+    ((x - left) / across) * width,
+    ((y - top) / down) * height,
+  ]);
+};
+
+// A star's inner corners, a share of the outer ones' distance, as Figma's
+const STAR_RATIO = 0.382;
+
+/**
+ * A shape's outline in px of its box, filling it: a polygon's or a star's
+ * corners touching its sides, an arrow pointing right, a heart, a speech
+ * bubble with its tail at the bottom left. The editor's thumbnails draw it
+ * too.
+ */
+export function shapePath(
+  shape: Figure,
+  width: number,
+  height: number,
+  { sides, points, radius }: { sides: number; points: number; radius: number },
+): string {
+  const w = width;
+  const h = height;
+  const at = (x: number, y: number) => `${hundredths(x)} ${hundredths(y)}`;
+  switch (shape) {
+    case "polygon":
+      return polygonPath(
+        fitted(
+          around(sides, () => 1),
+          w,
+          h,
+        ),
+      );
+    case "star":
+      return polygonPath(
+        fitted(
+          around(points * 2, (i) => (i % 2 ? STAR_RATIO : 1)),
+          w,
+          h,
+        ),
+      );
+    case "arrow": {
+      // Its head as long as the box is tall, at most half its width
+      const head = w - Math.min(h, w / 2);
+      return polygonPath([
+        [0, h / 4],
+        [head, h / 4],
+        [head, 0],
+        [w, h / 2],
+        [head, h],
+        [head, (h * 3) / 4],
+        [0, (h * 3) / 4],
+      ]);
+    }
+    case "heart": {
+      const p = (x: number, y: number) => at(x * w, y * h);
+      return (
+        `M${p(0.5, 1)}` +
+        `C${p(0.2, 0.78)} ${p(0, 0.58)} ${p(0, 0.31)}` +
+        `C${p(0, 0.12)} ${p(0.13, 0)} ${p(0.28, 0)}` +
+        `C${p(0.39, 0)} ${p(0.47, 0.07)} ${p(0.5, 0.17)}` +
+        `C${p(0.53, 0.07)} ${p(0.61, 0)} ${p(0.72, 0)}` +
+        `C${p(0.87, 0)} ${p(1, 0.12)} ${p(1, 0.31)}` +
+        `C${p(1, 0.58)} ${p(0.8, 0.78)} ${p(0.5, 1)}Z`
+      );
+    }
+    // The bubble
+    default: {
+      // Its body over the tail, which drops from its bottom edge
+      const tail = Math.min(h, w) * 0.25;
+      const body = h - tail;
+      const r = Math.max(0, Math.min(radius, w / 2, body / 2));
+      const from = Math.max(r, w * 0.15);
+      const across = Math.max(0, Math.min(tail, w - r - from));
+      const arc = (x: number, y: number) => `A${at(r, r)} 0 0 1 ${at(x, y)}`;
+      return (
+        `M${at(r, 0)}H${hundredths(w - r)}${arc(w, r)}` +
+        `V${hundredths(body - r)}${arc(w - r, body)}` +
+        `H${hundredths(from + across)}L${at(from, h)}L${at(from, body)}` +
+        `H${hundredths(r)}${arc(0, body - r)}V${hundredths(r)}${arc(r, 0)}Z`
+      );
+    }
+  }
+}
+
+const SVG = "http://www.w3.org/2000/svg";
+
+// A shape the body's paint can't draw: one path, in px of its box
+const newFigure = () => {
+  const svg = document.createElementNS(SVG, "svg");
+  svg.setAttribute("class", "studio-figure");
+  svg.append(document.createElementNS(SVG, "path"));
+  return svg;
+};
+
 // Chromium keeps a detached player that still has a source alive
 const release = (video: HTMLVideoElement) => {
   video.pause();
@@ -178,7 +299,7 @@ const newFrame = () => {
 };
 
 // The body's one child of that type, made in place of whatever was there
-function only<T extends HTMLElement>(
+function only<T extends Element>(
   body: HTMLElement,
   type: { new (): T; prototype: T },
   make: () => T,
@@ -537,16 +658,44 @@ export function createStage(
         layoutPicture(img, element, element.crop, element.rounding);
         break;
       }
-      case "shape":
-        el.style.setProperty("--studio-color", element.color ?? "transparent");
-        el.style.setProperty("--studio-radius", `${element.radius}px`);
+      case "shape": {
+        // A rectangle or an ellipse is its painted body, its border inside
+        // it; the others draw as SVG
+        const { shape, color, border } = element;
+        const painted = shape === "rectangle" || shape === "ellipse";
+        el.style.setProperty(
+          "--studio-color",
+          painted && color ? color : "transparent",
+        );
+        el.style.setProperty(
+          "--studio-radius",
+          shape === "ellipse" ? "50%" : `${element.radius}px`,
+        );
         el.style.setProperty(
           "--studio-border",
-          element.border
-            ? `${element.border.width}px solid ${element.border.color}`
+          painted && border
+            ? `${border.width}px solid ${border.color}`
             : "none",
         );
+        if (shape === "rectangle" || shape === "ellipse") {
+          body.firstElementChild?.remove();
+          break;
+        }
+        const figure = only(body, SVGSVGElement, newFigure);
+        const path = figure.firstElementChild!;
+        const d = shapePath(shape, element.width, element.height, element);
+        figure.setAttribute(
+          "viewBox",
+          `0 0 ${element.width} ${element.height}`,
+        );
+        path.setAttribute("d", d);
+        path.setAttribute("fill", color ?? "none");
+        // At twice its width, cut to the shape: a border inside its edge
+        path.setAttribute("stroke", border?.color ?? "none");
+        path.setAttribute("stroke-width", String((border?.width ?? 0) * 2));
+        figure.style.clipPath = `path("${d}")`;
         break;
+      }
       case "viewer": {
         const avatar = only(body, HTMLDivElement, makeAvatar);
         const side = Math.min(element.width, element.height);

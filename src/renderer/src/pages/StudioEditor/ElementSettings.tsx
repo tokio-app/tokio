@@ -37,6 +37,7 @@ import { ReactNode, useRef } from "react";
 import { BoxFields } from "./BoxFields";
 import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
 import { PictureFields } from "./PictureFields";
+import { ShapeFields } from "./ShapeFields";
 import styles from "./studioeditor.module.css";
 import { VideoFields } from "./VideoFields";
 
@@ -341,6 +342,7 @@ export function ElementSettings({
     case "shape":
       own = (
         <>
+          <ShapeFields element={element} onChange={onChange} />
           {/* Each on or off, its color beside it */}
           <div className={styles.paint}>
             <div
@@ -398,14 +400,6 @@ export function ElementSettings({
               )}
             </div>
           </div>
-          <Field label={t("studio.fields.radius")}>
-            <NumberInput
-              scrub
-              min={0}
-              value={element.radius}
-              onChange={(radius) => onChange({ ...element, radius })}
-            />
-          </Field>
         </>
       );
       break;

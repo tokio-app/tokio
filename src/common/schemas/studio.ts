@@ -33,6 +33,17 @@ const STUDIO_ANIMATIONS = ["bounce", "shake", "pulse"] as const;
 // A text's alignment in its box
 const STUDIO_ALIGNS = ["left", "center", "right"] as const;
 
+// What a shape element draws, filling its box
+export const STUDIO_SHAPES = [
+  "rectangle",
+  "ellipse",
+  "polygon",
+  "star",
+  "arrow",
+  "heart",
+  "bubble",
+] as const;
+
 // The most groups an overlay holds
 export const STUDIO_MAX_GROUPS = 100;
 // The most elements an overlay holds, in groups or on their own: each
@@ -48,6 +59,8 @@ export const STUDIO_MAX_SECONDS = 60;
 export const STUDIO_MAX_FONT_SIZE = 400;
 // The widest shape border, in px of the canvas
 export const STUDIO_MAX_BORDER = 100;
+// The most sides a polygon has, and points a star
+export const STUDIO_MAX_CORNERS = 12;
 // The most guides an overlay keeps across, and as many down
 export const STUDIO_MAX_GUIDES = 50;
 
@@ -166,6 +179,10 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
   z.object({
     ...ELEMENT,
     kind: z.literal("shape"),
+    shape: z.enum(STUDIO_SHAPES).default("rectangle"),
+    // A polygon's, and a star's
+    sides: z.number().int().min(3).max(STUDIO_MAX_CORNERS).default(3),
+    points: z.number().int().min(3).max(STUDIO_MAX_CORNERS).default(5),
     // Painted inside, unless fill is off
     fill: z.boolean().default(true),
     color: ColorSchema.default("#18181b"),
@@ -173,7 +190,7 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     border: z.boolean().default(false),
     border_color: ColorSchema.default("#f1f5f9"),
     border_width: z.number().min(1).max(STUDIO_MAX_BORDER).default(4),
-    // px of the canvas
+    // A rectangle's and a speech bubble's corners, px of the canvas
     radius: z.number().min(0).default(24),
   }),
   // The picture of the viewer who set off its trigger, or their initial: its
@@ -382,5 +399,6 @@ export type StudioWhen = StudioElement["when"];
 export type StudioEntrance = StudioElement["entrance"];
 export type StudioAnimation = StudioElement["animation"];
 export type StudioAlign = StudioElementOf<"text">["align"];
+export type StudioShape = StudioElementOf<"shape">["shape"];
 // What an overlay element frames
 export type StudioSource = NonNullable<StudioElementOf<"overlay">["source"]>;

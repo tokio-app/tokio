@@ -3,6 +3,7 @@ import type {
   StudioAnimation,
   StudioCrop,
   StudioEntrance,
+  StudioShape,
   StudioSource,
   StudioWhen,
 } from "../schemas/studio";
@@ -63,9 +64,13 @@ export type StudioElementView = StudioElementViewBase &
       } & StudioPictureView)
     | ({ kind: "gift"; src: string | null } & StudioPictureView)
     | ({ kind: "emote"; src: string | null } & StudioPictureView)
-    // color null without a fill, border null without one
+    // color null without a fill, border null without one; sides are a
+    // polygon's, points a star's and radius a rectangle's or a bubble's
     | {
         kind: "shape";
+        shape: StudioShape;
+        sides: number;
+        points: number;
         color: string | null;
         radius: number;
         border: { color: string; width: number } | null;

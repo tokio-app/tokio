@@ -1,4 +1,5 @@
 import { StudioCrop, StudioElement } from "@/common/schemas";
+import { shapePath } from "@/common/studio/stage";
 import { CustomGift } from "@/common/types";
 import { MediaThumbnail } from "@/components";
 import { useT } from "@/ui/i18n";
@@ -64,21 +65,50 @@ export function LayerThumb({
         </span>
       );
     case "shape": {
+      const { shape } = element;
       const scale = SHAPE_PX / Math.max(element.width, element.height);
+      const width = Math.max(2, element.width * scale);
+      const height = Math.max(2, element.height * scale);
+      const border = Math.max(1, element.border_width * scale);
+      if (shape === "rectangle" || shape === "ellipse") {
+        return (
+          <span className={styles.thumb} aria-hidden>
+            <span
+              className={styles.thumb_shape}
+              style={{
+                width,
+                height,
+                borderRadius:
+                  shape === "ellipse" ? "50%" : element.radius * scale,
+                backgroundColor: element.fill ? element.color : "transparent",
+                border: element.border
+                  ? `${border}px solid ${element.border_color}`
+                  : undefined,
+              }}
+            />
+          </span>
+        );
+      }
+      // As the stage draws it: a stroke at twice the width, cut to the shape
+      const d = shapePath(shape, width, height, {
+        ...element,
+        radius: element.radius * scale,
+      });
       return (
         <span className={styles.thumb} aria-hidden>
-          <span
-            className={styles.thumb_shape}
-            style={{
-              width: Math.max(2, element.width * scale),
-              height: Math.max(2, element.height * scale),
-              borderRadius: element.radius * scale,
-              backgroundColor: element.fill ? element.color : "transparent",
-              border: element.border
-                ? `${Math.max(1, element.border_width * scale)}px solid ${element.border_color}`
-                : undefined,
-            }}
-          />
+          <svg
+            width={width}
+            height={height}
+            viewBox={`0 0 ${width} ${height}`}
+            style={{ clipPath: `path("${d}")` }}
+          >
+            <path
+              d={d}
+              fill={element.fill ? element.color : "none"}
+              stroke={element.border ? element.border_color : "none"}
+              strokeWidth={element.border ? border * 2 : 0}
+            />
+          </svg>
         </span>
       );
     }

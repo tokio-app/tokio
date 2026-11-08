@@ -154,7 +154,7 @@ type NameContext = {
 
 /**
  * What the layers list calls an element with no label: what it shows (its
- * text, file, gift, emote or embed), else its kind.
+ * text, file, gift, emote, embed or shape), else its kind.
  */
 export function elementName(
   element: StudioElement,
@@ -172,6 +172,8 @@ export function elementName(
         return context.emotes.find((e) => e.value === element.emote?.id)?.label;
       case "overlay":
         return element.source && context.label(element.source);
+      case "shape":
+        return context.t(`studio.shapes.${element.shape}`);
       default:
         return "";
     }

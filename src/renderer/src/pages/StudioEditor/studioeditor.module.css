@@ -958,6 +958,48 @@
   min-height: var(--control-height);
 }
 
+/* A shape's picker: a tile per shape, the checked one in the rose wash */
+.shapes {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.shape_tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control-height);
+  border-radius: var(--radius-md);
+  background-color: var(--background-secondary);
+  color: var(--font-secondary);
+}
+
+.shape_tile:hover {
+  background-color: var(--background-secondary-hover);
+  color: var(--font-primary);
+}
+
+.shape_tile:has(.shape_input:checked) {
+  background-color: var(--accent-soft);
+  color: var(--accent-primary);
+}
+
+.shape_tile:has(.shape_input:focus-visible) {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Over the whole tile, so a click anywhere on it picks the shape */
+.shape_input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 /* In Seconds' place, at a field's height: how long a video that plays once
    stays */
 .until {

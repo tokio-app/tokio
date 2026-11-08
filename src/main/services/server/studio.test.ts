@@ -62,6 +62,8 @@ const view = (...elements: StudioElementView[]) =>
 
 // What a picture element draws when it keeps all of itself
 const PICTURE = { crop: null, rounding: 0 };
+// A shape element's rectangle
+const RECTANGLE = { shape: "rectangle", sides: 3, points: 5 } as const;
 // A media element's whole video, looping at full volume
 const MEDIA = { start: 0, end: null, loop: true, volume: 100 };
 
@@ -144,6 +146,7 @@ describe("studio overlay page", () => {
             elements: [
               element("s", {
                 kind: "shape",
+                ...RECTANGLE,
                 color: "#18181b",
                 radius: 0,
                 border: null,
@@ -196,6 +199,7 @@ describe("studio overlay page", () => {
           }),
           element("s", {
             kind: "shape",
+            ...RECTANGLE,
             color: "#18181b",
             radius: 24,
             border: null,
@@ -254,7 +258,13 @@ describe("studio overlay page", () => {
         view(
           element(
             "s",
-            { kind: "shape", color: "#18181b", radius: 0, border: null },
+            {
+              kind: "shape",
+              ...RECTANGLE,
+              color: "#18181b",
+              radius: 0,
+              border: null,
+            },
             { when: "animate" },
           ),
         ),

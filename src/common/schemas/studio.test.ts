@@ -79,6 +79,21 @@ describe("StudioElementSchema", () => {
     expect(parses({ volume: 101 })).toBe(false);
   });
 
+  it("makes a shape a rectangle, and keeps a polygon's sides and a star's points to 3 to 12", () => {
+    expect(StudioElementSchema.parse(element({ kind: "shape" }))).toMatchObject(
+      { shape: "rectangle", sides: 3, points: 5 },
+    );
+    const parses = (fields: object) =>
+      StudioElementSchema.safeParse(element({ kind: "shape", ...fields }))
+        .success;
+
+    expect(parses({ shape: "star", sides: 12, points: 3 })).toBe(true);
+    expect(parses({ shape: "line" })).toBe(false);
+    expect(parses({ sides: 2 })).toBe(false);
+    expect(parses({ points: 13 })).toBe(false);
+    expect(parses({ sides: 4.5 })).toBe(false);
+  });
+
   it("refuses a crop whose sides meet, and a rounding past round", () => {
     const parses = (fields: object) =>
       StudioElementSchema.safeParse(element({ kind: "media", ...fields }))

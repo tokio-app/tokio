@@ -258,7 +258,12 @@ describe("StudioEditor", () => {
         .closest("ul")!
         .querySelectorAll("[class*=layer_name]"),
     ].map((name) => name.textContent);
-    expect(names).toEqual([...kinds].reverse());
+    // A shape goes by its shape
+    expect(names).toEqual(
+      [...kinds]
+        .reverse()
+        .map((kind) => (kind === "Shape" ? "Rectangle" : kind)),
+    );
     // A viewer's picture waits for an event
     expect(overlay.items[5]).toMatchObject({ when: "event" });
   });
@@ -347,7 +352,7 @@ describe("StudioEditor", () => {
 
     await waitFor(() => expect(savedGroup(0)?.folded).toBe(true));
     expect(fold).toHaveAttribute("aria-expanded", "false");
-    expect(layers().queryByRole("button", { name: /^Shape/ })).toBeNull();
+    expect(layers().queryByRole("button", { name: /^Rectangle/ })).toBeNull();
     // Main's echo, so unfolding it again is a change to save
     await studio(lastSave()!);
 
@@ -356,23 +361,23 @@ describe("StudioEditor", () => {
     fireEvent.pointerUp(canvas());
 
     await waitFor(() => expect(savedGroup(0)?.folded).toBe(false));
-    expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
+    expect(row(/^Rectangle/)).toHaveAttribute("aria-pressed", "true");
   });
 
   it("lets go of the selection on a click in the list past the items", async () => {
     const shape = elementOf("shape");
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
-    expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
+    await user.click(row(/^Rectangle/));
+    expect(row(/^Rectangle/)).toHaveAttribute("aria-pressed", "true");
 
     // On the group's tray, past its rows, it stays
     await user.click(
       page().getByRole("list", { name: "Group 1" }).closest("li")!,
     );
-    expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
+    expect(row(/^Rectangle/)).toHaveAttribute("aria-pressed", "true");
 
     await user.click(page().getByRole("list", { name: "Elements" }));
-    expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "false");
+    expect(row(/^Rectangle/)).toHaveAttribute("aria-pressed", "false");
     expect(
       page().getByRole("heading", { name: "Overlay settings" }),
     ).toBeVisible();
@@ -405,7 +410,7 @@ describe("StudioEditor", () => {
     const shape = elementOf("shape", { x: 100, y: 200 });
     const { user } = await open(scene(shape));
 
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     canvas().focus();
     await user.keyboard("{ArrowRight}{ArrowRight}{Shift>}{ArrowDown}{/Shift}");
 
@@ -456,7 +461,7 @@ describe("StudioEditor", () => {
       height: 100,
     });
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     sized();
 
     expect(
@@ -486,7 +491,7 @@ describe("StudioEditor", () => {
       height: 100,
     });
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     sized();
 
     // Its center is at 125, 125 on screen: the pointer goes to its right
@@ -528,7 +533,7 @@ describe("StudioEditor", () => {
       height: 100,
     });
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     sized();
 
     // Over the shape, at 125, 125 on screen; past it, nothing to move
@@ -548,7 +553,7 @@ describe("StudioEditor", () => {
   it("flips an element from its settings, the canvas drawing it", async () => {
     const shape = elementOf("shape");
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     const flipX = page().getByRole("button", { name: "Flip horizontally" });
     expect(flipX).toHaveAttribute("aria-pressed", "false");
 
@@ -574,7 +579,7 @@ describe("StudioEditor", () => {
       height: 100,
     });
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     const align = within(
       page().getByRole("group", { name: "Align to the canvas" }),
     );
@@ -593,7 +598,7 @@ describe("StudioEditor", () => {
   it("sets the rotation by number", async () => {
     const shape = elementOf("shape");
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
 
     const input = field("Rotation (°)").getByRole("spinbutton");
     await user.clear(input);
@@ -605,7 +610,7 @@ describe("StudioEditor", () => {
   it("links the width and the height, a dragged field keeping their proportions", async () => {
     const shape = elementOf("shape", { width: 200, height: 150 });
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     const link = page().getByRole("button", { name: "Link width and height" });
     const width = field("Width").getByRole("spinbutton");
 
@@ -642,7 +647,7 @@ describe("StudioEditor", () => {
       height: 100,
     });
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     await user.click(
       page().getByRole("button", { name: "Link width and height" }),
     );
@@ -689,13 +694,13 @@ describe("StudioEditor", () => {
     const { user } = await open(scene(shape));
 
     await user.click(
-      rowOf(/^Shape/).getByRole("button", { name: "Hide element" }),
+      rowOf(/^Rectangle/).getByRole("button", { name: "Hide element" }),
     );
 
     await waitFor(() => expect(savedElement()?.hidden).toBe(true));
     expect(drawn(shape.id)).toBeNull();
     expect(
-      rowOf(/^Shape/).getByRole("button", { name: "Hide element" }),
+      rowOf(/^Rectangle/).getByRole("button", { name: "Hide element" }),
     ).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -1021,7 +1026,7 @@ describe("StudioEditor", () => {
     fireEvent.pointerUp(canvas());
     expect(page().getByRole("heading", { name: "Shape" })).toBeVisible();
     expect(
-      layers().getAllByRole("button", { name: /^Shape/ })[0],
+      layers().getAllByRole("button", { name: /^Rectangle/ })[0],
     ).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -1033,7 +1038,7 @@ describe("StudioEditor", () => {
       height: 100,
     });
     const { user } = await open(holding(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     expect(page().getByRole("heading", { name: "Shape" })).toBeVisible();
     sized();
     // Its own handles, not a group's bare outline
@@ -1072,7 +1077,9 @@ describe("StudioEditor", () => {
     const top = elementOf("shape", { x: 0, y: 0, width: 500, height: 500 });
     const { user } = await open(holding(group("Back", [under]), top));
 
-    const lock = rowOf(/^Shape/).getByRole("button", { name: "Lock element" });
+    const lock = rowOf(/^Rectangle/).getByRole("button", {
+      name: "Lock element",
+    });
     await user.click(lock);
     await waitFor(() =>
       expect(lastSave()?.items[1]).toMatchObject({ locked: true }),
@@ -1086,13 +1093,15 @@ describe("StudioEditor", () => {
     expect(page().getByRole("heading", { name: "Text" })).toBeVisible();
 
     // Picked from the list, it keeps still
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     expect(canvas().querySelector("[data-handle]")).toBeNull();
     canvas().focus();
     await user.keyboard("{ArrowRight}");
     expect(field("X").getByRole("spinbutton")).toHaveValue(0);
 
-    const eye = rowOf(/^Shape/).getByRole("button", { name: "Hide element" });
+    const eye = rowOf(/^Rectangle/).getByRole("button", {
+      name: "Hide element",
+    });
     await user.click(eye);
     await waitFor(() =>
       expect(lastSave()?.items[1]).toMatchObject({ hidden: true }),
@@ -1122,7 +1131,7 @@ describe("StudioEditor", () => {
     expect(page().getByRole("heading", { name: "Text" })).toBeVisible();
 
     // Its outline shows, without the handle, and nothing moves it
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     expect(canvas().querySelector("[class*=selection]")).not.toBeNull();
     expect(canvas().querySelector("[data-handle]")).toBeNull();
     canvas().focus();
@@ -1365,7 +1374,7 @@ describe("StudioEditor", () => {
       deleteButton("Select a group or an element to delete it"),
     ).toBeDisabled();
 
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
     await user.click(deleteButton("Delete element"));
     await waitFor(() => expect(savedGroup(2)?.elements).toEqual([]));
     expect(drawn(c.id)).toBeNull();
@@ -1563,7 +1572,7 @@ describe("StudioEditor", () => {
   it("turns a shape's fill off and a border on", async () => {
     const shape = elementOf("shape");
     const { user } = await open(scene(shape));
-    await user.click(row(/^Shape/));
+    await user.click(row(/^Rectangle/));
 
     await user.click(page().getByRole("checkbox", { name: "Fill" }));
     await user.click(page().getByRole("checkbox", { name: "Border" }));
@@ -1823,7 +1832,7 @@ describe("StudioEditor", () => {
       expect(undo()).toBeDisabled();
       expect(redo()).toBeDisabled();
 
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
       const x = field("X").getByRole("spinbutton");
       await user.clear(x);
       await user.type(x, "300");
@@ -1934,7 +1943,7 @@ describe("StudioEditor", () => {
     it("takes a burst of changes to one field as one step, and a pause or another field as the next", async () => {
       const shape = elementOf("shape", { x: 100, y: 100 });
       const { user } = await open(holding(shape));
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
       const x = field("X").getByRole("spinbutton");
       const y = field("Y").getByRole("spinbutton");
 
@@ -1967,7 +1976,7 @@ describe("StudioEditor", () => {
     it("drops what Redo would bring back once something else changes", async () => {
       const shape = elementOf("shape", { x: 100, y: 100 });
       const { user } = await open(holding(shape));
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
       canvas().focus();
       await user.keyboard("{ArrowRight}");
       await waitFor(() =>
@@ -1991,7 +2000,7 @@ describe("StudioEditor", () => {
     it("leaves a group folded as it is now when it undoes", async () => {
       const shape = elementOf("shape", { x: 100 });
       const { user } = await open(scene(shape));
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
       canvas().focus();
       await user.keyboard("{ArrowRight}");
       await waitFor(() => expect(savedElement()).toMatchObject({ x: 101 }));
@@ -2051,7 +2060,7 @@ describe("StudioEditor", () => {
       const locked = elementOf("emote", { locked: true });
       const { user } = await open(holding(g, a, b, locked));
 
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
       canvas().focus();
       await user.keyboard("{Delete}");
       await waitFor(() =>
@@ -2174,11 +2183,11 @@ describe("StudioEditor", () => {
       fireEvent.pointerUp(canvas());
       fireEvent.keyUp(canvas(), { key: " " });
       expect(canvas().style.cursor).toBe("");
-      expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "false");
+      expect(row(/^Rectangle/)).toHaveAttribute("aria-pressed", "false");
       expect(lastSave()).toBeUndefined();
 
       // A field keeps its Space
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
       const name = field("Name").getByRole("textbox");
       expect(fireEvent.keyDown(name, { key: " " })).toBe(true);
       expect(canvas().style.cursor).not.toBe("grab");
@@ -2187,10 +2196,10 @@ describe("StudioEditor", () => {
     it("keeps the selection on a press on its scrollbars", async () => {
       const { user } = await open(holding(elementOf("shape")));
       sized();
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
 
       fireEvent.pointerDown(scroller(), { button: 0, clientX: 5, clientY: 5 });
-      expect(row(/^Shape/)).toHaveAttribute("aria-pressed", "true");
+      expect(row(/^Rectangle/)).toHaveAttribute("aria-pressed", "true");
     });
 
     it("shows the rulers only while they're on", async () => {
@@ -2271,7 +2280,7 @@ describe("StudioEditor", () => {
     it("cuts the selection, and pastes it back where it was", async () => {
       const shape = elementOf("shape", { x: 100, y: 100 });
       const { user } = await open(holding(shape));
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
 
       expect(key("x")).toBe(false);
       await waitFor(() => expect(lastSave()?.items).toEqual([]));
@@ -2292,7 +2301,7 @@ describe("StudioEditor", () => {
       const main = holding(shape);
       const other = studioOverlay("Other");
       const { user, router } = await open(main);
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
       key("c");
 
       await studio(main, other);
@@ -2312,7 +2321,7 @@ describe("StudioEditor", () => {
 
     it("leaves copy, cut and paste to a field", async () => {
       const { user } = await open(holding(elementOf("shape")));
-      await user.click(row(/^Shape/));
+      await user.click(row(/^Rectangle/));
 
       const x = field("X").getByRole("spinbutton");
       expect(key("c", x)).toBe(true);
@@ -3135,6 +3144,60 @@ describe("StudioEditor", () => {
       await open(holding(text(), clip({ file: "pic.png", name: "pic.png" })));
 
       expect(sound()).toBeDisabled();
+    });
+  });
+
+  describe("shapes", () => {
+    const tiles = () => field("Shape");
+    const picked = () => tiles().getByRole("radio", { checked: true });
+
+    it("picks a shape from its tiles, each with the number it takes", async () => {
+      const { user } = await open(holding(elementOf("shape")));
+      await user.click(row(/^Rectangle/));
+      expect(picked()).toHaveAccessibleName("Rectangle");
+      expect(field("Corner radius").getByRole("spinbutton")).toBeVisible();
+
+      await user.click(tiles().getByRole("radio", { name: "Star" }));
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ shape: "star" }),
+      );
+      expect(page().queryByRole("group", { name: "Corner radius" })).toBeNull();
+
+      await studio(lastSave()!);
+      await user.clear(field("Points").getByRole("spinbutton"));
+      await user.type(field("Points").getByRole("spinbutton"), "7");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          shape: "star",
+          points: 7,
+        }),
+      );
+
+      await studio(lastSave()!);
+      await user.click(tiles().getByRole("radio", { name: "Speech bubble" }));
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ shape: "bubble" }),
+      );
+      expect(field("Corner radius").getByRole("spinbutton")).toBeVisible();
+      expect(page().queryByRole("group", { name: "Points" })).toBeNull();
+    });
+
+    it("moves through the shapes with the arrow keys, and names and draws one in the list", async () => {
+      const { user } = await open(holding(elementOf("shape")));
+      await user.click(row(/^Rectangle/));
+      await user.click(tiles().getByRole("radio", { name: "Star" }));
+
+      await user.keyboard("{ArrowLeft}");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ shape: "polygon" }),
+      );
+      expect(picked()).toHaveAccessibleName("Polygon");
+      expect(field("Sides").getByRole("spinbutton")).toHaveValue(3);
+      // Named by its shape, and drawn in miniature
+      expect(row(/^Polygon/).querySelector("svg path")).toHaveAttribute(
+        "d",
+        expect.stringMatching(/^M[\d.]+ 0L/),
+      );
     });
   });
 });

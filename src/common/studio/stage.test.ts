@@ -13,9 +13,10 @@ import type {
   StudioLayerView,
   StudioView,
 } from "../types/studio";
-import { createStage, Stage } from "./stage";
+import { createStage, Figure, shapePath, Stage } from "./stage";
 
 type TextView = Extract<StudioElementView, { kind: "text" }>;
+type ShapeView = Extract<StudioElementView, { kind: "shape" }>;
 
 const BASE: Omit<TextView, "id" | "kind" | keyof typeof TEXT> = {
   x: 10,
@@ -45,6 +46,8 @@ const TEXT = {
 
 // What a picture element draws when it keeps all of itself
 const PICTURE = { crop: null, rounding: 0 };
+// A shape element's rectangle
+const RECTANGLE = { shape: "rectangle", sides: 3, points: 5 } as const;
 
 // A media element's whole video, looping at full volume
 const MEDIA = { start: 0, end: null, loop: true, volume: 100 };
@@ -109,6 +112,7 @@ describe("on stream", () => {
           ...BASE,
           id: "shape",
           kind: "shape",
+          ...RECTANGLE,
           color: "#18181b",
           radius: 24,
           border: null,
@@ -414,6 +418,7 @@ describe("on stream", () => {
         ...BASE,
         id: "s",
         kind: "shape",
+        ...RECTANGLE,
         color: null,
         radius: 0,
         border: { color: "#445566", width: 8 },
@@ -426,6 +431,56 @@ describe("on stream", () => {
     expect(el("s").style.getPropertyValue("--studio-border")).toBe(
       "8px solid #445566",
     );
+  });
+
+  it("draws an ellipse as its painted body, and the other shapes as one path", () => {
+    const shape = (fields: Partial<ShapeView>): ShapeView => ({
+      ...BASE,
+      id: "s",
+      kind: "shape",
+      ...RECTANGLE,
+      color: "#18181b",
+      radius: 24,
+      border: null,
+      ...fields,
+    });
+    draw(view(shape({ shape: "ellipse" })));
+    expect(el("s").style.getPropertyValue("--studio-radius")).toBe("50%");
+    expect(el("s").querySelector("svg")).toBeNull();
+
+    // A triangle in its 300 × 200 box, bordered inside its edge
+    draw(
+      view(
+        shape({
+          shape: "polygon",
+          sides: 3,
+          border: { color: "#445566", width: 8 },
+        }),
+      ),
+    );
+    const figure = el("s").querySelector("svg")!;
+    const path = figure.querySelector("path")!;
+    expect(figure.getAttribute("class")).toBe("studio-figure");
+    expect(figure.getAttribute("viewBox")).toBe("0 0 300 200");
+    expect(path.getAttribute("d")).toBe("M150 0L300 200L0 200Z");
+    expect(path.getAttribute("fill")).toBe("#18181b");
+    expect(path.getAttribute("stroke")).toBe("#445566");
+    expect(path.getAttribute("stroke-width")).toBe("16");
+    expect(figure.style.clipPath).toBe('path("M150 0L300 200L0 200Z")');
+    // The body's own paint stays off
+    expect(el("s").style.getPropertyValue("--studio-color")).toBe(
+      "transparent",
+    );
+    expect(el("s").style.getPropertyValue("--studio-border")).toBe("none");
+
+    draw(view(shape({ shape: "heart", color: null })));
+    expect(el("s").querySelector("svg")).toBe(figure);
+    expect(path.getAttribute("fill")).toBe("none");
+    expect(path.getAttribute("stroke")).toBe("none");
+
+    draw(view(shape({ shape: "rectangle" })));
+    expect(el("s").querySelector("svg")).toBeNull();
+    expect(el("s").style.getPropertyValue("--studio-radius")).toBe("24px");
   });
 
   it("shows on an emote element the emote its event sent", () => {
@@ -1011,5 +1066,50 @@ describe("in the editor", () => {
 
     vi.advanceTimersByTime(60_000);
     expect(body("t").classList).not.toContain("studio-hidden");
+  });
+});
+
+describe("shapePath", () => {
+  const COUNTS = { sides: 6, points: 5, radius: 24 };
+  // The smallest and largest x and y a path's numbers reach, read in pairs
+  const bounds = (d: string) => {
+    const numbers = d.match(/-?\d+(\.\d+)?/g)!.map(Number);
+    const xs = numbers.filter((_, i) => i % 2 === 0);
+    const ys = numbers.filter((_, i) => i % 2 === 1);
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  };
+
+  it("fills its box edge to edge", () => {
+    const shapes: Figure[] = ["polygon", "star", "arrow", "heart"];
+    for (const shape of shapes) {
+      expect(bounds(shapePath(shape, 300, 200, COUNTS))).toEqual([
+        0, 0, 300, 200,
+      ]);
+    }
+  });
+
+  it("draws a polygon's and a star's corners, the first pointing up", () => {
+    expect(shapePath("polygon", 100, 100, { ...COUNTS, sides: 4 })).toBe(
+      "M50 0L100 50L50 100L0 50Z",
+    );
+    // Outer and inner in turn
+    expect(shapePath("star", 100, 100, COUNTS).split("L")).toHaveLength(10);
+  });
+
+  it("keeps an arrow's head as long as the box is tall in a wider box", () => {
+    expect(shapePath("arrow", 600, 100, COUNTS)).toBe(
+      "M0 25L500 25L500 0L600 50L500 100L500 75L0 75Z",
+    );
+  });
+
+  it("drops a speech bubble's tail from under its body, its corners no rounder than it", () => {
+    // A 50 px tail under a 150 px body
+    const bubble = shapePath("bubble", 300, 200, COUNTS);
+    expect(bubble.startsWith("M24 0")).toBe(true);
+    expect(bubble).toContain("L45 200");
+
+    const round = shapePath("bubble", 300, 200, { ...COUNTS, radius: 500 });
+    expect(round.startsWith("M75 0")).toBe(true);
+    expect(round).toContain("L75 200");
   });
 });

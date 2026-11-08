@@ -206,6 +206,9 @@ function elementView(
       return {
         ...base,
         kind: element.kind,
+        shape: element.shape,
+        sides: element.sides,
+        points: element.points,
         color: element.fill ? element.color : null,
         radius: element.radius,
         border: element.border

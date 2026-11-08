@@ -24,7 +24,9 @@
  *             media    img.studio-fill or video.studio-fill
  *             gift     img.studio-fill
  *             emote    img.studio-fill
- *             shape    nothing: the body is painted
+ *             shape    a rectangle or an ellipse: nothing, the body is
+ *                      painted; the others: svg.studio-figure, one path in
+ *                      px of the box, clipped to itself
  *             viewer   .studio-avatar (.studio-has-picture), sized inline,
  *                      holding an img and .studio-initial
  *             overlay  iframe.studio-embed on stream, .studio-slot in the
@@ -138,6 +140,14 @@
   border: var(--studio-border, none);
   background: var(--studio-color);
   border-radius: var(--studio-radius);
+}
+
+/* A polygon, star, arrow, heart or speech bubble (shapePath): its border is
+   a stroke at twice the width, which its clip-path cuts to the inside */
+.studio-figure {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .studio-embed {
