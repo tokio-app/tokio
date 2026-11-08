@@ -26,10 +26,10 @@ const HOLD_TIMEOUT_MS = 2 * 60_000;
 // Edge sends no audio for text of only punctuation ("?", "..."), so it isn't sent
 const SPEAKABLE = /[\p{L}\p{N}\p{Extended_Pictographic}]/u;
 
-// Cyrillic, Greek and Turkish letters that look Latin, and the Latin letter
-// at the same place
-const LOOKALIKES = "авекмнорстухѕіјԁһαεικνορτυχı";
-const LATIN = "abekmhopctyxsijdhaeikvoptuxi";
+// Cyrillic, Greek and Turkish letters that look Latin, and small capitals,
+// and the Latin letter at the same place
+const LOOKALIKES = "авекмнорстухѕіјԁһαεικνορτυχıᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘꞯʀꜱᴛᴜᴠᴡʏᴢ";
+const LATIN = "abekmhopctyxsijdhaeikvoptuxiabcdefghijklmnopqrstuvwyz";
 const LOOKALIKE = new RegExp(`[${LOOKALIKES}]`, "g");
 
 // Without accents, invisible characters, styled letters ("ｉｄｉｏｔ") or

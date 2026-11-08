@@ -304,6 +304,7 @@ describe("TTSService", () => {
       expect(await say("you іdiot", s)).toEqual([]);
       expect(await say("you ıdiot", s)).toEqual([]);
       expect(await say("you idіоt", s)).toEqual([]);
+      expect(await say("you ɪᴅɪᴏᴛ", s)).toEqual([]);
       expect(await say("вот так", s)).toHaveLength(1);
     });
 
