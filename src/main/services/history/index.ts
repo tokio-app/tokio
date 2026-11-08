@@ -562,6 +562,7 @@ export class HistoryService extends Service {
       const past = this._gifters.get(gifter.userId);
       this._gifters.set(gifter.userId, {
         ...gifter,
+        picture: gifter.picture || (past?.picture ?? ""),
         coins: (past?.coins ?? 0) + gifter.coins,
         gifts: (past?.gifts ?? 0) + gifter.gifts,
       });
@@ -651,7 +652,7 @@ export class HistoryService extends Service {
       userId: gifter.userId,
       username: gifter.username,
       handle: gifter.handle,
-      picture: gifter.picture,
+      picture: gifter.picture || (past?.picture ?? ""),
       live: { coins: live?.coins ?? 0, gifts: live?.gifts ?? 0 },
       allTime: {
         coins: (past?.coins ?? 0) + (live?.coins ?? 0),

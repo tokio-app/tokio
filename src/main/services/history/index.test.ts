@@ -161,6 +161,23 @@ describe("HistoryService", () => {
     ]);
   });
 
+  it("keeps a gifter's picture from an earlier LIVE", async () => {
+    const history = await loaded();
+    history.start("kai", 0);
+    gifts(history, [1, gift(viewer("1", "ana"), 1)]);
+    history.end(10);
+    history.start("kai", 20);
+    gifts(history, [
+      30,
+      gift({ ...viewer("1", "ana"), profilePictures: [] }, 1),
+    ]);
+
+    expect(history.top().live[0].picture).toBe("https://p16/ana.jpg");
+    history.end(40);
+    expect(history.getHistory().gifters[0].picture).toBe("https://p16/ana.jpg");
+    expect(history.top().allTime[0].picture).toBe("https://p16/ana.jpg");
+  });
+
   it("ranks both lists by coins, ties to whoever got there first", async () => {
     const history = await loaded();
     history.start("kai", 0);
