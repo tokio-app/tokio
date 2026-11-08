@@ -164,7 +164,8 @@ describe("AudioQueue", () => {
     expect(await queue.enqueue(bytes())).toBe(true);
     expect(await queue.enqueue(bytes())).toBe(false);
     expect(tone.decode).toHaveBeenCalledTimes(2);
-    expect(warn).toHaveBeenCalled();
+    // A full queue on a busy LIVE would warn for every alert
+    expect(warn).not.toHaveBeenCalled();
 
     // One finished, so there's room again
     tone.players[0].finish();
@@ -195,7 +196,7 @@ describe("AudioQueue", () => {
     expect(await queue.wait(3)).toBe(true);
     expect(await queue.enqueue(bytes())).toBe(true);
     expect(await queue.wait(3)).toBe(false);
-    expect(warn).toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
 
     // The queue's speed doesn't shorten a wait.
     expect(tone.players.map((p) => p.startedAt)).toEqual([10, 13.5]);
@@ -292,7 +293,6 @@ describe("AudioQueue", () => {
   });
 
   it("counts sounds still decoding, so it never decodes one that doesn't fit", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
     const queue = new AudioQueue();
     queue.setQueueOptions({ maxQueueLength: 1 });
     const decoded = held();
@@ -582,7 +582,6 @@ describe("AudioQueue", () => {
   });
 
   it("never fetches for a full queue", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
     const queue = new AudioQueue();
     queue.setQueueOptions({ maxQueueLength: 1 });
     const fetch = vi.fn(async () => bytes());
