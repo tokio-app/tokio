@@ -11,7 +11,7 @@ import {
   Section,
   Spinner,
 } from "@/components";
-import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useIpcListener, useIpcRequest, useServerEnabled } from "@/hooks";
 import toolsStyles from "@/pages/Tools/tools.module.css";
 import { useT } from "@/ui/i18n";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -28,7 +28,6 @@ export function Studio() {
   const t = useT();
   const navigate = useNavigate();
   const [overlays, setOverlays] = useState<StudioOverlay[]>();
-  const [serverEnabled, setServerEnabled] = useState(true);
   // The overlay just asked for, opened once a reply lists it
   const [adding, setAdding] = useState<string | null>(null);
   // Waiting for the user to confirm it's deleted
@@ -38,7 +37,7 @@ export function Studio() {
   > | null>(null);
 
   useIpcRequest(APP_EVENTS.GET_STUDIO);
-  useIpcRequest(APP_EVENTS.GET_SETTINGS);
+  const serverEnabled = useServerEnabled();
 
   // Failures still carry what main holds
   useIpcListener(APP_EVENTS_RESPONSE.STUDIO, (res) => {
@@ -48,10 +47,6 @@ export function Studio() {
       setAdding(null);
       void navigate({ to: "/tools/studio/$id", params: { id: adding } });
     }
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
-    if (res?.success) setServerEnabled(res.data!.settings.server.enabled);
   });
 
   const add = () => {

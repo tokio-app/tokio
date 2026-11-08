@@ -1,7 +1,12 @@
 import { MediaFile } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, GamesData } from "@/common/types";
 import { Page } from "@/components";
-import { useEditableSettings, useIpcListener, useIpcRequest } from "@/hooks";
+import {
+  useEditableSettings,
+  useIpcListener,
+  useIpcRequest,
+  useServerEnabled,
+} from "@/hooks";
 import { useTriggerChoices } from "@/pages/Alerts/useTriggerChoices";
 import { useRef, useState } from "react";
 import { PicturePicker } from "./PicturePicker";
@@ -17,7 +22,6 @@ export function Games() {
   // Until main's first push
   const [games, setGames] = useState<GamesData | null>(null);
   const { giftChoices, emoteChoices, emotes, setEmotes } = useTriggerChoices();
-  const [serverEnabled, setServerEnabled] = useState(true);
   // Id of the action whose overlay picture is being picked
   const [pictureFor, setPictureFor] = useState<string | null>(null);
   // Actions waiting for main to save browsed pictures. A pick made since
@@ -44,16 +48,12 @@ export function Games() {
   );
 
   useIpcRequest(APP_EVENTS.GET_GAMES);
-  useIpcRequest(APP_EVENTS.GET_SETTINGS);
+  const serverEnabled = useServerEnabled();
 
   // The reply, then each change of a connection. A failed one keeps the
   // last shown.
   useIpcListener(APP_EVENTS_RESPONSE.GAMES, (res) => {
     if (res?.success && res.data) setGames(res.data);
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
-    if (res?.success) setServerEnabled(res.data!.settings.server.enabled);
   });
 
   const setPicture = (id: string, picture: MediaFile | null) =>

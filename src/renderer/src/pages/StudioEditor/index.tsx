@@ -47,10 +47,11 @@ import {
   useAutosave,
   useIpcListener,
   useIpcRequest,
+  useServerEnabled,
 } from "@/hooks";
 import { useTriggerChoices } from "@/pages/Alerts/useTriggerChoices";
 import { capitalize } from "@/pages/CoinStats/helper";
-import { TimerPush } from "@/pages/CountdownTimer/helper";
+import { useTimerPush } from "@/pages/CountdownTimer/helper";
 import { newOverlayName, sizeText } from "@/pages/Studio/helper";
 import toolsStyles from "@/pages/Tools/tools.module.css";
 import { useLanguage, useT } from "@/ui/i18n";
@@ -170,8 +171,6 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const setOverlay = history.change;
   const [installed, setInstalled] = useState<OverlayApp[]>([]);
   const [profile, setProfile] = useState<Pick<Profile, "alerts" | "games">>();
-  const [timer, setTimer] = useState<TimerPush | null>(null);
-  const [serverEnabled, setServerEnabled] = useState(true);
   const { giftChoices, emoteChoices, emotes, setEmotes } = useTriggerChoices();
   // A new one per Test, so its samples are fresh
   const [samples, setSamples] = useState(() => new Samples());
@@ -195,8 +194,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
 
   useIpcRequest(APP_EVENTS.GET_OVERLAYS);
   useIpcRequest(APP_EVENTS.GET_PROFILE);
-  useIpcRequest(APP_EVENTS.GET_SETTINGS);
-  useIpcRequest(APP_EVENTS.GET_TIMER);
+  const serverEnabled = useServerEnabled();
+  const timer = useTimerPush();
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_OVERLAYS, (res) => {
     if (res?.success && res.data) setInstalled(res.data);
@@ -207,16 +206,6 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     if (!res?.success || !res.profile) return;
     setEmotes(res.profile.emotes);
     setProfile({ alerts: res.profile.alerts, games: res.profile.games });
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
-    if (res?.success) setServerEnabled(res.data!.settings.server.enabled);
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.TIMER, (res) => {
-    if (res?.success && res.data) {
-      setTimer({ data: res.data, at: performance.now() });
-    }
   });
 
   const setItems = (change: (items: StudioItem[]) => StudioItem[]) =>

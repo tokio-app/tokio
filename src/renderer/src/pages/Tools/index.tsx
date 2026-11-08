@@ -6,6 +6,7 @@ import {
   timeLeft,
   timerStatusText,
   TimerPush,
+  useTimerPush,
 } from "@/pages/CountdownTimer/helper";
 import homeStyles from "@/pages/Home/home.module.css";
 import { useLanguage, useT } from "@/ui/i18n";
@@ -21,13 +22,12 @@ import styles from "./tools.module.css";
 export function Tools() {
   const t = useT();
   const language = useLanguage();
-  const [timer, setTimer] = useState<TimerPush>();
   const [lives, setLives] = useState<LiveSummary[]>();
   const [fans, setFans] = useState<number>();
   const [testOverlays, setTestOverlays] = useState<number>();
   const [studio, setStudio] = useState<number>();
 
-  useIpcRequest(APP_EVENTS.GET_TIMER);
+  const timer = useTimerPush();
   useIpcRequest(APP_EVENTS.GET_STUDIO);
   useIpcRequest(APP_EVENTS.GET_LIVES);
   useIpcRequest(APP_EVENTS.GET_FANS);
@@ -35,12 +35,6 @@ export function Tools() {
 
   useIpcListener(APP_EVENTS_RESPONSE.STUDIO, (res) => {
     if (res?.data) setStudio(res.data.length);
-  });
-
-  useIpcListener(APP_EVENTS_RESPONSE.TIMER, (res) => {
-    if (res?.success && res.data) {
-      setTimer({ data: res.data, at: performance.now() });
-    }
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.LIVES, (res) => {
@@ -118,7 +112,7 @@ export function Tools() {
 }
 
 // The time left ticks between main's pushes, only while the timer runs
-function CountdownRow({ timer }: { timer?: TimerPush }) {
+function CountdownRow({ timer }: { timer: TimerPush | null }) {
   const t = useT();
   const language = useLanguage();
   const running = timer?.data.state.status === "running";
@@ -140,8 +134,7 @@ function CountdownRow({ timer }: { timer?: TimerPush }) {
       live={running}
       // Rounded up, as the preview and the overlay show it
       value={
-        remaining !== undefined &&
-        formatDuration(Math.ceil(remaining / 1000) * 1000)
+        remaining !== null && formatDuration(Math.ceil(remaining / 1000) * 1000)
       }
       label={
         timer && (

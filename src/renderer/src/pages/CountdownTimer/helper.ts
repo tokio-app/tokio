@@ -1,10 +1,33 @@
 import { MessageKey, translate } from "@/common/i18n";
 import { TimerSettings, TimerStatus } from "@/common/schemas";
-import { TimerData, TimerState } from "@/common/types";
+import {
+  APP_EVENTS,
+  APP_EVENTS_RESPONSE,
+  TimerData,
+  TimerState,
+} from "@/common/types";
+import { useIpcListener, useIpcRequest } from "@/hooks";
+import { useState } from "react";
 
 // The last TIMER from main, with the performance.now() it came at, which the
 // preview counts down from
 export type TimerPush = { data: TimerData; at: number };
+
+/** The timer main pushes, null until the first push. */
+export function useTimerPush() {
+  const [timer, setTimer] = useState<TimerPush | null>(null);
+
+  useIpcRequest(APP_EVENTS.GET_TIMER);
+
+  // A failed request keeps the last timer shown
+  useIpcListener(APP_EVENTS_RESPONSE.TIMER, (res) => {
+    if (res?.success && res.data) {
+      setTimer({ data: res.data, at: performance.now() });
+    }
+  });
+
+  return timer;
+}
 
 /**
  * The ms left on the clock at `now` (a performance.now()): the starting time
