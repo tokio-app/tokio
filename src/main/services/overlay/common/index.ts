@@ -167,6 +167,7 @@ export async function processHTML(
 ): Promise<{
   success: boolean;
   parsed?: OverlayConfigRedux;
+  error?: unknown;
 }> {
   try {
     const htmlPath = join(dir, "index.html");
@@ -196,9 +197,7 @@ export async function processHTML(
       success: true,
       parsed: overlay_config,
     };
-  } catch {
-    return {
-      success: false,
-    };
+  } catch (error) {
+    return { success: false, error };
   }
 }

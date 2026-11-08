@@ -17,7 +17,15 @@ import { createTestLive, formatError } from "@/common/util";
 import { renameWithRetry } from "@/helper/fs";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
-import { access, cp, lstat, readdir, realpath, rm } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  cp,
+  lstat,
+  readdir,
+  realpath,
+  rm,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { JSONManagerService } from "../json";
 import { ServerService } from "../server";
@@ -199,6 +207,13 @@ export class OverlayService extends Service {
         recursive: true,
         filter: async (src) => !(await lstat(src)).isSymbolicLink(),
       });
+      // cp keeps a read-only mode, and Windows can't replace such a file:
+      // its HTML and settings couldn't be written, now or after a save.
+      for (const file of ["index.html", "config.yaml", "config.yml"]) {
+        const path = join(staging, file);
+        const found = await lstat(path).catch(() => null);
+        if (found) await chmod(path, found.mode | 0o200);
+      }
 
       // Checked on the copy, without its links: an overlay that needs a
       // linked file is refused. It gets its ID through the block, settings
@@ -213,6 +228,11 @@ export class OverlayService extends Service {
       // The HTML holds no folder path, so the folder can move after.
       const html = await processHTML(id, htmlContent, staging, config, gifts);
       if (!html.success) {
+        Logger.error(
+          `<Overlays> Unable to write the HTML of overlay ${basedir} -- ${formatError(html.error)}`,
+          this._logFile,
+          html.error,
+        );
         await rm(staging, { recursive: true, force: true });
         return { success: false };
       }
