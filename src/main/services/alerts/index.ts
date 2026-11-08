@@ -151,8 +151,16 @@ export class AlertsService extends Service {
       }
       // Before the body is read, when MyInstants says how big it is
       this._checkSize(Number(response.headers.get("content-length")));
-      const data = new Uint8Array(await response.arrayBuffer());
-      this._checkSize(data.byteLength);
+      // Leaving the loop on a sound too big cancels the rest of the download.
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      for await (const chunk of response.body ?? []) {
+        size += chunk.byteLength;
+        this._checkSize(size);
+        chunks.push(chunk);
+      }
+      if (size === 0) throw new Error("MyInstants sent an empty sound.");
+      const data = new Uint8Array(Buffer.concat(chunks));
       this._remember(file, data);
       return { success: true, data };
     } catch (error) {

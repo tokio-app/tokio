@@ -1359,6 +1359,36 @@ describe("AlertsService", () => {
       expect(await readdir(sounds)).toEqual(["ding.mp3"]);
     });
 
+    it("stops downloading a sound once it's over the limit", async () => {
+      const half = CACHE_MAX_FILE_BYTES / 2;
+      let pulled = 0;
+      const cancel = vi.fn();
+      const body = new ReadableStream({
+        pull(controller) {
+          controller.enqueue(new Uint8Array(half + 1));
+          if (++pulled === 4) controller.close();
+        },
+        cancel,
+      });
+      vi.stubGlobal("fetch", async () => new Response(body));
+
+      expect((await service.fetchSound(SOUND_URL)).success).toBe(false);
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(pulled).toBeLessThan(4);
+    });
+
+    it("refuses a sound with no body, or an empty one", async () => {
+      const fetchMock = vi.fn(async () => new Response(null));
+      vi.stubGlobal("fetch", fetchMock);
+      expect((await service.fetchSound(SOUND_URL)).success).toBe(false);
+
+      fetchMock.mockResolvedValueOnce(new Response(new Uint8Array(0)));
+      expect((await service.downloadSound(SOUND_URL, "Empty")).success).toBe(
+        false,
+      );
+      expect(await readdir(sounds)).toEqual(["ding.mp3"]);
+    });
+
     it("refuses a sound that says it's too big before reading it", async () => {
       const arrayBuffer = vi.fn();
       const headers = { "content-length": `${CACHE_MAX_FILE_BYTES + 1}` };
