@@ -78,9 +78,9 @@ type Index = z.infer<typeof IndexSchema>;
 
 type Json = Pick<JSONManagerService, "loadFile" | "saveFile">;
 
-// What each event does to the LIVE in progress, true when it changes it
+// What each event does to the LIVE in progress
 type Recorders = {
-  [K in HistoryEvent]: (live: LiveSummary, data: TokioEventMap[K]) => boolean;
+  [K in HistoryEvent]: (live: LiveSummary, data: TokioEventMap[K]) => void;
 };
 
 // The most coins first, ties to whoever got there first
@@ -151,7 +151,6 @@ export class HistoryService extends Service {
   // Files of LIVEs a delete or the cap dropped, until an index without them
   // is saved: a load takes a file newer than every listed LIVE back
   private _dropped: string[] = [];
-  private _liveUnsaved = false;
   private _indexUnsaved = false;
   private _saving: Promise<boolean> = Promise.resolve(true);
   private _listeners: (() => void)[] = [];
@@ -159,7 +158,7 @@ export class HistoryService extends Service {
   private readonly _recorders: Recorders = {
     [TOKIO_EVENTS.GIFT]: (live, event) => {
       const { added } = this._streaks.add(event);
-      if (added <= 0) return false;
+      if (added <= 0) return;
       const { user, gift } = event;
       const coins = added * Math.max(0, gift.coins);
       live.gifts += added;
@@ -182,7 +181,6 @@ export class HistoryService extends Service {
         });
       }
       this._emit();
-      return true;
     },
   };
 
@@ -207,7 +205,6 @@ export class HistoryService extends Service {
     this._ended = [];
     // Their LIVEs are still in the index on disk, which keeps the files
     this._dropped = [];
-    this._liveUnsaved = false;
     this._indexUnsaved = false;
 
     await this._removeCleared(name);
@@ -266,13 +263,12 @@ export class HistoryService extends Service {
     this._liveGifters = new Map();
     this._minutes = [];
     this._streaks.clear();
-    this._liveUnsaved = true;
     this._emit();
   }
 
   public record<K extends HistoryEvent>(type: K, data: TokioEventMap[K]) {
     if (!this._live) return;
-    if (this._recorders[type](this._live, data)) this._liveUnsaved = true;
+    this._recorders[type](this._live, data);
   }
 
   /** Ends the LIVE in progress, whose gifters join all time. */
@@ -287,7 +283,6 @@ export class HistoryService extends Service {
     this._liveGifters = new Map();
     this._minutes = [];
     this._streaks.clear();
-    this._liveUnsaved = false;
     this._indexUnsaved = true;
     this._emit();
     // It reads the oldest LIVE's file, so its save comes after the end's
@@ -455,8 +450,6 @@ export class HistoryService extends Service {
       this._dropped = [];
       // An empty index, written after any save that raced the move
       this._indexUnsaved = true;
-      // Written again into a fresh folder
-      this._liveUnsaved = this._live !== null;
       this._emit();
       await this.save();
     }
@@ -466,12 +459,13 @@ export class HistoryService extends Service {
   }
 
   // shortcut: there's no save on quit, so a quit or crash during a LIVE loses
-  // up to 30 s of it (the next load adds the rest from its file). Upgrade to a
-  // save on quit if streamers notice.
+  // the time and gifts since its last save, up to 30 s (the next load adds the
+  // rest from its file). Upgrade to a save on quit if streamers notice.
   /**
-   * Writes what changed: the file of the LIVE in progress or of one that just
-   * ended, then the index, after which the dropped LIVEs' files go. False
-   * when a write failed; the next save retries.
+   * Writes the file of the LIVE in progress, ending at the save's time even
+   * when nothing came since the last one, and of the LIVEs that just ended,
+   * then the index when it changed, after which the dropped LIVEs' files go.
+   * False when a write failed; the next save retries.
    * With nothing to write, how the last save went, so a switch waits for one
    * still writing.
    */
@@ -479,7 +473,7 @@ export class HistoryService extends Service {
     const json = this._json;
     const dir = this._dir;
     if (!json || dir === null) return this._saving;
-    const live = this._liveUnsaved ? this._live : null;
+    const live = this._live;
     const records = [...this._ended];
     if (live) records.push(this._record(live, Date.now()));
     const index: Index | null = this._indexUnsaved
@@ -487,7 +481,6 @@ export class HistoryService extends Service {
       : null;
     if (!records.length && !index) return this._saving;
     this._ended = [];
-    this._liveUnsaved = false;
     this._indexUnsaved = false;
     // This index leaves their LIVEs out, so their files go once it's written
     const dropped = index ? this._dropped.splice(0) : [];
@@ -503,11 +496,11 @@ export class HistoryService extends Service {
         const file = join(dir, `${record.startedAt}.json`);
         if (await json.saveFile(file, LiveRecordSchema, record)) continue;
         ok = false;
-        // Tried again on the next save, unless another profile loaded since
-        // or the LIVE ended, whose final record then takes its place
+        // Tried again on the next save, unless another profile loaded since.
+        // Every save writes the LIVE in progress, and its end's record takes
+        // its place.
         if (this._dir !== dir) continue;
         if (record.startedAt !== live?.startedAt) this._ended.push(record);
-        else if (this._live === live) this._liveUnsaved = true;
       }
       if (index) {
         const file = join(dir, "index.json");

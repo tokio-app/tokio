@@ -829,7 +829,8 @@ const registerHistory = ({
     }
     save();
   });
-  // shortcut: a quit or crash during a LIVE loses up to 30 s of it, upgrade
+  // shortcut: a quit or crash during a LIVE loses the time and gifts since
+  // the last save, up to 30 s, since each save writes the LIVE's file. Upgrade
   // to a save on quit if streamers notice. The updater's install can't wait
   // for one.
   setInterval(save, HISTORY_SAVE_MS).unref();

@@ -267,6 +267,22 @@ describe("HistoryService", () => {
     expect((await read<LiveRecord>("1000.json")).endedAt).toBe(6000);
   });
 
+  it("moves a quiet LIVE's end on with each save", async () => {
+    const history = await loaded();
+    history.start("kai", 1000);
+    gifts(history, [1100, gift(viewer("1"), 5)]);
+    vi.setSystemTime(5000);
+    await history.save();
+    // Nothing came since the last save
+    vi.setSystemTime(40_000);
+
+    expect(await history.save()).toBe(true);
+    expect((await read<LiveRecord>("1000.json")).endedAt).toBe(40_000);
+    expect((await loaded()).getHistory().lives).toEqual([
+      expect.objectContaining({ startedAt: 1000, endedAt: 40_000, coins: 5 }),
+    ]);
+  });
+
   it("loads a saved history back, and writes nothing when unchanged", async () => {
     const empty = await loaded();
     expect(await empty.save()).toBe(true);
