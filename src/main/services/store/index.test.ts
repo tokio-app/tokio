@@ -190,6 +190,32 @@ describe("StoreManagerService", () => {
       expect(await readFile(defaultProfileFile, "utf-8")).toBe(custom);
     });
 
+    it("doesn't rebuild the store without a profile it can't read", async () => {
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+      const saved = JSON.stringify({ ...defaultProfile, name: "Stream" });
+      await writeFile(stream, saved);
+      await writeFile(storeFile, "{ oops");
+      busy.add(stream);
+
+      await expect(init()).rejects.toThrow("Unable to initialize store.");
+
+      expect(await readFile(stream, "utf-8")).toBe(saved);
+      expect(
+        (await init())
+          .getProfiles()
+          .map((p) => p.file)
+          .sort(),
+      ).toEqual(["default.json", "stream.json"]);
+    });
+
+    it("doesn't rebuild the store without a library folder it can't read", async () => {
+      await rm(paths.folders.soundsFolder, { recursive: true });
+      await writeFile(paths.folders.soundsFolder, "not a folder");
+      await writeFile(storeFile, "{ oops");
+
+      await expect(init()).rejects.toThrow("Unable to initialize store.");
+    });
+
     it("backs up a Default profile that can't be loaded, and replaces it", async () => {
       await writeFile(defaultProfileFile, "{ oops");
 

@@ -57,6 +57,9 @@ type Providers = {
 const isEncrypted = (key: string) =>
   /^v\d\d$/.test(Buffer.from(key, "base64").subarray(0, 3).toString("latin1"));
 
+const isMissing = (error: unknown) =>
+  error instanceof Error && "code" in error && error.code === "ENOENT";
+
 // How long live events go without reading again an active profile that failed
 const LOAD_RETRY_MS = 30_000;
 
@@ -238,6 +241,7 @@ export class StoreManagerService extends Service {
   }
 
   // Profile files outlive a rebuilt store, so list the ones that still load.
+  // One that can't be read throws, so a held file isn't left out of the list.
   private async _findProfiles(): Promise<{ file: string; profile: Profile }[]> {
     const folder = this._pathManagerService.folders.profilesFolder;
     const files = (await readdir(folder))
@@ -246,7 +250,7 @@ export class StoreManagerService extends Service {
 
     const profiles: { file: string; profile: Profile }[] = [];
     for (const file of files) {
-      const profile = await this._jsonManagerService.loadFile(
+      const { data: profile } = await this._readChecked(
         join(folder, file),
         ProfileSchema,
       );
@@ -264,7 +268,7 @@ export class StoreManagerService extends Service {
 
   // Alerts keep the names of the sounds and media they use, game actions the
   // pictures'. Files nothing uses lost their name, they're listed anyway so
-  // they can be deleted.
+  // they can be deleted. A folder that's there but can't be read throws.
   private async _findFiles(
     folder: string,
     extensions: string[],
@@ -272,7 +276,12 @@ export class StoreManagerService extends Service {
     label: MessageKey,
   ): Promise<AlertSound[]> {
     const files = new Set(
-      (await readdir(folder).catch(() => []))
+      (
+        await readdir(folder).catch((error: unknown) => {
+          if (isMissing(error)) return [];
+          throw error;
+        })
+      )
         .filter((file) => extensions.includes(extname(file).slice(1)))
         .sort(),
     );
@@ -1120,13 +1129,7 @@ export class StoreManagerService extends Service {
     schema: z.ZodType<T>,
   ): Promise<{ raw: Buffer | null; data: T | null }> {
     const raw = await readFile(path).catch((error: unknown) => {
-      if (
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT"
-      ) {
-        return null;
-      }
+      if (isMissing(error)) return null;
       throw error;
     });
     if (!raw) return { raw: null, data: null };
