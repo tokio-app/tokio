@@ -655,6 +655,27 @@ describe("Games", () => {
     );
   });
 
+  it("keeps the focused step's text field after a step above is removed", async () => {
+    const { user } = await load([
+      action("a1", {
+        steps: [
+          command("say "),
+          { type: "spawn", mob: "zombie", amount: 1, name: "" },
+          command("give "),
+        ],
+      }),
+    ]);
+    const panel = panels()[0];
+
+    await user.click(panel.getAllByRole("textbox", { name: "Command" })[1]);
+    await user.click(panel.getAllByRole("button", { name: "Remove step" })[0]);
+    await user.click(panel.getByRole("button", { name: "{username}" }));
+    expect(panel.getByRole("textbox", { name: "Command" })).toHaveValue(
+      "give {username}",
+    );
+    expect(panel.getByRole("textbox", { name: "Name" })).toHaveValue("");
+  });
+
   it("leaves the count out for a gift action on every gift", async () => {
     await load([
       action("a1", {
