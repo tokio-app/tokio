@@ -1814,10 +1814,11 @@ describe("StoreManagerService", () => {
       expect(store.getStudio()).toHaveLength(1);
     });
 
-    it("removes an overlay", async () => {
+    it("removes an overlay, and refuses one it doesn't hold", async () => {
       const store = await init();
       await store.addStudioOverlay(id, "One");
 
+      expect(await store.removeStudioOverlay(other)).toBeNull();
       expect(await store.removeStudioOverlay(id)).toBe(true);
       expect((await init()).getStudio()).toEqual([]);
     });

@@ -59,7 +59,7 @@ const store = (
   result: {
     add?: boolean | null;
     save?: boolean | null;
-    remove?: boolean;
+    remove?: boolean | null;
   } = {},
 ) => ({
   getStudio: () => held,
@@ -75,10 +75,9 @@ const store = (
     return result.save ?? true;
   }),
   removeStudioOverlay: vi.fn(async (id: string) => {
-    held.splice(
-      held.findIndex((o) => o.id === id),
-      1,
-    );
+    const index = held.findIndex((o) => o.id === id);
+    if (index === -1) return null;
+    held.splice(index, 1);
     return result.remove ?? true;
   }),
 });
@@ -314,6 +313,27 @@ describe("studio events", () => {
         { success: false, data: [], error: saveError },
       ]);
       expect(h.notices).toMatchObject([saveError]);
+    });
+
+    it("fails on an overlay main doesn't hold, replying the list", async () => {
+      const services = viewServices();
+      const h = createHandler({
+        ...services,
+        storeManagerService: store([overlay()]),
+      });
+
+      await h.invoke(studio, APP_EVENTS.REMOVE_STUDIO_OVERLAY, {
+        id: "0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e",
+      });
+
+      const failure = {
+        code: FEEDBACK_CODES.STUDIO_FAILED,
+        message: "This overlay no longer exists.",
+      };
+      expect(h.replies(APP_EVENTS_RESPONSE.STUDIO)).toEqual([
+        { success: false, data: [overlay()], error: failure },
+      ]);
+      expect(h.notices).toMatchObject([{ level: "warning", ...failure }]);
     });
   });
 

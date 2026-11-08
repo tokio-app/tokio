@@ -403,9 +403,11 @@ export class StoreManagerService extends Service {
     return this._queueSave();
   }
 
-  public async removeStudioOverlay(id: string): Promise<boolean> {
+  // Null when no overlay has the id, otherwise whether the store was written
+  public async removeStudioOverlay(id: string): Promise<boolean | null> {
     this._ensureInitialized();
     const { settings } = this._storeData!;
+    if (!settings.studio.some((o) => o.id === id)) return null;
     settings.studio = settings.studio.filter((o) => o.id !== id);
     return this._queueSave();
   }
