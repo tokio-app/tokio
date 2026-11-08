@@ -358,13 +358,17 @@ export class HistoryService extends Service {
    * with a query only the ones whose name or @handle has it. Every LIVE whole
    * is all time's list; other dates are added up from the LIVEs' files,
    * leaving out a file that doesn't load. Null when another profile loaded
-   * while they were read.
+   * while they were read, or the signal aborted.
    */
   public async getGifters({
     from,
     to,
     query = "",
-  }: DateRange & { query?: string }): Promise<RankedGifter[] | null> {
+    signal,
+  }: DateRange & {
+    query?: string;
+    signal?: AbortSignal;
+  }): Promise<RankedGifter[] | null> {
     const dir = this._dir;
     if (dir === null) return [];
     const range = { from, to };
@@ -379,8 +383,9 @@ export class HistoryService extends Service {
       // One at a time, so big LIVEs don't all sit in memory. Oldest first, so
       // the name, handle and picture end up the latest ones.
       for (const { startedAt } of lives) {
+        if (signal?.aborted) return null;
         const record = await this._readLive(dir, startedAt);
-        if (this._dir !== dir) return null;
+        if (this._dir !== dir || signal?.aborted) return null;
         if (!record) continue;
         const sent = allInRange(record, range)
           ? record.gifters

@@ -591,6 +591,27 @@ describe("HistoryService", () => {
     expect(await service().getGifters(range)).toEqual([]);
   });
 
+  it("stops reading dates when their signal aborts", async () => {
+    const history = await loaded();
+    history.start("kai", 1000);
+    history.end(2000);
+    history.start("kai", 3000);
+    history.end(4000);
+    history.start("kai", 6000);
+    history.end(7000);
+    await history.save();
+    const loadFile = vi.spyOn(json, "loadFile");
+
+    // Leaves the last LIVE out, so it reads the other two's files
+    const controller = new AbortController();
+    const gifters = history.getGifters({ to: 5000, signal: controller.signal });
+    controller.abort();
+
+    expect(await gifters).toBeNull();
+    expect(loadFile).toHaveBeenCalledOnce();
+    expect(await history.getGifters({ to: 5000 })).toEqual([]);
+  });
+
   describe(`past ${MAX_LIVES} LIVEs`, () => {
     const HOUR = 3_600_000;
     const ana = {
