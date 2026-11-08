@@ -33,6 +33,7 @@ paths:
 
 - The main window plays every sound, so it has `backgroundThrottling: false` like the music windows: Chromium never treats it as a background page, minimized or in the tray.
 - A page whose renderer process dies for any reason but a clean exit is reloaded (`reloadWhenGone`, `src/main/helper/network.ts`): the main window's and the music windows' views.
+- Main pushes each window's state when it changes (`RESIZE_WINDOW`, `RESIZE_MUSIC_WINDOW`), and each `TitleBar` asks for it when it mounts (`GET_WINDOW_STATE`, `GET_MUSIC_WINDOW_STATE`), so a page reloaded while its window is maximized shows Restore.
 - Playwright keeps pages visible, so it can't show how a hidden window behaves (see `.claude/rules/testing.md`).
 - The app keeps Electron's default menu, with its zoom off, and in a packaged app its reload and DevTools too (`lockMenu`, `src/main/helper/menu.ts`, at startup). Their keys still reach every page: Overlay Studio zooms and shows its rulers with them. F12 opens DevTools in development.
   - Don't block shortcuts in `before-input-event` instead. electron-toolkit's `watchWindowShortcuts` did, by where the key sits on a US keyboard: Ctrl+- never reached the editor on a US layout, and zoomed the window on a Spanish one.

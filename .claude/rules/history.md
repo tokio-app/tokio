@@ -15,7 +15,7 @@ paths:
 - `start(username)` gets the @username from `TikTokConnectorService.username`, the last `connect()`'s, set before the provider connects because `CONNECTED` comes before `connect()` resolves.
 - `HISTORY_EVENTS` is only gifts (the user's call), through the service's own `GiftStreaks`: `added` gifts and `added × max(0, coins)` coins, as Home counts them. Followers, shares, likes and viewers stay on Home.
 - Only gifts count as coins: Tokio's treasure chest event carries no data, and a Super Fan event only the viewer.
-- Gifters are keyed by `UserData.userId`. A gift without one counts in the totals only. Name, handle and picture follow the latest gift, and a gift without a picture keeps the last one.
+- Gifters are keyed by `UserData.userId`. A gift without one counts in the totals only. Name, handle and picture follow the latest gift, and a gift without a picture keeps the last one, from an earlier LIVE too.
 - Each gift also goes in its clock minute (`GiftMinute`, counted from the minute the LIVE started in) under its gifter's id, `""` without one, so dates that cut a LIVE count only its gifts in them.
 - Pictures are saved although TikTok's links expire within days (the user's call): overlays and the page fall back to the initial.
 - Nothing is recorded before a load, or for a profile whose index doesn't load.
@@ -25,7 +25,7 @@ paths:
 - `history/<profile name>/` (`folders.historyFolder`, the profile file's name without `.json`), outside the profile like the fans (Persistence in `AGENTS.md`).
 - `index.json`: the finished LIVEs' summaries, oldest first, and all time's gifters, the most coins first with ties to the earlier `giftedAt`. Written when a LIVE ends, after a recovery or a delete, and to retry a failed save.
 - `<startedAt>.json`: one `LiveRecord` per LIVE, with all its gifters and the minutes its gifts came in, which stay out of the index.
-  - The LIVE in progress rewrites only its own file, every `HISTORY_SAVE_MS` (30 s, `registerHistory`) while it changes, with `endedAt` set to the save's time.
+  - The LIVE in progress rewrites only its own file, on every save (every `HISTORY_SAVE_MS`, 30 s, `registerHistory`, and a delete's, the cap's or a clear's), with `endedAt` set to the save's time, so a quiet LIVE's end keeps up too.
   - A finished LIVE's file is never rewritten, so a 30 s save stays small however many LIVEs there are.
 - When a LIVE ends, its file is written one last time, then the index with its summary appended and its gifters added to all time.
 - `MAX_LIVES` (1,500): past it, the oldest LIVEs go as deleting them would, gifts included, after an end (`_cap`, which reads their files after the end's save) and when a profile loads. The user's call: All time always adds up to the LIVEs kept.
@@ -57,10 +57,10 @@ paths:
 - `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top 100. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page asks again on each `GET_PROFILE` reply, a profile switch, and so does Tools' list, whose Coin stats row shows the newest LIVE's coins. The page also drops its dates' and search's `GIFTERS` replies then, which the same range would still match.
 - `GET_LIVE { startedAt }` replies `LIVE` with that LIVE's record. Failures carry the `startedAt` too.
 - `GET_GIFTERS { from?, to?, query? }` replies `GIFTERS` with the top 100 of the finished LIVEs in the dates from `from` (included) to `to` (left out), each with their `rank` among them (`RankedGifter`).
-  - A LIVE is in them when it starts in them or runs into them (`inRange`, `src/common/util/history.ts`). One they cut (not `allInRange`) counts only its gifts in them, from its minutes.
+  - A LIVE is in them when it starts in them or runs into them (`inRange`, `src/common/util/history.ts`). One they cut (not `allInRange`) counts only its gifts in them, from its minutes: a minute counts when any of it is in them, at either end.
   - With a query, only the ones whose name or @handle has it, in any case, with a leading @ ignored (`viewerMatcher`, shared with the Fans page).
   - Every LIVE whole reads all time's list. Other dates are added up from the LIVEs' files by `getGifters`, one file at a time so a year of LIVEs isn't held at once, leaving out a file that doesn't load.
-  - When another profile loads while `getTotals` or `getGifters` reads, they give null and the handler sends nothing more: the page asks again for the new profile. With nothing loaded they still give zeros and `[]`.
+  - When another profile loads while `getTotals` or `getGifters` reads, they give null and the handler sends nothing more: the page asks again for the new profile. With nothing loaded they still give zeros and `[]`. A newer `GET_GIFTERS` of the same kind (dates, or a search) aborts the one before it (one `AbortController` per kind in `lives.ts`), whose `getGifters` then gives null too.
   - Dates without a query get their coins and gifts (`totals`, from `getTotals`, which reads only the files of the LIVEs they cut) in a first reply, then again with the gifters.
   - The reply carries the range and the query, failures included.
 - `DELETE_LIVE` and `CLEAR_LIVES` reply `LIVES` with what main holds, then send `LIVE_DELETED` or `HISTORY_CLEARED`. A failed save after a delete throws `HISTORY_SAVE_FAILED`, a refused clear `HISTORY_CLEAR_FAILED`.

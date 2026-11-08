@@ -71,7 +71,7 @@ paths:
 - **Clear** in the pickers takes the sound, message or media off the alert and keeps the file.
 - Upload counts only sounds new to the library: one already in `settings.sounds`, or picked twice, isn't counted.
 - Size and caching:
-  - Sounds are up to `CACHE_MAX_FILE_BYTES`: `importSound` and `fetchSound` refuse bigger ones (`fetchSound` checks `content-length` before reading the body), so every sound added now is served from memory.
+  - Sounds are up to `CACHE_MAX_FILE_BYTES`: `importSound` and `fetchSound` refuse bigger ones (`fetchSound` checks `content-length` before reading the body, then counts the bytes as they come and stops at the limit; an empty sound fails), so every sound added now is served from memory.
   - A bigger one saved before is read from disk only on `GET_SOUND_DATA`, one read shared by the requests that want it at once.
   - `handle` only checks that a library sound's file is there (`_missing`: the cache, else `access`), without reading it, and doesn't log a missing sound. `init.ts` logs it to `alerts.log` only when its notice goes out (once per `REPEAT_NOTICE_MS` per alert).
 - MyInstants has no API; `AlertsService` scrapes it with cheerio. Only fetch `www.myinstants.com` URLs.
@@ -126,7 +126,7 @@ paths:
 - The window's queue times the media, so it shows with the alert's sound and waits its turn:
   - `ALERT_AUDIO` carries `media`, and the item's place lasts `max(sound length / speed, duration)` (`minDuration`). A media-only alert sends neither `data` nor `key` and holds a silent place (`AudioQueue.wait`).
   - Once the item has its place, `queueAlert` (`renderer/src/helper/alerts.ts`) emits `SHOW_ALERT_MEDIA` with the delay and `media.volume`, and `AlertsService.showMedia` sends `tokio:alert:media` to the alert's overlay (`sendToClient`) when it's over. Main keeps the timers, so `clear` can drop the media still waiting.
-- The page shows one at a time and removes it after `duration`, when a video ends, or on `tokio:alert:clear`. It ignores the live events every client gets.
+- The page shows one at a time and removes it after `duration`, when a video ends, or on `tokio:alert:clear`. A video it removes is paused and loses its `src` (`drop`), since Chromium keeps a detached video with a source alive. It ignores the live events every client gets.
 - A video is muted if the browser refuses sound. One removed before its play started (its `play()` aborted) isn't replayed muted.
 - `AlertMediaSchema.volume` is the video's, apart from the alert's `volume`. Another file keeps it, as it keeps the duration.
 - Migration: `withSavedMedia` (a preprocess on `AlertSchema`) gives media saved without a volume the alert's, and cuts a video saved before cuts (no `start`) at its old `duration` unless its `match_video` was on. The schema no longer has `match_video`.

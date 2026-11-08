@@ -39,7 +39,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
   - An unref'd `SAVE_INTERVAL_MS` interval saves while running, or after a change no request saves: added time, the end, a pause on disconnect.
   - One that fails calls `onSaveFailed`. `registerTimer` turns that into a `TIMER_SAVE_FAILED` warning once per `REPEAT_NOTICE_MS` (key `timer`), and the next interval tries again.
   - Never on quit (`shortcut:`): that would hold the quit the updater's install can't wait for (`.claude/rules/updates.md`). A quit or crash while running loses up to `SAVE_INTERVAL_MS`.
-- `SET_PROFILE` saves the timer first and refuses the switch when that fails, then loads the new profile's timer. Picking the profile that's already active does nothing, even during a LIVE.
+- `SET_PROFILE` saves the timer first and refuses the switch when that fails, then loads the new profile's timer. Switches run one at a time, and the profile lock is checked again after the saves, so a LIVE that connected meanwhile refuses the switch (`PROFILE_LOCKED`). Picking the profile that's already active does nothing, even during a LIVE.
 
 ## Pushes and the overlay
 
