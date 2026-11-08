@@ -97,7 +97,15 @@ export class ServerService extends Service {
   private rebuildRoutes() {
     const newRouter = express.Router();
     this._routes.forEach((path, id) => {
-      newRouter.use("/" + id, express.static(path));
+      // An id like "gift-jar - Copy (2)" isn't a valid path for Express 5.
+      try {
+        newRouter.use("/" + id, express.static(path));
+      } catch (e) {
+        Logger.warn(
+          `<Server> Unable to serve ${id} -- ${formatError(e)}`,
+          this._logFile,
+        );
+      }
     });
     this._dynamicRouter = newRouter;
   }

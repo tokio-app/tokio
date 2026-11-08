@@ -257,6 +257,26 @@ describe("ServerService", () => {
     });
   });
 
+  it("skips an overlay id Express can't mount, serving the others", async () => {
+    const warn = vi.spyOn(Logger, "warn");
+    const overlay = join(dir, "clock");
+    await mkdir(overlay);
+    await writeFile(join(overlay, "index.html"), "<h1>clock</h1>");
+
+    server.mount("gift-jar - Copy (2)", overlay);
+    server.mount("clock", overlay);
+
+    expect((await server.start()).success).toBe(true);
+    expect((await fetch(url("/clock/"))).status).toBe(200);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^<Server> Unable to serve gift-jar - Copy \(2\) -- /,
+      ),
+      undefined,
+    );
+    expect(() => server.unmount("clock")).not.toThrow();
+  });
+
   describe("alert overlays", () => {
     beforeEach(async () => {
       const media = join(dir, "media");
