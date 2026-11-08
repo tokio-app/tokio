@@ -262,6 +262,12 @@ export class TTSService extends ProviderService<TTSProvider> {
     // Called when the audio can't be generated
     onError?: (error?: Error) => void,
   ) {
+    this._queue.setQueueOptions({
+      gapTime: settings.protection.cooldown,
+      maxQueueLength: settings.protection.queue_length,
+    });
+    // It would be dropped, so it isn't checked
+    if (this._queue.full()) return;
     const comment = this._comment(settings, chat);
     if (!this._valid(settings, chat, comment)) return;
     const text = this._parseText(settings, chat, comment);
@@ -270,10 +276,6 @@ export class TTSService extends ProviderService<TTSProvider> {
     const voice =
       settings.user_voices.find((u) => sameHandle(u.handle, chat.user.handle))
         ?.voice ?? settings.voice;
-    this._queue.setQueueOptions({
-      gapTime: settings.protection.cooldown,
-      maxQueueLength: settings.protection.queue_length,
-    });
     const run = this._run;
     this._queue.enqueue(async () => {
       // The window gets one message to play and the next one ready. The rest
