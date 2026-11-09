@@ -11,6 +11,8 @@ The source and the distributed app are MIT, with one LGPL file (see Licensing in
 1. Before installing, read its license: `npm view <package>@<version> license repository`. When it's missing or unusual, read the LICENSE in its repository. For an upgrade, compare it with the installed version's, `node -p "require('<package>/package.json').license"`: licenses change between versions (tiktok-live-connector went MIT → AGPL in 2.4.1).
 2. Copyleft (GPL, AGPL, LGPL, MPL, EUPL, CC BY-SA) or no license at all: stop and ask the user.
 3. Install with Yarn 1, never by editing `yarn.lock`: `yarn add <package>@<version>` (`-D` for build and test tools), `yarn upgrade <package>@<version>` or `yarn remove <package>`.
+   - A transitive package (a security fix inside its parent's range) is different: `yarn upgrade` skips it, and a `yarn add` then `yarn remove` leaves the old version locked. Add a temporary `resolutions` entry in `package.json` (`"express/body-parser": "^2.4.0"`) and run `yarn install`. Remove the entry, delete `node_modules/.yarn-integrity`, and run it again, so the lockfile keeps the new version without the entry's pattern. `yarn install --frozen-lockfile` must pass after.
+   - When the fix is outside the parent's range, a `resolutions` override forces a version the parent wasn't built for: ask the user first.
 4. Check what came with it: the packages `git diff yarn.lock` adds, and each one's license (`node -p "require('<name>/package.json').license"`), with the same rule as step 2.
 5. Update the notices where the change needs it. `src/renderer/src/pages/About/notices.test.ts` fails when they drift:
    - A plain npm package: nothing. About lists the production tree through `LicensesService`.
@@ -22,6 +24,10 @@ The source and the distributed app are MIT, with one LGPL file (see Licensing in
 6. After a removal, drop the rows and entries it had in the notices, and its name from that `files` pattern.
 7. `npx fallow dead-code` finds code that only a removed package used. A package loaded only through a dynamic `import()` looks unused to it: list it in `ignoreDependencies` in `.fallowrc.json`, like `electron-updater`.
 8. Verify: `yarn test src/renderer/src/pages/About/notices.test.ts`, `yarn typecheck`, `yarn lint` and `yarn build`.
+
+## Traps
+
+- On Windows, VS Code's Fallow extension runs its language server from `node_modules/@fallow-cli/<platform>/fallow.exe`, which Yarn can't replace while it runs (EPERM). Before an install that changes `fallow`, ask the user to disable the extension; **Fallow: Restart Language Server** locks the new binary at once.
 
 ## Done when
 
