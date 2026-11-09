@@ -207,7 +207,7 @@ Java Edition connects through the Tokio mod, a Fabric mod in `tokio-app/minecraf
 
 - Run `yarn format` on files you touch, and fix lint warnings in code you touch.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `feat!:`), enforced by a husky hook and by CI on pull requests. Don't bypass hooks.
-- Pull requests: a Conventional Commits title and the sections of `.github/pull_request_template.md`.
+- Pull requests: a Conventional Commits title, which is their line in the release notes, and the sections of `.github/pull_request_template.md`. Merge them with a merge commit, not a squash or rebase: the notes find pull requests by it (`.claude/rules/ci.md`).
 - Keep these stable; overlays, browser sources and saved data depend on them:
   - the server port (`37891`), the Minecraft port (`MINECRAFT_PORT`, 37892) and its Java subprotocol (`MINECRAFT_JAVA_PROTOCOL`, `tokio.java.v1`)
   - the alerts' overlay path (`/alerts/<alert id>/`), the countdown timer's (`/timer/`), Minecraft's overlay (`/games/minecraft/` and `/games/minecraft/<column>/`, its pictures under `/games/minecraft/pictures/`), Overlay Studio's (`/studio/<id>/`, socket id `studio:<id>`)

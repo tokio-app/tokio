@@ -1,12 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
-import { githubLogin, parseCommit, renderNotes } from "./util.js";
+import {
+  githubLogin,
+  parseCommit,
+  parsePull,
+  renderNotes,
+  sectionOf,
+} from "./util.js";
 
 const repo = "tokio-app/tokio";
 
-/** @param {Partial<import("./util.js").Commit>} overrides */
-const commit = (overrides = {}) => ({
+/** @param {Partial<import("./util.js").Pull>} overrides */
+const pull = (overrides = {}) => ({
+  number: 12,
   sha: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  short: "a1b2c3d",
   author: "Ana",
   email: "ana@example.com",
   type: "feat",
@@ -16,8 +22,8 @@ const commit = (overrides = {}) => ({
   ...overrides,
 });
 
-const render = (commits = [commit()], logins = new Map(), from = "v1.0.0") =>
-  renderNotes({ repo, from, to: "v1.1.0", commits, logins });
+const render = (pulls = [pull()], logins = new Map(), from = "v1.0.0") =>
+  renderNotes({ repo, from, to: "v1.1.0", pulls, logins });
 
 describe("parseCommit", () => {
   it("reads the type, the scope and the title", () => {
@@ -53,14 +59,38 @@ describe("parseCommit", () => {
   });
 });
 
+describe("parsePull", () => {
+  it("reads the number and the title GitHub writes when it merges", () => {
+    expect(
+      parsePull(
+        "Merge pull request #35 from tokio-app/fix/audit-10\n\nfix: everything from the tenth code audit\n",
+      ),
+    ).toEqual({
+      number: 35,
+      title: "fix: everything from the tenth code audit",
+    });
+  });
+
+  it("names a pull request merged with an empty message after its branch", () => {
+    expect(
+      parsePull("Merge pull request #7 from tokio-app/feat/fans\n"),
+    ).toEqual({ number: 7, title: "tokio-app/feat/fans" });
+  });
+
+  it("leaves out commits that didn't merge a pull request", () => {
+    expect(parsePull("Merge branch 'docs/morph-waits'\n")).toBeNull();
+    expect(parsePull("fix(music): say when Spotify has no app")).toBeNull();
+  });
+});
+
 describe("renderNotes", () => {
-  it("groups the commits by section, in order", () => {
+  it("groups the pull requests by section, in order", () => {
     const notes = render([
-      commit({ type: "chore", title: "Bump" }),
-      commit({ type: "fix", title: "Fix" }),
-      commit({ type: "feat", title: "Feature" }),
-      commit({ type: "feat", breaking: true, title: "Breaking" }),
-      commit({ type: "perf", title: "Faster" }),
+      pull({ type: "revert", title: "Undo" }),
+      pull({ type: "fix", title: "Fix" }),
+      pull({ type: "feat", title: "Feature" }),
+      pull({ type: "feat", breaking: true, title: "Breaking" }),
+      pull({ type: "perf", title: "Faster" }),
     ]);
 
     const order = [
@@ -72,17 +102,35 @@ describe("renderNotes", () => {
       "**Fix**",
       "## Performance",
       "**Faster**",
-      "## Other Changes",
-      "**Bump**",
+      "## Reverts",
+      "**Undo**",
     ].map((text) => notes.indexOf(text));
     expect(order.every((at, i) => at > (order[i - 1] ?? -1))).toBe(true);
     // A breaking feature is listed once, as breaking
     expect(notes.match(/\*\*Breaking\*\*/g)).toHaveLength(1);
   });
 
-  it("links each commit and its author's GitHub account", () => {
+  it("leaves out pull requests users don't notice, unless they break something", () => {
+    const quiet = [
+      pull({ type: "chore", title: "Bump" }),
+      pull({ type: "docs", title: "Describe" }),
+      pull({ type: "refactor", title: "Tidy" }),
+      pull({ type: null, title: "Untyped" }),
+    ];
+    for (const item of quiet) expect(sectionOf(item)).toBeUndefined();
+
+    const notes = render([
+      ...quiet,
+      pull({ type: "refactor", breaking: true, title: "Rename" }),
+    ]);
+    expect(notes).not.toMatch(/Bump|Describe|Tidy|Untyped/);
+    expect(notes).toContain("**Rename**");
+    expect(render(quiet)).toContain("No changes.");
+  });
+
+  it("links each pull request and its author's GitHub account", () => {
     const notes = render(
-      [commit(), commit({ author: "Bo", email: "bo@example.com" })],
+      [pull(), pull({ number: 13, author: "Bo", email: "bo@example.com" })],
       new Map([
         ["ana@example.com", "ana-gh"],
         ["bo@example.com", null],
@@ -90,13 +138,15 @@ describe("renderNotes", () => {
     );
 
     expect(notes).toContain(
-      `- [ [\`a1b2c3d\`](https://github.com/${repo}/commit/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2) ] - **Add alerts** _by_ [Ana](https://github.com/ana-gh)`,
+      `- [ [#12](https://github.com/${repo}/pull/12) ] - **Add alerts** _by_ [Ana](https://github.com/ana-gh)`,
     );
-    expect(notes).toContain("**Add alerts** _by_ Bo");
+    expect(notes).toContain(
+      `- [ [#13](https://github.com/${repo}/pull/13) ] - **Add alerts** _by_ Bo`,
+    );
   });
 
   it("leaves out empty sections and says when nothing changed", () => {
-    expect(render([commit({ type: "fix" })])).not.toContain("## New Features");
+    expect(render([pull({ type: "fix" })])).not.toContain("## New Features");
     expect(render([])).toContain("No changes.");
   });
 

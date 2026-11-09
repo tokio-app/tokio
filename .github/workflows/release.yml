@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: 24
 
-      # Lists the commits since the previous v* tag, grouped by Conventional Commits type.
+      # Lists the features, fixes, performance changes and reverts merged by pull request since the previous v* tag.
       - name: Write release notes
         env:
           GH_TOKEN: ${{ github.token }}

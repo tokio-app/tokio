@@ -7,29 +7,41 @@ const INTRO =
   "Make your TikTok LIVE react to chat, gifts, likes and more: text-to-speech, music requests, sound alerts and overlays.";
 
 /**
- * Release note sections in order. Each commit goes to the first section it matches.
+ * Release note sections in order. Each pull request goes to the first section
+ * it matches; one that matches none (chores, docs, refactors, tests, CI) is
+ * left out, since users don't notice it.
  *
- * @type {{ title: string, match: (commit: Commit) => boolean }[]}
+ * @type {{ title: string, match: (pull: Pull) => boolean }[]}
  */
 const SECTIONS = [
-  { title: "Breaking Changes", match: (c) => c.breaking },
-  { title: "New Features", match: (c) => c.type === "feat" },
-  { title: "Fixes", match: (c) => c.type === "fix" },
-  { title: "Performance", match: (c) => c.type === "perf" },
-  { title: "Other Changes", match: () => true },
+  { title: "Breaking Changes", match: (p) => p.breaking },
+  { title: "New Features", match: (p) => p.type === "feat" },
+  { title: "Fixes", match: (p) => p.type === "fix" },
+  { title: "Performance", match: (p) => p.type === "perf" },
+  { title: "Reverts", match: (p) => p.type === "revert" },
 ];
 
 /**
- * @typedef {object} Commit
- * @property {string} sha - The full hash.
- * @property {string} short - The abbreviated hash.
- * @property {string} author - The author's name.
- * @property {string} email - The author's email.
- * @property {string | null} type - The Conventional Commits type, or null if the subject doesn't follow it.
+ * @typedef {object} Pull
+ * @property {number} number - The pull request's number.
+ * @property {string} sha - Its first commit, whose author is credited.
+ * @property {string} author - That commit's author's name.
+ * @property {string} email - That commit's author's email.
+ * @property {string | null} type - The Conventional Commits type of its title, or null if the title doesn't follow it.
  * @property {string | null} scope - The Conventional Commits scope.
- * @property {boolean} breaking - Whether the commit is marked as a breaking change.
- * @property {string} title - The subject without type and scope, capitalized.
+ * @property {boolean} breaking - Whether the title marks a breaking change.
+ * @property {string} title - The title without type and scope, capitalized.
  */
+
+/**
+ * The section of the notes a pull request goes in.
+ *
+ * @param {Pull} pull - The pull request.
+ * @returns {string | undefined} The section's title, or undefined when it's left out.
+ */
+export function sectionOf(pull) {
+  return SECTIONS.find((section) => section.match(pull))?.title;
+}
 
 /**
  * Runs git in the repository root and returns its output.
@@ -70,8 +82,8 @@ export function previousTag(ref) {
 /**
  * Parses a commit message as a Conventional Commit.
  *
- * @param {string} message - The full commit message.
- * @returns {Pick<Commit, "type" | "scope" | "breaking" | "title">} The parsed message.
+ * @param {string} message - The full commit message, or a pull request's title.
+ * @returns {Pick<Pull, "type" | "scope" | "breaking" | "title">} The parsed message.
  */
 export function parseCommit(message) {
   const subject = message.split("\n", 1)[0].trim();
@@ -87,18 +99,37 @@ export function parseCommit(message) {
 }
 
 /**
- * Reads the commits in a range, newest first, without merges and release commits.
+ * Reads a pull request's number and title from the commit GitHub made to merge
+ * it: "Merge pull request #12 from owner/branch", then the title.
+ *
+ * @param {string} message - The full commit message.
+ * @returns {{ number: number, title: string } | null} The pull request, or null for any other commit.
+ */
+export function parsePull(message) {
+  const match = message.match(
+    /^Merge pull request #(\d+) from (\S+)(?:\n\n(.+))?/,
+  );
+  if (!match) return null;
+  // GitHub writes the title, unless the merge was given an empty message
+  return { number: Number(match[1]), title: (match[3] ?? match[2]).trim() };
+}
+
+/**
+ * Reads the pull requests merged in a range, newest first. Commits pushed or
+ * merged without a pull request are left out.
  *
  * @param {string | null} from - The exclusive start, or null for the whole history.
  * @param {string} to - The inclusive end.
- * @returns {Commit[]} The commits.
+ * @returns {Pull[]} The pull requests.
  */
-export function readCommits(from, to) {
+export function readPulls(from, to) {
   const range = from ? `${from}..${to}` : to;
+  // On the first-parent line: what was merged into main, not into the branches
   const log = git([
     "log",
-    "--no-merges",
-    "--format=%H%x1f%h%x1f%an%x1f%ae%x1f%B%x1e",
+    "--merges",
+    "--first-parent",
+    "--format=%P%x1f%B%x1e",
     range,
   ]);
 
@@ -106,13 +137,24 @@ export function readCommits(from, to) {
     .split("\x1e")
     .map((record) => record.trim())
     .filter(Boolean)
-    .map((record) => {
-      const [sha, short, author, email, message] = record.split("\x1f");
-      return { sha, short, author, email, ...parseCommit(message) };
-    })
-    .filter(
-      (commit) => !(commit.type === "chore" && commit.scope === "release"),
-    );
+    .flatMap((record) => {
+      const [parents, message] = record.split("\x1f");
+      const pull = parsePull(message);
+      if (!pull) return [];
+
+      // Its first commit, made by whoever opened it
+      const [base, head] = parents.split(" ");
+      const [first] = git([
+        "log",
+        "--reverse",
+        "--format=%H%x1f%an%x1f%ae",
+        `${base}..${head}`,
+      ]).split("\n");
+      const [sha, author, email] = first.split("\x1f");
+      return [
+        { number: pull.number, sha, author, email, ...parseCommit(pull.title) },
+      ];
+    });
 }
 
 /**
@@ -149,39 +191,35 @@ export async function githubLogin(repo, sha, token) {
  * @param {string} options.repo - The repository, as owner/name.
  * @param {string | null} options.from - The previous tag, or null for the first release.
  * @param {string} options.to - The released tag or ref.
- * @param {Commit[]} options.commits - The commits in the release, newest first.
+ * @param {Pull[]} options.pulls - The pull requests merged for the release, newest first.
  * @param {Map<string, string | null>} options.logins - GitHub logins by author email.
  * @returns {string} The notes.
  */
-export function renderNotes({ repo, from, to, commits, logins }) {
+export function renderNotes({ repo, from, to, pulls, logins }) {
   const url = `https://github.com/${repo}`;
   const lines = ["## Tokio", "", INTRO, "", "## What's Changed", ""];
 
-  /** @type {Map<string, Commit[]>} */
+  /** @type {Map<string, Pull[]>} */
   const groups = new Map(SECTIONS.map((section) => [section.title, []]));
-  for (const commit of commits) {
-    groups
-      .get(SECTIONS.find((section) => section.match(commit)).title)
-      .push(commit);
-  }
+  for (const pull of pulls) groups.get(sectionOf(pull))?.push(pull);
 
   for (const [title, items] of groups) {
     if (items.length === 0) continue;
 
     lines.push(`## ${title}`, "");
-    for (const commit of items) {
-      const login = logins.get(commit.email);
+    for (const pull of items) {
+      const login = logins.get(pull.email);
       const author = login
-        ? `[${commit.author}](https://github.com/${login})`
-        : commit.author;
+        ? `[${pull.author}](https://github.com/${login})`
+        : pull.author;
       lines.push(
-        `- [ [\`${commit.short}\`](${url}/commit/${commit.sha}) ] - **${commit.title}** _by_ ${author}`,
+        `- [ [#${pull.number}](${url}/pull/${pull.number}) ] - **${pull.title}** _by_ ${author}`,
       );
     }
     lines.push("");
   }
 
-  if (commits.length === 0) lines.push("No changes.", "");
+  if (!pulls.some(sectionOf)) lines.push("No changes.", "");
 
   const changelog = from
     ? `[\`${from}...${to}\`](${url}/compare/${from}...${to})`
