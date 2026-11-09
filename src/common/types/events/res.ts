@@ -146,7 +146,9 @@ export enum APP_EVENTS_RESPONSE {
 
 export interface AppEventsResponseMap {
   // INIT
-  [APP_EVENTS_RESPONSE.LOAD_APP]: Reply;
+  // updatedFrom: on the first load after an update, the version Tokio ran as
+  // before ("" from before it was kept), for What's new
+  [APP_EVENTS_RESPONSE.LOAD_APP]: Reply<{ updatedFrom?: string }>;
 
   // GLOBAL
   // Something the user should know about: failures, warnings, notices

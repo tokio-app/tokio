@@ -15,6 +15,7 @@ export const defaultStoreData: StoreSchema = {
     updates: {
       auto: true,
     },
+    lastVersion: "",
     tray: {
       enabled: true,
     },

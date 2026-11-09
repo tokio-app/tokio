@@ -1,9 +1,11 @@
+import { MESSAGES } from "@/common/i18n";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { forgetDecoded } from "@/helper/audio";
 import { createAudio } from "@test/audio";
 import { send, sent, sentEvents } from "@test/ipc";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { AppProvider } from ".";
 import { AudioContext } from "../audio";
 
@@ -38,6 +40,34 @@ describe("AppProvider", () => {
 
     expect(screen.getByText("Loaded")).toBeInTheDocument();
     expect(sent(APP_EVENTS.SHOW_WINDOW)).toHaveLength(1);
+  });
+
+  it("opens What's new when main says Tokio was updated, until it's closed", async () => {
+    const notes = `releases.${__APP_VERSION__}`;
+    MESSAGES.en[notes] = "Build your own overlays.";
+    onTestFinished(() => {
+      delete MESSAGES.en[notes];
+    });
+    const user = userEvent.setup();
+    setup();
+
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, {
+      success: true,
+      updatedFrom: "0.0.1",
+    });
+    expect(
+      screen.getByRole("dialog", { name: "What's new" }),
+    ).toBeInTheDocument();
+
+    // A later load's reply doesn't say it, like StrictMode's second load
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: true });
+    expect(
+      screen.getByRole("dialog", { name: "What's new" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Loaded")).toBeInTheDocument();
   });
 
   it("shows only the title bar and a message when main couldn't start", async () => {

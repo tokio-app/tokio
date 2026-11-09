@@ -1059,6 +1059,17 @@ const startApp = async (handler: AppHandlerVariables) => {
   return settings;
 };
 
+// The version Tokio ran as before this one, when it changed: the window then
+// shows what's new since it. A new store only records the version.
+function versionChange({ app, storeManagerService }: AppHandlerVariables) {
+  const version = app.getVersion();
+  const last = storeManagerService.getSettings().lastVersion;
+  if (last === version) return undefined;
+  // A failed save was logged, and What's new shows again on the next start
+  void storeManagerService.updateLastVersion(version);
+  return storeManagerService.wasRebuilt() ? undefined : last;
+}
+
 events.push(
   APP_EVENTS.LOAD_APP,
   async (handler, e) => {
@@ -1074,12 +1085,12 @@ events.push(
       });
     }
     const settings = await start;
+    // A reloaded window has already shown it
+    const updatedFrom = first ? versionChange(handler) : undefined;
 
     // On every load, so a reloaded window gets it too
     e.reply(APP_EVENTS_RESPONSE.LANGUAGE, language());
-    e.reply(APP_EVENTS_RESPONSE.LOAD_APP, {
-      success: true,
-    });
+    e.reply(APP_EVENTS_RESPONSE.LOAD_APP, { success: true, updatedFrom });
     if (!first) {
       // The window reloaded, dropping the TTS it was playing
       handler.ttsService.releaseHeld();

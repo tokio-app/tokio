@@ -280,6 +280,7 @@ function createFakes() {
       getPath: vi.fn((name: string) => `/fake/${name}`),
       setPath: vi.fn<(name: string, path: string) => void>(),
       getAppPath: vi.fn(() => "/fake/app"),
+      getVersion: vi.fn(() => "1.0.0"),
       whenReady: vi.fn(() => Promise.resolve()),
       quit: vi.fn(),
       requestSingleInstanceLock: vi.fn(() => true),

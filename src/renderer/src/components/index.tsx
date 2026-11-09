@@ -26,3 +26,4 @@ export * from "./Toasts";
 export * from "./UpdateButton";
 export * from "./VariableList";
 export * from "./VoiceSelect";
+export * from "./WhatsNew";

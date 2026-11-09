@@ -1,5 +1,6 @@
 import Logo from "@/assets/logo.png";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { WhatsNew } from "@/components/WhatsNew";
 import { queueAlert } from "@/helper/alerts";
 import { forgetDecoded } from "@/helper/audio";
 import { useAudio } from "@/hooks/useAudio";
@@ -18,15 +19,19 @@ import React, { useEffect, useState } from "react";
 export function AppProvider({ children }: { children: React.ReactNode }) {
   // Null until main has loaded
   const [started, setStarted] = useState<boolean | null>(null);
+  // The version the update replaced, while What's new is open
+  const [updatedFrom, setUpdatedFrom] = useState<string>();
   const t = useT();
 
   const { getQueue, stopQueues } = useAudio();
 
   useIpcRequest(APP_EVENTS.LOAD_APP);
 
-  useIpcListener(APP_EVENTS_RESPONSE.LOAD_APP, (res) =>
-    setStarted(!!res?.success),
-  );
+  useIpcListener(APP_EVENTS_RESPONSE.LOAD_APP, (res) => {
+    setStarted(!!res?.success);
+    // Only the first load's reply has it, so a later one leaves it open
+    if (res?.updatedFrom !== undefined) setUpdatedFrom(res.updatedFrom);
+  });
 
   useEffect(() => {
     if (started !== null) window.api.emit(APP_EVENTS.SHOW_WINDOW);
@@ -90,5 +95,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  return children;
+  return (
+    <>
+      {children}
+      {updatedFrom !== undefined && (
+        <WhatsNew
+          from={updatedFrom}
+          onClose={() => setUpdatedFrom(undefined)}
+        />
+      )}
+    </>
+  );
 }

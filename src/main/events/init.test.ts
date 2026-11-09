@@ -201,6 +201,8 @@ function setup() {
     activeProfile: profiles[0],
     server: { enabled: true },
     updates: { auto: false },
+    // The fake app's version
+    lastVersion: "1.0.0",
     tray: { enabled: true },
     language: "system",
     activityFeed: { ...defaultStoreData.settings.activityFeed },
@@ -291,6 +293,8 @@ function setup() {
     getProfiles: vi.fn(() => profiles),
     updateLiveStats: vi.fn(),
     updateServerSettings: vi.fn(async (_enabled: boolean) => true),
+    updateLastVersion: vi.fn(async (_version: string) => true),
+    wasRebuilt: vi.fn(() => false),
     recordEmotes: vi.fn(
       async (
         ..._args: Parameters<StoreManagerService["recordEmotes"]>
@@ -2526,6 +2530,59 @@ describe("init events", () => {
         "es-419",
         "es-419",
       ]);
+    });
+
+    it("tells only the first load the version Tokio was updated from, and records the new one", async () => {
+      const s = setup();
+      s.settings.lastVersion = "0.9.0";
+
+      await load(s);
+      await load(s);
+
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        { success: true, updatedFrom: "0.9.0" },
+        { success: true },
+      ]);
+      expect(s.storeManagerService.updateLastVersion.mock.calls).toEqual([
+        ["1.0.0"],
+      ]);
+    });
+
+    it('says an update from before Tokio kept its version came from ""', async () => {
+      const s = setup();
+      s.settings.lastVersion = "";
+
+      await load(s);
+
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        { success: true, updatedFrom: "" },
+      ]);
+    });
+
+    it("records the version of a new store without What's new", async () => {
+      const s = setup();
+      s.settings.lastVersion = "";
+      s.storeManagerService.wasRebuilt.mockReturnValue(true);
+
+      await load(s);
+
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        { success: true },
+      ]);
+      expect(s.storeManagerService.updateLastVersion.mock.calls).toEqual([
+        ["1.0.0"],
+      ]);
+    });
+
+    it("writes nothing when Tokio runs as the version it last ran as", async () => {
+      const s = setup();
+
+      await load(s);
+
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        { success: true },
+      ]);
+      expect(s.storeManagerService.updateLastVersion).not.toHaveBeenCalled();
     });
 
     it("sets up the folders in the home folder and hands out the log files", async () => {

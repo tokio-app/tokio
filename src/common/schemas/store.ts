@@ -59,6 +59,9 @@ const AppSettingsSchema = z.object({
       auto: z.boolean(),
     })
     .default({ auto: true }),
+  // The version Tokio last ran as, to show what's new after an update. "" in
+  // stores from before it was kept.
+  lastVersion: z.string().default(""),
   tray: z
     .object({
       // Closing the window keeps Tokio running, with an icon in the tray

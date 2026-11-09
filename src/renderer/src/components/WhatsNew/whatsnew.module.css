@@ -1,0 +1,46 @@
+/* Every page sits in the same cell, so the dialog keeps the tallest page's
+   height and the buttons stay in place from page to page */
+.pages {
+  display: grid;
+}
+
+.notes {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-left: var(--space-5);
+  list-style: disc;
+  font-size: var(--font-md);
+  line-height: 1.5;
+  color: var(--font-primary);
+}
+
+.notes[data-hidden] {
+  visibility: hidden;
+}
+
+.notes li::marker {
+  color: var(--font-secondary);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: var(--space-2);
+  margin-right: auto;
+  font-size: var(--font-md);
+  color: var(--font-secondary);
+}
+
+.link:hover {
+  color: var(--font-primary);
+}
+
+.count {
+  align-self: center;
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--font-secondary);
+}
