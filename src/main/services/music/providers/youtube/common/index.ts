@@ -127,7 +127,7 @@ export async function confirmLoggedOut(
   return "logged-out";
 }
 
-export const TIME_REGEX = /^(\d+:)*\d+$/;
+const TIME_REGEX = /^(\d+:)*\d+$/;
 
 export function parseDurationToSeconds(
   durationStr: string | undefined,

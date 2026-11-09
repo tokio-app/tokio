@@ -1,13 +1,10 @@
 {
   "$schema": "./node_modules/fallow/schema.json",
   "entry": [
-    "src/main/index.ts",
-    "src/preload/index.ts",
     "src/renderer/src/main.tsx",
     "src/renderer/src/splash/main.tsx",
     "src/music/src/main.tsx"
   ],
-  "ignoreDependencies": ["electron-updater"],
   "ignoreFindings": ["test/main/electron.ts"],
   "ignoreExports": [
     {
@@ -20,6 +17,5 @@
     "mode": "strict",
     "ignore": ["**/*.css", "package.json"]
   },
-
   "rules": {}
 }

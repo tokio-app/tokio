@@ -53,7 +53,7 @@ export function authQuery(cfg: EdgeConfig, auth: EdgeAuth) {
   return `&Sec-MS-GEC=${generateSecMsGec(cfg, auth.tokenVersion)}&Sec-MS-GEC-Version=${auth.gecVersion}`;
 }
 
-export function generateMuid() {
+function generateMuid() {
   return randomBytes(16).toString("hex").toUpperCase();
 }
 

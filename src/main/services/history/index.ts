@@ -38,7 +38,7 @@ export const MAX_GIFTERS = 10_000;
 // Overlays get this many of each list
 export const TOP_GIFTERS = 10;
 // Coin stats gets this many of all time's
-export const SHOWN_GIFTERS = 100;
+const SHOWN_GIFTERS = 100;
 
 const GifterSchema: z.ZodType<Gifter> = z.object({
   userId: z.string(),

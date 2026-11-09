@@ -56,12 +56,17 @@ export class AppHandler implements AppHandlerVariables {
   public readonly musicService: MusicService;
   public readonly serverService: ServerService;
   public readonly overlayService: OverlayService;
+  // Handlers read the ignored ones through AppServices, which fallow can't follow
+  // fallow-ignore-next-line unused-class-member
   public readonly urlManagerService: URLManagerService;
+  // fallow-ignore-next-line unused-class-member
   public readonly jsonManagerService: JSONManagerService;
+  // fallow-ignore-next-line unused-class-member
   public readonly yamlManagerService: YAMLManagerService;
   public readonly storeManagerService: StoreManagerService;
   public readonly pathManagerService: PathManagerService;
   public readonly alertsService: AlertsService;
+  // fallow-ignore-next-line unused-class-member
   public readonly licensesService: LicensesService;
   public readonly updaterService: UpdaterService;
   public readonly liveService: LiveService;

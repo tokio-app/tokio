@@ -22,7 +22,7 @@ The source and the distributed app are MIT, with one LGPL file (see Licensing in
    - Code, fonts or assets that don't come from npm: an entry in `COMPONENTS`, the license text in `LICENSES/<doc>.txt`, and a section in `THIRD_PARTY_NOTICES.md`.
    - A license change in the LGPL part: the banner in `electron.vite.config.ts`, `LICENSES/`, About and the website's licensing. Ask first.
 6. After a removal, drop the rows and entries it had in the notices, and its name from that `files` pattern.
-7. `npx fallow dead-code` finds code that only a removed package used. A package loaded only through a dynamic `import()` looks unused to it: list it in `ignoreDependencies` in `.fallowrc.json`, like `electron-updater`.
+7. `npx fallow dead-code` finds code that only a removed package used. It follows dynamic `import()`s (`electron-updater`'s); a package it still calls unused that the app loads goes in `ignoreDependencies` in `.fallowrc.json`.
 8. Verify: `yarn test src/renderer/src/pages/About/notices.test.ts`, `yarn typecheck`, `yarn lint` and `yarn build`.
 
 ## Traps
