@@ -31,7 +31,7 @@ paths:
 
 ## Windows
 
-- The main window plays every sound, so it has `backgroundThrottling: false` like the music windows: Chromium never treats it as a background page, minimized or in the tray.
+- The main window plays every sound, so it has `backgroundThrottling: false` like the music windows: Chromium never treats it as a background page, minimized or in the tray. The music windows keep it so music plays without affecting the user (the user's call), though Electron then draws the whole window and a minimized player keeps its drawing memory.
 - A page whose renderer process dies for any reason but a clean exit is reloaded (`reloadWhenGone`, `src/main/helper/network.ts`): the main window's and the music windows' views.
 - Main pushes each window's state when it changes (`RESIZE_WINDOW`, `RESIZE_MUSIC_WINDOW`), and each `TitleBar` asks for it when it mounts (`GET_WINDOW_STATE`, `GET_MUSIC_WINDOW_STATE`), so a page reloaded while its window is maximized shows Restore.
 - The app keeps Electron's default menu, with its zoom off, and in a packaged app its reload and DevTools too (`lockMenu`, `src/main/helper/menu.ts`, at startup). Their keys still reach every page: Overlay Studio zooms and shows its rulers with them. F12 opens DevTools in development.
