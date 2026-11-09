@@ -50,6 +50,12 @@ textarea {
   font-family: inherit;
 }
 
+/* Chromium lets every link and image be dragged out like a browser's */
+a,
+img {
+  -webkit-user-drag: none;
+}
+
 /* Controls that don't draw their own focus, such as buttons and links */
 :focus-visible {
   outline: 2px solid var(--accent-primary-hover);
