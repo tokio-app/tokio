@@ -73,6 +73,22 @@ describe("MusicQueue", () => {
     ]);
   });
 
+  it("tells overlays when the last song ends, with none playing", async () => {
+    const queue = new MusicQueue();
+    const listener = vi.fn();
+    queue.on(TOKIO_EVENTS.MUSIC_CHANGE, listener);
+
+    queue.enqueue("a", song("a"), () => {});
+    await vi.advanceTimersByTimeAsync(999);
+    expect(listener).toHaveBeenCalledOnce();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenLastCalledWith([
+      { title: "a", thumbnail: "", playing: false, played: true },
+    ]);
+  });
+
   it("emits MUSIC_CHANGE once per change, and calls onStart only when a song starts", async () => {
     const onStart = vi.fn();
     const queue = new MusicQueue({ onStart });

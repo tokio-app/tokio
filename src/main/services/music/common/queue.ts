@@ -279,6 +279,11 @@ export class MusicQueue extends TokioEmitter {
     }
 
     if (this._abortController === controller) this._isPlaying = false;
+    // The last song ended: overlays see none playing. A stopped loop's caller
+    // sends its own change.
+    if (active() && this._currentIndex >= this._queue.length) {
+      this.emit(TOKIO_EVENTS.MUSIC_CHANGE, this.getSongs());
+    }
   }
 
   // Until the song ends, by what the player says is left near its listed

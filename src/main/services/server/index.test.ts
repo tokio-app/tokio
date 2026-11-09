@@ -24,10 +24,15 @@ vi.mock("node:os", async (importOriginal) => {
 const musicEvents = vi.hoisted(
   () => new Map<string, (data: unknown) => void>(),
 );
+// The songs its queue holds, as overlays get them
+const musicSongs = vi.hoisted((): { current: unknown[] } => ({ current: [] }));
 vi.mock("../music", () => ({
   MusicService: class {
     on(event: string, listener: (data: unknown) => void) {
       musicEvents.set(event, listener);
+    }
+    songs() {
+      return musicSongs.current;
     }
   },
 }));
@@ -722,9 +727,22 @@ describe("ServerService", () => {
       provider = new FakeConnector();
       connector = new TikTokConnectorService();
       connector.addProvider("Fake", provider, true);
+      musicSongs.current = [];
       server.initEvents(connector, new MusicService());
       await server.start();
     });
+
+    // What's sent on connection can come before connect() resolves, so the
+    // first message is listened for before the socket opens.
+    const firstMessage = (id: string) => {
+      const client = new WebSocket(
+        `ws://127.0.0.1:${server.getPort()}/?id=${id}`,
+      );
+      clients.push(client);
+      const message = nextMessage(client);
+      const open = new Promise((resolve) => client.once("open", resolve));
+      return { message, open };
+    };
 
     it("broadcasts live events to every overlay", async () => {
       const a = await connect("a");
@@ -752,6 +770,29 @@ describe("ServerService", () => {
         type: TOKIO_EVENTS.MUSIC_CHANGE,
         data: songs,
       });
+    });
+
+    it("sends the music queue to an overlay as it connects", async () => {
+      const songs = [
+        { title: "Song", thumbnail: "", playing: true, played: false },
+      ];
+      musicSongs.current = songs;
+
+      const { message } = firstMessage("a");
+
+      expect(await message).toEqual({
+        type: TOKIO_EVENTS.MUSIC_CHANGE,
+        data: songs,
+      });
+    });
+
+    it("sends no music queue to an overlay while it's empty", async () => {
+      const { message, open } = firstMessage("a");
+      await open;
+
+      server.sendToClient("a", "ping");
+
+      expect(await message).toBe("ping");
     });
 
     it("listens to the music service only for music changes", () => {

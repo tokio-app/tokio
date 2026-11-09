@@ -92,6 +92,11 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue.off(event, listener);
   }
 
+  // The queue as overlays get it with MUSIC_CHANGE
+  public songs(): MusicInfo[] {
+    return this._music_queue.getSongs();
+  }
+
   // Called when a requested track can't be played. The listener logs it.
   public onPlaybackError(listener: (id: string, error: unknown) => void) {
     this._onPlaybackError = listener;

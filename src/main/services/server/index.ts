@@ -275,6 +275,12 @@ export class ServerService extends Service {
     musicService.on(TOKIO_EVENTS.MUSIC_CHANGE, (data) =>
       this.broadcast(TOKIO_EVENTS.MUSIC_CHANGE, data),
     );
+    // An overlay that loads mid-song gets the queue, not only its next change
+    this.onConnect((id) => {
+      const songs = musicService.songs();
+      if (songs.length === 0) return;
+      this.sendToClient(id, { type: TOKIO_EVENTS.MUSIC_CHANGE, data: songs });
+    });
   }
 
   /** Calls the listener with each overlay's id as it connects. */
