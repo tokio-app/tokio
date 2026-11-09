@@ -71,7 +71,10 @@ events.push(
     if (!res.success) {
       throw new AppFailure(
         FEEDBACK_CODES.MUSIC_CONNECT_FAILED,
-        t("main.music.connectFailed", { name }),
+        // Only Spotify has a key, its Client ID
+        res.badKey
+          ? t("main.spotify.badClientId")
+          : t("main.music.connectFailed", { name }),
         { cause: res.error },
       );
     }

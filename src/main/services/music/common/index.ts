@@ -16,7 +16,12 @@ import { join } from "node:path";
 import { TokioEmitter } from "../../shared/emitter";
 
 export { MusicQueue } from "./queue";
-export type ConnectionResponse = { success: boolean; error?: Error };
+export type ConnectionResponse = {
+  success: boolean;
+  error?: Error;
+  // The service has no app for the provider's key, Spotify's Client ID
+  badKey?: boolean;
+};
 
 export abstract class MusicProvider extends TokioEmitter {
   protected _logFile = "";

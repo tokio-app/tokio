@@ -1122,6 +1122,7 @@
   "main.failure.addStudioOverlay": "No se pudo crear el overlay.",
   "main.failure.saveStudioOverlay": "No se pudo guardar el overlay.",
   "main.failure.removeStudioOverlay": "No se pudo eliminar el overlay.",
+  "main.spotify.badClientId": "Spotify no tiene ninguna app con este Client ID. Cópialo desde Settings de tu app en el Spotify Developer Dashboard.",
   "minecraft.weather.clear": "Despejado",
   "minecraft.weather.rain": "Lluvia",
   "minecraft.weather.thunder": "Tormenta",

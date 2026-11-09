@@ -6,6 +6,7 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import { defaultProfile } from "@/common/util";
+import type { ConnectionResponse } from "@/services/music/common";
 import { describe, expect, it, vi } from "vitest";
 
 // music.ts keeps the last connect's listener, so every test gets a fresh
@@ -81,11 +82,10 @@ describe("music events", () => {
         disconnect: vi.fn(),
         clearHandler: vi.fn(),
         setProvider: vi.fn((_name: string, _key?: string) => {}),
-        connect: vi.fn(
-          async (): Promise<{ success: boolean; error?: Error }> =>
-            connects
-              ? { success: true }
-              : { success: false, error: new Error("window closed") },
+        connect: vi.fn(async (): Promise<ConnectionResponse> =>
+          connects
+            ? { success: true }
+            : { success: false, error: new Error("window closed") },
         ),
       };
       const h = m.createHandler({ musicService });
@@ -184,6 +184,31 @@ describe("music events", () => {
         undefined,
         expect.any(Error),
       );
+    });
+
+    it("says when Spotify has no app for the Client ID", async () => {
+      const { h, musicService, connect, connected } = await setup();
+      musicService.connect.mockResolvedValueOnce({
+        success: false,
+        badKey: true,
+        error: new Error("Spotify has no app with this Client ID."),
+      });
+
+      await connect("Spotify");
+
+      const failure = {
+        code: FEEDBACK_CODES.MUSIC_CONNECT_FAILED,
+        message:
+          "Spotify has no app with this Client ID. Copy it from your app's Settings in the Spotify Developer Dashboard.",
+      };
+      expect(connected()).toEqual([{ success: false, error: failure }]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          source: "music",
+          ...failure,
+        }),
+      ]);
     });
 
     it("says it disconnected once when the provider ends after connecting", async () => {

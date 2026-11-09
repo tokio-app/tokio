@@ -37,21 +37,38 @@ const bodyOf = (init: RequestInit | undefined) =>
   typeof init?.body === "string" ? init.body : "";
 
 type Answer = (path: string, init: RequestInit) => Response;
+type TokenAnswer = () => Response | Promise<Response>;
+
+// What Spotify answers a real Client ID's made-up code
+const refusedCode = () =>
+  json(
+    { error: "invalid_grant", error_description: "Invalid authorization code" },
+    400,
+  );
 
 /**
- * Answers the token endpoint (the code exchange with TOKENS, refreshes with
- * `refresh`) and the Web API with `api`, which gets the path after /v1.
+ * Answers the token endpoint (the Client ID check with `check`, the code
+ * exchange with `exchange`, refreshes with `refresh`) and the Web API with
+ * `api`, which gets the path after /v1.
  */
 const stubFetch = ({
   api = () => json({}),
+  check = refusedCode,
+  exchange = () => json(TOKENS),
   refresh = () => json(REFRESHED),
-}: { api?: Answer; refresh?: () => Response | Promise<Response> } = {}) => {
+}: {
+  api?: Answer;
+  check?: TokenAnswer;
+  exchange?: TokenAnswer;
+  refresh?: TokenAnswer;
+} = {}) => {
   const fetch = vi.fn(
     async (input: string | URL | Request, init: RequestInit = {}) => {
       const url = urlOf(input);
       if (url !== config.TOKEN_URL) return api(url.slice(API.length), init);
-      const grant = new URLSearchParams(bodyOf(init)).get("grant_type");
-      return grant === "refresh_token" ? refresh() : json(TOKENS);
+      const body = new URLSearchParams(bodyOf(init));
+      if (body.get("grant_type") === "refresh_token") return refresh();
+      return body.get("code") === "the-code" ? exchange() : check();
     },
   );
   vi.stubGlobal("fetch", fetch);
@@ -71,6 +88,10 @@ const tokenRequests = (fetch: FetchMock) =>
 
 const refreshes = (fetch: FetchMock) =>
   tokenRequests(fetch).filter((r) => r.body.grant_type === "refresh_token");
+
+// The code exchanges, without the Client ID check before each login
+const exchanges = (fetch: FetchMock) =>
+  tokenRequests(fetch).filter((r) => r.body.code === "the-code");
 
 const apiRequests = (fetch: FetchMock) =>
   fetch.mock.calls
@@ -97,8 +118,16 @@ const redirect = (url: string, event = "will-redirect") => {
 const callback = (params: Record<string, string>) =>
   `${config.CALLBACK}?${new URLSearchParams(params)}`;
 
-const login = async (spotify = new Spotify("client-id")) => {
+// Starts a connect and waits for its login window, which opens once the
+// Client ID checks out
+const openLogin = async (spotify: Spotify) => {
   const pending = spotify.connect();
+  await vi.advanceTimersByTimeAsync(0);
+  return { pending };
+};
+
+const login = async (spotify = new Spotify("client-id")) => {
+  const { pending } = await openLogin(spotify);
   redirect(callback({ code: "the-code" }));
   await expect(pending).resolves.toEqual({ success: true });
   return spotify;
@@ -133,6 +162,8 @@ const DEVICES = {
 describe("Spotify", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    // No connect reaches the network, even in tests that don't read requests
+    stubFetch();
   });
 
   afterEach(() => {
@@ -145,7 +176,7 @@ describe("Spotify", () => {
       const spotify = new Spotify();
       spotify.setKey("client-id");
 
-      const pending = spotify.connect();
+      const { pending } = await openLogin(spotify);
       const authorize = new URL(authView().webContents.getURL());
       redirect(callback({ code: "the-code" }));
       await pending;
@@ -163,25 +194,27 @@ describe("Spotify", () => {
         code_challenge: expect.any(String),
       });
 
-      const verifier = tokenRequests(fetch)[0].body.code_verifier;
+      const verifier = exchanges(fetch)[0].body.code_verifier;
       expect(verifier).toMatch(/^[A-Za-z0-9\-._~]{43,128}$/);
       expect(params.code_challenge).toBe(
         createHash("sha256").update(verifier).digest("base64url"),
       );
     });
 
-    it("trims the Client ID, which a paste can pad with spaces", () => {
+    it("trims the Client ID, which a paste can pad with spaces", async () => {
+      const fetch = stubFetch();
       const spotify = new Spotify();
       spotify.setKey(" client-id ");
 
-      spotify.connect();
+      await openLogin(spotify);
 
       const authorize = new URL(authView().webContents.getURL());
       expect(authorize.searchParams.get("client_id")).toBe("client-id");
+      expect(tokenRequests(fetch)[0].body.client_id).toBe("client-id");
     });
 
-    it("shows the login in its own session under the title bar", () => {
-      new Spotify("client-id").connect();
+    it("shows the login in its own session under the title bar", async () => {
+      await openLogin(new Spotify("client-id"));
       const shell = windows()[0];
       const view = authView();
 
@@ -211,14 +244,14 @@ describe("Spotify", () => {
       const fetch = stubFetch();
       const spotify = new Spotify("client-id");
 
-      const pending = spotify.connect();
+      const { pending } = await openLogin(spotify);
       const event = redirect(callback({ code: "the-code" }));
 
       await expect(pending).resolves.toEqual({ success: true });
       expect(event.defaultPrevented).toBe(true);
       expect(spotify.isActive()).toBe(true);
 
-      const [exchange] = tokenRequests(fetch);
+      const [exchange] = exchanges(fetch);
       expect(exchange.method).toBe("POST");
       expect(exchange.headers.get("Content-Type")).toBe(
         "application/x-www-form-urlencoded",
@@ -236,7 +269,7 @@ describe("Spotify", () => {
       stubFetch();
       const spotify = new Spotify("client-id");
 
-      const pending = spotify.connect();
+      const { pending } = await openLogin(spotify);
       const event = redirect(callback({ code: "the-code" }), "will-navigate");
 
       await expect(pending).resolves.toEqual({ success: true });
@@ -246,7 +279,8 @@ describe("Spotify", () => {
     it("lets the login pages navigate", async () => {
       const fetch = stubFetch();
       const done = vi.fn();
-      new Spotify("client-id").connect().then(done);
+      const { pending } = await openLogin(new Spotify("client-id"));
+      pending.then(done);
 
       const event = redirect(
         "https://accounts.spotify.com/login?continue=x",
@@ -256,14 +290,14 @@ describe("Spotify", () => {
 
       expect(event.defaultPrevented).toBe(false);
       expect(done).not.toHaveBeenCalled();
-      expect(fetch).not.toHaveBeenCalled();
+      expect(exchanges(fetch)).toEqual([]);
     });
 
     it("fails when the user denies access", async () => {
       const fetch = stubFetch();
       const spotify = new Spotify("client-id");
 
-      const pending = spotify.connect();
+      const { pending } = await openLogin(spotify);
       redirect(callback({ error: "access_denied" }));
 
       await expect(pending).resolves.toEqual({
@@ -271,7 +305,7 @@ describe("Spotify", () => {
         error: new Error("Login Error: access_denied"),
       });
       expect(spotify.isActive()).toBe(false);
-      expect(fetch).not.toHaveBeenCalled();
+      expect(exchanges(fetch)).toEqual([]);
     });
 
     it("fails when the exchange gives no token", async () => {
@@ -281,7 +315,7 @@ describe("Spotify", () => {
       );
       const spotify = new Spotify("client-id");
 
-      const pending = spotify.connect();
+      const { pending } = await openLogin(spotify);
       redirect(callback({ code: "the-code" }));
 
       await expect(pending).resolves.toEqual({
@@ -293,7 +327,7 @@ describe("Spotify", () => {
 
     it("fails when the window is closed before the redirect", async () => {
       const spotify = new Spotify("client-id");
-      const pending = spotify.connect();
+      const { pending } = await openLogin(spotify);
       const shell = windows()[0];
       const view = authView();
 
@@ -309,7 +343,7 @@ describe("Spotify", () => {
 
     it("removes and closes the login view and the window afterwards", async () => {
       stubFetch();
-      const pending = new Spotify("client-id").connect();
+      const { pending } = await openLogin(new Spotify("client-id"));
       const shell = windows()[0];
       const view = authView();
 
@@ -334,10 +368,10 @@ describe("Spotify", () => {
     it("closes a login still open when it connects again", async () => {
       stubFetch();
       const spotify = new Spotify("client-id");
-      const first = spotify.connect();
+      const { pending: first } = await openLogin(spotify);
       const [shell, view] = [windows()[0], authView()];
 
-      const second = spotify.connect();
+      const { pending: second } = await openLogin(spotify);
 
       expect(shell.isDestroyed()).toBe(true);
       expect(view.webContents.close).toHaveBeenCalledOnce();
@@ -351,7 +385,8 @@ describe("Spotify", () => {
     it("fails when the callback has neither a code nor an error", async () => {
       stubFetch();
       const done = vi.fn();
-      new Spotify("client-id").connect().then(done);
+      const { pending } = await openLogin(new Spotify("client-id"));
+      pending.then(done);
 
       redirect(callback({ state: "abc" }));
       await vi.advanceTimersByTimeAsync(0);
@@ -359,6 +394,88 @@ describe("Spotify", () => {
       expect(done).toHaveBeenCalledWith(
         expect.objectContaining({ success: false }),
       );
+    });
+
+    it.each(["Failed to get client", "Invalid client", undefined])(
+      "fails without a login when Spotify has no app for the Client ID (%s)",
+      async (description) => {
+        const fetch = stubFetch({
+          check: () =>
+            json(
+              { error: "invalid_client", error_description: description },
+              400,
+            ),
+        });
+        const spotify = new Spotify("not-an-app");
+
+        const pending = spotify.connect();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(windows()).toEqual([]);
+        await expect(pending).resolves.toEqual({
+          success: false,
+          badKey: true,
+          error: expect.any(Error),
+        });
+        expect(spotify.isActive()).toBe(false);
+        expect(tokenRequests(fetch)).toEqual([
+          {
+            headers: expect.any(Headers),
+            method: "POST",
+            body: {
+              client_id: "not-an-app",
+              grant_type: "authorization_code",
+              code: expect.any(String),
+              redirect_uri: config.CALLBACK,
+              code_verifier: expect.stringMatching(
+                /^[A-Za-z0-9\-._~]{43,128}$/,
+              ),
+            },
+          },
+        ]);
+      },
+    );
+
+    it.each([
+      ["refuses the made-up code", refusedCode],
+      [
+        "refuses something else as invalid_client",
+        () =>
+          json(
+            {
+              error: "invalid_client",
+              error_description: "Invalid redirect URI",
+            },
+            400,
+          ),
+      ],
+      ["fails", () => json({ error: "server_error" }, 500)],
+      ["gets no answer", () => Promise.reject(new TypeError("fetch failed"))],
+    ])("opens the login when the check %s", async (_, check) => {
+      stubFetch({ check });
+
+      await login();
+    });
+
+    it("opens one login when it connects again while checking the Client ID", async () => {
+      const answers: (() => void)[] = [];
+      stubFetch({
+        check: () =>
+          new Promise<Response>((resolve) =>
+            answers.push(() => resolve(refusedCode())),
+          ),
+      });
+      const spotify = new Spotify("client-id");
+
+      const first = spotify.connect();
+      const second = spotify.connect();
+      answers.forEach((answer) => answer());
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(windows()).toHaveLength(1);
+      expect((await first).success).toBe(false);
+      redirect(callback({ code: "the-code" }));
+      await expect(second).resolves.toEqual({ success: true });
     });
   });
 
@@ -784,10 +901,9 @@ describe("Spotify", () => {
     });
 
     it("refreshes right away when the token expires within a minute", async () => {
-      const fetch = stubFetch();
-      fetch.mockImplementationOnce(async () =>
-        json({ ...TOKENS, expires_in: 30 }),
-      );
+      const fetch = stubFetch({
+        exchange: () => json({ ...TOKENS, expires_in: 30 }),
+      });
       await login();
 
       await vi.advanceTimersByTimeAsync(0);
@@ -796,10 +912,9 @@ describe("Spotify", () => {
     });
 
     it("refreshes a token with no lifetime after an hour", async () => {
-      const fetch = stubFetch();
-      fetch.mockImplementationOnce(async () =>
-        json({ ...TOKENS, expires_in: undefined }),
-      );
+      const fetch = stubFetch({
+        exchange: () => json({ ...TOKENS, expires_in: undefined }),
+      });
       await login();
 
       await vi.advanceTimersByTimeAsync((3600 - 60) * 1000 - 1);
@@ -839,10 +954,11 @@ describe("Spotify", () => {
 
     await spotify.searchSong("song");
 
-    // The code exchange, the request, the refresh and the retry
+    // The Client ID check, the code exchange, the request, the refresh and
+    // the retry
     const signals = fetch.mock.calls.map(([, init]) => init?.signal);
-    expect(signals).toEqual(Array(4).fill(expect.any(AbortSignal)));
-    expect(new Set(signals).size).toBe(4);
+    expect(signals).toEqual(Array(5).fill(expect.any(AbortSignal)));
+    expect(new Set(signals).size).toBe(5);
   });
 
   describe("disconnect", () => {
@@ -875,13 +991,32 @@ describe("Spotify", () => {
 
     it("closes a login still open, which fails it", async () => {
       const spotify = new Spotify("client-id");
-      const pending = spotify.connect();
+      const { pending } = await openLogin(spotify);
       const shell = windows()[0];
 
       spotify.disconnect();
 
       expect(shell.isDestroyed()).toBe(true);
       expect((await pending).error?.message).toContain("closed by the user");
+    });
+
+    it("drops a connect still checking the Client ID", async () => {
+      let answer = () => {};
+      stubFetch({
+        check: () =>
+          new Promise<Response>((resolve) => {
+            answer = () => resolve(refusedCode());
+          }),
+      });
+      const spotify = new Spotify("client-id");
+      const pending = spotify.connect();
+
+      spotify.disconnect();
+      answer();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(windows()).toEqual([]);
+      expect((await pending).success).toBe(false);
     });
 
     it("stops calling a listener removed with off", async () => {

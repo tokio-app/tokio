@@ -14,7 +14,8 @@ export class Spotify extends MusicProvider {
   private _refreshToken: string | null = null;
   private _isActive: boolean = false;
   private _refreshTimeout: NodeJS.Timeout | null = null;
-  // Counts disconnects, so a refresh that ends after one is dropped
+  // Counts disconnects, so a refresh or a Client ID check that ends after
+  // one is dropped
   private _session = 0;
   // The refresh in flight, which requests that expire together share
   private _refreshing: Promise<void> | null = null;
@@ -37,10 +38,27 @@ export class Spotify extends MusicProvider {
     return this._isActive;
   }
 
-  public connect(): Promise<ConnectionResponse> {
-    if (this._isActive) return Promise.resolve({ success: true });
-    // A login still open from an earlier connect fails, so one window is left
+  public async connect(): Promise<ConnectionResponse> {
+    if (this._isActive) return { success: true };
+    // A login still open from an earlier connect fails, and a connect still
+    // checking its Client ID opens nothing, so one window is left
     this.disconnect();
+    const session = this._session;
+
+    const known = await this._knowsClient();
+    if (session !== this._session) {
+      return {
+        success: false,
+        error: new Error("A newer connect or a disconnect came first."),
+      };
+    }
+    if (!known) {
+      return {
+        success: false,
+        badKey: true,
+        error: new Error("Spotify has no app with this Client ID."),
+      };
+    }
 
     return new Promise((res) => {
       const codeVerifier = this.generateRandomString(64);
@@ -158,6 +176,7 @@ export class Spotify extends MusicProvider {
   }
 
   public disconnect(): void {
+    this._session++;
     // A login still open fails once its window closes
     if (this._authWindow && !this._authWindow.isDestroyed()) {
       this._authWindow.close();
@@ -165,7 +184,6 @@ export class Spotify extends MusicProvider {
     if (!this._isActive) return;
     if (this._refreshTimeout) clearTimeout(this._refreshTimeout);
     this._refreshTimeout = null;
-    this._session++;
     this._refreshing = null;
     this._accessToken = null;
     this._refreshToken = null;
@@ -227,6 +245,34 @@ export class Spotify extends MusicProvider {
       thumbnail: track.album?.images?.[0]?.url ?? "",
       duration: track.duration_ms ?? 0,
     };
+  }
+
+  // Spotify refuses a token request as invalid_client before any login when
+  // it has no app for the Client ID, and a real one's made-up code as
+  // invalid_grant. Any other answer, or none, lets the login try.
+  private async _knowsClient(): Promise<boolean> {
+    try {
+      const response = await fetch(config.TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: this._clientId,
+          grant_type: "authorization_code",
+          code: "client-check",
+          redirect_uri: config.CALLBACK,
+          code_verifier: this.generateRandomString(64),
+        }).toString(),
+        signal: AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
+      });
+      if (response.status !== 400) return true;
+      const { error, error_description = "" } = await response.json();
+      return !(
+        error === "invalid_client" &&
+        config.UNKNOWN_CLIENT.test(error_description)
+      );
+    } catch {
+      return true;
+    }
   }
 
   private async exchangeCodeForToken(
