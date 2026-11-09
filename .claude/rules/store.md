@@ -8,20 +8,19 @@ paths:
 
 # Store and profiles
 
-`StoreManagerService` (`src/main/services/store`) holds the store file and the profile files. The rules every area follows (schemas and defaults, store mutators, `updateProfileData`, provider keys, atomic writes) are in Persistence in `AGENTS.md`.
+`StoreManagerService` (`src/main/services/store`) holds the store file and the profile files.
 
 ## Profiles
 
 - `createNewProfile`, `cloneProfile` and `importProfile` return `"unsaved"` when only the store save failed, after deleting the profile file they wrote, and `null` for other failures.
 - A profile switch or a new listing (`addProfile`) that can't be saved is undone. The store is then saved once more so the file matches memory: an earlier queued save may have written it. An undone switch reads the active profile from its file again, since an update to it may have landed during the save.
-- Profile files are named by `profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file.
-- Creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`). An import's file is named by `profileFileFor` too, after the picked file's name.
+- Profile files, an import's too (after the picked file's name), are named by `profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file.
+- Creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`).
 - An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case. One whose trimmed name is too short is listed as "Imported profile".
 
 ## The active profile
 
-- `getProfileData` keeps the active profile in memory.
-- When its file fails to load, live events try it again at most every `LOAD_RETRY_MS`, so a broken file isn't read on every event.
+- `getProfileData` keeps the active profile in memory. When its file fails to load, live events try it again at most every `LOAD_RETRY_MS`, so a broken file isn't read on every event.
 - After an emote save fails (`recordEmotes`), emote saves for that file wait `LOAD_RETRY_MS` before writing again. An emote's image is compared with TikTok's once a run, and only counts as checked once its save went through.
 - GET_PROFILE and the sweeps that remove a sound, media file or picture from every profile (`removeFromAlerts`, `removeFromGames`, through `_updateProfiles`) pass `{ fresh: true }`: they wait for the active profile's update still writing and retry a failed file at once. A sweep logs another profile whose file it can't read (held, no access) and returns false, so the handler keeps the library file; one that's missing or doesn't load counts as done.
 

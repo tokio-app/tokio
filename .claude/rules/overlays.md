@@ -22,63 +22,58 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 ## Previews
 
 - The Overlays page shows each overlay in an `Iframe` named `TOKIO_APP-<id>`, loaded from disk through `local-resource:` so previews work with the overlay server off. `postToOverlay` posts `TOKIO_PREVIEW` messages to it, which `@tokioapp/overlay` reads instead of opening a WebSocket.
-- The settings dialog (`OverlayModal`) posts the unsaved settings (`getOverlayConfig`) to its own preview alone, through a ref, so the card and the live overlays keep the saved ones until Save. While it's open, Test reaches only the previews (`postToPreviews`), never the stream.
+- The settings dialog (`OverlayModal`) posts the unsaved settings to its own preview alone, so the card and the live overlays keep the saved ones until Save. While it's open, Test reaches only the previews (`postToPreviews`), never the stream.
 - Test sends every live event at once, as the next moment of a test LIVE (`createTestLive`, `src/common/util/samples`) that `OverlayService` keeps per overlay id, Tools → Test overlays' ids included, until the app quits. The settings' Test carries on the card's.
-- Each press ends with sample `tokio:gifters` (the test LIVE's gifters, plus 12 made-up past ones for all time, some of whom come back to it) and `tokio:fans`, so overlays built on them have something to show.
+- Each press ends with sample `tokio:gifters` (the test LIVE's gifters, plus 12 made-up past ones for all time, some of whom come back to it) and `tokio:fans`, so overlays built on them have something to show. Previews and test overlays get them then, not when they load.
 - `local-resource:` has no origin, so it's registered with `corsEnabled` and `supportFetchAPI`, and `withPreviewCORS` adds `Access-Control-Allow-Origin: *`. Without them Chromium blocks module scripts, `crossorigin` styles, fonts and `fetch`, and overlays built with Vite never run in previews.
 - Overlay code can load any `local-resource:` URL, so the handler serves only files inside the overlays folder (`previewFile`). Don't widen it.
 - `getConfig`, `saveConfig` and `remove` refuse an id that isn't stored (`_isStored`), so the renderer's id can't point outside the overlays folder. The check doesn't log; the config handlers and `_remove` do.
-- `withPreviewStyles` gives previews the app's background (for ClearType text) and hides scrollbars, as OBS's default CSS does. A URL with `?transparent` (`Iframe`'s `transparent`, for Overlay Studio's editor) keeps its own background, so the canvas shows through; the scrollbar rule stays. The files on disk and what the overlay server sends stay unchanged.
+- `withPreviewStyles` gives previews the app's background (for ClearType text) and hides scrollbars, as OBS's default CSS does. A URL with `?transparent` (`Iframe`'s `transparent`, for Overlay Studio's editor) keeps its own background; the scrollbar rule stays. The files on disk and what the overlay server sends stay unchanged.
 
 ## Files
 
-- An import copies the folder a picked link points to (`realpath`), leaving out every link inside, into `.install-<uuid>` inside the overlays folder.
-  - It checks the copy there (`processOverlay`, the setup block, then `processHTML`, which writes no folder path), then renames it into its UUID folder (`renameWithRetry`).
-  - `cp` keeps a read-only mode, which Windows can't rename over, so the copy's `index.html`, `config.yaml` and `config.yml` get the owner's write bit first. A `processHTML` failure is logged with its error.
+- An import copies the folder a picked link points to (`realpath`), leaving out every link inside, into `.install-<uuid>` inside the overlays folder. It checks the copy there (`processOverlay`, the setup block, then `processHTML`), then renames it into its UUID folder (`renameWithRetry`).
+  - `cp` keeps a read-only mode, which Windows can't rename over, so the copy's `index.html`, `config.yaml` and `config.yml` get the owner's write bit first.
   - A failure deletes the staging folder. One a quit leaves behind, `load` deletes.
-- A remove first renames the overlay's folder to `.old-<uuid>` (`renameWithRetry`; a missing folder counts as gone), so a folder another program holds stays whole and stored. Only then does it stop serving it, forget it and delete `.old-*`, which `load` deletes if that fails.
+- A remove first renames the overlay's folder to `.old-<uuid>` (a missing folder counts as gone), so a folder another program holds stays whole and stored. Only then does it stop serving it, forget it and delete `.old-*`, which `load` deletes if that fails.
 - `YAMLManagerService` logs to `overlays.log`, so a refused `info.yaml` or `config.yaml` says why there.
-- Imports, saves, updates and every start write the settings `config.yaml` holds into the HTML (`processHTML`). It writes only an HTML that changed, through `writeFileAtomic` (`src/main/helper/fs.ts`).
+- Imports, saves, updates and every start write the settings `config.yaml` holds into the HTML (`processHTML`), only when the HTML changed.
 - At each start `load` checks every stored overlay. One that fails isn't served but stays stored, so fixing it keeps its id and OBS link; only an overlay whose folder is gone is forgotten.
 - Saving settings writes `config.yaml` first, so settings the schema refuses change nothing, then the HTML with the gifts main keeps; the renderer doesn't send gifts.
 - The `SAVE_OVERLAY_CONFIG` handler sends the saved settings (`tokio:config`) to the live overlays itself, so they get them even after the page closed; the page posts them only to its previews. A save reply updates its overlay even after its settings closed, and only closes the dialog still open for it.
 - A save merges the dialog's values onto the installed version's fields (`mergeOverlayConfig`), so a dialog opened before an update can't write the old version's fields.
-- `OverlayService` runs each overlay's file work (`saveConfig`, `getConfig`, `remove`, `_writeHTML` for gift refreshes and starts, an install's extract and swap) one after another through `_lock(id)`, so a gift refresh can't write back settings read before a save.
+- `OverlayService` runs each overlay's file work (`saveConfig`, `getConfig`, `remove`, `_writeHTML`, an install's extract and swap) one after another through `_lock(id)`, so a gift refresh can't write back settings read before a save.
   - A task holding the lock must not call a method that takes it (`_prepare` uses `_readConfig`), or it waits on itself.
   - An install downloads before taking it.
-  - `writeFileAtomic` also runs writes to one file in the order they came.
-- Import, remove, install and Tools → Test overlays keep their change when the store file can't be written (`OverlayResult.saved: false`): the handler replies with the list main holds, then throws `saveFailure()`, with no success notice.
+- Import, remove, install and Tools → Test overlays keep their change when the store file can't be written (`OverlayResult.saved: false`), and the handler follows Feedback in `AGENTS.md`.
 
 ## Settings fields
 
-- `OverlayConfigSchema` (`src/common/schemas/overlay.ts`) holds the field types. `SettingField` lays each one out and `FieldControl` draws its control, which a table's cells reuse through `cellField`.
-- A `font` field is a `FontSelect` whose `""` reads as the overlay's own font (`components.overlayModal.overlayFont`): the official overlays use `system-ui`, not Archivo.
+- `OverlayConfigSchema` (`src/common/schemas/overlay.ts`) holds the field types. `FieldControl` draws a field's control, which a table's cells reuse through `cellField`.
+- A `font` field's `""` reads as the overlay's own font: the official overlays use `system-ui`, not Archivo.
 - A `table` field's rows are objects of cells keyed by column id. Columns take every type but `table` and `slider`, and `checkTable` refuses a row without exactly one cell of its column's kind per column.
-- `TableField` draws a real table, each cell a group named by its column. The settings column widens (`editor_wide`) for an overlay with a table, and the box scrolls sideways under the pinned remove buttons when the columns still don't fit.
-- Removing the last row, or adding one, moves the focus (to the previous row's remove button, Add, or the new row's first control). A button that leaves the DOM drops it on `<body>`, where the `Modal` no longer sees Escape or Tab.
+- In `TableField`, removing the last row moves the focus to the previous row's remove button or Add, and adding one to the new row's first control.
 - A merge (`mergeOverlayConfig`) keeps a table's rows up to the new `max`. A cell stays when the old table had a column with the same id and type and the value still fits (`fits`); the others take the column's default.
 
 ## Another computer
 
-- The server listens on every interface on purpose (see Conventions in `AGENTS.md`). A streaming app on another computer opens overlays through `tokio-app.local` pointed at this PC's address in that computer's hosts file or a DNS entry (as the website's docs describe), or at the address itself. Tokio's own hosts-file entry (`services/url`) is only for this PC.
+- A streaming app on another computer opens overlays through `tokio-app.local` pointed at this PC's address in that computer's hosts file or a DNS entry (as the website's docs describe), or at the address itself. Tokio's own hosts-file entry (`services/url`) is only for this PC.
 - `ServerService` sets Express's `env` to `production` (`NODE_ENV` isn't set), so an error page for a bad URL shows no stack, and no paths with the account's name.
 - `processHTML` appends `REMOTE_SOCKET` (`services/overlay/common`) to every setup block. On a page opened on port 37891 from a host other than `localhost`, `127.0.0.1` or `[::1]`, it wraps `WebSocket` so sockets to a loopback host on that port go to `location.host`.
 - Previews (`local-resource:`) and pages opened at `localhost` are left alone. A page Tokio doesn't serve gets no setup block, so it must connect to the Tokio PC's address itself.
-- **Settings → Overlay server** lists `ServerService.networkAddresses()` (`GET_NETWORK_ADDRESSES`, `notify: false`, `[]` on failure), each a `CopyField` of the IP alone, what a hosts file or a DNS entry needs.
+- **Settings → Overlay server** lists `ServerService.networkAddresses()` (`GET_NETWORK_ADDRESSES`), each the IP alone, what a hosts file or a DNS entry needs.
 
 ## Official overlays
 
-- They come from the catalog of `tokio-app/overlays` (see Overlays repo in `AGENTS.md`), listed on **Official overlays** (`pages/OfficialOverlays`, `/overlays/official`).
-- `OverlayService.getCatalog` reads the catalog when that page or the Overlays page opens and keeps it for `CATALOG_TTL_MS`. Calls made while it fetches share that one fetch. A failure isn't kept; a failure that comes while a catalog shows is ignored.
-- The Overlays page reads the catalog only for the dot on its **Official overlays** button (`countUpdates`, `src/common/util/catalog.ts`, next to `catalogState`).
-- `parseCatalog` (`services/overlay/common/catalog.ts`) drops entries that don't parse (`CatalogOverlaySchema`, `src/common/schemas/catalog.ts`) or whose zip isn't under `https://github.com/tokio-app/overlays/releases/download/`, and previews from anywhere else. Only fetch that prefix.
+- They come from the catalog of `tokio-app/overlays` (see Overlays repo in `AGENTS.md`), listed on **Official overlays** (`/overlays/official`).
+- `OverlayService.getCatalog` keeps the catalog for `CATALOG_TTL_MS`, and calls made while it fetches share that one fetch. A failure isn't kept; a failure that comes while a catalog shows is ignored.
+- `parseCatalog` (`services/overlay/common/catalog.ts`) drops entries that don't parse (`CatalogOverlaySchema`) or whose zip isn't under `https://github.com/tokio-app/overlays/releases/download/`, and previews from anywhere else. Only fetch that prefix.
 - The renderer sends only the id (`INSTALL_OVERLAY`); main looks the entry up in its catalog, so it never downloads a URL from the renderer.
-- `installFromCatalog` downloads the zip, checks its size and SHA-256 against the catalog, and extracts it (`extractZip`, refusing paths outside the folder) into `.install-<uuid>` inside the overlays folder. It's then checked like an import.
-- Renaming it into place (`renameWithRetry`, which retries for about a second while Windows antivirus or indexers hold the folder) keeps it on the same drive and the old version whole until the new one is in. `load` deletes `.install-*` and `.old-*` leftovers, so a rollback that fails is logged with the `.old-*` folder holding the old version.
+- `installFromCatalog` checks the zip's size and SHA-256 against the catalog and extracts it (`extractZip`, refusing paths outside the folder) into `.install-<uuid>`, then checks it like an import.
+- Renaming it into place (`renameWithRetry`, which retries for about a second while Windows antivirus or indexers hold the folder) keeps it on the same drive and the old version whole until the new one is in. A rollback that fails is logged with the `.old-*` folder holding the old version.
 - An official overlay's folder, id and URL path are its catalog id (`http://tokio-app.local:37891/gift-jar/`), and it's stored with `external: false`. Imported overlays get a random UUID, which is how `findOverlays` tells them apart when the store is rebuilt.
-- A rebuilt store takes back only folders named the way Tokio names them: a UUID, or an id `CatalogOverlaySchema` accepts. Express 5 can't mount a copy like `gift-jar - Copy (2)`, and `alerts`, `timer`, `games` and `studio` are Tokio's own paths.
-- `rebuildRoutes` skips, and logs, an id it can't mount, so one an older store still holds doesn't stop the server's start.
 - Keeping the catalog id over generated ids is the user's call: readable URLs survive removing and reinstalling, so OBS links keep working. A random id adds no security, since the socket accepts any id and every client gets the LIVE events. Don't propose switching.
-- `CatalogOverlaySchema` refuses the ids `alerts`, `timer`, `games` and `studio`: `/alerts/` serves each alert's own overlay, `/timer/` the countdown timer's, `/games/` the games' overlays and `/studio/` Overlay Studio's. None is stored or in the gallery (see `.claude/rules/alerts.md`, `.claude/rules/timer.md`, `.claude/rules/games-overlay.md` and `.claude/rules/studio.md`).
-- An update keeps the saved settings that still fit the new `config.yaml` (`mergeOverlayConfig`, `src/common/schemas/overlay.ts`) and replaces the store entry in place. Streaming apps keep the old page until refreshed, as the success notice says. The gallery keys cards by id and version, so previews reload.
-- Official overlays are removed from their card on Official overlays, imported ones in **Settings → Overlay library**. Both use `REMOVE_OVERLAY`.
+- `CatalogOverlaySchema` refuses the ids `alerts`, `timer`, `games` and `studio`, Tokio's own paths (`/alerts/`, `/timer/`, `/games/`, `/studio/`).
+- A rebuilt store takes back only folders named the way Tokio names them: a UUID, or an id `CatalogOverlaySchema` accepts. Express 5 can't mount a copy like `gift-jar - Copy (2)`.
+- `rebuildRoutes` skips, and logs, an id it can't mount, so one an older store still holds doesn't stop the server's start.
+- An update keeps the saved settings that still fit the new `config.yaml` (`mergeOverlayConfig`) and replaces the store entry in place. Streaming apps keep the old page until refreshed, as the success notice says. The gallery keys cards by id and version, so previews reload.

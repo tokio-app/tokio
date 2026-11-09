@@ -11,123 +11,70 @@ paths:
 
 # Games overlay and Minecraft pictures
 
-Builds on `.claude/rules/games.md` (actions, steps, editions).
-
-The **Overlay** section on the Games page builds the games overlay: each shown action is a row with the event (its gifts' or emotes' pictures, Tokio's sprite, or text like "Any gift"), a pixel arrow, then the picture and name the streamer picked.
+Builds on `.claude/rules/games.md`. The **Overlay** section builds the games overlay: each shown action is a row with the event's pictures or text, a pixel arrow, then the picture and name the streamer picked.
 
 - It's served at `MINECRAFT_OVERLAY_PATH` (`NOTE: DO NOT CHANGE`: OBS links use it): `/games/minecraft/` shows every column, `/games/minecraft/<column>/` one (`getMinecraftOverlayURL(column?)`).
 - Every page connects with the id `GAMES_PATH` (`"games"`). Later games get their own `/games/<game>/`.
-- `CatalogOverlaySchema` refuses the id `games`, like `alerts` and `timer` (see `.claude/rules/overlays.md`).
 
 ## Saved data
 
-- Per action in `GameActionSchema.overlay` (`image` is a `{ name, file }` from the Minecraft library, or `null`; `""` texts are automatic), the look in `Profile.games.overlay`.
-- All have defaults, so older profiles load. They save with the actions through `useEditableSettings("games")`.
+- Per action in `GameActionSchema.overlay` (`image` a `{ name, file }` from the library or `null`; `""` texts are automatic), the look in `Profile.games.overlay`. All have defaults, so older profiles load.
 
 ## Rows
 
-`gameOverlayRows(games, { gifts, emotes, mediaURL, language })` (`src/common/util/games.ts`) is shared by main and the preview, like `timerTriggers`. Its automatic texts are in the app's language (main passes `language()`, and sends the overlay again on a change); mob and item names stay English.
+`gameOverlayRows(games, { gifts, emotes, mediaURL, language })` (`src/common/util/games.ts`) is shared by main and the preview. Its automatic texts are in the app's language; mob and item names stay English.
 
-- **Shown:** an action shows when it's enabled, `show` is on, and it has a picture or a name. Rows keep the actions' order.
-- **Event pictures:** every picture of the trigger's gifts (`gameEventPictures`; the gift lists are TikTok's then the custom ones, so TikTok's entry wins) or emotes (`Profile.emotes`), each once. A gift or emote trigger with none picked has no picture.
-- **Sprites:** Follow, Share, Like, Chat and Super Fan get Tokio's own pixel art (`EVENT_SPRITES`, `src/common/games/sprites.ts`), drawn as SVG `data:` URLs with `crispEdges`. They're ours, never TikTok's artwork, and the user's pick over pictures the streamer chooses. Super Fan's crown (gold with rose gems) was the user's pick over a star.
-- An event with pictures shows only them: on the page, in the preview and in the builder's row, which then has no event text field. The page keeps the text, hidden, for when every picture fails to load.
-- Several pictures take turns in one place, crossfading every `ROTATE_MS`: the page turns every slot on one timer, the preview and the builder's rows use `usePictureTurn`.
-- In one at a time, a row's gifts start from the first as its turn begins, and its turn lasts until each has shown: `max(TURN_MS, gifts × ROTATE_MS)` (the page's `rotate` and `turnMs`, the preview's `usePictureTurn(currentId)`).
-- **Chat** is the exception: its row has `withText`, so its side never gets `has-picture` and its message shows by its bubble, with **Pictures only** too. Its text is the `event` override, else the keyword quoted, else none (no empty text span). Its builder row keeps the event text field.
-- **Likes:** `eventCount` (`gameEventCount`, when `likes_every` is over 1) shows on the heart's corner with the same `games-count` as the Minecraft side.
-- **Texts:** the `event` and `name` overrides, else `gameEventText` and `gameStepsText` (named by the action's edition). The builder shows the automatic ones as placeholders; the event text names the pictures for screen readers there.
-- **Picture:** `mediaURL(file)`: main passes `MINECRAFT_PICTURES_PATH` plus the encoded file, the preview `getPicturePreviewURL`.
-- **Count:** with a picture, the amount of the first mob or item (`gameCount`) shows on the picture's corner (`games-count`, like an inventory's stack), and the automatic name leaves it out (`gameStepsText(action, true)`). Without a picture it stays in the name.
-- A timed morph counts too, when it comes before any mob or item: its seconds ("30 s", `minecraft.seconds`) go on the picture's corner and never in the name, so without a picture they don't show (the user's call). `count` is the badge's text, `""` for none. Too wide for the bottom right in Sticker, where they'd run under the sticker, they sit on its top right there (the row's `timed`, `games-timed` on the `li`, set by the page and the preview; the user's call). Amounts stay bottom right.
+- An action shows when it's enabled, `show` is on, and it has a picture or a name.
+- Event pictures are every picture of the trigger's gifts (`gameEventPictures`; TikTok's entry wins over a custom one) or emotes, each once. A gift or emote trigger with none picked has none.
+- Follow, Share, Like, Chat and Super Fan get Tokio's own pixel art (`EVENT_SPRITES`, `src/common/games/sprites.ts`), never TikTok's artwork, over pictures the streamer picks (the user's call). Super Fan's crown was the user's pick over a star.
+- An event with pictures shows only them, and the builder's row has no event text field; the page keeps the text, hidden, for when every picture fails.
+- Several pictures crossfade every `ROTATE_MS`. In one at a time, a row's gifts start from the first as its turn begins, which lasts `max(TURN_MS, gifts × ROTATE_MS)` so each shows (the page's `turnMs`, the preview's `usePictureTurn(currentId)`).
+- **Chat** has `withText`: its side never gets `has-picture` and its message shows by its bubble, with **Pictures only** too. Its text is the `event` override, else the keyword quoted, else none (no empty span). Its builder row keeps the event text field.
+- Likes show `gameEventCount` (when `likes_every` is over 1) on the heart's corner, with the same `games-count` as the Minecraft side.
+- Texts are the `event` and `name` overrides, else `gameEventText` and `gameStepsText` (in the action's edition).
+- With a picture, the first mob's or item's amount (`gameCount`) goes on its corner like a stack and leaves the automatic name; without one it stays in the name.
+- A timed morph before any mob or item counts too: its seconds go on the picture's corner and never in the name, so without a picture they don't show (the user's call). In Sticker they sit top right, since bottom right runs under the sticker (`games-timed` on the `li`, the user's call); amounts stay bottom right.
 - Rows carry both texts. **Pictures only** is the look's job: it hides a text next to a picture, and a side without a picture keeps its text.
 
-## Page
+## Page and pushes
 
-- `ServerService` serves it from memory at `/games/minecraft{/:column}` like `/timer/`, a column only when it's digits (anything else, like the pictures' folder, passes on): `games.html?raw` with Archivo (`__ARCHIVO__`) and the shared stylesheet (`__STYLES__`) inlined.
-- It opens a raw WebSocket with `?id=games`, reconnecting after 2 s, and ignores the live events every client gets.
-- Text goes in with `textContent`, the font with `JSON.stringify`, colors as CSS variables (the schema keeps them hex). A picture that fails to load is hidden.
-- `--fit` shrinks it until all rows fit. It reads its column from its path and keeps only that column's rows.
-
-## Pushes
-
-In `src/main/helper/games.ts`:
-
-- `sendGamesOverlay(services)` sends `tokio:games` `{ look, rows }` to `GAMES_PATH` clients, from the active profile, `overlayService.getGifts()` and `getCustomGifts()`. It logs a failure and never throws, so it can't fail the change that called it.
-- It runs when a games page connects (`serverService.onConnect` in `registerGames`), after `refreshGifts` at startup, after `recordGift` saved a custom gift, after `recordEmotes` saved an emote, after `UPDATE_GAMES_SETTINGS` saved (none after a failed save), after `SET_PROFILE` and after `REMOVE_MINECRAFT_PICTURE`.
-- `sendGamesRun(services, id)` sends `tokio:games:run` `{ id }`, which lights the row for `LIT_MS` after its last run, so a burst glows steadily.
-- One at a time jumps to the lit row and holds it, unless the row it shows is still lit: otherwise two actions on one gift would flip between their rows every run. The preview does the same, and keeps the row it shows by id (`shownId`), so it stays on it when the rows change, the first when it's gone.
-- `GamesService.onRun(listener)` (one listener, set in `registerGames`) is called in `_pump` right before each run's `_send`: once per run, never for an action's **Test** or an offline drop.
-- `TEST_GAMES_OVERLAY { id }` (`notify: false`) sends the same run message from the section's Test, which lights the next shown row in the preview and on stream.
+- `ServerService` serves `/games/minecraft{/:column}` like `/timer/`, a column only when it's digits, so the pictures' folder passes on. Archivo (`__ARCHIVO__`) and the stylesheet (`__STYLES__`) are inlined.
+- A picture that fails to load is hidden. `--fit` shrinks it until all rows fit; it keeps only its column's rows.
+- `sendGamesOverlay(services)` (`src/main/helper/games.ts`) sends `tokio:games` `{ look, rows }` to `GAMES_PATH` clients from the active profile and the gift lists. It logs a failure and never throws, so it can't fail the change that called it.
+- Send it when a games page connects and after anything that changes the rows: the active profile's games, the TikTok or custom gifts, its emotes, the pictures library, the active profile, the language. Never after a failed save.
+- `sendGamesRun(services, id)` sends `tokio:games:run` `{ id }`, which lights the row for `LIT_MS` after its last run, so a burst glows steadily. `GamesService.onRun` (one listener) fires in `_pump` once per run, never for **Test** or an offline drop. `TEST_GAMES_OVERLAY { id }` (`notify: false`) sends it from the section's Test.
+- One at a time jumps to the lit row and holds it, unless the row it shows is still lit: otherwise two actions on one gift would flip every run. The preview keeps its row by id (`shownId`), the first when it's gone.
 
 ## Stylesheet
 
-- `src/common/games/overlay.css` is the overlay's one look. `ServerService` imports it raw (`?raw`) into the page; `OverlayPreview` imports it as a plain stylesheet, as Overlay Studio's editor does with `src/common/studio/overlay.css` (`.claude/rules/studio.md`).
-- It loads globally, so every class starts with `games-`. The page's markup and the preview's (`sections/OverlayPreview.tsx`) must stay in step.
-- It has to work in OBS 30's Chromium 103: no `:has()`, nesting, subgrid or container queries. The page's script sets classes like `has-picture` instead.
-- Pictures float over the game with a halo that follows their shape, with no box behind them, gifts and Minecraft pictures alike (the user's call: no black backgrounds).
-- A lit row's texts take the accent and its pictures glow along their shape and flash. Under `prefers-reduced-motion` only the flash stops.
-- A Minecraft picture drawn at twice its size or more (a 16×16 icon) gets `games-pixelated` from `sharpen`, on load and on each fit, in the page and the preview alike. Gifts and smaller scales stay smooth, since Chromium's `pixelated` is nearest-neighbor when shrinking too.
-
-### Formats
-
-- **Arrow** is the spine above. **Sticker** (`games-sticker`, the user's reference: the gift stuck on the item's corner) drops the arrow: the event's picture sits on the bottom left corner of the action's, over it.
-- Sticker's rows are each their own grid, their sides `display: contents`. The action's picture sits in a square that holds the sticker's overhang, so `fit` counts it.
-- Without the action's picture the event's takes its place: the row lacks `has-result-picture`, which the page and the preview set, and the page clears when that picture fails.
-- Sticker's row has a fixed height and `minmax(0, 1fr)` rows around the texts: with a plain `1fr`, Chromium sized those rows from the pictures across them and the texts landed off center.
-- Sticker with **Text below pictures** (`games-text-below`) centers everything on one line down the column, in a column wide enough that the overhang counts when fitting. One at a time stacks the row boxes in one cell and fades them.
-- Arrow with **Text below pictures** makes each side a grid, its picture on a line and its text under it, with `justify-items` toward the arrow so a long name doesn't push its picture away.
-- There, a text with no picture beside it (`:last-child` on the event's side, `:first-child` on the result's, from the markup's order) stays on the pictures' line, and the sides and the arrow align to the top so the arrows stay on that line.
-- Those rules use `:not(.games-sticker)`, as Sticker's sides are `display: contents`.
-
-### Horizontal
-
-- The `layout` `"horizontal"` (`games-horizontal`) puts the rows side by side on one line, a strip like a hotbar: `.games-rows` is a flex row and each Arrow row its own grid (Sticker's already are), with a wider gap between rows than inside one so each reads as one recipe.
-- With **Text below pictures** the rows align to the top, so the pictures share a line.
-- It's a `layout`, so it can't be on with one at a time, which has no direction. "list" is the vertical one.
-
-### Event picture sizes
-
-- **Event pictures** sizes the gifts, emotes and Tokio's sprites, not the action's picture: `games-event-medium` or `games-event-large` (Small has none) set `--games-event-scale`.
-- Every size that follows from the event's picture is a `calc` of it (`--games-line`, `--games-sticker`, `--games-overhang`, `--games-square`, Arrow's slot), so a larger sticker hangs further off and the row grows with it.
-- The variables hold `em`s, which resolve where they're used: every element using them has the overlay's font size.
-- **Counts** sizes both `games-count`s (the action's amount and the likes') the same way: `count_size`, `games-count-medium` or `games-count-large`, `--games-count-scale` on the count's font size. Its offsets are in its own `em`, so a larger count keeps to its picture's corner in every format.
-- `fit` measures `.games`, not the count's overhang, so Medium and Large pad `.games` to keep room for it. Small has none, so older profiles look the same.
+- `src/common/games/overlay.css` is the one look: the page inlines it, `OverlayPreview` imports it as a plain stylesheet, so the page's markup and the preview's must stay in step.
+- Without `:has()`, the page's script and the preview set classes like `has-picture` and `has-result-picture`.
+- Pictures float over the game with a halo along their shape, no box behind, gifts and Minecraft pictures alike (the user's call: no black backgrounds).
+- A lit row's texts take the accent, its pictures glow and flash. Under `prefers-reduced-motion` only the flash stops.
+- A Minecraft picture drawn at twice its size or more gets `games-pixelated` from `sharpen`, on load and each fit, in page and preview. Gifts and smaller scales stay smooth, since Chromium's `pixelated` is nearest-neighbor when shrinking too.
+- **Sticker** (`games-sticker`, the user's reference) drops the arrow: the event's picture sits on the action picture's bottom left corner. Its rows are each a grid, the sides `display: contents`, so rules for the other formats use `:not(.games-sticker)`.
+  - The action's picture sits in a square that holds the overhang, so `fit` counts it. Without that picture (no `has-result-picture`, cleared too when it fails) the event's takes its place.
+  - Its row has a fixed height and `minmax(0, 1fr)` rows around the texts: with plain `1fr`, Chromium sized them from the pictures and the texts landed off center.
+  - With **Text below pictures** it centers everything down a column wide enough to count the overhang. One at a time stacks the rows in one cell and fades them.
+- Arrow with **Text below pictures** makes each side a grid, its text under its picture, `justify-items` toward the arrow so a long name doesn't push its picture away. A text with no picture beside it (`:last-child` on the event's side, `:first-child` on the result's, from the markup's order) stays on the pictures' line, and everything aligns to the top so the arrows stay there.
+- `layout: "horizontal"` (`games-horizontal`) is a strip like a hotbar, with a wider gap between rows than inside one. With **Text below pictures** rows align to the top. It's a `layout`, so it can't be on with one at a time.
+- **Event pictures** sizes the gifts, emotes and sprites, not the action's picture (`--games-event-scale`). Every size that follows from it is a `calc` of it, so a larger sticker hangs further off and the row grows. The variables hold `em`s, so every element using them has the overlay's font size.
+- **Counts** (`count_size`) scales both `games-count`s by `--games-count-scale`, offsets in their own `em`s so they keep to the corner. `fit` measures `.games`, not the overhang, so Medium and Large pad `.games`; Small has none, so older profiles look the same.
 
 ## Builder
 
-- The rows panel is as wide as its rows need (`.overlay`'s `auto` track). The rows share one grid (each `li` a `subgrid`), so arrows line up while the event column is only as wide as its widest content.
-- Each row starts with a grip handle that moves its action in `games.actions`, the order of the overlay and of the Actions list. Dragged (native drag and drop, the row as the drag image), it lands where the rose line shows: after the row it's dropped on when moving down, before it when moving up. Only a row's own drag drops there, and a cancelled one moves nothing. A row changes column only through its picker (the user's call).
-- The handle's ArrowUp and ArrowDown move it a step. Moving the `li` drops the focus on `<body>` in Chromium, so the handle takes it back after a `flushSync`, as `TableField` does. jsdom keeps the focus, so only the real app shows that.
-- With more than one column, each row gets a **Column** picker and the section gives one URL per column.
-- Horizontal calls them rows (**Rows**, a **Row** picker, "Copy row N's URL"). The saved `columns` and `column` and the URLs stay the same, so column 2 becomes row 2.
-- `OverlayPreview` draws the columns side by side, each shrunk to fit its share as the page fits its source (`--fit`, written to the style in a layout effect, so measuring doesn't render again).
-- `bare` draws only the overlay, with no frame, column labels or empty state, for an embed in Overlay Studio's editor, which scales it to the element's box.
-- Horizontal stacks the rows (`preview_rows`), and the section puts the preview above the builder's rows instead of in the side column, so a strip previews near its size on stream.
+- Dragging a row (or ArrowUp and ArrowDown on its grip) moves its action in `games.actions`, the one order of the overlay and the Actions list. A row changes column only through its picker (the user's call). Its focus after a keyboard move: see `.claude/rules/renderer.md`.
+- Horizontal calls columns rows, but the saved `columns` and `column` and the URLs stay the same: column 2 becomes row 2.
+- `OverlayPreview` writes `--fit` in a layout effect, so measuring doesn't render again. `bare` draws only the overlay, for Overlay Studio's editor, which scales it.
+- Horizontal stacks the preview's rows (`preview_rows`) above the builder's, so a strip previews near its size on stream.
 
 ## Minecraft pictures library
 
-- Only for Minecraft, shared by all profiles: `settings.minecraftPictures` (`{ name, file }[]`), files in `Folders.minecraftFolder` (`~/.tokio/games/minecraft`; later games get folders beside `minecraft`), named by a hash of their content.
-- Allowed: `IMAGE_EXTENSIONS` (`src/common/util/alerts.ts`) up to `MEDIA_MAX_BYTES`.
+- Only for Minecraft, shared by all profiles: `settings.minecraftPictures` (`{ name, file }[]`), files in `Folders.minecraftFolder` (`~/.tokio/games/minecraft`; later games get folders beside it), named by a hash of their content. `IMAGE_EXTENSIONS` up to `MEDIA_MAX_BYTES`.
 - A rebuilt store recovers the folder with `_findFiles`, named from the actions' `image`s, else "Recovered picture N".
-- `GamesService` has `setPicturesFolder`, `importPicture` and `deletePicture`. Imports go through `importFile` (`src/main/helper/library.ts`, shared with `AlertsService`).
-- **Served:** the overlay server mounts the folder at `/games/minecraft/pictures/` (`MINECRAFT_PICTURES_PATH`, `serverService.mount`, next to `/alerts/media/`). The app's windows load it as `tokio-media:///games/minecraft/<file>` (`getPicturePreviewURL`); `mediaFile` in `helper/preview.ts` serves only images right in that folder.
-
-### Requests
-
-In `src/main/events/pages/games.ts`:
-
-- `GET_MINECRAFT_PICTURES` replies `MINECRAFT_PICTURES`.
-- `IMPORT_MINECRAFT_PICTURE { id, request }` opens a dialog for one or more pictures and adds them all (one bad file doesn't stop the others). It replies `SET_MINECRAFT_PICTURE { id, request, picture }` with the first, which goes on that action (failures echo `request` too), and `MINECRAFT_PICTURES`.
-- When the library can't be saved, it replies `MINECRAFT_PICTURES` (what main holds) before the failure. Its notices go out in the handler; the picker shows a failure itself.
-- `REMOVE_MINECRAFT_PICTURE { file }` takes it out of the library, then off every action in every profile (`removeFromGames`, which shares `_updateProfiles` with `removeFromAlerts`), pushes `MINECRAFT_PICTURE_REMOVED { file }` and the overlay, then deletes the file. A profile that can't be saved keeps the file and fails with `saveFailure()`.
-
-### Picker
-
-- `PicturePicker` is the shared `LibraryPicker` (`components/MediaPicker/LibraryPicker.tsx`, see the media picker in `.claude/rules/alerts.md`), with:
-  - `stays`: Clear · Browse · Done, and it stays open after a pick;
-  - `DeletePictureModal` (`components/DeleteModals`) for Delete;
-  - a tile of the picture and its name, styled by the media picker's CSS.
-- The page numbers each browse (`onRequest` returns it), from a module-level counter (`requests`), so the numbers keep growing when the page opens again. It applies a `SET_MINECRAFT_PICTURE` reply only to the action that asked (`asked`), and only if it's newer than the last applied for it (`applied`). The picker shows only the newest request's failure.
-- `asked` is cleared when another profile loads (`useEditableSettings`'s `switched`), since a clone has the same action ids.
+- Imports go through `importFile` (`src/main/helper/library.ts`, shared with `AlertsService`).
+- The overlay server mounts the folder at `MINECRAFT_PICTURES_PATH` (`/games/minecraft/pictures/`). The windows load `tokio-media:///games/minecraft/<file>` (`getPicturePreviewURL`); `mediaFile` serves only images right in that folder.
+- `IMPORT_MINECRAFT_PICTURE { id, request }` adds every picked file (one bad file doesn't stop the others) and replies `SET_MINECRAFT_PICTURE { id, request, picture }` with the first, for that action (failures echo `request`), and `MINECRAFT_PICTURES`. When the library can't be saved, `MINECRAFT_PICTURES` (what main holds) goes before the failure; the picker shows the failure itself.
+- `REMOVE_MINECRAFT_PICTURE { file }` takes it out of the library, then off every action in every profile (`removeFromGames`), pushes `MINECRAFT_PICTURE_REMOVED { file }` and the overlay, then deletes the file. A profile that can't be saved keeps the file and fails with `saveFailure()`.
+- `PicturePicker` is the shared `LibraryPicker` with `stays` (it stays open after a pick) and `DeletePictureModal`. Browses are numbered as in "Request numbering" in `.claude/rules/alerts.md`.
 - `MINECRAFT_PICTURE_REMOVED` clears the picture from the actions the page shows, so the next save doesn't bring it back.

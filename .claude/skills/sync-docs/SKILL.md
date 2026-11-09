@@ -16,7 +16,7 @@ Read the diff before writing anything: `git diff` for uncommitted work, `git dif
 ## Where it goes
 
 - `README.md`: a short overview, with a line per feature, the three steps to get started, building and the license; the details go in the website's docs. Retake its screenshots (`.github/screenshots/`) and the website's (`src/assets/screenshots/`, and `es/` with `--lang es-419`) with the `drive-app` skill's `scripts/screenshots.mjs` when a page they show changes visibly.
-- `AGENTS.md` for rules that cross areas, `.claude/rules/<topic>.md` for one area (keep its `paths` right; a new area gets its own rule), and `.claude/skills/<name>/SKILL.md` when a procedure changed.
+- `AGENTS.md` for rules that cross areas, `.claude/rules/<topic>.md` for one area (keep its `paths` right; a new area gets its own rule), and `.claude/skills/<name>/SKILL.md` when a procedure changed. A feature doesn't get a rule line per part: a rule gets only what the next agent to change that code would get wrong without it (see Writing).
 - The notices, when licensed parts, react-icons sets or online services change: `THIRD_PARTY_NOTICES.md`, `LICENSES/`, `src/renderer/src/pages/About/helper.ts` and the banner in `electron.vite.config.ts` (see Licensing in `AGENTS.md`, and the `add-dependency` skill).
 - The website, `../tokio-web`, for what the Website section of `AGENTS.md` lists. Read its `AGENTS.md` first. Its docs, in `src/content/docs/docs/`, are the full reference for features, settings, chat commands, install steps, platforms and the overlay setup; the services are in `src/i18n/en.json` (`about.services`). Every change lands in Spanish too: the docs' copies in `src/content/docs/es/docs/` and `src/i18n/es.json`.
 - The overlays repo, `../tokio-overlays`: `scripts/lib/schema.js` and `scripts/lib/validate.js` when `OverlayMetaSchema`, `OverlayConfigSchema`, `SCRIPT_REGEX` or what `processOverlay` accepts change, and `.github/ISSUE_TEMPLATE/overlay_request.yml` when `TOKIO_EVENTS` change.
@@ -26,7 +26,15 @@ Read the diff before writing anything: `git diff` for uncommitted work, `git dif
 
 - Check each fact against the code. Don't describe behavior you haven't confirmed.
 - Match each doc's voice. The README and the website: plain English, second person, short sentences, UI names in bold (**Settings → Overlay server**). The website's Spanish: the Spanish section of `.claude/rules/i18n.md`, the `humanizer` skill, and the app's own Spanish for every UI name (`es-419.json`). `AGENTS.md`, rules and skills: terse, with names and paths in backticks.
-- Run Prettier on what you touched, in each repo.
+- `AGENTS.md` and the rules are read by an agent about to change the code, who can read it too. They hold:
+  - the user's calls, marked "(the user's call)";
+  - gotchas, with the reason the obvious way breaks;
+  - contracts that other code, saved data or other repos depend on;
+  - couplings between files ("X and Y change together");
+  - how to check what tests can't (a real-game check, a probe script).
+- Leave out what reading the code shows (call chains, UI layout and labels, props), constants' values that aren't decisions, and history ("renamed from", "an earlier version") unless it stops a revert.
+- Give each fact one home, and have other docs point to it. Change an existing line before you add one.
+- Run Prettier on what you touched, in each repo. After editing AGENTS.md, a rule or a skill, run `node .claude/skills/optimize-docs/scripts/audit.mjs`: its Failures must say None.
 - Each repo gets its own commit, `docs: <what changed>` (`docs: describe the activity feed's settings`), and only when the user asks.
 
 ## Done when

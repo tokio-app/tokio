@@ -7,83 +7,71 @@ paths:
 
 # LIVE history
 
-`HistoryService` (`src/main/services/history`) keeps each profile's LIVEs and the viewers who sent gifts in them, for Coin stats (`/tools/coin-stats`, in Tools) and the top gifters overlays get as `tokio:gifters`.
+`HistoryService` (`src/main/services/history`) keeps each profile's LIVEs and the viewers who sent gifts in them, for Coin stats (`/tools/coin-stats`) and the top gifters overlays get as `tokio:gifters`. It holds the profile's data in memory as Persistence in `AGENTS.md` describes.
 
 ## Recording
 
 - A LIVE runs from `CONNECTED` to `DISCONNECTED`, the span of Home's session (`.claude/rules/live-session.md`). Drops the connector recovers from stay in it; a connection lost for good starts a new LIVE on the next connect.
-- `start(username)` gets the @username from `TikTokConnectorService.username`, the last `connect()`'s, set before the provider connects because `CONNECTED` comes before `connect()` resolves.
-- `HISTORY_EVENTS` is only gifts (the user's call), through the service's own `GiftStreaks`: `added` gifts and `added × max(0, coins)` coins, as Home counts them. Followers, shares, likes and viewers stay on Home.
-- Only gifts count as coins: Tokio's treasure chest event carries no data, and a Super Fan event only the viewer.
-- Gifters are keyed by `UserData.userId`. A gift without one counts in the totals only. Name, handle and picture follow the latest gift, and a gift without a picture keeps the last one, from an earlier LIVE too.
-- Each gift also goes in its clock minute (`GiftMinute`, counted from the minute the LIVE started in) under its gifter's id, `""` without one, so dates that cut a LIVE count only its gifts in them.
+- `start(username)` gets the @username from `TikTokConnectorService.username`, set before the provider connects because `CONNECTED` comes before `connect()` resolves.
+- `HISTORY_EVENTS` is only gifts (the user's call), through the service's own `GiftStreaks`: `added × max(0, coins)` coins, as Home counts them. A treasure chest carries no data and a Super Fan event only the viewer, so neither counts as coins.
+- Gifters are keyed by `UserData.userId`; a gift without one counts in the totals only. Name, handle and picture follow the latest gift, and a gift without a picture keeps the last one.
+- Each gift also goes in its clock minute (`GiftMinute`) under its gifter's id (`""` without one), so dates that cut a LIVE count only its gifts in them.
 - Pictures are saved although TikTok's links expire within days (the user's call): overlays and the page fall back to the initial.
 - Nothing is recorded before a load, or for a profile whose index doesn't load.
 
 ## The files
 
-- `history/<profile name>/` (`folders.historyFolder`, the profile file's name without `.json`), outside the profile like the fans (Persistence in `AGENTS.md`).
+- `history/<profile name>/` (`folders.historyFolder`, the profile file's name without `.json`).
 - `index.json`: the finished LIVEs' summaries, oldest first, and all time's gifters, the most coins first with ties to the earlier `giftedAt`. Written when a LIVE ends, after a recovery or a delete, and to retry a failed save.
-- `<startedAt>.json`: one `LiveRecord` per LIVE, with all its gifters and the minutes its gifts came in, which stay out of the index.
-  - The LIVE in progress rewrites only its own file, on every save (every `HISTORY_SAVE_MS`, 30 s, `registerHistory`, and a delete's, the cap's or a clear's), with `endedAt` set to the save's time, so a quiet LIVE's end keeps up too.
-  - A finished LIVE's file is never rewritten, so a 30 s save stays small however many LIVEs there are.
+- `<startedAt>.json`: one `LiveRecord` per LIVE, with all its gifters and its minutes, which stay out of the index.
+  - The LIVE in progress rewrites only its own file on every save (every `HISTORY_SAVE_MS`, and a delete's, the cap's or a clear's), with `endedAt` set to the save's time, so a quiet LIVE's end keeps up too.
+  - A finished LIVE's file is never rewritten, so a periodic save stays small however many LIVEs there are.
 - When a LIVE ends, its file is written one last time, then the index with its summary appended and its gifters added to all time.
-- `MAX_LIVES` (1,500): past it, the oldest LIVEs go as deleting them would, gifts included, after an end (`_cap`, which reads their files after the end's save) and when a profile loads. The user's call: All time always adds up to the LIVEs kept.
-- `MAX_GIFTERS` (10,000) caps all time: the fewest coins go first, then the oldest last gift. The page shows the top `SHOWN_GIFTERS` (100) and each LIVE keeps all of its own gifters, so nobody shown is dropped.
-- No save on quit (`shortcut:`), like the fans and the timer: a quit or a crash loses at most 30 s, and the next load adds the rest from the LIVE's file.
-- Saves run one after another: each waits for the one before (`_saving`), so an older index can't land after a newer one, as when a LIVE's end races the cap's drop.
+- `MAX_LIVES` (1,500): past it, the oldest LIVEs go as a delete would, gifts included, after an end (`_cap`, which reads their files after the end's save) and when a profile loads. The user's call: All time always adds up to the LIVEs kept.
+- `MAX_GIFTERS` caps all time: the fewest coins go first, then the oldest last gift. The page shows only the top `SHOWN_GIFTERS` and each LIVE keeps all its own gifters, so nobody shown is dropped.
+- On a quit or crash the next load adds what the last save missed from the LIVE's file.
+- Saves run one after another through `_saving`, so an older index can't land after a newer one, as when a LIVE's end races the cap's drop.
 
 ## Loading, recovery, deleting and clearing
 
-- `load(file)` runs at startup and on `SET_PROFILE`, which saves first and refuses the switch when that fails. A later load wins over an earlier one still reading.
 - A missing index is an empty history. One that's there but doesn't load is left as it is, nothing is recorded, and the log has a warning.
 - A LIVE file the index doesn't list, newer than every LIVE it does, was left by a quit or a crash: it's added, ending at its last save, and the index is saved at once. An unlisted older one is a delete's leftover and is removed, and so are `<name>.cleared-<digits>` folders, a clear's leftovers.
-- `deleteLive` subtracts the LIVE's gifters, read from its file, from all time, dropping a gifter left with nothing. Then it saves the index. An unreadable file still leaves the index, and all time keeps its gifts (logged).
-- A dropped LIVE's file (a delete's or the cap's) waits in `_dropped` until an index without it is written, by that save or the 30 s retry. A load would take back a file newer than every listed LIVE as a crash's leftover, and an index on disk must never list a LIVE whose file is gone.
+- `deleteLive` subtracts the LIVE's gifters, read from its file, from all time, dropping a gifter left with nothing, then saves the index. An unreadable file still leaves the index, and all time keeps its gifts (logged).
+- A dropped LIVE's file (a delete's or the cap's) waits in `_dropped` until an index without it is written, by that save or the retry. A load would take back a file newer than every listed LIVE as a crash's leftover, and an index on disk must never list a LIVE whose file is gone.
 - `clear` renames the profile's folder away in one step (`renameWithRetry`), then removes it.
   - A LIVE in progress carries on. Its file and an empty index are written at once, the index over anything a save racing the move wrote.
   - It refuses, changing nothing, when no history is loaded or the rename fails.
 
 ## Overlays
 
-- `{ type: "tokio:gifters", data: { live, allTime } }`, each the top `TOP_GIFTERS` (10) as `TopGifter`, with both the `live` and the `allTime` numbers. `live` is `[]` outside a LIVE.
-- `allTime` merges a cached top 10 of the finished LIVEs (`_best`) with this LIVE's gifters, so a push never sorts all of all time.
-- Each client gets it as it connects, then after each load, on a LIVE's start and end, a delete or a clear, and on gifts that count. Pushes go through a 1 s `throttle` (`GIFTERS_PUSH_MS`) that reads the lists when it fires, and `ServerService.sendToAll` sends them.
+- `{ type: "tokio:gifters", data: { live, allTime } }`, each the top `TOP_GIFTERS` as `TopGifter`, with both the `live` and the `allTime` numbers. `live` is `[]` outside a LIVE.
+- `allTime` merges a cached top of the finished LIVEs (`_best`) with this LIVE's gifters, so a push never sorts all of all time.
+- Each client gets it as it connects, then after each load, a LIVE's start and end, a delete or a clear, and gifts that count, through a `GIFTERS_PUSH_MS` `throttle` that reads the lists when it fires.
 - Test sends a sample (see Previews in `.claude/rules/overlays.md`).
 - The SDK (`@tokioapp/overlay`) types it as `TOKIO_EVENTS.GIFTERS`. Overlays on an older version log it as an unknown type.
 
 ## The page's data
 
-- `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top 100. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page asks again on each `GET_PROFILE` reply, a profile switch, and so does Tools' list, whose Coin stats row shows the newest LIVE's coins. The page also drops its dates' and search's `GIFTERS` replies then, which the same range would still match.
-- `GET_LIVE { startedAt }` replies `LIVE` with that LIVE's record. Failures carry the `startedAt` too.
-- `GET_GIFTERS { from?, to?, query? }` replies `GIFTERS` with the top 100 of the finished LIVEs in the dates from `from` (included) to `to` (left out), each with their `rank` among them (`RankedGifter`).
-  - A LIVE is in them when it starts in them or runs into them (`inRange`, `src/common/util/history.ts`). One they cut (not `allInRange`) counts only its gifts in them, from its minutes: a minute counts when any of it is in them, at either end.
-  - With a query, only the ones whose name or @handle has it, in any case, with a leading @ ignored (`viewerMatcher`, shared with the Fans page).
-  - Every LIVE whole reads all time's list. Other dates are added up from the LIVEs' files by `getGifters`, one file at a time so a year of LIVEs isn't held at once, leaving out a file that doesn't load.
-  - When another profile loads while `getTotals` or `getGifters` reads, they give null and the handler sends nothing more: the page asks again for the new profile. With nothing loaded they still give zeros and `[]`. A newer `GET_GIFTERS` of the same kind (dates, or a search) aborts the one before it (one `AbortController` per kind in `lives.ts`), whose `getGifters` then gives null too.
-  - Dates without a query get their coins and gifts (`totals`, from `getTotals`, which reads only the files of the LIVEs they cut) in a first reply, then again with the gifters.
-  - The reply carries the range and the query, failures included.
+- `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and all time's top gifters. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page and Tools' list ask again on each `GET_PROFILE` reply (a profile switch), and the page drops its `GIFTERS` replies then, which the same range would still match.
+- `GET_LIVE { startedAt }` replies `LIVE` with that LIVE's record, failures with the `startedAt` too. The page drops a reply for another `startedAt`.
+- `GET_GIFTERS { from?, to?, query? }` replies `GIFTERS` with the top of the finished LIVEs from `from` (included) to `to` (left out), each with their `rank` among them (`RankedGifter`). The reply carries the range and the query, failures included.
+  - A LIVE is in the dates when it starts in them or runs into them (`inRange`, `src/common/util/history.ts`). One they cut (not `allInRange`) counts only its gifts in them, from its minutes: a minute counts when any of it is in them.
+  - A query matches name or @handle through `viewerMatcher` (`src/common/util/history.ts`), which the Fans page's search uses too.
+  - Every LIVE whole reads all time's list. Other dates are added up by `getGifters` one file at a time, so a year of LIVEs isn't held at once, leaving out a file that doesn't load.
+  - When another profile loads while `getTotals` or `getGifters` reads, they give null and the handler sends nothing more: the page asks again. With nothing loaded they give zeros and `[]`. A newer `GET_GIFTERS` of the same kind (dates, or a search) aborts the one before it (one `AbortController` per kind in `lives.ts`).
+  - Dates without a query get their `totals` (`getTotals`, which reads only the files of the LIVEs they cut) in a first reply, then again with the gifters.
 - `DELETE_LIVE` and `CLEAR_LIVES` reply `LIVES` with what main holds, then send `LIVE_DELETED` or `HISTORY_CLEARED`. A failed save after a delete throws `HISTORY_SAVE_FAILED`, a refused clear `HISTORY_CLEAR_FAILED`.
 
 ## The page
 
-- `pages/CoinStats`, a row in Tools' list rather than a sidebar entry (the user's call), on Home's grid. The layout the user picked: the selected LIVE on the left as Home showed it when it ended, the list on the right.
-- Its header (a `BackButton` to Tools and "Coin stats") and the dashboard share the height the window leaves (`--title-bar-height`), and both lists scroll inside the dashboard, so picking a LIVE with more gifters doesn't move the list. The header shows while `LIVES` loads.
-- **The list** is a `listbox` with one tab stop (a roving `tabIndex`): Up, Down, Home and End move the selection and the focus, and each option is named by its date, time and coins. All time comes first, then the LIVEs, newest first.
-  - Under each LIVE, a 2px coin bar in Iron is scaled to the best LIVE, the page's one bold element. The selected one gets the rose edge, bar and `--accent-soft` wash.
-  - Hovered rows use Field (`--background-secondary`), since Iron would hide the bars.
-- **The left column** shows the LIVE's long date, its times, length and @username, the readout (coins and gifts, Home's 36px numbers) and its gifters, which come with `GET_LIVE` (a `Spinner` until then; a reply for another `startedAt` is dropped).
-  - All time sums the LIVEs' coins, gifts and length in `allTime` (`helper.ts`) and lists the top 100.
-- **Selection:** the newest LIVE, or All time when there are none. After a delete, the one that took its place, or the one before when it was the last (`keepSelection`). A LIVE that ends and joins keeps the selection; another profile's `LIVES` starts from its newest.
-- **The date filter** (`DateFilterBar`, above the list) is a preset: All time, Last 24 hours, Last 7 days, Last 30 days, Last 12 months or Custom dates. The presets count back from `now`, which is set with the filter and again when `LIVES` comes, so it doesn't move on every render; 12 months follow the calendar.
-  - Custom dates add On, After, Before or Between with Tokio's own `DateTimePicker` (`components/DateTimePicker`), the same on every system and in the app's language. Its days take a time, to the minute, except On's.
-  - `dateRange` turns them into a range. A day without a time is the whole day: After and Before leave it out, and Between takes both ends in either order. On is always a whole day. Nothing is filtered until the days are picked.
-  - The list keeps the LIVEs in the dates (`inRange`), each row still all of its LIVE, with the bars scaled to the best of them.
-  - The first row becomes the dates' totals, named by `periodText` ("Oct 1, 2026 to Oct 31, 2026"), with the top gifters main adds up (`GET_GIFTERS`, asked again when the LIVEs change). A new filter selects it.
-  - Their length is the LIVEs' time in the dates. Their coins and gifts are the LIVEs' all in them (`allTime` with the range) until main's `totals` add the gifts in them of a LIVE they cut.
-- **The gifter search** is a `SearchToggle` on the gifters' title row.
-  - Main searches (`GET_GIFTERS`, `SEARCH_DELAY_MS` after the last key), so it finds anyone, not only the 100 listed. The selected LIVE goes as its own span (`startedAt` to `endedAt`), or the filter's range.
-  - The rows show each match's `rank`.
-  - The search stays while the selection and the dates change: both cases render the same `GiftersSection`.
-- Delete and Clear history are icon buttons on the left's title row, which ask first with `DeleteLiveModal` and `ClearHistoryModal` (`components/DeleteModals`). Clear history shows only on All time, since it takes every LIVE, and is disabled while there's nothing to clear.
-- Dates go through `formatDate` (`helper/format.ts`), and a Spanish long date is capitalized for the title (`capitalize`).
+- Coin stats is a row in Tools' list, not a sidebar entry (the user's call). The layout the user picked: the selected LIVE on the left as Home showed it when it ended, the list on the right.
+- Both lists scroll inside the dashboard, so picking a LIVE with more gifters doesn't move the list.
+- The coin bar under each LIVE, in Iron and scaled to the best LIVE, is the page's one bold element. Hovered rows use Field (`--background-secondary`), since Iron would hide the bars.
+- Selection: the newest LIVE, or All time when there are none. After a delete, the one that took its place, or the one before when it was the last (`keepSelection`). A LIVE that ends and joins keeps the selection; another profile's `LIVES` starts from its newest.
+- The date presets count back from `now`, set with the filter and again when `LIVES` comes, so it doesn't move on every render; 12 months follow the calendar.
+  - Custom dates use Tokio's own `DateTimePicker`, the same on every system and in the app's language.
+  - `dateRange`: a day without a time is the whole day, which After and Before leave out; Between takes both ends in either order; On is always a whole day. Nothing is filtered until the days are picked.
+  - Rows stay all of their LIVE. The first row becomes the dates' totals with main's top gifters (`GET_GIFTERS`, asked again when the LIVEs change), and a new filter selects it. Its coins and gifts are the LIVEs all in the dates (`allTime` in `helper.ts`) until main's `totals` add the cut LIVEs' gifts.
+- The gifter search goes to main (`GET_GIFTERS`), so it finds anyone, not only the gifters listed. The selected LIVE goes as its own span (`startedAt` to `endedAt`), or the filter's range. The search stays while the selection and the dates change.
+- Clear history shows only on All time, since it takes every LIVE.
+- A Spanish long date is capitalized for the title (`capitalize`).
