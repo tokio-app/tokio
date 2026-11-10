@@ -29,7 +29,7 @@ import {
 } from "@/common/util";
 import config from "@/config";
 import { createStack, replyFailure } from "@/helper/events";
-import { AppFailure } from "@/helper/feedback";
+import { AppFailure, REPEAT_NOTICE_MS } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
 import {
@@ -60,9 +60,6 @@ const FANS_SAVE_MS = 30_000;
 const GIFTERS_PUSH_MS = 1000;
 // And the LIVE in progress is saved this often while it changes
 const HISTORY_SAVE_MS = 30_000;
-
-// Failures that repeat on every chat or event are sent at most this often.
-const REPEAT_NOTICE_MS = 30_000;
 
 // Update notices repeat on every check, once a day is enough.
 const UPDATE_NOTICE_MS = 24 * 60 * 60 * 1000;

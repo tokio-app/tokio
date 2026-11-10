@@ -19,6 +19,9 @@ export const unknownError = (): AppError => ({
 // The same warning or error is sent at most once in this window.
 export const DEDUPE_MS = 5000;
 
+// Failures that repeat on every chat or event are sent at most this often.
+export const REPEAT_NOTICE_MS = 30_000;
+
 const LABELS: Record<FeedbackSource, string> = {
   system: "System",
   connector: "Connector",

@@ -71,7 +71,7 @@ const setup = (
       ],
       getOverlays: () => [{ id: "gift jar" }],
     },
-    serverService: { sendToClient },
+    serverService: { sendToClient, cameraKey: "k3y" },
     studioService: studio,
     pathManagerService: { files: { logs: { overlays: "overlays.log" } } },
   });
@@ -134,6 +134,33 @@ describe("sendStudioOverlays", () => {
       "/games/minecraft/2/",
     ]);
     expect(elements?.[0]).toMatchObject({ kind: "media", video: true });
+  });
+
+  it("streams a camera element from the server, under this run's key", async () => {
+    const { handler, views } = setup([
+      overlay(ID, [
+        element("d", { kind: "camera" }),
+        element("c", {
+          kind: "camera",
+          camera: { id: "abc", label: "HD Webcam" },
+          quality: "1080p",
+        }),
+      ]),
+    ]);
+
+    await sendStudioOverlays(handler);
+
+    const [[, view]] = views();
+    expect(view?.layers[0].elements).toMatchObject([
+      {
+        kind: "camera",
+        src: "/studio/camera/k3y?device=&label=&quality=720p",
+      },
+      {
+        kind: "camera",
+        src: "/studio/camera/k3y?device=abc&label=HD+Webcam&quality=1080p",
+      },
+    ]);
   });
 
   it("fills texts with the live numbers and each element's last event", async () => {

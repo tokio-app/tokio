@@ -3,10 +3,11 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   AppError,
+  CAMERA_FAILURES,
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack } from "@/helper/events";
-import { AppFailure, saveFailure } from "@/helper/feedback";
+import { AppFailure, REPEAT_NOTICE_MS, saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
 import {
   liveNumbers,
@@ -14,9 +15,13 @@ import {
   sendStudioOverlay,
   sendStudioReact,
 } from "@/helper/studio";
+import Logger from "@/logger";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("overlays");
+
+// The largest camera frame main takes: a 1080p JPEG is far smaller
+const MAX_CAMERA_FRAME = 4 * 1024 * 1024;
 
 // Every request is answered with the overlays main holds, failures included
 const replyStudio = (
@@ -120,6 +125,60 @@ events.push(
     replyStudio(e, handler);
   },
   { ...options("main.failure.testOverlay"), notify: false },
+);
+
+// The main window asks what to capture when it loads
+events.push(
+  APP_EVENTS.GET_CAMERAS,
+  async ({ serverService }, e) =>
+    e.reply(APP_EVENTS_RESPONSE.CAMERAS, {
+      key: serverService.cameraKey,
+      captures: serverService.cameraCaptures(),
+    }),
+  { notify: false },
+);
+
+// A frame comes many times a second, from a page: anything that isn't
+// a JPEG's bytes of a sane size is dropped
+events.push(
+  APP_EVENTS.CAMERA_FRAME,
+  async ({ serverService }, _e, data) => {
+    const { id, frame }: Partial<typeof data> = data ?? {};
+    if (typeof id !== "string" || !(frame instanceof Uint8Array)) return;
+    if (frame.byteLength < 1 || frame.byteLength > MAX_CAMERA_FRAME) return;
+    serverService.cameraFrame(id, frame);
+  },
+  { notify: false },
+);
+
+// The window tries again every few seconds while the camera is wanted, so
+// the notice and its log go out at most once in REPEAT_NOTICE_MS
+events.push(
+  APP_EVENTS.CAMERA_FAILED,
+  async ({ serverService, notifier, pathManagerService }, _e, data) => {
+    const { id, reason }: Partial<typeof data> = data ?? {};
+    if (!reason || !CAMERA_FAILURES.includes(reason)) return;
+    const capture = serverService.cameraCaptures().find((c) => c.id === id);
+    if (!capture) return;
+    const name = capture.label || t("main.camera.default");
+    const sent = notifier.warn(
+      "overlays",
+      FEEDBACK_CODES.CAMERA_FAILED,
+      t(`main.camera.${reason}`, { name }),
+      {
+        key: `camera:${capture.device}\n${capture.label}`,
+        windowMs: REPEAT_NOTICE_MS,
+      },
+    );
+    if (!sent) return;
+    // Logs stay English
+    const camera = capture.label ? `"${capture.label}"` : "the default camera";
+    Logger.warn(
+      `<Studio> Unable to capture ${camera} (${reason})`,
+      pathManagerService.files.logs.overlays,
+    );
+  },
+  { notify: false },
 );
 
 export default events;
