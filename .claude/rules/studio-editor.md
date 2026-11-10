@@ -11,6 +11,7 @@ Builds on `.claude/rules/studio.md` (the stage and the data).
 
 - The panel is **Elements** (the user's call). Its list is a tree with the front on top, each group a tray around its row and its elements; the overlay keeps both back to front.
 - Its look is the user's call: a thumbnail per element (`LayerThumb`, from the element itself, so hidden ones keep theirs), the event under an element only while it reacts, and a row's grip, lock and eye only on hover, focus and the selection, or while that lock or eye is on.
+- A camera's thumbnail is an icon: a live one would open another stream.
 - A row's grip drags it. Dropped behind an element of a group from that row's lower half, an element reaches the group's back (the user found no way there); on a group row's top quarter, it goes in front of the group, on its own. Off the rows, in a gap or under the last, a drop leaves it on its own: that's how an element leaves a group (the user's call). A group drops only among the items.
 - ArrowUp and ArrowDown move a row a step, an element into or out of a group at its edge; the focus goes back to the row's grip.
 - Lock is the canvas's only: the list and the settings still change a locked group or element (the user's call, as OBS locks).
@@ -53,6 +54,7 @@ Builds on `.claude/rules/studio.md` (the stage and the data).
   - Without **Loop**, **Play again** plays the cut once more (`Stage.replay`) (the user's call: the canvas's video stops at its end).
   - The length stays in the component's state: an effect writing the overlay would make an undo step and drop Redo.
 - **Shape** tiles (`ShapeFields`) are native radios, so the arrow keys move through them.
+- **A camera's settings** (`CameraFields`) list the window's cameras (`enumerateDevices`, again on `devicechange`). A saved camera shows by its id, else by its name, else as "(not connected)"; picking one saves this build's id. The canvas shows the camera from the window's own capture (`previewCamera`, see `.claude/rules/studio.md`), with the overlay server off too.
 - **Canvas sound** plays the canvas's videos with their sound (`Stage.sound`), Test's included. It's off each time the editor opens (the user's call), isn't saved or an undo step.
 
 ## Embed previews

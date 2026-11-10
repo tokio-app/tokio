@@ -44,5 +44,6 @@ paths:
 ## End to end
 
 - `e2e/` drives the built app with Playwright's `_electron`, in a temporary folder that main reads from `TOKIO_HOME` (setting `home` and `userData`), and answers native dialogs from main with `electronApp.evaluate`. `TOKIO_LANG=en` makes the tests read English on any machine. The single-instance lock follows `userData`, so a run doesn't clash with an open Tokio (port 37891 aside).
+- It launches with `--use-fake-device-for-media-stream`, Chromium's test camera, so Overlay Studio's camera elements stream on any machine.
 - Built pages carry the production CSP as a meta tag. Check it with an inline script: what Playwright evaluates goes through DevTools, which skips the CSP's `eval` check.
 - Playwright's focus emulation keeps pages visible, so `drive-app` and `e2e/` can't show how a hidden page behaves. For hidden-window checks, see `.claude/skills/drive-app/RECIPES.md`.

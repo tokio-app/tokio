@@ -1,13 +1,15 @@
 // Launches the built app for a one-off check, the way e2e/app.spec.ts does,
 // and runs a steps file against it. See ../SKILL.md.
 //
-//   node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>] [--lang <tag>]
+//   node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>] [--lang <tag>] [--fake-camera]
 //
 // With --exe it starts a packaged build instead (yarn build:unpack), such as
 // dist/win-unpacked/tokio.exe. With --scale it renders at that device scale,
 // 2 for sharp screenshots, whatever the display's. With --lang it runs in
 // that language as the system's (TOKIO_LANG), en by default, so a run doesn't
 // depend on the machine's language. The steps file gets it as `lang`.
+// With --fake-camera, Chromium's test camera is the only camera, so Overlay
+// Studio's camera elements stream on any machine.
 import { _electron as electron } from "@playwright/test";
 import {
   copyFileSync,
@@ -32,11 +34,12 @@ const { values, positionals } = parseArgs({
     exe: { type: "string" },
     scale: { type: "string" },
     lang: { type: "string", default: "en" },
+    "fake-camera": { type: "boolean", default: false },
   },
 });
 if (positionals.length !== 1) {
   console.error(
-    "Usage: node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>] [--lang <tag>]",
+    "Usage: node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs> [--home <dir>] [--exe <app>] [--scale <n>] [--lang <tag>] [--fake-camera]",
   );
   process.exit(2);
 }
@@ -99,9 +102,10 @@ const env = Object.fromEntries(
 let app;
 let failed = false;
 try {
-  const args = values.scale
-    ? [`--force-device-scale-factor=${values.scale}`]
-    : [];
+  const args = [
+    ...(values.scale ? [`--force-device-scale-factor=${values.scale}`] : []),
+    ...(values["fake-camera"] ? ["--use-fake-device-for-media-stream"] : []),
+  ];
   app = await electron.launch({
     ...(exe
       ? { executablePath: exe, args }
