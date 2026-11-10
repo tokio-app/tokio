@@ -96,7 +96,12 @@ export function startCapture(capture: CameraCapture): () => void {
         });
         const bytes = new Uint8Array(await blob.arrayBuffer());
         if (stopped) return;
-        window.api.emit(APP_EVENTS.CAMERA_FRAME, { id, frame: bytes });
+        window.api.emit(APP_EVENTS.CAMERA_FRAME, {
+          id,
+          key: true,
+          timestamp: 0,
+          frame: bytes,
+        });
       }
       // The track ended: the camera was unplugged
       throw missing();

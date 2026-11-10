@@ -1,5 +1,5 @@
 import { AlertTrigger, TokioPayload } from "../connector";
-import { CameraFailure } from "../studio";
+import { CameraChunk, CameraFailure } from "../studio";
 import {
   ActivityFeed,
   AlertTts,
@@ -345,8 +345,8 @@ export interface AppEventsMap {
   [APP_EVENTS.TEST_STUDIO_OVERLAY]: { id: string };
   // Answered by CAMERAS
   [APP_EVENTS.GET_CAMERAS]: void;
-  // One JPEG of a capture main asked for, by the capture's id
-  [APP_EVENTS.CAMERA_FRAME]: { id: string; frame: Uint8Array };
+  // One encoded chunk of a capture main asked for, by the capture's id
+  [APP_EVENTS.CAMERA_FRAME]: CameraChunk;
   // A capture couldn't start, or its camera went away: the window tries
   // again while main still asks for it
   [APP_EVENTS.CAMERA_FAILED]: { id: string; reason: CameraFailure };

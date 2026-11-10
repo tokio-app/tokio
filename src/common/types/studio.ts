@@ -156,3 +156,18 @@ export const CAMERA_FAILURES = [
   "failed",
 ] as const;
 export type CameraFailure = (typeof CAMERA_FAILURES)[number];
+
+// What a page needs to decode a capture's video (WebCodecs' VideoDecoder):
+// the codec string, and the frames' size
+export type CameraConfig = { codec: string; width: number; height: number };
+
+// One encoded chunk of a capture's video (WebCodecs' EncodedVideoChunk),
+// from the window to main. A keyframe carries its config.
+export type CameraChunk = {
+  id: string;
+  key: boolean;
+  // Microseconds, as the encoder gave it
+  timestamp: number;
+  frame: Uint8Array;
+  config?: CameraConfig;
+};

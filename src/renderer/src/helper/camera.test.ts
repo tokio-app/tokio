@@ -138,8 +138,8 @@ describe("startCapture", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(sent(APP_EVENTS.CAMERA_FRAME)).toEqual([
-      { id: "cam-1", frame: new Uint8Array(JPEG) },
-      { id: "cam-1", frame: new Uint8Array(JPEG) },
+      { id: "cam-1", key: true, timestamp: 0, frame: new Uint8Array(JPEG) },
+      { id: "cam-1", key: true, timestamp: 0, frame: new Uint8Array(JPEG) },
     ]);
     expect(drawn).toHaveBeenCalledWith(first.f, 0, 0);
     expect(drawn).toHaveBeenCalledWith(second.f, 0, 0);

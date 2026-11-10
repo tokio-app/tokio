@@ -427,7 +427,12 @@ describe("studio events", () => {
       const { h, serverService } = cameras();
       const frame = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
 
-      await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, { id: "1", frame });
+      await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, {
+        id: "1",
+        key: true,
+        timestamp: 0,
+        frame,
+      });
 
       expect(serverService.cameraFrame).toHaveBeenCalledWith("1", frame);
       expect(h.notices).toEqual([]);
@@ -451,6 +456,8 @@ describe("studio events", () => {
       }
       await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, {
         id: "1",
+        key: true,
+        timestamp: 0,
         frame: new Uint8Array(4 * 1024 * 1024),
       });
 
