@@ -428,7 +428,7 @@ describe("studio events", () => {
       codec: "avc1.42001f",
       width: 1280,
       height: 720,
-      description: new Uint8Array([1]),
+      description: new Uint8Array(7),
     };
     const chunk = (patch: Record<string, unknown> = {}) => ({
       id: "1",
@@ -472,6 +472,14 @@ describe("studio events", () => {
         chunk({ config: { ...config, codec: "" } }),
         chunk({ config: { ...config, codec: "a".repeat(65) } }),
         chunk({ config: { ...config, codec: 'avc1"<x>' } }),
+        chunk({ config: { ...config, codec: "avc1." } }),
+        chunk({ config: { ...config, codec: `avc1.${"a".repeat(60)}` } }),
+        chunk({ config: { ...config, codec: "vp09.00.10.08" } }),
+        chunk({ config: { ...config, codec: "AVC1.42001f" } }),
+        chunk({ config: { ...config, description: new Uint8Array(6) } }),
+        chunk({ config: { ...config, description: new Uint8Array(1025) } }),
+        chunk({ config: { ...config, description: [1, 2, 3, 4, 5, 6, 7] } }),
+        chunk({ config: { ...config, description: undefined } }),
         chunk({ config: { ...config, codec: 1 } }),
         chunk({ config: { ...config, width: 0 } }),
         chunk({ config: { ...config, width: 1280.5 } }),
@@ -491,10 +499,10 @@ describe("studio events", () => {
         chunk({
           frame: new Uint8Array(4 * 1024 * 1024),
           config: {
-            codec: "vp09.00.10.08",
+            codec: `avc1.${"a".repeat(59)}`,
             width: 8192,
             height: 1,
-            description: new Uint8Array([1]),
+            description: new Uint8Array(1024),
           },
         }),
       );

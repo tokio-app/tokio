@@ -1,44 +1,39 @@
 import { STUDIO_CAMERA_QUALITIES, StudioCameraQuality } from "@/common/schemas";
 import type { CameraCapture, CameraChunk, CameraConfig } from "@/common/types";
 import type { ServerResponse } from "node:http";
+import { fragment, initSegment, MP4_TIMESCALE } from "./mp4";
 
 // A camera that no page shows any more, or that pages ask for at a lower
 // quality, keeps its capture this long, so an OBS source reloading doesn't
 // turn the camera off and on.
 export const CAMERA_LINGER_MS = 5000;
 
-// A stream's messages: a type byte, the payload's length (4 bytes, big
-// endian), then the payload. A config's is its JSON, a keyframe's and a
-// delta's the chunk's timestamp (a big-endian float64) then its bytes.
-// src/common/studio/stage.ts keeps its own copy (it may import only types),
-// so they change together.
-export const CAMERA_CONFIG = 1;
-export const CAMERA_KEYFRAME = 2;
-export const CAMERA_DELTA = 3;
-
 // The window sends a keyframe every 2 s, so a GOP this big means a stuck
 // encoder: past it, new pages wait for the next keyframe
 export const CAMERA_GOP_MAX_MESSAGES = 600;
 export const CAMERA_GOP_MAX_BYTES = 16 * 1024 * 1024;
 
+// A fragment lasts as long as since the chunk before, within these, in the
+// fragments' clock; the first one 1/30 s. Pages play in MediaSource's
+// sequence mode, so decode times only have to increase.
+const MIN_DURATION = MP4_TIMESCALE / 1000;
+const MAX_DURATION = MP4_TIMESCALE / 5;
+const DEFAULT_DURATION = MP4_TIMESCALE / 30;
+
 const rank = (quality: StudioCameraQuality) =>
   STUDIO_CAMERA_QUALITIES.indexOf(quality);
 
-// One buffer per message, written whole to every page
-const message = (type: number, ...parts: Uint8Array[]) => {
-  const header = Buffer.alloc(5);
-  header[0] = type;
-  header.writeUInt32BE(
-    parts.reduce((size, part) => size + part.byteLength, 0),
-    1,
-  );
-  return Buffer.concat([header, ...parts]);
-};
+const sameConfig = (a: CameraConfig, b: CameraConfig | null) =>
+  a.codec === b?.codec &&
+  a.width === b.width &&
+  a.height === b.height &&
+  Buffer.from(a.description).equals(b.description);
 
 type Watcher = {
   quality: StudioCameraQuality;
-  // The config message it was last sent, so it gets each one once
-  config: Buffer | null;
+  // The init segment it started with, null while it waits for a config
+  // (its headers name the codec)
+  init: Buffer | null;
   // It can't decode until the next keyframe: it's new, or missed a frame
   waiting: boolean;
 };
@@ -53,8 +48,12 @@ type Feed = {
   quality: StudioCameraQuality | null;
   linger: NodeJS.Timeout | null;
   config: CameraConfig | null;
-  configMessage: Buffer | null;
-  // The messages since the last keyframe, that keyframe first, so a new
+  init: Buffer | null;
+  sequence: number;
+  // The next fragment's decode time, and the last chunk's timestamp (µs)
+  decodeTime: number;
+  timestamp: number | null;
+  // The fragments since the last keyframe, that keyframe first, so a new
   // page shows the camera at once: null before the first keyframe, empty
   // past the cap
   gop: Buffer[] | null;
@@ -62,15 +61,18 @@ type Feed = {
 };
 
 /**
- * The camera streams pages have open, one feed per camera, each a stream
- * of the window's encoded video (see CAMERA_CONFIG).
+ * The camera streams pages have open, one feed per camera, each the
+ * window's H.264 as fragmented MP4, which pages play through MediaSource.
  */
 export class CameraFeeds {
   private _feeds = new Map<string, Feed>();
   private _count = 0;
   private _listeners: (() => void)[] = [];
 
-  /** Streams a camera's video to the response, until it closes. */
+  /**
+   * Streams a camera's video to the response, until it closes. Its headers
+   * wait for the camera's config.
+   */
   public watch(
     res: ServerResponse,
     camera: { device: string; label: string },
@@ -87,29 +89,20 @@ export class CameraFeeds {
         quality: null,
         linger: null,
         config: null,
-        configMessage: null,
+        init: null,
+        sequence: 0,
+        decodeTime: 0,
+        timestamp: null,
         gop: null,
         gopBytes: 0,
       };
       this._feeds.set(feed.id, feed);
     }
     const watched = feed;
-    res.writeHead(200, {
-      "Content-Type": "application/octet-stream",
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-      // The editor fetches it from file:// (or the dev server); the key
-      // still guards it
-      "Access-Control-Allow-Origin": "*",
-    });
-    // Node holds the headers until the first write, which may wait for a
-    // keyframe, and the page's fetch until the headers
-    res.flushHeaders();
-    const watcher: Watcher = { quality, config: null, waiting: true };
-    if (watched.configMessage && watched.gop?.length) {
-      res.write(watched.configMessage);
+    const watcher: Watcher = { quality, init: null, waiting: true };
+    this._start(watched, res, watcher);
+    if (watcher.init && watched.gop?.length) {
       for (const sent of watched.gop) res.write(sent);
-      watcher.config = watched.configMessage;
       watcher.waiting = false;
     }
     const drop = () => {
@@ -129,10 +122,8 @@ export class CameraFeeds {
     // reloads shows the camera at once
     const feed = this._feeds.get(chunk.id);
     if (!feed) return;
-    const time = Buffer.alloc(8);
-    time.writeDoubleBE(chunk.timestamp);
-    if (chunk.key) this._keyframe(feed, chunk, time);
-    else this._delta(feed, chunk, time);
+    if (chunk.key) this._keyframe(feed, chunk);
+    else this._delta(feed, chunk);
   }
 
   /** The cameras to capture, each at the largest quality a page wants. */
@@ -160,45 +151,80 @@ export class CameraFeeds {
     if (had) this._changed();
   }
 
-  private _keyframe(feed: Feed, chunk: CameraChunk, time: Buffer) {
+  // Sends the headers and the init segment, once the feed has a config
+  private _start(feed: Feed, res: ServerResponse, watcher: Watcher) {
+    if (!feed.config || !feed.init || watcher.init) return;
+    res.writeHead(200, {
+      // The codec string passed CAMERA_FRAME's check, so it can't break
+      // out of the quotes
+      "Content-Type": `video/mp4; codecs="${feed.config.codec}"`,
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      // The editor fetches it from file:// (or the dev server); the key
+      // still guards it
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.write(feed.init);
+    watcher.init = feed.init;
+  }
+
+  private _fragment(feed: Feed, chunk: CameraChunk) {
+    const since =
+      feed.timestamp === null
+        ? null
+        : ((chunk.timestamp - feed.timestamp) * MP4_TIMESCALE) / 1e6;
+    const duration =
+      since === null
+        ? DEFAULT_DURATION
+        : Math.min(MAX_DURATION, Math.max(MIN_DURATION, Math.round(since)));
+    feed.timestamp = chunk.timestamp;
+    const sent = fragment(
+      ++feed.sequence,
+      feed.decodeTime,
+      duration,
+      chunk.key,
+      chunk.frame,
+    );
+    feed.decodeTime += duration;
+    return sent;
+  }
+
+  private _keyframe(feed: Feed, chunk: CameraChunk) {
     const { config } = chunk;
-    if (
-      config &&
-      (config.codec !== feed.config?.codec ||
-        config.width !== feed.config.width ||
-        config.height !== feed.config.height)
-    ) {
+    if (config && !sameConfig(config, feed.config)) {
       const { codec, width, height, description } = config;
       feed.config = { codec, width, height, description };
-      feed.configMessage = message(
-        CAMERA_CONFIG,
-        Buffer.from(JSON.stringify(feed.config)),
-      );
+      feed.init = initSegment(feed.config);
+      // A page can't take another init mid-stream: ending it makes it
+      // reconnect, and the new stream starts with this one
+      const ended = [...feed.responses].filter(([, w]) => w.init);
+      for (const [res] of ended) {
+        feed.responses.delete(res);
+        res.end();
+      }
+      if (ended.length > 0) this._update(feed);
     }
     // Nothing could decode it
-    if (!feed.configMessage) return;
-    const sent = message(CAMERA_KEYFRAME, time, chunk.frame);
+    if (!feed.init) return;
+    const sent = this._fragment(feed, chunk);
     feed.gop = [sent];
     feed.gopBytes = sent.byteLength;
     for (const [res, watcher] of feed.responses) {
+      this._start(feed, res, watcher);
       // A page that can't keep up, like a slow PC on Wi-Fi, skips to a
       // later keyframe instead of piling frames up
       if (res.writableNeedDrain) {
         watcher.waiting = true;
         continue;
       }
-      if (watcher.config !== feed.configMessage) {
-        res.write(feed.configMessage);
-        watcher.config = feed.configMessage;
-      }
       res.write(sent);
       watcher.waiting = false;
     }
   }
 
-  private _delta(feed: Feed, chunk: CameraChunk, time: Buffer) {
+  private _delta(feed: Feed, chunk: CameraChunk) {
     if (!feed.gop) return;
-    const sent = message(CAMERA_DELTA, time, chunk.frame);
+    const sent = this._fragment(feed, chunk);
     // Past the cap the GOP stays empty until the next keyframe, and the
     // pages already following still get each delta
     if (feed.gop.length > 0) {

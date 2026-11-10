@@ -31,16 +31,25 @@ const isCameraSide = (side: unknown) =>
   side >= 1 &&
   side <= MAX_CAMERA_SIDE;
 
-// A codec string as WebCodecs names one, like avc1.42001f
+// H.264 only, as pages play it in MP4: a codec string like avc1.42001f,
+// which goes into the stream's Content-Type, and an
+// AVCDecoderConfigurationRecord, 7 bytes before its parameter sets
 const isCameraConfig = (config: unknown): config is CameraConfig => {
   if (typeof config !== "object" || config === null) return false;
-  const { codec, width, height }: Partial<Record<keyof CameraConfig, unknown>> =
-    config;
+  const {
+    codec,
+    width,
+    height,
+    description,
+  }: Partial<Record<keyof CameraConfig, unknown>> = config;
   return (
     typeof codec === "string" &&
-    /^[A-Za-z0-9._-]{1,64}$/.test(codec) &&
+    /^avc1\.[A-Za-z0-9._-]{1,59}$/.test(codec) &&
     isCameraSide(width) &&
-    isCameraSide(height)
+    isCameraSide(height) &&
+    description instanceof Uint8Array &&
+    description.byteLength >= 7 &&
+    description.byteLength <= 1024
   );
 };
 

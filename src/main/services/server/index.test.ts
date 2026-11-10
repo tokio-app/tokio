@@ -283,20 +283,34 @@ describe("ServerService", () => {
   });
 
   describe("camera streams", () => {
-    const stream = (key: string, query = "device=&label=&quality=720p") =>
-      fetch(url(`/studio/camera/${key}?${query}`));
+    const stream = (
+      key: string,
+      query = "device=&label=&quality=720p",
+      signal?: AbortSignal,
+    ) => fetch(url(`/studio/camera/${key}?${query}`), { signal });
+    const config = {
+      codec: "avc1.42e01f",
+      width: 1280,
+      height: 720,
+      description: new Uint8Array([1, 0x42, 0xe0, 0x1f, 0xff, 0xe1, 0, 0]),
+    };
 
-    // What the stream sent, once it holds `size` bytes or ends
-    const readBytes = async (res: Response, size: number) => {
+    // The types of the first `count` top-level boxes the stream sends
+    const readBoxes = async (res: Response, count: number) => {
       const reader = res.body!.getReader();
       let got = Buffer.alloc(0);
-      while (got.length < size) {
+      const types: string[] = [];
+      while (types.length < count) {
         const { value, done } = await reader.read();
         if (done) break;
         got = Buffer.concat([got, value]);
+        while (got.length >= 8 && got.length >= got.readUInt32BE(0)) {
+          types.push(got.toString("latin1", 4, 8));
+          got = got.subarray(got.readUInt32BE(0));
+        }
       }
       reader.releaseLock();
-      return got;
+      return types;
     };
 
     beforeEach(async () => {
@@ -326,17 +340,12 @@ describe("ServerService", () => {
       expect(server.cameraCaptures()).toEqual([]);
     });
 
-    it("streams a camera's video as binary messages, readable from any origin", async () => {
-      const res = await stream(
+    it("streams a camera's video as fragmented MP4 from its first keyframe, to any origin", async () => {
+      const pending = stream(
         server.cameraKey,
         "device=abc&label=HD+Webcam&quality=1080p",
       );
-
-      expect(res.status).toBe(200);
-      expect(res.headers.get("content-type")).toBe("application/octet-stream");
-      expect(res.headers.get("cache-control")).toBe("no-store");
-      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
-      expect(res.headers.get("access-control-allow-origin")).toBe("*");
+      await vi.waitFor(() => expect(server.cameraCaptures()).toHaveLength(1));
       const [capture] = server.cameraCaptures();
       expect(capture).toMatchObject({
         device: "abc",
@@ -344,40 +353,34 @@ describe("ServerService", () => {
         quality: "1080p",
       });
 
-      const config = {
-        codec: "avc1.42001f",
-        width: 1280,
-        height: 720,
-        description: new Uint8Array([1]),
-      };
       server.cameraFrame({
         id: capture.id,
         key: true,
-        timestamp: 1.5,
-        frame: Buffer.from("KEY"),
+        timestamp: 0,
+        frame: Buffer.from([0, 0, 0, 1, 0x65]),
         config,
       });
+      const res = await pending;
 
-      const json = Buffer.from(JSON.stringify(config));
-      const time = Buffer.alloc(8);
-      time.writeDoubleBE(1.5);
-      const expected = Buffer.concat([
-        Buffer.from([1, 0, 0, 0, json.length]),
-        json,
-        Buffer.from([2, 0, 0, 0, 11]),
-        time,
-        Buffer.from("KEY"),
-      ]);
-      expect(await readBytes(res, expected.length)).toEqual(expected);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe(
+        'video/mp4; codecs="avc1.42e01f"',
+      );
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(res.headers.get("access-control-allow-origin")).toBe("*");
+      expect(await readBoxes(res, 4)).toEqual(["ftyp", "moov", "moof", "mdat"]);
       await res.body?.cancel();
     });
 
     it("ends the streams when it stops", async () => {
-      const res = await stream(server.cameraKey);
+      const pending = stream(server.cameraKey);
+      await vi.waitFor(() => expect(server.cameraCaptures()).toHaveLength(1));
 
       server.stop();
 
-      expect(await readBytes(res, 1)).toEqual(Buffer.alloc(0));
+      const res = await pending;
+      expect(await readBoxes(res, 1)).toEqual([]);
       expect(server.cameraCaptures()).toEqual([]);
     });
 
@@ -402,16 +405,20 @@ describe("ServerService", () => {
     it("tells the listeners when a page opens a camera", async () => {
       const listener = vi.fn();
       server.onCameras(listener);
+      const abort = new AbortController();
 
-      const res = await stream(server.cameraKey);
+      const pending = stream(server.cameraKey, undefined, abort.signal);
 
-      expect(listener).toHaveBeenCalledWith({
-        key: server.cameraKey,
-        captures: [
-          expect.objectContaining({ device: "", label: "", quality: "720p" }),
-        ],
-      });
-      await res.body?.cancel();
+      await vi.waitFor(() =>
+        expect(listener).toHaveBeenCalledWith({
+          key: server.cameraKey,
+          captures: [
+            expect.objectContaining({ device: "", label: "", quality: "720p" }),
+          ],
+        }),
+      );
+      abort.abort();
+      await expect(pending).rejects.toThrow();
     });
   });
 

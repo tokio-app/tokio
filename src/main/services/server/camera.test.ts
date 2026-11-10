@@ -12,27 +12,43 @@ import {
   vi,
 } from "vitest";
 import {
-  CAMERA_CONFIG,
-  CAMERA_DELTA,
   CAMERA_GOP_MAX_BYTES,
   CAMERA_GOP_MAX_MESSAGES,
-  CAMERA_KEYFRAME,
   CAMERA_LINGER_MS,
   CameraFeeds,
 } from "./camera";
+import { initSegment } from "./mp4";
+
+const H264: CameraConfig = {
+  codec: "avc1.42e01f",
+  width: 1280,
+  height: 720,
+  description: new Uint8Array([1, 0x42, 0xe0, 0x1f, 0xff, 0xe1, 0, 0]),
+};
+const HD: CameraConfig = { ...H264, codec: "avc1.640028", height: 1080 };
+const INITS = new Map([
+  [initSegment(H264).toString("hex"), "H264"],
+  [initSegment(HD).toString("hex"), "HD"],
+]);
+
+// Where fragment() puts a fragment's fields: the moof is 100 bytes
+const SEQUENCE = 20;
+const DECODE_TIME = 60;
+const DURATION = 88;
+const FLAGS = 96;
+const MDAT = 108;
 
 // A response that records what it was sent
 class FakeResponse extends EventEmitter {
   writableNeedDrain = false;
   head: [number, Record<string, string>] | null = null;
-  chunks: Uint8Array[] = [];
+  chunks: Buffer[] = [];
   ended = false;
   writeHead(status: number, headers: Record<string, string>) {
     this.head = [status, headers];
     return this;
   }
-  flushHeaders() {}
-  write(chunk: Uint8Array) {
+  write(chunk: Buffer) {
     this.chunks.push(chunk);
     return true;
   }
@@ -41,26 +57,25 @@ class FakeResponse extends EventEmitter {
     this.emit("close");
     return this;
   }
-  // What it got, as config objects and "key 1 A" / "delta 2 B" lines
+  // What it got, as "init H264", "key K" or "delta A"
   messages() {
-    const bytes = Buffer.concat(this.chunks);
-    const got: (CameraConfig | string)[] = [];
-    for (let at = 0; at < bytes.length;) {
-      const type = bytes[at];
-      const size = bytes.readUInt32BE(at + 1);
-      const payload = bytes.subarray(at + 5, at + 5 + size);
-      at += 5 + size;
-      if (type === CAMERA_CONFIG) {
-        got.push(JSON.parse(payload.toString("utf8")));
-        continue;
+    return this.chunks.map((b) => {
+      if (b.toString("latin1", 4, 8) === "ftyp") {
+        return `init ${INITS.get(b.toString("hex"))}`;
       }
-      const kind = type === CAMERA_KEYFRAME ? "key" : "delta";
-      expect([CAMERA_KEYFRAME, CAMERA_DELTA]).toContain(type);
-      got.push(
-        `${kind} ${payload.readDoubleBE(0)} ${payload.subarray(8).toString("latin1")}`,
-      );
-    }
-    return got;
+      const kind = b.readUInt32BE(FLAGS) === 0x02000000 ? "key" : "delta";
+      return `${kind} ${b.subarray(MDAT).toString("latin1")}`;
+    });
+  }
+  // Each fragment's sequence number, decode time and duration
+  timing() {
+    return this.chunks
+      .filter((b) => b.toString("latin1", 4, 8) === "moof")
+      .map((b) => [
+        b.readUInt32BE(SEQUENCE),
+        Number(b.readBigUInt64BE(DECODE_TIME)),
+        b.readUInt32BE(DURATION),
+      ]);
   }
 }
 
@@ -70,12 +85,6 @@ const asResponse = (res: FakeResponse) => res as unknown as ServerResponse;
 
 const DEFAULT = { device: "", label: "" };
 const CAM = { device: "abc", label: "HD Webcam" };
-const H264 = {
-  codec: "avc1.42001f",
-  width: 1280,
-  height: 720,
-  description: new Uint8Array([1]),
-};
 
 describe("CameraFeeds", () => {
   let feeds: CameraFeeds;
@@ -117,74 +126,63 @@ describe("CameraFeeds", () => {
     vi.useRealTimers();
   });
 
-  it("starts a binary stream that sends nothing before a keyframe", () => {
+  it("holds the headers until the camera's config, which names the codec", () => {
     const res = watch();
+    expect(res.head).toBeNull();
 
+    delta(0, "A");
+    feeds.frame(chunk(1, "K", { key: true }));
+    expect(res.head).toBeNull();
+    expect(res.chunks).toEqual([]);
+
+    key(2, "K");
     expect(res.head).toEqual([
       200,
       {
-        "Content-Type": "application/octet-stream",
+        "Content-Type": 'video/mp4; codecs="avc1.42e01f"',
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         "Access-Control-Allow-Origin": "*",
       },
     ]);
-    expect(res.chunks).toEqual([]);
+    expect(res.messages()).toEqual(["init H264", "key K"]);
   });
 
-  it("frames each message as a type, a big-endian length and the payload", () => {
-    const res = watch();
-
-    key(33_333.5, "KEY");
-    delta(66_667, "D");
-
-    const config = Buffer.from(JSON.stringify(H264));
-    const time = (us: number) => {
-      const b = Buffer.alloc(8);
-      b.writeDoubleBE(us);
-      return b;
-    };
-    expect(Buffer.concat(res.chunks)).toEqual(
-      Buffer.concat([
-        Buffer.from([1, 0, 0, 0, config.length]),
-        config,
-        Buffer.from([2, 0, 0, 0, 11]),
-        time(33_333.5),
-        Buffer.from("KEY"),
-        Buffer.from([3, 0, 0, 0, 9]),
-        time(66_667),
-        Buffer.from("D"),
-      ]),
-    );
-    // Each message goes in one write
-    expect(res.chunks).toHaveLength(3);
-  });
-
-  it("sends a chunk to its camera's pages only, one buffer for all", () => {
+  it("sends a fragment to its camera's pages only, one buffer for all", () => {
     const one = watch();
     const two = watch();
     const other = watch(CAM);
 
     key(0, "K");
+    delta(1, "A");
 
-    expect(one.messages()).toEqual([H264, "key 0 K"]);
-    expect(two.messages()).toEqual([H264, "key 0 K"]);
-    expect(other.chunks).toEqual([]);
+    expect(one.messages()).toEqual(["init H264", "key K", "delta A"]);
+    expect(two.messages()).toEqual(["init H264", "key K", "delta A"]);
     expect(one.chunks[1]).toBe(two.chunks[1]);
+    expect(other.head).toBeNull();
+    expect(other.chunks).toEqual([]);
   });
 
-  it("drops deltas before the first keyframe, and keyframes before a config", () => {
+  it("numbers the fragments and times them from the chunks' timestamps", () => {
     const res = watch();
 
-    delta(0, "A");
-    feeds.frame(chunk(1, "K", { key: true }));
-    delta(2, "B");
-    key(3, "K");
+    key(1_000_000, "K");
+    delta(1_033_333, "A");
+    delta(1_033_333, "B");
+    delta(3_000_000, "C");
+    key(2_000_000, "K");
 
-    expect(res.messages()).toEqual([H264, "key 3 K"]);
+    expect(res.timing()).toEqual([
+      // 1/30 s for the first, then 33.333 ms, 1 ms at least, 200 at most
+      [1, 0, 3000],
+      [2, 3000, 3000],
+      [3, 6000, 90],
+      [4, 6090, 18000],
+      [5, 24090, 90],
+    ]);
   });
 
-  it("gives a new page the config and the GOP at once", () => {
+  it("gives a new page the headers, the init and the GOP at once", () => {
     watch();
     key(0, "K1");
     delta(1, "A");
@@ -194,14 +192,15 @@ describe("CameraFeeds", () => {
 
     const late = watch();
 
+    expect(late.head?.[0]).toBe(200);
     expect(late.messages()).toEqual([
-      H264,
-      "key 2 K2",
-      "delta 3 B",
-      "delta 4 C",
+      "init H264",
+      "key K2",
+      "delta B",
+      "delta C",
     ]);
     delta(5, "D");
-    expect(late.messages().at(-1)).toBe("delta 5 D");
+    expect(late.messages().at(-1)).toBe("delta D");
   });
 
   it("keeps the GOP while the camera lingers with no page", () => {
@@ -212,31 +211,53 @@ describe("CameraFeeds", () => {
 
     const again = watch();
 
-    expect(again.messages()).toEqual([H264, "key 0 K", "delta 1 A"]);
+    expect(again.messages()).toEqual(["init H264", "key K", "delta A"]);
   });
 
-  it("sends a changed config before its keyframe, and the same one once", () => {
-    const res = watch();
-    const hd = { ...H264, width: 1920, height: 1080 };
-
+  it("ends the pages that started with a config that changes, so they reconnect", () => {
+    const started = watch();
     key(0, "K1");
-    key(1, "K2");
-    key(2, "K3", hd);
-    key(3, "K4", { ...hd, codec: "avc1.640028" });
+    const fresh = watch(DEFAULT, "1080p");
+    // A copy of the same config changes nothing
+    key(1, "K2", { ...H264, description: new Uint8Array(H264.description) });
+    expect(started.ended).toBe(false);
 
-    expect(res.messages()).toEqual([
-      H264,
-      "key 0 K1",
-      "key 1 K2",
-      hd,
-      "key 2 K3",
-      { ...hd, codec: "avc1.640028" },
-      "key 3 K4",
-    ]);
-    expect(watch().messages()).toEqual([
-      { ...hd, codec: "avc1.640028" },
-      "key 3 K4",
-    ]);
+    const third = watch(DEFAULT, "1080p");
+    changed.mockClear();
+    key(2, "K3", HD);
+
+    expect(started.ended).toBe(true);
+    expect(started.messages()).toEqual(["init H264", "key K1", "key K2"]);
+    expect(fresh.ended).toBe(true);
+    expect(third.ended).toBe(true);
+    // The camera stays while its pages come back
+    expect(qualities()).toEqual([["", "1080p"]]);
+    expect(changed).not.toHaveBeenCalled();
+
+    const back = watch();
+    expect(back.head?.[1]["Content-Type"]).toBe(
+      'video/mp4; codecs="avc1.640028"',
+    );
+    expect(back.messages()).toEqual(["init HD", "key K3"]);
+  });
+
+  it("starts a page still waiting for its headers with the new config", () => {
+    const res = watch();
+    feeds.frame(chunk(0, "K", { key: true }));
+
+    key(1, "K", HD);
+
+    expect(res.ended).toBe(false);
+    expect(res.messages()).toEqual(["init HD", "key K"]);
+  });
+
+  it("ends a page whose only description changed", () => {
+    const res = watch();
+    key(0, "K1");
+
+    key(1, "K2", { ...H264, description: new Uint8Array([1, 2, 3, 4]) });
+
+    expect(res.ended).toBe(true);
   });
 
   it("keeps a page that can't keep up waiting for the next keyframe", () => {
@@ -251,15 +272,14 @@ describe("CameraFeeds", () => {
     key(3, "K2");
     slow.writableNeedDrain = false;
     delta(4, "C");
-    key(5, "K3", { ...H264, width: 640, height: 360 });
+    key(5, "K3");
     delta(6, "D");
 
     expect(slow.messages()).toEqual([
-      H264,
-      "key 0 K1",
-      { ...H264, width: 640, height: 360 },
-      "key 5 K3",
-      "delta 6 D",
+      "init H264",
+      "key K1",
+      "key K3",
+      "delta D",
     ]);
   });
 
@@ -272,12 +292,12 @@ describe("CameraFeeds", () => {
     delta(CAMERA_GOP_MAX_MESSAGES, "d");
     const late = watch();
     delta(CAMERA_GOP_MAX_MESSAGES + 1, "d");
-    expect(late.chunks).toEqual([]);
+    expect(late.messages()).toEqual(["init H264"]);
     // The pages already following still get every delta
     expect(res.messages()).toHaveLength(CAMERA_GOP_MAX_MESSAGES + 3);
 
     key(1000, "K2");
-    expect(late.messages()).toEqual([H264, "key 1000 K2"]);
+    expect(late.messages()).toEqual(["init H264", "key K2"]);
   });
 
   it("caps the GOP's bytes too", () => {
@@ -285,7 +305,7 @@ describe("CameraFeeds", () => {
     key(0, "K");
     delta(1, "x".repeat(CAMERA_GOP_MAX_BYTES));
 
-    expect(watch().chunks).toEqual([]);
+    expect(watch().messages()).toEqual(["init H264"]);
   });
 
   it("ignores chunks for a capture it doesn't hold", () => {
@@ -359,7 +379,7 @@ describe("CameraFeeds", () => {
     ]);
     expect(changed).not.toHaveBeenCalled();
     key(0, "K");
-    expect(again.messages()).toEqual([H264, "key 0 K"]);
+    expect(again.messages()).toEqual(["init H264", "key K"]);
   });
 
   it("waits the linger from the last page that closed", () => {
@@ -394,6 +414,7 @@ describe("CameraFeeds", () => {
     const again = watch();
 
     expect(idOf()).not.toBe(id);
+    expect(again.head).toBeNull();
     expect(again.chunks).toEqual([]);
   });
 
