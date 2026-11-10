@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   StudioElement,
+  StudioElementOf,
   StudioElementSchema,
   StudioGroupSchema,
   StudioOverlay,
@@ -184,6 +185,37 @@ describe("studioView", () => {
     expect(layers[5]).toMatchObject({ src: null });
     expect(layers[6]).toMatchObject({ src: "https://e/1.webp" });
     expect(layers[7]).toMatchObject({ src: "", name: "Sora", when: "event" });
+  });
+
+  it("streams a camera from where its deps say, cropped and rounded", () => {
+    const camera = vi.fn((e: StudioElementOf<"camera">) =>
+      e.camera ? `/camera/${e.camera.id}/${e.quality}` : null,
+    );
+    const crop = { left: 0.25, top: 0, right: 0.25, bottom: 0 };
+    const {
+      layers: [{ elements: layers }],
+    } = studioView(
+      overlay([
+        element("desk", {
+          kind: "camera",
+          camera: { id: "cam-b", label: "Desk" },
+          quality: "1080p",
+          crop,
+          rounding: 50,
+        }),
+        element("default", { kind: "camera" }),
+      ]),
+      deps({ camera }),
+    );
+
+    expect(layers[0]).toMatchObject({
+      kind: "camera",
+      src: "/camera/cam-b/1080p",
+      crop,
+      rounding: 50,
+    });
+    expect(layers[1]).toMatchObject({ src: null, crop: null, rounding: 0 });
+    expect(camera).toHaveBeenCalledTimes(2);
   });
 
   it("keeps an embed that can't load in its place, with no src", () => {

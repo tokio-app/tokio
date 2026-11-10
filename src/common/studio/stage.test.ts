@@ -674,6 +674,42 @@ describe("cropped and rounded pictures", () => {
     });
   });
 
+  it("draws a camera's stream as a picture, laid out on its first frame", () => {
+    const src =
+      "http://localhost:37891/studio/camera/key?device=&label=&quality=720p";
+    draw(
+      view({
+        ...BASE,
+        id: "c",
+        kind: "camera",
+        src,
+        crop: CROP,
+        rounding: 10,
+      }),
+    );
+    const img = el("c").querySelector("img")!;
+    expect(img.classList).toContain("studio-fill");
+    expect(img.getAttribute("src")).toBe(src);
+    expect(img.style.visibility).toBe("hidden");
+
+    // An MJPEG image fires load on its first frame
+    ownSize(img, 400, 200);
+    img.dispatchEvent(new Event("load"));
+    expect(placed(img)).toEqual({
+      left: "-150px",
+      top: "25px",
+      width: "600px",
+      height: "300px",
+      clipPath: "inset(0px 150px 150px 150px round 15px)",
+      visibility: "",
+    });
+
+    // No stream, as in the editor with the overlay server off
+    draw(view({ ...BASE, id: "c", kind: "camera", src: null, ...PICTURE }));
+    expect(el("c").querySelector("img")).toBe(img);
+    expect(img.hasAttribute("src")).toBe(false);
+  });
+
   it("rounds a viewer's circle by its rounding, and covers it with what it keeps", () => {
     draw(
       view({

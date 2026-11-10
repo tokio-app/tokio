@@ -3,6 +3,7 @@ import { TOKIO_EVENTS } from "../types/connector";
 import { defaultStoreData } from "../util/constants/store";
 import { StoreZodSchema } from "./store";
 import {
+  STUDIO_CAMERA_MAX_LENGTH,
   STUDIO_MAX_ELEMENTS,
   STUDIO_MAX_GROUPS,
   STUDIO_MAX_GUIDES,
@@ -50,7 +51,7 @@ describe("StudioElementSchema", () => {
 
   it("keeps all of a picture with square corners, a viewer's round", () => {
     const whole = { left: 0, top: 0, right: 0, bottom: 0 };
-    for (const kind of ["media", "gift", "emote"]) {
+    for (const kind of ["media", "camera", "gift", "emote"]) {
       expect(StudioElementSchema.parse(element({ kind }))).toMatchObject({
         crop: whole,
         rounding: 0,
@@ -133,6 +134,25 @@ describe("StudioElementSchema", () => {
     ).toMatchObject({
       source: null,
     });
+  });
+
+  it("shows the default camera at 720p, and refuses another quality or a long id or name", () => {
+    expect(
+      StudioElementSchema.parse(element({ kind: "camera" })),
+    ).toMatchObject({ camera: null, quality: "720p" });
+    const parses = (fields: object) =>
+      StudioElementSchema.safeParse(element({ kind: "camera", ...fields }))
+        .success;
+    const long = "x".repeat(STUDIO_CAMERA_MAX_LENGTH + 1);
+    const most = "x".repeat(STUDIO_CAMERA_MAX_LENGTH);
+
+    expect(
+      parses({ camera: { id: most, label: most }, quality: "1080p" }),
+    ).toBe(true);
+    expect(parses({ quality: "4k" })).toBe(false);
+    expect(parses({ camera: { id: long, label: "Desk" } })).toBe(false);
+    expect(parses({ camera: { id: "a", label: long } })).toBe(false);
+    expect(parses({ camera: "a" })).toBe(false);
   });
 
   it("keeps an emote's picture to https", () => {
