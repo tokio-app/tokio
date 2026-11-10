@@ -419,7 +419,10 @@ describe("StudioEditor", () => {
     await waitFor(() =>
       expect(savedElement()).toMatchObject({ x: 102, y: 210 }),
     );
-    expect(drawn(shape.id).style.left).toBe("102px");
+    // Placed from its group's box, which moved with it
+    const node = drawn(shape.id);
+    const box = node.closest<HTMLElement>(".studio-group")!;
+    expect(parseFloat(box.style.left) + parseFloat(node.style.left)).toBe(102);
     expect(field("X").getByRole("spinbutton")).toHaveValue(102);
   });
 
@@ -3411,8 +3414,11 @@ describe("StudioEditor", () => {
       await user.click(row(/^Pic/));
       sized();
       loaded(shown.id, 800, 400);
-      const body = () => drawn(shown.id).querySelector(".studio-body")!;
-      const mover = () => drawn(shown.id).closest(".studio-group")!;
+      // By its id: the canvas has another name while it crops
+      const node = () =>
+        document.querySelector<HTMLElement>(`[data-element="${shown.id}"]`)!;
+      const body = () => node().querySelector(".studio-body")!;
+      const mover = () => node().closest(".studio-group")!;
       expect(body().className).toMatch(/studio-loop-spin/);
       expect(mover().className).toMatch(/studio-loop-drift/);
 
