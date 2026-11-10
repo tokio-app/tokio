@@ -265,25 +265,24 @@ function cameraSrc(id: string) {
   });
 }
 
-// Reads the stream until one whole JPEG came, its start and end markers
-async function firstJPEG(url: string) {
+// Reads the stream's MP4 boxes (a big-endian size, then the type) until the
+// first fragment's media came
+async function firstFragment(url: string) {
   const res = await fetch(url);
-  expect(res.headers.get("content-type")).toContain(
-    "multipart/x-mixed-replace",
-  );
+  const type = res.headers.get("content-type");
   const reader = res.body!.getReader();
   let bytes = Buffer.alloc(0);
+  const boxes: string[] = [];
   try {
     for (;;) {
       const { value, done } = await reader.read();
-      if (done) throw new Error("The stream ended before a frame");
+      if (done) throw new Error("The stream ended before a fragment");
       bytes = Buffer.concat([bytes, value]);
-      const start = bytes.indexOf(Buffer.from([0xff, 0xd8]));
-      if (
-        start !== -1 &&
-        bytes.indexOf(Buffer.from([0xff, 0xd9]), start) !== -1
-      ) {
-        return bytes;
+      while (bytes.length >= 8 && bytes.length >= bytes.readUInt32BE(0)) {
+        const name = bytes.toString("latin1", 4, 8);
+        boxes.push(name);
+        if (name === "mdat") return { type, boxes };
+        bytes = bytes.subarray(bytes.readUInt32BE(0));
       }
     }
   } finally {
@@ -338,8 +337,11 @@ test("streams a camera element's frames to its overlay", async () => {
     /^\/studio\/camera\/[^/?]+\?device=&label=&quality=720p$/,
   );
 
-  // Tokio's window captures Chromium's test camera once a page asks
-  await expect(firstJPEG(`http://127.0.0.1:37891${src}`)).resolves.toBeTruthy();
+  // Tokio's window captures and encodes Chromium's test camera once a page
+  // asks, with whatever encoder the machine has
+  const first = await firstFragment(`http://127.0.0.1:37891${src}`);
+  expect(first.type).toMatch(/^video\/mp4; codecs="avc1\.[0-9a-f]{6}"$/);
+  expect(first.boxes).toEqual(["ftyp", "moov", "moof", "mdat"]);
   // Another run's key gets nothing
   const wrong = src.replace(/camera\/[^/?]+/, `camera/${crypto.randomUUID()}`);
   expect((await fetch(`http://127.0.0.1:37891${wrong}`)).status).toBe(404);
