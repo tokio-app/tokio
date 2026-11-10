@@ -411,6 +411,29 @@ describe("ServerService", () => {
       abort.abort();
       await expect(pending).rejects.toThrow();
     });
+
+    it("asks for a keyframe when a page joins a camera already streaming", async () => {
+      const listener = vi.fn();
+      server.onCameraKeyframe(listener);
+      const first = stream(server.cameraKey);
+      await vi.waitFor(() => expect(server.cameraCaptures()).toHaveLength(1));
+      const [capture] = server.cameraCaptures();
+      server.cameraFrame({
+        id: capture.id,
+        key: true,
+        timestamp: 0,
+        frame: Buffer.from([0, 0, 0, 1, 0x65]),
+        config,
+      });
+      await first;
+      expect(listener).not.toHaveBeenCalled();
+
+      const second = await stream(server.cameraKey);
+
+      expect(listener).toHaveBeenCalledWith(capture.id);
+      await second.body?.cancel();
+      await (await first).body?.cancel();
+    });
   });
 
   describe("alert overlays", () => {

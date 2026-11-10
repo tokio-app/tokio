@@ -13,11 +13,6 @@ import { fragment, initSegment, MP4_TIMESCALE } from "./mp4";
 // turn the camera off and on.
 export const CAMERA_LINGER_MS = 5000;
 
-// The window sends a keyframe every 2 s, so a GOP this big means a stuck
-// encoder: past it, new pages wait for the next keyframe
-export const CAMERA_GOP_MAX_MESSAGES = 600;
-export const CAMERA_GOP_MAX_BYTES = 16 * 1024 * 1024;
-
 // A fragment lasts as long as since the chunk before, within these, in the
 // fragments' clock; the first one 1/30 s. Pages play in MediaSource's
 // sequence mode, so decode times only have to increase.
@@ -65,11 +60,8 @@ type Feed = {
   // The next fragment's decode time, and the last chunk's timestamp (µs)
   decodeTime: number;
   timestamp: number | null;
-  // The fragments since the last keyframe, that keyframe first, so a new
-  // page shows the camera at once: null before the first keyframe, empty
-  // past the cap
-  gop: Buffer[] | null;
-  gopBytes: number;
+  // The window was asked for a keyframe that hasn't come yet
+  asked: boolean;
 };
 
 /**
@@ -80,6 +72,7 @@ export class CameraFeeds {
   private _feeds = new Map<string, Feed>();
   private _count = 0;
   private _listeners: (() => void)[] = [];
+  private _keyframeListeners: ((id: string) => void)[] = [];
 
   /**
    * Streams a camera's video to the response, until it closes. Its headers
@@ -105,18 +98,13 @@ export class CameraFeeds {
         sequence: 0,
         decodeTime: 0,
         timestamp: null,
-        gop: null,
-        gopBytes: 0,
+        asked: false,
       };
       this._feeds.set(feed.id, feed);
     }
     const watched = feed;
     const watcher: Watcher = { quality, init: null, waiting: true };
     this._start(watched, res, watcher);
-    if (watcher.init && watched.gop?.length) {
-      for (const sent of watched.gop) res.write(sent);
-      watcher.waiting = false;
-    }
     const drop = () => {
       if (!watched.responses.delete(res)) return;
       this._update(watched);
@@ -126,12 +114,13 @@ export class CameraFeeds {
     res.on("error", drop);
     watched.responses.set(res, watcher);
     this._update(watched);
+    // It starts at a new keyframe, which the window sends at once: from the
+    // last one, it would show the camera up to 2 s late
+    this._ask(watched);
   }
 
   /** Sends a chunk to every page that streams the capture with its id. */
   public frame(chunk: CameraChunk) {
-    // A feed lingering with no page still keeps its GOP, so a page that
-    // reloads shows the camera at once
     const feed = this._feeds.get(chunk.id);
     if (!feed) return;
     if (chunk.key) this._keyframe(feed, chunk);
@@ -149,6 +138,14 @@ export class CameraFeeds {
   /** Called whenever captures() changes. */
   public onChange(listener: () => void) {
     this._listeners.push(listener);
+  }
+
+  /**
+   * Called with a capture's id when a page waits for its next keyframe,
+   * which the window should then send at once.
+   */
+  public onKeyframe(listener: (id: string) => void) {
+    this._keyframeListeners.push(listener);
   }
 
   /** Ends every stream, as the server stops. */
@@ -215,9 +212,8 @@ export class CameraFeeds {
     }
     // Nothing could decode it
     if (!feed.init) return;
+    feed.asked = false;
     const sent = this._fragment(feed, chunk);
-    feed.gop = [sent];
-    feed.gopBytes = sent.byteLength;
     for (const [res, watcher] of feed.responses) {
       this._start(feed, res, watcher);
       // A page that can't keep up, like a slow PC on Wi-Fi, skips to a
@@ -232,21 +228,8 @@ export class CameraFeeds {
   }
 
   private _delta(feed: Feed, chunk: CameraChunk) {
-    if (!feed.gop) return;
+    if (!feed.init) return;
     const sent = this._fragment(feed, chunk);
-    // Past the cap the GOP stays empty until the next keyframe, and the
-    // pages already following still get each delta
-    if (feed.gop.length > 0) {
-      feed.gop.push(sent);
-      feed.gopBytes += sent.byteLength;
-    }
-    if (
-      feed.gop.length > CAMERA_GOP_MAX_MESSAGES ||
-      feed.gopBytes > CAMERA_GOP_MAX_BYTES
-    ) {
-      feed.gop = [];
-      feed.gopBytes = 0;
-    }
     for (const [res, watcher] of feed.responses) {
       if (watcher.waiting) continue;
       // A delta missed breaks every frame until the next keyframe
@@ -256,6 +239,13 @@ export class CameraFeeds {
       }
       res.write(sent);
     }
+  }
+
+  // Once per keyframe, and not before the first: a capture starts with one
+  private _ask(feed: Feed) {
+    if (!feed.init || feed.asked) return;
+    feed.asked = true;
+    for (const listener of this._keyframeListeners) listener(feed.id);
   }
 
   // A new camera or a higher quality is captured at once, a drop after the

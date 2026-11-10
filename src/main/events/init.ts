@@ -760,6 +760,11 @@ const registerCameras = ({
     asked = true;
     void systemPreferences.askForMediaAccess("camera");
   });
+  server.onCameraKeyframe((id) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send(APP_EVENTS_RESPONSE.CAMERA_KEYFRAME, { id });
+    }
+  });
 };
 
 // The profile keeps the fans its LIVEs show, whatever features are on.

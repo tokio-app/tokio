@@ -132,7 +132,7 @@ const listed = (...devices: MediaDeviceInfo[]) =>
     .mockResolvedValue(devices);
 
 const start = async (c = capture()) => {
-  const stop = camera.startCapture(c);
+  const { stop } = camera.startCapture(c);
   await vi.advanceTimersByTimeAsync(0);
   return stop;
 };
@@ -336,6 +336,25 @@ describe("startCapture", () => {
       true,
     ]);
     stop();
+  });
+
+  it("makes the next frame it encodes a keyframe when asked", async () => {
+    const capturing = camera.startCapture(capture());
+    await vi.advanceTimersByTimeAsync(0);
+    await push(0);
+    await push(33_333);
+    const [encoder] = FakeEncoder.made;
+
+    capturing.keyframe();
+    // A frame the encoder can't take doesn't use it up
+    encoder.encodeQueueSize = 3;
+    await push(66_666);
+    encoder.encodeQueueSize = 0;
+    await push(99_999);
+    await push(133_333);
+
+    expect(keyFrames(encoder)).toEqual([true, false, true, false]);
+    capturing.stop();
   });
 
   it("drops frames while the encoder is behind", async () => {

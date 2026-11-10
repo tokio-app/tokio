@@ -21,17 +21,21 @@ const capture = (
 const cameras = (...captures: CameraCapture[]) =>
   send(APP_EVENTS_RESPONSE.CAMERAS, { captures });
 
-// Each capture started, by id, and its stop
+// Each capture started, by id, and its stop and keyframe
 let stops: Map<string, ReturnType<typeof vi.fn>>;
+let keyframes: Map<string, ReturnType<typeof vi.fn>>;
 
 describe("useCameraCapture", () => {
   beforeEach(() => {
     stops = new Map();
+    keyframes = new Map();
     vi.mocked(startCapture).mockReset();
     vi.mocked(startCapture).mockImplementation((c) => {
       const stop = vi.fn();
+      const keyframe = vi.fn();
       stops.set(c.id, stop);
-      return stop;
+      keyframes.set(c.id, keyframe);
+      return { stop, keyframe };
     });
   });
 
@@ -83,6 +87,18 @@ describe("useCameraCapture", () => {
     expect(startCapture).toHaveBeenLastCalledWith(
       capture("a", { device: "other", label: "Other" }),
     );
+  });
+
+  it("asks the capture main names for a keyframe", async () => {
+    renderHook(() => useCameraCapture());
+    await cameras(capture("a"), capture("b"));
+
+    await send(APP_EVENTS_RESPONSE.CAMERA_KEYFRAME, { id: "b" });
+    // One it doesn't capture
+    await send(APP_EVENTS_RESPONSE.CAMERA_KEYFRAME, { id: "z" });
+
+    expect(keyframes.get("b")).toHaveBeenCalledTimes(1);
+    expect(keyframes.get("a")).not.toHaveBeenCalled();
   });
 
   it("stops every capture on unmount", async () => {

@@ -263,6 +263,7 @@ function setup() {
     ),
     sendToAll: vi.fn((_payload: TokioPayload) => {}),
     onCameras: vi.fn((_listener: (captures: CameraCapture[]) => void) => {}),
+    onCameraKeyframe: vi.fn((_listener: (id: string) => void) => {}),
   };
   const overlayService = {
     setLogFile: vi.fn(),
@@ -1306,6 +1307,11 @@ describe("init events", () => {
         listener(captures);
       }
     };
+    const keyframe = (s: Setup, id: string) => {
+      for (const [listener] of s.serverService.onCameraKeyframe.mock.calls) {
+        listener(id);
+      }
+    };
 
     it("pushes the cameras to capture to the window", async () => {
       const s = await live();
@@ -1322,7 +1328,19 @@ describe("init events", () => {
       s.h.win.close();
 
       expect(() => cameras(s, [])).not.toThrow();
+      expect(() => keyframe(s, "1")).not.toThrow();
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CAMERAS)).toEqual([]);
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CAMERA_KEYFRAME)).toEqual([]);
+    });
+
+    it("asks the window for the keyframe a page waits for", async () => {
+      const s = await live();
+
+      keyframe(s, "1");
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CAMERA_KEYFRAME)).toEqual([
+        { id: "1" },
+      ]);
     });
 
     it("asks macOS for the camera once, when one is first wanted", async () => {

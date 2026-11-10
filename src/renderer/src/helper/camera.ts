@@ -168,15 +168,21 @@ const shut = (encoder: VideoEncoder | null) => {
   if (encoder && encoder.state !== "closed") encoder.close();
 };
 
+export type Capture = {
+  stop: () => void;
+  // Encodes the next frame as a keyframe, for a page that waits for one
+  keyframe: () => void;
+};
+
 /**
  * Captures a camera main asked for and sends its frames as encoded video
- * chunks, until the returned function stops it. A failure, or the camera
- * going away, is sent as CAMERA_FAILED and tried again CAMERA_RETRY_MS
- * later.
+ * chunks, until it's stopped. A failure, or the camera going away, is sent
+ * as CAMERA_FAILED and tried again CAMERA_RETRY_MS later.
  */
-export function startCapture(capture: CameraCapture): () => void {
+export function startCapture(capture: CameraCapture): Capture {
   const { id } = capture;
   let stopped = false;
+  let keyNow = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
   let stream: MediaStream | null = null;
 
@@ -274,8 +280,11 @@ export function startCapture(capture: CameraCapture): () => void {
             lastKey = -Infinity;
           }
           if (encoder.encodeQueueSize > 2) continue;
-          const keyFrame = frame.timestamp - lastKey >= KEYFRAME_US;
-          if (keyFrame) lastKey = frame.timestamp;
+          const keyFrame = keyNow || frame.timestamp - lastKey >= KEYFRAME_US;
+          if (keyFrame) {
+            lastKey = frame.timestamp;
+            keyNow = false;
+          }
           encoder.encode(frame, { keyFrame });
         } finally {
           frame.close();
@@ -300,10 +309,15 @@ export function startCapture(capture: CameraCapture): () => void {
 
   void run();
 
-  return () => {
-    stopped = true;
-    clearTimeout(retry);
-    // Ends the track, which ends the reader's stream
-    stream?.getTracks().forEach((t) => t.stop());
+  return {
+    stop: () => {
+      stopped = true;
+      clearTimeout(retry);
+      // Ends the track, which ends the reader's stream
+      stream?.getTracks().forEach((t) => t.stop());
+    },
+    keyframe: () => {
+      keyNow = true;
+    },
   };
 }

@@ -344,6 +344,14 @@ export class ServerService extends Service {
     this._cameraListeners.push(listener);
   }
 
+  /**
+   * Calls the listener with a capture's id when a page waits for its next
+   * keyframe, which the window should send at once.
+   */
+  public onCameraKeyframe(listener: (id: string) => void) {
+    this._cameras.onKeyframe(listener);
+  }
+
   private _camerasChanged() {
     const captures = this.cameraCaptures();
     for (const listener of this._cameraListeners) listener(captures);

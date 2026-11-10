@@ -1,5 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, CameraCapture } from "@/common/types";
-import { startCapture } from "@/helper/camera";
+import { Capture, startCapture } from "@/helper/camera";
 import { useEffect, useRef } from "react";
 import { useIpcListener } from "./useIpcListener";
 import { useIpcRequest } from "./useIpcRequest";
@@ -14,7 +14,7 @@ const same = (a: CameraCapture, b: CameraCapture) =>
  */
 export function useCameraCapture() {
   const running = useRef(
-    new Map<string, { capture: CameraCapture; stop: () => void }>(),
+    new Map<string, { capture: CameraCapture; run: Capture }>(),
   );
 
   useIpcRequest(APP_EVENTS.GET_CAMERAS);
@@ -22,22 +22,26 @@ export function useCameraCapture() {
   useIpcListener(APP_EVENTS_RESPONSE.CAMERAS, (res) => {
     if (!res) return;
     const wanted = new Map(res.captures.map((c) => [c.id, c]));
-    for (const [id, { capture, stop }] of running.current) {
+    for (const [id, { capture, run }] of running.current) {
       const next = wanted.get(id);
       if (next && same(capture, next)) continue;
-      stop();
+      run.stop();
       running.current.delete(id);
     }
     for (const [id, capture] of wanted) {
       if (running.current.has(id)) continue;
-      running.current.set(id, { capture, stop: startCapture(capture) });
+      running.current.set(id, { capture, run: startCapture(capture) });
     }
+  });
+
+  useIpcListener(APP_EVENTS_RESPONSE.CAMERA_KEYFRAME, (res) => {
+    if (res) running.current.get(res.id)?.run.keyframe();
   });
 
   useEffect(() => {
     const captures = running.current;
     return () => {
-      for (const { stop } of captures.values()) stop();
+      for (const { run } of captures.values()) run.stop();
       captures.clear();
     };
   }, []);

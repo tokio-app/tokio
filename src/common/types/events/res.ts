@@ -107,6 +107,7 @@ export enum APP_EVENTS_RESPONSE {
   // OVERLAY STUDIO
   STUDIO = "app:studio:res:list",
   CAMERAS = "app:studio:res:cameras",
+  CAMERA_KEYFRAME = "app:studio:res:cameras:keyframe",
 
   // ALERTS
   ALERT_AUDIO = "app:alerts:audio",
@@ -342,6 +343,8 @@ export interface AppEventsResponseMap {
   // The cameras pages show, which the window captures: pushed when they
   // change, and the reply to GET_CAMERAS
   [APP_EVENTS_RESPONSE.CAMERAS]: { captures: CameraCapture[] };
+  // A page waits for the capture's next keyframe: the window encodes one now
+  [APP_EVENTS_RESPONSE.CAMERA_KEYFRAME]: { id: string };
 
   // ALERTS
   [APP_EVENTS_RESPONSE.ALERT_AUDIO]: {

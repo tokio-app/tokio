@@ -11,12 +11,7 @@ import {
   type Mock,
   vi,
 } from "vitest";
-import {
-  CAMERA_GOP_MAX_BYTES,
-  CAMERA_GOP_MAX_MESSAGES,
-  CAMERA_LINGER_MS,
-  CameraFeeds,
-} from "./camera";
+import { CAMERA_LINGER_MS, CameraFeeds } from "./camera";
 import { initSegment } from "./mp4";
 
 const H264: CameraConfig = {
@@ -90,6 +85,7 @@ const CAM = { device: "abc", label: "HD Webcam" };
 describe("CameraFeeds", () => {
   let feeds: CameraFeeds;
   let changed: Mock<() => void>;
+  let keyframes: Mock<(id: string) => void>;
 
   const watch = (camera = DEFAULT, quality: StudioCameraQuality = "720p") => {
     const res = new FakeResponse();
@@ -121,6 +117,8 @@ describe("CameraFeeds", () => {
     feeds = new CameraFeeds();
     changed = vi.fn<() => void>();
     feeds.onChange(changed);
+    keyframes = vi.fn<(id: string) => void>();
+    feeds.onKeyframe(keyframes);
   });
 
   afterEach(() => {
@@ -182,36 +180,42 @@ describe("CameraFeeds", () => {
     ]);
   });
 
-  it("gives a new page the headers, the init and the GOP at once", () => {
-    watch();
+  it("starts a new page at the next keyframe, which it asks the window for", () => {
+    const first = watch();
+    // A new capture starts with one
+    expect(keyframes).not.toHaveBeenCalled();
     key(0, "K1");
     delta(1, "A");
-    key(2, "K2");
-    delta(3, "B");
-    delta(4, "C");
 
     const late = watch();
 
+    expect(keyframes).toHaveBeenCalledWith(idOf());
     expect(late.head?.[0]).toBe(200);
-    expect(late.messages()).toEqual([
+    delta(2, "B");
+    expect(late.messages()).toEqual(["init H264"]);
+    key(3, "K2");
+    delta(4, "C");
+    expect(late.messages()).toEqual(["init H264", "key K2", "delta C"]);
+    expect(first.messages()).toEqual([
       "init H264",
-      "key K2",
+      "key K1",
+      "delta A",
       "delta B",
+      "key K2",
       "delta C",
     ]);
-    delta(5, "D");
-    expect(late.messages().at(-1)).toBe("delta D");
   });
 
-  it("keeps the GOP while the camera lingers with no page", () => {
-    const res = watch();
-    key(0, "K");
-    res.emit("close");
-    delta(1, "A");
+  it("asks once until the keyframe comes", () => {
+    watch();
+    key(0, "K1");
+    watch();
+    watch();
+    expect(keyframes).toHaveBeenCalledTimes(1);
 
-    const again = watch();
-
-    expect(again.messages()).toEqual(["init H264", "key K", "delta A"]);
+    key(1, "K2");
+    watch();
+    expect(keyframes).toHaveBeenCalledTimes(2);
   });
 
   it("ends the pages that started with a config that changes, so they reconnect", () => {
@@ -238,7 +242,8 @@ describe("CameraFeeds", () => {
     expect(back.head?.[1]["Content-Type"]).toBe(
       'video/mp4; codecs="avc1.640028"',
     );
-    expect(back.messages()).toEqual(["init HD", "key K3"]);
+    key(3, "K4", HD);
+    expect(back.messages()).toEqual(["init HD", "key K4"]);
   });
 
   it("starts a page still waiting for its headers with the new config", () => {
@@ -281,31 +286,6 @@ describe("CameraFeeds", () => {
       "key K3",
       "delta D",
     ]);
-  });
-
-  it("makes new pages wait for a keyframe once the GOP outgrows its cap", () => {
-    const res = watch();
-    key(0, "K");
-    for (let i = 1; i < CAMERA_GOP_MAX_MESSAGES; i++) delta(i, "d");
-
-    expect(watch().messages()).toHaveLength(CAMERA_GOP_MAX_MESSAGES + 1);
-    delta(CAMERA_GOP_MAX_MESSAGES, "d");
-    const late = watch();
-    delta(CAMERA_GOP_MAX_MESSAGES + 1, "d");
-    expect(late.messages()).toEqual(["init H264"]);
-    // The pages already following still get every delta
-    expect(res.messages()).toHaveLength(CAMERA_GOP_MAX_MESSAGES + 3);
-
-    key(1000, "K2");
-    expect(late.messages()).toEqual(["init H264", "key K2"]);
-  });
-
-  it("caps the GOP's bytes too", () => {
-    watch();
-    key(0, "K");
-    delta(1, "x".repeat(CAMERA_GOP_MAX_BYTES));
-
-    expect(watch().messages()).toEqual(["init H264"]);
   });
 
   it("ignores chunks for a capture it doesn't hold", () => {
@@ -404,7 +384,7 @@ describe("CameraFeeds", () => {
     expect(res.chunks).toEqual([]);
   });
 
-  it("gives a camera that comes back after the linger a new id, and no GOP", () => {
+  it("gives a camera that comes back after the linger a new id", () => {
     const res = watch();
     const id = idOf();
     key(0, "K");
@@ -416,6 +396,8 @@ describe("CameraFeeds", () => {
     expect(idOf()).not.toBe(id);
     expect(again.head).toBeNull();
     expect(again.chunks).toEqual([]);
+    // Its capture starts with a keyframe
+    expect(keyframes).not.toHaveBeenCalled();
   });
 
   it("ends every stream and drops every capture at once", () => {
