@@ -73,10 +73,23 @@ type Entry = {
   // timer that lets it go
   still: number | undefined;
   letGo: ReturnType<typeof setTimeout> | undefined;
+  // A camera's player, for the stream it plays
+  camera: { src: string; stop: () => void } | undefined;
 };
 
 // How long a held video stays still after a cut's handle last moved
 const HOLD_MS = 600;
+
+// How long a camera's stream waits to open again, as served pages reconnect
+const CAMERA_RETRY_MS = 2000;
+// How far behind its stream's end a camera may play before it skips ahead,
+// and where it lands
+const CAMERA_BEHIND = 0.5;
+const CAMERA_LEAD = 0.1;
+// What a camera keeps behind where it plays: MediaSource's quota fills in
+// minutes at 4 Mbps
+const CAMERA_KEEP = 30;
+const CAMERA_TRIMMED = 10;
 
 const ARCHIVO = '"Archivo Variable", sans-serif';
 const MOTION = /^studio-(enter|play)-/;
@@ -124,6 +137,11 @@ const partOf = (element: StudioElementView, duration: number) => {
 // A video that plays its part once, and stops there
 const once = (element: StudioElementView) =>
   element.kind === "media" && !element.loop;
+
+// A media element's video. A camera's plays its stream (playCamera), with
+// no part, loop or sound.
+const clipOf = (entry: Entry) =>
+  entry.element.kind === "media" ? entry.body.querySelector("video") : null;
 
 // The shapes a body's own paint can't draw, as SVG
 export type Figure = Exclude<StudioShape, "rectangle" | "ellipse">;
@@ -278,6 +296,120 @@ const setVideo = (video: HTMLVideoElement, src: string | null) => {
     video.src = src;
   }
 };
+
+/**
+ * Plays a camera's stream in the video until the returned function stops
+ * it: fragmented MP4 main muxes, appended to a MediaSource as it comes, kept
+ * at its live edge and trimmed behind it. WebCodecs needs a secure context,
+ * which a browser source at tokio-app.local or a LAN address isn't;
+ * MediaSource doesn't. It opens again 2 s after the stream ends or fails,
+ * and gives up quietly on a refused stream, or a browser that can't play
+ * it.
+ */
+function playCamera(video: HTMLVideoElement, src: string): () => void {
+  let controller: AbortController | undefined;
+  let url: string | undefined;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+
+  const teardown = () => {
+    if (controller) controller.abort();
+    controller = undefined;
+    if (url) URL.revokeObjectURL(url);
+    url = undefined;
+    release(video);
+  };
+
+  const open = async () => {
+    if (typeof MediaSource !== "function") return;
+    const aborter = new AbortController();
+    controller = aborter;
+    // Ended or failed, unless it was stopped
+    const again = () => {
+      if (aborter.signal.aborted) return;
+      teardown();
+      retry = setTimeout(open, CAMERA_RETRY_MS);
+    };
+    let res: Response;
+    try {
+      res = await fetch(src, { cache: "no-store", signal: aborter.signal });
+    } catch {
+      again();
+      return;
+    }
+    const type = res.headers.get("Content-Type") || "";
+    const body = res.body;
+    if (!res.ok || !body || !MediaSource.isTypeSupported(type)) {
+      aborter.abort();
+      return;
+    }
+    const source = new MediaSource();
+    url = URL.createObjectURL(source);
+    video.src = url;
+    video.play().catch(() => {});
+    source.addEventListener(
+      "sourceopen",
+      () => {
+        if (aborter.signal.aborted) return;
+        const queue: Uint8Array<ArrayBuffer>[] = [];
+        let buffer: SourceBuffer;
+        // One append at a time, each after its live edge and trim
+        const next = () => {
+          if (aborter.signal.aborted || buffer.updating) return;
+          try {
+            const { buffered } = buffer;
+            if (buffered.length) {
+              const end = buffered.end(buffered.length - 1);
+              if (end - video.currentTime > CAMERA_BEHIND) {
+                video.currentTime = end - CAMERA_LEAD;
+              }
+              // From where it keeps: its stream starts at main's timestamps
+              if (video.currentTime - buffered.start(0) > CAMERA_KEEP) {
+                buffer.remove(0, video.currentTime - CAMERA_TRIMMED);
+                return;
+              }
+            }
+            const chunk = queue.shift();
+            if (chunk) buffer.appendBuffer(chunk);
+          } catch {
+            // A decode error ended the source
+            again();
+          }
+        };
+        try {
+          buffer = source.addSourceBuffer(type);
+          buffer.mode = "sequence";
+        } catch {
+          again();
+          return;
+        }
+        buffer.addEventListener("updateend", next);
+        const reader = body.getReader();
+        const read = async () => {
+          try {
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              queue.push(value);
+              next();
+            }
+          } catch {
+            // Opened again below, unless it was stopped
+          }
+          again();
+        };
+        void read();
+      },
+      { once: true },
+    );
+  };
+
+  void open();
+
+  return () => {
+    clearTimeout(retry);
+    teardown();
+  };
+}
 
 // The stage mutes, loops and plays it (makeVideo, fill, playback)
 const newVideo = () => {
@@ -485,6 +617,15 @@ export function createStage(
     img.addEventListener("load", relayout);
     return img;
   };
+  // Muted, so it plays on its own, and laid out again once its size is read
+  // or changes. Not a clip: playback and the editor's sound leave it be.
+  const makeCamera = () => {
+    const video = newVideo();
+    video.muted = true;
+    video.addEventListener("loadedmetadata", relayout);
+    video.addEventListener("resize", relayout);
+    return video;
+  };
   const makeAvatar = () => {
     const avatar = newAvatar();
     avatar.querySelector("img")!.addEventListener("load", relayout);
@@ -517,7 +658,7 @@ export function createStage(
   // Videos play only while their element shows, from their part's start
   // when they start over, and one that played its part once stays there
   const playback = (entry: Entry, fromStart = false) => {
-    const video = entry.body.querySelector("video");
+    const video = clipOf(entry);
     if (!video) return;
     if (hidden(entry)) {
       video.pause();
@@ -651,9 +792,20 @@ export function createStage(
         layoutPicture(media, element, element.crop, element.rounding);
         break;
       }
-      // A camera's stream is an MJPEG image, which fires load on its first
-      // frame
-      case "camera":
+      case "camera": {
+        const video = only(body, HTMLVideoElement, makeCamera);
+        const { src } = element;
+        if ((entry.camera?.src ?? null) !== src) {
+          entry.camera?.stop();
+          entry.camera = src
+            ? { src, stop: playCamera(video, src) }
+            : undefined;
+          if (src) video.dataset.src = src;
+          else delete video.dataset.src;
+        }
+        layoutPicture(video, element, element.crop, element.rounding);
+        break;
+      }
       case "gift":
       case "emote": {
         const img = only(body, HTMLImageElement, makePicture);
@@ -758,11 +910,8 @@ export function createStage(
     clearTimeout(entry.cue);
     clearTimeout(entry.letGo);
     entry.body.querySelectorAll("video").forEach(release);
-    // A detached image keeps loading its src until it's collected, and a
-    // camera's stream keeps its camera on
-    entry.body
-      .querySelectorAll("img")
-      .forEach((img) => img.removeAttribute("src"));
+    // Its stream keeps the camera on
+    entry.camera?.stop();
     entry.el.remove();
     entries.delete(entry.element.id);
   };
@@ -793,6 +942,7 @@ export function createStage(
       cut: undefined,
       still: undefined,
       letGo: undefined,
+      camera: undefined,
     };
     entries.set(element.id, entry);
     return entry;
@@ -898,7 +1048,7 @@ export function createStage(
     if (!quiet) return;
     quiet = false;
     for (const entry of Array.from(entries.values())) {
-      const video = entry.body.querySelector("video");
+      const video = clipOf(entry);
       if (!video) continue;
       video.muted = silent;
       playback(entry);
@@ -924,13 +1074,13 @@ export function createStage(
     sound: (on) => {
       silent = !on;
       for (const entry of Array.from(entries.values())) {
-        const video = entry.body.querySelector("video");
+        const video = clipOf(entry);
         if (video) video.muted = silent || quiet;
       }
     },
     hold: (elementId, seconds) => {
       const entry = entries.get(elementId);
-      const video = entry?.body.querySelector("video");
+      const video = entry && clipOf(entry);
       if (!entry || !video) return;
       clearTimeout(entry.cue);
       clearTimeout(entry.letGo);
