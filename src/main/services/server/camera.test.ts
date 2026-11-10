@@ -70,7 +70,12 @@ const asResponse = (res: FakeResponse) => res as unknown as ServerResponse;
 
 const DEFAULT = { device: "", label: "" };
 const CAM = { device: "abc", label: "HD Webcam" };
-const H264 = { codec: "avc1.42001f", width: 1280, height: 720 };
+const H264 = {
+  codec: "avc1.42001f",
+  width: 1280,
+  height: 720,
+  description: new Uint8Array([1]),
+};
 
 describe("CameraFeeds", () => {
   let feeds: CameraFeeds;

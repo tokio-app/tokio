@@ -424,7 +424,12 @@ describe("studio events", () => {
       expect(h.notices).toEqual([]);
     });
 
-    const config = { codec: "avc1.42001f", width: 1280, height: 720 };
+    const config = {
+      codec: "avc1.42001f",
+      width: 1280,
+      height: 720,
+      description: new Uint8Array([1]),
+    };
     const chunk = (patch: Record<string, unknown> = {}) => ({
       id: "1",
       key: true,
@@ -485,7 +490,12 @@ describe("studio events", () => {
         APP_EVENTS.CAMERA_FRAME,
         chunk({
           frame: new Uint8Array(4 * 1024 * 1024),
-          config: { codec: "vp09.00.10.08", width: 8192, height: 1 },
+          config: {
+            codec: "vp09.00.10.08",
+            width: 8192,
+            height: 1,
+            description: new Uint8Array([1]),
+          },
         }),
       );
 

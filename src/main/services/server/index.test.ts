@@ -344,7 +344,12 @@ describe("ServerService", () => {
         quality: "1080p",
       });
 
-      const config = { codec: "avc1.42001f", width: 1280, height: 720 };
+      const config = {
+        codec: "avc1.42001f",
+        width: 1280,
+        height: 720,
+        description: new Uint8Array([1]),
+      };
       server.cameraFrame({
         id: capture.id,
         key: true,

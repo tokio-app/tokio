@@ -157,9 +157,15 @@ export const CAMERA_FAILURES = [
 ] as const;
 export type CameraFailure = (typeof CAMERA_FAILURES)[number];
 
-// What a page needs to decode a capture's video (WebCodecs' VideoDecoder):
-// the codec string, and the frames' size
-export type CameraConfig = { codec: string; width: number; height: number };
+// What a page needs to play a capture's H.264: the codec string, the
+// frames' size, and the encoder's decoder description (an
+// AVCDecoderConfigurationRecord, the MP4 avcC box's contents)
+export type CameraConfig = {
+  codec: string;
+  width: number;
+  height: number;
+  description: Uint8Array;
+};
 
 // One encoded chunk of a capture's video (WebCodecs' EncodedVideoChunk),
 // from the window to main. A keyframe carries its config.

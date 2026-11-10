@@ -128,10 +128,12 @@ export function startCapture(capture: CameraCapture): () => void {
 
       // Each encoder sends its chunks with its own config on keyframes
       const open = (config: VideoEncoderConfig) => {
+        // The description comes with the encoder's first keyframe
         const sent: CameraConfig = {
           codec: config.codec,
           width: config.width,
           height: config.height,
+          description: new Uint8Array(),
         };
         const made = new VideoEncoder({
           output: (chunk) => {

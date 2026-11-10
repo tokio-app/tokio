@@ -168,8 +168,8 @@ export class CameraFeeds {
         config.width !== feed.config.width ||
         config.height !== feed.config.height)
     ) {
-      const { codec, width, height } = config;
-      feed.config = { codec, width, height };
+      const { codec, width, height, description } = config;
+      feed.config = { codec, width, height, description };
       feed.configMessage = message(
         CAMERA_CONFIG,
         Buffer.from(JSON.stringify(feed.config)),
