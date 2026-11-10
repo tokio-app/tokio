@@ -63,9 +63,12 @@ export function startCapture(capture: CameraCapture): () => void {
       if (stopped) return;
       const [track] = stream.getVideoTracks();
       // Unlike requestVideoFrameCallback, it doesn't wait for paint, so it
-      // runs while the window is hidden in the tray
+      // runs while the window is hidden in the tray. It keeps only the
+      // newest frame while one encodes, so a slow encode drops frames
+      // instead of falling behind.
       const reader = new MediaStreamTrackProcessor({
         track,
+        maxBufferSize: 1,
       }).readable.getReader();
       const canvas = new OffscreenCanvas(1, 1);
       const context = canvas.getContext("2d")!;
