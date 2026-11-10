@@ -758,6 +758,11 @@ export function createStage(
     clearTimeout(entry.cue);
     clearTimeout(entry.letGo);
     entry.body.querySelectorAll("video").forEach(release);
+    // A detached image keeps loading its src until it's collected, and a
+    // camera's stream keeps its camera on
+    entry.body
+      .querySelectorAll("img")
+      .forEach((img) => img.removeAttribute("src"));
     entry.el.remove();
     entries.delete(entry.element.id);
   };

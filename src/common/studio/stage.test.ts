@@ -710,6 +710,18 @@ describe("cropped and rounded pictures", () => {
     expect(img.hasAttribute("src")).toBe(false);
   });
 
+  it("ends a camera's stream when its element goes, as a detached image keeps loading", () => {
+    const src =
+      "http://localhost:37891/studio/camera/key?device=&label=&quality=720p";
+    draw(view({ ...BASE, id: "c", kind: "camera", src, ...PICTURE }));
+    const img = el("c").querySelector("img")!;
+
+    draw(view());
+
+    expect(img.isConnected).toBe(false);
+    expect(img.hasAttribute("src")).toBe(false);
+  });
+
   it("rounds a viewer's circle by its rounding, and covers it with what it keeps", () => {
     draw(
       view({
