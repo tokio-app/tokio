@@ -25,6 +25,7 @@ import {
 } from "../live";
 import { OverlayApp } from "../server";
 import { VoiceData, VoiceEngine } from "../store";
+import { CameraCapture } from "../studio";
 import { TimerData } from "../timer";
 import { UpdateStatus } from "../updates";
 
@@ -105,6 +106,7 @@ export enum APP_EVENTS_RESPONSE {
 
   // OVERLAY STUDIO
   STUDIO = "app:studio:res:list",
+  CAMERAS = "app:studio:res:cameras",
 
   // ALERTS
   ALERT_AUDIO = "app:alerts:audio",
@@ -337,6 +339,10 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.STUDIO]: Reply<{
     data?: StudioOverlay[];
   }>;
+  // The cameras pages show, which the window captures, and the overlay
+  // server's key for this run, which the editor's camera URLs need. Pushed
+  // when either changes, and the reply to GET_CAMERAS.
+  [APP_EVENTS_RESPONSE.CAMERAS]: { key: string; captures: CameraCapture[] };
 
   // ALERTS
   [APP_EVENTS_RESPONSE.ALERT_AUDIO]: {

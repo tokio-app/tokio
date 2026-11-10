@@ -12,6 +12,7 @@ import {
   ALERTS_PATH,
   formatError,
   MINECRAFT_OVERLAY_PATH,
+  studioCameraPath,
   studioElements,
   studioSocketId,
   sentPicture,
@@ -83,6 +84,12 @@ function viewOf(
     served: (id) => served.has(id),
     mediaURL,
     embedPath,
+    camera: (element) =>
+      studioCameraPath(
+        services.serverService.cameraKey,
+        element.camera,
+        element.quality,
+      ),
     text: (element) =>
       studioText(element, numbers, studio.kept(element)?.values ?? null),
     viewer: (element) => {

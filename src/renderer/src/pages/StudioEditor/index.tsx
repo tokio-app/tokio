@@ -335,6 +335,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               : source.type === "timer"
                 ? getOverlayURL(TIMER_PATH)
                 : getMinecraftOverlayURL(source.column ?? undefined),
+        camera: () => null,
         text: (element) => sampleText(element, samples, language),
         viewer: (element) => sampleViewerOf(element, samples),
         sent: (element) => sampleSentOf(element, samples),

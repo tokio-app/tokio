@@ -1,4 +1,5 @@
 import { AlertTrigger, TokioPayload } from "../connector";
+import { CameraFailure } from "../studio";
 import {
   ActivityFeed,
   AlertTts,
@@ -111,6 +112,9 @@ export enum APP_EVENTS {
   SAVE_STUDIO_OVERLAY = "app:studio:save",
   REMOVE_STUDIO_OVERLAY = "app:studio:remove",
   TEST_STUDIO_OVERLAY = "app:studio:test",
+  GET_CAMERAS = "app:studio:cameras:get",
+  CAMERA_FRAME = "app:studio:cameras:frame",
+  CAMERA_FAILED = "app:studio:cameras:failed",
 
   // ALERTS
   UPDATE_ALERTS_SETTINGS = "app:alerts:update:settings",
@@ -339,6 +343,13 @@ export interface AppEventsMap {
   [APP_EVENTS.REMOVE_STUDIO_OVERLAY]: { id: string };
   // Plays every element that reacts once, with sample values, on stream
   [APP_EVENTS.TEST_STUDIO_OVERLAY]: { id: string };
+  // Answered by CAMERAS
+  [APP_EVENTS.GET_CAMERAS]: void;
+  // One JPEG of a capture main asked for, by the capture's id
+  [APP_EVENTS.CAMERA_FRAME]: { id: string; frame: Uint8Array };
+  // A capture couldn't start, or its camera went away: the window tries
+  // again while main still asks for it
+  [APP_EVENTS.CAMERA_FAILED]: { id: string; reason: CameraFailure };
 
   // ALERTS
   [APP_EVENTS.UPDATE_ALERTS_SETTINGS]: {

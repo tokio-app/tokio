@@ -34,6 +34,7 @@ import { EmoteOption } from "@/components";
 export const KIND_NAMES: Record<StudioElementKind, MessageKey> = {
   text: "studio.kinds.text",
   media: "studio.kinds.media",
+  camera: "studio.kinds.camera",
   gift: "studio.kinds.gift",
   emote: "studio.kinds.emote",
   shape: "studio.kinds.shape",

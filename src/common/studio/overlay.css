@@ -22,6 +22,7 @@
  *             text     .studio-text (.studio-bold, .studio-halo), its font,
  *                      size and alignment inline
  *             media    img.studio-fill or video.studio-fill
+ *             camera   img.studio-fill, its stream's frames (MJPEG)
  *             gift     img.studio-fill
  *             emote    img.studio-fill
  *             shape    a rectangle or an ellipse: nothing, the body is

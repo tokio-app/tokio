@@ -651,6 +651,9 @@ export function createStage(
         layoutPicture(media, element, element.crop, element.rounding);
         break;
       }
+      // A camera's stream is an MJPEG image, which fires load on its first
+      // frame
+      case "camera":
       case "gift":
       case "emote": {
         const img = only(body, HTMLImageElement, makePicture);

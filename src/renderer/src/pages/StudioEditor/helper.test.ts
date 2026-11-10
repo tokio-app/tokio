@@ -622,6 +622,7 @@ describe("the canvas's geometry", () => {
     served: () => true,
     mediaURL: (file: string) => file,
     embedPath: () => "",
+    camera: () => null,
     text: () => "",
     viewer: () => ({ src: "", name: "" }),
     sent: () => "",

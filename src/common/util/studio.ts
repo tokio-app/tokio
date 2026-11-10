@@ -103,6 +103,8 @@ export type StudioViewDeps = {
   mediaURL: (file: string, elementId: string) => string;
   // Where an embed loads from
   embedPath: (source: StudioSource) => string;
+  // Where a camera element's stream loads from, null for nowhere
+  camera: (element: StudioElementOf<"camera">) => string | null;
   // A text element's text, filled (fillStudioText)
   text: (element: StudioElementOf<"text">) => string;
   // The viewer's picture ("" for none) and name a viewer element shows
@@ -176,6 +178,13 @@ function elementView(
         volume: element.volume,
       };
     }
+    case "camera":
+      return {
+        ...base,
+        ...picture(element),
+        kind: element.kind,
+        src: deps.camera(element),
+      };
     case "gift": {
       // No gift picked: the one its event sent
       if (element.gift === null) {
@@ -275,6 +284,8 @@ const NEW_BOXES: Record<StudioElementKind, { width: number; height: number }> =
   {
     text: { width: 720, height: 160 },
     media: { width: 480, height: 480 },
+    // A webcam's 16:9
+    camera: { width: 640, height: 360 },
     gift: { width: 240, height: 240 },
     emote: { width: 200, height: 200 },
     shape: { width: 640, height: 320 },

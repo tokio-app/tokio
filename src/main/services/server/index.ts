@@ -57,6 +57,10 @@ export class ServerService extends Service {
   // Folders served under /<id>/, keyed by id.
   private _routes = new Map<string, string>();
   private _connectListeners: ((id: string) => void)[] = [];
+  // In every camera stream's URL: the server is open to the whole network,
+  // and a camera shouldn't be. New on each start, so pages that reconnect
+  // load their streams again. Never saved or logged.
+  private _cameraKey = randomUUID();
 
   // NOTE: Overlays connect to SERVER_PORT, other ports are for tests.
   constructor(port: number = SERVER_PORT) {
@@ -114,12 +118,18 @@ export class ServerService extends Service {
     return this._port;
   }
 
+  public get cameraKey(): string {
+    return this._cameraKey;
+  }
+
   public start(): Promise<{ success: boolean; message: string }> {
     if (this._server)
       return Promise.resolve({
         success: false,
         message: "Server already running.",
       });
+
+    this._cameraKey = randomUUID();
 
     return new Promise((resolve) => {
       // Without a host Node listens on :: for IPv4 and IPv6, or 0.0.0.0 without IPv6.

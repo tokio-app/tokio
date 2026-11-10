@@ -111,6 +111,7 @@ describe("studioView", () => {
     served: (id) => id === "gift-jar",
     mediaURL: (file, id) => `/alerts/media/${file}?${id}`,
     embedPath: (source) => `/${source.type}/`,
+    camera: (e) => `/camera/${e.camera?.label ?? "default"}/${e.quality}`,
     text: (l) => l.text.toUpperCase(),
     viewer: () => ({ src: "", name: "Sora" }),
     sent: () => "",

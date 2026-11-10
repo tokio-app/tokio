@@ -1,6 +1,7 @@
 import type {
   StudioAlign,
   StudioAnimation,
+  StudioCameraQuality,
   StudioCrop,
   StudioEntrance,
   StudioShape,
@@ -62,6 +63,9 @@ export type StudioElementView = StudioElementViewBase &
         loop: boolean;
         volume: number;
       } & StudioPictureView)
+    // src is the camera's stream, null when there's none to load (the
+    // editor's, with the overlay server off)
+    | ({ kind: "camera"; src: string | null } & StudioPictureView)
     | ({ kind: "gift"; src: string | null } & StudioPictureView)
     | ({ kind: "emote"; src: string | null } & StudioPictureView)
     // color null without a fill, border null without one; sides are a
@@ -131,3 +135,24 @@ export type StudioReact = {
   picture?: string;
   name?: string;
 };
+
+// A camera main wants the window to capture, while pages show it: its id
+// and name as the window listed them ("" for the default camera), at the
+// largest quality a page asks for. The id names its frames.
+export type CameraCapture = {
+  id: string;
+  device: string;
+  label: string;
+  quality: StudioCameraQuality;
+};
+
+// Why the window couldn't capture a camera: the system's privacy settings
+// refused it, it isn't connected (or was unplugged), another app holds it,
+// or anything else
+export const CAMERA_FAILURES = [
+  "blocked",
+  "missing",
+  "busy",
+  "failed",
+] as const;
+export type CameraFailure = (typeof CAMERA_FAILURES)[number];
