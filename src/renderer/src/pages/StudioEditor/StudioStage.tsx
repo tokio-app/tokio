@@ -410,24 +410,32 @@ export function StudioStage({
   );
 
   // While cropping, its element drawn whole and unrounded, where all of its
-  // picture is, under the crop frame
+  // picture is, under the crop frame, and held still with its group, so a
+  // loop or a reaction can't move the picture from under the frame
   const shownView = useMemo((): StudioView => {
     if (!draft) return view;
     return {
       ...view,
-      layers: view.layers.map((layer) => ({
-        ...layer,
-        elements: layer.elements.map((element) =>
-          element.id === draft.id && "crop" in element
-            ? {
-                ...element,
-                ...boxOn(element, draft.picture),
-                crop: null,
-                rounding: 0,
-              }
-            : element,
-        ),
-      })),
+      layers: view.layers.map((layer) => {
+        if (!layer.elements.some((element) => element.id === draft.id)) {
+          return layer;
+        }
+        return {
+          ...layer,
+          group: layer.group && { ...layer.group, when: "always" },
+          elements: layer.elements.map((element) =>
+            element.id === draft.id && "crop" in element
+              ? {
+                  ...element,
+                  ...boxOn(element, draft.picture),
+                  crop: null,
+                  rounding: 0,
+                  when: "always",
+                }
+              : element,
+          ),
+        };
+      }),
     };
   }, [view, draft]);
 
@@ -610,6 +618,18 @@ export function StudioStage({
       root.current?.querySelectorAll<HTMLElement>("[data-element]") ?? [],
     ).find((n) => n.dataset.element === id);
 
+  // What it measures, with every motion on the stage held still: a box's
+  // rect counts its parents' transforms, so a loop or a group's motion would
+  // measure the words larger and grow the box, which fitting never shrinks
+  const still = <T,>(measure: () => T): T => {
+    root.current?.classList.add(styles.measuring);
+    try {
+      return measure();
+    } finally {
+      root.current?.classList.remove(styles.measuring);
+    }
+  };
+
   /**
    * The height an element's text takes at that width, in px of the canvas,
    * 1 for one without text: the least its box can have. Measured on the
@@ -625,7 +645,7 @@ export function StudioStage({
     node.style.transform = "";
     const range = document.createRange();
     range.selectNodeContents(text);
-    const { height } = range.getBoundingClientRect();
+    const { height } = still(() => range.getBoundingClientRect());
     node.style.width = keptWidth;
     node.style.transform = transform;
     return Math.max(1, Math.ceil(height / scale));
@@ -647,7 +667,7 @@ export function StudioStage({
     text.style.width = "min-content";
     // On stream a word too long for its box breaks anywhere
     text.style.overflowWrap = "normal";
-    const measured = text.getBoundingClientRect().width;
+    const measured = still(() => text.getBoundingClientRect().width);
     node.style.transform = transform;
     text.style.width = width;
     text.style.overflowWrap = overflowWrap;

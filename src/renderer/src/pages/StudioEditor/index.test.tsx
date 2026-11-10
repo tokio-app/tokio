@@ -1778,6 +1778,37 @@ describe("StudioEditor", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("measures a text's words with every motion on the stage held still", async () => {
+    const words = text({
+      text: "Hello",
+      when: "loop",
+      width: 600,
+      height: 300,
+    });
+    const { user } = await open(
+      holding(group("Group 1", [words], { when: "loop" })),
+    );
+    await user.click(row(/^Hello/));
+    sized();
+    const root = canvas().querySelector<HTMLElement>(".studio-stage")!;
+    const still: boolean[] = [];
+    vi.spyOn(Range.prototype, "getBoundingClientRect").mockImplementation(
+      () => {
+        still.push(/measuring/.test(root.className));
+        return new DOMRect(0, 0, 300, 60);
+      },
+    );
+
+    fireEvent.pointerDown(handle("se"), { button: 0, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(canvas(), { clientX: 0, clientY: -500 });
+    fireEvent.pointerUp(canvas());
+
+    await waitFor(() => expect(savedElement()).toMatchObject({ height: 120 }));
+    expect(still.length).toBeGreaterThan(0);
+    expect(still.every(Boolean)).toBe(true);
+    expect(root.className).not.toMatch(/measuring/);
+  });
+
   it("tests: saves what's waiting, plays the event elements and asks main to", async () => {
     const shows = text({ text: "Hi {username}", when: "event" });
     const always = text({ text: "Always" });
@@ -3370,6 +3401,32 @@ describe("StudioEditor", () => {
       );
       // Still selected, and nothing else picked
       expect(row(/^Pic/)).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("holds the picture and its group still while it crops", async () => {
+      const shown = pic({ when: "loop", idle: "spin" });
+      const { user } = await open(
+        holding(group("Group 1", [shown], { when: "loop", idle: "drift" })),
+      );
+      await user.click(row(/^Pic/));
+      sized();
+      loaded(shown.id, 800, 400);
+      const body = () => drawn(shown.id).querySelector(".studio-body")!;
+      const mover = () => drawn(shown.id).closest(".studio-group")!;
+      expect(body().className).toMatch(/studio-loop-spin/);
+      expect(mover().className).toMatch(/studio-loop-drift/);
+
+      await user.click(
+        page().getByRole("button", {
+          name: "Crop on the canvas (double-click)",
+        }),
+      );
+      expect(body().className).not.toMatch(/studio-loop-/);
+      expect(mover().className).not.toMatch(/studio-loop-/);
+
+      fireEvent.keyDown(stage(), { key: "Escape" });
+      expect(body().className).toMatch(/studio-loop-spin/);
+      expect(mover().className).toMatch(/studio-loop-drift/);
     });
 
     it("crops no locked picture on the canvas", async () => {

@@ -503,6 +503,13 @@
   outline: calc(1px / var(--canvas-scale)) dashed var(--font-secondary);
 }
 
+/* While a text's words are measured: an important declaration beats the
+   running motion without restarting it, as animation: none would a loop */
+.measuring :global(.studio-body),
+.measuring :global(.studio-group) {
+  transform: none !important;
+}
+
 /* The streamer's guides, a screen px of Info across the whole view, cut at
    the sizer's edges, under the rose lines and the selection */
 .guide_x,
