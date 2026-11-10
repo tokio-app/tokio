@@ -4,6 +4,7 @@ import {
   APP_EVENTS_RESPONSE,
   AppError,
   CAMERA_FAILURES,
+  CameraColors,
   CameraConfig,
   FEEDBACK_CODES,
 } from "@/common/types";
@@ -31,9 +32,31 @@ const isCameraSide = (side: unknown) =>
   side >= 1 &&
   side <= MAX_CAMERA_SIDE;
 
+// A color space's name as WebCodecs gives one, or none
+const isColorName = (name: unknown) =>
+  name === null || (typeof name === "string" && /^[a-z0-9-]{1,32}$/.test(name));
+
+const isCameraColors = (colors: unknown): colors is CameraColors => {
+  if (colors === null) return true;
+  if (typeof colors !== "object") return false;
+  const {
+    primaries,
+    transfer,
+    matrix,
+    fullRange,
+  }: Partial<Record<keyof CameraColors, unknown>> = colors;
+  return (
+    isColorName(primaries) &&
+    isColorName(transfer) &&
+    isColorName(matrix) &&
+    (fullRange === null || typeof fullRange === "boolean")
+  );
+};
+
 // H.264 only, as pages play it in MP4: a codec string like avc1.42001f,
-// which goes into the stream's Content-Type, and an
-// AVCDecoderConfigurationRecord, 7 bytes before its parameter sets
+// which goes into the stream's Content-Type, an
+// AVCDecoderConfigurationRecord, 7 bytes before its parameter sets, and its
+// colors
 const isCameraConfig = (config: unknown): config is CameraConfig => {
   if (typeof config !== "object" || config === null) return false;
   const {
@@ -41,6 +64,7 @@ const isCameraConfig = (config: unknown): config is CameraConfig => {
     width,
     height,
     description,
+    colors,
   }: Partial<Record<keyof CameraConfig, unknown>> = config;
   return (
     typeof codec === "string" &&
@@ -49,7 +73,8 @@ const isCameraConfig = (config: unknown): config is CameraConfig => {
     isCameraSide(height) &&
     description instanceof Uint8Array &&
     description.byteLength >= 7 &&
-    description.byteLength <= 1024
+    description.byteLength <= 1024 &&
+    isCameraColors(colors)
   );
 };
 

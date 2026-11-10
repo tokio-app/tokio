@@ -103,6 +103,7 @@ class FakeEncoder {
     timestamp: number,
     bytes: number[],
     description?: AllowSharedBufferSource,
+    colorSpace?: VideoColorSpaceInit,
   ) {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fake
     const chunk = {
@@ -113,7 +114,9 @@ class FakeEncoder {
     } as unknown as EncodedVideoChunk;
     this.init.output(
       chunk,
-      description ? { decoderConfig: { codec: "", description } } : {},
+      description
+        ? { decoderConfig: { codec: "", description, colorSpace } }
+        : {},
     );
   }
 }
@@ -203,7 +206,13 @@ describe("startCapture", () => {
 
     // A view into a buffer the encoder reuses
     const record = new Uint8Array([0, 1, 0x64, 0, 0x1f, 0]);
-    encoder.out("key", 0, [1, 2], new DataView(record.buffer, 1, 4));
+    const colors = {
+      primaries: "smpte170m",
+      transfer: "smpte170m",
+      matrix: "smpte170m",
+      fullRange: false,
+    } as const;
+    encoder.out("key", 0, [1, 2], new DataView(record.buffer, 1, 4), colors);
     record.fill(0);
     encoder.out("delta", 33_333, [3]);
     expect(sent(APP_EVENTS.CAMERA_FRAME)).toEqual([
@@ -217,6 +226,7 @@ describe("startCapture", () => {
           width: 1280,
           height: 720,
           description: new Uint8Array([1, 0x64, 0, 0x1f]),
+          colors,
         },
       },
       {
@@ -303,6 +313,7 @@ describe("startCapture", () => {
           width: 1280,
           height: 720,
           description: new Uint8Array([7]),
+          colors: null,
         },
       ],
       [99_999, undefined],
@@ -363,6 +374,7 @@ describe("startCapture", () => {
           width: 640,
           height: 360,
           description: new Uint8Array([8]),
+          colors: null,
         },
       }),
     ]);

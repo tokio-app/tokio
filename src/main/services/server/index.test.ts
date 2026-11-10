@@ -293,6 +293,7 @@ describe("ServerService", () => {
       width: 1280,
       height: 720,
       description: new Uint8Array([1, 0x42, 0xe0, 0x1f, 0xff, 0xe1, 0, 0]),
+      colors: null,
     };
 
     // The types of the first `count` top-level boxes the stream sends

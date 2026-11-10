@@ -35,8 +35,65 @@ const MATRIX = u32(0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000);
 // "und", three 5-bit letters, each less 0x60
 const UND = (21 << 10) | (14 << 5) | 4;
 
+// The code points (ISO/IEC 23091-2) of the colors WebCodecs names; 2 is
+// unspecified
+const PRIMARIES: Record<string, number> = {
+  bt709: 1,
+  bt470bg: 5,
+  smpte170m: 6,
+  bt2020: 9,
+  smpte432: 12,
+};
+const TRANSFERS: Record<string, number> = {
+  bt709: 1,
+  smpte170m: 6,
+  linear: 8,
+  "iec61966-2-1": 13,
+  pq: 16,
+  hlg: 18,
+};
+const MATRICES: Record<string, number> = {
+  rgb: 0,
+  bt709: 1,
+  bt470bg: 5,
+  smpte170m: 6,
+  "bt2020-ncl": 9,
+};
+const UNSPECIFIED = 2;
+
+const codeOf = (codes: Record<string, number>, name: string | null) =>
+  (name !== null && Object.hasOwn(codes, name) && codes[name]) || UNSPECIFIED;
+
+/**
+ * The frames' colors (colr, nclx), which the encoder's H.264 doesn't carry:
+ * without them Chromium takes HD video for BT.709, and a camera's BT.601
+ * greens come out darker. None when nothing is known.
+ */
+function colr(colors: CameraConfig["colors"]) {
+  if (!colors) return [];
+  const codes = [
+    codeOf(PRIMARIES, colors.primaries),
+    codeOf(TRANSFERS, colors.transfer),
+    codeOf(MATRICES, colors.matrix),
+  ];
+  if (codes.every((code) => code === UNSPECIFIED)) return [];
+  return [
+    box(
+      "colr",
+      text("nclx"),
+      u16(...codes),
+      Buffer.from([colors.fullRange ? 0x80 : 0]),
+    ),
+  ];
+}
+
 /** The init segment: ftyp and moov, for a track of the config's video. */
-export function initSegment({ width, height, description }: CameraConfig) {
+export function initSegment({
+  width,
+  height,
+  description,
+  colors,
+}: CameraConfig) {
   const ftyp = box(
     "ftyp",
     text("isom"),
@@ -98,6 +155,7 @@ export function initSegment({ width, height, description }: CameraConfig) {
     // Depth, pre_defined -1
     u16(0x18, 0xffff),
     box("avcC", description),
+    ...colr(colors),
   );
   const stbl = box(
     "stbl",

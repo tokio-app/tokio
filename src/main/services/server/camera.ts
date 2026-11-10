@@ -1,5 +1,10 @@
 import { STUDIO_CAMERA_QUALITIES, StudioCameraQuality } from "@/common/schemas";
-import type { CameraCapture, CameraChunk, CameraConfig } from "@/common/types";
+import type {
+  CameraCapture,
+  CameraChunk,
+  CameraColors,
+  CameraConfig,
+} from "@/common/types";
 import type { ServerResponse } from "node:http";
 import { fragment, initSegment, MP4_TIMESCALE } from "./mp4";
 
@@ -23,11 +28,18 @@ const DEFAULT_DURATION = MP4_TIMESCALE / 30;
 const rank = (quality: StudioCameraQuality) =>
   STUDIO_CAMERA_QUALITIES.indexOf(quality);
 
+const sameColors = (a: CameraColors | null, b: CameraColors | null) =>
+  a?.primaries === b?.primaries &&
+  a?.transfer === b?.transfer &&
+  a?.matrix === b?.matrix &&
+  a?.fullRange === b?.fullRange;
+
 const sameConfig = (a: CameraConfig, b: CameraConfig | null) =>
   a.codec === b?.codec &&
   a.width === b.width &&
   a.height === b.height &&
-  Buffer.from(a.description).equals(b.description);
+  Buffer.from(a.description).equals(b.description) &&
+  sameColors(a.colors, b.colors);
 
 type Watcher = {
   quality: StudioCameraQuality;
@@ -189,8 +201,8 @@ export class CameraFeeds {
   private _keyframe(feed: Feed, chunk: CameraChunk) {
     const { config } = chunk;
     if (config && !sameConfig(config, feed.config)) {
-      const { codec, width, height, description } = config;
-      feed.config = { codec, width, height, description };
+      const { codec, width, height, description, colors } = config;
+      feed.config = { codec, width, height, description, colors };
       feed.init = initSegment(feed.config);
       // A page can't take another init mid-stream: ending it makes it
       // reconnect, and the new stream starts with this one

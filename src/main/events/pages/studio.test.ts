@@ -428,6 +428,12 @@ describe("studio events", () => {
       width: 1280,
       height: 720,
       description: new Uint8Array(7),
+      colors: {
+        primaries: "smpte170m",
+        transfer: "smpte170m",
+        matrix: "smpte170m",
+        fullRange: false,
+      },
     };
     const chunk = (patch: Record<string, unknown> = {}) => ({
       id: "1",
@@ -483,6 +489,17 @@ describe("studio events", () => {
         chunk({ config: { ...config, width: 0 } }),
         chunk({ config: { ...config, width: 1280.5 } }),
         chunk({ config: { ...config, height: 8193 } }),
+        chunk({ config: { ...config, colors: undefined } }),
+        chunk({ config: { ...config, colors: "smpte170m" } }),
+        chunk({
+          config: {
+            ...config,
+            colors: { ...config.colors, primaries: 'bt709"' },
+          },
+        }),
+        chunk({
+          config: { ...config, colors: { ...config.colors, fullRange: 0 } },
+        }),
         chunk({ config: { codec: "vp8", width: 640 } }),
         undefined,
       ];
@@ -502,6 +519,7 @@ describe("studio events", () => {
             width: 8192,
             height: 1,
             description: new Uint8Array(1024),
+            colors: null,
           },
         }),
       );

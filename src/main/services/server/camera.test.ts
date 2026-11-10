@@ -24,6 +24,7 @@ const H264: CameraConfig = {
   width: 1280,
   height: 720,
   description: new Uint8Array([1, 0x42, 0xe0, 0x1f, 0xff, 0xe1, 0, 0]),
+  colors: null,
 };
 const HD: CameraConfig = { ...H264, codec: "avc1.640028", height: 1080 };
 const INITS = new Map([

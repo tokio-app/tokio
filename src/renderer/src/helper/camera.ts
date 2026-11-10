@@ -202,11 +202,21 @@ export function startCapture(capture: CameraCapture): () => void {
             if (stopped) return;
             const description = metadata?.decoderConfig?.description;
             if (description) {
+              // The H.264 doesn't carry them: main puts them in the MP4
+              const space = metadata?.decoderConfig?.colorSpace;
               sent = {
                 codec: config.codec,
                 width: config.width,
                 height: config.height,
                 description: copied(description),
+                colors: space
+                  ? {
+                      primaries: space.primaries ?? null,
+                      transfer: space.transfer ?? null,
+                      matrix: space.matrix ?? null,
+                      fullRange: space.fullRange ?? null,
+                    }
+                  : null,
               };
             }
             const key = chunk.type === "key";

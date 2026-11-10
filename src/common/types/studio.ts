@@ -157,14 +157,25 @@ export const CAMERA_FAILURES = [
 ] as const;
 export type CameraFailure = (typeof CAMERA_FAILURES)[number];
 
+// The colors the encoder says its frames have, as WebCodecs names them
+// (VideoColorSpaceInit), null where it doesn't say
+export type CameraColors = {
+  primaries: string | null;
+  transfer: string | null;
+  matrix: string | null;
+  fullRange: boolean | null;
+};
+
 // What a page needs to play a capture's H.264: the codec string, the
-// frames' size, and the encoder's decoder description (an
-// AVCDecoderConfigurationRecord, the MP4 avcC box's contents)
+// frames' size, the encoder's decoder description (an
+// AVCDecoderConfigurationRecord, the MP4 avcC box's contents) and its
+// colors, which the H.264 itself doesn't carry
 export type CameraConfig = {
   codec: string;
   width: number;
   height: number;
   description: Uint8Array;
+  colors: CameraColors | null;
 };
 
 // One encoded chunk of a capture's video (WebCodecs' EncodedVideoChunk),

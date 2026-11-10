@@ -69,6 +69,7 @@ const CONFIG = {
   width: 1280,
   height: 720,
   description: DESCRIPTION,
+  colors: null,
 };
 
 describe("initSegment", () => {
@@ -177,6 +178,72 @@ describe("initSegment", () => {
     const avcC = find(init, [...stbl, "stsd", "avc1", "avcC"]);
     expect(avcC.size).toBe(8 + DESCRIPTION.length);
     expect(new Uint8Array(avcC.body)).toEqual(DESCRIPTION);
+  });
+
+  // The boxes in the avc1 entry, after its fields
+  const entryOf = (bytes: Buffer) =>
+    boxes(
+      find(bytes, [
+        "moov",
+        "trak",
+        "mdia",
+        "minf",
+        "stbl",
+        "stsd",
+        "avc1",
+      ]).body.subarray(CHILDREN.avc1),
+    );
+
+  it("carries the encoder's colors in a colr box after the avcC", () => {
+    const camera = initSegment({
+      ...CONFIG,
+      colors: {
+        primaries: "smpte170m",
+        transfer: "smpte170m",
+        matrix: "smpte170m",
+        fullRange: false,
+      },
+    });
+    const [avcC, colr] = entryOf(camera);
+    expect([avcC.type, colr.type]).toEqual(["avcC", "colr"]);
+    expect(colr.body.toString("latin1", 0, 4)).toBe("nclx");
+    expect([
+      colr.body.readUInt16BE(4),
+      colr.body.readUInt16BE(6),
+      colr.body.readUInt16BE(8),
+      colr.body[10],
+    ]).toEqual([6, 6, 6, 0]);
+
+    const hd = initSegment({
+      ...CONFIG,
+      colors: {
+        primaries: "bt709",
+        transfer: "iec61966-2-1",
+        matrix: "made-up",
+        fullRange: true,
+      },
+    });
+    const [, full] = entryOf(hd);
+    expect([
+      full.body.readUInt16BE(4),
+      full.body.readUInt16BE(6),
+      full.body.readUInt16BE(8),
+      full.body[10],
+    ]).toEqual([1, 13, 2, 0x80]);
+  });
+
+  it("leaves the colors out when it knows none", () => {
+    expect(entryOf(init).map((b) => b.type)).toEqual(["avcC"]);
+    const unknown = initSegment({
+      ...CONFIG,
+      colors: {
+        primaries: null,
+        transfer: "made-up",
+        matrix: null,
+        fullRange: null,
+      },
+    });
+    expect(entryOf(unknown).map((b) => b.type)).toEqual(["avcC"]);
   });
 
   it("leaves the sample tables empty", () => {
