@@ -13,6 +13,8 @@ import {
   AlertTrigger,
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
+  AppEventsResponseMap,
+  CameraCapture,
   ChatEvent,
   CustomGift,
   EMOTE_TRIGGER,
@@ -57,7 +59,7 @@ import type { TimerService } from "@/services/timer";
 import { TIMER_EVENTS } from "@/services/timer";
 import type { TTSService } from "@/services/tts";
 import type { UpdaterService } from "@/services/updater";
-import { app } from "@test/electron";
+import { app, systemPreferences } from "@test/electron";
 import { createHandler, eventSource } from "@test/handler";
 import {
   afterEach,
@@ -98,6 +100,8 @@ const folders: Folders = {
   fansFolder: "app/fans",
   historyFolder: "app/history",
 };
+
+type Cameras = AppEventsResponseMap[APP_EVENTS_RESPONSE.CAMERAS];
 
 const noStats = { likes: 0, viewers: 0, views: 0 };
 const profile: Profile = { ...defaultProfile, name: "Stream" };
@@ -261,6 +265,7 @@ function setup() {
       (_id: string, _payload: { type: string; data?: unknown }) => true,
     ),
     sendToAll: vi.fn((_payload: TokioPayload) => {}),
+    onCameras: vi.fn((_listener: (cameras: Cameras) => void) => {}),
   };
   const overlayService = {
     setLogFile: vi.fn(),
@@ -1289,6 +1294,66 @@ describe("init events", () => {
       await vi.waitFor(() =>
         expect(texts(s)).toEqual([[formatStat(1500, "es-419").short]]),
       );
+    });
+  });
+
+  describe("cameras", () => {
+    const capture: CameraCapture = {
+      id: "1",
+      device: "",
+      label: "",
+      quality: "720p",
+    };
+    const cameras = (s: Setup, data: Cameras) => {
+      for (const [listener] of s.serverService.onCameras.mock.calls) {
+        listener(data);
+      }
+    };
+
+    it("pushes the server's key and the cameras to capture to the window", async () => {
+      const s = await live();
+
+      cameras(s, { key: "k3y", captures: [capture] });
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CAMERAS)).toEqual([
+        { key: "k3y", captures: [capture] },
+      ]);
+    });
+
+    it("pushes nothing to a closed window", async () => {
+      const s = await live();
+      s.h.win.close();
+
+      expect(() => cameras(s, { key: "k3y", captures: [] })).not.toThrow();
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CAMERAS)).toEqual([]);
+    });
+
+    it("asks macOS for the camera once, when one is first wanted", async () => {
+      vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
+      systemPreferences.getMediaAccessStatus.mockReturnValue("not-determined");
+      const s = await live();
+
+      cameras(s, { key: "k3y", captures: [] });
+      expect(systemPreferences.askForMediaAccess).not.toHaveBeenCalled();
+      cameras(s, { key: "k3y", captures: [capture] });
+      cameras(s, { key: "k3y", captures: [capture] });
+
+      expect(systemPreferences.askForMediaAccess).toHaveBeenCalledTimes(1);
+      expect(systemPreferences.askForMediaAccess).toHaveBeenCalledWith(
+        "camera",
+      );
+    });
+
+    it("doesn't ask once the user decided, or on other systems", async () => {
+      vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
+      const s = await live();
+      cameras(s, { key: "k3y", captures: [capture] });
+
+      vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+      systemPreferences.getMediaAccessStatus.mockReturnValue("not-determined");
+      cameras(s, { key: "k3y", captures: [capture] });
+
+      expect(systemPreferences.askForMediaAccess).not.toHaveBeenCalled();
     });
   });
 

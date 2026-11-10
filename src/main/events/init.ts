@@ -28,6 +28,7 @@ import {
   timerTriggers,
 } from "@/common/util";
 import config from "@/config";
+import { systemPreferences } from "electron";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, REPEAT_NOTICE_MS } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
@@ -740,6 +741,28 @@ const registerStudio = (handler: AppHandlerVariables) => {
   onLanguage(() => void sendStudioOverlays(handler));
 };
 
+// The main window captures the cameras studio pages show, and the editor's
+// previews need the server's key, so both follow the server
+const registerCameras = ({
+  serverService: server,
+  win,
+}: AppHandlerVariables) => {
+  let asked = false;
+  server.onCameras((cameras) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send(APP_EVENTS_RESPONSE.CAMERAS, cameras);
+    }
+    // macOS asks the user once. Not awaited: the window tries again.
+    if (asked || process.platform !== "darwin") return;
+    if (cameras.captures.length === 0) return;
+    if (systemPreferences.getMediaAccessStatus("camera") !== "not-determined") {
+      return;
+    }
+    asked = true;
+    void systemPreferences.askForMediaAccess("camera");
+  });
+};
+
 // The profile keeps the fans its LIVEs show, whatever features are on.
 // Overlays get them as they connect, and again when they change.
 const registerFans = ({
@@ -981,6 +1004,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     registerHistory(handler);
     // After registerConnectorEvents, see registerStudio
     registerStudio(handler);
+    registerCameras(handler);
   }
 
   const settings = storeManagerService.getSettings();
