@@ -282,6 +282,120 @@ describe("ServerService", () => {
     expect(() => server.unmount("clock")).not.toThrow();
   });
 
+  describe("camera streams", () => {
+    const PART = "--tokio-camera-frame\r\nContent-Type: image/jpeg\r\n\r\n";
+    const stream = (key: string, query = "device=&label=&quality=720p") =>
+      fetch(url(`/studio/camera/${key}?${query}`));
+
+    // What the stream sent, once it holds `text` or ends
+    const readUntil = async (res: Response, text: string) => {
+      const reader = res.body!.getReader();
+      let got = "";
+      while (!got.includes(text)) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        got += Buffer.from(value).toString("latin1");
+      }
+      reader.releaseLock();
+      return got;
+    };
+
+    beforeEach(async () => {
+      await server.start();
+    });
+
+    it("refuses a wrong key as a page that isn't there", async () => {
+      for (const key of ["wrong", server.cameraKey.toUpperCase()]) {
+        const res = await stream(key);
+        expect(res.status).toBe(404);
+        await res.body?.cancel();
+      }
+      expect(server.cameraCaptures()).toEqual([]);
+    });
+
+    it("refuses a bad query", async () => {
+      for (const query of [
+        "device=&label=&quality=4k",
+        "device=&quality=720p",
+        `device=${"a".repeat(257)}&label=&quality=720p`,
+        "device=a&device=b&label=&quality=720p",
+      ]) {
+        const res = await stream(server.cameraKey, query);
+        expect(res.status).toBe(400);
+        await res.body?.cancel();
+      }
+      expect(server.cameraCaptures()).toEqual([]);
+    });
+
+    it("streams a camera's frames as MJPEG, each followed by the next part's headers", async () => {
+      const res = await stream(
+        server.cameraKey,
+        "device=abc&label=HD+Webcam&quality=1080p",
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe(
+        "multipart/x-mixed-replace; boundary=tokio-camera-frame",
+      );
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      const [capture] = server.cameraCaptures();
+      expect(capture).toMatchObject({
+        device: "abc",
+        label: "HD Webcam",
+        quality: "1080p",
+      });
+
+      server.cameraFrame(capture.id, Buffer.from("JPEG"));
+
+      expect(await readUntil(res, `JPEG\r\n${PART}`)).toBe(
+        `${PART}JPEG\r\n${PART}`,
+      );
+      await res.body?.cancel();
+    });
+
+    it("ends the streams when it stops", async () => {
+      const res = await stream(server.cameraKey);
+
+      server.stop();
+
+      expect(await readUntil(res, "never")).toBe(PART);
+      expect(server.cameraCaptures()).toEqual([]);
+    });
+
+    it("renews the key on each start, telling the listeners", async () => {
+      const listener = vi.fn();
+      server.onCameras(listener);
+      const before = server.cameraKey;
+
+      server.stop();
+      await server.start();
+
+      expect(server.cameraKey).not.toBe(before);
+      expect(listener).toHaveBeenCalledWith({
+        key: server.cameraKey,
+        captures: [],
+      });
+      const res = await stream(before);
+      expect(res.status).toBe(404);
+      await res.body?.cancel();
+    });
+
+    it("tells the listeners when a page opens a camera", async () => {
+      const listener = vi.fn();
+      server.onCameras(listener);
+
+      const res = await stream(server.cameraKey);
+
+      expect(listener).toHaveBeenCalledWith({
+        key: server.cameraKey,
+        captures: [
+          expect.objectContaining({ device: "", label: "", quality: "720p" }),
+        ],
+      });
+      await res.body?.cancel();
+    });
+  });
+
   describe("alert overlays", () => {
     beforeEach(async () => {
       const media = join(dir, "media");
