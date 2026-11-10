@@ -1,7 +1,12 @@
 // The stream's own stylesheet, global as on its page, like the games
 // overlay's preview: the canvas can't drift from what's on stream
 import "@/common/studio/overlay.css";
-import { STUDIO_MAX_GUIDES, StudioCrop, StudioGuides } from "@/common/schemas";
+import {
+  STUDIO_MAX_GUIDES,
+  StudioCrop,
+  StudioElementKind,
+  StudioGuides,
+} from "@/common/schemas";
 import { createStage, Stage, StageFit } from "@/common/studio/stage";
 import { StudioElementView, StudioView } from "@/common/types";
 import { Btn } from "@/components";
@@ -223,7 +228,12 @@ type Held = "rotate" | "move" | "pan" | Axis | CropSide;
 
 // The kinds a double-click crops on the canvas: not a viewer's picture,
 // which fills its circle, so only its fields crop it
-const CANVAS_CROPS = new Set(["media", "gift", "emote"]);
+const CANVAS_CROPS = new Set<StudioElementKind>([
+  "media",
+  "camera",
+  "gift",
+  "emote",
+]);
 
 // Each crop handle's place on the frame
 const CROP_HANDLES: Record<CropSide, string> = {

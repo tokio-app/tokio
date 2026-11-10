@@ -3104,6 +3104,44 @@ describe("StudioEditor", () => {
       );
     });
 
+    it("crops a camera on the canvas too", async () => {
+      const camera = elementOf("camera", {
+        label: "Cam",
+        x: 100,
+        y: 100,
+        width: 400,
+        height: 200,
+      });
+      const { user } = await open(holding(camera));
+      await user.click(row(/^Cam/));
+      sized();
+      // Its stream's first frame
+      loaded(camera.id, 1280, 640);
+
+      await user.click(
+        page().getByRole("button", {
+          name: "Crop on the canvas (double-click)",
+        }),
+      );
+      expect(stage()).toHaveAccessibleName(/^Cropping\./);
+      fireEvent.pointerDown(cropHandle("e"), {
+        button: 0,
+        clientX: 250,
+        clientY: 100,
+      });
+      fireEvent.pointerMove(stage(), { clientX: 200, clientY: 100 });
+      fireEvent.pointerUp(stage());
+      fireEvent.keyDown(stage(), { key: "Enter" });
+
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          crop: { ...WHOLE, right: 0.25 },
+          width: 300,
+          height: 200,
+        }),
+      );
+    });
+
     it("cancels a canvas crop with Escape, and keeps one with a click past it", async () => {
       const shown = pic();
       const { user } = await open(holding(shown));
