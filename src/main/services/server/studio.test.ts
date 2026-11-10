@@ -262,6 +262,31 @@ describe("studio overlay page", () => {
       expect(body("t").classList.contains("studio-enter-pop")).toBe(true);
     });
 
+    it("brings a group in as one on its react, its elements in its wrapper", async () => {
+      send(
+        viewOf({
+          id: "G",
+          z: 0,
+          opacity: 1,
+          group: { ...BASE, when: "event", entrance: "drop" },
+          elements: [element("t", TEXT, { x: 40 })],
+        }),
+      );
+      await vi.waitFor(() => expect(el("t")).not.toBeNull());
+      const wrapper = el("t")!.parentElement!;
+      expect(wrapper.className).toBe("studio-group studio-hidden");
+      expect(wrapper.parentElement!.dataset.layer).toBe("G");
+      expect([wrapper.style.left, el("t")!.style.left]).toEqual([
+        "40px",
+        "0px",
+      ]);
+
+      react({ element: "G" });
+      await vi.waitFor(() =>
+        expect(wrapper.className).toBe("studio-group studio-enter-drop"),
+      );
+    });
+
     it("plays an animate layer's animation on each react", async () => {
       send(
         view(
