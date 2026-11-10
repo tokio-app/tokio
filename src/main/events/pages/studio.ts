@@ -4,6 +4,7 @@ import {
   APP_EVENTS_RESPONSE,
   AppError,
   CAMERA_FAILURES,
+  CameraConfig,
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack } from "@/helper/events";
@@ -20,8 +21,28 @@ import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("overlays");
 
-// The largest camera frame main takes: a 1080p JPEG is far smaller
+// The largest camera chunk main takes: a 1080p keyframe is far smaller
 const MAX_CAMERA_FRAME = 4 * 1024 * 1024;
+const MAX_CAMERA_SIDE = 8192;
+
+const isCameraSide = (side: unknown) =>
+  typeof side === "number" &&
+  Number.isInteger(side) &&
+  side >= 1 &&
+  side <= MAX_CAMERA_SIDE;
+
+// A codec string as WebCodecs names one, like avc1.42001f
+const isCameraConfig = (config: unknown): config is CameraConfig => {
+  if (typeof config !== "object" || config === null) return false;
+  const { codec, width, height }: Partial<Record<keyof CameraConfig, unknown>> =
+    config;
+  return (
+    typeof codec === "string" &&
+    /^[A-Za-z0-9._-]{1,64}$/.test(codec) &&
+    isCameraSide(width) &&
+    isCameraSide(height)
+  );
+};
 
 // Every request is answered with the overlays main holds, failures included
 const replyStudio = (
@@ -138,15 +159,19 @@ events.push(
   { notify: false },
 );
 
-// A frame comes many times a second, from a page: anything that isn't
-// a JPEG's bytes of a sane size is dropped
+// A chunk comes many times a second, from a page: anything that isn't an
+// encoded chunk of a sane size is dropped
 events.push(
   APP_EVENTS.CAMERA_FRAME,
   async ({ serverService }, _e, data) => {
-    const { id, frame }: Partial<typeof data> = data ?? {};
-    if (typeof id !== "string" || !(frame instanceof Uint8Array)) return;
+    const { id, key, timestamp, frame, config }: Partial<typeof data> =
+      data ?? {};
+    if (typeof id !== "string" || typeof key !== "boolean") return;
+    if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) return;
+    if (!(frame instanceof Uint8Array)) return;
     if (frame.byteLength < 1 || frame.byteLength > MAX_CAMERA_FRAME) return;
-    serverService.cameraFrame(id, frame);
+    if (config !== undefined && !isCameraConfig(config)) return;
+    serverService.cameraFrame({ id, key, timestamp, frame, config });
   },
   { notify: false },
 );

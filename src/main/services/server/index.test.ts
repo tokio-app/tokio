@@ -283,18 +283,17 @@ describe("ServerService", () => {
   });
 
   describe("camera streams", () => {
-    const PART = "--tokio-camera-frame\r\nContent-Type: image/jpeg\r\n\r\n";
     const stream = (key: string, query = "device=&label=&quality=720p") =>
       fetch(url(`/studio/camera/${key}?${query}`));
 
-    // What the stream sent, once it holds `text` or ends
-    const readUntil = async (res: Response, text: string) => {
+    // What the stream sent, once it holds `size` bytes or ends
+    const readBytes = async (res: Response, size: number) => {
       const reader = res.body!.getReader();
-      let got = "";
-      while (!got.includes(text)) {
+      let got = Buffer.alloc(0);
+      while (got.length < size) {
         const { value, done } = await reader.read();
         if (done) break;
-        got += Buffer.from(value).toString("latin1");
+        got = Buffer.concat([got, value]);
       }
       reader.releaseLock();
       return got;
@@ -327,17 +326,17 @@ describe("ServerService", () => {
       expect(server.cameraCaptures()).toEqual([]);
     });
 
-    it("streams a camera's frames as MJPEG, each followed by the next part's headers", async () => {
+    it("streams a camera's video as binary messages, readable from any origin", async () => {
       const res = await stream(
         server.cameraKey,
         "device=abc&label=HD+Webcam&quality=1080p",
       );
 
       expect(res.status).toBe(200);
-      expect(res.headers.get("content-type")).toBe(
-        "multipart/x-mixed-replace; boundary=tokio-camera-frame",
-      );
+      expect(res.headers.get("content-type")).toBe("application/octet-stream");
       expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(res.headers.get("access-control-allow-origin")).toBe("*");
       const [capture] = server.cameraCaptures();
       expect(capture).toMatchObject({
         device: "abc",
@@ -345,11 +344,26 @@ describe("ServerService", () => {
         quality: "1080p",
       });
 
-      server.cameraFrame(capture.id, Buffer.from("JPEG"));
+      const config = { codec: "avc1.42001f", width: 1280, height: 720 };
+      server.cameraFrame({
+        id: capture.id,
+        key: true,
+        timestamp: 1.5,
+        frame: Buffer.from("KEY"),
+        config,
+      });
 
-      expect(await readUntil(res, `JPEG\r\n${PART}`)).toBe(
-        `${PART}JPEG\r\n${PART}`,
-      );
+      const json = Buffer.from(JSON.stringify(config));
+      const time = Buffer.alloc(8);
+      time.writeDoubleBE(1.5);
+      const expected = Buffer.concat([
+        Buffer.from([1, 0, 0, 0, json.length]),
+        json,
+        Buffer.from([2, 0, 0, 0, 11]),
+        time,
+        Buffer.from("KEY"),
+      ]);
+      expect(await readBytes(res, expected.length)).toEqual(expected);
       await res.body?.cancel();
     });
 
@@ -358,7 +372,7 @@ describe("ServerService", () => {
 
       server.stop();
 
-      expect(await readUntil(res, "never")).toBe(PART);
+      expect(await readBytes(res, 1)).toEqual(Buffer.alloc(0));
       expect(server.cameraCaptures()).toEqual([]);
     });
 

@@ -8,6 +8,7 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   CameraCapture,
+  CameraChunk,
   CameraFailure,
   FEEDBACK_CODES,
   STUDIO_MESSAGE,
@@ -398,7 +399,7 @@ describe("studio events", () => {
       const serverService = {
         cameraKey: "k3y",
         cameraCaptures: () => captures,
-        cameraFrame: vi.fn((_id: string, _frame: Uint8Array) => {}),
+        cameraFrame: vi.fn((_chunk: CameraChunk) => {}),
       };
       const h = createHandler({
         serverService,
@@ -423,29 +424,54 @@ describe("studio events", () => {
       expect(h.notices).toEqual([]);
     });
 
-    it("passes a frame to the server", async () => {
+    const config = { codec: "avc1.42001f", width: 1280, height: 720 };
+    const chunk = (patch: Record<string, unknown> = {}) => ({
+      id: "1",
+      key: true,
+      timestamp: 33_333,
+      frame: new Uint8Array([0, 0, 0, 1]),
+      config,
+      ...patch,
+    });
+
+    it("passes a chunk to the server", async () => {
       const { h, serverService } = cameras();
-      const frame = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+      const keyframe = chunk();
+      const delta = chunk({ key: false, timestamp: -1.5, config: undefined });
 
-      await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, {
-        id: "1",
-        key: true,
-        timestamp: 0,
-        frame,
-      });
+      await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, keyframe);
+      await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, delta);
 
-      expect(serverService.cameraFrame).toHaveBeenCalledWith("1", frame);
+      expect(serverService.cameraFrame.mock.calls).toEqual([
+        [keyframe],
+        [delta],
+      ]);
       expect(h.notices).toEqual([]);
     });
 
-    it("drops a frame that's empty, too big or not bytes", async () => {
+    it("drops a chunk that isn't one, silently", async () => {
       const { h, serverService } = cameras();
       const bad: unknown[] = [
-        { id: "1", frame: new Uint8Array(0) },
-        { id: "1", frame: new Uint8Array(4 * 1024 * 1024 + 1) },
-        { id: "1", frame: "JPEG" },
-        { id: "1", frame: [0xff, 0xd8] },
-        { id: 1, frame: new Uint8Array(4) },
+        chunk({ frame: new Uint8Array(0) }),
+        chunk({ frame: new Uint8Array(4 * 1024 * 1024 + 1) }),
+        chunk({ frame: "KEY" }),
+        chunk({ frame: [0, 0, 0, 1] }),
+        chunk({ id: 1 }),
+        chunk({ key: 1 }),
+        chunk({ key: undefined }),
+        chunk({ timestamp: Number.NaN }),
+        chunk({ timestamp: Number.POSITIVE_INFINITY }),
+        chunk({ timestamp: "0" }),
+        chunk({ config: null }),
+        chunk({ config: "avc1.42001f" }),
+        chunk({ config: { ...config, codec: "" } }),
+        chunk({ config: { ...config, codec: "a".repeat(65) } }),
+        chunk({ config: { ...config, codec: 'avc1"<x>' } }),
+        chunk({ config: { ...config, codec: 1 } }),
+        chunk({ config: { ...config, width: 0 } }),
+        chunk({ config: { ...config, width: 1280.5 } }),
+        chunk({ config: { ...config, height: 8193 } }),
+        chunk({ config: { codec: "vp8", width: 640 } }),
         undefined,
       ];
 
@@ -454,12 +480,14 @@ describe("studio events", () => {
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion
         await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, data as never);
       }
-      await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, {
-        id: "1",
-        key: true,
-        timestamp: 0,
-        frame: new Uint8Array(4 * 1024 * 1024),
-      });
+      await h.invoke(
+        studio,
+        APP_EVENTS.CAMERA_FRAME,
+        chunk({
+          frame: new Uint8Array(4 * 1024 * 1024),
+          config: { codec: "vp09.00.10.08", width: 8192, height: 1 },
+        }),
+      );
 
       expect(serverService.cameraFrame).toHaveBeenCalledTimes(1);
       expect(h.notices).toEqual([]);

@@ -7,6 +7,7 @@ import {
 } from "@/common/schemas";
 import {
   CameraCapture,
+  CameraChunk,
   isLiveEvent,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -91,8 +92,9 @@ export class ServerService extends Service {
     this._port = port;
     this._cameras.onChange(() => this._camerasChanged());
 
-    // A camera's frames, for a camera element's img. A wrong key is a plain
-    // 404. /studio/:id matches one segment, so it never takes these.
+    // A camera's video, which a camera element fetches and decodes. A wrong
+    // key is a plain 404. /studio/:id matches one segment, so it never takes
+    // these.
     this._app.get(`/${STUDIO_CAMERA_PATH}/:key`, (req, res, next) => {
       const given = Buffer.from(req.params.key);
       const key = Buffer.from(this._cameraKey);
@@ -331,9 +333,9 @@ export class ServerService extends Service {
     });
   }
 
-  /** Sends a frame of a capture to the pages that stream its camera. */
-  public cameraFrame(id: string, frame: Uint8Array) {
-    this._cameras.frame(id, frame);
+  /** Sends a chunk of a capture to the pages that stream its camera. */
+  public cameraFrame(chunk: CameraChunk) {
+    this._cameras.frame(chunk);
   }
 
   /** The cameras pages show, for the window to capture. */
