@@ -1,9 +1,11 @@
 import { STUDIO_NAME_MAX_LENGTH, StudioGroup } from "@/common/schemas";
-import { Field, Input } from "@/components";
-import { useT } from "@/ui/i18n";
+import { CustomGift } from "@/common/types";
+import { EmoteOption, Field, Input, TRIGGER_OPTIONS } from "@/components";
+import { useOptions, useT } from "@/ui/i18n";
 import { useRef } from "react";
 import { BoxFields } from "./BoxFields";
 import { AlignTo, Turned } from "./helper";
+import { ReactionFields, WHENS } from "./ReactionFields";
 import styles from "./studioeditor.module.css";
 
 type Props = {
@@ -18,6 +20,8 @@ type Props = {
   onFrame: (from: Turned, to: Turned) => void;
   onFlip: (key: "flip_x" | "flip_y") => void;
   onAlign: (to: AlignTo) => void;
+  gifts: CustomGift[];
+  emotes: EmoteOption[];
 };
 
 // The same turn, within a px: a frame comes back from its elements' whole px
@@ -28,8 +32,9 @@ const near = (a: Turned, b: Turned) =>
   );
 
 /**
- * The selected group's name, how its elements move together, and its frame's
- * position, size, turn, flips and opacity, which its elements take.
+ * The selected group's name, how its elements move together, its frame's
+ * position, size, turn, flips and opacity, which its elements take, and its
+ * When, which moves it as one around its elements.
  */
 export function GroupSettings({
   group,
@@ -40,8 +45,12 @@ export function GroupSettings({
   onFrame,
   onFlip,
   onAlign,
+  gifts,
+  emotes,
 }: Props) {
   const t = useT();
+  const whens = useOptions(WHENS);
+  const triggers = useOptions(TRIGGER_OPTIONS);
   // The frame a run of changes in its fields began from, and the last one
   // they asked for: while its frame is still that one, each change goes from
   // the first, so its elements' rounding doesn't add up over a dragged field
@@ -100,6 +109,15 @@ export function GroupSettings({
           onOpacity={(opacity) => onChange({ ...group, opacity })}
         />
       )}
+      <ReactionFields
+        value={group}
+        whens={whens}
+        triggers={triggers}
+        untilEnd={false}
+        gifts={gifts}
+        emotes={emotes}
+        onChange={onChange}
+      />
     </div>
   );
 }

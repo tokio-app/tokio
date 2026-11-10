@@ -24,11 +24,11 @@ export const STUDIO_KINDS = [
 // Always on screen; shows on its trigger for `seconds`; always on screen and
 // plays its animation on its trigger; or always on screen and plays its loop
 // over and over, with no trigger
-const STUDIO_WHEN = ["always", "event", "animate", "loop"] as const;
+export const STUDIO_WHEN = ["always", "event", "animate", "loop"] as const;
 
 // How an element that shows on an event comes in, and how it leaves when
 // its seconds end. "slide" slides up, as older files saved it.
-const STUDIO_ENTRANCES = [
+export const STUDIO_ENTRANCES = [
   "fade",
   "pop",
   "slide",
@@ -44,7 +44,7 @@ const STUDIO_ENTRANCES = [
 ] as const;
 
 // What an element that moves on an event plays, once per event
-const STUDIO_ANIMATIONS = [
+export const STUDIO_ANIMATIONS = [
   "bounce",
   "shake",
   "pulse",
@@ -60,7 +60,7 @@ const STUDIO_ANIMATIONS = [
 ] as const;
 
 // What an element that moves all the time plays, over and over
-const STUDIO_LOOPS = [
+export const STUDIO_LOOPS = [
   "float",
   "breathe",
   "spin",

@@ -1634,12 +1634,148 @@ describe("StudioEditor", () => {
 
     await user.click(row(/^Viewer's picture/));
 
-    expect(
-      page().queryByRole("radio", { name: "Always on screen" }),
-    ).not.toBeInTheDocument();
+    for (const name of ["Always on screen", "Moves all the time"]) {
+      expect(page().queryByRole("radio", { name })).not.toBeInTheDocument();
+    }
     expect(
       page().getByRole("radio", { name: "Shows on an event" }),
     ).toBeChecked();
+  });
+
+  // Picks an option of a field's Select
+  const pick = async (
+    user: Awaited<ReturnType<typeof open>>["user"],
+    label: string,
+    from: string,
+    to: string,
+  ) => {
+    const select = page().getByRole("group", { name: label });
+    await user.click(within(select).getByText(from));
+    await user.click(inList(select, to)!);
+  };
+
+  it("picks an entrance and an exit, an animation, and a loop", async () => {
+    const element = text({ text: "Hello" });
+    const { user } = await open(scene(element));
+    await user.click(row(/^Hello/));
+
+    await user.click(page().getByRole("radio", { name: "Shows on an event" }));
+    await pick(user, "Entrance", "Pop", "Drop");
+    await pick(user, "Exit", "Fade", "Zoom");
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ entrance: "drop", exit: "zoom" }),
+    );
+
+    await user.click(page().getByRole("radio", { name: "Moves on an event" }));
+    expect(page().queryByRole("group", { name: "Exit" })).toBeNull();
+    await pick(user, "Animation", "Bounce", "Ta-da");
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        when: "animate",
+        animation: "tada",
+      }),
+    );
+
+    // No trigger: it moves with or without the LIVE
+    await user.click(page().getByRole("radio", { name: "Moves all the time" }));
+    expect(page().queryByRole("group", { name: "Trigger" })).toBeNull();
+    expect(
+      page().queryByRole("group", { name: "Seconds on screen" }),
+    ).toBeNull();
+    await pick(user, "Animation", "Float", "Sway");
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({ when: "loop", idle: "sway" }),
+    );
+    expect(row(/^Hello/)).toHaveTextContent("Text, moves all the time");
+    // Only screen readers hear that it moves all the time
+    expect(
+      rowOf(/^Hello/).queryByText("Moves all the time", {
+        selector: "[class*=layer_when]",
+      }),
+    ).toBeNull();
+  });
+
+  it("makes a group react to an event, its row saying it", async () => {
+    const { user } = await open(scene(text({ text: "Hello" })));
+    await user.click(row(/^Group 1/));
+
+    await user.click(page().getByRole("radio", { name: "Shows on an event" }));
+    // A group has no video of its own to wait for
+    expect(field("Seconds on screen").getByRole("spinbutton")).toHaveValue(5);
+    await pick(user, "Exit", "Fade", "Blur");
+    await pick(user, "Trigger", "Follow", "Like");
+    const likes = field("Trigger").getByRole("spinbutton", {
+      name: "Likes per reaction",
+    });
+    await user.clear(likes);
+    await user.type(likes, "50");
+    const seconds = field("Seconds on screen").getByRole("spinbutton");
+    await user.clear(seconds);
+    await user.type(seconds, "8");
+
+    await waitFor(() =>
+      expect(savedGroup(0)).toMatchObject({
+        when: "event",
+        trigger: { type: TOKIO_EVENTS.LIKE },
+        likes_every: 50,
+        seconds: 8,
+        exit: "blur",
+      }),
+    );
+    // Its elements keep their own
+    expect(savedElement()).toMatchObject({ when: "always" });
+    expect(
+      rowOf(/^Group 1/).getByText("Shows on Like", {
+        selector: "[class*=layer_when]",
+      }),
+    ).toBeVisible();
+    expect(row(/^Group 1/)).toHaveAccessibleName(/Shows on Like/);
+
+    // A gift trigger picks from the gifts
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
+      data: [gift(5655, "Rose")],
+    });
+    await pick(user, "Trigger", "Like", "Gift");
+    await user.click(field("Trigger").getByText("Any gift"));
+    expect(
+      inList(page().getByRole("group", { name: "Trigger" }), "Rose"),
+    ).not.toBeNull();
+    await user.keyboard("{Escape}");
+
+    await user.click(page().getByRole("radio", { name: "Moves all the time" }));
+    await waitFor(() => expect(savedGroup(0)).toMatchObject({ when: "loop" }));
+    expect(
+      rowOf(/^Group 1/).queryByText(/Moves/, {
+        selector: "[class*=layer_when]",
+      }),
+    ).toBeNull();
+  });
+
+  it("turns a gift that moves all the time to show on its event when it shows what's sent", async () => {
+    const element = elementOf("gift", { gift: 5655, when: "loop" });
+    const { user } = await open(scene(element));
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
+      data: [gift(5655, "Rose")],
+    });
+    await user.click(row(/^Rose/));
+    expect(
+      page().getByRole("radio", { name: "Moves all the time" }),
+    ).toBeChecked();
+
+    await user.click(
+      page().getByRole("radio", { name: "The gift a viewer sends" }),
+    );
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        gift: null,
+        when: "event",
+        trigger: { type: TOKIO_EVENTS.GIFT },
+      }),
+    );
+    expect(
+      page().queryByRole("radio", { name: "Moves all the time" }),
+    ).not.toBeInTheDocument();
   });
 
   it("tests: saves what's waiting, plays the event elements and asks main to", async () => {
@@ -1672,6 +1808,44 @@ describe("StudioEditor", () => {
     expect(
       drawn(always.id).querySelector(".studio-body")!.className,
     ).not.toMatch(/studio-enter/);
+  });
+
+  it("tests the groups that react too, not a hidden one", async () => {
+    const shows = group("Shows", [text({ text: "One" })], {
+      when: "event",
+      entrance: "zoom",
+    });
+    const moves = group("Moves", [text({ text: "Two" })], {
+      when: "animate",
+      animation: "jelly",
+    });
+    const hidden = group("Hidden", [text({ text: "Three" })], {
+      when: "event",
+      hidden: true,
+    });
+    const loops = group("Loops", [text({ text: "Four" })], {
+      when: "loop",
+      idle: "hop",
+    });
+    const { user } = await open(holding(shows, moves, hidden, loops));
+    const mover = (id: string) =>
+      canvas().querySelector<HTMLElement>(
+        `.studio-layer[data-layer="${id}"] .studio-group`,
+      );
+    // A group that waits for its event keeps its dashed outline
+    expect(mover(shows.id)!.className).toMatch(/studio-waits/);
+    expect(mover(loops.id)!.className).toMatch(/studio-loop-hop/);
+
+    await user.click(
+      page().getByRole("button", {
+        name: "Test the elements and groups that react to events",
+      }),
+    );
+
+    expect(mover(shows.id)!.className).toMatch(/studio-enter-zoom/);
+    expect(mover(moves.id)!.className).toMatch(/studio-play-jelly/);
+    expect(mover(hidden.id)).toBeNull();
+    expect(mover(loops.id)!.className).not.toMatch(/studio-(enter|play)-/);
   });
 
   it("clears a deleted file from its media elements", async () => {
