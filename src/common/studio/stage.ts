@@ -87,9 +87,17 @@ const HOLD_MS = 600;
 // How long a camera's stream waits to open again, as served pages reconnect
 const CAMERA_RETRY_MS = 2000;
 // How far behind its stream's end a camera may play before it skips ahead,
-// and where it lands
-const CAMERA_BEHIND = 0.5;
+// and where it aims: the skip decodes from the last keyframe, up to 2 s of
+// frames, so it lands further behind, which playing faster makes up
+const CAMERA_BEHIND = 1;
 const CAMERA_LEAD = 0.1;
+// Behind by more than CAMERA_LATE, it plays faster until it's within
+// CAMERA_CAUGHT_UP: frames that come in a burst, as a new capture's first
+// ones do, would leave it late for good. A steady 30 fps stays under
+// CAMERA_LATE: speeding up there drops frames.
+const CAMERA_LATE = 0.15;
+const CAMERA_CAUGHT_UP = 0.07;
+const CAMERA_FAST = 1.5;
 // What a camera keeps behind where it plays: MediaSource's quota fills in
 // minutes at 4 Mbps
 const CAMERA_KEEP = 30;
@@ -304,11 +312,11 @@ const setVideo = (video: HTMLVideoElement, src: string | null) => {
 /**
  * Plays a camera's stream in the video until the returned function stops
  * it: fragmented MP4 main muxes, appended to a MediaSource as it comes, kept
- * at its live edge and trimmed behind it. WebCodecs needs a secure context,
- * which a browser source at tokio-app.local or a LAN address isn't;
- * MediaSource doesn't. It opens again 2 s after the stream ends or fails,
- * and gives up quietly on a refused stream, or a browser that can't play
- * it.
+ * at its live edge (faster while behind, skipping ahead when far behind) and
+ * trimmed behind it. WebCodecs needs a secure context, which a browser
+ * source at tokio-app.local or a LAN address isn't; MediaSource doesn't. It
+ * opens again 2 s after the stream ends or fails, and gives up quietly on a
+ * refused stream, or a browser that can't play it.
  */
 function playCamera(video: HTMLVideoElement, src: string): () => void {
   let controller: AbortController | undefined;
@@ -362,12 +370,21 @@ function playCamera(video: HTMLVideoElement, src: string): () => void {
           try {
             const { buffered } = buffer;
             if (buffered.length) {
+              const start = buffered.start(0);
               const end = buffered.end(buffered.length - 1);
-              if (end - video.currentTime > CAMERA_BEHIND) {
-                video.currentTime = end - CAMERA_LEAD;
+              const behind = end - video.currentTime;
+              // Not while a skip still decodes, which a slow PC could keep
+              // starting over
+              if (!video.seeking && behind > CAMERA_BEHIND) {
+                // Its first frame too: its stream starts at main's timestamps
+                video.currentTime = Math.max(start, end - CAMERA_LEAD);
+              } else if (!video.seeking && behind > CAMERA_LATE) {
+                video.playbackRate = CAMERA_FAST;
+              } else if (behind < CAMERA_CAUGHT_UP) {
+                video.playbackRate = 1;
               }
               // From where it keeps: its stream starts at main's timestamps
-              if (video.currentTime - buffered.start(0) > CAMERA_KEEP) {
+              if (video.currentTime - start > CAMERA_KEEP) {
                 buffer.remove(0, video.currentTime - CAMERA_TRIMMED);
                 return;
               }

@@ -909,22 +909,64 @@ describe("cameras", () => {
     expect(buffer.appended).toEqual([1, 2, 3]);
   });
 
-  it("stays at its live edge, and trims what it played", async () => {
+  // Its stream, its first frame appended and played from
+  const playing = async () => {
     draw(view(camera()));
     await flush();
     const buffer = FakeSource.made[0].open();
     const video = videoOf();
     feeds[0].send(bytes(1));
     await flush();
-
-    // Its stream starts where main's timestamps do
-    buffer.done([100, 100.4]);
-    expect(video.currentTime).toBeCloseTo(100.3);
-    feeds[0].send(bytes(2));
+    // It starts where main's timestamps do
+    buffer.done([100, 100.033]);
+    return { buffer, video };
+  };
+  // A chunk comes, and its append ends with what's buffered
+  const append = async (buffer: FakeBuffer, end: number) => {
+    feeds[0].send(bytes(9));
     await flush();
-    buffer.done([100, 100.7]);
-    // 0.4 s behind: close enough
-    expect(video.currentTime).toBeCloseTo(100.3);
+    buffer.done([100, end]);
+  };
+
+  it("skips to its stream's end when more than 1 s behind", async () => {
+    const { buffer, video } = await playing();
+    expect(video.currentTime).toBe(100);
+
+    await append(buffer, 101.5);
+    expect(video.currentTime).toBeCloseTo(101.4);
+
+    // Not while the skip still decodes
+    const seeking = vi
+      .spyOn(HTMLMediaElement.prototype, "seeking", "get")
+      .mockReturnValue(true);
+    await append(buffer, 103);
+    expect(video.currentTime).toBeCloseTo(101.4);
+    expect(video.playbackRate).toBe(1);
+    seeking.mockReturnValue(false);
+    await append(buffer, 103.1);
+    expect(video.currentTime).toBeCloseTo(102.9);
+  });
+
+  it("plays faster while behind, until it's caught up", async () => {
+    const { buffer, video } = await playing();
+
+    // 0.1 s behind is a steady 30 fps's own: no faster
+    await append(buffer, 100.1);
+    expect(video.playbackRate).toBe(1);
+    await append(buffer, 100.4);
+    expect(video.playbackRate).toBe(1.5);
+    expect(video.currentTime).toBe(100);
+
+    video.currentTime = 100.3;
+    await append(buffer, 100.43);
+    expect(video.playbackRate).toBe(1.5);
+    video.currentTime = 100.38;
+    await append(buffer, 100.44);
+    expect(video.playbackRate).toBe(1);
+  });
+
+  it("trims what it played", async () => {
+    const { buffer, video } = await playing();
 
     // Played for half a minute
     buffer.ranges = [[100, 131.2]];
@@ -932,10 +974,10 @@ describe("cameras", () => {
     feeds[0].send(bytes(3));
     await flush();
     expect(buffer.removed).toEqual([[0, 121]]);
-    expect(buffer.appended).toEqual([1, 2]);
+    expect(buffer.appended).toEqual([1]);
     // Appends go on once it's trimmed
     buffer.done([121, 131.2]);
-    expect(buffer.appended).toEqual([1, 2, 3]);
+    expect(buffer.appended).toEqual([1, 3]);
     expect(buffer.removed).toHaveLength(1);
   });
 
