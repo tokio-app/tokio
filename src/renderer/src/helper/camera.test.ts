@@ -96,8 +96,14 @@ class FakeEncoder {
     this.config = config;
     this.state = "configured";
   }
-  // The encoder's output of one chunk
-  out(type: "key" | "delta", timestamp: number, bytes: number[]) {
+  // The encoder's output of one chunk, with its description if it gives
+  // one
+  out(
+    type: "key" | "delta",
+    timestamp: number,
+    bytes: number[],
+    description?: AllowSharedBufferSource,
+  ) {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fake
     const chunk = {
       type,
@@ -105,7 +111,10 @@ class FakeEncoder {
       byteLength: bytes.length,
       copyTo: (to: Uint8Array) => to.set(bytes),
     } as unknown as EncodedVideoChunk;
-    this.init.output(chunk, {});
+    this.init.output(
+      chunk,
+      description ? { decoderConfig: { codec: "", description } } : {},
+    );
   }
 }
 
@@ -185,14 +194,17 @@ describe("startCapture", () => {
       bitrate: 4_000_000,
       codec: "avc1.42e01f",
       hardwareAcceleration: "prefer-hardware",
-      avc: { format: "annexb" },
+      avc: { format: "avc" },
     });
     expect(encoder.encode).toHaveBeenCalledWith(first.f, { keyFrame: true });
     expect(encoder.encode).toHaveBeenCalledWith(second.f, { keyFrame: false });
     expect(first.close).toHaveBeenCalled();
     expect(second.close).toHaveBeenCalled();
 
-    encoder.out("key", 0, [1, 2]);
+    // A view into a buffer the encoder reuses
+    const record = new Uint8Array([0, 1, 0x64, 0, 0x1f, 0]);
+    encoder.out("key", 0, [1, 2], new DataView(record.buffer, 1, 4));
+    record.fill(0);
     encoder.out("delta", 33_333, [3]);
     expect(sent(APP_EVENTS.CAMERA_FRAME)).toEqual([
       {
@@ -200,7 +212,12 @@ describe("startCapture", () => {
         key: true,
         timestamp: 0,
         frame: new Uint8Array([1, 2]),
-        config: { codec: "avc1.42e01f", width: 1280, height: 720 },
+        config: {
+          codec: "avc1.42e01f",
+          width: 1280,
+          height: 720,
+          description: new Uint8Array([1, 0x64, 0, 0x1f]),
+        },
       },
       {
         id: "cam-1",
@@ -214,8 +231,10 @@ describe("startCapture", () => {
     stop();
   });
 
-  it("tries H.264's profiles in hardware, then any, then VP8", async () => {
-    FakeEncoder.supports = (config) => config.codec === "vp8";
+  it("tries H.264's profiles in hardware, then in any", async () => {
+    FakeEncoder.supports = (config) =>
+      config.codec === "avc1.640028" &&
+      config.hardwareAcceleration === "no-preference";
     const stop = await start(capture({ quality: "1080p" }));
     await push(0, 1920, 1080);
 
@@ -231,7 +250,6 @@ describe("startCapture", () => {
       ["avc1.42e028", "no-preference"],
       ["avc1.4d0028", "no-preference"],
       ["avc1.640028", "no-preference"],
-      ["vp8", undefined],
     ]);
     expect(FakeEncoder.made[0].config).toEqual({
       width: 1920,
@@ -239,7 +257,9 @@ describe("startCapture", () => {
       framerate: 30,
       latencyMode: "realtime",
       bitrate: 6_000_000,
-      codec: "vp8",
+      codec: "avc1.640028",
+      hardwareAcceleration: "no-preference",
+      avc: { format: "avc" },
     });
     stop();
   });
@@ -257,6 +277,36 @@ describe("startCapture", () => {
     expect(source.track.stop).toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(RETRY_MS);
     expect(gum).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it("sends no keyframe before a description, and makes the next frame one", async () => {
+    const stop = await start();
+    await push(0);
+    const [encoder] = FakeEncoder.made;
+
+    encoder.out("key", 0, [1]);
+    encoder.out("delta", 33_333, [2]);
+    expect(sent(APP_EVENTS.CAMERA_FRAME)).toEqual([]);
+
+    await push(66_666);
+    expect(keyFrames(encoder)).toEqual([true, true]);
+    encoder.out("key", 66_666, [3], new Uint8Array([7]).buffer);
+    encoder.out("delta", 99_999, [4]);
+    expect(
+      sent(APP_EVENTS.CAMERA_FRAME).map((c) => [c?.timestamp, c?.config]),
+    ).toEqual([
+      [
+        66_666,
+        {
+          codec: "avc1.42e01f",
+          width: 1280,
+          height: 720,
+          description: new Uint8Array([7]),
+        },
+      ],
+      [99_999, undefined],
+    ]);
     stop();
   });
 
@@ -305,10 +355,15 @@ describe("startCapture", () => {
     expect(next.config).toMatchObject({ width: 640, height: 360 });
     expect(keyFrames(next)).toEqual([true]);
 
-    next.out("key", 66_666, [9]);
+    next.out("key", 66_666, [9], new Uint8Array([8]));
     expect(sent(APP_EVENTS.CAMERA_FRAME)).toEqual([
       expect.objectContaining({
-        config: { codec: "avc1.42e01f", width: 640, height: 360 },
+        config: {
+          codec: "avc1.42e01f",
+          width: 640,
+          height: 360,
+          description: new Uint8Array([8]),
+        },
       }),
     ]);
     stop();
@@ -419,7 +474,7 @@ describe("startCapture", () => {
     stop();
     await vi.advanceTimersByTimeAsync(RETRY_MS * 2);
     // A chunk the encoder still had
-    encoder.out("key", 0, [1]);
+    encoder.out("key", 0, [1], new Uint8Array([1]));
 
     expect(source.track.stop).toHaveBeenCalled();
     expect(encoder.close).toHaveBeenCalled();

@@ -49,8 +49,9 @@ const configs = new Map<string, VideoEncoderConfig>();
 
 /**
  * The encoder config for frames of that size: H.264 Constrained Baseline,
- * Main, then High, in hardware first, then VP8; null when none works. Annex
- * B, so pages decode H.264 without a description.
+ * Main, then High, in hardware first; null when none works. Its chunks are
+ * length-prefixed NAL units (avc), as an MP4 sample holds them: main muxes
+ * them for the pages' MediaSource, which plays only H.264 here.
  */
 async function configFor(width: number, height: number) {
   const id = `${width}x${height}`;
@@ -68,18 +69,16 @@ async function configFor(width: number, height: number) {
   const h264 = ["42e0", "4d00", "6400"].map(
     (profile) => `avc1.${profile}${big ? "28" : "1f"}`,
   );
-  const tries: VideoEncoderConfig[] = [
-    ...(["prefer-hardware", "no-preference"] as const).flatMap(
-      (hardwareAcceleration) =>
-        h264.map((codec) => ({
-          ...common,
-          codec,
-          hardwareAcceleration,
-          avc: { format: "annexb" as const },
-        })),
-    ),
-    { ...common, codec: "vp8" },
-  ];
+  const tries: VideoEncoderConfig[] = (
+    ["prefer-hardware", "no-preference"] as const
+  ).flatMap((hardwareAcceleration) =>
+    h264.map((codec) => ({
+      ...common,
+      codec,
+      hardwareAcceleration,
+      avc: { format: "avc" as const },
+    })),
+  );
   for (const config of tries) {
     const { supported } = await VideoEncoder.isConfigSupported(config);
     if (!supported) continue;
@@ -88,6 +87,12 @@ async function configFor(width: number, height: number) {
   }
   return null;
 }
+
+// A copy of the encoder's bytes, which it may reuse
+const copied = (bytes: AllowSharedBufferSource) =>
+  ArrayBuffer.isView(bytes)
+    ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength).slice()
+    : new Uint8Array(bytes).slice();
 
 const shut = (encoder: VideoEncoder | null) => {
   if (encoder && encoder.state !== "closed") encoder.close();
@@ -126,27 +131,41 @@ export function startCapture(capture: CameraCapture): () => void {
       const tracks = stream.getTracks();
       const [track] = stream.getVideoTracks();
 
+      let lastKey = -Infinity;
+
       // Each encoder sends its chunks with its own config on keyframes
       const open = (config: VideoEncoderConfig) => {
-        // The description comes with the encoder's first keyframe
-        const sent: CameraConfig = {
-          codec: config.codec,
-          width: config.width,
-          height: config.height,
-          description: new Uint8Array(),
-        };
+        let sent: CameraConfig | undefined;
+        // Until a keyframe goes out, a delta has nothing to build on
+        let keyed = false;
         const made = new VideoEncoder({
-          output: (chunk) => {
+          output: (chunk, metadata) => {
             if (stopped) return;
+            const description = metadata?.decoderConfig?.description;
+            if (description) {
+              sent = {
+                codec: config.codec,
+                width: config.width,
+                height: config.height,
+                description: copied(description),
+              };
+            }
+            const key = chunk.type === "key";
+            if (key && !sent) {
+              // No page could play it: the next frame is a keyframe
+              lastKey = -Infinity;
+              return;
+            }
+            if (!key && !keyed) return;
+            keyed = true;
             const frame = new Uint8Array(chunk.byteLength);
             chunk.copyTo(frame);
-            const key = chunk.type === "key";
             window.api.emit(APP_EVENTS.CAMERA_FRAME, {
               id,
               key,
               timestamp: chunk.timestamp,
               frame,
-              ...(key && { config: sent }),
+              ...(key && sent && { config: sent }),
             });
           },
           error: () => {
@@ -168,7 +187,6 @@ export function startCapture(capture: CameraCapture): () => void {
         maxBufferSize: 1,
       }).readable.getReader();
       let size = { width: 0, height: 0 };
-      let lastKey = -Infinity;
       for (;;) {
         const { done, value: frame } = await reader.read();
         if (done) break;
