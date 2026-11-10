@@ -5,10 +5,8 @@ import {
   StudioElementOf,
 } from "@/common/schemas";
 import { Field, Select } from "@/components";
-import { useServerEnabled } from "@/hooks";
 import { useOptions, useT } from "@/ui/i18n";
 import { useEffect, useState } from "react";
-import styles from "./studioeditor.module.css";
 
 const QUALITIES = STUDIO_CAMERA_QUALITIES.map((value) => ({
   value,
@@ -30,7 +28,6 @@ type Props = {
  */
 export function CameraFields({ element, onChange }: Props) {
   const t = useT();
-  const serverEnabled = useServerEnabled();
   const qualities = useOptions(QUALITIES);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
 
@@ -91,10 +88,6 @@ export function CameraFields({ element, onChange }: Props) {
             });
           }}
         />
-        {/* The canvas and the stream get the camera from the server */}
-        {!serverEnabled && (
-          <p className={styles.note}>{t("studio.camera.serverOff")}</p>
-        )}
       </Field>
       <Field label={t("studio.fields.quality")}>
         <Select

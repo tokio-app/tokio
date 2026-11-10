@@ -142,7 +142,6 @@ describe("CameraFeeds", () => {
         "Content-Type": 'video/mp4; codecs="avc1.42e01f"',
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
-        "Access-Control-Allow-Origin": "*",
       },
     ]);
     expect(res.messages()).toEqual(["init H264", "key K"]);

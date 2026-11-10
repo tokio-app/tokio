@@ -1063,6 +1063,32 @@ describe("cameras", () => {
     stage.sound(true);
     expect(videoOf().muted).toBe(true);
   });
+
+  it("shows the editor's camera through its own function, not the stream", async () => {
+    const stops: ReturnType<typeof vi.fn>[] = [];
+    const show = vi.fn((_video: HTMLVideoElement, _src: string) => {
+      const stop = vi.fn();
+      stops.push(stop);
+      return stop;
+    });
+    stage.destroy();
+    stage = createStage(root, { editing: true, camera: show });
+
+    draw(view(camera()));
+    await flush();
+    expect(show).toHaveBeenCalledWith(videoOf(), SRC);
+    expect(fetched).not.toHaveBeenCalled();
+
+    // Another camera starts over; the same one doesn't
+    draw(view(camera()));
+    const other = SRC.replace("quality=720p", "quality=1080p");
+    draw(view(camera({ src: other })));
+    expect(show).toHaveBeenCalledTimes(2);
+    expect(stops[0]).toHaveBeenCalled();
+
+    draw(view());
+    expect(stops[1]).toHaveBeenCalled();
+  });
 });
 
 type MediaView = Extract<StudioElementView, { kind: "media" }>;

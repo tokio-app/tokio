@@ -507,3 +507,86 @@ describe("startCapture", () => {
     expect(sent(APP_EVENTS.CAMERA_FAILED)).toHaveLength(1);
   });
 });
+
+describe("previewCamera", () => {
+  let preview: (typeof import("./camera"))["previewCamera"];
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    ({ previewCamera: preview } = await import("./camera"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const fakeStream = () => {
+    const track = Object.assign(new EventTarget(), { stop: vi.fn() });
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fake
+    const stream = {
+      getVideoTracks: () => [track],
+      getTracks: () => [track],
+    } as unknown as MediaStream;
+    return { track, stream };
+  };
+
+  it("shows the camera its src names, at its quality, until it's stopped", async () => {
+    vi.spyOn(navigator.mediaDevices, "enumerateDevices").mockResolvedValue([
+      {
+        kind: "videoinput",
+        deviceId: "cam-b",
+        label: "Desk",
+        groupId: "",
+        toJSON: () => ({}),
+      },
+    ]);
+    const { track, stream } = fakeStream();
+    const opened = vi
+      .spyOn(navigator.mediaDevices, "getUserMedia")
+      .mockResolvedValue(stream);
+    const video = document.createElement("video");
+
+    const stop = preview(
+      video,
+      "/studio/camera/?device=cam-b&label=Desk&quality=1080p",
+    );
+    await vi.waitFor(() => expect(video.srcObject).toBe(stream));
+
+    expect(opened).toHaveBeenCalledWith({
+      audio: false,
+      video: {
+        deviceId: { exact: "cam-b" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30, max: 30 },
+      },
+    });
+    stop();
+    expect(track.stop).toHaveBeenCalled();
+    expect(video.srcObject).toBeNull();
+  });
+
+  it("tries a camera that can't open, or goes away, again, with no notice", async () => {
+    const { track, stream } = fakeStream();
+    const opened = vi
+      .spyOn(navigator.mediaDevices, "getUserMedia")
+      .mockRejectedValueOnce(new DOMException("In use", "NotReadableError"))
+      .mockResolvedValue(stream);
+    const video = document.createElement("video");
+
+    const stop = preview(video, "/studio/camera/?device=&label=&quality=720p");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(video.srcObject ?? null).toBeNull();
+    await vi.advanceTimersByTimeAsync(RETRY_MS);
+    expect(video.srcObject).toBe(stream);
+
+    // Unplugged
+    track.dispatchEvent(new Event("ended"));
+    expect(video.srcObject).toBeNull();
+    await vi.advanceTimersByTimeAsync(RETRY_MS);
+    expect(opened).toHaveBeenCalledTimes(3);
+    expect(sent(APP_EVENTS.CAMERA_FAILED)).toEqual([]);
+    stop();
+  });
+});

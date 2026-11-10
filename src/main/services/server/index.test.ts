@@ -368,7 +368,6 @@ describe("ServerService", () => {
       );
       expect(res.headers.get("cache-control")).toBe("no-store");
       expect(res.headers.get("x-content-type-options")).toBe("nosniff");
-      expect(res.headers.get("access-control-allow-origin")).toBe("*");
       expect(await readBoxes(res, 4)).toEqual(["ftyp", "moov", "moof", "mdat"]);
       await res.body?.cancel();
     });

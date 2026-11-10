@@ -20,6 +20,10 @@ export type StageOptions = {
   // with studio-waits, and a react replays their entrance or animation in
   // place.
   editing?: boolean;
+  // The editor's: shows a camera element's camera in its video until the
+  // returned function stops it, in place of playing its stream. The window
+  // that edits captures the cameras itself.
+  camera?: (video: HTMLVideoElement, src: string) => () => void;
 };
 
 // The canvas's scale and its offset inside the root, in the root's px
@@ -567,7 +571,11 @@ const layoutAvatar = (
  */
 export function createStage(
   root: HTMLElement,
-  { slots = false, editing = false }: StageOptions = {},
+  {
+    slots = false,
+    editing = false,
+    camera: showCamera = playCamera,
+  }: StageOptions = {},
 ): Stage {
   const canvas = div("studio-canvas");
   // Each layer's node, the whole canvas, by layer id
@@ -798,7 +806,7 @@ export function createStage(
         if ((entry.camera?.src ?? null) !== src) {
           entry.camera?.stop();
           entry.camera = src
-            ? { src, stop: playCamera(video, src) }
+            ? { src, stop: showCamera(video, src) }
             : undefined;
           if (src) video.dataset.src = src;
           else delete video.dataset.src;

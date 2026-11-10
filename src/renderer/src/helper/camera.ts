@@ -44,6 +44,76 @@ async function deviceOf(capture: CameraCapture) {
   return found.deviceId;
 }
 
+// The capture's camera, at its quality
+async function openCamera(capture: CameraCapture) {
+  const deviceId = await deviceOf(capture);
+  const { width, height } = SIZES[capture.quality];
+  return navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: {
+      ...(deviceId !== undefined && { deviceId: { exact: deviceId } }),
+      width: { ideal: width },
+      height: { ideal: height },
+      frameRate: { ideal: 30, max: 30 },
+    },
+  });
+}
+
+/**
+ * Shows the camera a camera element's stream names (its src's device, label
+ * and quality) in the video, straight from this window, until the returned
+ * function stops it: the editor needs no encoding, stream or overlay server
+ * to show one. One that can't open is tried again CAMERA_RETRY_MS later,
+ * without a notice: a page that streams it gets one.
+ */
+export function previewCamera(
+  video: HTMLVideoElement,
+  src: string,
+): () => void {
+  const query = new URL(src, location.href).searchParams;
+  const camera: CameraCapture = {
+    id: "",
+    device: query.get("device") ?? "",
+    label: query.get("label") ?? "",
+    quality: query.get("quality") === "1080p" ? "1080p" : "720p",
+  };
+  let stopped = false;
+  let stream: MediaStream | null = null;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+
+  const again = () => {
+    if (stopped) return;
+    video.srcObject = null;
+    retry = setTimeout(run, CAMERA_RETRY_MS);
+  };
+  const run = async () => {
+    try {
+      const opened = await openCamera(camera);
+      if (stopped) {
+        opened.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      stream = opened;
+      // Unplugged: tried again
+      opened.getVideoTracks()[0]?.addEventListener("ended", again, {
+        once: true,
+      });
+      video.srcObject = opened;
+      video.play().catch(() => {});
+    } catch {
+      again();
+    }
+  };
+  void run();
+
+  return () => {
+    stopped = true;
+    clearTimeout(retry);
+    stream?.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+  };
+}
+
 // The first config this computer encodes, by frame size
 const configs = new Map<string, VideoEncoderConfig>();
 
@@ -115,18 +185,7 @@ export function startCapture(capture: CameraCapture): () => void {
     // The encoder failed: the capture ends as if its camera did
     let broken = false;
     try {
-      const deviceId = await deviceOf(capture);
-      if (stopped) return;
-      const { width, height } = SIZES[capture.quality];
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          ...(deviceId !== undefined && { deviceId: { exact: deviceId } }),
-          width: { ideal: width },
-          height: { ideal: height },
-          frameRate: { ideal: 30, max: 30 },
-        },
-      });
+      stream = await openCamera(capture);
       if (stopped) return;
       const tracks = stream.getTracks();
       const [track] = stream.getVideoTracks();

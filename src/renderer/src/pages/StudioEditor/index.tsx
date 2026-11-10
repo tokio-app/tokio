@@ -27,7 +27,6 @@ import {
   mediaKind,
   newStudioElement,
   newStudioGroup,
-  SERVER_PORT,
   studioCameraPath,
   studioElements,
   studioView,
@@ -197,12 +196,6 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   useIpcRequest(APP_EVENTS.GET_OVERLAYS);
   useIpcRequest(APP_EVENTS.GET_PROFILE);
   const serverEnabled = useServerEnabled();
-  // The overlay server's key for this run, which camera streams need
-  const [cameraKey, setCameraKey] = useState<string | null>(null);
-  useIpcRequest(APP_EVENTS.GET_CAMERAS);
-  useIpcListener(APP_EVENTS_RESPONSE.CAMERAS, (res) => {
-    if (res) setCameraKey(res.key);
-  });
   const timer = useTimerPush();
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_OVERLAYS, (res) => {
@@ -343,29 +336,17 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               : source.type === "timer"
                 ? getOverlayURL(TIMER_PATH)
                 : getMinecraftOverlayURL(source.column ?? undefined),
-        // Fetched from localhost, which the CSP's connect-src allows
+        // The stage shows it straight from this window (previewCamera), so
+        // its src only names the camera and its quality
         camera: (element) =>
-          serverEnabled && cameraKey
-            ? `http://localhost:${SERVER_PORT}${studioCameraPath(cameraKey, element.camera, element.quality)}`
-            : null,
+          studioCameraPath("", element.camera, element.quality),
         text: (element) => sampleText(element, samples, language),
         viewer: (element) => sampleViewerOf(element, samples),
         sent: (element) => sampleSentOf(element, samples),
         label,
       }),
     // label reads installed, alerts, the games layout and t
-    [
-      overlay,
-      giftChoices,
-      installed,
-      alerts,
-      gamesRows,
-      samples,
-      language,
-      t,
-      serverEnabled,
-      cameraKey,
-    ],
+    [overlay, giftChoices, installed, alerts, gamesRows, samples, language, t],
   );
 
   const gamesPreview = useMemo(

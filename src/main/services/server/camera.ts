@@ -160,9 +160,6 @@ export class CameraFeeds {
       "Content-Type": `video/mp4; codecs="${feed.config.codec}"`,
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
-      // The editor fetches it from file:// (or the dev server); the key
-      // still guards it
-      "Access-Control-Allow-Origin": "*",
     });
     res.write(feed.init);
     watcher.init = feed.init;

@@ -10,6 +10,7 @@ import {
 import { createStage, Stage, StageFit } from "@/common/studio/stage";
 import { StudioElementView, StudioView } from "@/common/types";
 import { Btn } from "@/components";
+import { previewCamera } from "@/helper/camera";
 import { cx } from "@/helper/cx";
 import { useLanguage, useT } from "@/ui/i18n";
 import isEqual from "fast-deep-equal";
@@ -376,7 +377,11 @@ export function StudioStage({
   const level = zoom ?? fit.scale;
 
   useLayoutEffect(() => {
-    const stage = createStage(root.current!, { slots: true, editing: true });
+    const stage = createStage(root.current!, {
+      slots: true,
+      editing: true,
+      camera: previewCamera,
+    });
     stageRef.current = stage;
     const refit = () =>
       setFit((last) => (sameFit(last, stage.fit()) ? last : stage.fit()));

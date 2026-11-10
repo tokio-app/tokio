@@ -684,7 +684,6 @@
   "studio.camera.missing": "{name} (no conectada)",
   "studio.camera.qualities.720p": "720p",
   "studio.camera.qualities.1080p": "1080p",
-  "studio.camera.serverOff": "El servidor de overlays está apagado. Actívalo en Configuración para ver la cámara aquí y en el stream.",
   "alerts.editor.title": "Alerta: {trigger}",
   "tts.voice.title": "Voz",
   "tts.voice.description": "La voz que lee el chat en voz alta.",

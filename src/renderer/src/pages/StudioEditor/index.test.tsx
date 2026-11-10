@@ -1858,7 +1858,6 @@ describe("StudioEditor", () => {
   });
 
   describe("camera elements", () => {
-    const KEY = "run-key";
     const device = (deviceId: string, label: string): MediaDeviceInfo => ({
       kind: "videoinput",
       deviceId,
@@ -1871,8 +1870,6 @@ describe("StudioEditor", () => {
         .spyOn(navigator.mediaDevices, "enumerateDevices")
         .mockResolvedValue(devices);
     const cameraField = () => page().getByRole("group", { name: "Camera" });
-    const cameras = () =>
-      send(APP_EVENTS_RESPONSE.CAMERAS, { key: KEY, captures: [] });
 
     it("picks one of this computer's cameras, or the default one", async () => {
       listed(device("cam-a", "Front"), device("cam-b", "Desk"));
@@ -1950,26 +1947,40 @@ describe("StudioEditor", () => {
       );
     });
 
-    it("streams it from the overlay server once main sends the key", async () => {
+    it("shows the camera straight from this window, with no stream", async () => {
+      listed(device("cam-b", "Desk"));
+      const stream = { getTracks: () => [], getVideoTracks: () => [] };
+      const opened = vi
+        .spyOn(navigator.mediaDevices, "getUserMedia")
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        .mockResolvedValue(stream as unknown as MediaStream);
       const element = elementOf("camera", {
         camera: { id: "cam-b", label: "Desk" },
       });
       await open(scene(element));
-      const src = () => drawn(element.id).querySelector("video")?.dataset.src;
+      const video = () => drawn(element.id).querySelector("video")!;
 
-      expect(sent(APP_EVENTS.GET_CAMERAS).length).toBeGreaterThan(0);
-      expect(src()).toBeFalsy();
-      await cameras();
-
-      expect(src()).toBe(
-        `http://localhost:37891/studio/camera/${KEY}?device=cam-b&label=Desk&quality=720p`,
+      // Its src names the camera and its quality, with no key or server
+      expect(video().dataset.src).toBe(
+        "/studio/camera/?device=cam-b&label=Desk&quality=720p",
       );
+      await waitFor(() => expect(video().srcObject).toBe(stream));
+      expect(opened).toHaveBeenCalledWith({
+        audio: false,
+        video: expect.objectContaining({
+          deviceId: { exact: "cam-b" },
+          width: { ideal: 1280 },
+        }),
+      });
     });
 
-    it("says it needs the overlay server, and shows nothing without it", async () => {
+    it("shows the camera with the overlay server off", async () => {
+      const stream = { getTracks: () => [], getVideoTracks: () => [] };
+      vi.spyOn(navigator.mediaDevices, "getUserMedia")
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        .mockResolvedValue(stream as unknown as MediaStream);
       const element = elementOf("camera");
       const { user } = await open(scene(element));
-      await cameras();
       await user.click(row(/^Camera/));
 
       await send(
@@ -1979,12 +1990,14 @@ describe("StudioEditor", () => {
         }),
       );
 
-      expect(
-        within(cameraField()).getByText(
-          /^The overlay server is off\. Enable it in Settings to see the camera/,
+      await waitFor(() =>
+        expect(drawn(element.id).querySelector("video")?.srcObject).toBe(
+          stream,
         ),
-      ).toBeVisible();
-      expect(drawn(element.id).querySelector("video")?.dataset.src).toBeFalsy();
+      );
+      expect(
+        within(cameraField()).queryByText(/overlay server/),
+      ).not.toBeInTheDocument();
     });
 
     it("shows a webcam in its row, not a live picture", async () => {
