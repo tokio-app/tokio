@@ -10,7 +10,7 @@ Builds on `.claude/rules/studio.md` (the stage and the data).
 ## The Elements panel
 
 - The panel is **Elements** (the user's call). Its list is a tree with the front on top, each group a tray around its row and its elements; the overlay keeps both back to front.
-- Its look is the user's call: a thumbnail per element (`LayerThumb`, from the element itself, so hidden ones keep theirs), the event under an element only while it reacts, and a row's grip, lock and eye only on hover, focus and the selection, or while that lock or eye is on.
+- Its look is the user's call: a thumbnail per element (`LayerThumb`, from the element itself, so hidden ones keep theirs), the event under an element or a group only while it reacts, and a row's grip, lock and eye only on hover, focus and the selection, or while that lock or eye is on.
 - A camera's thumbnail is an icon: a live one would open another stream.
 - A row's grip drags it. Dropped behind an element of a group from that row's lower half, an element reaches the group's back (the user found no way there); on a group row's top quarter, it goes in front of the group, on its own. Off the rows, in a gap or under the last, a drop leaves it on its own: that's how an element leaves a group (the user's call). A group drops only among the items.
 - ArrowUp and ArrowDown move a row a step, an element into or out of a group at its edge; the focus goes back to the row's grip.
@@ -38,6 +38,7 @@ Builds on `.claude/rules/studio.md` (the stage and the data).
 
 ## Text fitting
 
+- `textHeight` and `textWidth` measure inside `still()`, which puts `.measuring` on the root: `transform: none !important` on every mover beats a loop's or a group's running motion without restarting it (`animation: none` would), since a rect counts its parents' transforms and fitting never shrinks a box. The crop view draws the cropped element and its group always on screen, so no motion moves the picture from under the frame.
 - A text's box can't get shorter than its words on the canvas, nor narrower than its longest word, so its height can't run away (the user's call). `textHeight` measures the words with a `Range` on the stage, at the resize's width and unturned, so wrapped lines count; `textWidth` measures at `min-content` with `overflow-wrap: normal`, since on stream a word too long for its box breaks anywhere.
 - A change to its words in its settings (`WORDS`: text, font, size, bold) grows its box to them too, as a corner drag would (the user's call), once the stage has drawn them (`fitting`, then `fitText` in a layout effect after the stage's update), around where they show so they stay put. It never shrinks the box, and Test's samples don't grow it.
 - The box fields keep a text to its words too (the user's call): Width and Height take the stage's measures (`onWords`, `heightAt`) as their `min`, and a narrower Width grows the Height. `BoxFields`' `sizing` keeps the size a run of changes to one field began from, so the Height a narrower Width gave comes back with a wider one, keystrokes on the way to a number (the 45 of 450) don't leave it tall, and linked proportions don't drift by rounding. A size the fields didn't make (a drag, another element; within a px) starts over.
@@ -45,6 +46,7 @@ Builds on `.claude/rules/studio.md` (the stage and the data).
 
 ## Fields
 
+- **When** is `ReactionFields`, an element's and a group's alike. A group offers every When and trigger; an element's kind rules (a viewer, a gift or emote showing what's sent) stay in `ElementSettings`.
 - **Link width and height** makes them change together in proportion, in the fields and on the canvas's corners (`resizeBox`'s `even`) (the user's call). It's the editor's `linked`, until the editor closes, not saved.
 - The editor's number fields drag (`NumberInput`'s `scrub`) (the user's call). The double-arrow cursor shows only once a press is held a quarter second or drags, not on a click, which the user saw flash. The press doesn't focus the field; a click without movement does.
 - **Cropping** (`PictureFields`) never moves or scales a media, gift or emote picture: its box becomes the part it keeps (`recrop`, from `Stage.picture`). A viewer's picture fills its circle, so its crop picks what shows there, its box kept, with fields only (the user's call). Another file, gift or emote starts uncropped (`pictureSource`); its corners stay.
