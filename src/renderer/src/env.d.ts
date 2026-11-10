@@ -24,4 +24,11 @@ declare global {
     // Chromium's Local Font Access API, which TypeScript's DOM types lack
     queryLocalFonts(): Promise<{ family: string }[]>;
   }
+
+  // Chromium's MediaStreamTrackProcessor, which TypeScript's DOM types lack:
+  // a camera track's frames as a stream
+  class MediaStreamTrackProcessor {
+    constructor(init: { track: MediaStreamTrack; maxBufferSize?: number });
+    readonly readable: ReadableStream<VideoFrame>;
+  }
 }

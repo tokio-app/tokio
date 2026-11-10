@@ -43,6 +43,8 @@ const args = [
   ".",
   // GitHub's Ubuntu runners don't allow Chromium's sandbox
   ...(process.env.CI && process.platform === "linux" ? ["--no-sandbox"] : []),
+  // Chromium's own test camera, so camera elements stream on any machine
+  "--use-fake-device-for-media-stream",
 ];
 
 // English whatever the machine's language, as the tests read the English
@@ -237,6 +239,112 @@ test("serves a new Overlay Studio overlay", async () => {
       return res?.ok ? await res.text() : "";
     })
     .toContain("TokioStage.createStage");
+});
+
+// The src main gives the overlay's first camera element, over its socket
+function cameraSrc(id: string) {
+  return new Promise<string>((done, fail) => {
+    const socket = new WebSocket(
+      `ws://127.0.0.1:37891/?id=${encodeURIComponent(`studio:${id}`)}`,
+    );
+    const timeout = setTimeout(() => {
+      socket.close();
+      fail(new Error("No camera element in the overlay's view"));
+    }, 15_000);
+    socket.onmessage = (event) => {
+      const { type, data } = JSON.parse(String(event.data));
+      if (type !== "tokio:studio" || !data.view) return;
+      const camera = data.view.layers
+        .flatMap((layer: { elements: { kind: string }[] }) => layer.elements)
+        .find((e: { kind: string; src?: string }) => e.kind === "camera");
+      if (!camera?.src) return;
+      clearTimeout(timeout);
+      socket.close();
+      done(camera.src);
+    };
+  });
+}
+
+// Reads the stream's MP4 boxes (a big-endian size, then the type) until the
+// first fragment's media came
+async function firstFragment(url: string) {
+  const res = await fetch(url);
+  const type = res.headers.get("content-type");
+  const reader = res.body!.getReader();
+  let bytes = Buffer.alloc(0);
+  const boxes: string[] = [];
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) throw new Error("The stream ended before a fragment");
+      bytes = Buffer.concat([bytes, value]);
+      while (bytes.length >= 8 && bytes.length >= bytes.readUInt32BE(0)) {
+        const name = bytes.toString("latin1", 4, 8);
+        boxes.push(name);
+        if (name === "mdat") return { type, boxes };
+        bytes = bytes.subarray(bytes.readUInt32BE(0));
+      }
+    }
+  } finally {
+    await reader.cancel();
+  }
+}
+
+test("streams a camera element's frames to its overlay", async () => {
+  const id = crypto.randomUUID();
+  // A save is refused until main holds the overlay
+  await page.evaluate(
+    (id) =>
+      new Promise<void>((done) => {
+        const api = Reflect.get(globalThis, "api");
+        const off = api.on(
+          "app:studio:res:list",
+          (res: { data?: { id: string }[] }) => {
+            if (!res.data?.some((o) => o.id === id)) return;
+            off();
+            done();
+          },
+        );
+        api.emit("app:studio:add", { id, name: "Camera" });
+      }),
+    id,
+  );
+  await page.evaluate((id) => {
+    Reflect.get(globalThis, "api").emit("app:studio:save", {
+      overlay: {
+        id,
+        name: "Camera",
+        size: "landscape",
+        rulers: false,
+        guides: { x: [], y: [], locked: false },
+        items: [
+          {
+            kind: "camera",
+            id: crypto.randomUUID(),
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+          },
+        ],
+      },
+    });
+  }, id);
+
+  const src = await cameraSrc(id);
+  // The default camera, behind this run's key
+  expect(src).toMatch(
+    /^\/studio\/camera\/[^/?]+\?device=&label=&quality=720p$/,
+  );
+
+  // Tokio's window captures and encodes Chromium's test camera once a page
+  // asks, with whatever encoder the machine has
+  const first = await firstFragment(`http://127.0.0.1:37891${src}`);
+  expect(first.type).toMatch(/^video\/mp4; codecs="avc1\.[0-9a-f]{6}"$/);
+  expect(first.boxes).toEqual(["ftyp", "moov", "moof", "mdat"]);
+  // Another run's key gets nothing
+  const wrong = src.replace(/camera\/[^/?]+/, `camera/${crypto.randomUUID()}`);
+  expect((await fetch(`http://127.0.0.1:37891${wrong}`)).status).toBe(404);
 });
 
 // Whether each of the app's windows is on screen

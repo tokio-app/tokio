@@ -22,6 +22,8 @@
  *             text     .studio-text (.studio-bold, .studio-halo), its font,
  *                      size and alignment inline
  *             media    img.studio-fill or video.studio-fill
+ *             camera   video.studio-fill, muted, data-src its stream:
+ *                      fragmented MP4 fed to a MediaSource
  *             gift     img.studio-fill
  *             emote    img.studio-fill
  *             shape    a rectangle or an ellipse: nothing, the body is

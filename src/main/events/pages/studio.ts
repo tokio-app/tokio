@@ -3,10 +3,13 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   AppError,
+  CAMERA_FAILURES,
+  CameraColors,
+  CameraConfig,
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack } from "@/helper/events";
-import { AppFailure, saveFailure } from "@/helper/feedback";
+import { AppFailure, REPEAT_NOTICE_MS, saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
 import {
   liveNumbers,
@@ -14,9 +17,66 @@ import {
   sendStudioOverlay,
   sendStudioReact,
 } from "@/helper/studio";
+import Logger from "@/logger";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
 const events = createStack("overlays");
+
+// The largest camera chunk main takes: a 1080p keyframe is far smaller
+const MAX_CAMERA_FRAME = 4 * 1024 * 1024;
+const MAX_CAMERA_SIDE = 8192;
+
+const isCameraSide = (side: unknown) =>
+  typeof side === "number" &&
+  Number.isInteger(side) &&
+  side >= 1 &&
+  side <= MAX_CAMERA_SIDE;
+
+// A color space's name as WebCodecs gives one, or none
+const isColorName = (name: unknown) =>
+  name === null || (typeof name === "string" && /^[a-z0-9-]{1,32}$/.test(name));
+
+const isCameraColors = (colors: unknown): colors is CameraColors => {
+  if (colors === null) return true;
+  if (typeof colors !== "object") return false;
+  const {
+    primaries,
+    transfer,
+    matrix,
+    fullRange,
+  }: Partial<Record<keyof CameraColors, unknown>> = colors;
+  return (
+    isColorName(primaries) &&
+    isColorName(transfer) &&
+    isColorName(matrix) &&
+    (fullRange === null || typeof fullRange === "boolean")
+  );
+};
+
+// H.264 only, as pages play it in MP4: a codec string like avc1.42001f,
+// which goes into the stream's Content-Type, an
+// AVCDecoderConfigurationRecord, 7 bytes before its parameter sets, and its
+// colors
+const isCameraConfig = (config: unknown): config is CameraConfig => {
+  if (typeof config !== "object" || config === null) return false;
+  const {
+    codec,
+    width,
+    height,
+    description,
+    colors,
+  }: Partial<Record<keyof CameraConfig, unknown>> = config;
+  return (
+    typeof codec === "string" &&
+    /^avc1\.[A-Za-z0-9._-]{1,59}$/.test(codec) &&
+    isCameraSide(width) &&
+    isCameraSide(height) &&
+    description instanceof Uint8Array &&
+    description.byteLength >= 7 &&
+    description.byteLength <= 1024 &&
+    isCameraColors(colors)
+  );
+};
 
 // Every request is answered with the overlays main holds, failures included
 const replyStudio = (
@@ -120,6 +180,63 @@ events.push(
     replyStudio(e, handler);
   },
   { ...options("main.failure.testOverlay"), notify: false },
+);
+
+// The main window asks what to capture when it loads
+events.push(
+  APP_EVENTS.GET_CAMERAS,
+  async ({ serverService }, e) =>
+    e.reply(APP_EVENTS_RESPONSE.CAMERAS, {
+      captures: serverService.cameraCaptures(),
+    }),
+  { notify: false },
+);
+
+// A chunk comes many times a second, from a page: anything that isn't an
+// encoded chunk of a sane size is dropped
+events.push(
+  APP_EVENTS.CAMERA_FRAME,
+  async ({ serverService }, _e, data) => {
+    const { id, key, timestamp, frame, config }: Partial<typeof data> =
+      data ?? {};
+    if (typeof id !== "string" || typeof key !== "boolean") return;
+    if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) return;
+    if (!(frame instanceof Uint8Array)) return;
+    if (frame.byteLength < 1 || frame.byteLength > MAX_CAMERA_FRAME) return;
+    if (config !== undefined && !isCameraConfig(config)) return;
+    serverService.cameraFrame({ id, key, timestamp, frame, config });
+  },
+  { notify: false },
+);
+
+// The window tries again every few seconds while the camera is wanted, so
+// the notice and its log go out at most once in REPEAT_NOTICE_MS
+events.push(
+  APP_EVENTS.CAMERA_FAILED,
+  async ({ serverService, notifier, pathManagerService }, _e, data) => {
+    const { id, reason }: Partial<typeof data> = data ?? {};
+    if (!reason || !CAMERA_FAILURES.includes(reason)) return;
+    const capture = serverService.cameraCaptures().find((c) => c.id === id);
+    if (!capture) return;
+    const name = capture.label || t("main.camera.default");
+    const sent = notifier.warn(
+      "overlays",
+      FEEDBACK_CODES.CAMERA_FAILED,
+      t(`main.camera.${reason}`, { name }),
+      {
+        key: `camera:${capture.device}\n${capture.label}`,
+        windowMs: REPEAT_NOTICE_MS,
+      },
+    );
+    if (!sent) return;
+    // Logs stay English
+    const camera = capture.label ? `"${capture.label}"` : "the default camera";
+    Logger.warn(
+      `<Studio> Unable to capture ${camera} (${reason})`,
+      pathManagerService.files.logs.overlays,
+    );
+  },
+  { notify: false },
 );
 
 export default events;

@@ -7,13 +7,16 @@ import {
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
+  CameraCapture,
+  CameraChunk,
+  CameraFailure,
   FEEDBACK_CODES,
   STUDIO_MESSAGE,
   STUDIO_REACT_MESSAGE,
 } from "@/common/types";
 import Logger from "@/logger";
 import { createHandler } from "@test/handler";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import studio from "./studio";
 
 const ID = "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f";
@@ -381,6 +384,243 @@ describe("studio events", () => {
         },
       ]);
       expect(h.notices).toEqual([]);
+    });
+  });
+
+  describe("cameras", () => {
+    const capture = (patch: Partial<CameraCapture> = {}): CameraCapture => ({
+      id: "1",
+      device: "abc",
+      label: "HD Webcam",
+      quality: "720p",
+      ...patch,
+    });
+    const cameras = (captures: CameraCapture[] = [capture()]) => {
+      const serverService = {
+        cameraCaptures: () => captures,
+        cameraFrame: vi.fn((_chunk: CameraChunk) => {}),
+      };
+      const h = createHandler({
+        serverService,
+        pathManagerService: { files: { logs: { overlays: "overlays.log" } } },
+      });
+      const warn = vi.spyOn(Logger, "warn").mockImplementation(() => {});
+      return { h, serverService, warn };
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("replies the cameras to capture, with no notice", async () => {
+      const { h } = cameras();
+
+      await h.invoke(studio, APP_EVENTS.GET_CAMERAS);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.CAMERAS)).toEqual([
+        { captures: [capture()] },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    const config = {
+      codec: "avc1.42001f",
+      width: 1280,
+      height: 720,
+      description: new Uint8Array(7),
+      colors: {
+        primaries: "smpte170m",
+        transfer: "smpte170m",
+        matrix: "smpte170m",
+        fullRange: false,
+      },
+    };
+    const chunk = (patch: Record<string, unknown> = {}) => ({
+      id: "1",
+      key: true,
+      timestamp: 33_333,
+      frame: new Uint8Array([0, 0, 0, 1]),
+      config,
+      ...patch,
+    });
+
+    it("passes a chunk to the server", async () => {
+      const { h, serverService } = cameras();
+      const keyframe = chunk();
+      const delta = chunk({ key: false, timestamp: -1.5, config: undefined });
+
+      await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, keyframe);
+      await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, delta);
+
+      expect(serverService.cameraFrame.mock.calls).toEqual([
+        [keyframe],
+        [delta],
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("drops a chunk that isn't one, silently", async () => {
+      const { h, serverService } = cameras();
+      const bad: unknown[] = [
+        chunk({ frame: new Uint8Array(0) }),
+        chunk({ frame: new Uint8Array(4 * 1024 * 1024 + 1) }),
+        chunk({ frame: "KEY" }),
+        chunk({ frame: [0, 0, 0, 1] }),
+        chunk({ id: 1 }),
+        chunk({ key: 1 }),
+        chunk({ key: undefined }),
+        chunk({ timestamp: Number.NaN }),
+        chunk({ timestamp: Number.POSITIVE_INFINITY }),
+        chunk({ timestamp: "0" }),
+        chunk({ config: null }),
+        chunk({ config: "avc1.42001f" }),
+        chunk({ config: { ...config, codec: "" } }),
+        chunk({ config: { ...config, codec: "a".repeat(65) } }),
+        chunk({ config: { ...config, codec: 'avc1"<x>' } }),
+        chunk({ config: { ...config, codec: "avc1." } }),
+        chunk({ config: { ...config, codec: `avc1.${"a".repeat(60)}` } }),
+        chunk({ config: { ...config, codec: "vp09.00.10.08" } }),
+        chunk({ config: { ...config, codec: "AVC1.42001f" } }),
+        chunk({ config: { ...config, description: new Uint8Array(6) } }),
+        chunk({ config: { ...config, description: new Uint8Array(1025) } }),
+        chunk({ config: { ...config, description: [1, 2, 3, 4, 5, 6, 7] } }),
+        chunk({ config: { ...config, description: undefined } }),
+        chunk({ config: { ...config, codec: 1 } }),
+        chunk({ config: { ...config, width: 0 } }),
+        chunk({ config: { ...config, width: 1280.5 } }),
+        chunk({ config: { ...config, height: 8193 } }),
+        chunk({ config: { ...config, colors: undefined } }),
+        chunk({ config: { ...config, colors: "smpte170m" } }),
+        chunk({
+          config: {
+            ...config,
+            colors: { ...config.colors, primaries: 'bt709"' },
+          },
+        }),
+        chunk({
+          config: { ...config, colors: { ...config.colors, fullRange: 0 } },
+        }),
+        chunk({ config: { codec: "vp8", width: 640 } }),
+        undefined,
+      ];
+
+      for (const data of bad) {
+        // A page could send anything
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        await h.invoke(studio, APP_EVENTS.CAMERA_FRAME, data as never);
+      }
+      await h.invoke(
+        studio,
+        APP_EVENTS.CAMERA_FRAME,
+        chunk({
+          frame: new Uint8Array(4 * 1024 * 1024),
+          config: {
+            codec: `avc1.${"a".repeat(59)}`,
+            width: 8192,
+            height: 1,
+            description: new Uint8Array(1024),
+            colors: null,
+          },
+        }),
+      );
+
+      expect(serverService.cameraFrame).toHaveBeenCalledTimes(1);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("warns that a camera failed once in 30 s, logging each notice", async () => {
+      vi.useFakeTimers();
+      const { h, warn } = cameras();
+
+      for (let i = 0; i < 3; i++) {
+        await h.invoke(studio, APP_EVENTS.CAMERA_FAILED, {
+          id: "1",
+          reason: "busy",
+        });
+        vi.advanceTimersByTime(5000);
+      }
+
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "overlays",
+          code: FEEDBACK_CODES.CAMERA_FAILED,
+          message: "HD Webcam won't start. Another app may be using it.",
+        }),
+      ]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        `<Studio> Unable to capture "HD Webcam" (busy)`,
+        "overlays.log",
+      );
+
+      vi.advanceTimersByTime(30_000);
+      await h.invoke(studio, APP_EVENTS.CAMERA_FAILED, {
+        id: "1",
+        reason: "missing",
+      });
+      expect(h.notices.map((n) => n.message)).toEqual([
+        "HD Webcam won't start. Another app may be using it.",
+        "HD Webcam isn't connected.",
+      ]);
+      expect(warn).toHaveBeenCalledTimes(2);
+    });
+
+    it("names the default camera, once in the window whatever the reason", async () => {
+      const { h, warn } = cameras([capture({ device: "", label: "" })]);
+
+      await h.invoke(studio, APP_EVENTS.CAMERA_FAILED, {
+        id: "1",
+        reason: "blocked",
+      });
+      await h.invoke(studio, APP_EVENTS.CAMERA_FAILED, {
+        id: "1",
+        reason: "failed",
+      });
+
+      expect(h.notices.map((n) => n.message)).toEqual([
+        "Tokio isn't allowed to use cameras. Allow it in your system's privacy settings.",
+      ]);
+      expect(warn).toHaveBeenCalledWith(
+        "<Studio> Unable to capture the default camera (blocked)",
+        "overlays.log",
+      );
+    });
+
+    it("keeps a window per camera", async () => {
+      const { h } = cameras([
+        capture(),
+        capture({ id: "2", device: "def", label: "Capture card" }),
+      ]);
+
+      for (const id of ["1", "2"]) {
+        await h.invoke(studio, APP_EVENTS.CAMERA_FAILED, {
+          id,
+          reason: "failed",
+        });
+      }
+
+      expect(h.notices.map((n) => n.message)).toEqual([
+        "HD Webcam couldn't start.",
+        "Capture card couldn't start.",
+      ]);
+    });
+
+    it("ignores a capture main no longer holds, or an unknown reason", async () => {
+      const { h, warn } = cameras();
+
+      await h.invoke(studio, APP_EVENTS.CAMERA_FAILED, {
+        id: "2",
+        reason: "busy",
+      });
+      await h.invoke(studio, APP_EVENTS.CAMERA_FAILED, {
+        id: "1",
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        reason: "exploded" as CameraFailure,
+      });
+
+      expect(h.notices).toEqual([]);
+      expect(warn).not.toHaveBeenCalled();
     });
   });
 });

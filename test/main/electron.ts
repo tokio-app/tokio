@@ -362,6 +362,16 @@ function createFakes() {
         result: data.toString("utf-8").replace(/^v\d\d/, ""),
       }),
     },
+    // macOS's privacy settings, which allowed the camera
+    systemPreferences: {
+      getMediaAccessStatus: vi.fn(
+        (
+          _type: "camera" | "microphone" | "screen",
+        ): "not-determined" | "granted" | "denied" | "restricted" | "unknown" =>
+          "granted",
+      ),
+      askForMediaAccess: vi.fn(async (_type: "camera" | "microphone") => true),
+    },
   };
 }
 
@@ -385,6 +395,7 @@ export const {
   net,
   screen,
   safeStorage,
+  systemPreferences,
   Menu,
   nativeImage,
 } = fakes;

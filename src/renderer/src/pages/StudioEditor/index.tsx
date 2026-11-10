@@ -27,6 +27,7 @@ import {
   mediaKind,
   newStudioElement,
   newStudioGroup,
+  studioCameraPath,
   studioElements,
   studioView,
   TIMER_PATH,
@@ -335,6 +336,10 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               : source.type === "timer"
                 ? getOverlayURL(TIMER_PATH)
                 : getMinecraftOverlayURL(source.column ?? undefined),
+        // The stage shows it straight from this window (previewCamera), so
+        // its src only names the camera and its quality
+        camera: (element) =>
+          studioCameraPath("", element.camera, element.quality),
         text: (element) => sampleText(element, samples, language),
         viewer: (element) => sampleViewerOf(element, samples),
         sent: (element) => sampleSentOf(element, samples),

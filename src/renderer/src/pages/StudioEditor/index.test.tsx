@@ -216,6 +216,7 @@ describe("StudioEditor", () => {
     const kinds = [
       "Text",
       "Image or video",
+      "Camera",
       "Gift",
       "Emote",
       "Shape",
@@ -238,13 +239,14 @@ describe("StudioEditor", () => {
 
     const overlay = await waitFor(() => {
       const last = lastSave();
-      expect(last?.items).toHaveLength(7);
+      expect(last?.items).toHaveLength(8);
       return last!;
     });
     // No group made for them
     expect(overlay.items.map((item) => item.kind)).toEqual([
       "text",
       "media",
+      "camera",
       "gift",
       "emote",
       "shape",
@@ -265,7 +267,7 @@ describe("StudioEditor", () => {
         .map((kind) => (kind === "Shape" ? "Rectangle" : kind)),
     );
     // A viewer's picture waits for an event
-    expect(overlay.items[5]).toMatchObject({ when: "event" });
+    expect(overlay.items[6]).toMatchObject({ when: "event" });
   });
 
   it("adds a new group after the first free number, in front, and selects it", async () => {
@@ -1855,6 +1857,160 @@ describe("StudioEditor", () => {
     expect(page().getByText(/^The overlay server is off\./)).toBeVisible();
   });
 
+  describe("camera elements", () => {
+    const device = (deviceId: string, label: string): MediaDeviceInfo => ({
+      kind: "videoinput",
+      deviceId,
+      label,
+      groupId: "",
+      toJSON: () => ({}),
+    });
+    const listed = (...devices: MediaDeviceInfo[]) =>
+      vi
+        .spyOn(navigator.mediaDevices, "enumerateDevices")
+        .mockResolvedValue(devices);
+    const cameraField = () => page().getByRole("group", { name: "Camera" });
+
+    it("picks one of this computer's cameras, or the default one", async () => {
+      listed(device("cam-a", "Front"), device("cam-b", "Desk"));
+      const element = elementOf("camera");
+      const { user } = await open(scene(element));
+      await user.click(row(/^Camera/));
+
+      // The default camera, by the kind's name
+      await user.click(within(cameraField()).getByText("Default camera"));
+      expect(inList(cameraField(), "Front")).not.toBeNull();
+      await user.click(inList(cameraField(), "Desk")!);
+      await waitFor(() =>
+        expect(savedElement()).toMatchObject({
+          camera: { id: "cam-b", label: "Desk" },
+        }),
+      );
+      expect(row(/^Desk/)).toBeVisible();
+      // Main's echo, so the next pick is a change to save
+      await studio(lastSave()!);
+
+      await user.click(within(cameraField()).getByText("Desk"));
+      await user.click(inList(cameraField(), "Default camera")!);
+      await waitFor(() =>
+        expect(savedElement()).toMatchObject({ camera: null }),
+      );
+    });
+
+    it("lists a camera plugged in while it's open", async () => {
+      const enumerate = listed();
+      const { user } = await open(scene(elementOf("camera")));
+      await user.click(row(/^Camera/));
+
+      enumerate.mockResolvedValue([device("cam-a", "Front")]);
+      await act(async () => {
+        navigator.mediaDevices.dispatchEvent(new Event("devicechange"));
+      });
+      await user.click(within(cameraField()).getByText("Default camera"));
+
+      expect(inList(cameraField(), "Front")).not.toBeNull();
+    });
+
+    it("shows a saved camera by its name, or as not connected", async () => {
+      listed(device("cam-b", "Desk"));
+      // Saved where the ids differ, as in a dev build
+      const desk = elementOf("camera", {
+        label: "Desk cam",
+        camera: { id: "old-id", label: "Desk" },
+      });
+      const gone = elementOf("camera", {
+        label: "Gone cam",
+        camera: { id: "gone", label: "Old cam" },
+      });
+      const { user } = await open(scene(desk, gone));
+
+      await user.click(row(/^Desk cam/));
+      expect(await within(cameraField()).findByText("Desk")).toBeVisible();
+
+      await user.click(row(/^Gone cam/));
+      expect(
+        within(cameraField()).getByText("Old cam (not connected)"),
+      ).toBeVisible();
+    });
+
+    it("saves its quality", async () => {
+      const element = elementOf("camera");
+      const { user } = await open(scene(element));
+      await user.click(row(/^Camera/));
+
+      const quality = page().getByRole("group", { name: "Quality" });
+      await user.click(within(quality).getByText("720p"));
+      await user.click(inList(quality, "1080p")!);
+
+      await waitFor(() =>
+        expect(savedElement()).toMatchObject({ quality: "1080p" }),
+      );
+    });
+
+    it("shows the camera straight from this window, with no stream", async () => {
+      listed(device("cam-b", "Desk"));
+      const stream = { getTracks: () => [], getVideoTracks: () => [] };
+      const opened = vi
+        .spyOn(navigator.mediaDevices, "getUserMedia")
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        .mockResolvedValue(stream as unknown as MediaStream);
+      const element = elementOf("camera", {
+        camera: { id: "cam-b", label: "Desk" },
+      });
+      await open(scene(element));
+      const video = () => drawn(element.id).querySelector("video")!;
+
+      // Its src names the camera and its quality, with no key or server
+      expect(video().dataset.src).toBe(
+        "/studio/camera/?device=cam-b&label=Desk&quality=720p",
+      );
+      await waitFor(() => expect(video().srcObject).toBe(stream));
+      expect(opened).toHaveBeenCalledWith({
+        audio: false,
+        video: expect.objectContaining({
+          deviceId: { exact: "cam-b" },
+          width: { ideal: 1280 },
+        }),
+      });
+    });
+
+    it("shows the camera with the overlay server off", async () => {
+      const stream = { getTracks: () => [], getVideoTracks: () => [] };
+      vi.spyOn(navigator.mediaDevices, "getUserMedia")
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        .mockResolvedValue(stream as unknown as MediaStream);
+      const element = elementOf("camera");
+      const { user } = await open(scene(element));
+      await user.click(row(/^Camera/));
+
+      await send(
+        APP_EVENTS_RESPONSE.GET_SETTINGS,
+        settingsReply((store) => {
+          store.settings.server.enabled = false;
+        }),
+      );
+
+      await waitFor(() =>
+        expect(drawn(element.id).querySelector("video")?.srcObject).toBe(
+          stream,
+        ),
+      );
+      expect(
+        within(cameraField()).queryByText(/overlay server/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows a webcam in its row, not a live picture", async () => {
+      await open(scene(elementOf("camera")));
+
+      const thumb = rowOf(/^Camera/).getByText(
+        (_, el) => !!el?.matches("[class*=thumb]"),
+      );
+      expect(thumb.querySelector("svg")).not.toBeNull();
+      expect(thumb.querySelector("img")).toBeNull();
+    });
+  });
+
   describe("undo and redo", () => {
     // setSystemTime moves Date alone, the history's clock
     afterEach(() => {
@@ -2955,6 +3111,49 @@ describe("StudioEditor", () => {
       await user.click(undo());
       await waitFor(() =>
         expect(lastSave()?.items[0]).toMatchObject({ crop: WHOLE, width: 400 }),
+      );
+    });
+
+    it("crops a camera on the canvas too", async () => {
+      const camera = elementOf("camera", {
+        label: "Cam",
+        x: 100,
+        y: 100,
+        width: 400,
+        height: 200,
+      });
+      const { user } = await open(holding(camera));
+      await user.click(row(/^Cam/));
+      sized();
+      // Its stream's first frame
+      const video = drawn(camera.id).querySelector("video")!;
+      Object.defineProperty(video, "videoWidth", { value: 1280 });
+      Object.defineProperty(video, "videoHeight", { value: 640 });
+      act(() => {
+        video.dispatchEvent(new Event("loadedmetadata"));
+      });
+
+      await user.click(
+        page().getByRole("button", {
+          name: "Crop on the canvas (double-click)",
+        }),
+      );
+      expect(stage()).toHaveAccessibleName(/^Cropping\./);
+      fireEvent.pointerDown(cropHandle("e"), {
+        button: 0,
+        clientX: 250,
+        clientY: 100,
+      });
+      fireEvent.pointerMove(stage(), { clientX: 200, clientY: 100 });
+      fireEvent.pointerUp(stage());
+      fireEvent.keyDown(stage(), { key: "Enter" });
+
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          crop: { ...WHOLE, right: 0.25 },
+          width: 300,
+          height: 200,
+        }),
       );
     });
 

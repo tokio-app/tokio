@@ -28,8 +28,9 @@ import {
   timerTriggers,
 } from "@/common/util";
 import config from "@/config";
+import { systemPreferences } from "electron";
 import { createStack, replyFailure } from "@/helper/events";
-import { AppFailure } from "@/helper/feedback";
+import { AppFailure, REPEAT_NOTICE_MS } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
 import {
@@ -60,9 +61,6 @@ const FANS_SAVE_MS = 30_000;
 const GIFTERS_PUSH_MS = 1000;
 // And the LIVE in progress is saved this often while it changes
 const HISTORY_SAVE_MS = 30_000;
-
-// Failures that repeat on every chat or event are sent at most this often.
-const REPEAT_NOTICE_MS = 30_000;
 
 // Update notices repeat on every check, once a day is enough.
 const UPDATE_NOTICE_MS = 24 * 60 * 60 * 1000;
@@ -743,6 +741,32 @@ const registerStudio = (handler: AppHandlerVariables) => {
   onLanguage(() => void sendStudioOverlays(handler));
 };
 
+// The main window captures the cameras studio pages show
+const registerCameras = ({
+  serverService: server,
+  win,
+}: AppHandlerVariables) => {
+  let asked = false;
+  server.onCameras((captures) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send(APP_EVENTS_RESPONSE.CAMERAS, { captures });
+    }
+    // macOS asks the user once. Not awaited: the window tries again.
+    if (asked || process.platform !== "darwin") return;
+    if (captures.length === 0) return;
+    if (systemPreferences.getMediaAccessStatus("camera") !== "not-determined") {
+      return;
+    }
+    asked = true;
+    void systemPreferences.askForMediaAccess("camera");
+  });
+  server.onCameraKeyframe((id) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send(APP_EVENTS_RESPONSE.CAMERA_KEYFRAME, { id });
+    }
+  });
+};
+
 // The profile keeps the fans its LIVEs show, whatever features are on.
 // Overlays get them as they connect, and again when they change.
 const registerFans = ({
@@ -984,6 +1008,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     registerHistory(handler);
     // After registerConnectorEvents, see registerStudio
     registerStudio(handler);
+    registerCameras(handler);
   }
 
   const settings = storeManagerService.getSettings();

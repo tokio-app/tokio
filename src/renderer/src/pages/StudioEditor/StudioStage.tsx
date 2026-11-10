@@ -1,10 +1,16 @@
 // The stream's own stylesheet, global as on its page, like the games
 // overlay's preview: the canvas can't drift from what's on stream
 import "@/common/studio/overlay.css";
-import { STUDIO_MAX_GUIDES, StudioCrop, StudioGuides } from "@/common/schemas";
+import {
+  STUDIO_MAX_GUIDES,
+  StudioCrop,
+  StudioElementKind,
+  StudioGuides,
+} from "@/common/schemas";
 import { createStage, Stage, StageFit } from "@/common/studio/stage";
 import { StudioElementView, StudioView } from "@/common/types";
 import { Btn } from "@/components";
+import { previewCamera } from "@/helper/camera";
 import { cx } from "@/helper/cx";
 import { useLanguage, useT } from "@/ui/i18n";
 import isEqual from "fast-deep-equal";
@@ -223,7 +229,12 @@ type Held = "rotate" | "move" | "pan" | Axis | CropSide;
 
 // The kinds a double-click crops on the canvas: not a viewer's picture,
 // which fills its circle, so only its fields crop it
-const CANVAS_CROPS = new Set(["media", "gift", "emote"]);
+const CANVAS_CROPS = new Set<StudioElementKind>([
+  "media",
+  "camera",
+  "gift",
+  "emote",
+]);
 
 // Each crop handle's place on the frame
 const CROP_HANDLES: Record<CropSide, string> = {
@@ -366,7 +377,11 @@ export function StudioStage({
   const level = zoom ?? fit.scale;
 
   useLayoutEffect(() => {
-    const stage = createStage(root.current!, { slots: true, editing: true });
+    const stage = createStage(root.current!, {
+      slots: true,
+      editing: true,
+      camera: previewCamera,
+    });
     stageRef.current = stage;
     const refit = () =>
       setFit((last) => (sameFit(last, stage.fit()) ? last : stage.fit()));

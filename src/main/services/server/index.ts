@@ -2,6 +2,12 @@ import GAMES_STYLES from "@/common/games/overlay.css?raw";
 import STUDIO_STYLES from "@/common/studio/overlay.css?raw";
 import STAGE from "@/common/studio/stage.ts?script";
 import {
+  STUDIO_CAMERA_MAX_LENGTH,
+  STUDIO_CAMERA_QUALITIES,
+} from "@/common/schemas";
+import {
+  CameraCapture,
+  CameraChunk,
   isLiveEvent,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -12,19 +18,22 @@ import {
   formatError,
   MINECRAFT_OVERLAY_PATH,
   SERVER_PORT,
+  STUDIO_CAMERA_PATH,
   STUDIO_PATH,
   TIMER_PATH,
 } from "@/common/util";
 import ARCHIVO from "@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2?inline";
 import Logger from "@/logger";
 import express, { Express, Router } from "express";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Server as HttpServer } from "node:http";
 import { networkInterfaces } from "node:os";
+import { z } from "zod";
 import { TikTokConnectorService } from "../connector";
 import { MusicService } from "../music";
 import { Service } from "../shared";
 import ALERT_PAGE from "./alert.html?raw";
+import { CameraFeeds } from "./camera";
 import GAMES_HTML from "./games.html?raw";
 import STUDIO_HTML from "./studio.html?raw";
 import TIMER_HTML from "./timer.html?raw";
@@ -44,6 +53,13 @@ const STUDIO_PAGE = STUDIO_HTML.replace("__ARCHIVO__", () => ARCHIVO)
   .replace("/* __STYLES__ */", () => STUDIO_STYLES)
   .replace("/* __STAGE__ */", () => STAGE);
 
+// What a camera stream's URL asks for, as studioCameraPath builds it
+const CameraQuerySchema = z.object({
+  device: z.string().max(STUDIO_CAMERA_MAX_LENGTH),
+  label: z.string().max(STUDIO_CAMERA_MAX_LENGTH),
+  quality: z.enum(STUDIO_CAMERA_QUALITIES),
+});
+
 // Adapter names that are usually virtual: Hyper-V, WSL, VMs, Docker, bridges.
 // A real network card can have them too, with Hyper-V or a bridge set up.
 const VIRTUAL_ADAPTER = /vethernet|wsl|virtualbox|vmware|docker|^br|virbr/i;
@@ -57,6 +73,12 @@ export class ServerService extends Service {
   // Folders served under /<id>/, keyed by id.
   private _routes = new Map<string, string>();
   private _connectListeners: ((id: string) => void)[] = [];
+  // In every camera stream's URL: the server is open to the whole network,
+  // and a camera shouldn't be. New on each start, so pages that reconnect
+  // load their streams again. Never saved or logged.
+  private _cameraKey = randomUUID();
+  private _cameras = new CameraFeeds();
+  private _cameraListeners: ((captures: CameraCapture[]) => void)[] = [];
 
   // NOTE: Overlays connect to SERVER_PORT, other ports are for tests.
   constructor(port: number = SERVER_PORT) {
@@ -66,6 +88,22 @@ export class ServerService extends Service {
     this._app.set("env", "production");
     this._dynamicRouter = express.Router();
     this._port = port;
+    this._cameras.onChange(() => this._camerasChanged());
+
+    // A camera's video, which a camera element fetches and decodes. A wrong
+    // key is a plain 404. /studio/:id matches one segment, so it never takes
+    // these.
+    this._app.get(`/${STUDIO_CAMERA_PATH}/:key`, (req, res, next) => {
+      const given = Buffer.from(req.params.key);
+      const key = Buffer.from(this._cameraKey);
+      if (given.length !== key.length || !timingSafeEqual(given, key)) {
+        return next();
+      }
+      const query = CameraQuerySchema.safeParse(req.query);
+      if (!query.success) return void res.sendStatus(400);
+      const { device, label, quality } = query.data;
+      this._cameras.watch(res, { device, label }, quality);
+    });
 
     // Each alert's overlay, the same page: it reads the alert's id from its
     // path. Their media is mounted at /alerts/media/, a path one level deeper.
@@ -114,12 +152,18 @@ export class ServerService extends Service {
     return this._port;
   }
 
+  public get cameraKey(): string {
+    return this._cameraKey;
+  }
+
   public start(): Promise<{ success: boolean; message: string }> {
     if (this._server)
       return Promise.resolve({
         success: false,
         message: "Server already running.",
       });
+
+    this._cameraKey = randomUUID();
 
     return new Promise((resolve) => {
       // Without a host Node listens on :: for IPv4 and IPv6, or 0.0.0.0 without IPv6.
@@ -204,6 +248,8 @@ export class ServerService extends Service {
   }
 
   public stop(): void {
+    // server.close() alone leaves them streaming
+    this._cameras.closeAll();
     if (this._wss) {
       this._wss.closeAll();
       this._wss = null;
@@ -281,6 +327,34 @@ export class ServerService extends Service {
       if (songs.length === 0) return;
       this.sendToClient(id, { type: TOKIO_EVENTS.MUSIC_CHANGE, data: songs });
     });
+  }
+
+  /** Sends a chunk of a capture to the pages that stream its camera. */
+  public cameraFrame(chunk: CameraChunk) {
+    this._cameras.frame(chunk);
+  }
+
+  /** The cameras pages show, for the window to capture. */
+  public cameraCaptures(): CameraCapture[] {
+    return this._cameras.captures();
+  }
+
+  /** Calls the listener with the captures whenever they change. */
+  public onCameras(listener: (captures: CameraCapture[]) => void) {
+    this._cameraListeners.push(listener);
+  }
+
+  /**
+   * Calls the listener with a capture's id when a page waits for its next
+   * keyframe, which the window should send at once.
+   */
+  public onCameraKeyframe(listener: (id: string) => void) {
+    this._cameras.onKeyframe(listener);
+  }
+
+  private _camerasChanged() {
+    const captures = this.cameraCaptures();
+    for (const listener of this._cameraListeners) listener(captures);
   }
 
   /** Calls the listener with each overlay's id as it connects. */

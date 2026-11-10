@@ -1,6 +1,7 @@
 export * from "./useAlertTest";
 export * from "./useAudio";
 export * from "./useAutosave";
+export * from "./useCameraCapture";
 export * from "./useClickOutside";
 export * from "./useEditableSettings";
 export * from "./useImmerState";

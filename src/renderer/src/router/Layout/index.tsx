@@ -5,6 +5,7 @@ import { NotificationBell, ProfileDropdown, UpdateButton } from "@/components";
 import {
   flushSettings,
   useAudio,
+  useCameraCapture,
   useIpcListener,
   useIpcRequest,
   useNotifications,
@@ -47,6 +48,8 @@ export function Layout() {
   const { resumeContext } = useAudio();
   const notifications = useNotifications();
   const updateStatus = useUpdateStatus();
+  // Overlay Studio's cameras, captured here while pages show them
+  useCameraCapture();
 
   // Connecting or connected, which locks the profile
   const [isConnected, setIsConnected] = useState(false);

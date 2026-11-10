@@ -13,6 +13,7 @@ export const STUDIO_SIZES = {
 export const STUDIO_KINDS = [
   "text",
   "media",
+  "camera",
   "gift",
   "emote",
   "shape",
@@ -63,6 +64,12 @@ export const STUDIO_MAX_BORDER = 100;
 export const STUDIO_MAX_CORNERS = 12;
 // The most guides an overlay keeps across, and as many down
 export const STUDIO_MAX_GUIDES = 50;
+// The longest camera id or name a camera element keeps
+export const STUDIO_CAMERA_MAX_LENGTH = 256;
+
+// The sizes a camera element's stream can come in, the smallest first: two
+// elements showing one camera share the larger one's
+export const STUDIO_CAMERA_QUALITIES = ["720p", "1080p"] as const;
 
 // A media library file's basename, "" for none: never a path
 const LibraryFileSchema = z
@@ -115,7 +122,15 @@ const StudioCropSchema = z
   .refine((crop) => crop.left + crop.right < 1 && crop.top + crop.bottom < 1);
 
 // The kinds that draw a picture, which they crop and round
-export type StudioPictureKind = "media" | "gift" | "emote" | "viewer";
+export type StudioPictureKind =
+  "media" | "camera" | "gift" | "emote" | "viewer";
+
+// A camera as the app's window lists it: its id there, and its name, which
+// finds it when the id doesn't (ids differ per origin, as in a dev build)
+const StudioCameraSchema = z.object({
+  id: z.string().max(STUDIO_CAMERA_MAX_LENGTH),
+  label: z.string().max(STUDIO_CAMERA_MAX_LENGTH),
+});
 
 // A picture's crop, and its corners' rounding as a % of the shorter side of
 // what shows: at 50 it's round
@@ -154,6 +169,15 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     name: z.string().default(""),
     loop: z.boolean().default(true),
     volume: z.number().min(0).max(100).default(100),
+  }),
+  // A camera on this PC, live: Tokio's window captures it while a page shows
+  // it. null is the system's default camera.
+  z.object({
+    ...ELEMENT,
+    ...PICTURE,
+    kind: z.literal("camera"),
+    camera: StudioCameraSchema.nullable().default(null),
+    quality: z.enum(STUDIO_CAMERA_QUALITIES).default("720p"),
   }),
   // A gift's picture, by its id in TikTok's or the custom gift list
   z.object({
@@ -402,3 +426,5 @@ export type StudioAlign = StudioElementOf<"text">["align"];
 export type StudioShape = StudioElementOf<"shape">["shape"];
 // What an overlay element frames
 export type StudioSource = NonNullable<StudioElementOf<"overlay">["source"]>;
+export type StudioCamera = z.infer<typeof StudioCameraSchema>;
+export type StudioCameraQuality = (typeof STUDIO_CAMERA_QUALITIES)[number];

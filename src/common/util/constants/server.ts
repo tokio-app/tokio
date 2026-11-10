@@ -1,3 +1,5 @@
+import type { StudioCamera, StudioCameraQuality } from "../../schemas/studio";
+
 // NOTE: DO NOT CHANGE. browser sources and overlays point at this address.
 export const SERVER_PORT = 37891;
 export const APP_HOSTNAME = "tokio-app.local";
@@ -29,6 +31,23 @@ export const STUDIO_SOCKET_PREFIX = `${STUDIO_PATH}:`;
 
 // The socket id a studio overlay's page connects with
 export const studioSocketId = (id: string) => `${STUDIO_SOCKET_PREFIX}${id}`;
+
+// Where a camera element's frames stream from. Pages get the whole URL from
+// main, with the overlay server's key for this run, so it's never a
+// browser-source link. A studio overlay's id is a UUID, never "camera".
+export const STUDIO_CAMERA_PATH = `${STUDIO_PATH}/camera`;
+
+// A camera's stream: null is the default camera
+export const studioCameraPath = (
+  key: string,
+  camera: StudioCamera | null,
+  quality: StudioCameraQuality,
+) =>
+  `/${STUDIO_CAMERA_PATH}/${encodeURIComponent(key)}?${new URLSearchParams({
+    device: camera?.id ?? "",
+    label: camera?.label ?? "",
+    quality,
+  })}`;
 
 // NOTE: DO NOT CHANGE. Each game's overlay is served under /games/<game>/
 // and connects with this id.

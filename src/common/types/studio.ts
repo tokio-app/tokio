@@ -1,6 +1,7 @@
 import type {
   StudioAlign,
   StudioAnimation,
+  StudioCameraQuality,
   StudioCrop,
   StudioEntrance,
   StudioShape,
@@ -62,6 +63,9 @@ export type StudioElementView = StudioElementViewBase &
         loop: boolean;
         volume: number;
       } & StudioPictureView)
+    // src is the camera's stream, null when there's none to load (the
+    // editor's, with the overlay server off)
+    | ({ kind: "camera"; src: string | null } & StudioPictureView)
     | ({ kind: "gift"; src: string | null } & StudioPictureView)
     | ({ kind: "emote"; src: string | null } & StudioPictureView)
     // color null without a fill, border null without one; sides are a
@@ -130,4 +134,57 @@ export type StudioReact = {
   text?: string;
   picture?: string;
   name?: string;
+};
+
+// A camera main wants the window to capture, while pages show it: its id
+// and name as the window listed them ("" for the default camera), at the
+// largest quality a page asks for. The id names its frames.
+export type CameraCapture = {
+  id: string;
+  device: string;
+  label: string;
+  quality: StudioCameraQuality;
+};
+
+// Why the window couldn't capture a camera: the system's privacy settings
+// refused it, it isn't connected (or was unplugged), another app holds it,
+// or anything else
+export const CAMERA_FAILURES = [
+  "blocked",
+  "missing",
+  "busy",
+  "failed",
+] as const;
+export type CameraFailure = (typeof CAMERA_FAILURES)[number];
+
+// The colors the encoder says its frames have, as WebCodecs names them
+// (VideoColorSpaceInit), null where it doesn't say
+export type CameraColors = {
+  primaries: string | null;
+  transfer: string | null;
+  matrix: string | null;
+  fullRange: boolean | null;
+};
+
+// What a page needs to play a capture's H.264: the codec string, the
+// frames' size, the encoder's decoder description (an
+// AVCDecoderConfigurationRecord, the MP4 avcC box's contents) and its
+// colors, which the H.264 itself doesn't carry
+export type CameraConfig = {
+  codec: string;
+  width: number;
+  height: number;
+  description: Uint8Array;
+  colors: CameraColors | null;
+};
+
+// One encoded chunk of a capture's video (WebCodecs' EncodedVideoChunk),
+// from the window to main. A keyframe carries its config.
+export type CameraChunk = {
+  id: string;
+  key: boolean;
+  // Microseconds, as the encoder gave it
+  timestamp: number;
+  frame: Uint8Array;
+  config?: CameraConfig;
 };

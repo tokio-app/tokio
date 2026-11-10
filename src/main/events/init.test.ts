@@ -13,6 +13,7 @@ import {
   AlertTrigger,
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
+  CameraCapture,
   ChatEvent,
   CustomGift,
   EMOTE_TRIGGER,
@@ -57,7 +58,7 @@ import type { TimerService } from "@/services/timer";
 import { TIMER_EVENTS } from "@/services/timer";
 import type { TTSService } from "@/services/tts";
 import type { UpdaterService } from "@/services/updater";
-import { app } from "@test/electron";
+import { app, systemPreferences } from "@test/electron";
 import { createHandler, eventSource } from "@test/handler";
 import {
   afterEach,
@@ -261,6 +262,8 @@ function setup() {
       (_id: string, _payload: { type: string; data?: unknown }) => true,
     ),
     sendToAll: vi.fn((_payload: TokioPayload) => {}),
+    onCameras: vi.fn((_listener: (captures: CameraCapture[]) => void) => {}),
+    onCameraKeyframe: vi.fn((_listener: (id: string) => void) => {}),
   };
   const overlayService = {
     setLogFile: vi.fn(),
@@ -1289,6 +1292,83 @@ describe("init events", () => {
       await vi.waitFor(() =>
         expect(texts(s)).toEqual([[formatStat(1500, "es-419").short]]),
       );
+    });
+  });
+
+  describe("cameras", () => {
+    const capture: CameraCapture = {
+      id: "1",
+      device: "",
+      label: "",
+      quality: "720p",
+    };
+    const cameras = (s: Setup, captures: CameraCapture[]) => {
+      for (const [listener] of s.serverService.onCameras.mock.calls) {
+        listener(captures);
+      }
+    };
+    const keyframe = (s: Setup, id: string) => {
+      for (const [listener] of s.serverService.onCameraKeyframe.mock.calls) {
+        listener(id);
+      }
+    };
+
+    it("pushes the cameras to capture to the window", async () => {
+      const s = await live();
+
+      cameras(s, [capture]);
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CAMERAS)).toEqual([
+        { captures: [capture] },
+      ]);
+    });
+
+    it("pushes nothing to a closed window", async () => {
+      const s = await live();
+      s.h.win.close();
+
+      expect(() => cameras(s, [])).not.toThrow();
+      expect(() => keyframe(s, "1")).not.toThrow();
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CAMERAS)).toEqual([]);
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CAMERA_KEYFRAME)).toEqual([]);
+    });
+
+    it("asks the window for the keyframe a page waits for", async () => {
+      const s = await live();
+
+      keyframe(s, "1");
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CAMERA_KEYFRAME)).toEqual([
+        { id: "1" },
+      ]);
+    });
+
+    it("asks macOS for the camera once, when one is first wanted", async () => {
+      vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
+      systemPreferences.getMediaAccessStatus.mockReturnValue("not-determined");
+      const s = await live();
+
+      cameras(s, []);
+      expect(systemPreferences.askForMediaAccess).not.toHaveBeenCalled();
+      cameras(s, [capture]);
+      cameras(s, [capture]);
+
+      expect(systemPreferences.askForMediaAccess).toHaveBeenCalledTimes(1);
+      expect(systemPreferences.askForMediaAccess).toHaveBeenCalledWith(
+        "camera",
+      );
+    });
+
+    it("doesn't ask once the user decided, or on other systems", async () => {
+      vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
+      const s = await live();
+      cameras(s, [capture]);
+
+      vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+      systemPreferences.getMediaAccessStatus.mockReturnValue("not-determined");
+      cameras(s, [capture]);
+
+      expect(systemPreferences.askForMediaAccess).not.toHaveBeenCalled();
     });
   });
 

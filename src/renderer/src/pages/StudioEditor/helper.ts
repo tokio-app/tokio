@@ -34,6 +34,7 @@ import { EmoteOption } from "@/components";
 export const KIND_NAMES: Record<StudioElementKind, MessageKey> = {
   text: "studio.kinds.text",
   media: "studio.kinds.media",
+  camera: "studio.kinds.camera",
   gift: "studio.kinds.gift",
   emote: "studio.kinds.emote",
   shape: "studio.kinds.shape",
@@ -166,6 +167,8 @@ export function elementName(
         return element.text.trim().split("\n")[0];
       case "media":
         return element.name;
+      case "camera":
+        return element.camera?.label;
       case "gift":
         return context.gifts.find((g) => g.value === element.gift)?.label;
       case "emote":
