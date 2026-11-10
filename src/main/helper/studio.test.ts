@@ -236,7 +236,22 @@ describe("sendStudioOverlays", () => {
         {
           width: 1080,
           height: 1920,
-          layers: [{ id: "L1", z: 0, opacity: 1, elements: [] }],
+          layers: [
+            {
+              id: "L1",
+              z: 0,
+              opacity: 1,
+              group: {
+                when: "always",
+                seconds: 5,
+                entrance: "pop",
+                exit: "fade",
+                animation: "bounce",
+                idle: "float",
+              },
+              elements: [],
+            },
+          ],
         },
       ],
       ["studio:gone", null],

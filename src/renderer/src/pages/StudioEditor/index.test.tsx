@@ -1657,7 +1657,7 @@ describe("StudioEditor", () => {
 
     await user.click(
       page().getByRole("button", {
-        name: "Test the elements that react to events",
+        name: "Test the elements and groups that react to events",
       }),
     );
 

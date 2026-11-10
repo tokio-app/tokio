@@ -21,15 +21,53 @@ export const STUDIO_KINDS = [
   "overlay",
 ] as const;
 
-// Always on screen, shows on its trigger for `seconds`, or always on screen
-// and plays its animation on its trigger
-const STUDIO_WHEN = ["always", "event", "animate"] as const;
+// Always on screen; shows on its trigger for `seconds`; always on screen and
+// plays its animation on its trigger; or always on screen and plays its loop
+// over and over, with no trigger
+const STUDIO_WHEN = ["always", "event", "animate", "loop"] as const;
 
-// How an element that shows on an event comes in
-const STUDIO_ENTRANCES = ["fade", "pop", "slide"] as const;
+// How an element that shows on an event comes in, and how it leaves when
+// its seconds end. "slide" slides up, as older files saved it.
+const STUDIO_ENTRANCES = [
+  "fade",
+  "pop",
+  "slide",
+  "slide-down",
+  "slide-left",
+  "slide-right",
+  "zoom",
+  "drop",
+  "spin",
+  "flip",
+  "wipe",
+  "blur",
+] as const;
 
 // What an element that moves on an event plays, once per event
-const STUDIO_ANIMATIONS = ["bounce", "shake", "pulse"] as const;
+const STUDIO_ANIMATIONS = [
+  "bounce",
+  "shake",
+  "pulse",
+  "wiggle",
+  "spin",
+  "flip",
+  "jump",
+  "swing",
+  "tada",
+  "heartbeat",
+  "flash",
+  "jelly",
+] as const;
+
+// What an element that moves all the time plays, over and over
+const STUDIO_LOOPS = [
+  "float",
+  "breathe",
+  "spin",
+  "sway",
+  "hop",
+  "drift",
+] as const;
 
 // A text's alignment in its box
 const STUDIO_ALIGNS = ["left", "center", "right"] as const;
@@ -77,8 +115,25 @@ const LibraryFileSchema = z
   .refine((file) => !/[/\\]/.test(file) && !file.includes(".."))
   .default("");
 
-// Every kind's box and reaction. Nothing here trims, clamps or rounds:
-// useAutosave settles a save only when main's echo deep-equals what it sent.
+// How an element or a group reacts to the LIVE, and moves. Nothing here or
+// below trims, clamps or rounds: useAutosave settles a save only when main's
+// echo deep-equals what it sent.
+const REACTION = {
+  when: z.enum(STUDIO_WHEN).default("always"),
+  // Its type and gifts have no defaults
+  trigger: TriggerSchema.prefault({ type: TOKIO_EVENTS.FOLLOW, gifts: [] }),
+  // On Like, it reacts each time the likes of all viewers pass another
+  // likes_every, as game actions and the timer count them
+  likes_every: z.number().int().min(1).default(100),
+  seconds: z.number().min(1).max(STUDIO_MAX_SECONDS).default(5),
+  entrance: z.enum(STUDIO_ENTRANCES).default("pop"),
+  exit: z.enum(STUDIO_ENTRANCES).default("fade"),
+  animation: z.enum(STUDIO_ANIMATIONS).default("bounce"),
+  // Its loop. Not `loop`, which a media element's video has.
+  idle: z.enum(STUDIO_LOOPS).default("float"),
+};
+
+// Every kind's box and reaction
 const ELEMENT = {
   id: z.string().min(1),
   // Its name in the editor, empty for what it shows. Not `name`, which is a
@@ -99,15 +154,7 @@ const ELEMENT = {
   locked: z.boolean().default(false),
   // Off the canvas and the stream
   hidden: z.boolean().default(false),
-  when: z.enum(STUDIO_WHEN).default("always"),
-  // Its type and gifts have no defaults
-  trigger: TriggerSchema.prefault({ type: TOKIO_EVENTS.FOLLOW, gifts: [] }),
-  // On Like, it reacts each time the likes of all viewers pass another
-  // likes_every, as game actions and the timer count them
-  likes_every: z.number().int().min(1).default(100),
-  seconds: z.number().min(1).max(STUDIO_MAX_SECONDS).default(5),
-  entrance: z.enum(STUDIO_ENTRANCES).default("pop"),
-  animation: z.enum(STUDIO_ANIMATIONS).default("bounce"),
+  ...REACTION,
 };
 
 // What a picture keeps of itself: fractions of its own width and height cut
@@ -275,10 +322,12 @@ const GROUP = {
   flip_y: z.boolean().default(false),
   // Over its elements' own, on stream too
   opacity: z.number().min(0).max(1).default(1),
+  // As one, around its elements, which keep their own
+  ...REACTION,
 };
 
-// A group of elements that stack, hide, lock and move together. Groups
-// don't hold groups.
+// A group of elements that stack, hide, lock, move and react together.
+// Groups don't hold groups.
 export const StudioGroupSchema = z.object({
   ...GROUP,
   elements: z.array(StudioElementSchema).default([]),
@@ -345,10 +394,23 @@ const parsing =
       ? items.filter((item) => schema.safeParse(item).success)
       : items;
 
+// The field, or its default where it doesn't parse
+const orDefault = <T extends z.ZodType>(field: T) =>
+  field.catch(() => field.parse(undefined));
+
 // The store's group: drops an element that doesn't parse (a newer Tokio's
-// kind after a downgrade, a hand edit) instead of the group
+// kind after a downgrade, a hand edit) instead of the group, and takes the
+// default for a reaction it can't read, as a newer Tokio's animation
 const StoredStudioGroupSchema = z.object({
   ...GROUP,
+  when: orDefault(REACTION.when),
+  trigger: orDefault(REACTION.trigger),
+  likes_every: orDefault(REACTION.likes_every),
+  seconds: orDefault(REACTION.seconds),
+  entrance: orDefault(REACTION.entrance),
+  exit: orDefault(REACTION.exit),
+  animation: orDefault(REACTION.animation),
+  idle: orDefault(REACTION.idle),
   elements: z
     .preprocess(parsing(StudioElementSchema), z.array(StudioElementSchema))
     .default([]),
@@ -421,7 +483,14 @@ export type StudioElementOf<K extends StudioElementKind> = Extract<
 export type StudioSize = StudioOverlay["size"];
 export type StudioWhen = StudioElement["when"];
 export type StudioEntrance = StudioElement["entrance"];
+export type StudioExit = StudioElement["exit"];
 export type StudioAnimation = StudioElement["animation"];
+export type StudioIdle = StudioElement["idle"];
+// How an element or a group moves, as its page draws it
+export type StudioMotion = Pick<
+  StudioElement,
+  "when" | "seconds" | "entrance" | "exit" | "animation" | "idle"
+>;
 export type StudioAlign = StudioElementOf<"text">["align"];
 export type StudioShape = StudioElementOf<"shape">["shape"];
 // What an overlay element frames

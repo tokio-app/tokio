@@ -31,7 +31,9 @@ const BASE: Omit<TextView, "id" | "kind" | keyof typeof TEXT> = {
   when: "always",
   seconds: 5,
   entrance: "pop",
+  exit: "fade",
   animation: "bounce",
+  idle: "float",
 };
 
 const TEXT = {
@@ -69,7 +71,7 @@ const layered = (...layers: StudioLayerView[]): StudioView => ({
 
 // A canvas of one layer holding the elements
 const view = (...elements: StudioElementView[]): StudioView =>
-  layered({ id: "l", z: 0, opacity: 1, elements });
+  layered({ id: "l", z: 0, opacity: 1, group: null, elements });
 
 let root: HTMLElement;
 let stage: Stage;
@@ -165,11 +167,12 @@ describe("on stream", () => {
   it("stacks each layer over the whole canvas, its elements inside it", () => {
     draw(
       layered(
-        { id: "back", z: 0, opacity: 1, elements: [text("a")] },
+        { id: "back", z: 0, opacity: 1, group: null, elements: [text("a")] },
         {
           id: "front",
           z: 2,
           opacity: 1,
+          group: null,
           elements: [text("b"), text("c", { z: 1 })],
         },
       ),
@@ -195,23 +198,29 @@ describe("on stream", () => {
     };
     draw(
       layered(
-        { id: "back", z: 0, opacity: 1, elements: [text("a")] },
-        { id: "front", z: 1, opacity: 1, elements: [clip] },
+        { id: "back", z: 0, opacity: 1, group: null, elements: [text("a")] },
+        { id: "front", z: 1, opacity: 1, group: null, elements: [clip] },
       ),
     );
     const a = el("a");
 
     draw(
       layered(
-        { id: "back", z: 0, opacity: 1, elements: [] },
-        { id: "front", z: 1, opacity: 1, elements: [clip, text("a")] },
+        { id: "back", z: 0, opacity: 1, group: null, elements: [] },
+        {
+          id: "front",
+          z: 1,
+          opacity: 1,
+          group: null,
+          elements: [clip, text("a")],
+        },
       ),
     );
     expect(el("a")).toBe(a);
     expect(a.parentElement).toBe(layerNode("front"));
 
     const video = root.querySelector("video")!;
-    draw(layered({ id: "back", z: 0, opacity: 1, elements: [] }));
+    draw(layered({ id: "back", z: 0, opacity: 1, group: null, elements: [] }));
 
     expect(root.querySelector("[data-layer='front']")).toBeNull();
     expect(root.querySelectorAll(".studio-element")).toHaveLength(0);
@@ -407,7 +416,15 @@ describe("on stream", () => {
   });
 
   it("fades a group's layer by its opacity", () => {
-    draw(layered({ id: "g", z: 0, opacity: 0.5, elements: [text("t")] }));
+    draw(
+      layered({
+        id: "g",
+        z: 0,
+        opacity: 0.5,
+        group: null,
+        elements: [text("t")],
+      }),
+    );
 
     expect(layerNode("g").style.opacity).toBe("0.5");
   });

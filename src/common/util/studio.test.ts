@@ -11,6 +11,7 @@ import {
   fillStudioText,
   newStudioElement,
   newStudioGroup,
+  reactsToEvents,
   sentPicture,
   SAMPLE_NUMBERS,
   studioEventVariables,
@@ -88,6 +89,16 @@ describe("usesNumbers and studioEventVariables", () => {
         trigger: { ...text.trigger, type: TOKIO_EVENTS.GIFT },
       }),
     ).toEqual(["username", "handle", "gift", "count"]);
+  });
+
+  it("gives a text that moves all the time no event, since it has none", () => {
+    const text = element("t", { kind: "text", when: "loop" });
+
+    expect(reactsToEvents(text)).toBe(false);
+    expect(studioEventVariables(text)).toEqual([]);
+    expect(reactsToEvents({ when: "event" })).toBe(true);
+    expect(reactsToEvents({ when: "animate" })).toBe(true);
+    expect(reactsToEvents({ when: "always" })).toBe(false);
   });
 
   it("gives a Like no viewer or count, its likes coming from every viewer", () => {
@@ -340,9 +351,12 @@ describe("studioView", () => {
           StudioGroupSchema.parse({
             kind: "group",
             id: "g",
+            when: "event",
+            entrance: "drop",
+            exit: "blur",
             elements: [element("in", { kind: "shape" })],
           }),
-          element("alone", { kind: "shape" }),
+          element("alone", { kind: "shape", when: "loop", idle: "sway" }),
           element("hidden", { kind: "shape", hidden: true }),
         ],
       },
@@ -354,6 +368,21 @@ describe("studioView", () => {
       { id: "alone", z: 1, elements: [{ id: "alone", z: 0 }] },
     ]);
     expect(layers).toHaveLength(2);
+    // The group moves as a whole; the element on its own moves itself
+    expect(layers[0].group).toEqual({
+      when: "event",
+      seconds: 5,
+      entrance: "drop",
+      exit: "blur",
+      animation: "bounce",
+      idle: "float",
+    });
+    expect(layers[1].group).toBeNull();
+    expect(layers[1].elements[0]).toMatchObject({
+      when: "loop",
+      exit: "fade",
+      idle: "sway",
+    });
   });
 });
 

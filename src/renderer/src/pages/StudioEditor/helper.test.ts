@@ -646,7 +646,7 @@ describe("the canvas's geometry", () => {
     const bar = { ...under, id: "bar", width: 200, height: 20, rotation: 90 };
     const turned = {
       ...view,
-      layers: [{ id: "only", z: 0, opacity: 1, elements: [bar] }],
+      layers: [{ id: "only", z: 0, opacity: 1, group: null, elements: [bar] }],
     };
 
     expect(pickElement(turned, new Set(), { x: 100, y: 80 })).toBe("bar");

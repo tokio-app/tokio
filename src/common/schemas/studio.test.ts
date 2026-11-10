@@ -38,7 +38,9 @@ describe("StudioElementSchema", () => {
       likes_every: 100,
       seconds: 5,
       entrance: "pop",
+      exit: "fade",
       animation: "bounce",
+      idle: "float",
       text: "",
       font: "",
       size: 64,
@@ -216,6 +218,28 @@ describe("StudioElementSchema", () => {
     expect(text({ label: "a".repeat(61) })).toBe(false);
   });
 
+  it("moves all the time, and takes every entrance, exit, animation and loop", () => {
+    const moving = element({
+      kind: "text",
+      when: "loop",
+      entrance: "slide-left",
+      exit: "wipe",
+      animation: "jelly",
+      idle: "drift",
+    });
+    expect(StudioElementSchema.parse(moving)).toMatchObject(moving);
+    for (const fields of [
+      { when: "sometimes" },
+      { exit: "explode" },
+      { idle: "dance" },
+    ]) {
+      expect(
+        StudioElementSchema.safeParse(element({ kind: "text", ...fields }))
+          .success,
+      ).toBe(false);
+    }
+  });
+
   it("sends back what it got, untrimmed and unrounded", () => {
     const saved = StudioElementSchema.parse(
       element({ kind: "text", text: " Thanks {username} ", x: 10.5 }),
@@ -239,8 +263,36 @@ describe("StudioGroupSchema", () => {
       flip_x: false,
       flip_y: false,
       opacity: 1,
+      // Always on screen, as a group was before it could react
+      when: "always",
+      trigger: expect.objectContaining({
+        type: TOKIO_EVENTS.FOLLOW,
+        gifts: [],
+      }),
+      likes_every: 100,
+      seconds: 5,
+      entrance: "pop",
+      exit: "fade",
+      animation: "bounce",
+      idle: "float",
       elements: [],
     });
+  });
+
+  it("reacts like an element, and refuses what an element would", () => {
+    const reacting = {
+      kind: "group",
+      id: "g",
+      when: "event",
+      trigger: { type: TOKIO_EVENTS.GIFT, gifts: [] },
+      entrance: "drop",
+      exit: "spin",
+    } as const;
+    expect(StudioGroupSchema.parse(reacting)).toMatchObject(reacting);
+    expect(
+      StudioGroupSchema.safeParse({ ...reacting, animation: "explode" })
+        .success,
+    ).toBe(false);
   });
 
   it("refuses a long name or an element it can't parse", () => {
@@ -388,6 +440,35 @@ describe("StoredStudioOverlaysSchema", () => {
           expect.objectContaining({ id: "e", kind: "shape" }),
         ],
       },
+    ]);
+  });
+
+  it("keeps a group, and its elements, whose reaction it can't read", () => {
+    const [stored] = StoredStudioOverlaysSchema.parse([
+      {
+        id: ID,
+        items: [
+          {
+            kind: "group",
+            id: "g",
+            // A newer Tokio's
+            when: "sometimes",
+            animation: "explode",
+            seconds: 5,
+            elements: [element({ kind: "shape" })],
+          },
+        ],
+      },
+    ]);
+
+    expect(stored.items).toEqual([
+      expect.objectContaining({
+        id: "g",
+        when: "always",
+        animation: "bounce",
+        seconds: 5,
+        elements: [expect.objectContaining({ id: "a", kind: "shape" })],
+      }),
     ]);
   });
 

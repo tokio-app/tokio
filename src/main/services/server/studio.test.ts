@@ -26,7 +26,9 @@ const BASE = {
   when: "always",
   seconds: 5,
   entrance: "pop",
+  exit: "fade",
   animation: "bounce",
+  idle: "float",
 } as const;
 
 // An element of the kind, with its own fields
@@ -58,7 +60,7 @@ const viewOf = (...layers: StudioLayerView[]): StudioView => ({
 
 // The elements in one layer
 const view = (...elements: StudioElementView[]) =>
-  viewOf({ id: "L1", z: 0, opacity: 1, elements });
+  viewOf({ id: "L1", z: 0, opacity: 1, group: null, elements });
 
 // What a picture element draws when it keeps all of itself
 const PICTURE = { crop: null, rounding: 0 };
@@ -138,11 +140,18 @@ describe("studio overlay page", () => {
     it("draws each layer over the ones before, with its elements inside", async () => {
       send(
         viewOf(
-          { id: "back", z: 0, opacity: 1, elements: [element("t", TEXT)] },
+          {
+            id: "back",
+            z: 0,
+            opacity: 1,
+            group: null,
+            elements: [element("t", TEXT)],
+          },
           {
             id: "front",
             z: 1,
             opacity: 1,
+            group: null,
             elements: [
               element("s", {
                 kind: "shape",
