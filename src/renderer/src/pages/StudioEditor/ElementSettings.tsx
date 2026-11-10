@@ -35,6 +35,7 @@ import {
 import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
 import { BoxFields } from "./BoxFields";
+import { CameraFields } from "./CameraFields";
 import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
 import { PictureFields } from "./PictureFields";
 import { ShapeFields } from "./ShapeFields";
@@ -275,6 +276,9 @@ export function ElementSettings({
           )}
         </>
       );
+      break;
+    case "camera":
+      own = <CameraFields element={element} onChange={onChange} />;
       break;
     case "gift":
       own = (

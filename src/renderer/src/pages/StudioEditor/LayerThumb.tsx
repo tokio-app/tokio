@@ -11,6 +11,7 @@ import {
   LuGift,
   LuImage,
   LuSmile,
+  LuWebcam,
 } from "react-icons/lu";
 import styles from "./studioeditor.module.css";
 
@@ -128,6 +129,9 @@ export function LayerThumb({
       return element.emote
         ? picture(element.emote.image, element.crop)
         : icon(LuSmile);
+    // A live thumbnail would open another stream
+    case "camera":
+      return icon(LuWebcam);
     case "viewer":
       return icon(LuCircleUserRound);
     // An embedded overlay

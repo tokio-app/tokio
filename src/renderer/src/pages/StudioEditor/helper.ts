@@ -167,6 +167,8 @@ export function elementName(
         return element.text.trim().split("\n")[0];
       case "media":
         return element.name;
+      case "camera":
+        return element.camera?.label;
       case "gift":
         return context.gifts.find((g) => g.value === element.gift)?.label;
       case "emote":
