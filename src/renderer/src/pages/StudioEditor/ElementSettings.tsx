@@ -2,19 +2,20 @@ import { MessageKey } from "@/common/i18n";
 import {
   STUDIO_MAX_BORDER,
   STUDIO_MAX_FONT_SIZE,
-  STUDIO_MAX_SECONDS,
   STUDIO_NAME_MAX_LENGTH,
   STUDIO_TEXT_MAX_LENGTH,
   StudioAlign,
-  StudioAnimation,
   StudioCrop,
-  StudioEntrance,
   StudioElement,
-  StudioWhen,
   Trigger,
 } from "@/common/schemas";
 import { CustomGift, EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
-import { mediaKind, STUDIO_NUMBERS, studioEventVariables } from "@/common/util";
+import {
+  mediaKind,
+  reactsToEvents,
+  STUDIO_NUMBERS,
+  studioEventVariables,
+} from "@/common/util";
 import {
   Btn,
   Check,
@@ -29,36 +30,18 @@ import {
   Select,
   SelectOption,
   TRIGGER_OPTIONS,
-  TriggerFilter,
   VariableList,
 } from "@/components";
-import { rich, useOptions, useT } from "@/ui/i18n";
+import { useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
 import { BoxFields } from "./BoxFields";
 import { CameraFields } from "./CameraFields";
 import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
 import { PictureFields } from "./PictureFields";
+import { ReactionFields, WHENS } from "./ReactionFields";
 import { ShapeFields } from "./ShapeFields";
 import styles from "./studioeditor.module.css";
 import { VideoFields } from "./VideoFields";
-
-const WHENS: { value: StudioWhen; label: MessageKey }[] = [
-  { value: "always", label: "studio.when.always" },
-  { value: "event", label: "studio.when.event" },
-  { value: "animate", label: "studio.when.animate" },
-];
-
-const ENTRANCES: { value: StudioEntrance; label: MessageKey }[] = [
-  { value: "fade", label: "studio.entrances.fade" },
-  { value: "pop", label: "studio.entrances.pop" },
-  { value: "slide", label: "studio.entrances.slide" },
-];
-
-const ANIMATIONS: { value: StudioAnimation; label: MessageKey }[] = [
-  { value: "bounce", label: "studio.animations.bounce" },
-  { value: "shake", label: "studio.animations.shake" },
-  { value: "pulse", label: "studio.animations.pulse" },
-];
 
 // A gift or emote element's picture: what its event sent, or one picked
 type Picture = { value: "sent" | "picked"; label: MessageKey }[];
@@ -136,8 +119,6 @@ export function ElementSettings({
   const textRef = useRef<HTMLInputElement>(null);
   const aligns = useOptions(ALIGNS);
   const allWhens = useOptions(WHENS);
-  const entrances = useOptions(ENTRANCES);
-  const animations = useOptions(ANIMATIONS);
   const allTriggers = useOptions(TRIGGER_OPTIONS);
   const giftPictures = useOptions(GIFT_PICTURES);
   const emotePictures = useOptions(EMOTE_PICTURES);
@@ -155,20 +136,20 @@ export function ElementSettings({
       : sends
         ? allTriggers.filter((o) => o.value === sends)
         : allTriggers;
+  // Both need an event: they show what it brings
   const whens =
     element.kind === "viewer" || sends
-      ? allWhens.filter((w) => w.value !== "always")
+      ? allWhens.filter((w) => reactsToEvents({ when: w.value }))
       : allWhens;
-  // What the event sends shows: on that event, never always
+  // What the event sends shows: on that event, never always or in a loop
   const onSent = <E extends StudioElement>(
     changed: E,
     type: Trigger["type"],
   ) => ({
     ...changed,
-    when: changed.when === "always" ? "event" : changed.when,
+    when: reactsToEvents(changed) ? changed.when : "event",
     trigger: { ...changed.trigger, type },
   });
-  const { trigger } = element;
   const video =
     element.kind === "media" &&
     !!element.file &&
@@ -197,7 +178,7 @@ export function ElementSettings({
               value={element.text}
               onChange={(text) => onChange({ ...element, text })}
             />
-            {element.when !== "always" && (
+            {reactsToEvents(element) && (
               <VariableList
                 label={t("studio.variables.event")}
                 variables={studioEventVariables(element)}
@@ -464,92 +445,15 @@ export function ElementSettings({
         onOpacity={(opacity) => onChange({ ...element, opacity })}
       />
 
-      <Field label={t("studio.when.title")}>
-        <RadioGroup
-          name={`studio-when-${element.id}`}
-          value={element.when}
-          options={whens}
-          onChange={(when) => onChange({ ...element, when })}
-        />
-      </Field>
-
-      {element.when !== "always" && (
-        <>
-          <Field label={t("studio.fields.trigger")}>
-            <Select
-              aria-label={t("studio.fields.trigger")}
-              options={triggers}
-              value={trigger.type}
-              onChange={(type) =>
-                onChange({ ...element, trigger: { ...trigger, type } })
-              }
-            />
-            {trigger.type === TOKIO_EVENTS.LIKE ? (
-              // Counted as game actions count them, from all viewers
-              <span className={styles.likes}>
-                {rich(t("studio.fields.likesEvery"), {
-                  likes: (
-                    <NumberInput
-                      className={styles.number}
-                      scrub
-                      aria-label={t("studio.fields.likesPerReaction")}
-                      integer
-                      min={1}
-                      value={element.likes_every}
-                      onChange={(likes_every) =>
-                        onChange({ ...element, likes_every })
-                      }
-                    />
-                  ),
-                })}
-              </span>
-            ) : (
-              <TriggerFilter
-                trigger={trigger}
-                gifts={gifts}
-                emotes={emotes}
-                onChange={(changed) =>
-                  onChange({ ...element, trigger: changed })
-                }
-              />
-            )}
-          </Field>
-          {element.when === "event" ? (
-            <div className={styles.pair}>
-              <Field label={t("studio.fields.seconds")}>
-                {untilEnd ? (
-                  <p className={styles.until}>{t("studio.fields.untilEnd")}</p>
-                ) : (
-                  <NumberInput
-                    scrub
-                    min={1}
-                    max={STUDIO_MAX_SECONDS}
-                    value={element.seconds}
-                    onChange={(seconds) => onChange({ ...element, seconds })}
-                  />
-                )}
-              </Field>
-              <Field label={t("studio.fields.entrance")}>
-                <Select
-                  aria-label={t("studio.fields.entrance")}
-                  options={entrances}
-                  value={element.entrance}
-                  onChange={(entrance) => onChange({ ...element, entrance })}
-                />
-              </Field>
-            </div>
-          ) : (
-            <Field label={t("studio.fields.animation")}>
-              <Select
-                aria-label={t("studio.fields.animation")}
-                options={animations}
-                value={element.animation}
-                onChange={(animation) => onChange({ ...element, animation })}
-              />
-            </Field>
-          )}
-        </>
-      )}
+      <ReactionFields
+        value={element}
+        whens={whens}
+        triggers={triggers}
+        untilEnd={untilEnd}
+        gifts={gifts}
+        emotes={emotes}
+        onChange={onChange}
+      />
     </div>
   );
 }

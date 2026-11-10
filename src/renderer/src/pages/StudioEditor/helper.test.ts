@@ -130,6 +130,15 @@ describe("whenText", () => {
       ),
     ).toBe("moves on Gift");
   });
+
+  it("says a loop moves all the time, and a group's When too", () => {
+    expect(whenText(element("shape", { when: "loop" }), t)).toBe(
+      "moves all the time",
+    );
+    expect(whenText({ ...newStudioGroup("Group 1"), when: "event" }, t)).toBe(
+      "shows on Follow",
+    );
+  });
 });
 
 describe("sourceValue and sourceOf", () => {
@@ -498,6 +507,19 @@ describe("Samples", () => {
       element: expect.any(String),
     });
   });
+
+  it("takes no sample for one that moves all the time", () => {
+    const samples = new Samples();
+    const trigger = {
+      ...newStudioElement("gift", "portrait").trigger,
+      type: TOKIO_EVENTS.GIFT as const,
+    };
+    const sends = element("gift", { gift: null, when: "event", trigger });
+    const loops = element("gift", { gift: null, when: "loop", trigger });
+
+    expect(sampleReact(sends, samples, "en").picture).toMatch(/^https:/);
+    expect(sampleReact(loops, samples, "en").picture).toBe("");
+  });
 });
 
 // A group holding shapes with these ids, back to front
@@ -646,7 +668,7 @@ describe("the canvas's geometry", () => {
     const bar = { ...under, id: "bar", width: 200, height: 20, rotation: 90 };
     const turned = {
       ...view,
-      layers: [{ id: "only", z: 0, opacity: 1, elements: [bar] }],
+      layers: [{ id: "only", z: 0, opacity: 1, group: null, elements: [bar] }],
     };
 
     expect(pickElement(turned, new Set(), { x: 100, y: 80 })).toBe("bar");

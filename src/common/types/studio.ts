@@ -4,6 +4,9 @@ import type {
   StudioCameraQuality,
   StudioCrop,
   StudioEntrance,
+  StudioExit,
+  StudioIdle,
+  StudioMotion,
   StudioShape,
   StudioSource,
   StudioWhen,
@@ -27,7 +30,9 @@ type StudioElementViewBase = {
   when: StudioWhen;
   seconds: number;
   entrance: StudioEntrance;
+  exit: StudioExit;
   animation: StudioAnimation;
+  idle: StudioIdle;
 };
 
 // A picture's part it keeps, null for all of it, and its corners' rounding,
@@ -99,6 +104,9 @@ export type StudioLayerView = {
   z: number;
   // A group's, over its elements' own; 1 for an element on its own
   opacity: number;
+  // How a group moves as a whole, around its elements; null for an element
+  // on its own, which moves itself
+  group: StudioMotion | null;
   elements: StudioElementView[];
 };
 
@@ -127,9 +135,11 @@ export const STUDIO_REACT_MESSAGE = "tokio:studio:react";
 // tokio:studio: the overlay to draw, null when it was removed
 export type StudioMessage = { view: StudioView | null };
 
-// tokio:studio:react: an element's trigger fired. The text (a text's) and
-// the picture and name (a viewer's) replace what it shows.
+// tokio:studio:react: an element's or a group's trigger fired. The text (a
+// text's) and the picture and name (a viewer's) replace what it shows; a
+// group's has none.
 export type StudioReact = {
+  // An element's id or a group's: ids are unique across both
   element: string;
   text?: string;
   picture?: string;

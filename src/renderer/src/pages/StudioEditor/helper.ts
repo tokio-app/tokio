@@ -25,6 +25,7 @@ import {
   fillStudioText,
   generateEmoteChatSample,
   generateTikTokEventSample,
+  reactsToEvents,
   SAMPLE_NUMBERS,
   sentPicture,
   studioEventVariables,
@@ -75,7 +76,7 @@ function sampleViewer(sample: Sample) {
 }
 
 const sampleOf = (element: StudioElement, samples: Samples) =>
-  element.when === "always" ? null : samples.of(element.trigger.type);
+  reactsToEvents(element) ? samples.of(element.trigger.type) : null;
 
 /** The picture of the gift or emote its trigger's sample sent, "" for none. */
 export const sampleSentOf = (element: StudioElement, samples: Samples) =>
@@ -184,15 +185,16 @@ export function elementName(
   return shown || context.t(KIND_NAMES[element.kind]);
 }
 
-/** Its When, as the layers list says it under the name. */
+/** An element's or a group's When, as the layers list says it. */
 export function whenText(
-  element: StudioElement,
+  item: Pick<StudioElement, "when" | "trigger">,
   t: (key: MessageKey, params?: Record<string, string>) => string,
 ) {
-  if (element.when === "always") return t("studio.rows.always");
-  const trigger = t(ALERT_TRIGGER_LABELS[element.trigger.type]);
+  if (item.when === "always") return t("studio.rows.always");
+  if (item.when === "loop") return t("studio.rows.loop");
+  const trigger = t(ALERT_TRIGGER_LABELS[item.trigger.type]);
   return t(
-    element.when === "event" ? "studio.rows.event" : "studio.rows.animate",
+    item.when === "event" ? "studio.rows.event" : "studio.rows.animate",
     { trigger },
   );
 }

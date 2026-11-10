@@ -37,8 +37,8 @@ type Props = {
   items: StudioItem[];
   // A group's id or an element's
   selected: string | null;
-  // What each element's row says: its name, its kind and When for screen
-  // readers, and the event it reacts to, null when it's always on screen
+  // What each element's and group's row says: its name, its kind and When
+  // for screen readers, and the event it reacts to, null when it doesn't
   names: Record<string, { name: string; meta: string; when: string | null }>;
   // For the pictures of the gifts elements show
   gifts: CustomGift[];
@@ -429,6 +429,7 @@ export function LayersPanel({
   const groupItem = (group: StudioGroup) => {
     const index = items.indexOf(group);
     const name = groupName(group);
+    const { when } = names[group.id];
     const shown = !group.folded && group.elements.length > 0;
     return (
       <li
@@ -480,6 +481,12 @@ export function LayersPanel({
             <span className={styles.layer_text}>
               <span className={styles.layer_name}>{name}</span>
               {/* Read as two phrases, not one run-on word */}{" "}
+              {/* The event it reacts to, read by screen readers too */}
+              {when && (
+                <>
+                  <span className={styles.layer_when}>{when}</span>{" "}
+                </>
+              )}
               {/* Shown while its elements aren't under it */}
               <span className={shown ? styles.sr_only : styles.layer_count}>
                 {t("studio.editor.elements", { count: group.elements.length })}

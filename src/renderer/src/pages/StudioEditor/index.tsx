@@ -27,6 +27,7 @@ import {
   mediaKind,
   newStudioElement,
   newStudioGroup,
+  reactsToEvents,
   studioCameraPath,
   studioElements,
   studioView,
@@ -410,8 +411,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       }),
     ]),
   );
-  const names = Object.fromEntries(
-    elements.map((element) => {
+  const names = Object.fromEntries([
+    ...elements.map((element) => {
       const name = element.label.trim() || autoNames[element.id];
       const kind = t(`studio.kinds.${element.kind}`);
       const when = whenText(element, t);
@@ -420,13 +421,24 @@ function Editor({ saved }: { saved: StudioOverlay }) {
         name === kind
           ? capitalize(when, language)
           : t("studio.editor.rowMeta", { kind, when });
-      const reacts = element.when !== "always";
+      const reacts = reactsToEvents(element);
       return [
         element.id,
         { name, meta, when: reacts ? capitalize(when, language) : null },
       ];
     }),
-  );
+    ...overlay.items.flatMap((item) => {
+      if (item.kind !== "group") return [];
+      const name = item.name.trim() || t("studio.editor.untitledGroup");
+      const when = capitalize(whenText(item, t), language);
+      return [
+        [
+          item.id,
+          { name, meta: when, when: reactsToEvents(item) ? when : null },
+        ],
+      ];
+    }),
+  ]);
 
   const groups = overlay.items.filter((item) => item.kind === "group");
   const group = groups.find((g) => g.id === selected);
@@ -583,14 +595,20 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const setBox = (id: string, box: Box) =>
     changeElement(id, (e) => ({ ...e, ...box }));
 
-  // Plays every element that reacts, with fresh samples, here and on stream
+  // Plays every element and group that reacts, elements with fresh
+  // samples, here and on stream
   const test = () => {
     flushSettings();
     const fresh = new Samples();
     setSamples(fresh);
     for (const reacts of elements) {
-      if (reacts.when !== "always") {
+      if (reactsToEvents(reacts)) {
         stage.current?.react(sampleReact(reacts, fresh, language));
+      }
+    }
+    for (const reacts of overlay.items) {
+      if (reacts.kind === "group" && !reacts.hidden && reactsToEvents(reacts)) {
+        stage.current?.react({ element: reacts.id });
       }
     }
     window.api.emit(APP_EVENTS.TEST_STUDIO_OVERLAY, { id: overlay.id });
@@ -774,6 +792,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 onChange={(changed) => changeGroup(changed.id, () => changed)}
                 onFrame={(from, to) => reframeGroup(group.id, from, to)}
                 onFlip={(key) => flipGroup(group.id, key)}
+                gifts={giftChoices}
+                emotes={emoteChoices}
                 onAlign={(to) => {
                   if (!frame) return;
                   const at = alignTo(frame, canvas, to);

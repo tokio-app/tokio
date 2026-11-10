@@ -26,7 +26,9 @@ const BASE = {
   when: "always",
   seconds: 5,
   entrance: "pop",
+  exit: "fade",
   animation: "bounce",
+  idle: "float",
 } as const;
 
 // An element of the kind, with its own fields
@@ -58,7 +60,7 @@ const viewOf = (...layers: StudioLayerView[]): StudioView => ({
 
 // The elements in one layer
 const view = (...elements: StudioElementView[]) =>
-  viewOf({ id: "L1", z: 0, opacity: 1, elements });
+  viewOf({ id: "L1", z: 0, opacity: 1, group: null, elements });
 
 // What a picture element draws when it keeps all of itself
 const PICTURE = { crop: null, rounding: 0 };
@@ -138,11 +140,18 @@ describe("studio overlay page", () => {
     it("draws each layer over the ones before, with its elements inside", async () => {
       send(
         viewOf(
-          { id: "back", z: 0, opacity: 1, elements: [element("t", TEXT)] },
+          {
+            id: "back",
+            z: 0,
+            opacity: 1,
+            group: null,
+            elements: [element("t", TEXT)],
+          },
           {
             id: "front",
             z: 1,
             opacity: 1,
+            group: null,
             elements: [
               element("s", {
                 kind: "shape",
@@ -251,6 +260,31 @@ describe("studio overlay page", () => {
       react({ element: "t", text: "Thanks Bo" });
       await vi.waitFor(() => expect(body("t").textContent).toBe("Thanks Bo"));
       expect(body("t").classList.contains("studio-enter-pop")).toBe(true);
+    });
+
+    it("brings a group in as one on its react, its elements in its wrapper", async () => {
+      send(
+        viewOf({
+          id: "G",
+          z: 0,
+          opacity: 1,
+          group: { ...BASE, when: "event", entrance: "drop" },
+          elements: [element("t", TEXT, { x: 40 })],
+        }),
+      );
+      await vi.waitFor(() => expect(el("t")).not.toBeNull());
+      const wrapper = el("t")!.parentElement!;
+      expect(wrapper.className).toBe("studio-group studio-hidden");
+      expect(wrapper.parentElement!.dataset.layer).toBe("G");
+      expect([wrapper.style.left, el("t")!.style.left]).toEqual([
+        "40px",
+        "0px",
+      ]);
+
+      react({ element: "G" });
+      await vi.waitFor(() =>
+        expect(wrapper.className).toBe("studio-group studio-enter-drop"),
+      );
     });
 
     it("plays an animate layer's animation on each react", async () => {

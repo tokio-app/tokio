@@ -1,6 +1,7 @@
 import {
   StudioElement,
   StudioElementOf,
+  StudioItem,
   StudioOverlay,
 } from "@/common/schemas";
 import {
@@ -16,8 +17,8 @@ import {
   fillStudioText,
   generateEmoteChatSample,
   generateTikTokEventSample,
+  reactsToEvents,
   sentPicture,
-  studioElements,
   studioEventVariables,
 } from "@/common/util";
 import { language } from "@/helper/i18n";
@@ -45,14 +46,20 @@ export function studioText(
   numbers: StudioNumbers,
   values: TokioEventMap[AppEvents] | null,
 ) {
-  const reacts = element.when !== "always";
   return fillStudioText(element.text, {
     numbers,
-    values: reacts ? values : null,
+    values: reactsToEvents(element) ? values : null,
     variables: studioEventVariables(element),
     language: language(),
   });
 }
+
+// Every group and element of the overlay, a group just before its elements,
+// so the stage gets its reacts in the order the overlay holds them
+const itemsOf = (overlay: StudioOverlay): StudioItem[] =>
+  overlay.items.flatMap((item) =>
+    item.kind === "group" ? [item, ...item.elements] : [item],
+  );
 
 // The viewer an event came from, as a viewer element shows them
 const viewerOf = (payload: TokioEventMap[AppEvents]) => {
@@ -70,7 +77,7 @@ const viewerOf = (payload: TokioEventMap[AppEvents]) => {
 export class StudioService extends Service {
   // Each viewer's streak of a gift, see GiftStreaks
   private _streaks = new GiftStreaks();
-  // Likes toward each Like element's next react, by element id
+  // Likes toward each Like element's or group's next react, by its id
   private _likes = new Map<string, number>();
   // Each element's last event, by element id, until Tokio quits. A hidden
   // layer's elements react too, so the layer shows the latest when shown
@@ -83,8 +90,9 @@ export class StudioService extends Service {
   }
 
   /**
-   * Reacts every element whose trigger the event sets off. numbers is read
-   * only when a text element reacts.
+   * Reacts every element and group whose trigger the event sets off. A group
+   * keeps nothing, as it has no values to show. numbers is read only when a
+   * text element reacts.
    */
   public handle<K extends AppEvents>(
     type: K,
@@ -98,19 +106,23 @@ export class StudioService extends Service {
     const now = () => (read ??= numbers());
 
     for (const overlay of overlays) {
-      for (const element of studioElements(overlay)) {
-        if (element.when === "always") continue;
-        if (!matchesTrigger(element.trigger, type, payload, added, total)) {
+      for (const item of itemsOf(overlay)) {
+        if (!reactsToEvents(item)) continue;
+        if (!matchesTrigger(item.trigger, type, payload, added, total)) {
           continue;
         }
-        if (!this._passes(element, payload)) continue;
+        if (!this._passes(item, payload)) continue;
+        if (item.kind === "group") {
+          this._onReact?.(overlay.id, { element: item.id });
+          continue;
+        }
         const kept: StudioKept = {
-          trigger: element.trigger.type,
+          trigger: item.trigger.type,
           values,
           ...viewerOf(payload),
         };
-        this._kept.set(element.id, { ...kept, overlay: overlay.id });
-        this._onReact?.(overlay.id, this._react(element, kept, now));
+        this._kept.set(item.id, { ...kept, overlay: overlay.id });
+        this._onReact?.(overlay.id, this._react(item, kept, now));
       }
     }
   }
@@ -125,17 +137,19 @@ export class StudioService extends Service {
   }
 
   /**
-   * Every element of the overlay that reacts, once, with a sample of its
-   * trigger's event. Nothing is kept, so a reload shows the real last event.
+   * Every element and group of the overlay that reacts, once, with a sample
+   * of its trigger's event. Nothing is kept, so a reload shows the real last
+   * event.
    */
   public test(overlay: StudioOverlay, numbers: StudioNumbers): StudioReact[] {
     // One sample per trigger, so the elements one event sets off show the
     // same viewer, as a real event does: a follow alert's picture and text
     const samples = new Map<AlertTrigger, TokioEventMap[AppEvents]>();
-    return studioElements(overlay)
-      .filter((element) => element.when !== "always")
-      .map((element) => {
-        const { type } = element.trigger;
+    return itemsOf(overlay)
+      .filter(reactsToEvents)
+      .map((item) => {
+        if (item.kind === "group") return { element: item.id };
+        const { type } = item.trigger;
         let values = samples.get(type);
         if (!values) {
           // Emote triggers match chats with an emote
@@ -150,7 +164,7 @@ export class StudioService extends Service {
           values,
           ...viewerOf(values),
         };
-        return this._react(element, sample, () => numbers);
+        return this._react(item, sample, () => numbers);
       });
   }
 
@@ -175,7 +189,10 @@ export class StudioService extends Service {
   // Whether a matching element reacts: on Like, once the likes from every
   // viewer pass another likes_every (the rest count toward the next), at
   // most once per event
-  private _passes(element: StudioElement, payload: TokioEventMap[AppEvents]) {
+  private _passes(
+    element: Pick<StudioElement, "id" | "trigger" | "likes_every">,
+    payload: TokioEventMap[AppEvents],
+  ) {
     if (
       element.trigger.type !== TOKIO_EVENTS.LIKE ||
       typeof payload !== "object" ||

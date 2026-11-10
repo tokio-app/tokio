@@ -48,10 +48,15 @@ export const SAMPLE_NUMBERS: StudioNumbers = {
 export const usesNumbers = (text: string) =>
   STUDIO_NUMBERS.some((name) => text.includes(`{${name}}`));
 
-// The variables a text element gets from its trigger, none while it's
-// always on screen. The live numbers (STUDIO_NUMBERS) go in any text.
+// Whether an element or a group reacts to its trigger: one that's always on
+// screen or moves all the time has none
+export const reactsToEvents = (item: Pick<StudioElement, "when">) =>
+  item.when === "event" || item.when === "animate";
+
+// The variables a text element gets from its trigger, none while it doesn't
+// react to one. The live numbers (STUDIO_NUMBERS) go in any text.
 export const studioEventVariables = (element: StudioElement): string[] =>
-  element.when === "always" ? [] : countedVariables(element.trigger.type);
+  reactsToEvents(element) ? countedVariables(element.trigger.type) : [];
 
 // Every element of the overlay, its layers' in order
 export const studioElements = (overlay: StudioOverlay): StudioElement[] =>
@@ -138,7 +143,9 @@ function elementView(
     when: element.when,
     seconds: element.seconds,
     entrance: element.entrance,
+    exit: element.exit,
     animation: element.animation,
+    idle: element.idle,
   };
   // A picture's crop, null when it keeps all of itself, and its rounding
   const picture = (shown: StudioElementOf<StudioPictureKind>) => {
@@ -270,6 +277,17 @@ export function studioView(
           id: item.id,
           z,
           opacity: item.kind === "group" ? item.opacity : 1,
+          group:
+            item.kind === "group"
+              ? {
+                  when: item.when,
+                  seconds: item.seconds,
+                  entrance: item.entrance,
+                  exit: item.exit,
+                  animation: item.animation,
+                  idle: item.idle,
+                }
+              : null,
           elements: elements.flatMap((element, at) =>
             element.hidden ? [] : [elementView(element, at, deps)],
           ),

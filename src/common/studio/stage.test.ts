@@ -8,12 +8,13 @@ import {
   MockInstance,
   vi,
 } from "vitest";
+import type { StudioMotion } from "../schemas/studio";
 import type {
   StudioElementView,
   StudioLayerView,
   StudioView,
 } from "../types/studio";
-import { createStage, Figure, shapePath, Stage } from "./stage";
+import { createStage, EXIT_MS, Figure, shapePath, Stage } from "./stage";
 
 type TextView = Extract<StudioElementView, { kind: "text" }>;
 type ShapeView = Extract<StudioElementView, { kind: "shape" }>;
@@ -31,7 +32,9 @@ const BASE: Omit<TextView, "id" | "kind" | keyof typeof TEXT> = {
   when: "always",
   seconds: 5,
   entrance: "pop",
+  exit: "fade",
   animation: "bounce",
+  idle: "float",
 };
 
 const TEXT = {
@@ -69,7 +72,7 @@ const layered = (...layers: StudioLayerView[]): StudioView => ({
 
 // A canvas of one layer holding the elements
 const view = (...elements: StudioElementView[]): StudioView =>
-  layered({ id: "l", z: 0, opacity: 1, elements });
+  layered({ id: "l", z: 0, opacity: 1, group: null, elements });
 
 let root: HTMLElement;
 let stage: Stage;
@@ -165,11 +168,12 @@ describe("on stream", () => {
   it("stacks each layer over the whole canvas, its elements inside it", () => {
     draw(
       layered(
-        { id: "back", z: 0, opacity: 1, elements: [text("a")] },
+        { id: "back", z: 0, opacity: 1, group: null, elements: [text("a")] },
         {
           id: "front",
           z: 2,
           opacity: 1,
+          group: null,
           elements: [text("b"), text("c", { z: 1 })],
         },
       ),
@@ -195,23 +199,29 @@ describe("on stream", () => {
     };
     draw(
       layered(
-        { id: "back", z: 0, opacity: 1, elements: [text("a")] },
-        { id: "front", z: 1, opacity: 1, elements: [clip] },
+        { id: "back", z: 0, opacity: 1, group: null, elements: [text("a")] },
+        { id: "front", z: 1, opacity: 1, group: null, elements: [clip] },
       ),
     );
     const a = el("a");
 
     draw(
       layered(
-        { id: "back", z: 0, opacity: 1, elements: [] },
-        { id: "front", z: 1, opacity: 1, elements: [clip, text("a")] },
+        { id: "back", z: 0, opacity: 1, group: null, elements: [] },
+        {
+          id: "front",
+          z: 1,
+          opacity: 1,
+          group: null,
+          elements: [clip, text("a")],
+        },
       ),
     );
     expect(el("a")).toBe(a);
     expect(a.parentElement).toBe(layerNode("front"));
 
     const video = root.querySelector("video")!;
-    draw(layered({ id: "back", z: 0, opacity: 1, elements: [] }));
+    draw(layered({ id: "back", z: 0, opacity: 1, group: null, elements: [] }));
 
     expect(root.querySelector("[data-layer='front']")).toBeNull();
     expect(root.querySelectorAll(".studio-element")).toHaveLength(0);
@@ -334,9 +344,10 @@ describe("on stream", () => {
     expect(load).toHaveBeenCalled();
   });
 
-  it("shows an element on its event for its seconds, then hides it", () => {
+  it("shows an element on its event for its seconds, then plays its exit and hides it", () => {
     vi.useFakeTimers();
-    draw(view(text("t", { when: "event", seconds: 3, entrance: "slide" })));
+    const shows = { when: "event", seconds: 3, exit: "wipe" } as const;
+    draw(view(text("t", { ...shows, entrance: "slide" })));
     expect(body("t").classList).toContain("studio-hidden");
 
     stage.react({ element: "t", text: "Thanks Sora" });
@@ -351,10 +362,13 @@ describe("on stream", () => {
     expect(el("t").textContent).toBe("Thanks Kai");
 
     // Updates while it shows keep it on screen
-    draw(view(text("t", { when: "event", seconds: 3, text: "Thanks Kai" })));
+    draw(view(text("t", { ...shows, text: "Thanks Kai" })));
     expect(body("t").classList).not.toContain("studio-hidden");
 
     vi.advanceTimersByTime(1000);
+    expect(body("t").className).toBe("studio-body studio-exit-wipe");
+
+    vi.advanceTimersByTime(EXIT_MS);
     expect(body("t").className).toBe("studio-body studio-hidden");
   });
 
@@ -407,7 +421,15 @@ describe("on stream", () => {
   });
 
   it("fades a group's layer by its opacity", () => {
-    draw(layered({ id: "g", z: 0, opacity: 0.5, elements: [text("t")] }));
+    draw(
+      layered({
+        id: "g",
+        z: 0,
+        opacity: 0.5,
+        group: null,
+        elements: [text("t")],
+      }),
+    );
 
     expect(layerNode("g").style.opacity).toBe("0.5");
   });
@@ -1255,6 +1277,9 @@ describe("videos", () => {
 
     playbackOf(video).currentTime = 6;
     vi.advanceTimersByTime(4000);
+    expect(body("c").classList).toContain("studio-exit-fade");
+
+    vi.advanceTimersByTime(EXIT_MS);
     expect(body("c").classList).toContain("studio-hidden");
     expect(video.paused).toBe(true);
   });
@@ -1280,7 +1305,7 @@ describe("videos", () => {
     draw(view(clip("c", { when: "event", seconds: 2, loop: false })));
 
     stage.react({ element: "c" });
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(2000 + EXIT_MS);
 
     expect(body("c").classList).toContain("studio-hidden");
   });
@@ -1437,9 +1462,9 @@ describe("in the editor", () => {
     expect(stage.slot("nope")).toBeNull();
   });
 
-  it("keeps an element that waits for an event on screen, marked, and replays it in place", () => {
+  it("keeps an element that waits for an event on screen, marked, and plays its event in place", () => {
     vi.useFakeTimers();
-    draw(view(text("t", { when: "event", entrance: "fade" })));
+    draw(view(text("t", { when: "event", entrance: "fade", exit: "spin" })));
 
     expect(el("t").classList).toContain("studio-waits");
     expect(body("t").classList).not.toContain("studio-hidden");
@@ -1447,8 +1472,267 @@ describe("in the editor", () => {
     stage.react({ element: "t", text: "Thanks Sora" });
     expect(body("t").className).toBe("studio-body studio-enter-fade");
 
+    vi.advanceTimersByTime(5000);
+    expect(body("t").className).toBe("studio-body studio-exit-spin");
+
+    // Back as it waits, never hidden
+    vi.advanceTimersByTime(EXIT_MS);
+    expect(body("t").className).toBe("studio-body");
     vi.advanceTimersByTime(60_000);
-    expect(body("t").classList).not.toContain("studio-hidden");
+    expect(body("t").className).toBe("studio-body");
+    expect(el("t").classList).toContain("studio-waits");
+  });
+
+  it("marks a group that waits, plays its event in place, and plays loops", () => {
+    vi.useFakeTimers();
+    draw(
+      layered(grouped({ when: "event", seconds: 2, exit: "drop" }, text("a")), {
+        id: "b",
+        z: 1,
+        opacity: 1,
+        group: null,
+        elements: [text("b", { when: "loop", idle: "sway" })],
+      }),
+    );
+    expect(wrapper().className).toBe("studio-group studio-waits");
+    expect(body("b").className).toBe("studio-body studio-loop-sway");
+
+    stage.react({ element: "g" });
+    expect(wrapper().className).toBe(
+      "studio-group studio-waits studio-enter-pop",
+    );
+    vi.advanceTimersByTime(2000);
+    expect(wrapper().classList).toContain("studio-exit-drop");
+
+    vi.advanceTimersByTime(EXIT_MS);
+    expect(wrapper().className).toBe("studio-group studio-waits");
+  });
+});
+
+// How a group moves, still unless a test says otherwise
+const STILL: StudioMotion = {
+  when: "always",
+  seconds: 5,
+  entrance: "pop",
+  exit: "fade",
+  animation: "bounce",
+  idle: "float",
+};
+
+// A group's layer, "g", holding the elements
+const grouped = (
+  motion: Partial<StudioMotion>,
+  ...elements: StudioElementView[]
+): StudioLayerView => ({
+  id: "g",
+  z: 0,
+  opacity: 1,
+  group: { ...STILL, ...motion },
+  elements,
+});
+
+const wrapper = () =>
+  layerNode("g").querySelector<HTMLElement>(":scope > .studio-group")!;
+
+describe("groups and motion", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    fakePlayers();
+    stage = createStage(root);
+  });
+
+  it("puts a group's elements in its one wrapper, placed from its box's corner", () => {
+    const a = text("a", { x: 100, y: 200, width: 100, height: 50 });
+    const b = text("b", { x: 300, y: 400, width: 100, height: 100 });
+    draw(layered(grouped({}, a, b)));
+
+    expect(layerNode("g").children).toHaveLength(1);
+    expect(el("a").parentElement).toBe(wrapper());
+    expect(el("b").parentElement).toBe(wrapper());
+    const { style } = wrapper();
+    expect([style.left, style.top, style.width, style.height]).toEqual([
+      "100px",
+      "200px",
+      "300px",
+      "300px",
+    ]);
+    expect([el("a").style.left, el("a").style.top]).toEqual(["0px", "0px"]);
+    expect([el("b").style.left, el("b").style.top]).toEqual(["200px", "200px"]);
+
+    // Turned, it shows wider, and the box goes around it; its node stays
+    const node = el("b");
+    draw(layered(grouped({}, a, { ...b, rotation: 45 })));
+    const across = 100 * Math.SQRT2;
+    expect(parseFloat(style.width)).toBeCloseTo(200 + 50 + across / 2, 5);
+    expect(parseFloat(style.height)).toBeCloseTo(200 + 50 + across / 2, 5);
+    expect(el("b")).toBe(node);
+    expect(parseFloat(el("b").style.left)).toBe(200);
+  });
+
+  it("gives a group of no elements an empty box, and an element on its own no wrapper", () => {
+    draw(
+      layered(grouped({}), {
+        id: "t",
+        z: 1,
+        opacity: 1,
+        group: null,
+        elements: [text("t")],
+      }),
+    );
+
+    const { style } = wrapper();
+    expect([style.left, style.top, style.width, style.height]).toEqual([
+      "0px",
+      "0px",
+      "0px",
+      "0px",
+    ]);
+    expect(el("t").parentElement).toBe(layerNode("t"));
+    expect(el("t").style.left).toBe("10px");
+  });
+
+  it("brings a group in on its react, plays its exit after its seconds, then hides it and pauses its videos", () => {
+    const shows = grouped(
+      { when: "event", seconds: 2, exit: "zoom" },
+      clip("c"),
+    );
+    draw(layered(shows));
+    const video = videoOf("c");
+    loaded(video, 10);
+    expect(wrapper().className).toBe("studio-group studio-hidden");
+    expect(video.paused).toBe(true);
+
+    playbackOf(video).currentTime = 4;
+    stage.react({ element: "g" });
+    expect(wrapper().className).toBe("studio-group studio-enter-pop");
+    expect(video.currentTime).toBe(0);
+    expect(video.paused).toBe(false);
+
+    vi.advanceTimersByTime(2000);
+    expect(wrapper().className).toBe("studio-group studio-exit-zoom");
+    expect(video.paused).toBe(false);
+
+    // Its exit holds to its end: not through its animationend, nor a view
+    wrapper().dispatchEvent(new Event("animationend"));
+    draw(layered(shows));
+    expect(wrapper().className).toBe("studio-group studio-exit-zoom");
+    stage.react({ element: "nope" });
+
+    vi.advanceTimersByTime(EXIT_MS);
+    expect(wrapper().className).toBe("studio-group studio-hidden");
+    expect(video.paused).toBe(true);
+
+    // Updates leave it waiting, its video paused
+    draw(layered(shows));
+    expect(video.paused).toBe(true);
+  });
+
+  it("comes in again on a react during its exit", () => {
+    draw(layered(grouped({ when: "event", seconds: 2 }, text("a"))));
+    stage.react({ element: "g" });
+    vi.advanceTimersByTime(2000 + EXIT_MS / 2);
+
+    stage.react({ element: "g" });
+    expect(wrapper().className).toBe("studio-group studio-enter-pop");
+
+    // Its seconds start over, and the first exit's end is gone
+    vi.advanceTimersByTime(EXIT_MS);
+    expect(wrapper().className).toBe("studio-group studio-enter-pop");
+    vi.advanceTimersByTime(2000 - EXIT_MS);
+    expect(wrapper().className).toBe("studio-group studio-exit-fade");
+  });
+
+  it("starts over from a new When, mid-exit or mid-loop, with no class left behind", () => {
+    const at = (motion: Partial<StudioMotion>) =>
+      draw(layered(grouped({ seconds: 2, ...motion }, text("a"))));
+    at({ when: "event" });
+    stage.react({ element: "g" });
+    vi.advanceTimersByTime(2000);
+    expect(wrapper().classList).toContain("studio-exit-fade");
+
+    at({ when: "always" });
+    expect(wrapper().className).toBe("studio-group");
+    vi.advanceTimersByTime(EXIT_MS);
+    expect(wrapper().className).toBe("studio-group");
+
+    at({ when: "loop", idle: "drift" });
+    expect(wrapper().className).toBe("studio-group studio-loop-drift");
+
+    at({ when: "event" });
+    expect(wrapper().className).toBe("studio-group studio-hidden");
+
+    at({ when: "animate" });
+    expect(wrapper().className).toBe("studio-group");
+  });
+
+  it("keeps a loop going through updates, and swaps it when it changes", () => {
+    const loops = (idle: StudioMotion["idle"], words = "Hi") =>
+      draw(view(text("t", { when: "loop", idle, text: words })));
+    loops("breathe");
+    expect(body("t").className).toBe("studio-body studio-loop-breathe");
+
+    // Never touched again, so it never starts over
+    const changes = new MutationObserver(() => {});
+    changes.observe(body("t"), { attributeFilter: ["class"] });
+    loops("breathe", "Hello");
+    stage.react({ element: "t" });
+    expect(changes.takeRecords()).toHaveLength(0);
+    changes.disconnect();
+
+    loops("hop");
+    expect(body("t").className).toBe("studio-body studio-loop-hop");
+  });
+
+  it("ends a group's animation with its own animationend, not an element's in it", () => {
+    draw(
+      layered(
+        grouped(
+          { when: "animate", animation: "tada" },
+          text("a", { when: "animate", animation: "jelly" }),
+        ),
+      ),
+    );
+    stage.react({ element: "g" });
+    stage.react({ element: "a" });
+    expect(wrapper().className).toBe("studio-group studio-play-tada");
+    expect(body("a").className).toBe("studio-body studio-play-jelly");
+
+    body("a").dispatchEvent(new Event("animationend", { bubbles: true }));
+    expect(body("a").className).toBe("studio-body");
+    expect(wrapper().className).toBe("studio-group studio-play-tada");
+
+    wrapper().dispatchEvent(new Event("animationend", { bubbles: true }));
+    expect(wrapper().className).toBe("studio-group");
+  });
+
+  it("ignores a group's react where it's drawn on its own, or not at all", () => {
+    draw(
+      layered({
+        id: "g",
+        z: 0,
+        opacity: 1,
+        group: null,
+        elements: [text("t", { when: "event" })],
+      }),
+    );
+
+    stage.react({ element: "g" });
+    stage.react({ element: "gone" });
+
+    expect(layerNode("g").querySelector(".studio-group")).toBeNull();
+    expect(body("t").className).toBe("studio-body studio-hidden");
+  });
+
+  it("frees a group's timer when it goes, and when the stage does", () => {
+    draw(layered(grouped({ when: "event", seconds: 2 }, text("a"))));
+    stage.react({ element: "g" });
+    draw(layered());
+    expect(vi.getTimerCount()).toBe(0);
+
+    draw(layered(grouped({ when: "event", seconds: 2 }, text("a"))));
+    stage.react({ element: "g" });
+    stage.destroy();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 

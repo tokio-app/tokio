@@ -5,9 +5,10 @@
  * Type imports only: main inlines this file into its page through esbuild
  * without bundling it. Nothing newer than Chromium 103, OBS 30's browser.
  */
-import type { StudioShape } from "../schemas/studio";
+import type { StudioMotion, StudioShape } from "../schemas/studio";
 import type {
   StudioElementView,
+  StudioLayerView,
   StudioReact,
   StudioView,
 } from "../types/studio";
@@ -16,9 +17,9 @@ export type StageOptions = {
   // The editor's: every embed is an empty, stable element (slot) that React
   // portals its own preview into. Off, an embed is an iframe at its src.
   slots?: boolean;
-  // The editor's: elements that wait for an event stay on screen, marked
-  // with studio-waits, and a react replays their entrance or animation in
-  // place.
+  // The editor's: elements and groups that wait for an event stay on
+  // screen, marked with studio-waits. A react plays their entrance, their
+  // seconds and their exit, and they come back as they wait.
   editing?: boolean;
   // The editor's: shows a camera element's camera in its video until the
   // returned function stops it, in place of playing its stream. The window
@@ -32,7 +33,8 @@ export type StageFit = { scale: number; left: number; top: number };
 export type Stage = {
   // Draws the view, updating each element's node in place; null clears it
   update(view: StudioView | null): void;
-  // Plays an element's reaction to its trigger, with the new text or picture
+  // Plays an element's or a group's reaction to its trigger, with an
+  // element's new text or picture
   react(r: StudioReact): void;
   // The node an embed's preview goes in, with slots
   slot(elementId: string): HTMLElement | null;
@@ -57,15 +59,37 @@ type Crop = { left: number; top: number; right: number; bottom: number };
 
 const NO_CROP: Crop = { left: 0, top: 0, right: 0, bottom: 0 };
 
+/**
+ * What moves: an element's body or a group's wrapper. Each keeps its own
+ * motion, so a group comes in and leaves as one while its elements keep
+ * theirs.
+ */
+type Mover = {
+  node: HTMLDivElement;
+  // How the last view said it moves, undefined before the first
+  motion: StudioMotion | undefined;
+  // The element it moves, none for a group's wrapper
+  entry: Entry | undefined;
+  // Ends its seconds on screen, then its exit
+  timer: ReturnType<typeof setTimeout> | undefined;
+  // It came in on an event and hasn't finished leaving
+  shown: boolean;
+  // Its exit plays, which only a react or a new When cuts short
+  leaving: boolean;
+};
+
+// A layer's node, the whole canvas, and a group's wrapper in it, whose box's
+// corner its elements are placed from (0, 0 for an element on its own)
+type Layer = { node: HTMLDivElement; group?: Mover; x: number; y: number };
+
 type Entry = {
   element: StudioElementView;
   // The id of the layer it's in
   layer: string;
   el: HTMLDivElement;
   body: HTMLDivElement;
-  // Hides an element that shows on an event, on stream
-  timer: ReturnType<typeof setTimeout> | undefined;
-  shown: boolean;
+  // Its body's motion
+  mover: Mover;
   // Wakes its video at the end of the part it plays (watch)
   cue: ReturnType<typeof setTimeout> | undefined;
   // Its video, without loop, played its part and stays where it stopped
@@ -104,7 +128,10 @@ const CAMERA_KEEP = 30;
 const CAMERA_TRIMMED = 10;
 
 const ARCHIVO = '"Archivo Variable", sans-serif';
-const MOTION = /^studio-(enter|play)-/;
+const MOTION = /^studio-(enter|exit|play|loop)-/;
+
+// How long every exit plays: each studio-exit-* in overlay.css lasts this
+export const EXIT_MS = 450;
 
 // Splits a name into what shows as one character, a flag or emoji included
 const characters = new Intl.Segmenter();
@@ -119,17 +146,51 @@ const div = (className: string) => {
 const fontFamily = (font: string) =>
   font.trim() ? `${JSON.stringify(font.trim())}, ${ARCHIVO}` : ARCHIVO;
 
-const clearMotion = (body: HTMLElement) => {
-  for (const name of Array.from(body.classList)) {
-    if (MOTION.test(name)) body.classList.remove(name);
+const clearMotion = (node: HTMLElement) => {
+  for (const name of Array.from(node.classList)) {
+    if (MOTION.test(name)) node.classList.remove(name);
   }
 };
 
 // Plays the animation from its start, even mid-animation
-const restart = (body: HTMLElement, className: string) => {
-  clearMotion(body);
-  void body.offsetWidth;
-  body.classList.add(className);
+const restart = (node: HTMLElement, className: string) => {
+  clearMotion(node);
+  void node.offsetWidth;
+  node.classList.add(className);
+};
+
+type Box = { x: number; y: number; width: number; height: number };
+
+// The smallest unturned box around a turned one: the editor's extent
+// (pages/StudioEditor/helper.ts), copied since this file imports only types
+const extent = ({ x, y, width, height, rotation }: StudioElementView): Box => {
+  if (!rotation) return { x, y, width, height };
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  const w = width * cos + height * sin;
+  const h = width * sin + height * cos;
+  return {
+    x: x + (width - w) / 2,
+    y: y + (height - h) / 2,
+    width: w,
+    height: h,
+  };
+};
+
+// A group's box: the editor's bounds around its elements' extents, as they
+// show. Empty, at the canvas's corner, without any.
+const groupBox = (elements: StudioElementView[]): Box => {
+  if (elements.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+  const boxes = elements.map(extent);
+  const x = Math.min(...boxes.map((b) => b.x));
+  const y = Math.min(...boxes.map((b) => b.y));
+  return {
+    x,
+    y,
+    width: Math.max(...boxes.map((b) => b.x + b.width)) - x,
+    height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
+  };
 };
 
 /**
@@ -595,8 +656,8 @@ export function createStage(
   }: StageOptions = {},
 ): Stage {
   const canvas = div("studio-canvas");
-  // Each layer's node, the whole canvas, by layer id
-  const layers = new Map<string, HTMLDivElement>();
+  // Each layer's, by layer id
+  const layers = new Map<string, Layer>();
   // Each element's, by element id
   const entries = new Map<string, Entry>();
   let size = { width: 0, height: 0 };
@@ -625,8 +686,9 @@ export function createStage(
   if (observer) observer.observe(root);
   else window.addEventListener("resize", refit);
 
+  // Its own body, or the group it's in, waits or has left
   const hidden = (entry: Entry) =>
-    entry.body.classList.contains("studio-hidden");
+    entry.body.closest(".studio-hidden") !== null;
 
   // Draws its element again once its picture's own size is read, so a
   // cropped or rounded one is laid out: a gift a viewer sends, a new file
@@ -731,7 +793,7 @@ export function createStage(
     }
     entry.done = true;
     video.pause();
-    if (entry.shown) hide(entry);
+    if (entry.mover.shown) leave(entry.mover);
   };
 
   const makeVideo = (entry: Entry) => {
@@ -763,8 +825,10 @@ export function createStage(
   // Puts the element's content in its body, made on first use
   const fill = (entry: Entry) => {
     const { element, el, body } = entry;
-    el.style.left = `${element.x}px`;
-    el.style.top = `${element.y}px`;
+    // From its group's box, if it's in one
+    const origin = layers.get(entry.layer);
+    el.style.left = `${element.x - (origin?.x ?? 0)}px`;
+    el.style.top = `${element.y - (origin?.y ?? 0)}px`;
     el.style.width = `${element.width}px`;
     el.style.height = `${element.height}px`;
     el.style.zIndex = String(element.z);
@@ -903,35 +967,117 @@ export function createStage(
     }
   };
 
-  const hide = (entry: Entry) => {
-    clearTimeout(entry.timer);
-    entry.timer = undefined;
-    entry.shown = false;
-    clearMotion(entry.body);
-    entry.body.classList.add("studio-hidden");
-    playback(entry);
+  // The elements whose videos show with the mover: its own, or its group's
+  const under = (mover: Mover) =>
+    Array.from(entries.values()).filter((entry) =>
+      mover.node.contains(entry.body),
+    );
+
+  // Stops what it plays or would play next, an exit included
+  const halt = (mover: Mover) => {
+    clearTimeout(mover.timer);
+    mover.timer = undefined;
+    mover.shown = false;
+    mover.leaving = false;
+    clearMotion(mover.node);
   };
 
-  // An element that shows on an event comes in, for its seconds on stream
-  const show = (entry: Entry) => {
-    entry.body.classList.remove("studio-hidden");
-    restart(entry.body, `studio-enter-${entry.element.entrance}`);
-    playback(entry, true);
-    if (editing) return;
-    clearTimeout(entry.timer);
-    entry.shown = true;
-    entry.timer = setTimeout(() => {
-      // A video that plays once leaves when its part ends, while it plays
-      const video = entry.body.querySelector("video");
-      if (once(entry.element) && video && !video.paused && !video.error) {
+  // Its seconds ended: its exit plays, held at its end by its forwards fill
+  // until the timer, then it's gone on stream and its videos pause. The
+  // editor's comes back as it waits, outlined.
+  const leave = (mover: Mover) => {
+    if (mover.leaving || !mover.motion) return;
+    clearTimeout(mover.timer);
+    mover.leaving = true;
+    restart(mover.node, `studio-exit-${mover.motion.exit}`);
+    mover.timer = setTimeout(() => {
+      if (!editing) mover.node.classList.add("studio-hidden");
+      halt(mover);
+      for (const entry of under(mover)) playback(entry);
+    }, EXIT_MS);
+  };
+
+  // It comes in on its event, for its seconds, its videos from their part's
+  // start; mid-exit, it comes in again
+  const enter = (mover: Mover, motion: StudioMotion) => {
+    clearTimeout(mover.timer);
+    mover.shown = true;
+    mover.leaving = false;
+    mover.node.classList.remove("studio-hidden");
+    restart(mover.node, `studio-enter-${motion.entrance}`);
+    for (const entry of under(mover)) playback(entry, true);
+    mover.timer = setTimeout(() => {
+      // An element's video that plays once leaves when its part ends, while
+      // it plays (atEnd)
+      const { entry } = mover;
+      const video = entry && clipOf(entry);
+      if (
+        entry &&
+        once(entry.element) &&
+        video &&
+        !video.paused &&
+        !video.error
+      ) {
         return;
       }
-      hide(entry);
-    }, entry.element.seconds * 1000);
+      leave(mover);
+    }, motion.seconds * 1000);
+  };
+
+  // What a react plays: an entrance or an animation. A loop has no trigger.
+  const move = (mover: Mover) => {
+    const { motion } = mover;
+    if (motion?.when === "event") enter(mover, motion);
+    else if (motion?.when === "animate") {
+      restart(mover.node, `studio-play-${motion.animation}`);
+    }
+  };
+
+  /**
+   * Takes the view's motion, before the videos under it play. A new When
+   * starts it over: on screen, waiting (hidden on stream, outlined in the
+   * editor), or looping. A view that keeps it leaves it alone, mid-exit
+   * too, since views come on every autosave and numbers push: a new
+   * entrance, exit or animation plays at the next react.
+   */
+  const settle = (mover: Mover, motion: StudioMotion) => {
+    const before = mover.motion;
+    mover.motion = motion;
+    if (before?.when !== motion.when) {
+      halt(mover);
+      mover.node.classList.toggle(
+        "studio-hidden",
+        !editing && motion.when === "event",
+      );
+    } else if (motion.when === "loop" && before?.idle !== motion.idle) {
+      clearMotion(mover.node);
+    }
+    // Added only when it's missing, so it never starts over
+    const loop = `studio-loop-${motion.idle}`;
+    if (motion.when === "loop" && !mover.node.classList.contains(loop)) {
+      mover.node.classList.add(loop);
+    }
+  };
+
+  const newMover = (node: HTMLDivElement): Mover => {
+    const mover: Mover = {
+      node,
+      motion: undefined,
+      entry: undefined,
+      timer: undefined,
+      shown: false,
+      leaving: false,
+    };
+    node.addEventListener("animationend", (event) => {
+      // Not an element's inside a group's wrapper, and not an exit's, which
+      // holds until its timer
+      if (event.target === node && !mover.leaving) clearMotion(node);
+    });
+    return mover;
   };
 
   const remove = (entry: Entry) => {
-    clearTimeout(entry.timer);
+    clearTimeout(entry.mover.timer);
     clearTimeout(entry.cue);
     clearTimeout(entry.letGo);
     entry.body.querySelectorAll("video").forEach(release);
@@ -950,9 +1096,6 @@ export function createStage(
     // For tests and devtools to find it
     el.dataset.element = element.id;
     const body = div("studio-body");
-    body.addEventListener("animationend", (event) => {
-      if (event.target === body) clearMotion(body);
-    });
     el.appendChild(body);
     parent.appendChild(el);
     const entry: Entry = {
@@ -960,8 +1103,7 @@ export function createStage(
       layer,
       el,
       body,
-      timer: undefined,
-      shown: false,
+      mover: newMover(body),
       cue: undefined,
       done: false,
       cut: undefined,
@@ -969,22 +1111,46 @@ export function createStage(
       letGo: undefined,
       camera: undefined,
     };
+    entry.mover.entry = entry;
     entries.set(element.id, entry);
     return entry;
   };
 
-  // The layer's node, made on first use and appended: z-index stacks them
-  const layerNode = (id: string, z: number, opacity: number) => {
-    let node = layers.get(id);
-    if (!node) {
-      node = div("studio-layer");
-      node.dataset.layer = id;
+  /**
+   * The layer's node, made on first use and appended (z-index stacks them),
+   * with a group's wrapper made with it. The wrapper takes its box and its
+   * motion here, before its elements' videos play: a group that waits keeps
+   * them paused.
+   */
+  const layerOf = (view: StudioLayerView): Layer => {
+    let layer = layers.get(view.id);
+    if (!layer) {
+      const node = div("studio-layer");
+      node.dataset.layer = view.id;
       canvas.appendChild(node);
-      layers.set(id, node);
+      layer = { node, x: 0, y: 0 };
+      if (view.group) {
+        layer.group = newMover(div("studio-group"));
+        node.appendChild(layer.group.node);
+      }
+      layers.set(view.id, layer);
     }
-    node.style.zIndex = String(z);
-    node.style.opacity = String(opacity);
-    return node;
+    layer.node.style.zIndex = String(view.z);
+    layer.node.style.opacity = String(view.opacity);
+    const { group } = layer;
+    if (group && view.group) {
+      const box = groupBox(view.elements);
+      layer.x = box.x;
+      layer.y = box.y;
+      const { style, classList } = group.node;
+      style.left = `${box.x}px`;
+      style.top = `${box.y}px`;
+      style.width = `${box.width}px`;
+      style.height = `${box.height}px`;
+      classList.toggle("studio-waits", editing && view.group.when === "event");
+      settle(group, view.group);
+    }
+    return layer;
   };
 
   const update = (view: StudioView | null) => {
@@ -995,9 +1161,10 @@ export function createStage(
     }
     // After the elements, so the videos in a layer that goes are freed
     const layerIds = new Set(shown.map((layer) => layer.id));
-    for (const [id, node] of Array.from(layers)) {
+    for (const [id, layer] of Array.from(layers)) {
       if (layerIds.has(id)) continue;
-      node.remove();
+      clearTimeout(layer.group?.timer);
+      layer.node.remove();
       layers.delete(id);
     }
 
@@ -1010,7 +1177,8 @@ export function createStage(
     }
 
     for (const layer of shown) {
-      const parent = layerNode(layer.id, layer.z, layer.opacity);
+      const { node, group } = layerOf(layer);
+      const parent = group?.node ?? node;
       for (const element of layer.elements) {
         let entry = entries.get(element.id);
         if (entry && entry.element.kind !== element.kind) {
@@ -1025,16 +1193,11 @@ export function createStage(
         entry ??= create(element, layer.id, parent);
         entry.element = element;
         fill(entry);
-
-        const waits = element.when === "event";
-        entry.el.classList.toggle("studio-waits", editing && waits);
-        if (!editing && !waits) {
-          clearTimeout(entry.timer);
-          entry.shown = false;
-          entry.body.classList.remove("studio-hidden");
-        } else if (!editing && !entry.shown) {
-          entry.body.classList.add("studio-hidden");
-        }
+        entry.el.classList.toggle(
+          "studio-waits",
+          editing && element.when === "event",
+        );
+        settle(entry.mover, element);
         playback(entry);
       }
     }
@@ -1042,7 +1205,13 @@ export function createStage(
 
   const react = (r: StudioReact) => {
     const entry = entries.get(r.element);
-    if (!entry) return;
+    if (!entry) {
+      // A group's, with no values. An element on its own has a layer of its
+      // id, with no wrapper.
+      const group = layers.get(r.element)?.group;
+      if (group) move(group);
+      return;
+    }
     const { element } = entry;
     if (element.kind === "text" && r.text !== undefined) {
       entry.element = { ...element, text: r.text };
@@ -1060,12 +1229,9 @@ export function createStage(
       entry.element = { ...element, src: r.picture || null };
     }
     fill(entry);
-    if (element.when === "event") show(entry);
-    else if (element.when === "animate") {
-      restart(entry.body, `studio-play-${element.animation}`);
-      // A video that plays once plays its part again
-      if (once(element)) playback(entry, true);
-    }
+    move(entry.mover);
+    // A moving element's video that plays once plays its part again
+    if (element.when === "animate" && once(element)) playback(entry, true);
   };
 
   // Let in by a click, a browser tab plays the sound it refused

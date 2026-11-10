@@ -16,9 +16,7 @@
  *                                    a shape's --studio-border;
  *                                    .studio-waits in the editor on one that
  *                                    waits for an event
- *           .studio-body             what moves: .studio-hidden,
- *                                    .studio-enter-<fade|pop|slide>,
- *                                    .studio-play-<bounce|shake|pulse>
+ *           .studio-body             what moves: a mover (below)
  *             text     .studio-text (.studio-bold, .studio-halo), its font,
  *                      size and alignment inline
  *             media    img.studio-fill or video.studio-fill
@@ -35,9 +33,22 @@
  *                      editor, nothing when it can't load
  *           A picture that fails to load gets .studio-failed. One that's
  *           cropped or rounded gets .studio-cut, its place and clip inline.
+ *       .studio-layer                a group's: the same, but its elements
+ *         .studio-group              sit in one wrapper, the group's mover,
+ *           .studio-element ...      at the box around their turned boxes
+ *                                    and placed from its corner;
+ *                                    .studio-waits in the editor on one that
+ *                                    waits for an event
+ *
+ * A mover (.studio-body or .studio-group) takes .studio-hidden and one of
+ * .studio-enter-<entrance>, .studio-exit-<exit>, .studio-play-<animation> or
+ * .studio-loop-<loop>, from the lists in schemas/studio.ts. Each keyframe is
+ * named after its class, since spin and flip are in several lists.
  *
  * It must work in OBS 30's browser (Chromium 103): no :has(), nesting,
- * subgrid, container queries or color-mix(). Every class starts with studio-,
+ * subgrid, container queries or color-mix(), and motion through transform
+ * alone (no translate, rotate or scale properties, animation-composition or
+ * linear()). Every class starts with studio-,
  * as the app loads this stylesheet globally. Backgrounds stay transparent and
  * nothing sets color-scheme: Chromium paints an iframe opaque when its
  * color-scheme differs from its page's.
@@ -81,13 +92,18 @@
   inset: 0;
 }
 
-/* Gone after a fade, so it can't be seen or catch the pointer */
+/* A group's box around its elements, which it moves as one. It passes the
+   pointer through, as a layer does. */
+.studio-group {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Gone at once, so it can't be seen or catch the pointer: its exit already
+   faded it out */
 .studio-hidden {
   opacity: 0;
   visibility: hidden;
-  transition:
-    opacity 0.3s ease-in,
-    visibility 0s linear 0.3s;
 }
 
 /* Text */
@@ -205,29 +221,67 @@
   display: none;
 }
 
-/* Entrances, for an element that shows on an event. backwards only, so a
-   finished one leaves the element's own opacity and the hidden fade
-   alone. */
+/* Entrances, for a mover that shows on an event. backwards only, so a
+   finished one leaves the element's own opacity alone. */
 
 .studio-enter-fade {
-  animation: studio-fade 0.4s ease-out backwards;
+  animation: studio-enter-fade 0.4s ease-out backwards;
 }
 
 .studio-enter-pop {
-  animation: studio-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation: studio-enter-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 
 .studio-enter-slide {
-  animation: studio-slide 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: studio-enter-slide 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
-@keyframes studio-fade {
+.studio-enter-slide-down {
+  animation: studio-enter-slide-down 0.5s cubic-bezier(0.22, 1, 0.36, 1)
+    backwards;
+}
+
+.studio-enter-slide-left {
+  animation: studio-enter-slide-left 0.5s cubic-bezier(0.22, 1, 0.36, 1)
+    backwards;
+}
+
+.studio-enter-slide-right {
+  animation: studio-enter-slide-right 0.5s cubic-bezier(0.22, 1, 0.36, 1)
+    backwards;
+}
+
+.studio-enter-zoom {
+  animation: studio-enter-zoom 0.5s backwards;
+}
+
+.studio-enter-drop {
+  animation: studio-enter-drop 0.8s backwards;
+}
+
+.studio-enter-spin {
+  animation: studio-enter-spin 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.studio-enter-flip {
+  animation: studio-enter-flip 0.7s ease-out backwards;
+}
+
+.studio-enter-wipe {
+  animation: studio-enter-wipe 0.6s cubic-bezier(0.65, 0, 0.35, 1) backwards;
+}
+
+.studio-enter-blur {
+  animation: studio-enter-blur 0.5s ease-out backwards;
+}
+
+@keyframes studio-enter-fade {
   from {
     opacity: 0;
   }
 }
 
-@keyframes studio-pop {
+@keyframes studio-enter-pop {
   from {
     opacity: 0;
     transform: scale(0.6);
@@ -237,28 +291,352 @@
   }
 }
 
-@keyframes studio-slide {
+@keyframes studio-enter-slide {
   from {
     opacity: 0;
     transform: translateY(48px);
   }
 }
 
-/* Animations, for an element that moves on an event, once each */
+@keyframes studio-enter-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-48px);
+  }
+}
+
+/* Moves left into place, from the right */
+@keyframes studio-enter-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+
+@keyframes studio-enter-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(-48px);
+  }
+}
+
+/* A stamp: it speeds down onto the stream, squashes a little and settles */
+@keyframes studio-enter-zoom {
+  from {
+    opacity: 0;
+    transform: scale(1.8);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.94);
+    animation-timing-function: ease-out;
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Falls from above under gravity, then two smaller bounces */
+@keyframes studio-enter-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-120%);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  15% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+  }
+  66% {
+    transform: translateY(-12%);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  80% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+  }
+  90% {
+    transform: translateY(-4%);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes studio-enter-spin {
+  from {
+    opacity: 0;
+    transform: rotate(-200deg) scale(0.3);
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Turns in like a card, a little past, then back. Its perspective stays to
+   the end, so it turns rather than stretches. */
+@keyframes studio-enter-flip {
+  from {
+    opacity: 0;
+    transform: perspective(800px) rotateY(-90deg);
+  }
+  40% {
+    opacity: 1;
+  }
+  70% {
+    transform: perspective(800px) rotateY(12deg);
+  }
+  to {
+    transform: perspective(800px) rotateY(0deg);
+  }
+}
+
+/* Revealed from the left. Past the box on every side, so a text's halo
+   isn't cut. */
+@keyframes studio-enter-wipe {
+  from {
+    clip-path: inset(-20% 120% -20% -20%);
+  }
+  to {
+    clip-path: inset(-20% -20% -20% -20%);
+  }
+}
+
+@keyframes studio-enter-blur {
+  from {
+    opacity: 0;
+    filter: blur(16px);
+  }
+}
+
+/* Exits, for a mover whose seconds ended: each lasts EXIT_MS in stage.ts
+   (0.45 s), and its forwards fill holds it at opacity 0 until the stage
+   hides it. */
+
+.studio-exit-fade {
+  animation: studio-exit-fade 0.45s ease-in forwards;
+}
+
+.studio-exit-pop {
+  animation: studio-exit-pop 0.45s forwards;
+}
+
+.studio-exit-slide {
+  animation: studio-exit-slide 0.45s cubic-bezier(0.64, 0, 0.78, 0) forwards;
+}
+
+.studio-exit-slide-down {
+  animation: studio-exit-slide-down 0.45s cubic-bezier(0.64, 0, 0.78, 0)
+    forwards;
+}
+
+.studio-exit-slide-left {
+  animation: studio-exit-slide-left 0.45s cubic-bezier(0.64, 0, 0.78, 0)
+    forwards;
+}
+
+.studio-exit-slide-right {
+  animation: studio-exit-slide-right 0.45s cubic-bezier(0.64, 0, 0.78, 0)
+    forwards;
+}
+
+.studio-exit-zoom {
+  animation: studio-exit-zoom 0.45s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.studio-exit-drop {
+  animation: studio-exit-drop 0.45s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+.studio-exit-spin {
+  animation: studio-exit-spin 0.45s cubic-bezier(0.64, 0, 0.78, 0) forwards;
+}
+
+.studio-exit-flip {
+  animation: studio-exit-flip 0.45s ease-in forwards;
+}
+
+.studio-exit-wipe {
+  animation: studio-exit-wipe 0.45s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+.studio-exit-blur {
+  animation: studio-exit-blur 0.45s ease-in forwards;
+}
+
+/* Also the reduced-motion exit of every one */
+@keyframes studio-exit-fade {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Swells a little, then shrinks away */
+@keyframes studio-exit-pop {
+  30% {
+    opacity: 1;
+    transform: scale(1.1);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@keyframes studio-exit-slide {
+  to {
+    opacity: 0;
+    transform: translateY(-48px);
+  }
+}
+
+@keyframes studio-exit-slide-down {
+  to {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+
+@keyframes studio-exit-slide-left {
+  to {
+    opacity: 0;
+    transform: translateX(-48px);
+  }
+}
+
+@keyframes studio-exit-slide-right {
+  to {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+
+@keyframes studio-exit-zoom {
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+/* Lifts a hair, then falls away, tipping over */
+@keyframes studio-exit-drop {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+  15% {
+    transform: translateY(-4%) rotate(-2deg);
+  }
+  50% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(120%) rotate(10deg);
+  }
+}
+
+@keyframes studio-exit-spin {
+  to {
+    opacity: 0;
+    transform: rotate(200deg) scale(0.3);
+  }
+}
+
+@keyframes studio-exit-flip {
+  from {
+    transform: perspective(800px) rotateY(0deg);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: perspective(800px) rotateY(90deg);
+  }
+}
+
+/* Wiped off toward the right, past the box as its entrance is */
+@keyframes studio-exit-wipe {
+  from {
+    clip-path: inset(-20% -20% -20% -20%);
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    clip-path: inset(-20% -20% -20% 120%);
+  }
+}
+
+@keyframes studio-exit-blur {
+  to {
+    opacity: 0;
+    filter: blur(16px);
+  }
+}
+
+/* Animations, for a mover that moves on an event, once each */
 
 .studio-play-bounce {
-  animation: studio-bounce 0.8s ease-out;
+  animation: studio-play-bounce 0.8s ease-out;
 }
 
 .studio-play-shake {
-  animation: studio-shake 0.6s ease-in-out;
+  animation: studio-play-shake 0.6s ease-in-out;
 }
 
 .studio-play-pulse {
-  animation: studio-pulse 0.6s ease-in-out;
+  animation: studio-play-pulse 0.6s ease-in-out;
 }
 
-@keyframes studio-bounce {
+.studio-play-wiggle {
+  animation: studio-play-wiggle 0.7s ease-in-out;
+}
+
+.studio-play-spin {
+  animation: studio-play-spin 0.8s ease-in-out;
+}
+
+.studio-play-flip {
+  animation: studio-play-flip 0.9s ease-in-out;
+}
+
+/* From its feet, so it squashes on the ground */
+.studio-play-jump {
+  transform-origin: 50% 100%;
+  animation: studio-play-jump 0.9s;
+}
+
+/* Hangs from its top edge */
+.studio-play-swing {
+  transform-origin: 50% 0;
+  animation: studio-play-swing 1s ease-in-out;
+}
+
+.studio-play-tada {
+  animation: studio-play-tada 1s ease-in-out;
+}
+
+.studio-play-heartbeat {
+  animation: studio-play-heartbeat 1.2s ease-in-out;
+}
+
+.studio-play-flash {
+  animation: studio-play-flash 0.8s steps(1, end);
+}
+
+.studio-play-jelly {
+  animation: studio-play-jelly 0.9s ease-out;
+}
+
+@keyframes studio-play-bounce {
   0%,
   100% {
     transform: translateY(0);
@@ -274,7 +652,7 @@
   }
 }
 
-@keyframes studio-shake {
+@keyframes studio-play-shake {
   0%,
   100% {
     transform: translateX(0);
@@ -289,7 +667,7 @@
   }
 }
 
-@keyframes studio-pulse {
+@keyframes studio-play-pulse {
   0%,
   100% {
     transform: scale(1);
@@ -299,16 +677,293 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .studio-enter-pop,
-  .studio-enter-slide {
-    animation-name: studio-fade;
+/* Rocks on its center, each swing smaller */
+@keyframes studio-play-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(-8deg);
+  }
+  35% {
+    transform: rotate(8deg);
+  }
+  55% {
+    transform: rotate(-5deg);
+  }
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes studio-play-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes studio-play-flip {
+  from {
+    transform: perspective(800px) rotateY(0deg);
+  }
+  to {
+    transform: perspective(800px) rotateY(360deg);
+  }
+}
+
+/* Crouches, leaps a quarter of its height stretched tall, lands squashed */
+@keyframes studio-play-jump {
+  0% {
+    transform: translateY(0) scale(1, 1);
     animation-timing-function: ease-out;
   }
+  15% {
+    transform: translateY(0) scale(1.15, 0.85);
+    animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+  }
+  45% {
+    transform: translateY(-25%) scale(0.92, 1.08);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  70% {
+    transform: translateY(0) scale(1.12, 0.88);
+    animation-timing-function: ease-out;
+  }
+  85% {
+    transform: translateY(0) scale(0.97, 1.03);
+    animation-timing-function: ease-in-out;
+  }
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
 
-  .studio-play-bounce,
-  .studio-play-shake,
-  .studio-play-pulse {
+/* A pendulum, swinging out and settling */
+@keyframes studio-play-swing {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(15deg);
+  }
+  40% {
+    transform: rotate(-10deg);
+  }
+  60% {
+    transform: rotate(6deg);
+  }
+  80% {
+    transform: rotate(-3deg);
+  }
+}
+
+/* Shrinks with a tilt, then grows and tilts side to side */
+@keyframes studio-play-tada {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  10%,
+  20% {
+    transform: scale(0.9) rotate(-3deg);
+  }
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: scale(1.1) rotate(3deg);
+  }
+  40%,
+  60%,
+  80% {
+    transform: scale(1.1) rotate(-3deg);
+  }
+}
+
+/* Lub-dub, then rest */
+@keyframes studio-play-heartbeat {
+  0%,
+  28%,
+  70%,
+  100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.18);
+  }
+  42% {
+    transform: scale(1.12);
+  }
+}
+
+/* Off and on twice, sharp as a light */
+@keyframes studio-play-flash {
+  0%,
+  50%,
+  100% {
+    opacity: 1;
+  }
+  25%,
+  75% {
+    opacity: 0;
+  }
+}
+
+@keyframes studio-play-jelly {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  25% {
+    transform: scale(1.25, 0.75);
+  }
+  40% {
+    transform: scale(0.8, 1.2);
+  }
+  55% {
+    transform: scale(1.12, 0.88);
+  }
+  70% {
+    transform: scale(0.95, 1.05);
+  }
+  85% {
+    transform: scale(1.03, 0.97);
+  }
+}
+
+/* Loops, for a mover that moves all the time. The stage never restarts
+   one, so each starts and ends where it rests. */
+
+.studio-loop-float {
+  animation: studio-loop-float 3s ease-in-out infinite;
+}
+
+.studio-loop-breathe {
+  animation: studio-loop-breathe 3.2s ease-in-out infinite;
+}
+
+.studio-loop-spin {
+  animation: studio-loop-spin 8s linear infinite;
+}
+
+/* Rooted at its bottom edge, like a plant */
+.studio-loop-sway {
+  transform-origin: 50% 100%;
+  animation: studio-loop-sway 3s infinite;
+}
+
+.studio-loop-hop {
+  transform-origin: 50% 100%;
+  animation: studio-loop-hop 2.4s infinite;
+}
+
+.studio-loop-drift {
+  animation: studio-loop-drift 6s linear infinite;
+}
+
+@keyframes studio-loop-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6%);
+  }
+}
+
+@keyframes studio-loop-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes studio-loop-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Through the middle at full speed, slowing at each side */
+@keyframes studio-loop-sway {
+  0% {
+    transform: rotate(0deg);
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  25% {
+    transform: rotate(4deg);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  75% {
+    transform: rotate(-4deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* Two quick hops, the second lower, then a rest */
+@keyframes studio-loop-hop {
+  0% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+  }
+  9% {
+    transform: translateY(-10%);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  18% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1);
+  }
+  25% {
+    transform: translateY(-5%);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  32%,
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* A slow circle, its radius 3% of its width, around a point beside where it
+   rests. The turn and its undoing interpolate as numbers, so its path is
+   round and it never turns itself. */
+@keyframes studio-loop-drift {
+  from {
+    transform: translateX(-3%) rotate(0deg) translateX(3%) rotate(0deg);
+  }
+  to {
+    transform: translateX(-3%) rotate(360deg) translateX(3%) rotate(-360deg);
+  }
+}
+
+/* Reduced motion, which OBS follows from the system: entrances and exits
+   only fade, and nothing else moves */
+@media (prefers-reduced-motion: reduce) {
+  [class*="studio-enter-"] {
+    animation: studio-enter-fade 0.4s ease-out backwards;
+  }
+
+  /* Its own fade-out: the entrance's fade-in would flash it back */
+  [class*="studio-exit-"] {
+    animation: studio-exit-fade 0.45s ease-in forwards;
+  }
+
+  [class*="studio-play-"],
+  [class*="studio-loop-"] {
     animation: none;
   }
 }
