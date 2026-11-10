@@ -23,6 +23,18 @@ HTMLMediaElement.prototype.load = () => {};
 HTMLMediaElement.prototype.pause = () => {};
 HTMLMediaElement.prototype.play = () => Promise.resolve();
 
+// jsdom has no cameras: this lists none and opens none. Spy on its methods
+// for some, and dispatch "devicechange" on it.
+Object.defineProperty(navigator, "mediaDevices", {
+  configurable: true,
+  value: Object.assign(new EventTarget(), {
+    enumerateDevices: async (): Promise<MediaDeviceInfo[]> => [],
+    getUserMedia: async (): Promise<MediaStream> => {
+      throw new DOMException("No camera", "NotFoundError");
+    },
+  }),
+});
+
 globalThis.ResizeObserver = class {
   observe() {}
   unobserve() {}
