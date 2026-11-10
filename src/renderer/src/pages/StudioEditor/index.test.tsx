@@ -1955,8 +1955,7 @@ describe("StudioEditor", () => {
         camera: { id: "cam-b", label: "Desk" },
       });
       await open(scene(element));
-      const src = () =>
-        drawn(element.id).querySelector("img")?.getAttribute("src");
+      const src = () => drawn(element.id).querySelector("video")?.dataset.src;
 
       expect(sent(APP_EVENTS.GET_CAMERAS).length).toBeGreaterThan(0);
       expect(src()).toBeFalsy();
@@ -1985,9 +1984,7 @@ describe("StudioEditor", () => {
           /^The overlay server is off\. Enable it in Settings to see the camera/,
         ),
       ).toBeVisible();
-      expect(
-        drawn(element.id).querySelector("img")?.getAttribute("src"),
-      ).toBeFalsy();
+      expect(drawn(element.id).querySelector("video")?.dataset.src).toBeFalsy();
     });
 
     it("shows a webcam in its row, not a live picture", async () => {
@@ -3116,7 +3113,12 @@ describe("StudioEditor", () => {
       await user.click(row(/^Cam/));
       sized();
       // Its stream's first frame
-      loaded(camera.id, 1280, 640);
+      const video = drawn(camera.id).querySelector("video")!;
+      Object.defineProperty(video, "videoWidth", { value: 1280 });
+      Object.defineProperty(video, "videoHeight", { value: 640 });
+      act(() => {
+        video.dispatchEvent(new Event("loadedmetadata"));
+      });
 
       await user.click(
         page().getByRole("button", {

@@ -343,7 +343,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               : source.type === "timer"
                 ? getOverlayURL(TIMER_PATH)
                 : getMinecraftOverlayURL(source.column ?? undefined),
-        // Loaded from localhost, which the CSP's img-src allows
+        // Fetched from localhost, which the CSP's connect-src allows
         camera: (element) =>
           serverEnabled && cameraKey
             ? `http://localhost:${SERVER_PORT}${studioCameraPath(cameraKey, element.camera, element.quality)}`
