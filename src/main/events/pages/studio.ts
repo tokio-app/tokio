@@ -162,7 +162,6 @@ events.push(
   APP_EVENTS.GET_CAMERAS,
   async ({ serverService }, e) =>
     e.reply(APP_EVENTS_RESPONSE.CAMERAS, {
-      key: serverService.cameraKey,
       captures: serverService.cameraCaptures(),
     }),
   { notify: false },

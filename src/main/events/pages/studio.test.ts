@@ -397,7 +397,6 @@ describe("studio events", () => {
     });
     const cameras = (captures: CameraCapture[] = [capture()]) => {
       const serverService = {
-        cameraKey: "k3y",
         cameraCaptures: () => captures,
         cameraFrame: vi.fn((_chunk: CameraChunk) => {}),
       };
@@ -413,13 +412,13 @@ describe("studio events", () => {
       vi.useRealTimers();
     });
 
-    it("replies the server's key and the cameras to capture, with no notice", async () => {
+    it("replies the cameras to capture, with no notice", async () => {
       const { h } = cameras();
 
       await h.invoke(studio, APP_EVENTS.GET_CAMERAS);
 
       expect(h.replies(APP_EVENTS_RESPONSE.CAMERAS)).toEqual([
-        { key: "k3y", captures: [capture()] },
+        { captures: [capture()] },
       ]);
       expect(h.notices).toEqual([]);
     });

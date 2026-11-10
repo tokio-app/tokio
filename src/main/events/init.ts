@@ -741,20 +741,19 @@ const registerStudio = (handler: AppHandlerVariables) => {
   onLanguage(() => void sendStudioOverlays(handler));
 };
 
-// The main window captures the cameras studio pages show, and the editor's
-// previews need the server's key, so both follow the server
+// The main window captures the cameras studio pages show
 const registerCameras = ({
   serverService: server,
   win,
 }: AppHandlerVariables) => {
   let asked = false;
-  server.onCameras((cameras) => {
+  server.onCameras((captures) => {
     if (!win.isDestroyed()) {
-      win.webContents.send(APP_EVENTS_RESPONSE.CAMERAS, cameras);
+      win.webContents.send(APP_EVENTS_RESPONSE.CAMERAS, { captures });
     }
     // macOS asks the user once. Not awaited: the window tries again.
     if (asked || process.platform !== "darwin") return;
-    if (cameras.captures.length === 0) return;
+    if (captures.length === 0) return;
     if (systemPreferences.getMediaAccessStatus("camera") !== "not-determined") {
       return;
     }

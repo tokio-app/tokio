@@ -383,19 +383,13 @@ describe("ServerService", () => {
       expect(server.cameraCaptures()).toEqual([]);
     });
 
-    it("renews the key on each start, telling the listeners", async () => {
-      const listener = vi.fn();
-      server.onCameras(listener);
+    it("renews the key on each start", async () => {
       const before = server.cameraKey;
 
       server.stop();
       await server.start();
 
       expect(server.cameraKey).not.toBe(before);
-      expect(listener).toHaveBeenCalledWith({
-        key: server.cameraKey,
-        captures: [],
-      });
       const res = await stream(before);
       expect(res.status).toBe(404);
       await res.body?.cancel();
@@ -409,12 +403,9 @@ describe("ServerService", () => {
       const pending = stream(server.cameraKey, undefined, abort.signal);
 
       await vi.waitFor(() =>
-        expect(listener).toHaveBeenCalledWith({
-          key: server.cameraKey,
-          captures: [
-            expect.objectContaining({ device: "", label: "", quality: "720p" }),
-          ],
-        }),
+        expect(listener).toHaveBeenCalledWith([
+          expect.objectContaining({ device: "", label: "", quality: "720p" }),
+        ]),
       );
       abort.abort();
       await expect(pending).rejects.toThrow();

@@ -19,7 +19,7 @@ const capture = (
 });
 
 const cameras = (...captures: CameraCapture[]) =>
-  send(APP_EVENTS_RESPONSE.CAMERAS, { key: "key", captures });
+  send(APP_EVENTS_RESPONSE.CAMERAS, { captures });
 
 // Each capture started, by id, and its stop
 let stops: Map<string, ReturnType<typeof vi.fn>>;

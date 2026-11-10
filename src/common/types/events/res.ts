@@ -339,10 +339,9 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.STUDIO]: Reply<{
     data?: StudioOverlay[];
   }>;
-  // The cameras pages show, which the window captures, and the overlay
-  // server's key for this run, which the editor's camera URLs need. Pushed
-  // when either changes, and the reply to GET_CAMERAS.
-  [APP_EVENTS_RESPONSE.CAMERAS]: { key: string; captures: CameraCapture[] };
+  // The cameras pages show, which the window captures: pushed when they
+  // change, and the reply to GET_CAMERAS
+  [APP_EVENTS_RESPONSE.CAMERAS]: { captures: CameraCapture[] };
 
   // ALERTS
   [APP_EVENTS_RESPONSE.ALERT_AUDIO]: {

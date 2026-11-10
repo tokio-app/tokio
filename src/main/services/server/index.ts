@@ -60,8 +60,6 @@ const CameraQuerySchema = z.object({
   quality: z.enum(STUDIO_CAMERA_QUALITIES),
 });
 
-type Cameras = { key: string; captures: CameraCapture[] };
-
 // Adapter names that are usually virtual: Hyper-V, WSL, VMs, Docker, bridges.
 // A real network card can have them too, with Hyper-V or a bridge set up.
 const VIRTUAL_ADAPTER = /vethernet|wsl|virtualbox|vmware|docker|^br|virbr/i;
@@ -80,7 +78,7 @@ export class ServerService extends Service {
   // load their streams again. Never saved or logged.
   private _cameraKey = randomUUID();
   private _cameras = new CameraFeeds();
-  private _cameraListeners: ((cameras: Cameras) => void)[] = [];
+  private _cameraListeners: ((captures: CameraCapture[]) => void)[] = [];
 
   // NOTE: Overlays connect to SERVER_PORT, other ports are for tests.
   constructor(port: number = SERVER_PORT) {
@@ -220,8 +218,6 @@ export class ServerService extends Service {
           this._logFile,
         );
         this.rebuildRoutes();
-        // The new key changed every camera URL
-        this._camerasChanged();
         resolve({
           success: true,
           message: `Server running on port ${this._port}`,
@@ -343,14 +339,14 @@ export class ServerService extends Service {
     return this._cameras.captures();
   }
 
-  /** Calls the listener when the captures change, or a start renewed the key. */
-  public onCameras(listener: (cameras: Cameras) => void) {
+  /** Calls the listener with the captures whenever they change. */
+  public onCameras(listener: (captures: CameraCapture[]) => void) {
     this._cameraListeners.push(listener);
   }
 
   private _camerasChanged() {
-    const cameras = { key: this._cameraKey, captures: this.cameraCaptures() };
-    for (const listener of this._cameraListeners) listener(cameras);
+    const captures = this.cameraCaptures();
+    for (const listener of this._cameraListeners) listener(captures);
   }
 
   /** Calls the listener with each overlay's id as it connects. */
