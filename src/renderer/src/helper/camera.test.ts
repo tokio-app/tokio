@@ -9,9 +9,10 @@ import {
   MockInstance,
   vi,
 } from "vitest";
-import { CAMERA_RETRY_MS, startCapture } from "./camera";
 
-const JPEG = [0xff, 0xd8, 0xff, 0xd9];
+// Imported again for each test, so its cache of configs starts empty
+let camera: typeof import("./camera");
+const RETRY_MS = 5000;
 
 const capture = (patch: Partial<CameraCapture> = {}): CameraCapture => ({
   id: "cam-1",
@@ -34,7 +35,7 @@ type Read = ReadableStreamReadResult<VideoFrame>;
 
 // A camera's stream, whose frames a test pushes, and which ends once its
 // track stops
-function camera() {
+function webcam() {
   const waiting: ((read: Read) => void)[] = [];
   const queued: Read[] = [];
   const push = (read: Read) => {
@@ -52,12 +53,13 @@ function camera() {
     queued.length > 0
       ? Promise.resolve(queued.shift()!)
       : new Promise<Read>((resolve) => waiting.push(resolve));
-  const frame = (width = 1280, height = 720) => {
+  const frame = (timestamp = 0, width = 1280, height = 720) => {
     const close = vi.fn();
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fake
     const f = {
       displayWidth: width,
       displayHeight: height,
+      timestamp,
       close,
     } as unknown as VideoFrame;
     push({ done: false, value: f });
@@ -72,22 +74,70 @@ function camera() {
   };
 }
 
-let source: ReturnType<typeof camera>;
-let canvases: { width: number; height: number }[];
-const drawn = vi.fn();
+// What the fake encoders were made with, and what they were given
+class FakeEncoder {
+  static made: FakeEncoder[] = [];
+  static supports: (config: VideoEncoderConfig) => boolean = () => true;
+  static isConfigSupported = vi.fn(async (config: VideoEncoderConfig) => ({
+    supported: FakeEncoder.supports(config),
+    config,
+  }));
+  state = "unconfigured";
+  encodeQueueSize = 0;
+  config: VideoEncoderConfig | undefined;
+  encode = vi.fn<(frame: VideoFrame, options: { keyFrame: boolean }) => void>();
+  close = vi.fn(() => {
+    this.state = "closed";
+  });
+  constructor(public init: VideoEncoderInit) {
+    FakeEncoder.made.push(this);
+  }
+  configure(config: VideoEncoderConfig) {
+    this.config = config;
+    this.state = "configured";
+  }
+  // The encoder's output of one chunk
+  out(type: "key" | "delta", timestamp: number, bytes: number[]) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fake
+    const chunk = {
+      type,
+      timestamp,
+      byteLength: bytes.length,
+      copyTo: (to: Uint8Array) => to.set(bytes),
+    } as unknown as EncodedVideoChunk;
+    this.init.output(chunk, {});
+  }
+}
 
+const keyFrames = (encoder: FakeEncoder) =>
+  encoder.encode.mock.calls.map(([, options]) => options.keyFrame);
+
+let source: ReturnType<typeof webcam>;
 let gum: MockInstance<MediaDevices["getUserMedia"]>;
 const listed = (...devices: MediaDeviceInfo[]) =>
   vi
     .spyOn(navigator.mediaDevices, "enumerateDevices")
     .mockResolvedValue(devices);
 
+const start = async (c = capture()) => {
+  const stop = camera.startCapture(c);
+  await vi.advanceTimersByTimeAsync(0);
+  return stop;
+};
+
+// Pushes a frame and lets the capture take it
+const push = async (...args: Parameters<typeof source.frame>) => {
+  const frame = source.frame(...args);
+  await vi.advanceTimersByTimeAsync(0);
+  return frame;
+};
+
 describe("startCapture", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
-    source = camera();
-    canvases = [];
-    drawn.mockReset();
+    vi.resetModules();
+    camera = await import("./camera");
+    source = webcam();
     gum = vi
       .spyOn(navigator.mediaDevices, "getUserMedia")
       .mockResolvedValue(source.stream);
@@ -97,32 +147,23 @@ describe("startCapture", () => {
         readable = { getReader: () => ({ read: source.read }) };
       },
     );
-    vi.stubGlobal(
-      "OffscreenCanvas",
-      class {
-        constructor(
-          public width: number,
-          public height: number,
-        ) {
-          canvases.push(this);
-        }
-        getContext() {
-          return { drawImage: drawn };
-        }
-        async convertToBlob() {
-          return { arrayBuffer: async () => new Uint8Array(JPEG).buffer };
-        }
-      },
-    );
+    FakeEncoder.made = [];
+    FakeEncoder.supports = () => true;
+    FakeEncoder.isConfigSupported.mockClear();
+    vi.stubGlobal("VideoEncoder", FakeEncoder);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
-  it("opens the default camera at 720p and sends each frame as a JPEG", async () => {
-    const stop = startCapture(capture());
-    await vi.advanceTimersByTimeAsync(0);
+  it("waits as long to try again as main expects", () => {
+    expect(camera.CAMERA_RETRY_MS).toBe(RETRY_MS);
+  });
+
+  it("opens the default camera at 720p and sends its chunks, the config on keyframes", async () => {
+    const stop = await start();
 
     expect(gum).toHaveBeenCalledWith({
       audio: false,
@@ -132,31 +173,170 @@ describe("startCapture", () => {
         frameRate: { ideal: 30, max: 30 },
       },
     });
-    const first = source.frame(1280, 720);
-    await vi.advanceTimersByTimeAsync(0);
-    const second = source.frame(640, 360);
-    await vi.advanceTimersByTimeAsync(0);
+    const first = await push(0);
+    const second = await push(33_333);
 
-    expect(sent(APP_EVENTS.CAMERA_FRAME)).toEqual([
-      { id: "cam-1", key: true, timestamp: 0, frame: new Uint8Array(JPEG) },
-      { id: "cam-1", key: true, timestamp: 0, frame: new Uint8Array(JPEG) },
-    ]);
-    expect(drawn).toHaveBeenCalledWith(first.f, 0, 0);
-    expect(drawn).toHaveBeenCalledWith(second.f, 0, 0);
+    const [encoder] = FakeEncoder.made;
+    expect(encoder.config).toEqual({
+      width: 1280,
+      height: 720,
+      framerate: 30,
+      latencyMode: "realtime",
+      bitrate: 4_000_000,
+      codec: "avc1.42e01f",
+      hardwareAcceleration: "prefer-hardware",
+      avc: { format: "annexb" },
+    });
+    expect(encoder.encode).toHaveBeenCalledWith(first.f, { keyFrame: true });
+    expect(encoder.encode).toHaveBeenCalledWith(second.f, { keyFrame: false });
     expect(first.close).toHaveBeenCalled();
     expect(second.close).toHaveBeenCalled();
-    // One canvas, sized to the latest frame
-    expect(canvases).toHaveLength(1);
-    expect(canvases[0]).toMatchObject({ width: 640, height: 360 });
+
+    encoder.out("key", 0, [1, 2]);
+    encoder.out("delta", 33_333, [3]);
+    expect(sent(APP_EVENTS.CAMERA_FRAME)).toEqual([
+      {
+        id: "cam-1",
+        key: true,
+        timestamp: 0,
+        frame: new Uint8Array([1, 2]),
+        config: { codec: "avc1.42e01f", width: 1280, height: 720 },
+      },
+      {
+        id: "cam-1",
+        key: false,
+        timestamp: 33_333,
+        frame: new Uint8Array([3]),
+      },
+    ]);
+    // Asked once: the config is kept
+    expect(FakeEncoder.isConfigSupported).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("tries H.264's profiles in hardware, then any, then VP8", async () => {
+    FakeEncoder.supports = (config) => config.codec === "vp8";
+    const stop = await start(capture({ quality: "1080p" }));
+    await push(0, 1920, 1080);
+
+    expect(
+      FakeEncoder.isConfigSupported.mock.calls.map(([c]) => [
+        c.codec,
+        c.hardwareAcceleration,
+      ]),
+    ).toEqual([
+      ["avc1.42e028", "prefer-hardware"],
+      ["avc1.4d0028", "prefer-hardware"],
+      ["avc1.640028", "prefer-hardware"],
+      ["avc1.42e028", "no-preference"],
+      ["avc1.4d0028", "no-preference"],
+      ["avc1.640028", "no-preference"],
+      ["vp8", undefined],
+    ]);
+    expect(FakeEncoder.made[0].config).toEqual({
+      width: 1920,
+      height: 1080,
+      framerate: 30,
+      latencyMode: "realtime",
+      bitrate: 6_000_000,
+      codec: "vp8",
+    });
+    stop();
+  });
+
+  it("fails when no config is supported, and tries again later", async () => {
+    FakeEncoder.supports = () => false;
+    const stop = await start();
+    const frame = await push(0);
+
+    expect(FakeEncoder.made).toHaveLength(0);
+    expect(frame.close).toHaveBeenCalled();
+    expect(sent(APP_EVENTS.CAMERA_FAILED)).toEqual([
+      { id: "cam-1", reason: "failed" },
+    ]);
+    expect(source.track.stop).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(RETRY_MS);
+    expect(gum).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it("asks for a keyframe first, then every 2 seconds", async () => {
+    const stop = await start();
+    for (const t of [0, 33_333, 1_999_999, 2_000_000, 3_999_999, 4_000_000]) {
+      await push(t);
+    }
+
+    expect(keyFrames(FakeEncoder.made[0])).toEqual([
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+    ]);
+    stop();
+  });
+
+  it("drops frames while the encoder is behind", async () => {
+    const stop = await start();
+    await push(0);
+    const [encoder] = FakeEncoder.made;
+
+    encoder.encodeQueueSize = 3;
+    const dropped = await push(33_333);
+    expect(encoder.encode).toHaveBeenCalledTimes(1);
+    expect(dropped.close).toHaveBeenCalled();
+
+    encoder.encodeQueueSize = 2;
+    await push(66_666);
+    expect(encoder.encode).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it("starts a new encoder, from a keyframe, when the frames change size", async () => {
+    const stop = await start();
+    await push(0);
+    await push(33_333);
+    // Rounded down to even
+    await push(66_666, 641, 361);
+
+    const [old, next] = FakeEncoder.made;
+    expect(old.close).toHaveBeenCalled();
+    expect(next.config).toMatchObject({ width: 640, height: 360 });
+    expect(keyFrames(next)).toEqual([true]);
+
+    next.out("key", 66_666, [9]);
+    expect(sent(APP_EVENTS.CAMERA_FRAME)).toEqual([
+      expect.objectContaining({
+        config: { codec: "avc1.42e01f", width: 640, height: 360 },
+      }),
+    ]);
+    stop();
+  });
+
+  it("ends the capture when the encoder fails, and tries again later", async () => {
+    const stop = await start();
+    await push(0);
+    const [encoder] = FakeEncoder.made;
+
+    encoder.init.error(new DOMException("", "EncodingError"));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(sent(APP_EVENTS.CAMERA_FAILED)).toEqual([
+      { id: "cam-1", reason: "failed" },
+    ]);
+    expect(source.track.stop).toHaveBeenCalled();
+    expect(encoder.close).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(RETRY_MS);
+    expect(gum).toHaveBeenCalledTimes(2);
     stop();
   });
 
   it("finds a camera by its id, else by its name, at 1080p", async () => {
     listed(device("other", "Other"), device("id-2", "Studio Cam"));
-    const stop = startCapture(
+    const stop = await start(
       capture({ device: "id-1", label: "Studio Cam", quality: "1080p" }),
     );
-    await vi.advanceTimersByTimeAsync(0);
 
     expect(gum).toHaveBeenCalledWith({
       audio: false,
@@ -170,10 +350,9 @@ describe("startCapture", () => {
     stop();
     gum.mockClear();
 
-    const again = startCapture(
+    const again = await start(
       capture({ device: "other", label: "Studio Cam" }),
     );
-    await vi.advanceTimersByTimeAsync(0);
     expect(gum).toHaveBeenCalledWith(
       expect.objectContaining({
         video: expect.objectContaining({ deviceId: { exact: "other" } }),
@@ -184,8 +363,7 @@ describe("startCapture", () => {
 
   it("says a camera that isn't listed is missing, and tries again later", async () => {
     const enumerate = listed(device("other", "Other"));
-    const stop = startCapture(capture({ device: "id-1", label: "Studio Cam" }));
-    await vi.advanceTimersByTimeAsync(0);
+    const stop = await start(capture({ device: "id-1", label: "Studio Cam" }));
 
     expect(gum).not.toHaveBeenCalled();
     expect(sent(APP_EVENTS.CAMERA_FAILED)).toEqual([
@@ -193,7 +371,7 @@ describe("startCapture", () => {
     ]);
 
     enumerate.mockResolvedValue([device("id-1", "Studio Cam")]);
-    await vi.advanceTimersByTimeAsync(CAMERA_RETRY_MS - 1);
+    await vi.advanceTimersByTimeAsync(RETRY_MS - 1);
     expect(gum).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(gum).toHaveBeenCalledTimes(1);
@@ -210,16 +388,14 @@ describe("startCapture", () => {
     ["TypeError", "failed"],
   ])("sends a %s as %s", async (name, reason) => {
     gum.mockRejectedValue(new DOMException("", name));
-    const stop = startCapture(capture());
-    await vi.advanceTimersByTimeAsync(0);
+    const stop = await start();
 
     expect(sent(APP_EVENTS.CAMERA_FAILED)).toEqual([{ id: "cam-1", reason }]);
     stop();
   });
 
   it("says the camera went missing when its track ends, and stops it", async () => {
-    const stop = startCapture(capture());
-    await vi.advanceTimersByTimeAsync(0);
+    const stop = await start();
 
     source.end();
     await vi.advanceTimersByTimeAsync(0);
@@ -229,20 +405,24 @@ describe("startCapture", () => {
     ]);
     expect(source.track.stop).toHaveBeenCalled();
     // Opened again
-    await vi.advanceTimersByTimeAsync(CAMERA_RETRY_MS);
+    await vi.advanceTimersByTimeAsync(RETRY_MS);
     expect(gum).toHaveBeenCalledTimes(2);
     stop();
   });
 
   it("stops the camera and sends nothing after it's stopped", async () => {
-    const stop = startCapture(capture());
-    await vi.advanceTimersByTimeAsync(0);
+    const stop = await start();
+    await push(0);
+    const [encoder] = FakeEncoder.made;
 
-    source.frame();
+    source.frame(33_333);
     stop();
-    await vi.advanceTimersByTimeAsync(CAMERA_RETRY_MS * 2);
+    await vi.advanceTimersByTimeAsync(RETRY_MS * 2);
+    // A chunk the encoder still had
+    encoder.out("key", 0, [1]);
 
     expect(source.track.stop).toHaveBeenCalled();
+    expect(encoder.close).toHaveBeenCalled();
     expect(sent(APP_EVENTS.CAMERA_FRAME)).toEqual([]);
     expect(sent(APP_EVENTS.CAMERA_FAILED)).toEqual([]);
     expect(gum).toHaveBeenCalledTimes(1);
@@ -251,24 +431,22 @@ describe("startCapture", () => {
   it("stops a camera that opens after it was stopped", async () => {
     let open!: (stream: MediaStream) => void;
     gum.mockReturnValue(new Promise((resolve) => (open = resolve)));
-    const stop = startCapture(capture());
-    await vi.advanceTimersByTimeAsync(0);
+    const stop = await start();
 
     stop();
     open(source.stream);
     await vi.advanceTimersByTimeAsync(0);
 
     expect(source.track.stop).toHaveBeenCalled();
-    expect(canvases).toHaveLength(0);
+    expect(FakeEncoder.made).toHaveLength(0);
   });
 
   it("stops retrying once stopped", async () => {
     gum.mockRejectedValue(new DOMException("", "NotReadableError"));
-    const stop = startCapture(capture());
-    await vi.advanceTimersByTimeAsync(0);
+    const stop = await start();
 
     stop();
-    await vi.advanceTimersByTimeAsync(CAMERA_RETRY_MS * 3);
+    await vi.advanceTimersByTimeAsync(RETRY_MS * 3);
 
     expect(gum).toHaveBeenCalledTimes(1);
     expect(sent(APP_EVENTS.CAMERA_FAILED)).toHaveLength(1);

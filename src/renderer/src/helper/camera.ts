@@ -1,8 +1,17 @@
 import { StudioCameraQuality } from "@/common/schemas";
-import { APP_EVENTS, CameraCapture, CameraFailure } from "@/common/types";
+import {
+  APP_EVENTS,
+  CameraCapture,
+  CameraConfig,
+  CameraFailure,
+} from "@/common/types";
 
 // How long a failed capture waits before it tries again
 export const CAMERA_RETRY_MS = 5000;
+
+// A keyframe at least this often (by the frames' timestamps, in µs), so a
+// page that opens or falls behind waits at most this long for a picture
+const KEYFRAME_US = 2_000_000;
 
 const SIZES: Record<StudioCameraQuality, { width: number; height: number }> = {
   "720p": { width: 1280, height: 720 },
@@ -35,10 +44,60 @@ async function deviceOf(capture: CameraCapture) {
   return found.deviceId;
 }
 
+// The first config this computer encodes, by frame size
+const configs = new Map<string, VideoEncoderConfig>();
+
 /**
- * Captures a camera main asked for and sends its frames as JPEGs, until the
- * returned function stops it. A failure, or the camera going away, is sent
- * as CAMERA_FAILED and tried again CAMERA_RETRY_MS later.
+ * The encoder config for frames of that size: H.264 Constrained Baseline,
+ * Main, then High, in hardware first, then VP8; null when none works. Annex
+ * B, so pages decode H.264 without a description.
+ */
+async function configFor(width: number, height: number) {
+  const id = `${width}x${height}`;
+  const cached = configs.get(id);
+  if (cached) return cached;
+  // Level 4.0 past 720p, 3.1 up to it
+  const big = width * height > 1280 * 720;
+  const common = {
+    width,
+    height,
+    framerate: 30,
+    latencyMode: "realtime",
+    bitrate: big ? 6_000_000 : 4_000_000,
+  } as const;
+  const h264 = ["42e0", "4d00", "6400"].map(
+    (profile) => `avc1.${profile}${big ? "28" : "1f"}`,
+  );
+  const tries: VideoEncoderConfig[] = [
+    ...(["prefer-hardware", "no-preference"] as const).flatMap(
+      (hardwareAcceleration) =>
+        h264.map((codec) => ({
+          ...common,
+          codec,
+          hardwareAcceleration,
+          avc: { format: "annexb" as const },
+        })),
+    ),
+    { ...common, codec: "vp8" },
+  ];
+  for (const config of tries) {
+    const { supported } = await VideoEncoder.isConfigSupported(config);
+    if (!supported) continue;
+    configs.set(id, config);
+    return config;
+  }
+  return null;
+}
+
+const shut = (encoder: VideoEncoder | null) => {
+  if (encoder && encoder.state !== "closed") encoder.close();
+};
+
+/**
+ * Captures a camera main asked for and sends its frames as encoded video
+ * chunks, until the returned function stops it. A failure, or the camera
+ * going away, is sent as CAMERA_FAILED and tried again CAMERA_RETRY_MS
+ * later.
  */
 export function startCapture(capture: CameraCapture): () => void {
   const { id } = capture;
@@ -47,6 +106,9 @@ export function startCapture(capture: CameraCapture): () => void {
   let stream: MediaStream | null = null;
 
   const run = async () => {
+    let encoder: VideoEncoder | null = null;
+    // The encoder failed: the capture ends as if its camera did
+    let broken = false;
     try {
       const deviceId = await deviceOf(capture);
       if (stopped) return;
@@ -61,58 +123,87 @@ export function startCapture(capture: CameraCapture): () => void {
         },
       });
       if (stopped) return;
+      const tracks = stream.getTracks();
       const [track] = stream.getVideoTracks();
+
+      // Each encoder sends its chunks with its own config on keyframes
+      const open = (config: VideoEncoderConfig) => {
+        const sent: CameraConfig = {
+          codec: config.codec,
+          width: config.width,
+          height: config.height,
+        };
+        const made = new VideoEncoder({
+          output: (chunk) => {
+            if (stopped) return;
+            const frame = new Uint8Array(chunk.byteLength);
+            chunk.copyTo(frame);
+            const key = chunk.type === "key";
+            window.api.emit(APP_EVENTS.CAMERA_FRAME, {
+              id,
+              key,
+              timestamp: chunk.timestamp,
+              frame,
+              ...(key && { config: sent }),
+            });
+          },
+          error: () => {
+            broken = true;
+            // Ends the reader's stream
+            tracks.forEach((t) => t.stop());
+          },
+        });
+        made.configure(config);
+        return made;
+      };
+
       // Unlike requestVideoFrameCallback, it doesn't wait for paint, so it
       // runs while the window is hidden in the tray. It keeps only the
-      // newest frame while one encodes, so a slow encode drops frames
-      // instead of falling behind.
+      // newest frame while one waits, so frames the encoder can't take are
+      // dropped instead of falling behind.
       const reader = new MediaStreamTrackProcessor({
         track,
         maxBufferSize: 1,
       }).readable.getReader();
-      const canvas = new OffscreenCanvas(1, 1);
-      const context = canvas.getContext("2d")!;
-      // shortcut: the encode runs on the window's thread; move it to a worker
-      // (transfer processor.readable) if the UI stutters at 1080p or with
-      // several cameras
+      let size = { width: 0, height: 0 };
+      let lastKey = -Infinity;
       for (;;) {
         const { done, value: frame } = await reader.read();
         if (done) break;
         try {
-          if (
-            canvas.width !== frame.displayWidth ||
-            canvas.height !== frame.displayHeight
-          ) {
-            canvas.width = frame.displayWidth;
-            canvas.height = frame.displayHeight;
+          const width = frame.displayWidth & ~1;
+          const height = frame.displayHeight & ~1;
+          // The first frame, or the camera changed its format
+          if (!encoder || width !== size.width || height !== size.height) {
+            shut(encoder);
+            encoder = null;
+            const config = await configFor(width, height);
+            if (stopped) return;
+            if (!config) throw new Error("No encoder takes this camera");
+            size = { width, height };
+            encoder = open(config);
+            lastKey = -Infinity;
           }
-          context.drawImage(frame, 0, 0);
+          if (encoder.encodeQueueSize > 2) continue;
+          const keyFrame = frame.timestamp - lastKey >= KEYFRAME_US;
+          if (keyFrame) lastKey = frame.timestamp;
+          encoder.encode(frame, { keyFrame });
         } finally {
           frame.close();
         }
-        const blob = await canvas.convertToBlob({
-          type: "image/jpeg",
-          quality: 0.8,
-        });
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        if (stopped) return;
-        window.api.emit(APP_EVENTS.CAMERA_FRAME, {
-          id,
-          key: true,
-          timestamp: 0,
-          frame: bytes,
-        });
       }
+      if (broken) throw new Error("The encoder failed");
       // The track ended: the camera was unplugged
       throw missing();
     } catch (e) {
       if (stopped) return;
       const name =
         typeof e === "object" && e !== null && "name" in e ? e.name : null;
-      const reason = REASONS.get(name) ?? "failed";
+      const reason = broken ? "failed" : (REASONS.get(name) ?? "failed");
       window.api.emit(APP_EVENTS.CAMERA_FAILED, { id, reason });
       retry = setTimeout(run, CAMERA_RETRY_MS);
     } finally {
+      shut(encoder);
       stream?.getTracks().forEach((t) => t.stop());
       stream = null;
     }
