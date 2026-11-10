@@ -11,7 +11,7 @@ import {
   UserData,
 } from "@/common/types";
 import { describe, expect, it, vi } from "vitest";
-import { StudioService } from "./index";
+import { StudioService, studioText } from "./index";
 
 const NUMBERS: StudioNumbers = {
   likes: 1200,
@@ -394,5 +394,124 @@ describe("StudioService", () => {
     expect(onReact).not.toHaveBeenCalled();
     expect(studio.kept(text)).toBeNull();
     expect(studio.kept(viewer)).toBeNull();
+  });
+
+  it("reacts a group on its trigger with its id, and no values", () => {
+    const { studio, onReact, numbers } = setup();
+    const text = element("t", {
+      kind: "text",
+      text: "{username}",
+      trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+    });
+    const group = groupOf("G", {
+      when: "event",
+      trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+      elements: [text],
+    });
+    const share = groupOf("S", {
+      when: "event",
+      trigger: { type: TOKIO_EVENTS.SHARE, gifts: [] },
+    });
+    const overlay: StudioOverlay = { ...overlayOf(), items: [group, share] };
+
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user("Ana") },
+      [overlay],
+      numbers,
+    );
+
+    // The group first, then its elements
+    expect(onReact.mock.calls).toEqual([
+      ["o1", { element: "G" }],
+      ["o1", { element: "t", text: "Ana" }],
+    ]);
+    expect(studio.kept(text)).not.toBeNull();
+  });
+
+  it("counts a group's likes apart from an element's on Like", () => {
+    const { studio, onReact, numbers } = setup();
+    const trigger = { type: TOKIO_EVENTS.LIKE, gifts: [] };
+    const like = element("l", { trigger, likes_every: 10 });
+    const group = groupOf("G", {
+      when: "event",
+      trigger,
+      likes_every: 4,
+      elements: [like],
+    });
+    const likes = (likeCount: number) => ({
+      user: user("Ana"),
+      likeCount,
+      totalLikes: 0,
+    });
+    const overlays: StudioOverlay[] = [{ ...overlayOf(), items: [group] }];
+
+    for (const count of [3, 2, 9]) {
+      studio.handle(TOKIO_EVENTS.LIKE, likes(count), overlays, numbers);
+    }
+
+    // The group: 3, 5 (react, 1 left), 10 (react, 2 left). The element: 3, 5,
+    // 14 (react)
+    const reacted = (id: string) =>
+      onReact.mock.calls.filter(([, react]) => react.element === id);
+    expect(reacted("G")).toHaveLength(2);
+    expect(reacted("l")).toHaveLength(1);
+  });
+
+  it("never reacts a group or an element that loops", () => {
+    const { studio, onReact, numbers } = setup();
+    const loop = element("e", { when: "loop" });
+    const group = groupOf("G", { when: "loop", elements: [loop] });
+
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user("Ana") },
+      [{ ...overlayOf(), items: [group, loop] }],
+      numbers,
+    );
+
+    expect(onReact).not.toHaveBeenCalled();
+    expect(studio.kept(loop)).toBeNull();
+  });
+
+  it("tests the groups that react, not loops or always-on ones", () => {
+    const { studio, onReact } = setup();
+    const reacting = groupOf("R", { when: "animate" });
+    const loop = groupOf("L", { when: "loop" });
+    const always = groupOf("A", { when: "always" });
+    const mover = element("m", { when: "loop" });
+    const overlay: StudioOverlay = {
+      ...overlayOf(),
+      items: [always, reacting, loop, mover, element("e", {})],
+    };
+
+    expect(studio.test(overlay, NUMBERS)).toEqual([
+      { element: "R" },
+      { element: "e" },
+    ]);
+    expect(onReact).not.toHaveBeenCalled();
+  });
+
+  it("shows a loop text none of an earlier event's values", () => {
+    const { studio, numbers } = setup();
+    const trigger = { type: TOKIO_EVENTS.FOLLOW, gifts: [] };
+    const text = element("t", {
+      kind: "text",
+      text: "{username}!",
+      trigger,
+    });
+    if (text.kind !== "text") throw new Error("not a text");
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user("Ana") },
+      [overlayOf(text)],
+      numbers,
+    );
+    const values = studio.kept(text)?.values ?? null;
+    const loop = { ...text, when: "loop" as const };
+
+    expect(studioText(text, NUMBERS, values)).toBe("Ana!");
+    // A loop has no trigger's variables, so the name isn't filled in
+    expect(studioText(loop, NUMBERS, values)).toBe("{username}!");
   });
 });
