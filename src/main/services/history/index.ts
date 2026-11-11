@@ -681,6 +681,8 @@ export class HistoryService extends Service {
     dir: string,
     startedAt: number,
   ): Promise<LiveRecord | null> {
+    // A save still writing has its record out of _ended, and the file is older
+    await this._saving;
     // Not written yet when its save failed
     const ended = this._ended.find((r) => r.startedAt === startedAt);
     if (ended || !this._json) return ended ?? null;

@@ -633,6 +633,47 @@ describe("HistoryService", () => {
     expect(await history.getGifters({ to: 5000 })).toEqual([]);
   });
 
+  it("reads a LIVE that just ended once its save is written", async () => {
+    const history = await loaded();
+    history.start("kai", 1000);
+    history.end(2000);
+    history.start("kai", 3000);
+    gifts(history, [3100, gift(viewer("a"), 100)]);
+    // The periodic save's copy, without the gift after it
+    await history.save();
+    gifts(history, [3200, gift(viewer("a"), 50)]);
+    history.end(4000);
+
+    let open = () => {};
+    const gate = new Promise<void>((resolve) => (open = resolve));
+    const original = json.saveFile.bind(json);
+    vi.spyOn(json, "saveFile").mockImplementation(
+      async (file, schema, data) => {
+        if (file.endsWith("3000.json")) await gate;
+        return original(file, schema, data);
+      },
+    );
+    const loadFile = vi.spyOn(json, "loadFile");
+    const saved = history.save();
+    // Asked while the write waits: awaited first, they'd never end
+    const gifters = history.getGifters({ from: 3000 });
+    const live = history.getLive(3000);
+    // Any read that didn't wait finishes before the write
+    await Promise.all(loadFile.mock.results.map((r) => r.value));
+    open();
+
+    expect(await saved).toBe(true);
+    expect(await gifters).toEqual([
+      expect.objectContaining({ userId: "a", coins: 150, rank: 1 }),
+    ]);
+    expect(await live).toEqual(
+      expect.objectContaining({
+        endedAt: 4000,
+        gifters: [expect.objectContaining({ userId: "a", coins: 150 })],
+      }),
+    );
+  });
+
   describe(`past ${MAX_LIVES} LIVEs`, () => {
     const HOUR = 3_600_000;
     const ana = {
