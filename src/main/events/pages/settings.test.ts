@@ -23,7 +23,15 @@ import { TTSService } from "@/services/tts";
 import { language } from "@/helper/i18n";
 import { app, dialog } from "@test/electron";
 import { createHandler } from "@test/handler";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { strFromU8, unzipSync } from "fflate";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
@@ -1491,6 +1499,167 @@ describe("settings events", () => {
         }),
       ]);
     });
+  });
+
+  describe("SET_LOGS", () => {
+    it.each([
+      {
+        enabled: true,
+        level: "success",
+        code: FEEDBACK_CODES.DEBUG_LOGS_ENABLED,
+        message: "Detailed logs are on.",
+      },
+      {
+        enabled: false,
+        level: "info",
+        code: FEEDBACK_CODES.DEBUG_LOGS_DISABLED,
+        message: "Detailed logs are off.",
+      },
+    ])(
+      "saves enabled: $enabled, applies it to the logger and notifies",
+      async ({ enabled, ...expected }) => {
+        const setDebug = vi.spyOn(Logger, "setDebug");
+        const updateLogsSettings = vi.fn(async () => true);
+        const h = createHandler({
+          storeManagerService: { ...profileStore(), updateLogsSettings },
+        });
+
+        await h.invoke(settings, APP_EVENTS.SET_LOGS, { enabled });
+
+        expect(updateLogsSettings).toHaveBeenCalledWith(enabled);
+        expect(setDebug).toHaveBeenCalledWith(enabled);
+        expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+        expect(h.replies(APP_EVENTS_RESPONSE.SET_LOGS)).toEqual([
+          { success: true },
+        ]);
+        expect(h.notices).toEqual([expect.objectContaining(expected)]);
+      },
+    );
+
+    it("reports a change the store couldn't write, without a success notice", async () => {
+      const setDebug = vi.spyOn(Logger, "setDebug");
+      const h = createHandler({
+        storeManagerService: {
+          ...profileStore(),
+          updateLogsSettings: async () => false,
+        },
+      });
+
+      await h.invoke(settings, APP_EVENTS.SET_LOGS, { enabled: true });
+
+      // Main holds it, so the logger follows it
+      expect(setDebug).toHaveBeenCalledWith(true);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
+        {
+          success: true,
+          data: { settings: appSettings, profiles: expect.any(Array) },
+        },
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_LOGS)).toEqual([
+        {
+          success: false,
+          error: expect.objectContaining({
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        }),
+      ]);
+    });
+  });
+
+  describe("EXPORT_LOGS", () => {
+    const withFolder = async (
+      test: (logs: string, out: string) => Promise<void>,
+    ) => {
+      const home = await mkdtemp(join(tmpdir(), "tokio-test-"));
+      try {
+        const logs = join(home, "logs");
+        await mkdir(logs);
+        await test(logs, join(home, "out.zip"));
+      } finally {
+        await rm(home, { recursive: true, force: true });
+      }
+    };
+    const handler = (logsFolder: string) =>
+      createHandler({ pathManagerService: { folders: { logsFolder } } });
+
+    it("does nothing when the dialog is canceled", () =>
+      withFolder(async (logs, out) => {
+        const h = handler(logs);
+
+        await h.invoke(settings, APP_EVENTS.EXPORT_LOGS);
+
+        expect(dialog.showSaveDialog).toHaveBeenCalledWith(
+          h.win,
+          expect.objectContaining({
+            // In the last folder used, which earlier tests may have set
+            defaultPath: expect.stringMatching(
+              /(^|[\\/])tokio-logs-\d{4}-\d{2}-\d{2}\.zip$/,
+            ),
+          }),
+        );
+        await expect(stat(out)).rejects.toThrow();
+        expect(h.notices).toEqual([]);
+      }));
+
+    it("zips every log where the user chose and notifies", () =>
+      withFolder(async (logs, out) => {
+        await writeFile(join(logs, "system.log"), "system line\n");
+        await writeFile(join(logs, "music.old.log"), "old music line\n");
+        await writeFile(join(logs, "notes.txt"), "not a log");
+        dialog.showSaveDialog.mockResolvedValue({
+          canceled: false,
+          filePath: out,
+        });
+        const h = handler(logs);
+
+        await h.invoke(settings, APP_EVENTS.EXPORT_LOGS);
+
+        const files = unzipSync(await readFile(out));
+        expect(
+          Object.fromEntries(
+            Object.entries(files).map(([name, data]) => [
+              name,
+              strFromU8(data),
+            ]),
+          ),
+        ).toEqual({
+          "system.log": "system line\n",
+          "music.old.log": "old music line\n",
+        });
+        expect(h.notices).toEqual([
+          expect.objectContaining({
+            level: "success",
+            code: FEEDBACK_CODES.LOGS_EXPORTED,
+            message: "Logs exported.",
+          }),
+        ]);
+      }));
+
+    it("notifies when the logs can't be read", () =>
+      withFolder(async (logs, out) => {
+        dialog.showSaveDialog.mockResolvedValue({
+          canceled: false,
+          filePath: out,
+        });
+        const h = handler(join(logs, "missing"));
+
+        await h.invoke(settings, APP_EVENTS.EXPORT_LOGS);
+
+        await expect(stat(out)).rejects.toThrow();
+        expect(h.notices).toEqual([
+          expect.objectContaining({
+            level: "error",
+            code: FEEDBACK_CODES.LOGS_EXPORT_FAILED,
+            message: "Unable to export the logs.",
+          }),
+        ]);
+      }));
   });
 
   describe("SET_LANGUAGE", () => {

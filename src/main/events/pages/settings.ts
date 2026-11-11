@@ -9,8 +9,10 @@ import { SERVER_PORT } from "@/common/util";
 import { showOpenDialog, showSaveDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
+import { writeFileAtomic } from "@/helper/fs";
 import { sendGamesOverlay } from "@/helper/games";
 import { language, setLanguage, t } from "@/helper/i18n";
+import Logger, { localTime } from "@/logger";
 import { StoreManagerService } from "@/services/store";
 import { TTSService } from "@/services/tts";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
@@ -308,6 +310,33 @@ events.push(
 );
 
 events.push(
+  APP_EVENTS.EXPORT_LOGS,
+  async ({ pathManagerService, win, notifier }) => {
+    const res = await showSaveDialog(win, {
+      title: t("main.logs.exportTitle"),
+      defaultPath: `tokio-logs-${localTime().slice(0, 10)}.zip`,
+      filters: [{ name: t("main.logs.zipFilter"), extensions: ["zip"] }],
+    });
+    if (res.canceled || !res.filePath) return;
+    await writeFileAtomic(
+      res.filePath,
+      await Logger.zip(pathManagerService.folders.logsFolder),
+    );
+    notifier.success(
+      "system",
+      FEEDBACK_CODES.LOGS_EXPORTED,
+      t("main.logs.exported"),
+    );
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.LOGS_EXPORT_FAILED,
+      message: "main.failure.exportLogs",
+    },
+  },
+);
+
+events.push(
   APP_EVENTS.IMPORT_ENTITY,
   async ({ storeManagerService, win, notifier }, e, { type }) => {
     const name = t(ENTITY_NAMES[type]);
@@ -549,6 +578,39 @@ events.push(
       message: "main.failure.setTray",
     },
     onError: replyFailure(APP_EVENTS_RESPONSE.SET_TRAY),
+  },
+);
+
+events.push(
+  APP_EVENTS.SET_LOGS,
+  async ({ storeManagerService, notifier }, e, { enabled }) => {
+    const saved = await storeManagerService.updateLogsSettings(enabled);
+    Logger.setDebug(enabled);
+    replySettings(e, storeManagerService);
+    if (!saved) throw saveFailure();
+    e.reply(APP_EVENTS_RESPONSE.SET_LOGS, {
+      success: true,
+    });
+    if (enabled) {
+      notifier.success(
+        "system",
+        FEEDBACK_CODES.DEBUG_LOGS_ENABLED,
+        t("main.settings.debugLogsOn"),
+      );
+    } else {
+      notifier.info(
+        "system",
+        FEEDBACK_CODES.DEBUG_LOGS_DISABLED,
+        t("main.settings.debugLogsOff"),
+      );
+    }
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "main.failure.setLogs",
+    },
+    onError: replyFailure(APP_EVENTS_RESPONSE.SET_LOGS),
   },
 );
 
