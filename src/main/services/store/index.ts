@@ -622,9 +622,10 @@ export class StoreManagerService extends Service {
       // When the active one doesn't load, its file says why.
       let profile: Profile | null;
       try {
-        profile =
-          (active ? await this.getProfileData({ fresh: true }) : null) ??
-          (await this._readChecked(path, ProfileSchema)).data;
+        profile = active ? await this.getProfileData({ fresh: true }) : null;
+        // A switch during the read gave the new profile: this one's file then
+        if (profileFile !== this._activeProfileFile()) profile = null;
+        profile ??= (await this._readChecked(path, ProfileSchema)).data;
       } catch (error) {
         // A missing or broken file can't use the file, one held for a moment
         // might.
@@ -639,17 +640,8 @@ export class StoreManagerService extends Service {
       const updates = profile && change(profile);
       if (!updates) continue;
 
-      // The active one through updateProfileData, which keeps it in memory
-      const done = active
-        ? await this.updateProfileData(updates)
-        : (
-            await this._jsonManagerService.updateFile(
-              path,
-              ProfileSchema,
-              updates,
-            )
-          ).success;
-      saved &&= done;
+      // Through updateProfileData, which keeps the active one in memory
+      saved &&= await this.updateProfileData(updates, profileFile);
     }
     return saved;
   }
