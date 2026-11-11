@@ -722,15 +722,15 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   const toolSection = (name) =>
     page.locator("section").filter({ has: toolHeading(name) });
 
-  // Countdown timer
-  await tool(tr("Countdown timer"));
+  // Countdown
+  await tool(tr("Countdown"));
   await page
     .getByRole("group", {
       name: `${tr("Title", "tools.look.titleField")} ${tr("(optional)")}`,
     })
     .getByRole("textbox")
     .fill("Subathon");
-  await toolHeading(tr("Countdown timer")).scrollIntoViewIfNeeded();
+  await toolHeading(tr("Countdown")).scrollIntoViewIfNeeded();
   await page
     .getByRole("button", {
       name: tr("Start", "tools.countdown.start"),
@@ -742,9 +742,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await shoot("countdown-timer");
   await crop("timer-preview", page.getByRole("timer").locator(".."));
   // The controls, under the preview timer-preview shows
-  const timer = toolSection(tr("Countdown timer")).locator(
-    '[class*="section_body"]',
-  );
+  const timer = toolSection(tr("Countdown")).locator('[class*="section_body"]');
   await crop(
     "timer-controls",
     [
@@ -871,7 +869,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await studioNumber("Left", "studio.fields.cropLeft").fill("18");
   await studioNumber("Right", "studio.fields.cropRight").fill("18");
   const zoomIn = page.getByRole("button", {
-    name: tr("Zoom in (Ctrl+=)"),
+    name: tr("Zoom in (Ctrl++)"),
     exact: true,
   });
   await zoomIn.click();

@@ -44,7 +44,7 @@ describe("Tools", () => {
   it("lists the tools in order, each a link to its page", async () => {
     await renderApp("/tools");
     const names = [
-      "Countdown timer",
+      "Countdown",
       "Overlay Studio",
       "Coin stats",
       "Fans",
@@ -60,7 +60,7 @@ describe("Tools", () => {
       "/tools/fans",
       "/tools/test-overlays",
     ]);
-    expect(row("Countdown timer")).toHaveAccessibleDescription(
+    expect(row("Countdown")).toHaveAccessibleDescription(
       "A countdown viewers add time to.",
     );
   });
@@ -78,8 +78,8 @@ describe("Tools", () => {
   it("shows nothing on the right until main sends it", async () => {
     await renderApp("/tools");
 
-    expect(row("Countdown timer")).toHaveTextContent(
-      /^Countdown timerA countdown viewers add time to\.$/,
+    expect(row("Countdown")).toHaveTextContent(
+      /^CountdownA countdown viewers add time to\.$/,
     );
     expect(row("Fans")).toHaveTextContent(
       /^FansViewers with a fan level, highest first\.$/,
@@ -97,7 +97,7 @@ describe("Tools", () => {
     await fans(fan("Jules", 32), fan("Sofi", 28));
     await testOverlays(CLOCK);
 
-    expect(row("Countdown timer")).toHaveAccessibleDescription(
+    expect(row("Countdown")).toHaveAccessibleDescription(
       "A countdown viewers add time to. 01:00:00 Ready",
     );
     // The newest LIVE's
@@ -163,7 +163,7 @@ describe("Tools", () => {
   it("ticks the time left only while the timer runs", async () => {
     vi.useFakeTimers();
     await renderApp("/tools");
-    const clock = () => within(row("Countdown timer"));
+    const clock = () => within(row("Countdown"));
 
     await timer((t) => {
       t.state = { status: "running", remaining: 10_000 };
@@ -185,12 +185,12 @@ describe("Tools", () => {
     await renderApp("/tools");
 
     await timer();
-    expect(row("Countdown timer").className).not.toMatch(/tool_live/);
+    expect(row("Countdown").className).not.toMatch(/tool_live/);
 
     await timer((t) => {
       t.state = { status: "running", remaining: 10_000 };
     });
-    expect(row("Countdown timer").className).toMatch(/tool_live/);
+    expect(row("Countdown").className).toMatch(/tool_live/);
     expect(row("Coin stats").className).not.toMatch(/tool_live/);
   });
 
@@ -202,7 +202,7 @@ describe("Tools", () => {
       t.state = { status: "idle", remaining: 60 * 60_000 };
     });
 
-    expect(within(row("Countdown timer")).getByText("01:30:00")).toBeVisible();
+    expect(within(row("Countdown")).getByText("01:30:00")).toBeVisible();
   });
 
   it("asks for the LIVEs and the fans again when the profile changes", async () => {
@@ -221,7 +221,7 @@ describe("Tools", () => {
   });
 
   it.each([
-    ["Countdown timer", "/tools/timer"],
+    ["Countdown", "/tools/timer"],
     ["Overlay Studio", "/tools/studio"],
     ["Coin stats", "/tools/coin-stats"],
     ["Fans", "/tools/fans"],

@@ -44,7 +44,7 @@ describe("CountdownTimer", () => {
   it("shows its header and a loader until the timer comes", async () => {
     renderWithProviders(<CountdownTimer />);
 
-    const header = section("Countdown timer");
+    const header = section("Countdown");
     expect(header.getByText("A countdown viewers add time to.")).toBeVisible();
     expect(
       header.getByRole("button", { name: "Back to Tools" }),
@@ -55,7 +55,7 @@ describe("CountdownTimer", () => {
 
     expect(screen.queryByRole("status", { name: "Loading" })).toBeNull();
     expect(
-      section("Countdown timer").getByRole("button", { name: "Back to Tools" }),
+      section("Countdown").getByRole("button", { name: "Back to Tools" }),
     ).toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe("CountdownTimer", () => {
     );
     expect(screen.getByText(notice)).toBeInTheDocument();
     // Once, above the sections
-    expect(section("Countdown timer").queryByText(notice)).toBeNull();
+    expect(section("Countdown").queryByText(notice)).toBeNull();
 
     await send(
       APP_EVENTS_RESPONSE.GET_SETTINGS,
@@ -247,7 +247,7 @@ describe("CountdownTimer", () => {
 
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
-    ).toEqual(["Countdown timer", "Timer look", "Time added"]);
+    ).toEqual(["Countdown", "Timer look", "Time added"]);
   });
 
   it("gives chat a keyword and a cooldown, and no boxes, joins or envelopes", async () => {

@@ -2049,7 +2049,7 @@ describe("StudioEditor", () => {
     await user.click(field("Overlay").getByText("Alert: Party"));
 
     expect(screen.queryByText("Alert: Quiet")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Countdown timer").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Countdown").length).toBeGreaterThan(0);
   });
 
   it("says when the overlay server is off", async () => {
@@ -2503,7 +2503,7 @@ describe("StudioEditor", () => {
       sized();
       const button = (name: string) => page().getByRole("button", { name });
 
-      await user.click(button("Zoom in (Ctrl+=)"));
+      await user.click(button("Zoom in (Ctrl++)"));
       expect(zoomLevel()).toHaveTextContent("75%");
       expect(area().style.width).toBe("810px");
       expect(area().style.height).toBe("1440px");
@@ -2618,7 +2618,7 @@ describe("StudioEditor", () => {
       expect(drawnRulers()).toHaveLength(2);
       // At half size, a number every 200 px of the canvas
       await user.click(
-        page().getByRole("button", { name: "Zoom in (Ctrl+=)" }),
+        page().getByRole("button", { name: "Zoom in (Ctrl++)" }),
       );
       await user.click(
         page().getByRole("button", { name: "Zoom out (Ctrl+-)" }),

@@ -245,7 +245,7 @@ describe("tools events", () => {
     const settings = TimerSettingsSchema.parse({});
     const timerFailure = {
       code: FEEDBACK_CODES.TIMER_FAILED,
-      message: "Unable to update the countdown timer.",
+      message: "Unable to update the countdown.",
     };
 
     // The service's push answers the changes, they reply only failures

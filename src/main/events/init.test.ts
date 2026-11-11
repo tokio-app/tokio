@@ -1694,7 +1694,7 @@ describe("init events", () => {
                   level: "info",
                   source: "system",
                   message:
-                    "The countdown timer paused, since Tokio is no longer connected to the LIVE.",
+                    "The countdown paused, since Tokio is no longer connected to the LIVE.",
                 }),
               ]
             : [],
@@ -1713,7 +1713,7 @@ describe("init events", () => {
         expect.objectContaining({
           level: "warning",
           source: "system",
-          message: "Unable to save the countdown timer.",
+          message: "Unable to save the countdown.",
         }),
       ]);
     });

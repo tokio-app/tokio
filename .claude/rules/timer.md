@@ -8,9 +8,9 @@ paths:
   - "src/renderer/src/pages/Tools/**"
 ---
 
-# Countdown timer
+# Countdown
 
-A subathon clock that viewers add time to. `TimerService` (`src/main/services/timer`) holds the active profile's timer, its overlay is served at `/timer/` (`TIMER_PATH`), and **Tools → Countdown timer** drives it.
+A subathon clock that viewers add time to. `TimerService` (`src/main/services/timer`) holds the active profile's timer, its overlay is served at `/timer/` (`TIMER_PATH`), and **Tools → Countdown** drives it.
 
 ## Clock
 
