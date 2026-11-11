@@ -99,6 +99,7 @@ paths:
 - A games embed's `column` (1 to `GAMES_OVERLAY_MAX_COLUMNS`) places one column on its own, `null` all of them.
 - `StudioSource` has one union member per `type`, so a chain of `if`s on `type` narrows to the last.
 - An overlay embedded twice, in one studio overlay or two, shares its settings and saved state, as two browser sources of it do.
+- An embedded imported overlay is same-origin with the Studio page and can read it, the camera key included, so imported overlays are trusted code. Not sandboxed: that breaks overlays built with Vite (the user's call).
 
 ## Cameras
 
