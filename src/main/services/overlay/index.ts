@@ -220,7 +220,9 @@ export class OverlayService extends Service {
         filter: async (src) => !(await lstat(src)).isSymbolicLink(),
       });
       // cp keeps a read-only mode, and Windows can't replace such a file:
-      // its HTML and settings couldn't be written, now or after a save.
+      // its HTML and settings couldn't be written, now or after a save. A
+      // read-only folder (a mounted DMG's) couldn't hold index.html.tmp.
+      await chmod(staging, (await lstat(staging)).mode | 0o200);
       for (const file of ["index.html", "config.yaml", "config.yml"]) {
         const path = join(staging, file);
         const found = await lstat(path).catch(() => null);

@@ -605,6 +605,27 @@ describe("OverlayService", () => {
       }
     });
 
+    // Windows has no read-only folders to copy.
+    describe.runIf(process.platform !== "win32")(
+      "from a read-only folder",
+      () => {
+        it("makes the copy's folder writable, so its HTML can be written", async () => {
+          const source = join(root, "source");
+          await configurable(source);
+          await chmod(source, 0o555);
+
+          try {
+            expect(await service.import(source, gifts)).toEqual(done);
+
+            const [id] = await readdir(folder);
+            expect((await lstat(join(folder, id))).mode & 0o200).toBe(0o200);
+          } finally {
+            await chmod(source, 0o755);
+          }
+        });
+      },
+    );
+
     it("leaves out links, so the server can't reach files outside it", async () => {
       const source = join(root, "source");
       await configurable(source);

@@ -33,7 +33,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 ## Files
 
 - An import copies the folder a picked link points to (`realpath`), leaving out every link inside, into `.install-<uuid>` inside the overlays folder. It checks the copy there (`processOverlay`, the setup block, then `processHTML`), then renames it into its UUID folder (`renameWithRetry`).
-  - `cp` keeps a read-only mode, which Windows can't rename over, so the copy's `index.html`, `config.yaml` and `config.yml` get the owner's write bit first.
+  - `cp` keeps a read-only mode, which Windows can't rename over, so the copy's `index.html`, `config.yaml` and `config.yml` get the owner's write bit first, and so does the staging folder: copied from a read-only one (a mounted DMG on macOS), it couldn't hold `index.html.tmp`. Its subfolders keep their mode.
   - A failure deletes the staging folder. One a quit leaves behind, `load` deletes.
 - A remove first renames the overlay's folder to `.old-<uuid>` (a missing folder counts as gone), so a folder another program holds stays whole and stored. Only then does it stop serving it, forget it and delete `.old-*`, which `load` deletes if that fails.
 - `YAMLManagerService` logs to `overlays.log`, so a refused `info.yaml` or `config.yaml` says why there. `processOverlay` reads `info.yaml` itself and parses it with `parseFile`, since `loadFile` takes an empty or comment-only file for a missing one and logs nothing.
