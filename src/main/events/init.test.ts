@@ -2126,6 +2126,25 @@ describe("init events", () => {
       ]);
     });
 
+    it("says it again every 30 seconds while it retries", async () => {
+      const s = await live();
+      const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
+      vi.useFakeTimers();
+
+      reconnect("reconnecting");
+      reconnect("reconnected");
+      vi.advanceTimersByTime(10_000);
+      reconnect("reconnecting");
+      vi.advanceTimersByTime(21_000);
+      reconnect("reconnecting");
+
+      expect(s.h.notices.map((n) => n.code)).toEqual([
+        FEEDBACK_CODES.RECONNECTING,
+        FEEDBACK_CODES.RECONNECTED,
+        FEEDBACK_CODES.RECONNECTING,
+      ]);
+    });
+
     it.each([undefined, {}])(
       "says it disconnected for any other reason (%o)",
       async (data) => {

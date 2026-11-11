@@ -190,6 +190,11 @@ export class TikTokLiveConnector extends ConnectorProvider {
       },
     );
 
+    // Once per attempt, so a drop that lasts says so again
+    connection.on(WebcastEvent.RECONNECTING, () => {
+      this._onReconnect?.("reconnecting");
+    });
+
     connection.on(WebcastEvent.SHARE, (tdata) => {
       this.emit(TOKIO_EVENTS.SHARE, {
         shareCount: tdata.shareCount,
