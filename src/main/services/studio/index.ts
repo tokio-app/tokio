@@ -37,6 +37,9 @@ export type StudioKept = {
 
 type Kept = StudioKept & { overlay: string };
 
+// A Test's sample, until its element's seconds and exit are over
+type Tested = { kept: StudioKept; overlay: string; until: number };
+
 /**
  * A text element's text: the live numbers, and the event's values when it
  * reacts (its trigger's variables read "" before its first event).
@@ -82,6 +85,9 @@ export class StudioService extends Service {
   // Each element's last event, by element id, until Tokio quits. A hidden
   // layer's elements react too, so the layer shows the latest when shown
   private _kept = new Map<string, Kept>();
+  // Each element's Test sample, by element id, while it shows: views come
+  // again on every numbers push, and would show its last event at once
+  private _tests = new Map<string, Tested>();
   private _onReact?: (overlay: string, react: StudioReact) => void;
 
   // One listener, init.ts, which sends it to the overlay's page
@@ -121,6 +127,7 @@ export class StudioService extends Service {
           values,
           ...viewerOf(payload),
         };
+        this._tests.delete(item.id);
         this._kept.set(item.id, { ...kept, overlay: overlay.id });
         this._onReact?.(overlay.id, this._react(item, kept, now));
       }
@@ -128,18 +135,27 @@ export class StudioService extends Service {
   }
 
   /**
-   * What an element shows from its last event, none before its first or
-   * once its trigger changed.
+   * What an element shows from its last event, or from a Test while it
+   * shows, none before its first or once its trigger changed.
    */
   public kept(element: StudioElement): StudioKept | null {
+    const tested = this._tests.get(element.id);
+    if (tested) {
+      const { kept, until } = tested;
+      if (performance.now() < until && kept.trigger === element.trigger.type) {
+        return kept;
+      }
+      this._tests.delete(element.id);
+    }
     const kept = this._kept.get(element.id);
     return kept && kept.trigger === element.trigger.type ? kept : null;
   }
 
   /**
    * Every element and group of the overlay that reacts, once, with a sample
-   * of its trigger's event. Nothing is kept, so a reload shows the real last
-   * event.
+   * of its trigger's event. Each element keeps its sample for its seconds
+   * and a second for its exit (EXIT_MS, in the stage), unless a real event
+   * comes first, then shows its real last event again.
    */
   public test(overlay: StudioOverlay, numbers: StudioNumbers): StudioReact[] {
     // One sample per trigger, so the elements one event sets off show the
@@ -164,12 +180,20 @@ export class StudioService extends Service {
           values,
           ...viewerOf(values),
         };
+        this._tests.set(item.id, {
+          kept: sample,
+          overlay: overlay.id,
+          until: performance.now() + (item.seconds + 1) * 1000,
+        });
         return this._react(item, sample, () => numbers);
       });
   }
 
-  /** Forgets what a removed overlay's elements kept. */
+  /** Forgets what a removed overlay's elements kept, Test's samples too. */
   public forget(overlay: string) {
+    for (const [id, tested] of this._tests) {
+      if (tested.overlay === overlay) this._tests.delete(id);
+    }
     for (const [id, kept] of this._kept) {
       if (kept.overlay !== overlay) continue;
       this._kept.delete(id);
