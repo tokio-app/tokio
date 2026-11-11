@@ -65,6 +65,7 @@ paths:
 
 - The page applies a `SET_ALERT_SOUND` reply only while that alert waits for one (`asked`, set by `onRequest` from a Browse or MyInstants download), even after the picker closed. A library or TTS pick made since wins over a late reply. Media does the same with `askedMedia`, `SET_ALERT_MEDIA` and `appliedMedia`.
 - `onRequest` numbers each request: `DOWNLOAD_SOUND`, `IMPORT_SOUND` and `IMPORT_MEDIA` carry it as `request`, and the `SET_ALERT_*` replies echo it, failures included. A reply applies only if newer than the last one applied for that alert (`applied`), and the picker shows only the newest request's failure.
+- When the library's store file can't be written, the file still goes to the alert: the success reply comes first, then the `saveFailure()` one with the same `request`, which the page ignores and the picker shows. `upload` adds a listed file again for the same reason, counting only new ones.
 - The counter is module-level (`requests` in `pages/Alerts`), one for sounds and media, so a reply from before leaving the page can't beat a newer request.
 - `asked` and `askedMedia` are cleared on `useEditableSettings`'s `switched`, since a cloned profile has the same alert ids.
 - `useAlertTest` numbers `TEST_ALERT` the same way, so a late reply for a test restarted on the same id (which also keys its gain, `lengths` and `PlayButton`) is dropped.

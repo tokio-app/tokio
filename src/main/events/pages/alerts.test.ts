@@ -241,6 +241,29 @@ describe("alerts events", () => {
       ]);
     });
 
+    it("gives the alert the sound it holds, then says the library can't be saved", async () => {
+      const { h, storeManagerService } = setup({
+        success: true,
+        data: airhorn,
+      });
+      storeManagerService.addSound.mockResolvedValue(false);
+
+      await h.invoke(alerts, APP_EVENTS.DOWNLOAD_SOUND, request);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_SOUND)).toEqual([
+        { success: true, id: "alert-1", request: 3, sound: airhorn },
+        {
+          success: false,
+          id: "alert-1",
+          request: 3,
+          error: expect.objectContaining({
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
     it.each([{ success: false, error: "HTTP 404" }, { success: true }])(
       "replies the alert's id without a notice when it fails (%o)",
       async (res) => {
@@ -328,6 +351,30 @@ describe("alerts events", () => {
           message: 'Sound "ding" added.',
         }),
       ]);
+    });
+
+    it("gives the alert the sound it holds, then says the library can't be saved", async () => {
+      const { h, storeManagerService } = setup();
+      storeManagerService.addSound.mockResolvedValue(false);
+      pickFiles("/music/ding.wav");
+
+      await h.invoke(alerts, APP_EVENTS.IMPORT_SOUND, {
+        id: "alert-1",
+        request: 3,
+      });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_SOUND)).toEqual([
+        { success: true, id: "alert-1", request: 3, sound: ding },
+        {
+          success: false,
+          id: "alert-1",
+          request: 3,
+          error: expect.objectContaining({
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+      expect(h.notices).toEqual([]);
     });
 
     it("replies the alert's id without a notice when the file can't be used", async () => {
@@ -768,7 +815,7 @@ describe("alerts events", () => {
       ]);
     });
 
-    it("counts only the sounds new to the library", async () => {
+    it("counts only the sounds new to the library, and saves the others again", async () => {
       const { h, storeManagerService } = setup();
       const sounds = [{ name: "old", file: "old.mp3.hash" }];
       storeManagerService.getSounds = () => sounds;
@@ -780,7 +827,10 @@ describe("alerts events", () => {
 
       await h.invoke(alerts, APP_EVENTS.UPLOAD_SOUNDS);
 
+      // A failed save may have left a listed one out of the store file.
       expect(storeManagerService.addSound.mock.calls).toEqual([
+        [{ name: "old.mp3", file: "old.mp3.hash" }],
+        [{ name: "a.mp3", file: "a.mp3.hash" }],
         [{ name: "a.mp3", file: "a.mp3.hash" }],
       ]);
       expect(h.notices).toEqual([
@@ -1112,7 +1162,7 @@ describe("alerts events", () => {
       expect(logError).not.toHaveBeenCalled();
     });
 
-    it("gives the alert nothing when the library can't be saved", async () => {
+    it("gives the alert the file it holds, then says the library can't be saved", async () => {
       const { h, storeManagerService } = setup();
       storeManagerService.addMedia.mockResolvedValue(false);
       pickFiles("/pictures/party.gif");
@@ -1123,6 +1173,7 @@ describe("alerts events", () => {
       });
 
       expect(h.replies(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA)).toEqual([
+        { success: true, id: "alert-1", request: 3, media: party },
         {
           success: false,
           id: "alert-1",
@@ -1132,7 +1183,10 @@ describe("alerts events", () => {
           }),
         },
       ]);
-      expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([]);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
+        { success: true, data: [party] },
+      ]);
+      expect(h.notices).toEqual([]);
     });
   });
 
@@ -1201,8 +1255,10 @@ describe("alerts events", () => {
       await h.invoke(alerts, APP_EVENTS.UPLOAD_MEDIA);
 
       expect(storeManagerService.addMedia.mock.calls).toEqual([
+        [{ name: "old.png", file: "old.png.hash" }],
         [{ name: "a.png", file: "a.png.hash" }],
         [{ name: "b.png", file: "b.png.hash" }],
+        [{ name: "a.png", file: "a.png.hash" }],
       ]);
       expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
         {
