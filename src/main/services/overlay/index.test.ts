@@ -1000,6 +1000,34 @@ describe("OverlayService", () => {
         expect(await readdir(dir())).toContain("new.js");
       });
 
+      it("keeps the installed version when it stays held", async () => {
+        vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+        publish(release("1.0.1", { "new.js": "2" }));
+        const fs =
+          await vi.importActual<typeof import("node:fs/promises")>(
+            "node:fs/promises",
+          );
+        const files = await readdir(dir());
+        // The kept settings' and the new HTML's renames, then the installed
+        // version's: renameWithRetry's 5 retries and its last try
+        const busy = Object.assign(new Error("EBUSY"), { code: "EBUSY" });
+        const renames = vi
+          .mocked(rename)
+          .mockImplementationOnce(fs.rename)
+          .mockImplementationOnce(fs.rename);
+        for (let i = 0; i < 6; i++) renames.mockRejectedValueOnce(busy);
+
+        expect(await service.installFromCatalog("gift-jar", gifts)).toEqual({
+          success: false,
+        });
+
+        // The last try moved the installed version, never the new one
+        expect(renames.mock.lastCall?.[0]).toBe(dir());
+        expect(await readdir(folder)).toEqual(["gift-jar"]);
+        expect(await readdir(dir())).toEqual(files);
+        expect(stored).toMatchObject([{ id: "gift-jar", version: "1.0.0" }]);
+      });
+
       it("logs where the installed version is when it can't be put back", async () => {
         const error = vi.spyOn(Logger, "error");
 

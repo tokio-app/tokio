@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   downloadOverlay,
   extractZip,
+  MAX_ZIP_BYTES,
   parseCatalog,
   RELEASES_PREFIX,
 } from "./catalog";
@@ -132,6 +133,16 @@ describe("downloadOverlay", () => {
     vi.stubGlobal("fetch", async () => new Response(null, { status: 404 }));
 
     await expect(downloadOverlay(entry())).rejects.toThrow("404");
+  });
+
+  it("never asks for a zip the catalog says is too big", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      downloadOverlay(entry({ size: MAX_ZIP_BYTES + 1 })),
+    ).rejects.toThrow("too big");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("only downloads from the overlays' releases", async () => {

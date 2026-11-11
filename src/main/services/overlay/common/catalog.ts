@@ -15,7 +15,7 @@ export const RELEASES_PREFIX =
   "https://github.com/tokio-app/overlays/releases/download/";
 
 // Overlays weigh a few KB, this only stops a wrong catalog.
-const MAX_ZIP_BYTES = 50 * 1024 * 1024;
+export const MAX_ZIP_BYTES = 50 * 1024 * 1024;
 const CATALOG_TIMEOUT_MS = 15_000;
 const DOWNLOAD_TIMEOUT_MS = 60_000;
 
