@@ -7,7 +7,6 @@ import {
   StudioElement,
   StudioElementKind,
   StudioCrop,
-  StudioElementOf,
   StudioGroup,
   StudioItem,
   StudioOverlay,
@@ -66,7 +65,6 @@ import { Embed } from "./Embed";
 import {
   alignTo,
   Box,
-  copyItem,
   flipInFrame,
   groupFrame,
   reframe,
@@ -86,8 +84,10 @@ import {
   stepElement,
   whenText,
   WHOLE,
+  withoutMedia,
   Words,
 } from "./helper";
+import * as clipboard from "./clipboard";
 import { GroupSettings } from "./GroupSettings";
 import { ElementFlags, GroupFlags, LayersPanel } from "./LayersPanel";
 import { OverlaySettings } from "./OverlaySettings";
@@ -109,13 +109,6 @@ const TEXT_FIELDS =
 // And their own copy, cut and paste, number fields too
 const TYPED_FIELDS =
   "textarea, input:not([type=checkbox]):not([type=radio]):not([type=range])";
-
-// What Ctrl+C or Ctrl+X took, kept until Tokio quits so it pastes into
-// another overlay too, and how many steps down and right the next paste goes:
-// each one lands a step further, the first after a cut where it was
-let clipboard: { item: StudioItem; steps: number } | null = null;
-// A paste's step, in px of the canvas
-const PASTE_STEP = 20;
 
 /**
  * An Overlay Studio overlay's editor: its groups and elements, the
@@ -272,18 +265,10 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   // bring it back, nor an undo
   useIpcListener(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, (res) => {
     if (res?.field !== "media") return;
-    const shows = (e: StudioElement): e is StudioElementOf<"media"> =>
-      e.kind === "media" && e.file === res.file;
-    history.sweep((o) =>
-      studioElements(o).some(shows)
-        ? {
-            ...o,
-            items: mapElements(o.items, (e) =>
-              shows(e) ? { ...e, file: "", name: "" } : e,
-            ),
-          }
-        : o,
-    );
+    history.sweep((o) => {
+      const items = withoutMedia(o.items, res.file);
+      return items === o.items ? o : { ...o, items };
+    });
   });
 
   const alerts = profile?.alerts.items;
@@ -523,7 +508,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const copy = (cut: boolean) => {
     const item = group ?? element;
     if (!item) return;
-    clipboard = { item, steps: cut ? 0 : 1 };
+    clipboard.copy(item, cut);
     if (cut) remove(item.id);
   };
 
@@ -531,13 +516,12 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   // group or the selected element's group, which unfolds, else on its own in
   // front, and a group on its own in front. Not past the caps.
   const paste = () => {
-    if (!clipboard) return;
-    const { item } = clipboard;
-    const count = item.kind === "group" ? item.elements.length : 1;
-    if (elements.length + count > STUDIO_MAX_ELEMENTS) return;
-    if (item.kind === "group" && groups.length >= STUDIO_MAX_GROUPS) return;
-    const pasted = copyItem(item, PASTE_STEP * clipboard.steps);
-    clipboard.steps += 1;
+    const pasted = clipboard.paste((item) => {
+      const count = item.kind === "group" ? item.elements.length : 1;
+      if (elements.length + count > STUDIO_MAX_ELEMENTS) return false;
+      return item.kind !== "group" || groups.length < STUDIO_MAX_GROUPS;
+    });
+    if (!pasted) return;
     if (pasted.kind !== "group" && target) {
       changeGroup(target.id, (g) => ({
         ...g,

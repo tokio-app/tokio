@@ -2725,6 +2725,58 @@ describe("StudioEditor", () => {
       expect(lastSave()!.items).toMatchObject([{ x: 120, y: 120 }]);
     });
 
+    describe("a deleted file", () => {
+      const removed = () =>
+        send(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, {
+          field: "media",
+          file: "party.png",
+        });
+      const pastedFile = () => {
+        const items = lastSave()?.items ?? [];
+        return items.at(-1)?.kind === "media" ? items.at(-1) : undefined;
+      };
+
+      it("leaves the clipboard while the editor is open", async () => {
+        const media = elementOf("media", { file: "party.png", name: "Party" });
+        const { user } = await open(holding(media));
+        await user.click(row(/^Party/));
+        key("c");
+
+        await removed();
+        await studio(await saved());
+        key("v");
+
+        await waitFor(() => expect(lastSave()?.items).toHaveLength(2));
+        expect(pastedFile()).toMatchObject({ file: "", name: "" });
+      });
+
+      it("leaves the clipboard with the editor closed", async () => {
+        const media = elementOf("media", { file: "party.png", name: "Party" });
+        const main = holding(media);
+        const other = studioOverlay("Other");
+        const { user, router } = await open(main);
+        await user.click(row(/^Party/));
+        key("c");
+
+        await act(() => router.navigate({ to: "/tools/studio" }));
+        await removed();
+        await act(() =>
+          router.navigate({
+            to: "/tools/studio/$id",
+            params: { id: other.id },
+          }),
+        );
+        await studio(main, other);
+        expect(
+          await page().findByRole("heading", { name: "Other" }),
+        ).toBeVisible();
+        key("v");
+
+        await waitFor(() => expect(lastSave()?.id).toBe(other.id));
+        expect(pastedFile()).toMatchObject({ file: "", name: "" });
+      });
+    });
+
     it("leaves copy, cut and paste to a field", async () => {
       const { user } = await open(holding(elementOf("shape")));
       await user.click(row(/^Rectangle/));

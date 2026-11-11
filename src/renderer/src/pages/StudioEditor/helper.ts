@@ -238,6 +238,22 @@ export const mapElements = (
   );
 
 /**
+ * The items with a deleted media file taken off every element that shows
+ * it, which stays, empty. The same items when none shows it.
+ */
+export function withoutMedia(items: StudioItem[], file: string): StudioItem[] {
+  const shows = (e: StudioElement): e is StudioElementOf<"media"> =>
+    e.kind === "media" && e.file === file;
+  const any = items.some((item) =>
+    item.kind === "group" ? item.elements.some(shows) : shows(item),
+  );
+  if (!any) return items;
+  return mapElements(items, (e) =>
+    shows(e) ? { ...e, file: "", name: "" } : e,
+  );
+}
+
+/**
  * The items with an element moved into the group `to` (its id), or to the
  * top level with `to` null, at `at`: an index back to front of that group's
  * elements, or of the items, once the element is taken out. The group it
