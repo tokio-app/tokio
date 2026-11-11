@@ -9,6 +9,7 @@ import { YAMLManagerService } from "@/services/yaml";
 import { strToU8, zipSync } from "fflate";
 import { createHash } from "node:crypto";
 import {
+  access,
   chmod,
   lstat,
   mkdir,
@@ -42,7 +43,11 @@ vi.mock("./common", async (importOriginal) => {
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
-  return { ...actual, rename: vi.fn(actual.rename) };
+  return {
+    ...actual,
+    access: vi.fn(actual.access),
+    rename: vi.fn(actual.rename),
+  };
 });
 
 const SETUP = '<script id="tokio-setup"></script>';
@@ -235,6 +240,18 @@ describe("OverlayService", () => {
         await readFile(join(folder, "title", "index.html"), "utf-8"),
       ).toContain(`window.__OVERLAY_CONFIG__ = {"title":"Saved"}`);
       expect(await readJSON("gifts.json")).toEqual(gifts);
+    });
+
+    it("keeps an overlay whose folder it can't open", async () => {
+      // Its files can't be read either, so it fails to load.
+      stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
+      const denied = Object.assign(new Error("EACCES"), { code: "EACCES" });
+      vi.mocked(access).mockRejectedValueOnce(denied);
+
+      await service.load(gifts);
+
+      expect(mount).not.toHaveBeenCalled();
+      expect(stored.map((o) => o.id)).toEqual(["title"]);
     });
 
     it("writes gifts that changed after load into the loaded overlays", async () => {

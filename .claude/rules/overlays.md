@@ -38,7 +38,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 - A remove first renames the overlay's folder to `.old-<uuid>` (a missing folder counts as gone), so a folder another program holds stays whole and stored. Only then does it stop serving it, forget it and delete `.old-*`, which `load` deletes if that fails.
 - `YAMLManagerService` logs to `overlays.log`, so a refused `info.yaml` or `config.yaml` says why there.
 - Imports, saves, updates and every start write the settings `config.yaml` holds into the HTML (`processHTML`), only when the HTML changed.
-- At each start `load` checks every stored overlay. One that fails isn't served but stays stored, so fixing it keeps its id and OBS link; only an overlay whose folder is gone is forgotten.
+- At each start `load` checks every stored overlay. One that fails isn't served but stays stored, so fixing it keeps its id and OBS link; only an overlay whose folder is missing (`ENOENT`, not a permission error) is forgotten.
 - Saving settings writes `config.yaml` first, so settings the schema refuses change nothing, then the HTML with the gifts main keeps; the renderer doesn't send gifts.
 - The `SAVE_OVERLAY_CONFIG` handler sends the saved settings (`tokio:config`) to the live overlays itself, so they get them even after the page closed; the page posts them only to its previews. A save reply updates its overlay even after its settings closed, and only closes the dialog still open for it.
 - A save merges the dialog's values onto the installed version's fields (`mergeOverlayConfig`), so a dialog opened before an update can't write the old version's fields.

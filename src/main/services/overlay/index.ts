@@ -142,9 +142,10 @@ export class OverlayService extends Service {
       const info = await this._writeHTML(overlay.id, overlay.external!, gifts);
 
       if (!info) {
+        // Only a missing folder: one that lost its permissions keeps its entry.
         const gone = await access(this._dir(overlay.id)).then(
           () => false,
-          () => true,
+          isMissing,
         );
         Logger.warn(
           `<Overlays> Unable to load overlay ${overlay.id}, ${gone ? "its folder is gone. It has been removed." : "it's kept for the next start."}`,
