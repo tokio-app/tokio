@@ -20,7 +20,7 @@ describe("formatAdded", () => {
 });
 
 describe("TimerSettingsSchema's names", () => {
-  it("are blank by default, and read the old English defaults as blank", () => {
+  it("are blank by default, and keep what the streamer typed", () => {
     const names = (saved: Record<string, string>) =>
       TimerSettingsSchema.parse({ look: { names: saved } }).look.names;
 
@@ -32,13 +32,10 @@ describe("TimerSettingsSchema's names", () => {
       share: "",
       chat: "",
     });
-    expect(
-      names({ coin: "coin", superfan: "New Super Fan", follow: "Follow" }),
-    ).toMatchObject({ coin: "", superfan: "", follow: "" });
-    // Typed by the streamer
-    expect(names({ follow: "Seguir", share: "share" })).toMatchObject({
-      follow: "Seguir",
-      share: "share",
+    // An English name in a Spanish Tokio too
+    expect(names({ follow: "Follow", share: "Compartir" })).toMatchObject({
+      follow: "Follow",
+      share: "Compartir",
     });
   });
 });

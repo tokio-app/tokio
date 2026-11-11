@@ -43,7 +43,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 - `added` sums `onChange`'s deltas, sent through a no-argument `throttle` that reads `timer.get()` when it fires, so a late push never sends an old time.
 - The window gets `TIMER` (`{ settings, state, added }`), and the overlay's clients get `tokio:timer` (`{ status, remaining, added, multiplier, look, triggers }`). A client connecting with the id `timer` gets the state from `ServerService.onConnect`, with `added: 0`.
 - `triggers` are the carousel's items, `[]` while `look.show_triggers` is off. `timerTriggers(settings, language)` (`src/common/util/timer.ts`) builds them for main and the page's preview alike.
-- The names (`look.names`) default to `""`, the app language's name (`timer.names.*`). A saved name equal to its old English default reads as `""`. Main sends the overlay again when the language changes.
+- The names (`look.names`) default to `""`, the app language's name (`timer.names.*`). Main sends the overlay again when the language changes.
 - `timer.html` inlines Archivo as a `data:` URL: main imports the woff2 with `?inline`, which needs `@fontsource-variable/archivo` in main's `externalizeDeps.exclude`.
 - The page anchors `remaining` to `performance.now()`. `--fit` shrinks everything when a wide font or a wrapped title wouldn't fit.
   - The halo is set on each text, since `em` in a `text-shadow` set on `body` resolves against the body's 16px.
