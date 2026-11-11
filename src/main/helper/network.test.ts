@@ -1,11 +1,12 @@
 import { APP_HOSTNAME, SERVER_PORT } from "@/common/util";
 import { shell, views } from "@test/electron";
 import { WebContentsView } from "electron";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Logger from "@/logger";
 import {
   isOverlayURL,
   limitPermissions,
+  logPageErrors,
   openLinksOutside,
   reloadWhenGone,
 } from "./network";
@@ -59,6 +60,69 @@ describe("reloadWhenGone", () => {
     fake.emit("render-process-gone", {}, { reason: "clean-exit", exitCode: 0 });
 
     expect(fake.reload).not.toHaveBeenCalled();
+  });
+});
+
+describe("logPageErrors", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const message = (
+    level: string,
+    text: string,
+    parent: object | null = null,
+  ) => ({
+    level,
+    message: text,
+    lineNumber: 12,
+    sourceId: "app://index.js",
+    frame: { parent },
+  });
+
+  const setup = () => {
+    const error = vi.spyOn(Logger, "error");
+    const { real, fake } = contents();
+    logPageErrors(real, "Window", () => "system.log");
+    return { error, fake };
+  };
+
+  it("logs the top frame's errors with the label and the file", () => {
+    const { error, fake } = setup();
+
+    fake.emit("console-message", message("error", "Uncaught TypeError: boom"));
+
+    expect(error.mock.calls).toEqual([
+      ["<Window> Uncaught TypeError: boom (app://index.js:12)", "system.log"],
+    ]);
+  });
+
+  it("leaves out warnings and the errors of the page's iframes", () => {
+    const { error, fake } = setup();
+
+    fake.emit("console-message", message("warning", "Deprecated"));
+    fake.emit("console-message", message("error", "Overlay broke", {}));
+
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("logs the same error once every 30 seconds", () => {
+    vi.useFakeTimers();
+    const { error, fake } = setup();
+    const boom = message("error", "boom");
+
+    fake.emit("console-message", boom);
+    vi.advanceTimersByTime(29_999);
+    fake.emit("console-message", boom);
+    fake.emit("console-message", message("error", "other"));
+    vi.advanceTimersByTime(1);
+    fake.emit("console-message", boom);
+
+    expect(error.mock.calls.map(([line]) => line)).toEqual([
+      "<Window> boom (app://index.js:12)",
+      "<Window> other (app://index.js:12)",
+      "<Window> boom (app://index.js:12)",
+    ]);
   });
 });
 

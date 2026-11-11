@@ -4,6 +4,7 @@ import { Notifier } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
 import {
   isOverlayURL,
+  logPageErrors,
   openLinksOutside,
   reloadWhenGone,
   stayOnPage,
@@ -130,6 +131,11 @@ export class AppHandler implements AppHandlerVariables {
     // It plays every sound, so a crash would silence the LIVE
     reloadWhenGone(
       this.win.webContents,
+      () => this.pathManagerService.files?.logs.system,
+    );
+    logPageErrors(
+      this.win.webContents,
+      "Window",
       () => this.pathManagerService.files?.logs.system,
     );
 

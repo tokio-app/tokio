@@ -70,7 +70,10 @@ export class Spotify extends MusicProvider {
         },
       });
 
-      const shellWindow = (this._authWindow = createWindow(authView));
+      const shellWindow = (this._authWindow = createWindow(
+        authView,
+        () => this._logFile,
+      ));
 
       const cleanupView = () => {
         try {

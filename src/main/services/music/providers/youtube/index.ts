@@ -42,7 +42,7 @@ export class YouTubeMusic extends MusicProvider {
       },
     }));
 
-    const shell = (this._shellWindow = createWindow(view));
+    const shell = (this._shellWindow = createWindow(view, () => this._logFile));
 
     view.webContents.on("will-prevent-unload", (event) => {
       event.preventDefault();
