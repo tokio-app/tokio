@@ -28,6 +28,7 @@ The source and the distributed app are MIT, with one LGPL file (see Licensing in
 ## Traps
 
 - On Windows, VS Code's Fallow extension runs its language server from `node_modules/@fallow-cli/<platform>/fallow.exe`, which Yarn can't replace while it runs (EPERM). Before an install that changes `fallow`, ask the user to disable the extension; **Fallow: Restart Language Server** locks the new binary at once.
+- `yarn upgrade electron` replaces the package folder but doesn't run the root `postinstall`, so the Electron binary is missing until you run `yarn install`, which runs `install-electron`.
 
 ## Done when
 

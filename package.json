@@ -85,7 +85,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "5.0.5",
-    "electron": "^45.0.0",
+    "electron": "^45.3.0",
     "electron-builder": "^26.0.12",
     "electron-vite": "^5.0.0",
     "fallow": "^3.41.0",
