@@ -1,6 +1,6 @@
 import { formatError } from "@/common/util";
 import { cleanText } from "@/helper/chat";
-import { writeFileAtomic } from "@/helper/fs";
+import { isMissing, writeFileAtomic } from "@/helper/fs";
 import { track } from "@/helper/quit";
 import Logger from "@/logger";
 import { promises as fs } from "fs";
@@ -128,8 +128,7 @@ export abstract class BaseFileManagerService extends Service {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       return this.deserialize(fileContent) as T;
     } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT")
-        return null;
+      if (isMissing(error)) return null;
 
       const isSyntax =
         error instanceof SyntaxError ||

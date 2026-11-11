@@ -1107,7 +1107,6 @@
   "main.settings.profileExported": "Perfil exportado.",
   "main.settings.profileImported": "Perfil importado.",
   "main.settings.serverStartFailed": "El servidor de overlays no pudo iniciarse. Puede que el puerto {port} esté en uso.",
-  "main.settings.serverStopFailed": "No se pudo detener el servidor de overlays.",
   "main.settings.serverOn": "El servidor de overlays está encendido.",
   "main.settings.serverOff": "El servidor de overlays está apagado.",
   "main.settings.updatesOn": "Tokio busca actualizaciones automáticamente.",

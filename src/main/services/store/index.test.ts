@@ -32,13 +32,15 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoreManagerService } from "./index";
 
-const { busy, busyOnce } = vi.hoisted(() => {
+const { busy, held, busyOnce } = vi.hoisted(() => {
   // Paths whose next read fails, as when an antivirus holds the file
   const busy = new Set<string>();
+  // Paths whose every read fails until a test takes them out
+  const held = new Set<string>();
   const busyOnce =
     (read: unknown) =>
     async (path: unknown, ...rest: unknown[]) => {
-      if (busy.delete(String(path))) {
+      if (busy.delete(String(path)) || held.has(String(path))) {
         throw Object.assign(new Error("EBUSY: resource busy or locked"), {
           code: "EBUSY",
         });
@@ -46,7 +48,7 @@ const { busy, busyOnce } = vi.hoisted(() => {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       return (read as (...args: unknown[]) => Promise<unknown>)(path, ...rest);
     };
-  return { busy, busyOnce };
+  return { busy, held, busyOnce };
 });
 
 // Both: the store reads with fs/promises, the file managers with fs.
@@ -85,6 +87,7 @@ describe("StoreManagerService", () => {
 
   afterEach(async () => {
     busy.clear();
+    held.clear();
     tts.dispose();
     await rm(home, { recursive: true, force: true });
   });
@@ -862,6 +865,26 @@ describe("StoreManagerService", () => {
       expect(await store.profileFileFor("Stream")).toBe("stream-2.json");
     });
 
+    it("counts a listed file as taken in any case", async () => {
+      // Listed, with no such file on disk to find
+      await writeFile(
+        storeFile,
+        JSON.stringify({
+          ...defaultStoreData,
+          profiles: [
+            ...defaultStoreData.profiles,
+            { name: "Stream", file: "Stream.json" },
+          ],
+        }),
+      );
+      const store = await init();
+      expect(store.getProfiles()).toContainEqual(
+        expect.objectContaining({ file: "Stream.json" }),
+      );
+
+      expect(await store.profileFileFor("stream")).toBe("stream-2.json");
+    });
+
     it("clones a profile under a new name", async () => {
       const store = await init();
       await store.updateProfileData({ connector: { username: "streamer" } });
@@ -1477,6 +1500,15 @@ describe("StoreManagerService", () => {
       expect(store.getSounds()).toEqual([]);
     });
 
+    it("saves a sound again when it's added again after a failed save", async () => {
+      const store = await init();
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      expect(await store.addSound(sound)).toBe(false);
+      expect(await store.addSound(sound)).toBe(true);
+      expect((await readJSON(storeFile)).settings.sounds).toEqual([sound]);
+    });
+
     it("takes a deleted file off the alerts of every profile", async () => {
       const store = await init();
       const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({
@@ -1707,6 +1739,21 @@ describe("StoreManagerService", () => {
       expect(images(await readJSON(stream))).toEqual([tnt]);
 
       await writeFile(stream, "{ oops");
+      expect(await store.removeFromGames("tnt.png")).toBe(true);
+    });
+
+    it("says so when the active profile can't be read, but not when it's broken", async () => {
+      vi.spyOn(Logger, "error");
+      await (await init()).updateProfileData(withActions(gameAction("a", tnt)));
+      // Nothing in memory, so the sweep reads the file
+      const store = await init();
+      held.add(defaultProfileFile);
+
+      expect(await store.removeFromGames("tnt.png")).toBe(false);
+      held.clear();
+      expect(images(await readJSON(defaultProfileFile))).toEqual([tnt]);
+
+      await writeFile(defaultProfileFile, "{ oops");
       expect(await store.removeFromGames("tnt.png")).toBe(true);
     });
   });

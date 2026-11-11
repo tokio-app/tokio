@@ -362,7 +362,7 @@ describe("StudioService", () => {
     expect(studio.kept(b)).not.toBeNull();
   });
 
-  it("tests every element that reacts with samples, keeping none", () => {
+  it("tests every element that reacts with samples, kept while they show", () => {
     const { studio, onReact } = setup();
     const text = element("t", {
       kind: "text",
@@ -392,7 +392,48 @@ describe("StudioService", () => {
       name: expect.any(String),
     });
     expect(onReact).not.toHaveBeenCalled();
-    expect(studio.kept(text)).toBeNull();
+    // Views re-sent meanwhile show the samples
+    expect(studio.kept(text)).toMatchObject({ trigger: EMOTE_TRIGGER });
+    expect(studio.kept(viewer)).toMatchObject({ name: reacts[1].name });
+    expect(studio.kept(always)).toBeNull();
+  });
+
+  it("keeps a Test's sample for its seconds and exit, until a real event", () => {
+    const { studio, numbers } = setup();
+    const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+    const viewer = element("v", { kind: "viewer", seconds: 5 });
+    const overlay = overlayOf(viewer);
+    const follow = (name: string) =>
+      studio.handle(
+        TOKIO_EVENTS.FOLLOW,
+        { user: user(name) },
+        [overlay],
+        numbers,
+      );
+    follow("Ana");
+
+    const [sample] = studio.test(overlay, NUMBERS);
+    expect(studio.kept(viewer)).toMatchObject({ name: sample.name });
+    // A second past its seconds, for its exit
+    now.mockReturnValue(1000 + 5999);
+    expect(studio.kept(viewer)).toMatchObject({ name: sample.name });
+    now.mockReturnValue(1000 + 6000);
+    expect(studio.kept(viewer)).toMatchObject({ name: "Ana" });
+
+    // A real event wins over it
+    studio.test(overlay, NUMBERS);
+    follow("Bea");
+    expect(studio.kept(viewer)).toMatchObject({ name: "Bea" });
+
+    // Not once its trigger changed, nor once its overlay is gone
+    studio.test(overlay, NUMBERS);
+    const shared = StudioElementSchema.parse({
+      ...viewer,
+      trigger: { ...viewer.trigger, type: TOKIO_EVENTS.SHARE },
+    });
+    expect(studio.kept(shared)).toBeNull();
+    studio.test(overlay, NUMBERS);
+    studio.forget("o1");
     expect(studio.kept(viewer)).toBeNull();
   });
 

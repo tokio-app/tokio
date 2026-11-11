@@ -413,8 +413,39 @@ describe("startCapture", () => {
     ]);
     expect(source.track.stop).toHaveBeenCalled();
     expect(encoder.close).toHaveBeenCalled();
+    // The fake's reader ends on every stop: the retry gets a fresh camera
+    source = webcam();
+    gum.mockResolvedValue(source.stream);
     await vi.advanceTimersByTimeAsync(RETRY_MS);
     expect(gum).toHaveBeenCalledTimes(2);
+
+    // The GPU took the config but couldn't start: software from now on
+    await push(RETRY_MS * 1000);
+    expect(FakeEncoder.made[1].config).toMatchObject({
+      codec: "avc1.42e01f",
+      hardwareAcceleration: "prefer-software",
+    });
+    stop();
+  });
+
+  it("tries the GPU again when it fails after its first output", async () => {
+    const stop = await start();
+    await push(0);
+    const [encoder] = FakeEncoder.made;
+    encoder.out("key", 0, [1], new Uint8Array([1]));
+
+    encoder.init.error(new DOMException("", "EncodingError"));
+    await vi.advanceTimersByTimeAsync(0);
+    source = webcam();
+    gum.mockResolvedValue(source.stream);
+    await vi.advanceTimersByTimeAsync(RETRY_MS);
+    await push(RETRY_MS * 1000);
+
+    expect(FakeEncoder.made[1].config).toMatchObject({
+      hardwareAcceleration: "prefer-hardware",
+    });
+    // Asked again, as a driver reset may change what it takes
+    expect(FakeEncoder.isConfigSupported).toHaveBeenCalledTimes(2);
     stop();
   });
 

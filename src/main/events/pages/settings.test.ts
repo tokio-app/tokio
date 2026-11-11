@@ -1242,34 +1242,28 @@ describe("settings events", () => {
       }
     });
 
-    it.each([
-      {
-        enabled: true,
+    it("saves it off and reports it when a start fails", async () => {
+      const { h, updateServerSettings } = setup(false);
+
+      await h.invoke(settings, APP_EVENTS.SET_SERVER, { enabled: true });
+
+      const failure = {
+        code: FEEDBACK_CODES.SERVER_START_FAILED,
         message: `The overlay server couldn't start. Port ${SERVER_PORT} may be in use.`,
-      },
-      { enabled: false, message: "Unable to stop the overlay server." },
-    ])(
-      "saves it off and reports it when enabled: $enabled fails",
-      async ({ enabled, message }) => {
-        const { h, updateServerSettings } = setup(false);
-
-        await h.invoke(settings, APP_EVENTS.SET_SERVER, { enabled });
-
-        const failure = { code: FEEDBACK_CODES.SERVER_START_FAILED, message };
-        expect(updateServerSettings).toHaveBeenCalledWith(false);
-        expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
-        expect(h.replies(APP_EVENTS_RESPONSE.SET_SERVER)).toEqual([
-          { success: false, error: failure },
-        ]);
-        expect(h.notices).toEqual([
-          expect.objectContaining({
-            level: "error",
-            source: "server",
-            ...failure,
-          }),
-        ]);
-      },
-    );
+      };
+      expect(updateServerSettings).toHaveBeenCalledWith(false);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_SERVER)).toEqual([
+        { success: false, error: failure },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          source: "server",
+          ...failure,
+        }),
+      ]);
+    });
   });
 
   describe("SET_AUTO_UPDATES", () => {

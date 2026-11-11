@@ -65,7 +65,7 @@ The rest is Bedrock's:
   - A jockey is `summon zombie ~ ~ ~ 0 0 minecraft:as_baby [name]`, then `ride @e[type=zombie,r=2,c=1] summon_ride chicken no_ride_change minecraft:spawn_adult`. Summoning the rider leaves nearby chickens alone; `spawn_adult` because a baby chicken has no seat (`rideable` is in `chicken_adult`, for `baby_undead` only).
   - `DAYLIGHT_BURNERS` (mobs with `minecraft:burns_in_daylight`, minus the fire-immune magma cube; the jockey's zombie counts) get `effect … fire_resistance infinite 0 true`.
   - `ANGER_EVENTS` are spawn events that set a neutral mob on the player, passed as summon's event (a name goes after it). Only the cave spider's `minecraft:become_angry` adds a player target: the zombie pigman's and enderman's anger has none until hit, the spider's `become_hostile` ends in daylight, piglins and brutes already attack. A spawn event replaces `minecraft:entity_spawned`, so it's no use where that sets the mob up (the zombie pigman's adult group).
-- Variables are the trigger's `countedVariables` (`.claude/rules/alerts.md`), filled by `formatAlertMessage(text, payload, commandValue)`. `commandValue` strips `" ' \ { } [ ] § @` and control characters so a nickname can't inject NBT or selectors; a spawn name goes through it whole, then `JSON.stringify`. The command step's template is the user's own and isn't escaped.
+- Variables are the trigger's `countedVariables` (`.claude/rules/alerts.md`), filled by `formatAlertMessage(text, payload, commandValue)`. `commandValue` strips `" ' \ { } [ ] § @ *` and control characters so a nickname can't inject NBT or selectors, nor name every score holder (`*`, which stripping alone makes of `[*]`); a spawn name goes through it whole, then `JSON.stringify`. The command step's template is the user's own and isn't escaped.
 
 ### Hazards and helps
 
@@ -116,7 +116,7 @@ Checked against Java 26.3's command tree, registries and decompiled commands (Vi
 - `_pump` awaits `settled()` after a dropped run and before each run, so a game in its handshake, or one that took over, gets the backlog once ready.
 - `handle` resolves once its own batches are served or dropped. `dispatchGames` isn't awaited, so a backlog never holds up other events.
 - The connector's `DISCONNECTED` calls `clear`, which forgets streaks and counted likes, not backlogs.
-- An action runs only while a game of its `edition` is connected (`_unreachable`); a game of the other edition counts as none, for `handle` and `test` alike.
+- An action runs only while a game of its `edition` is connected (`_unreachable`); a game of the other edition counts as none, for `handle` and `test` alike. Mid-run too: `send(command, edition)` drops a command for the other edition's game, and `_send` stops there, without waiting out the rest of its waits.
 - **Test** (`TEST_GAME_ACTION`, `notify: false`, carries `edition`) runs the steps once with `generateTikTokEventSample` (Emote uses Chat) and returns each command with the game's reply. It fails with no game or the other edition. The reply carries the action's `id`.
 
 ## Notices and logs

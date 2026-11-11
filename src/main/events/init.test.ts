@@ -2126,6 +2126,25 @@ describe("init events", () => {
       ]);
     });
 
+    it("says it again every 30 seconds while it retries", async () => {
+      const s = await live();
+      const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
+      vi.useFakeTimers();
+
+      reconnect("reconnecting");
+      reconnect("reconnected");
+      vi.advanceTimersByTime(10_000);
+      reconnect("reconnecting");
+      vi.advanceTimersByTime(21_000);
+      reconnect("reconnecting");
+
+      expect(s.h.notices.map((n) => n.code)).toEqual([
+        FEEDBACK_CODES.RECONNECTING,
+        FEEDBACK_CODES.RECONNECTED,
+        FEEDBACK_CODES.RECONNECTING,
+      ]);
+    });
+
     it.each([undefined, {}])(
       "says it disconnected for any other reason (%o)",
       async (data) => {
@@ -2226,6 +2245,27 @@ describe("init events", () => {
       vi.advanceTimersByTime(1);
       onFailure();
       expect(s.h.notices).toEqual([failure, failure]);
+    });
+
+    it("leaves the TTS page's own failures their notice", async () => {
+      const s = await live({ tts: true });
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
+      const { onFailure } = await talked(s);
+
+      onFailure();
+      s.h.handler.notifier.report({
+        source: "tts",
+        error: new Error("Engine down"),
+        fallback: {
+          code: FEEDBACK_CODES.TTS_GENERATION_FAILED,
+          message: "Unable to test the voice.",
+        },
+      });
+
+      expect(s.h.notices.map((n) => n.message)).toEqual([
+        "Unable to generate TTS audio. Try another voice, or check its engine's key in Settings.",
+        "Unable to test the voice.",
+      ]);
     });
 
     it("logs a TTS failure once per notice", async () => {

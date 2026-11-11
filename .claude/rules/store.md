@@ -22,7 +22,8 @@ paths:
 
 - `getProfileData` keeps the active profile in memory. When its file fails to load, live events try it again at most every `LOAD_RETRY_MS`, so a broken file isn't read on every event.
 - After an emote save fails (`recordEmotes`), emote saves for that file wait `LOAD_RETRY_MS` before writing again. An emote's image is compared with TikTok's once a run, and only counts as checked once its save went through.
-- GET_PROFILE and the sweeps that remove a sound, media file or picture from every profile (`removeFromAlerts`, `removeFromGames`, through `_updateProfiles`) pass `{ fresh: true }`: they wait for the active profile's update still writing and retry a failed file at once. A sweep logs another profile whose file it can't read (held, no access) and returns false, so the handler keeps the library file; one that's missing or doesn't load counts as done.
+- GET_PROFILE and the sweeps that remove a sound, media file or picture from every profile (`removeFromAlerts`, `removeFromGames`, through `_updateProfiles`) pass `{ fresh: true }`: they wait for the active profile's update still writing and retry a failed file at once. A sweep logs a profile whose file it can't read (held, no access) and returns false, so the handler keeps the library file; one that's missing or doesn't load counts as done. The active one too: when it isn't in memory, the sweep reads its file itself (`_readChecked`), since `getProfileData` gives null for a held file.
+- A library file added again (`_addFile`) saves the store anyway: a failed save may have left it out of the file.
 
 ## Loading and recovery
 

@@ -1,4 +1,9 @@
-import { GAME_HELPS, GameStep, GameStepSchema } from "@/common/schemas";
+import {
+  GAME_HAZARDS,
+  GAME_HELPS,
+  GameStep,
+  GameStepSchema,
+} from "@/common/schemas";
 import { describe, expect, it } from "vitest";
 import {
   commandValue,
@@ -21,6 +26,12 @@ describe("commandValue", () => {
     expect(commandValue("@e[type=player] 'x' \\ §cRed")).toBe(
       "etype=player x cRed",
     );
+  });
+
+  it("drops *, which names every score holder", () => {
+    expect(commandValue("[*]")).toBe("");
+    expect(commandValue("@*")).toBe("");
+    expect(commandValue("*")).toBe("");
   });
 
   it("drops control characters and collapses whitespace", () => {
@@ -128,6 +139,16 @@ describe("gameCommands in Bedrock", () => {
       run({ type: "command", command: " /say Hi {username}" }, fill),
     ).toEqual(["say Hi Aku"]);
     expect(run({ type: "command", command: "  " }, fill)).toEqual([]);
+  });
+
+  it("keeps a nickname from naming every score holder", () => {
+    const fill = (text: string) =>
+      text.replace("{username}", commandValue("[*]"));
+    const [command] = run(
+      { type: "command", command: "scoreboard players add {username} gifts 1" },
+      fill,
+    );
+    expect(command).not.toContain("*");
   });
 });
 
@@ -246,6 +267,12 @@ describe("gameCommands for hazards", () => {
     edition: "bedrock" | "java",
     more: Record<string, unknown> = {},
   ) => gameCommands(step({ type: "hazard", hazard, ...more }), none, edition);
+
+  it("runs something for every hazard on Java, which runs them all", () => {
+    for (const hazard of GAME_HAZARDS) {
+      expect(run(hazard, "java"), hazard).not.toEqual([]);
+    }
+  });
 
   it("runs each hazard in each edition's syntax", () => {
     const both = (hazard: string) => [

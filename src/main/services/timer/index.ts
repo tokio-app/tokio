@@ -40,16 +40,24 @@ const MINUTE_MS = 60_000;
 const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 export const SAVE_INTERVAL_MS = 5000;
 
+// What the timer reads its profile from and saves it through
+type Store = Pick<
+  StoreManagerService,
+  "updateProfileData" | "getProfileData" | "getSettings"
+>;
+
 /**
  * The active profile's countdown timer. It lives in main, so it runs with
  * its page closed: Start, Pause, Stop and Reset, time added by live
  * events and by hand, and saving it into the profile it was loaded from.
  */
 export class TimerService extends Service {
-  private _store: Pick<StoreManagerService, "updateProfileData"> | null = null;
+  private _store: Store | null = null;
   private _interval: ReturnType<typeof setInterval> | null = null;
   // The profile file the timer was loaded from, null until a load
   private _file: string | null = null;
+  // A tick reading the profile, while nothing is loaded
+  private _reading = false;
   private _settings = TimerSettingsSchema.parse({});
   private _status: TimerStatus = "idle";
   // The time left while it isn't running
@@ -90,11 +98,7 @@ export class TimerService extends Service {
         : 0,
   };
 
-  public initialize({
-    store,
-  }: {
-    store: Pick<StoreManagerService, "updateProfileData">;
-  }) {
+  public initialize({ store }: { store: Store }) {
     this._store = store;
     // Once: startApp runs again after a failed load.
     // shortcut: a quit or crash while running loses up to 5 s (it comes back
@@ -229,6 +233,7 @@ export class TimerService extends Service {
     for (const [key, until] of this._cooldowns) {
       if (until <= now) this._cooldowns.delete(key);
     }
+    if (this._file === null) return this._read();
     if (!this._unsaved && this._status !== "running") return;
     this.save()
       .then((saved) => {
@@ -241,6 +246,36 @@ export class TimerService extends Service {
           error,
         );
       });
+  }
+
+  // Startup loads the timer only when the profile reads, so after a failed
+  // read the ticks try again (getProfileData rereads at most every
+  // LOAD_RETRY_MS), one at a time
+  private _read() {
+    const store = this._store;
+    if (!store || this._reading) return;
+    this._reading = true;
+    const file = store.getSettings().activeProfile.file;
+    store
+      .getProfileData()
+      .then((profile) => {
+        // A switch's load, or one under way, wins
+        if (
+          profile &&
+          this._file === null &&
+          store.getSettings().activeProfile.file === file
+        ) {
+          this.load(profile.timer, file);
+        }
+      })
+      .catch((error) => {
+        Logger.error(
+          `<Timer> Unable to load the timer -- ${formatError(error)}`,
+          this._logFile,
+          error,
+        );
+      })
+      .finally(() => (this._reading = false));
   }
 
   private _seconds() {

@@ -5,6 +5,8 @@ import {
   TimerSettingsSchema,
 } from "@/common/schemas";
 import { GiftEvent, TOKIO_EVENTS, UserData } from "@/common/types";
+import { defaultProfile } from "@/common/util";
+import { defaultStoreData } from "@/common/util/constants/store";
 import type { StoreManagerService } from "@/services/store";
 import {
   afterEach,
@@ -91,6 +93,9 @@ const profile = (patch: Partial<TimerProfile> = {}): TimerProfile => ({
 describe("TimerService", () => {
   let timer: TimerService;
   let updateProfileData: Mock<StoreManagerService["updateProfileData"]>;
+  let getProfileData: Mock<StoreManagerService["getProfileData"]>;
+  // The store's active profile file
+  let active: string;
   let changes: number[];
 
   const left = () => timer.get().state.remaining;
@@ -107,7 +112,18 @@ describe("TimerService", () => {
     vi.useFakeTimers();
     timer = new TimerService();
     updateProfileData = vi.fn(async () => true);
-    timer.initialize({ store: { updateProfileData } });
+    getProfileData = vi.fn(async () => null);
+    active = "stream.json";
+    timer.initialize({
+      store: {
+        updateProfileData,
+        getProfileData,
+        getSettings: () => ({
+          ...defaultStoreData.settings,
+          activeProfile: { name: "Stream", file: active },
+        }),
+      },
+    });
     changes = [];
     timer.onChange((delta) => changes.push(delta));
   });
@@ -478,6 +494,50 @@ describe("TimerService", () => {
     it("saves nothing before a load", async () => {
       expect(await timer.save()).toBe(true);
       expect(updateProfileData).not.toHaveBeenCalled();
+    });
+
+    it("loads on a tick once the profile reads, when startup's read failed", async () => {
+      const saved = profile({ settings: settings({ start: 25 }) });
+      const load = vi.spyOn(timer, "load");
+
+      await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
+      expect(load).not.toHaveBeenCalled();
+
+      getProfileData.mockResolvedValue({ ...defaultProfile, timer: saved });
+      await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
+      await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
+      expect(load).toHaveBeenCalledExactlyOnceWith(saved, "stream.json");
+      expect(left()).toBe(25 * MIN);
+      // Saved into that file from then on
+      timer.control("start");
+      expect(await timer.save()).toBe(true);
+      expect(updateProfileData).toHaveBeenCalledWith(
+        expect.anything(),
+        "stream.json",
+      );
+    });
+
+    it("leaves a switch's load during that read as it is", async () => {
+      let read = (_: Awaited<ReturnType<typeof getProfileData>>) => {};
+      getProfileData.mockReturnValue(new Promise((r) => (read = r)));
+
+      await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
+      expect(getProfileData).toHaveBeenCalledOnce();
+      // One read at a time
+      await vi.advanceTimersByTimeAsync(SAVE_INTERVAL_MS);
+      expect(getProfileData).toHaveBeenCalledOnce();
+
+      timer.load(profile({ settings: settings({ start: 5 }) }), "other.json");
+      active = "other.json";
+      read({ ...defaultProfile, timer: profile() });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(left()).toBe(5 * MIN);
+      timer.control("start");
+      await timer.save();
+      expect(updateProfileData).toHaveBeenCalledWith(
+        expect.anything(),
+        "other.json",
+      );
     });
 
     it("reports a save that failed", async () => {

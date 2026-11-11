@@ -16,7 +16,7 @@ import {
   inRange,
   viewerMatcher,
 } from "@/common/util";
-import { renameWithRetry } from "@/helper/fs";
+import { isMissing, renameWithRetry } from "@/helper/fs";
 import { GiftStreaks } from "@/helper/streaks";
 import Logger from "@/logger";
 import { access, mkdir, readdir, rm } from "node:fs/promises";
@@ -434,11 +434,7 @@ export class HistoryService extends Service {
     try {
       await renameWithRetry(dir, away);
     } catch (error) {
-      if (!(
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT"
-      )) {
+      if (!isMissing(error)) {
         Logger.error(
           `<History> Couldn't move ${dir} away: ${formatError(error)}`,
           this._logFile,
@@ -672,8 +668,8 @@ export class HistoryService extends Service {
     // loadFile logged why a file it found doesn't load
     return access(path).then(
       () => null,
-      (error: NodeJS.ErrnoException) =>
-        error.code === "ENOENT" ? { lives: [], gifters: [] } : null,
+      (error: unknown) =>
+        isMissing(error) ? { lives: [], gifters: [] } : null,
     );
   }
 
@@ -681,6 +677,8 @@ export class HistoryService extends Service {
     dir: string,
     startedAt: number,
   ): Promise<LiveRecord | null> {
+    // A save still writing has its record out of _ended, and the file is older
+    await this._saving;
     // Not written yet when its save failed
     const ended = this._ended.find((r) => r.startedAt === startedAt);
     if (ended || !this._json) return ended ?? null;

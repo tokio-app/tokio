@@ -1,4 +1,5 @@
 import { Fan, TOKIO_EVENTS, UserData } from "@/common/types";
+import { isMissing } from "@/helper/fs";
 import Logger from "@/logger";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
@@ -167,7 +168,7 @@ export class FansService extends Service {
     // loadFile logged why a file it found doesn't load
     return access(path).then(
       () => null,
-      (error: NodeJS.ErrnoException) => (error.code === "ENOENT" ? [] : null),
+      (error: unknown) => (isMissing(error) ? [] : null),
     );
   }
 

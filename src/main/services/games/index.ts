@@ -181,9 +181,7 @@ export class GamesService extends Service {
     games: Pick<Profile["games"], "actions">,
   ) {
     this._games = games;
-    // Nothing could reach the game: off, or the port is taken
-    const { state } = this._minecraft.status;
-    if (state === "off" || state === "error") return;
+    if (this._unusable()) return;
 
     // Once per event, whichever actions it runs
     const { added, total, values } = streakOf(this._streaks, type, payload);
@@ -226,7 +224,7 @@ export class GamesService extends Service {
       generateTikTokEventSample(event).data,
       edition,
     );
-    return { success: true, data: await this._send(commands) };
+    return { success: true, data: await this._send(commands, edition) };
   }
 
   /**
@@ -264,6 +262,12 @@ export class GamesService extends Service {
     return 1;
   }
 
+  // Nothing could reach the game: off, or the port is taken
+  private _unusable() {
+    const { state } = this._minecraft.status;
+    return state === "off" || state === "error";
+  }
+
   // Why the edition's commands can't run: no game, or the other edition's
   private _unreachable(edition: MinecraftEdition): string | undefined {
     const status = this._minecraft.status;
@@ -289,19 +293,29 @@ export class GamesService extends Service {
 
   // Sent at once, in order, as the connection queues them, up to a wait: the
   // rest go once those are answered and the wait is over. A oneOf is picked
-  // here, so each run of a batch gets its own.
-  private async _send(commands: GameCommand[]) {
+  // here, so each run of a batch gets its own. Stops when a game of the other
+  // edition took over, leaving out what wasn't sent.
+  private async _send(commands: GameCommand[], edition: MinecraftEdition) {
     const results: CommandResult[] = [];
     let sending: { command: string; mayFail?: boolean }[] = [];
+    // False once the other edition's game dropped some: the rest would be
+    // dropped too, after waiting out every wait
     const answers = async () => {
       const sent = sending.map(async ({ command, mayFail }) => {
-        const result = await this._minecraft.send(command);
+        const result = await this._minecraft.send(command, edition);
         // A clear that found nothing to take did its job; a game that left
         // still fails it
         return mayFail && !result.dropped ? { ...result, ok: true } : result;
       });
       sending = [];
-      results.push(...(await Promise.all(sent)));
+      const answered = await Promise.all(sent);
+      results.push(...answered);
+      const { state, edition: now } = this._minecraft.status;
+      return !(
+        answered.some((result) => result.dropped) &&
+        state === "connected" &&
+        now !== edition
+      );
     };
     for (const command of commands) {
       if (typeof command === "string") {
@@ -314,7 +328,7 @@ export class GamesService extends Service {
           command: oneOf[Math.floor(Math.random() * oneOf.length)],
         });
       } else {
-        await answers();
+        if (!(await answers())) return results;
         await delay(command.wait);
       }
     }
@@ -362,7 +376,7 @@ export class GamesService extends Service {
     this._backlogs.set(id, backlog);
     try {
       for (let first = true; backlog.length > 0; first = false) {
-        if (!first) await new Promise((r) => setTimeout(r, RUN_GAP_MS));
+        if (!first) await delay(RUN_GAP_MS);
         // A Bedrock game that took over in the gap is still in its handshake
         await this._minecraft.settled();
         // Stopped when the latest profile removed or disabled the action; runs
@@ -376,20 +390,21 @@ export class GamesService extends Service {
         const batch = backlog[0];
         if (!batch) break;
         // Turned off: dropped quietly, as handle skips everything then
-        const { state } = this._minecraft.status;
-        if (state === "off" || state === "error") break;
+        if (this._unusable()) break;
         const unreachable = this._unreachable(action.edition);
         if (unreachable) {
           this._onError?.(action, { offline: true, message: unreachable });
           break;
         }
         this._onRun?.(action);
-        const failed = (await this._send(batch.commands)).find((r) => !r.ok);
+        const failed = (await this._send(batch.commands, batch.edition)).find(
+          (r) => !r.ok,
+        );
         if (failed) {
           // A Bedrock game that took over is connected once its handshake ends
           if (failed.dropped) await this._minecraft.settled();
           // Turned off midway, which failed what the game hadn't answered
-          if (["off", "error"].includes(this._minecraft.status.state)) break;
+          if (this._unusable()) break;
           // A game that left or was replaced midway fails the commands it
           // hadn't answered, and drops the rest. Replaced by a game of its
           // edition, the run counts as done and the rest go to the new one.

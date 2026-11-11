@@ -438,12 +438,11 @@ events.push(
     );
     replySettings(e, storeManagerService);
 
+    // Only a start fails: stopping always works
     if (!res) {
       throw new AppFailure(
         FEEDBACK_CODES.SERVER_START_FAILED,
-        enabled
-          ? t("main.settings.serverStartFailed", { port: String(SERVER_PORT) })
-          : t("main.settings.serverStopFailed"),
+        t("main.settings.serverStartFailed", { port: String(SERVER_PORT) }),
       );
     }
     if (!saved) throw saveFailure();

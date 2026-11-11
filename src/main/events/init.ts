@@ -18,6 +18,7 @@ import {
 } from "@/common/types";
 import {
   ALERTS_PATH,
+  EMPTY_LIVE_STATS,
   formatError,
   STUDIO_SOCKET_PREFIX,
   GAMES_PATH,
@@ -323,7 +324,7 @@ const registerConnectorEvents = ({
     sendLikes.cancel();
     sendSession.cancel();
     likes = 0;
-    store.updateLiveStats({ likes: 0, viewers: 0, views: 0 });
+    store.updateLiveStats(EMPTY_LIVE_STATS);
     live.end();
     pushSession();
     music.clearHandler();
@@ -336,11 +337,7 @@ const registerConnectorEvents = ({
       win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: {
-          likes: 0,
-          viewers: 0,
-          views: 0,
-        },
+        stats: EMPTY_LIVE_STATS,
       });
     }
   });
@@ -388,7 +385,8 @@ const registerConnectorEvents = ({
               "tts",
               FEEDBACK_CODES.TTS_GENERATION_FAILED,
               t("main.init.ttsFailed", { settings: t("nav.settings") }),
-              { windowMs: REPEAT_NOTICE_MS },
+              // Not the TTS page's key, so its Test still says why it failed
+              { key: "tts:chat", windowMs: REPEAT_NOTICE_MS },
             )
           ) {
             Logger.error(
@@ -993,11 +991,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       store: storeManagerService,
     },
   );
-  storeManagerService.updateLiveStats({
-    likes: 0,
-    viewers: 0,
-    views: 0,
-  });
+  storeManagerService.updateLiveStats(EMPTY_LIVE_STATS);
   if (!wired.has(handler)) {
     wired.add(handler);
     serverService.initEvents(connectorService, musicService);

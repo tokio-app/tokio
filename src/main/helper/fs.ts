@@ -6,6 +6,9 @@ import { track } from "./quit";
 const BUSY = new Set(["EPERM", "EBUSY", "EACCES"]);
 const isBusy = (error: unknown) =>
   error instanceof Error && "code" in error && BUSY.has(String(error.code));
+// A file or folder that isn't there
+export const isMissing = (error: unknown) =>
+  error instanceof Error && "code" in error && error.code === "ENOENT";
 // About a second in all
 const RETRY_DELAYS_MS = [50, 100, 200, 300, 350];
 

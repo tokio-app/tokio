@@ -11,6 +11,7 @@ import {
   useNotifications,
   useUpdateStatus,
 } from "@/hooks";
+import { forgetMedia } from "@/pages/StudioEditor/clipboard";
 import { useT } from "@/ui/i18n";
 import { TitleBar } from "@/ui/TitleBar";
 import { Link, Outlet } from "@tanstack/react-router";
@@ -69,6 +70,12 @@ export function Layout() {
     if (!res?.success) return;
     setProfiles(res.data!.profiles);
     setActiveProfile(res.data!.settings.activeProfile);
+  });
+
+  // A deleted file leaves Overlay Studio's clipboard, which outlives its
+  // editor, so a paste can't bring it back
+  useIpcListener(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, (res) => {
+    if (res?.field === "media") forgetMedia(res.file);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {

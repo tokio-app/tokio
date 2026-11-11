@@ -1049,12 +1049,19 @@ describe("StudioEditor", () => {
     // Its own handles, not a group's bare outline
     expect(handle("se")).not.toBeNull();
 
-    // A press inside its box drags it, with no 3 px wait
+    // A press that slips under 3 screen px is a click: nothing moves
     press(150, 250);
-    fireEvent.pointerMove(canvas(), { clientX: 76, clientY: 125 });
+    fireEvent.pointerMove(canvas(), { clientX: 77, clientY: 125 });
+    fireEvent.pointerUp(canvas());
+    expect(lastSave()).toBeUndefined();
+    expect(undo()).toBeDisabled();
+
+    // Past them, a press inside its box drags it
+    press(150, 250);
+    fireEvent.pointerMove(canvas(), { clientX: 79, clientY: 125 });
     fireEvent.pointerUp(canvas());
     await waitFor(() =>
-      expect(lastSave()?.items[0]).toMatchObject({ x: 102, y: 200 }),
+      expect(lastSave()?.items[0]).toMatchObject({ x: 108, y: 200 }),
     );
 
     fireEvent.pointerDown(handle("se"), { button: 0, clientX: 0, clientY: 0 });
@@ -1062,7 +1069,7 @@ describe("StudioEditor", () => {
     fireEvent.pointerUp(canvas());
     await waitFor(() =>
       expect(lastSave()?.items[0]).toMatchObject({
-        x: 102,
+        x: 108,
         y: 200,
         width: 320,
         height: 110,
@@ -2718,6 +2725,58 @@ describe("StudioEditor", () => {
       expect(lastSave()!.items).toMatchObject([{ x: 120, y: 120 }]);
     });
 
+    describe("a deleted file", () => {
+      const removed = () =>
+        send(APP_EVENTS_RESPONSE.ALERT_FILE_REMOVED, {
+          field: "media",
+          file: "party.png",
+        });
+      const pastedFile = () => {
+        const items = lastSave()?.items ?? [];
+        return items.at(-1)?.kind === "media" ? items.at(-1) : undefined;
+      };
+
+      it("leaves the clipboard while the editor is open", async () => {
+        const media = elementOf("media", { file: "party.png", name: "Party" });
+        const { user } = await open(holding(media));
+        await user.click(row(/^Party/));
+        key("c");
+
+        await removed();
+        await studio(await saved());
+        key("v");
+
+        await waitFor(() => expect(lastSave()?.items).toHaveLength(2));
+        expect(pastedFile()).toMatchObject({ file: "", name: "" });
+      });
+
+      it("leaves the clipboard with the editor closed", async () => {
+        const media = elementOf("media", { file: "party.png", name: "Party" });
+        const main = holding(media);
+        const other = studioOverlay("Other");
+        const { user, router } = await open(main);
+        await user.click(row(/^Party/));
+        key("c");
+
+        await act(() => router.navigate({ to: "/tools/studio" }));
+        await removed();
+        await act(() =>
+          router.navigate({
+            to: "/tools/studio/$id",
+            params: { id: other.id },
+          }),
+        );
+        await studio(main, other);
+        expect(
+          await page().findByRole("heading", { name: "Other" }),
+        ).toBeVisible();
+        key("v");
+
+        await waitFor(() => expect(lastSave()?.id).toBe(other.id));
+        expect(pastedFile()).toMatchObject({ file: "", name: "" });
+      });
+    });
+
     it("leaves copy, cut and paste to a field", async () => {
       const { user } = await open(holding(elementOf("shape")));
       await user.click(row(/^Rectangle/));
@@ -3090,9 +3149,9 @@ describe("StudioEditor", () => {
       );
       // The rulers off, the guide isn't there to stick to
       await user.click(toggle());
-      drag([750, 750], [750, 745]);
+      drag([750, 750], [750, 740]);
       await waitFor(() =>
-        expect(lastSave()?.items[0]).toMatchObject({ x: 600, y: 695 }),
+        expect(lastSave()?.items[0]).toMatchObject({ x: 600, y: 690 }),
       );
     });
 

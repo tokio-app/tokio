@@ -172,6 +172,7 @@ const BOSSES = [
 
 // What a hazard runs where the player stands. No NBT but the creeper's and
 // the fuse, so they hold across game versions.
+// oxlint-disable-next-line consistent-return -- each hazard's case returns, which tsc checks
 function hazardCommands(
   step: Extract<GameStep, { type: "hazard" }>,
   java: boolean,
@@ -309,8 +310,9 @@ function hazardCommands(
       return java ? ["tokio laser super"] : [];
     case "super_duper_laser":
       return java ? ["tokio laser super duper"] : [];
-    default:
-      // A random teleport, anywhere within the distance
+    // No default, so a hazard without its own case fails the typecheck
+    case "random_teleport":
+      // Anywhere within the distance
       return [
         java
           ? `spreadplayers ~ ~ 0 ${step.distance} false @s`
@@ -434,15 +436,16 @@ function helpCommands(
 
 /**
  * Makes viewer text safe inside a command: without quotes, backslashes,
- * brackets, braces, § or @, a nickname can't end a string, add NBT
- * (`Passengers:[…]`) or a target selector (`@e`).
+ * brackets, braces, §, @ or *, a nickname can't end a string, add NBT
+ * (`Passengers:[…]`), a target selector (`@e`) or name every score holder
+ * (`*`, which the stripping alone would make of `[*]`).
  */
 export function commandValue(text: string): string {
   return (
     text
       // Before the control characters go, so a line break still parts words
       .replace(/\s+/g, " ")
-      .replace(/["'\\{}[\]§@\p{Cc}]/gu, "")
+      .replace(/["'\\{}[\]§@*\p{Cc}]/gu, "")
       .replace(/ {2,}/g, " ")
       .trim()
       .slice(0, MAX_VALUE_LENGTH)

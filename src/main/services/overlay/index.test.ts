@@ -4,6 +4,7 @@ import { defaultStoreData } from "@/common/util";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { ServerService } from "@/services/server";
+import { LOAD_RETRY_MS } from "@/services/store";
 import { YAMLManagerService } from "@/services/yaml";
 import { strToU8, zipSync } from "fflate";
 import { createHash } from "node:crypto";
@@ -485,7 +486,8 @@ describe("OverlayService", () => {
         });
       });
 
-      it("tries a gift again after a failed save", async () => {
+      it("tries the gifts again a while after a failed save", async () => {
+        const now = vi.spyOn(performance, "now").mockReturnValue(1000);
         // A folder where the file goes
         await mkdir(join(root, "custom-gifts.json"));
 
@@ -495,7 +497,18 @@ describe("OverlayService", () => {
         expect(await service.getCustomGifts()).toEqual([]);
 
         await rm(join(root, "custom-gifts.json"), { recursive: true });
+        // Not within the wait, for any gift
+        const save = vi.spyOn(
+          JSONManagerService.prototype,
+          "saveArbitraryFile",
+        );
+        now.mockReturnValue(1000 + LOAD_RETRY_MS - 1);
+        expect(await service.recordGift(sent("8"))).toEqual({
+          success: false,
+        });
+        expect(save).not.toHaveBeenCalled();
 
+        now.mockReturnValue(1000 + LOAD_RETRY_MS);
         expect((await service.recordGift(sent("9"))).data).toEqual([saved(9)]);
       });
     });

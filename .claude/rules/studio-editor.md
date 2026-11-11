@@ -17,9 +17,9 @@ Builds on `.claude/rules/studio.md` (the stage and the data).
 - Lock is the canvas's only: the list and the settings still change a locked group or element (the user's call, as OBS locks).
 - The **+** menu adds into the selected group or the selected element's group, else on its own in front. It sits in the header because the panel scrolls (`overflow-y: auto`), which would clip one per row.
 - The trash deletes the selection at once, a group with its elements, since Undo brings it back (the user's call). So do Delete and Backspace (a Mac's delete key; Supr on a Spanish keyboard): on the canvas not on a locked one, in the list (its `ul`'s `onKeyDown`) a locked one too. From the list, the focus goes on to the row after it, or before it at the end (`data-select`). Fields never see the key.
-- Ctrl+C, Ctrl+X and Ctrl+V (Cmd too) copy, cut and paste a group or element with new ids (`copyItem`), where the **+** menu adds, each paste `PASTE_STEP` further. The clipboard is the editor module's own, not the system's, kept until Tokio quits, so a copy pastes into another overlay too (the user's call). Fields keep their own (`TYPED_FIELDS`), and so does selected text.
+- Ctrl+C, Ctrl+X and Ctrl+V (Cmd too) copy, cut and paste a group or element with new ids (`copyItem`), where the **+** menu adds, each paste `PASTE_STEP` further. The clipboard is the editor's own (`clipboard.ts`), not the system's, kept until Tokio quits, so a copy pastes into another overlay too (the user's call). Fields keep their own (`TYPED_FIELDS`), and so does selected text.
 - `selected` is a group's id or an element's. A click in the list past the items clears it (the user's call), as Escape and a click on the empty canvas do.
-- A text's variables are in two rows: **LIVE numbers** (`STUDIO_NUMBERS`), always, and **From the event** (`studioEventVariables`), only while it reacts to one (the user's call).
+- A text's variables are in two rows: **LIVE numbers** (`STUDIO_NUMBERS`), always, and **From the event** (`studioEventVariables`), only while it reacts to one (the user's call). Both take the text's cap (`VariableList`'s `maxLength`): the input's own `maxLength` only stops typing, and past `STUDIO_TEXT_MAX_LENGTH` main refuses every save of the overlay.
 
 ## The canvas
 
@@ -89,6 +89,7 @@ Builds on `.claude/rules/studio.md` (the stage and the data).
 
 ## Sticking
 
+- A press moves, resizes or turns what it holds only once the pointer has gone `DRAG_START` (3 screen px), elements as groups do, so a click that slips can't move it, stick it to a line or clear Redo.
 - A drag on the canvas always sticks, with no setting, to the guides, the canvas and other elements (the user's call): edges and middles, within `SNAP_REACH`, the nearest line on each axis (`snapBox`, lines from `snapLines` at the press). A group moves by the frame it began with, before the shared delta is rounded, and never sticks to its own elements.
 - A dragged corner sticks the same way (`stickCorner`), with Link on too (the user's call): it keeps to the diagonal, so it sticks on the closer axis only.
 - Alt (Option), held during a drag, turns sticking off for moves, corners and guides (the user's call). On Linux desktops that move a window with Alt and a drag, Alt has to go down after the press.
@@ -96,4 +97,5 @@ Builds on `.claude/rules/studio.md` (the stage and the data).
 
 ## Media sweep
 
-- On `ALERT_FILE_REMOVED` for media the editor clears that file from its elements, so its next save can't bring it back, and from every step of its history (`sweep`), so an undo can't either. Main's half is in `.claude/rules/studio.md`.
+- On `ALERT_FILE_REMOVED` for media the editor clears that file from its elements (`withoutMedia`), so its next save can't bring it back, and from every step of its history (`sweep`), so an undo can't either. Main's half is in `.claude/rules/studio.md`.
+- `Layout` clears it from the clipboard (`forgetMedia`), since that outlives the editor. Not a module-level `window.api.on`: tests get a fresh `window.api` each, so a listener added once would hear only the first test's.

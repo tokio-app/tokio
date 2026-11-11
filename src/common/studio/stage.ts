@@ -178,8 +178,9 @@ const extent = ({ x, y, width, height, rotation }: StudioElementView): Box => {
   };
 };
 
-// A group's box: the editor's bounds around its elements' extents, as they
-// show. Empty, at the canvas's corner, without any.
+// A group's box: the smallest box around its elements' extents, as they
+// show, which is the editor's groupFrame unturned. Empty, at the canvas's
+// corner, without any.
 const groupBox = (elements: StudioElementView[]): Box => {
   if (elements.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
   const boxes = elements.map(extent);
@@ -748,6 +749,19 @@ export function createStage(
     const video = clipOf(entry);
     if (!video) return;
     if (hidden(entry)) {
+      // On stream, one its video held past its seconds waits again once its
+      // group hides it, or the group's next event would bring it back too
+      const { mover } = entry;
+      if (
+        !editing &&
+        mover.shown &&
+        !mover.leaving &&
+        mover.timer === undefined &&
+        !mover.node.classList.contains("studio-hidden")
+      ) {
+        mover.node.classList.add("studio-hidden");
+        halt(mover);
+      }
       video.pause();
       return;
     }
@@ -1005,7 +1019,8 @@ export function createStage(
     mover.leaving = false;
     mover.node.classList.remove("studio-hidden");
     restart(mover.node, `studio-enter-${motion.entrance}`);
-    for (const entry of under(mover)) playback(entry, true);
+    // Before the videos play, so a shown mover with no timer is only ever
+    // one its video holds (playback)
     mover.timer = setTimeout(() => {
       // An element's video that plays once leaves when its part ends, while
       // it plays (atEnd)
@@ -1018,10 +1033,12 @@ export function createStage(
         !video.paused &&
         !video.error
       ) {
+        mover.timer = undefined;
         return;
       }
       leave(mover);
     }, motion.seconds * 1000);
+    for (const entry of under(mover)) playback(entry, true);
   };
 
   // What a react plays: an entrance or an animation. A loop has no trigger.

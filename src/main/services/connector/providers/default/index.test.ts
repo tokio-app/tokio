@@ -434,6 +434,19 @@ describe("TikTokLiveConnector", () => {
       expect(onDisconnected).not.toHaveBeenCalled();
       expect(connection().listenerCount("chat")).toBe(1);
     });
+
+    it("says it's reconnecting on every attempt", () => {
+      const onReconnect = vi.fn();
+      connector.onReconnect(onReconnect);
+
+      connection().emit("reconnecting", {
+        attempt: 2,
+        delayMs: 2000,
+        reason: "wsClose",
+      });
+
+      expect(onReconnect).toHaveBeenCalledExactlyOnceWith("reconnecting");
+    });
   });
 
   describe("events", () => {

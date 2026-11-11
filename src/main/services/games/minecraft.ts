@@ -156,12 +156,25 @@ export class MinecraftConnection {
     return (this._listening ??= this._listen());
   }
 
-  /** Runs a command as the connected player, and resolves with its answer. */
-  public async send(command: string): Promise<CommandResult> {
+  /**
+   * Runs a command as the connected player, and resolves with its answer.
+   * With an edition, a game of the other one drops it, as one that took over
+   * during a wait would get the wrong syntax.
+   */
+  public async send(
+    command: string,
+    edition?: MinecraftEdition,
+  ): Promise<CommandResult> {
     // A game that took over during a launch's wait can still be in its handshake
     if (this._game && !this._game.ready) await this.settled();
     if (!this._game?.ready) {
       return failed(command, t("main.minecraft.notConnected"));
+    }
+    if (edition && edition !== this._game.edition) {
+      return {
+        ...failed(command, t("main.minecraft.notConnected")),
+        dropped: true,
+      };
     }
     if (this._waiting.length >= MAX_WAITING) {
       return failed(command, t("main.minecraft.tooManyWaiting"));

@@ -18,7 +18,7 @@ paths:
 - A connect that comes while one is connecting gets that one, so only one connection opens.
 - `isConnected()` is true from the start of a connect, so the profile can't be switched mid-connect.
 - `CONNECTED` comes only for a connect that worked. What its reply's `success` and `live` mean: `.claude/rules/live-session.md`.
-- It reconnects on its own: a drop it recovers from calls `onReconnect` and keeps the LIVE session.
+- It reconnects on its own: a drop it recovers from calls `onReconnect` and keeps the LIVE session. The drop and each retry (`RECONNECTING`) call `onReconnect("reconnecting")`, and `init.ts`'s 30 s window lets one notice through per window, so a drop that lasts is said again (the user's call) and a flapping one isn't repeated.
 - `DISCONNECTED` only comes once the connection stops: `reason: "ended"`, `"lost"`, or none when the user disconnected.
   - It's emitted on `setImmediate`: the library emits the stream's end right after its last batch's events, whose handlers first await the profile, so the cleanup must come after them. The listeners are removed and `_connection` cleared at once.
 - Gifts come in two kinds of combo, and `GIFT` sends both the same way: a growing `comboCount`, then one event with `repeatEnd`.

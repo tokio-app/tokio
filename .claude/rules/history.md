@@ -31,6 +31,7 @@ paths:
 - `MAX_GIFTERS` caps all time: the fewest coins go first, then the oldest last gift. The page shows only the top `SHOWN_GIFTERS` and each LIVE keeps all its own gifters, so nobody shown is dropped.
 - On a quit or crash the next load adds what the last save missed from the LIVE's file.
 - Saves run one after another through `_saving`, so an older index can't land after a newer one, as when a LIVE's end races the cap's drop.
+- Reading a LIVE (`_readLive`) waits for `_saving` too: a save takes the LIVEs that ended out of `_ended` before their files are written, so a read in between (Coin stats asks again as a LIVE ends) got the older file. A save never waits on a read.
 
 ## Loading, recovery, deleting and clearing
 

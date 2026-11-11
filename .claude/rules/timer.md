@@ -33,6 +33,7 @@ A subathon clock that viewers add time to. `TimerService` (`src/main/services/ti
 ## Saving
 
 - Each profile has its own timer (`Profile.timer`, `TimerProfileSchema`, `.prefault({})` so older profiles load). `load(timer, file)` turns `running` into `paused`. It holds the profile's data in memory as Persistence in `AGENTS.md` describes.
+- `startApp` loads it only when the profile reads. Until one loads, each tick reads the active profile again (`_read`, one at a time, `getProfileData` rereading at most every `LOAD_RETRY_MS`), and a switch's load wins. Unloaded, `save()` writes nothing, so a countdown left on the defaults would drop its changes.
 - The handlers save after each change and throw `saveFailure()` when that fails. The interval saves while running, or after a change no request saves: added time, the end, a pause on disconnect. A failed one warns once per `REPEAT_NOTICE_MS` (`TIMER_SAVE_FAILED`, key `timer`).
 - Never on quit: that would hold the quit the updater's install can't wait for (`.claude/rules/updates.md`).
 - `SET_PROFILE` switches run one at a time, and the profile lock is checked again after the saves, so a LIVE that connected meanwhile refuses the switch (`PROFILE_LOCKED`). Picking the profile that's already active does nothing, even during a LIVE.

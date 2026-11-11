@@ -157,10 +157,15 @@ type Drag =
       scale: number;
       // What it sticks to
       lines: SnapLines;
+      moved: boolean;
     }
   | {
       kind: "rotate";
       id: string;
+      // Where the pointer went down
+      x: number;
+      y: number;
+      moved: boolean;
       // The element's or group's center on screen
       center: Point;
       // A group's frame when it began
@@ -176,6 +181,7 @@ type Drag =
       frame: Turned;
       scale: number;
       lines: SnapLines;
+      moved: boolean;
     }
   | {
       kind: "group";
@@ -281,7 +287,8 @@ const CURSORS: Record<Exclude<Held, "rotate">, string> = {
   w: "ew-resize",
 };
 
-// Screen px a press inside a group's outline moves before it drags the group
+// Screen px a press moves before it drags what it holds, so a click that slips
+// can't move, turn or stick it
 const DRAG_START = 3;
 // Screen px within which a dragged edge, middle or corner sticks to a line
 const SNAP_REACH = 6;
@@ -862,6 +869,7 @@ export function StudioStage({
           corner,
           frame: groupFrame,
           lines: linesBut((layer) => layer === group),
+          moved: false,
           ...at,
         },
         corner,
@@ -879,6 +887,7 @@ export function StudioStage({
           box: boxOf(element),
           rotation: element.rotation,
           lines: linesBut((_, id) => id === element.id),
+          moved: false,
           ...at,
         },
         corner,
@@ -893,6 +902,9 @@ export function StudioStage({
         {
           kind: "rotate",
           id: chosen.element.id,
+          x: e.clientX,
+          y: e.clientY,
+          moved: false,
           center: {
             x: rect.left + fitted.left + (x + width / 2) * scale,
             y: rect.top + fitted.top + (y + height / 2) * scale,
@@ -914,6 +926,9 @@ export function StudioStage({
         {
           kind: "rotate",
           id: chosenGroup.id,
+          x: e.clientX,
+          y: e.clientY,
+          moved: false,
           center: {
             x: rect.left + fitted.left + (x + width / 2) * scale,
             y: rect.top + fitted.top + (y + height / 2) * scale,
@@ -963,6 +978,7 @@ export function StudioStage({
         box: boxOf(picked.element),
         rotation: picked.element.rotation,
         lines: linesBut((_, other) => other === id),
+        moved: false,
         ...at,
       },
       "move",
@@ -1049,6 +1065,10 @@ export function StudioStage({
       setDraft((last) => (last ? { ...last, ...next } : last));
       return;
     }
+    if (!d.moved) {
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < DRAG_START) return;
+      d.moved = true;
+    }
     if (d.kind === "rotate") {
       // Shift turns it in steps of 15 degrees
       const pointer = { x: e.clientX, y: e.clientY };
@@ -1091,9 +1111,6 @@ export function StudioStage({
       return;
     }
     if (d.kind === "group") {
-      const far = Math.hypot(e.clientX - d.x, e.clientY - d.y) >= DRAG_START;
-      if (!d.moved && !far) return;
-      d.moved = true;
       const moved = {
         ...d.frame,
         x: d.frame.x + pointer.x,

@@ -11,7 +11,6 @@ import { gift, studioOverlay } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   alignTo,
-  bounds,
   copyItem,
   boxOn,
   cornerOf,
@@ -695,22 +694,6 @@ describe("the canvas's geometry", () => {
     expect(pickElement(shown, new Set(["alone"]), { x: 10, y: 10 })).toBe(
       "under",
     );
-  });
-
-  it("boxes a group's elements", () => {
-    expect(bounds(overlay.items[1].elements)).toEqual({
-      x: 50,
-      y: 50,
-      width: 100,
-      height: 100,
-    });
-    expect(bounds([box("a", -10, 5, 10), box("b", 30, 40, 10)])).toEqual({
-      x: -10,
-      y: 5,
-      width: 50,
-      height: 45,
-    });
-    expect(bounds([])).toBeNull();
   });
 });
 

@@ -30,7 +30,7 @@ import {
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
-import { writeFileAtomic } from "@/helper/fs";
+import { isMissing, writeFileAtomic } from "@/helper/fs";
 import { t } from "@/helper/i18n";
 import { isInside } from "@/helper/path";
 import { track } from "@/helper/quit";
@@ -57,11 +57,8 @@ type Providers = {
 const isEncrypted = (key: string) =>
   /^v\d\d$/.test(Buffer.from(key, "base64").subarray(0, 3).toString("latin1"));
 
-const isMissing = (error: unknown) =>
-  error instanceof Error && "code" in error && error.code === "ENOENT";
-
 // How long live events go without reading again an active profile that failed
-const LOAD_RETRY_MS = 30_000;
+export const LOAD_RETRY_MS = 30_000;
 
 export class StoreManagerService extends Service {
   private _jsonManagerService!: JSONManagerService;
@@ -612,12 +609,13 @@ export class StoreManagerService extends Service {
         this._pathManagerService.folders.profilesFolder,
         profileFile,
       );
-      // Fresh, so the items changed aren't older than an update still writing
+      // Fresh, so the items changed aren't older than an update still writing.
+      // When the active one doesn't load, its file says why.
       let profile: Profile | null;
       try {
-        profile = active
-          ? await this.getProfileData({ fresh: true })
-          : (await this._readChecked(path, ProfileSchema)).data;
+        profile =
+          (active ? await this.getProfileData({ fresh: true }) : null) ??
+          (await this._readChecked(path, ProfileSchema)).data;
       } catch (error) {
         // A missing or broken file can't use the file, one held for a moment
         // might.
@@ -653,8 +651,9 @@ export class StoreManagerService extends Service {
   ): Promise<boolean> {
     this._ensureInitialized();
     const files = this._storeData!.settings[library];
-    // Files are named by content, so the same file means the same entry.
-    if (files.some((f) => f.file === entry.file)) return true;
+    // Files are named by content, so the same file means the same entry. Saved
+    // again, as a failed save may have left it out of the store file.
+    if (files.some((f) => f.file === entry.file)) return this._queueSave();
     files.push(entry);
     return this._queueSave();
   }

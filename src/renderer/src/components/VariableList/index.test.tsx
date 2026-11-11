@@ -10,10 +10,12 @@ function Message({
   initial = "",
   variables = ["username", "gift"],
   empty,
+  maxLength,
 }: {
   initial?: string;
   variables?: string[];
   empty?: string;
+  maxLength?: number;
 }) {
   const [value, setValue] = useState(initial);
   const ref = useRef<HTMLInputElement>(null);
@@ -31,6 +33,7 @@ function Message({
         value={value}
         onChange={setValue}
         empty={empty}
+        maxLength={maxLength}
       />
     </>
   );
@@ -142,5 +145,18 @@ describe("VariableList", () => {
 
     expect(input).toHaveValue("{username}{gift}");
     await caretAt(input, 10);
+  });
+
+  it("leaves the text as it was when a variable would pass its cap", async () => {
+    const user = userEvent.setup();
+    render(<Message initial="Thanks " maxLength={13} />);
+    const input = screen.getByRole("textbox");
+
+    await user.click(variable("username"));
+    expect(input).toHaveValue("Thanks ");
+
+    // One that fits still goes in
+    await user.click(variable("gift"));
+    expect(input).toHaveValue("Thanks {gift}");
   });
 });
