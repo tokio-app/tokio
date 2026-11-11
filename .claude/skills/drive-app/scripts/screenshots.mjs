@@ -213,16 +213,22 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     }
     await page.waitForTimeout(800);
   };
-  // The README's are English only
-  const shoot = async (name) => {
+  // The README's are English only. `ready` waits for the moment to shoot.
+  const shoot = async (name, ready) => {
     if (!english) return;
     await settle();
+    await ready?.();
     await page.screenshot({ path: join(out, `${name}.png`), scale: "css" });
   };
   // A docs screenshot of these elements and some room around them, below the
   // title bar unless `top` says otherwise. `width` cuts it short of empty
-  // space on the right, `left` starts it further left.
-  const crop = async (name, targets, { pad = 24, width, left, top } = {}) => {
+  // space on the right, `left` starts it further left, and `ready` waits for
+  // the moment to shoot.
+  const crop = async (
+    name,
+    targets,
+    { pad = 24, width, left, top, ready } = {},
+  ) => {
     if (!web) return;
     const all = [targets].flat();
     await all[0].evaluate((el) => el.scrollIntoView({ block: "center" }));
@@ -266,6 +272,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       top.parentElement.style.visibility = "visible";
       return true;
     });
+    await ready?.();
     await page.screenshot({
       path: join(docs, `${name}.png`),
       clip: { x, y, width: right - x, height: bottom - y },
@@ -312,8 +319,20 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await page.getByTitle(tr("Back to Overlays")).click();
   await page.getByRole("heading", { name: tr("Overlay gallery") }).waitFor();
   await page.waitForTimeout(8000);
-  await shoot("overlays");
-  await crop("overlays-gallery", [card("Gift Jar"), card("Top Likes")]);
+  // Top Likes' preview keeps liking and slides its rows when the ranking
+  // changes, so the gallery's shots wait until no row is sliding
+  const rowsStill = () =>
+    page
+      .frame({ name: "TOKIO_APP-top-likes" })
+      .waitForFunction(() =>
+        document
+          .getAnimations()
+          .every((a) => !a.effect?.target?.classList?.contains("viewer")),
+      );
+  await shoot("overlays", rowsStill);
+  await crop("overlays-gallery", [card("Gift Jar"), card("Top Likes")], {
+    ready: rowsStill,
+  });
   await crop("overlays-card", card("Gift Jar"));
   await card("Gift Jar")
     .getByRole("button", { name: tr("Customize") })
@@ -640,6 +659,9 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       .fill(name);
   }
   await crop("games-overlay", overlay);
+  // The README's: the actions, and the overlay that shows them under them
+  await actions.evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await shoot("games");
   const preview = overlay.locator('[class*="_preview_"]').first();
   await crop("games-preview", preview, { pad: 12 });
   // Sticker, then back to Arrow so the later shots are as before
@@ -739,6 +761,9 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     .click();
   await page.getByRole("button", { name: tr("Add"), exact: true }).click();
   await page.waitForTimeout(1500);
+  // Clicking Add can scroll the page, by a different amount each run: the
+  // README's shot starts at the top
+  await page.getByRole("main").evaluate((main) => main.scrollTo(0, 0));
   await shoot("countdown-timer");
   await crop("timer-preview", page.getByRole("timer").locator(".."));
   // The controls, under the preview timer-preview shows
@@ -858,6 +883,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await studioRow(tr("Star")).click();
   await page.waitForTimeout(500);
   await crop("studio-editor", page.getByRole("main"), { pad: 0 });
+  await shoot("overlay-studio");
   // The panel the list fills
   await crop("studio-elements", elementList.locator(".."));
   // The follow's text, with the event's values under the LIVE numbers

@@ -1,9 +1,10 @@
 <div align="center">
   <img src="resources/icon.png" alt="Tokio logo" width="96" />
   <h1>Tokio</h1>
-  <p>Make your TikTok LIVE react to chat, gifts, likes and more: text-to-speech, music requests, alerts, a countdown timer and overlays.</p>
+  <p>Make your TikTok LIVE react to chat, gifts, likes and more: text-to-speech, music requests, alerts, Minecraft actions, a countdown and overlays.</p>
   <p>
     <a href="https://tokio.ialfaro.com/download/">Download</a> ·
+    <a href="https://tokio.ialfaro.com/docs/">Docs</a> ·
     <a href="https://tokio.ialfaro.com">Website</a> ·
     <a href="https://github.com/tokio-app/tokio/issues">Report a bug</a>
   </p>
@@ -11,7 +12,7 @@
 
 ![Tokio's dashboard during a LIVE: viewers, likes and views, the features that are on, and the activity feed](.github/screenshots/dashboard.png)
 
-Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok LIVE and reacts to what happens in it. Its overlays work in **OBS**, **TikTok LIVE Studio** and any streaming app that can show a web page.
+Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok LIVE and reacts to what happens in it. Its overlays work in OBS, TikTok LIVE Studio and any streaming app that can show a web page.
 
 ## Features
 
@@ -32,13 +33,26 @@ Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok
       <p><a href="https://tokio.ialfaro.com/docs/features/overlays/"><b>Overlays</b></a>: install the official ones or import your own, and set them up from the gallery.</p>
     </td>
     <td width="50%" valign="top">
-      <img src=".github/screenshots/countdown-timer.png" alt="The countdown timer running" />
-      <p><a href="https://tokio.ialfaro.com/docs/features/countdown-timer/"><b>Countdown timer</b></a>: a subathon clock that gifts, likes, follows and chat add time to.</p>
+      <img src=".github/screenshots/overlay-studio.png" alt="Overlay Studio's editor: the Elements list, a portrait canvas with a likes banner, a star, the logo, a follow message and a viewer's picture, and the star's settings" />
+      <p><a href="https://tokio.ialfaro.com/docs/features/overlay-studio/"><b>Overlay Studio</b></a>: build your own overlays from text, images, your cameras and other overlays, each piece reacting to your LIVE.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src=".github/screenshots/games.png" alt="Games actions for Bedrock: a follow that spawns a zombie named after the viewer, and a Rose that runs a say command" />
+      <p><a href="https://tokio.ialfaro.com/docs/features/games/"><b>Games</b></a>: gifts and chat spawn mobs and run commands in Minecraft, Bedrock or Java with the Tokio mod.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src=".github/screenshots/countdown-timer.png" alt="The countdown running" />
+      <p><a href="https://tokio.ialfaro.com/docs/features/countdown-timer/"><b>Countdown</b></a>: a subathon clock that gifts, likes, follows and chat add time to.</p>
     </td>
   </tr>
 </table>
 
-Viewers can also [request songs](https://tokio.ialfaro.com/docs/features/music-requests/) from chat on YouTube Music or Spotify, [spawn mobs and run commands in Minecraft](https://tokio.ialfaro.com/docs/features/games/) (Bedrock, or Java with the Tokio mod) with gifts and chat, with an overlay that shows viewers which gift does what. In **Tools**, [Overlay Studio](https://tokio.ialfaro.com/docs/features/overlay-studio/) builds your own overlays from text, images, your cameras and the overlays you already have, and each piece can react to your LIVE; [Coin stats](https://tokio.ialfaro.com/docs/features/coin-stats/) keeps the coins and gifts of every LIVE and the viewers who sent them; and [Fans](https://tokio.ialfaro.com/docs/features/fans/) lists the viewers with a fan level. Overlays can show your top gifters and fans. [Profiles](https://tokio.ialfaro.com/docs/features/profiles-and-settings/) keep separate settings for different streams.
+- [Music](https://tokio.ialfaro.com/docs/features/music-requests/): viewers request songs from chat, played on YouTube or Spotify.
+- [Coin stats](https://tokio.ialfaro.com/docs/features/coin-stats/): the coins and gifts of every LIVE and who sent them. Overlays can show your top gifters.
+- [Fans](https://tokio.ialfaro.com/docs/features/fans/): the viewers with a fan level, which overlays can show too.
+- [Profiles](https://tokio.ialfaro.com/docs/features/profiles-and-settings/): separate settings for different streams.
 
 Tokio is in English and Spanish. It follows your system's language, and **Settings → Language** changes it.
 
@@ -48,11 +62,11 @@ Tokio is in English and Spanish. It follows your system's language, and **Settin
 2. Get a free API key from [Euler Stream](https://www.eulerstream.com/register) and paste it in **Settings → TikTok LIVE**.
 3. Start your LIVE, enter your `@username` on the **Home** page and connect.
 
-The [docs](https://tokio.ialfaro.com/docs/) cover every feature and how to [add an overlay](https://tokio.ialfaro.com/docs/guides/adding-an-overlay/) to your streaming app.
+[What you need](https://tokio.ialfaro.com/docs/#what-you-need) lists the rest, like a streaming app for the overlays. The [docs](https://tokio.ialfaro.com/docs/) cover every feature, the [chat commands](https://tokio.ialfaro.com/docs/features/chat-commands/) your viewers can type and how to [add an overlay](https://tokio.ialfaro.com/docs/guides/adding-an-overlay/) to your streaming app.
 
 ## Building from source
 
-Requires Node.js 24+ and Yarn 1.
+Requires Node.js 24.18 or later and Yarn 1.22.22 or later.
 
 ```sh
 yarn install
@@ -65,7 +79,7 @@ yarn build:mac    # build the macOS zips into dist/ (on macOS)
 yarn build:linux  # build the Linux AppImage into dist/
 ```
 
-Want to help? Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
+To contribute, read [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
