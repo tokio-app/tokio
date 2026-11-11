@@ -1049,12 +1049,19 @@ describe("StudioEditor", () => {
     // Its own handles, not a group's bare outline
     expect(handle("se")).not.toBeNull();
 
-    // A press inside its box drags it, with no 3 px wait
+    // A press that slips under 3 screen px is a click: nothing moves
     press(150, 250);
-    fireEvent.pointerMove(canvas(), { clientX: 76, clientY: 125 });
+    fireEvent.pointerMove(canvas(), { clientX: 77, clientY: 125 });
+    fireEvent.pointerUp(canvas());
+    expect(lastSave()).toBeUndefined();
+    expect(undo()).toBeDisabled();
+
+    // Past them, a press inside its box drags it
+    press(150, 250);
+    fireEvent.pointerMove(canvas(), { clientX: 79, clientY: 125 });
     fireEvent.pointerUp(canvas());
     await waitFor(() =>
-      expect(lastSave()?.items[0]).toMatchObject({ x: 102, y: 200 }),
+      expect(lastSave()?.items[0]).toMatchObject({ x: 108, y: 200 }),
     );
 
     fireEvent.pointerDown(handle("se"), { button: 0, clientX: 0, clientY: 0 });
@@ -1062,7 +1069,7 @@ describe("StudioEditor", () => {
     fireEvent.pointerUp(canvas());
     await waitFor(() =>
       expect(lastSave()?.items[0]).toMatchObject({
-        x: 102,
+        x: 108,
         y: 200,
         width: 320,
         height: 110,
@@ -3090,9 +3097,9 @@ describe("StudioEditor", () => {
       );
       // The rulers off, the guide isn't there to stick to
       await user.click(toggle());
-      drag([750, 750], [750, 745]);
+      drag([750, 750], [750, 740]);
       await waitFor(() =>
-        expect(lastSave()?.items[0]).toMatchObject({ x: 600, y: 695 }),
+        expect(lastSave()?.items[0]).toMatchObject({ x: 600, y: 690 }),
       );
     });
 
