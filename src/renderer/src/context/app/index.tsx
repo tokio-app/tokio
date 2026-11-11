@@ -1,5 +1,6 @@
 import Logo from "@/assets/logo.png";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { Tour } from "@/components/Tour";
 import { WhatsNew } from "@/components/WhatsNew";
 import { queueAlert } from "@/helper/alerts";
 import { forgetDecoded } from "@/helper/audio";
@@ -9,7 +10,22 @@ import { useIpcRequest } from "@/hooks/useIpcRequest";
 import styles from "@/router/Layout/layout.module.css";
 import { useT } from "@/ui/i18n";
 import { TitleBar } from "@/ui/TitleBar";
-import React, { useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+
+// Starts the tour. Outside AppProvider, as pages are in their own tests, it
+// does nothing.
+const TourContext = createContext<() => void>(() => {});
+
+/** Starts the tour, which About replays. */
+export function useTour() {
+  return useContext(TourContext);
+}
 
 /**
  * Renders the app once main has loaded, then asks main to show this window in
@@ -21,6 +37,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [started, setStarted] = useState<boolean | null>(null);
   // The version the update replaced, while What's new is open
   const [updatedFrom, setUpdatedFrom] = useState<string>();
+  const [touring, setTouring] = useState(false);
+  const startTour = useCallback(() => setTouring(true), []);
   const t = useT();
 
   const { getQueue, stopQueues } = useAudio();
@@ -29,8 +47,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useIpcListener(APP_EVENTS_RESPONSE.LOAD_APP, (res) => {
     setStarted(!!res?.success);
-    // Only the first load's reply has it, so a later one leaves it open
+    // Only the first load's reply has them, so a later one leaves them open
     if (res?.updatedFrom !== undefined) setUpdatedFrom(res.updatedFrom);
+    if (res?.newStore) setTouring(true);
   });
 
   useEffect(() => {
@@ -96,7 +115,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }
   return (
-    <>
+    <TourContext.Provider value={startTour}>
       {children}
       {updatedFrom !== undefined && (
         <WhatsNew
@@ -104,6 +123,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           onClose={() => setUpdatedFrom(undefined)}
         />
       )}
-    </>
+      {touring && <Tour onClose={() => setTouring(false)} />}
+    </TourContext.Provider>
   );
 }

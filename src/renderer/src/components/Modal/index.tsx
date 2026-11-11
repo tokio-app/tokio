@@ -1,5 +1,6 @@
 import { useT } from "@/ui/i18n";
 import {
+  CSSProperties,
   KeyboardEvent,
   ReactNode,
   useEffect,
@@ -37,7 +38,7 @@ function keepTab(e: KeyboardEvent<HTMLDivElement>) {
 
 type Props = {
   title: string;
-  description?: string;
+  description?: ReactNode;
   // Also called on Escape
   onClose: () => void;
   // With onConfirm and no footer, the footer is Cancel and a confirm button
@@ -50,6 +51,9 @@ type Props = {
   // Adds a close button to the header
   closeButton?: boolean;
   maxWidth?: string;
+  // Puts the card there instead of the window's center, over a backdrop that
+  // doesn't dim: the caller dims around what the card is about (the tour)
+  at?: Pick<CSSProperties, "top" | "left" | "translate">;
   children?: ReactNode;
 };
 
@@ -63,6 +67,7 @@ export function Modal({
   actions,
   closeButton,
   maxWidth = "400px",
+  at,
   children,
 }: Props) {
   const t = useT();
@@ -93,7 +98,7 @@ export function Modal({
     ));
 
   return (
-    <div className={styles.backdrop}>
+    <div className={styles.backdrop} data-placed={at ? "" : undefined}>
       <div
         ref={dialogRef}
         role="dialog"
@@ -102,7 +107,7 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={styles.card}
-        style={{ maxWidth }}
+        style={{ maxWidth, ...at }}
         onKeyDown={(e) => {
           if (e.key === "Tab") keepTab(e);
           if (e.key !== "Escape") return;

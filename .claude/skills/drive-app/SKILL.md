@@ -14,9 +14,13 @@ argument-hint: "[what to check]"
    ```js
    export default async ({ app, page, home, push, toggle, windowWith }) => {
      await page.getByRole("heading", { name: "Dashboard" }).waitFor();
+     // A new data folder opens the tour over the window
+     await page.keyboard.press("Escape");
      await page.screenshot({ path: "<scratchpad>/home.png" });
    };
    ```
+
+   The first start on a new data folder opens the tour, as a first install does. Close it before clicking around, or leave it open to check the tour itself.
 
 3. Run it from the repository root: `node .claude/skills/drive-app/scripts/drive.mjs <steps.mjs>`. With `--home <dir>` it uses that data folder and keeps it, to look at what the app saved or to start the next run from there. One Tokio runs per data folder, so runs on the same `--home` go one after the other: a second one quits at once. With `--exe <app>` it starts a packaged build instead, made with `yarn build:unpack`: `dist/win-unpacked/tokio.exe`, or `dist/linux-unpacked/tokio` on Linux. With `--scale 2` it renders at twice the device scale, for sharp screenshots on any display. With `--lang <tag>` it runs as if the system's language were that one (`TOKIO_LANG`, `en` by default): `--lang es-419` shows Spanish, unless the data folder saved another language. With `--fake-camera`, Chromium's test camera (a moving pattern) is the only camera, for Overlay Studio's camera elements.
 4. It refuses to start while port 37891 is in use. Ask the user to quit Tokio or stop `yarn dev`; don't stop them yourself.

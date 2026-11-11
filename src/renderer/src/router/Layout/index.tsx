@@ -137,7 +137,8 @@ export function Layout() {
               onMouseEnter={() => setNamesHidden(false)}
               onFocus={() => setNamesHidden(false)}
             >
-              <item.icon size={20} />
+              {/* The tour's pieces (components/Tour), by their page */}
+              <item.icon size={20} data-tour={item.to} />
               <span className={styles.sidebar_name}>{t(item.label)}</span>
             </Link>
           ))}

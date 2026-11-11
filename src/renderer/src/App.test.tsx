@@ -1,7 +1,9 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { TOUR_STEPS } from "@/components/Tour/helper";
 import { notification } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The real AudioProvider, without Tone.js: jsdom has no Web Audio
@@ -64,6 +66,43 @@ describe("App", () => {
 
     expect(
       await screen.findByRole("heading", { name: "Online services" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a new store the tour, with every piece it lights on Home", async () => {
+    await open();
+
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: true, newStore: true });
+
+    expect(
+      await screen.findByRole("heading", { name: "Dashboard" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Welcome to Tokio" }),
+    ).toBeInTheDocument();
+    // A renamed page or a dropped data-tour would leave its step unlit
+    const missing = TOUR_STEPS.flatMap(({ target }) =>
+      target && !document.querySelector(`[data-tour="${target}"]`)
+        ? [target]
+        : [],
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("takes the tour again from About, on Home", async () => {
+    const user = userEvent.setup();
+    await open("#/about");
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: true });
+
+    await user.click(
+      await screen.findByRole("button", { name: "Take the tour" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Dashboard" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Welcome to Tokio" }),
     ).toBeInTheDocument();
   });
 });

@@ -1,0 +1,51 @@
+/* The lit piece of the window. Its outer shadow is the dimming around it, not
+   a drop shadow, and the inner one its rose ring. */
+.spotlight {
+  position: fixed;
+  z-index: var(--z-modal);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    0 0 0 0 var(--accent-primary),
+    0 0 0 100vmax var(--modal-background);
+  pointer-events: none;
+  /* Modal's placed card moves at the same pace */
+  transition:
+    top 0.3s ease-out,
+    left 0.3s ease-out,
+    width 0.3s ease-out,
+    height 0.3s ease-out,
+    box-shadow 0.3s ease-out;
+  animation: fade 0.15s ease-out;
+}
+
+.spotlight[data-lit] {
+  box-shadow:
+    0 0 0 2px var(--accent-primary),
+    0 0 0 100vmax var(--modal-background);
+}
+
+.text a {
+  color: var(--accent-primary);
+}
+
+.count {
+  align-self: center;
+  margin-right: auto;
+  font-size: var(--font-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--font-secondary);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight {
+    transition: none;
+    animation: none;
+  }
+}

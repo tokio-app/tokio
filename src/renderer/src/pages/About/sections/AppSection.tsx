@@ -4,7 +4,7 @@ import { REPOSITORY_URL } from "@/common/util";
 import { Btn, Section, UpdateButton } from "@/components";
 import { formatPercent } from "@/helper/format";
 import { rich, useLanguage, useT } from "@/ui/i18n";
-import { FiCode, FiFileText, FiRefreshCw } from "react-icons/fi";
+import { FiCode, FiCompass, FiFileText, FiRefreshCw } from "react-icons/fi";
 import styles from "../about.module.css";
 import { COPYRIGHT, updateDetail, updateText } from "../helper";
 
@@ -17,6 +17,8 @@ type Props = {
   connected: boolean;
   onCheck: () => void;
   onView: (id: string) => void;
+  // Opens the tour on Home
+  onTour: () => void;
 };
 
 export function AppSection({
@@ -27,6 +29,7 @@ export function AppSection({
   connected,
   onCheck,
   onView,
+  onTour,
 }: Props) {
   const t = useT();
   const language = useLanguage();
@@ -101,6 +104,9 @@ export function AppSection({
       </div>
 
       <div className={styles.buttons}>
+        <Btn onClick={onTour}>
+          <FiCompass /> {t("about.app.tour")}
+        </Btn>
         <Btn onClick={() => window.open(REPOSITORY_URL)}>
           <FiCode /> {t("about.app.sourceCode")}
         </Btn>

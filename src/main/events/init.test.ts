@@ -2679,14 +2679,17 @@ describe("init events", () => {
       ]);
     });
 
-    it("records the version of a new store without What's new", async () => {
+    it("records the version of a new store, and tells only its first load it's new for the tour", async () => {
       const s = setup();
       s.settings.lastVersion = "";
       s.storeManagerService.wasRebuilt.mockReturnValue(true);
 
       await load(s);
+      await load(s);
 
+      // No updatedFrom: What's new doesn't open over the tour
       expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        { success: true, newStore: true },
         { success: true },
       ]);
       expect(s.storeManagerService.updateLastVersion.mock.calls).toEqual([

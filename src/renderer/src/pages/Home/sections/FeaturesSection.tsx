@@ -54,7 +54,7 @@ export function FeaturesSection({
 
   return (
     <Section title={t("home.features.title")}>
-      <ul className={styles.features}>
+      <ul className={styles.features} data-tour="features">
         {FEATURES.map(({ key, label, to }) => (
           <li key={key} className={styles.feature}>
             <Toggle
