@@ -1627,6 +1627,56 @@ describe("groups and motion", () => {
     expect(video.paused).toBe(true);
   });
 
+  it("sends an element its video holds back to waiting when its group leaves", () => {
+    draw(
+      layered(
+        grouped(
+          { when: "event", seconds: 5 },
+          clip("c", { when: "event", seconds: 5, loop: false }),
+        ),
+      ),
+    );
+    const video = videoOf("c");
+    stage.react({ element: "g" });
+    stage.react({ element: "c" });
+    loaded(video, 20);
+
+    // The group's seconds end first, while the video still plays
+    vi.advanceTimersByTime(5000 + EXIT_MS);
+    expect(wrapper().classList).toContain("studio-hidden");
+    expect(body("c").classList).toContain("studio-hidden");
+    expect(video.paused).toBe(true);
+
+    // The group's next event doesn't bring the element in with it
+    play.mockClear();
+    stage.react({ element: "g" });
+    expect(body("c").classList).toContain("studio-hidden");
+    expect(video.paused).toBe(true);
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it("shows an element that came on its own event when its group comes in", () => {
+    draw(
+      layered(
+        grouped(
+          { when: "event", seconds: 5 },
+          clip("c", { when: "event", seconds: 5, loop: false }),
+        ),
+      ),
+    );
+    const video = videoOf("c");
+    loaded(video, 20);
+
+    // Its own event while the group waits, then the group's
+    stage.react({ element: "c" });
+    expect(video.paused).toBe(true);
+    vi.advanceTimersByTime(2000);
+    stage.react({ element: "g" });
+
+    expect(body("c").classList).not.toContain("studio-hidden");
+    expect(video.paused).toBe(false);
+  });
+
   it("comes in again on a react during its exit", () => {
     draw(layered(grouped({ when: "event", seconds: 2 }, text("a"))));
     stage.react({ element: "g" });
