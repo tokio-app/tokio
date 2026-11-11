@@ -654,8 +654,9 @@ export class StoreManagerService extends Service {
   ): Promise<boolean> {
     this._ensureInitialized();
     const files = this._storeData!.settings[library];
-    // Files are named by content, so the same file means the same entry.
-    if (files.some((f) => f.file === entry.file)) return true;
+    // Files are named by content, so the same file means the same entry. Saved
+    // again, as a failed save may have left it out of the store file.
+    if (files.some((f) => f.file === entry.file)) return this._queueSave();
     files.push(entry);
     return this._queueSave();
   }

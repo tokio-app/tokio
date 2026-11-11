@@ -1480,6 +1480,15 @@ describe("StoreManagerService", () => {
       expect(store.getSounds()).toEqual([]);
     });
 
+    it("saves a sound again when it's added again after a failed save", async () => {
+      const store = await init();
+      vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+
+      expect(await store.addSound(sound)).toBe(false);
+      expect(await store.addSound(sound)).toBe(true);
+      expect((await readJSON(storeFile)).settings.sounds).toEqual([sound]);
+    });
+
     it("takes a deleted file off the alerts of every profile", async () => {
       const store = await init();
       const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({
