@@ -56,7 +56,7 @@ paths:
 - Imports (`importSound`, `importMedia`) go through `importFile` (`src/main/helper/library.ts`), shared with the Minecraft pictures. Read sounds through `AlertsService.readSound` (keeps paths inside the folder, caches). `UPLOAD_MEDIA` shares the `upload` loop with `UPLOAD_SOUNDS`.
 - Sounds are up to `CACHE_MAX_FILE_BYTES`, so every sound added now is served from memory: `importSound` and `fetchSound` refuse bigger ones (`fetchSound` counts the bytes as they come). A bigger one saved before is read from disk only on `GET_SOUND_DATA`, one read shared by concurrent requests.
 - `handle` only checks that a library sound's file is there (`_missing`: the cache, else `access`), without reading it.
-- MyInstants has no API; `AlertsService` scrapes it with cheerio. Only fetch `www.myinstants.com` URLs.
+- MyInstants has no API; `AlertsService` scrapes its result list (`resultInstants`, which counts div tags so the trending list after it stays out). Only fetch `www.myinstants.com` URLs.
 - `ALERT_AUDIO` carries a `key` (the file, or a `tts:` cache key), `repeat` and the cut. The window queues `repeat` copies sharing one decode, and forgets a `tts:` key's decode (`forgetDecoded`) once its copies have places, since messages rarely repeat.
 - Library sounds go by `key` alone: the window fetches the bytes with `GET_SOUND_DATA` (`soundData`) only when it hasn't decoded that key, one fetch for copies and concurrent events. Messages carry `data`.
 - Queues: `alerts`, or `alerts:<trigger>` with `simultaneous`. `ALERT_CLEAR` stops every `alerts*` queue. Tests and previews (`useAlertTest`) use `alert-test`, so clearing never cuts them.

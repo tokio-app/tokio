@@ -1434,6 +1434,21 @@ describe("AlertsService", () => {
       });
     });
 
+    it("reads a sound's name as its text, with the entities decoded", async () => {
+      const html = `<div id="instants_container"><div class="instants result-page"><div class="instant"><div><div></div></div><button class="small-button" onclick="play(&#39;/media/sounds/a&amp;b.mp3&#39;, &#39;loader-1&#39;)"></button><a class="link-secondary instant-link"> Tom &amp; <b>Jerry</b>&#x27;s &lt;3 &#233;&#128512; &quot;x&quot; </a></div></div><div class="instant"><button onclick="play('/media/sounds/out.mp3')"></button><a class="instant-link">Out</a></div></div>`;
+      vi.stubGlobal("fetch", async () => htmlResponse(html));
+
+      const res = await service.search("tom");
+
+      expect(res.data?.sounds).toEqual([
+        {
+          name: `Tom & Jerry's <3 é😀 "x"`,
+          url: "https://www.myinstants.com/media/sounds/a&b.mp3",
+          file: expect.stringMatching(/^[0-9a-f]{32}\.mp3$/),
+        },
+      ]);
+    });
+
     it("reports a next page when the page is full", async () => {
       const instant = (i: number) =>
         `<div class="instant"><button class="small-button" onclick="play('/media/sounds/${i}.mp3', 'loader-${i}', '${i}')"></button><a class="instant-link">Sound ${i}</a></div>`;

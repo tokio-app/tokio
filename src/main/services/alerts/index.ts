@@ -66,6 +66,63 @@ const clamp = (value: number, max: number) => Math.min(Math.max(value, 0), max);
 export const CACHE_MAX_BYTES = 32 * 1024 * 1024;
 export const CACHE_MAX_FILE_BYTES = 8 * 1024 * 1024;
 
+const classes = (tag: string) =>
+  /\bclass="([^"]*)"/i.exec(tag)?.[1].split(/\s+/) ?? [];
+
+const ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+};
+
+// The entities MyInstants' pages use; &#39; and &#x27; are numeric.
+const decodeEntities = (text: string) =>
+  text.replace(
+    /&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot));/gi,
+    (entity, dec?: string, hex?: string, name?: string) => {
+      if (name) return ENTITIES[name.toLowerCase()];
+      const code = dec ? Number(dec) : parseInt(hex!, 16);
+      return code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+    },
+  );
+
+/**
+ * The HTML of each `#instants_container > div.instants.result-page > .instant`,
+ * so the trending sounds after the result list stay out. Only div tags are
+ * counted, which is all the list nests.
+ */
+function resultInstants(html: string): string[] {
+  const id = html.indexOf('id="instants_container"');
+  if (id === -1) return [];
+  const page = html.slice(html.lastIndexOf("<", id));
+  const blocks: string[] = [];
+  let depth = 0;
+  // The depth inside the result list, 0 before it
+  let list = 0;
+  let from = -1;
+  for (const tag of page.matchAll(/<(\/?)div\b[^>]*>/gi)) {
+    if (tag[1]) {
+      depth--;
+      if (from !== -1 && depth === list) {
+        blocks.push(page.slice(from, tag.index));
+        from = -1;
+      } else if (depth < Math.max(list, 1)) break;
+      continue;
+    }
+    depth++;
+    const names = classes(tag[0]);
+    if (!list && depth === 2) {
+      if (names.includes("instants") && names.includes("result-page")) {
+        list = depth;
+      }
+    } else if (list && depth === list + 1) {
+      if (names.includes("instant")) from = tag.index;
+    }
+  }
+  return blocks;
+}
+
 export class AlertsService extends Service {
   private readonly BASE_URL = "https://www.myinstants.com";
   private readonly MAX_PER_PAGE = 36;
@@ -549,7 +606,7 @@ export class AlertsService extends Service {
         throw new Error(`MyInstants responded with status: ${response.status}`);
       }
 
-      const sounds = await this._parseSoundsFromHtml(await response.text());
+      const sounds = this._parseSoundsFromHtml(await response.text());
 
       return {
         success: true,
@@ -563,27 +620,22 @@ export class AlertsService extends Service {
   /**
    * Parses the HTML to extract sound buttons.
    */
-  private async _parseSoundsFromHtml(html: string): Promise<MyInstantsSound[]> {
-    // Loaded on the first search. The slim build skips parse5 and undici.
-    const { load } = await import("cheerio/slim");
-    const $ = load(html);
+  private _parseSoundsFromHtml(html: string): MyInstantsSound[] {
     const sounds: MyInstantsSound[] = [];
-
-    $("#instants_container > div.instants.result-page > .instant").each(
-      (_, element) => {
-        const name = $(element).find("a.instant-link").text().trim();
-        const playScript = $(element)
-          .find("button.small-button")
-          .attr("onclick");
-
-        const match = playScript?.match(/play\('([^']+)'/);
-        if (name && match?.[1]) {
-          const url = `${this.BASE_URL}${match[1]}`;
-          sounds.push({ name, url, file: this._fileForUrl(url) });
-        }
-      },
-    );
-
+    for (const block of resultInstants(html)) {
+      const link = [...block.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)].find(
+        (a) => classes(a[1]).includes("instant-link"),
+      );
+      const name = decodeEntities(
+        link?.[2].replace(/<[^>]*>/g, "") ?? "",
+      ).trim();
+      // Matched decoded, as the attribute reads
+      const path = /play\('([^']+)'/.exec(decodeEntities(block))?.[1];
+      if (name && path) {
+        const url = `${this.BASE_URL}${path}`;
+        sounds.push({ name, url, file: this._fileForUrl(url) });
+      }
+    }
     return sounds;
   }
 
