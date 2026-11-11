@@ -298,7 +298,8 @@ describe("VoiceSelect", () => {
 
       await previewed(bob);
 
-      expect(sent(APP_EVENTS.GET_TTS_TEST)[1].id).toBe(previewId(bob, 2));
+      const [first, second] = sent(APP_EVENTS.GET_TTS_TEST);
+      expect(second.id).not.toBe(first.id);
       expect(queue.enqueue).toHaveBeenCalledOnce();
     });
 
@@ -311,6 +312,21 @@ describe("VoiceSelect", () => {
 
       expect(queue.enqueue).not.toHaveBeenCalled();
       expect(row("Bob").getByRole("button", { name: "Play" })).toBeVisible();
+    });
+
+    it("ignores a reply from before the picker closed, once it's open again", async () => {
+      const { user, queue, field } = await openPicker();
+      const bob = voice("Bob", "en-US");
+      await user.click(row("Bob").getByRole("button", { name: "Play" }));
+      await user.keyboard("{Escape}");
+      expect(dialog()).not.toBeInTheDocument();
+      await user.click(field);
+      await user.click(row("Bob").getByRole("button", { name: "Play" }));
+
+      await previewed(bob, undefined, 0);
+
+      expect(queue.enqueue).not.toHaveBeenCalled();
+      expect(row("Bob").getByRole("button", { name: "Cancel" })).toBeVisible();
     });
 
     it("stops when the picker closes", async () => {

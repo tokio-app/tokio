@@ -7,15 +7,17 @@ import {
   useIpcListener,
 } from "@/hooks";
 import { useT } from "@/ui/i18n";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FormatSection } from "./sections/FormatSection";
 import { ProtectionFields } from "./sections/ProtectionFields";
 import { ReplacementsSection } from "./sections/ReplacementsSection";
 import { UserVoicesSection } from "./sections/UserVoicesSection";
 import { VoiceSection } from "./sections/VoiceSection";
 
-// Id of the tester's requests, voice previews share the event
-const TEST_ID = "tts-test";
+// Start of the tester's request ids, voice previews share the event
+const TEST_ID = "tts-test:";
+// Numbers each test across visits, so a reply from before leaving is ignored
+let tests = 0;
 
 export function TTS() {
   const t = useT();
@@ -23,6 +25,8 @@ export function TTS() {
   const testQueue = getQueue("tts_test");
 
   const [testLoading, setTestLoading] = useState(false);
+  // The latest test's id: only its reply plays
+  const pending = useRef<string | null>(null);
 
   const { settings, update } = useEditableSettings("tts", ({ tts }) =>
     testQueue.setFilters({
@@ -32,7 +36,7 @@ export function TTS() {
   );
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_TTS_TEST, (res) => {
-    if (res?.id !== TEST_ID) return;
+    if (!res || res.id !== pending.current) return;
     setTestLoading(false);
     if (!res.success) return;
     // A new test replaces the one playing
@@ -52,9 +56,10 @@ export function TTS() {
         update={update}
         onTest={(text) => {
           setTestLoading(true);
+          pending.current = `${TEST_ID}${++tests}`;
           // Read like chat, with the settings on the page, saved or not
           window.api.emit(APP_EVENTS.GET_TTS_TEST, {
-            id: TEST_ID,
+            id: pending.current,
             text,
             voice: settings.voice,
             settings,

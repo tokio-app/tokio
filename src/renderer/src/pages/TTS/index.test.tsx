@@ -49,6 +49,9 @@ async function setup(reply = loaded) {
   return { ...app, queue: app.audio.queue("tts_test") };
 }
 
+// The id of the latest test sent: numbered, on across tests
+const testId = () => sent(APP_EVENTS.GET_TTS_TEST).at(-1)!.id;
+
 const wait = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 
 // The settings saved once the changes settle
@@ -155,7 +158,7 @@ describe("TTS", () => {
 
     expect(sent(APP_EVENTS.GET_TTS_TEST)).toEqual([
       {
-        id: "tts-test",
+        id: expect.stringMatching(/^tts-test:\d+$/),
         text: "Hello chat",
         voice: aria,
         settings: loaded.profile.tts,
@@ -165,7 +168,7 @@ describe("TTS", () => {
 
     await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
       success: true,
-      id: "tts-test",
+      id: testId(),
       data,
     });
 
@@ -176,12 +179,17 @@ describe("TTS", () => {
   it("cuts the test playing when another one comes", async () => {
     const { user, queue } = await setup();
     await user.type(testMessage(), "Hello chat");
-    const reply = { success: true, id: "tts-test", data };
+    const reply = () =>
+      send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
+        success: true,
+        id: testId(),
+        data,
+      });
 
     await user.click(testButton());
-    await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, reply);
+    await reply();
     await user.click(testButton());
-    await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, reply);
+    await reply();
 
     const [, second] = queue.enqueue.mock.invocationCallOrder;
     expect(queue.stop).toHaveBeenCalledTimes(2);
@@ -194,7 +202,7 @@ describe("TTS", () => {
     await user.click(testButton());
     await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
       success: true,
-      id: "tts-test",
+      id: testId(),
       data,
     });
     queue.stop.mockClear();
@@ -212,11 +220,32 @@ describe("TTS", () => {
 
     await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
       ...failure(),
-      id: "tts-test",
+      id: testId(),
     });
 
     expect(queue.enqueue).not.toHaveBeenCalled();
     expect(test).not.toHaveAttribute("aria-busy");
+  });
+
+  it("ignores a test's reply from before the page left, once it's back", async () => {
+    const left = await setup();
+    await left.user.type(testMessage(), "Hello chat");
+    await left.user.click(testButton());
+    const old = testId();
+    left.unmount();
+    const { user, queue } = await setup();
+    const test = testButton();
+    await user.type(testMessage(), "Hello chat");
+    await user.click(test);
+
+    await send(APP_EVENTS_RESPONSE.GET_TTS_TEST, {
+      success: true,
+      id: old,
+      data,
+    });
+
+    expect(queue.enqueue).not.toHaveBeenCalled();
+    expect(test).toHaveAttribute("aria-busy", "true");
   });
 
   it("ignores test replies meant for voice previews", async () => {
@@ -254,7 +283,7 @@ describe("TTS", () => {
 
     expect(sent(APP_EVENTS.GET_TTS_TEST)).toEqual([
       {
-        id: "tts-test",
+        id: expect.stringMatching(/^tts-test:\d+$/),
         text: "Hello chat",
         voice: guy,
         settings: { ...loaded.profile.tts, voice: guy },

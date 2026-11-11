@@ -22,6 +22,10 @@ export type AlertTestRequest =
     })
   | { id: string; volume: number; media: AlertMedia };
 
+// Numbers each play across mounts, so a reply from before leaving the page
+// can't match a new one
+let requests = 0;
+
 /**
  * Plays one alert sound test at a time. Starting a test cancels the one
  * playing, and `testing` holds the test loading or playing. `lengths` has the
@@ -38,7 +42,6 @@ export function useAlertTest() {
   const current = useRef<{ req: AlertTestRequest; request: number } | null>(
     null,
   );
-  const requests = useRef(0);
 
   // By request, not id: a stopped test's sound still decoding resolves later,
   // and mustn't end the same alert's test started again
@@ -91,7 +94,7 @@ export function useAlertTest() {
   const play = useCallback(
     (req: AlertTestRequest) => {
       queue.stop();
-      const request = ++requests.current;
+      const request = ++requests;
       current.current = { req, request };
       setTesting({ id: req.id, loading: true });
       // Media alone needs nothing from main.

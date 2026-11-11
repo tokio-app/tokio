@@ -68,7 +68,7 @@ paths:
 - When the library's store file can't be written, the file still goes to the alert: the success reply comes first, then the `saveFailure()` one with the same `request`, which the page ignores and the picker shows. `upload` adds a listed file again for the same reason, counting only new ones.
 - The counter is module-level (`requests` in `pages/Alerts`), one for sounds and media, so a reply from before leaving the page can't beat a newer request.
 - `asked` and `askedMedia` are cleared on `useEditableSettings`'s `switched`, since a cloned profile has the same alert ids.
-- `useAlertTest` numbers `TEST_ALERT` the same way, so a late reply for a test restarted on the same id (which also keys its gain, `lengths` and `PlayButton`) is dropped.
+- `useAlertTest` numbers `TEST_ALERT` with its own module-level counter, so a late reply for a test restarted on the same id (which also keys its gain, `lengths` and `PlayButton`), or one from before the page left, is dropped. Tests read the number from `sent()`.
 
 ## Removing sounds and media
 
