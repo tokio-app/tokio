@@ -946,6 +946,14 @@ export class StoreManagerService extends Service {
 
   public async exportProfile(ref: string, path: string): Promise<boolean> {
     if (!ref || !path) return false;
+    // The save dialog can start there, and this write skips updateFile's lock
+    if (isInside(this._pathManagerService.folders.profilesFolder, path)) {
+      Logger.error(
+        `<System> Export refused: ${path} is in the profiles folder.`,
+        this._logFile,
+      );
+      return false;
+    }
 
     const data = await this._jsonManagerService.loadFile(
       join(this._pathManagerService.folders.profilesFolder, ref),

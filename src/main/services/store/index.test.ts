@@ -1263,6 +1263,16 @@ describe("StoreManagerService", () => {
       expect((await readJSON(dest)).connector.username).toBe("streamer");
     });
 
+    it("refuses to export into the profiles folder", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+      const before = await readFile(stream, "utf-8");
+
+      expect(await store.exportProfile("default.json", stream)).toBe(false);
+      expect(await readFile(stream, "utf-8")).toBe(before);
+    });
+
     it("fails to export a profile that isn't there", async () => {
       const error = vi.spyOn(Logger, "error");
       const store = await init();
