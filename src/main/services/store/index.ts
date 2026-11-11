@@ -30,7 +30,7 @@ import {
 } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { cleanText } from "@/helper/chat";
-import { writeFileAtomic } from "@/helper/fs";
+import { isMissing, writeFileAtomic } from "@/helper/fs";
 import { t } from "@/helper/i18n";
 import { isInside } from "@/helper/path";
 import { track } from "@/helper/quit";
@@ -56,9 +56,6 @@ type Providers = {
 // was unavailable, as plain text.
 const isEncrypted = (key: string) =>
   /^v\d\d$/.test(Buffer.from(key, "base64").subarray(0, 3).toString("latin1"));
-
-const isMissing = (error: unknown) =>
-  error instanceof Error && "code" in error && error.code === "ENOENT";
 
 // How long live events go without reading again an active profile that failed
 const LOAD_RETRY_MS = 30_000;

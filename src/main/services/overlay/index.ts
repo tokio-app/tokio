@@ -14,7 +14,7 @@ import {
   TokioPayload,
 } from "@/common/types";
 import { createTestLive, formatError } from "@/common/util";
-import { renameWithRetry } from "@/helper/fs";
+import { isMissing, renameWithRetry } from "@/helper/fs";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
 import {
@@ -333,11 +333,7 @@ export class OverlayService extends Service {
     try {
       await renameWithRetry(this._dir(id), old);
     } catch (error) {
-      if (!(
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT"
-      )) {
+      if (!isMissing(error)) {
         Logger.error(
           `<Overlays> Unable to remove overlay ${id} -- ${formatError(error)}`,
           this._logFile,
