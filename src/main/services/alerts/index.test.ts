@@ -926,6 +926,8 @@ describe("AlertsService", () => {
 
         expect(generateBuffer).toHaveBeenCalledTimes(2);
         expect(sent.map(said)).toEqual(["Thanks Ann", "Thanks Bob"]);
+        // Cid's message isn't even filled in
+        expect(prepareText).toHaveBeenCalledTimes(2);
       });
 
       it("drops the waiting messages and the one being made when cleared", async () => {

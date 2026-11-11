@@ -465,15 +465,16 @@ export class AlertsService extends Service {
     play: (data: Uint8Array, key: string) => void,
     onError: (error?: string) => void,
   ) {
-    // Checked before queueing, so blocked messages don't take a place.
-    const text = this._message(tts, payload, settings);
-    if (text === null) return;
-
     const { cooldown, queue_length } = settings.protection;
     this._speech.setQueueOptions({
       gapTime: cooldown,
       maxQueueLength: queue_length,
     });
+    // It would be dropped, so it isn't made
+    if (this._speech.full()) return;
+    // Checked before queueing, so blocked messages don't take a place.
+    const text = this._message(tts, payload, settings);
+    if (text === null) return;
     const run = this._run;
     this._speech.enqueue(async () => {
       // init.ts logs it with its notice, so a failing engine can't flood the log
