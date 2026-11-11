@@ -284,6 +284,7 @@ function createFakes() {
       whenReady: vi.fn(() => Promise.resolve()),
       quit: vi.fn(),
       requestSingleInstanceLock: vi.fn(() => true),
+      setAppUserModelId: vi.fn<(id: string) => void>(),
       getLocale: vi.fn(() => "en-US"),
       getLocaleCountryCode: vi.fn(() => "US"),
       getPreferredSystemLanguages: vi.fn(() => ["en-US"]),

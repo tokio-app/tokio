@@ -31,7 +31,6 @@ import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
 import { URLManagerService } from "@/services/url";
-import { electronApp, is } from "@electron-toolkit/utils";
 import {
   app,
   BrowserWindow,
@@ -135,7 +134,7 @@ let win: BrowserWindow | null = null;
 // starts in main's language (?lang), even when LOAD_APP fails.
 function loadPage(window: BrowserWindow, page: string) {
   const lang = language();
-  if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
+  if (!app.isPackaged && process.env["ELECTRON_RENDERER_URL"]) {
     window.loadURL(
       `${process.env["ELECTRON_RENDERER_URL"]}/${page}?lang=${encodeURIComponent(lang)}`,
     );
@@ -201,7 +200,11 @@ function createWindows(): void {
 
 app.whenReady().then(async () => {
   if (!primary) return;
-  electronApp.setAppUserModelId("com.ialfaro.tokio");
+  if (process.platform === "win32") {
+    app.setAppUserModelId(
+      app.isPackaged ? "com.ialfaro.tokio" : process.execPath,
+    );
+  }
 
   // The menu can't zoom the window, nor reload it or open DevTools once
   // packaged, and every page still gets those keys: Overlay Studio zooms
@@ -211,7 +214,7 @@ app.whenReady().then(async () => {
   // window.
   lockMenu(Menu.getApplicationMenu(), app.isPackaged);
   // DevTools on F12 in development, as electron-toolkit had it
-  if (is.dev) {
+  if (!app.isPackaged) {
     app.on("browser-window-created", (_, { webContents }) => {
       webContents.on("before-input-event", (_e, input) => {
         if (input.type !== "keyDown" || input.code !== "F12") return;
