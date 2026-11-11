@@ -1098,6 +1098,26 @@ describe("ServerService", () => {
       await expect(connect("a")).resolves.toBeInstanceOf(WebSocket);
     });
 
+    it("closes the overlays' sockets when it stops", async () => {
+      const client = await connect("a");
+      const closed = new Promise((resolve) => client.once("close", resolve));
+
+      // ws's own close() leaves its clients open
+      server.stop();
+
+      await expect(closed).resolves.toBe(1005);
+    });
+
+    it("skips an overlay that has over 1 MB still to send", async () => {
+      await connect("a");
+      const [socket] = server["_wss"]!["_mappedClients"].get("a")!;
+      Object.defineProperty(socket, "bufferedAmount", {
+        value: 1024 * 1024 + 1,
+      });
+
+      expect(server.sendToClient("a", "ping")).toBe(false);
+    });
+
     it("reports a send to an id with no overlay connected", () => {
       expect(server.sendToClient("missing", "ping")).toBe(false);
     });
