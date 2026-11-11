@@ -2247,6 +2247,27 @@ describe("init events", () => {
       expect(s.h.notices).toEqual([failure, failure]);
     });
 
+    it("leaves the TTS page's own failures their notice", async () => {
+      const s = await live({ tts: true });
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
+      const { onFailure } = await talked(s);
+
+      onFailure();
+      s.h.handler.notifier.report({
+        source: "tts",
+        error: new Error("Engine down"),
+        fallback: {
+          code: FEEDBACK_CODES.TTS_GENERATION_FAILED,
+          message: "Unable to test the voice.",
+        },
+      });
+
+      expect(s.h.notices.map((n) => n.message)).toEqual([
+        "Unable to generate TTS audio. Try another voice, or check its engine's key in Settings.",
+        "Unable to test the voice.",
+      ]);
+    });
+
     it("logs a TTS failure once per notice", async () => {
       const s = await live({ tts: true });
       s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));

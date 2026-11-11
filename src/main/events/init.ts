@@ -388,7 +388,8 @@ const registerConnectorEvents = ({
               "tts",
               FEEDBACK_CODES.TTS_GENERATION_FAILED,
               t("main.init.ttsFailed", { settings: t("nav.settings") }),
-              { windowMs: REPEAT_NOTICE_MS },
+              // Not the TTS page's key, so its Test still says why it failed
+              { key: "tts:chat", windowMs: REPEAT_NOTICE_MS },
             )
           ) {
             Logger.error(
