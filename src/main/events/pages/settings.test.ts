@@ -621,9 +621,10 @@ describe("settings events", () => {
 
       await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
 
-      // So the old profile's backlogs stop at once
+      // As a switch, so the old profile's backlogs stop at once
       expect(gamesService.setGames).toHaveBeenCalledExactlyOnceWith(
         gamesOf(streamProfile).games,
+        true,
       );
 
       expect(serverService.sendToClient).toHaveBeenCalledExactlyOnceWith(

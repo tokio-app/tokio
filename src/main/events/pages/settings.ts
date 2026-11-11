@@ -218,7 +218,8 @@ const switchProfile = async (
       t("main.lives.historyLoadFailed"),
     );
   }
-  services.gamesService.setGames(profile.games);
+  // A switch, so every backlog stops: clones keep the action ids
+  services.gamesService.setGames(profile.games, true);
 
   e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
     success: true,

@@ -86,6 +86,8 @@ export class GamesService extends Service {
   private _backlogs = new Map<string, Batch[]>();
   // The latest profile's actions, which can stop a backlog
   private _games: Pick<Profile["games"], "actions"> = { actions: [] };
+  // Profile switches so far, which stop every backlog started before
+  private _switches = 0;
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
   private _onRun?: (action: GameAction) => void;
@@ -115,9 +117,14 @@ export class GamesService extends Service {
     this._picturesFolder = folder;
   }
 
-  // The active profile's actions after a save or a switch, so backlogs stop at once
-  public setGames(games: Pick<Profile["games"], "actions">): void {
+  // The active profile's actions after a save or a switch, so backlogs stop at
+  // once. A switch stops them all: clones and imports keep the action ids.
+  public setGames(
+    games: Pick<Profile["games"], "actions">,
+    switched = false,
+  ): void {
     this._games = games;
+    if (switched) this._switches++;
   }
 
   /** Turns the connections on or off. False when one can't listen. */
@@ -374,11 +381,13 @@ export class GamesService extends Service {
   // until the backlog is empty. Each action has its own, side by side.
   private async _pump(id: string, backlog: Batch[]) {
     this._backlogs.set(id, backlog);
+    const switches = this._switches;
     try {
       for (let first = true; backlog.length > 0; first = false) {
         if (!first) await delay(RUN_GAP_MS);
         // A Bedrock game that took over in the gap is still in its handshake
         await this._minecraft.settled();
+        if (this._switches !== switches) break;
         // Stopped when the latest profile removed or disabled the action; runs
         // it accepted keep their commands if only steps changed
         const action = this._games.actions.find((a) => a.id === id);
