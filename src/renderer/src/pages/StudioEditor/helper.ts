@@ -547,19 +547,6 @@ export const toCanvas = (
 const holds = (box: Box, { x, y }: Point) =>
   x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height;
 
-/** The smallest box around the boxes, null for none. */
-export function bounds(boxes: Box[]): Box | null {
-  if (boxes.length === 0) return null;
-  const x = Math.min(...boxes.map((b) => b.x));
-  const y = Math.min(...boxes.map((b) => b.y));
-  return {
-    x,
-    y,
-    width: Math.max(...boxes.map((b) => b.x + b.width)) - x,
-    height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
-  };
-}
-
 // Whole degrees from -180 to 180, never -0
 const angle = (degrees: number) =>
   Math.round(((((degrees + 180) % 360) + 360) % 360) - 180) || 0;

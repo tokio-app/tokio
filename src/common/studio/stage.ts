@@ -178,8 +178,9 @@ const extent = ({ x, y, width, height, rotation }: StudioElementView): Box => {
   };
 };
 
-// A group's box: the editor's bounds around its elements' extents, as they
-// show. Empty, at the canvas's corner, without any.
+// A group's box: the smallest box around its elements' extents, as they
+// show, which is the editor's groupFrame unturned. Empty, at the canvas's
+// corner, without any.
 const groupBox = (elements: StudioElementView[]): Box => {
   if (elements.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
   const boxes = elements.map(extent);
