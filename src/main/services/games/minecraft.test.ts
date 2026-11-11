@@ -52,7 +52,8 @@ async function listen(options?: { timeoutMs?: number; handshakeMs?: number }) {
 /**
  * Plays the game: answers the encryption request with its three frames, then
  * answers each command with `reply` (null holds the answer). With
- * `protocols`, it offers those instead, like the Java mod.
+ * `protocols`, it offers those instead, like the Java mod. With `lateMs`,
+ * it answers the encryption request that late.
  */
 async function game(
   port: number,
@@ -60,7 +61,8 @@ async function game(
     encrypt = true,
     // The game offers wsencrypt when it requires encryption
     protocols = encrypt ? [WSENCRYPT] : [],
-  }: { encrypt?: boolean; protocols?: string[] } = {},
+    lateMs = 0,
+  }: { encrypt?: boolean; protocols?: string[]; lateMs?: number } = {},
 ) {
   const socket = new WebSocket(`ws://127.0.0.1:${port}//`, protocols);
   sockets.push(socket);
@@ -96,8 +98,10 @@ async function game(
     );
     if (handshake) {
       fake.handshakes++;
-      if (encrypt)
+      const answer = () =>
         answerHandshake(header.requestId, handshake[1], handshake[2]);
+      if (encrypt && lateMs) setTimeout(answer, lateMs);
+      else if (encrypt) answer();
       return;
     }
     const request = {
@@ -211,6 +215,26 @@ describe("MinecraftConnection", () => {
 
     expect((await connection.send("time set day")).ok).toBe(true);
     expect(fake.requests[0].binary).toBe(false);
+  });
+
+  it("keeps running commands when the game answers the encryption request late", async () => {
+    const { connection } = await listen({ handshakeMs: 20 });
+    const fake = await game(connection.port, { lateMs: 50 });
+    await connected(connection);
+    expect(await connection.send("say one")).toMatchObject({ ok: true });
+
+    // Past the late answer, the stream is encrypted
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(await connection.send("say two")).toMatchObject({
+      ok: true,
+      message: "Ran say two",
+    });
+    expect(
+      fake.requests.map(({ commandLine, binary }) => [commandLine, binary]),
+    ).toEqual([
+      ["say one", false],
+      ["say two", true],
+    ]);
   });
 
   it("connects Java Edition at once, with no handshake, and runs commands as plain text", async () => {
