@@ -412,11 +412,10 @@ export class OverlayService extends Service {
     try {
       const dir = this._dir(id);
       const res = await processOverlay(dir, this._yaml);
-      if (!res.success) return { success: false };
+      // An overlay without settings has no config.yaml to write.
+      if (!res.success || !res.data!.config) return { success: false };
       // A dialog opened before an update has the old version's fields.
-      const merged = res.data!.config
-        ? mergeOverlayConfig(res.data!.config, config)
-        : config;
+      const merged = mergeOverlayConfig(res.data!.config, config);
 
       // First, so settings the schema refuses never reach the HTML.
       const saved = await this._yaml.saveFile(

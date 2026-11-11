@@ -1137,6 +1137,28 @@ describe("OverlayService", () => {
     });
   });
 
+  it("refuses to save settings for an overlay without them", async () => {
+    await configurable(join(folder, "title"));
+    stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
+    const settings = (await service.getConfig("title")).data!;
+    await overlay(join(folder, "clock"), {
+      "info.yaml": info("Clock"),
+      "index.html": `<body>${SETUP}</body>`,
+    });
+    stored.push({
+      id: "clock",
+      name: "Clock",
+      version: "1.0.0",
+      config: false,
+    });
+    const save = vi.spyOn(YAMLManagerService.prototype, "saveFile");
+
+    expect(await service.saveConfig("clock", settings, gifts)).toEqual({
+      success: false,
+    });
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("samples every live event for tests", () => {
     const types = service.getTestPayloads("a").map((p) => p.type);
 
