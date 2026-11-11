@@ -7,6 +7,13 @@ const defaultEntity = {
 
 const defaultProvider = { name: "Default", key: "" };
 
+// The LIVE's stats while none is connected. Frozen, as every reset shares it.
+export const EMPTY_LIVE_STATS = Object.freeze({
+  likes: 0,
+  viewers: 0,
+  views: 0,
+});
+
 export const defaultStoreData: StoreSchema = {
   settings: {
     server: {
@@ -42,11 +49,7 @@ export const defaultStoreData: StoreSchema = {
     games: {
       minecraft: { enabled: false },
     },
-    liveStats: {
-      likes: 0,
-      viewers: 0,
-      views: 0,
-    },
+    liveStats: { ...EMPTY_LIVE_STATS },
     activeProfile: defaultEntity,
     activeConnProvider: defaultProvider,
     activeTTSProvider: defaultProvider,

@@ -330,15 +330,19 @@ export class TikTokLiveConnector extends ConnectorProvider {
     });
 
     connection.on(WebcastEvent.ROOM_USER, (tdata) => {
-      const ranks: RoomUserEvent["ranks"] = tdata.ranks.map((rank) => ({
-        // Same as getUserData
-        username: rank.user?.nickname ?? "",
-        handle: rank.user?.displayId ?? "",
-        profilePictures: rank.user?.avatarThumb?.urlList ?? [],
-        userId: rank.user?.userId ?? "",
-        score: rank.score,
-        position: rank.rank,
-      }));
+      const ranks: RoomUserEvent["ranks"] = tdata.ranks.map((rank) => {
+        const { username, handle, profilePictures, userId } = getUserData(
+          rank.user,
+        );
+        return {
+          username,
+          handle,
+          profilePictures,
+          userId,
+          score: rank.score,
+          position: rank.rank,
+        };
+      });
       this.emit(TOKIO_EVENTS.ROOM_USER, {
         ranks,
         viewers: tdata.total,

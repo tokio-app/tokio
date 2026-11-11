@@ -4,6 +4,7 @@ import {
   FEEDBACK_CODES,
   TOKIO_EVENTS,
 } from "@/common/types";
+import { EMPTY_LIVE_STATS } from "@/common/util";
 import { createStack } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
@@ -38,12 +39,6 @@ const connectMessage = (handle: string, error?: ConnectorFailure) => {
     default:
       return t("main.home.connect.failed", { handle });
   }
-};
-
-const EMPTY_STATS = {
-  likes: 0,
-  viewers: 0,
-  views: 0,
 };
 
 events.push(
@@ -112,7 +107,7 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: EMPTY_STATS,
+        stats: EMPTY_LIVE_STATS,
         error,
       }),
   },
@@ -125,7 +120,7 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
       success: false,
       live: false,
-      stats: EMPTY_STATS,
+      stats: EMPTY_LIVE_STATS,
     });
   },
   {
@@ -137,7 +132,7 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: EMPTY_STATS,
+        stats: EMPTY_LIVE_STATS,
         error,
       }),
   },
@@ -160,7 +155,7 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: EMPTY_STATS,
+        stats: EMPTY_LIVE_STATS,
         error,
       }),
   },
