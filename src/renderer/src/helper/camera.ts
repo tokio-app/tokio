@@ -116,6 +116,9 @@ export function previewCamera(
 
 // The first config this computer encodes, by frame size
 const configs = new Map<string, VideoEncoderConfig>();
+// Frame sizes whose GPU encoder took its config, then failed to start (when
+// OBS holds the encoder sessions, say): they encode in software from then on
+const noHardware = new Set<string>();
 
 /**
  * The encoder config for frames of that size: H.264 Constrained Baseline,
@@ -140,7 +143,9 @@ async function configFor(width: number, height: number) {
     (profile) => `avc1.${profile}${big ? "28" : "1f"}`,
   );
   const tries: VideoEncoderConfig[] = (
-    ["prefer-hardware", "no-preference"] as const
+    noHardware.has(id)
+      ? (["prefer-software", "no-preference"] as const)
+      : (["prefer-hardware", "no-preference"] as const)
   ).flatMap((hardwareAcceleration) =>
     h264.map((codec) => ({
       ...common,
@@ -245,6 +250,13 @@ export function startCapture(capture: CameraCapture): Capture {
           },
           error: () => {
             broken = true;
+            const size = `${config.width}x${config.height}`;
+            configs.delete(size);
+            // A GPU that sent chunks before, as after a driver reset, gets
+            // another go
+            if (config.hardwareAcceleration === "prefer-hardware" && !sent) {
+              noHardware.add(size);
+            }
             // Ends the reader's stream
             tracks.forEach((t) => t.stop());
           },
