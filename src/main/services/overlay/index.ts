@@ -647,6 +647,7 @@ export class OverlayService extends Service {
     }
 
     const staging = join(this._folder, `.install-${randomUUID()}`);
+    const wasStored = this._isStored(id);
     try {
       // Outside the lock, so a slow download doesn't hold up saves.
       const zip = await downloadOverlay(entry);
@@ -657,6 +658,15 @@ export class OverlayService extends Service {
         if (installed?.external) {
           Logger.warn(
             `<Overlays> Unable to install overlay ${id}, an imported overlay has its id.`,
+            this._logFile,
+          );
+          return { success: false };
+        }
+        // An update must not put back, with default settings, what a Remove
+        // took out while it downloaded.
+        if (wasStored && !installed) {
+          Logger.warn(
+            `<Overlays> Unable to update overlay ${id}, it was removed while it downloaded.`,
             this._logFile,
           );
           return { success: false };

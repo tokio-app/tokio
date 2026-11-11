@@ -1088,6 +1088,31 @@ describe("OverlayService", () => {
       expect(mount).toHaveBeenCalledOnce();
     });
 
+    it("doesn't put back an overlay removed while its update downloaded", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      publish(release("1.0.0"));
+      await service.installFromCatalog("gift-jar", gifts);
+      vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+      const fetchMock = publish(release("1.0.1"));
+      const serve = fetchMock.getMockImplementation()!;
+      let resume!: () => void;
+      const held = new Promise<void>((resolve) => (resume = resolve));
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url !== CATALOG_URL) await held;
+        return serve(url);
+      });
+
+      const update = service.installFromCatalog("gift-jar", gifts);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(await service.remove("gift-jar")).toEqual(done);
+      resume();
+
+      expect(await update).toEqual({ success: false });
+      expect(await readdir(folder)).toEqual([]);
+      expect(stored).toEqual([]);
+      expect(service.getOverlays()).toEqual([]);
+    });
+
     it("installs once when asked twice at the same time", async () => {
       const fetchMock = publish(release("1.0.0"));
 

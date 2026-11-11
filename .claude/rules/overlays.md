@@ -44,7 +44,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 - A save merges the dialog's values onto the installed version's fields (`mergeOverlayConfig`), so a dialog opened before an update can't write the old version's fields.
 - `OverlayService` runs each overlay's file work (`saveConfig`, `getConfig`, `remove`, `_writeHTML`, an install's extract and swap) one after another through `_lock(id)`, so a gift refresh can't write back settings read before a save.
   - A task holding the lock must not call a method that takes it (`_prepare` uses `_readConfig`), or it waits on itself.
-  - An install downloads before taking it.
+  - An install downloads before taking it. An update whose overlay a Remove took out meanwhile fails rather than put it back with default settings.
 - Import, remove, install and Tools → Test overlays keep their change when the store file can't be written (`OverlayResult.saved: false`), and the handler follows Feedback in `AGENTS.md`.
 
 ## Settings fields
