@@ -865,6 +865,26 @@ describe("StoreManagerService", () => {
       expect(await store.profileFileFor("Stream")).toBe("stream-2.json");
     });
 
+    it("counts a listed file as taken in any case", async () => {
+      // Listed, with no such file on disk to find
+      await writeFile(
+        storeFile,
+        JSON.stringify({
+          ...defaultStoreData,
+          profiles: [
+            ...defaultStoreData.profiles,
+            { name: "Stream", file: "Stream.json" },
+          ],
+        }),
+      );
+      const store = await init();
+      expect(store.getProfiles()).toContainEqual(
+        expect.objectContaining({ file: "Stream.json" }),
+      );
+
+      expect(await store.profileFileFor("stream")).toBe("stream-2.json");
+    });
+
     it("clones a profile under a new name", async () => {
       const store = await init();
       await store.updateProfileData({ connector: { username: "streamer" } });
