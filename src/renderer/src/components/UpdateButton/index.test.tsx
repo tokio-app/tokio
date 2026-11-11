@@ -1,4 +1,5 @@
 import { APP_EVENTS, UpdateStatus } from "@/common/types";
+import { useAutosave } from "@/hooks";
 import { sentEvents } from "@test/ipc";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -53,6 +54,31 @@ describe("UpdateButton", () => {
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(sentEvents()).toEqual([APP_EVENTS.INSTALL_UPDATE]);
+  });
+
+  it("sends a change still waiting to save before it restarts", async () => {
+    // A field whose change waits for its autosave delay
+    function Field() {
+      const [value, setValue] = useAutosave(1, (v) =>
+        window.api.emit(APP_EVENTS.ADJUST_TIMER, { seconds: v }),
+      );
+      return <button onClick={() => setValue(value + 1)}>{value}</button>;
+    }
+    const user = userEvent.setup();
+    render(
+      <>
+        <Field />
+        <UpdateButton status={ready} connected={false} />
+      </>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "1" }));
+    await user.click(restart());
+
+    expect(sentEvents()).toEqual([
+      APP_EVENTS.ADJUST_TIMER,
+      APP_EVENTS.INSTALL_UPDATE,
+    ]);
   });
 
   it("opens the release page right away, even while connected", async () => {

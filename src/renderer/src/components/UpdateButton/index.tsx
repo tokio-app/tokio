@@ -1,4 +1,5 @@
 import { APP_EVENTS, UpdateStatus } from "@/common/types";
+import { flushSettings } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { createPortal } from "react-dom";
@@ -25,7 +26,11 @@ export function UpdateButton({ status, connected }: Props) {
   const manual = status.state === "available" && status.manual;
   if (!ready && !manual) return null;
 
-  const install = () => window.api.emit(APP_EVENTS.INSTALL_UPDATE);
+  const install = () => {
+    // The installer quits Tokio before the window's pagehide would send them
+    flushSettings();
+    window.api.emit(APP_EVENTS.INSTALL_UPDATE);
+  };
 
   return (
     <div className={styles.container}>
