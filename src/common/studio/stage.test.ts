@@ -774,8 +774,9 @@ const fakePlayers = () => {
 
 describe("cameras", () => {
   type CameraView = Extract<StudioElementView, { kind: "camera" }>;
-  const SRC =
-    "http://localhost:37891/studio/camera/key?device=&label=&quality=720p";
+  const SRC = "/studio/camera/key?device=&label=&quality=720p";
+  // Where the stream opens: the src resolved against the page
+  const ws = (src: string) => `ws://${location.host}${src}`;
   const TYPE = 'video/mp4; codecs="avc1.42e01f"';
   const camera = (fields: Partial<CameraView> = {}): CameraView => ({
     ...BASE,
@@ -802,10 +803,10 @@ describe("cameras", () => {
     constructor(public type: string) {
       super();
     }
-    appendBuffer(data: Uint8Array) {
+    appendBuffer(data: ArrayBuffer) {
       if (this.updating) throw new DOMException("", "InvalidStateError");
       this.updating = true;
-      this.appended.push(data[0]);
+      this.appended.push(new Uint8Array(data)[0]);
     }
     remove(start: number, end: number) {
       this.updating = true;
@@ -840,16 +841,34 @@ describe("cameras", () => {
     }
   }
 
-  // Each stream fetched, which a test feeds and ends
-  type Feed = {
-    url: string;
-    signal: AbortSignal;
-    send: (bytes: Uint8Array) => void;
-    end: () => void;
-  };
-  let feeds: Feed[];
-  let fetched: MockInstance;
-  let answer: { ok: boolean; type: string };
+  // Each stream opened, which a test feeds and ends as main would
+  class FakeSocket {
+    binaryType = "blob";
+    closed = false;
+    onmessage: ((event: { data: ArrayBuffer | string }) => void) | null = null;
+    onclose: ((event: { code: number }) => void) | null = null;
+    constructor(public url: string) {
+      feeds.push(this);
+      queueMicrotask(() => opening(this));
+    }
+    close() {
+      this.closed = true;
+    }
+    message(data: ArrayBuffer | string) {
+      if (!this.closed) this.onmessage?.({ data });
+    }
+    send(chunk: Uint8Array) {
+      this.message(chunk.slice().buffer);
+    }
+    end(code = 1006) {
+      this.closed = true;
+      this.onclose?.({ code });
+    }
+  }
+  // Main sends the stream's type first
+  const start = (socket: FakeSocket) => socket.message(TYPE);
+  let opening: (socket: FakeSocket) => void;
+  let feeds: FakeSocket[];
   let revoked: string[];
 
   // Lets the stream's reads and the player's awaits run
@@ -862,7 +881,7 @@ describe("cameras", () => {
     fakePlayers();
     feeds = [];
     revoked = [];
-    answer = { ok: true, type: TYPE };
+    opening = start;
     FakeSource.made = [];
     FakeSource.supported = true;
     vi.stubGlobal("MediaSource", FakeSource);
@@ -872,31 +891,7 @@ describe("cameras", () => {
     vi.spyOn(URL, "revokeObjectURL").mockImplementation((url) => {
       revoked.push(url);
     });
-    fetched = vi.fn(async (url: string, init: RequestInit) => {
-      let controller!: ReadableStreamDefaultController<Uint8Array>;
-      const body = new ReadableStream<Uint8Array>({
-        start: (c) => {
-          controller = c;
-        },
-      });
-      const signal = init.signal!;
-      signal.addEventListener("abort", () =>
-        controller.error(new DOMException("", "AbortError")),
-      );
-      feeds.push({
-        url,
-        signal,
-        send: (b) => controller.enqueue(b),
-        end: () => controller.close(),
-      });
-      return {
-        ok: answer.ok,
-        status: answer.ok ? 200 : 403,
-        headers: new Headers({ "Content-Type": answer.type }),
-        body,
-      };
-    });
-    vi.stubGlobal("fetch", fetched);
+    vi.stubGlobal("WebSocket", FakeSocket);
     stage = createStage(root);
   });
 
@@ -909,16 +904,17 @@ describe("cameras", () => {
     expect(video.dataset.src).toBe(SRC);
     expect(video.muted).toBe(true);
     expect(video.hasAttribute("playsinline")).toBe(true);
-    expect(fetched).toHaveBeenCalledWith(
-      SRC,
-      expect.objectContaining({ cache: "no-store" }),
-    );
+    expect(feeds[0]).toMatchObject({
+      url: ws(SRC),
+      binaryType: "arraybuffer",
+    });
     expect(video.getAttribute("src")).toBe("blob:1");
     expect(play).toHaveBeenCalled();
 
+    // What comes before the source opens waits for it
+    feeds[0].send(bytes(1));
     const buffer = FakeSource.made[0].open();
     expect(buffer).toMatchObject({ type: TYPE, mode: "sequence" });
-    feeds[0].send(bytes(1));
     feeds[0].send(bytes(2));
     feeds[0].send(bytes(3));
     await flush();
@@ -1040,21 +1036,25 @@ describe("cameras", () => {
     expect(feeds).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(1);
     await flush();
-    expect(feeds[1].url).toBe(SRC);
+    expect(feeds[1].url).toBe(ws(SRC));
     expect(videoOf().getAttribute("src")).toBe("blob:2");
 
-    fetched.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    // The next one can't connect
+    opening = (socket) => {
+      opening = start;
+      socket.end();
+    };
     FakeSource.made[1].open();
     feeds[1].end();
     await flush();
     await vi.advanceTimersByTimeAsync(2000);
     await flush();
     await vi.advanceTimersByTimeAsync(2000);
-    expect(fetched).toHaveBeenCalledTimes(4);
+    expect(feeds).toHaveLength(4);
   });
 
   it.each([
-    ["it's refused", () => (answer.ok = false)],
+    ["it's refused", () => (opening = (socket) => socket.end(1008))],
     ["its type can't play", () => (FakeSource.supported = false)],
   ])("plays nothing when %s, and doesn't try again", async (_, set) => {
     set();
@@ -1063,9 +1063,9 @@ describe("cameras", () => {
 
     expect(FakeSource.made).toHaveLength(0);
     expect(videoOf().hasAttribute("src")).toBe(false);
-    expect(feeds[0].signal.aborted).toBe(true);
+    expect(feeds[0].closed).toBe(true);
     await vi.advanceTimersByTimeAsync(10_000);
-    expect(fetched).toHaveBeenCalledTimes(1);
+    expect(feeds).toHaveLength(1);
   });
 
   it("plays nothing without MediaSource", async () => {
@@ -1073,7 +1073,7 @@ describe("cameras", () => {
     draw(view(camera()));
     await flush();
 
-    expect(fetched).not.toHaveBeenCalled();
+    expect(feeds).toHaveLength(0);
     expect(videoOf().hasAttribute("src")).toBe(false);
     expect(videoOf().dataset.src).toBe(SRC);
   });
@@ -1086,9 +1086,9 @@ describe("cameras", () => {
     const other = `${SRC}&device=b`;
     draw(view(camera({ src: other })));
     await flush();
-    expect(feeds[0].signal.aborted).toBe(true);
+    expect(feeds[0].closed).toBe(true);
     expect(revoked).toEqual(["blob:1"]);
-    expect(feeds[1].url).toBe(other);
+    expect(feeds[1].url).toBe(ws(other));
     expect(videoOf()).toBe(video);
     expect(video.dataset.src).toBe(other);
     expect(video.getAttribute("src")).toBe("blob:2");
@@ -1096,7 +1096,7 @@ describe("cameras", () => {
     // No stream, as in the editor with the overlay server off
     draw(view(camera({ src: null })));
     await flush();
-    expect(feeds[1].signal.aborted).toBe(true);
+    expect(feeds[1].closed).toBe(true);
     expect(video.hasAttribute("src")).toBe(false);
     expect(video.hasAttribute("data-src")).toBe(false);
     await vi.advanceTimersByTimeAsync(10_000);
@@ -1108,11 +1108,11 @@ describe("cameras", () => {
     await flush();
 
     draw(view(camera({ id: "d" })));
-    expect(feeds[0].signal.aborted).toBe(true);
-    expect(feeds[1].signal.aborted).toBe(false);
+    expect(feeds[0].closed).toBe(true);
+    expect(feeds[1].closed).toBe(false);
 
     stage.destroy();
-    expect(feeds[1].signal.aborted).toBe(true);
+    expect(feeds[1].closed).toBe(true);
     await vi.advanceTimersByTimeAsync(10_000);
     expect(feeds).toHaveLength(2);
     stage = createStage(root);
@@ -1141,7 +1141,7 @@ describe("cameras", () => {
     draw(view(camera()));
     await flush();
     expect(show).toHaveBeenCalledWith(videoOf(), SRC);
-    expect(fetched).not.toHaveBeenCalled();
+    expect(feeds).toHaveLength(0);
 
     // Another camera starts over; the same one doesn't
     draw(view(camera()));

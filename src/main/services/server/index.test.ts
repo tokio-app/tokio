@@ -304,11 +304,15 @@ describe("ServerService", () => {
   });
 
   describe("camera streams", () => {
-    const stream = (
-      key: string,
-      query = "device=&label=&quality=720p",
-      signal?: AbortSignal,
-    ) => fetch(url(`/studio/camera/${key}?${query}`), { signal });
+    const stream = (key: string, query = "device=&label=&quality=720p") => {
+      const client = new WebSocket(
+        `ws://127.0.0.1:${server.getPort()}/studio/camera/${key}?${query}`,
+      );
+      clients.push(client);
+      return client;
+    };
+    const closed = (client: WebSocket) =>
+      new Promise<number>((resolve) => client.once("close", resolve));
     const config = {
       codec: "avc1.42e01f",
       width: 1280,
@@ -317,33 +321,35 @@ describe("ServerService", () => {
       colors: null,
     };
 
-    // The types of the first `count` top-level boxes the stream sends
-    const readBoxes = async (res: Response, count: number) => {
-      const reader = res.body!.getReader();
-      let got = Buffer.alloc(0);
-      const types: string[] = [];
-      while (types.length < count) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        got = Buffer.concat([got, value]);
-        while (got.length >= 8 && got.length >= got.readUInt32BE(0)) {
-          types.push(got.toString("latin1", 4, 8));
-          got = got.subarray(got.readUInt32BE(0));
-        }
-      }
-      reader.releaseLock();
-      return types;
-    };
+    // The first `count` messages' text and top-level boxes' types, or what
+    // came before the stream closed
+    const readBoxes = (client: WebSocket, count: number) =>
+      new Promise<string[]>((resolve) => {
+        const got: string[] = [];
+        const done = () => {
+          client.off("message", onMessage);
+          resolve(got);
+        };
+        const onMessage = (data: Buffer, binary: boolean) => {
+          if (!binary) got.push(`text ${String(data)}`);
+          else {
+            for (let at = 0; at < data.length; at += data.readUInt32BE(at)) {
+              got.push(data.toString("latin1", at + 4, at + 8));
+            }
+          }
+          if (got.length >= count) done();
+        };
+        client.on("message", onMessage);
+        client.once("close", done);
+      });
 
     beforeEach(async () => {
       await server.start();
     });
 
-    it("refuses a wrong key as a page that isn't there", async () => {
+    it("refuses a wrong key", async () => {
       for (const key of ["wrong", server.cameraKey.toUpperCase()]) {
-        const res = await stream(key);
-        expect(res.status).toBe(404);
-        await res.body?.cancel();
+        expect(await closed(stream(key))).toBe(1008);
       }
       expect(server.cameraCaptures()).toEqual([]);
     });
@@ -353,20 +359,18 @@ describe("ServerService", () => {
         "device=&label=&quality=4k",
         "device=&quality=720p",
         `device=${"a".repeat(257)}&label=&quality=720p`,
-        "device=a&device=b&label=&quality=720p",
       ]) {
-        const res = await stream(server.cameraKey, query);
-        expect(res.status).toBe(400);
-        await res.body?.cancel();
+        expect(await closed(stream(server.cameraKey, query))).toBe(1008);
       }
       expect(server.cameraCaptures()).toEqual([]);
     });
 
-    it("streams a camera's video as fragmented MP4 from its first keyframe, to any origin", async () => {
-      const pending = stream(
+    it("streams a camera's type, then its video as fragmented MP4 from its first keyframe", async () => {
+      const client = stream(
         server.cameraKey,
         "device=abc&label=HD+Webcam&quality=1080p",
       );
+      const boxes = readBoxes(client, 5);
       await vi.waitFor(() => expect(server.cameraCaptures()).toHaveLength(1));
       const [capture] = server.cameraCaptures();
       expect(capture).toMatchObject({
@@ -382,26 +386,23 @@ describe("ServerService", () => {
         frame: Buffer.from([0, 0, 0, 1, 0x65]),
         config,
       });
-      const res = await pending;
 
-      expect(res.status).toBe(200);
-      expect(res.headers.get("content-type")).toBe(
-        'video/mp4; codecs="avc1.42e01f"',
-      );
-      expect(res.headers.get("cache-control")).toBe("no-store");
-      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
-      expect(await readBoxes(res, 4)).toEqual(["ftyp", "moov", "moof", "mdat"]);
-      await res.body?.cancel();
+      expect(await boxes).toEqual([
+        'text video/mp4; codecs="avc1.42e01f"',
+        "ftyp",
+        "moov",
+        "moof",
+        "mdat",
+      ]);
     });
 
     it("ends the streams when it stops", async () => {
-      const pending = stream(server.cameraKey);
+      const client = stream(server.cameraKey);
       await vi.waitFor(() => expect(server.cameraCaptures()).toHaveLength(1));
 
       server.stop();
 
-      const res = await pending;
-      expect(await readBoxes(res, 1)).toEqual([]);
+      await closed(client);
       expect(server.cameraCaptures()).toEqual([]);
     });
 
@@ -412,31 +413,30 @@ describe("ServerService", () => {
       await server.start();
 
       expect(server.cameraKey).not.toBe(before);
-      const res = await stream(before);
-      expect(res.status).toBe(404);
-      await res.body?.cancel();
+      expect(await closed(stream(before))).toBe(1008);
     });
 
-    it("tells the listeners when a page opens a camera", async () => {
+    it("tells the listeners when a page opens a camera, never as an overlay", async () => {
       const listener = vi.fn();
       server.onCameras(listener);
-      const abort = new AbortController();
+      const connected = vi.fn();
+      server.onConnect(connected);
 
-      const pending = stream(server.cameraKey, undefined, abort.signal);
+      stream(server.cameraKey);
 
       await vi.waitFor(() =>
         expect(listener).toHaveBeenCalledWith([
           expect.objectContaining({ device: "", label: "", quality: "720p" }),
         ]),
       );
-      abort.abort();
-      await expect(pending).rejects.toThrow();
+      expect(connected).not.toHaveBeenCalled();
     });
 
     it("asks for a keyframe when a page joins a camera already streaming", async () => {
       const listener = vi.fn();
       server.onCameraKeyframe(listener);
       const first = stream(server.cameraKey);
+      const started = readBoxes(first, 5);
       await vi.waitFor(() => expect(server.cameraCaptures()).toHaveLength(1));
       const [capture] = server.cameraCaptures();
       server.cameraFrame({
@@ -446,14 +446,12 @@ describe("ServerService", () => {
         frame: Buffer.from([0, 0, 0, 1, 0x65]),
         config,
       });
-      await first;
+      await started;
       expect(listener).not.toHaveBeenCalled();
 
-      const second = await stream(server.cameraKey);
+      stream(server.cameraKey);
 
-      expect(listener).toHaveBeenCalledWith(capture.id);
-      await second.body?.cancel();
-      await (await first).body?.cancel();
+      await vi.waitFor(() => expect(listener).toHaveBeenCalledWith(capture.id));
     });
   });
 

@@ -1,7 +1,6 @@
 import type { StudioCameraQuality } from "@/common/schemas";
 import type { CameraChunk, CameraConfig } from "@/common/types";
 import { EventEmitter } from "node:events";
-import type { ServerResponse } from "node:http";
 import {
   afterEach,
   beforeEach,
@@ -13,6 +12,7 @@ import {
 } from "vitest";
 import { CAMERA_LINGER_MS, CameraFeeds } from "./camera";
 import { initSegment } from "./mp4";
+import type { WebSocket } from "ws";
 
 const H264: CameraConfig = {
   codec: "avc1.42e01f",
@@ -34,24 +34,18 @@ const DURATION = 88;
 const FLAGS = 96;
 const MDAT = 108;
 
-// A response that records what it was sent
-class FakeResponse extends EventEmitter {
-  writableNeedDrain = false;
-  head: [number, Record<string, string>] | null = null;
+// A socket that records what it was sent: text, the stream's type, apart
+class FakeSocket extends EventEmitter {
+  bufferedAmount = 0;
+  texts: string[] = [];
   chunks: Buffer[] = [];
-  ended = false;
-  writeHead(status: number, headers: Record<string, string>) {
-    this.head = [status, headers];
-    return this;
+  closed = false;
+  send(data: Buffer | string) {
+    if (typeof data === "string") this.texts.push(data);
+    else this.chunks.push(data);
   }
-  write(chunk: Buffer) {
-    this.chunks.push(chunk);
-    return true;
-  }
-  end() {
-    this.ended = true;
-    this.emit("close");
-    return this;
+  close() {
+    this.closed = true;
   }
   // What it got, as "init H264", "key K" or "delta A"
   messages() {
@@ -75,9 +69,9 @@ class FakeResponse extends EventEmitter {
   }
 }
 
-// The fake stands in for Node's type
+// The fake stands in for ws's type
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-const asResponse = (res: FakeResponse) => res as unknown as ServerResponse;
+const asSocket = (socket: FakeSocket) => socket as unknown as WebSocket;
 
 const DEFAULT = { device: "", label: "" };
 const CAM = { device: "abc", label: "HD Webcam" };
@@ -88,8 +82,8 @@ describe("CameraFeeds", () => {
   let keyframes: Mock<(id: string) => void>;
 
   const watch = (camera = DEFAULT, quality: StudioCameraQuality = "720p") => {
-    const res = new FakeResponse();
-    feeds.watch(asResponse(res), camera, quality);
+    const res = new FakeSocket();
+    feeds.watch(asSocket(res), camera, quality);
     return res;
   };
   const qualities = () =>
@@ -125,24 +119,17 @@ describe("CameraFeeds", () => {
     vi.useRealTimers();
   });
 
-  it("holds the headers until the camera's config, which names the codec", () => {
+  it("holds the type until the camera's config, which names the codec", () => {
     const res = watch();
-    expect(res.head).toBeNull();
+    expect(res.texts).toEqual([]);
 
     delta(0, "A");
     feeds.frame(chunk(1, "K", { key: true }));
-    expect(res.head).toBeNull();
+    expect(res.texts).toEqual([]);
     expect(res.chunks).toEqual([]);
 
     key(2, "K");
-    expect(res.head).toEqual([
-      200,
-      {
-        "Content-Type": 'video/mp4; codecs="avc1.42e01f"',
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
-    ]);
+    expect(res.texts).toEqual(['video/mp4; codecs="avc1.42e01f"']);
     expect(res.messages()).toEqual(["init H264", "key K"]);
   });
 
@@ -157,7 +144,7 @@ describe("CameraFeeds", () => {
     expect(one.messages()).toEqual(["init H264", "key K", "delta A"]);
     expect(two.messages()).toEqual(["init H264", "key K", "delta A"]);
     expect(one.chunks[1]).toBe(two.chunks[1]);
-    expect(other.head).toBeNull();
+    expect(other.texts).toEqual([]);
     expect(other.chunks).toEqual([]);
   });
 
@@ -190,7 +177,7 @@ describe("CameraFeeds", () => {
     const late = watch();
 
     expect(keyframes).toHaveBeenCalledWith(idOf());
-    expect(late.head?.[0]).toBe(200);
+    expect(late.texts).toHaveLength(1);
     delta(2, "B");
     expect(late.messages()).toEqual(["init H264"]);
     key(3, "K2");
@@ -224,24 +211,22 @@ describe("CameraFeeds", () => {
     const fresh = watch(DEFAULT, "1080p");
     // A copy of the same config changes nothing
     key(1, "K2", { ...H264, description: new Uint8Array(H264.description) });
-    expect(started.ended).toBe(false);
+    expect(started.closed).toBe(false);
 
     const third = watch(DEFAULT, "1080p");
     changed.mockClear();
     key(2, "K3", HD);
 
-    expect(started.ended).toBe(true);
+    expect(started.closed).toBe(true);
     expect(started.messages()).toEqual(["init H264", "key K1", "key K2"]);
-    expect(fresh.ended).toBe(true);
-    expect(third.ended).toBe(true);
+    expect(fresh.closed).toBe(true);
+    expect(third.closed).toBe(true);
     // The camera stays while its pages come back
     expect(qualities()).toEqual([["", "1080p"]]);
     expect(changed).not.toHaveBeenCalled();
 
     const back = watch();
-    expect(back.head?.[1]["Content-Type"]).toBe(
-      'video/mp4; codecs="avc1.640028"',
-    );
+    expect(back.texts).toEqual(['video/mp4; codecs="avc1.640028"']);
     key(3, "K4", HD);
     expect(back.messages()).toEqual(["init HD", "key K4"]);
   });
@@ -252,7 +237,7 @@ describe("CameraFeeds", () => {
 
     key(1, "K", HD);
 
-    expect(res.ended).toBe(false);
+    expect(res.closed).toBe(false);
     expect(res.messages()).toEqual(["init HD", "key K"]);
   });
 
@@ -262,20 +247,20 @@ describe("CameraFeeds", () => {
 
     key(1, "K2", { ...H264, description: new Uint8Array([1, 2, 3, 4]) });
 
-    expect(res.ended).toBe(true);
+    expect(res.closed).toBe(true);
   });
 
   it("keeps a page that can't keep up waiting for the next keyframe", () => {
     const slow = watch();
     key(0, "K1");
 
-    slow.writableNeedDrain = true;
+    slow.bufferedAmount = 16 * 1024;
     delta(1, "A");
-    slow.writableNeedDrain = false;
+    slow.bufferedAmount = 16 * 1024 - 1;
     delta(2, "B");
-    slow.writableNeedDrain = true;
+    slow.bufferedAmount = 16 * 1024;
     key(3, "K2");
-    slow.writableNeedDrain = false;
+    slow.bufferedAmount = 16 * 1024 - 1;
     delta(4, "C");
     key(5, "K3");
     delta(6, "D");
@@ -376,7 +361,7 @@ describe("CameraFeeds", () => {
     expect(feeds.captures()).toEqual([]);
   });
 
-  it("drops a response that errors, without throwing", () => {
+  it("drops a socket that errors, without throwing", () => {
     const res = watch();
 
     expect(() => res.emit("error", new Error("EPIPE"))).not.toThrow();
@@ -394,7 +379,7 @@ describe("CameraFeeds", () => {
     const again = watch();
 
     expect(idOf()).not.toBe(id);
-    expect(again.head).toBeNull();
+    expect(again.texts).toEqual([]);
     expect(again.chunks).toEqual([]);
     // Its capture starts with a keyframe
     expect(keyframes).not.toHaveBeenCalled();
@@ -407,7 +392,7 @@ describe("CameraFeeds", () => {
 
     feeds.closeAll();
 
-    expect([one.ended, two.ended]).toEqual([true, true]);
+    expect([one.closed, two.closed]).toEqual([true, true]);
     expect(feeds.captures()).toEqual([]);
     expect(changed).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(CAMERA_LINGER_MS);

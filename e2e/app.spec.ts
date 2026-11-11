@@ -272,29 +272,38 @@ function cameraSrc(id: string) {
   });
 }
 
-// Reads the stream's MP4 boxes (a big-endian size, then the type) until the
-// first fragment's media came
-async function firstFragment(url: string) {
-  const res = await fetch(url);
-  const type = res.headers.get("content-type");
-  const reader = res.body!.getReader();
-  let bytes = Buffer.alloc(0);
-  const boxes: string[] = [];
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) throw new Error("The stream ended before a fragment");
-      bytes = Buffer.concat([bytes, value]);
-      while (bytes.length >= 8 && bytes.length >= bytes.readUInt32BE(0)) {
-        const name = bytes.toString("latin1", 4, 8);
-        boxes.push(name);
-        if (name === "mdat") return { type, boxes };
-        bytes = bytes.subarray(bytes.readUInt32BE(0));
+// Reads the stream's type, its first message, then its MP4 boxes (a
+// big-endian size, then the type) until the first fragment's media came
+function firstFragment(url: string) {
+  return new Promise<{ type: string; boxes: string[] }>((done, fail) => {
+    const socket = new WebSocket(url);
+    socket.binaryType = "arraybuffer";
+    let type = "";
+    const boxes: string[] = [];
+    socket.onmessage = ({ data }: MessageEvent<ArrayBuffer | string>) => {
+      if (typeof data === "string") {
+        type = data;
+        return;
       }
-    }
-  } finally {
-    await reader.cancel();
-  }
+      const bytes = Buffer.from(data);
+      for (let at = 0; at < bytes.length; at += bytes.readUInt32BE(at)) {
+        boxes.push(bytes.toString("latin1", at + 4, at + 8));
+      }
+      if (!boxes.includes("mdat")) return;
+      socket.onclose = null;
+      socket.close();
+      done({ type, boxes });
+    };
+    socket.onclose = () =>
+      fail(new Error("The stream ended before a fragment"));
+  });
+}
+
+// The code the server closes a stream with
+function closeCode(url: string) {
+  return new Promise<number>((done) => {
+    new WebSocket(url).onclose = ({ code }) => done(code);
+  });
 }
 
 test("streams a camera element's frames to its overlay", async () => {
@@ -346,12 +355,12 @@ test("streams a camera element's frames to its overlay", async () => {
 
   // Tokio's window captures and encodes Chromium's test camera once a page
   // asks, with whatever encoder the machine has
-  const first = await firstFragment(`http://127.0.0.1:37891${src}`);
+  const first = await firstFragment(`ws://127.0.0.1:37891${src}`);
   expect(first.type).toMatch(/^video\/mp4; codecs="avc1\.[0-9a-f]{6}"$/);
   expect(first.boxes).toEqual(["ftyp", "moov", "moof", "mdat"]);
   // Another run's key gets nothing
   const wrong = src.replace(/camera\/[^/?]+/, `camera/${crypto.randomUUID()}`);
-  expect((await fetch(`http://127.0.0.1:37891${wrong}`)).status).toBe(404);
+  expect(await closeCode(`ws://127.0.0.1:37891${wrong}`)).toBe(1008);
 });
 
 // Whether each of the app's windows is on screen

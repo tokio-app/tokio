@@ -373,120 +373,122 @@ const setVideo = (video: HTMLVideoElement, src: string | null) => {
 
 /**
  * Plays a camera's stream in the video until the returned function stops
- * it: fragmented MP4 main muxes, appended to a MediaSource as it comes, kept
- * at its live edge (faster while behind, skipping ahead when far behind) and
- * trimmed behind it. WebCodecs needs a secure context, which a browser
- * source at tokio-app.local or a LAN address isn't; MediaSource doesn't. It
- * opens again 2 s after the stream ends or fails, and gives up quietly on a
- * refused stream, or a browser that can't play it.
+ * it: fragmented MP4 main muxes, over a WebSocket (OBS's sources share 6
+ * HTTP connections per host, and a stream would hold one for good), appended
+ * to a MediaSource as it comes, kept at its live edge (faster while behind,
+ * skipping ahead when far behind) and trimmed behind it. WebCodecs needs a
+ * secure context, which a browser source at tokio-app.local or a LAN address
+ * isn't; MediaSource doesn't. It opens again 2 s after the stream ends or
+ * fails, and gives up quietly on a refused stream, or a browser that can't
+ * play it.
  */
 function playCamera(video: HTMLVideoElement, src: string): () => void {
-  let controller: AbortController | undefined;
+  let socket: WebSocket | undefined;
   let url: string | undefined;
   let retry: ReturnType<typeof setTimeout> | undefined;
 
   const teardown = () => {
-    if (controller) controller.abort();
-    controller = undefined;
+    if (socket) {
+      socket.onclose = null;
+      socket.close();
+    }
+    socket = undefined;
     if (url) URL.revokeObjectURL(url);
     url = undefined;
     release(video);
   };
 
-  const open = async () => {
+  const open = () => {
     if (typeof MediaSource !== "function") return;
-    const aborter = new AbortController();
-    controller = aborter;
+    const address = new URL(src, location.href);
+    address.protocol = address.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(address.href);
+    ws.binaryType = "arraybuffer";
+    socket = ws;
     // Ended or failed, unless it was stopped
     const again = () => {
-      if (aborter.signal.aborted) return;
+      if (socket !== ws) return;
       teardown();
       retry = setTimeout(open, CAMERA_RETRY_MS);
     };
-    let res: Response;
-    try {
-      res = await fetch(src, { cache: "no-store", signal: aborter.signal });
-    } catch {
-      again();
-      return;
-    }
-    const type = res.headers.get("Content-Type") || "";
-    const body = res.body;
-    if (!res.ok || !body || !MediaSource.isTypeSupported(type)) {
-      aborter.abort();
-      return;
-    }
-    const source = new MediaSource();
-    url = URL.createObjectURL(source);
-    video.src = url;
-    video.play().catch(() => {});
-    source.addEventListener(
-      "sourceopen",
-      () => {
-        if (aborter.signal.aborted) return;
-        const queue: Uint8Array<ArrayBuffer>[] = [];
-        let buffer: SourceBuffer;
-        // One append at a time, each after its live edge and trim
-        const next = () => {
-          if (aborter.signal.aborted || buffer.updating) return;
-          try {
-            const { buffered } = buffer;
-            if (buffered.length) {
-              const start = buffered.start(0);
-              const end = buffered.end(buffered.length - 1);
-              const behind = end - video.currentTime;
-              // Not while a skip still decodes, which a slow PC could keep
-              // starting over
-              if (!video.seeking && behind > CAMERA_BEHIND) {
-                // Its first frame too: its stream starts at main's timestamps
-                video.currentTime = Math.max(start, end - CAMERA_LEAD);
-              } else if (!video.seeking && behind > CAMERA_LATE) {
-                video.playbackRate = CAMERA_FAST;
-              } else if (behind < CAMERA_CAUGHT_UP) {
-                video.playbackRate = 1;
-              }
-              // From where it keeps: its stream starts at main's timestamps
-              if (video.currentTime - start > CAMERA_KEEP) {
-                buffer.remove(0, video.currentTime - CAMERA_TRIMMED);
-                return;
-              }
-            }
-            const chunk = queue.shift();
-            if (chunk) buffer.appendBuffer(chunk);
-          } catch {
-            // A decode error ended the source
-            again();
+    // What came before the source opened waits here too
+    const queue: ArrayBuffer[] = [];
+    let buffer: SourceBuffer | undefined;
+    // One append at a time, each after its live edge and trim
+    const next = () => {
+      if (socket !== ws || !buffer || buffer.updating) return;
+      try {
+        const { buffered } = buffer;
+        if (buffered.length) {
+          const start = buffered.start(0);
+          const end = buffered.end(buffered.length - 1);
+          const behind = end - video.currentTime;
+          // Not while a skip still decodes, which a slow PC could keep
+          // starting over
+          if (!video.seeking && behind > CAMERA_BEHIND) {
+            // Its first frame too: its stream starts at main's timestamps
+            video.currentTime = Math.max(start, end - CAMERA_LEAD);
+          } else if (!video.seeking && behind > CAMERA_LATE) {
+            video.playbackRate = CAMERA_FAST;
+          } else if (behind < CAMERA_CAUGHT_UP) {
+            video.playbackRate = 1;
           }
-        };
-        try {
-          buffer = source.addSourceBuffer(type);
-          buffer.mode = "sequence";
-        } catch {
-          again();
-          return;
+          // From where it keeps: its stream starts at main's timestamps
+          if (video.currentTime - start > CAMERA_KEEP) {
+            buffer.remove(0, video.currentTime - CAMERA_TRIMMED);
+            return;
+          }
         }
-        buffer.addEventListener("updateend", next);
-        const reader = body.getReader();
-        const read = async () => {
+        const chunk = queue.shift();
+        if (chunk) buffer.appendBuffer(chunk);
+      } catch {
+        // A decode error ended the source
+        again();
+      }
+    };
+    // A wrong key: a new view brings the new one
+    ws.onclose = (event) => {
+      if (event.code !== 1008) again();
+    };
+    ws.onmessage = (event: MessageEvent<ArrayBuffer | string>) => {
+      const { data } = event;
+      if (socket !== ws) return;
+      if (typeof data !== "string") {
+        queue.push(data);
+        next();
+        return;
+      }
+      // The first message is the stream's type
+      if (url) return;
+      if (!MediaSource.isTypeSupported(data)) {
+        ws.onclose = null;
+        ws.close();
+        return;
+      }
+      const source = new MediaSource();
+      url = URL.createObjectURL(source);
+      video.src = url;
+      video.play().catch(() => {});
+      source.addEventListener(
+        "sourceopen",
+        () => {
+          if (socket !== ws) return;
           try {
-            for (;;) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              queue.push(value);
-              next();
-            }
+            buffer = source.addSourceBuffer(data);
+            buffer.mode = "sequence";
           } catch {
-            // Opened again below, unless it was stopped
+            again();
+            return;
           }
-          again();
-        };
-        void read();
-      },
-      { once: true },
-    );
+          buffer.addEventListener("updateend", next);
+          next();
+        },
+        { once: true },
+      );
+    };
   };
 
-  void open();
+  open();
 
   return () => {
     clearTimeout(retry);
