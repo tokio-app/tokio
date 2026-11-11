@@ -33,7 +33,7 @@ events.push(
       title: t("main.dialog.importOverlay"),
       properties: ["openDirectory"],
     });
-    if (diagRes.canceled) return;
+    if (diagRes.canceled || !diagRes.filePaths[0]) return;
 
     const gifts = await overlayService.getGifts();
     const res = await overlayService.import(diagRes.filePaths[0], gifts);

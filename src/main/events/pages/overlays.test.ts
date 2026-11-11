@@ -159,6 +159,19 @@ describe("overlays events", () => {
       expect(h.notices).toEqual([]);
     });
 
+    it("does nothing when no folder is picked", async () => {
+      const { h, overlayService } = setup();
+      dialog.showOpenDialog.mockResolvedValue({
+        canceled: false,
+        filePaths: [],
+      });
+
+      await h.invoke(overlays, APP_EVENTS.IMPORT_OVERLAY);
+
+      expect(overlayService.import).not.toHaveBeenCalled();
+      expect(h.sent()).toEqual([]);
+    });
+
     it("imports the folder with the gifts and answers with the overlays", async () => {
       const { h, overlayService } = setup();
       pickFolder("/streams/chat-box");
@@ -424,13 +437,16 @@ describe("overlays events", () => {
       ]);
     });
 
-    it("installs it when only an imported overlay has that id", async () => {
-      const { h } = setup([overlay({ external: true })]);
+    it("says it can't install when an imported overlay has that id", async () => {
+      // installFromCatalog refuses to replace it
+      const { h } = setup([overlay({ external: true })], false);
 
       await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
 
       expect(h.notices).toEqual([
-        expect.objectContaining({ code: FEEDBACK_CODES.OVERLAY_INSTALLED }),
+        expect.objectContaining({
+          code: FEEDBACK_CODES.OVERLAY_INSTALL_FAILED,
+        }),
       ]);
     });
 
