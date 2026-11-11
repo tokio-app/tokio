@@ -32,13 +32,15 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoreManagerService } from "./index";
 
-const { busy, busyOnce } = vi.hoisted(() => {
+const { busy, held, busyOnce } = vi.hoisted(() => {
   // Paths whose next read fails, as when an antivirus holds the file
   const busy = new Set<string>();
+  // Paths whose every read fails until a test takes them out
+  const held = new Set<string>();
   const busyOnce =
     (read: unknown) =>
     async (path: unknown, ...rest: unknown[]) => {
-      if (busy.delete(String(path))) {
+      if (busy.delete(String(path)) || held.has(String(path))) {
         throw Object.assign(new Error("EBUSY: resource busy or locked"), {
           code: "EBUSY",
         });
@@ -46,7 +48,7 @@ const { busy, busyOnce } = vi.hoisted(() => {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       return (read as (...args: unknown[]) => Promise<unknown>)(path, ...rest);
     };
-  return { busy, busyOnce };
+  return { busy, held, busyOnce };
 });
 
 // Both: the store reads with fs/promises, the file managers with fs.
@@ -85,6 +87,7 @@ describe("StoreManagerService", () => {
 
   afterEach(async () => {
     busy.clear();
+    held.clear();
     tts.dispose();
     await rm(home, { recursive: true, force: true });
   });
@@ -1707,6 +1710,21 @@ describe("StoreManagerService", () => {
       expect(images(await readJSON(stream))).toEqual([tnt]);
 
       await writeFile(stream, "{ oops");
+      expect(await store.removeFromGames("tnt.png")).toBe(true);
+    });
+
+    it("says so when the active profile can't be read, but not when it's broken", async () => {
+      vi.spyOn(Logger, "error");
+      await (await init()).updateProfileData(withActions(gameAction("a", tnt)));
+      // Nothing in memory, so the sweep reads the file
+      const store = await init();
+      held.add(defaultProfileFile);
+
+      expect(await store.removeFromGames("tnt.png")).toBe(false);
+      held.clear();
+      expect(images(await readJSON(defaultProfileFile))).toEqual([tnt]);
+
+      await writeFile(defaultProfileFile, "{ oops");
       expect(await store.removeFromGames("tnt.png")).toBe(true);
     });
   });

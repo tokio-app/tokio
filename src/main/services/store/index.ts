@@ -612,12 +612,13 @@ export class StoreManagerService extends Service {
         this._pathManagerService.folders.profilesFolder,
         profileFile,
       );
-      // Fresh, so the items changed aren't older than an update still writing
+      // Fresh, so the items changed aren't older than an update still writing.
+      // When the active one doesn't load, its file says why.
       let profile: Profile | null;
       try {
-        profile = active
-          ? await this.getProfileData({ fresh: true })
-          : (await this._readChecked(path, ProfileSchema)).data;
+        profile =
+          (active ? await this.getProfileData({ fresh: true }) : null) ??
+          (await this._readChecked(path, ProfileSchema)).data;
       } catch (error) {
         // A missing or broken file can't use the file, one held for a moment
         // might.
