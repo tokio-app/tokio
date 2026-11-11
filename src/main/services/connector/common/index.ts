@@ -1,4 +1,5 @@
-import { Gift } from "@/common/types";
+import { Gift, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import Logger from "@/logger";
 import { TokioEmitter } from "../../shared/emitter";
 
 // What stopped a connect, so the page can say what to do about it.
@@ -53,5 +54,24 @@ export abstract class ConnectorProvider extends TokioEmitter {
   // Called when the connection drops and is tried again, and once it's back.
   public onReconnect(listener: (state: ReconnectState) => void) {
     this._onReconnect = listener;
+  }
+
+  // Detailed logs get a line per event, never what a chat says. Room users
+  // come every few seconds and only feed overlays.
+  protected override emit<K extends TOKIO_EVENTS>(
+    event: K,
+    data?: TokioEventMap[K],
+  ): void {
+    if (event !== TOKIO_EVENTS.ROOM_USER) {
+      const payload: TokioEventMap[TOKIO_EVENTS] | undefined = data;
+      const what =
+        payload && "gift" in payload
+          ? ` ${payload.gift.name} x${payload.gift.comboCount}${payload.gift.repeatEnd ? " (end)" : ""}`
+          : "";
+      const who =
+        payload && "user" in payload ? ` from @${payload.user.handle}` : "";
+      Logger.debug(`<Connector> ${event}${what}${who}`, this._logFile);
+    }
+    super.emit(event, data);
   }
 }

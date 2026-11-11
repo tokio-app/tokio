@@ -80,8 +80,8 @@ export class TikTokLiveConnector extends ConnectorProvider {
     try {
       connection = new TikTokLiveConnection(name, {
         signer: new EulerSigner({ apiKey: this._key }),
-        // Its warnings and errors explain drops and failed reconnects, the
-        // rest is routine.
+        // Its warnings and errors explain drops and failed reconnects. The
+        // rest is routine, so only Detailed logs write it.
         logger: (level, message, data) => {
           if (level === "warn") {
             // A drop's error holds the close code and reason
@@ -95,6 +95,8 @@ export class TikTokLiveConnector extends ConnectorProvider {
             if (last !== undefined && now - last < LOG_REPEAT_MS) return;
             this._logged.set(code, now);
             Logger.error(`<Connector> ${message}`, this._logFile, error);
+          } else {
+            Logger.debug(`<Connector> ${message}`, this._logFile);
           }
         },
       });
