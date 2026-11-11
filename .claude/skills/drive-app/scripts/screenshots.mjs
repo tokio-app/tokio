@@ -929,6 +929,64 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await crop("studio-guides", page.locator('[class*="stage_frame"]'), {
     pad: 0,
   });
+  // The rulers off again, for the canvas's next picture
+  await page
+    .getByRole("button", {
+      name: tr("Rulers and guides (Ctrl+R)"),
+      exact: true,
+    })
+    .click();
+
+  // The follow message's When: in on a follow, with an entrance and an exit.
+  // The settings' lists re-render as Playwright scrolls to an option, so
+  // its click never settles: the option gets the click event itself.
+  const choose = async (field, option, key) => {
+    const select = page.getByRole("combobox", { name: tr(field), exact: true });
+    const name = tr(option, key);
+    if ((await select.innerText()).trim() === name) return;
+    await select.click();
+    await page
+      .getByRole("option", { name, exact: true })
+      .dispatchEvent("click");
+  };
+  await studioRow(say("Thanks for the follow, {username}!")).click();
+  await choose("Trigger", "Follow", "triggers.follow");
+  await choose("Entrance", "Pop", "studio.entrances.pop");
+  await choose("Exit", "Slide down", "studio.exits.slide-down");
+  // Scrolled to the trigger, the block's middle, so the panel shows all of it
+  await crop("studio-when", [
+    studioGroup("Trigger"),
+    studioGroup("When", "studio.when.title"),
+    studioGroup("Seconds on screen"),
+  ]);
+
+  // A round camera, Chromium's test camera (drive.mjs --fake-camera), with
+  // the canvas showing it. Its 16:9 cut to a square rounds to a circle.
+  await stage.press("Escape");
+  await addStudio("Camera");
+  await placeAt(700, 560, 360, 360);
+  await studioNumber("Left", "studio.fields.cropLeft").fill("22");
+  await studioNumber("Right", "studio.fields.cropRight").fill("22");
+  await page
+    .getByRole("slider", {
+      name: tr("Round corners (0%)", "studio.fields.rounding", {
+        rounding: "0",
+      }),
+    })
+    .fill("50");
+  await crop(
+    "studio-camera",
+    [page.locator('[class*="stage_frame"]'), studioGroup("Quality")],
+    {
+      pad: 16,
+      ready: () =>
+        page.waitForFunction(() =>
+          [...document.querySelectorAll("main video")].some(
+            (video) => video.readyState >= 2 && video.videoWidth > 0,
+          ),
+        ),
+    },
+  );
 
   // Test overlays
   await tool(tr("Test overlays"));

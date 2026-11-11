@@ -22,7 +22,7 @@ argument-hint: "[what to check]"
 4. It refuses to start while port 37891 is in use. Ask the user to quit Tokio or stop `yarn dev`; don't stop them yourself.
 5. Look at the screenshots, and at what the script printed: renderer errors come out as `[page]` and `[console]` lines, and it exits with 1 when a step throws.
 
-`scripts/screenshots.mjs` is a steps file that retakes the README's screenshots into `.github/screenshots/` (the whole window, 1200×800) and the website docs' into `../tokio-web/src/assets/screenshots/` (crops of what each docs section describes), with made-up viewers: `node .claude/skills/drive-app/scripts/drive.mjs --scale 2 .claude/skills/drive-app/scripts/screenshots.mjs`. It needs the network for the official overlays. A docs crop is named after its file, which the docs reference; a new one needs a line in the docs page that shows it.
+`scripts/screenshots.mjs` is a steps file that retakes the README's screenshots into `.github/screenshots/` (the whole window, 1200×800) and the website docs' into `../tokio-web/src/assets/screenshots/` (crops of what each docs section describes), with made-up viewers: `node .claude/skills/drive-app/scripts/drive.mjs --scale 2 --fake-camera .claude/skills/drive-app/scripts/screenshots.mjs`. It needs the network for the official overlays, and `--fake-camera` for Overlay Studio's camera, which it waits for. A docs crop is named after its file, which the docs reference; a new one needs a line in the docs page that shows it.
 
 The website is in English and Spanish, so retake both:
 
