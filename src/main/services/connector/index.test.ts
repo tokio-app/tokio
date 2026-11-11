@@ -31,7 +31,6 @@ const setup = () => {
 describe("TikTokConnectorService", () => {
   it("connects through the active provider and logs it", async () => {
     const info = vi.spyOn(Logger, "info");
-    const success = vi.spyOn(Logger, "success");
     const { service, provider } = setup();
 
     const res = await service.connect("streamer");
@@ -42,7 +41,7 @@ describe("TikTokConnectorService", () => {
       "<Connector> Connecting to: streamer",
       "connector.log",
     );
-    expect(success).toHaveBeenCalledWith(
+    expect(info).toHaveBeenCalledWith(
       "<Connector> Connected to streamer.",
       "connector.log",
     );

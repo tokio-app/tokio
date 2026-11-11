@@ -205,7 +205,7 @@ export class ServerService extends Service {
             );
           });
         });
-        Logger.success(
+        Logger.debug(
           `<Server> Server running on port ${this._port}`,
           this._logFile,
         );

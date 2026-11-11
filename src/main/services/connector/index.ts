@@ -57,7 +57,7 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
         res.error,
       );
     } else {
-      Logger.success(`<Connector> Connected to ${username}.`, this._logFile);
+      Logger.info(`<Connector> Connected to ${username}.`, this._logFile);
     }
     return res;
   }
