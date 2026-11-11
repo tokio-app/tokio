@@ -12,6 +12,8 @@ type Props = {
   onChange: (value: string) => void;
   // Shown when there are no variables
   empty?: string;
+  // The input's cap, which its maxLength keeps only for typing
+  maxLength?: number;
 };
 
 const VARIABLE = /\{\w+\}/g;
@@ -37,7 +39,8 @@ function widenToVariables(
 /**
  * The variables a message can use. Clicking one puts it in the input, in
  * place of the selection, or at the end when the input isn't focused. A
- * variable the cursor is in is replaced.
+ * variable the cursor is in is replaced. One that would pass maxLength
+ * isn't put in.
  */
 export function VariableList({
   variables,
@@ -46,6 +49,7 @@ export function VariableList({
   onChange,
   empty,
   label,
+  maxLength = Infinity,
 }: Props) {
   const t = useT();
   if (variables.length === 0) {
@@ -64,7 +68,9 @@ export function VariableList({
       cursor,
       focused ? (input.selectionEnd ?? cursor) : cursor,
     );
-    onChange(value.slice(0, start) + variable + value.slice(end));
+    const next = value.slice(0, start) + variable + value.slice(end);
+    if (next.length > maxLength) return;
+    onChange(next);
 
     // After React puts the new value in the input
     const caret = start + variable.length;

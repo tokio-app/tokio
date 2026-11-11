@@ -176,6 +176,7 @@ export function ElementSettings({
               variables={STUDIO_NUMBERS}
               inputRef={textRef}
               value={element.text}
+              maxLength={STUDIO_TEXT_MAX_LENGTH}
               onChange={(text) => onChange({ ...element, text })}
             />
             {reactsToEvents(element) && (
@@ -185,6 +186,7 @@ export function ElementSettings({
                 empty={t("common.noVariables")}
                 inputRef={textRef}
                 value={element.text}
+                maxLength={STUDIO_TEXT_MAX_LENGTH}
                 onChange={(text) => onChange({ ...element, text })}
               />
             )}
