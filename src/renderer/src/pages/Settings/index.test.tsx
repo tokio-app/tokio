@@ -147,6 +147,69 @@ describe("Settings", () => {
     });
   });
 
+  describe("Logs", () => {
+    const debugBox = () =>
+      screen.getByRole("checkbox", { name: "Detailed logs" });
+
+    it("shows the saved setting", async () => {
+      await setup(
+        settingsReply((s) => {
+          s.settings.logs.debug = true;
+        }),
+      );
+
+      expect(debugBox()).toBeChecked();
+    });
+
+    it("asks before turning on detailed logs, and Cancel leaves them off", async () => {
+      const { user } = await setup();
+      expect(debugBox()).not.toBeChecked();
+
+      await user.click(debugBox());
+      expect(dialog().getByText("Turn on detailed logs?")).toBeInTheDocument();
+      expect(debugBox()).not.toBeChecked();
+
+      await user.click(dialog().getByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(debugBox()).not.toBeChecked();
+      expect(sentEvents()).not.toContain(APP_EVENTS.SET_LOGS);
+    });
+
+    it("turns on detailed logs once confirmed", async () => {
+      const { user } = await setup();
+
+      await user.click(debugBox());
+      await user.click(dialog().getByRole("button", { name: "Turn on" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(debugBox()).toBeChecked();
+      expect(sent(APP_EVENTS.SET_LOGS)).toEqual([{ enabled: true }]);
+    });
+
+    it("turns detailed logs off right away", async () => {
+      const { user } = await setup(
+        settingsReply((s) => {
+          s.settings.logs.debug = true;
+        }),
+      );
+
+      await user.click(debugBox());
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(debugBox()).not.toBeChecked();
+      expect(sent(APP_EVENTS.SET_LOGS)).toEqual([{ enabled: false }]);
+    });
+
+    it("exports the logs", async () => {
+      const { user } = await setup();
+
+      await user.click(screen.getByRole("button", { name: "Export logs" }));
+
+      expect(sent(APP_EVENTS.EXPORT_LOGS)).toEqual([undefined]);
+    });
+  });
+
   describe("Language", () => {
     it("follows the system until a language is picked, each in its own name", async () => {
       const { user, container } = await setup();
