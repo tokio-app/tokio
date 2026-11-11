@@ -239,6 +239,8 @@ describe("ServerService", () => {
     const outcome = new Promise((resolve) => {
       socket.once("data", (data) => resolve(String(data).split("\r\n")[0]));
       socket.once("close", () => resolve("closed"));
+      // The server resets it
+      socket.once("error", () => {});
     });
     await new Promise((resolve) => socket.once("connect", resolve));
     // Busy with a request whose headers haven't all come
