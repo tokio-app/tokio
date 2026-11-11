@@ -50,6 +50,7 @@ import { HISTORY_EVENTS } from "@/services/history";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { TIMER_EVENTS } from "@/services/timer";
 import { AppHandlerVariables } from "@/types";
+import { release } from "node:os";
 
 const STATS_THROTTLE_MS = 250;
 
@@ -958,6 +959,18 @@ const startApp = async (handler: AppHandlerVariables) => {
       serverService.mount(MINECRAFT_PICTURES_PATH, folders.minecraftFolder);
     },
   );
+  // Each run starts every log with what wrote it, and the zone makes its local
+  // times readable on any machine.
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const offset = new Intl.DateTimeFormat("en-US", {
+    timeZoneName: "longOffset",
+  })
+    .formatToParts()
+    .find((part) => part.type === "timeZoneName")?.value;
+  Logger.run(
+    `<System> Tokio ${app.getVersion()} (${app.isPackaged ? "installed" : "dev"}) · ${process.platform} ${release()} ${process.arch} · Electron ${process.versions.electron} · ${language()} · ${zone} (${offset})`,
+    Object.values(pathManagerService.files.logs),
+  );
   await storeManagerService.initialize(
     config.DB.name,
     {
@@ -969,6 +982,7 @@ const startApp = async (handler: AppHandlerVariables) => {
   );
   // Before any notice, so they're all in the user's language
   setLanguage(storeManagerService.getSettings().language);
+  Logger.setDebug(storeManagerService.getSettings().logs.debug);
   const backup = storeManagerService.corruptedBackup();
   if (backup) {
     notifier.warn(

@@ -26,6 +26,9 @@ export const defaultStoreData: StoreSchema = {
     tray: {
       enabled: true,
     },
+    logs: {
+      debug: false,
+    },
     language: "system",
     overlays: [],
     testOverlays: [],

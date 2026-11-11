@@ -196,6 +196,10 @@ export class Notifier {
   /**
    * Logs a failure to the source's log file and notifies the user, unless
    * `notify` is false or the AppFailure opted out. Returns what to reply with.
+   * A warning without a cause isn't logged: it's what the user did, or a
+   * service already logged it, so the notice says it all. An AppFailure's
+   * error logs one line, since formatError carries its cause chain, and
+   * anything else that's thrown logs its stack.
    */
   public report({
     source,
@@ -217,9 +221,9 @@ export class Notifier {
       detail === undefined ? msg : `${msg} -- ${formatError(detail)}`;
     const logFile = this._logFiles[source];
     if (!logged && level === "warning") {
-      Logger.warn(line, logFile);
+      if (detail !== undefined) Logger.warn(line, logFile);
     } else if (!logged) {
-      Logger.error(line, logFile, detail);
+      Logger.error(line, logFile, failure ? undefined : detail);
     }
 
     if (notify && (failure?.notify ?? true)) {

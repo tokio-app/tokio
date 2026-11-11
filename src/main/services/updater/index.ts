@@ -38,6 +38,7 @@ export interface Updater {
   allowPrerelease: boolean;
   allowDowngrade: boolean;
   forceDevUpdateConfig: boolean;
+  disableWebInstaller: boolean;
   logger: UpdaterLogger | null;
   on(event: string, listener: (...args: any[]) => void): unknown;
   checkForUpdates(): Promise<{
@@ -89,6 +90,9 @@ export class UpdaterService extends Service {
     // allow prereleases for -alpha versions.
     updater.allowPrerelease = false;
     updater.allowDowngrade = false;
+    // Tokio ships plain NSIS, and this silences electron-updater's warning on
+    // every check.
+    updater.disableWebInstaller = true;
     updater.logger = this.logger();
 
     updater.on("checking-for-update", () => {
@@ -222,7 +226,7 @@ export class UpdaterService extends Service {
   private logger(): UpdaterLogger {
     const text = (message: unknown) => `<Updater> ${String(message)}`;
     return {
-      info: (message) => Logger.info(text(message), this._logFile),
+      info: (message) => Logger.debug(text(message), this._logFile),
       warn: (message) => Logger.warn(text(message), this._logFile),
       error: (message) => Logger.error(text(message), this._logFile),
     };

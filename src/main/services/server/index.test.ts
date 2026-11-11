@@ -1,9 +1,11 @@
 import { TimerSettingsSchema } from "@/common/schemas";
 import { TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import { TIMER_PATH } from "@/common/util";
+import { settle } from "@/helper/quit";
 import Logger from "@/logger";
 import { JSDOM } from "jsdom";
 import { EventEmitter } from "node:events";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { NetworkInterfaceInfo, networkInterfaces, tmpdir } from "node:os";
@@ -1007,13 +1009,13 @@ describe("ServerService", () => {
     });
 
     it("keeps sending to an overlay when another with its id disconnects", async () => {
-      const info = vi.spyOn(Logger, "info");
+      const debug = vi.spyOn(Logger, "debug");
       const first = await connect("a");
       const second = await connect("a");
 
       first.close();
       await vi.waitFor(() =>
-        expect(info.mock.calls.map(([message]) => message)).toContain(
+        expect(debug.mock.calls.map(([message]) => message)).toContain(
           "<WebSocket> Client disconnected: a",
         ),
       );
@@ -1024,18 +1026,36 @@ describe("ServerService", () => {
     });
 
     it("logs no more than 64 characters of a client's id", async () => {
-      const info = vi.spyOn(Logger, "info");
+      const debug = vi.spyOn(Logger, "debug");
       const client = await connect("a".repeat(1000));
 
       client.close();
       await vi.waitFor(() =>
-        expect(info.mock.calls.map(([message]) => message)).toContain(
+        expect(debug.mock.calls.map(([message]) => message)).toContain(
           `<WebSocket> Client disconnected: ${"a".repeat(64)}`,
         ),
       );
-      expect(info.mock.calls.map(([message]) => message)).toContain(
+      expect(debug.mock.calls.map(([message]) => message)).toContain(
         `<WebSocket> New client connected: ${"a".repeat(64)}`,
       );
+    });
+
+    it("writes nothing to the log for an overlay that comes and goes, while debug is off", async () => {
+      const debug = vi.spyOn(Logger, "debug");
+      const logFile = join(dir, "server.log");
+      server.setLogFile(logFile);
+
+      const client = await connect("a");
+      client.close();
+      await vi.waitFor(() =>
+        expect(debug.mock.calls.map(([message]) => message)).toContain(
+          "<WebSocket> Client disconnected: a",
+        ),
+      );
+      // Any line would be written by now
+      await settle(1000);
+
+      expect(existsSync(logFile)).toBe(false);
     });
 
     it("keeps internal events in the app", async () => {

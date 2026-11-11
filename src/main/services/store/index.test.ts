@@ -658,6 +658,31 @@ describe("StoreManagerService", () => {
     });
   });
 
+  describe("logs", () => {
+    it("keeps Detailed logs off for stores saved before the setting", async () => {
+      const { logs: _logs, ...settings } = defaultStoreData.settings;
+      await writeFile(
+        storeFile,
+        JSON.stringify({ ...defaultStoreData, settings }),
+      );
+
+      const store = await init();
+
+      expect(store.getSettings().logs).toEqual({ debug: false });
+    });
+
+    it("saves the setting", async () => {
+      const store = await init();
+
+      await store.updateLogsSettings(true);
+
+      expect((await readJSON(storeFile)).settings.logs).toEqual({
+        debug: true,
+      });
+      expect((await init()).getSettings().logs).toEqual({ debug: true });
+    });
+  });
+
   describe("language", () => {
     it("follows the system for stores saved before the setting", async () => {
       const { language: _language, ...settings } = defaultStoreData.settings;

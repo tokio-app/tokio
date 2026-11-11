@@ -121,7 +121,7 @@ Checked against Java 26.3's command tree, registries and decompiled commands (Vi
 
 ## Notices and logs
 
-- Logs go to `Files.logs.games`; the source is `games`. A status change is logged once, never per command. An error status comes with an English `cause`, which `GamesService` logs, never the translated `status.error`.
+- Logs go to `Files.logs.games`; the source is `games`. A status change is logged once, at debug (an error status at warn), never per command. An error status comes with an English `cause`, which `GamesService` logs, never the translated `status.error`.
 - `registerGames` (`src/main/events/init.ts`) turns `onError` into notices:
   - `GAME_NOT_CONNECTED`, key `game:minecraft:offline`, 60 s: an action ran with the toggle on and no game of its edition. It names the edition and its command (`MINECRAFT_CONNECT_COMMANDS`, `src/common/types/games.ts`, also the page's).
   - `GAME_COMMAND_FAILED`, key `game:<action id>`, `REPEAT_NOTICE_MS`: the game refused a command.

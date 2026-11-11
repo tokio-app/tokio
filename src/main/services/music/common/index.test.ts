@@ -1,5 +1,6 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { setLanguage } from "@/helper/i18n";
+import Logger from "@/logger";
 import {
   cancelableEvent,
   ipcMain,
@@ -10,7 +11,7 @@ import {
 } from "@test/electron";
 import { WebContentsView } from "electron";
 import { normalize, sep } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createWindow } from "./index";
 
 // The last `count` segments of a path, whatever the platform's separator
@@ -18,7 +19,7 @@ const tail = (file: unknown, count: number) =>
   typeof file === "string" ? normalize(file).split(sep).slice(-count) : [];
 
 const open = () => {
-  const win = createWindow(new WebContentsView());
+  const win = createWindow(new WebContentsView(), () => "music.log");
   const shell = windows().at(-1)!;
   const [content, nav] = views().slice(-2);
   return { win, shell, nav, content };
@@ -160,6 +161,34 @@ describe("createWindow", () => {
     expect(navigate("https://example.com/")).toBe(false);
     expect(navigate("file:///C:/x.png")).toBe(false);
     expect(navigate(`${page}#/other`)).toBe(true);
+  });
+
+  it("logs the title bar's errors and both views' crashes, never the player's errors", () => {
+    const error = vi.spyOn(Logger, "error").mockImplementation(() => {});
+    const { nav, content } = open();
+    const message = (text: string) => ({
+      level: "error",
+      message: text,
+      lineNumber: 1,
+      sourceId: "index.html",
+      frame: { parent: null },
+    });
+
+    nav.webContents.emit("console-message", message("title bar"));
+    content.webContents.emit("console-message", message("player"));
+    for (const view of [nav, content]) {
+      view.webContents.emit(
+        "render-process-gone",
+        {},
+        { reason: "crashed", exitCode: 1 },
+      );
+    }
+
+    expect(error.mock.calls).toEqual([
+      ["<Music window> title bar (index.html:1)", "music.log"],
+      [expect.stringContaining("crashed"), "music.log"],
+      [expect.stringContaining("crashed"), "music.log"],
+    ]);
   });
 
   it("opens the player's links in the browser and limits its permissions", () => {

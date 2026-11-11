@@ -275,10 +275,11 @@ describe("TikTokLiveConnector", () => {
     });
   });
 
-  it("logs the connection's warnings with their reason and errors, not routine lines", async () => {
+  it("logs the connection's warnings with their reason and errors, routine lines at debug", async () => {
     const warn = vi.spyOn(Logger, "warn");
     const error = vi.spyOn(Logger, "error");
     const info = vi.spyOn(Logger, "info");
+    const debug = vi.spyOn(Logger, "debug");
     connector.setLogFile("connector.log");
     await connected();
     const log = connection().options.logger!;
@@ -309,6 +310,12 @@ describe("TikTokLiveConnector", () => {
       cause,
     );
     expect(info).not.toHaveBeenCalled();
+    expect(debug.mock.calls).toEqual(
+      expect.arrayContaining([
+        ["<Connector> Connected to room 1", "connector.log"],
+        ["<Connector> Opening the WebSocket", "connector.log"],
+      ]),
+    );
   });
 
   it("logs an error that repeats at most every 30 seconds", async () => {

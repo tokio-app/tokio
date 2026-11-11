@@ -155,7 +155,7 @@ describe("Notifier", () => {
       ]);
     });
 
-    it("uses an AppFailure's level and logs warnings as warnings", () => {
+    it("uses an AppFailure's level and logs warnings with a cause as warnings", () => {
       const warn = vi.spyOn(Logger, "warn");
 
       notifier.report({
@@ -165,18 +165,57 @@ describe("Notifier", () => {
           "Disconnect first.",
           {
             level: "warning",
+            cause: new Error("EBUSY"),
           },
         ),
       });
 
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining("Disconnect first."),
+        expect.stringMatching(/Disconnect first..*EBUSY$/),
         "system.log",
       );
       expect(sent[0]).toMatchObject({
         level: "warning",
         code: FEEDBACK_CODES.PROFILE_LOCKED,
       });
+    });
+
+    it("notifies a warning without a cause but doesn't log it", () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const error = vi.spyOn(Logger, "error");
+
+      notifier.report({
+        source: "system",
+        error: new AppFailure(
+          FEEDBACK_CODES.PROFILE_LOCKED,
+          "Disconnect first.",
+          { level: "warning" },
+        ),
+      });
+
+      expect(warn).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
+      expect(sent[0]).toMatchObject({
+        level: "warning",
+        code: FEEDBACK_CODES.PROFILE_LOCKED,
+      });
+    });
+
+    it("logs an AppFailure's error in one line, without its cause's stack", () => {
+      const error = vi.spyOn(Logger, "error");
+
+      notifier.report({
+        source: "system",
+        error: new AppFailure(FEEDBACK_CODES.UNKNOWN, "Couldn't save.", {
+          cause: new Error("EACCES"),
+        }),
+      });
+
+      expect(error).toHaveBeenCalledExactlyOnceWith(
+        expect.stringMatching(/Couldn't save..*EACCES$/),
+        "system.log",
+        undefined,
+      );
     });
 
     it("doesn't log again what the service already logged", () => {

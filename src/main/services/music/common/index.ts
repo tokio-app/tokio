@@ -7,6 +7,7 @@ import {
 import { language, onLanguage } from "@/helper/i18n";
 import {
   limitPermissions,
+  logPageErrors,
   openLinksOutside,
   reloadWhenGone,
   stayOnPage,
@@ -42,7 +43,10 @@ export abstract class MusicProvider extends TokioEmitter {
 const TITLE_BAR_HEIGHT = 40;
 
 // A window with the title bar on top and the content view under it
-export function createWindow(content: WebContentsView) {
+export function createWindow(
+  content: WebContentsView,
+  logFile: () => string | undefined,
+) {
   const APP_ICON = join(__dirname, "../../resources/icon.png");
   const APP_PRELOAD = join(__dirname, "../preload/index.cjs");
 
@@ -68,7 +72,7 @@ export function createWindow(content: WebContentsView) {
   // microphone or other device
   openLinksOutside(content.webContents);
   limitPermissions(content.webContents.session);
-  reloadWhenGone(content.webContents);
+  reloadWhenGone(content.webContents, logFile);
 
   const _navView = new WebContentsView({
     webPreferences: {
@@ -98,7 +102,9 @@ export function createWindow(content: WebContentsView) {
   // The title bar lives in the nav view, so it gets the window state.
   const nav = _navView.webContents;
   stayOnPage(nav);
-  reloadWhenGone(nav);
+  reloadWhenGone(nav, logFile);
+  // Only the title bar, Tokio's own page: the player's site isn't Tokio's
+  logPageErrors(nav, "Music window", logFile);
   const sendWindowState = () => {
     if (nav.isDestroyed()) return;
     nav.send(APP_EVENTS_RESPONSE.RESIZE_MUSIC_WINDOW, {

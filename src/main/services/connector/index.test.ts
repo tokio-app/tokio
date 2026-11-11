@@ -1,4 +1,5 @@
 import { TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import { generateTikTokEventSample } from "@/common/util";
 import Logger from "@/logger";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -18,6 +19,9 @@ class FakeConnector extends ConnectorProvider {
     success: true,
     data: [],
   }));
+  fire<K extends TOKIO_EVENTS>(event: K, data?: TokioEventMap[K]) {
+    this.emit(event, data);
+  }
 }
 
 const setup = () => {
@@ -30,19 +34,19 @@ const setup = () => {
 
 describe("TikTokConnectorService", () => {
   it("connects through the active provider and logs it", async () => {
+    const debug = vi.spyOn(Logger, "debug");
     const info = vi.spyOn(Logger, "info");
-    const success = vi.spyOn(Logger, "success");
     const { service, provider } = setup();
 
     const res = await service.connect("streamer");
 
     expect(res).toEqual({ success: true });
     expect(provider.connect).toHaveBeenCalledWith("streamer");
-    expect(info).toHaveBeenCalledWith(
+    expect(debug).toHaveBeenCalledWith(
       "<Connector> Connecting to: streamer",
       "connector.log",
     );
-    expect(success).toHaveBeenCalledWith(
+    expect(info).toHaveBeenCalledWith(
       "<Connector> Connected to streamer.",
       "connector.log",
     );
@@ -64,7 +68,7 @@ describe("TikTokConnectorService", () => {
     expect(service.username).toBe("other");
   });
 
-  it("logs and returns a failed connection", async () => {
+  it("logs and returns a failed connection, in one line for a known kind", async () => {
     const error = vi.spyOn(Logger, "error");
     const { service, provider } = setup();
     const cause = connectFailure("offline", "User is offline");
@@ -75,6 +79,21 @@ describe("TikTokConnectorService", () => {
     expect(res).toEqual({ success: false, error: cause });
     expect(error).toHaveBeenCalledWith(
       "<Connector> Unable to connect to streamer -- User is offline",
+      "connector.log",
+      undefined,
+    );
+  });
+
+  it("logs the stack of a failed connection it didn't expect", async () => {
+    const error = vi.spyOn(Logger, "error");
+    const { service, provider } = setup();
+    const cause = connectFailure("unknown", "Something broke");
+    provider.connect.mockResolvedValue({ success: false, error: cause });
+
+    await service.connect("streamer");
+
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("Something broke"),
       "connector.log",
       cause,
     );
@@ -121,6 +140,44 @@ describe("TikTokConnectorService", () => {
     service.setLogFile("other.log");
 
     expect(setLogFile).toHaveBeenCalledWith("other.log");
+  });
+
+  it("logs each event at debug, without a chat's text or room users", () => {
+    const debug = vi.spyOn(Logger, "debug");
+    const { provider } = setup();
+    provider.setLogFile("connector.log");
+    const user = {
+      ...generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data.user,
+    };
+    user.handle = "handle";
+    const gift = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
+    const chat = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data;
+    const received = vi.fn();
+    provider.on(TOKIO_EVENTS.GIFT, received);
+
+    provider.fire(TOKIO_EVENTS.GIFT, {
+      user,
+      gift: { ...gift.gift, name: "Rose", comboCount: 5, repeatEnd: true },
+    });
+    provider.fire(TOKIO_EVENTS.CHAT, {
+      user,
+      comment: { ...chat.comment, content: "secret" },
+    });
+    provider.fire(
+      TOKIO_EVENTS.ROOM_USER,
+      generateTikTokEventSample(TOKIO_EVENTS.ROOM_USER).data,
+    );
+    provider.fire(TOKIO_EVENTS.CONNECTED);
+
+    expect(received).toHaveBeenCalledOnce();
+    expect(debug.mock.calls).toEqual([
+      [
+        "<Connector> tokio:event:gift Rose x5 (end) from @handle",
+        "connector.log",
+      ],
+      ["<Connector> tokio:event:chat from @handle", "connector.log"],
+      [`<Connector> ${TOKIO_EVENTS.CONNECTED}`, "connector.log"],
+    ]);
   });
 
   it("starts with the default provider", () => {

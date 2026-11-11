@@ -65,6 +65,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `renderer-state.md`: profile autosaves, `useAutosave` and `AudioQueue`
 - `i18n.md`: the locale files, translating in the windows and main, and the language setting
 - `app-lifecycle.md`: single instance, tray, windows and quitting
+- `logging.md`: the log files, what goes at which level, Detailed logs and the export
 - `store.md`: the store and profile files
 - `ci.md`: CI, packaging and releases
 - `updates.md`: the auto-updater
@@ -121,7 +122,7 @@ Tokio is in English and Spanish, following the system's language unless **Settin
 - Each service lives in `src/main/services/<name>/index.ts` and extends `Service` (or `ProviderService<T>`) from `src/main/services/shared`. It's created once in `src/main/index.ts`, added to `AppServices` (`src/main/types`) and injected into `AppHandler`.
 - Swappable backends (connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)` (without a key the provider keeps its own; `""` clears it). Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. Each service starts a provider in its constructor, so `_current` is always set. TTS uses every provider at once, as engines (`.claude/rules/tts.md`).
 - Classes that send live events to listeners (`MusicProvider` in `services/music/common`, `MusicQueue`, `ConnectorProvider`) extend `TokioEmitter` (`services/shared/emitter`): a typed `on`/`off` and a protected `emit`. `createWindow(view)` places a provider's page under the music window's title bar.
-- Log through `Logger` (`@/logger`) with the service's `_logFile` and a `<ServiceName>` prefix, e.g. ``Logger.error(`<Connector> ...`, this._logFile)``. Format errors with `formatError` from `@/common/util`.
+- Log through `Logger` (`@/logger`) with the service's `_logFile` and a `<ServiceName>` prefix, e.g. ``Logger.error(`<Connector> ...`, this._logFile)``. Format errors with `formatError` from `@/common/util`. Routine traffic goes to `Logger.debug`, which only Detailed logs writes (`.claude/rules/logging.md`).
 - Fallible service methods return `ServiceResult<T>` (`{ success, error?, data? }`, in `services/shared`) instead of throwing.
 
 ### IPC events
@@ -144,7 +145,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 - `createStack(source)` sets the `FeedbackSource` (and log file) of a page's handlers.
 - `push` options: `failure` (`{ code, message }` for unexpected throws, its message a locale key that `runEvent` translates when it reports), `onError(e, error, data, services)` to send the failure reply (`replyFailure(APP_EVENTS_RESPONSE.X)` for a plain `{ success: false, error }`), `notify: false` when the page already shows the failure or for status probes, and `source` to override the stack's.
 - Throw `new AppFailure(code, message, { level: "warning", cause })` for an expected failure with its own message or level. A canceled dialog is not a failure: just `return`.
-- Log failures once. If a service already logged it, throw `new LoggedError(res.error)` or pass `{ logged: true }` to `AppFailure`.
+- Log failures once. If a service already logged it, throw `new LoggedError(res.error)` or pass `{ logged: true }` to `AppFailure`. A warning is logged only with a `cause`.
 - A store mutator that returns false couldn't write the store file (`JSONManagerService` logged why): send the reply that shows what main holds, then throw `saveFailure()` (`SETTINGS_SAVE_FAILED`), with no success notice.
 - `notifier` (in the handler's services) pushes `APP_EVENTS_RESPONSE.NOTIFY`. `report({ source, error, fallback })` logs and notifies; `error/warn/info/success(source, code, message, { key, windowMs })` sends a notice. Repeated warnings and errors are dropped within `windowMs` (`DEDUPE_MS` by default).
 - User actions that change something call `notifier.success(...)` after the reply. Reads, status checks, tests, autosaves (TTS, music, alerts, the keys in Settings) and controls whose state the UI already shows (Home's feature switches) send nothing.

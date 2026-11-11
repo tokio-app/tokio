@@ -1,6 +1,7 @@
 import { UpdateStatus } from "@/common/types";
 import { REPOSITORY_URL } from "@/common/util";
 import { track } from "@/helper/quit";
+import Logger from "@/logger";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -20,6 +21,7 @@ class FakeUpdater extends EventEmitter implements Updater {
   allowPrerelease = true;
   allowDowngrade = false;
   forceDevUpdateConfig = false;
+  disableWebInstaller = false;
   logger: Updater["logger"] = null;
   active = true;
   checkForUpdates = vi.fn<() => Promise<CheckResult>>(async () => {
@@ -71,6 +73,28 @@ describe("UpdaterService", () => {
     expect(updater.autoDownload).toBe(true);
     expect(updater.autoInstallOnAppQuit).toBe(true);
     expect(updater.logger).not.toBeNull();
+  });
+
+  it("turns off the web installer, which Tokio doesn't ship", async () => {
+    await create();
+
+    expect(updater.disableWebInstaller).toBe(true);
+  });
+
+  it("logs the library's info at debug, and its warnings as they come", async () => {
+    const debug = vi.spyOn(Logger, "debug");
+    const warn = vi.spyOn(Logger, "warn").mockImplementation(() => {});
+
+    await create();
+    updater.logger?.info("Checking for update");
+    updater.logger?.warn("Something odd");
+
+    expect(debug.mock.calls.map(([msg]) => msg)).toEqual([
+      expect.stringContaining("Checking for update"),
+    ]);
+    expect(warn.mock.calls.map(([msg]) => msg)).toEqual([
+      expect.stringContaining("Something odd"),
+    ]);
   });
 
   it("reports the status of a download until it's ready", async () => {

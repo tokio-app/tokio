@@ -25,6 +25,10 @@ export enum FEEDBACK_CODES {
   FQDN_INSTALL_FAILED = "fqdn_install_failed",
   ABOUT_LOAD_FAILED = "about_load_failed",
   LICENSE_LOAD_FAILED = "license_load_failed",
+  DEBUG_LOGS_ENABLED = "debug_logs_enabled",
+  DEBUG_LOGS_DISABLED = "debug_logs_disabled",
+  LOGS_EXPORTED = "logs_exported",
+  LOGS_EXPORT_FAILED = "logs_export_failed",
 
   // UPDATES
   UPDATE_AVAILABLE = "update_available",

@@ -46,7 +46,7 @@ export class URLManagerService extends Service {
 
     const command = this._appendCommand(hostsFilePath);
 
-    Logger.info(
+    Logger.debug(
       `<System> Prompting for admin rights to add ${config.CMD.FQDN} to the hosts file.`,
       this._logFile,
     );
@@ -66,10 +66,7 @@ export class URLManagerService extends Service {
     // Antivirus or a file lock can stop the write without failing the command.
     try {
       if (this._hasAppFQDN(await fs.readFile(hostsFilePath, "utf-8"))) {
-        Logger.success(
-          "<System> Successfully updated hosts file.",
-          this._logFile,
-        );
+        Logger.info("<System> Successfully updated hosts file.", this._logFile);
         return true;
       }
       Logger.error(

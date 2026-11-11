@@ -57,6 +57,38 @@ export function reloadWhenGone(
   });
 }
 
+// A page that throws on every event can't fill the log.
+const PAGE_ERROR_REPEAT_MS = 30_000;
+
+/**
+ * Logs the errors a page writes to its console: uncaught errors, rejected
+ * promises, failed loads, and React's caught errors, since React 19's
+ * production `defaultOnCaughtError` calls `console.error`. Only the top
+ * frame's: overlay previews are iframes, and their errors aren't Tokio's.
+ */
+export function logPageErrors(
+  contents: WebContents,
+  label: string,
+  logFile: () => string | undefined,
+) {
+  // Until when each line's repeats are dropped
+  const muted = new Map<string, number>();
+  contents.on(
+    "console-message",
+    ({ level, message, lineNumber, sourceId, frame }) => {
+      if (level !== "error" || frame?.parent) return;
+      const line = `<${label}> ${message} (${sourceId}:${lineNumber})`;
+      const now = Date.now();
+      for (const [key, until] of muted) {
+        if (until <= now) muted.delete(key);
+      }
+      if (muted.has(line)) return;
+      muted.set(line, now + PAGE_ERROR_REPEAT_MS);
+      Logger.error(line, logFile());
+    },
+  );
+}
+
 /**
  * Opens the web and mail links a page would open in a new window in the
  * browser instead, and denies every new window.

@@ -23,6 +23,8 @@ paths:
   - `screen` has a 1920×1040 work area unless a test sets `getPrimaryDisplay`. A `nativeImage`'s images only say what they were made from.
   - `safeStorage`'s async calls round-trip text with the `v10` prefix Chromium adds; a saved key that doesn't start with `v` and two digits is read as plain text.
 - The setup also silences the console, and Logger only writes to absolute paths, so tests can name log files `"system.log"`. Spy on `Logger` to assert logs; after `vi.resetModules()`, on the copy the re-imported code got.
+  - It turns debug off before each test. A spy on `Logger.debug` still records calls while debug is off.
+  - It imports `Logger` before any test file runs, so a test's `vi.mock("node:fs/promises")` doesn't reach it. Fail a write for real instead: the logger test puts a folder where the backup goes.
 - Test IPC handlers with `createHandler(stubs)` from `@test/handler`: partial service stubs (anything else the handler reaches for fails the test), fake windows and a real `Notifier`. `invoke(stack, APP_EVENTS.X, data)` runs a page's handler as the Handler does; read `replies(channel)`, `pushed(channel)`, `notices`, or `sent()` for all in order. `eventSource()` stands in for the connector's and the music service's live events.
 - `test/setup.ts` also resets main's language to English (`resetLanguage`). The fake `app.getPreferredSystemLanguages` gives `["en-US"]`; `setLanguage("es-419")` tests the Spanish.
 - Give services a temp folder (`mkdtemp`) through their setters or `initialize`, stub `fetch` with `vi.stubGlobal`, and use fake timers for the queues.

@@ -105,10 +105,9 @@ export class GamesService extends Service {
         : status.edition
           ? ` (${MINECRAFT_EDITION_NAMES[status.edition]}).`
           : ".";
-      Logger.info(
-        `<Games> Minecraft ${STATES[status.state]}${why}`,
-        this._logFile,
-      );
+      const line = `<Games> Minecraft ${STATES[status.state]}${why}`;
+      if (status.state === "error") Logger.warn(line, this._logFile);
+      else Logger.debug(line, this._logFile);
       this._onStatus?.(this.status());
     });
   }

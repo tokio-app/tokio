@@ -27,4 +27,4 @@ paths:
   - Any other gift ends at once (`isStreakEnd`).
 - A comment made only of emotes is its own TikTok message (`emote`, never also a `chat`). `_listen` maps it to `CHAT` with an empty `content` and `lang`, each emote at `index` 0, so Emote alerts and game actions fire and its emotes are saved.
 - A failed connect's `error.kind` (`ConnectErrorKind`, `services/connector/common`) picks the message `home.ts` shows.
-- The library's warnings and errors go to `connector.log` through its `logger` option, with the error they carry; its info and debug lines are dropped. An error with the same code is logged once per `LOG_REPEAT_MS`.
+- The library's warnings and errors go to `connector.log` through its `logger` option, with the error they carry; its info and debug lines go to `Logger.debug`. An error with the same code is logged once per `LOG_REPEAT_MS`.

@@ -185,7 +185,6 @@ export class StoreManagerService extends Service {
         }
       }
       this._storeData = data;
-      Logger.success(`<System> JSON Store initialized cleanly`, this._logFile);
     } catch (error) {
       Logger.error(
         `<System> Fatal: Unable to initialize JSON store -- ${formatError(error)}`,
@@ -464,6 +463,12 @@ export class StoreManagerService extends Service {
   public async updateTraySettings(enabled: boolean): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.tray = { enabled };
+    return this._queueSave();
+  }
+
+  public async updateLogsSettings(debug: boolean): Promise<boolean> {
+    this._ensureInitialized();
+    this._storeData!.settings.logs = { debug };
     return this._queueSave();
   }
 

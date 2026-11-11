@@ -85,6 +85,7 @@ describe("runEvent", () => {
           "Disconnect first.",
           {
             level: "warning",
+            cause: new Error("EBUSY"),
           },
         );
       },

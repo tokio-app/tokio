@@ -24,6 +24,8 @@ beforeEach(() => {
   resetElectron();
   resetLanguage();
   keepLogsInTempFolders(Logger);
+  // Static, so one test's Detailed logs don't reach the next
+  Logger.setDebug(false);
   for (const method of ["log", "warn", "error"] as const) {
     vi.spyOn(console, method).mockImplementation(() => {});
   }

@@ -5,6 +5,7 @@ import { useImmerState, useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { LanguageSection } from "./sections/LanguageSection";
+import { LogsSection } from "./sections/LogsSection";
 import { MediaSection } from "./sections/MediaSection";
 import { OverlaysSection } from "./sections/OverlaysSection";
 import { CloneProfileModal, NewProfileModal } from "./sections/ProfileModals";
@@ -16,7 +17,8 @@ import { TraySection } from "./sections/TraySection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { VoiceKeysSection } from "./sections/VoiceKeysSection";
 
-type ModalType = "newProfile" | "cloneProfile" | "confirmServer";
+type ModalType =
+  "newProfile" | "cloneProfile" | "confirmServer" | "confirmDebug";
 
 export function Settings() {
   const t = useT();
@@ -27,6 +29,11 @@ export function Settings() {
   const setServerEnabled = (enabled: boolean) =>
     updateStore((s) => {
       s.settings.server.enabled = enabled;
+    });
+
+  const setDebug = (debug: boolean) =>
+    updateStore((s) => {
+      s.settings.logs.debug = debug;
     });
 
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
@@ -59,6 +66,20 @@ export function Settings() {
             setServerEnabled(true);
             closeModal();
             window.api.emit(APP_EVENTS.REQ_FQDN);
+          }}
+        />
+      )}
+
+      {modal === "confirmDebug" && (
+        <Modal
+          title={t("settings.logs.confirmTitle")}
+          description={t("settings.logs.confirmDescription")}
+          confirmText={t("settings.logs.enable")}
+          onClose={closeModal}
+          onConfirm={() => {
+            setDebug(true);
+            closeModal();
+            window.api.emit(APP_EVENTS.SET_LOGS, { enabled: true });
           }}
         />
       )}
@@ -134,6 +155,18 @@ export function Settings() {
         <MediaSection />
 
         <OverlaysSection />
+
+        <LogsSection
+          debug={store.settings.logs.debug}
+          onChange={(debug) => {
+            if (debug) {
+              setModal("confirmDebug");
+            } else {
+              setDebug(false);
+              window.api.emit(APP_EVENTS.SET_LOGS, { enabled: false });
+            }
+          }}
+        />
       </Page>
     </>
   );

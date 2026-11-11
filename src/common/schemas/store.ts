@@ -68,6 +68,12 @@ const AppSettingsSchema = z.object({
       enabled: z.boolean(),
     })
     .default({ enabled: true }),
+  logs: z
+    .object({
+      // Detailed logs: the debug lines too, such as one for each LIVE event
+      debug: z.boolean(),
+    })
+    .default({ debug: false }),
   // A tag in APP_LANGUAGES, or "system" to follow the OS. Any string, so a
   // language removed later can't invalidate the store.
   language: z.string().default("system"),

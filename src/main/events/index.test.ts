@@ -13,7 +13,7 @@ async function listeners() {
   const h = createHandler();
   const handler = new Handler(h.handler);
   await handler.init(events);
-  createWindow(new WebContentsView());
+  createWindow(new WebContentsView(), () => undefined);
   const nav = views().at(-1)!.webContents.ipc;
   return (channel: string) =>
     ipcMain.listenerCount(channel) + nav.listenerCount(channel);
