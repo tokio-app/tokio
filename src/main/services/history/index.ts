@@ -511,7 +511,13 @@ export class HistoryService extends Service {
       if (index) {
         const file = join(dir, "index.json");
         if (await json.saveFile(file, IndexSchema, index)) {
-          for (const path of dropped) await this._remove(path);
+          // A file left over would come back on a load as a crash's leftover.
+          // Not a failed save: a held file mustn't refuse a profile switch.
+          for (const path of dropped) {
+            if ((await this._remove(path)) || this._dir !== dir) continue;
+            this._indexUnsaved = true;
+            this._dropped.push(path);
+          }
         } else {
           ok = false;
           if (this._dir === dir) {
@@ -706,14 +712,17 @@ export class HistoryService extends Service {
     }
   }
 
-  // With a few tries, for files Windows holds a moment
-  private async _remove(path: string) {
-    await rm(path, { recursive: true, force: true, maxRetries: 3 }).catch(
-      (error: unknown) =>
+  // With a few tries, for files Windows holds a moment. False when it failed.
+  private async _remove(path: string): Promise<boolean> {
+    return rm(path, { recursive: true, force: true, maxRetries: 3 }).then(
+      () => true,
+      (error: unknown) => {
         Logger.warn(
           `<History> Couldn't remove ${path}: ${formatError(error)}`,
           this._logFile,
-        ),
+        );
+        return false;
+      },
     );
   }
 

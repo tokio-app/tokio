@@ -21,6 +21,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HistoryService, MAX_GIFTERS, MAX_LIVES, TOP_GIFTERS } from "./index";
 
+// A test can make a removal fail
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, rm: vi.fn(actual.rm) };
+});
+
 const viewer = (userId: string, handle = `fan${userId}`) =>
   ({
     userId,
@@ -853,6 +859,20 @@ describe("HistoryService", () => {
       expect(existsSync(join(dir, "a", "3000.json"))).toBe(true);
 
       // The retry saves the index, then the file goes
+      expect(await history.save()).toBe(true);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
+      expect((await loaded()).getHistory().lives).toEqual([
+        expect.objectContaining({ startedAt: 1000 }),
+      ]);
+    });
+
+    it("removes its file on the next save when it can't at once", async () => {
+      const history = await twoLives();
+      vi.mocked(rm).mockRejectedValueOnce(new Error("EBUSY"));
+
+      expect(await history.deleteLive(3000)).toBe(true);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(true);
+
       expect(await history.save()).toBe(true);
       expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
       expect((await loaded()).getHistory().lives).toEqual([
