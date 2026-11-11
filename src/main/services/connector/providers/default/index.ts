@@ -291,11 +291,14 @@ export class TikTokLiveConnector extends ConnectorProvider {
         ...data,
         gift: { ...data.gift, repeatEnd: false, comboCount },
       };
-      combos.set(key, {
-        group: tdata.groupId,
-        event,
-        timer: setTimeout(() => endCombo(key), COMBO_END_MS),
-      });
+      // A reconnect delivers the gap's gifts once back, so the combo waits
+      const end = (): NodeJS.Timeout =>
+        setTimeout(() => {
+          const combo = combos.get(key);
+          if (combo && connection.state === "reconnecting") combo.timer = end();
+          else endCombo(key);
+        }, COMBO_END_MS);
+      combos.set(key, { group: tdata.groupId, event, timer: end() });
       this.emit(TOKIO_EVENTS.GIFT, event);
     });
 
