@@ -9,6 +9,7 @@ import {
   StudioView,
 } from "@/common/types";
 import {
+  alertMediaPath,
   ALERTS_PATH,
   formatError,
   MINECRAFT_OVERLAY_PATH,
@@ -67,10 +68,6 @@ const embedPath = (source: StudioSource) => {
     : `/${MINECRAFT_OVERLAY_PATH}/${source.column}/`;
 };
 
-// The media library, as the server mounts it for the alerts' pages
-const mediaURL = (file: string) =>
-  `/${ALERTS_PATH}/media/${encodeURIComponent(file)}`;
-
 function viewOf(
   overlay: StudioOverlay,
   services: Services,
@@ -82,7 +79,7 @@ function viewOf(
   return studioView(overlay, {
     gifts,
     served: (id) => served.has(id),
-    mediaURL,
+    mediaURL: alertMediaPath,
     embedPath,
     camera: (element) =>
       studioCameraPath(

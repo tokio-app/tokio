@@ -16,7 +16,7 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import {
-  ALERTS_PATH,
+  alertMediaPath,
   AUDIO_EXTENSIONS,
   formatAlertMessage,
   formatError,
@@ -375,7 +375,7 @@ export class AlertsService extends Service {
         const sent = this._server?.sendToClient(id, {
           type: SHOW_MEDIA,
           data: {
-            src: `/${ALERTS_PATH}/media/${encodeURIComponent(file)}`,
+            src: alertMediaPath(file),
             kind,
             duration: clamp(duration, MAX_SECONDS),
             volume: clamp(volume, 100),
