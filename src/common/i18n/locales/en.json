@@ -1266,5 +1266,6 @@
   "timer.names.superfan": "New Super Fan",
   "timer.names.follow": "Follow",
   "timer.names.share": "Share",
-  "timer.names.chat": "Chat"
+  "timer.names.chat": "Chat",
+  "releases.0.1.4-beta.1": "Build your own overlays in Tools → Overlay Studio, with texts, shapes, pictures, videos, gifts and viewers on one canvas.\nElements and groups get 12 entrances and exits, and can move on each event or all the time.\nShow your camera on stream with Overlay Studio's Camera element, cut to a circle if you like.\nThe Games overlay shows the seconds left on a timed Turn into mob step.\nWhen your LIVE's connection drops and stays down, Tokio says it's reconnecting every 30 seconds until it's back.\nCoin stats counts a LIVE's last gifts as soon as it ends."
 }
