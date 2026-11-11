@@ -1,4 +1,9 @@
-import { GAME_HELPS, GameStep, GameStepSchema } from "@/common/schemas";
+import {
+  GAME_HAZARDS,
+  GAME_HELPS,
+  GameStep,
+  GameStepSchema,
+} from "@/common/schemas";
 import { describe, expect, it } from "vitest";
 import {
   commandValue,
@@ -262,6 +267,12 @@ describe("gameCommands for hazards", () => {
     edition: "bedrock" | "java",
     more: Record<string, unknown> = {},
   ) => gameCommands(step({ type: "hazard", hazard, ...more }), none, edition);
+
+  it("runs something for every hazard on Java, which runs them all", () => {
+    for (const hazard of GAME_HAZARDS) {
+      expect(run(hazard, "java"), hazard).not.toEqual([]);
+    }
+  });
 
   it("runs each hazard in each edition's syntax", () => {
     const both = (hazard: string) => [
