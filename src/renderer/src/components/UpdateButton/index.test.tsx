@@ -5,6 +5,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { UpdateButton } from ".";
+import elements from "../Elements/elements.module.css";
 
 const ready: UpdateStatus = { state: "ready", version: "1.2.0" };
 const manual: UpdateStatus = {
@@ -36,6 +37,30 @@ describe("UpdateButton", () => {
     render(<UpdateButton status={ready} connected={false} />);
 
     expect(restart()).toHaveAttribute("title", "Tokio 1.2.0");
+  });
+
+  it("fills a ring in the title bar while the update downloads", () => {
+    render(
+      <UpdateButton
+        titleBar
+        status={{ state: "downloading", version: "1.2.0", percent: 40 }}
+        connected={false}
+      />,
+    );
+
+    expect(
+      screen.getByRole("progressbar", { name: "Downloading Tokio 1.2.0…" }),
+    ).toHaveAttribute("aria-valuenow", "40");
+  });
+
+  it("is rose only while no LIVE is connected", () => {
+    const { rerender } = render(
+      <UpdateButton status={ready} connected={false} />,
+    );
+    expect(restart()).toHaveClass(elements.btn_accent);
+
+    rerender(<UpdateButton status={ready} connected />);
+    expect(restart()).not.toHaveClass(elements.btn_accent);
   });
 
   it("offers the download when the update can't be installed by the app", () => {

@@ -2,10 +2,11 @@ import Logo from "@/assets/logo.png";
 import { AboutInfo, UpdateStatus } from "@/common/types";
 import { REPOSITORY_URL } from "@/common/util";
 import { Btn, Section, UpdateButton } from "@/components";
+import { formatPercent } from "@/helper/format";
 import { rich, useLanguage, useT } from "@/ui/i18n";
 import { FiCode, FiFileText, FiRefreshCw } from "react-icons/fi";
 import styles from "../about.module.css";
-import { COPYRIGHT, updateText } from "../helper";
+import { COPYRIGHT, updateDetail, updateText } from "../helper";
 
 type Props = {
   versions?: AboutInfo["versions"];
@@ -29,8 +30,8 @@ export function AppSection({
 }: Props) {
   const t = useT();
   const language = useLanguage();
-  const busy =
-    checking || update.state === "checking" || update.state === "downloading";
+  const busy = checking || update.state === "checking";
+  const detail = checkError ? undefined : updateDetail(update, language);
   return (
     <Section>
       <div className={styles.app}>
@@ -47,21 +48,38 @@ export function AppSection({
       </div>
 
       <div className={styles.update}>
-        <p className={checkError ? styles.update_error : styles.muted}>
-          {checkError ?? updateText(update, language)}
-        </p>
-        <div className={styles.update_actions}>
-          <UpdateButton status={update} connected={connected} />
-          {update.state !== "ready" && (
-            <Btn
-              loading={busy}
-              disabled={update.state === "unsupported"}
-              onClick={onCheck}
-            >
-              <FiRefreshCw /> {t("about.app.check")}
-            </Btn>
-          )}
+        <div className={styles.update_text}>
+          <p className={checkError ? styles.update_error : styles.update_title}>
+            {checkError ?? updateText(update, language)}
+          </p>
+          {detail && <p className={styles.muted}>{detail}</p>}
         </div>
+        {update.state === "downloading" ? (
+          <>
+            <span className={styles.update_percent}>
+              {formatPercent(update.percent, language)}
+            </span>
+            <progress
+              className={styles.update_progress}
+              max={100}
+              value={update.percent}
+              aria-label={updateText(update, language)}
+            />
+          </>
+        ) : (
+          <div className={styles.update_actions}>
+            <UpdateButton status={update} connected={connected} />
+            {update.state !== "ready" && (
+              <Btn
+                loading={busy}
+                disabled={update.state === "unsupported"}
+                onClick={onCheck}
+              >
+                <FiRefreshCw /> {t("about.app.check")}
+              </Btn>
+            )}
+          </div>
+        )}
       </div>
 
       <div className={styles.notice}>

@@ -111,7 +111,7 @@ export function Layout() {
             window.api.emit(APP_EVENTS.SET_PROFILE, { file });
           }}
         />
-        <UpdateButton status={updateStatus} connected={isConnected} />
+        <UpdateButton titleBar status={updateStatus} connected={isConnected} />
         <NotificationBell
           history={notifications.history}
           unread={notifications.unread}

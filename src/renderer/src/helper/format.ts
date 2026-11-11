@@ -51,6 +51,10 @@ export function formatDate(ms: number, language: string, style: DateStyle) {
   return format.format(ms);
 }
 
+// "45%", as the language writes it
+export const formatPercent = (percent: number, language: string) =>
+  new Intl.NumberFormat(language, { style: "percent" }).format(percent / 100);
+
 // "00:42:13". Hours keep counting past a day.
 export function formatDuration(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));
