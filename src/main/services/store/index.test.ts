@@ -89,6 +89,8 @@ describe("StoreManagerService", () => {
     busy.clear();
     held.clear();
     tts.dispose();
+    // Writes still running, like an undone switch's save, make rm fail with ENOTEMPTY
+    await settle(1000);
     await rm(home, { recursive: true, force: true });
   });
 
