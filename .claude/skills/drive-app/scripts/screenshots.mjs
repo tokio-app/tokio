@@ -296,6 +296,9 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     }, file);
 
   await page.getByRole("heading", { name: tr("Dashboard") }).waitFor();
+  // A new data folder opens the tour, which covers the window
+  if (await dialog.isVisible()) await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "detached" });
 
   // The overlay server, through IPC as e2e/app.spec.ts does: the Settings
   // switch asks first

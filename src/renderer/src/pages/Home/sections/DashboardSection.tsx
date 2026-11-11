@@ -67,7 +67,7 @@ export function DashboardSection({
         </p>
       }
     >
-      <div className={styles.connect}>
+      <div className={styles.connect} data-tour="connect">
         <Input
           className={styles.username}
           placeholder={t("home.dashboard.username")}

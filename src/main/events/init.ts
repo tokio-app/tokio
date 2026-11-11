@@ -1104,12 +1104,19 @@ events.push(
       });
     }
     const settings = await start;
-    // A reloaded window has already shown it
+    // A reloaded window has already shown them. Undefined rather than false,
+    // so replies without them look the same.
     const updatedFrom = first ? versionChange(handler) : undefined;
+    const newStore =
+      (first && handler.storeManagerService.wasRebuilt()) || undefined;
 
     // On every load, so a reloaded window gets it too
     e.reply(APP_EVENTS_RESPONSE.LANGUAGE, language());
-    e.reply(APP_EVENTS_RESPONSE.LOAD_APP, { success: true, updatedFrom });
+    e.reply(APP_EVENTS_RESPONSE.LOAD_APP, {
+      success: true,
+      updatedFrom,
+      newStore,
+    });
     if (!first) {
       // The window reloaded, dropping the TTS it was playing
       handler.ttsService.releaseHeld();

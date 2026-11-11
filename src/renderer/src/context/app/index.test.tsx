@@ -70,6 +70,31 @@ describe("AppProvider", () => {
     expect(screen.getByText("Loaded")).toBeInTheDocument();
   });
 
+  it("opens the tour when main says the store is new, until it's closed", async () => {
+    const user = userEvent.setup();
+    setup();
+
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: true, newStore: true });
+    const tour = screen.getByRole("dialog", { name: "Welcome to Tokio" });
+    expect(tour).toBeInTheDocument();
+
+    // A later load's reply doesn't say it, like StrictMode's second load
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: true });
+    expect(tour).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("opens no tour for a store that was already there", async () => {
+    setup();
+
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: true });
+
+    expect(screen.getByText("Loaded")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("shows only the title bar and a message when main couldn't start", async () => {
     setup();
 

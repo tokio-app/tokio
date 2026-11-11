@@ -1,6 +1,8 @@
 import { AboutInfo, APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { Page } from "@/components";
+import { useTour } from "@/context";
 import { useIpcListener, useIpcRequest, useUpdateStatus } from "@/hooks";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppSection } from "./sections/AppSection";
 import { ComponentsSection } from "./sections/ComponentsSection";
@@ -17,6 +19,8 @@ export function About() {
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string>();
   const [connected, setConnected] = useState(false);
+  const navigate = useNavigate();
+  const startTour = useTour();
 
   useIpcRequest(APP_EVENTS.GET_ABOUT);
   useIpcRequest(APP_EVENTS.IS_CONNECTED);
@@ -59,6 +63,11 @@ export function About() {
             window.api.emit(APP_EVENTS.CHECK_UPDATES);
           }}
           onView={setViewing}
+          onTour={() => {
+            // Its last steps are on Home
+            void navigate({ to: "/" });
+            startTour();
+          }}
         />
         <ComponentsSection onView={setViewing} />
         <PackagesSection

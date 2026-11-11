@@ -85,6 +85,13 @@ test("shows the splash, then the app, with its data in the home folder", async (
   await expect.poll(() => splash.isClosed()).toBe(true);
   expect(existsSync(data("settings", "tokio.json"))).toBe(true);
   expect(existsSync(data("profiles", "default.json"))).toBe(true);
+
+  // A new store opens the tour, which would cover the window for the tests
+  // after this one
+  const tour = page.getByRole("dialog", { name: "Welcome to Tokio" });
+  await expect(tour).toBeVisible();
+  await tour.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("keeps Node out of the page", async () => {
