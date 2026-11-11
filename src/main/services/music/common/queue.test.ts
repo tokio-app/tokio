@@ -438,6 +438,17 @@ describe("MusicQueue", () => {
       expect(b).toHaveBeenCalledOnce();
     });
 
+    it("starts the next song within a minute of the player leaving a long one", async () => {
+      // A 10-minute song the player left at once for another track
+      const remaining = vi.fn(async () => 0);
+      const b = run(remaining, 600_000);
+
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect(b).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(b).toHaveBeenCalledOnce();
+    });
+
     it.each([
       ["it can't tell", async () => null],
       ["it fails", () => Promise.reject(new Error("player gone"))],
