@@ -114,17 +114,22 @@ describe("StoreManagerService", () => {
       expect(await readJSON(storeFile)).toEqual(defaultStoreData);
       expect(await readJSON(defaultProfileFile)).toEqual(defaultProfile);
       expect(await store.getProfileData()).toEqual(defaultProfile);
+      expect(store.wasRebuilt()).toBe(true);
+      expect(store.corruptedBackup()).toBeNull();
     });
 
     it("backs up a corrupted store and starts over", async () => {
       await writeFile(storeFile, "{ oops");
 
-      await init();
+      const store = await init();
 
       const backups = (await readdir(paths.folders.settingsFolder)).filter(
         (file) => /^store\.corrupted-\d+\.json$/.test(file),
       );
       expect(backups).toHaveLength(1);
+      expect(store.corruptedBackup()).toBe(
+        join(paths.folders.settingsFolder, backups[0]),
+      );
       expect(
         await readFile(join(paths.folders.settingsFolder, backups[0]), "utf-8"),
       ).toBe("{ oops");

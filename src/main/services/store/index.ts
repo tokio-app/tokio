@@ -68,6 +68,7 @@ export class StoreManagerService extends Service {
   private _storeData: StoreSchema | null = null;
   private _memoryProfile: Profile | null = null;
   private _rebuilt = false;
+  private _corruptedBackup: string | null = null;
   // Emote saves run one after another, so one doesn't drop another's emotes.
   private _emoteSave: Promise<unknown> = Promise.resolve();
   // The store's own saves, chained by _queueSave. saveFile never rejects.
@@ -129,7 +130,10 @@ export class StoreManagerService extends Service {
       const read = await this._readChecked(this._storeFilePath, StoreZodSchema);
       data = read.data;
       if (read.raw && !data) {
-        await this._backupCorrupted(this._storeFilePath, read.raw);
+        this._corruptedBackup = await this._backupCorrupted(
+          this._storeFilePath,
+          read.raw,
+        );
       }
 
       if (!data) {
@@ -235,6 +239,11 @@ export class StoreManagerService extends Service {
    */
   public wasRebuilt(): boolean {
     return this._rebuilt;
+  }
+
+  /** Where initialize copied a store file that didn't load, if it did. */
+  public corruptedBackup(): string | null {
+    return this._corruptedBackup;
   }
 
   // Profile files outlive a rebuilt store, so list the ones that still load.
@@ -1172,7 +1181,7 @@ export class StoreManagerService extends Service {
 
   // Throws when the copy can't be written, so the defaults never replace the
   // only copy of the user's data.
-  private async _backupCorrupted(path: string, raw: Buffer) {
+  private async _backupCorrupted(path: string, raw: Buffer): Promise<string> {
     const corruptedPath = join(
       dirname(path),
       `${basename(path, ".json")}.corrupted-${Date.now()}.json`,
@@ -1182,6 +1191,7 @@ export class StoreManagerService extends Service {
       `<System> Backed up the corrupted ${path} to ${corruptedPath}`,
       this._logFile,
     );
+    return corruptedPath;
   }
 
   private async _encryptProviderKey(

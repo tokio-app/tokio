@@ -1201,6 +1201,7 @@
   "main.camera.failed": "{name} couldn't start.",
   "main.fans.loadFailed": "Tokio couldn't load this profile's fans, so it won't record any until you restart Tokio or pick another profile.",
   "main.lives.historyLoadFailed": "Tokio couldn't load this profile's LIVE history, so it won't record LIVEs until you restart Tokio or pick another profile.",
+  "main.store.reset": "Tokio couldn't load its settings file, so it went back to the default settings. The old file is saved as {file}.",
   "minecraft.weather.clear": "Clear",
   "minecraft.weather.rain": "Rain",
   "minecraft.weather.thunder": "Thunder",

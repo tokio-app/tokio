@@ -969,6 +969,14 @@ const startApp = async (handler: AppHandlerVariables) => {
   );
   // Before any notice, so they're all in the user's language
   setLanguage(storeManagerService.getSettings().language);
+  const backup = storeManagerService.corruptedBackup();
+  if (backup) {
+    notifier.warn(
+      "system",
+      FEEDBACK_CODES.SETTINGS_LOAD_FAILED,
+      t("main.store.reset", { file: backup }),
+    );
+  }
   timerService.initialize({ store: storeManagerService });
   fansService.initialize({
     json: jsonManagerService,
@@ -1119,8 +1127,13 @@ events.push(
     // A reloaded window has already shown them. Undefined rather than false,
     // so replies without them look the same.
     const updatedFrom = first ? versionChange(handler) : undefined;
+    // Only a first run gets the tour, not a store that didn't load
+    const { storeManagerService } = handler;
     const newStore =
-      (first && handler.storeManagerService.wasRebuilt()) || undefined;
+      (first &&
+        storeManagerService.wasRebuilt() &&
+        !storeManagerService.corruptedBackup()) ||
+      undefined;
 
     // On every load, so a reloaded window gets it too
     e.reply(APP_EVENTS_RESPONSE.LANGUAGE, language());

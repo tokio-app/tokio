@@ -29,6 +29,6 @@ paths:
 
 - JSON files load with or without a leading UTF-8 BOM (`JSONManagerService`).
 - The store file is read once, at startup.
-- One that doesn't parse or validate is backed up from the bytes read to `tokio.corrupted-<time>.json` next to it and replaced by the defaults.
+- One that doesn't parse or validate is backed up from the bytes read to `tokio.corrupted-<time>.json` next to it and replaced by the defaults. `startApp` warns naming the backup (`corruptedBackup()`, `SETTINGS_LOAD_FAILED`), and LOAD_APP's `newStore` (the tour) is only for a store file that wasn't there.
 - One that can't be read (locked, no access) or backed up stops startup ("Tokio couldn't start") and is left as it is.
 - A rebuilt store keeps a valid `default.json`. An invalid one is backed up as `default.corrupted-<time>.json` before it's replaced, and one that can't be read stops startup too. So does another profile file it can't read, or a sounds, media or pictures folder that's there but can't be read. Profiles that don't load are left out.
