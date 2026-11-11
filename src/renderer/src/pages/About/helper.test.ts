@@ -1,6 +1,6 @@
 import { REPOSITORY_URL } from "@/common/util";
 import { describe, expect, it } from "vitest";
-import { resolveNoticeLink, updateText } from "./helper";
+import { resolveNoticeLink, updateDetail, updateText } from "./helper";
 
 describe("resolveNoticeLink", () => {
   it("keeps web and mail links", () => {
@@ -49,10 +49,41 @@ describe("updateText", () => {
       "Tokio is up to date.",
     );
     expect(
+      updateText(
+        { state: "available", version: "1.2.0", manual: true, url: "" },
+        "en",
+      ),
+    ).toBe("Tokio 1.2.0 is available.");
+    expect(
       updateText({ state: "downloading", version: "1.2.0", percent: 40 }, "en"),
-    ).toBe("Downloading Tokio 1.2.0… 40%");
+    ).toBe("Downloading Tokio 1.2.0…");
     expect(updateText({ state: "ready", version: "1.2.0" }, "en")).toBe(
       "Tokio 1.2.0 is ready to install.",
+    );
+  });
+});
+
+describe("updateDetail", () => {
+  it("says what comes next", () => {
+    expect(
+      updateDetail(
+        { state: "downloading", version: "1.2.0", percent: 40 },
+        "en",
+      ),
+    ).toBe("You can keep using Tokio while it downloads.");
+    expect(updateDetail({ state: "ready", version: "1.2.0" }, "en")).toBe(
+      "It also installs when you quit Tokio.",
+    );
+    expect(updateDetail({ state: "idle" }, "en")).toBeUndefined();
+    expect(updateDetail({ state: "checking" }, "en")).toBeUndefined();
+  });
+
+  it("says when Tokio last checked", () => {
+    const checkedAt = new Date(2026, 10, 11, 14, 5).getTime();
+
+    // Intl puts a narrow no-break space before PM
+    expect(updateDetail({ state: "none", checkedAt }, "en")).toMatch(
+      /^Last checked at 2:05\sPM$/,
     );
   });
 
@@ -62,11 +93,9 @@ describe("updateText", () => {
       version: "1.2.0",
       url: "",
     } as const;
-    expect(updateText({ ...available, manual: false }, "en")).toBe(
-      "Tokio 1.2.0 is available.",
-    );
-    expect(updateText({ ...available, manual: true }, "en")).toBe(
-      "Tokio 1.2.0 is available. Download it from the release page.",
+    expect(updateDetail({ ...available, manual: false }, "en")).toBeUndefined();
+    expect(updateDetail({ ...available, manual: true }, "en")).toBe(
+      "Download it from the release page.",
     );
   });
 });

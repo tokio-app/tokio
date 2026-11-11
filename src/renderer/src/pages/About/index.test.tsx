@@ -119,11 +119,14 @@ describe("About", () => {
 
     await status({ state: "none", checkedAt: Date.now() });
     expect(screen.getByText("Tokio is up to date.")).toBeInTheDocument();
+    expect(screen.getByText(/^Last checked at /)).toBeInTheDocument();
 
     await status({ state: "downloading", version: "1.2.0", percent: 40 });
+    expect(screen.getByText("Downloading Tokio 1.2.0…")).toBeInTheDocument();
+    expect(screen.getByText("40%")).toBeInTheDocument();
     expect(
-      screen.getByText("Downloading Tokio 1.2.0… 40%"),
-    ).toBeInTheDocument();
+      screen.getByRole("progressbar", { name: "Downloading Tokio 1.2.0…" }),
+    ).toHaveAttribute("value", "40");
   });
 
   it("checks for updates, loading until main answers", async () => {
@@ -141,19 +144,25 @@ describe("About", () => {
     expect(check).toHaveTextContent("Check for updates");
   });
 
-  it("loads while the updater checks or downloads", async () => {
+  it("loads while the updater checks, and shows the download instead", async () => {
     renderWithProviders(<About />);
-    const check = screen.getByRole("button", { name: "Check for updates" });
+    const check = () =>
+      screen.getByRole("button", { name: "Check for updates" });
+    const checking = check();
 
     await status({ state: "checking" });
-    expect(check).toHaveAttribute("aria-busy", "true");
+    expect(checking).toHaveAttribute("aria-busy", "true");
     expect(screen.getByText("Checking for updates…")).toBeInTheDocument();
 
     await status({ state: "downloading", version: "1.2.0", percent: 5 });
-    expect(check).toHaveAttribute("aria-busy", "true");
+    expect(
+      screen.queryByRole("button", { name: "Check for updates" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
 
     await status({ state: "none", checkedAt: Date.now() });
-    expect(check).not.toHaveAttribute("aria-busy");
+    expect(check()).not.toHaveAttribute("aria-busy");
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
   it("shows why a check failed until the next one", async () => {
@@ -171,6 +180,7 @@ describe("About", () => {
       screen.getByText("Couldn't check for updates. Check your connection."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Tokio is up to date.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Last checked at /)).not.toBeInTheDocument();
 
     await user.click(check);
 
@@ -200,6 +210,9 @@ describe("About", () => {
 
     expect(
       screen.getByText("Tokio 1.2.0 is ready to install."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("It also installs when you quit Tokio."),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Check for updates" }),
@@ -235,10 +248,9 @@ describe("About", () => {
       url: "https://github.com/tokio-app/tokio/releases/tag/v1.2.0",
     });
 
+    expect(screen.getByText("Tokio 1.2.0 is available.")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Tokio 1.2.0 is available. Download it from the release page.",
-      ),
+      screen.getByText("Download it from the release page."),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Download update/ }),

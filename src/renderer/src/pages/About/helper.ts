@@ -1,6 +1,7 @@
 import { MessageKey, Params, translate } from "@/common/i18n";
 import { UpdateStatus } from "@/common/types";
 import { REPOSITORY_URL } from "@/common/util";
+import { formatDate } from "@/helper/format";
 
 // Keep in sync with THIRD_PARTY_NOTICES.md. npm packages are listed by main,
 // these are the notices that don't come from a package.
@@ -134,16 +135,33 @@ export function updateText(status: UpdateStatus, language: string): string {
     case "none":
       return t("about.update.none");
     case "available":
-      return t(
-        status.manual ? "about.update.manual" : "about.update.available",
-        { version: status.version },
-      );
+      return t("about.update.available", { version: status.version });
     case "downloading":
-      return t("about.update.downloading", {
-        version: status.version,
-        percent: String(status.percent),
-      });
+      return t("about.update.downloading", { version: status.version });
     default:
       return t("about.update.ready", { version: status.version });
+  }
+}
+
+/** The line under it: what happens next, or when Tokio last checked. */
+export function updateDetail(
+  status: UpdateStatus,
+  language: string,
+): string | undefined {
+  switch (status.state) {
+    case "none":
+      return translate(language, "about.update.checkedAt", {
+        time: formatDate(status.checkedAt, language, "time"),
+      });
+    case "available":
+      return status.manual
+        ? translate(language, "about.update.manual")
+        : undefined;
+    case "downloading":
+      return translate(language, "about.update.downloadingDetail");
+    case "ready":
+      return translate(language, "about.update.readyDetail");
+    default:
+      return undefined;
   }
 }
