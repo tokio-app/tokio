@@ -30,7 +30,7 @@ import { join } from "node:path";
 import { JSONManagerService } from "../json";
 import { ServerService } from "../server";
 import { Service } from "../shared";
-import { StoreManagerService } from "../store";
+import { LOAD_RETRY_MS, StoreManagerService } from "../store";
 import { YAMLManagerService } from "../yaml";
 import {
   findOverlays,
@@ -85,6 +85,8 @@ export class OverlayService extends Service {
   private _giftSave: Promise<unknown> = Promise.resolve();
   // Custom gifts whose details were already compared since the app started
   private _checkedGifts = new Set<number>();
+  // When the last gift save failed, null after one that worked
+  private _giftSaveFailedAt: number | null = null;
   // A test LIVE per overlay, so each Test carries on from that overlay's last
   private _testLives = new Map<string, () => TokioPayload[]>();
   private _overlays: OverlayApp[] = [];
@@ -505,9 +507,16 @@ export class OverlayService extends Service {
     this._checkedGifts.add(value);
 
     if (!changed) return { success: true };
-    if (!(await this._json.saveArbitraryFile(this._customGiftsFile, saved))) {
+    // A file that can't be written isn't tried on every gift
+    const failed = this._giftSaveFailedAt;
+    if (failed !== null && performance.now() - failed < LOAD_RETRY_MS) {
       return { success: false };
     }
+    if (!(await this._json.saveArbitraryFile(this._customGiftsFile, saved))) {
+      this._giftSaveFailedAt = performance.now();
+      return { success: false };
+    }
+    this._giftSaveFailedAt = null;
     this._customGifts = saved;
     return { success: true, data: saved };
   }

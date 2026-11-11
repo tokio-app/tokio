@@ -58,7 +58,7 @@ const isEncrypted = (key: string) =>
   /^v\d\d$/.test(Buffer.from(key, "base64").subarray(0, 3).toString("latin1"));
 
 // How long live events go without reading again an active profile that failed
-const LOAD_RETRY_MS = 30_000;
+export const LOAD_RETRY_MS = 30_000;
 
 export class StoreManagerService extends Service {
   private _jsonManagerService!: JSONManagerService;
