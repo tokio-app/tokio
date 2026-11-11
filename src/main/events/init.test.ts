@@ -208,6 +208,7 @@ function setup() {
     language: "system",
     activityFeed: { ...defaultStoreData.settings.activityFeed },
     games: { minecraft: { enabled: true } },
+    logs: { debug: false },
   };
 
   const pathManagerService = {
@@ -2643,6 +2644,33 @@ describe("init events", () => {
   });
 
   describe("LOAD_APP", () => {
+    it("starts every log file with the run header, once per start", async () => {
+      const run = vi.spyOn(Logger, "run").mockImplementation(() => {});
+      const s = setup();
+
+      await load(s);
+      await load(s);
+
+      expect(run).toHaveBeenCalledTimes(1);
+      const [text, logFiles] = run.mock.calls[0];
+      expect(text).toMatch(
+        new RegExp(
+          `^<System> Tokio 1\\.0\\.0 \\(dev\\) · ${process.platform} .+ ${process.arch} · Electron .+ · en · .+ \\(GMT.*\\)$`,
+        ),
+      );
+      expect(logFiles).toEqual(Object.values(files.logs));
+    });
+
+    it("turns on the detailed logs saved last time", async () => {
+      const setDebug = vi.spyOn(Logger, "setDebug");
+      const s = setup();
+      s.settings.logs.debug = true;
+
+      await load(s);
+
+      expect(setDebug).toHaveBeenCalledWith(true);
+    });
+
     it("shows the saved language from the store, before its reply on every load", async () => {
       const s = setup();
       s.settings.language = "es-419";
