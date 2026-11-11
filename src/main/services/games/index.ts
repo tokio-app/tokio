@@ -42,7 +42,7 @@ import { MinecraftConnection } from "./minecraft";
  * reply in message. full when the action had MAX_BACKLOG runs waiting, so
  * the event's were skipped.
  */
-export type GameError = { offline: boolean; full?: boolean; message: string };
+type GameError = { offline: boolean; full?: boolean; message: string };
 
 // The wait between two runs of an action, so a burst doesn't flood the game
 export const RUN_GAP_MS = 100;
