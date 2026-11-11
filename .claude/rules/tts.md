@@ -33,4 +33,5 @@ paths:
 - Main sends each message with `TTS_AUDIO` to the window's `tts_data` queue, with speed and pitch per message, so a change spares the queued ones.
 - The window answers `TTS_PLAYED { id }` when a message ends or is dropped. Main makes the next message only while fewer than min(2, queue length) are held, so nothing is made just to be dropped. A hold ends after `HOLD_TIMEOUT_MS`, and a repeat `LOAD_APP` (a reloaded window) calls `releaseHeld()`.
 - `TTS_CLEAR` (on disconnect, and when TTS is turned off, with `clearTalk()`) stops `tts_data`. `clearTalk()` drops the waiting messages, the one being made and the held ids.
+- A chat message's failed audio warns under its own key (`tts:chat`): the TTS page's tester and the voice previews show their failures only through their notice, which a shared key would drop during an outage.
 - The page's tester (`GET_TTS_TEST`) runs `prepareText` only: no trigger cut, template or permissions.
