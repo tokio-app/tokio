@@ -21,6 +21,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HistoryService, MAX_GIFTERS, MAX_LIVES, TOP_GIFTERS } from "./index";
 
+// A test can make a removal fail
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, rm: vi.fn(actual.rm) };
+});
+
 const viewer = (userId: string, handle = `fan${userId}`) =>
   ({
     userId,
@@ -301,6 +307,7 @@ describe("HistoryService", () => {
   });
 
   it("loads a saved history back, and writes nothing when unchanged", async () => {
+    expect(await service().load("a.json")).toBe(true);
     const empty = await loaded();
     expect(await empty.save()).toBe(true);
     expect(existsSync(join(dir, "a"))).toBe(false);
@@ -311,7 +318,7 @@ describe("HistoryService", () => {
     history.end(2000);
     await history.save();
 
-    const saveFile = vi.spyOn(json, "saveFile");
+    const saveFile = vi.spyOn(json, "saveArbitraryFile");
     expect(await history.save()).toBe(true);
     const again = await loaded();
     expect(again.getHistory()).toEqual(history.getHistory());
@@ -333,7 +340,8 @@ describe("HistoryService", () => {
       await mkdir(join(dir, "a"));
       await writeFile(path, content);
       const warn = vi.spyOn(Logger, "warn");
-      const history = await loaded();
+      const history = service();
+      expect(await history.load("a.json")).toBe(false);
       history.start("kai", 1000);
       history.record(TOKIO_EVENTS.GIFT, gift(viewer("1"), 5));
       history.end(2000);
@@ -378,15 +386,33 @@ describe("HistoryService", () => {
     expect(history.getHistory().lives).toEqual([]);
   });
 
+  it("checks only the index on a save", async () => {
+    const history = await loaded();
+    history.start("kai", 1000);
+    history.record(TOKIO_EVENTS.GIFT, gift(viewer("1"), 5));
+    history.end(2000);
+    const saveFile = vi.spyOn(json, "saveFile");
+
+    expect(await history.save()).toBe(true);
+    expect(saveFile.mock.calls.map(([file]) => file)).toEqual([
+      join(dir, "a", "index.json"),
+    ]);
+    expect((await read<LiveRecord>("1000.json")).coins).toBe(5);
+  });
+
   it("tries a failed save again on the next one", async () => {
     const history = await loaded();
     history.start("kai", 1000);
     history.record(TOKIO_EVENTS.GIFT, gift(viewer("1"), 5));
     history.end(2000);
-    // The LIVE's file fails, the index saves
-    const saveFile = vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
+    // The LIVE's file fails, so the index listing it waits too
+    const saveFile = vi
+      .spyOn(json, "saveArbitraryFile")
+      .mockResolvedValueOnce(false);
 
     expect(await history.save()).toBe(false);
+    expect(saveFile).toHaveBeenCalledOnce();
+    expect(existsSync(join(dir, "a", "index.json"))).toBe(false);
     expect(await history.getLive(1000)).toEqual(
       expect.objectContaining({ coins: 5 }),
     );
@@ -646,11 +672,11 @@ describe("HistoryService", () => {
 
     let open = () => {};
     const gate = new Promise<void>((resolve) => (open = resolve));
-    const original = json.saveFile.bind(json);
-    vi.spyOn(json, "saveFile").mockImplementation(
-      async (file, schema, data) => {
+    const original = json.saveArbitraryFile.bind(json);
+    vi.spyOn(json, "saveArbitraryFile").mockImplementation(
+      async (file, data) => {
         if (file.endsWith("3000.json")) await gate;
-        return original(file, schema, data);
+        return original(file, data);
       },
     );
     const loadFile = vi.spyOn(json, "loadFile");
@@ -738,12 +764,12 @@ describe("HistoryService", () => {
       // The new LIVE's file waits, so the drop's index could pass the end's
       let open = () => {};
       const gate = new Promise<void>((resolve) => (open = resolve));
-      const original = json.saveFile.bind(json);
+      const original = json.saveArbitraryFile.bind(json);
       const saveFile = vi
-        .spyOn(json, "saveFile")
-        .mockImplementation(async (file, schema, data) => {
+        .spyOn(json, "saveArbitraryFile")
+        .mockImplementation(async (file, data) => {
           if (file.endsWith(`${startedAt}.json`)) await gate;
-          return original(file, schema, data);
+          return original(file, data);
         });
 
       history.start("kai", startedAt);
@@ -837,6 +863,20 @@ describe("HistoryService", () => {
       expect(existsSync(join(dir, "a", "3000.json"))).toBe(true);
 
       // The retry saves the index, then the file goes
+      expect(await history.save()).toBe(true);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
+      expect((await loaded()).getHistory().lives).toEqual([
+        expect.objectContaining({ startedAt: 1000 }),
+      ]);
+    });
+
+    it("removes its file on the next save when it can't at once", async () => {
+      const history = await twoLives();
+      vi.mocked(rm).mockRejectedValueOnce(new Error("EBUSY"));
+
+      expect(await history.deleteLive(3000)).toBe(true);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(true);
+
       expect(await history.save()).toBe(true);
       expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
       expect((await loaded()).getHistory().lives).toEqual([

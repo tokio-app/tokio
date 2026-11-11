@@ -32,6 +32,9 @@ const END_CHECK_MS = 5000;
 // The next song starts this early, so a song's last moment, often silent,
 // covers part of the time the player takes to switch.
 const START_LEAD_MS = 300;
+// Until then the player is asked this often whether it moved on to another
+// song, so a request doesn't wait out the whole listed length.
+const MOVED_CHECK_MS = 60_000;
 // Taken as the length of a song whose length didn't parse, so the player is
 // first asked once it has loaded the song.
 // shortcut: when the player can't tell either, such a song plays 15 s, or
@@ -297,7 +300,20 @@ export class MusicQueue extends TokioEmitter {
     const { remaining } = this._hooks;
     if (!remaining) return delayWithAbort(waitTime, signal);
 
-    await delayWithAbort(Math.max(0, waitTime - END_CHECK_MS), signal);
+    // Waits ms, or less once the player moved on, like after its Next
+    const wait = async (ms: number) => {
+      let left = ms;
+      do {
+        const step = Math.min(left, MOVED_CHECK_MS);
+        await delayWithAbort(step, signal);
+        left -= step;
+        if (left > 0 && (await remaining(song).catch(() => null)) === 0) {
+          return;
+        }
+      } while (left > 0 && !signal.aborted);
+    };
+
+    await wait(Math.max(0, waitTime - END_CHECK_MS));
     while (!signal.aborted) {
       const left = await remaining(song).catch(() => null);
       if (left === null) {
@@ -312,7 +328,7 @@ export class MusicQueue extends TokioEmitter {
       }
       // Still far from the end, like after an ad: asked again near it
       if (left > END_CHECK_MS) {
-        await delayWithAbort(left - END_CHECK_MS, signal);
+        await wait(left - END_CHECK_MS);
         continue;
       }
       // One timer from here: asked again this close to the end, a slow

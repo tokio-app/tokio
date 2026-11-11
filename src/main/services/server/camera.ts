@@ -5,7 +5,7 @@ import type {
   CameraColors,
   CameraConfig,
 } from "@/common/types";
-import type { ServerResponse } from "node:http";
+import type { WebSocket } from "ws";
 import { fragment, initSegment, MP4_TIMESCALE } from "./mp4";
 
 // A camera that no page shows any more, or that pages ask for at a lower
@@ -19,6 +19,10 @@ export const CAMERA_LINGER_MS = 5000;
 const MIN_DURATION = MP4_TIMESCALE / 1000;
 const MAX_DURATION = MP4_TIMESCALE / 5;
 const DEFAULT_DURATION = MP4_TIMESCALE / 30;
+
+// What a socket may hold unsent before a page counts as behind: a Node
+// stream's high-water mark
+const BEHIND_BYTES = 16 * 1024;
 
 const rank = (quality: StudioCameraQuality) =>
   STUDIO_CAMERA_QUALITIES.indexOf(quality);
@@ -39,7 +43,7 @@ const sameConfig = (a: CameraConfig, b: CameraConfig | null) =>
 type Watcher = {
   quality: StudioCameraQuality;
   // The init segment it started with, null while it waits for a config
-  // (its headers name the codec)
+  // (its first message names the codec)
   init: Buffer | null;
   // It can't decode until the next keyframe: it's new, or missed a frame
   waiting: boolean;
@@ -50,7 +54,7 @@ type Feed = {
   device: string;
   label: string;
   // Each open stream and the quality its page asked for
-  responses: Map<ServerResponse, Watcher>;
+  sockets: Map<WebSocket, Watcher>;
   // The quality captured, which a drop reaches only after the linger
   quality: StudioCameraQuality | null;
   linger: NodeJS.Timeout | null;
@@ -75,11 +79,12 @@ export class CameraFeeds {
   private _keyframeListeners: ((id: string) => void)[] = [];
 
   /**
-   * Streams a camera's video to the response, until it closes. Its headers
-   * wait for the camera's config.
+   * Streams a camera's video to the socket, until it closes: the codec
+   * string, once the camera has a config, then the init segment and each
+   * fragment.
    */
   public watch(
-    res: ServerResponse,
+    socket: WebSocket,
     camera: { device: string; label: string },
     quality: StudioCameraQuality,
   ) {
@@ -90,7 +95,7 @@ export class CameraFeeds {
       feed = {
         id: String(++this._count),
         ...camera,
-        responses: new Map(),
+        sockets: new Map(),
         quality: null,
         linger: null,
         config: null,
@@ -104,15 +109,15 @@ export class CameraFeeds {
     }
     const watched = feed;
     const watcher: Watcher = { quality, init: null, waiting: true };
-    this._start(watched, res, watcher);
+    this._start(watched, socket, watcher);
     const drop = () => {
-      if (!watched.responses.delete(res)) return;
+      if (!watched.sockets.delete(socket)) return;
       this._update(watched);
     };
-    res.on("close", drop);
+    socket.on("close", drop);
     // Unhandled, a broken pipe would throw in main
-    res.on("error", drop);
-    watched.responses.set(res, watcher);
+    socket.on("error", drop);
+    watched.sockets.set(socket, watcher);
     this._update(watched);
     // It starts at a new keyframe, which the window sends at once: from the
     // last one, it would show the camera up to 2 s late
@@ -155,22 +160,18 @@ export class CameraFeeds {
     this._feeds.clear();
     for (const feed of feeds) {
       if (feed.linger) clearTimeout(feed.linger);
-      for (const res of feed.responses.keys()) res.end();
+      for (const socket of feed.sockets.keys()) socket.close();
     }
     if (had) this._changed();
   }
 
-  // Sends the headers and the init segment, once the feed has a config
-  private _start(feed: Feed, res: ServerResponse, watcher: Watcher) {
+  // Sends the type and the init segment, once the feed has a config
+  private _start(feed: Feed, socket: WebSocket, watcher: Watcher) {
     if (!feed.config || !feed.init || watcher.init) return;
-    res.writeHead(200, {
-      // The codec string passed CAMERA_FRAME's check, so it can't break
-      // out of the quotes
-      "Content-Type": `video/mp4; codecs="${feed.config.codec}"`,
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-    });
-    res.write(feed.init);
+    // The codec string passed CAMERA_FRAME's check, so it can't break out
+    // of the quotes
+    socket.send(`video/mp4; codecs="${feed.config.codec}"`);
+    socket.send(feed.init);
     watcher.init = feed.init;
   }
 
@@ -203,10 +204,10 @@ export class CameraFeeds {
       feed.init = initSegment(feed.config);
       // A page can't take another init mid-stream: ending it makes it
       // reconnect, and the new stream starts with this one
-      const ended = [...feed.responses].filter(([, w]) => w.init);
-      for (const [res] of ended) {
-        feed.responses.delete(res);
-        res.end();
+      const ended = [...feed.sockets].filter(([, w]) => w.init);
+      for (const [socket] of ended) {
+        feed.sockets.delete(socket);
+        socket.close();
       }
       if (ended.length > 0) this._update(feed);
     }
@@ -214,15 +215,15 @@ export class CameraFeeds {
     if (!feed.init) return;
     feed.asked = false;
     const sent = this._fragment(feed, chunk);
-    for (const [res, watcher] of feed.responses) {
-      this._start(feed, res, watcher);
+    for (const [socket, watcher] of feed.sockets) {
+      this._start(feed, socket, watcher);
       // A page that can't keep up, like a slow PC on Wi-Fi, skips to a
       // later keyframe instead of piling frames up
-      if (res.writableNeedDrain) {
+      if (socket.bufferedAmount >= BEHIND_BYTES) {
         watcher.waiting = true;
         continue;
       }
-      res.write(sent);
+      socket.send(sent);
       watcher.waiting = false;
     }
   }
@@ -230,14 +231,14 @@ export class CameraFeeds {
   private _delta(feed: Feed, chunk: CameraChunk) {
     if (!feed.init) return;
     const sent = this._fragment(feed, chunk);
-    for (const [res, watcher] of feed.responses) {
+    for (const [socket, watcher] of feed.sockets) {
       if (watcher.waiting) continue;
       // A delta missed breaks every frame until the next keyframe
-      if (res.writableNeedDrain) {
+      if (socket.bufferedAmount >= BEHIND_BYTES) {
         watcher.waiting = true;
         continue;
       }
-      res.write(sent);
+      socket.send(sent);
     }
   }
 
@@ -282,7 +283,7 @@ export class CameraFeeds {
 
   private _wanted(feed: Feed): StudioCameraQuality | null {
     let best: StudioCameraQuality | null = null;
-    for (const { quality } of feed.responses.values()) {
+    for (const { quality } of feed.sockets.values()) {
       if (best === null || rank(quality) > rank(best)) best = quality;
     }
     return best;

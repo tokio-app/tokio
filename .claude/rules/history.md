@@ -26,7 +26,7 @@ paths:
 - `<startedAt>.json`: one `LiveRecord` per LIVE, with all its gifters and its minutes, which stay out of the index.
   - The LIVE in progress rewrites only its own file on every save (every `HISTORY_SAVE_MS`, and a delete's, the cap's or a clear's), with `endedAt` set to the save's time, so a quiet LIVE's end keeps up too.
   - A finished LIVE's file is never rewritten, so a periodic save stays small however many LIVEs there are.
-- When a LIVE ends, its file is written one last time, then the index with its summary appended and its gifters added to all time.
+- When a LIVE ends, its file is written one last time, then the index with its summary appended and its gifters added to all time. When an ended LIVE's file fails, the index waits for the next save, which writes both.
 - `MAX_LIVES` (1,500): past it, the oldest LIVEs go as a delete would, gifts included, after an end (`_cap`, which reads their files after the end's save) and when a profile loads. The user's call: All time always adds up to the LIVEs kept.
 - `MAX_GIFTERS` caps all time: the fewest coins go first, then the oldest last gift. The page shows only the top `SHOWN_GIFTERS` and each LIVE keeps all its own gifters, so nobody shown is dropped.
 - On a quit or crash the next load adds what the last save missed from the LIVE's file.
@@ -35,10 +35,10 @@ paths:
 
 ## Loading, recovery, deleting and clearing
 
-- A missing index is an empty history. One that's there but doesn't load is left as it is, nothing is recorded, and the log has a warning.
+- A missing index is an empty history. One that's there but doesn't load (held at startup too) is left as it is and nothing is recorded until another load. `load` then gives false, and startup and a profile switch warn (`HISTORY_LOAD_FAILED`).
 - A LIVE file the index doesn't list, newer than every LIVE it does, was left by a quit or a crash: it's added, ending at its last save, and the index is saved at once. An unlisted older one is a delete's leftover and is removed, and so are `<name>.cleared-<digits>` folders, a clear's leftovers.
 - `deleteLive` subtracts the LIVE's gifters, read from its file, from all time, dropping a gifter left with nothing, then saves the index. An unreadable file still leaves the index, and all time keeps its gifts (logged).
-- A dropped LIVE's file (a delete's or the cap's) waits in `_dropped` until an index without it is written, by that save or the retry. A load would take back a file newer than every listed LIVE as a crash's leftover, and an index on disk must never list a LIVE whose file is gone.
+- A dropped LIVE's file (a delete's or the cap's) waits in `_dropped` until an index without it is written, by that save or the retry, and it's removed: one that can't be goes back for the next save, which doesn't count as failed (a held file mustn't refuse a switch). A load would take back a file newer than every listed LIVE as a crash's leftover, and an index on disk must never list a LIVE whose file is gone.
 - `clear` renames the profile's folder away in one step (`renameWithRetry`), then removes it.
   - A LIVE in progress carries on. Its file and an empty index are written at once, the index over anything a save racing the move wrote.
   - It refuses, changing nothing, when no history is loaded or the rename fails.

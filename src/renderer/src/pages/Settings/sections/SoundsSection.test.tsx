@@ -82,8 +82,10 @@ describe("SoundsSection", () => {
     const { user, queue } = await setup();
 
     await user.click(row("Airhorn").getByRole("button", { name: "Play" }));
+    // Tests are numbered across mounts, so the reply takes the sent number
+    const [{ request }] = sent(APP_EVENTS.TEST_ALERT);
     expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([
-      { id: "airhorn.mp3", file: "airhorn.mp3", volume: 100, request: 1 },
+      { id: "airhorn.mp3", file: "airhorn.mp3", volume: 100, request },
     ]);
     expect(
       row("Airhorn").getByRole("button", { name: "Cancel" }),
@@ -92,7 +94,7 @@ describe("SoundsSection", () => {
     await send(APP_EVENTS_RESPONSE.TEST_ALERT, {
       success: true,
       id: "airhorn.mp3",
-      request: 1,
+      request,
       data,
       volume: 100,
     });
@@ -112,10 +114,11 @@ describe("SoundsSection", () => {
     await send(APP_EVENTS_RESPONSE.TEST_ALERT, {
       success: true,
       id: "airhorn.mp3",
-      request: 1,
+      request: sent(APP_EVENTS.TEST_ALERT)[0].request,
       data,
       volume: 100,
     });
+    expect(queue.enqueue).toHaveBeenCalled();
     queue.stop.mockClear();
 
     await user.click(row("Airhorn").getByRole("button", { name: "Delete" }));

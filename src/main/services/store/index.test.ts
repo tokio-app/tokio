@@ -114,17 +114,22 @@ describe("StoreManagerService", () => {
       expect(await readJSON(storeFile)).toEqual(defaultStoreData);
       expect(await readJSON(defaultProfileFile)).toEqual(defaultProfile);
       expect(await store.getProfileData()).toEqual(defaultProfile);
+      expect(store.wasRebuilt()).toBe(true);
+      expect(store.corruptedBackup()).toBeNull();
     });
 
     it("backs up a corrupted store and starts over", async () => {
       await writeFile(storeFile, "{ oops");
 
-      await init();
+      const store = await init();
 
       const backups = (await readdir(paths.folders.settingsFolder)).filter(
         (file) => /^store\.corrupted-\d+\.json$/.test(file),
       );
       expect(backups).toHaveLength(1);
+      expect(store.corruptedBackup()).toBe(
+        join(paths.folders.settingsFolder, backups[0]),
+      );
       expect(
         await readFile(join(paths.folders.settingsFolder, backups[0]), "utf-8"),
       ).toBe("{ oops");
@@ -1258,6 +1263,16 @@ describe("StoreManagerService", () => {
       expect((await readJSON(dest)).connector.username).toBe("streamer");
     });
 
+    it("refuses to export into the profiles folder", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+      const before = await readFile(stream, "utf-8");
+
+      expect(await store.exportProfile("default.json", stream)).toBe(false);
+      expect(await readFile(stream, "utf-8")).toBe(before);
+    });
+
     it("fails to export a profile that isn't there", async () => {
       const error = vi.spyOn(Logger, "error");
       const store = await init();
@@ -1709,6 +1724,30 @@ describe("StoreManagerService", () => {
         null,
         creeper,
       ]);
+    });
+
+    it("takes it off the profile it read when a switch lands mid-sweep", async () => {
+      const store = await init();
+      await store.updateProfileData(withActions(gameAction("a", tnt)));
+      await store.createNewProfile("stream.json", "Stream");
+      await store.updateProfileData(
+        withActions(gameAction("b", tnt)),
+        "stream.json",
+      );
+      const read = store.getProfileData.bind(store);
+      vi.spyOn(store, "getProfileData").mockImplementationOnce(
+        async (options) => {
+          await store.updateActiveProfile("stream.json");
+          return read(options);
+        },
+      );
+
+      expect(await store.removeFromGames("tnt.png")).toBe(true);
+
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+      expect(images(await readJSON(defaultProfileFile))).toEqual([null]);
+      expect(images(await readJSON(stream))).toEqual([null]);
+      expect(images((await store.getProfileData())!)).toEqual([null]);
     });
 
     it("says so when a profile that has the picture can't be saved", async () => {

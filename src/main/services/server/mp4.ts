@@ -53,7 +53,6 @@ const TRANSFERS: Record<string, number> = {
   hlg: 18,
 };
 const MATRICES: Record<string, number> = {
-  rgb: 0,
   bt709: 1,
   bt470bg: 5,
   smpte170m: 6,

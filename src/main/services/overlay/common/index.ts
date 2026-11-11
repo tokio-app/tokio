@@ -68,7 +68,7 @@ export async function findOverlays(
     const named =
       external || CatalogOverlaySchema.shape.id.safeParse(entry.name).success;
     if (!entry.isDirectory() || !named) continue;
-    const res = await processOverlay(join(folder, entry.name), yaml, external);
+    const res = await processOverlay(join(folder, entry.name), yaml);
     if (res.success && res.data) {
       overlays.push({ ...res.data.info, id: entry.name, external });
     }
@@ -79,7 +79,6 @@ export async function findOverlays(
 export async function processOverlay(
   basedir: string,
   yaml: YAMLManagerService,
-  force_external: boolean,
 ): Promise<{
   success: boolean;
   data?: {
@@ -111,7 +110,10 @@ export async function processOverlay(
     }
 
     const [info_data, htmlContent] = await Promise.all([
-      yaml.loadFile(infoPath, OverlayMetaSchema),
+      // Not loadFile, which reads an empty file as a missing one and logs nothing
+      readFile(infoPath, "utf-8").then((content) =>
+        yaml.parseFile(infoPath, content, OverlayMetaSchema),
+      ),
       readFile(htmlPath, "utf-8"),
     ]);
 
@@ -136,10 +138,6 @@ export async function processOverlay(
       if (!htmlContent || !hasSetupBlock(htmlContent)) {
         return { success: false };
       }
-    }
-
-    if (force_external) {
-      info_data.external = true;
     }
 
     return {

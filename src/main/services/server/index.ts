@@ -28,6 +28,7 @@ import express, { Express, Router } from "express";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Server as HttpServer } from "node:http";
 import { networkInterfaces } from "node:os";
+import type { WebSocket } from "ws";
 import { z } from "zod";
 import { TikTokConnectorService } from "../connector";
 import { MusicService } from "../music";
@@ -53,6 +54,8 @@ const STUDIO_PAGE = STUDIO_HTML.replace("__ARCHIVO__", () => ARCHIVO)
   .replace("/* __STYLES__ */", () => STUDIO_STYLES)
   .replace("/* __STAGE__ */", () => STAGE);
 
+// Where a camera element opens its stream, the key after it
+const CAMERA_PREFIX = `/${STUDIO_CAMERA_PATH}/`;
 // What a camera stream's URL asks for, as studioCameraPath builds it
 const CameraQuerySchema = z.object({
   device: z.string().max(STUDIO_CAMERA_MAX_LENGTH),
@@ -89,21 +92,6 @@ export class ServerService extends Service {
     this._dynamicRouter = express.Router();
     this._port = port;
     this._cameras.onChange(() => this._camerasChanged());
-
-    // A camera's video, which a camera element fetches and decodes. A wrong
-    // key is a plain 404. /studio/:id matches one segment, so it never takes
-    // these.
-    this._app.get(`/${STUDIO_CAMERA_PATH}/:key`, (req, res, next) => {
-      const given = Buffer.from(req.params.key);
-      const key = Buffer.from(this._cameraKey);
-      if (given.length !== key.length || !timingSafeEqual(given, key)) {
-        return next();
-      }
-      const query = CameraQuerySchema.safeParse(req.query);
-      if (!query.success) return void res.sendStatus(400);
-      const { device, label, quality } = query.data;
-      this._cameras.watch(res, { device, label }, quality);
-    });
 
     // Each alert's overlay, the same page: it reads the alert's id from its
     // path. Their media is mounted at /alerts/media/, a path one level deeper.
@@ -187,20 +175,24 @@ export class ServerService extends Service {
           ),
         );
         this._wss.on("connection", (client, req) => {
+          // URL.parse, as a request target like "http://[" makes new URL throw.
+          const url = URL.parse(req.url ?? "/", "http://localhost");
+          if (url?.pathname.startsWith(CAMERA_PREFIX)) {
+            this._watchCamera(client, url);
+            return;
+          }
           // Unhandled, a bad frame would throw in main. ws closes the socket.
           client.on("error", (err) =>
             Logger.warn(
-              `<WebSocket> Client ${clientId} error -- ${formatError(err)}`,
+              `<WebSocket> Client ${clientId.slice(0, 64)} error -- ${formatError(err)}`,
               this._logFile,
             ),
           );
-          // URL.parse, as a request target like "http://[" makes new URL throw.
-          const url = URL.parse(req.url ?? "/", "http://localhost");
           const clientId = url?.searchParams.get("id") || randomUUID();
 
           this._wss?.addClient(clientId, client);
           Logger.info(
-            `<WebSocket> New client connected: ${clientId}`,
+            `<WebSocket> New client connected: ${clientId.slice(0, 64)}`,
             this._logFile,
           );
           for (const listener of this._connectListeners) listener(clientId);
@@ -208,7 +200,7 @@ export class ServerService extends Service {
           client.on("close", () => {
             this._wss?.removeClient(clientId, client);
             Logger.info(
-              `<WebSocket> Client disconnected: ${clientId}`,
+              `<WebSocket> Client disconnected: ${clientId.slice(0, 64)}`,
               this._logFile,
             );
           });
@@ -257,6 +249,9 @@ export class ServerService extends Service {
     }
     if (this._server) {
       this._server.close();
+      // close() ends only idle connections: a busy keep-alive one would
+      // serve its next requests after the stop
+      this._server.closeAllConnections();
       this._server = null;
       Logger.info(`<Server> Server stopped.`, this._logFile);
     }
@@ -327,6 +322,33 @@ export class ServerService extends Service {
       if (songs.length === 0) return;
       this.sendToClient(id, { type: TOKIO_EVENTS.MUSIC_CHANGE, data: songs });
     });
+  }
+
+  // A camera's video, which a camera element streams and decodes. Never an
+  // overlay client. A wrong key or a bad query is refused.
+  private _watchCamera(client: WebSocket, url: URL) {
+    // Unhandled, a bad frame would throw in main. ws closes the socket.
+    client.on("error", (err) =>
+      Logger.warn(
+        `<WebSocket> Camera stream error -- ${formatError(err)}`,
+        this._logFile,
+      ),
+    );
+    const given = Buffer.from(url.pathname.slice(CAMERA_PREFIX.length));
+    const key = Buffer.from(this._cameraKey);
+    const query = CameraQuerySchema.safeParse(
+      Object.fromEntries(url.searchParams),
+    );
+    if (
+      given.length !== key.length ||
+      !timingSafeEqual(given, key) ||
+      !query.success
+    ) {
+      client.close(1008);
+      return;
+    }
+    const { device, label, quality } = query.data;
+    this._cameras.watch(client, { device, label }, quality);
   }
 
   /** Sends a chunk of a capture to the pages that stream its camera. */

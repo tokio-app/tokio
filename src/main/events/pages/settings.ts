@@ -204,9 +204,22 @@ const switchProfile = async (
   if (!profile || !profiles) throw new Error(`Unable to load ${file}.`);
   timerService.load(profile.timer, file);
   // Overlays get the new profile's fans once they load
-  await services.fansService.load(file);
-  await services.historyService.load(file);
-  services.gamesService.setGames(profile.games);
+  if (!(await services.fansService.load(file))) {
+    notifier.warn(
+      "overlays",
+      FEEDBACK_CODES.FANS_LOAD_FAILED,
+      t("main.fans.loadFailed"),
+    );
+  }
+  if (!(await services.historyService.load(file))) {
+    notifier.warn(
+      "system",
+      FEEDBACK_CODES.HISTORY_LOAD_FAILED,
+      t("main.lives.historyLoadFailed"),
+    );
+  }
+  // A switch, so every backlog stops: clones keep the action ids
+  services.gamesService.setGames(profile.games, true);
 
   e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, {
     success: true,

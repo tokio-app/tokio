@@ -15,6 +15,7 @@ import {
 } from "@/common/types";
 import { createTestLive, formatError } from "@/common/util";
 import { isMissing, renameWithRetry } from "@/helper/fs";
+import { isSaved } from "@/helper/library";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
 import {
@@ -87,6 +88,8 @@ export class OverlayService extends Service {
   private _checkedGifts = new Set<number>();
   // When the last gift save failed, null after one that worked
   private _giftSaveFailedAt: number | null = null;
+  // custom-gifts.json is there but can't be read, so a save would lose it
+  private _customGiftsUnreadable = false;
   // A test LIVE per overlay, so each Test carries on from that overlay's last
   private _testLives = new Map<string, () => TokioPayload[]>();
   private _overlays: OverlayApp[] = [];
@@ -115,6 +118,7 @@ export class OverlayService extends Service {
     this._customGiftsFile = paths.customGiftsFile;
     this._gifts = null;
     this._customGifts = null;
+    this._customGiftsUnreadable = false;
     this._yaml = services.yaml;
     this._json = services.json;
     this._server = services.server;
@@ -139,12 +143,13 @@ export class OverlayService extends Service {
     this._gifts = gifts;
 
     for (const overlay of this._store.getSettings().overlays) {
-      const info = await this._writeHTML(overlay.id, overlay.external!, gifts);
+      const info = await this._writeHTML(overlay.id, gifts);
 
       if (!info) {
+        // Only a missing folder: one that lost its permissions keeps its entry.
         const gone = await access(this._dir(overlay.id)).then(
           () => false,
-          () => true,
+          isMissing,
         );
         Logger.warn(
           `<Overlays> Unable to load overlay ${overlay.id}, ${gone ? "its folder is gone. It has been removed." : "it's kept for the next start."}`,
@@ -155,7 +160,12 @@ export class OverlayService extends Service {
       }
 
       this._register(
-        { ...info, id: overlay.id, path: this._dir(overlay.id) },
+        {
+          ...info,
+          id: overlay.id,
+          external: overlay.external,
+          path: this._dir(overlay.id),
+        },
         false,
       );
     }
@@ -174,7 +184,7 @@ export class OverlayService extends Service {
     const loaded = new Set(this._overlays.map((o) => o.id));
     for (const overlay of this._store.getSettings().overlays) {
       if (!loaded.has(overlay.id)) continue;
-      if (!(await this._writeHTML(overlay.id, overlay.external!, gifts))) {
+      if (!(await this._writeHTML(overlay.id, gifts))) {
         Logger.warn(
           `<Overlays> Unable to update the gifts of overlay ${overlay.id}.`,
           this._logFile,
@@ -199,7 +209,7 @@ export class OverlayService extends Service {
     try {
       // A link picked as the folder is copied as the folder it points to.
       const source = await realpath(basedir);
-      if (!(await processOverlay(source, this._yaml, true)).success) {
+      if (!(await processOverlay(source, this._yaml)).success) {
         return { success: false };
       }
 
@@ -210,7 +220,9 @@ export class OverlayService extends Service {
         filter: async (src) => !(await lstat(src)).isSymbolicLink(),
       });
       // cp keeps a read-only mode, and Windows can't replace such a file:
-      // its HTML and settings couldn't be written, now or after a save.
+      // its HTML and settings couldn't be written, now or after a save. A
+      // read-only folder (a mounted DMG's) couldn't hold index.html.tmp.
+      await chmod(staging, (await lstat(staging)).mode | 0o200);
       for (const file of ["index.html", "config.yaml", "config.yml"]) {
         const path = join(staging, file);
         const found = await lstat(path).catch(() => null);
@@ -220,7 +232,7 @@ export class OverlayService extends Service {
       // Checked on the copy, without its links: an overlay that needs a
       // linked file is refused. It gets its ID through the block, settings
       // or not.
-      const res = await processOverlay(staging, this._yaml, true);
+      const res = await processOverlay(staging, this._yaml);
       if (!res.success || !hasSetupBlock(res.data!.htmlContent)) {
         await rm(staging, { recursive: true, force: true });
         return { success: false };
@@ -240,8 +252,9 @@ export class OverlayService extends Service {
       }
       await renameWithRetry(staging, dir);
 
-      this._register({ ...info, id, path: dir }, true);
-      const saved = await this._store.addOverlayInfo({ ...info, id });
+      const meta = { ...info, id, external: true };
+      this._register({ ...meta, path: dir }, true);
+      const saved = await this._store.addOverlayInfo(meta);
       return { success: true, saved };
     } catch (error) {
       Logger.error(
@@ -377,7 +390,7 @@ export class OverlayService extends Service {
   private async _readConfig(
     id: string,
   ): Promise<OverlayResult<OverlayConfig | undefined>> {
-    const res = await processOverlay(this._dir(id), this._yaml, false);
+    const res = await processOverlay(this._dir(id), this._yaml);
     return { success: res.success, data: res.data?.config };
   }
 
@@ -400,12 +413,11 @@ export class OverlayService extends Service {
     if (!this._isStored(id)) return { success: false };
     try {
       const dir = this._dir(id);
-      const res = await processOverlay(dir, this._yaml, false);
-      if (!res.success) return { success: false };
+      const res = await processOverlay(dir, this._yaml);
+      // An overlay without settings has no config.yaml to write.
+      if (!res.success || !res.data!.config) return { success: false };
       // A dialog opened before an update has the old version's fields.
-      const merged = res.data!.config
-        ? mergeOverlayConfig(res.data!.config, config)
-        : config;
+      const merged = mergeOverlayConfig(res.data!.config, config);
 
       // First, so settings the schema refuses never reach the HTML.
       const saved = await this._yaml.saveFile(
@@ -452,6 +464,9 @@ export class OverlayService extends Service {
       const saved = await this._json.loadArbitraryFile<CustomGift[]>(
         this._customGiftsFile,
       );
+      if (saved === null && (await isSaved(this._customGiftsFile))) {
+        this._customGiftsUnreadable = true;
+      }
       this._customGifts ??= saved ?? [];
     }
     return this._customGifts;
@@ -504,9 +519,13 @@ export class OverlayService extends Service {
       saved[index] = entry;
       changed = true;
     }
-    this._checkedGifts.add(value);
 
-    if (!changed) return { success: true };
+    if (!changed) {
+      this._checkedGifts.add(value);
+      return { success: true };
+    }
+    // loadArbitraryFile logged why.
+    if (this._customGiftsUnreadable) return { success: false };
     // A file that can't be written isn't tried on every gift
     const failed = this._giftSaveFailedAt;
     if (failed !== null && performance.now() - failed < LOAD_RETRY_MS) {
@@ -517,6 +536,7 @@ export class OverlayService extends Service {
       return { success: false };
     }
     this._giftSaveFailedAt = null;
+    this._checkedGifts.add(value);
     this._customGifts = saved;
     return { success: true, data: saved };
   }
@@ -591,12 +611,11 @@ export class OverlayService extends Service {
   // Writes the overlay's saved config and the gifts into its HTML.
   private _writeHTML(
     id: string,
-    external: boolean,
     gifts: CustomGift[],
   ): Promise<OverlayMetadata | null> {
     return this._lock(id, async () => {
       const dir = this._dir(id);
-      const res = await processOverlay(dir, this._yaml, external);
+      const res = await processOverlay(dir, this._yaml);
       if (!res.success) return null;
 
       const html = await processHTML(
@@ -628,6 +647,7 @@ export class OverlayService extends Service {
     }
 
     const staging = join(this._folder, `.install-${randomUUID()}`);
+    const wasStored = this._isStored(id);
     try {
       // Outside the lock, so a slow download doesn't hold up saves.
       const zip = await downloadOverlay(entry);
@@ -638,6 +658,15 @@ export class OverlayService extends Service {
         if (installed?.external) {
           Logger.warn(
             `<Overlays> Unable to install overlay ${id}, an imported overlay has its id.`,
+            this._logFile,
+          );
+          return { success: false };
+        }
+        // An update must not put back, with default settings, what a Remove
+        // took out while it downloaded.
+        if (wasStored && !installed) {
+          Logger.warn(
+            `<Overlays> Unable to update overlay ${id}, it was removed while it downloaded.`,
             this._logFile,
           );
           return { success: false };
@@ -676,7 +705,7 @@ export class OverlayService extends Service {
   ): Promise<OverlayMetadata> {
     await extractZip(zip, staging);
 
-    const res = await processOverlay(staging, this._yaml, false);
+    const res = await processOverlay(staging, this._yaml);
     if (!res.success || !hasSetupBlock(res.data!.htmlContent)) {
       throw new Error("The download isn't a valid overlay.");
     }
@@ -727,10 +756,7 @@ export class OverlayService extends Service {
    */
   private async _swap(staging: string, dir: string): Promise<void> {
     const old = join(this._folder, `.old-${randomUUID()}`);
-    const replacing = await access(dir).then(
-      () => true,
-      () => false,
-    );
+    const replacing = await isSaved(dir);
     if (replacing) await renameWithRetry(dir, old);
 
     try {

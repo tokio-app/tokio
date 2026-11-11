@@ -8,7 +8,7 @@ import { useIpcListener } from "./useIpcListener";
 import { useIpcRequest } from "./useIpcRequest";
 
 // Groups quick changes, like dragging a slider or typing, into one save.
-const SAVE_DELAY = 300;
+export const SAVE_DELAY = 300;
 
 type Section = "tts" | "music" | "alerts" | "games";
 

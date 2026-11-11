@@ -11,6 +11,10 @@ export const getOverlayURL = (id: string) =>
 // and browser sources point at it.
 export const ALERTS_PATH = "alerts";
 
+// A media library file, where the server mounts the folder for the alerts' pages
+export const alertMediaPath = (file: string) =>
+  `/${ALERTS_PATH}/media/${encodeURIComponent(file)}`;
+
 export const getAlertOverlayURL = (id: string) =>
   `http://${APP_HOSTNAME}:${SERVER_PORT}/${ALERTS_PATH}/${encodeURIComponent(id)}/`;
 

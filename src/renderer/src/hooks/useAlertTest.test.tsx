@@ -20,6 +20,9 @@ const party = {
   end: null,
 };
 
+// The number of the nth request this test sent: they go on across tests
+const numbered = (n: number) => sent(APP_EVENTS.TEST_ALERT)[n - 1].request;
+
 function setup() {
   const { wrapper, audio } = providers();
   const hook = renderHook(() => useAlertTest(), { wrapper });
@@ -32,12 +35,14 @@ describe("useAlertTest", () => {
 
     act(() => result.current.toggle(airhorn));
     expect(result.current.testing).toEqual({ id: "alert-1", loading: true });
-    expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([{ ...airhorn, request: 1 }]);
+    expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([
+      { ...airhorn, request: expect.any(Number) },
+    ]);
 
     await send(TEST_ALERT, {
       success: true,
       id: "alert-1",
-      request: 1,
+      request: numbered(1),
       data,
       volume: 80,
       filters: { speed: 1.2, pitch: 0.9 },
@@ -60,7 +65,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       success: true,
       id: "alert-1",
-      request: 1,
+      request: numbered(1),
       data,
       volume: 80,
     });
@@ -77,7 +82,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       success: true,
       id: "alert-1",
-      request: 1,
+      request: numbered(1),
       data,
       volume: 80,
     });
@@ -97,7 +102,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       success: true,
       id: "alert-1",
-      request: 1,
+      request: numbered(1),
       data,
       volume: 80,
     });
@@ -115,7 +120,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       success: true,
       id: "alert-1",
-      request: 1,
+      request: numbered(1),
       data,
       volume: 80,
     });
@@ -126,7 +131,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       success: true,
       id: "alert-2",
-      request: 2,
+      request: numbered(2),
       data,
       volume: 100,
     });
@@ -148,16 +153,16 @@ describe("useAlertTest", () => {
     act(() => result.current.toggle(airhorn));
     act(() => result.current.toggle(airhorn));
     expect(sent(APP_EVENTS.TEST_ALERT)).toEqual([
-      { ...airhorn, request: 1 },
-      { ...airhorn, request: 2 },
+      { ...airhorn, request: numbered(1) },
+      { ...airhorn, request: numbered(1) + 1 },
     ]);
 
-    await reply(1);
+    await reply(numbered(1));
     expect(queue.enqueue).not.toHaveBeenCalled();
     expect(result.current.testing).toEqual({ id: "alert-1", loading: true });
 
-    await reply(2);
-    await reply(1);
+    await reply(numbered(2));
+    await reply(numbered(1));
     expect(queue.enqueue).toHaveBeenCalledOnce();
     expect(result.current.testing).toEqual({ id: "alert-1", loading: false });
   });
@@ -171,7 +176,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       ...failure(),
       id: "alert-1",
-      request: 1,
+      request: numbered(1),
       volume: 80,
     });
 
@@ -188,7 +193,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       success: true,
       id: "alert-1",
-      request: 1,
+      request: numbered(1),
       data,
       volume: 80,
     });
@@ -202,7 +207,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       success: true,
       id: "alert-1",
-      request: 2,
+      request: numbered(2),
       data,
       volume: 80,
     });
@@ -217,7 +222,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       ...failure(),
       id: "alert-1",
-      request: 1,
+      request: numbered(1),
       volume: 80,
     });
     expect(result.current.testing).toBeNull();
@@ -228,7 +233,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       success: true,
       id: "alert-2",
-      request: 2,
+      request: numbered(2),
       data,
       volume: 100,
     });
@@ -276,7 +281,7 @@ describe("useAlertTest", () => {
     await send(TEST_ALERT, {
       success: true,
       id: "alert-1",
-      request: 1,
+      request: numbered(1),
       data,
       volume: 80,
     });
@@ -288,6 +293,25 @@ describe("useAlertTest", () => {
         onScheduled: expect.any(Function),
       }),
     );
+  });
+
+  it("ignores a reply from before the page left, once it's back", async () => {
+    const left = setup();
+    act(() => left.result.current.toggle(airhorn));
+    left.unmount();
+    const { result, queue } = setup();
+    act(() => result.current.toggle(airhorn));
+
+    await send(TEST_ALERT, {
+      success: true,
+      id: "alert-1",
+      request: numbered(1),
+      data,
+      volume: 80,
+    });
+
+    expect(queue.enqueue).not.toHaveBeenCalled();
+    expect(result.current.testing).toEqual({ id: "alert-1", loading: true });
   });
 
   it("stop() cuts the test", () => {

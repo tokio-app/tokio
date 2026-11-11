@@ -36,7 +36,7 @@ paths:
 
 ## Gifts
 
-- TikTok's gift list (`extra/gifts.json`) misses some, like other regions' gifts. `OverlayService.recordGift` saves the ones viewers send that aren't on it to `extra/custom-gifts.json`, shared by all profiles. It saves nothing while TikTok's list is empty, since every gift would look missing. After a failed save it writes nothing for `LOAD_RETRY_MS`, as emote saves do, so a file that can't be written isn't tried and logged on every gift.
+- TikTok's gift list (`extra/gifts.json`) misses some, like other regions' gifts. `OverlayService.recordGift` saves the ones viewers send that aren't on it to `extra/custom-gifts.json`, shared by all profiles. It saves nothing while TikTok's list is empty, since every gift would look missing. After a failed save it writes nothing for `LOAD_RETRY_MS`, as emote saves do, so a file that can't be written isn't tried and logged on every gift. A file that's there but doesn't read is never written over (it fails instead), and a saved gift's details count as compared once a run only after their save went through.
 - The Alerts and Games pages read both through `useTriggerChoices` (`pages/Alerts`), with the emotes; `giftOptions` merges them. Overlay gift settings use TikTok's list only.
 
 ## Page
@@ -56,7 +56,7 @@ paths:
 - Imports (`importSound`, `importMedia`) go through `importFile` (`src/main/helper/library.ts`), shared with the Minecraft pictures. Read sounds through `AlertsService.readSound` (keeps paths inside the folder, caches). `UPLOAD_MEDIA` shares the `upload` loop with `UPLOAD_SOUNDS`.
 - Sounds are up to `CACHE_MAX_FILE_BYTES`, so every sound added now is served from memory: `importSound` and `fetchSound` refuse bigger ones (`fetchSound` counts the bytes as they come). A bigger one saved before is read from disk only on `GET_SOUND_DATA`, one read shared by concurrent requests.
 - `handle` only checks that a library sound's file is there (`_missing`: the cache, else `access`), without reading it.
-- MyInstants has no API; `AlertsService` scrapes it with cheerio. Only fetch `www.myinstants.com` URLs.
+- MyInstants has no API; `AlertsService` scrapes its result list (`resultInstants`, which counts div tags so the trending list after it stays out). Only fetch `www.myinstants.com` URLs.
 - `ALERT_AUDIO` carries a `key` (the file, or a `tts:` cache key), `repeat` and the cut. The window queues `repeat` copies sharing one decode, and forgets a `tts:` key's decode (`forgetDecoded`) once its copies have places, since messages rarely repeat.
 - Library sounds go by `key` alone: the window fetches the bytes with `GET_SOUND_DATA` (`soundData`) only when it hasn't decoded that key, one fetch for copies and concurrent events. Messages carry `data`.
 - Queues: `alerts`, or `alerts:<trigger>` with `simultaneous`. `ALERT_CLEAR` stops every `alerts*` queue. Tests and previews (`useAlertTest`) use `alert-test`, so clearing never cuts them.
@@ -65,9 +65,10 @@ paths:
 
 - The page applies a `SET_ALERT_SOUND` reply only while that alert waits for one (`asked`, set by `onRequest` from a Browse or MyInstants download), even after the picker closed. A library or TTS pick made since wins over a late reply. Media does the same with `askedMedia`, `SET_ALERT_MEDIA` and `appliedMedia`.
 - `onRequest` numbers each request: `DOWNLOAD_SOUND`, `IMPORT_SOUND` and `IMPORT_MEDIA` carry it as `request`, and the `SET_ALERT_*` replies echo it, failures included. A reply applies only if newer than the last one applied for that alert (`applied`), and the picker shows only the newest request's failure.
+- When the library's store file can't be written, the file still goes to the alert: the success reply comes first, then the `saveFailure()` one with the same `request`, which the page ignores and the picker shows. `upload` adds a listed file again for the same reason, counting only new ones.
 - The counter is module-level (`requests` in `pages/Alerts`), one for sounds and media, so a reply from before leaving the page can't beat a newer request.
 - `asked` and `askedMedia` are cleared on `useEditableSettings`'s `switched`, since a cloned profile has the same alert ids.
-- `useAlertTest` numbers `TEST_ALERT` the same way, so a late reply for a test restarted on the same id (which also keys its gain, `lengths` and `PlayButton`) is dropped.
+- `useAlertTest` numbers `TEST_ALERT` with its own module-level counter, so a late reply for a test restarted on the same id (which also keys its gain, `lengths` and `PlayButton`), or one from before the page left, is dropped. Tests read the number from `sent()`.
 
 ## Removing sounds and media
 

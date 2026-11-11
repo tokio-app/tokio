@@ -9,6 +9,7 @@ import { YAMLManagerService } from "@/services/yaml";
 import { strToU8, zipSync } from "fflate";
 import { createHash } from "node:crypto";
 import {
+  access,
   chmod,
   lstat,
   mkdir,
@@ -42,7 +43,11 @@ vi.mock("./common", async (importOriginal) => {
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
-  return { ...actual, rename: vi.fn(actual.rename) };
+  return {
+    ...actual,
+    access: vi.fn(actual.access),
+    rename: vi.fn(actual.rename),
+  };
 });
 
 const SETUP = '<script id="tokio-setup"></script>';
@@ -235,6 +240,18 @@ describe("OverlayService", () => {
         await readFile(join(folder, "title", "index.html"), "utf-8"),
       ).toContain(`window.__OVERLAY_CONFIG__ = {"title":"Saved"}`);
       expect(await readJSON("gifts.json")).toEqual(gifts);
+    });
+
+    it("keeps an overlay whose folder it can't open", async () => {
+      // Its files can't be read either, so it fails to load.
+      stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
+      const denied = Object.assign(new Error("EACCES"), { code: "EACCES" });
+      vi.mocked(access).mockRejectedValueOnce(denied);
+
+      await service.load(gifts);
+
+      expect(mount).not.toHaveBeenCalled();
+      expect(stored.map((o) => o.id)).toEqual(["title"]);
     });
 
     it("writes gifts that changed after load into the loaded overlays", async () => {
@@ -475,6 +492,38 @@ describe("OverlayService", () => {
         expect(again).toEqual({ success: true });
       });
 
+      it("compares a saved gift's details again after a failed save", async () => {
+        await writeFile(
+          join(root, "custom-gifts.json"),
+          JSON.stringify([saved(9, "Old", "old.png")]),
+        );
+        const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+        vi.spyOn(
+          JSONManagerService.prototype,
+          "saveArbitraryFile",
+        ).mockResolvedValueOnce(false);
+
+        expect(await service.recordGift(sent("9", "New", "new.png"))).toEqual({
+          success: false,
+        });
+
+        now.mockReturnValue(1000 + LOAD_RETRY_MS);
+        expect(
+          (await service.recordGift(sent("9", "New", "new.png"))).data,
+        ).toEqual([saved(9, "New", "new.png")]);
+      });
+
+      it("doesn't write over a custom gifts file it can't read", async () => {
+        await writeFile(join(root, "custom-gifts.json"), "[{ broken");
+
+        expect(await service.recordGift(sent("9"))).toEqual({
+          success: false,
+        });
+        expect(await readFile(join(root, "custom-gifts.json"), "utf-8")).toBe(
+          "[{ broken",
+        );
+      });
+
       it("leaves a saved gift alone when its details are the same", async () => {
         await writeFile(
           join(root, "custom-gifts.json"),
@@ -488,7 +537,8 @@ describe("OverlayService", () => {
 
       it("tries the gifts again a while after a failed save", async () => {
         const now = vi.spyOn(performance, "now").mockReturnValue(1000);
-        // A folder where the file goes
+        // Read while missing, then a folder where the file goes
+        await service.getCustomGifts();
         await mkdir(join(root, "custom-gifts.json"));
 
         expect(await service.recordGift(sent("9"))).toEqual({
@@ -554,6 +604,27 @@ describe("OverlayService", () => {
         await Promise.all(files.map((file) => chmod(file, 0o644)));
       }
     });
+
+    // Windows has no read-only folders to copy.
+    describe.runIf(process.platform !== "win32")(
+      "from a read-only folder",
+      () => {
+        it("makes the copy's folder writable, so its HTML can be written", async () => {
+          const source = join(root, "source");
+          await configurable(source);
+          await chmod(source, 0o555);
+
+          try {
+            expect(await service.import(source, gifts)).toEqual(done);
+
+            const [id] = await readdir(folder);
+            expect((await lstat(join(folder, id))).mode & 0o200).toBe(0o200);
+          } finally {
+            await chmod(source, 0o755);
+          }
+        });
+      },
+    );
 
     it("leaves out links, so the server can't reach files outside it", async () => {
       const source = join(root, "source");
@@ -655,6 +726,22 @@ describe("OverlayService", () => {
       expect(await service.import(source, gifts)).toEqual({ success: false });
       expect(await readdir(folder)).toEqual([]);
       expect(stored).toEqual([]);
+    });
+
+    it("logs why it refuses an empty info.yaml", async () => {
+      const source = join(root, "source");
+      await overlay(source, {
+        "info.yaml": "# nothing yet\n",
+        "index.html": `<body>${SETUP}</body>`,
+      });
+      const error = vi.spyOn(Logger, "error");
+
+      expect(await service.import(source, gifts)).toEqual({ success: false });
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining("info.yaml"),
+        undefined,
+        undefined,
+      );
     });
 
     it("rejects a folder that isn't an overlay", async () => {
@@ -913,6 +1000,34 @@ describe("OverlayService", () => {
         expect(await readdir(dir())).toContain("new.js");
       });
 
+      it("keeps the installed version when it stays held", async () => {
+        vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+        publish(release("1.0.1", { "new.js": "2" }));
+        const fs =
+          await vi.importActual<typeof import("node:fs/promises")>(
+            "node:fs/promises",
+          );
+        const files = await readdir(dir());
+        // The kept settings' and the new HTML's renames, then the installed
+        // version's: renameWithRetry's 5 retries and its last try
+        const busy = Object.assign(new Error("EBUSY"), { code: "EBUSY" });
+        const renames = vi
+          .mocked(rename)
+          .mockImplementationOnce(fs.rename)
+          .mockImplementationOnce(fs.rename);
+        for (let i = 0; i < 6; i++) renames.mockRejectedValueOnce(busy);
+
+        expect(await service.installFromCatalog("gift-jar", gifts)).toEqual({
+          success: false,
+        });
+
+        // The last try moved the installed version, never the new one
+        expect(renames.mock.lastCall?.[0]).toBe(dir());
+        expect(await readdir(folder)).toEqual(["gift-jar"]);
+        expect(await readdir(dir())).toEqual(files);
+        expect(stored).toMatchObject([{ id: "gift-jar", version: "1.0.0" }]);
+      });
+
       it("logs where the installed version is when it can't be put back", async () => {
         const error = vi.spyOn(Logger, "error");
 
@@ -971,6 +1086,31 @@ describe("OverlayService", () => {
       });
       expect(stored).toMatchObject([{ id: "gift-jar" }]);
       expect(mount).toHaveBeenCalledOnce();
+    });
+
+    it("doesn't put back an overlay removed while its update downloaded", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      publish(release("1.0.0"));
+      await service.installFromCatalog("gift-jar", gifts);
+      vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+      const fetchMock = publish(release("1.0.1"));
+      const serve = fetchMock.getMockImplementation()!;
+      let resume!: () => void;
+      const held = new Promise<void>((resolve) => (resume = resolve));
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url !== CATALOG_URL) await held;
+        return serve(url);
+      });
+
+      const update = service.installFromCatalog("gift-jar", gifts);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(await service.remove("gift-jar")).toEqual(done);
+      resume();
+
+      expect(await update).toEqual({ success: false });
+      expect(await readdir(folder)).toEqual([]);
+      expect(stored).toEqual([]);
+      expect(service.getOverlays()).toEqual([]);
     });
 
     it("installs once when asked twice at the same time", async () => {
@@ -1069,6 +1209,28 @@ describe("OverlayService", () => {
       success: false,
       data: undefined,
     });
+  });
+
+  it("refuses to save settings for an overlay without them", async () => {
+    await configurable(join(folder, "title"));
+    stored = [{ id: "title", name: "Title", version: "1.0.0", config: true }];
+    const settings = (await service.getConfig("title")).data!;
+    await overlay(join(folder, "clock"), {
+      "info.yaml": info("Clock"),
+      "index.html": `<body>${SETUP}</body>`,
+    });
+    stored.push({
+      id: "clock",
+      name: "Clock",
+      version: "1.0.0",
+      config: false,
+    });
+    const save = vi.spyOn(YAMLManagerService.prototype, "saveFile");
+
+    expect(await service.saveConfig("clock", settings, gifts)).toEqual({
+      success: false,
+    });
+    expect(save).not.toHaveBeenCalled();
   });
 
   it("samples every live event for tests", () => {

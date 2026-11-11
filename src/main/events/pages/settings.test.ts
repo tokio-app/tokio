@@ -405,6 +405,8 @@ describe("settings events", () => {
       timerSaved = true,
       fansSaved = true,
       historySaved = true,
+      fansLoaded = true,
+      historyLoaded = true,
     } = {}) => {
       const profiles = [defaultProfile, streamProfile];
       let active = defaultProfile;
@@ -427,11 +429,11 @@ describe("settings events", () => {
       };
       const fansService = {
         save: vi.fn(async () => fansSaved),
-        load: vi.fn(async (_file: string) => {}),
+        load: vi.fn(async (_file: string) => fansLoaded),
       };
       const historyService = {
         save: vi.fn(async () => historySaved),
-        load: vi.fn(async (_file: string) => {}),
+        load: vi.fn(async (_file: string) => historyLoaded),
       };
       const serverService = {
         sendToClient: vi.fn((_id: string, _data: unknown) => true),
@@ -593,14 +595,36 @@ describe("settings events", () => {
       ]);
     });
 
+    it("switches but warns when the new profile's fans or history don't load", async () => {
+      const { h } = setup({ fansLoaded: false, historyLoaded: false });
+
+      await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toHaveLength(1);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.FANS_LOAD_FAILED,
+        }),
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.HISTORY_LOAD_FAILED,
+          message:
+            "Tokio couldn't load this profile's LIVE history, so it won't record LIVEs until you restart Tokio or pick another profile.",
+        }),
+        expect.objectContaining({ code: FEEDBACK_CODES.PROFILE_SWITCHED }),
+      ]);
+    });
+
     it("sends the new profile's actions to the games overlay", async () => {
       const { h, serverService, gamesService } = setup();
 
       await h.invoke(settings, APP_EVENTS.SET_PROFILE, { file: "stream.json" });
 
-      // So the old profile's backlogs stop at once
+      // As a switch, so the old profile's backlogs stop at once
       expect(gamesService.setGames).toHaveBeenCalledExactlyOnceWith(
         gamesOf(streamProfile).games,
+        true,
       );
 
       expect(serverService.sendToClient).toHaveBeenCalledExactlyOnceWith(

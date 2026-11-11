@@ -242,6 +242,37 @@ describe("MusicService", () => {
       expect(searched()).toEqual(["A"]);
     });
 
+    it("gives the cooldown back to a request dropped while requests wait", async () => {
+      const { service, provider, searched } = setup();
+      const music = settings((m) => {
+        m.protection.queue_length = 1;
+        m.protection.cooldown = 2;
+      });
+      // A searches until let go; none is found, so the queue stays empty
+      let found = (_: SongInfo | null) => {};
+      provider.searchSong.mockImplementation(async (query) =>
+        query === "A"
+          ? new Promise((resolve) => (found = resolve))
+          : query === "D"
+            ? song(query)
+            : null,
+      );
+      const ask = async (content: string, handle: string, ms = 0) => {
+        service.handle(chat(content, { handle }), music);
+        await vi.advanceTimersByTimeAsync(ms);
+      };
+
+      await ask("!play A", "a", 2_000);
+      await ask("!play B", "b", 2_000);
+      // B waits in the only place, so C is dropped
+      await ask("!play C", "c");
+      found(null);
+      await vi.advanceTimersByTimeAsync(0);
+      await ask("!play D", "d");
+
+      expect(searched()).toEqual(["A", "B", "D"]);
+    });
+
     it("doesn't search a request while the queue is full, and gives the cooldown back", async () => {
       const { request, searched, queue } = setup();
       const music = settings((m) => {

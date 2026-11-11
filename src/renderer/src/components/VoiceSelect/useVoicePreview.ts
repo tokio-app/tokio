@@ -7,6 +7,9 @@ import type { TestState } from "../PlayButton";
 
 // Test ids of the previews, so the TTS page's tester is ignored
 const ID_PREFIX = "voice-preview:";
+// Numbered across mounts, so a reply to a stopped request for the same voice,
+// from before the picker closed too, is ignored
+let requests = 0;
 
 /**
  * Speaks a sample line with one voice at a time. Previewing a voice cancels
@@ -26,8 +29,6 @@ export function useVoicePreview({
   const [previewing, setPreviewing] = useState<TestState>(null);
   // Read by the IPC callback, which would otherwise see a stale `previewing`
   const current = useRef<string | null>(null);
-  // Numbered, so a reply to a stopped request for the same voice is ignored
-  const requests = useRef(0);
   const pending = useRef<string | null>(null);
 
   const finish = (key: string) => {
@@ -51,7 +52,7 @@ export function useVoicePreview({
     pending.current = null;
     if (playing) return;
 
-    pending.current = `${ID_PREFIX}${++requests.current}:${key}`;
+    pending.current = `${ID_PREFIX}${++requests}:${key}`;
     window.api.emit(APP_EVENTS.GET_TTS_TEST, {
       id: pending.current,
       text: voiceSample(voice.lang),

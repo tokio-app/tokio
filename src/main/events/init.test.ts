@@ -298,6 +298,7 @@ function setup() {
     updateServerSettings: vi.fn(async (_enabled: boolean) => true),
     updateLastVersion: vi.fn(async (_version: string) => true),
     wasRebuilt: vi.fn(() => false),
+    corruptedBackup: vi.fn((): string | null => null),
     recordEmotes: vi.fn(
       async (
         ..._args: Parameters<StoreManagerService["recordEmotes"]>
@@ -344,7 +345,7 @@ function setup() {
   const fansService = {
     setLogFile: vi.fn(),
     initialize: vi.fn((..._args: Parameters<FansService["initialize"]>) => {}),
-    load: vi.fn(async (_file: string) => {}),
+    load: vi.fn(async (_file: string) => true),
     record: vi.fn((_user: UserData) => {}),
     list: vi.fn((): Fan[] => []),
     save: vi.fn(async () => true),
@@ -355,7 +356,7 @@ function setup() {
     initialize: vi.fn(
       (..._args: Parameters<HistoryService["initialize"]>) => {},
     ),
-    load: vi.fn(async (_file: string) => {}),
+    load: vi.fn(async (_file: string) => true),
     start: vi.fn((_username: string) => {}),
     record: vi.fn((..._args: Parameters<HistoryService["record"]>) => {}),
     end: vi.fn(() => {}),
@@ -1851,6 +1852,25 @@ describe("init events", () => {
       expect(s.fansService.load).toHaveBeenCalledExactlyOnceWith("stream.json");
     });
 
+    it("warns once when the fans or the LIVE history don't load", async () => {
+      const s = setup();
+      s.fansService.load.mockResolvedValue(false);
+      s.historyService.load.mockResolvedValue(false);
+
+      await load(s);
+
+      expect(noticesFor(s, FEEDBACK_CODES.FANS_LOAD_FAILED)).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          message:
+            "Tokio couldn't load this profile's fans, so it won't record any until you restart Tokio or pick another profile.",
+        }),
+      ]);
+      expect(noticesFor(s, FEEDBACK_CODES.HISTORY_LOAD_FAILED)).toEqual([
+        expect.objectContaining({ level: "warning" }),
+      ]);
+    });
+
     it("loads the fans even when the profile didn't load", async () => {
       const s = setup();
       s.storeManagerService.getProfileData.mockResolvedValue(null);
@@ -2694,6 +2714,28 @@ describe("init events", () => {
       ]);
       expect(s.storeManagerService.updateLastVersion.mock.calls).toEqual([
         ["1.0.0"],
+      ]);
+    });
+
+    it("warns that a store that didn't load was reset, without the tour", async () => {
+      const s = setup();
+      s.settings.lastVersion = "";
+      s.storeManagerService.wasRebuilt.mockReturnValue(true);
+      s.storeManagerService.corruptedBackup.mockReturnValue(
+        "app/tokio.corrupted-1.json",
+      );
+
+      await load(s);
+
+      expect(s.h.replies(APP_EVENTS_RESPONSE.LOAD_APP)).toEqual([
+        { success: true },
+      ]);
+      expect(noticesFor(s, FEEDBACK_CODES.SETTINGS_LOAD_FAILED)).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          message:
+            "Tokio couldn't load its settings file, so it went back to the default settings. The old file is saved as app/tokio.corrupted-1.json.",
+        }),
       ]);
     });
 

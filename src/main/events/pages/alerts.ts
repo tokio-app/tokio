@@ -85,13 +85,15 @@ const addPickedSound = async (
   res: ServiceResult<AlertSound>,
 ) => {
   if (!res.success || !res.data) throw new LoggedError(res.error);
-  if (!(await storeManagerService.addSound(res.data))) throw saveFailure();
+  const saved = await storeManagerService.addSound(res.data);
+  // Main holds it even when the store file wasn't written.
   e.reply(APP_EVENTS_RESPONSE.SET_ALERT_SOUND, {
     success: true,
     id,
     request,
     sound: res.data,
   });
+  if (!saved) throw saveFailure();
   notifier.success(
     "alerts",
     FEEDBACK_CODES.SOUND_ADDED,
@@ -172,7 +174,8 @@ events.push(
 
     const res = await alertsService.importMedia(diagRes.filePaths[0]);
     if (!res.success || !res.data) throw new LoggedError(res.error);
-    if (!(await storeManagerService.addMedia(res.data))) throw saveFailure();
+    const saved = await storeManagerService.addMedia(res.data);
+    // Main holds it even when the store file wasn't written.
     e.reply(APP_EVENTS_RESPONSE.SET_ALERT_MEDIA, {
       success: true,
       id,
@@ -183,6 +186,7 @@ events.push(
       success: true,
       data: storeManagerService.getMedia(),
     });
+    if (!saved) throw saveFailure();
     notifier.success(
       "alerts",
       FEEDBACK_CODES.MEDIA_ADDED,
@@ -365,9 +369,10 @@ const upload = async (
       continue;
     }
     // Files are named by content: one in the library, or picked twice, isn't new.
-    if (library.list().some((f) => f.file === entry.file)) continue;
-    if (await library.add(entry)) added++;
-    else saved = false;
+    const listed = library.list().some((f) => f.file === entry.file);
+    // Added anyway: a failed save may have left it out of the store file.
+    if (!(await library.add(entry))) saved = false;
+    else if (!listed) added++;
   }
   if (!saved) throw saveFailure();
   return { failed, added };

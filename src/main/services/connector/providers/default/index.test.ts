@@ -637,6 +637,23 @@ describe("TikTokLiveConnector", () => {
         ]);
       });
 
+      it("keeps it going through a reconnect, which delivers the gap's gifts", () => {
+        const onGift = capture(TOKIO_EVENTS.GIFT);
+
+        connection().emit("gift", heart());
+        connection().state = "reconnecting";
+        vi.advanceTimersByTime(10_000);
+        connection().state = "connected";
+        connection().emit("gift", heart());
+        vi.advanceTimersByTime(4000);
+
+        expect(counts(onGift)).toEqual([
+          [1, false],
+          [2, false],
+          [2, true],
+        ]);
+      });
+
       it("keeps each sender's combo apart", () => {
         const onGift = capture(TOKIO_EVENTS.GIFT);
 

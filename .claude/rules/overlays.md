@@ -33,18 +33,18 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 ## Files
 
 - An import copies the folder a picked link points to (`realpath`), leaving out every link inside, into `.install-<uuid>` inside the overlays folder. It checks the copy there (`processOverlay`, the setup block, then `processHTML`), then renames it into its UUID folder (`renameWithRetry`).
-  - `cp` keeps a read-only mode, which Windows can't rename over, so the copy's `index.html`, `config.yaml` and `config.yml` get the owner's write bit first.
+  - `cp` keeps a read-only mode, which Windows can't rename over, so the copy's `index.html`, `config.yaml` and `config.yml` get the owner's write bit first, and so does the staging folder: copied from a read-only one (a mounted DMG on macOS), it couldn't hold `index.html.tmp`. Its subfolders keep their mode.
   - A failure deletes the staging folder. One a quit leaves behind, `load` deletes.
 - A remove first renames the overlay's folder to `.old-<uuid>` (a missing folder counts as gone), so a folder another program holds stays whole and stored. Only then does it stop serving it, forget it and delete `.old-*`, which `load` deletes if that fails.
-- `YAMLManagerService` logs to `overlays.log`, so a refused `info.yaml` or `config.yaml` says why there.
+- `YAMLManagerService` logs to `overlays.log`, so a refused `info.yaml` or `config.yaml` says why there. `processOverlay` reads `info.yaml` itself and parses it with `parseFile`, since `loadFile` takes an empty or comment-only file for a missing one and logs nothing.
 - Imports, saves, updates and every start write the settings `config.yaml` holds into the HTML (`processHTML`), only when the HTML changed.
-- At each start `load` checks every stored overlay. One that fails isn't served but stays stored, so fixing it keeps its id and OBS link; only an overlay whose folder is gone is forgotten.
+- At each start `load` checks every stored overlay. One that fails isn't served but stays stored, so fixing it keeps its id and OBS link; only an overlay whose folder is missing (`ENOENT`, not a permission error) is forgotten.
 - Saving settings writes `config.yaml` first, so settings the schema refuses change nothing, then the HTML with the gifts main keeps; the renderer doesn't send gifts.
 - The `SAVE_OVERLAY_CONFIG` handler sends the saved settings (`tokio:config`) to the live overlays itself, so they get them even after the page closed; the page posts them only to its previews. A save reply updates its overlay even after its settings closed, and only closes the dialog still open for it.
 - A save merges the dialog's values onto the installed version's fields (`mergeOverlayConfig`), so a dialog opened before an update can't write the old version's fields.
 - `OverlayService` runs each overlay's file work (`saveConfig`, `getConfig`, `remove`, `_writeHTML`, an install's extract and swap) one after another through `_lock(id)`, so a gift refresh can't write back settings read before a save.
   - A task holding the lock must not call a method that takes it (`_prepare` uses `_readConfig`), or it waits on itself.
-  - An install downloads before taking it.
+  - An install downloads before taking it. An update whose overlay a Remove took out meanwhile fails rather than put it back with default settings.
 - Import, remove, install and Tools → Test overlays keep their change when the store file can't be written (`OverlayResult.saved: false`), and the handler follows Feedback in `AGENTS.md`.
 
 ## Settings fields

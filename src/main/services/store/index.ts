@@ -68,6 +68,7 @@ export class StoreManagerService extends Service {
   private _storeData: StoreSchema | null = null;
   private _memoryProfile: Profile | null = null;
   private _rebuilt = false;
+  private _corruptedBackup: string | null = null;
   // Emote saves run one after another, so one doesn't drop another's emotes.
   private _emoteSave: Promise<unknown> = Promise.resolve();
   // The store's own saves, chained by _queueSave. saveFile never rejects.
@@ -129,7 +130,10 @@ export class StoreManagerService extends Service {
       const read = await this._readChecked(this._storeFilePath, StoreZodSchema);
       data = read.data;
       if (read.raw && !data) {
-        await this._backupCorrupted(this._storeFilePath, read.raw);
+        this._corruptedBackup = await this._backupCorrupted(
+          this._storeFilePath,
+          read.raw,
+        );
       }
 
       if (!data) {
@@ -235,6 +239,11 @@ export class StoreManagerService extends Service {
    */
   public wasRebuilt(): boolean {
     return this._rebuilt;
+  }
+
+  /** Where initialize copied a store file that didn't load, if it did. */
+  public corruptedBackup(): string | null {
+    return this._corruptedBackup;
   }
 
   // Profile files outlive a rebuilt store, so list the ones that still load.
@@ -613,9 +622,10 @@ export class StoreManagerService extends Service {
       // When the active one doesn't load, its file says why.
       let profile: Profile | null;
       try {
-        profile =
-          (active ? await this.getProfileData({ fresh: true }) : null) ??
-          (await this._readChecked(path, ProfileSchema)).data;
+        profile = active ? await this.getProfileData({ fresh: true }) : null;
+        // A switch during the read gave the new profile: this one's file then
+        if (profileFile !== this._activeProfileFile()) profile = null;
+        profile ??= (await this._readChecked(path, ProfileSchema)).data;
       } catch (error) {
         // A missing or broken file can't use the file, one held for a moment
         // might.
@@ -630,17 +640,8 @@ export class StoreManagerService extends Service {
       const updates = profile && change(profile);
       if (!updates) continue;
 
-      // The active one through updateProfileData, which keeps it in memory
-      const done = active
-        ? await this.updateProfileData(updates)
-        : (
-            await this._jsonManagerService.updateFile(
-              path,
-              ProfileSchema,
-              updates,
-            )
-          ).success;
-      saved &&= done;
+      // Through updateProfileData, which keeps the active one in memory
+      saved &&= await this.updateProfileData(updates, profileFile);
     }
     return saved;
   }
@@ -945,6 +946,14 @@ export class StoreManagerService extends Service {
 
   public async exportProfile(ref: string, path: string): Promise<boolean> {
     if (!ref || !path) return false;
+    // The save dialog can start there, and this write skips updateFile's lock
+    if (isInside(this._pathManagerService.folders.profilesFolder, path)) {
+      Logger.error(
+        `<System> Export refused: ${path} is in the profiles folder.`,
+        this._logFile,
+      );
+      return false;
+    }
 
     const data = await this._jsonManagerService.loadFile(
       join(this._pathManagerService.folders.profilesFolder, ref),
@@ -1172,7 +1181,7 @@ export class StoreManagerService extends Service {
 
   // Throws when the copy can't be written, so the defaults never replace the
   // only copy of the user's data.
-  private async _backupCorrupted(path: string, raw: Buffer) {
+  private async _backupCorrupted(path: string, raw: Buffer): Promise<string> {
     const corruptedPath = join(
       dirname(path),
       `${basename(path, ".json")}.corrupted-${Date.now()}.json`,
@@ -1182,6 +1191,7 @@ export class StoreManagerService extends Service {
       `<System> Backed up the corrupted ${path} to ${corruptedPath}`,
       this._logFile,
     );
+    return corruptedPath;
   }
 
   private async _encryptProviderKey(

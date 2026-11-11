@@ -1,9 +1,6 @@
 import isEqual from "fast-deep-equal";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFlush } from "./useEditableSettings";
-
-// Groups typing into one save, as useEditableSettings does
-const SAVE_DELAY = 300;
+import { SAVE_DELAY, useFlush } from "./useEditableSettings";
 
 /**
  * A value edited on the page and saved shortly after its last change, for

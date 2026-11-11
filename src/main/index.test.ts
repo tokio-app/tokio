@@ -21,10 +21,6 @@ const mocks = vi.hoisted(() => {
   return { services, service, deps: null as AppHandlerVariables | null };
 });
 
-vi.mock("@electron-toolkit/utils", () => ({
-  electronApp: { setAppUserModelId: vi.fn() },
-  is: { dev: false },
-}));
 vi.mock("@/services/alerts", () => ({
   AlertsService: mocks.service("alerts"),
 }));

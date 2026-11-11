@@ -111,12 +111,12 @@ Checked against Java 26.3's command tree, registries and decompiled commands (Vi
 - Gifts and likes are never capped (the user's call: every gift and like count runs).
 - Each action has a FIFO backlog (`_backlogs`) of batches (one run's filled commands, `times` left) that `_pump` serves one run at a time, `RUN_GAP_MS` after the answers. A lone run goes out at once; actions pump side by side.
 - An action on any other trigger takes no new runs while its backlog holds `MAX_BACKLOG` runs (the one being sent included): `_queue` reports `full` and resolves the skipped batch.
-- Before each run `_pump` checks the latest `games` and the game; its comments say when the rest drop. Filled commands stay as accepted. Whatever changes the active profile's games calls `setGames` (now `UPDATE_GAMES_SETTINGS` after a save and `SET_PROFILE`).
+- Before each run `_pump` checks the latest `games` and the game; its comments say when the rest drop. Filled commands stay as accepted. Whatever changes the active profile's games calls `setGames` (now `UPDATE_GAMES_SETTINGS` after a save and `SET_PROFILE`). A switch passes `switched`, which stops every backlog (the user's call), since clones and imports keep action ids.
 - A game replaced midway by one of its edition fails only the unanswered commands (`dropped`), with no notice: the run counts as done and the backlog goes on in the new game.
 - `_pump` awaits `settled()` after a dropped run and before each run, so a game in its handshake, or one that took over, gets the backlog once ready.
 - `handle` resolves once its own batches are served or dropped. `dispatchGames` isn't awaited, so a backlog never holds up other events.
 - The connector's `DISCONNECTED` calls `clear`, which forgets streaks and counted likes, not backlogs.
-- An action runs only while a game of its `edition` is connected (`_unreachable`); a game of the other edition counts as none, for `handle` and `test` alike. Mid-run too: `send(command, edition)` drops a command for the other edition's game, and `_send` stops there, without waiting out the rest of its waits.
+- An action runs only while a game of its `edition` is connected (`_unreachable`); a game of the other edition counts as none, for `handle` and `test` alike. Mid-run too: `send(command, edition)` drops a command for the other edition's game. A failure that leaves no game of the edition (it left, was replaced by the other edition, or Minecraft was turned off) stops `_send` there, without waiting out the rest of its waits, so the backlog drops before Minecraft can come back.
 - **Test** (`TEST_GAME_ACTION`, `notify: false`, carries `edition`) runs the steps once with `generateTikTokEventSample` (Emote uses Chat) and returns each command with the game's reply. It fails with no game or the other edition. The reply carries the action's `id`.
 
 ## Notices and logs

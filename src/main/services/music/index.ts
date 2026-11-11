@@ -161,15 +161,16 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._music_queue.setMaxSize(settings.protection.queue_length);
 
     if (control === controls.play) {
-      // A duplicate is dropped and gives the cooldown back, unless another
-      // command took it since
+      // A duplicate, or a request the full queue drops, gives the cooldown
+      // back, unless another command took it since
       const refund = () => {
         if (this._lastCommand === taken) this._lastCommand = previous;
       };
       const added = this._queue.enqueue(() =>
         this._request({ query: args, by: handle, unique, refund }),
       );
-      if (added && handle) this._requesting.add(handle);
+      if (!added) refund();
+      else if (handle) this._requesting.add(handle);
     } else if (control === controls.next) {
       // With nothing playing, there's nothing this Next was meant for
       const from = this._music_queue.playing();

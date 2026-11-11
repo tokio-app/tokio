@@ -42,7 +42,7 @@ import { MinecraftConnection } from "./minecraft";
  * reply in message. full when the action had MAX_BACKLOG runs waiting, so
  * the event's were skipped.
  */
-export type GameError = { offline: boolean; full?: boolean; message: string };
+type GameError = { offline: boolean; full?: boolean; message: string };
 
 // The wait between two runs of an action, so a burst doesn't flood the game
 export const RUN_GAP_MS = 100;
@@ -86,6 +86,8 @@ export class GamesService extends Service {
   private _backlogs = new Map<string, Batch[]>();
   // The latest profile's actions, which can stop a backlog
   private _games: Pick<Profile["games"], "actions"> = { actions: [] };
+  // Profile switches so far, which stop every backlog started before
+  private _switches = 0;
   private _onStatus?: (status: GamesStatus) => void;
   private _onError?: (action: GameAction, error: GameError) => void;
   private _onRun?: (action: GameAction) => void;
@@ -115,9 +117,14 @@ export class GamesService extends Service {
     this._picturesFolder = folder;
   }
 
-  // The active profile's actions after a save or a switch, so backlogs stop at once
-  public setGames(games: Pick<Profile["games"], "actions">): void {
+  // The active profile's actions after a save or a switch, so backlogs stop at
+  // once. A switch stops them all: clones and imports keep the action ids.
+  public setGames(
+    games: Pick<Profile["games"], "actions">,
+    switched = false,
+  ): void {
     this._games = games;
+    if (switched) this._switches++;
   }
 
   /** Turns the connections on or off. False when one can't listen. */
@@ -293,13 +300,15 @@ export class GamesService extends Service {
 
   // Sent at once, in order, as the connection queues them, up to a wait: the
   // rest go once those are answered and the wait is over. A oneOf is picked
-  // here, so each run of a batch gets its own. Stops when a game of the other
-  // edition took over, leaving out what wasn't sent.
+  // here, so each run of a batch gets its own. Stops when the game left,
+  // Minecraft was turned off or a game of the other edition took over,
+  // leaving out what wasn't sent.
   private async _send(commands: GameCommand[], edition: MinecraftEdition) {
     const results: CommandResult[] = [];
     let sending: { command: string; mayFail?: boolean }[] = [];
-    // False once the other edition's game dropped some: the rest would be
-    // dropped too, after waiting out every wait
+    // False once a failure leaves no game of the edition: the rest would go
+    // nowhere, after waiting out every wait. A refused command goes on, and
+    // so does a game of the edition that took over, once ready.
     const answers = async () => {
       const sent = sending.map(async ({ command, mayFail }) => {
         const result = await this._minecraft.send(command, edition);
@@ -310,12 +319,10 @@ export class GamesService extends Service {
       sending = [];
       const answered = await Promise.all(sent);
       results.push(...answered);
+      if (answered.every((result) => result.ok)) return true;
+      await this._minecraft.settled();
       const { state, edition: now } = this._minecraft.status;
-      return !(
-        answered.some((result) => result.dropped) &&
-        state === "connected" &&
-        now !== edition
-      );
+      return state === "connected" && now === edition;
     };
     for (const command of commands) {
       if (typeof command === "string") {
@@ -374,11 +381,13 @@ export class GamesService extends Service {
   // until the backlog is empty. Each action has its own, side by side.
   private async _pump(id: string, backlog: Batch[]) {
     this._backlogs.set(id, backlog);
+    const switches = this._switches;
     try {
       for (let first = true; backlog.length > 0; first = false) {
         if (!first) await delay(RUN_GAP_MS);
         // A Bedrock game that took over in the gap is still in its handshake
         await this._minecraft.settled();
+        if (this._switches !== switches) break;
         // Stopped when the latest profile removed or disabled the action; runs
         // it accepted keep their commands if only steps changed
         const action = this._games.actions.find((a) => a.id === id);

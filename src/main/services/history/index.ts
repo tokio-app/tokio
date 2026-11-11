@@ -76,7 +76,10 @@ const IndexSchema = z.object({
 
 type Index = z.infer<typeof IndexSchema>;
 
-type Json = Pick<JSONManagerService, "loadFile" | "saveFile">;
+type Json = Pick<
+  JSONManagerService,
+  "loadFile" | "saveFile" | "saveArbitraryFile"
+>;
 
 // What each event does to the LIVE in progress
 type Recorders = {
@@ -190,8 +193,11 @@ export class HistoryService extends Service {
     this._folder = folder;
   }
 
-  /** Loads a profile's history, adding a LIVE that a quit or a crash left. */
-  public async load(profileFile: string): Promise<void> {
+  /**
+   * Loads a profile's history, adding a LIVE that a quit or a crash left.
+   * False when its index is there but doesn't load, so nothing is recorded.
+   */
+  public async load(profileFile: string): Promise<boolean> {
     const { name } = parse(profileFile);
     const dir = join(this._folder, name);
     this._loading = dir;
@@ -210,14 +216,14 @@ export class HistoryService extends Service {
 
     await this._removeCleared(name);
     const index = await this._readIndex(dir);
-    if (this._loading !== dir) return;
+    if (this._loading !== dir) return true;
     if (!index) {
       Logger.warn(
         `<History> Not recording LIVEs, ${join(dir, "index.json")} didn't load`,
         this._logFile,
       );
       this._emit();
-      return;
+      return false;
     }
 
     const lives = index.lives;
@@ -237,7 +243,7 @@ export class HistoryService extends Service {
       const record = await this._readLive(dir, startedAt);
       if (record) recovered.push(record);
     }
-    if (this._loading !== dir) return;
+    if (this._loading !== dir) return true;
 
     this._dir = dir;
     this._lives = lives;
@@ -254,6 +260,7 @@ export class HistoryService extends Service {
       await this.save();
     }
     await this._cap();
+    return true;
   }
 
   /** Starts a LIVE on @username, ending one still open first. */
@@ -466,7 +473,8 @@ export class HistoryService extends Service {
   /**
    * Writes the file of the LIVE in progress, ending at the save's time even
    * when nothing came since the last one, and of the LIVEs that just ended,
-   * then the index when it changed, after which the dropped LIVEs' files go.
+   * then the index when it changed and every ended LIVE's file was written,
+   * after which the dropped LIVEs' files go.
    * False when a write failed; the next save retries.
    * With nothing to write, how the last save went, so a switch waits for one
    * still writing.
@@ -494,20 +502,31 @@ export class HistoryService extends Service {
       // saveFile doesn't make folders. If this fails, the writes log why.
       await mkdir(dir, { recursive: true }).catch(() => {});
       let ok = true;
+      let endFailed = false;
       for (const record of records) {
         const file = join(dir, `${record.startedAt}.json`);
-        if (await json.saveFile(file, LiveRecordSchema, record)) continue;
+        // Built here, so unchecked: Zod on a long LIVE takes tens of ms
+        if (await json.saveArbitraryFile(file, record)) continue;
         ok = false;
+        const ended = record.startedAt !== live?.startedAt;
+        if (ended) endFailed = true;
         // Tried again on the next save, unless another profile loaded since.
         // Every save writes the LIVE in progress, and its end's record takes
         // its place.
         if (this._dir !== dir) continue;
-        if (record.startedAt !== live?.startedAt) this._ended.push(record);
+        if (ended) this._ended.push(record);
       }
       if (index) {
         const file = join(dir, "index.json");
-        if (await json.saveFile(file, IndexSchema, index)) {
-          for (const path of dropped) await this._remove(path);
+        // An index on disk must never list a LIVE whose file isn't written
+        if (!endFailed && (await json.saveFile(file, IndexSchema, index))) {
+          // A file left over would come back on a load as a crash's leftover.
+          // Not a failed save: a held file mustn't refuse a profile switch.
+          for (const path of dropped) {
+            if ((await this._remove(path)) || this._dir !== dir) continue;
+            this._indexUnsaved = true;
+            this._dropped.push(path);
+          }
         } else {
           ok = false;
           if (this._dir === dir) {
@@ -702,14 +721,17 @@ export class HistoryService extends Service {
     }
   }
 
-  // With a few tries, for files Windows holds a moment
-  private async _remove(path: string) {
-    await rm(path, { recursive: true, force: true, maxRetries: 3 }).catch(
-      (error: unknown) =>
+  // With a few tries, for files Windows holds a moment. False when it failed.
+  private async _remove(path: string): Promise<boolean> {
+    return rm(path, { recursive: true, force: true, maxRetries: 3 }).then(
+      () => true,
+      (error: unknown) => {
         Logger.warn(
           `<History> Couldn't remove ${path}: ${formatError(error)}`,
           this._logFile,
-        ),
+        );
+        return false;
+      },
     );
   }
 

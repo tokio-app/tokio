@@ -9,6 +9,7 @@ import { createStack } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
 import { ConnectorFailure } from "@/services/connector/common";
+import { normalizeUsername } from "@tokioapp/connector";
 
 const events = createStack("connector");
 
@@ -41,6 +42,16 @@ const connectMessage = (handle: string, error?: ConnectorFailure) => {
   }
 };
 
+// A pasted LIVE link becomes its @username. A name the library refuses goes
+// to the connect as typed, so the user gets its "not found".
+const toUsername = (input: string) => {
+  try {
+    return normalizeUsername(input);
+  } catch {
+    return input.trim().replace(/^@/, "");
+  }
+};
+
 events.push(
   APP_EVENTS.CONNECT,
   async (
@@ -48,7 +59,7 @@ events.push(
     e,
     { username },
   ) => {
-    const name = username.trim().replace(/^@/, "");
+    const name = toUsername(username);
     const handle = `@${name}`;
     const saved = await storeManagerService.updateProfileData({
       connector: {

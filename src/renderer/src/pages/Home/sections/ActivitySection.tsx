@@ -69,8 +69,16 @@ function Action({ item }: { item: Exclude<ActivityItem, { type: "join" }> }) {
   return rich(t(DID[item.type]), { name });
 }
 
-// Memoized: each viewers or likes push renders the page again, but leaves the
-// feed's items as they were
+// Each push brings every item as a new object, so a row renders again only
+// when its item changed: main never changes an item, but a join's count
+// (its users grow with it)
+const sameItem = (
+  { item: a }: { item: ActivityItem },
+  { item: b }: { item: ActivityItem },
+) =>
+  a.id === b.id &&
+  (a.type !== "join" || (b.type === "join" && a.count === b.count));
+
 const Event = memo(function Event({ item }: { item: ActivityItem }) {
   const language = useLanguage();
   if (item.type === "join") {
@@ -89,7 +97,7 @@ const Event = memo(function Event({ item }: { item: ActivityItem }) {
       </div>
     </li>
   );
-});
+}, sameItem);
 
 function emptyText(connected: boolean, feedOff: boolean): MessageKey {
   if (feedOff) return "home.activity.feedOff";

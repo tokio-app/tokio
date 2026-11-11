@@ -61,6 +61,22 @@ describe("home events", () => {
       ]);
     });
 
+    it("saves and connects a pasted LIVE link as its username", async () => {
+      const { h, connectorService, storeManagerService } = setup({
+        success: true,
+      });
+
+      await h.invoke(home, APP_EVENTS.CONNECT, {
+        username: "https://www.tiktok.com/@mia/live",
+      });
+
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        connector: { username: "mia" },
+      });
+      expect(connectorService.connect).toHaveBeenCalledWith("mia");
+      expect(h.notices[0].message).toBe("Connected to @mia.");
+    });
+
     it("connects but warns when the username can't be saved", async () => {
       const { h, connectorService, storeManagerService } = setup({
         success: true,
