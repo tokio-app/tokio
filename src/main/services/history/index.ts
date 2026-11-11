@@ -469,7 +469,8 @@ export class HistoryService extends Service {
   /**
    * Writes the file of the LIVE in progress, ending at the save's time even
    * when nothing came since the last one, and of the LIVEs that just ended,
-   * then the index when it changed, after which the dropped LIVEs' files go.
+   * then the index when it changed and every ended LIVE's file was written,
+   * after which the dropped LIVEs' files go.
    * False when a write failed; the next save retries.
    * With nothing to write, how the last save went, so a switch waits for one
    * still writing.
@@ -497,20 +498,24 @@ export class HistoryService extends Service {
       // saveFile doesn't make folders. If this fails, the writes log why.
       await mkdir(dir, { recursive: true }).catch(() => {});
       let ok = true;
+      let endFailed = false;
       for (const record of records) {
         const file = join(dir, `${record.startedAt}.json`);
         // Built here, so unchecked: Zod on a long LIVE takes tens of ms
         if (await json.saveArbitraryFile(file, record)) continue;
         ok = false;
+        const ended = record.startedAt !== live?.startedAt;
+        if (ended) endFailed = true;
         // Tried again on the next save, unless another profile loaded since.
         // Every save writes the LIVE in progress, and its end's record takes
         // its place.
         if (this._dir !== dir) continue;
-        if (record.startedAt !== live?.startedAt) this._ended.push(record);
+        if (ended) this._ended.push(record);
       }
       if (index) {
         const file = join(dir, "index.json");
-        if (await json.saveFile(file, IndexSchema, index)) {
+        // An index on disk must never list a LIVE whose file isn't written
+        if (!endFailed && (await json.saveFile(file, IndexSchema, index))) {
           // A file left over would come back on a load as a crash's leftover.
           // Not a failed save: a held file mustn't refuse a profile switch.
           for (const path of dropped) {

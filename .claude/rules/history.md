@@ -26,7 +26,7 @@ paths:
 - `<startedAt>.json`: one `LiveRecord` per LIVE, with all its gifters and its minutes, which stay out of the index.
   - The LIVE in progress rewrites only its own file on every save (every `HISTORY_SAVE_MS`, and a delete's, the cap's or a clear's), with `endedAt` set to the save's time, so a quiet LIVE's end keeps up too.
   - A finished LIVE's file is never rewritten, so a periodic save stays small however many LIVEs there are.
-- When a LIVE ends, its file is written one last time, then the index with its summary appended and its gifters added to all time.
+- When a LIVE ends, its file is written one last time, then the index with its summary appended and its gifters added to all time. When an ended LIVE's file fails, the index waits for the next save, which writes both.
 - `MAX_LIVES` (1,500): past it, the oldest LIVEs go as a delete would, gifts included, after an end (`_cap`, which reads their files after the end's save) and when a profile loads. The user's call: All time always adds up to the LIVEs kept.
 - `MAX_GIFTERS` caps all time: the fewest coins go first, then the oldest last gift. The page shows only the top `SHOWN_GIFTERS` and each LIVE keeps all its own gifters, so nobody shown is dropped.
 - On a quit or crash the next load adds what the last save missed from the LIVE's file.

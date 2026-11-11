@@ -403,12 +403,14 @@ describe("HistoryService", () => {
     history.start("kai", 1000);
     history.record(TOKIO_EVENTS.GIFT, gift(viewer("1"), 5));
     history.end(2000);
-    // The LIVE's file fails, the index saves
+    // The LIVE's file fails, so the index listing it waits too
     const saveFile = vi
       .spyOn(json, "saveArbitraryFile")
       .mockResolvedValueOnce(false);
 
     expect(await history.save()).toBe(false);
+    expect(saveFile).toHaveBeenCalledOnce();
+    expect(existsSync(join(dir, "a", "index.json"))).toBe(false);
     expect(await history.getLive(1000)).toEqual(
       expect.objectContaining({ coins: 5 }),
     );
