@@ -219,12 +219,13 @@ describe("MinecraftConnection", () => {
 
   it("keeps running commands when the game answers the encryption request late", async () => {
     const { connection } = await listen({ handshakeMs: 20 });
-    const fake = await game(connection.port, { lateMs: 50 });
+    // Far later than connected()'s 50 ms polls, so say one always goes first
+    const fake = await game(connection.port, { lateMs: 300 });
     await connected(connection);
     expect(await connection.send("say one")).toMatchObject({ ok: true });
 
     // Past the late answer, the stream is encrypted
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await new Promise((resolve) => setTimeout(resolve, 350));
     expect(await connection.send("say two")).toMatchObject({
       ok: true,
       message: "Ran say two",
