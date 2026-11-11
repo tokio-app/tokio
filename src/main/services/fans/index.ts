@@ -78,16 +78,16 @@ export class FansService extends Service {
 
   /**
    * Takes the fans of a profile, by its file's name. A file that doesn't load
-   * is left as it is, and nothing is recorded until another load.
+   * is left as it is, and nothing is recorded until another load: false then.
    */
-  public async load(profileFile: string) {
+  public async load(profileFile: string): Promise<boolean> {
     const path = join(this._folder, profileFile);
     this._loading = path;
     this._file = null;
     this._fans.clear();
     this._unsaved = false;
     const fans = await this._read(path);
-    if (this._loading !== path) return;
+    if (this._loading !== path) return true;
     if (fans) {
       for (const fan of fans.slice(-MAX_FANS)) this._fans.set(fan.userId, fan);
       this._file = path;
@@ -98,6 +98,7 @@ export class FansService extends Service {
       );
     }
     this._emit();
+    return fans !== null;
   }
 
   /** Keeps a viewer with a fan level, as the event `type` shows them now. */

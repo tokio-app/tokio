@@ -169,13 +169,16 @@ describe("FansService", () => {
   });
 
   it("saves the fans in their profile's file, and loads them back", async () => {
-    const fans = await loaded();
+    const fans = service();
+    expect(await fans.load("a.json")).toBe(true);
     expect(fans.list()).toEqual([]);
     vi.setSystemTime(1000);
     fans.record(viewer("1", 3, "ana"));
 
     expect(await fans.save()).toBe(true);
-    expect((await loaded()).list()).toEqual(fans.list());
+    const again = service();
+    expect(await again.load("a.json")).toBe(true);
+    expect(again.list()).toEqual(fans.list());
   });
 
   it("writes nothing when nothing changed", async () => {
@@ -194,7 +197,8 @@ describe("FansService", () => {
       const path = join(dir, "a.json");
       await writeFile(path, content);
       const warn = vi.spyOn(Logger, "warn");
-      const fans = await loaded();
+      const fans = service();
+      expect(await fans.load("a.json")).toBe(false);
       fans.record(viewer("1"));
 
       expect(fans.list()).toEqual([]);

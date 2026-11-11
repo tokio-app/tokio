@@ -35,7 +35,7 @@ paths:
 
 ## Loading, recovery, deleting and clearing
 
-- A missing index is an empty history. One that's there but doesn't load is left as it is, nothing is recorded, and the log has a warning.
+- A missing index is an empty history. One that's there but doesn't load (held at startup too) is left as it is and nothing is recorded until another load. `load` then gives false, and startup and a profile switch warn (`HISTORY_LOAD_FAILED`).
 - A LIVE file the index doesn't list, newer than every LIVE it does, was left by a quit or a crash: it's added, ending at its last save, and the index is saved at once. An unlisted older one is a delete's leftover and is removed, and so are `<name>.cleared-<digits>` folders, a clear's leftovers.
 - `deleteLive` subtracts the LIVE's gifters, read from its file, from all time, dropping a gifter left with nothing, then saves the index. An unreadable file still leaves the index, and all time keeps its gifts (logged).
 - A dropped LIVE's file (a delete's or the cap's) waits in `_dropped` until an index without it is written, by that save or the retry, and it's removed: one that can't be goes back for the next save, which doesn't count as failed (a held file mustn't refuse a switch). A load would take back a file newer than every listed LIVE as a crash's leftover, and an index on disk must never list a LIVE whose file is gone.

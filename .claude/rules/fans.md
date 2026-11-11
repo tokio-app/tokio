@@ -22,7 +22,7 @@ paths:
 ## The file
 
 - `fans/<profile file>` in the app folder (`folders.fansFolder`). Clones and imports start with no fans.
-- `load(file)` runs at startup even when the profile didn't load. A file that's there but doesn't load is left as it is, and nothing is recorded for that profile until a later load (logged).
+- `load(file)` runs at startup even when the profile didn't load. A file that's there but doesn't load (held at startup too) is left as it is, and nothing is recorded for that profile until a later load. `load` then gives false, and startup and a profile switch warn (`FANS_LOAD_FAILED`).
 - Saved when it changed, as Persistence in `AGENTS.md` describes, and also on `DISCONNECTED`. A failed background save warns once per `REPEAT_NOTICE_MS` (`FANS_SAVE_FAILED`).
 - With nothing to save, `save()` returns how the last save went, so a switch waits for one still writing.
 

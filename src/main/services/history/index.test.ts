@@ -307,6 +307,7 @@ describe("HistoryService", () => {
   });
 
   it("loads a saved history back, and writes nothing when unchanged", async () => {
+    expect(await service().load("a.json")).toBe(true);
     const empty = await loaded();
     expect(await empty.save()).toBe(true);
     expect(existsSync(join(dir, "a"))).toBe(false);
@@ -339,7 +340,8 @@ describe("HistoryService", () => {
       await mkdir(join(dir, "a"));
       await writeFile(path, content);
       const warn = vi.spyOn(Logger, "warn");
-      const history = await loaded();
+      const history = service();
+      expect(await history.load("a.json")).toBe(false);
       history.start("kai", 1000);
       history.record(TOKIO_EVENTS.GIFT, gift(viewer("1"), 5));
       history.end(2000);

@@ -1199,6 +1199,8 @@
   "main.camera.missing": "{name} isn't connected.",
   "main.camera.busy": "{name} won't start. Another app may be using it.",
   "main.camera.failed": "{name} couldn't start.",
+  "main.fans.loadFailed": "Tokio couldn't load this profile's fans, so it won't record any until you restart Tokio or pick another profile.",
+  "main.lives.historyLoadFailed": "Tokio couldn't load this profile's LIVE history, so it won't record LIVEs until you restart Tokio or pick another profile.",
   "minecraft.weather.clear": "Clear",
   "minecraft.weather.rain": "Rain",
   "minecraft.weather.thunder": "Thunder",

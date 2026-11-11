@@ -1010,8 +1010,20 @@ const startApp = async (handler: AppHandlerVariables) => {
   const profile = await storeManagerService.getProfileData();
   if (profile) timerService.load(profile.timer, settings.activeProfile.file);
   // Its own file, so the fans load even when the profile doesn't
-  await fansService.load(settings.activeProfile.file);
-  await historyService.load(settings.activeProfile.file);
+  if (!(await fansService.load(settings.activeProfile.file))) {
+    notifier.warn(
+      "overlays",
+      FEEDBACK_CODES.FANS_LOAD_FAILED,
+      t("main.fans.loadFailed"),
+    );
+  }
+  if (!(await historyService.load(settings.activeProfile.file))) {
+    notifier.warn(
+      "system",
+      FEEDBACK_CODES.HISTORY_LOAD_FAILED,
+      t("main.lives.historyLoadFailed"),
+    );
+  }
 
   // Before the server starts, so it serves the overlays right away. The
   // gifts saved last time are used when there are any, so startup doesn't

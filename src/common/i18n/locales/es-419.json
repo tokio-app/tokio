@@ -1199,6 +1199,8 @@
   "main.camera.missing": "{name} no está conectada.",
   "main.camera.busy": "{name} no inicia. Puede que otra app la esté usando.",
   "main.camera.failed": "{name} no pudo iniciar.",
+  "main.fans.loadFailed": "Tokio no pudo cargar los fans de este perfil, así que no registrará ninguno hasta que reinicies Tokio o elijas otro perfil.",
+  "main.lives.historyLoadFailed": "Tokio no pudo cargar el historial de LIVE de este perfil, así que no registrará LIVEs hasta que reinicies Tokio o elijas otro perfil.",
   "minecraft.weather.clear": "Despejado",
   "minecraft.weather.rain": "Lluvia",
   "minecraft.weather.thunder": "Tormenta",

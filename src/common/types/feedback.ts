@@ -86,6 +86,7 @@ export enum FEEDBACK_CODES {
   GIFTS_FETCH_FAILED = "gifts_fetch_failed",
   TEST_OVERLAY_FAILED = "test_overlay_failed",
   FANS_SAVE_FAILED = "fans_save_failed",
+  FANS_LOAD_FAILED = "fans_load_failed",
 
   // TIMER
   TIMER_PAUSED = "timer_paused",
@@ -104,6 +105,7 @@ export enum FEEDBACK_CODES {
   LIVE_LOAD_FAILED = "live_load_failed",
   HISTORY_SAVE_FAILED = "history_save_failed",
   HISTORY_CLEAR_FAILED = "history_clear_failed",
+  HISTORY_LOAD_FAILED = "history_load_failed",
 
   // ALERTS
   SOUND_ADDED = "sound_added",

@@ -193,8 +193,11 @@ export class HistoryService extends Service {
     this._folder = folder;
   }
 
-  /** Loads a profile's history, adding a LIVE that a quit or a crash left. */
-  public async load(profileFile: string): Promise<void> {
+  /**
+   * Loads a profile's history, adding a LIVE that a quit or a crash left.
+   * False when its index is there but doesn't load, so nothing is recorded.
+   */
+  public async load(profileFile: string): Promise<boolean> {
     const { name } = parse(profileFile);
     const dir = join(this._folder, name);
     this._loading = dir;
@@ -213,14 +216,14 @@ export class HistoryService extends Service {
 
     await this._removeCleared(name);
     const index = await this._readIndex(dir);
-    if (this._loading !== dir) return;
+    if (this._loading !== dir) return true;
     if (!index) {
       Logger.warn(
         `<History> Not recording LIVEs, ${join(dir, "index.json")} didn't load`,
         this._logFile,
       );
       this._emit();
-      return;
+      return false;
     }
 
     const lives = index.lives;
@@ -240,7 +243,7 @@ export class HistoryService extends Service {
       const record = await this._readLive(dir, startedAt);
       if (record) recovered.push(record);
     }
-    if (this._loading !== dir) return;
+    if (this._loading !== dir) return true;
 
     this._dir = dir;
     this._lives = lives;
@@ -257,6 +260,7 @@ export class HistoryService extends Service {
       await this.save();
     }
     await this._cap();
+    return true;
   }
 
   /** Starts a LIVE on @username, ending one still open first. */
