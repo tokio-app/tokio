@@ -774,6 +774,95 @@ describe("GamesService", () => {
         expect(onError).not.toHaveBeenCalled();
       });
 
+      it("reports a game that left between a spawn's mobs at once", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        // The first cow goes out, then the game leaves in the gap
+        minecraft.send.mockImplementation(async (command) => {
+          if (minecraft.status.state !== "connected") {
+            return {
+              command,
+              ok: false,
+              message: "Minecraft isn't connected.",
+            };
+          }
+          minecraft.sent.push(command);
+          minecraft.set({ state: "waiting" });
+          return { command, ok: true, message: "" };
+        });
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        let done = false;
+        const cows = action({
+          steps: [
+            GameStepSchema.parse({ type: "spawn", mob: "cow", amount: 100 }),
+          ],
+        });
+        void games
+          .handle(TOKIO_EVENTS.FOLLOW, { user }, { actions: [cows] })
+          .then(() => (done = true));
+
+        await vi.advanceTimersByTimeAsync(SPAWN_GAP_MS);
+        expect(done).toBe(true);
+        expect(minecraft.sent).toEqual(["summon cow ~ ~ ~"]);
+        expect(onError).toHaveBeenCalledWith(
+          cows,
+          expect.objectContaining({ offline: true }),
+        );
+      });
+
+      it("drops the backlog when Minecraft is turned off and on mid-run", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft("connected", "java");
+        let calls = 0;
+        minecraft.send.mockImplementation(async (command) => {
+          if (minecraft.status.state !== "connected") {
+            return {
+              command,
+              ok: false,
+              message: "Minecraft isn't connected.",
+            };
+          }
+          // Turned off while the third zombie was in flight
+          if (++calls === 3) {
+            minecraft.set({ state: "off" });
+            return {
+              command,
+              ok: false,
+              message: "Minecraft disconnected.",
+              dropped: true,
+            };
+          }
+          minecraft.sent.push(command);
+          return { command, ok: true, message: "" };
+        });
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(5), {
+          actions: [
+            {
+              ...everyGift([
+                GameStepSchema.parse({
+                  type: "spawn",
+                  mob: "zombie",
+                  amount: 10,
+                }),
+              ]),
+              edition: "java",
+            },
+          ],
+        });
+        await vi.advanceTimersByTimeAsync(1000);
+        // On again, and the game is back before the run would have ended
+        minecraft.set({ state: "connected", edition: "java" });
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toHaveLength(2);
+        expect(onError).not.toHaveBeenCalled();
+      });
+
       it("skips new runs once an action has MAX_BACKLOG waiting", async () => {
         vi.useFakeTimers();
         const minecraft = fakeMinecraft();

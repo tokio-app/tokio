@@ -293,13 +293,15 @@ export class GamesService extends Service {
 
   // Sent at once, in order, as the connection queues them, up to a wait: the
   // rest go once those are answered and the wait is over. A oneOf is picked
-  // here, so each run of a batch gets its own. Stops when a game of the other
-  // edition took over, leaving out what wasn't sent.
+  // here, so each run of a batch gets its own. Stops when the game left,
+  // Minecraft was turned off or a game of the other edition took over,
+  // leaving out what wasn't sent.
   private async _send(commands: GameCommand[], edition: MinecraftEdition) {
     const results: CommandResult[] = [];
     let sending: { command: string; mayFail?: boolean }[] = [];
-    // False once the other edition's game dropped some: the rest would be
-    // dropped too, after waiting out every wait
+    // False once a failure leaves no game of the edition: the rest would go
+    // nowhere, after waiting out every wait. A refused command goes on, and
+    // so does a game of the edition that took over, once ready.
     const answers = async () => {
       const sent = sending.map(async ({ command, mayFail }) => {
         const result = await this._minecraft.send(command, edition);
@@ -310,12 +312,10 @@ export class GamesService extends Service {
       sending = [];
       const answered = await Promise.all(sent);
       results.push(...answered);
+      if (answered.every((result) => result.ok)) return true;
+      await this._minecraft.settled();
       const { state, edition: now } = this._minecraft.status;
-      return !(
-        answered.some((result) => result.dropped) &&
-        state === "connected" &&
-        now !== edition
-      );
+      return state === "connected" && now === edition;
     };
     for (const command of commands) {
       if (typeof command === "string") {
