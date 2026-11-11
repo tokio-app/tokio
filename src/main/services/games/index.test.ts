@@ -125,8 +125,9 @@ describe("GamesService", () => {
     expect(minecraft.setEnabled).toHaveBeenCalledWith(true);
   });
 
-  it("passes on every status and logs it in English", () => {
-    const info = vi.spyOn(Logger, "info");
+  it("passes on every status and logs it in English, an error as a warning", () => {
+    const debug = vi.spyOn(Logger, "debug");
+    const warn = vi.spyOn(Logger, "warn");
     const minecraft = fakeMinecraft("off");
     const games = service(minecraft);
     games.setLogFile("games.log");
@@ -151,10 +152,12 @@ describe("GamesService", () => {
         },
       ],
     ]);
-    expect(info.mock.calls).toEqual([
+    expect(debug.mock.calls).toEqual([
       ["<Games> Minecraft is waiting for the game.", "games.log"],
       ["<Games> Minecraft is connected (Bedrock Edition).", "games.log"],
       ["<Games> Minecraft is connected (Java Edition).", "games.log"],
+    ]);
+    expect(warn.mock.calls).toEqual([
       [
         "<Games> Minecraft can't work: listen EADDRINUSE: address already in use :::37892",
         "games.log",

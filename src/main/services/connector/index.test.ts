@@ -30,6 +30,7 @@ const setup = () => {
 
 describe("TikTokConnectorService", () => {
   it("connects through the active provider and logs it", async () => {
+    const debug = vi.spyOn(Logger, "debug");
     const info = vi.spyOn(Logger, "info");
     const { service, provider } = setup();
 
@@ -37,7 +38,7 @@ describe("TikTokConnectorService", () => {
 
     expect(res).toEqual({ success: true });
     expect(provider.connect).toHaveBeenCalledWith("streamer");
-    expect(info).toHaveBeenCalledWith(
+    expect(debug).toHaveBeenCalledWith(
       "<Connector> Connecting to: streamer",
       "connector.log",
     );
@@ -63,7 +64,7 @@ describe("TikTokConnectorService", () => {
     expect(service.username).toBe("other");
   });
 
-  it("logs and returns a failed connection", async () => {
+  it("logs and returns a failed connection, in one line for a known kind", async () => {
     const error = vi.spyOn(Logger, "error");
     const { service, provider } = setup();
     const cause = connectFailure("offline", "User is offline");
@@ -74,6 +75,21 @@ describe("TikTokConnectorService", () => {
     expect(res).toEqual({ success: false, error: cause });
     expect(error).toHaveBeenCalledWith(
       "<Connector> Unable to connect to streamer -- User is offline",
+      "connector.log",
+      undefined,
+    );
+  });
+
+  it("logs the stack of a failed connection it didn't expect", async () => {
+    const error = vi.spyOn(Logger, "error");
+    const { service, provider } = setup();
+    const cause = connectFailure("unknown", "Something broke");
+    provider.connect.mockResolvedValue({ success: false, error: cause });
+
+    await service.connect("streamer");
+
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("Something broke"),
       "connector.log",
       cause,
     );

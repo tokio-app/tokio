@@ -48,13 +48,15 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
 
   public async connect(username: string): Promise<ConnectorResponse> {
     this._username = username;
-    Logger.info(`<Connector> Connecting to: ${username}`, this._logFile);
+    Logger.debug(`<Connector> Connecting to: ${username}`, this._logFile);
     const res = await this._current.provider.connect(username);
     if (!res.success) {
       Logger.error(
         `<Connector> Unable to connect to ${username} -- ${formatError(res.error)}`,
         this._logFile,
-        res.error,
+        // formatError carries a known kind's cause, so only a surprise needs
+        // its stack.
+        res.error?.kind === "unknown" ? res.error : undefined,
       );
     } else {
       Logger.info(`<Connector> Connected to ${username}.`, this._logFile);

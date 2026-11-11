@@ -3033,7 +3033,8 @@ describe("init events", () => {
       expect(noticesFor(s, FEEDBACK_CODES.GAME_LISTEN_FAILED)).toEqual([
         expect.objectContaining({ level: "warning", source: "games", message }),
       ]);
-      expect(logWarn).toHaveBeenCalledWith(
+      // The service logged why
+      expect(logWarn).not.toHaveBeenCalledWith(
         expect.stringContaining(message),
         "games.log",
       );
@@ -3058,7 +3059,8 @@ describe("init events", () => {
           message,
         }),
       ]);
-      expect(logWarn).toHaveBeenCalledWith(
+      // The service logged why
+      expect(logWarn).not.toHaveBeenCalledWith(
         expect.stringContaining(message),
         "server.log",
       );

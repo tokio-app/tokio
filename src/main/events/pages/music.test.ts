@@ -182,7 +182,8 @@ describe("music events", () => {
       expect(logError).toHaveBeenCalledWith(
         expect.stringContaining("window closed"),
         undefined,
-        expect.any(Error),
+        // One line: the message already carries the cause
+        undefined,
       );
     });
 

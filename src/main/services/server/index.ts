@@ -191,7 +191,7 @@ export class ServerService extends Service {
           const clientId = url?.searchParams.get("id") || randomUUID();
 
           this._wss?.addClient(clientId, client);
-          Logger.info(
+          Logger.debug(
             `<WebSocket> New client connected: ${clientId.slice(0, 64)}`,
             this._logFile,
           );
@@ -199,7 +199,7 @@ export class ServerService extends Service {
 
           client.on("close", () => {
             this._wss?.removeClient(clientId, client);
-            Logger.info(
+            Logger.debug(
               `<WebSocket> Client disconnected: ${clientId.slice(0, 64)}`,
               this._logFile,
             );
@@ -245,7 +245,7 @@ export class ServerService extends Service {
     if (this._wss) {
       this._wss.closeAll();
       this._wss = null;
-      Logger.info(`<WebSocket> WebSocket server stopped.`, this._logFile);
+      Logger.debug(`<WebSocket> WebSocket server stopped.`, this._logFile);
     }
     if (this._server) {
       this._server.close();
@@ -253,7 +253,7 @@ export class ServerService extends Service {
       // serve its next requests after the stop
       this._server.closeAllConnections();
       this._server = null;
-      Logger.info(`<Server> Server stopped.`, this._logFile);
+      Logger.debug(`<Server> Server stopped.`, this._logFile);
     }
   }
 

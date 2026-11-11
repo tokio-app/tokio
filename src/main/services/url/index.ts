@@ -46,7 +46,7 @@ export class URLManagerService extends Service {
 
     const command = this._appendCommand(hostsFilePath);
 
-    Logger.info(
+    Logger.debug(
       `<System> Prompting for admin rights to add ${config.CMD.FQDN} to the hosts file.`,
       this._logFile,
     );

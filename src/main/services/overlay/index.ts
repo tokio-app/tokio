@@ -583,7 +583,7 @@ export class OverlayService extends Service {
       this._server.sendToClient(id, payload),
     );
     if (!sent) {
-      Logger.info(
+      Logger.debug(
         `<Overlays> No overlay connected with id ${id} to send test events to.`,
         this._logFile,
       );

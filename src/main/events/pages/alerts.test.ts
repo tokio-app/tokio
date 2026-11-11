@@ -588,7 +588,8 @@ describe("alerts events", () => {
       expect(h.notices).toEqual([
         expect.objectContaining({ level: "warning", ...failure }),
       ]);
-      expect(logWarn).toHaveBeenCalledOnce();
+      // What the user wrote, so the notice says it all
+      expect(logWarn).not.toHaveBeenCalled();
     });
 
     it("asks for another voice when the message can't be spoken", async () => {
