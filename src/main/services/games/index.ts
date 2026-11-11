@@ -226,7 +226,7 @@ export class GamesService extends Service {
       generateTikTokEventSample(event).data,
       edition,
     );
-    return { success: true, data: await this._send(commands) };
+    return { success: true, data: await this._send(commands, edition) };
   }
 
   /**
@@ -289,19 +289,29 @@ export class GamesService extends Service {
 
   // Sent at once, in order, as the connection queues them, up to a wait: the
   // rest go once those are answered and the wait is over. A oneOf is picked
-  // here, so each run of a batch gets its own.
-  private async _send(commands: GameCommand[]) {
+  // here, so each run of a batch gets its own. Stops when a game of the other
+  // edition took over, leaving out what wasn't sent.
+  private async _send(commands: GameCommand[], edition: MinecraftEdition) {
     const results: CommandResult[] = [];
     let sending: { command: string; mayFail?: boolean }[] = [];
+    // False once the other edition's game dropped some: the rest would be
+    // dropped too, after waiting out every wait
     const answers = async () => {
       const sent = sending.map(async ({ command, mayFail }) => {
-        const result = await this._minecraft.send(command);
+        const result = await this._minecraft.send(command, edition);
         // A clear that found nothing to take did its job; a game that left
         // still fails it
         return mayFail && !result.dropped ? { ...result, ok: true } : result;
       });
       sending = [];
-      results.push(...(await Promise.all(sent)));
+      const answered = await Promise.all(sent);
+      results.push(...answered);
+      const { state, edition: now } = this._minecraft.status;
+      return !(
+        answered.some((result) => result.dropped) &&
+        state === "connected" &&
+        now !== edition
+      );
     };
     for (const command of commands) {
       if (typeof command === "string") {
@@ -314,7 +324,7 @@ export class GamesService extends Service {
           command: oneOf[Math.floor(Math.random() * oneOf.length)],
         });
       } else {
-        await answers();
+        if (!(await answers())) return results;
         await delay(command.wait);
       }
     }
@@ -384,7 +394,9 @@ export class GamesService extends Service {
           break;
         }
         this._onRun?.(action);
-        const failed = (await this._send(batch.commands)).find((r) => !r.ok);
+        const failed = (await this._send(batch.commands, batch.edition)).find(
+          (r) => !r.ok,
+        );
         if (failed) {
           // A Bedrock game that took over is connected once its handshake ends
           if (failed.dropped) await this._minecraft.settled();

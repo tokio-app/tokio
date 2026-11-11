@@ -18,6 +18,7 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SPAWN_GAP_MS } from "./commands";
 import { GamesService, MAX_BACKLOG, RUN_GAP_MS } from "./index";
 
 // Stands in for the game's WebSocket: records the commands, answers each
@@ -43,10 +44,19 @@ const fakeMinecraft = (
       fake.set({ state: enabled ? "waiting" : "off" });
       return true;
     }),
-    send: vi.fn(async (command: string) => {
-      fake.sent.push(command);
-      return fake.answer(command);
-    }),
+    send: vi.fn(
+      async (
+        command: string,
+        sentFor?: MinecraftEdition,
+      ): Promise<CommandResult> => {
+        // A game of the other edition drops it, as MinecraftConnection does
+        if (sentFor && fake.status.edition && fake.status.edition !== sentFor) {
+          return { command, ok: false, message: "", dropped: true };
+        }
+        fake.sent.push(command);
+        return fake.answer(command);
+      },
+    ),
     settled: vi.fn(async () => {}),
     set: (status: GameStatus, cause?: string) => {
       fake.status = status;
@@ -705,6 +715,38 @@ describe("GamesService", () => {
         await run;
         expect(minecraft.sent).toEqual(["each 3", "each 3", "each 3"]);
         expect(onError).not.toHaveBeenCalled();
+      });
+
+      it("stops a spawn when a Java game takes over between its mobs", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        // The first cow goes out, then Java takes over in the gap
+        minecraft.send.mockImplementationOnce(async (command) => {
+          minecraft.sent.push(command);
+          minecraft.set({ state: "connected", edition: "java" });
+          return { command, ok: true, message: "" };
+        });
+        const games = service(minecraft);
+        const onError = vi.fn();
+        games.onError(onError);
+        let done = false;
+        const cows = action({
+          steps: [
+            GameStepSchema.parse({ type: "spawn", mob: "cow", amount: 3 }),
+          ],
+        });
+        void games
+          .handle(TOKIO_EVENTS.FOLLOW, { user }, { actions: [cows] })
+          .then(() => (done = true));
+
+        // Over after one gap, not the spawn's two
+        await vi.advanceTimersByTimeAsync(SPAWN_GAP_MS);
+        expect(done).toBe(true);
+        expect(minecraft.sent).toEqual(["summon cow ~ ~ ~"]);
+        expect(onError).toHaveBeenCalledWith(
+          cows,
+          expect.objectContaining({ offline: true }),
+        );
       });
 
       it("drops the rest quietly when Minecraft is turned off midway", async () => {

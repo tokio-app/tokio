@@ -450,6 +450,25 @@ describe("MinecraftConnection", () => {
     ]);
   });
 
+  it("drops a command for the other edition's game", async () => {
+    const { connection } = await listen();
+    const java = await game(connection.port, {
+      protocols: [MINECRAFT_JAVA_PROTOCOL],
+    });
+    await connected(connection);
+
+    expect(await connection.send("summon cow ~ ~ ~", "bedrock")).toEqual({
+      command: "summon cow ~ ~ ~",
+      ok: false,
+      message: "Minecraft isn't connected.",
+      dropped: true,
+    });
+    expect((await connection.send("say hi", "java")).ok).toBe(true);
+    expect(java.requests).toEqual([
+      expect.objectContaining({ commandLine: "say hi" }),
+    ]);
+  });
+
   it("refuses connections that carry an Origin, as browsers send", async () => {
     const { connection } = await listen();
     const socket = new WebSocket(`ws://127.0.0.1:${connection.port}//`, {
