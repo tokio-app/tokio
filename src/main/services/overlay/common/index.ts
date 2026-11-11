@@ -110,7 +110,10 @@ export async function processOverlay(
     }
 
     const [info_data, htmlContent] = await Promise.all([
-      yaml.loadFile(infoPath, OverlayMetaSchema),
+      // Not loadFile, which reads an empty file as a missing one and logs nothing
+      readFile(infoPath, "utf-8").then((content) =>
+        yaml.parseFile(infoPath, content, OverlayMetaSchema),
+      ),
       readFile(htmlPath, "utf-8"),
     ]);
 

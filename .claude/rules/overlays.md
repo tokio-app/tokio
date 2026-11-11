@@ -36,7 +36,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
   - `cp` keeps a read-only mode, which Windows can't rename over, so the copy's `index.html`, `config.yaml` and `config.yml` get the owner's write bit first.
   - A failure deletes the staging folder. One a quit leaves behind, `load` deletes.
 - A remove first renames the overlay's folder to `.old-<uuid>` (a missing folder counts as gone), so a folder another program holds stays whole and stored. Only then does it stop serving it, forget it and delete `.old-*`, which `load` deletes if that fails.
-- `YAMLManagerService` logs to `overlays.log`, so a refused `info.yaml` or `config.yaml` says why there.
+- `YAMLManagerService` logs to `overlays.log`, so a refused `info.yaml` or `config.yaml` says why there. `processOverlay` reads `info.yaml` itself and parses it with `parseFile`, since `loadFile` takes an empty or comment-only file for a missing one and logs nothing.
 - Imports, saves, updates and every start write the settings `config.yaml` holds into the HTML (`processHTML`), only when the HTML changed.
 - At each start `load` checks every stored overlay. One that fails isn't served but stays stored, so fixing it keeps its id and OBS link; only an overlay whose folder is missing (`ENOENT`, not a permission error) is forgotten.
 - Saving settings writes `config.yaml` first, so settings the schema refuses change nothing, then the HTML with the gifts main keeps; the renderer doesn't send gifts.

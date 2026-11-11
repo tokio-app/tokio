@@ -707,6 +707,22 @@ describe("OverlayService", () => {
       expect(stored).toEqual([]);
     });
 
+    it("logs why it refuses an empty info.yaml", async () => {
+      const source = join(root, "source");
+      await overlay(source, {
+        "info.yaml": "# nothing yet\n",
+        "index.html": `<body>${SETUP}</body>`,
+      });
+      const error = vi.spyOn(Logger, "error");
+
+      expect(await service.import(source, gifts)).toEqual({ success: false });
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining("info.yaml"),
+        undefined,
+        undefined,
+      );
+    });
+
     it("rejects a folder that isn't an overlay", async () => {
       const source = join(root, "source");
       await overlay(source, { "index.html": "<p></p>" });
