@@ -1023,6 +1023,21 @@ describe("ServerService", () => {
       expect(await message).toBe("ping");
     });
 
+    it("logs no more than 64 characters of a client's id", async () => {
+      const info = vi.spyOn(Logger, "info");
+      const client = await connect("a".repeat(1000));
+
+      client.close();
+      await vi.waitFor(() =>
+        expect(info.mock.calls.map(([message]) => message)).toContain(
+          `<WebSocket> Client disconnected: ${"a".repeat(64)}`,
+        ),
+      );
+      expect(info.mock.calls.map(([message]) => message)).toContain(
+        `<WebSocket> New client connected: ${"a".repeat(64)}`,
+      );
+    });
+
     it("keeps internal events in the app", async () => {
       const client = await connect("a");
       const message = nextMessage(client);

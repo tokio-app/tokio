@@ -190,7 +190,7 @@ export class ServerService extends Service {
           // Unhandled, a bad frame would throw in main. ws closes the socket.
           client.on("error", (err) =>
             Logger.warn(
-              `<WebSocket> Client ${clientId} error -- ${formatError(err)}`,
+              `<WebSocket> Client ${clientId.slice(0, 64)} error -- ${formatError(err)}`,
               this._logFile,
             ),
           );
@@ -200,7 +200,7 @@ export class ServerService extends Service {
 
           this._wss?.addClient(clientId, client);
           Logger.info(
-            `<WebSocket> New client connected: ${clientId}`,
+            `<WebSocket> New client connected: ${clientId.slice(0, 64)}`,
             this._logFile,
           );
           for (const listener of this._connectListeners) listener(clientId);
@@ -208,7 +208,7 @@ export class ServerService extends Service {
           client.on("close", () => {
             this._wss?.removeClient(clientId, client);
             Logger.info(
-              `<WebSocket> Client disconnected: ${clientId}`,
+              `<WebSocket> Client disconnected: ${clientId.slice(0, 64)}`,
               this._logFile,
             );
           });
