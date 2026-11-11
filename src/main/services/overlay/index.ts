@@ -15,6 +15,7 @@ import {
 } from "@/common/types";
 import { createTestLive, formatError } from "@/common/util";
 import { isMissing, renameWithRetry } from "@/helper/fs";
+import { isSaved } from "@/helper/library";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
 import {
@@ -87,6 +88,8 @@ export class OverlayService extends Service {
   private _checkedGifts = new Set<number>();
   // When the last gift save failed, null after one that worked
   private _giftSaveFailedAt: number | null = null;
+  // custom-gifts.json is there but can't be read, so a save would lose it
+  private _customGiftsUnreadable = false;
   // A test LIVE per overlay, so each Test carries on from that overlay's last
   private _testLives = new Map<string, () => TokioPayload[]>();
   private _overlays: OverlayApp[] = [];
@@ -115,6 +118,7 @@ export class OverlayService extends Service {
     this._customGiftsFile = paths.customGiftsFile;
     this._gifts = null;
     this._customGifts = null;
+    this._customGiftsUnreadable = false;
     this._yaml = services.yaml;
     this._json = services.json;
     this._server = services.server;
@@ -453,6 +457,9 @@ export class OverlayService extends Service {
       const saved = await this._json.loadArbitraryFile<CustomGift[]>(
         this._customGiftsFile,
       );
+      if (saved === null && (await isSaved(this._customGiftsFile))) {
+        this._customGiftsUnreadable = true;
+      }
       this._customGifts ??= saved ?? [];
     }
     return this._customGifts;
@@ -505,9 +512,13 @@ export class OverlayService extends Service {
       saved[index] = entry;
       changed = true;
     }
-    this._checkedGifts.add(value);
 
-    if (!changed) return { success: true };
+    if (!changed) {
+      this._checkedGifts.add(value);
+      return { success: true };
+    }
+    // loadArbitraryFile logged why.
+    if (this._customGiftsUnreadable) return { success: false };
     // A file that can't be written isn't tried on every gift
     const failed = this._giftSaveFailedAt;
     if (failed !== null && performance.now() - failed < LOAD_RETRY_MS) {
@@ -518,6 +529,7 @@ export class OverlayService extends Service {
       return { success: false };
     }
     this._giftSaveFailedAt = null;
+    this._checkedGifts.add(value);
     this._customGifts = saved;
     return { success: true, data: saved };
   }

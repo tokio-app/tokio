@@ -492,6 +492,38 @@ describe("OverlayService", () => {
         expect(again).toEqual({ success: true });
       });
 
+      it("compares a saved gift's details again after a failed save", async () => {
+        await writeFile(
+          join(root, "custom-gifts.json"),
+          JSON.stringify([saved(9, "Old", "old.png")]),
+        );
+        const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+        vi.spyOn(
+          JSONManagerService.prototype,
+          "saveArbitraryFile",
+        ).mockResolvedValueOnce(false);
+
+        expect(await service.recordGift(sent("9", "New", "new.png"))).toEqual({
+          success: false,
+        });
+
+        now.mockReturnValue(1000 + LOAD_RETRY_MS);
+        expect(
+          (await service.recordGift(sent("9", "New", "new.png"))).data,
+        ).toEqual([saved(9, "New", "new.png")]);
+      });
+
+      it("doesn't write over a custom gifts file it can't read", async () => {
+        await writeFile(join(root, "custom-gifts.json"), "[{ broken");
+
+        expect(await service.recordGift(sent("9"))).toEqual({
+          success: false,
+        });
+        expect(await readFile(join(root, "custom-gifts.json"), "utf-8")).toBe(
+          "[{ broken",
+        );
+      });
+
       it("leaves a saved gift alone when its details are the same", async () => {
         await writeFile(
           join(root, "custom-gifts.json"),
@@ -505,7 +537,8 @@ describe("OverlayService", () => {
 
       it("tries the gifts again a while after a failed save", async () => {
         const now = vi.spyOn(performance, "now").mockReturnValue(1000);
-        // A folder where the file goes
+        // Read while missing, then a folder where the file goes
+        await service.getCustomGifts();
         await mkdir(join(root, "custom-gifts.json"));
 
         expect(await service.recordGift(sent("9"))).toEqual({
