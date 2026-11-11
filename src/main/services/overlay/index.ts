@@ -143,7 +143,7 @@ export class OverlayService extends Service {
     this._gifts = gifts;
 
     for (const overlay of this._store.getSettings().overlays) {
-      const info = await this._writeHTML(overlay.id, overlay.external!, gifts);
+      const info = await this._writeHTML(overlay.id, gifts);
 
       if (!info) {
         // Only a missing folder: one that lost its permissions keeps its entry.
@@ -160,7 +160,12 @@ export class OverlayService extends Service {
       }
 
       this._register(
-        { ...info, id: overlay.id, path: this._dir(overlay.id) },
+        {
+          ...info,
+          id: overlay.id,
+          external: overlay.external,
+          path: this._dir(overlay.id),
+        },
         false,
       );
     }
@@ -179,7 +184,7 @@ export class OverlayService extends Service {
     const loaded = new Set(this._overlays.map((o) => o.id));
     for (const overlay of this._store.getSettings().overlays) {
       if (!loaded.has(overlay.id)) continue;
-      if (!(await this._writeHTML(overlay.id, overlay.external!, gifts))) {
+      if (!(await this._writeHTML(overlay.id, gifts))) {
         Logger.warn(
           `<Overlays> Unable to update the gifts of overlay ${overlay.id}.`,
           this._logFile,
@@ -204,7 +209,7 @@ export class OverlayService extends Service {
     try {
       // A link picked as the folder is copied as the folder it points to.
       const source = await realpath(basedir);
-      if (!(await processOverlay(source, this._yaml, true)).success) {
+      if (!(await processOverlay(source, this._yaml)).success) {
         return { success: false };
       }
 
@@ -225,7 +230,7 @@ export class OverlayService extends Service {
       // Checked on the copy, without its links: an overlay that needs a
       // linked file is refused. It gets its ID through the block, settings
       // or not.
-      const res = await processOverlay(staging, this._yaml, true);
+      const res = await processOverlay(staging, this._yaml);
       if (!res.success || !hasSetupBlock(res.data!.htmlContent)) {
         await rm(staging, { recursive: true, force: true });
         return { success: false };
@@ -245,8 +250,9 @@ export class OverlayService extends Service {
       }
       await renameWithRetry(staging, dir);
 
-      this._register({ ...info, id, path: dir }, true);
-      const saved = await this._store.addOverlayInfo({ ...info, id });
+      const meta = { ...info, id, external: true };
+      this._register({ ...meta, path: dir }, true);
+      const saved = await this._store.addOverlayInfo(meta);
       return { success: true, saved };
     } catch (error) {
       Logger.error(
@@ -382,7 +388,7 @@ export class OverlayService extends Service {
   private async _readConfig(
     id: string,
   ): Promise<OverlayResult<OverlayConfig | undefined>> {
-    const res = await processOverlay(this._dir(id), this._yaml, false);
+    const res = await processOverlay(this._dir(id), this._yaml);
     return { success: res.success, data: res.data?.config };
   }
 
@@ -405,7 +411,7 @@ export class OverlayService extends Service {
     if (!this._isStored(id)) return { success: false };
     try {
       const dir = this._dir(id);
-      const res = await processOverlay(dir, this._yaml, false);
+      const res = await processOverlay(dir, this._yaml);
       if (!res.success) return { success: false };
       // A dialog opened before an update has the old version's fields.
       const merged = res.data!.config
@@ -604,12 +610,11 @@ export class OverlayService extends Service {
   // Writes the overlay's saved config and the gifts into its HTML.
   private _writeHTML(
     id: string,
-    external: boolean,
     gifts: CustomGift[],
   ): Promise<OverlayMetadata | null> {
     return this._lock(id, async () => {
       const dir = this._dir(id);
-      const res = await processOverlay(dir, this._yaml, external);
+      const res = await processOverlay(dir, this._yaml);
       if (!res.success) return null;
 
       const html = await processHTML(
@@ -689,7 +694,7 @@ export class OverlayService extends Service {
   ): Promise<OverlayMetadata> {
     await extractZip(zip, staging);
 
-    const res = await processOverlay(staging, this._yaml, false);
+    const res = await processOverlay(staging, this._yaml);
     if (!res.success || !hasSetupBlock(res.data!.htmlContent)) {
       throw new Error("The download isn't a valid overlay.");
     }
@@ -740,10 +745,7 @@ export class OverlayService extends Service {
    */
   private async _swap(staging: string, dir: string): Promise<void> {
     const old = join(this._folder, `.old-${randomUUID()}`);
-    const replacing = await access(dir).then(
-      () => true,
-      () => false,
-    );
+    const replacing = await isSaved(dir);
     if (replacing) await renameWithRetry(dir, old);
 
     try {
