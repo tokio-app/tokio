@@ -23,6 +23,12 @@ describe("commandValue", () => {
     );
   });
 
+  it("drops *, which names every score holder", () => {
+    expect(commandValue("[*]")).toBe("");
+    expect(commandValue("@*")).toBe("");
+    expect(commandValue("*")).toBe("");
+  });
+
   it("drops control characters and collapses whitespace", () => {
     expect(commandValue("  a\n\tb\u0000c\u007f   d  ")).toBe("a bc d");
   });
@@ -128,6 +134,16 @@ describe("gameCommands in Bedrock", () => {
       run({ type: "command", command: " /say Hi {username}" }, fill),
     ).toEqual(["say Hi Aku"]);
     expect(run({ type: "command", command: "  " }, fill)).toEqual([]);
+  });
+
+  it("keeps a nickname from naming every score holder", () => {
+    const fill = (text: string) =>
+      text.replace("{username}", commandValue("[*]"));
+    const [command] = run(
+      { type: "command", command: "scoreboard players add {username} gifts 1" },
+      fill,
+    );
+    expect(command).not.toContain("*");
   });
 });
 

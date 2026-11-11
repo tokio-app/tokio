@@ -434,15 +434,16 @@ function helpCommands(
 
 /**
  * Makes viewer text safe inside a command: without quotes, backslashes,
- * brackets, braces, § or @, a nickname can't end a string, add NBT
- * (`Passengers:[…]`) or a target selector (`@e`).
+ * brackets, braces, §, @ or *, a nickname can't end a string, add NBT
+ * (`Passengers:[…]`), a target selector (`@e`) or name every score holder
+ * (`*`, which the stripping alone would make of `[*]`).
  */
 export function commandValue(text: string): string {
   return (
     text
       // Before the control characters go, so a line break still parts words
       .replace(/\s+/g, " ")
-      .replace(/["'\\{}[\]§@\p{Cc}]/gu, "")
+      .replace(/["'\\{}[\]§@*\p{Cc}]/gu, "")
       .replace(/ {2,}/g, " ")
       .trim()
       .slice(0, MAX_VALUE_LENGTH)
