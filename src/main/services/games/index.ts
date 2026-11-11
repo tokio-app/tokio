@@ -181,9 +181,7 @@ export class GamesService extends Service {
     games: Pick<Profile["games"], "actions">,
   ) {
     this._games = games;
-    // Nothing could reach the game: off, or the port is taken
-    const { state } = this._minecraft.status;
-    if (state === "off" || state === "error") return;
+    if (this._unusable()) return;
 
     // Once per event, whichever actions it runs
     const { added, total, values } = streakOf(this._streaks, type, payload);
@@ -262,6 +260,12 @@ export class GamesService extends Service {
       return Math.floor(likes / likes_every);
     }
     return 1;
+  }
+
+  // Nothing could reach the game: off, or the port is taken
+  private _unusable() {
+    const { state } = this._minecraft.status;
+    return state === "off" || state === "error";
   }
 
   // Why the edition's commands can't run: no game, or the other edition's
@@ -372,7 +376,7 @@ export class GamesService extends Service {
     this._backlogs.set(id, backlog);
     try {
       for (let first = true; backlog.length > 0; first = false) {
-        if (!first) await new Promise((r) => setTimeout(r, RUN_GAP_MS));
+        if (!first) await delay(RUN_GAP_MS);
         // A Bedrock game that took over in the gap is still in its handshake
         await this._minecraft.settled();
         // Stopped when the latest profile removed or disabled the action; runs
@@ -386,8 +390,7 @@ export class GamesService extends Service {
         const batch = backlog[0];
         if (!batch) break;
         // Turned off: dropped quietly, as handle skips everything then
-        const { state } = this._minecraft.status;
-        if (state === "off" || state === "error") break;
+        if (this._unusable()) break;
         const unreachable = this._unreachable(action.edition);
         if (unreachable) {
           this._onError?.(action, { offline: true, message: unreachable });
@@ -401,7 +404,7 @@ export class GamesService extends Service {
           // A Bedrock game that took over is connected once its handshake ends
           if (failed.dropped) await this._minecraft.settled();
           // Turned off midway, which failed what the game hadn't answered
-          if (["off", "error"].includes(this._minecraft.status.state)) break;
+          if (this._unusable()) break;
           // A game that left or was replaced midway fails the commands it
           // hadn't answered, and drops the rest. Replaced by a game of its
           // edition, the run counts as done and the rest go to the new one.
