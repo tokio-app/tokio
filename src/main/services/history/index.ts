@@ -76,7 +76,10 @@ const IndexSchema = z.object({
 
 type Index = z.infer<typeof IndexSchema>;
 
-type Json = Pick<JSONManagerService, "loadFile" | "saveFile">;
+type Json = Pick<
+  JSONManagerService,
+  "loadFile" | "saveFile" | "saveArbitraryFile"
+>;
 
 // What each event does to the LIVE in progress
 type Recorders = {
@@ -496,7 +499,8 @@ export class HistoryService extends Service {
       let ok = true;
       for (const record of records) {
         const file = join(dir, `${record.startedAt}.json`);
-        if (await json.saveFile(file, LiveRecordSchema, record)) continue;
+        // Built here, so unchecked: Zod on a long LIVE takes tens of ms
+        if (await json.saveArbitraryFile(file, record)) continue;
         ok = false;
         // Tried again on the next save, unless another profile loaded since.
         // Every save writes the LIVE in progress, and its end's record takes
