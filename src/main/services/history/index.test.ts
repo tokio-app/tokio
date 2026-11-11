@@ -817,6 +817,17 @@ describe("HistoryService", () => {
       expect(await history.deleteLive(1000)).toBe(true);
     });
 
+    it("subtracts it once when two deletes run at once", async () => {
+      const history = await twoLives();
+
+      expect(
+        await Promise.all([history.deleteLive(1000), history.deleteLive(1000)]),
+      ).toEqual([true, true]);
+      expect(history.getHistory().gifters).toEqual([
+        expect.objectContaining({ userId: "a", coins: 50, gifts: 1 }),
+      ]);
+    });
+
     it("keeps its file until the index is saved", async () => {
       const history = await twoLives();
       vi.spyOn(json, "saveFile").mockResolvedValueOnce(false);
