@@ -232,6 +232,25 @@ describe("ServerService", () => {
     expect((await server.start()).success).toBe(true);
   });
 
+  it("ends a keep-alive connection busy as it stops", async () => {
+    await server.start();
+    const socket = createConnection(server.getPort(), "127.0.0.1");
+    // A reply, or the end of the connection
+    const outcome = new Promise((resolve) => {
+      socket.once("data", (data) => resolve(String(data).split("\r\n")[0]));
+      socket.once("close", () => resolve("closed"));
+    });
+    await new Promise((resolve) => socket.once("connect", resolve));
+    // Busy with a request whose headers haven't all come
+    socket.write(`GET /${TIMER_PATH}/ HTTP/1.1\r\nHost: 127.0.0.1\r\n`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    server.stop();
+    socket.write("\r\n");
+
+    expect(await outcome).toBe("closed");
+  });
+
   describe("overlays", () => {
     beforeEach(async () => {
       const overlay = join(dir, "clock");

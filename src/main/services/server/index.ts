@@ -257,6 +257,9 @@ export class ServerService extends Service {
     }
     if (this._server) {
       this._server.close();
+      // close() ends only idle connections: a busy keep-alive one would
+      // serve its next requests after the stop
+      this._server.closeAllConnections();
       this._server = null;
       Logger.info(`<Server> Server stopped.`, this._logFile);
     }
