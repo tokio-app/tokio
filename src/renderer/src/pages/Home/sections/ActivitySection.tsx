@@ -153,6 +153,11 @@ export function ActivitySection({
               {song.title}
             </span>
           </p>
+          <span className={styles.bars} aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
         </footer>
       )}
     </section>
