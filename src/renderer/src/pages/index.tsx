@@ -5,6 +5,7 @@ export * from "./CountdownTimer";
 export * from "./Fans";
 export * from "./Games";
 export * from "./Home";
+export * from "./Library";
 export * from "./Music";
 export * from "./OfficialOverlays";
 export * from "./Overlays";

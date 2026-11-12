@@ -2,7 +2,9 @@ import { Profile } from "@/common/schemas";
 import { Btn, NumberInput, SearchToggle, Section, Toggle } from "@/components";
 import { Updater } from "@/hooks";
 import { useT } from "@/ui/i18n";
+import { useNavigate } from "@tanstack/react-router";
 import { Ref } from "react";
+import { LuLibrary } from "react-icons/lu";
 import { MdOutlineAddAlert } from "react-icons/md";
 import styles from "../alerts.module.css";
 
@@ -29,6 +31,7 @@ export function HeaderSection({
   update,
 }: Props) {
   const t = useT();
+  const navigate = useNavigate();
   return (
     <Section
       title={t("alerts.header.title")}
@@ -40,6 +43,10 @@ export function HeaderSection({
             value={search}
             onChange={onSearch}
           />
+          <Btn onClick={() => navigate({ to: "/alerts/library" })}>
+            <LuLibrary size={18} />
+            {t("alerts.library.title")}
+          </Btn>
           <Btn ref={addRef} title={t("alerts.header.add")} onClick={onAdd}>
             <MdOutlineAddAlert size={20} />
           </Btn>

@@ -740,7 +740,7 @@ describe("alerts events", () => {
         ),
       };
       const storeManagerService = {
-        addSound: vi.fn(async (_sound: AlertSound) => true),
+        addSounds: vi.fn(async (_sounds: AlertSound[]) => true),
         getSounds: () => library,
       };
       const h = createHandler({ alertsService, storeManagerService });
@@ -770,8 +770,8 @@ describe("alerts events", () => {
 
       await h.invoke(alerts, APP_EVENTS.UPLOAD_SOUNDS);
 
-      expect(storeManagerService.addSound.mock.calls).toEqual(
-        paths.map((path) => [{ name: path, file: `${path}.hash` }]),
+      expect(storeManagerService.addSounds).toHaveBeenCalledExactlyOnceWith(
+        paths.map((path) => ({ name: path, file: `${path}.hash` })),
       );
       expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
         { success: true, data: library, error: undefined },
@@ -793,10 +793,9 @@ describe("alerts events", () => {
       await h.invoke(alerts, APP_EVENTS.UPLOAD_SOUNDS);
 
       expect(alertsService.importSound).toHaveBeenCalledTimes(3);
-      expect(storeManagerService.addSound).toHaveBeenCalledExactlyOnceWith({
-        name: "b.mp3",
-        file: "b.mp3.hash",
-      });
+      expect(storeManagerService.addSounds).toHaveBeenCalledExactlyOnceWith([
+        { name: "b.mp3", file: "b.mp3.hash" },
+      ]);
       expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
         {
           success: false,
@@ -804,7 +803,7 @@ describe("alerts events", () => {
           error: {
             code: FEEDBACK_CODES.SOUND_IMPORT_FAILED,
             message:
-              "Unable to upload 2 of the sounds. Use mp3, wav or ogg files up to 8 MB.",
+              "Unable to add 2 of the sounds. Use mp3, wav or ogg files up to 8 MB.",
           },
         },
       ]);
@@ -818,25 +817,56 @@ describe("alerts events", () => {
 
     it("counts only the sounds new to the library, and saves the others again", async () => {
       const { h, storeManagerService } = setup();
-      const sounds = [{ name: "old", file: "old.mp3.hash" }];
-      storeManagerService.getSounds = () => sounds;
-      storeManagerService.addSound.mockImplementation(async (sound) => {
-        sounds.push(sound);
-        return true;
-      });
+      storeManagerService.getSounds = () => [
+        { name: "old", file: "old.mp3.hash" },
+      ];
       pickFiles("old.mp3", "a.mp3", "a.mp3");
 
       await h.invoke(alerts, APP_EVENTS.UPLOAD_SOUNDS);
 
-      // A failed save may have left a listed one out of the store file.
-      expect(storeManagerService.addSound.mock.calls).toEqual([
-        [{ name: "old.mp3", file: "old.mp3.hash" }],
-        [{ name: "a.mp3", file: "a.mp3.hash" }],
-        [{ name: "a.mp3", file: "a.mp3.hash" }],
+      // One call with all of them: a failed save may have left a listed one
+      // out of the store file.
+      expect(storeManagerService.addSounds).toHaveBeenCalledExactlyOnceWith([
+        { name: "old.mp3", file: "old.mp3.hash" },
+        { name: "a.mp3", file: "a.mp3.hash" },
+        { name: "a.mp3", file: "a.mp3.hash" },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({ message: "1 sound added to the library." }),
       ]);
+    });
+
+    it("saves again but sends no notice when every sound is listed already", async () => {
+      const { h, storeManagerService } = setup();
+      storeManagerService.getSounds = () => [
+        { name: "old", file: "old.mp3.hash" },
+      ];
+      pickFiles("old.mp3", "old.mp3");
+
+      await h.invoke(alerts, APP_EVENTS.UPLOAD_SOUNDS);
+
+      expect(storeManagerService.addSounds).toHaveBeenCalledOnce();
+      expect(h.notices).toEqual([]);
+    });
+
+    it("says when the sounds could not be saved", async () => {
+      const { h, storeManagerService } = setup();
+      storeManagerService.addSounds.mockResolvedValue(false);
+      pickFiles("a.mp3", "b.mp3");
+
+      await h.invoke(alerts, APP_EVENTS.UPLOAD_SOUNDS);
+
+      expect(storeManagerService.addSounds).toHaveBeenCalledOnce();
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
+        {
+          success: false,
+          data: library,
+          error: expect.objectContaining({
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        },
+      ]);
+      expect(h.notices).toEqual([]);
     });
 
     it("sends no notice when nothing was added", async () => {
@@ -845,13 +875,13 @@ describe("alerts events", () => {
 
       await h.invoke(alerts, APP_EVENTS.UPLOAD_SOUNDS);
 
-      expect(storeManagerService.addSound).not.toHaveBeenCalled();
+      expect(storeManagerService.addSounds).not.toHaveBeenCalled();
       expect(h.replies(APP_EVENTS_RESPONSE.GET_SOUNDS)).toEqual([
         expect.objectContaining({
           success: false,
           error: expect.objectContaining({
             message:
-              "Unable to upload 1 of the sounds. Use mp3, wav or ogg files up to 8 MB.",
+              "Unable to add 1 of the sounds. Use mp3, wav or ogg files up to 8 MB.",
           }),
         }),
       ]);
@@ -1224,8 +1254,10 @@ describe("alerts events", () => {
         ),
       };
       const storeManagerService = {
-        addMedia: vi.fn(async (file: MediaFile) => {
-          media.push(file);
+        addMediaFiles: vi.fn(async (files: MediaFile[]) => {
+          for (const file of files) {
+            if (!media.some((m) => m.file === file.file)) media.push(file);
+          }
           return true;
         }),
         getMedia: () => media,
@@ -1255,12 +1287,14 @@ describe("alerts events", () => {
 
       await h.invoke(alerts, APP_EVENTS.UPLOAD_MEDIA);
 
-      expect(storeManagerService.addMedia.mock.calls).toEqual([
-        [{ name: "old.png", file: "old.png.hash" }],
-        [{ name: "a.png", file: "a.png.hash" }],
-        [{ name: "b.png", file: "b.png.hash" }],
-        [{ name: "a.png", file: "a.png.hash" }],
-      ]);
+      expect(storeManagerService.addMediaFiles).toHaveBeenCalledExactlyOnceWith(
+        [
+          { name: "old.png", file: "old.png.hash" },
+          { name: "a.png", file: "a.png.hash" },
+          { name: "b.png", file: "b.png.hash" },
+          { name: "a.png", file: "a.png.hash" },
+        ],
+      );
       expect(h.replies(APP_EVENTS_RESPONSE.GET_MEDIA)).toEqual([
         {
           success: false,
@@ -1268,7 +1302,7 @@ describe("alerts events", () => {
           error: {
             code: FEEDBACK_CODES.MEDIA_IMPORT_FAILED,
             message:
-              "Unable to upload 1 of the files. Use png, jpg, gif, webp, mp4 or webm files up to 50 MB.",
+              "Unable to add 1 of the files. Use png, jpg, gif, webp, mp4 or webm files up to 50 MB.",
           },
         },
       ]);
@@ -1276,14 +1310,26 @@ describe("alerts events", () => {
         expect.objectContaining({
           level: "success",
           code: FEEDBACK_CODES.MEDIA_UPLOADED,
-          message: "2 files added to the media library.",
+          message: "2 files added to the library.",
         }),
       ]);
     });
 
+    it("saves again but sends no notice when every file is listed already", async () => {
+      const { h, storeManagerService } = setup([
+        { name: "old", file: "old.png.hash" },
+      ]);
+      pickFiles("old.png", "old.png");
+
+      await h.invoke(alerts, APP_EVENTS.UPLOAD_MEDIA);
+
+      expect(storeManagerService.addMediaFiles).toHaveBeenCalledOnce();
+      expect(h.notices).toEqual([]);
+    });
+
     it("says when the library couldn't be saved", async () => {
       const { h, storeManagerService } = setup();
-      storeManagerService.addMedia.mockResolvedValue(false);
+      storeManagerService.addMediaFiles.mockResolvedValue(false);
       pickFiles("a.png");
 
       await h.invoke(alerts, APP_EVENTS.UPLOAD_MEDIA);

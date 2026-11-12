@@ -349,32 +349,38 @@ events.push(
   },
 );
 
-// Copies the files into a library. One bad file doesn't stop the others,
-// the service logs each failure. Throws when the library couldn't be saved.
+// Copies the files into a library, then lists them with one save. One bad
+// file doesn't stop the others, the service logs each failure. Throws when the
+// library couldn't be saved.
 const upload = async (
   paths: string[],
   importFile: (path: string) => Promise<ServiceResult<MediaFile>>,
   library: {
     list: () => MediaFile[];
-    add: (file: MediaFile) => Promise<boolean>;
+    add: (files: MediaFile[]) => Promise<boolean>;
   },
 ) => {
   let failed = 0;
-  let added = 0;
-  let saved = true;
+  const imported: MediaFile[] = [];
   for (const path of paths) {
     const entry = (await importFile(path)).data;
-    if (!entry) {
-      failed++;
-      continue;
-    }
-    // Files are named by content: one in the library, or picked twice, isn't new.
-    const listed = library.list().some((f) => f.file === entry.file);
-    // Added anyway: a failed save may have left it out of the store file.
-    if (!(await library.add(entry))) saved = false;
-    else if (!listed) added++;
+    if (entry) imported.push(entry);
+    else failed++;
   }
-  if (!saved) throw saveFailure();
+  // Files are named by content: one in the library, or picked twice, isn't new.
+  const known = new Set(library.list().map((f) => f.file));
+  const added = imported.filter((f) => {
+    const isNew = !known.has(f.file);
+    known.add(f.file);
+    return isNew;
+  }).length;
+  // shortcut: a quit in the middle of a big add saves none of it (the copied
+  // files stay in the folder), save in chunks if that bites.
+  // Added even with nothing new: a failed save may have left one out of the
+  // store file.
+  if (imported.length > 0 && !(await library.add(imported))) {
+    throw saveFailure();
+  }
   return { failed, added };
 };
 
@@ -394,7 +400,7 @@ events.push(
       (path) => alertsService.importSound(path),
       {
         list: () => storeManagerService.getSounds(),
-        add: (sound) => storeManagerService.addSound(sound),
+        add: (sounds) => storeManagerService.addSounds(sounds),
       },
     );
 
@@ -514,7 +520,7 @@ events.push(
       (path) => alertsService.importMedia(path),
       {
         list: () => storeManagerService.getMedia(),
-        add: (media) => storeManagerService.addMedia(media),
+        add: (media) => storeManagerService.addMediaFiles(media),
       },
     );
     const error =

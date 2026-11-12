@@ -6,13 +6,10 @@ import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { LanguageSection } from "./sections/LanguageSection";
 import { LogsSection } from "./sections/LogsSection";
-import { MediaSection } from "./sections/MediaSection";
-import { OverlaysSection } from "./sections/OverlaysSection";
 import { CloneProfileModal, NewProfileModal } from "./sections/ProfileModals";
 import { ProfileSection } from "./sections/ProfileSection";
 import { ProvidersSection } from "./sections/ProvidersSection";
 import { ServerSection } from "./sections/ServerSection";
-import { SoundsSection } from "./sections/SoundsSection";
 import { TraySection } from "./sections/TraySection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { VoiceKeysSection } from "./sections/VoiceKeysSection";
@@ -149,12 +146,6 @@ export function Settings() {
           onNew={() => setModal("newProfile")}
           onClone={() => setModal("cloneProfile")}
         />
-
-        <SoundsSection />
-
-        <MediaSection />
-
-        <OverlaysSection />
 
         <LogsSection
           debug={store.settings.logs.debug}

@@ -9,11 +9,19 @@ import { FiCheck } from "react-icons/fi";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OverlayView } from ".";
 
-function setup(overlay: OverlayApp = overlayApp("gift-jar")) {
+function setup(
+  overlay: OverlayApp = overlayApp("gift-jar"),
+  onRemove?: (overlay: OverlayApp) => void,
+) {
   const onTest = vi.fn();
   const onCustomize = vi.fn();
   const view = render(
-    <OverlayView overlay={overlay} onTest={onTest} onCustomize={onCustomize} />,
+    <OverlayView
+      overlay={overlay}
+      onTest={onTest}
+      onCustomize={onCustomize}
+      onRemove={onRemove}
+    />,
   );
   const user = userEvent.setup({
     advanceTimers: (ms) => vi.advanceTimersByTime(ms),
@@ -143,5 +151,20 @@ describe("OverlayView", () => {
 
     await user.click(dialog.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("offers Remove only when it can remove", async () => {
+    const { unmount } = setup();
+    expect(
+      screen.queryByRole("button", { name: "Remove" }),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    const onRemove = vi.fn();
+    const overlay = overlayApp("gift-jar");
+    const { user } = setup(overlay, onRemove);
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(onRemove).toHaveBeenCalledWith(overlay);
   });
 });

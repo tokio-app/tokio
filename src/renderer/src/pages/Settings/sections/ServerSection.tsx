@@ -42,7 +42,7 @@ export function ServerSection({ enabled, onChange }: Props) {
             hint={t("settings.server.addressHint")}
           >
             {addresses.length === 0 ? (
-              <p className={styles.library_meta}>
+              <p className={styles.no_address}>
                 {t("settings.server.noAddress")}
               </p>
             ) : (

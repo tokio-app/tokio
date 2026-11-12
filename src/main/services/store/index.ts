@@ -546,6 +546,11 @@ export class StoreManagerService extends Service {
     return this._addFile("sounds", sound);
   }
 
+  /** Adds the sounds not listed yet, with one save. */
+  public addSounds(sounds: AlertSound[]): Promise<boolean> {
+    return this._addFiles("sounds", sounds);
+  }
+
   public removeSound(file: string): Promise<boolean> {
     return this._removeFile("sounds", file);
   }
@@ -557,6 +562,11 @@ export class StoreManagerService extends Service {
 
   public addMedia(media: MediaFile): Promise<boolean> {
     return this._addFile("media", media);
+  }
+
+  /** Adds the media files not listed yet, with one save. */
+  public addMediaFiles(media: MediaFile[]): Promise<boolean> {
+    return this._addFiles("media", media);
   }
 
   public removeMedia(file: string): Promise<boolean> {
@@ -651,16 +661,26 @@ export class StoreManagerService extends Service {
     return saved;
   }
 
-  private async _addFile(
+  private _addFile(
     library: "sounds" | "media" | "minecraftPictures",
     entry: AlertSound,
   ): Promise<boolean> {
+    return this._addFiles(library, [entry]);
+  }
+
+  private async _addFiles(
+    library: "sounds" | "media" | "minecraftPictures",
+    entries: AlertSound[],
+  ): Promise<boolean> {
     this._ensureInitialized();
     const files = this._storeData!.settings[library];
-    // Files are named by content, so the same file means the same entry. Saved
-    // again, as a failed save may have left it out of the store file.
-    if (files.some((f) => f.file === entry.file)) return this._queueSave();
-    files.push(entry);
+    // Files are named by content, so the same file means the same entry, in
+    // the library or twice in the batch.
+    for (const entry of entries) {
+      if (!files.some((f) => f.file === entry.file)) files.push(entry);
+    }
+    // Saved once, even with nothing new: a failed save may have left an entry
+    // out of the store file.
     return this._queueSave();
   }
 

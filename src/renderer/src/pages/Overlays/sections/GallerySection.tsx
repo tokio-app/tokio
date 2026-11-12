@@ -12,6 +12,7 @@ import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useLanguage, useT } from "@/ui/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { FiPlus } from "react-icons/fi";
 import { LuPackageSearch } from "react-icons/lu";
 import { updatesHint } from "../helper";
 import styles from "../overlays.module.css";
@@ -20,9 +21,15 @@ interface Props {
   overlays: OverlayApp[];
   onTest: (id: string) => void;
   onCustomize: (id: string) => void;
+  onRemove: (overlay: OverlayApp) => void;
 }
 
-export function GallerySection({ overlays, onTest, onCustomize }: Props) {
+export function GallerySection({
+  overlays,
+  onTest,
+  onCustomize,
+  onRemove,
+}: Props) {
   const t = useT();
   const [search, setSearch] = useState("");
 
@@ -44,6 +51,12 @@ export function GallerySection({ overlays, onTest, onCustomize }: Props) {
             onChange={setSearch}
           />
           <OfficialButton overlays={overlays} />
+          <Btn
+            title={t("overlays.gallery.import")}
+            onClick={() => window.api.emit(APP_EVENTS.IMPORT_OVERLAY)}
+          >
+            <FiPlus size={20} />
+          </Btn>
         </>
       }
     >
@@ -56,6 +69,7 @@ export function GallerySection({ overlays, onTest, onCustomize }: Props) {
               overlay={overlay}
               onTest={onTest}
               onCustomize={onCustomize}
+              onRemove={onRemove}
             />
           ))}
         </div>

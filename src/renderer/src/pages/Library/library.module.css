@@ -1,0 +1,93 @@
+/* The header, the tabs and the panel as tall as the window leaves them: the
+   panel scrolls inside, like Fans' */
+.library {
+  display: flex;
+  flex-direction: column;
+  height: calc(
+    100vh - var(--title-bar-height) - 2 * var(--space-8) - var(--space-12)
+  );
+}
+
+.library > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* What a tab holds, in the readout */
+.count {
+  color: var(--font-secondary);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-tertiary);
+  list-style: none;
+}
+
+/* SOUNDS */
+
+/* Rows out of view skip layout, so a thousand sounds stay cheap */
+.sound {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 52px;
+}
+
+.sound + .sound {
+  border-top: 1px solid var(--border);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* MEDIA */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+/* Tiles out of view skip layout too. The clip margin keeps the button's
+   focus ring, which the containment would cut off. */
+.tile {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 124px;
+  overflow-clip-margin: var(--space-1);
+}
+
+/* A file shown full size */
+.media_full {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+}
+
+.error {
+  color: var(--danger);
+  font-size: var(--font-sm);
+}

@@ -20,6 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const GIFT_JAR = overlayApp("gift-jar", { name: "Gift Jar" });
 const TOP_LIKES = overlayApp("top-likes", { name: "Top Likes" });
+const MY_GOAL = overlayApp("5f0c7a52", { name: "My Goal", external: true });
 const GIFTS = [gift(1, "Rose"), gift(5655, "Lion")];
 
 const PAYLOADS: TokioPayload[] = [
@@ -109,7 +110,7 @@ describe("Overlays", () => {
 
     expect(
       page().getByText(
-        "No overlays yet. Install an official one, or import your own in Settings.",
+        "No overlays yet. Install an official one, or import your own.",
       ),
     ).toBeInTheDocument();
   });
@@ -521,5 +522,67 @@ describe("Overlays", () => {
     expect(
       page().getByRole("heading", { name: "Official overlays" }),
     ).toBeInTheDocument();
+  });
+
+  it("imports an overlay with the + button", async () => {
+    const { user } = await renderApp("/overlays");
+
+    await user.click(page().getByRole("button", { name: "Import overlay" }));
+
+    expect(sent(APP_EVENTS.IMPORT_OVERLAY)).toHaveLength(1);
+  });
+
+  it.each([
+    ["an official", GIFT_JAR],
+    ["an imported", MY_GOAL],
+  ])(
+    "asks before removing %s overlay, and Cancel keeps it",
+    async (_, overlay) => {
+      const { user } = await renderApp("/overlays");
+      await overlays(GIFT_JAR, MY_GOAL);
+
+      await user.click(
+        card(overlay.name).getByRole("button", { name: "Remove" }),
+      );
+      expect(dialog().getByText("Remove overlay?")).toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toHaveTextContent(
+        `${overlay.name} and its settings will be deleted.`,
+      );
+
+      await user.click(dialog().getByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(sent(APP_EVENTS.REMOVE_OVERLAY)).toEqual([]);
+    },
+  );
+
+  it.each([
+    ["an official", GIFT_JAR],
+    ["an imported", MY_GOAL],
+  ])("removes %s overlay once confirmed", async (_, overlay) => {
+    const { user } = await renderApp("/overlays");
+    await overlays(GIFT_JAR, MY_GOAL);
+
+    await user.click(
+      card(overlay.name).getByRole("button", { name: "Remove" }),
+    );
+    await user.click(dialog().getByRole("button", { name: "Remove" }));
+
+    expect(sent(APP_EVENTS.REMOVE_OVERLAY)).toEqual([{ id: overlay.id }]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  // Failed imports and removals send the current list
+  it("shows the list a failed reply brings", async () => {
+    await renderApp("/overlays");
+    await overlays(GIFT_JAR, MY_GOAL);
+
+    await send(APP_EVENTS_RESPONSE.GET_OVERLAYS, {
+      ...failure(),
+      data: [MY_GOAL],
+    });
+
+    expect(card("My Goal").getByRole("button", { name: "Test" })).toBeVisible();
+    expect(page().queryByRole("heading", { name: "Gift Jar" })).toBeNull();
   });
 });
