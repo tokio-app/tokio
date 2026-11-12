@@ -1,23 +1,23 @@
 import { MessageKey } from "@/common/i18n";
-import { ActivityItem } from "@/common/types";
-import { Avatar, Btn, EmptyState, Section } from "@/components";
+import { ActivityItem, MusicInfo } from "@/common/types";
+import { Avatar, Btn } from "@/components";
 import { cx } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
 import { rich, useLanguage, useT } from "@/ui/i18n";
 import { memo } from "react";
 import { FiSettings } from "react-icons/fi";
 import styles from "../home.module.css";
-import { joinedText, Stat, statText } from "../helper";
+import { joinedText, songParts } from "../helper";
 
 interface Props {
   connected: boolean;
-  // Counted since connecting
-  totals: Stat[];
   // Newest first
   activity: ActivityItem[];
   // Every kind of event is hidden
   feedOff: boolean;
   onFeedSettings: () => void;
+  // The song playing, while the music player is connected
+  song?: MusicInfo;
 }
 
 const DID: Record<"follow" | "share" | "superfan", MessageKey> = {
@@ -29,7 +29,6 @@ const DID: Record<"follow" | "share" | "superfan", MessageKey> = {
 // The viewer's name and what they did, in the language's order
 function Action({ item }: { item: Exclude<ActivityItem, { type: "join" }> }) {
   const t = useT();
-  const language = useLanguage();
   const name = (
     <span className={styles.event_name} title={`@${item.user.handle}`}>
       {item.user.name}
@@ -60,9 +59,6 @@ function Action({ item }: { item: Exclude<ActivityItem, { type: "join" }> }) {
         {item.gift.image && (
           <img className={styles.inline_img} src={item.gift.image} alt="" />
         )}{" "}
-        <span className={styles.coins}>
-          {coinsLabel(item.gift.coins, language)}
-        </span>
       </>
     );
   }
@@ -95,6 +91,12 @@ const Event = memo(function Event({ item }: { item: ActivityItem }) {
       <div className={styles.event_body}>
         <Action item={item} />
       </div>
+      {/* At the row's end, after the body's trailing space */}
+      {item.type === "gift" && (
+        <span className={styles.coins}>
+          {coinsLabel(item.gift.coins, language)}
+        </span>
+      )}
     </li>
   );
 }, sameItem);
@@ -105,19 +107,20 @@ function emptyText(connected: boolean, feedOff: boolean): MessageKey {
   return "home.activity.offline";
 }
 
+// The rail: the feed as tall as the window, the song playing at its foot
 export function ActivitySection({
   connected,
-  totals,
   activity,
   feedOff,
   onFeedSettings,
+  song,
 }: Props) {
   const t = useT();
-  const language = useLanguage();
+  const { name, artist } = songParts(song?.title ?? "");
   return (
-    <Section
-      title={t("home.activity.title")}
-      actions={
+    <section className={styles.rail}>
+      <header className={styles.rail_header}>
+        <h2 className={styles.rail_title}>{t("home.activity.title")}</h2>
         <Btn
           variant="icon"
           title={t("home.activity.feedSettings")}
@@ -125,37 +128,44 @@ export function ActivitySection({
         >
           <FiSettings size={18} />
         </Btn>
-      }
-    >
-      <div className={styles.totals}>
-        {totals.map(({ label, value }) => {
-          const { text, title } = statText(value, connected, language);
-          return (
-            <div key={label} className={styles.total}>
-              <span className={styles.total_value} title={title}>
-                {text}
-              </span>
-              <span className={styles.stat_label}>{t(label)}</span>
-            </div>
-          );
-        })}
-      </div>
+      </header>
 
-      <div className={styles.feed}>
-        {activity.length === 0 ? (
-          <EmptyState>{t(emptyText(connected, feedOff))}</EmptyState>
-        ) : (
-          // Not a live region, a busy chat would flood screen readers
-          <ol
-            className={styles.feed_list}
-            aria-label={t("home.activity.title")}
-          >
-            {activity.map((item) => (
-              <Event key={item.id} item={item} />
-            ))}
-          </ol>
-        )}
-      </div>
-    </Section>
+      {activity.length === 0 ? (
+        <p className={styles.feed_empty}>{t(emptyText(connected, feedOff))}</p>
+      ) : (
+        // Not a live region, a busy chat would flood screen readers
+        <ol className={styles.feed_list} aria-label={t("home.activity.title")}>
+          {activity.map((item) => (
+            <Event key={item.id} item={item} />
+          ))}
+        </ol>
+      )}
+
+      {song && (
+        <footer className={styles.playing}>
+          {song.thumbnail && (
+            <img className={styles.playing_art} src={song.thumbnail} alt="" />
+          )}
+          <p className={styles.playing_body}>
+            <span className={styles.playing_label}>
+              {t("home.playing.title")}
+            </span>
+            <span className={styles.playing_title} title={name}>
+              {name}
+            </span>
+            {artist && (
+              <span className={styles.playing_artist} title={artist}>
+                {artist}
+              </span>
+            )}
+          </p>
+          <span className={styles.bars} aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+        </footer>
+      )}
+    </section>
   );
 }

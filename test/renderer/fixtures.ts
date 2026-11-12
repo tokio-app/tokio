@@ -21,10 +21,12 @@ import {
   Gifter,
   LiveSession,
   LiveSummary,
+  MusicInfo,
   MyInstantsSound,
   OverlayApp,
   PackageLicense,
   TimerData,
+  TopGifter,
   VoiceData,
   VoiceEngine,
 } from "@/common/types";
@@ -133,6 +135,7 @@ export const liveSession = (patch: Partial<LiveSession> = {}): LiveSession => ({
   startedAt: null,
   totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
   activity: [],
+  viewers: [],
   ...patch,
 });
 
@@ -158,6 +161,34 @@ export const gifter = (name: string, coins: number, gifts = 1): Gifter => ({
   coins,
   gifts,
   giftedAt: 0,
+});
+
+/** A viewer who sent `coins` this LIVE in one gift, all they ever sent, without a picture. */
+export const topGifter = (
+  name: string,
+  coins: number,
+  patch: Partial<TopGifter> = {},
+): TopGifter => ({
+  userId: `id-${slug(name)}`,
+  username: name,
+  handle: slug(name),
+  picture: "",
+  live: { coins, gifts: 1 },
+  allTime: { coins, gifts: 1 },
+  giftedAt: 0,
+  ...patch,
+});
+
+/** A song in the request queue, waiting its turn, without a thumbnail. */
+export const song = (
+  title: string,
+  patch: Partial<MusicInfo> = {},
+): MusicInfo => ({
+  title,
+  thumbnail: "",
+  playing: false,
+  played: false,
+  ...patch,
 });
 
 /** A viewer at fan level `fanLevel`, with TikTok's badge, never seen, not a Super Fan. */

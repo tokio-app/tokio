@@ -17,33 +17,37 @@ export const PlayerStateJSCode = `
   // Buffering counts as playing
   const playing = state === 1 || state === 3;
   const time = player.getCurrentTime() * 1000;
-  const formats = player.getPlayerResponse?.()?.streamingData?.adaptiveFormats ?? [];
+  const response = player.getPlayerResponse?.();
+  const formats = response?.streamingData?.adaptiveFormats ?? [];
   const audio = formats.find((f) => f.mimeType?.startsWith("audio/"));
   const duration = Number(audio?.approxDurationMs) || player.getDuration() * 1000;
+  const id = player.getVideoData().video_id;
+
+  // The song's own pictures, smallest first. The player bar's picture isn't
+  // one: in the minimized window, or during an ad, it holds the page's address.
+  const pictures = response?.videoDetails?.thumbnail?.thumbnails ?? [];
+  const picture =
+    pictures.at(-1)?.url ?? (id ? "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg" : "");
+  const thumbnail = picture.replace(${THUMBNAIL_SIZE}, ${JSON.stringify(config.THUMBNAIL_SPEC)});
 
   const playerBar = document.querySelector("ytmusic-player-bar");
 
   let name = "";
   let artist = "";
-  let thumbnail = "";
 
   if (playerBar) {
     const titleNode = playerBar.querySelector(".title");
     const artistNode = playerBar.querySelector(".subtitle a");
-    const imageNode = playerBar.querySelector(".thumbnail-image-wrapper img.image");
 
     name = titleNode?.textContent?.trim() ?? "";
     artist = artistNode?.textContent?.trim() ?? "";
-
-    const rawImageSrc = imageNode?.src?.trim() ?? "";
-    thumbnail = rawImageSrc.replace(${THUMBNAIL_SIZE}, ${JSON.stringify(config.THUMBNAIL_SPEC)});
   }
 
   const title = name && artist ? \`\${name} - \${artist}\` : name || artist;
 
   return {
     album: "Unknown",
-    track: player.getVideoData().video_id || "Unknown",
+    track: id || "Unknown",
     title,
     thumbnail,
     time,

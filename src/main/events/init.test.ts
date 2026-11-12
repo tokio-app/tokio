@@ -527,7 +527,8 @@ describe("init events", () => {
       // MUSIC_CHANGE also fires when a song is queued, so it's left out
       // Once for the alerts and games, once for Overlay Studio
       expect(s.musicService.onSongChange).toHaveBeenCalledTimes(2);
-      expect(subscribed(s.music)).toEqual([]);
+      // Only Home's queue
+      expect(subscribed(s.music)).toEqual([TOKIO_EVENTS.MUSIC_CHANGE]);
       expect(subscribed(s.conn)).not.toContain(TOKIO_EVENTS.MUSIC_CHANGE);
       for (const trigger of triggers) {
         if (trigger === TOKIO_EVENTS.MUSIC_CHANGE) continue;
@@ -1473,7 +1474,7 @@ describe("init events", () => {
       connect(s);
 
       expect(sessions(s)).toEqual([
-        { startedAt: 5000, totals: noTotals, activity: [] },
+        { startedAt: 5000, totals: noTotals, activity: [], viewers: [] },
       ]);
     });
 
@@ -1509,6 +1510,32 @@ describe("init events", () => {
       vi.advanceTimersByTime(1000);
 
       expect(sessions(s)).toHaveLength(1);
+    });
+
+    it("pushes the session as each minute of viewers ends", async () => {
+      vi.useFakeTimers({ now: 5000 });
+      const s = await live();
+      connect(s);
+      const viewers = (n: number) =>
+        s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(100, n));
+
+      viewers(10);
+      viewers(30);
+      vi.advanceTimersByTime(60_000);
+      expect(sessions(s)).toHaveLength(1);
+
+      viewers(20);
+      expect(sessions(s)).toHaveLength(2);
+      vi.advanceTimersByTime(30_000);
+      viewers(25);
+      vi.advanceTimersByTime(30_000);
+      viewers(15);
+
+      expect(sessions(s).map((session) => session.viewers)).toEqual([
+        [],
+        [30, 20],
+        [30, 25, 15],
+      ]);
     });
 
     it("keeps the kinds of events the saved feed shows", async () => {
@@ -1981,6 +2008,24 @@ describe("init events", () => {
         [message()],
         [message(top([gifter]))],
       ]);
+      // Home gets this LIVE's with each push
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
+        { data: [] },
+        { data: [gifter] },
+      ]);
+    });
+
+    it("still pushes them to the overlays when the window closed", async () => {
+      const s = await live();
+      s.historyService.top.mockReturnValue(top([gifter]));
+      s.h.win.close();
+
+      change(s);
+
+      expect(s.serverService.sendToAll).toHaveBeenCalledExactlyOnceWith(
+        message(top([gifter])),
+      );
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([]);
     });
 
     it("saves the LIVE in progress every 30 s", async () => {
@@ -2534,6 +2579,19 @@ describe("init events", () => {
   });
 
   describe("music playback", () => {
+    it("pushes the queue to the window as it changes", async () => {
+      const s = await live();
+      const { data: songs } = generateTikTokEventSample(
+        TOKIO_EVENTS.MUSIC_CHANGE,
+      );
+
+      s.music.emit(TOKIO_EVENTS.MUSIC_CHANGE, songs);
+      s.h.win.close();
+      s.music.emit(TOKIO_EVENTS.MUSIC_CHANGE, []);
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.SONGS)).toEqual([{ data: songs }]);
+    });
+
     it("warns when a song request couldn't be played", async () => {
       const s = await live();
       const [listener] = s.musicService.onPlaybackError.mock.calls[0];

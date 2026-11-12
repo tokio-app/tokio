@@ -12,4 +12,5 @@ export * from "./useIpcRequest";
 export * from "./useNotifications";
 export * from "./usePopover";
 export * from "./useServerEnabled";
+export * from "./useServerSwitch";
 export * from "./useUpdateStatus";

@@ -11,6 +11,7 @@ Profile sections save through `useEditableSettings`, single fields through `useA
 ## Pages and components
 
 - Each page is a folder `src/renderer/src/pages/<Page>/` with `index.tsx`, `<page>.module.css`, an optional `helper.ts` and `sections/*Section.tsx`, built from `components/Page` (`Page`, `Section`, `Field`, `FormGrid`, `EmptyState`). The router uses hash history. The `new-page` skill has the steps.
+- Home is the one page without `Page`. Its grid (`.home`) cancels Layout's 32px padding with negative margins and is as tall as the window minus the title bar, so the feed runs down the window's right edge: change it with `.content`'s padding. Its "Dashboard" heading is visually hidden in a 1px box, never `display: none`, since App, Layout and e2e tests and drive-app wait for it to be visible.
 - A page opened from another page (Official overlays, the tools) gets a path under its parent's (`/overlays/official`, `/tools/fans`), which keeps the parent's sidebar item active, and a `BackButton` (`components/BackButton`) before its first heading (`Section`'s `icon`).
 - Tools lists its tools one row each: a link named by the tool, with what it holds now in the readout on the right. No icons, chevrons or cards (the user's call). A new tool gets a page under `/tools/` and a row there.
 - Leave room for Spanish, which runs about 25% longer.

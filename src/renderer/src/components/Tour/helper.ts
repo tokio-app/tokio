@@ -82,8 +82,8 @@ export function placeTour(
     hole,
     card: {
       top: middle,
-      // shortcut: doesn't check the window's right edge, as every piece is in
-      // its left half (the widest card ends near 1106 of the 1200px minimum);
+      // shortcut: doesn't check the window's right edge, as every piece ends
+      // near x 808 (the widest card ends near 1170 of the 1200px minimum);
       // put the card on the piece's left if one ever sits on the right.
       left: hole.left + hole.width + GAP,
       translate: `0 ${-share}%`,

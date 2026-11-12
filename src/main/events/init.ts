@@ -267,10 +267,6 @@ const registerConnectorEvents = ({
     win.webContents.send(APP_EVENTS_RESPONSE.LIKES, { likes });
   }, STATS_THROTTLE_MS);
 
-  conn.on(TOKIO_EVENTS.ROOM_USER, (d) => {
-    store.updateLiveStats({ viewers: d.viewers, views: d.views });
-    sendViews(d.views, d.viewers);
-  });
   // TikTok sometimes lowers the total for a while, so the most seen is kept
   let likes = 0;
   conn.on(TOKIO_EVENTS.LIKE, (d) => {
@@ -287,6 +283,12 @@ const registerConnectorEvents = ({
     });
   };
   const sendSession = throttle(pushSession, STATS_THROTTLE_MS);
+  // Home's chart gets the session again as each minute of viewers ends
+  conn.on(TOKIO_EVENTS.ROOM_USER, (d) => {
+    store.updateLiveStats({ viewers: d.viewers, views: d.views });
+    sendViews(d.views, d.viewers);
+    if (live.recordViewers(d.viewers)) sendSession();
+  });
   for (const type of ACTIVITY_EVENTS) {
     conn.on(type, (d) => {
       if (live.record(type, d)) sendSession();
@@ -487,6 +489,12 @@ const registerConnectorEvents = ({
     recordGift(d).catch((error) => {
       notifier.report({ source: "alerts", error, context: TOKIO_EVENTS.GIFT });
     });
+  });
+
+  // Home's now playing gets the queue as overlays do, on every change
+  music.on(TOKIO_EVENTS.MUSIC_CHANGE, (songs) => {
+    if (win.isDestroyed()) return;
+    win.webContents.send(APP_EVENTS_RESPONSE.SONGS, { data: songs });
   });
 
   music.onPlaybackError((id, error) => {
@@ -825,12 +833,18 @@ const registerHistory = ({
     conn.on(type, (d) => history.record(type, d));
   }
 
-  const message = (): TokioPayload => ({
+  const message = (top = history.top()): TokioPayload => ({
     type: "tokio:gifters",
-    data: history.top(),
+    data: top,
   });
-  // The lists are read when the push goes, so they're never old ones.
-  const push = throttle(() => server.sendToAll(message()), GIFTERS_PUSH_MS);
+  // The lists are read when the push goes, so they're never old ones. Home's
+  // top gifters go with the overlays', so both show the same list.
+  const push = throttle(() => {
+    const top = history.top();
+    server.sendToAll(message(top));
+    if (win.isDestroyed()) return;
+    win.webContents.send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, { data: top.live });
+  }, GIFTERS_PUSH_MS);
   history.onChange(push);
   server.onConnect((id) => server.sendToClient(id, message()));
 

@@ -39,6 +39,9 @@ export type LiveSession = {
   totals: LiveTotals;
   // Newest first. Kept when the LIVE ends, until the next one starts.
   activity: ActivityItem[];
+  // Each minute's highest viewer count since startedAt, the last one still
+  // counting. Kept like the feed.
+  viewers: number[];
 };
 
 // A viewer who sent gifts, keyed by TikTok's user id. Name, handle and

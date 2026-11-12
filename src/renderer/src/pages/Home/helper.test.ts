@@ -1,27 +1,74 @@
 import { createAlert } from "@/pages/Alerts/helper";
 import { describe, expect, it } from "vitest";
-import { alertsStatus, joinedText, serverStatus, statText } from "./helper";
+import {
+  alertsStatus,
+  chartPoints,
+  joinedText,
+  nearestIndex,
+  overlaysStatus,
+  songParts,
+} from "./helper";
 
-describe("statText", () => {
-  it("gives the short number with the exact one for the title", () => {
-    expect(statText(1234, true, "en")).toEqual({
-      text: "1.2K",
-      title: "1,234",
-    });
+describe("chartPoints", () => {
+  it("spreads the points across, from 0 on the baseline to the peak on top", () => {
+    expect(chartPoints([0, 20, 40])).toEqual([
+      { x: 0, y: 100 },
+      { x: 50, y: 50 },
+      { x: 100, y: 0 },
+    ]);
   });
 
-  it("gives dashes while offline", () => {
-    expect(statText(1234, false, "en")).toEqual({
-      text: "--",
-      title: undefined,
-    });
+  it("puts a lone point on the right edge", () => {
+    expect(chartPoints([12])).toEqual([{ x: 100, y: 0 }]);
+  });
+
+  it("keeps a LIVE with no viewers on the baseline", () => {
+    expect(chartPoints([0, 0])).toEqual([
+      { x: 0, y: 100 },
+      { x: 100, y: 100 },
+    ]);
+  });
+});
+
+describe("nearestIndex", () => {
+  it("snaps to the nearest point", () => {
+    expect(nearestIndex(0.2, 3)).toBe(0);
+    expect(nearestIndex(0.3, 3)).toBe(1);
+    expect(nearestIndex(0.9, 3)).toBe(2);
+  });
+
+  it("stays on the chart past its edges", () => {
+    expect(nearestIndex(-0.5, 3)).toBe(0);
+    expect(nearestIndex(1.5, 3)).toBe(2);
+    expect(nearestIndex(0.7, 1)).toBe(0);
   });
 });
 
 describe("feature status", () => {
   it("counts one alert or overlay in the singular", () => {
     expect(alertsStatus([createAlert()], "en")).toBe("1 of 1 alert on");
-    expect(serverStatus(true, 1, "en")).toBe("Running · 1 overlay");
+    expect(overlaysStatus(1, "en")).toBe("1 overlay");
+  });
+
+  it("says when there are no overlays yet", () => {
+    expect(overlaysStatus(0, "en")).toBe("No overlays yet");
+  });
+});
+
+describe("songParts", () => {
+  it("puts the artist after the last dash, as the providers name songs", () => {
+    expect(songParts("Try - P!NK")).toEqual({ name: "Try", artist: "P!NK" });
+    expect(songParts("Try - Live - P!NK")).toEqual({
+      name: "Try - Live",
+      artist: "P!NK",
+    });
+  });
+
+  it("keeps a title without one whole", () => {
+    expect(songParts("Blinding Lights")).toEqual({
+      name: "Blinding Lights",
+      artist: "",
+    });
   });
 });
 

@@ -367,4 +367,52 @@ describe("PlayerStateJSCode", () => {
 
     expect(runInNewContext(PlayerStateJSCode, { document })).toBeNull();
   });
+
+  describe("cover", () => {
+    // The player bar's picture as the minimized window has it: the page's
+    // own address, which isn't an image
+    const bar = {
+      querySelector: (selector: string) =>
+        selector.includes("img")
+          ? { src: "https://music.youtube.com/" }
+          : { textContent: "Blinding Lights" },
+    };
+    const status = (thumbnails?: { url: string; width: number }[]) => {
+      const player = {
+        getVideoData: () => ({ video_id: "abc" }),
+        getPlayerState: () => 1,
+        getCurrentTime: () => 0,
+        getDuration: () => 200,
+        getPlayerResponse: () => ({
+          videoDetails: thumbnails && { thumbnail: { thumbnails } },
+        }),
+      };
+      const document = {
+        querySelector: (selector: string) =>
+          selector === "#movie_player" ? player : bar,
+      };
+      return runInNewContext(PlayerStateJSCode, { document });
+    };
+
+    it("takes the song's largest picture, not the player bar's", () => {
+      expect(
+        status([
+          {
+            url: "https://lh3.googleusercontent.com/art=w60-h60-l90-rj",
+            width: 60,
+          },
+          {
+            url: "https://lh3.googleusercontent.com/art=w544-h544-l90-rj",
+            width: 544,
+          },
+        ]).thumbnail,
+      ).toBe("https://lh3.googleusercontent.com/art=w480-h480-l90-rj");
+    });
+
+    it("falls back to the video's still without pictures", () => {
+      expect(status().thumbnail).toBe(
+        "https://i.ytimg.com/vi/abc/hqdefault.jpg",
+      );
+    });
+  });
 });

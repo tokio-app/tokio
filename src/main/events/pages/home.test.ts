@@ -13,6 +13,9 @@ import home from "./home";
 const stats = { likes: 3, viewers: 2, views: 10 };
 const noStats = { likes: 0, viewers: 0, views: 0 };
 const noTotals = { followers: 0, shares: 0, gifts: 0, coins: 0 };
+const fail = (): never => {
+  throw new Error("broken");
+};
 
 describe("home events", () => {
   describe("CONNECT", () => {
@@ -300,6 +303,66 @@ describe("home events", () => {
       expect(h.notices).toEqual([]);
     });
   });
+
+  describe("GET_LIVE_GIFTERS", () => {
+    it("replies with this LIVE's top gifters without a notice", async () => {
+      const gifter = {
+        userId: "1",
+        username: "Leo",
+        handle: "leo",
+        picture: "",
+        live: { coins: 1000, gifts: 1 },
+        allTime: { coins: 5000, gifts: 9 },
+        giftedAt: 1000,
+      };
+      const h = createHandler({
+        historyService: { top: () => ({ live: [gifter], allTime: [] }) },
+      });
+
+      await h.invoke(home, APP_EVENTS.GET_LIVE_GIFTERS);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
+        { data: [gifter] },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+  });
+
+  describe("GET_SONGS", () => {
+    it("replies with the request queue without a notice", async () => {
+      const songs = [
+        {
+          title: "Blinding Lights",
+          thumbnail: "",
+          playing: true,
+          played: false,
+        },
+      ];
+      const h = createHandler({ musicService: { songs: () => songs } });
+
+      await h.invoke(home, APP_EVENTS.GET_SONGS);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.SONGS)).toEqual([{ data: songs }]);
+      expect(h.notices).toEqual([]);
+    });
+  });
+
+  it.each([
+    [APP_EVENTS.GET_LIVE_GIFTERS, { historyService: { top: () => fail() } }],
+    [APP_EVENTS.GET_SONGS, { musicService: { songs: () => fail() } }],
+  ] as const)(
+    "sends no reply and no notice when %s fails",
+    async (event, services) => {
+      const error = vi.spyOn(Logger, "error");
+      const h = createHandler(services);
+
+      await h.invoke(home, event);
+
+      expect(h.sent()).toEqual([]);
+      expect(h.notices).toEqual([]);
+      expect(error).toHaveBeenCalled();
+    },
+  );
 
   describe("SET_ACTIVITY_FEED", () => {
     const feed = {

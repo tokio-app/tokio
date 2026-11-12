@@ -4,7 +4,7 @@ import { cx } from "@/helper";
 import { useLanguage, useT } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
 import { FiChevronRight } from "react-icons/fi";
-import { alertsStatus, serverStatus } from "../helper";
+import { alertsStatus, overlaysStatus } from "../helper";
 import styles from "../home.module.css";
 
 type Features = AppSettings["activeFeatures"];
@@ -21,6 +21,8 @@ interface Props {
   musicConnected: boolean;
   server: { enabled: boolean; overlays: number };
   onChange: (feature: keyof Features, enabled: boolean) => void;
+  // The overlay server, saved in the settings, not with the features
+  onServerChange: (enabled: boolean) => void;
 }
 
 export function FeaturesSection({
@@ -29,6 +31,7 @@ export function FeaturesSection({
   musicConnected,
   server,
   onChange,
+  onServerChange,
 }: Props) {
   const t = useT();
   const language = useLanguage();
@@ -48,20 +51,28 @@ export function FeaturesSection({
     },
     alerts: { text: alertsStatus(profile.alerts.items, language) },
   };
-  const serverPage = server.enabled
-    ? ({ to: "/overlays", label: "nav.overlays" } as const)
-    : ({ to: "/settings", label: "nav.settings" } as const);
+  const overlaysText = overlaysStatus(server.overlays, language);
 
   return (
     <Section title={t("home.features.title")}>
+      {/* A 2x2 switchboard: each cell's name and link, the status under */}
       <ul className={styles.features} data-tour="features">
         {FEATURES.map(({ key, label, to }) => (
           <li key={key} className={styles.feature}>
-            <Toggle
-              label={t(label)}
-              checked={features[key]}
-              onChange={(e) => onChange(key, e.target.checked)}
-            />
+            <div className={styles.feature_head}>
+              <Toggle
+                label={t(label)}
+                checked={features[key]}
+                onChange={(e) => onChange(key, e.target.checked)}
+              />
+              <Link
+                to={to}
+                className={styles.feature_link}
+                aria-label={t("home.features.goTo", { page: t(label) })}
+              >
+                <FiChevronRight size={18} />
+              </Link>
+            </div>
             <span
               className={cx(
                 styles.feature_status,
@@ -71,35 +82,27 @@ export function FeaturesSection({
             >
               {status[key].text}
             </span>
-            <Link
-              to={to}
-              className={styles.feature_link}
-              aria-label={t("home.features.goTo", { page: t(label) })}
-            >
-              <FiChevronRight size={18} />
-            </Link>
           </li>
         ))}
 
         <li className={styles.feature}>
-          <span className={styles.feature_name}>
-            <span className={styles.feature_dot}>
-              <span
-                className={cx(styles.dot, server.enabled && styles.dot_on)}
-              />
-            </span>
-            {t("nav.overlays")}
+          <div className={styles.feature_head}>
+            <Toggle
+              label={t("nav.overlays")}
+              checked={server.enabled}
+              onChange={(e) => onServerChange(e.target.checked)}
+            />
+            <Link
+              to="/overlays"
+              className={styles.feature_link}
+              aria-label={t("home.features.goTo", { page: t("nav.overlays") })}
+            >
+              <FiChevronRight size={18} />
+            </Link>
+          </div>
+          <span className={styles.feature_status} title={overlaysText}>
+            {overlaysText}
           </span>
-          <span className={styles.feature_status}>
-            {serverStatus(server.enabled, server.overlays, language)}
-          </span>
-          <Link
-            to={serverPage.to}
-            className={styles.feature_link}
-            aria-label={t("home.features.goTo", { page: t(serverPage.label) })}
-          >
-            <FiChevronRight size={18} />
-          </Link>
         </li>
       </ul>
     </Section>

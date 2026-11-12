@@ -21,7 +21,6 @@ const feed = (joined: number): ActivityItem[] => [
 const section = (activity: ActivityItem[]) => (
   <ActivitySection
     connected
-    totals={[]}
     activity={activity}
     feedOff={false}
     onFeedSettings={() => {}}

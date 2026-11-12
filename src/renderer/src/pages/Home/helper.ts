@@ -1,13 +1,13 @@
 import { listOf, MessageKey, translate } from "@/common/i18n";
 import { ActivityFeed, Alert } from "@/common/schemas";
 import { ActivityUser, LiveSession } from "@/common/types";
-import { formatStat } from "@/helper";
 
 // Until main answers
 export const NO_SESSION: LiveSession = {
   startedAt: null,
   totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
   activity: [],
+  viewers: [],
 };
 
 // The kinds of events the feed can show, as its settings list them
@@ -22,12 +22,31 @@ export const FEED_KINDS: { kind: keyof ActivityFeed; label: MessageKey }[] = [
 
 export type Stat = { label: MessageKey; value: number };
 
-// Short, with the exact number on hover, as the language writes them. Dashes
-// while offline.
-export function statText(value: number, connected: boolean, language: string) {
-  if (!connected) return { text: "--", title: undefined };
-  const { short, full } = formatStat(value, language);
-  return { text: short, title: full };
+// The chart's points, x and y from 0 to 100 with y down, as the SVG's viewBox
+// reads them: the peak at the top, 0 on the baseline, a lone point on the
+// right edge, where now is
+export function chartPoints(values: number[]): { x: number; y: number }[] {
+  const peak = Math.max(0, ...values);
+  const last = values.length - 1;
+  return values.map((value, i) => ({
+    x: last > 0 ? (i / last) * 100 : 100,
+    y: peak > 0 ? 100 - (value / peak) * 100 : 100,
+  }));
+}
+
+// Every music provider names a song "name - artist". A song's name can hold
+// " - " itself ("Try - Live"), an artist's rarely does, so the last one splits
+// them. Without one it's all name.
+export function songParts(title: string): { name: string; artist: string } {
+  const at = title.lastIndexOf(" - ");
+  if (at === -1) return { name: title, artist: "" };
+  return { name: title.slice(0, at), artist: title.slice(at + 3) };
+}
+
+// The point nearest a spot across the chart, given as a share of its width
+export function nearestIndex(ratio: number, count: number): number {
+  if (count <= 1) return 0;
+  return Math.round(Math.min(Math.max(ratio, 0), 1) * (count - 1));
 }
 
 // "kai joined", "kai and yui joined", "kai, yui, and 3 others joined"
@@ -58,12 +77,8 @@ export function alertsStatus(alerts: Alert[], language: string): string {
   });
 }
 
-// "Running · 2 overlays"
-export function serverStatus(
-  enabled: boolean,
-  overlays: number,
-  language: string,
-): string {
-  if (!enabled) return translate(language, "home.features.serverOff");
-  return translate(language, "home.features.serverOn", { count: overlays });
+// "2 overlays", whether the server runs or not: its switch says that
+export function overlaysStatus(overlays: number, language: string): string {
+  if (overlays === 0) return translate(language, "home.features.noOverlays");
+  return translate(language, "home.features.overlays", { count: overlays });
 }
