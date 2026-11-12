@@ -561,7 +561,7 @@
 
 .playing_artist {
   color: var(--font-secondary);
-  font-size: var(--font-xs);
+  font-size: var(--font-2xs);
 }
 
 /* Three bars that move while the song plays, each on its own beat. Only
