@@ -10,7 +10,7 @@
   </p>
 </div>
 
-![Tokio's dashboard during a LIVE: viewers, likes and views, the features that are on, and the activity feed](.github/screenshots/dashboard.png)
+![Tokio's Home during a LIVE: the viewers with their line, the LIVE's numbers and top gifters, the features, and the activity feed with the song playing](.github/screenshots/dashboard.png)
 
 Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok LIVE and reacts to what happens in it. Its overlays work in OBS, TikTok LIVE Studio and any streaming app that can show a web page.
 
