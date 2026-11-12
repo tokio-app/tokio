@@ -524,10 +524,11 @@
   border-top: 1px solid var(--border);
 }
 
+/* As tall as the three lines beside it */
 .playing_art {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-md);
   object-fit: cover;
 }
@@ -545,13 +546,22 @@
   font-weight: 500;
 }
 
-.playing_title {
+.playing_title,
+.playing_artist {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playing_title {
   color: var(--font-primary);
   font-size: var(--font-md);
   font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.playing_artist {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
 }
 
 /* Three bars that move while the song plays, each on its own beat. Only

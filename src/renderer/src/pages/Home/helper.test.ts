@@ -6,6 +6,7 @@ import {
   joinedText,
   nearestIndex,
   overlaysStatus,
+  songParts,
 } from "./helper";
 
 describe("chartPoints", () => {
@@ -51,6 +52,23 @@ describe("feature status", () => {
 
   it("says when there are no overlays yet", () => {
     expect(overlaysStatus(0, "en")).toBe("No overlays yet");
+  });
+});
+
+describe("songParts", () => {
+  it("puts the artist after the last dash, as the providers name songs", () => {
+    expect(songParts("Try - P!NK")).toEqual({ name: "Try", artist: "P!NK" });
+    expect(songParts("Try - Live - P!NK")).toEqual({
+      name: "Try - Live",
+      artist: "P!NK",
+    });
+  });
+
+  it("keeps a title without one whole", () => {
+    expect(songParts("Blinding Lights")).toEqual({
+      name: "Blinding Lights",
+      artist: "",
+    });
   });
 });
 

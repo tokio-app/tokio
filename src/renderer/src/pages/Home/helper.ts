@@ -34,6 +34,15 @@ export function chartPoints(values: number[]): { x: number; y: number }[] {
   }));
 }
 
+// Every music provider names a song "name - artist". A song's name can hold
+// " - " itself ("Try - Live"), an artist's rarely does, so the last one splits
+// them. Without one it's all name.
+export function songParts(title: string): { name: string; artist: string } {
+  const at = title.lastIndexOf(" - ");
+  if (at === -1) return { name: title, artist: "" };
+  return { name: title.slice(0, at), artist: title.slice(at + 3) };
+}
+
 // The point nearest a spot across the chart, given as a share of its width
 export function nearestIndex(ratio: number, count: number): number {
   if (count <= 1) return 0;

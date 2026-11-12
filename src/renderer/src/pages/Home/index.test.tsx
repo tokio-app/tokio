@@ -372,13 +372,14 @@ describe("Home", () => {
       await send(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, { success: true });
 
       expect(playing()).toBeInTheDocument();
-      expect(page().getByText("Blinding Lights - The Weeknd")).toHaveAttribute(
-        "title",
-        "Blinding Lights - The Weeknd",
+      // The name, then the artist under it
+      expect(footer("Blinding Lights")).toHaveTextContent(
+        "Now playingBlinding LightsThe Weeknd",
       );
-      expect(
-        footer("Blinding Lights - The Weeknd").querySelector("img"),
-      ).toHaveAttribute("src", "https://example.com/blinding-lights.jpg");
+      expect(footer("Blinding Lights").querySelector("img")).toHaveAttribute(
+        "src",
+        "https://example.com/blinding-lights.jpg",
+      );
 
       await send(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, { success: false });
       expect(playing()).not.toBeInTheDocument();
@@ -403,7 +404,7 @@ describe("Home", () => {
         data: [song("Flowers - Miley Cyrus", { playing: true })],
       });
 
-      expect(footer("Flowers - Miley Cyrus").querySelector("img")).toBeNull();
+      expect(footer("Flowers").querySelector("img")).toBeNull();
     });
   });
 

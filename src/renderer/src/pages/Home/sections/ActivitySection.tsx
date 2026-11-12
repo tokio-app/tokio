@@ -7,7 +7,7 @@ import { rich, useLanguage, useT } from "@/ui/i18n";
 import { memo } from "react";
 import { FiSettings } from "react-icons/fi";
 import styles from "../home.module.css";
-import { joinedText } from "../helper";
+import { joinedText, songParts } from "../helper";
 
 interface Props {
   connected: boolean;
@@ -116,6 +116,7 @@ export function ActivitySection({
   song,
 }: Props) {
   const t = useT();
+  const { name, artist } = songParts(song?.title ?? "");
   return (
     <section className={styles.rail}>
       <header className={styles.rail_header}>
@@ -149,9 +150,14 @@ export function ActivitySection({
             <span className={styles.playing_label}>
               {t("home.playing.title")}
             </span>
-            <span className={styles.playing_title} title={song.title}>
-              {song.title}
+            <span className={styles.playing_title} title={name}>
+              {name}
             </span>
+            {artist && (
+              <span className={styles.playing_artist} title={artist}>
+                {artist}
+              </span>
+            )}
           </p>
           <span className={styles.bars} aria-hidden="true">
             <span />
