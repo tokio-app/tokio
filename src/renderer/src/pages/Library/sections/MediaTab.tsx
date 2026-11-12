@@ -1,5 +1,4 @@
 import { MediaFile } from "@/common/schemas";
-import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { getMediaPreviewURL, mediaKind } from "@/common/util";
 import {
   Btn,
@@ -7,21 +6,28 @@ import {
   EmptyState,
   MediaThumbnail,
   Modal,
-  Section,
   SoundLength,
   useVideoURL,
 } from "@/components";
+import picker from "@/components/MediaPicker/mediapicker.module.css";
+import { cx } from "@/helper";
 import { releaseOnUnmount } from "@/helper/media";
-import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
-import { FiImage, FiMaximize2, FiTrash2, FiUpload } from "react-icons/fi";
-import styles from "../settings.module.css";
+import { FiFilm, FiTrash2 } from "react-icons/fi";
+import styles from "../library.module.css";
 
-export function MediaSection() {
+interface Props {
+  // The ones the search shows, newest first
+  media: MediaFile[];
+  // The library has none
+  empty: boolean;
+  // An upload or a deletion failed
+  failed: boolean;
+}
+
+export function MediaTab({ media, empty, failed }: Props) {
   const t = useT();
-  const [media, setMedia] = useState<MediaFile[]>([]);
-  const [error, setError] = useState(false);
   // File shown full size
   const [showing, setShowing] = useState<MediaFile | null>(null);
   // File waiting for the user to confirm it's deleted
@@ -30,15 +36,6 @@ export function MediaSection() {
   const [lengths, setLengths] = useState<Record<string, number>>({});
   // Apart from its thumbnail's, which is loaded too
   const fullVideo = useVideoURL(showing?.file ?? "");
-
-  useIpcRequest(APP_EVENTS.GET_MEDIA);
-
-  // Also the reply to an upload or a deletion
-  useIpcListener(APP_EVENTS_RESPONSE.GET_MEDIA, (res) => {
-    if (!res) return;
-    setMedia(res.data);
-    setError(!res.success);
-  });
 
   return (
     <>
@@ -71,62 +68,59 @@ export function MediaSection() {
         <DeleteMediaModal item={removing} onClose={() => setRemoving(null)} />
       )}
 
-      <Section
-        icon={<FiImage />}
-        title={t("settings.media.title")}
-        description={t("settings.media.description")}
-        actions={
-          <Btn
-            variant="icon"
-            title={t("common.upload")}
-            onClick={() => window.api.emit(APP_EVENTS.UPLOAD_MEDIA)}
-          >
-            <FiUpload size={20} />
-          </Btn>
-        }
-      >
-        {media.length === 0 ? (
-          <EmptyState>{t("settings.media.empty")}</EmptyState>
-        ) : (
-          <div className={styles.library}>
+      {media.length === 0 ? (
+        <EmptyState>
+          {empty
+            ? t("alerts.library.mediaEmpty")
+            : t("alerts.library.mediaNoMatch")}
+        </EmptyState>
+      ) : (
+        <div className={styles.panel}>
+          <div className={styles.grid}>
             {media.map((file) => (
-              <div key={file.file} className={styles.library_item}>
-                <div className={styles.library_thumb}>
+              <div key={file.file} className={cx(picker.tile, styles.tile)}>
+                <button
+                  type="button"
+                  className={picker.choice}
+                  title={file.name}
+                  onClick={() => setShowing(file)}
+                >
                   <MediaThumbnail
                     file={file.file}
                     onLength={(seconds) =>
-                      setLengths((known) => ({
-                        ...known,
-                        [file.file]: seconds,
-                      }))
+                      setLengths((known) =>
+                        Object.is(known[file.file], seconds)
+                          ? known
+                          : { ...known, [file.file]: seconds },
+                      )
                     }
                   />
-                </div>
-                <span className={styles.library_name} title={file.name}>
-                  {file.name}
-                </span>
-                <SoundLength seconds={lengths[file.file]} />
-                <Btn
-                  variant="icon"
-                  title={t("common.fullSize")}
-                  onClick={() => setShowing(file)}
-                >
-                  <FiMaximize2 size={20} />
-                </Btn>
+                  <span className={picker.label}>
+                    {mediaKind(file.file) === "video" && (
+                      <FiFilm size={14} className={picker.video} aria-hidden />
+                    )}
+                    <span className={picker.file_name}>{file.name}</span>
+                    {/* The button's name reads "Clip 12s", not "Clip12s" */}{" "}
+                    <SoundLength seconds={lengths[file.file]} />
+                  </span>
+                </button>
                 <Btn
                   variant="icon"
                   title={t("common.delete")}
+                  className={picker.delete}
                   onClick={() => setRemoving(file)}
                 >
-                  <FiTrash2 size={20} />
+                  <FiTrash2 size={16} />
                 </Btn>
               </div>
             ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {error && <p className={styles.error}>{t("settings.media.error")}</p>}
-      </Section>
+      {failed && (
+        <p className={styles.error}>{t("alerts.library.mediaError")}</p>
+      )}
     </>
   );
 }

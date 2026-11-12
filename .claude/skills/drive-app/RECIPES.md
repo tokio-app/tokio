@@ -70,7 +70,7 @@ await app.evaluate(({ BrowserWindow }) => {
 - Never put the user's own files (their videos, recordings, pictures) in a check or a screenshot. Make test media.
 - **Sound:** write a WAV like `tone()` in this skill's `scripts/screenshots.mjs`, or on Windows copy `C:\Windows\Media\Alarm01.wav`. Give a test alert `volume: 0` so nothing plays out loud.
 - **Video:** in a headless browser (Playwright's `chromium`, or the installed Edge with `channel: "msedge"`), draw on a `<canvas>`, record `canvas.captureStream(30)` with `MediaRecorder` (`video/webm`) for 3 s, and return the bytes as base64. About 18 KB, and it plays in the app.
-- **Upload:** stub `dialog.showOpenDialog` to return the file (SKILL.md's `app.evaluate`), then click the section's **Upload** (`page.locator("section", { has: heading })`).
+- **Upload:** stub `dialog.showOpenDialog` to return the file (SKILL.md's `app.evaluate`), then click the + on **Alerts → Library** (`button[title="Add sounds"]`, or `"Add images and videos"` on its other tab).
 
 ## Minimized or hidden windows
 
@@ -84,7 +84,7 @@ Playwright turns on Chromium's focus emulation for every page it drives, so `doc
 
 ## Overlays
 
-- **Import a local build:** stub `dialog.showOpenDialog` to return `../tokio-overlays/overlays/<id>/dist` (build it there first), then click the Overlay library's `button[title="Import"]`: Settings has two Import buttons.
+- **Import a local build:** stub `dialog.showOpenDialog` to return `../tokio-overlays/overlays/<id>/dist` (build it there first), then click the Overlays page's + (`button[title="Import overlay"]`).
 - **Watch what main sends overlays:** create an ID in Tools → Test overlays (placeholder "Overlay name", **Create ID**), then connect Node's global `WebSocket` to `ws://localhost:37891?id=<id>`. Messages are `{ type, data }`, `type` a `TOKIO_EVENTS` name. Each press of Test plays the next moment of that ID's test LIVE.
 - **The games overlay:** seed a `--home` with the profile's `games.actions`, the store's `minecraftPictures` and the server on. Then open `http://localhost:37891/games/minecraft/` in a separate browser, through a page that iframes it over a game-like backdrop, to see the pictures float over a game.
 

@@ -17,6 +17,7 @@ import {
   Fans,
   Games,
   Home,
+  Library,
   Music,
   OfficialOverlays,
   Overlays,
@@ -97,6 +98,13 @@ const alertsRoute = createRoute({
   component: Alerts,
 });
 
+// Opened from Alerts. Under /alerts, so the sidebar keeps Alerts active.
+const libraryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/alerts/library",
+  component: Library,
+});
+
 const musicRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/music",
@@ -172,6 +180,7 @@ const routeTree = rootRoute.addChildren([
   officialOverlaysRoute,
   ttsRoute,
   alertsRoute,
+  libraryRoute,
   musicRoute,
   gamesRoute,
   toolsRoute,

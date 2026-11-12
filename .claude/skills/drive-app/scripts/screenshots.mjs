@@ -1033,10 +1033,6 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     width: 640,
   });
   await crop("settings-profiles", section(tr("Live profiles")));
-  await crop("settings-libraries", [
-    section(tr("Sound library")),
-    section(tr("Media library")),
-  ]);
   // An overlay of your own, the e2e fixture under the docs' example name
   const own = join(home, "likes-counter");
   cpSync(join(repo, "test", "fixtures", "overlay"), own, { recursive: true });
@@ -1045,11 +1041,22 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     "name: Likes Counter\nversion: 1.0.0\nconfig: false\n",
   );
   await pick(own);
-  await section(tr("Overlay library"))
-    .getByRole("button", { name: tr("Import") })
-    .click();
-  await section(tr("Overlay library")).getByText("Likes Counter").waitFor();
-  await crop("settings-overlay-library", section(tr("Overlay library")));
+  // After the gallery's shots, so it stays out of them
+  await open(tr("Overlays"), tr("Overlay gallery"));
+  await page.getByTitle(tr("Import overlay"), { exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Likes Counter", exact: true })
+    .waitFor();
+
+  // The Library, with the files the alerts above added
+  await open(tr("Alerts"), tr("Alerts"));
+  await page.getByRole("button", { name: tr("Library"), exact: true }).click();
+  await page
+    .getByRole("heading", { name: tr("Library"), exact: true })
+    .waitFor();
+  await crop("alerts-library", section(tr("Library")));
+
+  await open(tr("Settings"), tr("Live profiles"));
   await page.getByTitle(tr("Create a profile")).click();
   await page
     .getByPlaceholder(tr("e.g. Chill Stream"))

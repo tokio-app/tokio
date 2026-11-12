@@ -125,6 +125,36 @@ describe("OfficialOverlays", () => {
     ).toBeInTheDocument();
   });
 
+  it("finds overlays by name or description", async () => {
+    const { user } = await renderApp("/overlays/official");
+    await catalog(GIFT_JAR, TOP_LIKES, CLOCK);
+    const search = () => page().getByPlaceholderText("Search overlays...");
+
+    await user.click(page().getByRole("button", { name: "Search" }));
+    expect(search()).toHaveFocus();
+    await user.type(search(), "  LIKES ");
+
+    expect(page().getByRole("heading", { name: "Top Likes" })).toBeVisible();
+    expect(page().queryByRole("heading", { name: "Gift Jar" })).toBeNull();
+    expect(page().queryByRole("heading", { name: "Clock" })).toBeNull();
+
+    await user.clear(search());
+    await user.type(search(), "gifts of your");
+
+    expect(page().getByRole("heading", { name: "Gift Jar" })).toBeVisible();
+    expect(page().queryByRole("heading", { name: "Top Likes" })).toBeNull();
+
+    await user.type(search(), "x");
+
+    expect(page().getByText("No overlays found.")).toBeInTheDocument();
+    expect(page().queryByRole("heading", { level: 3 })).toBeNull();
+
+    // Closing the search shows them all again
+    await user.click(page().getByRole("button", { name: "Close search" }));
+
+    expect(page().getAllByRole("heading", { level: 3 })).toHaveLength(3);
+  });
+
   it("offers to install, update or remove each overlay", async () => {
     await renderApp("/overlays/official");
     await catalog(GIFT_JAR, TOP_LIKES, CLOCK);

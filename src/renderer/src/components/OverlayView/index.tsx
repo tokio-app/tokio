@@ -2,7 +2,7 @@ import { OverlayApp } from "@/common/types";
 import { getOverlayURL } from "@/common/util";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
-import { FiMaximize2 } from "react-icons/fi";
+import { FiMaximize2, FiTrash2 } from "react-icons/fi";
 import { GoUnverified, GoVerified } from "react-icons/go";
 import { PiShootingStarThin } from "react-icons/pi";
 import { VscPackage, VscSettings } from "react-icons/vsc";
@@ -16,10 +16,12 @@ import styles from "./overlayview.module.css";
 interface Props {
   onTest: (id: string) => void;
   onCustomize: (id: string) => void;
+  // Shows a Remove button, official overlays included
+  onRemove?: (overlay: OverlayApp) => void;
   overlay: OverlayApp;
 }
 
-export function OverlayView({ onTest, onCustomize, overlay }: Props) {
+export function OverlayView({ onTest, onCustomize, onRemove, overlay }: Props) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
 
@@ -77,6 +79,15 @@ export function OverlayView({ onTest, onCustomize, overlay }: Props) {
             <Btn onClick={() => onCustomize(overlay.id)}>
               <VscSettings size={18} />
               {t("components.overlayView.customize")}
+            </Btn>
+          )}
+          {onRemove && (
+            <Btn
+              variant="icon"
+              title={t("common.remove")}
+              onClick={() => onRemove(overlay)}
+            >
+              <FiTrash2 size={20} />
             </Btn>
           )}
         </div>

@@ -6,6 +6,7 @@ import {
   Btn,
   EmptyState,
   RemoveOverlayModal,
+  SearchToggle,
   Section,
   Spinner,
 } from "@/components";
@@ -36,6 +37,7 @@ export function CatalogSection({ overlays }: Props) {
   const [installing, setInstalling] = useState<string[]>([]);
   // Overlay waiting for the user to confirm its removal
   const [removing, setRemoving] = useState<CatalogOverlay | null>(null);
+  const [search, setSearch] = useState("");
 
   useIpcRequest(APP_EVENTS.GET_OVERLAY_CATALOG);
 
@@ -75,10 +77,20 @@ export function CatalogSection({ overlays }: Props) {
         title={t("overlays.official.title")}
         description={t("overlays.official.description")}
         divider
-        actions={error && <Btn onClick={retry}>{t("common.tryAgain")}</Btn>}
+        actions={
+          <>
+            <SearchToggle
+              placeholder={t("overlays.gallery.search")}
+              value={search}
+              onChange={setSearch}
+            />
+            {error && <Btn onClick={retry}>{t("common.tryAgain")}</Btn>}
+          </>
+        }
       >
         <CatalogList
           catalog={catalog}
+          search={search}
           error={error}
           overlays={overlays}
           installing={installing}
@@ -92,6 +104,8 @@ export function CatalogSection({ overlays }: Props) {
 
 interface ListProps {
   catalog: CatalogOverlay[] | null;
+  // Shows only the overlays whose name or description has it
+  search: string;
   error: string | null;
   overlays: OverlayApp[];
   installing: string[];
@@ -102,6 +116,7 @@ interface ListProps {
 // The official overlays, or why they aren't shown
 function CatalogList({
   catalog,
+  search,
   error,
   overlays,
   installing,
@@ -121,9 +136,20 @@ function CatalogList({
     return <EmptyState>{t("overlays.official.empty")}</EmptyState>;
   }
 
+  // By what the card shows: you may not know an overlay's name yet
+  const needle = search.trim().toLowerCase();
+  const shown = catalog.filter((entry) =>
+    [entry.name, entry.description].some((text) =>
+      text.toLowerCase().includes(needle),
+    ),
+  );
+  if (shown.length === 0) {
+    return <EmptyState>{t("overlays.gallery.notFound")}</EmptyState>;
+  }
+
   return (
     <div className={styles.grid}>
-      {catalog.map((entry) => (
+      {shown.map((entry) => (
         <CatalogCard
           key={entry.id}
           entry={entry}

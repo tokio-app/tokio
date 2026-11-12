@@ -179,20 +179,11 @@ test("imports an overlay and runs its preview from disk", async () => {
 
   await page
     .getByRole("navigation")
-    .getByRole("link", { name: "Settings" })
-    .click();
-  await page
-    .locator("section", {
-      has: page.getByRole("heading", { name: "Overlay library" }),
-    })
-    .getByRole("button", { name: "Import" })
-    .click();
-  await expect(page.getByText("Overlay imported.")).toBeVisible();
-
-  await page
-    .getByRole("navigation")
     .getByRole("link", { name: "Overlays" })
     .click();
+  await page.getByRole("button", { name: "Import overlay" }).click();
+  await expect(page.getByText("Overlay imported.")).toBeVisible();
+
   const preview = page.locator('iframe[name^="TOKIO_APP-"]');
   const id = (await preview.getAttribute("name"))!.replace("TOKIO_APP-", "");
 

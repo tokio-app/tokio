@@ -7,6 +7,7 @@ import {
 } from "@/common/types";
 import { ALERT_MESSAGE_VARIABLES } from "@/common/util";
 import { createAlert } from "@/pages/Alerts/helper";
+import { intersect } from "@test/dom";
 import { alertSound, engine, failure, voice } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
@@ -332,7 +333,7 @@ describe("SoundPicker", () => {
 
       expect(
         screen.getByText(
-          "No sounds yet. Download one from MyInstants, upload some in Settings, or browse for a file.",
+          "No sounds yet. Download one from MyInstants, browse for a file, or add several in the Library.",
         ),
       ).toBeInTheDocument();
 
@@ -370,6 +371,7 @@ describe("SoundPicker", () => {
     it("shows each one's length", async () => {
       setup();
       await sounds(LIBRARY);
+      intersect();
 
       const audio = screen
         .getByRole("dialog")

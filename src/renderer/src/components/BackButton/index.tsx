@@ -5,7 +5,7 @@ import styles from "./backbutton.module.css";
 
 interface Props {
   // The page that opens this one
-  to: "/overlays" | "/tools" | "/tools/studio";
+  to: "/alerts" | "/overlays" | "/tools" | "/tools/studio";
   title: string;
 }
 

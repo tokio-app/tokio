@@ -14,8 +14,7 @@ paths:
   - "src/renderer/src/hooks/useAlertTest.ts"
   - "src/renderer/src/helper/alerts.ts"
   - "src/main/services/server/alert.html"
-  - "src/renderer/src/pages/Settings/sections/SoundsSection.tsx"
-  - "src/renderer/src/pages/Settings/sections/MediaSection.tsx"
+  - "src/renderer/src/pages/Library/**"
 ---
 
 # Alerts
@@ -52,8 +51,9 @@ paths:
 
 ## Sounds
 
+- The sound and media libraries are managed on **Alerts → Library** (`/alerts/library`, `pages/Library`), not in Settings (the user's call). It has one tab each over a panel that scrolls inside, newest first (the user's call); the pickers keep the stored order.
 - The sound library is shared by all profiles (`settings.sounds`). Files in the `sounds` folder are named by a hash of their content (uploads) or URL (MyInstants); alerts store only the basename.
-- Imports (`importSound`, `importMedia`) go through `importFile` (`src/main/helper/library.ts`), shared with the Minecraft pictures. Read sounds through `AlertsService.readSound` (keeps paths inside the folder, caches). `UPLOAD_MEDIA` shares the `upload` loop with `UPLOAD_SOUNDS`.
+- Imports (`importSound`, `importMedia`) go through `importFile` (`src/main/helper/library.ts`), shared with the Minecraft pictures. Read sounds through `AlertsService.readSound` (keeps paths inside the folder, caches). `UPLOAD_MEDIA` shares the `upload` loop with `UPLOAD_SOUNDS`: it imports every file, then lists them with one store save, so 1000 files aren't 1000 writes.
 - Sounds are up to `CACHE_MAX_FILE_BYTES`, so every sound added now is served from memory: `importSound` and `fetchSound` refuse bigger ones (`fetchSound` counts the bytes as they come). A bigger one saved before is read from disk only on `GET_SOUND_DATA`, one read shared by concurrent requests.
 - `handle` only checks that a library sound's file is there (`_missing`: the cache, else `access`), without reading it.
 - MyInstants has no API; `AlertsService` scrapes its result list (`resultInstants`, which counts div tags so the trending list after it stays out). Only fetch `www.myinstants.com` URLs.

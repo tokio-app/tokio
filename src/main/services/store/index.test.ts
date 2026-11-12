@@ -1551,6 +1551,50 @@ describe("StoreManagerService", () => {
       expect((await readJSON(storeFile)).settings.sounds).toEqual([sound]);
     });
 
+    it.each([
+      ["sounds", "addSounds", "getSounds"],
+      ["media", "addMediaFiles", "getMedia"],
+    ] as const)(
+      "adds a batch of %s with one save, listing each file once",
+      async (library, add, get) => {
+        const store = await init();
+        await store[add]([sound]);
+        const save = vi.spyOn(json, "saveFile");
+        const batch = [
+          sound,
+          { name: "A", file: "a.mp3" },
+          { name: "B", file: "b.mp3" },
+          { name: "A again", file: "a.mp3" },
+        ];
+
+        expect(await store[add](batch)).toBe(true);
+
+        expect(save).toHaveBeenCalledOnce();
+        const expected = [sound, batch[1], batch[2]];
+        expect(store[get]()).toEqual(expected);
+        expect((await readJSON(storeFile)).settings[library]).toEqual(expected);
+      },
+    );
+
+    it("saves once for a batch with nothing new, and again after a failed save", async () => {
+      const store = await init();
+      await store.addSounds([sound]);
+      const save = vi.spyOn(json, "saveFile");
+
+      expect(await store.addSounds([sound, sound])).toBe(true);
+      expect(save).toHaveBeenCalledOnce();
+
+      save.mockResolvedValueOnce(false);
+      const other = { name: "Other", file: "other.mp3" };
+      expect(await store.addSounds([other])).toBe(false);
+      expect(store.getSounds()).toEqual([sound, other]);
+      expect(await store.addSounds([])).toBe(true);
+      expect((await readJSON(storeFile)).settings.sounds).toEqual([
+        sound,
+        other,
+      ]);
+    });
+
     it("takes a deleted file off the alerts of every profile", async () => {
       const store = await init();
       const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({

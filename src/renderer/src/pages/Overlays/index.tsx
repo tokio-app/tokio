@@ -5,7 +5,7 @@ import {
   CustomGift,
   OverlayApp,
 } from "@/common/types";
-import { OverlayModal, Page } from "@/components";
+import { OverlayModal, Page, RemoveOverlayModal } from "@/components";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
 import { postToOverlay, postToPreviews } from "./helper";
@@ -18,6 +18,8 @@ export function Overlays() {
   const [configId, setConfigId] = useState<string | null>(null);
   const [config, setConfig] = useState<OverlayConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  // Overlay waiting for the user to confirm its removal
+  const [removing, setRemoving] = useState<OverlayApp | null>(null);
   const editing = overlays.find((overlay) => overlay.id === configId);
 
   const closeModal = () => {
@@ -30,7 +32,8 @@ export function Overlays() {
   useIpcRequest(APP_EVENTS.GET_GIFTS);
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_OVERLAYS, (res) => {
-    if (res?.success) setOverlays(res.data!);
+    // Failed imports and removals also send the current list
+    if (res?.data) setOverlays(res.data);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG, (res) => {
@@ -67,6 +70,10 @@ export function Overlays() {
 
   return (
     <>
+      {removing && (
+        <RemoveOverlayModal item={removing} onClose={() => setRemoving(null)} />
+      )}
+
       {editing && (
         <OverlayModal
           overlay={editing}
@@ -95,6 +102,7 @@ export function Overlays() {
             window.api.emit(APP_EVENTS.GET_OVERLAY_CONFIG, { id });
             setConfigId(id);
           }}
+          onRemove={setRemoving}
         />
       </Page>
     </>

@@ -6,6 +6,7 @@ export * from "./useClickOutside";
 export * from "./useEditableSettings";
 export * from "./useImmerState";
 export * from "./useMenu";
+export * from "./useNearView";
 export * from "./useIpcListener";
 export * from "./useIpcRequest";
 export * from "./useNotifications";

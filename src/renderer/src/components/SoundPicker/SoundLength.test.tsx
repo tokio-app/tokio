@@ -1,3 +1,4 @@
+import { intersect } from "@test/dom";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import { describe, expect, it } from "vitest";
@@ -13,6 +14,9 @@ const measure = (container: HTMLElement, seconds: number) => {
 describe("SoundLength", () => {
   it("reads a library file's length", () => {
     const { container } = render(<SoundLength file="horn file.mp3" />);
+    expect(container.querySelector("audio")).toBeNull();
+
+    intersect();
     expect(container.querySelector("audio")).toHaveAttribute(
       "src",
       "tokio-media:///sounds/horn%20file.mp3",
@@ -22,10 +26,23 @@ describe("SoundLength", () => {
     measure(container, 2.46);
 
     expect(screen.getByText("2.5s")).toBeInTheDocument();
+    // Read once, its player goes
+    expect(container.querySelector("audio")).toBeNull();
+  });
+
+  it("shows nothing for a file that fails to load, and doesn't retry it", () => {
+    const { container } = render(<SoundLength file="gone.mp3" />);
+    intersect();
+    fireEvent.error(container.querySelector("audio")!);
+
+    expect(container).toHaveTextContent("");
+    intersect();
+    expect(container.querySelector("audio")).toBeNull();
   });
 
   it("shows a known length without reading the file", () => {
     const { container } = render(<SoundLength file="horn.mp3" seconds={65} />);
+    intersect();
     expect(container.querySelector("audio")).toBeNull();
     expect(screen.getByText("1:05")).toBeInTheDocument();
   });
@@ -35,6 +52,7 @@ describe("SoundLength", () => {
       const { container } = render(
         <SoundLength file="horn.mp3" cut={{ start, end }} />,
       );
+      intersect();
       measure(container, 10);
       return container.textContent;
     };
@@ -47,6 +65,7 @@ describe("SoundLength", () => {
 
   it.each([NaN, Infinity, 0])("shows nothing for a length of %s", (seconds) => {
     const { container } = render(<SoundLength file="horn.mp3" />);
+    intersect();
     measure(container, seconds);
     expect(container).toHaveTextContent("");
   });
@@ -58,6 +77,7 @@ describe("SoundLength", () => {
 
   it("frees its audio once it's removed", async () => {
     const { container, unmount } = render(<SoundLength file="horn.mp3" />);
+    intersect();
     const audio = container.querySelector("audio")!;
 
     unmount();
@@ -72,6 +92,7 @@ describe("SoundLength", () => {
         <SoundLength file="horn.mp3" />
       </StrictMode>,
     );
+    intersect();
     await Promise.resolve();
 
     expect(container.querySelector("audio")).toHaveAttribute(

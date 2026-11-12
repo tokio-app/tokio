@@ -1098,6 +1098,7 @@ describe("Alerts", () => {
 
       expect(opened.getByText("Plays 0.5s of 2s")).toBeInTheDocument();
       // How long the cut plays, of the file's length the row read
+      intersect();
       const length = summary(0).querySelector("audio")!;
       Object.defineProperty(length, "duration", { value: 2 });
       fireEvent.loadedMetadata(length);
@@ -1151,6 +1152,7 @@ describe("Alerts", () => {
       });
 
       await user.click(dialog.getByRole("button", { name: "Airhorn" }));
+      intersect();
       const length = summary(0).querySelector("audio")!;
       Object.defineProperty(length, "duration", { value: 2 });
       fireEvent.loadedMetadata(length);
