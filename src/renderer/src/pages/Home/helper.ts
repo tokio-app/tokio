@@ -68,12 +68,8 @@ export function alertsStatus(alerts: Alert[], language: string): string {
   });
 }
 
-// "Running · 2 overlays"
-export function serverStatus(
-  enabled: boolean,
-  overlays: number,
-  language: string,
-): string {
-  if (!enabled) return translate(language, "home.features.serverOff");
-  return translate(language, "home.features.serverOn", { count: overlays });
+// "2 overlays", whether the server runs or not: its switch says that
+export function overlaysStatus(overlays: number, language: string): string {
+  if (overlays === 0) return translate(language, "home.features.noOverlays");
+  return translate(language, "home.features.overlays", { count: overlays });
 }

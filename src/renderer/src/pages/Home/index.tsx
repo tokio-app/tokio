@@ -5,7 +5,14 @@ import {
   TopGifter,
 } from "@/common/types";
 import { defaultProfile, defaultStoreData } from "@/common/util";
-import { useImmerState, useIpcListener, useIpcRequest } from "@/hooks";
+import { Modal } from "@/components";
+import {
+  useImmerState,
+  useIpcListener,
+  useIpcRequest,
+  useServerSwitch,
+} from "@/hooks";
+import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import styles from "./home.module.css";
 import { NO_SESSION } from "./helper";
@@ -16,12 +23,17 @@ import { FeedModal } from "./sections/FeedModal";
 import { LiveSection } from "./sections/LiveSection";
 
 export function Home() {
+  const t = useT();
   const [username, setUsername] = useState(defaultProfile.connector.username);
   const [profile, setProfile] = useState(defaultProfile);
   const [features, updateFeatures, setFeatures] = useImmerState(
     defaultStoreData.settings.activeFeatures,
   );
   const [server, setServer] = useState({ enabled: false, overlays: 0 });
+  // As in Settings: on asks first, and main answers with the settings
+  const serverSwitch = useServerSwitch((enabled) =>
+    setServer((s) => ({ ...s, enabled })),
+  );
   const [feed, setFeed] = useState(defaultStoreData.settings.activityFeed);
   const [editingFeed, setEditingFeed] = useState(false);
   const [musicConnected, setMusicConnected] = useState(false);
@@ -103,6 +115,16 @@ export function Home() {
 
   return (
     <>
+      {serverSwitch.asking && (
+        <Modal
+          title={t("settings.server.confirmTitle")}
+          description={t("settings.server.confirmDescription")}
+          confirmText={t("settings.server.enable")}
+          onClose={serverSwitch.cancel}
+          onConfirm={serverSwitch.confirm}
+        />
+      )}
+
       {editingFeed && (
         <FeedModal
           feed={feed}
@@ -160,6 +182,7 @@ export function Home() {
               profile={profile}
               musicConnected={musicConnected}
               server={server}
+              onServerChange={serverSwitch.toggle}
               onChange={(feature, enabled) => {
                 window.api.emit(APP_EVENTS.ACTIVE_FEATURES, {
                   [feature]: enabled,

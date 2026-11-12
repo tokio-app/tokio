@@ -5,7 +5,7 @@ import {
   chartPoints,
   joinedText,
   nearestIndex,
-  serverStatus,
+  overlaysStatus,
 } from "./helper";
 
 describe("chartPoints", () => {
@@ -46,7 +46,11 @@ describe("nearestIndex", () => {
 describe("feature status", () => {
   it("counts one alert or overlay in the singular", () => {
     expect(alertsStatus([createAlert()], "en")).toBe("1 of 1 alert on");
-    expect(serverStatus(true, 1, "en")).toBe("Running · 1 overlay");
+    expect(overlaysStatus(1, "en")).toBe("1 overlay");
+  });
+
+  it("says when there are no overlays yet", () => {
+    expect(overlaysStatus(0, "en")).toBe("No overlays yet");
   });
 });
 

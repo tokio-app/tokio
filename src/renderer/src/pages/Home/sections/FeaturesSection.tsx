@@ -4,7 +4,7 @@ import { cx } from "@/helper";
 import { useLanguage, useT } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
 import { FiChevronRight } from "react-icons/fi";
-import { alertsStatus, serverStatus } from "../helper";
+import { alertsStatus, overlaysStatus } from "../helper";
 import styles from "../home.module.css";
 
 type Features = AppSettings["activeFeatures"];
@@ -21,6 +21,8 @@ interface Props {
   musicConnected: boolean;
   server: { enabled: boolean; overlays: number };
   onChange: (feature: keyof Features, enabled: boolean) => void;
+  // The overlay server, saved in the settings, not with the features
+  onServerChange: (enabled: boolean) => void;
 }
 
 export function FeaturesSection({
@@ -29,6 +31,7 @@ export function FeaturesSection({
   musicConnected,
   server,
   onChange,
+  onServerChange,
 }: Props) {
   const t = useT();
   const language = useLanguage();
@@ -48,10 +51,7 @@ export function FeaturesSection({
     },
     alerts: { text: alertsStatus(profile.alerts.items, language) },
   };
-  const serverText = serverStatus(server.enabled, server.overlays, language);
-  const serverPage = server.enabled
-    ? ({ to: "/overlays", label: "nav.overlays" } as const)
-    : ({ to: "/settings", label: "nav.settings" } as const);
+  const overlaysText = overlaysStatus(server.overlays, language);
 
   return (
     <Section title={t("home.features.title")}>
@@ -87,26 +87,21 @@ export function FeaturesSection({
 
         <li className={styles.feature}>
           <div className={styles.feature_head}>
-            <span className={styles.feature_name}>
-              <span className={styles.feature_dot}>
-                <span
-                  className={cx(styles.dot, server.enabled && styles.dot_on)}
-                />
-              </span>
-              {t("nav.overlays")}
-            </span>
+            <Toggle
+              label={t("nav.overlays")}
+              checked={server.enabled}
+              onChange={(e) => onServerChange(e.target.checked)}
+            />
             <Link
-              to={serverPage.to}
+              to="/overlays"
               className={styles.feature_link}
-              aria-label={t("home.features.goTo", {
-                page: t(serverPage.label),
-              })}
+              aria-label={t("home.features.goTo", { page: t("nav.overlays") })}
             >
               <FiChevronRight size={18} />
             </Link>
           </div>
-          <span className={styles.feature_status} title={serverText}>
-            {serverText}
+          <span className={styles.feature_status} title={overlaysText}>
+            {overlaysText}
           </span>
         </li>
       </ul>

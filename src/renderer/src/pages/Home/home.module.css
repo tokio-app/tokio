@@ -88,10 +88,6 @@
   background-color: var(--font-muted);
 }
 
-.dot_on {
-  background-color: var(--success);
-}
-
 /* Steady, like the title bar's tally */
 .dot_live {
   background-color: var(--accent-primary);
@@ -388,21 +384,6 @@
   justify-content: space-between;
   gap: var(--space-3);
   min-height: 28px;
-}
-
-/* The overlay server has a dot where the others have a toggle, as wide */
-.feature_name {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--font-primary);
-  font-size: var(--font-md);
-}
-
-.feature_dot {
-  display: flex;
-  justify-content: center;
-  width: 36px;
 }
 
 /* Under the name: the toggle's 36px and its label's 12px gap */

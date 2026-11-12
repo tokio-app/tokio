@@ -1,7 +1,12 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { defaultStoreData } from "@/common/util";
 import { Modal, Page } from "@/components";
-import { useImmerState, useIpcListener, useIpcRequest } from "@/hooks";
+import {
+  useImmerState,
+  useIpcListener,
+  useIpcRequest,
+  useServerSwitch,
+} from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { LanguageSection } from "./sections/LanguageSection";
@@ -14,8 +19,7 @@ import { TraySection } from "./sections/TraySection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { VoiceKeysSection } from "./sections/VoiceKeysSection";
 
-type ModalType =
-  "newProfile" | "cloneProfile" | "confirmServer" | "confirmDebug";
+type ModalType = "newProfile" | "cloneProfile" | "confirmDebug";
 
 export function Settings() {
   const t = useT();
@@ -27,6 +31,7 @@ export function Settings() {
     updateStore((s) => {
       s.settings.server.enabled = enabled;
     });
+  const server = useServerSwitch(setServerEnabled);
 
   const setDebug = (debug: boolean) =>
     updateStore((s) => {
@@ -44,26 +49,17 @@ export function Settings() {
     if (res?.success) setStore(res.data!);
   });
 
-  useIpcListener(APP_EVENTS_RESPONSE.REQ_FQDN, (res) => {
-    setServerEnabled(res?.success ?? false);
-    if (res?.success) window.api.emit(APP_EVENTS.SET_SERVER, { enabled: true });
-  });
-
   const closeModal = () => setModal(null);
 
   return (
     <>
-      {modal === "confirmServer" && (
+      {server.asking && (
         <Modal
           title={t("settings.server.confirmTitle")}
           description={t("settings.server.confirmDescription")}
           confirmText={t("settings.server.enable")}
-          onClose={closeModal}
-          onConfirm={() => {
-            setServerEnabled(true);
-            closeModal();
-            window.api.emit(APP_EVENTS.REQ_FQDN);
-          }}
+          onClose={server.cancel}
+          onConfirm={server.confirm}
         />
       )}
 
@@ -97,14 +93,7 @@ export function Settings() {
 
         <ServerSection
           enabled={store.settings.server.enabled}
-          onChange={(enabled) => {
-            if (enabled) {
-              setModal("confirmServer");
-            } else {
-              setServerEnabled(false);
-              window.api.emit(APP_EVENTS.SET_SERVER, { enabled: false });
-            }
-          }}
+          onChange={server.toggle}
         />
 
         <LanguageSection

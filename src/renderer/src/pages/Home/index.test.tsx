@@ -708,22 +708,56 @@ describe("Home", () => {
       expect(router.state.location.pathname).toBe("/tts");
     });
 
-    it("sends to Settings while the overlay server is off", async () => {
-      await renderApp();
+    it("turns the overlay server on after asking, as Settings does", async () => {
+      const { user } = await renderApp();
+      const overlays = page().getByRole("checkbox", { name: "Overlays" });
+      const dialog = () => within(screen.getByRole("dialog"));
 
-      expect(page().getByText("Off · turn it on in Settings")).toBeVisible();
-      expect(
-        page().getByRole("link", { name: "Go to Settings" }),
-      ).toHaveAttribute("href", "/settings");
+      await user.click(overlays);
+      expect(dialog().getByText("Enable the overlay server?")).toBeVisible();
+      await user.click(dialog().getByRole("button", { name: "Cancel" }));
+
+      expect(overlays).not.toBeChecked();
+      expect(sentEvents()).not.toContain(APP_EVENTS.REQ_FQDN);
+
+      await user.click(overlays);
+      await user.click(dialog().getByRole("button", { name: "Enable server" }));
+
+      expect(overlays).toBeChecked();
+      expect(sent(APP_EVENTS.SET_SERVER)).toEqual([]);
+
+      // Once main has set up tokio-app.local
+      await send(APP_EVENTS_RESPONSE.REQ_FQDN, { success: true });
+
+      expect(sent(APP_EVENTS.SET_SERVER)).toEqual([{ enabled: true }]);
+      expect(sent(APP_EVENTS.ACTIVE_FEATURES)).toEqual([]);
     });
 
-    it("counts the overlays while the server runs", async () => {
-      await renderApp();
-
+    it("stops the overlay server at once", async () => {
+      const { user } = await renderApp();
       await send(
         APP_EVENTS_RESPONSE.GET_SETTINGS,
         settingsReply((s) => {
           s.settings.server.enabled = true;
+        }),
+      );
+      const overlays = page().getByRole("checkbox", { name: "Overlays" });
+      expect(overlays).toBeChecked();
+
+      await user.click(overlays);
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(overlays).not.toBeChecked();
+      expect(sent(APP_EVENTS.SET_SERVER)).toEqual([{ enabled: false }]);
+    });
+
+    it("counts the overlays, with the server on or off", async () => {
+      await renderApp();
+      expect(featureRow("Overlays")).toHaveTextContent("No overlays yet");
+
+      await send(
+        APP_EVENTS_RESPONSE.GET_SETTINGS,
+        settingsReply((s) => {
           s.settings.overlays = [
             {
               id: "gift-jar",
@@ -736,7 +770,7 @@ describe("Home", () => {
         }),
       );
 
-      expect(page().getByText("Running · 2 overlays")).toBeVisible();
+      expect(featureRow("Overlays")).toHaveTextContent("2 overlays");
       expect(
         page().getByRole("link", { name: "Go to Overlays" }),
       ).toHaveAttribute("href", "/overlays");
