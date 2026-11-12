@@ -1047,6 +1047,14 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await page
     .getByRole("heading", { name: "Likes Counter", exact: true })
     .waitFor();
+  // The gallery's header, with the + that imports
+  await crop("overlays-import", [
+    page.getByRole("heading", { name: tr("Overlay gallery"), exact: true }),
+    page.getByText(tr("Browser sources for your streaming app."), {
+      exact: true,
+    }),
+    page.getByTitle(tr("Import overlay"), { exact: true }),
+  ]);
 
   // The Library, with the files the alerts above added
   await open(tr("Alerts"), tr("Alerts"));
@@ -1054,7 +1062,11 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await page
     .getByRole("heading", { name: tr("Library"), exact: true })
     .waitFor();
-  await crop("alerts-library", section(tr("Library")));
+  // From the title to the list's end: the section fills the window
+  await crop("alerts-library", [
+    page.getByRole("heading", { name: tr("Library"), exact: true }),
+    page.getByRole("list", { name: tr("Sounds"), exact: true }),
+  ]);
 
   await open(tr("Settings"), tr("Live profiles"));
   await page.getByTitle(tr("Create a profile")).click();
