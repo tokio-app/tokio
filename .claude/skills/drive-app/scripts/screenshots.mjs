@@ -1175,7 +1175,45 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       startedAt: Date.now() - (1 * 60 + 23) * 60_000,
       totals: { followers: 48, shares: 17, gifts: 126, coins: 3480 },
       activity,
+      // Each minute's highest viewer count: a climb, a peak of 412, then
+      // settling toward the 342 watching now
+      viewers: [
+        40, 82, 94, 109, 145, 165, 161, 176, 209, 220, 220, 247, 276, 276, 275,
+        297, 308, 295, 299, 325, 332, 325, 342, 365, 359, 349, 364, 373, 357,
+        355, 378, 385, 374, 385, 405, 397, 382, 392, 401, 386, 381, 402, 401,
+        397, 402, 404, 409, 412, 397, 403, 388, 378, 394, 398, 378, 373, 384,
+        370, 344, 344, 353, 339, 330, 351, 365, 354, 356, 374, 372, 354, 360,
+        378, 371, 363, 381, 371, 366, 368, 361, 355, 350, 346, 342,
+      ],
     },
+  });
+  // This LIVE's top gifters, from the feed's people
+  await push("app:home:res:gifters", {
+    data: [
+      ["Leo", "leo_on_air", 1000, 1],
+      ["Ana", "ana.bakes", 480, 14],
+      ["Sam", "samwise", 300, 9],
+    ].map(([username, handle, coins, gifts], i) => ({
+      userId: `live-gifter-${i}`,
+      username,
+      handle,
+      picture: "",
+      live: { coins, gifts },
+      allTime: { coins, gifts },
+      giftedAt: Date.now() - (i + 1) * 60_000,
+    })),
+  });
+  // A song playing, so the rail shows it at its foot
+  await push("app:music:res:music:connected", { success: true });
+  await push("app:home:res:songs", {
+    data: [
+      {
+        title: "Blinding Lights - The Weeknd",
+        thumbnail: "",
+        playing: true,
+        played: false,
+      },
+    ],
   });
   await shoot("dashboard");
   await crop("dashboard", page.locator("body"), { pad: 0 });
