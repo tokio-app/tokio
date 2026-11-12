@@ -25,6 +25,7 @@ Profile sections save through `useEditableSettings`, single fields through `useA
 ## Media elements
 
 - Every video player loads its own URL: `useVideoURL(file)` (`components/MediaPicker`) adds a `?player=` query from `useId`, which `mediaFile` ignores, and Overlay Studio's stage keys it by element id. Chromium fails every player that loads one `tokio-media:` URL at once (error 4), and the URL stays failed.
+- `SoundLength` and `MediaThumbnail` mount their player only while in view (`useNearView`, one observer per element), so lists of 1000 files don't load 1000 at once. A sound's `<audio>` leaves once its length is read. A video's comes and goes with its tile, each mount with its own `useVideoURL`, since its last URL was just released. Tests call `intersect()` (`@test/dom`) before looking for them.
 - Every `<audio>` and `<video>` takes `releaseOnUnmount` (`src/renderer/src/helper/media.ts`) as its ref, or calls it from its own: Chromium keeps a detached player that has a source alive, with the page section it was in. It waits a microtask and leaves an element still in the document, since StrictMode attaches refs again at once in development.
 
 ## CSP

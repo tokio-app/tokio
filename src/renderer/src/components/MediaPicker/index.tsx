@@ -2,7 +2,8 @@ import { MediaFile } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { getMediaPreviewURL, mediaKind } from "@/common/util";
 import { releaseOnUnmount } from "@/helper/media";
-import { CSSProperties, useId, useState } from "react";
+import { useNearView } from "@/hooks/useNearView";
+import { CSSProperties, useCallback, useId, useState } from "react";
 import { FiFilm } from "react-icons/fi";
 import { DeleteMediaModal } from "../DeleteModals";
 import { SoundLength } from "../SoundPicker/SoundLength";
@@ -33,38 +34,68 @@ export function useVideoURL(file: string) {
   return `${getMediaPreviewURL(file)}?player=${encodeURIComponent(player)}`;
 }
 
-/**
- * What a media library file shows: an image, or a video's first frame. A
- * video also gives its length once it's read.
- */
-export function MediaThumbnail({
-  file,
-  onLength,
-  style,
-}: {
+type ThumbnailProps = {
   file: string;
   onLength?: (seconds: number) => void;
   // Overlay Studio's crop, through object-view-box
   style?: CSSProperties;
-}) {
+};
+
+/**
+ * What a media library file shows: an image, or a video's first frame. A
+ * video also gives its length once it's read. Its player mounts only while
+ * it's in view, with a box of the same size in its place.
+ */
+export function MediaThumbnail({ file, onLength, style }: ThumbnailProps) {
+  const [nearRef, near] = useNearView<HTMLElement>();
+  if (mediaKind(file) !== "video")
+    return (
+      <img
+        className={styles.thumb}
+        style={style}
+        src={getMediaPreviewURL(file)}
+        alt=""
+        loading="lazy"
+      />
+    );
+  // A span, since thumbnails sit inside buttons
+  if (!near)
+    return <span ref={nearRef} className={styles.thumb} style={style} />;
+  return (
+    <ThumbVideo
+      file={file}
+      onLength={onLength}
+      style={style}
+      nearRef={nearRef}
+    />
+  );
+}
+
+// Its own component, so each mount loads a new URL: the one its last player
+// released would fail
+function ThumbVideo({
+  file,
+  onLength,
+  style,
+  nearRef,
+}: ThumbnailProps & { nearRef: (el: HTMLElement | null) => void }) {
   const video = useVideoURL(file);
-  return mediaKind(file) === "video" ? (
+  const ref = useCallback(
+    (el: HTMLVideoElement | null) => {
+      nearRef(el);
+      return releaseOnUnmount(el);
+    },
+    [nearRef],
+  );
+  return (
     <video
-      ref={releaseOnUnmount}
+      ref={ref}
       className={styles.thumb}
       style={style}
       src={`${video}#t=0.1`}
       muted
       preload="metadata"
       onLoadedMetadata={(e) => onLength?.(e.currentTarget.duration)}
-    />
-  ) : (
-    <img
-      className={styles.thumb}
-      style={style}
-      src={getMediaPreviewURL(file)}
-      alt=""
-      loading="lazy"
     />
   );
 }
@@ -108,7 +139,11 @@ export function MediaPicker({
           <MediaThumbnail
             file={file.file}
             onLength={(seconds) =>
-              setLengths((known) => ({ ...known, [file.file]: seconds }))
+              setLengths((known) =>
+                Object.is(known[file.file], seconds)
+                  ? known
+                  : { ...known, [file.file]: seconds },
+              )
             }
           />
           <span className={styles.label}>

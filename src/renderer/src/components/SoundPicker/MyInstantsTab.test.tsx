@@ -283,6 +283,7 @@ describe("MyInstantsTab", () => {
 
     expect(row("Bruh").getByText("2.5s")).toBeInTheDocument();
     expect(row("Vine Boom").queryByText(/\ds$/)).not.toBeInTheDocument();
+    intersect();
     // Only the downloaded one reads its file.
     const audio = container.querySelectorAll("audio");
     expect(audio).toHaveLength(1);

@@ -1,6 +1,7 @@
 import { Alert } from "@/common/schemas";
 import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import { createAlert } from "@/pages/Alerts/helper";
+import { intersect } from "@test/dom";
 import { alertClip, alertMedia, gift, voice } from "@test/fixtures";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -240,6 +241,7 @@ describe("AlertItem", () => {
     );
     expect(summary()).toHaveTextContent("Airhorn");
     // The cut's part of the file's length, as the queue plays it
+    intersect();
     const length = cut.container.querySelector("audio")!;
     Object.defineProperty(length, "duration", { value: 10 });
     fireEvent.loadedMetadata(length);
@@ -252,6 +254,7 @@ describe("AlertItem", () => {
     const { container } = setup(
       alert({ sound: alertClip("Airhorn", { start: 3 }) }),
     );
+    intersect();
     const audio = container.querySelector("audio")!;
     expect(audio.getAttribute("src")).toBe("tokio-media:///sounds/airhorn.mp3");
     Object.defineProperty(audio, "duration", { value: 10 });
@@ -264,6 +267,7 @@ describe("AlertItem", () => {
       alert({ sound: alertClip("Airhorn") }),
     );
     const load = (seconds: number) => {
+      intersect();
       const audio = container.querySelector("audio")!;
       Object.defineProperty(audio, "duration", { value: seconds });
       fireEvent.loadedMetadata(audio);

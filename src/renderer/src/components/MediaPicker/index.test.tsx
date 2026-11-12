@@ -1,6 +1,7 @@
 import { Alert } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { createAlert } from "@/pages/Alerts/helper";
+import { intersect } from "@test/dom";
 import { alertMedia, failure, mediaFile } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderWithProviders } from "@test/render";
@@ -70,6 +71,7 @@ describe("MediaPicker", () => {
     expect(
       [...dialog.querySelectorAll("img")].map((img) => img.getAttribute("src")),
     ).toEqual(["tokio-media:///party.png", "tokio-media:///confetti.png"]);
+    intersect();
     // A video shows its first frame, from a URL of its own
     expect(dialog.querySelector("video")?.getAttribute("src")).toMatch(
       /^tokio-media:\/\/\/clip\.webm\?player=.+#t=0\.1$/,
@@ -84,11 +86,33 @@ describe("MediaPicker", () => {
         <MediaThumbnail file="clip.webm" />
       </>,
     );
+    intersect();
 
     const [one, two] = [...container.querySelectorAll("video")].map((v) =>
       v.getAttribute("src"),
     );
     expect(one).not.toBe(two);
+  });
+
+  it("mounts a video's player only while it's in view, with a new URL each time", () => {
+    const { container } = renderWithProviders(
+      <MediaThumbnail file="clip.webm" />,
+    );
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector("span")).toBeInTheDocument();
+
+    intersect();
+    const first = container.querySelector("video")!.getAttribute("src");
+    expect(first).toMatch(/^tokio-media:\/\/\/clip\.webm\?player=/);
+
+    intersect(false);
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector("span")).toBeInTheDocument();
+
+    intersect();
+    expect(container.querySelector("video")!.getAttribute("src")).not.toBe(
+      first,
+    );
   });
 
   it("marks the alert's media", async () => {
@@ -215,6 +239,7 @@ describe("MediaPicker", () => {
   it("shows each video's length", async () => {
     setup();
     await library();
+    intersect();
 
     const video = screen
       .getByRole("dialog")
