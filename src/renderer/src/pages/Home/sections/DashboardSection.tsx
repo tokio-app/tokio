@@ -1,12 +1,11 @@
 import { EULER_SIGNUP_URL } from "@/common/util";
-import { Btn, Input, Section } from "@/components";
+import { Btn, Input } from "@/components";
 import { cx, formatDuration } from "@/helper";
-import { rich, useLanguage, useT } from "@/ui/i18n";
+import { rich, useT } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { FiPlay, FiSquare } from "react-icons/fi";
 import styles from "../home.module.css";
-import { Stat, statText } from "../helper";
 
 interface Props {
   username: string;
@@ -16,8 +15,6 @@ interface Props {
   needsKey: boolean;
   // When the LIVE was connected, null until main says
   startedAt: number | null;
-  // TikTok's numbers for the LIVE
-  stats: Stat[];
   onUsernameChange: (username: string) => void;
   onConnect: () => void;
   onDisconnect: () => void;
@@ -35,38 +32,37 @@ function LiveTimer({ since }: { since: number }) {
   return <span className={styles.timer}>{formatDuration(now - since)}</span>;
 }
 
+// The slate: the handle with Connect, and whether the LIVE is on
 export function DashboardSection({
   username,
   connected,
   loading,
   needsKey,
   startedAt,
-  stats,
   onUsernameChange,
   onConnect,
   onDisconnect,
 }: Props) {
   const t = useT();
-  const language = useLanguage();
   return (
-    <Section
-      title={t("home.dashboard.title")}
-      description={t("home.dashboard.description")}
-      actions={
-        <p className={cx(styles.status, connected && styles.status_live)}>
-          <span className={cx(styles.dot, connected && styles.dot_live)} />
-          <span>
-            {connected ? "LIVE" : t("home.dashboard.offline")}
-            {connected && startedAt !== null && (
-              <>
-                {" · "}
-                <LiveTimer since={startedAt} />
-              </>
-            )}
-          </span>
-        </p>
-      }
-    >
+    <section className={styles.slate}>
+      {/* The slate says what the page is. App, Layout, e2e and drive-app wait
+          for this heading, so it's a 1px box, never display: none. */}
+      <h2 className={styles.sr_only}>{t("home.dashboard.title")}</h2>
+
+      <p className={cx(styles.status, connected && styles.status_live)}>
+        <span className={cx(styles.dot, connected && styles.dot_live)} />
+        {connected ? (
+          <>
+            {/* Like the title bar's tally, said only to screen readers */}
+            <span className={styles.sr_only}>LIVE</span>{" "}
+            {startedAt !== null && <LiveTimer since={startedAt} />}
+          </>
+        ) : (
+          t("home.dashboard.offline")
+        )}
+      </p>
+
       <div className={styles.connect} data-tour="connect">
         <Input
           className={styles.username}
@@ -76,8 +72,9 @@ export function DashboardSection({
           onChange={(e) => onUsernameChange(e.target.value)}
         />
 
+        {/* Rose only while connecting is the thing to do */}
         <Btn
-          variant="accent"
+          variant={connected ? "default" : "accent"}
           size="lg"
           className={styles.connect_btn}
           loading={loading}
@@ -107,20 +104,6 @@ export function DashboardSection({
           })}
         </p>
       )}
-
-      <div className={styles.stats}>
-        {stats.map(({ label, value }) => {
-          const { text, title } = statText(value, connected, language);
-          return (
-            <div key={label} className={styles.stat}>
-              <span className={styles.stat_value} title={title}>
-                {text}
-              </span>
-              <span className={styles.stat_label}>{t(label)}</span>
-            </div>
-          );
-        })}
-      </div>
-    </Section>
+    </section>
   );
 }

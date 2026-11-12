@@ -267,7 +267,6 @@
   "settings.language.system": "Idioma del sistema",
   "settings.tray.title": "Bandeja del sistema",
   "home.dashboard.title": "Panel",
-  "home.dashboard.description": "Conéctate a tu LIVE de TikTok para empezar a recibir eventos.",
   "home.dashboard.offline": "Desconectado",
   "home.dashboard.username": "@usuario",
   "home.dashboard.keyHint": "Para conectarte necesitas tu clave de API de Euler Stream. <link>Consigue una clave gratis</link> y agrégala en <settings>Configuración</settings>.",

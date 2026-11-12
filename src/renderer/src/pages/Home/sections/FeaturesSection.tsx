@@ -48,20 +48,31 @@ export function FeaturesSection({
     },
     alerts: { text: alertsStatus(profile.alerts.items, language) },
   };
+  const serverText = serverStatus(server.enabled, server.overlays, language);
   const serverPage = server.enabled
     ? ({ to: "/overlays", label: "nav.overlays" } as const)
     : ({ to: "/settings", label: "nav.settings" } as const);
 
   return (
     <Section title={t("home.features.title")}>
+      {/* A 2x2 switchboard: each cell's name and link, the status under */}
       <ul className={styles.features} data-tour="features">
         {FEATURES.map(({ key, label, to }) => (
           <li key={key} className={styles.feature}>
-            <Toggle
-              label={t(label)}
-              checked={features[key]}
-              onChange={(e) => onChange(key, e.target.checked)}
-            />
+            <div className={styles.feature_head}>
+              <Toggle
+                label={t(label)}
+                checked={features[key]}
+                onChange={(e) => onChange(key, e.target.checked)}
+              />
+              <Link
+                to={to}
+                className={styles.feature_link}
+                aria-label={t("home.features.goTo", { page: t(label) })}
+              >
+                <FiChevronRight size={18} />
+              </Link>
+            </div>
             <span
               className={cx(
                 styles.feature_status,
@@ -71,35 +82,32 @@ export function FeaturesSection({
             >
               {status[key].text}
             </span>
-            <Link
-              to={to}
-              className={styles.feature_link}
-              aria-label={t("home.features.goTo", { page: t(label) })}
-            >
-              <FiChevronRight size={18} />
-            </Link>
           </li>
         ))}
 
         <li className={styles.feature}>
-          <span className={styles.feature_name}>
-            <span className={styles.feature_dot}>
-              <span
-                className={cx(styles.dot, server.enabled && styles.dot_on)}
-              />
+          <div className={styles.feature_head}>
+            <span className={styles.feature_name}>
+              <span className={styles.feature_dot}>
+                <span
+                  className={cx(styles.dot, server.enabled && styles.dot_on)}
+                />
+              </span>
+              {t("nav.overlays")}
             </span>
-            {t("nav.overlays")}
+            <Link
+              to={serverPage.to}
+              className={styles.feature_link}
+              aria-label={t("home.features.goTo", {
+                page: t(serverPage.label),
+              })}
+            >
+              <FiChevronRight size={18} />
+            </Link>
+          </div>
+          <span className={styles.feature_status} title={serverText}>
+            {serverText}
           </span>
-          <span className={styles.feature_status}>
-            {serverStatus(server.enabled, server.overlays, language)}
-          </span>
-          <Link
-            to={serverPage.to}
-            className={styles.feature_link}
-            aria-label={t("home.features.goTo", { page: t(serverPage.label) })}
-          >
-            <FiChevronRight size={18} />
-          </Link>
         </li>
       </ul>
     </Section>

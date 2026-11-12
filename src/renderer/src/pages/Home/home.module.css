@@ -1,25 +1,81 @@
-/* The feed on the right, as tall as the sections on the left */
-.dashboard {
+/* The board on the left, the rail flush with the window's right edge. The
+   grid cancels Layout's padding so the rail runs the window's full height,
+   and each side scrolls on its own. */
+.home {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: var(--space-10);
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 440px);
+  grid-template-rows: minmax(0, 1fr);
+  height: calc(100vh - var(--title-bar-height));
+  margin: calc(-1 * var(--space-8));
 }
 
-.column {
+/* x hidden: overflow-y alone would make the slate's wash scroll sideways */
+.board {
+  min-height: 0;
+  padding: var(--space-8);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.board_inner {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  gap: var(--space-10);
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
 }
 
-/* DASHBOARD */
+/* Only screen readers get it. A 1px box, so tests and Playwright still find
+   it visible. */
+.sr_only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.stat_label {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+/* SLATE */
+
+.slate {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Home's one warm spot, from the board's corner, fading out before any edge.
+   It stops at the slate's right side, which can be the board's. */
+.slate::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--space-8)) 0 0 calc(-1 * var(--space-8));
+  z-index: -1;
+  background: radial-gradient(
+    ellipse 70% 100% at 0 0,
+    color-mix(in srgb, var(--accent-primary) 8%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
 
 .status {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: 24px;
   color: var(--font-secondary);
   font-size: var(--font-sm);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .status_live {
@@ -27,7 +83,11 @@
 }
 
 .timer {
+  font-size: var(--font-xl);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .dot {
@@ -47,101 +107,298 @@
   background-color: var(--accent-primary);
 }
 
-/* A soft rose wash, Home's one warm spot */
 .connect {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: radial-gradient(
-    circle at 0 0,
-    color-mix(in srgb, var(--accent-primary) 8%, transparent),
-    transparent 70%
-  );
+  gap: var(--space-4);
 }
 
-/* Centered, so a short handle doesn't leave a gap before the button */
-.username {
+/* The handle as the slate's headline: a hairline under it, rose on focus
+   from the Input's own :focus */
+.connect .username {
   flex: 1;
   height: var(--control-height-lg);
-  padding: 0 var(--space-4);
-  font-size: var(--font-lg);
-  text-align: center;
+  padding: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background-color: transparent;
+  font-size: var(--font-2xl);
+  font-weight: 600;
 }
 
+/* While LIVE the handle is the slate's title, not a field */
+.connect .username:disabled {
+  border-color: transparent;
+  color: var(--font-primary);
+  cursor: default;
+}
+
+/* As wide as either label, so the spinner doesn't move it */
 .connect_btn {
   width: 168px;
 }
 
 .key_hint {
-  font-size: var(--font-sm);
+  max-width: 60ch;
   color: var(--font-secondary);
-  text-align: center;
+  font-size: var(--font-sm);
 }
 
 .key_hint a {
   color: var(--accent-primary);
 }
 
-/* TikTok's numbers and the totals read as a readout: muted until LIVE */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-6);
-}
+/* LIVE */
 
-.stat,
-.total {
+.live {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-10);
+  animation: home-fade-in 200ms ease-out;
 }
 
+@keyframes home-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The viewer count is the page's one hero, its line beside it */
+.pulse {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-8);
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 96px;
+}
+
+.hero_value,
 .stat_value,
-.total_value {
-  color: var(--font-muted);
+.peak_value,
+.tooltip_value,
+.rank {
   font-stretch: var(--stretch-readout);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
-.live .stat_value,
-.live .total_value {
+.hero_value {
   color: var(--font-primary);
+  font-size: var(--font-4xl);
+}
+
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.peak {
+  align-self: flex-end;
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+.peak_value {
+  color: var(--font-primary);
+  font-size: var(--font-md);
+}
+
+.plot {
+  position: relative;
+  height: 72px;
+}
+
+/* Visible overflow keeps the half of the line's stroke past the peak */
+.plot_svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.plot_area {
+  fill: var(--font-secondary);
+  fill-opacity: 0.1;
+}
+
+.plot_base {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.plot_line {
+  fill: none;
+  stroke: var(--font-secondary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Now, ringed in the page's color so it stands off the line */
+.plot_now {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--background-primary);
+  border-radius: var(--radius-full);
+  background-color: var(--accent-primary);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--background-secondary-hover);
+  translate: -50% 0;
+  pointer-events: none;
+}
+
+.tooltip {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--background-secondary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tooltip_value {
+  color: var(--font-primary);
+  font-size: var(--font-md);
+}
+
+.tooltip_time {
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Values on one line, labels free to wrap in Spanish */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .stat_value {
-  font-size: var(--font-3xl);
+  color: var(--font-primary);
+  font-size: var(--font-2xl);
 }
 
-.stat_label {
-  font-size: var(--font-sm);
-  font-weight: 500;
+.gifters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  list-style: none;
+}
+
+.gifter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.rank {
+  min-width: 1ch;
   color: var(--font-secondary);
+  font-size: var(--font-lg);
+}
+
+.gifter_body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gifter_name {
+  overflow: hidden;
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gifter_coins {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.quiet {
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live {
+    animation: none;
+  }
 }
 
 /* FEATURES */
 
+/* A 2x2 switchboard. Hairlines go only right of the left column and above the
+   second row, so none doubles. */
 .features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background-color: var(--background-tertiary);
+  list-style: none;
 }
 
 .feature {
-  display: grid;
-  grid-template-columns: 160px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-4);
-  min-height: 48px;
-  padding: var(--space-2) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
 }
 
-.feature + .feature {
+.feature:nth-child(odd) {
+  border-right: 1px solid var(--border);
+}
+
+.feature:nth-child(n + 3) {
   border-top: 1px solid var(--border);
+}
+
+.feature_head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 28px;
 }
 
 /* The overlay server has a dot where the others have a toggle, as wide */
@@ -149,8 +406,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  font-size: var(--font-md);
   color: var(--font-primary);
+  font-size: var(--font-md);
 }
 
 .feature_dot {
@@ -159,7 +416,9 @@
   width: 36px;
 }
 
+/* Under the name: the toggle's 36px and its label's 12px gap */
 .feature_status {
+  padding-left: calc(36px + var(--space-3));
   overflow: hidden;
   color: var(--font-secondary);
   font-size: var(--font-sm);
@@ -187,41 +446,60 @@
 
 /* ACTIVITY */
 
-/* Counted since connecting, quieter than TikTok's numbers */
-.totals {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4) var(--space-6);
-}
-
-.total_value {
-  font-size: var(--font-2xl);
-}
-
-/* The list scrolls inside the column instead of making the page taller */
-.feed {
-  position: relative;
-  flex: 1;
-  min-height: 280px;
-}
-
-.feed_list {
-  position: absolute;
-  inset: 0;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+.rail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--border);
   background-color: var(--background-tertiary);
+}
+
+/* The gear's 6px padding comes off the right, so its icon lines up with the
+   rows */
+.rail_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-6) calc(var(--space-6) - 6px) var(--space-3)
+    var(--space-6);
+}
+
+.rail_title {
+  color: var(--font-primary);
+  font-size: var(--font-xl);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Scrolls inside the rail instead of making the page taller */
+.feed_list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   list-style: none;
+}
+
+.feed_empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+  text-align: center;
+  text-wrap: balance;
 }
 
 .event {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--font-md);
+  padding: var(--space-3) var(--space-6);
   color: var(--font-primary);
+  font-size: var(--font-md);
 }
 
 .event + .event {
@@ -255,8 +533,52 @@
   object-fit: contain;
 }
 
+/* A gift's coins at the row's end */
 .coins {
-  margin-left: var(--space-1);
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: var(--space-2);
   color: var(--font-secondary);
   font-size: var(--font-sm);
+  white-space: nowrap;
+}
+
+/* Pinned at the rail's foot */
+.playing {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--border);
+}
+
+.playing_art {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.playing_body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.playing_label {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+.playing_title {
+  overflow: hidden;
+  color: var(--font-primary);
+  font-size: var(--font-md);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

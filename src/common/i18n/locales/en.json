@@ -267,7 +267,6 @@
   "settings.language.system": "System language",
   "settings.tray.title": "Tray",
   "home.dashboard.title": "Dashboard",
-  "home.dashboard.description": "Connect to your TikTok LIVE to begin receiving events.",
   "home.dashboard.offline": "Offline",
   "home.dashboard.username": "@username",
   "home.dashboard.keyHint": "Connecting needs your Euler Stream API key. <link>Get a free key</link> and add it in <settings>Settings</settings>.",

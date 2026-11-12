@@ -5,6 +5,8 @@ import {
   liveSession,
   profileReply,
   settingsReply,
+  song,
+  topGifter,
   viewer,
 } from "@test/fixtures";
 import { send, sent, sentEvents } from "@test/ipc";
@@ -30,8 +32,11 @@ const page = () => within(screen.getByRole("main"));
 const username = () => page().getByPlaceholderText("@username");
 // The value shown above a stat's label
 const stat = (label: string) => page().getByText(label).previousElementSibling;
-// "Offline", or "LIVE" and how long
-const status = () => page().getByText(/^(Offline|LIVE)/);
+// "Offline", or "LIVE" (said only to screen readers) and how long
+const status = () =>
+  page()
+    .getByText(/^(Offline|LIVE)$/)
+    .closest("p");
 const events = () =>
   within(page().getByRole("list", { name: "Activity" })).getAllByRole(
     "listitem",
@@ -42,7 +47,7 @@ afterEach(() => {
 });
 
 describe("Home", () => {
-  it("asks main for the profile, the settings, the connection, the music and the LIVE", async () => {
+  it("asks main for the profile, the settings, the connection, the music, the LIVE, its gifters and the songs", async () => {
     await renderApp();
 
     expect(sentEvents()).toEqual(
@@ -52,6 +57,8 @@ describe("Home", () => {
         APP_EVENTS.IS_CONNECTED,
         APP_EVENTS.IS_MUSIC_CONNECTED,
         APP_EVENTS.GET_LIVE_SESSION,
+        APP_EVENTS.GET_LIVE_GIFTERS,
+        APP_EVENTS.GET_SONGS,
       ]),
     );
   });
@@ -170,12 +177,12 @@ describe("Home", () => {
     await connected();
 
     await session({ startedAt: 100_000 - 65_000 });
-    expect(status()).toHaveTextContent("LIVE · 00:01:05");
+    expect(status()).toHaveTextContent("LIVE 00:01:05");
 
     act(() => {
       vi.advanceTimersByTime(2000);
     });
-    expect(status()).toHaveTextContent("LIVE · 00:01:07");
+    expect(status()).toHaveTextContent("LIVE 00:01:07");
 
     await disconnected();
     await session();
@@ -198,23 +205,33 @@ describe("Home", () => {
     ]);
   });
 
-  it("shows dashes for the stats while offline", async () => {
+  it("shows the LIVE's numbers, its chart and top gifters only while LIVE", async () => {
     await renderApp();
+    const shown = () => ({
+      numbers: page().queryByText("Coins") !== null,
+      chart: page().queryByRole("img", { name: "Viewers during the LIVE" }),
+      gifters: page().queryByRole("heading", { name: "Top gifters" }),
+    });
     await session({
       totals: { followers: 3, shares: 2, gifts: 1, coins: 1 },
     });
 
-    for (const label of [
-      "Viewers",
-      "Likes",
-      "Total views",
-      "New followers",
-      "Shares",
-      "Gifts",
-      "Coins",
-    ]) {
-      expect(stat(label)).toHaveTextContent("--");
-    }
+    expect(shown()).toEqual({ numbers: false, chart: null, gifters: null });
+
+    // A connect still in progress
+    await send(APP_EVENTS_RESPONSE.CONNECTED, {
+      success: true,
+      live: false,
+      stats: { views: 0, viewers: 0, likes: 0 },
+    });
+    expect(shown()).toEqual({ numbers: false, chart: null, gifters: null });
+
+    await connected();
+    expect(shown()).toEqual({
+      numbers: true,
+      chart: expect.any(HTMLElement),
+      gifters: expect.any(HTMLElement),
+    });
   });
 
   it("shows the live stats short, with the exact number on hover", async () => {
@@ -250,6 +267,144 @@ describe("Home", () => {
     expect(stat("Gifts")).toHaveTextContent("1.5K");
     expect(stat("Coins")).toHaveTextContent("12K");
     expect(stat("Coins")).toHaveAttribute("title", "12,000");
+  });
+
+  describe("viewers chart", () => {
+    const chart = () =>
+      page().getByRole("img", { name: "Viewers during the LIVE" });
+    const peak = () => page().getByText(/^Peak/);
+    const views = (viewers: number) =>
+      send(APP_EVENTS_RESPONSE.VIEWS, { data: { viewers, views: 2000 } });
+
+    it("draws each minute, with the live count for this one", async () => {
+      await renderApp();
+      await connected();
+      await session({ startedAt: Date.now(), viewers: [10, 30, 20] });
+
+      await views(25);
+      expect(peak()).toHaveTextContent("Peak 30");
+
+      await views(40);
+      expect(peak()).toHaveTextContent("Peak 40");
+    });
+
+    it("says a minute's count and when on hover", async () => {
+      const { user } = await renderApp();
+      await connected();
+      await session({ startedAt: Date.now(), viewers: [10, 30, 20] });
+      await views(25);
+      vi.spyOn(chart(), "getBoundingClientRect").mockReturnValue(
+        new DOMRect(0, 0, 200, 72),
+      );
+
+      // Halfway across: the second of three minutes
+      await user.pointer({ target: chart(), coords: { clientX: 100 } });
+
+      expect(chart()).toHaveTextContent("30");
+      expect(chart()).toHaveTextContent("00:01:00");
+
+      await user.unhover(chart());
+      expect(chart()).not.toHaveTextContent("00:01:00");
+    });
+  });
+
+  describe("top gifters", () => {
+    const gifters = () =>
+      within(page().getByRole("list", { name: "Top gifters" })).getAllByRole(
+        "listitem",
+      );
+
+    it("lists this LIVE's top 3", async () => {
+      await renderApp();
+      await connected();
+
+      await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+        data: [
+          topGifter("Leo", 1000),
+          topGifter("Ana", 480, { username: "" }),
+          topGifter("Sam", 300),
+          topGifter("Kai", 120),
+        ],
+      });
+
+      expect(gifters().map((g) => g.textContent)).toEqual([
+        "1LLeo1,000 coins",
+        "2Aana480 coins",
+        "3SSam300 coins",
+      ]);
+      // With no name, the handle
+      expect(within(gifters()[1]).getByText("ana")).toHaveAttribute(
+        "title",
+        "@ana",
+      );
+    });
+
+    it("says when nobody has sent a gift yet", async () => {
+      await renderApp();
+      await connected();
+
+      await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, { data: [] });
+
+      expect(page().getByText("No gifts yet")).toBeInTheDocument();
+    });
+  });
+
+  describe("now playing", () => {
+    const playing = () => page().queryByText("Now playing");
+    const footer = (title: string) =>
+      page().getByText(title).closest("footer")!;
+
+    it("shows the song playing while the music player is connected", async () => {
+      await renderApp();
+      await send(APP_EVENTS_RESPONSE.SONGS, {
+        data: [
+          song("Levitating - Dua Lipa", { played: true }),
+          song("Blinding Lights - The Weeknd", {
+            playing: true,
+            thumbnail: "https://example.com/blinding-lights.jpg",
+          }),
+          song("Flowers - Miley Cyrus"),
+        ],
+      });
+
+      expect(playing()).not.toBeInTheDocument();
+
+      await send(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, { success: true });
+
+      expect(playing()).toBeInTheDocument();
+      expect(page().getByText("Blinding Lights - The Weeknd")).toHaveAttribute(
+        "title",
+        "Blinding Lights - The Weeknd",
+      );
+      expect(
+        footer("Blinding Lights - The Weeknd").querySelector("img"),
+      ).toHaveAttribute("src", "https://example.com/blinding-lights.jpg");
+
+      await send(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, { success: false });
+      expect(playing()).not.toBeInTheDocument();
+    });
+
+    it("shows nothing while no song plays", async () => {
+      await renderApp();
+      await send(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, { success: true });
+
+      await send(APP_EVENTS_RESPONSE.SONGS, {
+        data: [song("Flowers - Miley Cyrus")],
+      });
+
+      expect(playing()).not.toBeInTheDocument();
+    });
+
+    it("leaves the picture out without a thumbnail", async () => {
+      await renderApp();
+      await send(APP_EVENTS_RESPONSE.MUSIC_CONNECTED, { success: true });
+
+      await send(APP_EVENTS_RESPONSE.SONGS, {
+        data: [song("Flowers - Miley Cyrus", { playing: true })],
+      });
+
+      expect(footer("Flowers - Miley Cyrus").querySelector("img")).toBeNull();
+    });
   });
 
   describe("activity", () => {
