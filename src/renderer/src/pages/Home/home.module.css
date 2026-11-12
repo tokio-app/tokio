@@ -9,18 +9,24 @@
   margin: calc(-1 * var(--space-8));
 }
 
-/* x hidden: overflow-y alone would make the slate's wash scroll sideways */
+/* Home's one warm spot fades out from the board's corner, behind the slate,
+   and scrolls with it. Sized in px, so a wide window doesn't stretch it. */
 .board {
   min-height: 0;
   padding: var(--space-8);
-  overflow-x: hidden;
   overflow-y: auto;
+  background: radial-gradient(
+      720px 360px at 0 0,
+      color-mix(in srgb, var(--accent-primary) 8%, transparent),
+      transparent
+    )
+    no-repeat local;
 }
 
 .board_inner {
   display: flex;
   flex-direction: column;
-  gap: var(--space-10);
+  gap: var(--space-8);
   width: 100%;
   max-width: 880px;
   margin: 0 auto;
@@ -47,25 +53,9 @@
 
 .slate {
   position: relative;
-  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-
-/* Home's one warm spot, from the board's corner, fading out before any edge.
-   It stops at the slate's right side, which can be the board's. */
-.slate::before {
-  content: "";
-  position: absolute;
-  inset: calc(-1 * var(--space-8)) 0 0 calc(-1 * var(--space-8));
-  z-index: -1;
-  background: radial-gradient(
-    ellipse 70% 100% at 0 0,
-    color-mix(in srgb, var(--accent-primary) 8%, transparent),
-    transparent
-  );
-  pointer-events: none;
 }
 
 .status {
@@ -153,7 +143,7 @@
 .live {
   display: flex;
   flex-direction: column;
-  gap: var(--space-10);
+  gap: var(--space-8);
   animation: home-fade-in 200ms ease-out;
 }
 
@@ -163,19 +153,22 @@
   }
 }
 
-/* The viewer count is the page's one hero, its line beside it */
+/* The viewer count is the page's one hero, its line beside it on the same
+   floor, and "Viewers" and "Peak" share the line under both */
 .pulse {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: end;
-  gap: var(--space-8);
+  gap: var(--space-2) var(--space-8);
 }
 
-.hero {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 96px;
+.hero,
+.chart {
+  display: contents;
+}
+
+.hero .stat_label {
+  grid-area: 2 / 1;
 }
 
 .hero_value,
@@ -190,19 +183,14 @@
 }
 
 .hero_value {
+  grid-area: 1 / 1;
   color: var(--font-primary);
   font-size: var(--font-4xl);
 }
 
-.chart {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
 .peak {
-  align-self: flex-end;
+  grid-area: 2 / 2;
+  justify-self: end;
   color: var(--font-secondary);
   font-size: var(--font-sm);
   font-weight: 500;
@@ -214,8 +202,9 @@
 }
 
 .plot {
+  grid-area: 1 / 2;
   position: relative;
-  height: 72px;
+  height: 56px;
 }
 
 /* Visible overflow keeps the half of the line's stroke past the peak */
@@ -533,13 +522,14 @@
   object-fit: contain;
 }
 
-/* A gift's coins at the row's end */
+/* A gift's coins at the row's end, on its first line's height */
 .coins {
   flex-shrink: 0;
   margin-left: auto;
   padding-left: var(--space-2);
   color: var(--font-secondary);
   font-size: var(--font-sm);
+  line-height: calc(var(--font-md) * 1.5);
   white-space: nowrap;
 }
 
