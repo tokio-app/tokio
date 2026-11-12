@@ -24,6 +24,7 @@
 }
 
 .sidebar {
+  position: relative;
   z-index: var(--z-sidebar);
   display: flex;
   flex-direction: column;
@@ -58,20 +59,29 @@
   margin-top: auto;
 }
 
+.sidebar_item_active {
+  anchor-name: --sidebar-active;
+}
+
 .sidebar_item_active svg {
   color: var(--accent-primary);
 }
 
-/* The open page's mark, on the rail's edge */
-.sidebar_item_active::before {
+/* The open page's mark, on the rail's edge: one for the whole rail, anchored
+   to the open page's link, so it slides to the next one. Only top moves: a
+   transition on bottom would stretch it while the window resizes. Not found
+   has no open page, so no mark. */
+.sidebar:has(.sidebar_item_active)::before {
   content: "";
   position: absolute;
-  top: var(--space-3);
-  bottom: var(--space-3);
+  position-anchor: --sidebar-active;
+  top: calc(anchor(top) + var(--space-3));
   left: 0;
   width: 2px;
+  height: calc(anchor-size(height) - 2 * var(--space-3));
   border-radius: 0 2px 2px 0;
   background-color: var(--accent-primary);
+  transition: top 0.25s ease-out;
 }
 
 /* The page's name beside its icon, on hover and keyboard focus. Opacity hides
@@ -113,7 +123,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar_name {
+  .sidebar_name,
+  .sidebar:has(.sidebar_item_active)::before {
     transition: none;
   }
 }
