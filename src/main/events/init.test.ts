@@ -1473,7 +1473,7 @@ describe("init events", () => {
       connect(s);
 
       expect(sessions(s)).toEqual([
-        { startedAt: 5000, totals: noTotals, activity: [] },
+        { startedAt: 5000, totals: noTotals, activity: [], viewers: [] },
       ]);
     });
 

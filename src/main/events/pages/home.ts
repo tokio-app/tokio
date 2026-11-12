@@ -183,6 +183,26 @@ events.push(
   { notify: false },
 );
 
+// Also pushed from init as gifts come, with the overlays' top gifters
+events.push(
+  APP_EVENTS.GET_LIVE_GIFTERS,
+  ({ historyService }, e) => {
+    e.reply(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+      data: historyService.top().live,
+    });
+  },
+  { notify: false },
+);
+
+// Also pushed from init as the request queue changes
+events.push(
+  APP_EVENTS.GET_SONGS,
+  ({ musicService }, e) => {
+    e.reply(APP_EVENTS_RESPONSE.SONGS, { data: musicService.songs() });
+  },
+  { notify: false },
+);
+
 events.push(
   APP_EVENTS.SET_ACTIVITY_FEED,
   async ({ storeManagerService, liveService, notifier }, e, { feed }) => {

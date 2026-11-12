@@ -67,6 +67,7 @@ describe("LiveService", () => {
       startedAt: null,
       totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
       activity: [],
+      viewers: [],
     });
   });
 
@@ -254,6 +255,7 @@ describe("LiveService", () => {
       startedAt: 1000,
       totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
       activity: [],
+      viewers: [],
     });
   });
 
@@ -314,6 +316,7 @@ describe("LiveService", () => {
         startedAt: null,
         totals: { followers: 1, shares: 0, gifts: 2, coins: 2 },
         activity: [{ id: 1, type: "follow", user: shown("sora") }],
+        viewers: [],
       });
     });
 

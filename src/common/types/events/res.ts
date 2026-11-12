@@ -1,6 +1,6 @@
 import { AboutInfo, LicenseText } from "../about";
 import { MyInstantsSound } from "../alerts";
-import { Fan, TokioPayload } from "../connector";
+import { Fan, MusicInfo, TokioPayload, TopGifter } from "../connector";
 import { CustomGift, OverlayConfigRedux } from "../overlay";
 import {
   AlertMedia,
@@ -84,6 +84,8 @@ export enum APP_EVENTS_RESPONSE {
   VIEWS = "app:home:res:views",
   LIKES = "app:home:res:likes",
   LIVE_SESSION = "app:home:res:session",
+  LIVE_GIFTERS = "app:home:res:gifters",
+  SONGS = "app:home:res:songs",
 
   // LIVES
   LIVES = "app:lives:res:get",
@@ -270,6 +272,16 @@ export interface AppEventsResponseMap {
   // The reply to GET_LIVE_SESSION, pushed again when the session changes
   [APP_EVENTS_RESPONSE.LIVE_SESSION]: {
     data: LiveSession;
+  };
+  // The reply to GET_LIVE_GIFTERS, pushed again as they change: this LIVE's
+  // gifters, the most coins first, [] outside a LIVE
+  [APP_EVENTS_RESPONSE.LIVE_GIFTERS]: {
+    data: TopGifter[];
+  };
+  // The reply to GET_SONGS, pushed again as the request queue changes, as
+  // overlays get it
+  [APP_EVENTS_RESPONSE.SONGS]: {
+    data: MusicInfo[];
   };
 
   // LIVES

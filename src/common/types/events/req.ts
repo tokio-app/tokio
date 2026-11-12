@@ -77,6 +77,8 @@ export enum APP_EVENTS {
   ACTIVE_FEATURES = "app:home:activefeatures",
   GET_LIVE_SESSION = "app:home:session",
   SET_ACTIVITY_FEED = "app:home:set:feed",
+  GET_LIVE_GIFTERS = "app:home:gifters",
+  GET_SONGS = "app:home:songs",
 
   // LIVES
   GET_LIVES = "app:lives:get",
@@ -292,6 +294,8 @@ export interface AppEventsMap {
   [APP_EVENTS.GET_LIVE_SESSION]: void;
   // Main replies LIVE_SESSION without the events the feed no longer shows
   [APP_EVENTS.SET_ACTIVITY_FEED]: { feed: ActivityFeed };
+  [APP_EVENTS.GET_LIVE_GIFTERS]: void;
+  [APP_EVENTS.GET_SONGS]: void;
 
   // LIVES
   [APP_EVENTS.GET_LIVES]: void;

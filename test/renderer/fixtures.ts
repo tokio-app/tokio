@@ -133,6 +133,7 @@ export const liveSession = (patch: Partial<LiveSession> = {}): LiveSession => ({
   startedAt: null,
   totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
   activity: [],
+  viewers: [],
   ...patch,
 });
 

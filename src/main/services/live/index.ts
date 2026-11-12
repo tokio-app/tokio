@@ -72,6 +72,8 @@ export class LiveService extends Service {
   private _lastId = 0;
   // The kinds of events the feed keeps. Totals count all of them.
   private _feed: ActivityFeed = { ...defaultStoreData.settings.activityFeed };
+  // Each minute's highest viewer count since the LIVE started
+  private _viewers: number[] = [];
 
   private readonly _recorders: Recorders = {
     [TOKIO_EVENTS.CHAT]: ({ user, comment }) =>
@@ -123,6 +125,7 @@ export class LiveService extends Service {
     this._startedAt = now;
     this._totals = noTotals();
     this._activity = [];
+    this._viewers = [];
     this._streaks.clear();
   }
 
@@ -154,6 +157,7 @@ export class LiveService extends Service {
       startedAt: this._startedAt,
       totals: { ...this._totals },
       activity: [...this._activity],
+      viewers: [...this._viewers],
     };
   }
 
