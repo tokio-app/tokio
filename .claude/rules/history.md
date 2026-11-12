@@ -48,6 +48,7 @@ paths:
 - `{ type: "tokio:gifters", data: { live, allTime } }`, each the top `TOP_GIFTERS` as `TopGifter`, with both the `live` and the `allTime` numbers. `live` is `[]` outside a LIVE.
 - `allTime` merges a cached top of the finished LIVEs (`_best`) with this LIVE's gifters, so a push never sorts all of all time.
 - Each client gets it as it connects, then after each load, a LIVE's start and end, a delete or a clear, and gifts that count, through a `GIFTERS_PUSH_MS` `throttle` that reads the lists when it fires.
+- Home's top gifters (`LIVE_GIFTERS`, `live` only) go out in the same throttled push, from the same `top()`, so the window and the overlays show one list. `end()` empties `live`, so the push after a LIVE ends carries `[]`.
 - Test sends a sample (see Previews in `.claude/rules/overlays.md`).
 - The SDK (`@tokioapp/overlay`) types it as `TOKIO_EVENTS.GIFTERS`. Overlays on an older version log it as an unknown type.
 
