@@ -8,7 +8,14 @@ import {
 } from "@/common/types";
 import { defaultStoreData } from "@/common/util";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ACTIVITY_LIMIT, JOIN_LIMIT, LiveService } from "./index";
+import {
+  ACTIVITY_LIMIT,
+  JOIN_LIMIT,
+  LiveService,
+  VIEWER_MINUTES,
+} from "./index";
+
+const MINUTE = 60_000;
 
 const viewer = (handle: string, patch: Partial<UserData> = {}): UserData => ({
   username: `${handle} name`,
@@ -290,6 +297,80 @@ describe("LiveService", () => {
     expect(before.activity).toEqual([
       { id: 1, type: "join", users: [shown("kai")], count: 1 },
     ]);
+  });
+
+  describe("viewers", () => {
+    const viewers = () => live.getSession().viewers;
+
+    beforeEach(() => {
+      live.start(0);
+    });
+
+    it("keeps each minute's highest count, true only as a later minute starts", () => {
+      expect(live.recordViewers(10, 0)).toBe(false);
+      expect(live.recordViewers(30, 20_000)).toBe(false);
+      expect(live.recordViewers(20, 59_999)).toBe(false);
+      expect(live.recordViewers(5, MINUTE)).toBe(true);
+      expect(live.recordViewers(8, MINUTE + 1)).toBe(false);
+
+      expect(viewers()).toEqual([30, 8]);
+    });
+
+    it("repeats the last count over minutes without one", () => {
+      live.recordViewers(10, 0);
+      expect(live.recordViewers(40, 3 * MINUTE)).toBe(true);
+
+      expect(viewers()).toEqual([10, 10, 10, 40]);
+    });
+
+    it("fills the minutes before the first count with it", () => {
+      expect(live.recordViewers(7, 2 * MINUTE)).toBe(true);
+
+      expect(viewers()).toEqual([7, 7, 7]);
+    });
+
+    it("ignores counts before a LIVE starts and after it ends", () => {
+      const idle = new LiveService();
+      expect(idle.recordViewers(10, 0)).toBe(false);
+      expect(idle.getSession().viewers).toEqual([]);
+
+      live.recordViewers(10, 0);
+      live.end();
+      expect(live.recordViewers(50, MINUTE)).toBe(false);
+      expect(viewers()).toEqual([10]);
+    });
+
+    it("starts over with the next LIVE", () => {
+      live.recordViewers(10, 0);
+      live.recordViewers(20, MINUTE);
+
+      live.start(5 * MINUTE);
+
+      expect(viewers()).toEqual([]);
+      expect(live.recordViewers(3, 5 * MINUTE)).toBe(false);
+      expect(viewers()).toEqual([3]);
+    });
+
+    it("keeps a clock set back in the minute it reached", () => {
+      live.recordViewers(10, 0);
+      live.recordViewers(20, 2 * MINUTE);
+
+      expect(live.recordViewers(50, MINUTE)).toBe(false);
+      expect(live.recordViewers(60, -MINUTE)).toBe(false);
+
+      expect(viewers()).toEqual([10, 10, 60]);
+    });
+
+    it(`stops after ${VIEWER_MINUTES} minutes`, () => {
+      live.recordViewers(10, 0);
+      expect(live.recordViewers(20, (VIEWER_MINUTES - 1) * MINUTE)).toBe(true);
+
+      expect(live.recordViewers(30, VIEWER_MINUTES * MINUTE)).toBe(false);
+      expect(live.recordViewers(40, (VIEWER_MINUTES + 5) * MINUTE)).toBe(false);
+
+      expect(viewers()).toHaveLength(VIEWER_MINUTES);
+      expect(viewers().at(-1)).toBe(20);
+    });
   });
 
   describe("feed", () => {

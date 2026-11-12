@@ -21,6 +21,10 @@ const JOIN_NAMES = 2;
 // A join item counts up to this many viewers, which bounds the handles kept
 export const JOIN_LIMIT = 1000;
 
+const MINUTE = 60_000;
+// shortcut: the chart stops at 24 h, keep coarser minutes if LIVEs run longer
+export const VIEWER_MINUTES = 24 * 60;
+
 // The live events the Home page shows or counts
 export const ACTIVITY_EVENTS = [
   TOKIO_EVENTS.CHAT,
@@ -149,6 +153,30 @@ export class LiveService extends Service {
     data: TokioEventMap[K],
   ): boolean {
     return this._recorders[type](data);
+  }
+
+  /**
+   * Keeps the minute's highest viewer count. True when the count starts a
+   * minute after the first one, so Home's chart gets the minute that ended.
+   */
+  public recordViewers(count: number, now = Date.now()): boolean {
+    if (this._startedAt === null) return false;
+    const viewers = this._viewers;
+    // A clock set back stays in the minute it reached
+    const minute = Math.max(
+      0,
+      viewers.length - 1,
+      Math.floor((now - this._startedAt) / MINUTE),
+    );
+    if (minute >= VIEWER_MINUTES) return false;
+    if (minute === viewers.length - 1) {
+      viewers[minute] = Math.max(viewers[minute], count);
+      return false;
+    }
+    // Minutes without a reading repeat the last one
+    while (viewers.length < minute) viewers.push(viewers.at(-1) ?? count);
+    viewers.push(count);
+    return viewers.length > 1;
   }
 
   /** A copy, so later events don't change what was sent. */
