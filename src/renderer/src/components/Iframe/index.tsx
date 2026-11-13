@@ -1,5 +1,14 @@
+import { PREVIEW_READY } from "@/common/util";
 import { useT } from "@/ui/i18n";
-import { Ref, useMemo, useState } from "react";
+import {
+  Ref,
+  useEffect,
+  useEffectEvent,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Spinner } from "../Elements";
 import styles from "./iframe.module.css";
 
@@ -22,6 +31,25 @@ export const Iframe = ({
 }: IframeProps) => {
   const t = useT();
   const [loading, setLoading] = useState(true);
+  const frame = useRef<HTMLIFrameElement>(null);
+  useImperativeHandle(ref, () => frame.current!, []);
+
+  const loaded = () => {
+    setLoading(false);
+    onLoad?.();
+  };
+
+  // Main's script in the page posts this once the overlay's own scripts have
+  // run. Its load also waits for pictures from other hosts, which can hang.
+  const onReady = useEffectEvent(loaded);
+  useEffect(() => {
+    const ready = (e: MessageEvent) => {
+      if (e.data === PREVIEW_READY && e.source === frame.current?.contentWindow)
+        onReady();
+    };
+    window.addEventListener("message", ready);
+    return () => window.removeEventListener("message", ready);
+  }, []);
 
   const iframeSrc = useMemo(() => {
     const normalizedPath = source.replace(/\\/g, "/");
@@ -46,7 +74,7 @@ export const Iframe = ({
         </div>
       )}
       <iframe
-        ref={ref}
+        ref={frame}
         src={iframeSrc}
         title={t("components.iframe.title", { name })}
         name={`TOKIO_APP-${name}`}
@@ -54,10 +82,7 @@ export const Iframe = ({
         loading="lazy"
         // Previews ignore the pointer, Tab skips them too
         tabIndex={-1}
-        onLoad={() => {
-          setLoading(false);
-          onLoad?.();
-        }}
+        onLoad={loaded}
         className={styles.iframe_component}
         style={{
           visibility: loading ? "hidden" : "visible",

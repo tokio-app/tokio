@@ -7,6 +7,7 @@ import {
   getMediaPreviewURL,
   getPicturePreviewURL,
   getSoundPreviewURL,
+  PREVIEW_READY,
 } from "@/common/util";
 import {
   mediaFile,
@@ -207,6 +208,17 @@ describe("withPreviewStyles", () => {
       "C:/overlays/a/index.html",
     );
     expect(await res.text()).toContain("html,body{overflow:hidden!important}");
+  });
+
+  // Its load waits for every picture, even from a host that never answers.
+  it("tells the Iframe once the page's own scripts have run", async () => {
+    const res = await withPreviewStyles(
+      new Response(page),
+      "C:/overlays/a/index.html",
+    );
+    expect(await res.text()).toContain(
+      `<script>addEventListener("DOMContentLoaded",()=>parent.postMessage("${PREVIEW_READY}","*"))</script>`,
+    );
   });
 
   it("keeps a transparent preview's own background, still without scrollbars", async () => {

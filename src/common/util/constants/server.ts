@@ -78,3 +78,7 @@ export const MINECRAFT_JAVA_PROTOCOL = "tokio.java.v1";
 // Overlays connect here with their id to get the events meant for them.
 export const getOverlaySocketURL = (id: string) =>
   `ws://localhost:${SERVER_PORT}/?id=${encodeURIComponent(id)}`;
+
+// What an overlay's preview posts to the window showing it once its own
+// scripts have run (see withPreviewStyles), so the Iframe shows it.
+export const PREVIEW_READY = "tokio:preview-ready";
