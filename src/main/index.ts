@@ -273,4 +273,5 @@ app.on("will-quit", (event) => {
   }
   services.ttsService.dispose();
   services.updaterService.dispose();
+  services.overlayService.dispose();
 });

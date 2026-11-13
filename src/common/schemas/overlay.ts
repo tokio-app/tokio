@@ -2,15 +2,33 @@ import { z } from "zod";
 import { CustomGift, OverlayConfigRedux } from "../types/overlay";
 import { FONT_MAX_LENGTH } from "./timer";
 
+// The text beside it in other languages, by language code
+const Translations = z.record(z.string(), z.string()).optional();
+
 const SectionSchema = z.object({
   name: z.string(),
   id: z.string(),
+  translations: Translations,
 });
+
+// The values a condition names: one, or a list of which any matches
+const Values = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.array(z.union([z.string(), z.number(), z.boolean()])).min(1),
+]);
+
+// Shows a field only while each named earlier field has one of the values,
+// or with `not`, none of them
+const When = z.record(z.string(), z.union([Values, z.object({ not: Values })]));
 
 const BaseSetting = {
   name: z.string(),
   id: z.string(),
   section: z.string(),
+  when: When.optional(),
+  translations: Translations,
 };
 
 const InputValue = z.union([z.string().default(""), z.number().default(0)]);
@@ -21,6 +39,7 @@ const InputSetting = z.object({
   attributes: z.object({
     mode: z.enum(["text", "number"]),
     placeholder: z.string().optional(),
+    translations: Translations,
     value: InputValue,
     default: InputValue,
   }),
@@ -46,6 +65,7 @@ const DropdownSetting = z.object({
         value: z.union([z.string(), z.number()]),
         label: z.union([z.string(), z.number()]),
         img: z.string().optional(),
+        translations: Translations,
       }),
     ),
   }),
@@ -115,28 +135,29 @@ const FontSetting = z.object({
   }),
 });
 
-// A table's column: a field without its section and value, whose default
-// fills the cell of a new row. A slider has no room for its number in a cell.
+// A table's column: a field without its section, conditions and value, whose
+// default fills the cell of a new row. A slider has no room for its number in
+// a cell.
 const ColumnSchema = z.discriminatedUnion("type", [
-  InputSetting.omit({ section: true }).extend({
+  InputSetting.omit({ section: true, when: true }).extend({
     attributes: InputSetting.shape.attributes.omit({ value: true }),
   }),
-  DropdownSetting.omit({ section: true }).extend({
+  DropdownSetting.omit({ section: true, when: true }).extend({
     attributes: DropdownSetting.shape.attributes.omit({ value: true }),
   }),
-  ColorSetting.omit({ section: true }).extend({
+  ColorSetting.omit({ section: true, when: true }).extend({
     attributes: ColorSetting.shape.attributes.omit({ value: true }),
   }),
-  CheckSetting.omit({ section: true }).extend({
+  CheckSetting.omit({ section: true, when: true }).extend({
     attributes: CheckSetting.shape.attributes.omit({ value: true }),
   }),
-  ToggleSetting.omit({ section: true }).extend({
+  ToggleSetting.omit({ section: true, when: true }).extend({
     attributes: ToggleSetting.shape.attributes.omit({ value: true }),
   }),
-  GiftsSetting.omit({ section: true }).extend({
+  GiftsSetting.omit({ section: true, when: true }).extend({
     attributes: GiftsSetting.shape.attributes.omit({ value: true }),
   }),
-  FontSetting.omit({ section: true }).extend({
+  FontSetting.omit({ section: true, when: true }).extend({
     attributes: FontSetting.shape.attributes.omit({ value: true }),
   }),
 ]);
@@ -186,7 +207,8 @@ export const OverlayConfigSchema = z
   })
   .superRefine((data, ctx) => {
     const seenSectionIds = new Set<string>();
-    const seenFieldIds = new Set<string>();
+    // The fields listed so far, by id
+    const seenFields = new Map<string, OverlayConfigField>();
 
     data.sections.forEach((section, index) => {
       if (seenSectionIds.has(section.id)) {
@@ -208,7 +230,7 @@ export const OverlayConfigSchema = z
         });
       }
 
-      if (seenFieldIds.has(field.id)) {
+      if (seenFields.has(field.id)) {
         ctx.addIssue({
           code: "custom",
           message: `Duplicate field ID found: '${field.id}'. Each field must have a unique ID.`,
@@ -216,7 +238,8 @@ export const OverlayConfigSchema = z
         });
       }
 
-      seenFieldIds.add(field.id);
+      checkWhen(field, index, seenFields, ctx);
+      seenFields.set(field.id, field);
 
       if (field.type === "table") checkTable(field, index, ctx);
     });
@@ -229,6 +252,76 @@ export type OverlayConfigTable = Extract<OverlayConfigField, { type: "table" }>;
 export type OverlayConfigLeaf = Exclude<OverlayConfigField, { type: "table" }>;
 export type OverlayConfigColumn = z.infer<typeof ColumnSchema>;
 export type OverlayConfigRow = z.infer<typeof Rows>[number];
+type Condition = z.infer<typeof When>[string];
+type Values = z.infer<typeof Values>;
+
+// Each condition names a field listed earlier, which also rules out cycles,
+// that isn't a table, with values that field can have.
+function checkWhen(
+  field: OverlayConfigField,
+  index: number,
+  seen: Map<string, OverlayConfigField>,
+  ctx: z.RefinementCtx,
+) {
+  for (const [id, condition] of Object.entries(field.when ?? {})) {
+    const path = ["fields", index, "when", id];
+    const other = seen.get(id);
+    if (!other || other.type === "table") {
+      ctx.addIssue({
+        code: "custom",
+        message: other
+          ? `Invalid condition: '${id}' is a table, which a condition can't name.`
+          : `Invalid condition: '${id}' is not a field listed before '${field.id}'.`,
+        path,
+      });
+      continue;
+    }
+
+    const list = Array.isArray(other.attributes.default);
+    for (const value of conditionValues(condition)) {
+      if (!fits(other, list ? [value] : value)) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Invalid condition: '${id}' can't have the value ${JSON.stringify(value)}.`,
+          path,
+        });
+      }
+    }
+  }
+}
+
+// Whether a condition is a `not`
+const isNot = (condition: Condition): condition is { not: Values } =>
+  typeof condition === "object" && !Array.isArray(condition);
+
+// The values a condition lists, `not`'s included
+function conditionValues(condition: Condition) {
+  const values = isNot(condition) ? condition.not : condition;
+  return Array.isArray(values) ? values : [values];
+}
+
+/**
+ * The ids of the fields the settings dialog shows. A field shows when, for
+ * each of its conditions, the named field shows and its value is one of the
+ * values (with `not`, none of them). A list value matches when any item does.
+ */
+export function shownFields({ fields }: OverlayConfig): Set<string> {
+  const shown = new Set<string>();
+  const values = new Map(fields.map((f) => [f.id, f.attributes.value]));
+  for (const field of fields) {
+    const conditions = Object.entries(field.when ?? {});
+    const matches = conditions.every(([id, condition]) => {
+      const value: unknown = values.get(id);
+      const items: unknown[] = Array.isArray(value) ? value : [value];
+      const listed = new Set<unknown>(conditionValues(condition));
+      return (
+        shown.has(id) && items.some((i) => listed.has(i)) !== isNot(condition)
+      );
+    });
+    if (matches) shown.add(field.id);
+  }
+  return shown;
+}
 
 // A table's column ids are its own, it has no more rows than its max, and each
 // row fits its columns.
@@ -305,6 +398,40 @@ export function cellField(
   };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the config's check fits each cell to its column
   return field as OverlayConfigLeaf;
+}
+
+/**
+ * The config with its names, table column names, placeholders and option
+ * labels in the language, or its base language (`es` for `es-419`), where
+ * it has them.
+ */
+export function localizeOverlayConfig(
+  config: OverlayConfig,
+  language: string,
+): OverlayConfig {
+  const base = language.split("-")[0];
+  const local = <T>(text: T, translations?: Record<string, string>) =>
+    translations?.[language] ?? translations?.[base] ?? text;
+  const localize = (field: OverlayConfigField | OverlayConfigColumn) => {
+    field.name = local(field.name, field.translations);
+    if (field.type === "input" && field.attributes.placeholder !== undefined) {
+      const { placeholder, translations } = field.attributes;
+      field.attributes.placeholder = local(placeholder, translations);
+    }
+    if (field.type === "dropdown") {
+      for (const option of field.attributes.options) {
+        option.label = local(option.label, option.translations);
+      }
+    }
+    if (field.type === "table") field.attributes.columns.forEach(localize);
+  };
+
+  const localized = structuredClone(config);
+  for (const section of localized.sections) {
+    section.name = local(section.name, section.translations);
+  }
+  localized.fields.forEach(localize);
+  return localized;
 }
 
 /** The config with every field's value set back to its default. */

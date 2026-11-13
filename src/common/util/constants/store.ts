@@ -22,6 +22,9 @@ export const defaultStoreData: StoreSchema = {
     updates: {
       auto: true,
     },
+    overlayUpdates: {
+      auto: true,
+    },
     lastVersion: "",
     tray: {
       enabled: true,

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { CustomGift } from "../types/overlay";
 import {
   getOverlayConfig,
+  localizeOverlayConfig,
   mergeOverlayConfig,
   OverlayConfig,
   OverlayConfigSchema,
   resetOverlayConfig,
+  shownFields,
 } from "./overlay";
 
 const GIFTS: CustomGift[] = [
@@ -159,6 +161,52 @@ function makeTable(): OverlayConfig {
   };
 }
 
+// makeConfig with one more field, shown while the conditions hold
+function withWhen(
+  when: OverlayConfig["fields"][number]["when"],
+  config = makeConfig(),
+): OverlayConfig {
+  config.fields.push({
+    id: "extra",
+    name: "Extra",
+    section: "style",
+    type: "toggle",
+    when,
+    attributes: { value: true, default: true },
+  });
+  return config;
+}
+
+// makeConfig and makeTable in one, with Spanish beside most of their texts
+function makeTranslated(): OverlayConfig {
+  const config = makeConfig();
+  const table = makeTable();
+  const [general] = config.sections;
+  const [title, mode] = config.fields;
+  const [font, socials] = table.fields;
+  general.translations = { es: "Ajustes", "es-419": "Configuración" };
+  title.translations = { es: "Título" };
+  if (title.type === "input") title.attributes.translations = { es: "Escribe" };
+  if (mode.type === "dropdown") {
+    mode.attributes.options[1].translations = { es: "Be" };
+  }
+  font.translations = { es: "Fuente" };
+  socials.translations = { es: "Redes" };
+  if (socials.type === "table") {
+    const [platform, username] = socials.attributes.columns;
+    platform.translations = { es: "Plataforma" };
+    if (platform.type === "dropdown") {
+      platform.attributes.options[0].translations = { es: "Face" };
+    }
+    // No placeholder to translate
+    if (username.type === "input") {
+      username.attributes.translations = { es: "Nombre" };
+    }
+  }
+  config.fields.push(font, socials);
+  return config;
+}
+
 // The attributes of makeTable's table
 function socials(config: OverlayConfig) {
   const field = config.fields[1];
@@ -250,6 +298,168 @@ describe("OverlayConfigSchema", () => {
     config.fields[3].id = "title";
 
     expect(issues(config)).toEqual([["fields", 3, "id"]]);
+  });
+
+  it("keeps the translations", () => {
+    expect(OverlayConfigSchema.parse(makeTranslated())).toEqual(
+      makeTranslated(),
+    );
+  });
+
+  it("keeps conditions on earlier fields", () => {
+    const when = {
+      mode: ["a", "b"],
+      size: { not: 0 },
+      show: true,
+      gifts: 2,
+      title: { not: ["", "x"] },
+    };
+
+    const parsed = OverlayConfigSchema.parse(withWhen(when));
+
+    expect(parsed.fields.at(-1)?.when).toEqual(when);
+  });
+
+  it("refuses a condition on a later, unknown or table field", () => {
+    const config = withWhen({ extra: true, missing: 1 });
+    config.fields[0].when = { show: true };
+    expect(issues(config)).toEqual([
+      ["fields", 0, "when", "show"],
+      ["fields", 7, "when", "extra"],
+      ["fields", 7, "when", "missing"],
+    ]);
+
+    const table = makeTable();
+    table.fields.push({ ...makeConfig().fields[3], section: "general" });
+    table.fields[2].when = { socials: { not: 1 } };
+    expect(issues(table)).toEqual([["fields", 2, "when", "socials"]]);
+  });
+
+  it("refuses a value the named field can't have", () => {
+    // Not an option, out of range, a boolean for a dropdown, text for a check
+    const config = withWhen({
+      mode: "z",
+      size: { not: [50, 200] },
+      tint: "00ff00",
+      show: "yes",
+    });
+    config.fields[2].when = { mode: true };
+
+    expect(issues(config)).toEqual([
+      ["fields", 2, "when", "mode"],
+      ["fields", 7, "when", "mode"],
+      ["fields", 7, "when", "size"],
+      ["fields", 7, "when", "show"],
+    ]);
+  });
+});
+
+describe("localizeOverlayConfig", () => {
+  it("takes the language's texts, or its base language's", () => {
+    const es = localizeOverlayConfig(makeTranslated(), "es-419");
+    const [title, mode, , , , , , font, socials] = es.fields;
+
+    expect(es.sections.map((s) => s.name)).toEqual(["Configuración", "Style"]);
+    expect(es.fields.map((f) => f.name)).toEqual([
+      "Título",
+      "Mode",
+      "Tint",
+      "Show",
+      "Sound",
+      "Gifts",
+      "Size",
+      "Fuente",
+      "Redes",
+    ]);
+    expect(title.type === "input" && title.attributes.placeholder).toBe(
+      "Escribe",
+    );
+    expect(
+      mode.type === "dropdown" && mode.attributes.options.map((o) => o.label),
+    ).toEqual(["A", "Be"]);
+    expect(font.attributes.value).toBe("Comic Sans MS");
+
+    if (socials.type !== "table") throw new Error("Not a table");
+    const [platform, username] = socials.attributes.columns;
+    expect(socials.attributes.columns.map((c) => c.name)).toEqual([
+      "Plataforma",
+      "Username",
+      "Icon color",
+      "Gift",
+    ]);
+    expect(
+      platform.type === "dropdown" &&
+        platform.attributes.options.map((o) => o.label),
+    ).toEqual(["Face", "Instagram"]);
+    expect(username.attributes).not.toHaveProperty("placeholder");
+  });
+
+  it("keeps the texts as written in another language", () => {
+    expect(localizeOverlayConfig(makeTranslated(), "en")).toEqual(
+      makeTranslated(),
+    );
+  });
+
+  it("doesn't change its input", () => {
+    const config = makeTranslated();
+
+    localizeOverlayConfig(config, "es");
+
+    expect(config).toEqual(makeTranslated());
+  });
+});
+
+describe("shownFields", () => {
+  const shows = (config: OverlayConfig) => shownFields(config).has("extra");
+
+  it("shows the fields without conditions", () => {
+    expect([...shownFields(makeConfig())]).toEqual(
+      makeConfig().fields.map((f) => f.id),
+    );
+  });
+
+  it("shows a field while the named field has the value", () => {
+    const config = withWhen({ show: true });
+    expect(shows(config)).toBe(false);
+
+    config.fields[3].attributes.value = true;
+    expect(shows(config)).toBe(true);
+  });
+
+  it("needs every condition to hold", () => {
+    expect(shows(withWhen({ sound: true, size: 80 }))).toBe(true);
+    expect(shows(withWhen({ sound: true, size: 50 }))).toBe(false);
+  });
+
+  it("matches any value of a list, and none with not", () => {
+    expect(shows(withWhen({ size: [50, 80] }))).toBe(true);
+    expect(shows(withWhen({ size: [50, 60] }))).toBe(false);
+    expect(shows(withWhen({ size: { not: [50, 60] } }))).toBe(true);
+    expect(shows(withWhen({ size: { not: 80 } }))).toBe(false);
+  });
+
+  it("matches a list value when any of its items does", () => {
+    expect(shows(withWhen({ mode: "a" }))).toBe(true);
+    expect(shows(withWhen({ mode: "b" }))).toBe(false);
+    expect(shows(withWhen({ mode: { not: "a" } }))).toBe(false);
+    expect(shows(withWhen({ gifts: [1, 3] }))).toBe(true);
+  });
+
+  it("hides a field whose named field is hidden", () => {
+    // extra is on but hidden, so the field after it is hidden too
+    const config = withWhen({ show: true });
+    config.fields.push({
+      id: "after",
+      name: "After",
+      section: "style",
+      type: "check",
+      when: { extra: true },
+      attributes: { value: false, default: false },
+    });
+    expect(shownFields(config).has("after")).toBe(false);
+
+    config.fields[3].attributes.value = true;
+    expect(shownFields(config).has("after")).toBe(true);
   });
 });
 
@@ -501,6 +711,22 @@ describe("mergeOverlayConfig", () => {
       { platform: "facebook", username: false, color: "ff0000", label: "Hi" },
     ]);
     expect(OverlayConfigSchema.safeParse(merged).success).toBe(true);
+  });
+
+  it("takes the new version's conditions and translations", () => {
+    const next = withWhen({ show: true }, resetOverlayConfig(makeTranslated()));
+
+    const merged = mergeOverlayConfig(next, makeConfig());
+
+    expect(merged.fields.at(-1)?.when).toEqual({ show: true });
+    expect(merged.sections).toEqual(next.sections);
+    expect(merged.fields.map((f) => f.translations)).toEqual(
+      next.fields.map((f) => f.translations),
+    );
+    expect(merged.fields[0].attributes).toEqual({
+      ...next.fields[0].attributes,
+      value: "changed",
+    });
   });
 
   it("doesn't change its inputs", () => {

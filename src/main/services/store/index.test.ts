@@ -633,6 +633,32 @@ describe("StoreManagerService", () => {
       });
       expect((await init()).getSettings().updates).toEqual({ auto: false });
     });
+
+    it("updates official overlays on their own for stores saved before the setting", async () => {
+      const { overlayUpdates: _overlayUpdates, ...settings } =
+        defaultStoreData.settings;
+      await writeFile(
+        storeFile,
+        JSON.stringify({ ...defaultStoreData, settings }),
+      );
+
+      const store = await init();
+
+      expect(store.getSettings().overlayUpdates).toEqual({ auto: true });
+    });
+
+    it("saves the official overlays setting", async () => {
+      const store = await init();
+
+      await store.updateOverlayUpdatesSettings(false);
+
+      expect((await readJSON(storeFile)).settings.overlayUpdates).toEqual({
+        auto: false,
+      });
+      expect((await init()).getSettings().overlayUpdates).toEqual({
+        auto: false,
+      });
+    });
   });
 
   describe("tray", () => {

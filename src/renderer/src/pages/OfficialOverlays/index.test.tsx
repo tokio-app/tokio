@@ -248,6 +248,44 @@ describe("OfficialOverlays", () => {
     ).toBeEnabled();
   });
 
+  it("asks before a breaking update, and Cancel keeps the installed version", async () => {
+    const { user } = await renderApp("/overlays/official");
+    await catalog({ ...GIFT_JAR, version: "2.0.0" });
+    await overlays(overlayApp("gift-jar", { version: "1.2.0" }));
+
+    await user.click(card(GIFT_JAR).getByRole("button", { name: "Update" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Update Gift Jar to 2.0.0?");
+    expect(dialog).toHaveTextContent(
+      "This version changes how the overlay works. Some settings may go back to their defaults, and it may look different. Check it in your streaming app afterwards.",
+    );
+    expect(sent(APP_EVENTS.INSTALL_OVERLAY)).toEqual([]);
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(sent(APP_EVENTS.INSTALL_OVERLAY)).toEqual([]);
+  });
+
+  it("installs a breaking update once confirmed", async () => {
+    const { user } = await renderApp("/overlays/official");
+    await catalog({ ...GIFT_JAR, version: "2.0.0" });
+    await overlays(overlayApp("gift-jar", { version: "1.2.0" }));
+    const update = card(GIFT_JAR).getByRole("button", { name: "Update" });
+
+    await user.click(update);
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Update",
+      }),
+    );
+
+    expect(sent(APP_EVENTS.INSTALL_OVERLAY)).toEqual([{ id: "gift-jar" }]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(update).toHaveAttribute("aria-busy", "true");
+  });
+
   it("asks before removing an overlay, and Cancel keeps it", async () => {
     const { user } = await renderApp("/overlays/official");
     await catalog(GIFT_JAR);

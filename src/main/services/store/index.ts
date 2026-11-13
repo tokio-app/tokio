@@ -460,6 +460,12 @@ export class StoreManagerService extends Service {
     return this._queueSave();
   }
 
+  public async updateOverlayUpdatesSettings(auto: boolean): Promise<boolean> {
+    this._ensureInitialized();
+    this._storeData!.settings.overlayUpdates = { auto };
+    return this._queueSave();
+  }
+
   public async updateTraySettings(enabled: boolean): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.tray = { enabled };

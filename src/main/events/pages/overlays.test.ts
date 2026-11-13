@@ -14,6 +14,7 @@ import {
   TOKIO_EVENTS,
   TokioPayload,
 } from "@/common/types";
+import { setLanguage } from "@/helper/i18n";
 import Logger from "@/logger";
 import { dialog } from "@test/electron";
 import { createHandler } from "@test/handler";
@@ -567,6 +568,36 @@ describe("overlays events", () => {
       expect(h.replies(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG)).toEqual([
         { success: true, id: "gift-jar", data: config },
       ]);
+    });
+
+    it("answers with the settings' names in Tokio's language", async () => {
+      setLanguage("es-419");
+      const translated: OverlayConfig = {
+        sections: [{ id: "jar", name: "Jar", translations: { es: "Frasco" } }],
+        fields: [
+          {
+            id: "shake",
+            name: "Shake",
+            section: "jar",
+            type: "toggle",
+            translations: { "es-419": "Agitar" },
+            attributes: { value: true, default: true },
+          },
+        ],
+      };
+      const h = createHandler({
+        overlayService: {
+          getConfig: async () => ({ success: true, data: translated }),
+        },
+      });
+
+      await h.invoke(overlays, APP_EVENTS.GET_OVERLAY_CONFIG, {
+        id: "gift-jar",
+      });
+
+      const [reply] = h.replies(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG);
+      expect(reply.data?.sections[0].name).toBe("Frasco");
+      expect(reply.data?.fields[0].name).toBe("Agitar");
     });
 
     it("replies the id when the settings can't be read", async () => {

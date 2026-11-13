@@ -3,10 +3,10 @@ import { OverlayApp } from "@/common/types";
 import { describe, expect, it } from "vitest";
 import { catalogState, countUpdates } from "./catalog";
 
-const entry = (id: string): CatalogOverlay => ({
+const entry = (id: string, version = "1.0.1"): CatalogOverlay => ({
   id,
   name: id,
-  version: "1.0.1",
+  version,
   description: "",
   config: true,
   url: `https://github.com/tokio-app/overlays/releases/download/v0.1.1/${id}.zip`,
@@ -44,18 +44,41 @@ describe("catalogState", () => {
     expect(catalogState(entry("gift-jar"), current)).toBe("installed");
     expect(catalogState(entry("gift-jar"), older)).toBe("update");
   });
+
+  it("calls a new first version number breaking", () => {
+    const installed = [overlay("gift-jar", "1.4.2")];
+    expect(catalogState(entry("gift-jar", "2.0.0"), installed)).toBe(
+      "breaking",
+    );
+    expect(catalogState(entry("gift-jar", "1.5.0"), installed)).toBe("update");
+  });
+
+  it("calls a version that doesn't start with a number breaking", () => {
+    const installed = [overlay("gift-jar", "1.0.0")];
+    expect(catalogState(entry("gift-jar", "v1.0.1"), installed)).toBe(
+      "breaking",
+    );
+    const odd = [overlay("gift-jar", "next")];
+    expect(catalogState(entry("gift-jar", "1.0.1"), odd)).toBe("breaking");
+  });
 });
 
 describe("countUpdates", () => {
   it("counts the installed official overlays with a new version", () => {
-    const catalog = [entry("gift-jar"), entry("top-likes"), entry("jar-two")];
+    const catalog = [
+      entry("gift-jar"),
+      entry("top-likes"),
+      entry("jar-two"),
+      entry("now-playing", "2.0.0"),
+    ];
     const overlays = [
       overlay("gift-jar", "1.0.0"),
       overlay("top-likes", "1.0.1"),
       overlay("jar-two", "0.9.0", true),
+      overlay("now-playing", "1.2.0"),
     ];
 
-    expect(countUpdates(catalog, overlays)).toBe(1);
+    expect(countUpdates(catalog, overlays)).toBe(2);
     expect(countUpdates([], overlays)).toBe(0);
   });
 });

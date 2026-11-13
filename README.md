@@ -30,7 +30,7 @@ Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok
   <tr>
     <td width="50%" valign="top">
       <img src=".github/screenshots/overlays.png" alt="The overlay gallery with two official overlays" />
-      <p><a href="https://tokio.ialfaro.com/docs/features/overlays/"><b>Overlays</b></a>: install the official ones or import your own, and set them up from the gallery.</p>
+      <p><a href="https://tokio.ialfaro.com/docs/features/overlays/"><b>Overlays</b></a>: install the official ones, which update on their own, or import your own, and set them up from the gallery.</p>
     </td>
     <td width="50%" valign="top">
       <img src=".github/screenshots/overlay-studio.png" alt="Overlay Studio's editor: the Elements list, a portrait canvas with a likes banner, a star, the logo, a follow message and a viewer's picture, and the star's settings" />

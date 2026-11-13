@@ -73,6 +73,7 @@ export enum APP_EVENTS_RESPONSE {
   SET_VOICE_KEY = "app:settings:res:set:voice-key",
   SET_SERVER = "app:settings:res:set:server",
   SET_AUTO_UPDATES = "app:settings:res:set:updates",
+  SET_OVERLAY_UPDATES = "app:settings:res:set:overlay-updates",
   SET_TRAY = "app:settings:res:set:tray",
   SET_LOGS = "app:settings:res:set:logs",
   LANGUAGE = "app:settings:res:language",
@@ -239,6 +240,7 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.SET_SERVER]: Reply;
 
   [APP_EVENTS_RESPONSE.SET_AUTO_UPDATES]: Reply;
+  [APP_EVENTS_RESPONSE.SET_OVERLAY_UPDATES]: Reply;
   [APP_EVENTS_RESPONSE.SET_TRAY]: Reply;
   [APP_EVENTS_RESPONSE.SET_LOGS]: Reply;
   // The language the windows show, resolved from the setting
