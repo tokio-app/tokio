@@ -199,6 +199,7 @@ The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`)
 - Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change.
 - Its releases publish the catalog Tokio installs from, `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`, see `.claude/rules/overlays.md`). A new catalog schema (a renamed or removed field) needs `CatalogOverlaySchema` and `parseCatalog` to read both.
 - No official overlay can have the id `alerts`, `timer`, `games` or `studio`, paths Tokio serves itself: Tokio drops a catalog entry with any of them.
+- Tokio installs an overlay's new versions in the background, except one with a new first version number, a breaking update the user confirms (`catalogState`). Its `AGENTS.md` keeps that number for breaking changes.
 
 ## Minecraft mod repo
 

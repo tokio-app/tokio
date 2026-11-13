@@ -54,6 +54,9 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 - A `table` field's rows are objects of cells keyed by column id. Columns take every type but `table` and `slider`, and `checkTable` refuses a row without exactly one cell of its column's kind per column.
 - In `TableField`, removing the last row moves the focus to the previous row's remove button or Add, and adding one to the new row's first control.
 - A merge (`mergeOverlayConfig`) keeps a table's rows up to the new `max`. A cell stays when the old table had a column with the same id and type and the value still fits (`fits`); the others take the column's default.
+- A field's `when` shows it only while each field it names has one of the values (`{ not }`: none of them). It may name only fields listed before it that aren't tables (`checkWhen`), so `shownFields` decides in one pass and conditions can't loop. Hiding is the dialog's alone: hidden fields keep their values, which are saved and sent to the overlay. Columns have no `when`.
+- `translations` sits next to the text it translates, by language code (the user's call): a section's, field's or column's `name`, an option's `label`, and an input's `placeholder`, from its `attributes`. Main translates the config it replies to `GET_OVERLAY_CONFIG` (`localizeOverlayConfig`: the exact tag, then the base language). A save merges only the values onto the config on disk, so translated names never reach `config.yaml`.
+- New `config.yaml` keys must be optional, with the old ones keeping their types: older Tokio versions strip a key they don't know (and a save there writes the file without it), but refuse a changed type, such as a `name` that isn't a string.
 
 ## Another computer
 
@@ -77,3 +80,10 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 - A rebuilt store takes back only folders named the way Tokio names them: a UUID, or an id `CatalogOverlaySchema` accepts. Express 5 can't mount a copy like `gift-jar - Copy (2)`.
 - `rebuildRoutes` skips, and logs, an id it can't mount, so one an older store still holds doesn't stop the server's start.
 - An update keeps the saved settings that still fit the new `config.yaml` (`mergeOverlayConfig`) and replaces the store entry in place. Streaming apps keep the old page until refreshed, as the success notice says. The gallery keys cards by id and version, so previews reload.
+
+### Automatic updates
+
+- Installed official overlays update on their own while `settings.overlayUpdates.auto` is on, the default (the user's call). `OverlayService.setAutoUpdate` runs `updateAll` `STARTUP_DELAY_MS` after the first `LOAD_APP` and then every `CHECK_INTERVAL_MS`, the app updater's timings. Each pass runs inside `track()`, so a quit waits for a folder swap in progress.
+- A new first version number (2.0.0 after 1.4.2) is a breaking update, `catalogState`'s `"breaking"`, and so is a version that doesn't start with a number. Tokio never installs one on its own: the user hears about it and confirms it from the card's **Update** (the user's call). The overlays repo bumps that number only for a breaking change.
+- `updateAll` hands `installFromCatalog` the entry it judged, so a catalog read again in between can't install a breaking version.
+- Nothing asked for a background update, so `reportOverlayUpdates` (`events/init.ts`) pushes `GET_OVERLAYS` and sends the notices. A breaking version's notice repeats at most once a day. The failure warning has its own key: the default one is a manual update's, which it would mute for a day.
