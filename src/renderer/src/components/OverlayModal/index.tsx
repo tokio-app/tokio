@@ -2,6 +2,7 @@ import {
   getOverlayConfig,
   OverlayConfig,
   resetOverlayConfig,
+  shownFields,
 } from "@/common/schemas";
 import { CustomGift, OverlayApp, TokioPreviewMessage } from "@/common/types";
 import { cx } from "@/helper/cx";
@@ -72,6 +73,9 @@ export function OverlayModal({
   const atDefaults = fields.every((field) =>
     isEqual(field.attributes.value, field.attributes.default),
   );
+
+  // Hidden fields keep their values, which are saved as they are.
+  const shown = settings == null ? new Set() : shownFields(settings);
 
   const handleValueChange = (id: string, value: unknown) => {
     setSettings((prev) => {
@@ -153,7 +157,7 @@ export function OverlayModal({
           <div className={styles.settings}>
             {settings.sections.map((section) => {
               const sectionFields = fields.filter(
-                (field) => field.section === section.id,
+                (field) => field.section === section.id && shown.has(field.id),
               );
               if (sectionFields.length === 0) return null;
 

@@ -6,6 +6,7 @@ import {
   OverlayConfig,
   OverlayConfigSchema,
   resetOverlayConfig,
+  shownFields,
 } from "./overlay";
 
 const GIFTS: CustomGift[] = [
@@ -159,6 +160,22 @@ function makeTable(): OverlayConfig {
   };
 }
 
+// makeConfig with one more field, shown while the conditions hold
+function withWhen(
+  when: OverlayConfig["fields"][number]["when"],
+  config = makeConfig(),
+): OverlayConfig {
+  config.fields.push({
+    id: "extra",
+    name: "Extra",
+    section: "style",
+    type: "toggle",
+    when,
+    attributes: { value: true, default: true },
+  });
+  return config;
+}
+
 // The attributes of makeTable's table
 function socials(config: OverlayConfig) {
   const field = config.fields[1];
@@ -250,6 +267,107 @@ describe("OverlayConfigSchema", () => {
     config.fields[3].id = "title";
 
     expect(issues(config)).toEqual([["fields", 3, "id"]]);
+  });
+
+  it("keeps conditions on earlier fields", () => {
+    const when = {
+      mode: ["a", "b"],
+      size: { not: 0 },
+      show: true,
+      gifts: 2,
+      title: { not: ["", "x"] },
+    };
+
+    const parsed = OverlayConfigSchema.parse(withWhen(when));
+
+    expect(parsed.fields.at(-1)?.when).toEqual(when);
+  });
+
+  it("refuses a condition on a later, unknown or table field", () => {
+    const config = withWhen({ extra: true, missing: 1 });
+    config.fields[0].when = { show: true };
+    expect(issues(config)).toEqual([
+      ["fields", 0, "when", "show"],
+      ["fields", 7, "when", "extra"],
+      ["fields", 7, "when", "missing"],
+    ]);
+
+    const table = makeTable();
+    table.fields.push({ ...makeConfig().fields[3], section: "general" });
+    table.fields[2].when = { socials: { not: 1 } };
+    expect(issues(table)).toEqual([["fields", 2, "when", "socials"]]);
+  });
+
+  it("refuses a value the named field can't have", () => {
+    // Not an option, out of range, a boolean for a dropdown, text for a check
+    const config = withWhen({
+      mode: "z",
+      size: { not: [50, 200] },
+      tint: "00ff00",
+      show: "yes",
+    });
+    config.fields[2].when = { mode: true };
+
+    expect(issues(config)).toEqual([
+      ["fields", 2, "when", "mode"],
+      ["fields", 7, "when", "mode"],
+      ["fields", 7, "when", "size"],
+      ["fields", 7, "when", "show"],
+    ]);
+  });
+});
+
+describe("shownFields", () => {
+  const shows = (config: OverlayConfig) => shownFields(config).has("extra");
+
+  it("shows the fields without conditions", () => {
+    expect([...shownFields(makeConfig())]).toEqual(
+      makeConfig().fields.map((f) => f.id),
+    );
+  });
+
+  it("shows a field while the named field has the value", () => {
+    const config = withWhen({ show: true });
+    expect(shows(config)).toBe(false);
+
+    config.fields[3].attributes.value = true;
+    expect(shows(config)).toBe(true);
+  });
+
+  it("needs every condition to hold", () => {
+    expect(shows(withWhen({ sound: true, size: 80 }))).toBe(true);
+    expect(shows(withWhen({ sound: true, size: 50 }))).toBe(false);
+  });
+
+  it("matches any value of a list, and none with not", () => {
+    expect(shows(withWhen({ size: [50, 80] }))).toBe(true);
+    expect(shows(withWhen({ size: [50, 60] }))).toBe(false);
+    expect(shows(withWhen({ size: { not: [50, 60] } }))).toBe(true);
+    expect(shows(withWhen({ size: { not: 80 } }))).toBe(false);
+  });
+
+  it("matches a list value when any of its items does", () => {
+    expect(shows(withWhen({ mode: "a" }))).toBe(true);
+    expect(shows(withWhen({ mode: "b" }))).toBe(false);
+    expect(shows(withWhen({ mode: { not: "a" } }))).toBe(false);
+    expect(shows(withWhen({ gifts: [1, 3] }))).toBe(true);
+  });
+
+  it("hides a field whose named field is hidden", () => {
+    // extra is on but hidden, so the field after it is hidden too
+    const config = withWhen({ show: true });
+    config.fields.push({
+      id: "after",
+      name: "After",
+      section: "style",
+      type: "check",
+      when: { extra: true },
+      attributes: { value: false, default: false },
+    });
+    expect(shownFields(config).has("after")).toBe(false);
+
+    config.fields[3].attributes.value = true;
+    expect(shownFields(config).has("after")).toBe(true);
   });
 });
 
@@ -501,6 +619,14 @@ describe("mergeOverlayConfig", () => {
       { platform: "facebook", username: false, color: "ff0000", label: "Hi" },
     ]);
     expect(OverlayConfigSchema.safeParse(merged).success).toBe(true);
+  });
+
+  it("takes the new version's conditions", () => {
+    const next = withWhen({ show: true }, newer());
+
+    const merged = mergeOverlayConfig(next, makeConfig());
+
+    expect(merged.fields.at(-1)?.when).toEqual({ show: true });
   });
 
   it("doesn't change its inputs", () => {

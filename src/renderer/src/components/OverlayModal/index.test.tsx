@@ -105,6 +105,29 @@ describe("OverlayModal", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows a field only while its conditions hold", async () => {
+    const config = overlayConfig();
+    config.sections.push({ id: "count", name: "Count" });
+    config.fields.push({
+      id: "digits",
+      name: "Digits",
+      section: "count",
+      type: "check",
+      when: { show: true },
+      attributes: { value: true, default: true },
+    });
+    const { user } = setup({ config });
+    const count = () => screen.queryByRole("group", { name: "Count" });
+    expect(count()).toBeInTheDocument();
+
+    // Its only field hidden, the section goes too
+    await user.click(show());
+    expect(count()).not.toBeInTheDocument();
+
+    await user.click(show());
+    expect(within(count()!).getByText("Digits")).toBeInTheDocument();
+  });
+
   it("saves the edited config, once something changed", async () => {
     const { user, onSave } = setup();
     expect(button("Save")).toBeDisabled();
