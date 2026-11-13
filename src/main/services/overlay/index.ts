@@ -13,9 +13,10 @@ import {
   OverlayConfigRedux,
   TokioPayload,
 } from "@/common/types";
-import { createTestLive, formatError } from "@/common/util";
+import { catalogState, createTestLive, formatError } from "@/common/util";
 import { isMissing, renameWithRetry } from "@/helper/fs";
 import { isSaved } from "@/helper/library";
+import { track } from "@/helper/quit";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
 import {
@@ -32,6 +33,7 @@ import { JSONManagerService } from "../json";
 import { ServerService } from "../server";
 import { Service } from "../shared";
 import { LOAD_RETRY_MS, StoreManagerService } from "../store";
+import { CHECK_INTERVAL_MS, STARTUP_DELAY_MS } from "../updater";
 import { YAMLManagerService } from "../yaml";
 import {
   findOverlays,
@@ -66,6 +68,16 @@ export interface OverlayResult<T = undefined> {
   // false when the change was made but the store file wasn't written
   saved?: boolean;
   data?: T;
+}
+
+// What a background update pass did, see updateAll
+export interface OverlayUpdates {
+  updated: CatalogOverlay[];
+  // A new first version number, left for the user to confirm
+  breaking: CatalogOverlay[];
+  failed: CatalogOverlay[];
+  // false when an update was made but the store file wasn't written
+  saved: boolean;
 }
 
 const sameGift = (a: CustomGift, b: CustomGift) =>
@@ -103,6 +115,10 @@ export class OverlayService extends Service {
   private _installs = new Map<string, Promise<OverlayResult>>();
   // The last task queued for each overlay's files, see _lock
   private _locks = new Map<string, Promise<unknown>>();
+  // Automatic updates, see setAutoUpdate
+  private _startup?: NodeJS.Timeout;
+  private _interval?: NodeJS.Timeout;
+  private _onUpdates?: (updates: OverlayUpdates) => void;
 
   public initialize(
     paths: { folder: string; giftsFile: string; customGiftsFile: string },
@@ -313,16 +329,91 @@ export class OverlayService extends Service {
   public installFromCatalog(
     id: string,
     gifts: CustomGift[],
+    entry?: CatalogOverlay,
   ): Promise<OverlayResult> {
     // A second request for the same overlay gets the first one's result.
     let install = this._installs.get(id);
     if (!install) {
-      install = this._installFromCatalog(id, gifts).finally(() =>
+      install = this._installFromCatalog(id, gifts, entry).finally(() =>
         this._installs.delete(id),
       );
       this._installs.set(id, install);
     }
     return install;
+  }
+
+  /**
+   * Installs the catalog's new versions of the installed official overlays,
+   * one at a time, except breaking ones (a new first version number), which
+   * wait for the user. Never rejects.
+   */
+  public async updateAll(): Promise<OverlayUpdates> {
+    const updates: OverlayUpdates = {
+      updated: [],
+      breaking: [],
+      failed: [],
+      saved: true,
+    };
+    // getCatalog logged why it has none.
+    const catalog = await this.getCatalog();
+    if (!catalog.success) return updates;
+
+    const gifts = await this.getGifts();
+    for (const entry of catalog.data!) {
+      const state = catalogState(entry, this._overlays);
+      if (state === "breaking") updates.breaking.push(entry);
+      if (state !== "update") continue;
+
+      // This entry, so a catalog read again can't install a breaking version
+      const res = await this.installFromCatalog(entry.id, gifts, entry);
+      if (!res.success) {
+        updates.failed.push(entry);
+        continue;
+      }
+      if (res.saved === false) updates.saved = false;
+      updates.updated.push(entry);
+      Logger.info(
+        `<Overlays> Updated overlay ${entry.id} to version ${entry.version} automatically.`,
+        this._logFile,
+      );
+    }
+    return updates;
+  }
+
+  /**
+   * Runs updateAll on startup and every few hours while `auto` is on, and
+   * hands each result to the onUpdates listener.
+   */
+  public setAutoUpdate(auto: boolean): void {
+    this.dispose();
+    if (!auto) return;
+
+    this._startup = setTimeout(() => void this._autoUpdate(), STARTUP_DELAY_MS);
+    this._interval = setInterval(
+      () => void this._autoUpdate(),
+      CHECK_INTERVAL_MS,
+    );
+    this._startup.unref?.();
+    this._interval.unref?.();
+  }
+
+  /** Where each automatic pass's result goes. */
+  public onUpdates(listener: (updates: OverlayUpdates) => void): void {
+    this._onUpdates = listener;
+  }
+
+  /** Stops the automatic updates. */
+  public dispose(): void {
+    clearTimeout(this._startup);
+    clearInterval(this._interval);
+    this._startup = undefined;
+    this._interval = undefined;
+  }
+
+  // A quit waits for the pass, so it can't cut a folder swap short.
+  private async _autoUpdate(): Promise<void> {
+    const updates = await track(this.updateAll());
+    this._onUpdates?.(updates);
   }
 
   /**
@@ -632,18 +723,22 @@ export class OverlayService extends Service {
   private async _installFromCatalog(
     id: string,
     gifts: CustomGift[],
+    judged?: CatalogOverlay,
   ): Promise<OverlayResult> {
-    const catalog = await this.getCatalog();
-    const entry = catalog.data?.find((o) => o.id === id);
+    let entry = judged;
     if (!entry) {
-      // getCatalog logged why it has no catalog.
-      if (catalog.success) {
-        Logger.warn(
-          `<Overlays> Unable to install overlay ${id}, it isn't in the catalog.`,
-          this._logFile,
-        );
+      const catalog = await this.getCatalog();
+      entry = catalog.data?.find((o) => o.id === id);
+      if (!entry) {
+        // getCatalog logged why it has no catalog.
+        if (catalog.success) {
+          Logger.warn(
+            `<Overlays> Unable to install overlay ${id}, it isn't in the catalog.`,
+            this._logFile,
+          );
+        }
+        return { success: false };
       }
-      return { success: false };
     }
 
     const staging = join(this._folder, `.install-${randomUUID()}`);

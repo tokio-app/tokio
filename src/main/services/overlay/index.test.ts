@@ -4,7 +4,9 @@ import { defaultStoreData } from "@/common/util";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { ServerService } from "@/services/server";
+import { hasPending } from "@/helper/quit";
 import { LOAD_RETRY_MS } from "@/services/store";
+import { CHECK_INTERVAL_MS, STARTUP_DELAY_MS } from "@/services/updater";
 import { YAMLManagerService } from "@/services/yaml";
 import { strToU8, zipSync } from "fflate";
 import { createHash } from "node:crypto";
@@ -34,7 +36,7 @@ import {
 } from "vitest";
 import { processHTML, REMOTE_SOCKET } from "./common";
 import { CATALOG_URL, RELEASES_PREFIX } from "./common/catalog";
-import { CATALOG_TTL_MS, OverlayService } from "./index";
+import { CATALOG_TTL_MS, OverlayService, OverlayUpdates } from "./index";
 
 vi.mock("./common", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./common")>();
@@ -74,7 +76,11 @@ const done = { success: true, saved: true };
 
 // A release of an official overlay's zip, as tokio-overlays builds it, with
 // its settings at their defaults.
-const release = (version: string, files: Record<string, string> = {}) => {
+const release = (
+  version: string,
+  files: Record<string, string> = {},
+  id = "gift-jar",
+) => {
   const zip = zipSync(
     Object.fromEntries(
       Object.entries({
@@ -88,12 +94,12 @@ const release = (version: string, files: Record<string, string> = {}) => {
   return {
     zip,
     entry: {
-      id: "gift-jar",
+      id,
       name: "Gift Jar",
       version,
       description: "Gifts drop into a jar.",
       config: true,
-      url: `${RELEASES_PREFIX}v${version}/gift-jar.zip`,
+      url: `${RELEASES_PREFIX}v${version}/${id}.zip`,
       size: zip.length,
       sha256: createHash("sha256").update(zip).digest("hex"),
       preview: null,
@@ -1125,6 +1131,162 @@ describe("OverlayService", () => {
       expect(stored).toHaveLength(1);
       // The catalog, then the zip
       expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("updateAll", () => {
+    const none: OverlayUpdates = {
+      updated: [],
+      breaking: [],
+      failed: [],
+      saved: true,
+    };
+
+    // Installs the releases, then makes the next catalog read a new one
+    const installed = async (...releases: ReturnType<typeof release>[]) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      publish(...releases);
+      for (const r of releases) {
+        await service.installFromCatalog(r.entry.id, gifts);
+      }
+      vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+    };
+
+    it("installs a minor update and leaves a breaking one", async () => {
+      await installed(release("1.0.0"), release("1.0.0", {}, "top-likes"));
+      const minor = release("1.1.0");
+      const major = release("2.0.0", {}, "top-likes");
+      publish(minor, major, release("1.0.0", {}, "now-playing"));
+      const info = vi.spyOn(Logger, "info");
+
+      expect(await service.updateAll()).toEqual({
+        ...none,
+        updated: [minor.entry],
+        breaking: [major.entry],
+      });
+
+      // Overlays that aren't installed stay that way
+      expect(stored).toMatchObject([
+        { id: "gift-jar", version: "1.1.0" },
+        { id: "top-likes", version: "1.0.0" },
+      ]);
+      expect(info).toHaveBeenCalledExactlyOnceWith(
+        "<Overlays> Updated overlay gift-jar to version 1.1.0 automatically.",
+        undefined, // the test sets no log file
+      );
+    });
+
+    it("reports an update it couldn't install", async () => {
+      await installed(release("1.0.0"));
+      const broken = release("1.0.1");
+      broken.entry.sha256 = "0".repeat(64);
+      publish(broken);
+
+      expect(await service.updateAll()).toEqual({
+        ...none,
+        failed: [broken.entry],
+      });
+      expect(stored).toMatchObject([{ id: "gift-jar", version: "1.0.0" }]);
+    });
+
+    it("reports an update the store couldn't save", async () => {
+      await installed(release("1.0.0"));
+      const update = release("1.0.1");
+      publish(update);
+      writes = false;
+
+      expect(await service.updateAll()).toEqual({
+        ...none,
+        updated: [update.entry],
+        saved: false,
+      });
+    });
+
+    it("installs the version it judged when the catalog changes meanwhile", async () => {
+      await installed(release("1.0.0"));
+      const minor = release("1.0.1");
+      const major = release("2.0.0");
+      publish(minor, major);
+      const getCatalog = vi
+        .spyOn(service, "getCatalog")
+        .mockResolvedValueOnce({ success: true, data: [minor.entry] })
+        .mockResolvedValue({ success: true, data: [major.entry] });
+
+      expect(await service.updateAll()).toEqual({
+        ...none,
+        updated: [minor.entry],
+      });
+      expect(getCatalog).toHaveBeenCalledOnce();
+      expect(stored).toMatchObject([{ id: "gift-jar", version: "1.0.1" }]);
+    });
+
+    it("does nothing without a catalog", async () => {
+      await installed(release("1.0.0"));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new TypeError("fetch failed");
+        }),
+      );
+
+      expect(await service.updateAll()).toEqual(none);
+    });
+
+    describe("setAutoUpdate", () => {
+      afterEach(() => service.dispose());
+
+      it("runs after startup and then on an interval while auto is on", async () => {
+        vi.useFakeTimers();
+        const updates = { ...none, updated: [release("1.0.1").entry] };
+        const updateAll = vi
+          .spyOn(service, "updateAll")
+          .mockResolvedValue(updates);
+        const listener = vi.fn();
+        service.onUpdates(listener);
+
+        service.setAutoUpdate(true);
+        expect(updateAll).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(STARTUP_DELAY_MS);
+        expect(updateAll).toHaveBeenCalledTimes(1);
+        expect(listener).toHaveBeenCalledExactlyOnceWith(updates);
+        await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS - STARTUP_DELAY_MS);
+        expect(updateAll).toHaveBeenCalledTimes(2);
+
+        service.setAutoUpdate(false);
+        await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS * 2);
+        expect(updateAll).toHaveBeenCalledTimes(2);
+      });
+
+      it("doesn't run when auto is off or after dispose", async () => {
+        vi.useFakeTimers();
+        const updateAll = vi.spyOn(service, "updateAll");
+
+        service.setAutoUpdate(false);
+        await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
+        service.setAutoUpdate(true);
+        service.dispose();
+        await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
+
+        expect(updateAll).not.toHaveBeenCalled();
+      });
+
+      it("holds a quit while a pass runs", async () => {
+        vi.useFakeTimers();
+        let finish!: (updates: OverlayUpdates) => void;
+        vi.spyOn(service, "updateAll").mockReturnValue(
+          new Promise((resolve) => (finish = resolve)),
+        );
+        const listener = vi.fn();
+        service.onUpdates(listener);
+
+        service.setAutoUpdate(true);
+        await vi.advanceTimersByTimeAsync(STARTUP_DELAY_MS);
+        expect(hasPending()).toBe(true);
+
+        finish(none);
+        await vi.waitFor(() => expect(listener).toHaveBeenCalledWith(none));
+        expect(hasPending()).toBe(false);
+      });
     });
   });
 
