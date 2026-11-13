@@ -1,5 +1,5 @@
-import { DEFAULT_LANGUAGE, translate } from "@/common/i18n";
-import { ALERT_TRIGGERS, AppSettings } from "@/common/schemas";
+import { DEFAULT_LANGUAGE, listOf, translate } from "@/common/i18n";
+import { ALERT_TRIGGERS, AppSettings, CatalogOverlay } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
   APP_EVENTS,
@@ -31,7 +31,7 @@ import {
 import config from "@/config";
 import { systemPreferences } from "electron";
 import { createStack, replyFailure } from "@/helper/events";
-import { AppFailure, REPEAT_NOTICE_MS } from "@/helper/feedback";
+import { AppFailure, REPEAT_NOTICE_MS, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
 import {
@@ -48,6 +48,7 @@ import { FAN_EVENTS } from "@/services/fans";
 import { MAX_BACKLOG } from "@/services/games";
 import { HISTORY_EVENTS } from "@/services/history";
 import { ACTIVITY_EVENTS } from "@/services/live";
+import { OverlayUpdates } from "@/services/overlay";
 import { TIMER_EVENTS } from "@/services/timer";
 import { AppHandlerVariables } from "@/types";
 import { release } from "node:os";
@@ -125,6 +126,64 @@ const initUpdater = async ({
       );
     },
   });
+};
+
+// Official overlays update in the background, so main tells the user what
+// changed and what waits for them.
+const reportOverlayUpdates = (
+  { overlayService, win, notifier }: AppHandlerVariables,
+  { updated, breaking, failed, saved }: OverlayUpdates,
+) => {
+  const names = (entries: CatalogOverlay[]) =>
+    listOf(
+      language(),
+      entries.map((o) => o.name),
+    );
+
+  if (updated.length > 0) {
+    // Pages showing the overlays get the new versions
+    if (!win.isDestroyed()) {
+      win.webContents.send(APP_EVENTS_RESPONSE.GET_OVERLAYS, {
+        success: true,
+        data: overlayService.getOverlays(),
+      });
+    }
+    notifier.info(
+      "overlays",
+      FEEDBACK_CODES.OVERLAYS_UPDATED,
+      t("main.overlays.autoUpdated", {
+        count: updated.length,
+        names: names(updated),
+      }),
+    );
+  }
+  // Once a day each, as every pass finds them again
+  for (const { id, name, version } of breaking) {
+    notifier.info(
+      "overlays",
+      FEEDBACK_CODES.OVERLAY_UPDATE_WAITING,
+      t("main.overlays.updateWaiting", {
+        name,
+        version,
+        official: t("overlays.official.title"),
+      }),
+      { key: `overlay-update:${id}@${version}`, windowMs: UPDATE_NOTICE_MS },
+    );
+  }
+  // installFromCatalog logged why
+  if (failed.length > 0) {
+    notifier.warn(
+      "overlays",
+      FEEDBACK_CODES.OVERLAY_UPDATE_FAILED,
+      t("main.overlays.autoUpdateFailed", {
+        count: failed.length,
+        names: names(failed),
+      }),
+      // Its own key, so a failed Update click still gets its notice
+      { key: "overlay-update:failed", windowMs: UPDATE_NOTICE_MS },
+    );
+  }
+  if (!saved) notifier.report({ source: "overlays", error: saveFailure() });
 };
 
 // Live events reach TTS, music, alerts and the UI from here. No request waits
@@ -1179,6 +1238,10 @@ events.push(
     handler.trayService.setEnabled(settings.tray.enabled);
     await initUpdater(handler);
     handler.updaterService.setAuto(settings.updates.auto);
+    handler.overlayService.onUpdates((updates) =>
+      reportOverlayUpdates(handler, updates),
+    );
+    handler.overlayService.setAutoUpdate(settings.overlayUpdates.auto);
   },
   {
     failure: {

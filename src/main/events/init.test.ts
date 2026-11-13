@@ -1,6 +1,7 @@
 import {
   Alert,
   ALERT_TRIGGERS,
+  CatalogOverlay,
   GameAction,
   Profile,
   SavedEmote,
@@ -202,6 +203,7 @@ function setup() {
     activeProfile: profiles[0],
     server: { enabled: true },
     updates: { auto: false },
+    overlayUpdates: { auto: true },
     // The fake app's version
     lastVersion: "1.0.0",
     tray: { enabled: true },
@@ -274,6 +276,8 @@ function setup() {
     getOverlays: vi.fn((): { id: string }[] => []),
     load: vi.fn(async (_gifts: CustomGift[]) => {}),
     refreshGifts: vi.fn(async (_gifts: CustomGift[]) => {}),
+    onUpdates: vi.fn((..._args: Parameters<OverlayService["onUpdates"]>) => {}),
+    setAutoUpdate: vi.fn((_auto: boolean) => {}),
     recordGift: vi.fn(
       async (
         ..._args: Parameters<OverlayService["recordGift"]>
@@ -3145,6 +3149,204 @@ describe("init events", () => {
       expect(
         s.updaterService.initialize.mock.invocationCallOrder[0],
       ).toBeLessThan(s.updaterService.setAuto.mock.invocationCallOrder[0]);
+    });
+
+    it("starts the official overlay updates as saved, after the updater", async () => {
+      const s = setup();
+
+      await load(s);
+
+      expect(s.overlayService.onUpdates).toHaveBeenCalledOnce();
+      expect(s.overlayService.setAutoUpdate).toHaveBeenCalledExactlyOnceWith(
+        true,
+      );
+      expect(s.updaterService.setAuto.mock.invocationCallOrder[0]).toBeLessThan(
+        s.overlayService.onUpdates.mock.invocationCallOrder[0],
+      );
+      expect(
+        s.overlayService.onUpdates.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        s.overlayService.setAutoUpdate.mock.invocationCallOrder[0],
+      );
+    });
+
+    describe("official overlay updates", () => {
+      const entry = (
+        id: string,
+        name: string,
+        version = "1.1.0",
+      ): CatalogOverlay => ({
+        id,
+        name,
+        version,
+        description: "",
+        config: true,
+        url: `https://github.com/tokio-app/overlays/releases/download/v${version}/${id}.zip`,
+        size: 1,
+        sha256: "0".repeat(64),
+        preview: null,
+      });
+      const none = { updated: [], breaking: [], failed: [], saved: true };
+
+      async function report() {
+        const s = await live();
+        const [listener] = s.overlayService.onUpdates.mock.calls[0];
+        return { s, listener };
+      }
+
+      it("pushes the overlays and names the updated ones", async () => {
+        const { s, listener } = await report();
+        const overlays = [{ id: "gift-jar" }, { id: "top-likes" }];
+        s.overlayService.getOverlays.mockReturnValue(overlays);
+
+        listener({ ...none, updated: [entry("gift-jar", "Gift Jar")] });
+        listener({
+          ...none,
+          updated: [
+            entry("gift-jar", "Gift Jar"),
+            entry("top-likes", "Top Likes"),
+          ],
+        });
+
+        expect(s.h.pushed(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([
+          { success: true, data: overlays },
+          { success: true, data: overlays },
+        ]);
+        expect(s.h.notices).toEqual([
+          expect.objectContaining({
+            level: "info",
+            source: "overlays",
+            code: FEEDBACK_CODES.OVERLAYS_UPDATED,
+            message:
+              "Gift Jar updated. Refresh it in your streaming app to load the new version.",
+          }),
+          expect.objectContaining({
+            message:
+              "Gift Jar and Top Likes updated. Refresh them in your streaming app to load the new versions.",
+          }),
+        ]);
+      });
+
+      it("names them in Spanish", async () => {
+        const { s, listener } = await report();
+        setLanguage("es-419");
+
+        listener({
+          ...none,
+          updated: [
+            entry("gift-jar", "Gift Jar"),
+            entry("top-likes", "Top Likes"),
+          ],
+        });
+
+        expect(s.h.notices).toEqual([
+          expect.objectContaining({
+            message:
+              "Se actualizaron Gift Jar y Top Likes. Recárgalos en tu app de streaming para cargar las versiones nuevas.",
+          }),
+        ]);
+      });
+
+      it("doesn't push to a closed window", async () => {
+        const { s, listener } = await report();
+        s.h.win.close();
+
+        listener({ ...none, updated: [entry("gift-jar", "Gift Jar")] });
+
+        expect(s.h.pushed(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([]);
+        expect(noticesFor(s, FEEDBACK_CODES.OVERLAYS_UPDATED)).toHaveLength(1);
+      });
+
+      it("tells about each breaking version once a day", async () => {
+        const { s, listener } = await report();
+        vi.useFakeTimers();
+        const breaking = [
+          entry("gift-jar", "Gift Jar", "2.0.0"),
+          entry("top-likes", "Top Likes", "3.0.0"),
+        ];
+
+        listener({ ...none, breaking });
+        listener({ ...none, breaking });
+        listener({
+          ...none,
+          breaking: [entry("gift-jar", "Gift Jar", "2.1.0")],
+        });
+
+        expect(s.h.notices).toEqual([
+          expect.objectContaining({
+            level: "info",
+            source: "overlays",
+            code: FEEDBACK_CODES.OVERLAY_UPDATE_WAITING,
+            message:
+              "Gift Jar 2.0.0 changes how the overlay works, so Tokio didn't update it. Update it from Official overlays when you're ready.",
+          }),
+          expect.objectContaining({
+            message: expect.stringContaining("Top Likes 3.0.0"),
+          }),
+          expect.objectContaining({
+            message: expect.stringContaining("Gift Jar 2.1.0"),
+          }),
+        ]);
+        expect(s.h.pushed(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([]);
+
+        vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+        listener({ ...none, breaking });
+        expect(s.h.notices).toHaveLength(5);
+      });
+
+      it("warns about the updates that failed", async () => {
+        const { s, listener } = await report();
+
+        listener({ ...none, failed: [entry("gift-jar", "Gift Jar")] });
+
+        expect(s.h.notices).toEqual([
+          expect.objectContaining({
+            level: "warning",
+            source: "overlays",
+            code: FEEDBACK_CODES.OVERLAY_UPDATE_FAILED,
+            message: "Unable to update Gift Jar. Tokio will try again later.",
+          }),
+        ]);
+        expect(s.h.pushed(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([]);
+
+        // An Update click that fails right after still says so
+        s.h.handler.notifier.error(
+          "overlays",
+          FEEDBACK_CODES.OVERLAY_UPDATE_FAILED,
+          "Unable to update the overlay.",
+        );
+        expect(
+          noticesFor(s, FEEDBACK_CODES.OVERLAY_UPDATE_FAILED),
+        ).toHaveLength(2);
+      });
+
+      it("reports an update the store couldn't save", async () => {
+        const { s, listener } = await report();
+
+        listener({
+          ...none,
+          updated: [entry("gift-jar", "Gift Jar")],
+          saved: false,
+        });
+
+        expect(s.h.notices).toEqual([
+          expect.objectContaining({ code: FEEDBACK_CODES.OVERLAYS_UPDATED }),
+          expect.objectContaining({
+            level: "error",
+            source: "overlays",
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        ]);
+      });
+
+      it("says nothing when nothing changed", async () => {
+        const { s, listener } = await report();
+
+        listener(none);
+
+        expect(s.h.notices).toEqual([]);
+        expect(s.h.pushed(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([]);
+      });
     });
 
     describe("updater", () => {

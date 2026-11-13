@@ -59,6 +59,13 @@ const AppSettingsSchema = z.object({
       auto: z.boolean(),
     })
     .default({ auto: true }),
+  overlayUpdates: z
+    .object({
+      // Installs new official overlay versions in the background, except a
+      // breaking one (a new first version number), which waits for the user
+      auto: z.boolean(),
+    })
+    .default({ auto: true }),
   // The version Tokio last ran as, to show what's new after an update. "" in
   // stores from before it was kept.
   lastVersion: z.string().default(""),

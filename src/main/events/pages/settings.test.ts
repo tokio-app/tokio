@@ -1405,6 +1405,112 @@ describe("settings events", () => {
     });
   });
 
+  describe("SET_OVERLAY_UPDATES", () => {
+    const setup = () => {
+      const updateOverlayUpdatesSettings = vi.fn(async () => true);
+      const setAutoUpdate = vi.fn();
+      const h = createHandler({
+        storeManagerService: {
+          ...profileStore(),
+          updateOverlayUpdatesSettings,
+        },
+        overlayService: { setAutoUpdate },
+      });
+      return { h, updateOverlayUpdatesSettings, setAutoUpdate };
+    };
+
+    it.each([
+      {
+        enabled: true,
+        level: "success",
+        code: FEEDBACK_CODES.OVERLAY_UPDATES_ENABLED,
+        message: "Tokio updates official overlays automatically.",
+      },
+      {
+        enabled: false,
+        level: "info",
+        code: FEEDBACK_CODES.OVERLAY_UPDATES_DISABLED,
+        message:
+          "Automatic overlay updates are off. Update them from Official overlays.",
+      },
+    ])(
+      "saves enabled: $enabled, tells the overlay service and notifies",
+      async ({ enabled, ...expected }) => {
+        const { h, updateOverlayUpdatesSettings, setAutoUpdate } = setup();
+
+        await h.invoke(settings, APP_EVENTS.SET_OVERLAY_UPDATES, { enabled });
+
+        expect(updateOverlayUpdatesSettings).toHaveBeenCalledWith(enabled);
+        expect(setAutoUpdate).toHaveBeenCalledWith(enabled);
+        expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+        expect(h.replies(APP_EVENTS_RESPONSE.SET_OVERLAY_UPDATES)).toEqual([
+          { success: true },
+        ]);
+        expect(h.notices).toEqual([
+          expect.objectContaining({ source: "overlays", ...expected }),
+        ]);
+      },
+    );
+
+    it("replies and notifies when the setting can't be saved", async () => {
+      const setAutoUpdate = vi.fn();
+      const h = createHandler({
+        storeManagerService: {
+          updateOverlayUpdatesSettings: async () => {
+            throw new Error("disk full");
+          },
+        },
+        overlayService: { setAutoUpdate },
+      });
+
+      await h.invoke(settings, APP_EVENTS.SET_OVERLAY_UPDATES, {
+        enabled: true,
+      });
+
+      const failure = {
+        code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        message: "Unable to save the overlay update setting.",
+      };
+      expect(setAutoUpdate).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_OVERLAY_UPDATES)).toEqual([
+        { success: false, error: failure },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ source: "overlays", ...failure }),
+      ]);
+    });
+
+    it("reports a change the store couldn't write, without a success notice", async () => {
+      const setAutoUpdate = vi.fn();
+      const h = createHandler({
+        storeManagerService: {
+          ...profileStore(),
+          updateOverlayUpdatesSettings: async () => false,
+        },
+        overlayService: { setAutoUpdate },
+      });
+
+      await h.invoke(settings, APP_EVENTS.SET_OVERLAY_UPDATES, {
+        enabled: false,
+      });
+
+      const failure = {
+        code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        message:
+          "Tokio couldn't save the change. Check the logs folder for details.",
+      };
+      // It runs as saved in memory until the next start
+      expect(setAutoUpdate).toHaveBeenCalledWith(false);
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_OVERLAY_UPDATES)).toEqual([
+        { success: false, error: failure },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "error", ...failure }),
+      ]);
+    });
+  });
+
   describe("SET_TRAY", () => {
     const setup = () => {
       const updateTraySettings = vi.fn(async () => true);

@@ -114,6 +114,13 @@ export function Settings() {
             });
             window.api.emit(APP_EVENTS.SET_AUTO_UPDATES, { enabled });
           }}
+          overlays={store.settings.overlayUpdates.auto}
+          onOverlaysChange={(enabled) => {
+            updateStore((s) => {
+              s.settings.overlayUpdates.auto = enabled;
+            });
+            window.api.emit(APP_EVENTS.SET_OVERLAY_UPDATES, { enabled });
+          }}
         />
 
         <TraySection

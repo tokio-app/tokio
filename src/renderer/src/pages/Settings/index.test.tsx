@@ -124,6 +124,26 @@ describe("Settings", () => {
         { enabled: false },
       ]);
     });
+
+    it("turns automatic official overlay updates off and on", async () => {
+      const { user } = await setup();
+      const overlays = screen.getByRole("checkbox", {
+        name: "Update official overlays automatically",
+      });
+      expect(overlays).toBeChecked();
+
+      await user.click(overlays);
+      expect(overlays).not.toBeChecked();
+
+      await user.click(overlays);
+      expect(overlays).toBeChecked();
+
+      expect(sent(APP_EVENTS.SET_OVERLAY_UPDATES)).toEqual([
+        { enabled: false },
+        { enabled: true },
+      ]);
+      expect(sent(APP_EVENTS.SET_AUTO_UPDATES)).toEqual([]);
+    });
   });
 
   describe("Tray", () => {

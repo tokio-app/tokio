@@ -549,6 +549,43 @@ events.push(
 );
 
 events.push(
+  APP_EVENTS.SET_OVERLAY_UPDATES,
+  async ({ storeManagerService, overlayService, notifier }, e, { enabled }) => {
+    const saved =
+      await storeManagerService.updateOverlayUpdatesSettings(enabled);
+    overlayService.setAutoUpdate(enabled);
+    replySettings(e, storeManagerService);
+    if (!saved) throw saveFailure();
+    e.reply(APP_EVENTS_RESPONSE.SET_OVERLAY_UPDATES, {
+      success: true,
+    });
+    if (enabled) {
+      notifier.success(
+        "overlays",
+        FEEDBACK_CODES.OVERLAY_UPDATES_ENABLED,
+        t("main.settings.overlayUpdatesOn"),
+      );
+    } else {
+      notifier.info(
+        "overlays",
+        FEEDBACK_CODES.OVERLAY_UPDATES_DISABLED,
+        t("main.settings.overlayUpdatesOff", {
+          official: t("overlays.official.title"),
+        }),
+      );
+    }
+  },
+  {
+    source: "overlays",
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "main.failure.setOverlayUpdates",
+    },
+    onError: replyFailure(APP_EVENTS_RESPONSE.SET_OVERLAY_UPDATES),
+  },
+);
+
+events.push(
   APP_EVENTS.SET_TRAY,
   async ({ storeManagerService, trayService, notifier }, e, { enabled }) => {
     const saved = await storeManagerService.updateTraySettings(enabled);

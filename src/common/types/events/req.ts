@@ -64,6 +64,7 @@ export enum APP_EVENTS {
   SET_VOICE_KEY = "app:settings:set:voice-key",
   SET_SERVER = "app:settings:set:server",
   SET_AUTO_UPDATES = "app:settings:set:updates",
+  SET_OVERLAY_UPDATES = "app:settings:set:overlay-updates",
   SET_TRAY = "app:settings:set:tray",
   SET_LOGS = "app:settings:set:logs",
   SET_LANGUAGE = "app:settings:set:language",
@@ -264,6 +265,9 @@ export interface AppEventsMap {
   };
 
   [APP_EVENTS.SET_AUTO_UPDATES]: {
+    enabled: boolean;
+  };
+  [APP_EVENTS.SET_OVERLAY_UPDATES]: {
     enabled: boolean;
   };
   [APP_EVENTS.SET_TRAY]: {
