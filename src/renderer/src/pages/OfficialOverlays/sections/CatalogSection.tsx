@@ -5,6 +5,7 @@ import {
   BackButton,
   Btn,
   EmptyState,
+  Modal,
   RemoveOverlayModal,
   SearchToggle,
   Section,
@@ -37,6 +38,8 @@ export function CatalogSection({ overlays }: Props) {
   const [installing, setInstalling] = useState<string[]>([]);
   // Overlay waiting for the user to confirm its removal
   const [removing, setRemoving] = useState<CatalogOverlay | null>(null);
+  // Breaking update waiting for the user to confirm it
+  const [confirming, setConfirming] = useState<CatalogOverlay | null>(null);
   const [search, setSearch] = useState("");
 
   useIpcRequest(APP_EVENTS.GET_OVERLAY_CATALOG);
@@ -61,6 +64,12 @@ export function CatalogSection({ overlays }: Props) {
     window.api.emit(APP_EVENTS.INSTALL_OVERLAY, { id });
   };
 
+  // A breaking update (a new first version number) asks first
+  const choose = (entry: CatalogOverlay) => {
+    if (catalogState(entry, overlays) === "breaking") setConfirming(entry);
+    else install(entry.id);
+  };
+
   const retry = () => {
     setError(null);
     window.api.emit(APP_EVENTS.GET_OVERLAY_CATALOG);
@@ -70,6 +79,21 @@ export function CatalogSection({ overlays }: Props) {
     <>
       {removing && (
         <RemoveOverlayModal item={removing} onClose={() => setRemoving(null)} />
+      )}
+      {confirming && (
+        <Modal
+          title={t("overlays.official.breakingTitle", {
+            name: confirming.name,
+            version: confirming.version,
+          })}
+          description={t("overlays.official.breakingText")}
+          confirmText={t("overlays.official.update")}
+          onClose={() => setConfirming(null)}
+          onConfirm={() => {
+            install(confirming.id);
+            setConfirming(null);
+          }}
+        />
       )}
 
       <Section
@@ -94,7 +118,7 @@ export function CatalogSection({ overlays }: Props) {
           error={error}
           overlays={overlays}
           installing={installing}
-          onInstall={install}
+          onInstall={choose}
           onRemove={setRemoving}
         />
       </Section>
@@ -109,7 +133,7 @@ interface ListProps {
   error: string | null;
   overlays: OverlayApp[];
   installing: string[];
-  onInstall: (id: string) => void;
+  onInstall: (entry: CatalogOverlay) => void;
   onRemove: (entry: CatalogOverlay) => void;
 }
 
@@ -155,7 +179,7 @@ function CatalogList({
           entry={entry}
           state={catalogState(entry, overlays)}
           busy={installing.includes(entry.id)}
-          onInstall={() => onInstall(entry.id)}
+          onInstall={() => onInstall(entry)}
           onRemove={() => onRemove(entry)}
         />
       ))}
@@ -230,7 +254,7 @@ function CatalogActions({
           {t("overlays.official.installed")}
         </span>
       )}
-      {state === "update" && (
+      {(state === "update" || state === "breaking") && (
         <Btn loading={busy} onClick={onInstall}>
           <LuRefreshCw size={16} />
           {t("overlays.official.update")}
