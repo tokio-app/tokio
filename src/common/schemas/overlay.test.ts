@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CustomGift } from "../types/overlay";
 import {
   getOverlayConfig,
+  localizeOverlayConfig,
   mergeOverlayConfig,
   OverlayConfig,
   OverlayConfigSchema,
@@ -176,6 +177,36 @@ function withWhen(
   return config;
 }
 
+// makeConfig and makeTable in one, with Spanish beside most of their texts
+function makeTranslated(): OverlayConfig {
+  const config = makeConfig();
+  const table = makeTable();
+  const [general] = config.sections;
+  const [title, mode] = config.fields;
+  const [font, socials] = table.fields;
+  general.translations = { es: "Ajustes", "es-419": "Configuración" };
+  title.translations = { es: "Título" };
+  if (title.type === "input") title.attributes.translations = { es: "Escribe" };
+  if (mode.type === "dropdown") {
+    mode.attributes.options[1].translations = { es: "Be" };
+  }
+  font.translations = { es: "Fuente" };
+  socials.translations = { es: "Redes" };
+  if (socials.type === "table") {
+    const [platform, username] = socials.attributes.columns;
+    platform.translations = { es: "Plataforma" };
+    if (platform.type === "dropdown") {
+      platform.attributes.options[0].translations = { es: "Face" };
+    }
+    // No placeholder to translate
+    if (username.type === "input") {
+      username.attributes.translations = { es: "Nombre" };
+    }
+  }
+  config.fields.push(font, socials);
+  return config;
+}
+
 // The attributes of makeTable's table
 function socials(config: OverlayConfig) {
   const field = config.fields[1];
@@ -269,6 +300,12 @@ describe("OverlayConfigSchema", () => {
     expect(issues(config)).toEqual([["fields", 3, "id"]]);
   });
 
+  it("keeps the translations", () => {
+    expect(OverlayConfigSchema.parse(makeTranslated())).toEqual(
+      makeTranslated(),
+    );
+  });
+
   it("keeps conditions on earlier fields", () => {
     const when = {
       mode: ["a", "b"],
@@ -314,6 +351,61 @@ describe("OverlayConfigSchema", () => {
       ["fields", 7, "when", "size"],
       ["fields", 7, "when", "show"],
     ]);
+  });
+});
+
+describe("localizeOverlayConfig", () => {
+  it("takes the language's texts, or its base language's", () => {
+    const es = localizeOverlayConfig(makeTranslated(), "es-419");
+    const [title, mode, , , , , , font, socials] = es.fields;
+
+    expect(es.sections.map((s) => s.name)).toEqual(["Configuración", "Style"]);
+    expect(es.fields.map((f) => f.name)).toEqual([
+      "Título",
+      "Mode",
+      "Tint",
+      "Show",
+      "Sound",
+      "Gifts",
+      "Size",
+      "Fuente",
+      "Redes",
+    ]);
+    expect(title.type === "input" && title.attributes.placeholder).toBe(
+      "Escribe",
+    );
+    expect(
+      mode.type === "dropdown" && mode.attributes.options.map((o) => o.label),
+    ).toEqual(["A", "Be"]);
+    expect(font.attributes.value).toBe("Comic Sans MS");
+
+    if (socials.type !== "table") throw new Error("Not a table");
+    const [platform, username] = socials.attributes.columns;
+    expect(socials.attributes.columns.map((c) => c.name)).toEqual([
+      "Plataforma",
+      "Username",
+      "Icon color",
+      "Gift",
+    ]);
+    expect(
+      platform.type === "dropdown" &&
+        platform.attributes.options.map((o) => o.label),
+    ).toEqual(["Face", "Instagram"]);
+    expect(username.attributes).not.toHaveProperty("placeholder");
+  });
+
+  it("keeps the texts as written in another language", () => {
+    expect(localizeOverlayConfig(makeTranslated(), "en")).toEqual(
+      makeTranslated(),
+    );
+  });
+
+  it("doesn't change its input", () => {
+    const config = makeTranslated();
+
+    localizeOverlayConfig(config, "es");
+
+    expect(config).toEqual(makeTranslated());
   });
 });
 
@@ -621,12 +713,20 @@ describe("mergeOverlayConfig", () => {
     expect(OverlayConfigSchema.safeParse(merged).success).toBe(true);
   });
 
-  it("takes the new version's conditions", () => {
-    const next = withWhen({ show: true }, newer());
+  it("takes the new version's conditions and translations", () => {
+    const next = withWhen({ show: true }, resetOverlayConfig(makeTranslated()));
 
     const merged = mergeOverlayConfig(next, makeConfig());
 
     expect(merged.fields.at(-1)?.when).toEqual({ show: true });
+    expect(merged.sections).toEqual(next.sections);
+    expect(merged.fields.map((f) => f.translations)).toEqual(
+      next.fields.map((f) => f.translations),
+    );
+    expect(merged.fields[0].attributes).toEqual({
+      ...next.fields[0].attributes,
+      value: "changed",
+    });
   });
 
   it("doesn't change its inputs", () => {

@@ -1,3 +1,4 @@
+import { localizeOverlayConfig } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -7,7 +8,7 @@ import {
 import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
-import { t } from "@/helper/i18n";
+import { language, t } from "@/helper/i18n";
 import { sendStudioOverlays } from "@/helper/studio";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
@@ -195,7 +196,7 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.GET_OVERLAY_CONFIG, {
       success: true,
       id,
-      data: res.data,
+      data: res.data && localizeOverlayConfig(res.data, language()),
     });
   },
   {

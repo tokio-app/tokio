@@ -2,9 +2,13 @@ import { z } from "zod";
 import { CustomGift, OverlayConfigRedux } from "../types/overlay";
 import { FONT_MAX_LENGTH } from "./timer";
 
+// The text beside it in other languages, by language code
+const Translations = z.record(z.string(), z.string()).optional();
+
 const SectionSchema = z.object({
   name: z.string(),
   id: z.string(),
+  translations: Translations,
 });
 
 // The values a condition names: one, or a list of which any matches
@@ -24,6 +28,7 @@ const BaseSetting = {
   id: z.string(),
   section: z.string(),
   when: When.optional(),
+  translations: Translations,
 };
 
 const InputValue = z.union([z.string().default(""), z.number().default(0)]);
@@ -34,6 +39,7 @@ const InputSetting = z.object({
   attributes: z.object({
     mode: z.enum(["text", "number"]),
     placeholder: z.string().optional(),
+    translations: Translations,
     value: InputValue,
     default: InputValue,
   }),
@@ -59,6 +65,7 @@ const DropdownSetting = z.object({
         value: z.union([z.string(), z.number()]),
         label: z.union([z.string(), z.number()]),
         img: z.string().optional(),
+        translations: Translations,
       }),
     ),
   }),
@@ -391,6 +398,40 @@ export function cellField(
   };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the config's check fits each cell to its column
   return field as OverlayConfigLeaf;
+}
+
+/**
+ * The config with its names, table column names, placeholders and option
+ * labels in the language, or its base language (`es` for `es-419`), where
+ * it has them.
+ */
+export function localizeOverlayConfig(
+  config: OverlayConfig,
+  language: string,
+): OverlayConfig {
+  const base = language.split("-")[0];
+  const local = <T>(text: T, translations?: Record<string, string>) =>
+    translations?.[language] ?? translations?.[base] ?? text;
+  const localize = (field: OverlayConfigField | OverlayConfigColumn) => {
+    field.name = local(field.name, field.translations);
+    if (field.type === "input" && field.attributes.placeholder !== undefined) {
+      const { placeholder, translations } = field.attributes;
+      field.attributes.placeholder = local(placeholder, translations);
+    }
+    if (field.type === "dropdown") {
+      for (const option of field.attributes.options) {
+        option.label = local(option.label, option.translations);
+      }
+    }
+    if (field.type === "table") field.attributes.columns.forEach(localize);
+  };
+
+  const localized = structuredClone(config);
+  for (const section of localized.sections) {
+    section.name = local(section.name, section.translations);
+  }
+  localized.fields.forEach(localize);
+  return localized;
 }
 
 /** The config with every field's value set back to its default. */
