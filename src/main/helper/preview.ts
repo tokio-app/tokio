@@ -1,5 +1,10 @@
 import type { Folders } from "@/common/types";
-import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, mediaKind } from "@/common/util";
+import {
+  AUDIO_EXTENSIONS,
+  IMAGE_EXTENSIONS,
+  mediaKind,
+  PREVIEW_READY,
+} from "@/common/util";
 import { openAsBlob } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { isInside } from "./path";
@@ -154,6 +159,11 @@ export function withPreviewCORS(res: Response): Response {
  * A `transparent` preview (`?transparent` on its URL: an embed in Overlay
  * Studio's editor) keeps its own background, so what's under it shows.
  *
+ * It also tells the Iframe the page is ready (PREVIEW_READY) once its own
+ * scripts have run. The page's load waits for every picture, and Top Likes'
+ * sample photos from a host that never answered kept its preview behind the
+ * spinner. An overlay whose CSP blocks the script shows on load.
+ *
  * The files and what the overlay server sends stay as they are. Other files
  * pass through.
  */
@@ -169,7 +179,8 @@ export async function withPreviewStyles(
     : `html{background-color:${PREVIEW_BACKGROUND}!important}`;
   // After everything else, so it wins over the overlay's own styles. Adding
   // it before the doctype would switch the page to quirks mode.
-  const html = `${await res.text()}<style>${background}html,body{overflow:hidden!important}</style>`;
+  const ready = `<script>addEventListener("DOMContentLoaded",()=>parent.postMessage("${PREVIEW_READY}","*"))</script>`;
+  const html = `${await res.text()}<style>${background}html,body{overflow:hidden!important}</style>${ready}`;
   const headers = new Headers(res.headers);
   headers.delete("content-length");
   return new Response(html, { status: res.status, headers });

@@ -27,6 +27,7 @@ The gifts `OverlayService.recordGift` saves are described in `.claude/rules/aler
 - `local-resource:` has no origin, so it's registered with `corsEnabled` and `supportFetchAPI`, and `withPreviewCORS` adds `Access-Control-Allow-Origin: *`. Without them Chromium blocks module scripts, `crossorigin` styles, fonts and `fetch`, and overlays built with Vite never run in previews.
 - Overlay code can load any `local-resource:` URL, so the handler serves only files inside the overlays folder (`previewFile`). Don't widen it.
 - `getConfig`, `saveConfig` and `remove` refuse an id that isn't stored (`_isStored`), so the renderer's id can't point outside the overlays folder. The check doesn't log; the config handlers and `_remove` do.
+- `Iframe` shows a preview once its page posts `PREVIEW_READY`, from the script `withPreviewStyles` adds, on `DOMContentLoaded`, or on `load` when the overlay's CSP blocks that script. Not on `load` alone: it waits for every picture, and a host that never answered (picsum.photos, behind most official overlays' sample photos) kept Top Likes behind the spinner. `onLoad`, which the settings dialog waits for before posting its settings, fires then too.
 - `withPreviewStyles` gives previews the app's background (for ClearType text) and hides scrollbars, as OBS's default CSS does. A URL with `?transparent` (`Iframe`'s `transparent`, for Overlay Studio's editor) keeps its own background; the scrollbar rule stays. The files on disk and what the overlay server sends stay unchanged.
 
 ## Files

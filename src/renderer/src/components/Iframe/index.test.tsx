@@ -1,9 +1,10 @@
 import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { PREVIEW_READY } from "@/common/util";
 import { Iframe } from ".";
 
-const frame = () => screen.getByTitle("Viewer for gift-jar");
+const frame = () => screen.getByTitle<HTMLIFrameElement>("Viewer for gift-jar");
 const src = () => frame().getAttribute("src");
 
 describe("Iframe", () => {
@@ -77,6 +78,32 @@ describe("Iframe", () => {
     expect(screen.getByRole("status", { name: "Loading" })).toBeVisible();
 
     fireEvent.load(frame());
+
+    expect(frame()).toBeVisible();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(onLoad).toHaveBeenCalledOnce();
+  });
+
+  it("shows the overlay once its page says it's ready, before load", () => {
+    const onLoad = vi.fn();
+    render(
+      <Iframe
+        name="gift-jar"
+        source="C:\overlays\index.html"
+        onLoad={onLoad}
+      />,
+    );
+
+    // Another window's message changes nothing
+    const ready = (source: Window | null) =>
+      fireEvent(
+        window,
+        new MessageEvent("message", { data: PREVIEW_READY, source }),
+      );
+    ready(window);
+    expect(frame()).not.toBeVisible();
+
+    ready(frame().contentWindow);
 
     expect(frame()).toBeVisible();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
