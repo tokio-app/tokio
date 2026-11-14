@@ -855,7 +855,7 @@
   "alerts.library.soundsError": "Algunos sonidos no se pudieron agregar o eliminar.",
   "alerts.library.mediaError": "Algunos archivos no se pudieron agregar o eliminar.",
   "tts.cloneVoice.title": "Clonar una voz",
-  "tts.cloneVoice.description": "{engine} agrega la voz a tu cuenta. Después puedes elegirla como cualquier otra voz.",
+  "tts.cloneVoice.description": "{engine} agrega la voz a tu cuenta. Cada mensaje que lee usa tus créditos, así que conviene usarla para usuarios especiales.",
   "tts.cloneVoice.name": "Nombre",
   "tts.cloneVoice.namePlaceholder": "Mi voz",
   "tts.cloneVoice.samples": "Muestras",
