@@ -214,7 +214,8 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.PICK_VOICE_SAMPLES]: Reply<{
     samples?: VoiceSample[];
   }>;
-  // The CLONE_VOICE request this answers, failures included
+  // The CLONE_VOICE request this answers, failures included. A success also
+  // replies GET_VOICES with the new list.
   [APP_EVENTS_RESPONSE.CLONE_VOICE]: Reply<{
     id: string;
   }>;

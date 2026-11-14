@@ -410,6 +410,9 @@ describe("tts events", () => {
       name: " My voice ",
       samples,
     };
+    const voices = [
+      { engine: "ElevenLabs", name: "My voice", lang: "mul", id: "v1" },
+    ];
     const cloning = (
       result: { success: boolean; verify?: boolean; error?: Error } = {
         success: true,
@@ -418,12 +421,16 @@ describe("tts events", () => {
     ) => {
       const cloneVoice = vi.fn(async () => result);
       const h = createHandler({
-        ttsService: { getEngines: () => engines, cloneVoice },
+        ttsService: {
+          getEngines: () => engines,
+          cloneVoice,
+          getVoices: async () => voices,
+        },
       });
       return { h, cloneVoice };
     };
 
-    it("clones the voice and says where to pick it", async () => {
+    it("clones the voice, and sends the voices with it", async () => {
       const { h, cloneVoice } = cloning();
 
       await h.invoke(tts, APP_EVENTS.CLONE_VOICE, request);
@@ -435,13 +442,14 @@ describe("tts events", () => {
       );
       expect(h.sent()).toEqual([
         [APP_EVENTS_RESPONSE.CLONE_VOICE, { id: "clone-1", success: true }],
+        [APP_EVENTS_RESPONSE.GET_VOICES, { voices, engines, success: true }],
         [
           "notice",
           expect.objectContaining({
             level: "success",
             source: "tts",
             code: FEEDBACK_CODES.VOICE_CLONED,
-            message: 'Voice "My voice" cloned. Pick it in TTS.',
+            message: `Voice "My voice" cloned. It's in the voice list now.`,
           }),
         ],
       ]);

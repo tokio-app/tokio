@@ -1,8 +1,3 @@
-/* The button that opens it, under an engine's key field */
-.open {
-  align-self: flex-start;
-}
-
 .samples {
   display: flex;
   flex-direction: column;

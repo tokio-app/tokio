@@ -4,8 +4,6 @@ paths:
   - "src/renderer/src/pages/TTS/**"
   - "src/renderer/src/components/VoiceSelect/**"
   - "src/renderer/src/pages/Settings/sections/VoiceKeysSection.tsx"
-  - "src/renderer/src/pages/Settings/sections/CloneVoiceModal.tsx"
-  - "src/renderer/src/pages/Settings/sections/useRecorder.ts"
   - "src/main/events/pages/tts.ts"
   - "scripts/edge-tts/**"
 ---
@@ -30,7 +28,8 @@ paths:
 
 ## Voice cloning
 
-- **Settings → Voice engines** offers **Clone a voice** for an engine with `cloneVoice` (`VoiceEngine.clones`), in `CloneVoiceModal`. The consent box is required and never saved.
+- **Clone a voice** sits on the TTS page's Voice section title row, not in Settings (the user's call). It shows once an engine with `cloneVoice` (`VoiceEngine.clones`) lists voices, so a missing or wrong key hides it. It opens `CloneVoiceModal`, whose consent box is required and never saved.
+- A successful clone also replies `GET_VOICES`, and every `VoiceSelect` takes any `GET_VOICES` reply, so the new voice shows in the pickers on screen.
 - Samples travel as bytes: main reads files from its own picker (`PICK_VOICE_SAMPLES`), and recordings come from the window, so main never reads a path the window names. `CLONE_VOICE` checks them (extension with `Object.hasOwn`, size, count), and they upload as `sample-<n>.<ext>`, so the user's file names stay on their computer.
 - Recordings are WebM/Opus without echo cancellation, noise suppression or gain control, up to 3 minutes. macOS asks for the microphone in main first (`ASK_MICROPHONE`), as it does for the camera.
 - The dialog plays a sample from a copy of its bytes: `AudioQueue` decodes the bytes it gets without copying, which detaches them, and the sample would go out empty.

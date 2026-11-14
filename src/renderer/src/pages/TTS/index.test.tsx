@@ -292,6 +292,31 @@ describe("TTS", () => {
     expect((await saved()).voice).toEqual(guy);
   });
 
+  it("offers to clone a voice once an engine that clones lists voices", async () => {
+    const { user } = await setup();
+    const eleven = { ...engine("ElevenLabs", "ElevenLabs"), clones: true };
+    const clone = () => screen.queryByRole("button", { name: "Clone a voice" });
+
+    // Its key is missing or wrong, so it lists none
+    await send(APP_EVENTS_RESPONSE.GET_VOICES, {
+      success: true,
+      voices: [aria],
+      engines: [engine("edge", "Edge"), eleven],
+    });
+    expect(clone()).not.toBeInTheDocument();
+
+    await send(APP_EVENTS_RESPONSE.GET_VOICES, {
+      success: true,
+      voices: [aria, voice("Mine", "mul", "ElevenLabs")],
+      engines: [engine("edge", "Edge"), eleven],
+    });
+    await user.click(clone()!);
+
+    expect(
+      screen.getByRole("dialog", { name: "Clone a voice" }),
+    ).toHaveAccessibleDescription(/^ElevenLabs adds the voice/);
+  });
+
   it("tests with the settings on the page, saved or not", async () => {
     const { user } = await setup();
     await user.click(removeEmojis());

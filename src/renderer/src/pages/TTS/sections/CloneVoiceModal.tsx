@@ -17,10 +17,10 @@ import styles from "./clonevoice.module.css";
 import { RECORD_MAX_SECONDS, useRecorder } from "./useRecorder";
 
 const MIC_FAILURES: Record<CameraFailure, MessageKey> = {
-  blocked: "settings.cloneVoice.micBlocked",
-  missing: "settings.cloneVoice.micMissing",
-  busy: "settings.cloneVoice.micBusy",
-  failed: "settings.cloneVoice.micFailed",
+  blocked: "tts.cloneVoice.micBlocked",
+  missing: "tts.cloneVoice.micMissing",
+  busy: "tts.cloneVoice.micBusy",
+  failed: "tts.cloneVoice.micFailed",
 };
 
 // 2:05 for 125
@@ -65,9 +65,7 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
   const recorder = useRecorder((data) => {
     recordings.current += 1;
     const number = String(recordings.current);
-    add([
-      { name: `${t("settings.cloneVoice.recording", { number })}.webm`, data },
-    ]);
+    add([{ name: `${t("tts.cloneVoice.recording", { number })}.webm`, data }]);
   });
   const recording = recorder.state === "recording";
 
@@ -119,15 +117,15 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
 
   const full = samples.length >= VOICE_SAMPLES_MAX;
   const fullTitle = full
-    ? t("settings.cloneVoice.full", { max: String(VOICE_SAMPLES_MAX) })
+    ? t("tts.cloneVoice.full", { max: String(VOICE_SAMPLES_MAX) })
     : undefined;
   const ready =
     name.trim() !== "" && samples.length > 0 && consent && !recording;
 
   return (
     <Modal
-      title={t("settings.cloneVoice.title")}
-      description={t("settings.cloneVoice.description", {
+      title={t("tts.cloneVoice.title")}
+      description={t("tts.cloneVoice.description", {
         engine: engine.label,
       })}
       maxWidth="520px"
@@ -141,15 +139,15 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
             loading={cloning !== null}
             onClick={clone}
           >
-            {t("settings.cloneVoice.clone")}
+            {t("tts.cloneVoice.clone")}
           </Btn>
         </>
       }
     >
-      <Field label={t("settings.cloneVoice.name")}>
+      <Field label={t("tts.cloneVoice.name")}>
         <Input
-          aria-label={t("settings.cloneVoice.name")}
-          placeholder={t("settings.cloneVoice.namePlaceholder")}
+          aria-label={t("tts.cloneVoice.name")}
+          placeholder={t("tts.cloneVoice.namePlaceholder")}
           maxLength={VOICE_NAME_MAX}
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -159,25 +157,25 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
       <div className={styles.samples} role="group" aria-labelledby={labelId}>
         <div className={styles.header}>
           <span id={labelId} className={styles.label}>
-            {t("settings.cloneVoice.samples")}
+            {t("tts.cloneVoice.samples")}
           </span>
           <Btn
             disabled={full || recording}
             title={fullTitle}
             onClick={() => window.api.emit(APP_EVENTS.PICK_VOICE_SAMPLES)}
           >
-            {t("settings.cloneVoice.addFiles")}
+            {t("tts.cloneVoice.addFiles")}
           </Btn>
           {/* One button for both, so the focus stays on it */}
           {recording ? (
-            <Btn onClick={recorder.stop}>{t("settings.cloneVoice.stop")}</Btn>
+            <Btn onClick={recorder.stop}>{t("tts.cloneVoice.stop")}</Btn>
           ) : (
             <Btn
               disabled={full || recorder.state === "starting"}
               title={fullTitle}
               onClick={recorder.record}
             >
-              {t("settings.cloneVoice.record")}
+              {t("tts.cloneVoice.record")}
             </Btn>
           )}
         </div>
@@ -206,7 +204,7 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
             <li className={styles.row}>
               <span className={styles.dot} aria-hidden />
               <span className={styles.time}>
-                {t("settings.cloneVoice.elapsed", {
+                {t("tts.cloneVoice.elapsed", {
                   time: clock(recorder.seconds),
                   max: clock(RECORD_MAX_SECONDS),
                 })}
@@ -223,7 +221,7 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
           )}
 
           {samples.length === 0 && !recording && (
-            <li className={styles.empty}>{t("settings.cloneVoice.empty")}</li>
+            <li className={styles.empty}>{t("tts.cloneVoice.empty")}</li>
           )}
         </ul>
 
@@ -232,11 +230,11 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
             {t(MIC_FAILURES[recorder.failure])}
           </p>
         )}
-        <p className={styles.hint}>{t("settings.cloneVoice.hint")}</p>
+        <p className={styles.hint}>{t("tts.cloneVoice.hint")}</p>
       </div>
 
       <Check
-        label={t("settings.cloneVoice.consent")}
+        label={t("tts.cloneVoice.consent")}
         checked={consent}
         onChange={(e) => setConsent(e.target.checked)}
       />

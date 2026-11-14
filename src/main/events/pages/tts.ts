@@ -248,6 +248,12 @@ events.push(
       );
     }
     e.reply(APP_EVENTS_RESPONSE.CLONE_VOICE, { id, success: true });
+    // The voice pickers on screen show the new voice
+    e.reply(APP_EVENTS_RESPONSE.GET_VOICES, {
+      voices: await ttsService.getVoices(),
+      engines: ttsService.getEngines(),
+      success: true,
+    });
     if (res.verify) {
       notifier.warn(
         "tts",
@@ -258,7 +264,7 @@ events.push(
       notifier.success(
         "tts",
         FEEDBACK_CODES.VOICE_CLONED,
-        t("main.tts.voiceCloned", { name, tts: t("nav.tts") }),
+        t("main.tts.voiceCloned", { name }),
       );
     }
   },
