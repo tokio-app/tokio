@@ -25,3 +25,20 @@ export function formatStat(value: number, language: string) {
     full: format.full.format(value),
   };
 }
+
+/**
+ * A length in whole minutes, else seconds, as the language writes it: "30
+ * seconds", or with a max "1–2 minutes".
+ */
+export function formatSeconds(language: string, seconds: number, max?: number) {
+  const minutes = seconds % 60 === 0 && (max ?? 0) % 60 === 0;
+  const per = minutes ? 60 : 1;
+  const format = new Intl.NumberFormat(language, {
+    style: "unit",
+    unit: minutes ? "minute" : "second",
+    unitDisplay: "long",
+  });
+  return max === undefined
+    ? format.format(seconds / per)
+    : format.formatRange(seconds / per, max / per);
+}

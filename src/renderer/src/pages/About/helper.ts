@@ -91,6 +91,18 @@ export const SERVICES: { name: string; note: string }[] = [
     name: "ElevenLabs",
     note: "The ElevenLabs voices and voice cloning (api.elevenlabs.io), with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.",
   },
+  {
+    name: "Fish Audio",
+    note: "The Fish Audio voices and voice cloning (api.fish.audio), with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.",
+  },
+  {
+    name: "Cartesia",
+    note: "The Cartesia voices and voice cloning (api.cartesia.ai), with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.",
+  },
+  {
+    name: "Inworld",
+    note: "The Inworld voices and voice cloning (api.inworld.ai), with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.",
+  },
   { name: "Spotify and YouTube", note: "Music requests." },
   {
     name: "GitHub",

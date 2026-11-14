@@ -1065,7 +1065,7 @@ describe("settings events", () => {
       };
       const h = createHandler({
         storeManagerService,
-        ttsService: { getEngines: () => engines },
+        ttsService: { getEngines: () => engines, voicesNeedKey: () => false },
       });
       return { h, storeManagerService };
     };
@@ -1178,6 +1178,81 @@ describe("settings events", () => {
           code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
         }),
       ]);
+    });
+
+    describe("an engine whose voices need its key", () => {
+      const all: VoiceEngine[] = [
+        ...engines,
+        { id: "ElevenLabs", label: "ElevenLabs", keyLabel: "voiceKeys.apiKey" },
+      ];
+      const profile = structuredClone(baseProfile);
+      const keyedSetup = (removed = true) => {
+        const storeManagerService = {
+          getVoiceKey: vi.fn(() => ""),
+          updateVoiceKey: vi.fn(async () => true),
+          removeVoices: vi.fn(async () => removed),
+          getProfileData: vi.fn(async () => profile),
+        };
+        const h = createHandler({
+          storeManagerService,
+          ttsService: {
+            getEngines: () => all,
+            voicesNeedKey: (engine: string) => engine === "ElevenLabs",
+          },
+        });
+        return { h, storeManagerService };
+      };
+
+      it("puts the default voice back in every profile once its key is removed", async () => {
+        const { h, storeManagerService } = keyedSetup();
+
+        await h.invoke(settings, APP_EVENTS.SET_VOICE_KEY, {
+          engine: "ElevenLabs",
+          key: " ",
+        });
+
+        expect(
+          storeManagerService.removeVoices,
+        ).toHaveBeenCalledExactlyOnceWith("ElevenLabs");
+        expect(storeManagerService.getProfileData).toHaveBeenCalledWith({
+          fresh: true,
+        });
+        expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([
+          { success: true, profile },
+        ]);
+        expect(h.notices).toEqual([]);
+      });
+
+      it("keeps its voices while it has a key", async () => {
+        const { h, storeManagerService } = keyedSetup();
+
+        await h.invoke(settings, APP_EVENTS.SET_VOICE_KEY, {
+          engine: "ElevenLabs",
+          key: "sk_new",
+        });
+
+        expect(storeManagerService.removeVoices).not.toHaveBeenCalled();
+        expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([]);
+      });
+
+      it("shows the profile and warns when a profile couldn't be saved", async () => {
+        const { h } = keyedSetup(false);
+
+        await h.invoke(settings, APP_EVENTS.SET_VOICE_KEY, {
+          engine: "ElevenLabs",
+          key: "",
+        });
+
+        expect(h.replies(APP_EVENTS_RESPONSE.GET_PROFILE)).toEqual([
+          { success: true, profile },
+        ]);
+        expect(h.notices).toEqual([
+          expect.objectContaining({
+            level: "error",
+            code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          }),
+        ]);
+      });
     });
 
     it("removes the key when it's empty", async () => {

@@ -1,7 +1,7 @@
 // Type only: `yarn tts:edge:check` runs this file under tsx, which can't load
 // the locale files
 import type { MessageKey } from "@/common/i18n";
-import type { VoiceSample } from "@/common/types";
+import type { CloneLimits, VoiceSample } from "@/common/types";
 
 export type GenerationResponse = {
   success: boolean;
@@ -23,6 +23,8 @@ export abstract class TTSProvider {
   // Set when the engine takes a key, which is then editable in Settings: the
   // key of its name, which the window translates.
   public readonly keyLabel?: MessageKey;
+  // True when its voices speak only with its key, unlike TikTok's
+  public readonly needsKey: boolean = false;
   public abstract setKey(key: string): void;
   public abstract getVoices(): ProviderVoice[] | Promise<ProviderVoice[]>;
   // Unknown voices (e.g. another engine's) must fall back to a default, unless
@@ -33,11 +35,15 @@ export abstract class TTSProvider {
     lang?: string,
     voice?: string,
   ): Promise<GenerationResponse>;
-  // Set when the engine clones voices from samples. verify is true when the
-  // voice works only once the user verifies it on the engine's website.
+  // Both set when the engine clones voices from samples, which come within
+  // its limits. language is the app's, for an engine that must be told the
+  // samples' language. verify is true when the voice works only once the user
+  // verifies it on the engine's website.
+  public readonly cloning?: CloneLimits;
   public cloneVoice?(
     name: string,
     samples: VoiceSample[],
+    language: string,
   ): Promise<{ id: string; verify: boolean }>;
   // Release any resources (e.g. child processes) held by the provider.
   public dispose(): void {}
@@ -85,6 +91,8 @@ export function failureKey(
   ) {
     return "main.tts.keyPermissions";
   }
+  // Cartesia sends a plan that can't do it as a 402, like no credits
+  if (error.code === "plan_required") return "main.tts.notAllowed";
   switch (error.status) {
     case 401:
       return "main.tts.keyRejected";

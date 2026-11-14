@@ -434,6 +434,68 @@ describe("StoreManagerService", () => {
       });
     });
 
+    it("puts the default voice in place of an engine's voices, in every profile", async () => {
+      const store = await init();
+      const eleven = {
+        engine: "ElevenLabs",
+        name: "Ava",
+        lang: "mul",
+        id: "v1",
+      };
+      const edge = { engine: "Edge", name: "Jorge", lang: "es-MX", id: "" };
+      // The empty id replaces the old one: saves merge
+      const fallback = { ...defaultProfile.tts.voice, id: "" };
+      const alert: Alert = {
+        id: "a",
+        name: "a",
+        enabled: true,
+        trigger: {
+          type: TOKIO_EVENTS.FOLLOW,
+          gifts: [],
+          every_gift: false,
+          emotes: [],
+          keyword: "",
+          user: "",
+          min_coins: 0,
+          roles: [],
+        },
+        sound: null,
+        tts: { voice: eleven, message: "{username}", speed: 1, pitch: 1 },
+        media: null,
+        volume: 100,
+      };
+      await store.updateProfileData({
+        tts: {
+          ...defaultProfile.tts,
+          voice: eleven,
+          user_voices: [
+            { handle: "fan", voice: eleven },
+            { handle: "mod", voice: edge },
+          ],
+        },
+        alerts: { ...defaultProfile.alerts, items: [alert] },
+      });
+      await store.createNewProfile("stream.json", "Stream");
+      await store.updateActiveProfile("stream.json");
+      await store.updateProfileData({
+        tts: { ...defaultProfile.tts, voice: eleven },
+      });
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+
+      expect(await store.removeVoices("ElevenLabs")).toBe(true);
+
+      // The active profile, in memory and on disk, and another one
+      expect((await store.getProfileData())!.tts.voice).toEqual(fallback);
+      expect((await readJSON(stream)).tts.voice).toEqual(fallback);
+      const other = await readJSON(defaultProfileFile);
+      expect(other.tts.voice).toEqual(fallback);
+      expect(other.tts.user_voices).toEqual([
+        { handle: "fan", voice: fallback },
+        { handle: "mod", voice: edge },
+      ]);
+      expect(other.alerts.items[0].tts.voice).toEqual(fallback);
+    });
+
     it("keeps one entry, with the last key, for two keys saved at once", async () => {
       const store = await init();
 

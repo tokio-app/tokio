@@ -294,7 +294,10 @@ describe("TTS", () => {
 
   it("offers to clone a voice once an engine that clones has a key", async () => {
     const { user } = await setup();
-    const eleven = { ...engine("ElevenLabs", "ElevenLabs"), clones: true };
+    const eleven = {
+      ...engine("ElevenLabs", "ElevenLabs"),
+      cloning: { samples: 10, minSeconds: 60, maxSeconds: 120 },
+    };
     const tiktok = engine("tiktok", "TikTok", "voiceKeys.sessionId");
     const clone = () => screen.queryByRole("button", { name: "Clone a voice" });
     // Not the voices, which wait for every engine

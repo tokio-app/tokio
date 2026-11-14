@@ -12,14 +12,23 @@ export type VoiceData = {
   id?: string;
 };
 
+// What an engine clones a voice from: up to `samples` samples, best
+// `minSeconds` to `maxSeconds` long in all, where a recording stops. An
+// engine that takes one gets them joined into one WAV, cut at maxSeconds.
+export type CloneLimits = {
+  samples: number;
+  minSeconds: number;
+  maxSeconds: number;
+};
+
 // keyLabel is set when the engine takes a key, e.g. TikTok's session ID: the
-// key of its name, translated where it's shown. clones is set when it can
+// key of its name, translated where it's shown. cloning is set when it can
 // clone a voice from samples.
 export type VoiceEngine = {
   id: string;
   label: string;
   keyLabel?: MessageKey;
-  clones?: boolean;
+  cloning?: CloneLimits;
 };
 
 // An audio file or a recording to clone a voice from: its file name, which

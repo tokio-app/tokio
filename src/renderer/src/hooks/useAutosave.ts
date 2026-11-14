@@ -8,7 +8,7 @@ import { SAVE_DELAY, useFlush } from "./useEditableSettings";
  * over from it when it changes, but not for main's echo of one of its own
  * saves, which would undo what was typed since. A change still waiting is sent
  * when the component unmounts, the window closes or flushSettings is called,
- * so one made right before leaving isn't lost.
+ * so one made right before leaving isn't lost. `flush` sends it at once.
  */
 export function useAutosave<T>(saved: T, save: (value: T) => void) {
   const [value, setValue] = useState(saved);
@@ -60,5 +60,5 @@ export function useAutosave<T>(saved: T, save: (value: T) => void) {
 
   useFlush(flush);
 
-  return [value, setValue] as const;
+  return [value, setValue, flush] as const;
 }

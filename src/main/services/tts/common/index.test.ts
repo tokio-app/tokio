@@ -40,6 +40,12 @@ describe("failureKey", () => {
     );
   });
 
+  it("says the plan can't do it by the code, whatever the status", () => {
+    expect(failureKey(failed(402, "plan_required"), { cloning: true })).toBe(
+      "main.tts.notAllowed",
+    );
+  });
+
   it("blames the samples for a 400 or 422 only when cloning", () => {
     for (const status of [400, 422]) {
       expect(failureKey(failed(status), { cloning: true })).toBe(

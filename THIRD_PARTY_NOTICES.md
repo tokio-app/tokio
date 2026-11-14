@@ -52,6 +52,9 @@ Tokio talks to these online services. None of them is covered by Tokio's license
 - **Euler Stream** (`tiktok.eulerstream.com`): signs the connection to TikTok LIVE, with each user's own API key.
 - **Microsoft:** Edge's Read Aloud service (the Edge voices), which isn't an official public API.
 - **ElevenLabs** (`api.elevenlabs.io`): the ElevenLabs voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
+- **Fish Audio** (`api.fish.audio`): the Fish Audio voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
+- **Cartesia** (`api.cartesia.ai`): the Cartesia voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
+- **Inworld** (`api.inworld.ai`): the Inworld voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
 - **Spotify and YouTube:** music requests.
 - **GitHub** (`github.com`, `api.github.com`): update checks and downloads, from Tokio's releases, and the official overlays (their list, previews and downloads), from the releases of `tokio-app/overlays`.
 - **MyInstants** (`www.myinstants.com`): sound search and downloads for alerts, read from the public website rather than an official API. Its sounds are uploaded by its users and aren't covered by Tokio's license.

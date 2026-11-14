@@ -17,7 +17,15 @@ import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
 import { GenerationResponse, TTSProvider } from "./common";
-import { ElevenLabsTTS, EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
+import {
+  CartesiaTTS,
+  EdgeTTS,
+  ElevenLabsTTS,
+  FishAudioTTS,
+  InworldTTS,
+  TikTokTTS,
+  WindowsTTS,
+} from "./providers";
 
 // A message the window never says it played stops holding the next ones
 // after this long, like the ones it had when it reloaded or crashed.
@@ -67,6 +75,9 @@ export class TTSService extends ProviderService<TTSProvider> {
     }
     this.addProvider("Edge", new EdgeTTS());
     this.addProvider("ElevenLabs", new ElevenLabsTTS());
+    this.addProvider("FishAudio", new FishAudioTTS());
+    this.addProvider("Cartesia", new CartesiaTTS());
+    this.addProvider("Inworld", new InworldTTS());
   }
 
   public getEngines(): VoiceEngine[] {
@@ -74,8 +85,13 @@ export class TTSService extends ProviderService<TTSProvider> {
       id,
       label: provider.label,
       keyLabel: provider.keyLabel,
-      clones: provider.cloneVoice ? true : undefined,
+      cloning: provider.cloneVoice ? provider.cloning : undefined,
     }));
+  }
+
+  // Whether the engine's voices speak only with its key
+  public voicesNeedKey(engine: string) {
+    return this._providerPool.get(engine)?.needsKey === true;
   }
 
   public setEngineKey(engine: string, key: string) {
@@ -140,18 +156,20 @@ export class TTSService extends ProviderService<TTSProvider> {
     );
   }
 
-  // The error is the engine's, whose status says why it failed
+  // The error is the engine's, whose status says why it failed. language is
+  // the app's.
   public async cloneVoice(
     engine: string,
     name: string,
     samples: VoiceSample[],
+    language: string,
   ): Promise<{ success: boolean; verify?: boolean; error?: Error }> {
     try {
       const provider = this._providerPool.get(engine);
       if (!provider?.cloneVoice) {
         throw new Error(`The engine "${engine}" can't clone voices.`);
       }
-      const { verify } = await provider.cloneVoice(name, samples);
+      const { verify } = await provider.cloneVoice(name, samples, language);
       return { success: true, verify };
     } catch (e) {
       Logger.error(

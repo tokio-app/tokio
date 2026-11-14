@@ -1,5 +1,5 @@
 import { Profile } from "@/common/schemas";
-import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceEngine } from "@/common/types";
+import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import {
   Btn,
   Field,
@@ -15,7 +15,7 @@ import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiMic } from "react-icons/fi";
 import styles from "../tts.module.css";
-import { CloneVoiceModal } from "./CloneVoiceModal";
+import { Cloner, CloneVoiceModal } from "./CloneVoiceModal";
 
 type Settings = Profile["tts"];
 
@@ -37,16 +37,19 @@ export function VoiceSection({
   const [testMessage, setTestMessage] = useState("");
   const { filters } = settings;
   const t = useT();
-  // An engine that clones and has a key
-  const [cloner, setCloner] = useState<VoiceEngine | null>(null);
+  // The engines that clone and have a key
+  const [cloners, setCloners] = useState<Cloner[]>([]);
   const [cloning, setCloning] = useState(false);
 
   // Main answers the keys at once, while the voices wait for every engine
   useIpcRequest(APP_EVENTS.GET_VOICE_KEYS);
   useIpcListener(APP_EVENTS_RESPONSE.GET_VOICE_KEYS, (res) => {
     if (!res?.success) return;
-    const engine = res.engines?.find((e) => e.clones && e.key.trim() !== "");
-    setCloner(engine ?? null);
+    setCloners(
+      (res.engines ?? []).filter(
+        (e): e is typeof e & Cloner => !!e.cloning && e.key.trim() !== "",
+      ),
+    );
   });
 
   return (
@@ -54,7 +57,7 @@ export function VoiceSection({
       title={t("tts.voice.title")}
       description={t("tts.voice.description")}
       actions={
-        cloner && (
+        cloners.length > 0 && (
           <Btn
             variant="icon"
             title={t("tts.cloneVoice.title")}
@@ -141,8 +144,8 @@ export function VoiceSection({
         />
       </div>
 
-      {cloning && cloner && (
-        <CloneVoiceModal engine={cloner} onClose={() => setCloning(false)} />
+      {cloning && cloners.length > 0 && (
+        <CloneVoiceModal engines={cloners} onClose={() => setCloning(false)} />
       )}
     </Section>
   );
