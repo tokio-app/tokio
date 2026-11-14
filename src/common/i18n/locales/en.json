@@ -263,6 +263,7 @@
   "components.tour.step": "{step} of {total}",
   "components.tour.back": "Back",
   "components.tour.next": "Next",
+  "components.voicePicker.multilingual": "Multiple languages",
   "settings.language.title": "Language",
   "settings.language.description": "Menus and messages. Pick voices in TTS.",
   "settings.language.system": "System language",

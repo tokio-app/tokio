@@ -1,5 +1,6 @@
 import { translate } from "@/common/i18n";
 import { VoiceData, VoiceEngine } from "@/common/types";
+import { MULTILINGUAL } from "@/common/util/constants";
 import type { SelectOption } from "@/components/Elements";
 
 export const voiceKey = (voice: VoiceData) =>
@@ -14,6 +15,10 @@ const languageOf = (lang: string) => lang.split(/[-_]/)[0].toLowerCase();
 // "English" for "en", "English (United States)" for "en-US", named in the
 // window's language. Tags Intl can't read are shown as they are.
 function languageName(lang: string, language: string): string {
+  // Node's Intl names "mul", Chromium's trimmed one doesn't
+  if (lang === MULTILINGUAL) {
+    return translate(language, "components.voicePicker.multilingual");
+  }
   let names = displayNames.get(language);
   if (!names) {
     names = new Intl.DisplayNames([language], {

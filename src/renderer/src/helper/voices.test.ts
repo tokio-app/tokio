@@ -64,6 +64,25 @@ describe("voiceDetails", () => {
   it("shows a tag Intl can't read as it is", () => {
     expect(voiceDetails(voice("Odd", "not a tag"), [], "en")).toBe("not a tag");
   });
+
+  // Electron's Intl shows "mul" as is, which Node's test Intl hides
+  it("names a voice that speaks every language with its own text", () => {
+    const clone = voice("Clone", "mul", "elevenlabs");
+    const engines = [engine("elevenlabs", "ElevenLabs")];
+
+    expect(voiceDetails(clone, engines, "en")).toBe(
+      "Multiple languages · ElevenLabs",
+    );
+    expect(voiceDetails(clone, engines, "es-419")).toBe(
+      "varios idiomas · ElevenLabs",
+    );
+    expect(languageOptions(voiceEntries([clone], engines, "en"), "en")).toEqual(
+      [
+        { value: "", label: "All languages" },
+        { value: "mul", label: "Multiple languages" },
+      ],
+    );
+  });
 });
 
 describe("voiceEntries", () => {
