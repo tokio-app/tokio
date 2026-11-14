@@ -10,15 +10,17 @@
 }
 
 /* Home's one warm spot fades out from the board's corner, behind the slate,
-   and scrolls with it. Sized in px, so a wide window doesn't stretch it. */
+   and scrolls with it. Sized in px, so a wide window doesn't stretch it.
+   Opaque stops: fading to transparent rounds back up partway and draws a
+   visible ridge. */
 .board {
   min-height: 0;
   padding: var(--space-8);
   overflow-y: auto;
   background: radial-gradient(
       720px 360px at 0 0,
-      color-mix(in srgb, var(--accent-primary) 8%, transparent),
-      transparent
+      color-mix(in srgb, var(--accent-primary) 8%, var(--background-primary)),
+      var(--background-primary)
     )
     no-repeat local;
 }
@@ -125,7 +127,6 @@
 }
 
 .key_hint {
-  max-width: 60ch;
   color: var(--font-secondary);
   font-size: var(--font-sm);
 }
