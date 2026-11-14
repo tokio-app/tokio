@@ -1,0 +1,132 @@
+/* The button that opens it, under an engine's key field */
+.open {
+  align-self: flex-start;
+}
+
+.samples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The label, then Add files and Record at the row's end */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.label {
+  margin-right: auto;
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--font-primary);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-lg);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+}
+
+.row + .row {
+  border-top: 1px solid var(--border);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-md);
+  color: var(--font-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The recording, last in the list until it stops */
+.row:has(.dot) {
+  gap: var(--space-3);
+  background: var(--accent-soft);
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
+}
+
+.time {
+  flex-shrink: 0;
+  font-size: var(--font-md);
+  font-stretch: var(--stretch-readout);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--font-primary);
+}
+
+/* How far it is toward the longest recording */
+.track {
+  flex: 1;
+  height: 2px;
+  margin-right: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progress {
+  display: block;
+  height: 100%;
+  background: var(--accent-primary);
+  transition: width 0.25s linear;
+}
+
+.empty {
+  padding: var(--space-5) var(--space-3);
+  font-size: var(--font-sm);
+  color: var(--font-secondary);
+  text-align: center;
+}
+
+.hint {
+  font-size: var(--font-sm);
+  color: var(--font-secondary);
+}
+
+.error {
+  font-size: var(--font-sm);
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dot {
+    animation: blink 1.2s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress {
+    transition: none;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.35;
+  }
+}

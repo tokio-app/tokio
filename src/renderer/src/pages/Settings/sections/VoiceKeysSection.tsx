@@ -1,10 +1,12 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceEngine } from "@/common/types";
-import { Field, FormGrid, Input, Section } from "@/components";
+import { Btn, Field, FormGrid, Input, Section } from "@/components";
 import { useAutosave, useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiKey } from "react-icons/fi";
 import styles from "../settings.module.css";
+import cloneStyles from "./clonevoice.module.css";
+import { CloneVoiceModal } from "./CloneVoiceModal";
 
 type EngineKey = VoiceEngine & { key: string };
 
@@ -47,6 +49,7 @@ function KeyForm({ engine }: { engine: EngineKey }) {
       key: value,
     }),
   );
+  const [cloning, setCloning] = useState(false);
 
   return (
     <div className={styles.provider}>
@@ -64,6 +67,18 @@ function KeyForm({ engine }: { engine: EngineKey }) {
           onChange={(e) => setKey(e.target.value)}
         />
       </Field>
+      {engine.clones && (
+        <Btn
+          className={cloneStyles.open}
+          disabled={key.trim() === ""}
+          onClick={() => setCloning(true)}
+        >
+          {t("settings.cloneVoice.title")}
+        </Btn>
+      )}
+      {cloning && (
+        <CloneVoiceModal engine={engine} onClose={() => setCloning(false)} />
+      )}
     </div>
   );
 }

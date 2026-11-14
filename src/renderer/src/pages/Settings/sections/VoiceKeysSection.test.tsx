@@ -88,6 +88,56 @@ describe("VoiceKeysSection", () => {
     );
   });
 
+  describe("Clone a voice", () => {
+    const cloner = (key = "") => ({ ...eleven(key), clones: true });
+    const button = () =>
+      screen.queryByRole("button", { name: "Clone a voice" });
+
+    it("shows only for engines that clone", async () => {
+      renderWithProviders(<VoiceKeysSection />);
+
+      await keys(azure("key"), eleven("key"));
+      expect(button()).not.toBeInTheDocument();
+
+      await keys(azure("key"), cloner("key"));
+      expect(
+        screen.getAllByRole("button", { name: "Clone a voice" }),
+      ).toHaveLength(1);
+      expect(form("ElevenLabs voices").getByRole("button")).toBe(button());
+    });
+
+    it("waits for a key", async () => {
+      const { user } = renderWithProviders(<VoiceKeysSection />);
+      await keys(cloner());
+      expect(button()).toBeDisabled();
+
+      await user.type(
+        screen.getByPlaceholderText("ElevenLabs Session ID..."),
+        "   ",
+      );
+      expect(button()).toBeDisabled();
+
+      await user.type(
+        screen.getByPlaceholderText("ElevenLabs Session ID..."),
+        "abc",
+      );
+      expect(button()).toBeEnabled();
+    });
+
+    it("opens the dialog for its engine", async () => {
+      const { user } = renderWithProviders(<VoiceKeysSection />);
+      await keys(cloner("key"));
+
+      await user.click(button()!);
+
+      const dialog = screen.getByRole("dialog", { name: "Clone a voice" });
+      expect(dialog).toHaveTextContent("ElevenLabs adds the voice");
+
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
   it("replaces the typed key when main holds another one", async () => {
     const { user } = renderWithProviders(<VoiceKeysSection />);
     await keys(azure());
