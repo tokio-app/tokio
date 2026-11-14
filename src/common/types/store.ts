@@ -1,8 +1,10 @@
 import type { MessageKey } from "../i18n";
 
 // engine is the id of the TTS engine (provider) that speaks the voice. id is
-// the engine's own id for it, set when its names can repeat or change
-// (ElevenLabs): the engine gets it instead of the name, which is only shown.
+// the engine's own id for it when its names can repeat or change (ElevenLabs),
+// and the engine gets it instead of the name, which is only shown. The voice
+// list gives every voice one, empty for the other engines, so a pick replaces
+// the last voice's: profile saves deep-merge (updateFile). Read id || name.
 export type VoiceData = {
   engine: string;
   name: string;

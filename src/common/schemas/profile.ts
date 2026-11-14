@@ -77,8 +77,8 @@ const VoiceSchema = z.object({
   engine: z.string().default(""),
   name: z.string(),
   lang: z.string(),
-  // Only engines whose names can repeat set it (VoiceData). Optional rather
-  // than a default, so other engines' saved voices stay as they were.
+  // The engine's own id, empty for engines without one (see VoiceData).
+  // Optional, so voices saved before it load as they are.
   id: z.string().optional(),
 });
 
