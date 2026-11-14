@@ -217,6 +217,20 @@ describe("ElevenLabsTTS", () => {
         "ElevenLabs request failed: HTTP 404 voice_not_found - Gone",
       ],
       [
+        // As a live key without voices_write answered
+        "a missing permission, sent as a plain 401",
+        {
+          detail: {
+            code: "unauthorized",
+            message:
+              "The API key you used is missing the permission voices_write to execute this operation.",
+          },
+        },
+        401,
+        "missing_permissions",
+        "ElevenLabs request failed: HTTP 401 missing_permissions - The API key you used is missing the permission voices_write to execute this operation.",
+      ],
+      [
         "a list of validation errors",
         { detail: [{ loc: ["body", "text"], msg: "Field required" }] },
         422,

@@ -31,6 +31,15 @@ describe("failureKey", () => {
     );
   });
 
+  it("says the key lacks a permission, whatever the status", () => {
+    expect(failureKey(failed(401, "missing_permissions"))).toBe(
+      "main.tts.keyPermissions",
+    );
+    expect(failureKey(failed(403, "insufficient_permissions"))).toBe(
+      "main.tts.keyPermissions",
+    );
+  });
+
   it("blames the samples for a 400 or 422 only when cloning", () => {
     for (const status of [400, 422]) {
       expect(failureKey(failed(status), { cloning: true })).toBe(

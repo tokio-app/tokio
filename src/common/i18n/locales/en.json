@@ -1272,6 +1272,7 @@
   "main.failure.cloneVoice": "Unable to clone the voice.",
   "main.failure.pickVoiceSamples": "Unable to add the samples.",
   "main.failure.askMicrophone": "Unable to ask for the microphone.",
+  "main.tts.keyPermissions": "Your {engine} API key is missing a permission. Give it access to Text to Speech, and read and write access to Voices, on the {engine} website.",
   "minecraft.weather.clear": "Clear",
   "minecraft.weather.rain": "Rain",
   "minecraft.weather.thunder": "Thunder",

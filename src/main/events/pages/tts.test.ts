@@ -64,9 +64,12 @@ describe("tts events", () => {
       { id: "Edge", label: "Edge" },
       { id: "ElevenLabs", label: "ElevenLabs", keyLabel: "voiceKeys.apiKey" },
     ] as const;
-    const failing = (failed: string[], key = "sk_1") => {
+    const failing = (
+      failed: string[],
+      key = "sk_1",
+      error: Error = new Error("HTTP 500"),
+    ) => {
       const logVoicesFailure = vi.fn();
-      const error = new Error("HTTP 401");
       const h = createHandler({
         ttsService: {
           getVoices: async (onFail) => {
@@ -103,6 +106,25 @@ describe("tts events", () => {
         "ElevenLabs",
         error,
       );
+    });
+
+    it("says what the engine told, like a missing permission", async () => {
+      const error = new TTSRequestError(
+        "ElevenLabs",
+        "missing_permissions",
+        "HTTP 401",
+        401,
+      );
+      const { h } = failing(["ElevenLabs"], "sk_1", error);
+
+      await h.invoke(tts, APP_EVENTS.GET_VOICES);
+
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          message:
+            "Your ElevenLabs API key is missing a permission. Give it access to Text to Speech, and read and write access to Voices, on the ElevenLabs website.",
+        }),
+      ]);
     });
 
     it("only logs an engine without a saved key, or without keys", async () => {
@@ -440,9 +462,9 @@ describe("tts events", () => {
         "My voice",
         samples,
       );
+      // The notice doesn't wait for the list
       expect(h.sent()).toEqual([
         [APP_EVENTS_RESPONSE.CLONE_VOICE, { id: "clone-1", success: true }],
-        [APP_EVENTS_RESPONSE.GET_VOICES, { voices, engines, success: true }],
         [
           "notice",
           expect.objectContaining({
@@ -452,6 +474,7 @@ describe("tts events", () => {
             message: `Voice "My voice" cloned. It's in the voice list now.`,
           }),
         ],
+        [APP_EVENTS_RESPONSE.GET_VOICES, { voices, engines, success: true }],
       ]);
     });
 

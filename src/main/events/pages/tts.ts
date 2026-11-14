@@ -72,7 +72,7 @@ events.push(
       const shown = notifier.warn(
         "tts",
         FEEDBACK_CODES.TTS_VOICES_FAILED,
-        t("main.tts.voicesFailed", {
+        t(failureKey(error) ?? "main.tts.voicesFailed", {
           engine: engine.label,
           settings: t("nav.settings"),
         }),
@@ -248,12 +248,6 @@ events.push(
       );
     }
     e.reply(APP_EVENTS_RESPONSE.CLONE_VOICE, { id, success: true });
-    // The voice pickers on screen show the new voice
-    e.reply(APP_EVENTS_RESPONSE.GET_VOICES, {
-      voices: await ttsService.getVoices(),
-      engines: ttsService.getEngines(),
-      success: true,
-    });
     if (res.verify) {
       notifier.warn(
         "tts",
@@ -267,6 +261,13 @@ events.push(
         t("main.tts.voiceCloned", { name }),
       );
     }
+    // The voice pickers on screen show the new voice. After the notice: the
+    // list takes a moment to come
+    e.reply(APP_EVENTS_RESPONSE.GET_VOICES, {
+      voices: await ttsService.getVoices(),
+      engines: ttsService.getEngines(),
+      success: true,
+    });
   },
   {
     failure: {

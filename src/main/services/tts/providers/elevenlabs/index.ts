@@ -203,6 +203,12 @@ export class ElevenLabsTTS extends TTSProvider {
     } else if (detail && typeof detail === "object") {
       code = detail.code || detail.status || code;
       reason = detail.message;
+      if (detail.status === "missing_permissions") code = detail.status;
+    }
+    // A key without a permission gets a 401 "unauthorized", like a wrong key:
+    // only the message tells them apart
+    if (/missing the permission/i.test(reason ?? "")) {
+      code = "missing_permissions";
     }
     const message = `ElevenLabs request failed: HTTP ${res.status} ${code}`;
     return new TTSRequestError(

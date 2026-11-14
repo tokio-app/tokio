@@ -78,6 +78,13 @@ export function failureKey(
   ) {
     return "main.tts.noCredits";
   }
+  // ElevenLabs sends a key without a permission as a 401
+  if (
+    error.code === "missing_permissions" ||
+    error.code === "insufficient_permissions"
+  ) {
+    return "main.tts.keyPermissions";
+  }
   switch (error.status) {
     case 401:
       return "main.tts.keyRejected";

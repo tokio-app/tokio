@@ -23,7 +23,7 @@ paths:
 - `elevenlabs` works only with the user's own API key, and Tokio never ships one. Its voices are the account's, all `lang: MULTILINGUAL` (`"mul"`): its models speak every language with any voice, so the window previews them in its own language. `languageName` names `mul` from the locale files: Electron's trimmed Intl shows it as is, while Node's names it, so only the real app shows the difference.
   - Without a key it lists `[]` with no request. Every `VoiceSelect` mount lists voices, so the list is kept `VOICES_TTL_MS`, and calls at once share one request under one deadline for every page. `setKey` comes on every autosave pause in Settings, so it only drops the list; a clone does too.
   - Its errors are `TTSRequestError`s holding only the status and ElevenLabs' code and message, never a cause or the request, so the key can't reach `Logger`.
-  - `failureKey` turns one into the notice's text for chat TTS, the tester and previews, and cloning. It reads the code before the status, since older errors send an empty quota as a 401.
+  - `failureKey` turns one into the notice's text for chat TTS, the tester and previews, and cloning. It reads the code before the status: older errors send an empty quota as a 401, and a key without a permission gets a 401 "unauthorized" that only its message tells apart from a wrong key, so the provider makes that code `missing_permissions`.
   - `GET_VOICES` warns when an engine with a saved key fails to list (`tts:voices:<engine>`), logging it only when the warning goes out, so a wrong key shows. Engines without a key fail quietly, as before.
 
 ## Voice cloning
