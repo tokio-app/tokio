@@ -107,6 +107,7 @@ export function voiceEntries(
 // An empty engine or language means any.
 export type VoiceFilter = { search: string; engine: string; language: string };
 
+// A voice that speaks every language shows under each one
 export function filterVoices(
   entries: VoiceEntry[],
   { search, engine, language }: VoiceFilter,
@@ -115,7 +116,9 @@ export function filterVoices(
   return entries.filter(
     (entry) =>
       (engine === "" || entry.voice.engine === engine) &&
-      (language === "" || entry.language === language) &&
+      (language === "" ||
+        entry.language === language ||
+        entry.language === MULTILINGUAL) &&
       entry.text.includes(needle),
   );
 }

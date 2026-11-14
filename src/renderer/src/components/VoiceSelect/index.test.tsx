@@ -353,5 +353,22 @@ describe("VoiceSelect", () => {
         { id: expect.any(String), text: voiceSample("en"), voice: clone },
       ]);
     });
+
+    it("speaks a multilingual voice's sample in the picked language", async () => {
+      const { user, field } = setup();
+      const clone = voice("Clone", "mul", "elevenlabs");
+      await voicesLoaded([...VOICES, clone]);
+      await user.click(field);
+      await user.click(picker().getByText("All languages"));
+      await user.click(option("Spanish"));
+
+      await user.click(row("Clone").getByRole("button", { name: "Play" }));
+
+      expect(sent(APP_EVENTS.GET_TTS_TEST).at(-1)).toEqual({
+        id: expect.any(String),
+        text: voiceSample("es"),
+        voice: clone,
+      });
+    });
   });
 });

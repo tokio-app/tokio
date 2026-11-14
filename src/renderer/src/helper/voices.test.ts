@@ -129,6 +129,22 @@ describe("filterVoices", () => {
     expect(names({ language: "en" })).toEqual(["Amy", "Bob"]);
     expect(names({ language: "es", engine: "edge" })).toEqual(["Zed"]);
   });
+
+  it("keeps a voice that speaks every language under each one", () => {
+    const withClone = voiceEntries(
+      [...VOICES, voice("Clone", "mul", "elevenlabs")],
+      ENGINES,
+      "en",
+    );
+    const named = (language: string) =>
+      filterVoices(withClone, { search: "", engine: "", language }).map(
+        (e) => e.voice.name,
+      );
+
+    expect(named("es")).toEqual(["Clone", "Zed", "Ana"]);
+    expect(named("en")).toContain("Clone");
+    expect(named("mul")).toEqual(["Clone"]);
+  });
 });
 
 describe("engineOptions", () => {

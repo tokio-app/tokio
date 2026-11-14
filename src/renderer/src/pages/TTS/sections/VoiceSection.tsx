@@ -1,5 +1,5 @@
 import { Profile } from "@/common/schemas";
-import { APP_EVENTS_RESPONSE, VoiceEngine } from "@/common/types";
+import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceEngine } from "@/common/types";
 import {
   Btn,
   Field,
@@ -10,7 +10,7 @@ import {
   VoiceSelect,
 } from "@/components";
 import { AudioQueue } from "@/helper";
-import { Updater, useIpcListener } from "@/hooks";
+import { Updater, useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
 import { FiMic } from "react-icons/fi";
@@ -37,17 +37,15 @@ export function VoiceSection({
   const [testMessage, setTestMessage] = useState("");
   const { filters } = settings;
   const t = useT();
-  // An engine that clones and lists voices, so its key works
+  // An engine that clones and has a key
   const [cloner, setCloner] = useState<VoiceEngine | null>(null);
   const [cloning, setCloning] = useState(false);
 
-  // The voice field asks for the voices, and a clone sends them again
-  useIpcListener(APP_EVENTS_RESPONSE.GET_VOICES, (res) => {
+  // Main answers the keys at once, while the voices wait for every engine
+  useIpcRequest(APP_EVENTS.GET_VOICE_KEYS);
+  useIpcListener(APP_EVENTS_RESPONSE.GET_VOICE_KEYS, (res) => {
     if (!res?.success) return;
-    const voices = res.voices ?? [];
-    const engine = res.engines?.find(
-      (e) => e.clones && voices.some((v) => v.engine === e.id),
-    );
+    const engine = res.engines?.find((e) => e.clones && e.key.trim() !== "");
     setCloner(engine ?? null);
   });
 

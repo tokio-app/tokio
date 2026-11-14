@@ -45,8 +45,9 @@ export function useVoicePreview({
     setPreviewing((p) => (p?.id === key ? { id: key, loading: false } : p));
   };
 
-  // Previewing the voice playing stops it.
-  const toggle = (voice: VoiceData) => {
+  // Previewing the voice playing stops it. A voice that speaks every language
+  // says its line in `filtered`, the picker's language, else the window's.
+  const toggle = (voice: VoiceData, filtered = "") => {
     const key = voiceKey(voice);
     const playing = current.current === key;
     queue.stop();
@@ -56,10 +57,10 @@ export function useVoicePreview({
     if (playing) return;
 
     pending.current = `${ID_PREFIX}${++requests}:${key}`;
+    const speakIn = filtered && filtered !== MULTILINGUAL ? filtered : language;
     window.api.emit(APP_EVENTS.GET_TTS_TEST, {
       id: pending.current,
-      // A voice that speaks every language says it in the window's
-      text: voiceSample(voice.lang === MULTILINGUAL ? language : voice.lang),
+      text: voiceSample(voice.lang === MULTILINGUAL ? speakIn : voice.lang),
       voice,
     });
   };

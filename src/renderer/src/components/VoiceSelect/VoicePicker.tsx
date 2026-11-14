@@ -116,7 +116,7 @@ export function VoicePicker({
             </button>
             <PlayButton
               {...testProps(preview.previewing, key)}
-              onClick={() => preview.toggle(voice)}
+              onClick={() => preview.toggle(voice, filter.language)}
             />
           </div>
         ))}
