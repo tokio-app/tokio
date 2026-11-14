@@ -1,5 +1,5 @@
 import { Profile } from "@/common/schemas";
-import { ChatEvent, VoiceData, VoiceEngine } from "@/common/types";
+import { ChatEvent, VoiceData, VoiceEngine, VoiceSample } from "@/common/types";
 import {
   delay,
   formatAlertMessage,
@@ -17,7 +17,7 @@ import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
 import { GenerationResponse, TTSProvider } from "./common";
-import { EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
+import { ElevenLabsTTS, EdgeTTS, TikTokTTS, WindowsTTS } from "./providers";
 
 // A message the window never says it played stops holding the next ones
 // after this long, like the ones it had when it reloaded or crashed.
@@ -66,6 +66,7 @@ export class TTSService extends ProviderService<TTSProvider> {
       this.addProvider("Windows", new WindowsTTS());
     }
     this.addProvider("Edge", new EdgeTTS());
+    this.addProvider("ElevenLabs", new ElevenLabsTTS());
   }
 
   public getEngines(): VoiceEngine[] {
@@ -73,6 +74,7 @@ export class TTSService extends ProviderService<TTSProvider> {
       id,
       label: provider.label,
       keyLabel: provider.keyLabel,
+      clones: provider.cloneVoice ? true : undefined,
     }));
   }
 
@@ -80,8 +82,12 @@ export class TTSService extends ProviderService<TTSProvider> {
     this._providerPool.get(engine)?.setKey(key.trim());
   }
 
-  // The voices of every engine. An engine that fails is left out.
-  public async getVoices(): Promise<VoiceData[]> {
+  // The voices of every engine. An engine that fails is left out, and given to
+  // onFail to log, else logged here. Every voice has an id, empty for engines
+  // without them: saves merge into the profile, so a pick must replace it.
+  public async getVoices(
+    onFail?: (engine: string, error: unknown) => void,
+  ): Promise<VoiceData[]> {
     const engines = [...this._providerPool.entries()];
     const results = await Promise.allSettled(
       engines.map(async ([, provider]) => provider.getVoices()),
@@ -89,15 +95,24 @@ export class TTSService extends ProviderService<TTSProvider> {
     return results.flatMap((res, i) => {
       const [engine] = engines[i];
       if (res.status === "fulfilled") {
-        return res.value.map((voice) => ({ engine, ...voice }));
+        return res.value.map((voice) => ({
+          engine,
+          ...voice,
+          id: voice.id ?? "",
+        }));
       }
-      Logger.error(
-        `<TTS> Unable to get the ${engine} voices - ${formatError(res.reason)}`,
-        this._logFile,
-        res.reason,
-      );
+      if (onFail) onFail(engine, res.reason);
+      else this.logVoicesFailure(engine, res.reason);
       return [];
     });
+  }
+
+  public logVoicesFailure(engine: string, error: unknown) {
+    Logger.error(
+      `<TTS> Unable to get the ${engine} voices - ${formatError(error)}`,
+      this._logFile,
+      error,
+    );
   }
 
   public dispose() {
@@ -120,8 +135,35 @@ export class TTSService extends ProviderService<TTSProvider> {
     return await this._engineOf(voice).generateBuffer(
       text,
       voice?.lang,
-      voice?.name,
+      // Engines without ids list them empty
+      voice?.id || voice?.name,
     );
+  }
+
+  // The error is the engine's, whose status says why it failed
+  public async cloneVoice(
+    engine: string,
+    name: string,
+    samples: VoiceSample[],
+  ): Promise<{ success: boolean; verify?: boolean; error?: Error }> {
+    try {
+      const provider = this._providerPool.get(engine);
+      if (!provider?.cloneVoice) {
+        throw new Error(`The engine "${engine}" can't clone voices.`);
+      }
+      const { verify } = await provider.cloneVoice(name, samples);
+      return { success: true, verify };
+    } catch (e) {
+      Logger.error(
+        `<TTS> Unable to clone a voice - ${formatError(e)}`,
+        this._logFile,
+        e,
+      );
+      return {
+        success: false,
+        error: e instanceof Error ? e : new Error(formatError(e)),
+      };
+    }
   }
 
   // The comment without its trigger, which isn't read

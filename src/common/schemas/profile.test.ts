@@ -30,6 +30,21 @@ describe("ProfileSchema", () => {
     expect(timer).toEqual(defaultProfile.timer);
   });
 
+  it("keeps a voice's engine id, and loads voices saved without one", () => {
+    const saved = structuredClone(defaultProfile);
+    saved.tts.voice = {
+      engine: "ElevenLabs",
+      name: "My voice",
+      lang: "mul",
+      id: "abc123",
+    };
+
+    expect(ProfileSchema.parse(saved).tts.voice.id).toBe("abc123");
+    expect(ProfileSchema.parse(defaultProfile).tts.voice).toEqual(
+      defaultProfile.tts.voice,
+    );
+  });
+
   it("gives TTS settings saved before special users none", () => {
     const saved = structuredClone(defaultProfile);
     const tts: Partial<Profile["tts"]> = saved.tts;

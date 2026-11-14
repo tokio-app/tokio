@@ -28,6 +28,13 @@ const REASONS = new Map<unknown, CameraFailure>([
   ["AbortError", "busy"],
 ]);
 
+// Why getUserMedia rejected with e, cameras and microphones alike
+export function mediaFailure(e: unknown): CameraFailure {
+  const name =
+    typeof e === "object" && e !== null && "name" in e ? e.name : null;
+  return REASONS.get(name) ?? "failed";
+}
+
 const missing = () => new DOMException("No such camera", "NotFoundError");
 
 // The camera's id here, undefined for the default one. Ids are per origin, so
@@ -307,9 +314,7 @@ export function startCapture(capture: CameraCapture): Capture {
       throw missing();
     } catch (e) {
       if (stopped) return;
-      const name =
-        typeof e === "object" && e !== null && "name" in e ? e.name : null;
-      const reason = broken ? "failed" : (REASONS.get(name) ?? "failed");
+      const reason = broken ? "failed" : mediaFailure(e);
       window.api.emit(APP_EVENTS.CAMERA_FAILED, { id, reason });
       retry = setTimeout(run, CAMERA_RETRY_MS);
     } finally {

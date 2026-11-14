@@ -77,6 +77,9 @@ const VoiceSchema = z.object({
   engine: z.string().default(""),
   name: z.string(),
   lang: z.string(),
+  // The engine's own id, empty for engines without one (see VoiceData).
+  // Optional, so voices saved before it load as they are.
+  id: z.string().optional(),
 });
 
 const AlertTtsSchema = z.object({

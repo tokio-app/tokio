@@ -12,7 +12,7 @@ import {
   TimerAction,
   TimerSettings,
 } from "../../schemas";
-import { VoiceData } from "../store";
+import { VoiceData, VoiceSample } from "../store";
 
 export enum APP_EVENTS {
   // INIT
@@ -45,6 +45,11 @@ export enum APP_EVENTS {
 
   // CHAT TTS
   TTS_PLAYED = "app:tts:played",
+
+  // VOICE CLONING
+  PICK_VOICE_SAMPLES = "app:tts:pick:voice-samples",
+  CLONE_VOICE = "app:tts:clone-voice",
+  ASK_MICROPHONE = "app:tts:ask:microphone",
 
   //MUSIC PAGE
   UPDATE_MUSIC_SETTINGS = "app:music:update:settings",
@@ -210,6 +215,21 @@ export interface AppEventsMap {
   // CHAT TTS
   // The window is done with a TTS_AUDIO message, so main can make the next
   [APP_EVENTS.TTS_PLAYED]: { id: number };
+
+  // VOICE CLONING
+  // Browses for audio files to clone a voice from: main reads them and sends
+  // their bytes back, so it never reads a path the window names
+  [APP_EVENTS.PICK_VOICE_SAMPLES]: void;
+  // Clones a voice with the engine from the files and recordings
+  [APP_EVENTS.CLONE_VOICE]: {
+    // Echoed in the reply, failures included
+    id: string;
+    engine: string;
+    name: string;
+    samples: VoiceSample[];
+  };
+  // Asks the system for the microphone first where it needs asking (macOS)
+  [APP_EVENTS.ASK_MICROPHONE]: void;
 
   //MUSIC PAGE
   [APP_EVENTS.UPDATE_MUSIC_SETTINGS]: {

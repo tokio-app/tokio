@@ -1,9 +1,10 @@
 import { translate } from "@/common/i18n";
 import { VoiceData, VoiceEngine } from "@/common/types";
+import { MULTILINGUAL } from "@/common/util/constants";
 import type { SelectOption } from "@/components/Elements";
 
 export const voiceKey = (voice: VoiceData) =>
-  `${voice.engine}|${voice.lang}|${voice.name}`;
+  `${voice.engine}|${voice.lang}|${voice.id || voice.name}`;
 
 // Language names in each window language, made once
 const displayNames = new Map<string, Intl.DisplayNames>();
@@ -14,6 +15,10 @@ const languageOf = (lang: string) => lang.split(/[-_]/)[0].toLowerCase();
 // "English" for "en", "English (United States)" for "en-US", named in the
 // window's language. Tags Intl can't read are shown as they are.
 function languageName(lang: string, language: string): string {
+  // Node's Intl names "mul", Chromium's trimmed one doesn't
+  if (lang === MULTILINGUAL) {
+    return translate(language, "components.voicePicker.multilingual");
+  }
   let names = displayNames.get(language);
   if (!names) {
     names = new Intl.DisplayNames([language], {
@@ -102,6 +107,7 @@ export function voiceEntries(
 // An empty engine or language means any.
 export type VoiceFilter = { search: string; engine: string; language: string };
 
+// A voice that speaks every language shows under each one
 export function filterVoices(
   entries: VoiceEntry[],
   { search, engine, language }: VoiceFilter,
@@ -110,7 +116,9 @@ export function filterVoices(
   return entries.filter(
     (entry) =>
       (engine === "" || entry.voice.engine === engine) &&
-      (language === "" || entry.language === language) &&
+      (language === "" ||
+        entry.language === language ||
+        entry.language === MULTILINGUAL) &&
       entry.text.includes(needle),
   );
 }

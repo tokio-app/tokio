@@ -27,6 +27,16 @@ describe("voiceKey", () => {
   it("names the voice by engine, language and name", () => {
     expect(voiceKey(voice("Aria", "en-US", "edge"))).toBe("edge|en-US|Aria");
   });
+
+  it("names a voice with an id by its id, so equal names stay apart", () => {
+    const named = voice("Aria", "mul", "elevenlabs");
+    expect(voiceKey({ ...named, id: "a1" })).toBe("elevenlabs|mul|a1");
+    // Engines without ids list them empty
+    expect(voiceKey({ ...named, id: "" })).toBe("elevenlabs|mul|Aria");
+    expect(voiceKey({ ...named, id: "b2" })).not.toBe(
+      voiceKey({ ...named, id: "a1" }),
+    );
+  });
 });
 
 describe("voiceDetails", () => {
@@ -53,6 +63,25 @@ describe("voiceDetails", () => {
 
   it("shows a tag Intl can't read as it is", () => {
     expect(voiceDetails(voice("Odd", "not a tag"), [], "en")).toBe("not a tag");
+  });
+
+  // Electron's Intl shows "mul" as is, which Node's test Intl hides
+  it("names a voice that speaks every language with its own text", () => {
+    const clone = voice("Clone", "mul", "elevenlabs");
+    const engines = [engine("elevenlabs", "ElevenLabs")];
+
+    expect(voiceDetails(clone, engines, "en")).toBe(
+      "Multiple languages · ElevenLabs",
+    );
+    expect(voiceDetails(clone, engines, "es-419")).toBe(
+      "varios idiomas · ElevenLabs",
+    );
+    expect(languageOptions(voiceEntries([clone], engines, "en"), "en")).toEqual(
+      [
+        { value: "", label: "All languages" },
+        { value: "mul", label: "Multiple languages" },
+      ],
+    );
   });
 });
 
@@ -99,6 +128,22 @@ describe("filterVoices", () => {
     expect(names({ engine: "windows" })).toEqual(["Ana"]);
     expect(names({ language: "en" })).toEqual(["Amy", "Bob"]);
     expect(names({ language: "es", engine: "edge" })).toEqual(["Zed"]);
+  });
+
+  it("keeps a voice that speaks every language under each one", () => {
+    const withClone = voiceEntries(
+      [...VOICES, voice("Clone", "mul", "elevenlabs")],
+      ENGINES,
+      "en",
+    );
+    const named = (language: string) =>
+      filterVoices(withClone, { search: "", engine: "", language }).map(
+        (e) => e.voice.name,
+      );
+
+    expect(named("es")).toEqual(["Clone", "Zed", "Ana"]);
+    expect(named("en")).toContain("Clone");
+    expect(named("mul")).toEqual(["Clone"]);
   });
 });
 

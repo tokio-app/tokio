@@ -20,7 +20,7 @@ Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok
   <tr>
     <td width="50%" valign="top">
       <img src=".github/screenshots/text-to-speech.png" alt="Picking a text-to-speech voice" />
-      <p><a href="https://tokio.ialfaro.com/docs/features/text-to-speech/"><b>Text-to-speech</b></a>: chat read aloud with TikTok, Edge or Windows voices.</p>
+      <p><a href="https://tokio.ialfaro.com/docs/features/text-to-speech/"><b>Text-to-speech</b></a>: chat read aloud with TikTok, Edge or Windows voices, or your ElevenLabs voices, including a clone of your own.</p>
     </td>
     <td width="50%" valign="top">
       <img src=".github/screenshots/alerts.png" alt="Alerts for follows, gifts, chat, shares and a viewer joining" />

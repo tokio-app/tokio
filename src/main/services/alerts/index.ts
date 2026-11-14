@@ -587,7 +587,7 @@ export class AlertsService extends Service {
   }
 
   private _ttsKey({ voice }: AlertTts, text: string) {
-    return `tts:${hash(`${voice.engine}|${voice.lang}|${voice.name}|${text}`)}`;
+    return `tts:${hash(`${voice.engine}|${voice.lang}|${voice.id || voice.name}|${text}`)}`;
   }
 
   private async _fetchPage(

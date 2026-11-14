@@ -292,6 +292,37 @@ describe("TTS", () => {
     expect((await saved()).voice).toEqual(guy);
   });
 
+  it("offers to clone a voice once an engine that clones has a key", async () => {
+    const { user } = await setup();
+    const eleven = { ...engine("ElevenLabs", "ElevenLabs"), clones: true };
+    const tiktok = engine("tiktok", "TikTok", "voiceKeys.sessionId");
+    const clone = () => screen.queryByRole("button", { name: "Clone a voice" });
+    // Not the voices, which wait for every engine
+    expect(sent(APP_EVENTS.GET_VOICE_KEYS)).toHaveLength(1);
+
+    await send(APP_EVENTS_RESPONSE.GET_VOICE_KEYS, {
+      success: true,
+      engines: [
+        { ...tiktok, key: "session" },
+        { ...eleven, key: "  " },
+      ],
+    });
+    expect(clone()).not.toBeInTheDocument();
+
+    await send(APP_EVENTS_RESPONSE.GET_VOICE_KEYS, {
+      success: true,
+      engines: [
+        { ...tiktok, key: "" },
+        { ...eleven, key: "sk_1" },
+      ],
+    });
+    await user.click(clone()!);
+
+    expect(
+      screen.getByRole("dialog", { name: "Clone a voice" }),
+    ).toHaveAccessibleDescription(/^ElevenLabs adds the voice/);
+  });
+
   it("tests with the settings on the page, saved or not", async () => {
     const { user } = await setup();
     await user.click(removeEmojis());

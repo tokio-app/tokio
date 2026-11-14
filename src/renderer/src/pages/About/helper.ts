@@ -87,6 +87,10 @@ export const SERVICES: { name: string; note: string }[] = [
     name: "Microsoft",
     note: "Edge's Read Aloud service (the Edge voices), which isn't an official public API.",
   },
+  {
+    name: "ElevenLabs",
+    note: "The ElevenLabs voices and voice cloning (api.elevenlabs.io), with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.",
+  },
   { name: "Spotify and YouTube", note: "Music requests." },
   {
     name: "GitHub",

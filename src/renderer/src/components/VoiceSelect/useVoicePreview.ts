@@ -1,7 +1,9 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceData } from "@/common/types";
+import { MULTILINGUAL } from "@/common/util/constants";
 import { voiceKey, voiceSample } from "@/helper/voices";
 import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
+import { useLanguage } from "@/ui/i18n";
 import { useEffect, useRef, useState } from "react";
 import type { TestState } from "../PlayButton";
 
@@ -23,6 +25,7 @@ export function useVoicePreview({
   speed: number;
   pitch: number;
 }) {
+  const language = useLanguage();
   const { getQueue } = useAudio();
   const queue = getQueue("voice-preview");
 
@@ -42,8 +45,9 @@ export function useVoicePreview({
     setPreviewing((p) => (p?.id === key ? { id: key, loading: false } : p));
   };
 
-  // Previewing the voice playing stops it.
-  const toggle = (voice: VoiceData) => {
+  // Previewing the voice playing stops it. A voice that speaks every language
+  // says its line in `filtered`, the picker's language, else the window's.
+  const toggle = (voice: VoiceData, filtered = "") => {
     const key = voiceKey(voice);
     const playing = current.current === key;
     queue.stop();
@@ -53,9 +57,10 @@ export function useVoicePreview({
     if (playing) return;
 
     pending.current = `${ID_PREFIX}${++requests}:${key}`;
+    const speakIn = filtered && filtered !== MULTILINGUAL ? filtered : language;
     window.api.emit(APP_EVENTS.GET_TTS_TEST, {
       id: pending.current,
-      text: voiceSample(voice.lang),
+      text: voiceSample(voice.lang === MULTILINGUAL ? speakIn : voice.lang),
       voice,
     });
   };

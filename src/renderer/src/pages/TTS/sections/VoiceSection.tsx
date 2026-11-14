@@ -1,4 +1,5 @@
 import { Profile } from "@/common/schemas";
+import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceEngine } from "@/common/types";
 import {
   Btn,
   Field,
@@ -9,10 +10,12 @@ import {
   VoiceSelect,
 } from "@/components";
 import { AudioQueue } from "@/helper";
-import { Updater } from "@/hooks";
+import { Updater, useIpcListener, useIpcRequest } from "@/hooks";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
+import { FiMic } from "react-icons/fi";
 import styles from "../tts.module.css";
+import { CloneVoiceModal } from "./CloneVoiceModal";
 
 type Settings = Profile["tts"];
 
@@ -34,11 +37,34 @@ export function VoiceSection({
   const [testMessage, setTestMessage] = useState("");
   const { filters } = settings;
   const t = useT();
+  // An engine that clones and has a key
+  const [cloner, setCloner] = useState<VoiceEngine | null>(null);
+  const [cloning, setCloning] = useState(false);
+
+  // Main answers the keys at once, while the voices wait for every engine
+  useIpcRequest(APP_EVENTS.GET_VOICE_KEYS);
+  useIpcListener(APP_EVENTS_RESPONSE.GET_VOICE_KEYS, (res) => {
+    if (!res?.success) return;
+    const engine = res.engines?.find((e) => e.clones && e.key.trim() !== "");
+    setCloner(engine ?? null);
+  });
 
   return (
     <Section
       title={t("tts.voice.title")}
       description={t("tts.voice.description")}
+      actions={
+        cloner && (
+          <Btn
+            variant="icon"
+            title={t("tts.cloneVoice.title")}
+            aria-label={t("tts.cloneVoice.title")}
+            onClick={() => setCloning(true)}
+          >
+            <FiMic size={20} />
+          </Btn>
+        )
+      }
     >
       <FormGrid>
         <Field label={t("tts.voice.selection")}>
@@ -114,6 +140,10 @@ export function VoiceSection({
           onChange={(e) => setTestMessage(e.target.value)}
         />
       </div>
+
+      {cloning && cloner && (
+        <CloneVoiceModal engine={cloner} onClose={() => setCloning(false)} />
+      )}
     </Section>
   );
 }

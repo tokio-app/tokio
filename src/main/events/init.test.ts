@@ -58,6 +58,7 @@ import { StudioService } from "@/services/studio";
 import type { TimerService } from "@/services/timer";
 import { TIMER_EVENTS } from "@/services/timer";
 import type { TTSService } from "@/services/tts";
+import { TTSRequestError } from "@/services/tts/common";
 import type { UpdaterService } from "@/services/updater";
 import { app, systemPreferences } from "@test/electron";
 import { createHandler, eventSource } from "@test/handler";
@@ -2315,6 +2316,25 @@ describe("init events", () => {
       vi.advanceTimersByTime(1);
       onFailure();
       expect(s.h.notices).toEqual([failure, failure]);
+    });
+
+    it("says why the engine refused, under the same key", async () => {
+      const s = await live({ tts: true });
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
+      const { onFailure } = await talked(s);
+
+      onFailure(new TTSRequestError("ElevenLabs", "x", "HTTP 402", 402));
+      onFailure(new Error("Engine down"));
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "error",
+          source: "tts",
+          code: FEEDBACK_CODES.TTS_GENERATION_FAILED,
+          message:
+            "Your ElevenLabs account is out of credits. Add more on its website, or pick another voice.",
+        }),
+      ]);
     });
 
     it("leaves the TTS page's own failures their notice", async () => {

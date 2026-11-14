@@ -26,7 +26,12 @@ vi.mock("./providers", async () => {
       return { success: true, buffer: Buffer.from(text) };
     }
   }
-  return { TikTokTTS: FakeTTS, WindowsTTS: FakeTTS, EdgeTTS: FakeTTS };
+  return {
+    TikTokTTS: FakeTTS,
+    WindowsTTS: FakeTTS,
+    EdgeTTS: FakeTTS,
+    ElevenLabsTTS: FakeTTS,
+  };
 });
 
 type TTSSettings = Profile["tts"];
@@ -85,15 +90,31 @@ describe("TTSService", () => {
     it("lists the voices of every engine, tagged with it", async () => {
       const voices = await service.getVoices();
 
+      // An empty id, so picking it replaces another engine's in the profile
       expect(voices).toContainEqual({
         engine: "Default",
         name: "Fake",
         lang: "en",
+        id: "",
       });
       expect(voices).toContainEqual({
         engine: "Edge",
         name: "Fake",
         lang: "en",
+        id: "",
+      });
+    });
+
+    it("lists an engine's own voice ids", async () => {
+      vi.spyOn(engine("ElevenLabs"), "getVoices").mockResolvedValue([
+        { id: "v1", name: "Ava", lang: "mul" },
+      ]);
+
+      expect(await service.getVoices()).toContainEqual({
+        engine: "ElevenLabs",
+        name: "Ava",
+        lang: "mul",
+        id: "v1",
       });
     });
 
@@ -154,6 +175,95 @@ describe("TTSService", () => {
         expect(edge).toHaveBeenCalledExactlyOnceWith("hi", "es-MX", "Jorge");
       },
     );
+
+    it("gives an engine the voice's id when it has one", async () => {
+      const eleven = vi.spyOn(engine("ElevenLabs"), "generateBuffer");
+
+      await service.generateBuffer("hi", {
+        engine: "ElevenLabs",
+        name: "Ava",
+        lang: "mul",
+        id: "voice-1",
+      });
+
+      expect(eleven).toHaveBeenCalledExactlyOnceWith("hi", "mul", "voice-1");
+    });
+
+    it("leaves the engines that fail to onFail, to log", async () => {
+      const log = vi.spyOn(Logger, "error");
+      const error = new Error("401");
+      vi.spyOn(engine("ElevenLabs"), "getVoices").mockRejectedValue(error);
+      const onFail = vi.fn();
+
+      const voices = await service.getVoices(onFail);
+
+      expect(onFail).toHaveBeenCalledExactlyOnceWith("ElevenLabs", error);
+      expect(log).not.toHaveBeenCalled();
+      expect(voices.some((v) => v.engine === "Edge")).toBe(true);
+    });
+
+    it("speaks a voice with an empty id by its name", async () => {
+      const edge = vi.spyOn(engine("Edge"), "generateBuffer");
+
+      await service.generateBuffer("hi", {
+        engine: "Edge",
+        name: "Jorge",
+        lang: "es-MX",
+        id: "",
+      });
+
+      expect(edge).toHaveBeenCalledExactlyOnceWith("hi", "es-MX", "Jorge");
+    });
+
+    it("marks the engines that clone voices", () => {
+      engine("ElevenLabs").cloneVoice = vi.fn();
+
+      const engines = service.getEngines();
+
+      expect(engines.find((e) => e.id === "ElevenLabs")?.clones).toBe(true);
+      expect(engines.find((e) => e.id === "Edge")).toEqual({
+        id: "Edge",
+        label: "Fake",
+      });
+    });
+
+    describe("cloneVoice", () => {
+      const samples = [{ name: "me.mp3", data: new Uint8Array([1]) }];
+
+      it("clones with the engine, saying whether to verify the voice", async () => {
+        const cloneVoice = vi.fn(async () => ({ id: "v1", verify: true }));
+        engine("ElevenLabs").cloneVoice = cloneVoice;
+
+        const res = await service.cloneVoice("ElevenLabs", "Me", samples);
+
+        expect(res).toEqual({ success: true, verify: true });
+        expect(cloneVoice).toHaveBeenCalledExactlyOnceWith("Me", samples);
+      });
+
+      it("logs a failure once and returns the engine's error", async () => {
+        const log = vi.spyOn(Logger, "error");
+        const error = new Error("HTTP 402");
+        engine("ElevenLabs").cloneVoice = vi.fn().mockRejectedValue(error);
+
+        const res = await service.cloneVoice("ElevenLabs", "Me", samples);
+
+        expect(res).toEqual({ success: false, error });
+        expect(log).toHaveBeenCalledExactlyOnceWith(
+          "<TTS> Unable to clone a voice - HTTP 402",
+          undefined,
+          error,
+        );
+      });
+
+      it("fails with an engine that can't clone", async () => {
+        vi.spyOn(Logger, "error");
+
+        const res = await service.cloneVoice("Edge", "Me", samples);
+
+        expect(res.success).toBe(false);
+        expect(res.error?.message).toContain("can't clone");
+      });
+    });
 
     it("gives a key only to its engine", () => {
       const tiktok = vi.spyOn(engine("Default"), "setKey");

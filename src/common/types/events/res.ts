@@ -24,7 +24,7 @@ import {
   RankedGifter,
 } from "../live";
 import { OverlayApp } from "../server";
-import { VoiceData, VoiceEngine } from "../store";
+import { VoiceData, VoiceEngine, VoiceSample } from "../store";
 import { CameraCapture } from "../studio";
 import { TimerData } from "../timer";
 import { UpdateStatus } from "../updates";
@@ -57,6 +57,11 @@ export enum APP_EVENTS_RESPONSE {
 
   // TTS PAGE TESTER
   GET_TTS_TEST = "app:tts:res:test",
+
+  // VOICE CLONING
+  PICK_VOICE_SAMPLES = "app:tts:res:pick:voice-samples",
+  CLONE_VOICE = "app:tts:res:clone-voice",
+  ASK_MICROPHONE = "app:tts:res:ask:microphone",
 
   //MUSIC PAGE
   UPDATE_MUSIC_SETTINGS = "app:music:res:update:settings",
@@ -202,6 +207,20 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.GET_TTS_TEST]: Reply<{
     id: string;
     data?: Uint8Array;
+  }>;
+
+  // VOICE CLONING
+  // The files picked that could be read; nothing when the dialog is canceled
+  [APP_EVENTS_RESPONSE.PICK_VOICE_SAMPLES]: Reply<{
+    samples?: VoiceSample[];
+  }>;
+  // The CLONE_VOICE request this answers, failures included. A success also
+  // replies GET_VOICES with the new list.
+  [APP_EVENTS_RESPONSE.CLONE_VOICE]: Reply<{
+    id: string;
+  }>;
+  [APP_EVENTS_RESPONSE.ASK_MICROPHONE]: Reply<{
+    granted?: boolean;
   }>;
 
   //MUSIC PAGE
