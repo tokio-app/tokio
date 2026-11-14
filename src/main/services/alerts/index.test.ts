@@ -851,6 +851,25 @@ describe("AlertsService", () => {
         expect(sent[1].key).toBe(sent[0].key);
       });
 
+      it("makes the message again for another voice of the same name", async () => {
+        const withVoice = (id: string) => {
+          const item = speaking("Thanks");
+          item.tts!.voice = {
+            engine: "ElevenLabs",
+            name: "Ava",
+            lang: "mul",
+            id,
+          };
+          return withTts([item]);
+        };
+
+        await speak(gift("5655", true), withVoice("a1"));
+        await speak(gift("5655", true), withVoice("b2"));
+
+        expect(generateBuffer).toHaveBeenCalledTimes(2);
+        expect(sent[1].key).not.toBe(sent[0].key);
+      });
+
       it("makes one message for the gifts an update adds, on every gift", async () => {
         const everyGift = {
           ...speaking("Thanks {username}"),
