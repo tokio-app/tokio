@@ -62,6 +62,10 @@ export enum FEEDBACK_CODES {
   TTS_VOICES_FAILED = "tts_voices_failed",
   TTS_GENERATION_FAILED = "tts_generation_failed",
   TTS_TEST_BLOCKED = "tts_test_blocked",
+  VOICE_CLONED = "voice_cloned",
+  VOICE_CLONE_FAILED = "voice_clone_failed",
+  VOICE_SAMPLE_FAILED = "voice_sample_failed",
+  MICROPHONE_FAILED = "microphone_failed",
 
   // MUSIC
   MUSIC_CONNECTED = "music_connected",

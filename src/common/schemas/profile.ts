@@ -77,6 +77,9 @@ const VoiceSchema = z.object({
   engine: z.string().default(""),
   name: z.string(),
   lang: z.string(),
+  // Only engines whose names can repeat set it (VoiceData). Optional rather
+  // than a default, so other engines' saved voices stay as they were.
+  id: z.string().optional(),
 });
 
 const AlertTtsSchema = z.object({
