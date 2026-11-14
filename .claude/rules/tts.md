@@ -4,20 +4,36 @@ paths:
   - "src/renderer/src/pages/TTS/**"
   - "src/renderer/src/components/VoiceSelect/**"
   - "src/renderer/src/pages/Settings/sections/VoiceKeysSection.tsx"
+  - "src/renderer/src/pages/Settings/sections/CloneVoiceModal.tsx"
+  - "src/renderer/src/pages/Settings/sections/useRecorder.ts"
+  - "src/main/events/pages/tts.ts"
   - "scripts/edge-tts/**"
 ---
 
 # TTS engines
 
 - A provider extends `TTSProvider` (`src/main/services/tts/common`). Set `keyLabel` if it takes a key, and override `dispose` (runs on `will-quit`) if it holds resources such as child processes.
-- Providers aren't picked: each is an engine, its `addProvider` name the engine id. `getVoices` lists every engine's voices as `VoiceData` (`{ engine, name, lang }`), leaving out a failing engine, and `generateBuffer` speaks with the voice's engine.
-- Voices saved before engines existed have `engine: ""`. Those, and voices of an engine that isn't registered (Windows on macOS), go to `settings.activeTTSProvider`, set by the store at startup. `generateBuffer` must still fall back to a default when given another engine's voice name.
+- Providers aren't picked: each is an engine, its `addProvider` name the engine id, which saved voices and keys hold. `getVoices` lists every engine's voices as `VoiceData` (`{ engine, name, lang, id }`), leaving out a failing engine, and `generateBuffer` speaks with the voice's engine.
+- `id` is the engine's own id for a voice whose name can repeat or change (ElevenLabs'); the engine gets `id || name`, and `voiceKey` and the spoken-alert cache key read it the same way. `getVoices` gives every voice one, `""` for the other engines: profile saves deep-merge (`updateFile`), so a pick must replace the last voice's id, or Edge would get an ElevenLabs id.
+- Voices saved before engines existed have `engine: ""`. Those, and voices of an engine that isn't registered (Windows on macOS), go to `settings.activeTTSProvider`, set by the store at startup. `generateBuffer` must still fall back to a default when given another engine's voice name, except in an engine that's never the active provider: ElevenLabs fails on an id it doesn't know (`voiceGone`).
 - Engines with a `keyLabel` get a field in **Settings → Voice engines**. Their keys are saved in `settings.providers.tts` and applied to every engine at startup; `setEngineKey` trims them, saved ones too.
 - `default` (the TikTok voices) sends the session ID as a cookie. A failed request, or a failed read of a 200's body, is rethrown as a new `Error` with only `formatError`'s message and no cause, so the request headers never reach `Logger`, which prints errors whole. Without a session ID it uses the third-party proxy `API_URL_ALT`, listed under Services in `THIRD_PARTY_NOTICES.md`.
 - `windows` drives SAPI and OneCore voices through a long-lived 32-bit PowerShell helper, so 32-bit-only voices such as Loquendo show. Its script (`common/script.ts`) must not contain backticks, and answers `{ name, lang, engine }` per voice.
 - The helper starts on the first request and exits `IDLE_TIMEOUT_MS` after the last, so it doesn't hold memory between uses. `getVoices` lists the voices once a run; a failed or empty list isn't kept, and a voice installed meanwhile shows after a restart.
 - `common/script.test.ts` runs that script in a real PowerShell on Windows (CI's Windows job) with whatever voices are installed, with a raised `START_TIMEOUT_MS`, since a busy runner is slow to start the host.
 - `edge` uses Microsoft's unofficial Read Aloud protocol. Read `providers/edge/README.md` before changing it. Volatile values live in its `config/index.ts`. It fetches the voice list before its first message (one shared fetch), so the default-voice fallback for a retired voice works without the TTS page.
+- `elevenlabs` works only with the user's own API key, and Tokio never ships one. Its voices are the account's, all `lang: MULTILINGUAL` (`"mul"`, "Multiple languages"): its models speak every language with any voice, so the window previews them in its own language.
+  - Without a key it lists `[]` with no request. Every `VoiceSelect` mount lists voices, so the list is kept `VOICES_TTL_MS`, and calls at once share one request under one deadline for every page. `setKey` comes on every autosave pause in Settings, so it only drops the list; a clone does too.
+  - Its errors are `TTSRequestError`s holding only the status and ElevenLabs' code and message, never a cause or the request, so the key can't reach `Logger`.
+  - `failureKey` turns one into the notice's text for chat TTS, the tester and previews, and cloning. It reads the code before the status, since older errors send an empty quota as a 401.
+  - `GET_VOICES` warns when an engine with a saved key fails to list (`tts:voices:<engine>`), logging it only when the warning goes out, so a wrong key shows. Engines without a key fail quietly, as before.
+
+## Voice cloning
+
+- **Settings → Voice engines** offers **Clone a voice** for an engine with `cloneVoice` (`VoiceEngine.clones`), in `CloneVoiceModal`. The consent box is required and never saved.
+- Samples travel as bytes: main reads files from its own picker (`PICK_VOICE_SAMPLES`), and recordings come from the window, so main never reads a path the window names. `CLONE_VOICE` checks them (extension with `Object.hasOwn`, size, count), and they upload as `sample-<n>.<ext>`, so the user's file names stay on their computer.
+- Recordings are WebM/Opus without echo cancellation, noise suppression or gain control, up to 3 minutes. macOS asks for the microphone in main first (`ASK_MICROPHONE`), as it does for the camera.
+- The dialog plays a sample from a copy of its bytes: `AudioQueue` decodes the bytes it gets without copying, which detaches them, and the sample would go out empty.
 
 ## Chat TTS
 
