@@ -7,6 +7,7 @@ import {
 } from "@/common/types";
 import {
   formatError,
+  formatSeconds,
   VOICE_NAME_MAX,
   VOICE_SAMPLE_MAX_BYTES,
   VOICE_SAMPLE_TYPES,
@@ -231,18 +232,26 @@ events.push(
   async ({ ttsService, notifier }, e, data) => {
     const { id, engine, name, samples } = CloneSchema.parse(data);
     const info = ttsService.getEngines().find((v) => v.id === engine);
-    if (!info?.clones) {
+    if (!info?.cloning) {
       throw new Error(`The engine "${engine}" can't clone voices.`);
     }
+    // The window joins them for an engine that takes fewer
+    if (samples.length > info.cloning.samples) {
+      throw new Error(
+        `The engine "${engine}" takes up to ${info.cloning.samples} samples.`,
+      );
+    }
     const label = info.label;
-    const res = await ttsService.cloneVoice(engine, name, samples);
+    const res = await ttsService.cloneVoice(engine, name, samples, language());
     if (!res.success) {
       const key = failureKey(res.error, { cloning: true });
+      const { minSeconds, maxSeconds } = info.cloning;
       throw new AppFailure(
         FEEDBACK_CODES.VOICE_CLONE_FAILED,
         t(key ?? "main.failure.cloneVoice", {
           engine: label,
           settings: t("nav.settings"),
+          length: formatSeconds(language(), minSeconds, maxSeconds),
         }),
         { logged: true, cause: res.error },
       );

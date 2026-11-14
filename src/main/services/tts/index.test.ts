@@ -31,6 +31,9 @@ vi.mock("./providers", async () => {
     WindowsTTS: FakeTTS,
     EdgeTTS: FakeTTS,
     ElevenLabsTTS: FakeTTS,
+    FishAudioTTS: FakeTTS,
+    CartesiaTTS: FakeTTS,
+    InworldTTS: FakeTTS,
   };
 });
 
@@ -215,12 +218,13 @@ describe("TTSService", () => {
       expect(edge).toHaveBeenCalledExactlyOnceWith("hi", "es-MX", "Jorge");
     });
 
-    it("marks the engines that clone voices", () => {
-      engine("ElevenLabs").cloneVoice = vi.fn();
+    it("gives the engines that clone voices their limits", () => {
+      const cloning = { samples: 1, minSeconds: 10, maxSeconds: 30 };
+      Object.assign(engine("ElevenLabs"), { cloning, cloneVoice: vi.fn() });
 
       const engines = service.getEngines();
 
-      expect(engines.find((e) => e.id === "ElevenLabs")?.clones).toBe(true);
+      expect(engines.find((e) => e.id === "ElevenLabs")?.cloning).toBe(cloning);
       expect(engines.find((e) => e.id === "Edge")).toEqual({
         id: "Edge",
         label: "Fake",
@@ -234,10 +238,10 @@ describe("TTSService", () => {
         const cloneVoice = vi.fn(async () => ({ id: "v1", verify: true }));
         engine("ElevenLabs").cloneVoice = cloneVoice;
 
-        const res = await service.cloneVoice("ElevenLabs", "Me", samples);
+        const res = await service.cloneVoice("ElevenLabs", "Me", samples, "es");
 
         expect(res).toEqual({ success: true, verify: true });
-        expect(cloneVoice).toHaveBeenCalledExactlyOnceWith("Me", samples);
+        expect(cloneVoice).toHaveBeenCalledExactlyOnceWith("Me", samples, "es");
       });
 
       it("logs a failure once and returns the engine's error", async () => {
@@ -245,7 +249,7 @@ describe("TTSService", () => {
         const error = new Error("HTTP 402");
         engine("ElevenLabs").cloneVoice = vi.fn().mockRejectedValue(error);
 
-        const res = await service.cloneVoice("ElevenLabs", "Me", samples);
+        const res = await service.cloneVoice("ElevenLabs", "Me", samples, "en");
 
         expect(res).toEqual({ success: false, error });
         expect(log).toHaveBeenCalledExactlyOnceWith(
@@ -258,11 +262,19 @@ describe("TTSService", () => {
       it("fails with an engine that can't clone", async () => {
         vi.spyOn(Logger, "error");
 
-        const res = await service.cloneVoice("Edge", "Me", samples);
+        const res = await service.cloneVoice("Edge", "Me", samples, "en");
 
         expect(res.success).toBe(false);
         expect(res.error?.message).toContain("can't clone");
       });
+    });
+
+    it("says which engines' voices speak only with their key", () => {
+      Object.assign(engine("ElevenLabs"), { needsKey: true });
+
+      expect(service.voicesNeedKey("ElevenLabs")).toBe(true);
+      expect(service.voicesNeedKey("Default")).toBe(false);
+      expect(service.voicesNeedKey("Missing")).toBe(false);
     });
 
     it("gives a key only to its engine", () => {

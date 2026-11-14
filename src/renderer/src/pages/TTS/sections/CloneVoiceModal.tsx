@@ -3,18 +3,29 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   CameraFailure,
+  CloneLimits,
   VoiceEngine,
   VoiceSample,
 } from "@/common/types";
 import { VOICE_NAME_MAX, VOICE_SAMPLES_MAX } from "@/common/util/constants";
-import { Btn, Check, Field, Input, Modal, PlayButton } from "@/components";
+import { formatSeconds } from "@/common/util/format";
+import {
+  Btn,
+  Check,
+  Field,
+  Input,
+  Modal,
+  PlayButton,
+  Select,
+} from "@/components";
+import { joinedWav } from "@/helper/wav";
 import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
-import { useT } from "@/ui/i18n";
+import { useLanguage, useT } from "@/ui/i18n";
 import { useEffect, useId, useRef, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import styles from "./clonevoice.module.css";
-import { RECORD_MAX_SECONDS, useRecorder } from "./useRecorder";
+import { useRecorder } from "./useRecorder";
 
 const MIC_FAILURES: Record<CameraFailure, MessageKey> = {
   blocked: "tts.cloneVoice.micBlocked",
@@ -31,18 +42,45 @@ const clock = (seconds: number) =>
 type Row = VoiceSample & { id: number };
 let rows = 0;
 
+export type Cloner = VoiceEngine & { cloning: CloneLimits };
+
 type Props = {
-  engine: VoiceEngine;
+  engines: Cloner[];
   onClose: () => void;
 };
+
+// Decoding resamples every sample to this rate
+const JOIN_RATE = 44100;
+
+// The samples as one WAV, or the first one that doesn't decode
+async function join(samples: Row[], maxSeconds: number) {
+  const context = new OfflineAudioContext(1, 1, JOIN_RATE);
+  const buffers: AudioBuffer[] = [];
+  for (const row of samples) {
+    try {
+      // A copy: decoding detaches the bytes it gets
+      buffers.push(await context.decodeAudioData(row.data.slice().buffer));
+    } catch {
+      return { unreadable: row };
+    }
+  }
+  return { data: joinedWav(buffers, maxSeconds) };
+}
 
 /**
  * Clones a voice with the engine from audio files and recordings. Main shows
  * whether it worked; the dialog closes when it did and keeps everything when
  * it didn't.
  */
-export function CloneVoiceModal({ engine, onClose }: Props) {
+export function CloneVoiceModal({ engines, onClose }: Props) {
   const t = useT();
+  const language = useLanguage();
+  const [engineId, setEngineId] = useState(engines[0].id);
+  const engine = engines.find((e) => e.id === engineId) ?? engines[0];
+  const limits = engine.cloning;
+  const joins = limits.samples === 1;
+  // The sample that didn't decode for joining, by id
+  const [unreadable, setUnreadable] = useState<number | null>(null);
   const queue = useAudio().getQueue("voice-sample");
   const [name, setName] = useState("");
   const [samples, setSamples] = useState<Row[]>([]);
@@ -62,7 +100,7 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
       ),
     );
 
-  const recorder = useRecorder((data) => {
+  const recorder = useRecorder(limits.maxSeconds, (data) => {
     recordings.current += 1;
     const number = String(recordings.current);
     add([{ name: `${t("tts.cloneVoice.recording", { number })}.webm`, data }]);
@@ -79,8 +117,15 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
     else setCloning(null);
   });
 
-  // Closing cuts the sample playing.
-  useEffect(() => () => queue.stop(), [queue]);
+  // Closing cuts the sample playing, and a clone still joining its samples
+  const open = useRef(true);
+  useEffect(() => {
+    open.current = true;
+    return () => {
+      open.current = false;
+      queue.stop();
+    };
+  }, [queue]);
 
   const play = (row: Row) => {
     queue.stop();
@@ -104,16 +149,31 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
     setSamples((list) => list.filter((s) => s.id !== row.id));
   };
 
-  const clone = () => {
+  const clone = async () => {
     const id = crypto.randomUUID();
     setCloning(id);
+    setUnreadable(null);
+    let sending = samples.map(({ name, data }) => ({ name, data }));
+    if (joins) {
+      const joined = await join(samples, limits.maxSeconds);
+      if (!open.current) return;
+      if (joined.unreadable) {
+        setUnreadable(joined.unreadable.id);
+        setCloning(null);
+        return;
+      }
+      sending = [{ name: "sample.wav", data: joined.data }];
+    }
     window.api.emit(APP_EVENTS.CLONE_VOICE, {
       id,
       engine: engine.id,
       name: name.trim(),
-      samples: samples.map(({ name, data }) => ({ name, data })),
+      samples: sending,
     });
   };
+  const unreadableRow = joins
+    ? samples.find((s) => s.id === unreadable)
+    : undefined;
 
   const full = samples.length >= VOICE_SAMPLES_MAX;
   const fullTitle = full
@@ -137,13 +197,25 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
             variant="accent"
             disabled={!ready}
             loading={cloning !== null}
-            onClick={clone}
+            onClick={() => void clone()}
           >
             {t("tts.cloneVoice.clone")}
           </Btn>
         </>
       }
     >
+      {engines.length > 1 && (
+        <Field label={t("tts.cloneVoice.engine")}>
+          <Select
+            aria-label={t("tts.cloneVoice.engine")}
+            options={engines.map((e) => ({ label: e.label, value: e.id }))}
+            value={engine.id}
+            disabled={recording || cloning !== null}
+            onChange={setEngineId}
+          />
+        </Field>
+      )}
+
       <Field label={t("tts.cloneVoice.name")}>
         <Input
           aria-label={t("tts.cloneVoice.name")}
@@ -206,14 +278,14 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
               <span className={styles.time}>
                 {t("tts.cloneVoice.elapsed", {
                   time: clock(recorder.seconds),
-                  max: clock(RECORD_MAX_SECONDS),
+                  max: clock(limits.maxSeconds),
                 })}
               </span>
               <span className={styles.track} aria-hidden>
                 <span
                   className={styles.progress}
                   style={{
-                    width: `${(recorder.seconds / RECORD_MAX_SECONDS) * 100}%`,
+                    width: `${(recorder.seconds / limits.maxSeconds) * 100}%`,
                   }}
                 />
               </span>
@@ -230,7 +302,25 @@ export function CloneVoiceModal({ engine, onClose }: Props) {
             {t(MIC_FAILURES[recorder.failure])}
           </p>
         )}
-        <p className={styles.hint}>{t("tts.cloneVoice.hint")}</p>
+        {unreadableRow && (
+          <p className={styles.error} role="alert">
+            {t("tts.cloneVoice.unreadable", { name: unreadableRow.name })}
+          </p>
+        )}
+        <p className={styles.hint}>
+          {t("tts.cloneVoice.hint", {
+            length: formatSeconds(
+              language,
+              limits.minSeconds,
+              limits.maxSeconds,
+            ),
+          })}
+          {joins &&
+            ` ${t("tts.cloneVoice.joined", {
+              engine: engine.label,
+              max: formatSeconds(language, limits.maxSeconds),
+            })}`}
+        </p>
       </div>
 
       <Check

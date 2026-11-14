@@ -423,7 +423,16 @@ describe("tts events", () => {
   describe("CLONE_VOICE", () => {
     const engines = [
       { id: "Edge", label: "Edge" },
-      { id: "ElevenLabs", label: "ElevenLabs", clones: true },
+      {
+        id: "ElevenLabs",
+        label: "ElevenLabs",
+        cloning: { samples: 10, minSeconds: 60, maxSeconds: 120 },
+      },
+      {
+        id: "Cartesia",
+        label: "Cartesia",
+        cloning: { samples: 1, minSeconds: 10, maxSeconds: 60 },
+      },
     ];
     const samples = [{ name: "me.mp3", data: new Uint8Array([1]) }];
     const request = {
@@ -461,6 +470,7 @@ describe("tts events", () => {
         "ElevenLabs",
         "My voice",
         samples,
+        "en",
       );
       // The notice doesn't wait for the list
       expect(h.sent()).toEqual([
@@ -519,6 +529,10 @@ describe("tts events", () => {
         },
       ],
       ["an engine that can't clone", { engine: "Edge" }],
+      [
+        "more samples than the engine takes",
+        { engine: "Cartesia", samples: [samples[0], samples[0]] },
+      ],
     ])("refuses %s, replying with the id", async (_, change) => {
       vi.spyOn(Logger, "error");
       const { h, cloneVoice } = cloning();
@@ -565,7 +579,7 @@ describe("tts events", () => {
       [
         "unusable samples",
         new TTSRequestError("ElevenLabs", "x", "x", 422),
-        "ElevenLabs couldn't clone a voice from these samples. Try 1 to 2 minutes of clear speech.",
+        "ElevenLabs couldn't clone a voice from these samples. Try 1–2 minutes of clear speech.",
       ],
       [
         "anything else",

@@ -1,64 +1,28 @@
 import { VoiceSample } from "@/common/types";
-import { formatError, MULTILINGUAL, VOICE_SAMPLE_TYPES } from "@/common/util";
+import { MULTILINGUAL, VOICE_SAMPLES_MAX } from "@/common/util";
 import { Buffer } from "node:buffer";
-import { extname } from "node:path";
-import {
-  GenerationResponse,
-  ProviderVoice,
-  TTSProvider,
-  TTSRequestError,
-} from "../../common";
+import { ProviderVoice } from "../../common";
+import { appendSamples, KeyedTTSProvider } from "../../common/keyed";
 import config from "./config";
 import { CloneResponse, ErrorResponse, VoicesResponse } from "./types";
 
-// Speaks with each user's own API key: Tokio never ships one.
-export class ElevenLabsTTS extends TTSProvider {
+export class ElevenLabsTTS extends KeyedTTSProvider {
   public readonly label = "ElevenLabs";
-  public override readonly keyLabel = "voiceKeys.apiKey";
-  private _key = "";
-  // Bumped when the list may have changed, so a listing begun before isn't kept
-  private _gen = 0;
-  private _cache?: { voices: ProviderVoice[]; until: number };
-  private _listing?: Promise<ProviderVoice[]>;
+  // ElevenLabs asks for 1 to 2 minutes: more adds little
+  public readonly cloning = {
+    samples: VOICE_SAMPLES_MAX,
+    minSeconds: 60,
+    maxSeconds: 120,
+  };
+  protected readonly config = config;
 
-  // Called on every autosave pause in Settings, so it never fetches
-  public setKey(key: string) {
-    this._key = key;
-    this._clear();
+  protected _headers(key: string) {
+    return { "xi-api-key": key };
   }
 
-  private _clear() {
-    this._gen++;
-    this._cache = undefined;
-    this._listing = undefined;
-  }
-
-  public async getVoices(): Promise<ProviderVoice[]> {
-    const key = this._key;
-    if (!key) return [];
-    // Not Date.now(), so a clock change can't keep the list for hours
-    if (this._cache && performance.now() < this._cache.until) {
-      return this._cache.voices;
-    }
-    const gen = this._gen;
-    const listing = (this._listing ??= this._list(key));
-    try {
-      const voices = await listing;
-      if (gen === this._gen) {
-        const until = performance.now() + config.VOICES_TTL_MS;
-        this._cache = { voices, until };
-      }
-      return voices;
-    } finally {
-      if (this._listing === listing) this._listing = undefined;
-    }
-  }
-
-  private async _list(key: string): Promise<ProviderVoice[]> {
+  protected async _list(key: string, signal: AbortSignal) {
     const voices: ProviderVoice[] = [];
     let token: string | null | undefined;
-    // One deadline for every page: each voice picker waits for the list
-    const signal = AbortSignal.timeout(config.LIST_TIMEOUT_MS);
     for (let page = 0; page < config.MAX_PAGES; page++) {
       const next = token ? `&next_page_token=${encodeURIComponent(token)}` : "";
       const data = await this._request<VoicesResponse>(
@@ -81,116 +45,50 @@ export class ElevenLabsTTS extends TTSProvider {
     return voices;
   }
 
-  // voice is the voice's id
-  public async generateBuffer(
+  protected async _speak(
+    key: string,
     text: string,
-    _lang?: string,
-    voice?: string,
-  ): Promise<GenerationResponse> {
-    try {
-      if (!voice) {
-        throw new TTSRequestError(this.label, "missing_voice", "No voice.");
-      }
-      const buffer = await this._request(
-        this._requireKey(),
-        `/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=${config.OUTPUT_FORMAT}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, model_id: config.MODEL_ID }),
-        },
-        AbortSignal.timeout(config.REQUEST_TIMEOUT_MS),
-        async (res) => Buffer.from(await res.arrayBuffer()),
-      );
-      return { success: true, buffer };
-    } catch (e) {
-      return {
-        success: false,
-        error: e instanceof Error ? e : new Error(formatError(e)),
-      };
-    }
+    voice: string,
+    _lang: string | undefined,
+    signal: AbortSignal,
+  ) {
+    return await this._request(
+      key,
+      `/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=${config.OUTPUT_FORMAT}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, model_id: config.MODEL_ID }),
+      },
+      signal,
+      async (res) => Buffer.from(await res.arrayBuffer()),
+    );
   }
 
-  public async cloneVoice(name: string, samples: VoiceSample[]) {
+  protected async _clone(
+    key: string,
+    name: string,
+    samples: VoiceSample[],
+    _language: string,
+    signal: AbortSignal,
+  ) {
     const form = new FormData();
     form.append("name", name);
-    samples.forEach((sample, i) => {
-      const ext = extname(sample.name).slice(1).toLowerCase();
-      // A copy, as Blob takes only arrays on an ArrayBuffer
-      const data = new Uint8Array(sample.data);
-      // Numbered, so the user's own file names stay on their computer
-      form.append(
-        "files",
-        new Blob([data], { type: VOICE_SAMPLE_TYPES[ext] }),
-        `sample-${i + 1}.${ext}`,
-      );
-    });
+    appendSamples(form, "files", samples);
     const res = await this._request<CloneResponse>(
-      this._requireKey(),
+      key,
       "/v1/voices/add",
       { method: "POST", body: form },
-      AbortSignal.timeout(config.CLONE_TIMEOUT_MS),
+      signal,
       (res) => res.json(),
     );
-    this._clear();
     return { id: res.voice_id, verify: res.requires_verification === true };
   }
 
-  private _requireKey() {
-    if (!this._key) {
-      throw new TTSRequestError(
-        this.label,
-        "missing_api_key",
-        "No ElevenLabs API key set.",
-      );
-    }
-    return this._key;
-  }
-
-  // The errors hold only the status and the API's code and message, never the
-  // request, so the key can't reach the logs, which print errors whole.
-  private async _request<T>(
-    key: string,
-    path: string,
-    init: Omit<RequestInit, "headers"> & { headers?: Record<string, string> },
-    signal: AbortSignal,
-    read: (res: Response) => Promise<T>,
-  ): Promise<T> {
-    let res: Response;
-    try {
-      res = await fetch(`${config.API_URL}${path}`, {
-        ...init,
-        headers: { ...init.headers, "xi-api-key": key },
-        signal,
-      });
-    } catch (error) {
-      // oxlint-disable-next-line preserve-caught-error
-      throw new TTSRequestError(
-        this.label,
-        "network",
-        `ElevenLabs request failed: ${formatError(error)}`,
-      );
-    }
-    if (!res.ok) throw await this._failure(res);
-    try {
-      return await read(res);
-    } catch (error) {
-      // oxlint-disable-next-line preserve-caught-error
-      throw new TTSRequestError(
-        this.label,
-        "bad_response",
-        `ElevenLabs sent an unreadable response: ${formatError(error)}`,
-        res.status,
-      );
-    }
-  }
-
-  private async _failure(res: Response) {
-    const body: ErrorResponse | undefined = await res
-      .json()
-      .catch(() => undefined);
+  // A 422's detail is a list, and older errors' a string
+  protected _reason(body: ErrorResponse | undefined) {
     const detail = body?.detail;
-    let code = `http_${res.status}`;
+    let code: string | undefined;
     let reason: string | undefined;
     if (typeof detail === "string") {
       reason = detail;
@@ -201,7 +99,7 @@ export class ElevenLabsTTS extends TTSProvider {
         .filter((msg) => typeof msg === "string")
         .join("; ");
     } else if (detail && typeof detail === "object") {
-      code = detail.code || detail.status || code;
+      code = detail.code || detail.status || undefined;
       reason = detail.message;
       if (detail.status === "missing_permissions") code = detail.status;
     }
@@ -210,12 +108,6 @@ export class ElevenLabsTTS extends TTSProvider {
     if (/missing the permission/i.test(reason ?? "")) {
       code = "missing_permissions";
     }
-    const message = `ElevenLabs request failed: HTTP ${res.status} ${code}`;
-    return new TTSRequestError(
-      this.label,
-      code,
-      reason ? `${message} - ${reason}` : message,
-      res.status,
-    );
+    return { code, reason };
   }
 }

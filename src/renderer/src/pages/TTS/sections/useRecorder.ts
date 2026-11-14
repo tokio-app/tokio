@@ -3,9 +3,6 @@ import { mediaFailure } from "@/helper/camera";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useEffect, useRef, useState } from "react";
 
-// A recording stops by itself at this length
-export const RECORD_MAX_SECONDS = 180;
-
 const MIME_TYPE = "audio/webm;codecs=opus";
 
 type Session = {
@@ -18,9 +15,13 @@ type Session = {
 /**
  * Records the microphone, unprocessed, for voice samples. `record` asks main
  * first (macOS asks the user), `stop` hands the bytes to onRecorded, and
- * unmounting drops the recording and lets the microphone go.
+ * unmounting drops the recording and lets the microphone go. A recording
+ * stops by itself at maxSeconds.
  */
-export function useRecorder(onRecorded: (data: Uint8Array) => void) {
+export function useRecorder(
+  maxSeconds: number,
+  onRecorded: (data: Uint8Array) => void,
+) {
   // "starting" from the click until the microphone opens
   const [state, setState] = useState<"idle" | "starting" | "recording">("idle");
   const [seconds, setSeconds] = useState(0);
@@ -75,7 +76,7 @@ export function useRecorder(onRecorded: (data: Uint8Array) => void) {
           () => setSeconds(Math.floor((performance.now() - started) / 1000)),
           250,
         ),
-        limit: setTimeout(() => end(true), RECORD_MAX_SECONDS * 1000),
+        limit: setTimeout(() => end(true), maxSeconds * 1000),
       };
       // Unplugged: what was recorded is kept
       stream

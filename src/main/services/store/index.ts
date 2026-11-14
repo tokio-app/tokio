@@ -612,6 +612,29 @@ export class StoreManagerService extends Service {
   }
 
   /**
+   * Puts the default voice in place of every voice of the engine (the TTS
+   * page's, the special users', the alerts' spoken ones), in every profile.
+   * False when a profile that had one couldn't be saved.
+   */
+  public removeVoices(engine: string): Promise<boolean> {
+    // An empty id: saves merge into the profile, which would keep the old one
+    const voice = { ...defaultProfile.tts.voice, id: "" };
+    return this._updateProfiles(({ tts, alerts }) => {
+      let changed = false;
+      const swap = <T extends { voice: { engine: string } }>(item: T): T => {
+        if (item.voice.engine !== engine) return item;
+        changed = true;
+        return { ...item, voice };
+      };
+      const next = { ...swap(tts), user_voices: tts.user_voices.map(swap) };
+      const items = alerts.items.map((a) =>
+        a.tts ? { ...a, tts: swap(a.tts) } : a,
+      );
+      return changed ? { tts: next, alerts: { ...alerts, items } } : null;
+    });
+  }
+
+  /**
    * Takes a deleted Minecraft picture off every game action that has it, in
    * every profile. False when a profile that had it couldn't be saved.
    */

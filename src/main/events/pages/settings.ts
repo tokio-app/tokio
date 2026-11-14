@@ -460,6 +460,17 @@ events.push(
       success: true,
     });
     replyVoiceKeys(e, ttsService, storeManagerService);
+
+    // Its voices can't speak without it: every profile's go back to the
+    // default voice, and a page open on the profile shows it
+    if (key.trim() === "" && ttsService.voicesNeedKey(engine)) {
+      const removed = await storeManagerService.removeVoices(engine);
+      const profile = await storeManagerService.getProfileData({ fresh: true });
+      if (profile) {
+        e.reply(APP_EVENTS_RESPONSE.GET_PROFILE, { success: true, profile });
+      }
+      if (!removed) throw saveFailure();
+    }
   },
   {
     failure: {

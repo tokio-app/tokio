@@ -1,5 +1,5 @@
 // The lang of a voice that speaks every language its engine does
-// (ElevenLabs'). Intl names it "Multiple languages".
+// (ElevenLabs', Fish Audio's). Intl names it "Multiple languages".
 export const MULTILINGUAL = "mul";
 
 // What a voice can be cloned from: each file extension's media type
@@ -12,7 +12,7 @@ export const VOICE_SAMPLE_TYPES: Record<string, string> = {
   webm: "audio/webm",
 };
 
-// Each sample's most bytes, since ElevenLabs doesn't say its own limit
+// Each sample's most bytes, since most engines don't say their own limit
 export const VOICE_SAMPLE_MAX_BYTES = 25 * 1024 * 1024;
 
 // Samples one clone takes

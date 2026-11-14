@@ -14,7 +14,14 @@ import {
 } from "vitest";
 import { CloneVoiceModal } from "./CloneVoiceModal";
 
-const ELEVEN = { ...engine("elevenlabs", "ElevenLabs"), clones: true };
+const ELEVEN = {
+  ...engine("elevenlabs", "ElevenLabs"),
+  cloning: { samples: 10, minSeconds: 60, maxSeconds: 120 },
+};
+const INWORLD = {
+  ...engine("inworld", "Inworld"),
+  cloning: { samples: 1, minSeconds: 10, maxSeconds: 30 },
+};
 const RECORDED = [7, 8, 9];
 
 const sample = (name: string): VoiceSample => ({
@@ -44,6 +51,29 @@ class FakeRecorder {
   }
 }
 
+// Decodes bytes into a mono buffer of 0.5s, one frame per byte, and fails on
+// bytes that start with 0
+class FakeContext {
+  static decoded: ArrayBuffer[] = [];
+  constructor(
+    public channels: number,
+    public length: number,
+    public sampleRate: number,
+  ) {}
+  decodeAudioData(data: ArrayBuffer) {
+    FakeContext.decoded.push(data);
+    const bytes = new Uint8Array(data);
+    if (bytes[0] === 0)
+      return Promise.reject(new DOMException("", "EncodingError"));
+    return Promise.resolve({
+      sampleRate: this.sampleRate,
+      numberOfChannels: 1,
+      length: bytes.length,
+      getChannelData: () => new Float32Array(bytes.length).fill(0.5),
+    });
+  }
+}
+
 const CLONE_ID = "00000000-0000-4000-8000-000000000001";
 
 let track: { stop: ReturnType<typeof vi.fn>; addEventListener: () => void };
@@ -53,6 +83,8 @@ beforeEach(() => {
   FakeRecorder.made = [];
   track = { stop: vi.fn(), addEventListener: () => {} };
   vi.stubGlobal("MediaRecorder", FakeRecorder);
+  FakeContext.decoded = [];
+  vi.stubGlobal("OfflineAudioContext", FakeContext);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fake
   const stream = {
     getTracks: () => [track],
@@ -69,10 +101,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function setup() {
+function setup(engines = [ELEVEN]) {
   const onClose = vi.fn();
   const view = renderWithProviders(
-    <CloneVoiceModal engine={ELEVEN} onClose={onClose} />,
+    <CloneVoiceModal engines={engines} onClose={onClose} />,
   );
   return { ...view, onClose, queue: view.audio.queue("voice-sample") };
 }
@@ -176,7 +208,7 @@ describe("CloneVoiceModal", () => {
       expect(gum).not.toHaveBeenCalled();
 
       await granted();
-      await dialog().findByText("0:00 of 3:00");
+      await dialog().findByText("0:00 of 2:00");
       expect(gum).toHaveBeenCalledWith({
         audio: {
           echoCancellation: false,
@@ -205,19 +237,21 @@ describe("CloneVoiceModal", () => {
       ]);
     });
 
-    it("stops by itself at 3:00", async () => {
+    it("stops by itself at the engine's longest length", async () => {
       vi.useFakeTimers();
       setup();
 
       fireEvent.click(button("Record"));
       await granted();
       await act(async () => {});
-      expect(dialog().getByText("0:00 of 3:00")).toBeInTheDocument();
+      expect(dialog().getByText("0:00 of 2:00")).toBeInTheDocument();
 
       await act(async () => vi.advanceTimersByTime(65_000));
-      expect(dialog().getByText("1:05 of 3:00")).toBeInTheDocument();
+      expect(dialog().getByText("1:05 of 2:00")).toBeInTheDocument();
 
-      await act(async () => vi.advanceTimersByTime(115_000));
+      await act(async () => vi.advanceTimersByTime(54_000));
+      expect(FakeRecorder.made[0].state).toBe("recording");
+      await act(async () => vi.advanceTimersByTime(1_000));
       await act(async () => {});
 
       expect(FakeRecorder.made[0].state).toBe("inactive");
@@ -254,7 +288,7 @@ describe("CloneVoiceModal", () => {
       const { user, unmount } = setup();
       await user.click(button("Record"));
       await granted();
-      await dialog().findByText("0:00 of 3:00");
+      await dialog().findByText("0:00 of 2:00");
 
       unmount();
 
@@ -279,6 +313,55 @@ describe("CloneVoiceModal", () => {
         },
       ]);
       expect(cloneButton()).toHaveAccessibleName("Loading");
+      // As they are, since ElevenLabs takes several
+      expect(FakeContext.decoded).toEqual([]);
+    });
+
+    it("joins the samples into one WAV for an engine that takes one", async () => {
+      const { user } = setup([INWORLD]);
+      const a = sample("a.mp3");
+      await user.type(dialog().getByPlaceholderText("My voice"), "Me");
+      await picked(a, sample("b.webm"));
+      await user.click(dialog().getByRole("checkbox"));
+
+      await user.click(button("Clone voice"));
+
+      const [sent0] = sent(APP_EVENTS.CLONE_VOICE);
+      expect(sent0.engine).toBe("inworld");
+      expect(sent0.samples).toHaveLength(1);
+      const wav = sent0.samples[0];
+      expect(wav.name).toBe("sample.wav");
+      // 2 samples of 3 frames, 16 bits each
+      expect(wav.data).toHaveLength(44 + 12);
+      expect(String.fromCharCode(...wav.data.slice(0, 4))).toBe("RIFF");
+      expect(new DataView(wav.data.buffer).getUint32(24, true)).toBe(44100);
+      // Decoded from copies, so the samples keep their bytes
+      expect(FakeContext.decoded).toHaveLength(2);
+      expect(FakeContext.decoded[0]).not.toBe(a.data.buffer);
+      expect(a.data).toEqual(new Uint8Array([1, 2, 3]));
+    });
+
+    it("says which sample it can't read, and sends nothing", async () => {
+      const { user } = setup([INWORLD]);
+      await user.type(dialog().getByPlaceholderText("My voice"), "Me");
+      await picked(sample("a.mp3"), {
+        name: "b.m4a",
+        data: new Uint8Array([0, 1]),
+      });
+      await user.click(dialog().getByRole("checkbox"));
+
+      await user.click(button("Clone voice"));
+
+      expect(await dialog().findByRole("alert")).toHaveTextContent(
+        'Unable to read "b.m4a". Remove it and add another file.',
+      );
+      expect(sent(APP_EVENTS.CLONE_VOICE)).toEqual([]);
+      expect(button("Clone voice")).toBeEnabled();
+      expect(dialog().getByText("a.mp3")).toBeInTheDocument();
+
+      const bad = within(dialog().getAllByRole("listitem")[1]);
+      await user.click(bad.getByRole("button", { name: "Remove" }));
+      expect(dialog().queryByRole("alert")).not.toBeInTheDocument();
     });
 
     it("closes once it's cloned", async () => {
@@ -313,6 +396,62 @@ describe("CloneVoiceModal", () => {
       expect(button("Clone voice")).toBeEnabled();
       expect(dialog().getByPlaceholderText("My voice")).toHaveValue("  Me  ");
       expect(dialog().getByText("me.mp3")).toBeInTheDocument();
+    });
+  });
+
+  describe("engines", () => {
+    const picker = () => dialog().queryByRole("combobox", { name: "Engine" });
+    const hint = () => dialog().getByText(/^Best with/);
+
+    it("picks one only when there are two or more", () => {
+      setup();
+
+      expect(picker()).not.toBeInTheDocument();
+      expect(hint()).toHaveTextContent(/^Best with 1–2 minutes of one person/);
+    });
+
+    it("names the picked engine and its lengths", async () => {
+      const { user } = setup([ELEVEN, INWORLD]);
+      await picked(sample("a.mp3"));
+      expect(picker()).toHaveTextContent("ElevenLabs");
+
+      await user.click(picker()!);
+      await user.click(screen.getByRole("option", { name: "Inworld" }));
+
+      expect(
+        screen.getByRole("dialog", { name: "Clone a voice" }),
+      ).toHaveAccessibleDescription(/^Inworld adds the voice/);
+      expect(hint()).toHaveTextContent(
+        /^Best with 10–30 seconds of .+ Inworld takes a single sample, so Tokio joins yours, up to 30 seconds.$/,
+      );
+      // The samples stay
+      expect(dialog().getByText("a.mp3")).toBeInTheDocument();
+    });
+
+    it("can't change while recording", async () => {
+      const { user } = setup([ELEVEN, INWORLD]);
+
+      await user.click(button("Record"));
+      await granted();
+      await dialog().findByText("0:00 of 2:00");
+
+      expect(picker()).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("stops a recording at the picked engine's longest length", async () => {
+      vi.useFakeTimers();
+      setup([INWORLD]);
+
+      fireEvent.click(button("Record"));
+      await granted();
+      await act(async () => {});
+      expect(dialog().getByText("0:00 of 0:30")).toBeInTheDocument();
+
+      await act(async () => vi.advanceTimersByTime(30_000));
+      await act(async () => {});
+
+      expect(FakeRecorder.made[0].state).toBe("inactive");
+      expect(dialog().getByText("Recording 1.webm")).toBeInTheDocument();
     });
   });
 

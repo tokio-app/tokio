@@ -303,7 +303,7 @@ describe("ElevenLabsTTS", () => {
     it("uploads the name and each sample, numbered and typed by its extension", async () => {
       fetchMock.mockResolvedValue(json({ voice_id: "new-id" }));
 
-      const res = await tts.cloneVoice("My voice", samples);
+      const res = await tts.cloneVoice("My voice", samples, "en");
 
       expect(res).toEqual({ id: "new-id", verify: false });
       const [url, init] = fetchMock.mock.calls[0];
@@ -331,7 +331,7 @@ describe("ElevenLabsTTS", () => {
         json({ voice_id: "new-id", requires_verification: true }),
       );
 
-      expect(await tts.cloneVoice("Me", samples)).toEqual({
+      expect(await tts.cloneVoice("Me", samples, "en")).toEqual({
         id: "new-id",
         verify: true,
       });
@@ -341,7 +341,7 @@ describe("ElevenLabsTTS", () => {
       fetchMock.mockResolvedValueOnce(page(["Ava"]));
       await tts.getVoices();
       fetchMock.mockResolvedValueOnce(json({ voice_id: "new-id" }));
-      await tts.cloneVoice("Me", samples);
+      await tts.cloneVoice("Me", samples, "en");
 
       fetchMock.mockResolvedValueOnce(page(["Ava", "Me"]));
       expect(await tts.getVoices()).toEqual([voice("Ava"), voice("Me")]);
@@ -352,7 +352,7 @@ describe("ElevenLabsTTS", () => {
         json({ detail: { code: "invalid_audio", message: "Too short" } }, 400),
       );
 
-      await expect(tts.cloneVoice("Me", samples)).rejects.toMatchObject({
+      await expect(tts.cloneVoice("Me", samples, "en")).rejects.toMatchObject({
         status: 400,
         code: "invalid_audio",
       });
@@ -361,7 +361,7 @@ describe("ElevenLabsTTS", () => {
     it("throws without a key, without asking", async () => {
       tts.setKey("");
 
-      await expect(tts.cloneVoice("Me", samples)).rejects.toMatchObject({
+      await expect(tts.cloneVoice("Me", samples, "en")).rejects.toMatchObject({
         code: "missing_api_key",
       });
       expect(fetchMock).not.toHaveBeenCalled();
