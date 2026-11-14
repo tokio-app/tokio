@@ -27,6 +27,16 @@ describe("voiceKey", () => {
   it("names the voice by engine, language and name", () => {
     expect(voiceKey(voice("Aria", "en-US", "edge"))).toBe("edge|en-US|Aria");
   });
+
+  it("names a voice with an id by its id, so equal names stay apart", () => {
+    const named = voice("Aria", "mul", "elevenlabs");
+    expect(voiceKey({ ...named, id: "a1" })).toBe("elevenlabs|mul|a1");
+    // Engines without ids list them empty
+    expect(voiceKey({ ...named, id: "" })).toBe("elevenlabs|mul|Aria");
+    expect(voiceKey({ ...named, id: "b2" })).not.toBe(
+      voiceKey({ ...named, id: "a1" }),
+    );
+  });
 });
 
 describe("voiceDetails", () => {

@@ -1,7 +1,9 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, VoiceData } from "@/common/types";
+import { MULTILINGUAL } from "@/common/util/constants";
 import { voiceKey, voiceSample } from "@/helper/voices";
 import { useAudio } from "@/hooks/useAudio";
 import { useIpcListener } from "@/hooks/useIpcListener";
+import { useLanguage } from "@/ui/i18n";
 import { useEffect, useRef, useState } from "react";
 import type { TestState } from "../PlayButton";
 
@@ -23,6 +25,7 @@ export function useVoicePreview({
   speed: number;
   pitch: number;
 }) {
+  const language = useLanguage();
   const { getQueue } = useAudio();
   const queue = getQueue("voice-preview");
 
@@ -55,7 +58,8 @@ export function useVoicePreview({
     pending.current = `${ID_PREFIX}${++requests}:${key}`;
     window.api.emit(APP_EVENTS.GET_TTS_TEST, {
       id: pending.current,
-      text: voiceSample(voice.lang),
+      // A voice that speaks every language says it in the window's
+      text: voiceSample(voice.lang === MULTILINGUAL ? language : voice.lang),
       voice,
     });
   };

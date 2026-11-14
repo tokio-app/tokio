@@ -339,5 +339,19 @@ describe("VoiceSelect", () => {
 
       expect(queue.stop).toHaveBeenCalled();
     });
+
+    // After the others: they count their requests from the first
+    it("speaks a multilingual voice's sample in the window's language", async () => {
+      const { user, field } = setup();
+      const clone = voice("Clone", "mul", "elevenlabs");
+      await voicesLoaded([...VOICES, clone]);
+      await user.click(field);
+
+      await user.click(row("Clone").getByRole("button", { name: "Play" }));
+
+      expect(sent(APP_EVENTS.GET_TTS_TEST)).toEqual([
+        { id: expect.any(String), text: voiceSample("en"), voice: clone },
+      ]);
+    });
   });
 });

@@ -3,7 +3,7 @@ import { VoiceData, VoiceEngine } from "@/common/types";
 import type { SelectOption } from "@/components/Elements";
 
 export const voiceKey = (voice: VoiceData) =>
-  `${voice.engine}|${voice.lang}|${voice.name}`;
+  `${voice.engine}|${voice.lang}|${voice.id || voice.name}`;
 
 // Language names in each window language, made once
 const displayNames = new Map<string, Intl.DisplayNames>();
