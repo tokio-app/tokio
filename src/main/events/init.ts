@@ -50,6 +50,7 @@ import { HISTORY_EVENTS } from "@/services/history";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { OverlayUpdates } from "@/services/overlay";
 import { TIMER_EVENTS } from "@/services/timer";
+import { failureKey, TTSRequestError } from "@/services/tts/common";
 import { AppHandlerVariables } from "@/types";
 import { release } from "node:os";
 
@@ -441,12 +442,15 @@ const registerConnectorEvents = ({
           });
         },
         (error) => {
+          // Says why when the engine told, like no credits left
+          const key = failureKey(error) ?? "main.init.ttsFailed";
+          const engine = error instanceof TTSRequestError ? error.engine : "";
           // Logged once per notice, so a broken voice can't flood the log
           if (
             notifier.error(
               "tts",
               FEEDBACK_CODES.TTS_GENERATION_FAILED,
-              t("main.init.ttsFailed", { settings: t("nav.settings") }),
+              t(key, { engine, settings: t("nav.settings") }),
               // Not the TTS page's key, so its Test still says why it failed
               { key: "tts:chat", windowMs: REPEAT_NOTICE_MS },
             )
