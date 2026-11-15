@@ -463,3 +463,37 @@ test("switches the app to the language picked in Settings, and back to the syste
   ).toBeVisible();
   await expect.poll(savedLanguage).toBe("system");
 });
+
+test("registers a shortcut recorded in Settings, and resumes a pause from Home", async () => {
+  const sidebar = page.getByRole("navigation");
+  await sidebar.getByRole("link", { name: "Settings", exact: true }).click();
+  const field = page
+    .getByRole("group", { name: "Pause everything" })
+    .getByTitle("Change shortcut");
+
+  await field.click();
+  // The page gets the keys: Playwright's don't go through the OS
+  await page.keyboard.press("Control+Shift+F9");
+
+  await expect(field).toHaveText("Ctrl + Shift + F9");
+  await expect
+    .poll(() =>
+      app.evaluate(({ globalShortcut }) =>
+        globalShortcut.isRegistered("Ctrl+Shift+F9"),
+      ),
+    )
+    .toBe(true);
+
+  // As the shortcut would, since Playwright can't press OS-wide keys
+  await sidebar.getByRole("link", { name: "Home", exact: true }).click();
+  await page.evaluate(() =>
+    Reflect.get(globalThis, "api").emit("app:controls:run", {
+      action: "pause",
+    }),
+  );
+  const paused = page.getByRole("region", { name: "Tokio is paused" });
+  await expect(paused).toBeVisible();
+
+  await paused.getByRole("button", { name: "Resume" }).click();
+  await expect(paused).toBeHidden();
+});
