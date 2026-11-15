@@ -167,14 +167,12 @@ export const tools: ToolDef<any>[] = [
       );
       return ok({
         total: found.length,
-        voices: found
-          .slice(0, limit)
-          .map((v) => ({
-            engine: v.engine,
-            id: v.id ?? "",
-            name: v.name,
-            lang: v.lang,
-          })),
+        voices: found.slice(0, limit).map((v) => ({
+          engine: v.engine,
+          id: v.id ?? "",
+          name: v.name,
+          lang: v.lang,
+        })),
         failedEngines: failed,
       });
     },
