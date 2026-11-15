@@ -10,7 +10,7 @@ paths:
 ## YouTube's player
 
 - Connecting doesn't ask for an account: YouTube connects once a `music.youtube.com` page loads, signed in or not, and the streamer signs in from YouTube Music's own page if they want to (the user's call). Never send the page to Google's sign-in or clear its session to force one. A page that loads first, like Google's sign-in or a consent page, doesn't count.
-- After about 40 minutes with nobody at the page, YouTube Music pauses each song a few seconds in, behind "Video paused. Continue watching?", for every streamer. `KeepPlayingJSCode` answers it from an isolated world (`KEEP_PLAYING_WORLD`) on each page load. A real check takes that long: a scratch run with fake chat requests (`.claude/skills/drive-app/RECIPES.md`).
+- After about 40 minutes with nobody at the page, YouTube Music pauses each song a few seconds in, behind "Video paused. Continue watching?", for every streamer. `KeepPlayingJSCode` answers it from an isolated world (`KEEP_PLAYING_WORLD`) on each page load. A real check takes that long, and can't run under Playwright (`drive-app`, `e2e/`). Playwright sets `navigator.webdriver`, and YouTube then stops each stream 40 to 60 seconds in. Use a plain Electron script with the player's setup.
 
 ## YouTube's ad blocker
 

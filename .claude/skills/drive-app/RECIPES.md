@@ -45,6 +45,7 @@ await emit("tokio:event:chat", {
 - Payloads are typed by `TokioEventMap` (`src/common/types/connector.ts`). `tokio:event:disconnected` takes `{ reason: "ended" }` for a LIVE that ended.
 - `tokio:event:connected` starts the LIVE session, so Home's feed lists what follows. The page still says Offline, since its LIVE state comes from the `CONNECTED` reply: `push` that too (SKILL.md).
 - Don't look for the emitter with `node:inspector`'s `Runtime.queryObjects`: it killed main on Electron 45 every time.
+- A music request plays, but YouTube stops each song 40 to 60 seconds in under Playwright (`.claude/rules/music.md`). Check longer playback outside it.
 
 ## Counting what main sends
 
