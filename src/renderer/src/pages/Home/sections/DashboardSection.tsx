@@ -3,12 +3,13 @@ import { Btn, Input } from "@/components";
 import { cx, formatDuration } from "@/helper";
 import { rich, useT } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { type Ref, useEffect, useState } from "react";
 import { FiPlay, FiSquare } from "react-icons/fi";
 import styles from "../home.module.css";
 
 interface Props {
   username: string;
+  usernameRef?: Ref<HTMLInputElement>;
   connected: boolean;
   loading: boolean;
   // No Euler Stream API key is saved, so connecting can't work
@@ -35,6 +36,7 @@ function LiveTimer({ since }: { since: number }) {
 // The slate: the handle with Connect, and whether the LIVE is on
 export function DashboardSection({
   username,
+  usernameRef,
   connected,
   loading,
   needsKey,
@@ -65,6 +67,7 @@ export function DashboardSection({
 
       <div className={styles.connect} data-tour="connect">
         <Input
+          ref={usernameRef}
           className={styles.username}
           placeholder={t("home.dashboard.username")}
           value={username}
