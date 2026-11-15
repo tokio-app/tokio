@@ -12,10 +12,10 @@ const store = {
 
 describe("tools MCP tools", () => {
   describe("timer", () => {
-    const setup = () => {
+    const setup = (status: "idle" | "running" = "idle") => {
       const timer = {
         settings: TimerSettingsSchema.parse({}),
-        state: { status: "idle" as const, remaining: 3_600_000 },
+        state: { status, remaining: 3_600_000 },
       };
       const timerService = {
         get: () => timer,
@@ -83,12 +83,23 @@ describe("tools MCP tools", () => {
       ["add", 30_000],
       ["remove", -30_000],
     ])("can %s seconds", async (action, ms) => {
-      const { h, timerService } = setup();
+      const { h, timerService } = setup("running");
       const { call } = await mcpClient(h.handler);
 
       await call("timer", { action, seconds: 30 });
 
       expect(timerService.adjust).toHaveBeenCalledWith(ms);
+    });
+
+    it("says the clock can't change before it starts", async () => {
+      const { h, timerService } = setup("idle");
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("timer", { action: "add", seconds: 30 });
+
+      expect(res.isError).toBe(true);
+      expect(res.text).toContain("hasn't started");
+      expect(timerService.adjust).not.toHaveBeenCalled();
     });
 
     it("needs the seconds to add", async () => {

@@ -174,6 +174,12 @@ export const tools: ToolDef<any>[] = [
       if (action === "add" || action === "remove") {
         if (seconds === undefined)
           return fail("Give the seconds to add or remove.");
+        // The timer ignores it while idle, which would read as done
+        if (handler.timerService.get().state.status === "idle") {
+          return fail(
+            "The countdown hasn't started, so there's no clock to change. Start it first, or change its starting time in the timer section.",
+          );
+        }
         const { error } = await invokeOk(handler, APP_EVENTS.ADJUST_TIMER, {
           seconds: action === "add" ? seconds : -seconds,
         });
