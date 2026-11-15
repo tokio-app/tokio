@@ -1,7 +1,6 @@
 import {
   GameActionSchema,
   GameStepSchema,
-  MediaFile,
   TriggerSchema,
 } from "@/common/schemas";
 import {
@@ -15,6 +14,7 @@ import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { t } from "@/helper/i18n";
+import { importPictures } from "@/helper/library";
 import { AppHandlerVariables } from "@/types";
 import { z } from "zod";
 
@@ -184,27 +184,10 @@ events.push(
     });
     if (diagRes.canceled || diagRes.filePaths.length === 0) return;
 
-    const pictures: MediaFile[] = [];
-    let failed = 0;
-    let error: string | undefined;
-    for (const path of diagRes.filePaths) {
-      const { data, error: why } = await gamesService.importPicture(path);
-      if (!data) {
-        failed++;
-        error = why;
-      } else if (!pictures.some((p) => p.file === data.file)) {
-        // Files are named by content: one picked twice is the same picture
-        pictures.push(data);
-      }
-    }
-    if (pictures.length === 0) throw new LoggedError(error);
-
-    let saved = true;
-    for (const picture of pictures) {
-      if (!(await storeManagerService.addMinecraftPicture(picture))) {
-        saved = false;
-      }
-    }
+    const { pictures, failed, saved } = await importPictures(
+      { gamesService, storeManagerService },
+      diagRes.filePaths,
+    );
     if (!saved) {
       // What main holds: the pictures stay in its library, unsaved
       e.reply(APP_EVENTS_RESPONSE.MINECRAFT_PICTURES, {
