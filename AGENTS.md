@@ -193,7 +193,7 @@ The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../
 
 - features, settings, chat commands or install steps (its docs describe them in full; the README only sums them up)
 - the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, `TOKIO_EVENTS` names and payloads, or the other messages overlays get (`TokioPayload`)
-- the URL or behavior of Tokio's own overlays: the alerts' (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`), Minecraft's (`getMinecraftOverlayURL`) and Overlay Studio's (`getStudioOverlayURL`)
+- the URL or behavior of Tokio's own overlays: the alerts' (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`), Minecraft's (`getMinecraftOverlayURL`) and Overlay Studio's (`getStudioOverlayURL`), and the phone remote's page and API (`getRemoteURL`, `/remote/api/*`)
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
@@ -203,7 +203,7 @@ The official overlays live in `tokio-app/overlays` (locally `../tokio-overlays`)
 
 - Its `scripts/lib/schema.js` copies `OverlayMetaSchema`, `OverlayConfigSchema` and the setup block's `SCRIPT_REGEX` so its builds are checked the way `processOverlay` checks an import. Update that copy when any of them, or what `processOverlay` accepts, change.
 - Its releases publish the catalog Tokio installs from, `https://github.com/tokio-app/overlays/releases/latest/download/overlays.json` (format in its `README.md`, see `.claude/rules/overlays.md`). A new catalog schema (a renamed or removed field) needs `CatalogOverlaySchema` and `parseCatalog` to read both.
-- No official overlay can have the id `alerts`, `timer`, `games` or `studio`, paths Tokio serves itself: Tokio drops a catalog entry with any of them.
+- No official overlay can have the id `alerts`, `timer`, `games`, `studio`, `remote` or `mcp`, paths Tokio serves itself (`RESERVED_IDS`, `src/common/schemas/catalog.ts`): Tokio drops a catalog entry with any of them.
 - Tokio installs an overlay's new versions in the background, except one with a new first version number, a breaking update the user confirms (`catalogState`). Its `AGENTS.md` keeps that number for breaking changes.
 
 ## Minecraft mod repo
@@ -217,9 +217,9 @@ Java Edition connects through the Tokio mod, a Fabric mod in `tokio-app/minecraf
 - Pull requests: a Conventional Commits title, which is their line in the release notes, and the sections of `.github/pull_request_template.md`. Merge them with a merge commit, not a squash or rebase: the notes find pull requests by it (`.claude/rules/ci.md`).
 - Keep these stable; overlays, browser sources and saved data depend on them:
   - the server port (`37891`), the Minecraft port (`MINECRAFT_PORT`, 37892) and its Java subprotocol (`MINECRAFT_JAVA_PROTOCOL`, `tokio.java.v1`)
-  - the alerts' overlay path (`/alerts/<alert id>/`), the countdown timer's (`/timer/`), Minecraft's overlay (`/games/minecraft/` and `/games/minecraft/<column>/`, its pictures under `/games/minecraft/pictures/`), Overlay Studio's (`/studio/<id>/`, socket id `studio:<id>`)
+  - the alerts' overlay path (`/alerts/<alert id>/`), the countdown timer's (`/timer/`), Minecraft's overlay (`/games/minecraft/` and `/games/minecraft/<column>/`, its pictures under `/games/minecraft/pictures/`), Overlay Studio's (`/studio/<id>/`, socket id `studio:<id>`), the phone remote's (`/remote/`) and its API's routes (`/remote/api/state`, `/remote/api/<action>`), which Stream Deck setups call
   - existing event names
-- The overlay server listens on every network interface on purpose, for streaming apps on other computers (`tokio-app.local`, `REMOTE_SOCKET`, see `.claude/rules/overlays.md`). Don't bind it to loopback or add Host/Origin checks. The Minecraft socket is the exception (`.claude/rules/games.md`).
+- The overlay server listens on every network interface on purpose, for streaming apps on other computers (`tokio-app.local`, `REMOTE_SOCKET`, see `.claude/rules/overlays.md`). Don't bind it to loopback or add Host/Origin checks. The Minecraft socket is the exception (`.claude/rules/games.md`). The remote's API is gated by its key instead (`.claude/rules/controls.md`).
 - Respect inline `NOTE: DO NOT CHANGE` markers.
 - Inside a folder with a barrel `index` (`common/types`, `common/schemas`, `components`, `context`, `hooks`), import sibling files directly, never through the barrel, to avoid import cycles.
 - `npx fallow health` (also `dead-code`, `dupes`) reports import cycles, dead code and duplication. `.fallowrc.json` makes the music window UI an entry point.

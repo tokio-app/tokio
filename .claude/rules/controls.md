@@ -7,6 +7,10 @@ paths:
   - "src/renderer/src/components/ShortcutField/**"
   - "src/renderer/src/pages/Settings/sections/ShortcutsSection.tsx"
   - "src/renderer/src/pages/Home/sections/PausedSection.tsx"
+  - "src/main/services/server/remote.ts"
+  - "src/main/services/server/remote.html"
+  - "src/renderer/src/pages/Settings/sections/RemoteSection.tsx"
+  - "src/renderer/src/components/QRCode/**"
 ---
 
 # Live controls
@@ -37,3 +41,13 @@ Skip song, stop TTS, replay the last alert and pause everything (`CONTROL_ACTION
   - On Windows and Linux, Ctrl+Alt without Shift is refused: it's AltGr there, which types @ and € on Spanish layouts. So is a press with AltGr itself.
 - A combination already on another row moves to the new one, since main would report the second as taken.
 - On Wayland the shortcuts go through the GlobalShortcuts portal. GNOME asks once and needs a valid app identity (`desktopName`). This hasn't been checked on a real session.
+
+## Remote access
+
+- **Settings → Remote control** turns on the phone page at `/remote/` and its API under `/remote/api/` (`src/main/services/server/remote.ts`). It's off by default and has one key (`settings.remote`), made on first enable and replaced by **New key**, which cuts off every device. The key is plain in the store: it's local, and safeStorage would make macOS ask for the Keychain. Never log it, and never send it to overlays or WebSocket clients.
+- The overlay server listens on every interface, so the key is the API's only gate on the LAN. Every API route checks, in order: remote off → 403, then `Authorization: Bearer <key>` → 401, comparing lengths and then `timingSafeEqual`, and refusing everything while the key is empty. The check runs before a body is parsed. No CORS headers: a page on another origin can't send the header without a preflight that fails.
+- The routes are a contract (`NOTE: DO NOT CHANGE`): Stream Deck and Companion setups call `GET /remote/api/state` and `POST /remote/api/skip-song|stop-tts|replay-alert|pause` (with an optional strict `{ paused }`). Each action runs `CONTROL` through `invoke`; the state is read straight from `ControlsService`.
+- `setControlRoutes` puts the routes before the overlays' dynamic router, so they win over an installed overlay. `remote` and `mcp` are reserved ids for the same reason (`RESERVED_IDS`).
+- The page keeps the key in the URL's fragment (`#key=`), never in `localStorage`: every overlay is same-origin with `/remote/`, and a browser that opened both would share the storage. Its link (`getRemoteURL`) uses this PC's IP, since a phone can't edit its hosts file for `tokio-app.local`.
+- The page pauses with an explicit `{ paused }`, so two phones pressing at once can't undo each other; the API still toggles without a body.
+- Settings hides the QR code and the key until **Show**, since streamers show their screen. The QR is drawn black on white in any theme, for phone cameras.
