@@ -28,7 +28,8 @@ const MODIFIER_KEYS = new Set([
   "OS",
 ]);
 
-// Keys that may stand alone, as no app types with them
+// The numpad by its place, needing modifiers like the rest: a global num1
+// would stop the numpad typing 1 in every app
 const NUMPAD: Record<string, string> = {
   NumpadAdd: "numadd",
   NumpadSubtract: "numsub",
@@ -89,12 +90,17 @@ function keyName(
   map?: LayoutMap,
 ): { name: string; alone: boolean } | null {
   const { key, code } = press;
-  if (/^F([1-9]|1\d|2[0-4])$/.test(key)) return { name: key, alone: true };
+  if (/^F([1-9]|1\d|2[0-4])$/.test(key)) {
+    // F1 to F12 act in most apps (F5 reloads, Alt+F4 closes)
+    return { name: key, alone: Number(key.slice(1)) >= 13 };
+  }
   // With Num Lock off a digit's key is End, Home…, handled as those below
   if (/^Numpad\d$/.test(code) && /^\d$/.test(key)) {
-    return { name: `num${code.slice(6)}`, alone: true };
+    return { name: `num${code.slice(6)}`, alone: false };
   }
-  if (NUMPAD[code]) return { name: NUMPAD[code], alone: true };
+  if (NUMPAD[code]) return { name: NUMPAD[code], alone: false };
+  // Media keys and F13 to F24 stand alone: no app types with them, and macro
+  // pads and Stream Deck hotkeys send them
   if (MEDIA[key]) return { name: MEDIA[key], alone: true };
   if (NAMED[key]) return { name: NAMED[key], alone: false };
   if (code === "Space") return { name: "Space", alone: false };

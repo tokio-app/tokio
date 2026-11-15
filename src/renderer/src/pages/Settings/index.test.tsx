@@ -450,14 +450,14 @@ describe("Settings", () => {
     const row = (name: string) => within(screen.getByRole("group", { name }));
 
     const withShortcuts = settingsReply((s) => {
-      s.settings.shortcuts.pause = "F9";
+      s.settings.shortcuts.pause = "Ctrl+Shift+P";
     });
 
     it("saves a recorded shortcut with the others, right away", async () => {
       const { user } = await setup(withShortcuts);
       expect(
         row("Pause everything").getByTitle("Change shortcut"),
-      ).toHaveTextContent("F9");
+      ).toHaveTextContent("Ctrl + Shift + P");
 
       await user.click(row("Skip song").getByTitle("Change shortcut"));
       await user.keyboard("{Control>}{Shift>}n{/Shift}{/Control}");
@@ -468,7 +468,7 @@ describe("Settings", () => {
             skipSong: "Ctrl+Shift+N",
             stopTts: "",
             replayAlert: "",
-            pause: "F9",
+            pause: "Ctrl+Shift+P",
           },
         },
       ]);
@@ -481,10 +481,10 @@ describe("Settings", () => {
       const { user } = await setup(withShortcuts);
 
       await user.click(row("Stop TTS").getByTitle("Change shortcut"));
-      await user.keyboard("{F9}");
+      await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
 
       expect(sent(APP_EVENTS.SET_SHORTCUTS).at(-1)!.shortcuts).toMatchObject({
-        stopTts: "F9",
+        stopTts: "Ctrl+Shift+P",
         pause: "",
       });
     });

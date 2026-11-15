@@ -56,13 +56,15 @@ describe("ShortcutField", () => {
 
     expect(onChange).not.toHaveBeenCalled();
     expect(
-      screen.getByText("Hold Ctrl and one more modifier key with it."),
+      screen.getByText(
+        /^Hold Ctrl and one more modifier with it, such as Shift\./,
+      ),
     ).toHaveAttribute("aria-live", "polite");
     expect(field()).toHaveAttribute("aria-pressed", "true");
     expect(suspends()).toEqual([true]);
 
-    await user.keyboard("{F8}");
-    expect(onChange).toHaveBeenCalledExactlyOnceWith("F8");
+    await user.keyboard("{Control>}{Shift>}{F8}{/Shift}{/Control}");
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("Ctrl+Shift+F8");
   });
 
   it("cancels on Escape, without the Escape reaching a dialog or the page", async () => {

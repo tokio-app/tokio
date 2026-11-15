@@ -52,16 +52,10 @@ describe("toAccelerator", () => {
     });
   });
 
-  it("lets F-keys, the numpad and media keys stand alone", () => {
+  it("lets only F13 to F24 and the media keys stand alone", () => {
     const alone: [string, string, string][] = [
-      ["F1", "F1", "F1"],
+      ["F13", "F13", "F13"],
       ["F24", "F24", "F24"],
-      ["5", "Numpad5", "num5"],
-      ["+", "NumpadAdd", "numadd"],
-      ["-", "NumpadSubtract", "numsub"],
-      ["*", "NumpadMultiply", "nummult"],
-      ["/", "NumpadDivide", "numdiv"],
-      [".", "NumpadDecimal", "numdec"],
       ["MediaTrackNext", "MediaTrackNext", "MediaNextTrack"],
       ["MediaTrackPrevious", "MediaTrackPrevious", "MediaPreviousTrack"],
       ["MediaPlayPause", "MediaPlayPause", "MediaPlayPause"],
@@ -75,9 +69,42 @@ describe("toAccelerator", () => {
         accelerator,
       });
     }
-    expect(toAccelerator(press("F5", "F5", { altKey: true }), "linux")).toEqual(
-      { accelerator: "Alt+F5" },
-    );
+  });
+
+  it("asks F1 to F12 and the numpad for Ctrl and one more modifier", () => {
+    const refused = { refused: "modifiers" };
+    expect(toAccelerator(press("F5", "F5"), "windows")).toEqual(refused);
+    expect(
+      toAccelerator(press("F4", "F4", { altKey: true }), "windows"),
+    ).toEqual(refused);
+    expect(
+      toAccelerator(press("F5", "F5", { ctrlKey: true }), "linux"),
+    ).toEqual(refused);
+    expect(toAccelerator(press("1", "Numpad1"), "windows")).toEqual(refused);
+    expect(toAccelerator(press("F12", "F12", ctrlShift), "windows")).toEqual({
+      accelerator: "Ctrl+Shift+F12",
+    });
+    const numpad: [string, string, string][] = [
+      ["1", "Numpad1", "num1"],
+      ["+", "NumpadAdd", "numadd"],
+      ["-", "NumpadSubtract", "numsub"],
+      ["*", "NumpadMultiply", "nummult"],
+      ["/", "NumpadDivide", "numdiv"],
+      [".", "NumpadDecimal", "numdec"],
+    ];
+    for (const [key, code, name] of numpad) {
+      expect(toAccelerator(press(key, code), "windows")).toEqual(refused);
+      expect(toAccelerator(press(key, code, ctrlShift), "windows")).toEqual({
+        accelerator: `Ctrl+Shift+${name}`,
+      });
+    }
+    // Ctrl+Alt is still AltGr there
+    expect(
+      toAccelerator(
+        press("F5", "F5", { ctrlKey: true, altKey: true }),
+        "windows",
+      ),
+    ).toEqual({ refused: "altGr" });
   });
 
   it("reads a numpad key with Num Lock off as the key it acts as", () => {
