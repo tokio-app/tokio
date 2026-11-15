@@ -21,6 +21,7 @@ export * from "./PermissionsSection";
 export * from "./PlayButton";
 export * from "./ProfileDropdown";
 export * from "./ProtectionSection";
+export * from "./ShortcutField";
 export * from "./SoundPicker";
 export * from "./Toasts";
 export * from "./Tour";

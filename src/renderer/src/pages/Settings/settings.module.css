@@ -107,3 +107,9 @@
   color: var(--font-secondary);
   font-size: var(--font-sm);
 }
+
+/* SHORTCUTS: under a row whose keys another app holds */
+.taken {
+  color: var(--warning);
+  font-size: var(--font-sm);
+}

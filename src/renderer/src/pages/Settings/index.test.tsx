@@ -445,4 +445,68 @@ describe("Settings", () => {
       ]);
     });
   });
+
+  describe("Shortcuts", () => {
+    const row = (name: string) => within(screen.getByRole("group", { name }));
+
+    const withShortcuts = settingsReply((s) => {
+      s.settings.shortcuts.pause = "F9";
+    });
+
+    it("saves a recorded shortcut with the others, right away", async () => {
+      const { user } = await setup(withShortcuts);
+      expect(
+        row("Pause everything").getByTitle("Change shortcut"),
+      ).toHaveTextContent("F9");
+
+      await user.click(row("Skip song").getByTitle("Change shortcut"));
+      await user.keyboard("{Control>}{Shift>}n{/Shift}{/Control}");
+
+      expect(sent(APP_EVENTS.SET_SHORTCUTS)).toEqual([
+        {
+          shortcuts: {
+            skipSong: "Ctrl+Shift+N",
+            stopTts: "",
+            replayAlert: "",
+            pause: "F9",
+          },
+        },
+      ]);
+      expect(row("Skip song").getByTitle("Change shortcut")).toHaveTextContent(
+        "Ctrl + Shift + N",
+      );
+    });
+
+    it("moves a shortcut that another row had", async () => {
+      const { user } = await setup(withShortcuts);
+
+      await user.click(row("Stop TTS").getByTitle("Change shortcut"));
+      await user.keyboard("{F9}");
+
+      expect(sent(APP_EVENTS.SET_SHORTCUTS).at(-1)!.shortcuts).toMatchObject({
+        stopTts: "F9",
+        pause: "",
+      });
+    });
+
+    it("says which shortcuts another app holds, until the row changes", async () => {
+      const { user } = await setup(withShortcuts);
+
+      await send(APP_EVENTS_RESPONSE.SET_SHORTCUTS, {
+        success: true,
+        taken: ["pause"],
+      });
+      expect(
+        row("Pause everything").getByText("In use by another app"),
+      ).toBeVisible();
+      expect(screen.getAllByText("In use by another app")).toHaveLength(1);
+
+      await user.click(row("Pause everything").getByTitle("Remove shortcut"));
+
+      expect(
+        row("Pause everything").queryByText("In use by another app"),
+      ).not.toBeInTheDocument();
+      expect(sent(APP_EVENTS.SET_SHORTCUTS).at(-1)!.shortcuts.pause).toBe("");
+    });
+  });
 });
