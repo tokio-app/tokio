@@ -44,7 +44,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 // Least time the splash stays on screen, so a fast start doesn't flash it
 const SPLASH_MIN_MS = 2000;
 
-export class AppHandler implements AppHandlerVariables {
+// Handler adds invoke, which needs the stack init gets
+type AppHandlerDeps = Omit<AppHandlerVariables, "invoke">;
+
+export class AppHandler implements AppHandlerDeps {
   public readonly app: App;
   // Shown once a run, and kept: a collected notification loses its click
   private _stillRunning: Notification | null = null;
@@ -81,7 +84,7 @@ export class AppHandler implements AppHandlerVariables {
   public readonly translationService: TranslationService;
   public readonly notifier: Notifier;
 
-  constructor(deps: AppHandlerVariables) {
+  constructor(deps: AppHandlerDeps) {
     Object.assign(this, deps);
   }
 

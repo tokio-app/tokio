@@ -17,7 +17,6 @@ import { AppFailure, Notifier } from "./feedback";
 
 // Stand-ins with only what runEvent reads
 const asHandler = (value: any): AppHandlerVariables => value;
-const asReplyEvent = (value: any): ReplyEvent => value;
 
 const failure = {
   code: FEEDBACK_CODES.PROFILE_CREATE_FAILED,
@@ -32,7 +31,7 @@ const failureError = {
 describe("runEvent", () => {
   let sent: AppNotification[];
   let handler: AppHandlerVariables;
-  let reply: ReturnType<typeof vi.fn>;
+  let reply: ReturnType<typeof vi.fn<ReplyEvent["reply"]>>;
   let e: ReplyEvent;
 
   beforeEach(() => {
@@ -44,7 +43,7 @@ describe("runEvent", () => {
       pathManagerService: { files: { logs: { system: "system.log" } } },
     });
     reply = vi.fn();
-    e = asReplyEvent({ reply });
+    e = { reply };
   });
 
   // Runs the only handler of a stack, the way the Handler does.
@@ -56,16 +55,17 @@ describe("runEvent", () => {
     const stack = createStack(source);
     stack.push(APP_EVENTS.CREATE_PROFILE, callback, options);
     const [item] = stack.getEvents();
-    await runEvent(item, handler, e, { name: "Main" });
+    return runEvent(item, handler, e, { name: "Main" });
   };
 
   it("doesn't report a handler that succeeds", async () => {
     const error = vi.spyOn(Logger, "error");
 
-    await run(async (_, e) => {
+    const res = await run(async (_, e) => {
       e.reply(APP_EVENTS_RESPONSE.CREATE_PROFILE, { success: true });
     });
 
+    expect(res).toBeUndefined();
     expect(reply).toHaveBeenCalledExactlyOnceWith(
       APP_EVENTS_RESPONSE.CREATE_PROFILE,
       { success: true },
@@ -78,7 +78,7 @@ describe("runEvent", () => {
     const warn = vi.spyOn(Logger, "warn");
     const onError = vi.fn();
 
-    await run(
+    const res = await run(
       () => {
         throw new AppFailure(
           FEEDBACK_CODES.PROFILE_LOCKED,
@@ -96,6 +96,7 @@ describe("runEvent", () => {
       code: FEEDBACK_CODES.PROFILE_LOCKED,
       message: "Disconnect first.",
     };
+    expect(res).toEqual(error);
     expect(onError).toHaveBeenCalledExactlyOnceWith(
       e,
       error,
@@ -168,7 +169,9 @@ describe("runEvent", () => {
           },
         },
       ),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual(
+      expect.objectContaining({ code: FEEDBACK_CODES.UNKNOWN }),
+    );
 
     expect(logError).toHaveBeenCalledWith(
       expect.stringContaining("window closed"),
