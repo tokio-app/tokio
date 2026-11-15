@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ControlAction } from "../types/controls";
 import { AlertSoundSchema } from "./profile";
 import { StoredStudioOverlaysSchema } from "./studio";
 
@@ -50,6 +51,18 @@ export const GamesSettingsSchema = z
     // /connect from its chat
     minecraft: z.object({ enabled: z.boolean().default(false) }).prefault({}),
   })
+  .prefault({});
+
+// An Electron accelerator per live control, the same for every profile. ""
+// is none, as each starts: a global shortcut takes its keys from every app.
+const accelerator = z.string().default("");
+export const ShortcutsSchema = z
+  .object({
+    skipSong: accelerator,
+    stopTts: accelerator,
+    replayAlert: accelerator,
+    pause: accelerator,
+  } satisfies Record<ControlAction, typeof accelerator>)
   .prefault({});
 
 const AppSettingsSchema = z.object({
@@ -118,6 +131,7 @@ const AppSettingsSchema = z.object({
     join: true,
   }),
   games: GamesSettingsSchema,
+  shortcuts: ShortcutsSchema,
   liveStats: z.object({
     likes: z.number(),
     views: z.number(),
@@ -143,5 +157,6 @@ export type OverlayMetadata = z.infer<typeof OverlayMetaSchema>;
 export type TestOverlay = z.infer<typeof TestOverlaySchema>;
 export type ActivityFeed = z.infer<typeof ActivityFeedSchema>;
 export type GamesSettings = z.infer<typeof GamesSettingsSchema>;
+export type Shortcuts = z.infer<typeof ShortcutsSchema>;
 export type AppSettings = z.infer<typeof AppSettingsSchema>;
 export type StoreSchema = z.infer<typeof StoreZodSchema>;

@@ -10,6 +10,7 @@ import {
 import type { Notifier } from "@/helper/feedback";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
+import { ControlsService } from "@/services/controls";
 import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
 import { HistoryService } from "@/services/history";
@@ -71,6 +72,7 @@ export interface AppServices {
   readonly studioService: StudioService;
   readonly trayService: TrayService;
   readonly translationService: TranslationService;
+  readonly controlsService: ControlsService;
 }
 
 export interface AppHandlerVariables extends AppServices {

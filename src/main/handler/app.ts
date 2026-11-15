@@ -11,6 +11,7 @@ import {
 } from "@/helper/network";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
+import { ControlsService } from "@/services/controls";
 import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
 import { HistoryService } from "@/services/history";
@@ -82,6 +83,7 @@ export class AppHandler implements AppHandlerDeps {
   public readonly studioService: StudioService;
   public readonly trayService: TrayService;
   public readonly translationService: TranslationService;
+  public readonly controlsService: ControlsService;
   public readonly notifier: Notifier;
 
   constructor(deps: AppHandlerDeps) {

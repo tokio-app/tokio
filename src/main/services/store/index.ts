@@ -11,6 +11,7 @@ import {
   Profile,
   ProfileSchema,
   SavedEmote,
+  ShortcutsSchema,
   StoreSchema,
   StoreZodSchema,
   StudioElement,
@@ -518,6 +519,13 @@ export class StoreManagerService extends Service {
     this._ensureInitialized();
     const games = GamesSettingsSchema.parse(settings);
     this._storeData!.settings.games = games;
+    return this._queueSave();
+  }
+
+  // Throws on shortcuts the schema refuses, like updateGamesSettings
+  public async updateShortcuts(shortcuts: unknown): Promise<boolean> {
+    this._ensureInitialized();
+    this._storeData!.settings.shortcuts = ShortcutsSchema.parse(shortcuts);
     return this._queueSave();
   }
 

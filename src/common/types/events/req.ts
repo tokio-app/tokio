@@ -1,4 +1,5 @@
 import { AlertTrigger, TokioPayload } from "../connector";
+import { ControlAction } from "../controls";
 import { CameraChunk, CameraFailure } from "../studio";
 import {
   ActivityFeed,
@@ -8,6 +9,7 @@ import {
   MinecraftEdition,
   OverlayConfig,
   Profile,
+  Shortcuts,
   StudioOverlay,
   TimerAction,
   TimerSettings,
@@ -77,6 +79,12 @@ export enum APP_EVENTS {
   TEST_TRANSLATION = "app:settings:test:translation",
   REQ_FQDN = "app:settings:req:fqdn",
   GET_NETWORK_ADDRESSES = "app:settings:get:network",
+  SET_SHORTCUTS = "app:settings:set:shortcuts",
+  SUSPEND_SHORTCUTS = "app:settings:suspend:shortcuts",
+
+  // LIVE CONTROLS
+  CONTROL = "app:controls:run",
+  GET_CONTROLS = "app:controls:get",
 
   // HOME
   CONNECT = "app:home:connect",
@@ -316,6 +324,16 @@ export interface AppEventsMap {
 
   [APP_EVENTS.REQ_FQDN]: void;
   [APP_EVENTS.GET_NETWORK_ADDRESSES]: void;
+  // An Electron accelerator per action, "" for none
+  [APP_EVENTS.SET_SHORTCUTS]: { shortcuts: Shortcuts };
+  // While a shortcut field records, so its keys reach the field
+  [APP_EVENTS.SUSPEND_SHORTCUTS]: { suspended: boolean };
+
+  // LIVE CONTROLS
+  // pause toggles without paused, and sets it with
+  [APP_EVENTS.CONTROL]: { action: ControlAction; paused?: boolean };
+  // Answered by CONTROLS
+  [APP_EVENTS.GET_CONTROLS]: void;
 
   // HOME
   [APP_EVENTS.CONNECT]: {

@@ -14,6 +14,7 @@ import { hasPending, settle } from "@/helper/quit";
 import Logger from "@/logger";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
+import { ControlsService } from "@/services/controls";
 import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
 import { HistoryService } from "@/services/history";
@@ -110,6 +111,7 @@ const services: AppServices = {
   studioService: new StudioService(),
   trayService: new TrayService(),
   translationService: new TranslationService(),
+  controlsService: new ControlsService(),
 };
 
 // Packaged, the notices are copied to resources/licenses (electron-builder.yml).

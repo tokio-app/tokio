@@ -20,6 +20,7 @@ paths:
 
 - `test/setup.ts` mocks `electron` with the fakes in `test/main/electron.ts` (import them from `@test/electron`) and resets them before each test. Their state survives `vi.resetModules()`.
   - Windows, views and webContents record what they get (emit `render-process-gone` on a `FakeWebContents` to test `reloadWhenGone`). Tray icons are in `trays()`, notifications in `notifications()`.
+  - `globalShortcut` keeps what's registered: `take(accelerator)` marks one another app holds, `press(accelerator)` fires one, and nothing registers or fires while suspended.
   - `screen` has a 1920×1040 work area unless a test sets `getPrimaryDisplay`. A `nativeImage`'s images only say what they were made from.
   - `safeStorage`'s async calls round-trip text with the `v10` prefix Chromium adds; a saved key that doesn't start with `v` and two digits is read as plain text.
 - The setup also silences the console, and Logger only writes to absolute paths, so tests can name log files `"system.log"`. Spy on `Logger` to assert logs; after `vi.resetModules()`, on the copy the re-imported code got.

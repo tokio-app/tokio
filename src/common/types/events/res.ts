@@ -1,6 +1,7 @@
 import { AboutInfo, LicenseText } from "../about";
 import { MyInstantsSound } from "../alerts";
 import { Fan, MusicInfo, TokioPayload, TopGifter } from "../connector";
+import { ControlAction, ControlState } from "../controls";
 import { CustomGift, OverlayConfigRedux } from "../overlay";
 import {
   AlertMedia,
@@ -86,6 +87,11 @@ export enum APP_EVENTS_RESPONSE {
   TEST_TRANSLATION = "app:settings:res:test:translation",
   REQ_FQDN = "app:settings:res:fqdn",
   GET_NETWORK_ADDRESSES = "app:settings:res:network",
+  SET_SHORTCUTS = "app:settings:res:set:shortcuts",
+
+  // LIVE CONTROLS
+  CONTROL = "app:controls:res:run",
+  CONTROLS = "app:controls:res:state",
 
   //HOME
   CONNECTED = "app:home:res:connect",
@@ -275,6 +281,19 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.REQ_FQDN]: Reply;
   // This PC's IPv4 addresses, see ServerService.networkAddresses
   [APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES]: { addresses: string[] };
+  // The actions whose shortcut another app holds, which don't fire
+  [APP_EVENTS_RESPONSE.SET_SHORTCUTS]: Reply<{ taken: ControlAction[] }>;
+
+  // LIVE CONTROLS
+  // done is false when there was nothing to do, such as no alert to replay.
+  // paused is the state after it.
+  [APP_EVENTS_RESPONSE.CONTROL]: Reply<{
+    action: ControlAction;
+    done: boolean;
+    paused: boolean;
+  }>;
+  // The reply to GET_CONTROLS, pushed again on every change
+  [APP_EVENTS_RESPONSE.CONTROLS]: ControlState;
 
   // HOME
   // success while connecting or connected, which locks the profile; live
