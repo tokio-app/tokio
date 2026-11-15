@@ -10,8 +10,8 @@ import {
 import { APP_EVENTS, APP_EVENTS_RESPONSE, TOKIO_EVENTS } from "@/common/types";
 import { newStudioElement, newStudioGroup } from "@/common/util";
 import { rotateCursor } from "./helper";
-import { createAction } from "@/pages/Games/helper";
-import { createAlert } from "@/pages/Alerts/helper";
+import { createAction } from "@/common/util";
+import { createAlert } from "@/common/util";
 import {
   gift,
   overlayApp,

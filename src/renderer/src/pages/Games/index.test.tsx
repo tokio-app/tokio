@@ -20,7 +20,7 @@ import { act, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Games } from ".";
 import styles from "./games.module.css";
-import { createAction } from "./helper";
+import { createAction } from "@/common/util";
 
 const action = (id: string, patch: Partial<GameAction> = {}): GameAction => ({
   ...createAction("bedrock"),

@@ -1,6 +1,6 @@
 import { Alert } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { createAlert } from "@/pages/Alerts/helper";
+import { createAlert } from "@/common/util";
 import { intersect } from "@test/dom";
 import { alertMedia, failure, mediaFile } from "@test/fixtures";
 import { send, sent } from "@test/ipc";

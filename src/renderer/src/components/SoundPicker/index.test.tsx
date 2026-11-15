@@ -6,7 +6,7 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import { ALERT_MESSAGE_VARIABLES } from "@/common/util";
-import { createAlert } from "@/pages/Alerts/helper";
+import { createAlert } from "@/common/util";
 import { intersect } from "@test/dom";
 import { alertSound, engine, failure, voice } from "@test/fixtures";
 import { send, sent } from "@test/ipc";

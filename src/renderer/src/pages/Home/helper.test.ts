@@ -1,4 +1,4 @@
-import { createAlert } from "@/pages/Alerts/helper";
+import { createAlert } from "@/common/util";
 import { describe, expect, it } from "vitest";
 import {
   alertsStatus,

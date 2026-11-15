@@ -1,6 +1,6 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, LiveSession } from "@/common/types";
 import { EULER_SIGNUP_URL } from "@/common/util";
-import { createAlert } from "@/pages/Alerts/helper";
+import { createAlert } from "@/common/util";
 import {
   liveSession,
   profileReply,

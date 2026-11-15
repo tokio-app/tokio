@@ -31,6 +31,11 @@ export const REMOTE_PATH = "remote";
 export const getRemoteURL = (host: string, key: string) =>
   `http://${host}:${SERVER_PORT}/${REMOTE_PATH}/#key=${encodeURIComponent(key)}`;
 
+// NOTE: DO NOT CHANGE. MCP clients are set up with this URL. It answers on
+// loopback only: the key would cross the LAN unencrypted.
+export const MCP_PATH = "mcp";
+export const MCP_URL = `http://127.0.0.1:${SERVER_PORT}/${MCP_PATH}`;
+
 // NOTE: DO NOT CHANGE. Each Overlay Studio overlay is served at
 // /studio/<overlay id>/, connects with studio:<overlay id>, and browser
 // sources point at it.
