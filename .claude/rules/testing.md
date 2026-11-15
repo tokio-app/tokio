@@ -20,12 +20,13 @@ paths:
 
 - `test/setup.ts` mocks `electron` with the fakes in `test/main/electron.ts` (import them from `@test/electron`) and resets them before each test. Their state survives `vi.resetModules()`.
   - Windows, views and webContents record what they get (emit `render-process-gone` on a `FakeWebContents` to test `reloadWhenGone`). Tray icons are in `trays()`, notifications in `notifications()`.
+  - `globalShortcut` keeps what's registered: `take(accelerator)` marks one another app holds, `press(accelerator)` fires one, and nothing registers or fires while suspended.
   - `screen` has a 1920×1040 work area unless a test sets `getPrimaryDisplay`. A `nativeImage`'s images only say what they were made from.
   - `safeStorage`'s async calls round-trip text with the `v10` prefix Chromium adds; a saved key that doesn't start with `v` and two digits is read as plain text.
 - The setup also silences the console, and Logger only writes to absolute paths, so tests can name log files `"system.log"`. Spy on `Logger` to assert logs; after `vi.resetModules()`, on the copy the re-imported code got.
   - It turns debug off before each test. A spy on `Logger.debug` still records calls while debug is off.
   - It imports `Logger` before any test file runs, so a test's `vi.mock("node:fs/promises")` doesn't reach it. Fail a write for real instead: the logger test puts a folder where the backup goes.
-- Test IPC handlers with `createHandler(stubs)` from `@test/handler`: partial service stubs (anything else the handler reaches for fails the test), fake windows and a real `Notifier`. `invoke(stack, APP_EVENTS.X, data)` runs a page's handler as the Handler does; read `replies(channel)`, `pushed(channel)`, `notices`, or `sent()` for all in order. `eventSource()` stands in for the connector's and the music service's live events.
+- Test IPC handlers with `createHandler(stubs)` from `@test/handler`: partial service stubs (anything else the handler reaches for fails the test), fake windows and a real `Notifier`. `invoke(stack, APP_EVENTS.X, data)` runs a page's handler as the Handler does; read `replies(channel)`, `pushed(channel)`, `notices`, or `sent()` for all in order. `createHandler(stubs, { stack })` gives code that runs a request in main a `handler.invoke` that runs that stack's handlers as `Handler.invoke` does: its replies reach `pushed`, all but `PRIVATE_REPLIES`. `eventSource()` stands in for the connector's and the music service's live events.
 - `test/setup.ts` also resets main's language to English (`resetLanguage`). The fake `app.getPreferredSystemLanguages` gives `["en-US"]`; `setLanguage("es-419")` tests the Spanish.
 - Give services a temp folder (`mkdtemp`) through their setters or `initialize`, stub `fetch` with `vi.stubGlobal`, and use fake timers for the queues.
 - The Windows TTS script runs for real, on Windows only (`describe.runIf`).

@@ -862,6 +862,39 @@ describe("Spotify", () => {
     });
   });
 
+  describe("next", () => {
+    it("asks Spotify for the next song", async () => {
+      const fetch = stubFetch({ api: () => noContent() });
+      const spotify = await login();
+
+      await spotify.next();
+
+      expect(apiRequests(fetch).at(-1)).toEqual({
+        path: "/me/player/next",
+        method: "POST",
+        auth: "Bearer access",
+        body: "",
+      });
+    });
+
+    it("fails as the API says", async () => {
+      stubFetch({ api: () => apiError(403, "Premium required") });
+      const spotify = await login();
+
+      await expect(spotify.next()).rejects.toThrow(
+        "Premium Required or user not whitelisted.",
+      );
+    });
+
+    it("does nothing while inactive", async () => {
+      const fetch = stubFetch({ api: () => noContent() });
+
+      await new Spotify("client-id").next();
+
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+
   describe("token refresh", () => {
     it("refreshes 60 seconds before the token expires", async () => {
       const fetch = stubFetch({

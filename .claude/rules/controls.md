@@ -1,0 +1,39 @@
+---
+paths:
+  - "src/main/services/controls/**"
+  - "src/main/events/pages/controls.ts"
+  - "src/main/helper/shortcuts.ts"
+  - "src/renderer/src/helper/accelerator.ts"
+  - "src/renderer/src/components/ShortcutField/**"
+  - "src/renderer/src/pages/Settings/sections/ShortcutsSection.tsx"
+  - "src/renderer/src/pages/Home/sections/PausedSection.tsx"
+---
+
+# Live controls
+
+Skip song, stop TTS, replay the last alert and pause everything (`CONTROL_ACTIONS`). They all run through the `CONTROL` request (`src/main/events/pages/controls.ts`), which global shortcuts reach with `invoke` (AGENTS.md, IPC events). The handler parses its payload, since `invoke` callers send whatever they got.
+
+## Actions
+
+- Stop TTS is `clearTalk()` and `TTS_CLEAR`, always together (`.claude/rules/tts.md`).
+- Skip (`MusicService.skip`) waits behind song searches as `!next` does, with no cooldown or permissions. A waiting request plays; otherwise the player's own Next runs (`MusicProvider.next`), and `endCurrent` drops the skipped request at once, since `remaining()` would notice only within `MOVED_CHECK_MS`. YouTube's Next selector is `NEXT_BUTTON` in its config: fix it there when YouTube changes. A failed Next is only logged.
+- Replay sends the last LIVE event's alerts again, once each (`repeat: 1`), even with alerts off or paused: it's an explicit press. Each `dispatchAlert` call (`init.ts`) collects its payloads in one array, recorded with its first, so spoken alerts made later join their own event.
+- Pause holds reactions while the music plays on (the user's call):
+  - Pausing stops TTS and alerts (the same pairs as Home's switches) and drops the game backlogs (`GamesService.stopRuns`).
+  - While paused, `handleChat`, `dispatchAlert` and `dispatchGames` return at once. So does the alert send callback, for a spoken alert finished after the pause came. Nothing from the pause plays later.
+  - `handleChat` returns before its `else` branches: their `clearHandler()` would empty the song queue.
+  - It lives in memory. `CONNECTED` clears it, so a new LIVE never starts silent.
+  - Home shows it: it asks `GET_CONTROLS` on mount, since a reload mid-pause misses the `CONTROLS` push.
+- No success notices: the effect is heard, and a LIVE's skips would fill the bell.
+
+## Shortcuts
+
+- `settings.shortcuts` holds an Electron accelerator per action, all empty by default: a global shortcut takes its keys from every app. `applyShortcuts` registers them at the first `LOAD_APP` and on `SET_SHORTCUTS`. `register` is false when another app holds one, which warns (`SHORTCUT_TAKEN`) and shows under its row.
+- The recorder suspends them (`SUSPEND_SHORTCUTS`), or a combination already set would fire its action instead of reaching the field. Registrations fail while suspended, so `SET_SHORTCUTS` resumes first. Every `LOAD_APP` resumes too, so a window that died mid-recording can't leave them off. `will-quit` unregisters before its settle wait.
+- `toAccelerator` takes a letter from the character its key types on the user's layout (`navigator.keyboard.getLayoutMap()`), never from where it sits on a US keyboard (`.claude/rules/app-lifecycle.md`), and a digit from the number row's key.
+- What a shortcut may be:
+  - F13–F24 and the media keys can stand alone: macro pads and Stream Deck hotkey actions send them.
+  - Everything else needs two modifiers, one of them Ctrl (⌘ or ⌃ on macOS), so Ctrl+C, F5 or a numpad digit never stop working in other apps.
+  - On Windows and Linux, Ctrl+Alt without Shift is refused: it's AltGr there, which types @ and € on Spanish layouts. So is a press with AltGr itself.
+- A combination already on another row moves to the new one, since main would report the second as taken.
+- On Wayland the shortcuts go through the GlobalShortcuts portal. GNOME asks once and needs a valid app identity (`desktopName`). This hasn't been checked on a real session.

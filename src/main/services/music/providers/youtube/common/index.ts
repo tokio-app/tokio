@@ -88,6 +88,22 @@ export const PlayJSCode = (videoId: string) => `
 })();
 `;
 
+// Presses the player bar's Next as a person would, else asks the player for
+// its next video. True once one of them was there.
+export const NextJSCode = `
+(() => {
+  const next = document.querySelector(${JSON.stringify(config.NEXT_BUTTON)});
+  if (next) {
+    next.click();
+    return true;
+  }
+  const player = document.querySelector("#movie_player");
+  if (!player?.nextVideo) return false;
+  player.nextVideo();
+  return true;
+})();
+`;
+
 // An isolated world of its own, where YouTube's page can't see the script
 export const KEEP_PLAYING_WORLD = 1919;
 

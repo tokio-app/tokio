@@ -21,6 +21,7 @@ import { DashboardSection } from "./sections/DashboardSection";
 import { FeaturesSection } from "./sections/FeaturesSection";
 import { FeedModal } from "./sections/FeedModal";
 import { LiveSection } from "./sections/LiveSection";
+import { PausedSection } from "./sections/PausedSection";
 
 export function Home() {
   const t = useT();
@@ -46,6 +47,7 @@ export function Home() {
   const [session, setSession] = useState(NO_SESSION);
   const [gifters, setGifters] = useState<TopGifter[]>([]);
   const [songs, setSongs] = useState<MusicInfo[]>([]);
+  const [paused, setPaused] = useState(false);
 
   useIpcRequest(APP_EVENTS.GET_PROFILE);
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
@@ -54,6 +56,12 @@ export function Home() {
   useIpcRequest(APP_EVENTS.GET_LIVE_SESSION);
   useIpcRequest(APP_EVENTS.GET_LIVE_GIFTERS);
   useIpcRequest(APP_EVENTS.GET_SONGS);
+  // Asked too, since a reload mid-pause would miss the push
+  useIpcRequest(APP_EVENTS.GET_CONTROLS);
+
+  useIpcListener(APP_EVENTS_RESPONSE.CONTROLS, (res) => {
+    if (res) setPaused(res.paused);
+  });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
     if (!res?.success) return;
@@ -143,6 +151,17 @@ export function Home() {
       <div className={styles.home}>
         <div className={styles.board}>
           <div className={styles.board_inner}>
+            {paused && (
+              <PausedSection
+                onResume={() =>
+                  window.api.emit(APP_EVENTS.CONTROL, {
+                    action: "pause",
+                    paused: false,
+                  })
+                }
+              />
+            )}
+
             <DashboardSection
               username={username}
               connected={connected}

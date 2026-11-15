@@ -623,6 +623,20 @@ describe("GamesService", () => {
         expect(minecraft.sent).toEqual(["each 300", "each 300"]);
       });
 
+      it("stops backlogs on stopRuns", async () => {
+        vi.useFakeTimers();
+        const minecraft = fakeMinecraft();
+        const games = service(minecraft);
+        const run = games.handle(TOKIO_EVENTS.GIFT, gift(300), {
+          actions: [everyGift()],
+        });
+        await vi.advanceTimersByTimeAsync(RUN_GAP_MS);
+        games.stopRuns();
+        await vi.runAllTimersAsync();
+        await run;
+        expect(minecraft.sent).toEqual(["each 300", "each 300"]);
+      });
+
       it("drops the backlog when the game leaves, reporting it once", async () => {
         vi.useFakeTimers();
         const minecraft = fakeMinecraft();

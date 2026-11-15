@@ -5,9 +5,10 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { TaskQueue } from "@/common/util";
+import { formatError, TaskQueue } from "@/common/util";
 import { sameHandle, startsWithCommand } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
+import Logger from "@/logger";
 import { ProviderService } from "@/services/shared";
 import {
   ConnectionResponse,
@@ -130,6 +131,35 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._requesting.clear();
     this._queue.stop();
     this._music_queue.clear();
+  }
+
+  /**
+   * Skips whatever plays, for the live controls: a request that waits plays,
+   * else the player's own Next. Behind the song searches, as !next is, with
+   * no cooldown or permissions. False when not connected or the queue is full.
+   */
+  public skip(): boolean {
+    if (!this.isActive()) return false;
+    const from = this._music_queue.playing();
+    return this._queue.enqueue(async () => {
+      // Another song started meanwhile
+      if (this._music_queue.playing() !== from) return;
+      if (this._music_queue.hasNext()) {
+        await this._music_queue.triggerNext(from);
+        return;
+      }
+      try {
+        await this._current.provider.next();
+      } catch (error) {
+        Logger.warn(
+          `<Music> Unable to skip the song -- ${formatError(error)}`,
+          this._logFile,
+        );
+        return;
+      }
+      // Undefined would end a request that started meanwhile
+      if (from) await this._music_queue.endCurrent(from);
+    });
   }
 
   // The host is the handle of the LIVE's account

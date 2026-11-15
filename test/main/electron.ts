@@ -260,6 +260,50 @@ type HeadersListener = (
   callback: (response: { responseHeaders?: Record<string, string[]> }) => void,
 ) => void;
 
+// Global shortcuts by accelerator. Tests mark the ones another app holds
+// with take, and press fires one.
+function createGlobalShortcut() {
+  const registered = new Map<string, () => void>();
+  const taken = new Set<string>();
+  let suspended = false;
+  return {
+    register: vi.fn((accelerator: string, callback: () => void) => {
+      // Electron refuses registrations while suspended
+      if (suspended || taken.has(accelerator) || registered.has(accelerator)) {
+        return false;
+      }
+      registered.set(accelerator, callback);
+      return true;
+    }),
+    unregister: vi.fn((accelerator: string) => {
+      registered.delete(accelerator);
+    }),
+    unregisterAll: vi.fn(() => {
+      registered.clear();
+    }),
+    isRegistered: vi.fn((accelerator: string) => registered.has(accelerator)),
+    setSuspended: vi.fn((value: boolean) => {
+      suspended = value;
+    }),
+    isSuspended: vi.fn(() => suspended),
+    take: (accelerator: string) => {
+      taken.add(accelerator);
+    },
+    /** Fires the shortcut as its keys would; false when none fired. */
+    press: (accelerator: string) => {
+      const callback = registered.get(accelerator);
+      if (suspended || !callback) return false;
+      callback();
+      return true;
+    },
+    reset: () => {
+      registered.clear();
+      taken.clear();
+      suspended = false;
+    },
+  };
+}
+
 function createFakes() {
   return {
     created: {
@@ -366,6 +410,7 @@ function createFakes() {
         result: data.toString("utf-8").replace(/^v\d\d/, ""),
       }),
     },
+    globalShortcut: createGlobalShortcut(),
     // macOS's privacy settings, which allowed the camera
     systemPreferences: {
       getMediaAccessStatus: vi.fn(
@@ -400,6 +445,7 @@ export const {
   screen,
   safeStorage,
   systemPreferences,
+  globalShortcut,
   Menu,
   nativeImage,
 } = fakes;
@@ -445,5 +491,6 @@ export function resetElectron() {
   ipcRenderer.removeAllListeners();
   app.removeAllListeners();
   app.isPackaged = false;
+  globalShortcut.reset();
   resetMocks(fakes);
 }

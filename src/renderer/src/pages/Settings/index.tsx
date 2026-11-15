@@ -1,4 +1,9 @@
-import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import {
+  APP_EVENTS,
+  APP_EVENTS_RESPONSE,
+  CONTROL_ACTIONS,
+  ControlAction,
+} from "@/common/types";
 import { defaultStoreData } from "@/common/util";
 import { Modal, Page } from "@/components";
 import {
@@ -15,6 +20,7 @@ import { CloneProfileModal, NewProfileModal } from "./sections/ProfileModals";
 import { ProfileSection } from "./sections/ProfileSection";
 import { ProvidersSection } from "./sections/ProvidersSection";
 import { ServerSection } from "./sections/ServerSection";
+import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { TranslationSection } from "./sections/TranslationSection";
 import { TraySection } from "./sections/TraySection";
 import { UpdatesSection } from "./sections/UpdatesSection";
@@ -27,6 +33,8 @@ export function Settings() {
   const [store, updateStore, setStore] = useImmerState(defaultStoreData);
   const [modal, setModal] = useState<ModalType | null>(null);
   const [connected, setConnected] = useState(false);
+  // The shortcuts another app holds, from main's last answer
+  const [taken, setTaken] = useState<ControlAction[]>([]);
 
   const setServerEnabled = (enabled: boolean) =>
     updateStore((s) => {
@@ -49,6 +57,27 @@ export function Settings() {
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
     if (res?.success) setStore(res.data!);
   });
+
+  useIpcListener(APP_EVENTS_RESPONSE.SET_SHORTCUTS, (res) => {
+    if (res) setTaken(res.taken ?? []);
+  });
+
+  const setShortcut = (action: ControlAction, accelerator: string) => {
+    const old = store.settings.shortcuts;
+    // One shortcut fires one action, so it leaves the row it was on
+    const shortcuts = { ...old };
+    for (const a of CONTROL_ACTIONS) {
+      if (accelerator && shortcuts[a] === accelerator) shortcuts[a] = "";
+    }
+    shortcuts[action] = accelerator;
+    updateStore((s) => {
+      s.settings.shortcuts = shortcuts;
+    });
+    setTaken((list) =>
+      list.filter((a) => a !== action && shortcuts[a] === old[a]),
+    );
+    window.api.emit(APP_EVENTS.SET_SHORTCUTS, { shortcuts });
+  };
 
   const closeModal = () => setModal(null);
 
@@ -142,6 +171,12 @@ export function Settings() {
             });
             window.api.emit(APP_EVENTS.SET_TRAY, { enabled });
           }}
+        />
+
+        <ShortcutsSection
+          shortcuts={store.settings.shortcuts}
+          taken={taken}
+          onChange={setShortcut}
         />
 
         <VoiceKeysSection />

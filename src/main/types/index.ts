@@ -10,6 +10,7 @@ import {
 import type { Notifier } from "@/helper/feedback";
 import { AlertsService } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
+import { ControlsService } from "@/services/controls";
 import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
 import { HistoryService } from "@/services/history";
@@ -33,7 +34,6 @@ import {
   App,
   BrowserWindow,
   IpcMain,
-  IpcMainEvent,
   session as Session,
   Shell,
   WebContents,
@@ -72,6 +72,7 @@ export interface AppServices {
   readonly studioService: StudioService;
   readonly trayService: TrayService;
   readonly translationService: TranslationService;
+  readonly controlsService: ControlsService;
 }
 
 export interface AppHandlerVariables extends AppServices {
@@ -83,14 +84,36 @@ export interface AppHandlerVariables extends AppServices {
   readonly shell: Shell;
   readonly session: typeof Session;
   readonly notifier: Notifier;
+  // Runs a request's handler in main, as if the window had sent it. A void
+  // request still needs undefined as its data.
+  readonly invoke: Invoke;
 }
 
-export type ReplyEvent = Omit<IpcMainEvent, "reply"> & {
+// All a handler gets of the event, so it can run without the window too
+// (Handler.invoke). Electron's IpcMainEvent is one.
+export type ReplyEvent = {
   reply: <T extends APP_EVENTS_RESPONSE>(
     event: T,
     args: AppEventsResponseMap[T],
   ) => void;
 };
+
+// A reply as a [channel, data] pair
+export type SentReply = {
+  [T in APP_EVENTS_RESPONSE]: [T, AppEventsResponseMap[T]];
+}[APP_EVENTS_RESPONSE];
+
+export interface InvokeResult {
+  // What the handler reported when it threw
+  error?: AppError;
+  // The replies sent before it finished, oldest first
+  replies: SentReply[];
+}
+
+export type Invoke = <K extends APP_EVENTS>(
+  event: K,
+  data: AppEventsMap[K],
+) => Promise<InvokeResult>;
 
 export type EventCallback<K extends APP_EVENTS> = (
   handler: AppHandlerVariables,

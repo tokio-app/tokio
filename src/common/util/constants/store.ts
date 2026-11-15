@@ -56,6 +56,12 @@ export const defaultStoreData: StoreSchema = {
     games: {
       minecraft: { enabled: false },
     },
+    shortcuts: {
+      skipSong: "",
+      stopTts: "",
+      replayAlert: "",
+      pause: "",
+    },
     liveStats: { ...EMPTY_LIVE_STATS },
     activeProfile: defaultEntity,
     activeConnProvider: defaultProvider,

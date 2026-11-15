@@ -10,6 +10,7 @@ paths:
 ## Chat commands
 
 - `MusicService._match` matches a control's command with `startsWithCommand` (`src/main/helper/chat.ts`): in any case, alone or followed by a space. Chat translation uses it too, to leave music commands untranslated (`.claude/rules/translation.md`), so a change there changes both.
+- `!next` skips only to a waiting request. The live controls' skip (`MusicService.skip`, `.claude/rules/controls.md`) also presses the player's own Next (`MusicProvider.next`).
 
 ## YouTube's player
 

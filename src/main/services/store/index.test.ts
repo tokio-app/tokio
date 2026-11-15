@@ -891,6 +891,43 @@ describe("StoreManagerService", () => {
     });
   });
 
+  describe("shortcuts", () => {
+    const none = { skipSong: "", stopTts: "", replayAlert: "", pause: "" };
+
+    it("has none in stores saved before the setting", async () => {
+      const { shortcuts: _shortcuts, ...settings } = defaultStoreData.settings;
+      await writeFile(
+        storeFile,
+        JSON.stringify({ ...defaultStoreData, settings }),
+      );
+
+      const store = await init();
+
+      expect(store.wasRebuilt()).toBe(false);
+      expect(store.getSettings().shortcuts).toEqual(none);
+    });
+
+    it("saves them, filling the missing ones", async () => {
+      const store = await init();
+
+      expect(await store.updateShortcuts({ pause: "F9" })).toBe(true);
+
+      const saved = { ...none, pause: "F9" };
+      expect((await readJSON(storeFile)).settings.shortcuts).toEqual(saved);
+      expect((await init()).getSettings().shortcuts).toEqual(saved);
+    });
+
+    it("refuses a bad value without changing the store", async () => {
+      const store = await init();
+
+      await expect(store.updateShortcuts({ pause: 9 })).rejects.toThrow();
+
+      expect(store.getSettings().shortcuts).toEqual(none);
+      // Later saves still pass the store's schema
+      expect(await store.updateTraySettings(false)).toBe(true);
+    });
+  });
+
   describe("live state", () => {
     afterEach(() => {
       vi.useRealTimers();

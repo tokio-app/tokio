@@ -30,6 +30,10 @@ export enum FEEDBACK_CODES {
   LOGS_EXPORTED = "logs_exported",
   LOGS_EXPORT_FAILED = "logs_export_failed",
 
+  // LIVE CONTROLS
+  SHORTCUT_TAKEN = "shortcut_taken",
+  CONTROL_FAILED = "control_failed",
+
   // UPDATES
   UPDATE_AVAILABLE = "update_available",
   UPDATE_READY = "update_ready",

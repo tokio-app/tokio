@@ -7,9 +7,14 @@ import type {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { runEvent, type Stack } from "@/helper/events";
+import { invokeEvent, runEvent, type Stack } from "@/helper/events";
 import { Notifier } from "@/helper/feedback";
-import type { AppHandlerVariables, AppServices, ReplyEvent } from "@/types";
+import type {
+  AppHandlerVariables,
+  AppServices,
+  Invoke,
+  ReplyEvent,
+} from "@/types";
 import { EventEmitter } from "node:events";
 import { vi } from "vitest";
 import { app, FakeBrowserWindow, ipcMain, session, shell } from "./electron";
@@ -49,6 +54,7 @@ const SERVICES: (keyof AppServices)[] = [
   "studioService",
   "trayService",
   "translationService",
+  "controlsService",
 ];
 
 // Read by Vitest and Node when they print or await a value
@@ -80,14 +86,21 @@ function strict(
 
 // The fakes stand in for Electron's types
 const asHandler = (value: any): AppHandlerVariables => value;
-const asReplyEvent = (value: any): ReplyEvent => value;
+
+interface HandlerOptions {
+  // What handler.invoke runs, as the Handler runs the stack init got
+  stack?: Stack;
+}
 
 /**
  * What a Handler gets, for a test: the services passed as stubs, fakes of
  * the windows and Electron modules, and a real Notifier whose notices the
  * test reads. `invoke` runs a handler from a page's stack as the Handler does.
  */
-export function createHandler(services: ServiceStubs = {}) {
+export function createHandler(
+  services: ServiceStubs = {},
+  { stack }: HandlerOptions = {},
+) {
   const notices: AppNotification[] = [];
   // Replies as [channel, data] and notices as ["notice", notice], in order
   const sent: [string, unknown][] = [];
@@ -116,7 +129,16 @@ export function createHandler(services: ServiceStubs = {}) {
     trayService: { onOpen: () => {} },
     ...services,
   };
+  // Handler.invoke's: replies reach the fake window, read with pushed
+  const invoke: Invoke = (event, data) =>
+    invokeEvent(
+      new Map(stack?.getEvents().map((item) => [item.event, item])),
+      handler,
+      event,
+      data,
+    );
   const handler = asHandler({
+    invoke,
     app,
     win,
     splash,
@@ -149,7 +171,7 @@ export function createHandler(services: ServiceStubs = {}) {
       const item = stack.getEvents().find((ev) => ev.event === event);
       if (!item) throw new Error(`The stack doesn't handle ${event}.`);
       unexpected = undefined;
-      await runEvent(item, handler, asReplyEvent({ reply }), data);
+      await runEvent(item, handler, { reply }, data);
       if (unexpected) throw unexpected;
     },
 
