@@ -77,6 +77,10 @@ events.push(
 
 - Renderer, next to the page: `await send(APP_EVENTS_RESPONSE.<NAME>, data)` from `@test/ipc` for main's reply. `sent(APP_EVENTS.<NAME>)` lists the payloads the page sent, and `sentEvents()` the events in order.
 
+## MCP
+
+A request that changes something users can change needs its MCP section field, kind or tool, so assistants can do it too (`.claude/rules/mcp.md`). Reads there go to the services, not through this request.
+
 ## Done when
 
 Both sides are typed, the success and failure paths have tests, and the `verify` checks pass.

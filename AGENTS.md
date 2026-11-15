@@ -71,7 +71,8 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `updates.md`: the auto-updater
 - `connector.md`: the TikTok connector and its key
 - `live-session.md`: the LIVE session and activity feed on Home
-- `controls.md`: the live controls (skip song, stop TTS, replay alert, pause) and their global shortcuts
+- `controls.md`: the live controls (skip song, stop TTS, replay alert, pause), their global shortcuts and the phone remote
+- `mcp.md`: the MCP server at `/mcp`, its tools and what it must never expose
 - `tts.md`: TTS engines and chat TTS
 - `music.md`: music requests and YouTube's ad blocker
 - `translation.md`: chat translation, its pipe and the commands it leaves as typed
@@ -134,7 +135,7 @@ All renderer ↔ main communication is typed. The `ipc-event` skill has the step
 
 - Requests go in `APP_EVENTS` and `AppEventsMap` (`src/common/types/events/req.ts`), named `app:<area>:<action>`. Replies and pushes go in `APP_EVENTS_RESPONSE` and `AppEventsResponseMap` (`res.ts`).
 - Handlers live in `src/main/events/pages/<page>.ts`, registered with `events.push(event, handler, options)`. Don't wrap them in try/catch; throw and let `options` handle it (see Feedback). A new page stack goes in `mergeStacks` (`src/main/events/index.ts`).
-- `invoke(event, data)` (in the handler variables) runs a request's handler in main as if the window had sent it, so global shortcuts get the UI's checks, saving and notices. Handlers only call `e.reply`. Each reply also reaches the main window, except `PRIVATE_REPLIES` (`src/main/helper/events.ts`): a page would take those as the answer to its own request.
+- `invoke(event, data)` (in the handler variables) runs a request's handler in main as if the window had sent it, so global shortcuts, the remote's API and MCP get the UI's checks, saving and notices. Handlers only call `e.reply`. Each reply also reaches the main window, except `PRIVATE_REPLIES` (`src/main/helper/events.ts`): a page would take those as the answer to its own request.
 - The renderer sends with `window.api.emit` and listens with the `useIpcRequest` / `useIpcListener` hooks. Main pushes without a request with `win.webContents.send(APP_EVENTS_RESPONSE.Y, data)`; a `void` response still needs `undefined` as payload.
 - Handlers open file dialogs with `showOpenDialog` / `showSaveDialog` from `@/helper/dialog`, which start in the last folder used. Electron's own start in Downloads.
 - A request about one item (an overlay, a document, a test) gets its id back in the reply, failures included, so the renderer ignores a late reply for another one (see `GET_OVERLAY_CONFIG`).
@@ -180,6 +181,7 @@ Tokio's source is MIT; treat license compliance as part of every change.
 - **react-icons:** only use the sets listed under Icons in `THIRD_PARTY_NOTICES.md`, and add a row for any new set.
 - **Keep the notices in sync** when licensed components or online services change: `THIRD_PARTY_NOTICES.md` and `LICENSES/`, the license banner in `electron.vite.config.ts` (the bundler strips header comments), and `COMPONENTS` and `SERVICES` in `src/renderer/src/pages/About/helper.ts`, which mirror the non-npm parts of `THIRD_PARTY_NOTICES.md`. `src/renderer/src/pages/About/notices.test.ts` fails when they drift; the `add-dependency` skill says what each change needs.
 - The About page shows the license notices; keep it reachable from the sidebar.
+- The MCP server SDK (`@modelcontextprotocol/server`) is Apache-2.0, with MIT for older contributions, and compiles other packages into its files. Their licenses are in `LICENSES/MCP-SDK-bundled.txt`, which an upgrade must check (`.claude/rules/mcp.md`).
 - Keep `"license": "MIT"` in `package.json`; it describes the repository's own code.
 
 ## CI and releases
@@ -193,7 +195,7 @@ The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../
 
 - features, settings, chat commands or install steps (its docs describe them in full; the README only sums them up)
 - the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, `TOKIO_EVENTS` names and payloads, or the other messages overlays get (`TokioPayload`)
-- the URL or behavior of Tokio's own overlays: the alerts' (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`), Minecraft's (`getMinecraftOverlayURL`) and Overlay Studio's (`getStudioOverlayURL`), and the phone remote's page and API (`getRemoteURL`, `/remote/api/*`)
+- the URL or behavior of Tokio's own overlays: the alerts' (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`), Minecraft's (`getMinecraftOverlayURL`) and Overlay Studio's (`getStudioOverlayURL`), the phone remote's page and API (`getRemoteURL`, `/remote/api/*`), and the MCP server's address and tools (`MCP_URL`)
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing
 
@@ -217,9 +219,10 @@ Java Edition connects through the Tokio mod, a Fabric mod in `tokio-app/minecraf
 - Pull requests: a Conventional Commits title, which is their line in the release notes, and the sections of `.github/pull_request_template.md`. Merge them with a merge commit, not a squash or rebase: the notes find pull requests by it (`.claude/rules/ci.md`).
 - Keep these stable; overlays, browser sources and saved data depend on them:
   - the server port (`37891`), the Minecraft port (`MINECRAFT_PORT`, 37892) and its Java subprotocol (`MINECRAFT_JAVA_PROTOCOL`, `tokio.java.v1`)
-  - the alerts' overlay path (`/alerts/<alert id>/`), the countdown timer's (`/timer/`), Minecraft's overlay (`/games/minecraft/` and `/games/minecraft/<column>/`, its pictures under `/games/minecraft/pictures/`), Overlay Studio's (`/studio/<id>/`, socket id `studio:<id>`), the phone remote's (`/remote/`) and its API's routes (`/remote/api/state`, `/remote/api/<action>`), which Stream Deck setups call
+  - the alerts' overlay path (`/alerts/<alert id>/`), the countdown timer's (`/timer/`), Minecraft's overlay (`/games/minecraft/` and `/games/minecraft/<column>/`, its pictures under `/games/minecraft/pictures/`), Overlay Studio's (`/studio/<id>/`, socket id `studio:<id>`), the phone remote's (`/remote/`) and its API's routes (`/remote/api/state`, `/remote/api/<action>`), which Stream Deck setups call, and the MCP server's (`/mcp`)
   - existing event names
-- The overlay server listens on every network interface on purpose, for streaming apps on other computers (`tokio-app.local`, `REMOTE_SOCKET`, see `.claude/rules/overlays.md`). Don't bind it to loopback or add Host/Origin checks. The Minecraft socket is the exception (`.claude/rules/games.md`). The remote's API is gated by its key instead (`.claude/rules/controls.md`).
+- The overlay server listens on every network interface on purpose, for streaming apps on other computers (`tokio-app.local`, `REMOTE_SOCKET`, see `.claude/rules/overlays.md`). Don't bind it to loopback or add Host/Origin checks. The Minecraft socket is the exception (`.claude/rules/games.md`). The remote's API is gated by its key instead (`.claude/rules/controls.md`), and `/mcp` also answers only on loopback and refuses an `Origin` (`.claude/rules/mcp.md`).
 - Respect inline `NOTE: DO NOT CHANGE` markers.
+- A new setting or action users have needs its MCP section field, kind or tool, with a test (`.claude/rules/mcp.md`).
 - Inside a folder with a barrel `index` (`common/types`, `common/schemas`, `components`, `context`, `hooks`), import sibling files directly, never through the barrel, to avoid import cycles.
 - `npx fallow health` (also `dead-code`, `dupes`) reports import cycles, dead code and duplication. `.fallowrc.json` makes the music window UI an entry point.

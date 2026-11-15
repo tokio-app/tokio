@@ -15,6 +15,7 @@ Follow `.claude/rules/renderer.md`; it loads with the renderer files. Test overl
 5. Get data from main with `useIpcRequest` and `useIpcListener`, and use the `ipc-event` skill for new events. A profile section that saves as it changes uses `useEditableSettings`.
 6. Test it in `index.test.tsx`: `renderWithProviders(<Page />)` from `@test/render`, with main's replies sent through `send` (`@test/ipc`). Test the route and the sidebar link with `renderApp("/<path>")`.
 7. If users see it, describe it in the website's docs, and give a new feature a line in the README (the `sync-docs` skill).
+8. What users can set or do on it gets its MCP section, kind or tool (`.claude/rules/mcp.md`).
 
 ## Done when
 

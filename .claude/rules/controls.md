@@ -40,6 +40,7 @@ Skip song, stop TTS, replay the last alert and pause everything (`CONTROL_ACTION
   - Everything else needs two modifiers, one of them Ctrl (⌘ or ⌃ on macOS), so Ctrl+C, F5 or a numpad digit never stop working in other apps.
   - On Windows and Linux, Ctrl+Alt without Shift is refused: it's AltGr there, which types @ and € on Spanish layouts. So is a press with AltGr itself.
 - A combination already on another row moves to the new one, since main would report the second as taken.
+- MCP's `shortcuts` section checks the same rule with `shortcutProblem` (`src/main/mcp/tools/settings.ts`), since `SET_SHORTCUTS` takes any string: change it with `toAccelerator`.
 - On Wayland the shortcuts go through the GlobalShortcuts portal. GNOME asks once and needs a valid app identity (`desktopName`). This hasn't been checked on a real session.
 
 ## Remote access
