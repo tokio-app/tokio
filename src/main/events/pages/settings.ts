@@ -50,7 +50,7 @@ const assertNameFree = (store: StoreManagerService, name: string) => {
 };
 
 // Changes to the settings also send the updated settings and profiles.
-const replySettings = (e: ReplyEvent, store: StoreManagerService) => {
+export const replySettings = (e: ReplyEvent, store: StoreManagerService) => {
   e.reply(APP_EVENTS_RESPONSE.GET_SETTINGS, {
     data: {
       settings: store.getSettings(),

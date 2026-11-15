@@ -37,6 +37,7 @@ import { adblockScheme } from "@tokioapp/adblock";
 import {
   app,
   BrowserWindow,
+  globalShortcut,
   ipcMain,
   Menu,
   net,
@@ -272,6 +273,8 @@ app.on("window-all-closed", () => {
 // Not before-quit: on Cmd+Q it comes before the windows send their last saves.
 let settling = false;
 app.on("will-quit", (event) => {
+  // So a shortcut can't start work during the wait below
+  globalShortcut.unregisterAll();
   // Saves still running would be cut off, so quit again once they're done.
   if (!settling && hasPending()) {
     settling = true;
