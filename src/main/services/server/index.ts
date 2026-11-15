@@ -72,6 +72,8 @@ export class ServerService extends Service {
   private _server: HttpServer | null = null;
   private _wss: CustomWebSocketServer | null = null;
   private _dynamicRouter: Router;
+  // The phone remote and the control API, set once the handlers exist
+  private _controlRouter: Router | null = null;
   private _port: number;
   // Folders served under /<id>/, keyed by id.
   private _routes = new Map<string, string>();
@@ -116,8 +118,17 @@ export class ServerService extends Service {
     });
 
     this._app.use((req, res, next) => {
+      if (this._controlRouter) this._controlRouter(req, res, next);
+      else next();
+    });
+    this._app.use((req, res, next) => {
       this._dynamicRouter(req, res, next);
     });
+  }
+
+  /** Serves the phone remote and the control API (createRemoteRoutes). */
+  public setControlRoutes(router: Router) {
+    this._controlRouter = router;
   }
 
   private rebuildRoutes() {

@@ -271,6 +271,7 @@ function setup() {
     setLogFile: vi.fn(),
     mount: vi.fn(),
     initEvents: vi.fn(),
+    setControlRoutes: vi.fn(),
     toggleServer: vi.fn(async (_enabled: boolean) => true),
     onConnect: vi.fn((_listener: (id: string) => void) => {}),
     sendToClient: vi.fn(
@@ -3754,6 +3755,7 @@ describe("init events", () => {
       expect(s.pathManagerService.initialize).toHaveBeenCalledOnce();
       expect(s.storeManagerService.initialize).toHaveBeenCalledOnce();
       expect(s.serverService.initEvents).toHaveBeenCalledOnce();
+      expect(s.serverService.setControlRoutes).toHaveBeenCalledOnce();
       expect(s.overlayService.load).toHaveBeenCalledOnce();
       expect(s.updaterService.initialize).toHaveBeenCalledOnce();
       expect(s.updaterService.setAuto).toHaveBeenCalledOnce();
