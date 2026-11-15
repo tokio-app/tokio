@@ -543,6 +543,18 @@ describe("Coin stats", () => {
     expect(selected()).toMatch(/^Friday/);
   });
 
+  it("ignores a resync of the same profile", async () => {
+    const { user } = renderWithProviders(<CoinStats />);
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
+    await lives([saturday, friday]);
+    await user.click(option(/^All time/));
+
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
+
+    expect(sent(APP_EVENTS.GET_LIVES)).toEqual([undefined, undefined]);
+    expect(selected()).toMatch(/^All time/);
+  });
+
   it("drops the last profile's totals and gifters after a switch", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 31, 21));

@@ -88,6 +88,9 @@ export enum APP_EVENTS {
   CONTROL = "app:controls:run",
   GET_CONTROLS = "app:controls:get",
 
+  // MCP
+  SETTINGS_FLUSHED = "app:mcp:flushed",
+
   // HOME
   CONNECT = "app:home:connect",
   DISCONNECT = "app:home:disconnect",
@@ -341,6 +344,10 @@ export interface AppEventsMap {
   [APP_EVENTS.CONTROL]: { action: ControlAction; paused?: boolean };
   // Answered by CONTROLS
   [APP_EVENTS.GET_CONTROLS]: void;
+
+  // MCP
+  // The window sent the saves FLUSH_SETTINGS asked for
+  [APP_EVENTS.SETTINGS_FLUSHED]: { id: string };
 
   // HOME
   [APP_EVENTS.CONNECT]: {

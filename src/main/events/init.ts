@@ -44,6 +44,7 @@ import {
 import { applyStoredShortcuts, warnTaken } from "@/helper/shortcuts";
 import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
+import { createMcpRoutes } from "@/mcp";
 import type { AlertAudio } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
 import { FAN_EVENTS } from "@/services/fans";
@@ -57,6 +58,7 @@ import { chatCommands } from "@/services/translation/commands";
 import { reasonKey } from "@/services/translation/common";
 import { failureKey, TTSRequestError } from "@/services/tts/common";
 import { AppHandlerVariables } from "@/types";
+import express from "express";
 import { release } from "node:os";
 
 const STATS_THROTTLE_MS = 250;
@@ -1161,14 +1163,18 @@ const startApp = async (handler: AppHandlerVariables) => {
   if (!wired.has(handler)) {
     wired.add(handler);
     serverService.initEvents(connectorService, musicService);
-    serverService.setControlRoutes(
+    // One router: the phone remote and its API, and MCP
+    const control = express.Router();
+    control.use(
       createRemoteRoutes({
         remote: () => storeManagerService.getSettings().remote,
         paused: () => handler.controlsService.isPaused(),
         invoke: handler.invoke,
         labels: remoteLabels,
       }),
+      createMcpRoutes(handler),
     );
+    serverService.setControlRoutes(control);
     registerConnectorEvents(handler);
     registerControls(handler);
     registerTimer(handler);

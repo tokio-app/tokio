@@ -5,6 +5,7 @@ import { WhatsNew } from "@/components/WhatsNew";
 import { queueAlert } from "@/helper/alerts";
 import { forgetDecoded } from "@/helper/audio";
 import { useAudio } from "@/hooks/useAudio";
+import { flushSettings } from "@/hooks/useEditableSettings";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
 import styles from "@/router/Layout/layout.module.css";
@@ -101,6 +102,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.ALERT_CLEAR, () => stopQueues("alerts"));
+
+  // Before an MCP write. IPC keeps the order, so the saves reach main before
+  // the answer.
+  useIpcListener(APP_EVENTS_RESPONSE.FLUSH_SETTINGS, (res) => {
+    if (!res) return;
+    flushSettings();
+    window.api.emit(APP_EVENTS.SETTINGS_FLUSHED, { id: res.id });
+  });
 
   if (started === null) return null;
   // The pages can't load the profile, and would save its defaults over it

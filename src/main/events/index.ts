@@ -6,6 +6,7 @@ import controls from "./pages/controls";
 import games from "./pages/games";
 import home from "./pages/home";
 import lives from "./pages/lives";
+import mcp from "./pages/mcp";
 import music from "./pages/music";
 import overlays from "./pages/overlays";
 import settings from "./pages/settings";
@@ -29,4 +30,5 @@ export default mergeStacks(
   about,
   updates,
   controls,
+  mcp,
 );
