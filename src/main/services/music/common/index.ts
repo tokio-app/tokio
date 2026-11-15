@@ -22,12 +22,21 @@ export type ConnectionResponse = {
   error?: Error;
   // The service has no app for the provider's key, Spotify's Client ID
   badKey?: boolean;
+  // Why YouTube plays its ads although blockAds was asked for
+  adblockError?: unknown;
+};
+
+export type ConnectOptions = {
+  // YouTube's player only
+  blockAds?: boolean;
 };
 
 export abstract class MusicProvider extends TokioEmitter {
   protected _logFile = "";
   public abstract setKey(key: string): void;
-  public abstract connect(): Promise<ConnectionResponse>;
+  public abstract connect(
+    options?: ConnectOptions,
+  ): Promise<ConnectionResponse>;
   public abstract disconnect(): void;
   public abstract play(track: SongInfo): Promise<void>;
   public abstract searchSong(query: string): Promise<SongInfo | null>;

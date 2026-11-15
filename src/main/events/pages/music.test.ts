@@ -6,7 +6,10 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import { defaultProfile } from "@/common/util";
-import type { ConnectionResponse } from "@/services/music/common";
+import type {
+  ConnectionResponse,
+  ConnectOptions,
+} from "@/services/music/common";
 import { describe, expect, it, vi } from "vitest";
 
 // music.ts keeps the last connect's listener, so every test gets a fresh
@@ -24,7 +27,8 @@ async function load() {
     import("@/logger"),
   ]);
   const logError = vi.spyOn(Logger, "error").mockImplementation(() => {});
-  return { music, createHandler, eventSource, logError };
+  const logWarn = vi.spyOn(Logger, "warn").mockImplementation(() => {});
+  return { music, createHandler, eventSource, logError, logWarn };
 }
 
 const settings: Profile["music"] = defaultProfile.music;
@@ -46,6 +50,27 @@ describe("music events", () => {
       ]);
       expect(h.notices).toEqual([]);
     });
+
+    it.each([true, false])(
+      "gets the ad blocker ready once turned on (%s)",
+      async (block_ads) => {
+        const { music, createHandler } = await load();
+        const prepareAdBlocker = vi.fn();
+        const h = createHandler({
+          storeManagerService: { updateProfileData: async () => true },
+          musicService: { prepareAdBlocker },
+        });
+
+        await h.invoke(music, APP_EVENTS.UPDATE_MUSIC_SETTINGS, {
+          settings: {
+            ...settings,
+            provider: { ...settings.provider, block_ads },
+          },
+        });
+
+        expect(prepareAdBlocker).toHaveBeenCalledTimes(block_ads ? 1 : 0);
+      },
+    );
 
     it("reports a failed save as the system's, logged once by the store", async () => {
       const { music, createHandler, logError } = await load();
@@ -82,15 +107,20 @@ describe("music events", () => {
         disconnect: vi.fn(),
         clearHandler: vi.fn(),
         setProvider: vi.fn((_name: string, _key?: string) => {}),
-        connect: vi.fn(async (): Promise<ConnectionResponse> =>
-          connects
-            ? { success: true }
-            : { success: false, error: new Error("window closed") },
+        connect: vi.fn(
+          async (_options?: ConnectOptions): Promise<ConnectionResponse> =>
+            connects
+              ? { success: true }
+              : { success: false, error: new Error("window closed") },
         ),
       };
       const h = m.createHandler({ musicService });
-      const connect = (name = "Spotify", key = "client-id") =>
-        h.invoke(m.music, APP_EVENTS.CONNECT_MUSIC, { name, key });
+      const connect = (
+        name = "Spotify",
+        key = "client-id",
+        block_ads = false,
+      ) =>
+        h.invoke(m.music, APP_EVENTS.CONNECT_MUSIC, { name, key, block_ads });
       const ended = () =>
         events.emit(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, undefined);
       const connected = () => h.replies(APP_EVENTS_RESPONSE.MUSIC_CONNECTED);
@@ -106,7 +136,9 @@ describe("music events", () => {
         "Spotify",
         "client-id",
       );
-      expect(musicService.connect).toHaveBeenCalledOnce();
+      expect(musicService.connect).toHaveBeenCalledExactlyOnceWith({
+        blockAds: false,
+      });
       expect(connected()).toEqual([{ success: true }]);
       expect(h.notices).toEqual([
         expect.objectContaining({
@@ -210,6 +242,42 @@ describe("music events", () => {
           ...failure,
         }),
       ]);
+    });
+
+    it("blocks YouTube's ads when the profile asks", async () => {
+      const { musicService, connect } = await setup();
+
+      await connect("YouTube", "", true);
+
+      expect(musicService.connect).toHaveBeenCalledExactlyOnceWith({
+        blockAds: true,
+      });
+    });
+
+    it("warns after connecting when the ads couldn't be blocked", async () => {
+      const { h, musicService, connect, connected, logWarn } = await setup();
+      musicService.connect.mockResolvedValueOnce({
+        success: true,
+        adblockError: new Error("offline"),
+      });
+
+      await connect("YouTube", "", true);
+
+      expect(connected()).toEqual([{ success: true }]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ code: FEEDBACK_CODES.MUSIC_CONNECTED }),
+        expect.objectContaining({
+          level: "warning",
+          source: "music",
+          code: FEEDBACK_CODES.MUSIC_ADBLOCK_FAILED,
+          message:
+            "Unable to download the ad blocker's lists. YouTube will play its ads.",
+        }),
+      ]);
+      expect(logWarn).toHaveBeenCalledExactlyOnceWith(
+        expect.stringContaining("-- offline"),
+        undefined,
+      );
     });
 
     it("says it disconnected once when the provider ends after connecting", async () => {

@@ -1,5 +1,4 @@
 import { SongInfo } from "@/common/types";
-import { delay } from "@/common/util";
 import config from "../config";
 
 // The size part of a thumbnail URL, swapped for the size we want
@@ -88,48 +87,6 @@ export const PlayJSCode = (videoId: string) => `
   return new URLSearchParams(location.search).get("v") === id;
 })();
 `;
-
-export const LoginJSCode = `
-(() => {
-  const signInBtn = document.querySelector('a.sign-in-link, [aria-label="Sign in"]');
-  return signInBtn === null;
-})();
-`;
-
-export type LoginConfirmation = "logged-in" | "logged-out" | "stale";
-
-/**
- * Runs `check` up to `attempts` times, spaced `intervalMs` apart, and reports
- * "logged-out" only when every attempt said so. A rejected check counts as a
- * failed attempt. Returns "stale" as soon as `isStale()` is true.
- */
-export async function confirmLoggedOut(
-  check: () => Promise<boolean>,
-  opts: { attempts: number; intervalMs: number; isStale: () => boolean },
-): Promise<LoginConfirmation> {
-  const { attempts, intervalMs, isStale } = opts;
-
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    if (isStale()) return "stale";
-
-    let loggedIn = false;
-    try {
-      loggedIn = await check();
-    } catch {
-      loggedIn = false;
-    }
-
-    if (isStale()) return "stale";
-    if (loggedIn) return "logged-in";
-
-    if (attempt < attempts) {
-      await delay(intervalMs);
-      if (isStale()) return "stale";
-    }
-  }
-
-  return "logged-out";
-}
 
 const TIME_REGEX = /^(\d+:)*\d+$/;
 

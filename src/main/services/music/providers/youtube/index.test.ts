@@ -1,4 +1,5 @@
 import { CurrentSongInfo, SongInfo, TOKIO_EVENTS } from "@/common/types";
+import type { ElectronBlocker } from "@tokioapp/adblock";
 import {
   cancelableEvent,
   FakeWebContentsView,
@@ -7,14 +8,14 @@ import {
 } from "@test/electron";
 import { songRenderer } from "@test/fixtures";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LoginJSCode, PlayerStateJSCode, PlayJSCode } from "./common";
+import type { ConnectOptions } from "../../common";
+import { PlayerStateJSCode, PlayJSCode } from "./common";
 import config from "./config";
 import { YouTubeMusic } from "./index";
 
 const PARTITION = "persist:music-youtube";
-// The time a full run of login checks takes, from the first to the last
-const CHECKS_MS =
-  config.LOGIN_CHECK_INTERVAL_MS * (config.LOGIN_CHECK_ATTEMPTS - 1);
+// What the window closing before YouTube Music loads fails with
+const CLOSED = new Error("The window was closed before YouTube Music loaded");
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -73,27 +74,17 @@ const ytView = () =>
     .filter((view) => view.options.webPreferences?.partition === PARTITION)
     .at(-1)!;
 
-const scripts = (view: FakeWebContentsView, code: string) =>
-  view.webContents.executeJavaScript.mock.calls.filter(([c]) => c === code)
-    .length;
-
 const loads = (view: FakeWebContentsView, url: string) =>
   view.webContents.loadURL.mock.calls.filter(([u]) => u === url).length;
 
 /**
- * Starts connect(), with the page answering the login check with `loggedIn`.
- * The page reports a load only when the test emits "did-finish-load".
+ * Starts connect(). The page reports a load, of the address it loaded last,
+ * only when the test emits "did-finish-load".
  */
-const open = (
-  loggedIn: () => boolean = () => true,
-  provider = new YouTubeMusic(),
-) => {
-  const pending = provider.connect();
+const open = (provider = new YouTubeMusic(), options?: ConnectOptions) => {
+  const pending = provider.connect(options);
   const shell = windows().at(-1)!;
   const view = ytView();
-  view.webContents.executeJavaScript.mockImplementation(async (code) =>
-    code === LoginJSCode ? loggedIn() : undefined,
-  );
   const finishLoad = () => view.webContents.emit("did-finish-load");
   return { provider, pending, shell, view, finishLoad };
 };
@@ -226,19 +217,19 @@ describe("YouTubeMusic", () => {
       });
     });
 
-    it("resolves once logged in, after a single check", async () => {
+    it("connects once YouTube Music loads, signed in or not", async () => {
       const { provider, pending, view, finishLoad } = open();
 
       finishLoad();
 
       await expect(pending).resolves.toEqual({ success: true });
       expect(provider.isActive()).toBe(true);
-      expect(scripts(view, LoginJSCode)).toBe(1);
-
-      finishLoad();
-      await vi.advanceTimersByTimeAsync(CHECKS_MS);
-
-      expect(scripts(view, LoginJSCode)).toBe(1);
+      // No account check, no sign-in page and no cleared session
+      expect(view.webContents.executeJavaScript).not.toHaveBeenCalled();
+      expect(view.webContents.loadURL).toHaveBeenCalledExactlyOnceWith(
+        config.YTM_URL,
+      );
+      expect(view.webContents.session.clearStorageData).not.toHaveBeenCalled();
     });
 
     it("resolves right away while active", async () => {
@@ -248,137 +239,68 @@ describe("YouTubeMusic", () => {
       expect(windows()).toHaveLength(1);
     });
 
-    it("sends a logged-out user to the login page once, then fails", async () => {
+    it("waits for YouTube Music when another page loads first", async () => {
       const done = vi.fn();
-      const { provider, pending, view, finishLoad } = open(() => false);
+      const { pending, view, finishLoad } = open();
       pending.then(done);
 
-      finishLoad();
-      await vi.advanceTimersByTimeAsync(CHECKS_MS - 1);
-      expect(scripts(view, LoginJSCode)).toBe(config.LOGIN_CHECK_ATTEMPTS - 1);
-      expect(loads(view, config.YTM_LOGIN_URL)).toBe(0);
-
-      await vi.advanceTimersByTimeAsync(1);
-      expect(scripts(view, LoginJSCode)).toBe(config.LOGIN_CHECK_ATTEMPTS);
-      expect(view.webContents.session.clearStorageData).toHaveBeenCalledOnce();
-      expect(loads(view, config.YTM_LOGIN_URL)).toBe(1);
+      // Google's sign-in, or a consent page
+      for (const url of [
+        "https://accounts.google.com/ServiceLogin",
+        "https://consent.youtube.com/m?continue=https://music.youtube.com/",
+      ]) {
+        await view.webContents.loadURL(url);
+        finishLoad();
+      }
+      await vi.advanceTimersByTimeAsync(0);
       expect(done).not.toHaveBeenCalled();
 
-      // Back on YouTube Music from the login page, still logged out
-      await view.webContents.loadURL(config.YTM_URL);
-      finishLoad();
-      await vi.advanceTimersByTimeAsync(CHECKS_MS);
-
-      expect(done).toHaveBeenCalledExactlyOnceWith({
-        success: false,
-        error: new Error("Login failed. Please try again."),
-      });
-      expect(view.webContents.session.clearStorageData).toHaveBeenCalledOnce();
-      expect(loads(view, config.YTM_LOGIN_URL)).toBe(1);
-      expect(provider.isActive()).toBe(false);
-
-      // The window stays open, and its next pages aren't checked
-      const checks = scripts(view, LoginJSCode);
-      finishLoad();
-      await vi.advanceTimersByTimeAsync(CHECKS_MS);
-      expect(scripts(view, LoginJSCode)).toBe(checks);
-    });
-
-    it("closes a login still open when it connects again", async () => {
-      const first = open(() => false);
-      first.finishLoad();
-
-      const second = open(() => false, first.provider);
-      await vi.advanceTimersByTimeAsync(CHECKS_MS);
-
-      await expect(first.pending).resolves.toEqual({
-        success: false,
-        error: new Error("Authentication window was closed by the user"),
-      });
-      expect(first.shell.isDestroyed()).toBe(true);
-      expect(first.view.webContents.close).toHaveBeenCalledOnce();
-      // The first page's login check stopped, and didn't reach the new page
-      expect(scripts(first.view, LoginJSCode)).toBe(1);
-      for (const { view } of [first, second]) {
-        expect(
-          view.webContents.session.clearStorageData,
-        ).not.toHaveBeenCalled();
-        expect(loads(view, config.YTM_LOGIN_URL)).toBe(0);
-      }
-
-      second.view.webContents.executeJavaScript.mockResolvedValue(true);
-      second.finishLoad();
-      await expect(second.pending).resolves.toEqual({ success: true });
-      expect(windows().filter((w) => !w.isDestroyed())).toEqual([second.shell]);
-    });
-
-    it("resolves once the user logs in on the login page", async () => {
-      let loggedIn = false;
-      const { pending, view, finishLoad } = open(() => loggedIn);
-
-      finishLoad();
-      await vi.advanceTimersByTimeAsync(CHECKS_MS);
-      expect(loads(view, config.YTM_LOGIN_URL)).toBe(1);
-
-      loggedIn = true;
-      await view.webContents.loadURL(config.YTM_URL);
+      await view.webContents.loadURL(`${config.YTM_URL}/`);
       finishLoad();
 
       await expect(pending).resolves.toEqual({ success: true });
     });
 
-    it("skips pages on accounts.google.com", async () => {
-      const { view, finishLoad } = open(() => false);
+    it("stays connected while the streamer signs in from the page", async () => {
+      const { provider, view, finishLoad } = await connected();
+      const ended = vi.fn();
+      provider.on(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, ended);
 
-      await view.webContents.loadURL(config.YTM_LOGIN_URL);
+      await view.webContents.loadURL("https://accounts.google.com/signin");
       finishLoad();
-      await vi.advanceTimersByTimeAsync(CHECKS_MS);
+      await view.webContents.loadURL(config.YTM_URL);
+      finishLoad();
 
-      expect(scripts(view, LoginJSCode)).toBe(0);
+      expect(provider.isActive()).toBe(true);
+      expect(ended).not.toHaveBeenCalled();
+      expect(windows().filter((w) => !w.isDestroyed())).toHaveLength(1);
     });
 
-    it("drops a check that's still retrying when a newer page loads", async () => {
-      const { view, finishLoad } = open(() => false);
+    it("closes a connect still waiting when it connects again", async () => {
+      const first = open();
 
-      finishLoad();
-      await vi.advanceTimersByTimeAsync(500);
-      finishLoad();
-      expect(scripts(view, LoginJSCode)).toBe(2);
+      const second = open(first.provider);
 
-      await vi.advanceTimersByTimeAsync(CHECKS_MS * 2);
+      await expect(first.pending).resolves.toEqual({
+        success: false,
+        error: CLOSED,
+      });
+      expect(first.shell.isDestroyed()).toBe(true);
+      expect(first.view.webContents.close).toHaveBeenCalledOnce();
 
-      // The first load's check stopped after one attempt
-      expect(scripts(view, LoginJSCode)).toBe(1 + config.LOGIN_CHECK_ATTEMPTS);
-      expect(view.webContents.session.clearStorageData).toHaveBeenCalledOnce();
-      expect(loads(view, config.YTM_LOGIN_URL)).toBe(1);
+      second.finishLoad();
+      await expect(second.pending).resolves.toEqual({ success: true });
+      expect(windows().filter((w) => !w.isDestroyed())).toEqual([second.shell]);
     });
 
-    it("fails when the window is closed before login", async () => {
-      const { provider, pending, shell, view, finishLoad } = open(() => false);
-      finishLoad();
+    it("fails when the window is closed before YouTube Music loads", async () => {
+      const { provider, pending, shell, view } = open();
 
       shell.close();
 
-      await expect(pending).resolves.toEqual({
-        success: false,
-        error: new Error("Authentication window was closed by the user"),
-      });
+      await expect(pending).resolves.toEqual({ success: false, error: CLOSED });
       expect(provider.isActive()).toBe(false);
       expect(view.webContents.close).toHaveBeenCalledOnce();
-
-      await vi.advanceTimersByTimeAsync(CHECKS_MS);
-      expect(scripts(view, LoginJSCode)).toBe(1);
-    });
-
-    it("fails when the login check throws", async () => {
-      const { pending, view, finishLoad } = open(() => false);
-      const error = new Error("storage locked");
-      view.webContents.session.clearStorageData.mockRejectedValue(error);
-
-      finishLoad();
-      await vi.advanceTimersByTimeAsync(CHECKS_MS);
-
-      await expect(pending).resolves.toEqual({ success: false, error });
     });
 
     it("only lets the page navigate to YouTube and Google accounts", () => {
@@ -417,7 +339,7 @@ describe("YouTubeMusic", () => {
       expect(event.defaultPrevented).toBe(true);
     });
 
-    it("ends the session when the window is closed after login", async () => {
+    it("ends the session when the window is closed after it connected", async () => {
       const { provider, shell, view } = await connected();
       const ended = vi.fn();
       provider.on(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, ended);
@@ -428,6 +350,117 @@ describe("YouTubeMusic", () => {
       expect(view.webContents.setAudioMuted).toHaveBeenCalledWith(true);
       expect(view.webContents.close).toHaveBeenCalledOnce();
       expect(ended).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("blocking ads", () => {
+    // What connect calls on the blocker, which needs Electron's session
+    const blocker = () => {
+      const fake = { enable: vi.fn() };
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      return { fake, blocker: fake as unknown as ElectronBlocker };
+    };
+
+    // The blocker the provider's next ready() gives, once `finish` is called
+    const stubReady = (provider: YouTubeMusic) => {
+      let finish: (result: ElectronBlocker | Error) => void = () => {};
+      vi.spyOn(provider.adBlocker, "ready").mockReturnValue(
+        new Promise((resolve, reject) => {
+          finish = (result) =>
+            result instanceof Error ? reject(result) : resolve(result);
+        }),
+      );
+      return (result: ElectronBlocker | Error) => finish(result);
+    };
+
+    it("blocks ads in the page's session before the page loads", async () => {
+      const { fake, blocker: ready } = blocker();
+      const provider = new YouTubeMusic();
+      const finish = stubReady(provider);
+      const { pending, view, finishLoad } = open(provider, {
+        blockAds: true,
+      });
+      expect(loads(view, config.YTM_URL)).toBe(0);
+
+      finish(ready);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(fake.enable).toHaveBeenCalledExactlyOnceWith(
+        view.webContents.session,
+      );
+      expect(loads(view, config.YTM_URL)).toBe(1);
+      expect(fake.enable.mock.invocationCallOrder[0]).toBeLessThan(
+        view.webContents.loadURL.mock.invocationCallOrder[0],
+      );
+      finishLoad();
+      await expect(pending).resolves.toEqual({ success: true });
+    });
+
+    it("stops blocking and frees the blocker when it connects without it", () => {
+      const provider = new YouTubeMusic();
+      const dispose = vi.spyOn(provider.adBlocker, "dispose");
+
+      const { view } = open(provider);
+
+      expect(dispose).toHaveBeenCalledOnce();
+      expect(dispose.mock.invocationCallOrder[0]).toBeLessThan(
+        view.webContents.loadURL.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("loads the page with its ads when the session refuses the blocker", async () => {
+      const { fake, blocker: ready } = blocker();
+      const error = new Error("The scheme is taken");
+      fake.enable.mockImplementation(() => {
+        throw error;
+      });
+      const provider = new YouTubeMusic();
+      stubReady(provider)(ready);
+      const { pending, view, finishLoad } = open(provider, {
+        blockAds: true,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(loads(view, config.YTM_URL)).toBe(1);
+      finishLoad();
+      await expect(pending).resolves.toEqual({
+        success: true,
+        adblockError: error,
+      });
+    });
+
+    it("loads the page with its ads when the blocker fails, and says why", async () => {
+      const provider = new YouTubeMusic();
+      const error = new Error("offline");
+      stubReady(provider)(error);
+      const { pending, view, finishLoad } = open(provider, {
+        blockAds: true,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(loads(view, config.YTM_URL)).toBe(1);
+      finishLoad();
+      await expect(pending).resolves.toEqual({
+        success: true,
+        adblockError: error,
+      });
+    });
+
+    it("leaves a page closed while the blocker loads alone", async () => {
+      const { fake, blocker: ready } = blocker();
+      const provider = new YouTubeMusic();
+      const finish = stubReady(provider);
+      const { pending, shell, view } = open(provider, {
+        blockAds: true,
+      });
+
+      shell.close();
+      finish(ready);
+      await vi.advanceTimersByTimeAsync(0);
+
+      await expect(pending).resolves.toMatchObject({ success: false });
+      expect(fake.enable).not.toHaveBeenCalled();
+      expect(loads(view, config.YTM_URL)).toBe(0);
     });
   });
 
@@ -452,24 +485,21 @@ describe("YouTubeMusic", () => {
       expect(ended).toHaveBeenCalledOnce();
     });
 
-    it("closes a login still open, which fails it", async () => {
-      const { provider, pending, shell, view } = open(() => false);
+    it("closes a connect still waiting, which fails it", async () => {
+      const { provider, pending, shell, view } = open();
 
       provider.disconnect();
 
       expect(shell.isDestroyed()).toBe(true);
       expect(view.webContents.close).toHaveBeenCalledOnce();
-      await expect(pending).resolves.toEqual({
-        success: false,
-        error: new Error("Authentication window was closed by the user"),
-      });
+      await expect(pending).resolves.toEqual({ success: false, error: CLOSED });
     });
 
     it("leaves the next session alone when an older window closes late", async () => {
-      const first = open(() => false);
+      const first = open();
       // Its "close" comes only when the test emits it
       first.shell.close.mockImplementation(() => {});
-      const second = open(undefined, first.provider);
+      const second = open(first.provider);
       second.finishLoad();
       await expect(second.pending).resolves.toEqual({ success: true });
       const ended = vi.fn();

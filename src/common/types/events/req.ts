@@ -239,6 +239,7 @@ export interface AppEventsMap {
   [APP_EVENTS.CONNECT_MUSIC]: {
     name: string;
     key: string;
+    block_ads: boolean;
   };
 
   [APP_EVENTS.DISCONNECT_MUSIC]: void;

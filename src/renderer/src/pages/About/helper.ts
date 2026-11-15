@@ -105,6 +105,14 @@ export const SERVICES: { name: string; note: string }[] = [
   },
   { name: "Spotify and YouTube", note: "Music requests." },
   {
+    name: "uBlock Origin's filter lists",
+    note: "The YouTube player's ad blocker, when Block ads is on (ublockorigin.github.io, then its mirrors ublockorigin.pages.dev and cdn.jsdelivr.net). uBlock Origin's own lists and its copies of EasyList and EasyPrivacy belong to their authors, are under the GPL-3.0 or CC BY-SA 3.0, and aren't covered by Tokio's license. Tokio downloads them on the user's machine and doesn't ship them.",
+  },
+  {
+    name: "Public Suffix List",
+    note: "The same ad blocker, to tell a site from its subdomains (publicsuffix.org). Mozilla's list is under the MPL-2.0, and Tokio downloads it rather than ship it.",
+  },
+  {
     name: "GitHub",
     note: "Update checks and downloads, from Tokio's releases, and the official overlays (their list, previews and downloads), from the releases of tokio-app/overlays.",
   },

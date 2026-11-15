@@ -73,6 +73,7 @@ export enum FEEDBACK_CODES {
   MUSIC_CONNECT_FAILED = "music_connect_failed",
   MUSIC_DISCONNECT_FAILED = "music_disconnect_failed",
   MUSIC_PLAYBACK_FAILED = "music_playback_failed",
+  MUSIC_ADBLOCK_FAILED = "music_adblock_failed",
 
   // OVERLAYS
   OVERLAY_IMPORTED = "overlay_imported",

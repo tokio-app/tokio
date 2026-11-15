@@ -48,6 +48,7 @@ export const defaultProfile: Profile = {
     provider: {
       name: "YouTube",
       key: "",
+      block_ads: false,
     },
   },
   tts: {

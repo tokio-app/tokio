@@ -1,6 +1,7 @@
 import { APP_EVENTS_RESPONSE, FEEDBACK_CODES } from "@/common/types";
 import type { AppHandlerVariables } from "@/types";
 import { app, Menu, net, protocol, windows } from "@test/electron";
+import { adblockScheme } from "@tokioapp/adblock";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -116,6 +117,9 @@ describe("main process entry", () => {
       },
       // Videos play from it
       { scheme: "tokio-media", privileges: { stream: true } },
+      // Only YouTube's player handles it, and the ad blocker's stand-ins
+      // need its privileges
+      adblockScheme,
     ]);
     expect(
       protocol.registerSchemesAsPrivileged.mock.invocationCallOrder[0],

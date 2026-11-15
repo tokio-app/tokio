@@ -1,8 +1,9 @@
 import { Profile } from "@/common/schemas";
-import { Btn, Field, Input, Section, Tabs } from "@/components";
+import { Btn, Check, Field, Input, Modal, Section, Tabs } from "@/components";
 import { cx } from "@/helper";
 import { Updater } from "@/hooks";
 import { rich, useT } from "@/ui/i18n";
+import { useState } from "react";
 import { FaSpotify, FaYoutube } from "react-icons/fa";
 import styles from "../music.module.css";
 
@@ -44,14 +45,33 @@ export function ProviderSection({
   onConnect,
 }: Props) {
   const t = useT();
+  // Turning ad blocking on asks first: it breaks YouTube's terms
+  const [askingAds, setAskingAds] = useState(false);
   const isSpotify = provider.name === "Spotify";
   const missingKey = isSpotify && provider.key === "";
+  const setBlockAds = (blockAds: boolean) =>
+    update((p) => {
+      p.block_ads = blockAds;
+    });
 
   return (
     <Section
       title={t("music.provider.title")}
       description={t("music.provider.description")}
     >
+      {askingAds && (
+        <Modal
+          title={t("music.provider.blockAdsTitle")}
+          description={t("music.provider.blockAdsDescription")}
+          confirmText={t("music.provider.blockAds")}
+          onClose={() => setAskingAds(false)}
+          onConfirm={() => {
+            setBlockAds(true);
+            setAskingAds(false);
+          }}
+        />
+      )}
+
       <div className={styles.status}>
         {rich(t("music.provider.status"), {
           status: (
@@ -75,6 +95,29 @@ export function ProviderSection({
           })
         }
       />
+
+      <div
+        className={cx(
+          styles.expandable,
+          !isSpotify && styles.expandable_open,
+          connected && styles.locked,
+        )}
+        // Only CSS collapses it
+        aria-hidden={isSpotify || undefined}
+      >
+        <div className={styles.expandable_content}>
+          <Check
+            label={t("music.provider.blockAds")}
+            tabIndex={isSpotify ? -1 : undefined}
+            checked={provider.block_ads}
+            disabled={connected}
+            onChange={(e) => {
+              if (e.target.checked) setAskingAds(true);
+              else setBlockAds(false);
+            }}
+          />
+        </div>
+      </div>
 
       <div
         className={cx(

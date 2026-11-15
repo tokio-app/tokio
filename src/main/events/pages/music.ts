@@ -17,7 +17,7 @@ let attempt = 0;
 
 events.push(
   APP_EVENTS.UPDATE_MUSIC_SETTINGS,
-  async ({ storeManagerService }, e, { settings }) => {
+  async ({ storeManagerService, musicService }, e, { settings }) => {
     const res = await storeManagerService.updateProfileData({
       music: settings,
     });
@@ -25,6 +25,8 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.UPDATE_MUSIC_SETTINGS, {
       success: true,
     });
+    // Turned on, its lists download now rather than when YouTube connects
+    if (settings.provider.block_ads) musicService.prepareAdBlocker();
   },
   {
     source: "system",
@@ -38,7 +40,7 @@ events.push(
 
 events.push(
   APP_EVENTS.CONNECT_MUSIC,
-  async ({ musicService, notifier }, e, { name, key }) => {
+  async ({ musicService, notifier }, e, { name, key, block_ads }) => {
     const current = ++attempt;
     if (onMusicEnded) {
       musicService.off(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, onMusicEnded);
@@ -66,7 +68,7 @@ events.push(
     };
     musicService.on(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED, onMusicEnded);
 
-    const res = await musicService.connect();
+    const res = await musicService.connect({ blockAds: block_ads });
     if (current !== attempt) return;
     if (!res.success) {
       throw new AppFailure(
@@ -88,6 +90,16 @@ events.push(
       FEEDBACK_CODES.MUSIC_CONNECTED,
       t("main.music.connected", { name }),
     );
+    if (res.adblockError) {
+      notifier.report({
+        source: "music",
+        error: new AppFailure(
+          FEEDBACK_CODES.MUSIC_ADBLOCK_FAILED,
+          t("main.music.adblockFailed"),
+          { level: "warning", cause: res.adblockError },
+        ),
+      });
+    }
   },
   {
     failure: {

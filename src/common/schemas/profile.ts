@@ -451,6 +451,8 @@ export const ProfileSchema = z.object({
     provider: z.object({
       name: z.enum(["YouTube", "Spotify"]),
       key: z.string(),
+      // YouTube's player blocks ads, against YouTube's terms
+      block_ads: z.boolean().default(false),
     }),
   }),
   tts: z.object({
