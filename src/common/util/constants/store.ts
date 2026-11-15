@@ -33,6 +33,7 @@ export const defaultStoreData: StoreSchema = {
       debug: false,
     },
     language: "system",
+    translation: { language: "" },
     overlays: [],
     testOverlays: [],
     sounds: [],

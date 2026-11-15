@@ -32,6 +32,7 @@ import {
   TRIGGER_OPTIONS,
   VariableList,
 } from "@/components";
+import { useVariables } from "@/hooks";
 import { useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
 import { BoxFields } from "./BoxFields";
@@ -157,6 +158,8 @@ export function ElementSettings({
   // On an event, a video without loop stays until it ends, not for seconds
   const untilEnd = video && element.kind === "media" && !element.loop;
 
+  const eventVariables = useVariables(studioEventVariables(element));
+
   let own: ReactNode = null;
   switch (element.kind) {
     case "text":
@@ -182,7 +185,7 @@ export function ElementSettings({
             {reactsToEvents(element) && (
               <VariableList
                 label={t("studio.variables.event")}
-                variables={studioEventVariables(element)}
+                variables={eventVariables}
                 empty={t("common.noVariables")}
                 inputRef={textRef}
                 value={element.text}

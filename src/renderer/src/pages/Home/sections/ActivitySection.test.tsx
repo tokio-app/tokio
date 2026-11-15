@@ -1,6 +1,7 @@
 import { ActivityItem } from "@/common/types";
 import { Avatar } from "@/components";
 import { renderWithProviders } from "@test/render";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ActivitySection } from "./ActivitySection";
 
@@ -41,5 +42,30 @@ describe("ActivitySection", () => {
     // Another viewer joined
     rerender(section(feed(3)));
     expect(avatar).toHaveBeenCalledOnce();
+  });
+
+  it("shows a chat's translation under it, led for screen readers", () => {
+    const chat: ActivityItem = {
+      id: 1,
+      type: "chat",
+      user: user("Kenji"),
+      text: "where are you streaming from?",
+      emotes: [],
+      translation: { text: "¿desde dónde transmites?", from: "en", to: "es" },
+    };
+    renderWithProviders(section([chat]));
+
+    expect(screen.getByText("where are you streaming from?")).toBeVisible();
+    expect(screen.getByText("¿desde dónde transmites?")).toHaveAttribute(
+      "lang",
+      "es",
+    );
+    expect(screen.getByText("Translated from English:")).toBeInTheDocument();
+  });
+
+  it("shows no translation line for a chat without one", () => {
+    renderWithProviders(section(feed(2)));
+
+    expect(screen.queryByText(/Translated from/)).not.toBeInTheDocument();
   });
 });

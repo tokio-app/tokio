@@ -574,6 +574,62 @@ describe("TTSService", () => {
     });
   });
 
+  describe("translations", () => {
+    // As the pipe gives it: the trigger as typed, then the translation
+    const translated = (content: string, text: string): ChatEvent => ({
+      ...chat(content),
+      comment: {
+        ...chat(content).comment,
+        lang: "es",
+        translation: { text, from: "es", to: "en" },
+      },
+    });
+    const triggered = (change: (s: TTSSettings) => void = () => {}) =>
+      settings((s) => {
+        s.format.trigger = { mode: "custom", value: "!tts" };
+        change(s);
+      });
+
+    it("reads the translation for {comment} and an empty template, trigger cut", async () => {
+      const message = translated("!tts hola amigos", "!tts hello friends");
+      const on = (template: string) =>
+        triggered((s) => {
+          s.format.translate = true;
+          s.format.template = template;
+        });
+
+      expect(await say(message, on(""))).toEqual(["hello friends"]);
+      expect(await say(message, on("{username}: {comment}"))).toEqual([
+        "Viewer: hello friends",
+      ]);
+    });
+
+    it("reads what was typed with the checkbox off", async () => {
+      const message = translated("!tts hola amigos", "!tts hello friends");
+
+      expect(await say(message, triggered())).toEqual(["hola amigos"]);
+    });
+
+    it("fills {translation} with the translation, else the comment, trigger cut", async () => {
+      const s = triggered((s) => {
+        s.format.template = "{comment} / {translation}";
+      });
+
+      expect(
+        await say(translated("!tts hola amigos", "!tts hello friends"), s),
+      ).toEqual(["hola amigos / hello friends"]);
+      expect(await say("!tts hello", s)).toEqual(["hello / hello"]);
+    });
+
+    it("drops a message with a banned word in its translation", async () => {
+      const s = settings((s) => {
+        s.protection.banned = ["idiot"];
+      });
+
+      expect(await say(translated("tonto", "idiot"), s)).toEqual([]);
+    });
+  });
+
   describe("text", () => {
     it("skips a message of only punctuation", async () => {
       expect(await say("?")).toEqual([]);

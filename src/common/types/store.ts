@@ -60,6 +60,7 @@ export interface Files {
     music: string;
     overlays: string;
     games: string;
+    translation: string;
   };
   gifts: string;
   customGifts: string;

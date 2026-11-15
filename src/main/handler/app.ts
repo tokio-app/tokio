@@ -24,6 +24,7 @@ import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
 import { TimerService } from "@/services/timer";
+import { TranslationService } from "@/services/translation";
 import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
@@ -77,6 +78,7 @@ export class AppHandler implements AppHandlerVariables {
   public readonly gamesService: GamesService;
   public readonly studioService: StudioService;
   public readonly trayService: TrayService;
+  public readonly translationService: TranslationService;
   public readonly notifier: Notifier;
 
   constructor(deps: AppHandlerVariables) {

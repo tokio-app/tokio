@@ -76,6 +76,30 @@ export async function findOverlays(
   return overlays;
 }
 
+/**
+ * The chat commands an overlay answers: info.yaml's, and the values of the
+ * input fields and table input columns marked `command`.
+ */
+export function chatCommands(
+  info: OverlayMetadata,
+  config?: OverlayConfig,
+): string[] {
+  const values = (config?.fields ?? []).flatMap((field): unknown[] => {
+    if (field.type === "input") {
+      return field.attributes.command ? [field.attributes.value] : [];
+    }
+    if (field.type !== "table") return [];
+    const ids = field.attributes.columns
+      .filter((column) => column.type === "input" && column.attributes.command)
+      .map((column) => column.id);
+    return field.attributes.value.flatMap((row) => ids.map((id) => row[id]));
+  });
+  return [...(info.commands ?? []), ...values].filter(
+    (value): value is string =>
+      typeof value === "string" && value.trim() !== "",
+  );
+}
+
 export async function processOverlay(
   basedir: string,
   yaml: YAMLManagerService,

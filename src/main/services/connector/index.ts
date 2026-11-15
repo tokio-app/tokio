@@ -3,6 +3,7 @@ import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
 import {
+  ChatStage,
   ConnectorProvider,
   ConnectorResponse,
   GiftResponse,
@@ -21,6 +22,10 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
   public override setLogFile(logFile: string): void {
     super.setLogFile(logFile);
     this._providerPool.forEach((provider) => provider.setLogFile(logFile));
+  }
+
+  public setChatStage(stage: ChatStage): void {
+    this._providerPool.forEach((provider) => provider.setChatStage(stage));
   }
 
   public on<T extends TOKIO_EVENTS>(

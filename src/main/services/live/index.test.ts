@@ -94,6 +94,18 @@ describe("LiveService", () => {
     ]);
   });
 
+  it("keeps a chat's translation", () => {
+    const translation = { text: "hello", from: "es", to: "en" };
+    const translated = chat("kenji", "hola");
+    translated.comment.translation = translation;
+
+    live.record(TOKIO_EVENTS.CHAT, translated);
+
+    expect(live.getSession().activity).toEqual([
+      expect.objectContaining({ type: "chat", text: "hola", translation }),
+    ]);
+  });
+
   it("names a viewer by the handle without a nickname, and without a picture when TikTok sent none", () => {
     live.record(TOKIO_EVENTS.FOLLOW, {
       user: viewer("sora", { username: "", profilePictures: [] }),

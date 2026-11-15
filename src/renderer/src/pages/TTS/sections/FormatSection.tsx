@@ -7,8 +7,10 @@ import {
   Section,
   VariableList,
 } from "@/components";
-import { Updater } from "@/hooks";
-import { useT } from "@/ui/i18n";
+import { languageName } from "@/helper/voices";
+import { shownVariables, Updater, useTranslationLanguage } from "@/hooks";
+import { rich, useLanguage, useT } from "@/ui/i18n";
+import { Link } from "@tanstack/react-router";
 import { useRef } from "react";
 import styles from "../tts.module.css";
 
@@ -24,7 +26,7 @@ const MODE_VALUES: Record<Mode, string> = {
 };
 
 // The ones TTSService fills in the template, see _parseText
-const TEMPLATE_VARIABLES = ["username", "handle", "comment"];
+const TEMPLATE_VARIABLES = ["username", "handle", "comment", "translation"];
 
 interface Props {
   format: Format;
@@ -35,6 +37,9 @@ export function FormatSection({ format, update }: Props) {
   const custom = format.trigger.mode === "custom";
   const templateRef = useRef<HTMLInputElement>(null);
   const t = useT();
+  const lang = useLanguage();
+  const translating = useTranslationLanguage();
+  const variables = shownVariables(TEMPLATE_VARIABLES, translating);
 
   return (
     <Section
@@ -99,7 +104,7 @@ export function FormatSection({ format, update }: Props) {
           }
         />
         <VariableList
-          variables={TEMPLATE_VARIABLES}
+          variables={variables}
           inputRef={templateRef}
           value={format.template}
           onChange={(template) =>
@@ -119,6 +124,28 @@ export function FormatSection({ format, update }: Props) {
           })
         }
       />
+
+      <div className={styles.check_group}>
+        <Check
+          label={t("tts.format.translate")}
+          checked={format.translate}
+          disabled={translating === ""}
+          onChange={(e) =>
+            update((f) => {
+              f.translate = e.target.checked;
+            })
+          }
+        />
+        <p className={styles.check_hint}>
+          {translating === ""
+            ? rich(t("tts.format.translateOff"), {
+                link: (text) => <Link to="/settings">{text}</Link>,
+              })
+            : t("tts.format.translateHint", {
+                language: languageName(translating, lang),
+              })}
+        </p>
+      </div>
     </Section>
   );
 }

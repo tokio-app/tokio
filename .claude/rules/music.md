@@ -7,6 +7,10 @@ paths:
 
 # Music
 
+## Chat commands
+
+- `MusicService._match` matches a control's command with `startsWithCommand` (`src/main/helper/chat.ts`): in any case, alone or followed by a space. Chat translation uses it too, to leave music commands untranslated (`.claude/rules/translation.md`), so a change there changes both.
+
 ## YouTube's player
 
 - Connecting doesn't ask for an account: YouTube connects once a `music.youtube.com` page loads, signed in or not, and the streamer signs in from YouTube Music's own page if they want to (the user's call). Never send the page to Google's sign-in or clear its session to force one. A page that loads first, like Google's sign-in or a consent page, doesn't count.

@@ -84,6 +84,7 @@ export const defaultProfile: Profile = {
         value: "",
       },
       remove_emojis: false,
+      translate: false,
     },
     protection: {
       comment_length: 300,

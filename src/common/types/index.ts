@@ -11,4 +11,5 @@ export * from "./server";
 export * from "./store";
 export * from "./studio";
 export * from "./timer";
+export * from "./translation";
 export * from "./updates";

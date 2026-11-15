@@ -17,6 +17,9 @@ const OverlayMeta = {
   version: z.string(),
   external: z.boolean().optional(),
   config: z.boolean(),
+  // Chat commands the overlay answers that no setting holds, so Chat
+  // translation leaves them as typed. Older versions strip it.
+  commands: z.array(z.string()).optional(),
 };
 
 export const OverlayMetaSchema = z.object(OverlayMeta);
@@ -84,6 +87,11 @@ const AppSettingsSchema = z.object({
   // A tag in APP_LANGUAGES, or "system" to follow the OS. Any string, so a
   // language removed later can't invalidate the store.
   language: z.string().default("system"),
+  // Chat translation: a code in TRANSLATION_LANGUAGES, or "" when it's off.
+  // Any string loads, like language; main applies only the listed ones.
+  translation: z
+    .object({ language: z.string().default("") })
+    .default({ language: "" }),
   overlays: z.array(z.object({ ...OverlayMeta, id: z.string() })),
   testOverlays: z.array(TestOverlaySchema).default([]),
   // Uploaded sounds, available to alerts in every profile

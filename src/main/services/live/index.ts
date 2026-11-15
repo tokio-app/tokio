@@ -86,6 +86,7 @@ export class LiveService extends Service {
         user: activityUser(user),
         text: comment.content,
         emotes: comment.emotes.flatMap((emote) => emote.images.slice(0, 1)),
+        ...(comment.translation && { translation: comment.translation }),
       }),
     [TOKIO_EVENTS.GIFT]: (event) => {
       // The totals count gifts as they come, the feed once per combo, like

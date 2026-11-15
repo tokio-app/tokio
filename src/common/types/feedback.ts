@@ -67,6 +67,10 @@ export enum FEEDBACK_CODES {
   VOICE_SAMPLE_FAILED = "voice_sample_failed",
   MICROPHONE_FAILED = "microphone_failed",
 
+  // CHAT TRANSLATION
+  TRANSLATION_FAILED = "translation_failed",
+  TRANSLATION_TEST_FAILED = "translation_test_failed",
+
   // MUSIC
   MUSIC_CONNECTED = "music_connected",
   MUSIC_DISCONNECTED = "music_disconnected",
@@ -167,7 +171,8 @@ export type FeedbackSource =
   | "alerts"
   | "music"
   | "overlays"
-  | "games";
+  | "games"
+  | "translation";
 
 export interface AppError {
   code: FEEDBACK_CODES;

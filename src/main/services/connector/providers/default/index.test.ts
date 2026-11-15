@@ -1,4 +1,4 @@
-import { TOKIO_EVENTS } from "@/common/types";
+import { ChatEvent, TOKIO_EVENTS } from "@/common/types";
 import {
   ConnectorError,
   InvalidUsernameError,
@@ -518,6 +518,49 @@ describe("TikTokLiveConnector", () => {
           ],
         },
       });
+    });
+
+    it("sends a chat through the stage, and drops it once the connection stopped", async () => {
+      const onChat = capture(TOKIO_EVENTS.CHAT);
+      const stage = vi.fn((chat: ChatEvent) =>
+        Promise.resolve({
+          ...chat,
+          comment: {
+            ...chat.comment,
+            translation: { text: "hola", from: "en", to: "es" },
+          },
+        }),
+      );
+      connector.setChatStage(stage);
+      const chat = { user: rawUser, content: "hello", contentLanguage: "en" };
+
+      connection().emit("chat", { ...chat, emotes: [] });
+      await vi.waitFor(() => expect(onChat).toHaveBeenCalledOnce());
+      expect(onChat.mock.calls[0][0].comment.translation).toEqual({
+        text: "hola",
+        from: "en",
+        to: "es",
+      });
+
+      connection().emit("chat", { ...chat, emotes: [] });
+      await connector.disconnect();
+      await Promise.resolve();
+      expect(stage).toHaveBeenCalledTimes(2);
+      expect(onChat).toHaveBeenCalledOnce();
+    });
+
+    it("sends an emote-only comment through the stage", () => {
+      const onChat = capture(TOKIO_EVENTS.CHAT);
+      const stage = vi.fn((_chat: ChatEvent) => null);
+      connector.setChatStage(stage);
+
+      connection().emit("emote", {
+        user: rawUser,
+        emoteList: [{ emoteId: "e1" }],
+      });
+
+      expect(stage).toHaveBeenCalledOnce();
+      expect(onChat).toHaveBeenCalledOnce();
     });
 
     it("maps gifts and marks the end of a combo", () => {

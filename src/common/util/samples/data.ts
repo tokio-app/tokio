@@ -34,6 +34,34 @@ export const CHAT_MESSAGES = [
 
 export const LANGUAGES = ["en", "en", "en", "es", "pt", "fr"];
 
+// Chats in other languages with their translation, as Chat translation gives
+// them, so overlays' Test shows comment.translation
+export const TRANSLATED_CHATS = [
+  {
+    content: "Olá do Brasil!",
+    lang: "pt",
+    translation: { text: "Hello from Brazil!", from: "pt", to: "en" },
+  },
+  {
+    content: "¿Puedes poner esa canción otra vez?",
+    lang: "es",
+    translation: {
+      text: "Can you play that song again?",
+      from: "es",
+      to: "en",
+    },
+  },
+  {
+    content: "Première fois ici, j'adore l'ambiance",
+    lang: "fr",
+    translation: {
+      text: "First time here, I love the vibe",
+      from: "fr",
+      to: "en",
+    },
+  },
+];
+
 // Real gifts. Only type 1 ones can be sent in a streak, here of up to maxCombo.
 export const GIFTS = [
   {

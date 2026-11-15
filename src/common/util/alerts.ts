@@ -7,7 +7,9 @@ import {
 } from "../types/connector";
 
 const USER = ["username", "handle"];
-const CHAT = [...USER, "comment"];
+// The windows offer {translation} only while Chat translation is on
+// (useVariables)
+const CHAT = [...USER, "comment", "translation"];
 
 export const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg"];
 
@@ -92,7 +94,14 @@ function messageValues(payload: TokioEventMap[AppEvents]) {
     values.set("username", payload.user.username);
     values.set("handle", payload.user.handle);
   }
-  if ("comment" in payload) values.set("comment", payload.comment.content);
+  if ("comment" in payload) {
+    values.set("comment", payload.comment.content);
+    // What the viewer typed when there's none, like with translation off
+    values.set(
+      "translation",
+      payload.comment.translation?.text ?? payload.comment.content,
+    );
+  }
   if ("gift" in payload) {
     values.set("gift", payload.gift.name);
     values.set("count", String(payload.gift.comboCount));

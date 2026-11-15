@@ -50,6 +50,8 @@ import { HISTORY_EVENTS } from "@/services/history";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { OverlayUpdates } from "@/services/overlay";
 import { TIMER_EVENTS } from "@/services/timer";
+import { chatCommands } from "@/services/translation/commands";
+import { reasonKey } from "@/services/translation/common";
 import { failureKey, TTSRequestError } from "@/services/tts/common";
 import { AppHandlerVariables } from "@/types";
 import { release } from "node:os";
@@ -837,6 +839,36 @@ const registerCameras = ({
   });
 };
 
+// Chat in other languages reaches every listener translated, and a failing
+// Google says so once a while
+const registerTranslation = (handler: AppHandlerVariables) => {
+  const {
+    connectorService: conn,
+    pathManagerService: paths,
+    notifier,
+  } = handler;
+  const translation = handler.translationService;
+  conn.setChatStage((chat) =>
+    translation.forChat(chat, () => chatCommands(handler)),
+  );
+  translation.onFailure((error) => {
+    // Logged once per notice, so an outage can't flood the log
+    if (
+      notifier.warn(
+        "translation",
+        FEEDBACK_CODES.TRANSLATION_FAILED,
+        t("main.translation.failed", { reason: t(reasonKey(error)) }),
+        { key: "translation", windowMs: REPEAT_NOTICE_MS },
+      )
+    ) {
+      Logger.warn(
+        `<Translation> Unable to translate chat - ${formatError(error)}`,
+        paths.files.logs.translation,
+      );
+    }
+  });
+};
+
 // The profile keeps the fans its LIVEs show, whatever features are on.
 // Overlays get them as they connect, and again when they change.
 const registerFans = ({
@@ -999,6 +1031,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     historyService,
     gamesService,
     studioService,
+    translationService,
     notifier,
   } = handler;
 
@@ -1024,6 +1057,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       historyService.setLogFile(files.logs.system);
       gamesService.setLogFile(files.logs.games);
       studioService.setLogFile(files.logs.overlays);
+      translationService.setLogFile(files.logs.translation);
       notifier.setLogFiles(files.logs);
       musicService.setAdBlockFolder(folders.extraFolder);
       alertsService.setSoundsFolder(folders.soundsFolder);
@@ -1054,6 +1088,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     {
       connector: connectorService,
       tts: ttsService,
+      translation: translationService,
     },
     jsonManagerService,
     pathManagerService,
@@ -1103,6 +1138,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     // After registerConnectorEvents, see registerStudio
     registerStudio(handler);
     registerCameras(handler);
+    registerTranslation(handler);
   }
 
   const settings = storeManagerService.getSettings();

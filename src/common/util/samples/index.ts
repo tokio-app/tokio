@@ -14,7 +14,14 @@ import {
   TopGifter,
   UserData,
 } from "@/common/types";
-import { ADJECTIVES, CHAT_MESSAGES, GIFTS, LANGUAGES, NOUNS } from "./data";
+import {
+  ADJECTIVES,
+  CHAT_MESSAGES,
+  GIFTS,
+  LANGUAGES,
+  NOUNS,
+  TRANSLATED_CHATS,
+} from "./data";
 
 const randomBool = (probability = 0.5): boolean => Math.random() < probability;
 const pickRandom = <T>(arr: T[]): T =>
@@ -84,18 +91,18 @@ const chatEventFactory = (
   user = chatterFactory(),
   numEmotes = randomBool(0.4) ? randomInt(1, 3) : 0,
 ): ChatEvent => {
-  const content = pickRandom(CHAT_MESSAGES);
+  // Some in another language, translated
+  const { content, lang, translation }: Omit<ChatEvent["comment"], "emotes"> =
+    randomBool(0.25)
+      ? structuredClone(pickRandom(TRANSLATED_CHATS))
+      : { content: pickRandom(CHAT_MESSAGES), lang: pickRandom(LANGUAGES) };
   const emotes = Array.from({ length: numEmotes }, () =>
     emoteFactory(content.length),
   );
 
   return {
     user,
-    comment: {
-      content,
-      emotes,
-      lang: pickRandom(LANGUAGES),
-    },
+    comment: { content, emotes, lang, ...(translation && { translation }) },
   };
 };
 

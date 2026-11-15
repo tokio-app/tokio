@@ -471,6 +471,9 @@ export const ProfileSchema = z.object({
       }),
       // Emojis are left out of what's read, chat and alert messages alike
       remove_emojis: z.boolean().default(false),
+      // A message's translation takes {comment}'s place, when Chat
+      // translation gave it one
+      translate: z.boolean().default(false),
     }),
     protection: z.object({
       cooldown: z.number(),

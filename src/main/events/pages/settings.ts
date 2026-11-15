@@ -5,7 +5,7 @@ import {
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
 } from "@/common/types";
-import { SERVER_PORT } from "@/common/util";
+import { SERVER_PORT, TRANSLATION_LANGUAGES } from "@/common/util";
 import { showOpenDialog, showSaveDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
@@ -14,6 +14,8 @@ import { sendGamesOverlay } from "@/helper/games";
 import { language, setLanguage, t } from "@/helper/i18n";
 import Logger, { localTime } from "@/logger";
 import { StoreManagerService } from "@/services/store";
+import { chatCommands } from "@/services/translation/commands";
+import { reasonKey, TranslationError } from "@/services/translation/common";
 import { TTSService } from "@/services/tts";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
 
@@ -685,6 +687,64 @@ events.push(
       code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
       message: "main.failure.setLanguage",
     },
+  },
+);
+
+// Applies on pick, and the section shows it: no success notice
+events.push(
+  APP_EVENTS.SET_TRANSLATION,
+  async ({ storeManagerService }, e, { language }) => {
+    if (
+      language !== "" &&
+      !TRANSLATION_LANGUAGES.some((code) => code === language)
+    ) {
+      replySettings(e, storeManagerService);
+      throw new Error(`Chat translation has no language "${language}".`);
+    }
+    const saved = await storeManagerService.updateTranslationLanguage(language);
+    replySettings(e, storeManagerService);
+    if (!saved) throw saveFailure();
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "main.failure.setTranslation",
+    },
+  },
+);
+
+// The section shows the result, the failure too
+events.push(
+  APP_EVENTS.TEST_TRANSLATION,
+  async (services, e, { id, text }) => {
+    const { translationService } = services;
+    let data;
+    try {
+      data = await translationService.test(text, await chatCommands(services));
+    } catch (error) {
+      if (!(error instanceof TranslationError)) throw error;
+      const reason = t(reasonKey(error));
+      throw new AppFailure(
+        FEEDBACK_CODES.TRANSLATION_TEST_FAILED,
+        t("main.translation.testFailed", { reason }),
+        { level: "warning", cause: error },
+      );
+    }
+    e.reply(APP_EVENTS_RESPONSE.TEST_TRANSLATION, { id, success: true, data });
+  },
+  {
+    source: "translation",
+    notify: false,
+    failure: {
+      code: FEEDBACK_CODES.TRANSLATION_TEST_FAILED,
+      message: "main.failure.testTranslation",
+    },
+    onError: (e, error, { id }) =>
+      e.reply(APP_EVENTS_RESPONSE.TEST_TRANSLATION, {
+        id,
+        success: false,
+        error,
+      }),
   },
 );
 
