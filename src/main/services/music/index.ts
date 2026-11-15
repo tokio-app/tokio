@@ -9,7 +9,12 @@ import { TaskQueue } from "@/common/util";
 import { sameHandle } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import { ProviderService } from "@/services/shared";
-import { ConnectionResponse, MusicProvider, MusicQueue } from "./common";
+import {
+  ConnectionResponse,
+  ConnectOptions,
+  MusicProvider,
+  MusicQueue,
+} from "./common";
 import { Spotify, YouTubeMusic } from "./providers";
 
 interface SongRequest {
@@ -33,6 +38,7 @@ export class MusicService extends ProviderService<MusicProvider> {
   private _run = 0;
   // The viewers with a request waiting to be searched or searching
   private _requesting = new Set<string>();
+  private _youtube = new YouTubeMusic();
   constructor() {
     super();
     this._queue = new TaskQueue();
@@ -54,7 +60,7 @@ export class MusicService extends ProviderService<MusicProvider> {
         return Math.max(0, status.duration - status.time - age);
       },
     });
-    this.addProvider("YouTube", new YouTubeMusic(), true);
+    this.addProvider("YouTube", this._youtube, true);
     this.addProvider("Spotify", new Spotify());
   }
 
@@ -63,8 +69,19 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._providerPool.forEach((provider) => provider.setLogFile(logFile));
   }
 
-  public connect(): Promise<ConnectionResponse> {
-    return this._current.provider.connect();
+  // The extra folder, where YouTube's ad blocker saves its lists
+  public setAdBlockFolder(folder: string) {
+    this._youtube.adBlocker.folder = folder;
+  }
+
+  // Starts loading YouTube's ad blocker's lists before a connect needs them.
+  // A failure comes back when YouTube connects, which tries again.
+  public prepareAdBlocker() {
+    this._youtube.adBlocker.get();
+  }
+
+  public connect(options?: ConnectOptions): Promise<ConnectionResponse> {
+    return this._current.provider.connect(options);
   }
 
   public disconnect() {

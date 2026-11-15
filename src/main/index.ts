@@ -31,6 +31,7 @@ import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
 import { URLManagerService } from "@/services/url";
+import { adblockScheme } from "@tokioapp/adblock";
 import {
   app,
   BrowserWindow,
@@ -81,6 +82,9 @@ protocol.registerSchemesAsPrivileged([
   // The media library's thumbnails, the sounds and the Minecraft pictures,
   // see mediaFile. Videos need streaming.
   { scheme: MEDIA_SCHEME, privileges: { stream: true } },
+  // The stand-ins YouTube's ad blocker serves in place of ad scripts, only in
+  // the player's session
+  adblockScheme,
 ]);
 
 const services: AppServices = {

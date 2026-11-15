@@ -1025,6 +1025,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       gamesService.setLogFile(files.logs.games);
       studioService.setLogFile(files.logs.overlays);
       notifier.setLogFiles(files.logs);
+      musicService.setAdBlockFolder(folders.extraFolder);
       alertsService.setSoundsFolder(folders.soundsFolder);
       alertsService.setMediaFolder(folders.mediaFolder);
       alertsService.setSpeaker(ttsService);
@@ -1108,6 +1109,8 @@ const startApp = async (handler: AppHandlerVariables) => {
   liveService.setFeed(settings.activityFeed);
   const profile = await storeManagerService.getProfileData();
   if (profile) timerService.load(profile.timer, settings.activeProfile.file);
+  // Its lists update now, so connecting YouTube doesn't wait for them
+  if (profile?.music.provider.block_ads) musicService.prepareAdBlocker();
   // Its own file, so the fans load even when the profile doesn't
   if (!(await fansService.load(settings.activeProfile.file))) {
     notifier.warn(

@@ -1,13 +1,19 @@
 import { CurrentSongInfo, SongInfo, TOKIO_EVENTS } from "@/common/types";
 import { BrowserWindow, WebContentsView } from "electron";
-import { ConnectionResponse, createWindow, MusicProvider } from "../../common";
 import {
-  confirmLoggedOut,
-  LoginJSCode,
+  ConnectionResponse,
+  ConnectOptions,
+  createWindow,
+  MusicProvider,
+} from "../../common";
+import {
+  KEEP_PLAYING_WORLD,
+  KeepPlayingJSCode,
   parseSongRenderer,
   PlayerStateJSCode,
   PlayJSCode,
 } from "./common";
+import { AdBlocker } from "./common/adblock";
 import config from "./config";
 
 // Where the player's window may go: YouTube and Google's sign-in
@@ -16,7 +22,12 @@ const isYouTubeOrLogin = (hostname: string) =>
   hostname === "youtube.com" ||
   hostname.endsWith(".youtube.com");
 
+const YTM_HOST = new URL(config.YTM_URL).hostname;
+const isYouTubeMusic = (url: string) =>
+  URL.canParse(url) && new URL(url).hostname === YTM_HOST;
+
 export class YouTubeMusic extends MusicProvider {
+  public readonly adBlocker = new AdBlocker(() => this._logFile);
   private _ytView: WebContentsView | null = null;
   private _shellWindow: BrowserWindow | null = null;
   private _isActive: boolean = false;
@@ -29,9 +40,11 @@ export class YouTubeMusic extends MusicProvider {
     return this._isActive;
   }
 
-  public connect(): Promise<ConnectionResponse> {
+  public connect({
+    blockAds = false,
+  }: ConnectOptions = {}): Promise<ConnectionResponse> {
     if (this._isActive) return Promise.resolve({ success: true });
-    // A login still open from an earlier connect fails, so one window is left
+    // An earlier connect still waiting fails, so one window is left
     this.disconnect();
 
     // This connect's own, for listeners that outlive it
@@ -78,92 +91,63 @@ export class YouTubeMusic extends MusicProvider {
 
     return new Promise((res) => {
       let isInitializing = true;
+      // Why ads couldn't be blocked, said once connected
+      let adblockError: unknown;
 
-      const handleAuthAbort = () => {
+      const handleClose = () => {
         isInitializing = false;
         res({
           success: false,
-          error: new Error("Authentication window was closed by the user"),
+          error: new Error("The window was closed before YouTube Music loaded"),
         });
       };
 
-      shell.once("close", handleAuthAbort);
-      view.webContents.loadURL(config.YTM_URL);
+      shell.once("close", handleClose);
+      // Unless the window closed or a newer connect replaced it meanwhile
+      const current = () => this._ytView === view;
+      const load = () => {
+        if (current()) view.webContents.loadURL(config.YTM_URL);
+      };
+      const { session } = view.webContents;
+      if (blockAds) {
+        // Before the page loads: only pages loaded after get its preload.
+        // It owns the session's webRequest listeners, one per event.
+        this.adBlocker
+          .ready()
+          .then((blocker) => {
+            if (current()) blocker.enable(session);
+          })
+          .catch((error: unknown) => {
+            adblockError = error;
+          })
+          .finally(load);
+      } else {
+        // Off, its lists leave memory too
+        this.adBlocker.dispose();
+        load();
+      }
 
-      let hasAttemptedLoginRedirect = false;
-      let checkGeneration = 0;
-
-      const markReady = () => {
+      // Connected once YouTube Music loads, signed in or not: signing in is
+      // up to the streamer, from the page (the user's call)
+      view.webContents.on("did-finish-load", () => {
+        if (!isYouTubeMusic(view.webContents.getURL())) return;
+        // Each page load starts without it. A page gone meanwhile has
+        // nothing left to keep playing.
+        view.webContents
+          .executeJavaScriptInIsolatedWorld(KEEP_PLAYING_WORLD, [
+            { code: KeepPlayingJSCode },
+          ])
+          .catch(() => {});
         if (!isInitializing) return;
         isInitializing = false;
-        shell.off("close", handleAuthAbort);
+        shell.off("close", handleClose);
         this._isActive = true;
-        res({ success: true });
-      };
-
-      const handleNavigation = async () => {
-        // A newer page load cancels any login check still retrying.
-        const generation = ++checkGeneration;
-
-        if (!this._ytView || this._shellWindow?.isDestroyed()) return;
-
-        const currentUrl = this._ytView.webContents.getURL();
-        if (currentUrl.includes("accounts.google.com")) return;
-
-        if (!isInitializing) return;
-
-        try {
-          const isStale = () =>
-            generation !== checkGeneration ||
-            !isInitializing ||
-            !this._ytView ||
-            this._ytView.webContents.isDestroyed() ||
-            !!this._shellWindow?.isDestroyed() ||
-            this._ytView.webContents.getURL().includes("accounts.google.com");
-
-          // A logged-in user resolves on the first check; only a run of
-          // failed checks counts as logged out.
-          const status = await confirmLoggedOut(() => this.checkIsLoggedIn(), {
-            attempts: config.LOGIN_CHECK_ATTEMPTS,
-            intervalMs: config.LOGIN_CHECK_INTERVAL_MS,
-            isStale,
-          });
-
-          if (status === "stale") return;
-
-          if (status === "logged-in") {
-            markReady();
-          } else {
-            if (hasAttemptedLoginRedirect) {
-              isInitializing = false;
-              shell.off("close", handleAuthAbort);
-              this._isActive = false;
-              res({
-                success: false,
-                error: new Error("Login failed. Please try again."),
-              });
-              return;
-            }
-            hasAttemptedLoginRedirect = true;
-            await this._ytView.webContents.session.clearStorageData();
-            await this._ytView.webContents.loadURL(config.YTM_LOGIN_URL);
-          }
-        } catch (err) {
-          isInitializing = false;
-          this._isActive = false;
-          shell.off("close", handleAuthAbort);
-          const error = err instanceof Error ? err : new Error(String(err));
-          res({ success: false, error });
-        }
-      };
-
-      view.webContents.on("did-finish-load", async () => {
-        await handleNavigation();
+        res({ success: true, adblockError });
       });
     });
   }
 
-  // Ends the session, or fails a login still open. The window's close
+  // Ends the session, or fails a connect still waiting. The window's close
   // listener, added in connect, closes the page and emits the end.
   public disconnect() {
     if (this._shellWindow && !this._shellWindow.isDestroyed()) {
@@ -246,18 +230,5 @@ export class YouTubeMusic extends MusicProvider {
     const result = parseSongRenderer(firstItemRenderer);
 
     return result;
-  }
-
-  private async checkIsLoggedIn(): Promise<boolean> {
-    if (!this._ytView) return false;
-
-    const currentUrl = this._ytView.webContents.getURL();
-    if (currentUrl.includes("accounts.google.com")) return false;
-
-    try {
-      return await this._ytView.webContents.executeJavaScript(LoginJSCode);
-    } catch {
-      return false;
-    }
   }
 }

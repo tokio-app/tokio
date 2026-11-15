@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Music } from ".";
 
 const loaded = profileReply((p) => {
-  p.music.provider = { name: "Spotify", key: "client-id" };
+  p.music.provider = { name: "Spotify", key: "client-id", block_ads: false };
   p.music.controls.play = { enabled: false, command: "!song" };
   p.music.protection = {
     cooldown: 4,
@@ -29,6 +29,9 @@ const tab = (name: string) => screen.getByRole("tab", { name });
 const clientId = () =>
   screen.getByPlaceholderText("Enter your Spotify Client ID...");
 const connectButton = () => screen.getByRole("button", { name: "Connect" });
+const blockAds = () => screen.getByRole("checkbox", { name: "Block ads" });
+const adsDialog = () =>
+  screen.queryByRole("dialog", { name: "Block YouTube's ads?" });
 
 async function setup(reply = loaded) {
   const app = renderWithProviders(<Music />, {
@@ -94,7 +97,11 @@ describe("Music", () => {
     await user.click(tab("Spotify"));
 
     expect(tab("Spotify")).toHaveAttribute("aria-selected", "true");
-    expect((await saved()).provider).toEqual({ name: "Spotify", key: "" });
+    expect((await saved()).provider).toEqual({
+      name: "Spotify",
+      key: "",
+      block_ads: false,
+    });
 
     await user.click(tab("YouTube"));
     expect(tab("YouTube")).toHaveAttribute("aria-selected", "true");
@@ -113,6 +120,7 @@ describe("Music", () => {
     expect((await saved()).provider).toEqual({
       name: "Spotify",
       key: "my-client",
+      block_ads: false,
     });
   });
 
@@ -131,6 +139,87 @@ describe("Music", () => {
     expect(reached).not.toContain(clientId());
   });
 
+  describe("Block ads", () => {
+    it("asks first, warning that it breaks YouTube's terms", async () => {
+      const { user } = await setup(youtube);
+
+      await user.click(blockAds());
+
+      const dialog = adsDialog()!;
+      expect(dialog).toHaveAccessibleDescription(
+        "YouTube says blocking its ads breaks its Terms of Service, and it may stop playing videos for you.",
+      );
+      expect(blockAds()).not.toBeChecked();
+
+      await user.click(
+        within(dialog).getByRole("button", { name: "Block ads" }),
+      );
+
+      expect(adsDialog()).toBeNull();
+      expect(blockAds()).toBeChecked();
+      expect((await saved()).provider.block_ads).toBe(true);
+    });
+
+    it("stays off when the warning is canceled", async () => {
+      const { user } = await setup(youtube);
+
+      await user.click(blockAds());
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(adsDialog()).toBeNull();
+      expect(blockAds()).not.toBeChecked();
+      await wait(300);
+      expect(sent(APP_EVENTS.UPDATE_MUSIC_SETTINGS)).toEqual([]);
+    });
+
+    it("turns off without asking, and connects with it", async () => {
+      const { user } = await setup(
+        profileReply((p) => {
+          p.music.provider.block_ads = true;
+        }),
+      );
+      expect(blockAds()).toBeChecked();
+      await user.click(connectButton());
+      expect(sent(APP_EVENTS.CONNECT_MUSIC)).toEqual([
+        { name: "YouTube", key: "", block_ads: true },
+      ]);
+      await musicConnected(false);
+
+      await user.click(blockAds());
+
+      expect(adsDialog()).toBeNull();
+      expect(blockAds()).not.toBeChecked();
+      expect((await saved()).provider.block_ads).toBe(false);
+    });
+
+    it("is locked while connected", async () => {
+      await setup(youtube);
+
+      await musicConnected();
+
+      expect(blockAds()).toBeDisabled();
+    });
+
+    // Only CSS hides it while Spotify is selected
+    it("is out of the keyboard's reach under Spotify", async () => {
+      const { user } = await setup();
+      const connect = connectButton();
+
+      const reached: Element[] = [];
+      while (document.activeElement !== connect && reached.length < 50) {
+        await user.tab();
+        reached.push(document.activeElement!);
+      }
+
+      expect(reached).toContain(connect);
+      const box = screen.getByRole("checkbox", {
+        name: "Block ads",
+        hidden: true,
+      });
+      expect(reached).not.toContain(box);
+    });
+  });
+
   it("connects with the provider shown, loading until main answers", async () => {
     const { user } = await setup(youtube);
     const connect = connectButton();
@@ -140,7 +229,7 @@ describe("Music", () => {
     await user.click(connect);
 
     expect(sent(APP_EVENTS.CONNECT_MUSIC)).toEqual([
-      { name: "Spotify", key: "my-client" },
+      { name: "Spotify", key: "my-client", block_ads: false },
     ]);
     expect(connect).toHaveAttribute("aria-busy", "true");
 

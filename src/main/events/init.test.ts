@@ -246,6 +246,8 @@ function setup() {
   const musicService = {
     ...music,
     setLogFile: vi.fn(),
+    setAdBlockFolder: vi.fn((_folder: string) => {}),
+    prepareAdBlocker: vi.fn(),
     isActive: vi.fn(() => false),
     handle: vi.fn(),
     clearHandler: vi.fn(),
@@ -1777,6 +1779,32 @@ describe("init events", () => {
       await load(s);
 
       expect(s.timerService.load).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("YouTube's ad blocker", () => {
+    it("gets ready at startup when the active profile blocks ads", async () => {
+      const s = setup();
+      const { music } = profile;
+      s.storeManagerService.getProfileData.mockResolvedValue({
+        ...profile,
+        music: { ...music, provider: { ...music.provider, block_ads: true } },
+      });
+
+      await load(s);
+
+      expect(s.musicService.setAdBlockFolder).toHaveBeenCalledExactlyOnceWith(
+        "app/extra",
+      );
+      expect(s.musicService.prepareAdBlocker).toHaveBeenCalledOnce();
+    });
+
+    it("waits for a connect when the profile doesn't block ads", async () => {
+      const s = setup();
+
+      await load(s);
+
+      expect(s.musicService.prepareAdBlocker).not.toHaveBeenCalled();
     });
   });
 

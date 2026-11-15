@@ -1,5 +1,4 @@
 import { SongInfo } from "@/common/types";
-import { delay } from "@/common/util";
 import config from "../config";
 
 // The size part of a thumbnail URL, swapped for the size we want
@@ -89,47 +88,23 @@ export const PlayJSCode = (videoId: string) => `
 })();
 `;
 
-export const LoginJSCode = `
+// An isolated world of its own, where YouTube's page can't see the script
+export const KEEP_PLAYING_WORLD = 1919;
+
+// After about 40 minutes with nobody at the page, YouTube Music pauses each
+// song a few seconds in behind "Video paused. Continue watching?". The page
+// answers it as a person would. Its only button is the yes. Its Premium
+// upsell is left alone: it doesn't pause a song, and its other button opens
+// Premium.
+export const KeepPlayingJSCode = `
 (() => {
-  const signInBtn = document.querySelector('a.sign-in-link, [aria-label="Sign in"]');
-  return signInBtn === null;
+  if (window.keepPlaying) return;
+  window.keepPlaying = setInterval(() => {
+    const yes = document.querySelector("ytmusic-you-there-renderer button");
+    if (yes && yes.getClientRects().length > 0) yes.click();
+  }, 1000);
 })();
 `;
-
-export type LoginConfirmation = "logged-in" | "logged-out" | "stale";
-
-/**
- * Runs `check` up to `attempts` times, spaced `intervalMs` apart, and reports
- * "logged-out" only when every attempt said so. A rejected check counts as a
- * failed attempt. Returns "stale" as soon as `isStale()` is true.
- */
-export async function confirmLoggedOut(
-  check: () => Promise<boolean>,
-  opts: { attempts: number; intervalMs: number; isStale: () => boolean },
-): Promise<LoginConfirmation> {
-  const { attempts, intervalMs, isStale } = opts;
-
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    if (isStale()) return "stale";
-
-    let loggedIn = false;
-    try {
-      loggedIn = await check();
-    } catch {
-      loggedIn = false;
-    }
-
-    if (isStale()) return "stale";
-    if (loggedIn) return "logged-in";
-
-    if (attempt < attempts) {
-      await delay(intervalMs);
-      if (isStale()) return "stale";
-    }
-  }
-
-  return "logged-out";
-}
 
 const TIME_REGEX = /^(\d+:)*\d+$/;
 

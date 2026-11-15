@@ -72,6 +72,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `connector.md`: the TikTok connector and its key
 - `live-session.md`: the LIVE session and activity feed on Home
 - `tts.md`: TTS engines and chat TTS
+- `music.md`: music requests and YouTube's ad blocker
 - `alerts.md`: alert triggers, gifts, sounds, media and spoken alerts
 - `games.md`: the Games page, the Minecraft connection and game actions
 - `games-overlay.md`: the games overlay and the Minecraft pictures library
@@ -171,6 +172,7 @@ Tokio's source is MIT; treat license compliance as part of every change.
 
 - **LGPL code stays isolated.** `src/main/services/tts/providers/edge/common/drm-v2.ts` is LGPL-3.0-only (derived from edge-tts). Code ported from edge-tts goes only into its own LGPL file with the same header (SPDX line, upstream commit, authors, dated modification notice). Never copy upstream code into MIT files.
 - **The distributed app is MIT too**, with that one LGPL file and the Archivo font files (`@fontsource-variable/archivo`). The font stays under the SIL OFL 1.1, which the user approved: it allows bundling with any software. Keep it that way: no other copyleft dependency, and no code from `tiktok-live-connector` 2.4.1 or later or `tiktok-live-proto` 0.2.4 or later (AGPL).
+- **The ad blocker's filter lists are other authors' data under the GPL-3.0 or CC BY-SA.** Each user's Tokio downloads them at runtime (`@tokioapp/adblock`, ours, MIT). Never ship them in the app, bundle a copy for a first start, or commit them.
 - **Check licenses when adding or upgrading a dependency**, even minor bumps (tiktok-live-connector went MIT → AGPL in 2.4.1), with the `add-dependency` skill. Ask before adding anything copyleft (GPL, AGPL, LGPL, MPL, CC BY-SA).
 - **react-icons:** only use the sets listed under Icons in `THIRD_PARTY_NOTICES.md`, and add a row for any new set.
 - **Keep the notices in sync** when licensed components or online services change: `THIRD_PARTY_NOTICES.md` and `LICENSES/`, the license banner in `electron.vite.config.ts` (the bundler strips header comments), and `COMPONENTS` and `SERVICES` in `src/renderer/src/pages/About/helper.ts`, which mirror the non-npm parts of `THIRD_PARTY_NOTICES.md`. `src/renderer/src/pages/About/notices.test.ts` fails when they drift; the `add-dependency` skill says what each change needs.
