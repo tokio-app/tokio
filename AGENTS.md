@@ -71,6 +71,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `updates.md`: the auto-updater
 - `connector.md`: the TikTok connector and its key
 - `live-session.md`: the LIVE session and activity feed on Home
+- `controls.md`: the live controls (skip song, stop TTS, replay alert, pause) and their global shortcuts
 - `tts.md`: TTS engines and chat TTS
 - `music.md`: music requests and YouTube's ad blocker
 - `translation.md`: chat translation, its pipe and the commands it leaves as typed
@@ -133,6 +134,7 @@ All renderer ↔ main communication is typed. The `ipc-event` skill has the step
 
 - Requests go in `APP_EVENTS` and `AppEventsMap` (`src/common/types/events/req.ts`), named `app:<area>:<action>`. Replies and pushes go in `APP_EVENTS_RESPONSE` and `AppEventsResponseMap` (`res.ts`).
 - Handlers live in `src/main/events/pages/<page>.ts`, registered with `events.push(event, handler, options)`. Don't wrap them in try/catch; throw and let `options` handle it (see Feedback). A new page stack goes in `mergeStacks` (`src/main/events/index.ts`).
+- `invoke(event, data)` (in the handler variables) runs a request's handler in main as if the window had sent it, so global shortcuts get the UI's checks, saving and notices. Handlers only call `e.reply`. Each reply also reaches the main window, except `PRIVATE_REPLIES` (`src/main/helper/events.ts`): a page would take those as the answer to its own request.
 - The renderer sends with `window.api.emit` and listens with the `useIpcRequest` / `useIpcListener` hooks. Main pushes without a request with `win.webContents.send(APP_EVENTS_RESPONSE.Y, data)`; a `void` response still needs `undefined` as payload.
 - Handlers open file dialogs with `showOpenDialog` / `showSaveDialog` from `@/helper/dialog`, which start in the last folder used. Electron's own start in Downloads.
 - A request about one item (an overlay, a document, a test) gets its id back in the reply, failures included, so the renderer ignores a late reply for another one (see `GET_OVERLAY_CONFIG`).
