@@ -2,6 +2,7 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   CONTROL_ACTIONS,
+  ControlAction,
   FEEDBACK_CODES,
 } from "@/common/types";
 import { createStack } from "@/helper/events";
@@ -28,44 +29,42 @@ const stopTts = ({ ttsService, win }: AppHandlerVariables) => {
   }
 };
 
-// Runs the action, returning whether there was something to do
-const runControl = (
-  handler: AppHandlerVariables,
-  { action, paused }: z.infer<typeof ControlSchema>,
-): boolean => {
-  const { controlsService: controls, win } = handler;
-  switch (action) {
-    case "skipSong":
-      return handler.musicService.skip();
-    case "stopTts":
+// Each action, returning whether there was something to do
+const CONTROLS: Record<
+  ControlAction,
+  (handler: AppHandlerVariables, paused?: boolean) => boolean
+> = {
+  skipSong: ({ musicService }) => musicService.skip(),
+  stopTts: (handler) => {
+    stopTts(handler);
+    return true;
+  },
+  // Once each, even with alerts off or paused: it's an explicit press
+  replayAlert: ({ controlsService, win }) => {
+    const alerts = controlsService.lastAlerts();
+    for (const audio of alerts) {
+      if (win.isDestroyed()) break;
+      win.webContents.send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
+        ...audio,
+        repeat: 1,
+      });
+    }
+    return alerts.length > 0;
+  },
+  pause: (handler, paused) => {
+    const { controlsService, alertsService, gamesService, win } = handler;
+    const next = paused ?? !controlsService.isPaused();
+    // Nothing from before the pause plays later
+    if (next) {
       stopTts(handler);
-      return true;
-    case "replayAlert": {
-      // Once each, even with alerts off or paused: it's an explicit press
-      const alerts = controls.lastAlerts();
-      for (const audio of alerts) {
-        if (win.isDestroyed()) break;
-        win.webContents.send(APP_EVENTS_RESPONSE.ALERT_AUDIO, {
-          ...audio,
-          repeat: 1,
-        });
+      alertsService.clear();
+      if (!win.isDestroyed()) {
+        win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
       }
-      return alerts.length > 0;
+      gamesService.stopRuns();
     }
-    case "pause": {
-      const next = paused ?? !controls.isPaused();
-      // Nothing from before the pause plays later
-      if (next) {
-        stopTts(handler);
-        handler.alertsService.clear();
-        if (!win.isDestroyed()) {
-          win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
-        }
-        handler.gamesService.stopRuns();
-      }
-      return controls.setPaused(next);
-    }
-  }
+    return controlsService.setPaused(next);
+  },
 };
 
 // No success notice: the effect is audible, and a LIVE's skips would fill
@@ -74,7 +73,7 @@ events.push(
   APP_EVENTS.CONTROL,
   (handler, e, data) => {
     const control = ControlSchema.parse(data);
-    const done = runControl(handler, control);
+    const done = CONTROLS[control.action](handler, control.paused);
     e.reply(APP_EVENTS_RESPONSE.CONTROL, {
       success: true,
       action: control.action,

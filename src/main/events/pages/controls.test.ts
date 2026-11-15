@@ -140,6 +140,7 @@ describe("CONTROL", () => {
     controlsService.setPaused(true);
 
     await h.invoke(controls, APP_EVENTS.CONTROL, {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- what a bad caller could send
       action: "dance" as ControlAction,
     });
 
