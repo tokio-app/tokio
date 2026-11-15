@@ -45,8 +45,9 @@ import {
 import config from "@/config";
 import { language, setLanguage } from "@/helper/i18n";
 import Logger from "@/logger";
-import type { AlertsService } from "@/services/alerts";
+import type { AlertAudio, AlertsService } from "@/services/alerts";
 import type { ReconnectState } from "@/services/connector/common";
+import { ControlsService } from "@/services/controls";
 import { FAN_EVENTS, type FansService } from "@/services/fans";
 import type { GamesService } from "@/services/games";
 import { HISTORY_EVENTS, type HistoryService } from "@/services/history";
@@ -63,7 +64,7 @@ import { TranslationError } from "@/services/translation/common";
 import type { TTSService } from "@/services/tts";
 import { TTSRequestError } from "@/services/tts/common";
 import type { UpdaterService } from "@/services/updater";
-import { app, systemPreferences } from "@test/electron";
+import { app, globalShortcut, systemPreferences } from "@test/electron";
 import { createHandler, eventSource } from "@test/handler";
 import {
   afterEach,
@@ -216,6 +217,7 @@ function setup() {
     activityFeed: { ...defaultStoreData.settings.activityFeed },
     games: { minecraft: { enabled: true } },
     logs: { debug: false },
+    shortcuts: { ...defaultStoreData.settings.shortcuts },
   };
 
   const pathManagerService = {
@@ -398,6 +400,7 @@ function setup() {
   };
   const yamlManagerService = { setLogFile: vi.fn() };
   const studioService = new StudioService();
+  const controlsService = new ControlsService();
   const translationService = {
     setLogFile: vi.fn(),
     forChat: vi.fn(
@@ -432,6 +435,7 @@ function setup() {
     trayService,
     yamlManagerService,
     translationService,
+    controlsService,
   });
 
   return {
@@ -464,6 +468,7 @@ function setup() {
     trayService,
     yamlManagerService,
     translationService,
+    controlsService,
   };
 }
 
@@ -2785,6 +2790,134 @@ describe("init events", () => {
         error,
       ];
       expect(logError.mock.calls).toEqual([logged, logged]);
+    });
+  });
+
+  describe("live controls", () => {
+    const sound = (id: string): AlertAudio => ({
+      id,
+      key: `${id}.mp3`,
+      volume: 80,
+      channel: "alerts",
+      maxQueueLength: 100,
+    });
+
+    it("ignores chat while paused, keeping the song queue", async () => {
+      const s = await live({ tts: true, music: false });
+      s.controlsService.setPaused(true);
+
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hello"));
+      await flushPromises();
+
+      expect(s.ttsService.talk).not.toHaveBeenCalled();
+      expect(s.musicService.handle).not.toHaveBeenCalled();
+      expect(s.musicService.clearHandler).not.toHaveBeenCalled();
+    });
+
+    it("ignores alerts and game actions while paused", async () => {
+      const s = await live();
+      s.controlsService.setPaused(true);
+
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+      await flushPromises();
+
+      expect(s.alertsService.handle).not.toHaveBeenCalled();
+      expect(s.gamesService.handle).not.toHaveBeenCalled();
+    });
+
+    it("drops a spoken alert made after the pause came", async () => {
+      const s = await live();
+      let speak = (_audio: AlertAudio) => {};
+      s.alertsService.handle.mockImplementation(async (_t, _p, _prof, play) => {
+        speak = play;
+      });
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+      await vi.waitFor(() => expect(s.alertsService.handle).toHaveBeenCalled());
+
+      s.controlsService.setPaused(true);
+      speak(sound("spoken"));
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.ALERT_AUDIO)).toEqual([]);
+      expect(s.controlsService.lastAlerts()).toEqual([]);
+    });
+
+    it("keeps each event's alerts for a replay, spoken ones made later too", async () => {
+      const s = await live();
+      const plays: ((audio: AlertAudio) => void)[] = [];
+      s.alertsService.handle.mockImplementation(async (_t, _p, _prof, play) => {
+        plays.push(play);
+      });
+      s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
+      s.conn.emit(
+        TOKIO_EVENTS.SHARE,
+        generateTikTokEventSample(TOKIO_EVENTS.SHARE).data,
+      );
+      await vi.waitFor(() => expect(plays).toHaveLength(2));
+      const [follow, share] = plays;
+
+      follow(sound("follow"));
+      share(sound("share"));
+      // The follow's spoken message, made after the share's sound
+      follow(sound("follow-spoken"));
+
+      expect(s.controlsService.lastAlerts()).toEqual([sound("share")]);
+      share(sound("share-spoken"));
+      expect(s.controlsService.lastAlerts()).toEqual([
+        sound("share"),
+        sound("share-spoken"),
+      ]);
+    });
+
+    it("clears the pause when a LIVE connects", async () => {
+      const s = await live();
+      s.controlsService.setPaused(true);
+
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+
+      expect(s.controlsService.isPaused()).toBe(false);
+    });
+
+    it("pushes the state on every change, not to a closed window", async () => {
+      const s = await live();
+
+      s.controlsService.setPaused(true);
+      s.controlsService.setPaused(false);
+      s.h.win.close();
+      s.controlsService.setPaused(true);
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CONTROLS)).toEqual([
+        { paused: true },
+        { paused: false },
+      ]);
+    });
+
+    it("applies the saved shortcuts on the first load, warning about taken ones", async () => {
+      const s = setup();
+      s.settings.shortcuts.skipSong = "F9";
+      s.settings.shortcuts.pause = "F10";
+      globalShortcut.take("F10");
+
+      await load(s);
+      await load(s);
+
+      expect(globalShortcut.isRegistered("F9")).toBe(true);
+      expect(globalShortcut.register).toHaveBeenCalledTimes(2);
+      expect(noticesFor(s, FEEDBACK_CODES.SHORTCUT_TAKEN)).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          message: expect.stringContaining("Pause everything"),
+        }),
+      ]);
+    });
+
+    it("turns the shortcuts back on at every load", async () => {
+      const s = setup();
+      await load(s);
+      globalShortcut.setSuspended(true);
+
+      await load(s);
+
+      expect(globalShortcut.isSuspended()).toBe(false);
     });
   });
 

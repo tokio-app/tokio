@@ -29,7 +29,7 @@ import {
   timerTriggers,
 } from "@/common/util";
 import config from "@/config";
-import { systemPreferences } from "electron";
+import { globalShortcut, systemPreferences } from "electron";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, REPEAT_NOTICE_MS, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
@@ -41,8 +41,10 @@ import {
   sendStudioReact,
   showsNumbers,
 } from "@/helper/studio";
+import { applyStoredShortcuts, warnTaken } from "@/helper/shortcuts";
 import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
+import type { AlertAudio } from "@/services/alerts";
 import { TikTokConnectorService } from "@/services/connector";
 import { FAN_EVENTS } from "@/services/fans";
 import { MAX_BACKLOG } from "@/services/games";
@@ -204,20 +206,29 @@ const registerConnectorEvents = ({
   liveService: live,
   pathManagerService: paths,
   serverService: server,
+  controlsService: controls,
   notifier,
 }: AppHandlerVariables) => {
   const dispatchAlert = async <K extends AppEvents>(
     type: K,
     payload: TokioEventMap[K],
   ) => {
+    // Ignored while paused, and never played later
+    if (controls.isPaused()) return;
     if (!store.getActiveFeatures().alerts) return;
     const profile = await store.getProfileData();
     if (!profile) return;
+    // This event's sounds, media and spoken messages, which a replay plays
+    const group: AlertAudio[] = [];
     await alerts.handle(
       type,
       payload,
       profile,
       (audio) => {
+        // A spoken message made after a pause came
+        if (controls.isPaused()) return;
+        // Kept by reference, so the messages made later join it
+        if (group.push(audio) === 1) controls.recordAlerts(group);
         // A sound read or a message made after the window closed on quit
         if (win.isDestroyed()) return;
         win.webContents.send(APP_EVENTS_RESPONSE.ALERT_AUDIO, audio);
@@ -274,6 +285,8 @@ const registerConnectorEvents = ({
     type: K,
     payload: TokioEventMap[K],
   ) => {
+    // The pause dropped the waiting runs, and takes no new ones
+    if (controls.isPaused()) return;
     const profile = await store.getProfileData();
     if (!profile) return;
     await games.handle(type, payload, profile.games);
@@ -426,6 +439,9 @@ const registerConnectorEvents = ({
   });
 
   const handleChat = async (d: ChatEvent) => {
+    // Before the else branches below, whose clearHandler would empty the
+    // song queue the pause lets play on
+    if (controls.isPaused()) return;
     const features = store.getActiveFeatures();
     const profile = await store.getProfileData();
     if (features.tts) {
@@ -666,6 +682,20 @@ const registerGames = (handler: AppHandlerVariables) => {
   });
   // Its automatic texts are in the app's language
   onLanguage(() => void sendGamesOverlay(handler));
+};
+
+// The pause lives in memory, and the window follows it. A new LIVE never
+// starts paused.
+const registerControls = ({
+  connectorService: conn,
+  controlsService: controls,
+  win,
+}: AppHandlerVariables) => {
+  conn.on(TOKIO_EVENTS.CONNECTED, () => controls.setPaused(false));
+  controls.onChange((state) => {
+    if (win.isDestroyed()) return;
+    win.webContents.send(APP_EVENTS_RESPONSE.CONTROLS, state);
+  });
 };
 
 // The countdown timer takes time from live events whatever features are on.
@@ -1131,6 +1161,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     wired.add(handler);
     serverService.initEvents(connectorService, musicService);
     registerConnectorEvents(handler);
+    registerControls(handler);
     registerTimer(handler);
     registerGames(handler);
     registerFans(handler);
@@ -1242,6 +1273,8 @@ function versionChange({ app, storeManagerService }: AppHandlerVariables) {
 events.push(
   APP_EVENTS.LOAD_APP,
   async (handler, e) => {
+    // A window that died while a shortcut field recorded left them suspended
+    globalShortcut.setSuspended(false);
     let start = started.get(handler);
     const first = start === undefined;
     if (!start) {
@@ -1279,6 +1312,7 @@ events.push(
     }
 
     handler.trayService.setEnabled(settings.tray.enabled);
+    warnTaken(handler.notifier, applyStoredShortcuts(handler));
     await initUpdater(handler);
     handler.updaterService.setAuto(settings.updates.auto);
     handler.overlayService.onUpdates((updates) =>
