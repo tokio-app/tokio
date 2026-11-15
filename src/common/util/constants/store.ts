@@ -62,6 +62,7 @@ export const defaultStoreData: StoreSchema = {
       replayAlert: "",
       pause: "",
     },
+    remote: { enabled: false, key: "" },
     liveStats: { ...EMPTY_LIVE_STATS },
     activeProfile: defaultEntity,
     activeConnProvider: defaultProvider,

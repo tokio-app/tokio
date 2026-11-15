@@ -65,6 +65,15 @@ export const ShortcutsSchema = z
   } satisfies Record<ControlAction, typeof accelerator>)
   .prefault({});
 
+// The phone remote and the control API, off until turned on. The key is
+// their only gate on the LAN; "" until the first time it's on.
+export const RemoteSettingsSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    key: z.string().default(""),
+  })
+  .prefault({});
+
 const AppSettingsSchema = z.object({
   server: z.object({
     enabled: z.boolean(),
@@ -132,6 +141,7 @@ const AppSettingsSchema = z.object({
   }),
   games: GamesSettingsSchema,
   shortcuts: ShortcutsSchema,
+  remote: RemoteSettingsSchema,
   liveStats: z.object({
     likes: z.number(),
     views: z.number(),
@@ -158,5 +168,6 @@ export type TestOverlay = z.infer<typeof TestOverlaySchema>;
 export type ActivityFeed = z.infer<typeof ActivityFeedSchema>;
 export type GamesSettings = z.infer<typeof GamesSettingsSchema>;
 export type Shortcuts = z.infer<typeof ShortcutsSchema>;
+export type RemoteSettings = z.infer<typeof RemoteSettingsSchema>;
 export type AppSettings = z.infer<typeof AppSettingsSchema>;
 export type StoreSchema = z.infer<typeof StoreZodSchema>;

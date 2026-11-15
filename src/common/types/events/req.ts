@@ -81,6 +81,8 @@ export enum APP_EVENTS {
   GET_NETWORK_ADDRESSES = "app:settings:get:network",
   SET_SHORTCUTS = "app:settings:set:shortcuts",
   SUSPEND_SHORTCUTS = "app:settings:suspend:shortcuts",
+  SET_REMOTE = "app:settings:set:remote",
+  NEW_REMOTE_KEY = "app:settings:new:remote-key",
 
   // LIVE CONTROLS
   CONTROL = "app:controls:run",
@@ -328,6 +330,11 @@ export interface AppEventsMap {
   [APP_EVENTS.SET_SHORTCUTS]: { shortcuts: Shortcuts };
   // While a shortcut field records, so its keys reach the field
   [APP_EVENTS.SUSPEND_SHORTCUTS]: { suspended: boolean };
+  // The phone remote and the control API. Turning it on makes a key when
+  // there's none; both echo the settings, which carry the key.
+  [APP_EVENTS.SET_REMOTE]: { enabled: boolean };
+  // Replaces the key, so every device with the old link stops working
+  [APP_EVENTS.NEW_REMOTE_KEY]: void;
 
   // LIVE CONTROLS
   // pause toggles without paused, and sets it with

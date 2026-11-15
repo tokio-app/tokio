@@ -22,6 +22,15 @@ export const getAlertOverlayURL = (id: string) =>
 // connects with this id, and browser sources point at it.
 export const TIMER_PATH = "timer";
 
+// NOTE: DO NOT CHANGE. The phone remote is served at /remote/ and its API
+// under /remote/api/, which Stream Deck setups call.
+export const REMOTE_PATH = "remote";
+
+// The link a phone opens, with the key in the fragment so it never reaches
+// a server log or a Referer
+export const getRemoteURL = (host: string, key: string) =>
+  `http://${host}:${SERVER_PORT}/${REMOTE_PATH}/#key=${encodeURIComponent(key)}`;
+
 // NOTE: DO NOT CHANGE. Each Overlay Studio overlay is served at
 // /studio/<overlay id>/, connects with studio:<overlay id>, and browser
 // sources point at it.
