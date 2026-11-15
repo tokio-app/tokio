@@ -10,6 +10,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
 import { CSP } from "../src/main/config/csp";
 
 // The app runs once for the whole file, in a temporary home folder, and the
@@ -524,4 +528,45 @@ test("serves the phone remote, whose API takes only its key", async () => {
     headers: { Authorization: `Bearer ${await savedKey()}` },
   });
   expect(await state.json()).toEqual({ paused: false });
+});
+
+test("serves MCP on this computer, with the remote's key", async () => {
+  const mcp = "http://127.0.0.1:37891/mcp";
+  const key = String(
+    JSON.parse(await readFile(data("settings", "tokio.json"), "utf8")).settings
+      .remote.key,
+  );
+  // A browser page can't reach it, and it needs the key
+  const fromPage = await fetch(mcp, {
+    method: "POST",
+    headers: { Origin: "http://example.com" },
+  });
+  expect(fromPage.status).toBe(403);
+  expect((await fetch(mcp, { method: "POST" })).status).toBe(401);
+
+  const client = new Client({ name: "e2e", version: "1.0.0" });
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(mcp), {
+      requestInit: { headers: { Authorization: `Bearer ${key}` } },
+    }),
+  );
+  try {
+    const { tools } = await client.listTools();
+    expect(tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(["get_status", "update_settings", "control"]),
+    );
+
+    // Paused from MCP, Home shows it as it does a shortcut's pause
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name: "Home", exact: true })
+      .click();
+    await client.callTool({ name: "control", arguments: { action: "pause" } });
+    const paused = page.getByRole("region", { name: "Tokio is paused" });
+    await expect(paused).toBeVisible();
+    await client.callTool({ name: "control", arguments: { action: "resume" } });
+    await expect(paused).toBeHidden();
+  } finally {
+    await client.close();
+  }
 });
