@@ -62,6 +62,15 @@ export const COMPONENTS: Component[] = [
     note: ICONS_NOTE,
   },
   {
+    name: "Code bundled in the MCP SDK",
+    author:
+      "Evgeny Poberezkin, Jeremy Danyow, Gary Court and the Fastify team, Remy Rylan",
+    license: "MIT, BSD-3-Clause, BSD-2-Clause",
+    url: "https://github.com/modelcontextprotocol/typescript-sdk",
+    note: "ajv, ajv-formats, json-schema-traverse and @cfworker/json-schema (MIT), fast-uri (BSD-3-Clause) and json-schema-typed (BSD-2-Clause), compiled into the MCP server SDK, which ships them without their license files.",
+    doc: "MCP-SDK-bundled",
+  },
+  {
     name: "Electron and Chromium",
     author: "The Electron and Chromium authors",
     license: "MIT and others",
