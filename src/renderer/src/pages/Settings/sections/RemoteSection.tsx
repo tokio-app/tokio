@@ -1,6 +1,6 @@
 import { RemoteSettings } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { getRemoteURL } from "@/common/util";
+import { getRemoteURL, MCP_URL } from "@/common/util";
 import {
   Btn,
   Check,
@@ -16,6 +16,10 @@ import { useState } from "react";
 import { FiRefreshCw } from "react-icons/fi";
 import { LuSmartphone } from "react-icons/lu";
 import styles from "../settings.module.css";
+
+// What sets Tokio up in Claude Code, key included
+const mcpCommand = (key: string) =>
+  `claude mcp add --transport http tokio ${MCP_URL} --header "Authorization: Bearer ${key}"`;
 
 interface Props {
   remote: RemoteSettings;
@@ -68,6 +72,19 @@ export function RemoteSection({ remote, serverEnabled, onChange }: Props) {
         >
           <CopyField value={remote.key} title={t("settings.remote.copyKey")} />
         </Field>
+        <Field
+          label={t("settings.remote.mcp")}
+          hint={t("settings.remote.mcpHint")}
+        >
+          <CopyField value={MCP_URL} title={t("settings.remote.copyMcp")} />
+        </Field>
+        <Field label={t("settings.remote.mcpCommand")}>
+          <CopyField
+            value={mcpCommand(remote.key)}
+            title={t("settings.remote.copyCommand")}
+          />
+        </Field>
+        <p className={styles.note}>{t("settings.remote.mcpNote")}</p>
         <div>
           <Btn onClick={() => setShown(false)}>{t("settings.remote.hide")}</Btn>
         </div>
