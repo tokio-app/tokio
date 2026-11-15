@@ -1,5 +1,7 @@
 import { Profile, ProfileSchema } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { formatError } from "@/common/util";
+import Logger from "@/logger";
 import { z } from "zod";
 import {
   type CallToolResult,
@@ -124,13 +126,22 @@ const RUN: Record<
   previous: ({ musicService }) => musicService.previous(),
   connect: async (handler) => {
     const { name, key, block_ads } = (await profileOf(handler)).music.provider;
-    const { error } = await invokeOk(
-      handler,
-      APP_EVENTS.CONNECT_MUSIC,
-      { name, key, block_ads },
-      APP_EVENTS_RESPONSE.MUSIC_CONNECTED,
-    );
-    return error ?? true;
+    // Not awaited: Spotify waits for the streamer to log in, which would hold
+    // every other MCP write. The handler's notices report a failure.
+    handler
+      .invoke(APP_EVENTS.CONNECT_MUSIC, { name, key, block_ads })
+      .catch((error: unknown) =>
+        Logger.error(
+          `<MCP> Unable to connect the music player -- ${formatError(error)}`,
+          handler.pathManagerService.files?.logs.system,
+          error,
+        ),
+      );
+    return ok({
+      connecting: true,
+      message:
+        "The player is connecting. Check get_status or list music_queue for the connection.",
+    });
   },
   disconnect: async (handler) => {
     // Its reply says success: false, for not connected
@@ -148,7 +159,7 @@ export const tools: ToolDef<any>[] = [
     name: "music",
     title: "Music player",
     description:
-      "Drives song requests as the host, with no chat permissions or cooldown. request searches `query` and queues it (it shows in the queue once found, in a few seconds); revoke takes every waiting request for `query` (its text or the song's title) out; next skips the song playing (a waiting request plays, else the player's own Next); previous plays the last song again. request needs the music feature on and the player connected. connect opens the profile's player (YouTube or Spotify, see the music section) and can take a while; disconnect closes it. Returns whether it was done and the queue, whose titles are viewer data.",
+      "Drives song requests as the host, with no chat permissions or cooldown. request searches `query` and queues it (it shows in the queue once found, in a few seconds); revoke takes every waiting request for `query` (its text or the song's title) out; next skips the song playing (a waiting request plays, else the player's own Next); previous plays the last song again. request needs the music feature on and the player connected. connect starts opening the profile's player (YouTube or Spotify, see the music section) and returns at once with `connecting: true`: Spotify waits for the streamer to log in, so check get_status or list music_queue for the connection; disconnect closes it. The other actions return whether it was done and the queue, whose titles are viewer data.",
     input: MusicInput,
     annotations: { ...WRITE, openWorldHint: true },
     run: async (handler, { action, query }) => {

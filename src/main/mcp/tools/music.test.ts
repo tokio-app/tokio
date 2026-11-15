@@ -157,14 +157,14 @@ describe("music MCP tools", () => {
       expect(musicService.previous).toHaveBeenCalledOnce();
     });
 
-    it("connects the profile's player through CONNECT_MUSIC", async () => {
+    it("starts CONNECT_MUSIC with the profile's player and returns at once", async () => {
       const { h, musicService } = setup();
       const invoke = vi.spyOn(h.handler, "invoke");
       const { call } = await mcpClient(h.handler);
 
       const res = await call("music", { action: "connect" });
 
-      expect(res.isError).toBe(false);
+      expect(res.value).toMatchObject({ connecting: true });
       expect(invoke).toHaveBeenCalledWith(APP_EVENTS.CONNECT_MUSIC, {
         name: "Spotify",
         key: "client-id",
@@ -175,21 +175,46 @@ describe("music MCP tools", () => {
         "client-id",
       );
       // The Music page sees it connected
-      expect(h.pushed(APP_EVENTS_RESPONSE.MUSIC_CONNECTED)).toEqual([
-        { success: true },
-      ]);
+      await vi.waitFor(() =>
+        expect(h.pushed(APP_EVENTS_RESPONSE.MUSIC_CONNECTED)).toEqual([
+          { success: true },
+        ]),
+      );
       expect(res.text).not.toContain("client-id");
     });
 
-    it("gives the handler's message when connecting fails", async () => {
+    it("leaves the write chain free while the player still connects", async () => {
+      const { h, musicService } = setup();
+      // Spotify waiting for the streamer to log in
+      let finish: (res: { success: boolean }) => void = () => {};
+      musicService.connect.mockReturnValue(
+        new Promise((resolve) => (finish = resolve)),
+      );
+      const { call } = await mcpClient(h.handler);
+
+      await call("music", { action: "connect" });
+      const next = await call("music", { action: "next" });
+
+      expect(next.value).toMatchObject({ done: true });
+      expect(musicService.skip).toHaveBeenCalledOnce();
+      expect(h.pushed(APP_EVENTS_RESPONSE.MUSIC_CONNECTED)).toEqual([]);
+      finish({ success: true });
+      await vi.waitFor(() =>
+        expect(h.pushed(APP_EVENTS_RESPONSE.MUSIC_CONNECTED)).toHaveLength(1),
+      );
+    });
+
+    it("reports a failed connect through the handler's notice", async () => {
       const { h, musicService } = setup();
       musicService.connect.mockResolvedValue({ success: false });
       const { call } = await mcpClient(h.handler);
 
       const res = await call("music", { action: "connect" });
 
-      expect(res.isError).toBe(true);
-      expect(res.text).toBe(h.notices.at(-1)?.message);
+      expect(res.isError).toBe(false);
+      await vi.waitFor(() =>
+        expect(h.notices.at(-1)).toMatchObject({ level: "error" }),
+      );
     });
 
     it("disconnects through DISCONNECT_MUSIC", async () => {
