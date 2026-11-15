@@ -777,4 +777,35 @@ describe("Home", () => {
       ).toHaveAttribute("href", "/overlays");
     });
   });
+
+  describe("Paused", () => {
+    const banner = () =>
+      page().queryByRole("region", { name: "Tokio is paused" });
+
+    it("asks whether Tokio is paused, and shows it until main says it resumed", async () => {
+      const { user } = await renderApp();
+      expect(sent(APP_EVENTS.GET_CONTROLS)).toHaveLength(1);
+      expect(banner()).not.toBeInTheDocument();
+
+      await send(APP_EVENTS_RESPONSE.CONTROLS, { paused: true });
+      expect(banner()).toBeVisible();
+      expect(
+        within(banner()!).getByText(
+          "Chat TTS, alerts, song requests and game actions are ignored until you resume. Music keeps playing.",
+        ),
+      ).toBeVisible();
+
+      await user.click(
+        within(banner()!).getByRole("button", { name: "Resume" }),
+      );
+      expect(sent(APP_EVENTS.CONTROL)).toEqual([
+        { action: "pause", paused: false },
+      ]);
+      // Main's push hides it
+      expect(banner()).toBeVisible();
+
+      await send(APP_EVENTS_RESPONSE.CONTROLS, { paused: false });
+      expect(banner()).not.toBeInTheDocument();
+    });
+  });
 });

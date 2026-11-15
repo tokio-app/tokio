@@ -135,6 +135,63 @@
   color: var(--accent-primary);
 }
 
+/* PAUSED: the board's first thing while reactions are held. A rose wash,
+   since Resume is the thing to do, with the bars of Now playing still. */
+
+.paused {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border));
+  border-radius: var(--radius-lg);
+  background-color: color-mix(
+    in srgb,
+    var(--accent-primary) 10%,
+    var(--background-tertiary)
+  );
+}
+
+.paused_bars {
+  display: flex;
+  flex-shrink: 0;
+  gap: 5px;
+  height: 28px;
+}
+
+.paused_bars span {
+  width: 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-primary);
+}
+
+/* Takes the row, and pushes Resume under it when there's no room */
+.paused_body {
+  display: flex;
+  flex: 1 1 280px;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.paused_title {
+  color: var(--font-primary);
+  font-size: var(--font-xl);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.paused_text {
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+  text-wrap: pretty;
+}
+
+.paused_btn {
+  margin-left: auto;
+}
+
 /* LIVE */
 
 .live {
