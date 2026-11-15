@@ -27,6 +27,7 @@ import { OverlayApp } from "../server";
 import { VoiceData, VoiceEngine, VoiceSample } from "../store";
 import { CameraCapture } from "../studio";
 import { TimerData } from "../timer";
+import { TranslationTest } from "../translation";
 import { UpdateStatus } from "../updates";
 
 type WindowState = { state: "normal" | "maximized" };
@@ -82,6 +83,7 @@ export enum APP_EVENTS_RESPONSE {
   SET_TRAY = "app:settings:res:set:tray",
   SET_LOGS = "app:settings:res:set:logs",
   LANGUAGE = "app:settings:res:language",
+  TEST_TRANSLATION = "app:settings:res:test:translation",
   REQ_FQDN = "app:settings:res:fqdn",
   GET_NETWORK_ADDRESSES = "app:settings:res:network",
 
@@ -264,6 +266,11 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.SET_LOGS]: Reply;
   // The language the windows show, resolved from the setting
   [APP_EVENTS_RESPONSE.LANGUAGE]: string;
+  // Failures too carry the tester's id
+  [APP_EVENTS_RESPONSE.TEST_TRANSLATION]: Reply<{
+    id: string;
+    data?: TranslationTest;
+  }>;
 
   [APP_EVENTS_RESPONSE.REQ_FQDN]: Reply;
   // This PC's IPv4 addresses, see ServerService.networkAddresses

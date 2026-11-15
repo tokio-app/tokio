@@ -55,6 +55,10 @@ const fold = (text: string) =>
         : word,
     );
 
+// A chat message without the trigger: as typed, its translation when it has
+// one, and the one read
+type Comment = { typed: string; translation?: string; read: string };
+
 // Every provider is an engine, and voices name the engine that speaks them.
 // The active provider only speaks voices with no engine, or an unknown one.
 export class TTSService extends ProviderService<TTSProvider> {
@@ -184,15 +188,20 @@ export class TTSService extends ProviderService<TTSProvider> {
     }
   }
 
-  // The comment without its trigger, which isn't read
-  private _comment(settings: Profile["tts"], chat: ChatEvent) {
-    const { trigger } = settings.format;
-    const content = chat.comment.content;
-    if (trigger.mode === "any") return content;
-    return content.slice(trigger.value.length).trim();
+  // The comment and its translation without the trigger, which isn't read
+  // (the translation starts with it as typed), and the one that is read
+  private _comment(settings: Profile["tts"], chat: ChatEvent): Comment {
+    const { trigger, translate } = settings.format;
+    const cut = (text: string) =>
+      trigger.mode === "any" ? text : text.slice(trigger.value.length).trim();
+    const typed = cut(chat.comment.content);
+    const translation =
+      chat.comment.translation && cut(chat.comment.translation.text);
+    const read = translate && translation !== undefined ? translation : typed;
+    return { typed, translation, read };
   }
 
-  private _valid(settings: Profile["tts"], chat: ChatEvent, comment: string) {
+  private _valid(settings: Profile["tts"], chat: ChatEvent, comment: Comment) {
     // In any case: phone keyboards often capitalize the first letter
     const { trigger } = settings.format;
     if (trigger.mode !== "any") {
@@ -203,14 +212,15 @@ export class TTSService extends ProviderService<TTSProvider> {
     }
     // Nothing to read, like only the trigger, or only emojis when they're
     // removed
-    if (isBlank(this._clean(comment, settings))) {
+    if (isBlank(this._clean(comment.read, settings))) {
       return false;
     }
 
-    // What the viewer wrote, their name included. Not the template's words.
+    // What the viewer wrote, their name and its translation included. Not
+    // the template's words.
     const { username, handle } = chat.user;
     const banned = this._hasBanned(
-      [username, handle, comment].join("\n"),
+      [username, handle, comment.typed, comment.translation ?? ""].join("\n"),
       settings,
     );
     const over_length =
@@ -276,15 +286,24 @@ export class TTSService extends ProviderService<TTSProvider> {
   private _parseText(
     settings: Profile["tts"],
     chat: ChatEvent,
-    comment: string,
+    comment: Comment,
   ) {
     const template = settings.format.template;
+    const { translation } = chat.comment;
     const text = formatAlertMessage(template, {
       ...chat,
-      comment: { ...chat.comment, content: comment },
+      comment: {
+        ...chat.comment,
+        content: comment.read,
+        // {translation} without the trigger too
+        translation: translation && {
+          ...translation,
+          text: comment.translation ?? translation.text,
+        },
+      },
     });
     const filled = template.trim() !== "" && text !== template;
-    return this._clean(filled ? text : comment, settings);
+    return this._clean(filled ? text : comment.read, settings);
   }
 
   /**

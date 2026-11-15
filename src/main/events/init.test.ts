@@ -57,6 +57,9 @@ import type { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
 import type { TimerService } from "@/services/timer";
 import { TIMER_EVENTS } from "@/services/timer";
+import type { TikTokConnectorService } from "@/services/connector";
+import type { TranslationService } from "@/services/translation";
+import { TranslationError } from "@/services/translation/common";
 import type { TTSService } from "@/services/tts";
 import { TTSRequestError } from "@/services/tts/common";
 import type { UpdaterService } from "@/services/updater";
@@ -83,6 +86,7 @@ const files: Files = {
     music: "music.log",
     overlays: "overlays.log",
     games: "games.log",
+    translation: "translation.log",
   },
   gifts: "extra/gifts.json",
   customGifts: "extra/custom-gifts.json",
@@ -229,6 +233,9 @@ function setup() {
     ...conn,
     username: "streamer",
     setLogFile: vi.fn(),
+    setChatStage: vi.fn(
+      (..._args: Parameters<TikTokConnectorService["setChatStage"]>) => {},
+    ),
     onReconnect: vi.fn((_listener: (state: ReconnectState) => void) => {}),
     fetchGifts: vi.fn(
       async (): Promise<{ success: boolean; data: Gift[] }> => ({
@@ -277,6 +284,7 @@ function setup() {
     getGifts: vi.fn(async (): Promise<CustomGift[]> => []),
     getCustomGifts: vi.fn(async (): Promise<CustomGift[]> => []),
     getOverlays: vi.fn((): { id: string }[] => []),
+    chatCommands: vi.fn((): string[] => []),
     load: vi.fn(async (_gifts: CustomGift[]) => {}),
     refreshGifts: vi.fn(async (_gifts: CustomGift[]) => {}),
     onUpdates: vi.fn((..._args: Parameters<OverlayService["onUpdates"]>) => {}),
@@ -390,6 +398,17 @@ function setup() {
   };
   const yamlManagerService = { setLogFile: vi.fn() };
   const studioService = new StudioService();
+  const translationService = {
+    setLogFile: vi.fn(),
+    forChat: vi.fn(
+      (
+        ..._args: Parameters<TranslationService["forChat"]>
+      ): Promise<ChatEvent> | null => null,
+    ),
+    onFailure: vi.fn(
+      (..._args: Parameters<TranslationService["onFailure"]>) => {},
+    ),
+  };
 
   const h = createHandler({
     pathManagerService,
@@ -412,6 +431,7 @@ function setup() {
     studioService,
     trayService,
     yamlManagerService,
+    translationService,
   });
 
   return {
@@ -443,6 +463,7 @@ function setup() {
     stats,
     trayService,
     yamlManagerService,
+    translationService,
   };
 }
 
@@ -2627,6 +2648,72 @@ describe("init events", () => {
         }),
       ]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CUSTOM_GIFTS)).toEqual([]);
+    });
+  });
+
+  describe("chat translation", () => {
+    it("translates chat with the profile's commands, read when a message needs them", async () => {
+      const s = await live();
+      s.overlayService.chatCommands.mockReturnValue(["!socials"]);
+      const stage = s.connectorService.setChatStage.mock.calls[0][0];
+      const message = chat("hola");
+      const reads = s.storeManagerService.getProfileData.mock.calls.length;
+
+      expect(stage(message)).toBeNull();
+      expect(s.storeManagerService.getProfileData).toHaveBeenCalledTimes(reads);
+
+      const [given, commands] = s.translationService.forChat.mock.calls[0];
+      expect(given).toBe(message);
+      expect(await commands()).toEqual({
+        trigger: "",
+        commands: [
+          ...Object.values(profile.music.controls)
+            .filter((control) => control.enabled)
+            .map((control) => control.command),
+          "!socials",
+        ],
+        keywords: [],
+      });
+      expect(s.translationService.setLogFile).toHaveBeenCalledWith(
+        "translation.log",
+      );
+    });
+
+    it("warns once a while when Google fails, logging with the notice", async () => {
+      const s = await live();
+      const [onFailure] = s.translationService.onFailure.mock.calls[0];
+      vi.useFakeTimers();
+      const down = new TranslationError("network", "Google down");
+      const busy = new TranslationError("http_429", "Google busy", 429);
+
+      onFailure(down);
+      onFailure(down);
+      vi.advanceTimersByTime(30_000);
+      onFailure(busy);
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          code: FEEDBACK_CODES.TRANSLATION_FAILED,
+          source: "translation",
+          level: "warning",
+          message:
+            "Google didn't answer, so chat stays untranslated for a minute.",
+        }),
+        expect.objectContaining({
+          message:
+            "Google is getting too many requests, so chat stays untranslated for a minute.",
+        }),
+      ]);
+      expect(logWarn.mock.calls).toEqual([
+        [
+          "<Translation> Unable to translate chat - Google down",
+          "translation.log",
+        ],
+        [
+          "<Translation> Unable to translate chat - Google busy",
+          "translation.log",
+        ],
+      ]);
     });
   });
 

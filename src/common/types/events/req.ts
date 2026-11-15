@@ -73,6 +73,8 @@ export enum APP_EVENTS {
   SET_TRAY = "app:settings:set:tray",
   SET_LOGS = "app:settings:set:logs",
   SET_LANGUAGE = "app:settings:set:language",
+  SET_TRANSLATION = "app:settings:set:translation",
+  TEST_TRANSLATION = "app:settings:test:translation",
   REQ_FQDN = "app:settings:req:fqdn",
   GET_NETWORK_ADDRESSES = "app:settings:get:network",
 
@@ -300,6 +302,16 @@ export interface AppEventsMap {
   // "system", or a tag in APP_LANGUAGES
   [APP_EVENTS.SET_LANGUAGE]: {
     language: string;
+  };
+  // Chat translation's language: a code in TRANSLATION_LANGUAGES, or "" for
+  // off
+  [APP_EVENTS.SET_TRANSLATION]: {
+    language: string;
+  };
+  // id: the tester's own, echoed so a late reply is ignored
+  [APP_EVENTS.TEST_TRANSLATION]: {
+    id: string;
+    text: string;
   };
 
   [APP_EVENTS.REQ_FQDN]: void;

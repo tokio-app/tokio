@@ -38,6 +38,7 @@ import Logger from "@/logger";
 import { TikTokConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
+import { TranslationService } from "@/services/translation";
 import { TTSService } from "@/services/tts";
 import { safeStorage } from "electron";
 import { access, readdir, readFile, unlink } from "fs/promises";
@@ -49,6 +50,7 @@ import { Service } from "../shared";
 type Providers = {
   tts: TTSService;
   connector: TikTokConnectorService;
+  translation: TranslationService;
 };
 
 // safeStorage output starts with "v" and two digits: v10 and v11 so far, and a
@@ -184,6 +186,7 @@ export class StoreManagerService extends Service {
           if (key) this._providers.tts.setEngineKey(name, key);
         }
       }
+      this._applyTranslation(data.settings);
       this._storeData = data;
     } catch (error) {
       Logger.error(
@@ -482,6 +485,19 @@ export class StoreManagerService extends Service {
     this._ensureInitialized();
     this._storeData!.settings.language = language;
     return this._queueSave();
+  }
+
+  // Chat translation's language, applied as it's saved
+  public async updateTranslationLanguage(language: string): Promise<boolean> {
+    this._ensureInitialized();
+    this._storeData!.settings.translation = { language };
+    this._providers.translation.setLanguage(language);
+    return this._queueSave();
+  }
+
+  // The saved language, at startup
+  private _applyTranslation(settings: AppSettings) {
+    this._providers.translation.setLanguage(settings.translation.language);
   }
 
   public async updateLastVersion(version: string): Promise<boolean> {

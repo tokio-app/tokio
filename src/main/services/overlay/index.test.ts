@@ -1308,6 +1308,111 @@ describe("OverlayService", () => {
     expect((await service.getConfig("title")).data).toEqual(res.data);
   });
 
+  describe("chatCommands", () => {
+    // social-links' command, a table of more, and info.yaml's fixed one
+    const commandsConfig = (command: string) =>
+      [
+        "sections:",
+        "  - { name: Main, id: main }",
+        "fields:",
+        "  - name: Command",
+        "    id: command",
+        "    section: main",
+        "    type: input",
+        `    attributes: { mode: text, command: true, value: "${command}", default: "!socials" }`,
+        "  - name: Title",
+        "    id: title",
+        "    section: main",
+        "    type: input",
+        "    attributes: { mode: text, value: Hello, default: Hello }",
+        "  - name: Links",
+        "    id: links",
+        "    section: main",
+        "    type: table",
+        "    attributes:",
+        "      columns:",
+        '        - { name: Command, id: cmd, type: input, attributes: { mode: text, command: true, default: "" } }',
+        '        - { name: Label, id: label, type: input, attributes: { mode: text, default: "" } }',
+        '      value: [{ cmd: "!discord", label: Discord }, { cmd: "", label: Empty }]',
+        "      default: []",
+      ].join("\n");
+    const commandsInfo = `${info("Links", true)}commands: ["!links"]\n`;
+    const commandsOverlay = (dir: string) =>
+      overlay(dir, {
+        "info.yaml": commandsInfo,
+        "config.yaml": commandsConfig("!socials"),
+        "index.html": `<body>${SETUP}</body>`,
+      });
+
+    it("collects info.yaml's commands and the marked fields' values at load", async () => {
+      await commandsOverlay(join(folder, "links"));
+      await configurable(join(folder, "title"));
+      stored = [
+        { id: "links", name: "Links", version: "1.0.0", config: true },
+        { id: "title", name: "Title", version: "1.0.0", config: true },
+      ];
+
+      await service.load(gifts);
+
+      expect(service.chatCommands()).toEqual([
+        "!links",
+        "!socials",
+        "!discord",
+      ]);
+    });
+
+    it("follows a save, and forgets a removed overlay", async () => {
+      await commandsOverlay(join(folder, "links"));
+      stored = [{ id: "links", name: "Links", version: "1.0.0", config: true }];
+      await service.load(gifts);
+      const changed = (await service.getConfig("links")).data!;
+      const field = changed.fields[0];
+      if (field.type !== "input") throw new Error("Expected an input field");
+      field.attributes.value = "!redes";
+
+      await service.saveConfig("links", changed, gifts);
+      expect(service.chatCommands()).toEqual(["!links", "!redes", "!discord"]);
+
+      await service.remove("links");
+      expect(service.chatCommands()).toEqual([]);
+    });
+
+    it("adds an imported overlay's", async () => {
+      const source = join(root, "source");
+      await commandsOverlay(source);
+
+      await service.import(source, gifts);
+
+      expect(service.chatCommands()).toEqual([
+        "!links",
+        "!socials",
+        "!discord",
+      ]);
+    });
+
+    it("follows an install and its update", async () => {
+      const files = (command: string) => ({
+        "info.yaml": `name: Gift Jar\nversion: 1.0.0\nconfig: true\ncommands: ["!jar"]\n`,
+        "config.yaml": commandsConfig(command),
+      });
+      publish(release("1.0.0", files("!socials")));
+      await service.installFromCatalog("gift-jar", gifts);
+      expect(service.chatCommands()).toEqual(["!jar", "!socials", "!discord"]);
+
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + CATALOG_TTL_MS);
+      publish(
+        release("1.0.1", {
+          ...files("!socials"),
+          "info.yaml": `name: Gift Jar\nversion: 1.0.1\nconfig: true\n`,
+        }),
+      );
+      await service.installFromCatalog("gift-jar", gifts);
+      // The saved settings stay, info.yaml's command went with the update
+      expect(service.chatCommands()).toEqual(["!socials", "!discord"]);
+    });
+  });
+
   it("saves the installed version's fields with the dialog's values", async () => {
     const dir = join(folder, "title");
     await configurable(dir);

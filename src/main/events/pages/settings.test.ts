@@ -19,6 +19,8 @@ import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
+import { TranslationService } from "@/services/translation";
+import { TranslationError } from "@/services/translation/common";
 import { TTSService } from "@/services/tts";
 import { language } from "@/helper/i18n";
 import { app, dialog } from "@test/electron";
@@ -1447,7 +1449,11 @@ describe("settings events", () => {
         const store = new StoreManagerService();
         await store.initialize(
           "store",
-          { tts, connector: new TikTokConnectorService() },
+          {
+            tts,
+            connector: new TikTokConnectorService(),
+            translation: new TranslationService(),
+          },
           new JSONManagerService(),
           paths,
         );
@@ -1909,6 +1915,142 @@ describe("settings events", () => {
         [APP_EVENTS_RESPONSE.LANGUAGE, "es-419"],
         [APP_EVENTS_RESPONSE.GET_SETTINGS, expect.anything()],
         notice({ level: "error", code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED }),
+      ]);
+    });
+  });
+
+  describe("SET_TRANSLATION", () => {
+    const setup = (saved = true) => {
+      const updateTranslationLanguage = vi.fn(async () => saved);
+      const h = createHandler({
+        storeManagerService: { ...profileStore(), updateTranslationLanguage },
+      });
+      return { h, updateTranslationLanguage };
+    };
+
+    it("saves and applies a listed language, or off, with no notice", async () => {
+      const { h, updateTranslationLanguage } = setup();
+
+      const sent = await run(h, APP_EVENTS.SET_TRANSLATION, {
+        language: "zh-Hans",
+      });
+      await h.invoke(settings, APP_EVENTS.SET_TRANSLATION, { language: "" });
+
+      expect(updateTranslationLanguage.mock.calls).toEqual([["zh-Hans"], [""]]);
+      expect(sent).toEqual([
+        [APP_EVENTS_RESPONSE.GET_SETTINGS, expect.anything()],
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("refuses a language outside the list", async () => {
+      const { h, updateTranslationLanguage } = setup();
+
+      await h.invoke(settings, APP_EVENTS.SET_TRANSLATION, { language: "xx" });
+
+      expect(updateTranslationLanguage).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+          message: "Unable to save the chat translation.",
+        }),
+      ]);
+    });
+
+    it("reports a language the store couldn't write", async () => {
+      const { h } = setup(false);
+
+      const sent = await run(h, APP_EVENTS.SET_TRANSLATION, {
+        language: "es",
+      });
+
+      expect(sent).toEqual([
+        [APP_EVENTS_RESPONSE.GET_SETTINGS, expect.anything()],
+        notice({ level: "error", code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED }),
+      ]);
+    });
+  });
+
+  describe("TEST_TRANSLATION", () => {
+    const setup = (test: TranslationService["test"]) =>
+      createHandler({
+        storeManagerService: {
+          getProfileData: async () => baseProfile,
+          getStudio: () => [],
+        },
+        overlayService: { chatCommands: () => ["!socials"] },
+        translationService: { test: vi.fn(test) },
+      });
+
+    it("replies the result with the tester's id, with the profile's commands", async () => {
+      const data = {
+        kind: "translated" as const,
+        translation: { text: "hola", from: "en", to: "es" },
+      };
+      const test = vi.fn(async () => data);
+      const h = setup(test);
+
+      await h.invoke(settings, APP_EVENTS.TEST_TRANSLATION, {
+        id: "t1",
+        text: "hello",
+      });
+
+      expect(test).toHaveBeenCalledWith(
+        "hello",
+        expect.objectContaining({
+          commands: expect.arrayContaining(["!socials"]),
+        }),
+      );
+      expect(h.replies(APP_EVENTS_RESPONSE.TEST_TRANSLATION)).toEqual([
+        { id: "t1", success: true, data },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("says what failed in the reply, with no notice", async () => {
+      const h = setup(async () => {
+        throw new TranslationError("network", "Google down");
+      });
+
+      await h.invoke(settings, APP_EVENTS.TEST_TRANSLATION, {
+        id: "t2",
+        text: "hello",
+      });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.TEST_TRANSLATION)).toEqual([
+        {
+          id: "t2",
+          success: false,
+          error: {
+            code: FEEDBACK_CODES.TRANSLATION_TEST_FAILED,
+            message:
+              "Google didn't answer. Check your connection and try again.",
+          },
+        },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("replies a surprise failure with the id too", async () => {
+      const h = setup(async () => {
+        throw new Error("bug");
+      });
+
+      await h.invoke(settings, APP_EVENTS.TEST_TRANSLATION, {
+        id: "t3",
+        text: "hello",
+      });
+
+      expect(h.replies(APP_EVENTS_RESPONSE.TEST_TRANSLATION)).toEqual([
+        {
+          id: "t3",
+          success: false,
+          error: {
+            code: FEEDBACK_CODES.TRANSLATION_TEST_FAILED,
+            message: "Unable to test the translation.",
+          },
+        },
       ]);
     });
   });

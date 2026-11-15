@@ -1,11 +1,26 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
-import { engine, failure, profileReply, voice } from "@test/fixtures";
+import {
+  engine,
+  failure,
+  profileReply,
+  settingsReply,
+  voice,
+} from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { section } from "@test/queries";
 import { renderWithProviders } from "@test/render";
 import { act, fireEvent, screen, within } from "@testing-library/react";
+import { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TTS } from ".";
+
+// The page is rendered without a router, so a link is a plain anchor
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
+  Link: ({ to, children }: { to: string; children: ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
+}));
 
 const aria = voice("en-US-AriaNeural");
 const guy = voice("en-US-GuyNeural");
@@ -18,6 +33,7 @@ const loaded = profileReply((p) => {
     template: "{username} says {comment}",
     trigger: { mode: "custom", value: "!say" },
     remove_emojis: true,
+    translate: false,
   };
   p.tts.replacements = [{ old: "brb", new: "be right back" }];
   p.tts.protection = {
@@ -413,6 +429,38 @@ describe("TTS", () => {
 
     expect(removeEmojis()).not.toBeChecked();
     expect((await saved()).format.remove_emojis).toBe(false);
+  });
+
+  it("reads translations only once Settings has a language", async () => {
+    const { user } = await setup();
+    const translate = () =>
+      screen.getByRole("checkbox", { name: "Read translations" });
+    const chip = () => screen.queryByRole("button", { name: "{translation}" });
+
+    // Off, until the settings say
+    expect(translate()).toBeDisabled();
+    expect(chip()).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Settings → Chat translation" }),
+    ).toHaveAttribute("href", "/settings");
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_SETTINGS,
+      settingsReply((s) => {
+        s.settings.translation.language = "es";
+      }),
+    );
+
+    expect(translate()).toBeEnabled();
+    expect(chip()).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "{comment} is the Spanish translation when a message has one.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(translate());
+    expect((await saved()).format.translate).toBe(true);
   });
 
   it("adds a clicked variable to the template", async () => {

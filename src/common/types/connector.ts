@@ -46,12 +46,25 @@ export interface TopGifter {
   giftedAt: number;
 }
 
+// A chat message translated into the language Settings → Chat translation
+// picked. Codes are lowercase BCP 47 tags, like "en" and "zh-hans".
+export interface ChatTranslation {
+  text: string;
+  // The language the engine read
+  from: string;
+  to: string;
+}
+
 export interface ChatEvent {
   user: UserData;
   comment: {
+    // As the viewer typed it. Emotes' indexes point into it.
     content: string;
     emotes: Emotes[];
     lang: string;
+    // Only when it was translated: Chat translation is on, and TikTok tagged
+    // the message with another language
+    translation?: ChatTranslation;
   };
 }
 

@@ -1,11 +1,13 @@
 import { MessageKey } from "@/common/i18n";
-import { ActivityItem, MusicInfo } from "@/common/types";
+import { ActivityItem, ChatTranslation, MusicInfo } from "@/common/types";
+import { languageName } from "@/helper/voices";
 import { Avatar, Btn } from "@/components";
 import { cx } from "@/helper";
 import { coinsLabel } from "@/helper/gifts";
 import { rich, useLanguage, useT } from "@/ui/i18n";
 import { memo } from "react";
 import { FiSettings } from "react-icons/fi";
+import { MdTranslate } from "react-icons/md";
 import styles from "../home.module.css";
 import { joinedText, songParts } from "../helper";
 
@@ -26,27 +28,69 @@ const DID: Record<"follow" | "share" | "superfan", MessageKey> = {
   superfan: "home.activity.superfan",
 };
 
+type ChatItem = Extract<ActivityItem, { type: "chat" }>;
+
+// What a message got translated into, under it: the glyph marks it, and a
+// screen reader hears where it came from first
+function Translation({ translation }: { translation: ChatTranslation }) {
+  const t = useT();
+  const language = useLanguage();
+  return (
+    <p className={styles.event_translation}>
+      <MdTranslate
+        className={styles.event_glyph}
+        size={14}
+        aria-hidden="true"
+      />
+      <span className={styles.sr_only}>
+        {t("home.activity.translatedFrom", {
+          language: languageName(translation.from, language),
+        })}
+      </span>
+      <span lang={translation.to}>{translation.text}</span>
+    </p>
+  );
+}
+
+// A chat row. Settings' translation tester draws it too, so it shows the
+// streamer what the feed will.
+export function ChatRow({
+  user,
+  text,
+  emotes,
+  translation,
+}: Pick<ChatItem, "user" | "text" | "emotes" | "translation">) {
+  return (
+    <li className={styles.event}>
+      <Avatar name={user.name} picture={user.picture} />
+      <div className={styles.event_body}>
+        <span className={styles.event_name} title={`@${user.handle}`}>
+          {user.name}
+        </span>{" "}
+        <p className={styles.event_message}>
+          {text}
+          {emotes.map((emote, i) => (
+            <img key={i} className={styles.inline_img} src={emote} alt="" />
+          ))}
+        </p>
+        {translation && <Translation translation={translation} />}
+      </div>
+    </li>
+  );
+}
+
 // The viewer's name and what they did, in the language's order
-function Action({ item }: { item: Exclude<ActivityItem, { type: "join" }> }) {
+function Action({
+  item,
+}: {
+  item: Exclude<ActivityItem, { type: "join" | "chat" }>;
+}) {
   const t = useT();
   const name = (
     <span className={styles.event_name} title={`@${item.user.handle}`}>
       {item.user.name}
     </span>
   );
-  if (item.type === "chat") {
-    return (
-      <>
-        {name}{" "}
-        <p className={styles.event_message}>
-          {item.text}
-          {item.emotes.map((emote, i) => (
-            <img key={i} className={styles.inline_img} src={emote} alt="" />
-          ))}
-        </p>
-      </>
-    );
-  }
   if (item.type === "gift") {
     const { count } = item.gift;
     const sent =
@@ -85,6 +129,7 @@ const Event = memo(function Event({ item }: { item: ActivityItem }) {
       </li>
     );
   }
+  if (item.type === "chat") return <ChatRow {...item} />;
   return (
     <li className={styles.event}>
       <Avatar name={item.user.name} picture={item.user.picture} />

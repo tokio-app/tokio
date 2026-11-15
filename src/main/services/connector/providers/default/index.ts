@@ -221,12 +221,12 @@ export class TikTokLiveConnector extends ConnectorProvider {
           lang: tdata.contentLanguage,
         },
       };
-      this.emit(TOKIO_EVENTS.CHAT, data);
+      this.emitChat(data, () => this._connection === connection);
     });
 
     // A comment made of emotes only, so Emote alerts and actions see it too
     connection.on(WebcastEvent.EMOTE, (tdata) => {
-      this.emit(TOKIO_EVENTS.CHAT, {
+      const data: ChatEvent = {
         user: getUserData(tdata.user, tdata.userIdentity),
         comment: {
           content: "",
@@ -238,7 +238,8 @@ export class TikTokLiveConnector extends ConnectorProvider {
           })),
           lang: "",
         },
-      });
+      };
+      this.emitChat(data, () => this._connection === connection);
     });
 
     // A combo of a gift that isn't streakable (Hand Heart) comes as one

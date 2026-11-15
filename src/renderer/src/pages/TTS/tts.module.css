@@ -20,6 +20,18 @@
   font-weight: 500;
 }
 
+/* A checkbox and the sentence under it */
+.check_group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.check_hint {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
 /* LISTS (special users, replacements) */
 
 .rows {

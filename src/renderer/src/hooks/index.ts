@@ -13,4 +13,6 @@ export * from "./useNotifications";
 export * from "./usePopover";
 export * from "./useServerEnabled";
 export * from "./useServerSwitch";
+export * from "./useTranslationLanguage";
 export * from "./useUpdateStatus";
+export * from "./useVariables";

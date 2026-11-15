@@ -1,4 +1,4 @@
-import { TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import { ChatEvent, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import { generateTikTokEventSample } from "@/common/util";
 import Logger from "@/logger";
 import { describe, expect, it, vi } from "vitest";
@@ -22,7 +22,16 @@ class FakeConnector extends ConnectorProvider {
   fire<K extends TOKIO_EVENTS>(event: K, data?: TokioEventMap[K]) {
     this.emit(event, data);
   }
+  chat(data: ChatEvent, current = () => true) {
+    this.emitChat(data, current);
+  }
 }
+
+const viewer = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data.user;
+const chatOf = (content: string, lang = "en"): ChatEvent => ({
+  user: viewer,
+  comment: { content, emotes: [], lang },
+});
 
 const setup = () => {
   const service = new TikTokConnectorService();
@@ -178,6 +187,63 @@ describe("TikTokConnectorService", () => {
       ["<Connector> tokio:event:chat from @handle", "connector.log"],
       [`<Connector> ${TOKIO_EVENTS.CONNECTED}`, "connector.log"],
     ]);
+  });
+
+  describe("the chat stage", () => {
+    it("sends a chat on in the same tick without a stage, or when it gives null", () => {
+      const { service, provider } = setup();
+      const received = vi.fn();
+      service.on(TOKIO_EVENTS.CHAT, received);
+
+      provider.chat(chatOf("hi"));
+      const stage = vi.fn(() => null);
+      service.setChatStage(stage);
+      provider.chat(chatOf("hello"));
+
+      expect(stage).toHaveBeenCalledExactlyOnceWith(chatOf("hello"));
+      expect(received.mock.calls).toEqual([[chatOf("hi")], [chatOf("hello")]]);
+    });
+
+    it("sends a staged chat once it settles, and a later one doesn't wait for it", async () => {
+      const { service, provider } = setup();
+      const received = vi.fn();
+      service.on(TOKIO_EVENTS.CHAT, received);
+      const translated = {
+        ...chatOf("hola", "es"),
+        comment: {
+          ...chatOf("hola", "es").comment,
+          translation: { text: "hello", from: "es", to: "en" },
+        },
+      };
+      let settle = (_chat: ChatEvent) => {};
+      service.setChatStage((chat) =>
+        chat.comment.lang === "es"
+          ? new Promise<ChatEvent>((resolve) => (settle = resolve))
+          : null,
+      );
+
+      provider.chat(chatOf("hola", "es"));
+      provider.chat(chatOf("next"));
+      expect(received.mock.calls).toEqual([[chatOf("next")]]);
+
+      settle(translated);
+      await vi.waitFor(() => expect(received).toHaveBeenCalledTimes(2));
+      expect(received).toHaveBeenLastCalledWith(translated);
+    });
+
+    it("drops a staged chat whose connection stopped meanwhile", async () => {
+      const { service, provider } = setup();
+      const received = vi.fn();
+      service.on(TOKIO_EVENTS.CHAT, received);
+      const staged = Promise.resolve(chatOf("hola", "es"));
+      service.setChatStage(() => staged);
+
+      provider.chat(chatOf("hola", "es"), () => false);
+      await staged;
+      await Promise.resolve();
+
+      expect(received).not.toHaveBeenCalled();
+    });
   });
 
   it("starts with the default provider", () => {

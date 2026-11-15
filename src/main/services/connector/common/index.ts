@@ -1,4 +1,4 @@
-import { Gift, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import { ChatEvent, Gift, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
 import Logger from "@/logger";
 import { TokioEmitter } from "../../shared/emitter";
 
@@ -26,6 +26,9 @@ export type GiftResponse = {
   error?: Error;
 };
 export type ReconnectState = "reconnecting" | "reconnected";
+// Takes a chat before listeners get it: null sends it on at once, a promise
+// once it settles. The promise never rejects.
+export type ChatStage = (chat: ChatEvent) => Promise<ChatEvent> | null;
 
 export const connectFailure = (
   kind: ConnectErrorKind,
@@ -40,6 +43,7 @@ export const connectFailure = (
 export abstract class ConnectorProvider extends TokioEmitter {
   protected _onReconnect?: (state: ReconnectState) => void;
   protected _logFile = "";
+  private _chatStage?: ChatStage;
   public abstract setKey(key: string): void;
   public abstract connect(username: string): Promise<ConnectorResponse>;
   public abstract disconnect(): Promise<void>;
@@ -54,6 +58,25 @@ export abstract class ConnectorProvider extends TokioEmitter {
   // Called when the connection drops and is tried again, and once it's back.
   public onReconnect(listener: (state: ReconnectState) => void) {
     this._onReconnect = listener;
+  }
+
+  // Chat translation, set once by init.ts
+  public setChatStage(stage: ChatStage) {
+    this._chatStage = stage;
+  }
+
+  // Emits a chat the stage gave back, only that chat waiting for it, so a
+  // staged one can land after later ones. current() false drops it: its
+  // connection stopped meanwhile.
+  protected emitChat(chat: ChatEvent, current: () => boolean) {
+    const staged = this._chatStage?.(chat);
+    if (!staged) {
+      this.emit(TOKIO_EVENTS.CHAT, chat);
+      return;
+    }
+    void staged.then((out) => {
+      if (current()) this.emit(TOKIO_EVENTS.CHAT, out);
+    });
   }
 
   // Detailed logs get a line per event, never what a chat says. Room users

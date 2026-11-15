@@ -73,6 +73,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `live-session.md`: the LIVE session and activity feed on Home
 - `tts.md`: TTS engines and chat TTS
 - `music.md`: music requests and YouTube's ad blocker
+- `translation.md`: chat translation, its pipe and the commands it leaves as typed
 - `alerts.md`: alert triggers, gifts, sounds, media and spoken alerts
 - `games.md`: the Games page, the Minecraft connection and game actions
 - `games-overlay.md`: the games overlay and the Minecraft pictures library

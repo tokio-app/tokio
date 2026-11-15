@@ -36,6 +36,7 @@ import { LOAD_RETRY_MS, StoreManagerService } from "../store";
 import { CHECK_INTERVAL_MS, STARTUP_DELAY_MS } from "../updater";
 import { YAMLManagerService } from "../yaml";
 import {
+  chatCommands,
   findOverlays,
   hasSetupBlock,
   processHTML,
@@ -119,6 +120,8 @@ export class OverlayService extends Service {
   private _startup?: NodeJS.Timeout;
   private _interval?: NodeJS.Timeout;
   private _onUpdates?: (updates: OverlayUpdates) => void;
+  // Each overlay's chat commands, as its files last read hold them
+  private _commands = new Map<string, string[]>();
 
   public initialize(
     paths: { folder: string; giftsFile: string; customGiftsFile: string },
@@ -267,6 +270,7 @@ export class OverlayService extends Service {
         return { success: false };
       }
       await renameWithRetry(staging, dir);
+      this._commands.set(id, chatCommands(info, config));
 
       const meta = { ...info, id, external: true };
       this._register({ ...meta, path: dir }, true);
@@ -380,6 +384,11 @@ export class OverlayService extends Service {
     return updates;
   }
 
+  /** Every stored overlay's chat commands, which Chat translation leaves. */
+  public chatCommands(): string[] {
+    return [...this._commands.values()].flat();
+  }
+
   /**
    * Runs updateAll on startup and every few hours while `auto` is on, and
    * hands each result to the onUpdates listener.
@@ -451,6 +460,7 @@ export class OverlayService extends Service {
 
     this._server.unmount(id);
     this._overlays = this._overlays.filter((o) => o.id !== id);
+    this._commands.delete(id);
     const saved = await this._store.removeOverlayInfo(id);
     await rm(old, { recursive: true, force: true }).catch(() => {});
     return { success: true, saved };
@@ -482,6 +492,8 @@ export class OverlayService extends Service {
     id: string,
   ): Promise<OverlayResult<OverlayConfig | undefined>> {
     const res = await processOverlay(this._dir(id), this._yaml);
+    if (res.data)
+      this._commands.set(id, chatCommands(res.data.info, res.data.config));
     return { success: res.success, data: res.data?.config };
   }
 
@@ -526,6 +538,7 @@ export class OverlayService extends Service {
         gifts,
       );
       if (!html.success) return { success: false };
+      this._commands.set(id, chatCommands(res.data!.info, merged));
 
       return { success: true, data: html.parsed };
     } catch (error) {
@@ -716,7 +729,9 @@ export class OverlayService extends Service {
         res.data!.config,
         gifts,
       );
-      return html.success ? res.data!.info : null;
+      if (!html.success) return null;
+      this._commands.set(id, chatCommands(res.data!.info, res.data!.config));
+      return res.data!.info;
     });
   }
 
@@ -768,8 +783,15 @@ export class OverlayService extends Service {
         }
 
         const update = installed !== undefined;
-        const info = await this._prepare(entry, zip, staging, update, gifts);
+        const { info, commands } = await this._prepare(
+          entry,
+          zip,
+          staging,
+          update,
+          gifts,
+        );
         await this._swap(staging, this._dir(id));
+        this._commands.set(id, commands);
         return {
           success: true,
           saved: await this._track({ ...info, id }, update),
@@ -797,7 +819,7 @@ export class OverlayService extends Service {
     staging: string,
     update: boolean,
     gifts: CustomGift[],
-  ): Promise<OverlayMetadata> {
+  ): Promise<{ info: OverlayMetadata; commands: string[] }> {
     await extractZip(zip, staging);
 
     const res = await processOverlay(staging, this._yaml);
@@ -825,7 +847,8 @@ export class OverlayService extends Service {
       gifts,
     );
     if (!html.success) throw new Error("Unable to write its HTML.");
-    return { ...res.data!.info, external: false };
+    const info = { ...res.data!.info, external: false };
+    return { info, commands: chatCommands(info, config) };
   }
 
   // Serves an installed official overlay and saves it in the store.

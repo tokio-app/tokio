@@ -2,6 +2,7 @@ import { Alert, AlertTts } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
 import { ALERT_MESSAGE_VARIABLES } from "@/common/util";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
+import { useVariables } from "@/hooks/useVariables";
 import { useT } from "@/ui/i18n";
 import { useRef } from "react";
 import { Input, Slider } from "../Elements";
@@ -38,10 +39,11 @@ export function TtsTab({
   const messageRef = useRef<HTMLInputElement>(null);
   const testId = `${alertId}:tts`;
   // An alert on every gift speaks for each one, it has no count to say.
-  const variables =
+  const variables = useVariables(
     trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
       ? ALERT_MESSAGE_VARIABLES[trigger.type].filter((name) => name !== "count")
-      : ALERT_MESSAGE_VARIABLES[trigger.type];
+      : ALERT_MESSAGE_VARIABLES[trigger.type],
+  );
 
   return (
     <div className={styles.tts}>

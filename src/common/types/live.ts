@@ -1,6 +1,8 @@
 // The LIVE Tokio is connected to, for the Home page: when it started, what
 // viewers did in it and how much.
 
+import type { ChatTranslation } from "./connector";
+
 export type ActivityUser = {
   handle: string;
   // The nickname, or the handle when there's none
@@ -11,7 +13,13 @@ export type ActivityUser = {
 
 // Something a viewer did
 export type Activity =
-  | { type: "chat"; user: ActivityUser; text: string; emotes: string[] }
+  | {
+      type: "chat";
+      user: ActivityUser;
+      text: string;
+      emotes: string[];
+      translation?: ChatTranslation;
+    }
   // `coins` is what the whole combo cost
   | {
       type: "gift";

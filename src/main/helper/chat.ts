@@ -74,6 +74,18 @@ export function hasKeyword(content: string, keyword: string): boolean {
   return pattern.test(cleanText(content, { asciiOnly: true }));
 }
 
+/**
+ * Whether the chat starts with the command, in any case, alone or followed by
+ * a space and its args. An empty command matches none.
+ */
+export function startsWithCommand(content: string, command: string): boolean {
+  const name = command.trim().toLowerCase();
+  if (!name) return false;
+  if (content.slice(0, name.length).toLowerCase() !== name) return false;
+  const next = content.charAt(name.length);
+  return next === "" || /\s/.test(next);
+}
+
 const bareHandle = (handle: string) =>
   handle.trim().replace(/^@/, "").toLowerCase();
 

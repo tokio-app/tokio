@@ -14,7 +14,7 @@ const languageOf = (lang: string) => lang.split(/[-_]/)[0].toLowerCase();
 
 // "English" for "en", "English (United States)" for "en-US", named in the
 // window's language. Tags Intl can't read are shown as they are.
-function languageName(lang: string, language: string): string {
+export function languageName(lang: string, language: string): string {
   // Node's Intl names "mul", Chromium's trimmed one doesn't
   if (lang === MULTILINGUAL) {
     return translate(language, "components.voicePicker.multilingual");

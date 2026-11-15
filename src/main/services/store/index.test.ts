@@ -17,6 +17,7 @@ import { TikTokConnectorService } from "@/services/connector";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
+import { TranslationService } from "@/services/translation";
 import { TTSService } from "@/services/tts";
 import {
   mkdir,
@@ -71,6 +72,7 @@ describe("StoreManagerService", () => {
   let json: JSONManagerService;
   let tts: TTSService;
   let connector: TikTokConnectorService;
+  let translation: TranslationService;
   let storeFile: string;
   let defaultProfileFile: string;
 
@@ -81,6 +83,7 @@ describe("StoreManagerService", () => {
     json = new JSONManagerService();
     tts = new TTSService();
     connector = new TikTokConnectorService();
+    translation = new TranslationService();
     storeFile = join(paths.folders.settingsFolder, "store.json");
     defaultProfileFile = join(paths.folders.profilesFolder, "default.json");
   });
@@ -96,7 +99,12 @@ describe("StoreManagerService", () => {
 
   const init = async () => {
     const store = new StoreManagerService();
-    await store.initialize("store", { tts, connector }, json, paths);
+    await store.initialize(
+      "store",
+      { tts, connector, translation },
+      json,
+      paths,
+    );
     return store;
   };
 
@@ -170,7 +178,7 @@ describe("StoreManagerService", () => {
       await mkdir(storeFile);
       const store = new StoreManagerService();
       await expect(
-        store.initialize("store", { tts, connector }, json, paths),
+        store.initialize("store", { tts, connector, translation }, json, paths),
       ).rejects.toThrow();
 
       await expect(
@@ -412,6 +420,21 @@ describe("StoreManagerService", () => {
         ...voice,
         engine: "",
       });
+    });
+  });
+
+  describe("chat translation", () => {
+    it("saves the language and applies it, also at startup", async () => {
+      const store = await init();
+      const setLanguage = vi.spyOn(translation, "setLanguage");
+
+      expect(await store.updateTranslationLanguage("es")).toBe(true);
+      expect(setLanguage).toHaveBeenCalledExactlyOnceWith("es");
+      expect(store.getSettings().translation).toEqual({ language: "es" });
+
+      setLanguage.mockClear();
+      await init();
+      expect(setLanguage).toHaveBeenCalledExactlyOnceWith("es");
     });
   });
 

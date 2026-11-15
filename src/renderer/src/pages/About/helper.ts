@@ -103,6 +103,10 @@ export const SERVICES: { name: string; note: string }[] = [
     name: "Inworld",
     note: "The Inworld voices and voice cloning (api.inworld.ai), with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.",
   },
+  {
+    name: "Google",
+    note: "Chat translation, through Google Translate's web service (translate.googleapis.com), which isn't an official public API. It gets the text of each message to translate.",
+  },
   { name: "Spotify and YouTube", note: "Music requests." },
   {
     name: "uBlock Origin's filter lists",

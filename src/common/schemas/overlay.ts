@@ -40,6 +40,9 @@ const InputSetting = z.object({
     mode: z.enum(["text", "number"]),
     placeholder: z.string().optional(),
     translations: Translations,
+    // Its value is a chat command the overlay answers, so Chat translation
+    // leaves messages that start with it as typed. Older versions strip it.
+    command: z.boolean().optional(),
     value: InputValue,
     default: InputValue,
   }),

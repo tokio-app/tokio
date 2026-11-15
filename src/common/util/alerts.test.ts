@@ -41,6 +41,23 @@ describe("formatAlertMessage", () => {
     expect(formatAlertMessage("Playing {song}", songs)).toBe("Playing Now");
   });
 
+  it("fills {translation} with a chat's translation, else what was typed", () => {
+    const chat = (translation?: {
+      text: string;
+      from: string;
+      to: string;
+    }) => ({
+      user,
+      comment: { content: "hola", emotes: [], lang: "es", translation },
+    });
+    const message = "{comment} / {translation}";
+
+    expect(
+      formatAlertMessage(message, chat({ text: "hi", from: "es", to: "en" })),
+    ).toBe("hola / hi");
+    expect(formatAlertMessage(message, chat())).toBe("hola / hola");
+  });
+
   it("leaves variables the event doesn't have", () => {
     expect(
       formatAlertMessage("{username} {gift} {constructor}", { user }),

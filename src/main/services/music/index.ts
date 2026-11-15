@@ -6,7 +6,7 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import { TaskQueue } from "@/common/util";
-import { sameHandle } from "@/helper/chat";
+import { sameHandle, startsWithCommand } from "@/helper/chat";
 import { hasPermission } from "@/helper/permissions";
 import { ProviderService } from "@/services/shared";
 import {
@@ -258,13 +258,9 @@ export class MusicService extends ProviderService<MusicProvider> {
   // control is off or the viewer may not use it.
   private _match(settings: Profile["music"], chat: ChatEvent) {
     const { content } = chat.comment;
-    const control = Object.values(settings.controls).find(({ command }) => {
-      const name = command.trim().toLowerCase();
-      if (!name) return false;
-      if (content.slice(0, name.length).toLowerCase() !== name) return false;
-      const next = content.charAt(name.length);
-      return next === "" || /\s/.test(next);
-    });
+    const control = Object.values(settings.controls).find(({ command }) =>
+      startsWithCommand(content, command),
+    );
     if (!control?.enabled) return null;
     if (!hasPermission(settings.permissions, chat.user)) return null;
 

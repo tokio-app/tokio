@@ -1528,7 +1528,8 @@ describe("Games overlay", () => {
     setup();
     const notice =
       "The overlay server is off. Enable it in Settings to show this overlay on stream.";
-    expect(sent(APP_EVENTS.GET_SETTINGS)).toHaveLength(1);
+    // This notice's, and the one behind the actions' {translation}
+    expect(sent(APP_EVENTS.GET_SETTINGS)).toHaveLength(2);
 
     await send(
       APP_EVENTS_RESPONSE.GET_SETTINGS,

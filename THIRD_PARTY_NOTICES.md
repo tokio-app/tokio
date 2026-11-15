@@ -55,6 +55,7 @@ Tokio talks to these online services. None of them is covered by Tokio's license
 - **Fish Audio** (`api.fish.audio`): the Fish Audio voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
 - **Cartesia** (`api.cartesia.ai`): the Cartesia voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
 - **Inworld** (`api.inworld.ai`): the Inworld voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
+- **Google** (`translate.googleapis.com`): chat translation, through Google Translate's web service, which isn't an official public API. It gets the text of each message to translate.
 - **Spotify and YouTube:** music requests.
 - **uBlock Origin's filter lists** (`ublockorigin.github.io`, then its mirrors `ublockorigin.pages.dev` and `cdn.jsdelivr.net`): the YouTube player's ad blocker, when **Block ads** is on. uBlock Origin's own lists and its copies of EasyList and EasyPrivacy belong to their authors, are under the GPL-3.0 or CC BY-SA 3.0, and aren't covered by Tokio's license. Tokio downloads them on the user's machine and doesn't ship them.
 - **Public Suffix List** (`publicsuffix.org`): the same ad blocker, to tell a site from its subdomains. Mozilla's list is under the MPL-2.0, and Tokio downloads it rather than ship it.

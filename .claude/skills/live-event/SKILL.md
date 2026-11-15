@@ -39,9 +39,9 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
 
 Tell the user which of these need a change and a release:
 
-- The overlay SDK, `../tokio-event-loader` (`@tokioapp/overlay`): `src/types/index.ts` copies `TOKIO_EVENTS` and the payload types. Overlays get the new type once a new version is published; ask before publishing.
+- The overlay SDK, `../tokio-event-loader` (`@tokioapp/overlay`): `src/types/index.ts` copies `TOKIO_EVENTS` and `src/types/events.ts` the payload types (a new one is exported from `src/index.ts`), and its `README.md`'s event and Data tables describe them. Overlays get the new type once a new version is published; ask before publishing.
 - The overlays repo, `../tokio-overlays`: the event list in `.github/ISSUE_TEMPLATE/overlay_request.yml`.
-- The website, `../tokio-web`: `src/content/docs/docs/developers/events.md`, in its LIVE events and Data sections, and the events `features/alerts.mdx`, `features/games.mdx` and `features/countdown-timer.mdx` list.
+- The website, `../tokio-web`: `src/content/docs/docs/developers/events.md`, in its LIVE events and Data sections, and the events `features/alerts.mdx`, `features/games.mdx` and `features/countdown-timer.mdx` list, each with its Spanish copy under `src/content/docs/es/docs/`.
 
 ## Done when
 

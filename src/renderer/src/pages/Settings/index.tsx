@@ -15,6 +15,7 @@ import { CloneProfileModal, NewProfileModal } from "./sections/ProfileModals";
 import { ProfileSection } from "./sections/ProfileSection";
 import { ProvidersSection } from "./sections/ProvidersSection";
 import { ServerSection } from "./sections/ServerSection";
+import { TranslationSection } from "./sections/TranslationSection";
 import { TraySection } from "./sections/TraySection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { VoiceKeysSection } from "./sections/VoiceKeysSection";
@@ -103,6 +104,16 @@ export function Settings() {
               s.settings.language = language;
             });
             window.api.emit(APP_EVENTS.SET_LANGUAGE, { language });
+          }}
+        />
+
+        <TranslationSection
+          language={store.settings.translation.language}
+          onChange={(language) => {
+            updateStore((s) => {
+              s.settings.translation.language = language;
+            });
+            window.api.emit(APP_EVENTS.SET_TRANSLATION, { language });
           }}
         />
 

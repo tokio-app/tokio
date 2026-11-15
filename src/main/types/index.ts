@@ -23,6 +23,7 @@ import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
 import { TimerService } from "@/services/timer";
+import { TranslationService } from "@/services/translation";
 import { TrayService } from "@/services/tray";
 import { TTSService } from "@/services/tts";
 import { UpdaterService } from "@/services/updater";
@@ -70,6 +71,7 @@ export interface AppServices {
   readonly gamesService: GamesService;
   readonly studioService: StudioService;
   readonly trayService: TrayService;
+  readonly translationService: TranslationService;
 }
 
 export interface AppHandlerVariables extends AppServices {

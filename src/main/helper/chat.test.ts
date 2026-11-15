@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { hasKeyword, isBlank, isUser, removeEmojis, sameHandle } from "./chat";
+import {
+  hasKeyword,
+  isBlank,
+  isUser,
+  removeEmojis,
+  sameHandle,
+  startsWithCommand,
+} from "./chat";
 
 describe("removeEmojis", () => {
   it.each([
@@ -92,6 +99,19 @@ describe("hasKeyword", () => {
     expect(hasKeyword("日本語hello", "hello")).toBe(true);
     expect(hasKeyword("concat", "cat")).toBe(false);
     expect(hasKeyword("snake_case", "case")).toBe(false);
+  });
+});
+
+describe("startsWithCommand", () => {
+  it.each([
+    ["!play", "!play", true],
+    ["!PLAY song name", "!play", true],
+    ["!play	song", " !play ", true],
+    ["!playlist", "!play", false],
+    ["say !play", "!play", false],
+    ["anything", "   ", false],
+  ])("%j starts with %j: %s", (content, command, expected) => {
+    expect(startsWithCommand(content, command)).toBe(expected);
   });
 });
 

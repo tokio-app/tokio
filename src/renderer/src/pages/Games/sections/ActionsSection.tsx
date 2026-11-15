@@ -28,7 +28,12 @@ import {
   TriggerFilter,
   VariableList,
 } from "@/components";
-import { Updater, useIpcListener } from "@/hooks";
+import {
+  shownVariables,
+  Updater,
+  useIpcListener,
+  useTranslationLanguage,
+} from "@/hooks";
 import { MessageKey } from "@/common/i18n";
 import { rich, useLanguage, useOptions, useT } from "@/ui/i18n";
 import { ReactNode, Ref, useId, useRef, useState } from "react";
@@ -82,6 +87,8 @@ export function ActionsSection({
   update,
 }: Props) {
   const t = useT();
+  // Asked once here, not by each action
+  const translation = useTranslationLanguage();
   // Collapsed, the overlay below gets the room. Only while on the page.
   const [open, setOpen] = useState(true);
   const body = useId();
@@ -128,6 +135,7 @@ export function ActionsSection({
               <ActionItem
                 key={action.id}
                 action={action}
+                translation={translation}
                 gifts={gifts}
                 emotes={emotes}
                 onChange={(changed) => {
@@ -179,6 +187,8 @@ export function ActionsSection({
 
 type ItemProps = {
   action: GameAction;
+  // The language Settings translates chat into, "" while it's off
+  translation: string;
   gifts: CustomGift[];
   emotes: EmoteOption[];
   onChange: (action: GameAction) => void;
@@ -205,6 +215,7 @@ const sentence = (message: string, fields: Record<string, ReactNode>) =>
 
 function ActionItem({
   action,
+  translation,
   gifts,
   emotes,
   onChange,
@@ -226,10 +237,12 @@ function ActionItem({
       ? focused
       : steps.findIndex((step) => stepText(step) !== null);
   // A gift on every gift runs once for each, it has no count to say.
-  const variables =
+  const variables = shownVariables(
     trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
       ? countedVariables(trigger.type).filter((name) => name !== "count")
-      : countedVariables(trigger.type);
+      : countedVariables(trigger.type),
+    translation,
+  );
 
   useIpcListener(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, (res) => {
     if (!res || res.id !== action.id) return;
