@@ -46,11 +46,15 @@ export interface RemoteLabels {
 
 /** The page's texts in the user's language. */
 export const remoteLabels = (): RemoteLabels => {
-  const settings = t("nav.settings");
+  // Where to turn it on and scan the code: Settings → Remote control
+  const params = {
+    settings: t("nav.settings"),
+    section: t("settings.remote.title"),
+  };
   return {
     lang: language(),
     text: Object.fromEntries(
-      LABELS.map((label) => [label, t(`remote.${label}`, { settings })]),
+      LABELS.map((label) => [label, t(`remote.${label}`, params)]),
     ),
   };
 };
