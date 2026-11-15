@@ -37,7 +37,7 @@ describe("ShortcutField", () => {
     expect(field()).toHaveAttribute("aria-pressed", "true");
     expect(field()).toHaveTextContent("Press the keys");
     expect(
-      screen.getByText("Esc cancels. Backspace removes it."),
+      screen.getByText("Esc cancels. Backspace removes the shortcut."),
     ).toBeVisible();
     expect(suspends()).toEqual([true]);
 
@@ -138,7 +138,7 @@ describe("ShortcutField", () => {
 
     expect(onChange).not.toHaveBeenCalled();
     expect(
-      screen.getByText("AltGr types characters, so it can't be in a shortcut."),
+      screen.getByText("AltGr types characters, so shortcuts can't use it."),
     ).toBeVisible();
   });
 });

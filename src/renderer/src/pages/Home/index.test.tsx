@@ -791,7 +791,7 @@ describe("Home", () => {
       expect(banner()).toBeVisible();
       expect(
         within(banner()!).getByText(
-          "Chat TTS, alerts, song requests and game actions are ignored until you resume. Music keeps playing.",
+          "Tokio ignores chat TTS, alerts, song requests and game actions until you resume. The music keeps playing.",
         ),
       ).toBeVisible();
 
