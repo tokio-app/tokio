@@ -3,6 +3,7 @@ import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getHighResThumbnailUrl,
+  KeepPlayingJSCode,
   parseDurationToSeconds,
   parseSongRenderer,
   PlayerStateJSCode,
@@ -108,6 +109,58 @@ describe("getHighResThumbnailUrl", () => {
 
   it("gives an empty string without a URL", () => {
     expect(getHighResThumbnailUrl(undefined)).toBe("");
+  });
+});
+
+describe("KeepPlayingJSCode", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // A page whose "Continue watching?" dialog shows once the test says so
+  const idlePage = () => {
+    const yes = {
+      click: vi.fn(),
+      getClientRects: vi.fn((): unknown[] => []),
+    };
+    const context = {
+      window: {},
+      document: {
+        querySelector: (selector: string) =>
+          selector === "ytmusic-you-there-renderer button" ? yes : null,
+      },
+      setInterval,
+    };
+    const run = () => runInNewContext(KeepPlayingJSCode, context);
+    const show = () => yes.getClientRects.mockReturnValue([{}]);
+    return { yes, run, show };
+  };
+
+  it("answers YouTube's idle check within a second of it showing", () => {
+    const { yes, run, show } = idlePage();
+    run();
+
+    vi.advanceTimersByTime(5000);
+    expect(yes.click).not.toHaveBeenCalled();
+
+    show();
+    vi.advanceTimersByTime(1000);
+    expect(yes.click).toHaveBeenCalledOnce();
+  });
+
+  it("watches once per page, however often it runs", () => {
+    const { yes, run, show } = idlePage();
+    run();
+    run();
+    show();
+
+    vi.advanceTimersByTime(1000);
+
+    expect(yes.click).toHaveBeenCalledOnce();
   });
 });
 

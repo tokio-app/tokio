@@ -88,6 +88,24 @@ export const PlayJSCode = (videoId: string) => `
 })();
 `;
 
+// An isolated world of its own, where YouTube's page can't see the script
+export const KEEP_PLAYING_WORLD = 1919;
+
+// After about 40 minutes with nobody at the page, YouTube Music pauses each
+// song a few seconds in behind "Video paused. Continue watching?". The page
+// answers it as a person would. Its only button is the yes. Its Premium
+// upsell is left alone: it doesn't pause a song, and its other button opens
+// Premium.
+export const KeepPlayingJSCode = `
+(() => {
+  if (window.keepPlaying) return;
+  window.keepPlaying = setInterval(() => {
+    const yes = document.querySelector("ytmusic-you-there-renderer button");
+    if (yes && yes.getClientRects().length > 0) yes.click();
+  }, 1000);
+})();
+`;
+
 const TIME_REGEX = /^(\d+:)*\d+$/;
 
 export function parseDurationToSeconds(

@@ -52,6 +52,9 @@ export class FakeWebContents extends EventEmitter {
   readonly executeJavaScript = vi.fn<(code: string) => Promise<unknown>>(
     async () => undefined,
   );
+  readonly executeJavaScriptInIsolatedWorld = vi.fn<
+    (worldId: number, scripts: { code: string }[]) => Promise<unknown>
+  >(async () => undefined);
   readonly insertCSS = vi.fn<(css: string) => Promise<string>>(async () => "");
   readonly sendInputEvent =
     vi.fn<(event: { type: string; keyCode: string }) => void>();

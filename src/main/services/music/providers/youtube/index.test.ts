@@ -9,7 +9,12 @@ import {
 import { songRenderer } from "@test/fixtures";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectOptions } from "../../common";
-import { PlayerStateJSCode, PlayJSCode } from "./common";
+import {
+  KEEP_PLAYING_WORLD,
+  KeepPlayingJSCode,
+  PlayerStateJSCode,
+  PlayJSCode,
+} from "./common";
 import config from "./config";
 import { YouTubeMusic } from "./index";
 
@@ -230,6 +235,12 @@ describe("YouTubeMusic", () => {
         config.YTM_URL,
       );
       expect(view.webContents.session.clearStorageData).not.toHaveBeenCalled();
+      // The page answers YouTube's idle check from now on
+      expect(
+        view.webContents.executeJavaScriptInIsolatedWorld,
+      ).toHaveBeenCalledExactlyOnceWith(KEEP_PLAYING_WORLD, [
+        { code: KeepPlayingJSCode },
+      ]);
     });
 
     it("resolves right away while active", async () => {
@@ -274,6 +285,11 @@ describe("YouTubeMusic", () => {
       expect(provider.isActive()).toBe(true);
       expect(ended).not.toHaveBeenCalled();
       expect(windows().filter((w) => !w.isDestroyed())).toHaveLength(1);
+      // Each YouTube Music page gets its own watch on the idle check, Google's
+      // sign-in none
+      expect(
+        view.webContents.executeJavaScriptInIsolatedWorld,
+      ).toHaveBeenCalledTimes(2);
     });
 
     it("closes a connect still waiting when it connects again", async () => {

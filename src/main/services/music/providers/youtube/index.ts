@@ -6,7 +6,13 @@ import {
   createWindow,
   MusicProvider,
 } from "../../common";
-import { parseSongRenderer, PlayerStateJSCode, PlayJSCode } from "./common";
+import {
+  KEEP_PLAYING_WORLD,
+  KeepPlayingJSCode,
+  parseSongRenderer,
+  PlayerStateJSCode,
+  PlayJSCode,
+} from "./common";
 import { AdBlocker } from "./common/adblock";
 import config from "./config";
 
@@ -124,9 +130,15 @@ export class YouTubeMusic extends MusicProvider {
       // Connected once YouTube Music loads, signed in or not: signing in is
       // up to the streamer, from the page (the user's call)
       view.webContents.on("did-finish-load", () => {
-        if (!isInitializing || !isYouTubeMusic(view.webContents.getURL())) {
-          return;
-        }
+        if (!isYouTubeMusic(view.webContents.getURL())) return;
+        // Each page load starts without it. A page gone meanwhile has
+        // nothing left to keep playing.
+        view.webContents
+          .executeJavaScriptInIsolatedWorld(KEEP_PLAYING_WORLD, [
+            { code: KeepPlayingJSCode },
+          ])
+          .catch(() => {});
+        if (!isInitializing) return;
         isInitializing = false;
         shell.off("close", handleClose);
         this._isActive = true;
