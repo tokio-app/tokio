@@ -216,6 +216,9 @@ Java Edition connects through the Tokio mod, a Fabric mod in `tokio-app/minecraf
 
 - Run `yarn format` on files you touch, and fix lint warnings in code you touch.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `feat!:`), enforced by a husky hook and by CI on pull requests. Don't bypass hooks.
+- Keep a commit's subject under 100 characters and wrap its body at 72 columns. CI's commitlint fails a pull request on any longer line (`header-max-length`, `body-max-line-length`).
+  - The hook doesn't run on `git cherry-pick`, nor in a checkout installed with `--ignore-scripts` until `npx husky` runs there.
+  - So check a branch with `npx commitlint --from <base> --to HEAD` before pushing it.
 - Pull requests: a Conventional Commits title, which is their line in the release notes, and the sections of `.github/pull_request_template.md`. Merge them with a merge commit, not a squash or rebase: the notes find pull requests by it (`.claude/rules/ci.md`).
 - Keep these stable; overlays, browser sources and saved data depend on them:
   - the server port (`37891`), the Minecraft port (`MINECRAFT_PORT`, 37892) and its Java subprotocol (`MINECRAFT_JAVA_PROTOCOL`, `tokio.java.v1`)

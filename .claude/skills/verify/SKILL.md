@@ -23,6 +23,7 @@ Run them from the repository root, the narrow ones first:
    - `npx fallow dead-code` after moving, renaming or deleting code.
    - The tests in WSL, on Windows, for code that can behave differently on Linux or macOS: file links, paths, case-sensitive names, permissions. Commit first: the WSL copy runs committed code (see Linux checks in WSL below).
    - `git ls-files --eol | grep w/crlf` after a script wrote files: the repo uses LF. `.commitlintrc`, `.editorconfig`, `.gitattributes` and `LICENSE` always show up and are fine. A Python script writes CRLF on Windows unless it opens files with `newline="\n"`.
+5. Before pushing a branch: `npx commitlint --from <base> --to HEAD`. CI checks every commit of a pull request, and the hook skipped cherry-picks and checkouts installed with `--ignore-scripts`. A long body line is fixed by rewrapping it at 72 columns, words unchanged.
 
 ## Linux checks in WSL
 
