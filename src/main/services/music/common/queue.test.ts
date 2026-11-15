@@ -176,6 +176,50 @@ describe("MusicQueue", () => {
     expect(playing(queue)).toBe("b");
   });
 
+  describe("endCurrent", () => {
+    it("ends the last song at once, playing nothing", async () => {
+      const queue = new MusicQueue();
+      const changes = vi.fn();
+      queue.on(TOKIO_EVENTS.MUSIC_CHANGE, changes);
+      const a = vi.fn();
+      queue.enqueue("a", song("a", 60_000), a);
+      changes.mockClear();
+
+      await queue.endCurrent(queue.playing());
+
+      expect(a).toHaveBeenCalledOnce();
+      expect(changes).toHaveBeenCalledExactlyOnceWith([
+        { title: "a", thumbnail: "", playing: false, played: true },
+      ]);
+      expect(queue.getQueueState().isPlaying).toBe(false);
+    });
+
+    it("plays a request that came after it", async () => {
+      const queue = new MusicQueue();
+      const b = vi.fn();
+      queue.enqueue("a", song("a", 60_000), () => {});
+      const from = queue.playing();
+      queue.enqueue("b", song("b"), b);
+
+      await queue.endCurrent(from);
+
+      expect(b).toHaveBeenCalledOnce();
+      expect(playing(queue)).toBe("b");
+    });
+
+    it("leaves a song that started after it was asked", async () => {
+      const queue = new MusicQueue();
+      queue.enqueue("a", song("a"), () => {});
+      const from = queue.playing();
+      queue.enqueue("b", song("b", 60_000), () => {});
+      await vi.advanceTimersByTimeAsync(1000);
+
+      await queue.endCurrent(from);
+
+      expect(playing(queue)).toBe("b");
+    });
+  });
+
   describe("when the player is gone", () => {
     const broken = (): void => {
       throw new Error("Video unavailable.");

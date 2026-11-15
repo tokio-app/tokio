@@ -39,6 +39,8 @@ export abstract class MusicProvider extends TokioEmitter {
   ): Promise<ConnectionResponse>;
   public abstract disconnect(): void;
   public abstract play(track: SongInfo): Promise<void>;
+  // The player's own Next, for a skip with no request waiting
+  public abstract next(): Promise<void>;
   public abstract searchSong(query: string): Promise<SongInfo | null>;
   public abstract playerStatus(): Promise<CurrentSongInfo | null>;
   public abstract isActive(): boolean;

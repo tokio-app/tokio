@@ -9,6 +9,7 @@ import {
   UserData,
 } from "@/common/types";
 import { defaultProfile } from "@/common/util";
+import Logger from "@/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectionResponse, MusicProvider } from "./common";
 import { MusicService } from "./index";
@@ -28,6 +29,7 @@ class FakeProvider extends MusicProvider {
   }));
   disconnect = vi.fn<() => void>();
   play = vi.fn<(track: SongInfo) => Promise<void>>(async () => {});
+  next = vi.fn<() => Promise<void>>(async () => {});
   searchSong = vi.fn<(query: string) => Promise<SongInfo | null>>(
     async (query) => song(query),
   );
@@ -791,6 +793,92 @@ describe("MusicService", () => {
       await vi.advanceTimersByTimeAsync(3_000);
 
       expect(played()).toEqual(["A"]);
+    });
+
+    describe("skip", () => {
+      it("plays a request that waits", async () => {
+        const { service, request, provider, played } = setup();
+        await request("!play A");
+        await request("!play B");
+
+        expect(service.skip()).toBe(true);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(played()).toEqual(["A", "B"]);
+        expect(provider.next).not.toHaveBeenCalled();
+      });
+
+      it("presses the player's Next past the last request, which leaves at once", async () => {
+        const { service, request, provider, queue } = setup();
+        await request("!play A");
+
+        expect(service.skip()).toBe(true);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(provider.next).toHaveBeenCalledOnce();
+        expect(queue()).toEqual(["A"]);
+      });
+
+      it("presses the player's Next with no request", async () => {
+        const { service, provider } = setup();
+
+        expect(service.skip()).toBe(true);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(provider.next).toHaveBeenCalledOnce();
+      });
+
+      it("skips nothing once a song started after it was asked", async () => {
+        const { service, request, provider, played } = setup();
+        slowSearch(provider, 3_000);
+        await request("!play A");
+        service.skip();
+
+        await vi.advanceTimersByTimeAsync(3_000);
+
+        expect(played()).toEqual(["A"]);
+        expect(provider.next).not.toHaveBeenCalled();
+      });
+
+      it("keeps the request when the player's Next fails", async () => {
+        const { service, request, provider, queue } = setup();
+        const warn = vi.spyOn(Logger, "warn");
+        service.setLogFile("music.log");
+        provider.next.mockRejectedValueOnce(new Error("Premium Required"));
+        await request("!play A");
+
+        service.skip();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(queue()).toEqual(["A (playing)"]);
+        expect(warn).toHaveBeenCalledWith(
+          "<Music> Unable to skip the song -- Premium Required",
+          "music.log",
+        );
+      });
+
+      it("does nothing while not connected", async () => {
+        const { service, provider } = setup();
+        provider.isActive.mockReturnValue(false);
+
+        expect(service.skip()).toBe(false);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(provider.next).not.toHaveBeenCalled();
+      });
+
+      it("is refused while the queue is full", async () => {
+        const { service, request, provider } = setup();
+        const music = settings((m) => {
+          m.protection.queue_length = 1;
+          m.protection.one_per_viewer = false;
+        });
+        slowSearch(provider, 3_000);
+        await request("!play A", music);
+        await request("!play B", music);
+
+        expect(service.skip()).toBe(false);
+      });
     });
 
     it("goes back to the last song", async () => {

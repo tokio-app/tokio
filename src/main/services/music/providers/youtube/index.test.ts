@@ -12,6 +12,7 @@ import type { ConnectOptions } from "../../common";
 import {
   KEEP_PLAYING_WORLD,
   KeepPlayingJSCode,
+  NextJSCode,
   PlayerStateJSCode,
   PlayJSCode,
 } from "./common";
@@ -576,6 +577,32 @@ describe("YouTubeMusic", () => {
     it("does nothing without a page", async () => {
       await expect(new YouTubeMusic().play(song())).resolves.toBeUndefined();
       expect(views()).toEqual([]);
+    });
+  });
+
+  describe("next", () => {
+    it("presses the page's Next", async () => {
+      const { provider, view } = await connected();
+      const { executeJavaScript } = view.webContents;
+      executeJavaScript.mockResolvedValue(true);
+
+      await provider.next();
+
+      expect(executeJavaScript).toHaveBeenLastCalledWith(NextJSCode);
+      expect(NextJSCode).toContain(JSON.stringify(config.NEXT_BUTTON));
+    });
+
+    it("fails when the page has no Next", async () => {
+      const { provider, view } = await connected();
+      view.webContents.executeJavaScript.mockResolvedValue(false);
+
+      await expect(provider.next()).rejects.toThrow(
+        "YouTube Music's page has no Next.",
+      );
+    });
+
+    it("does nothing without a page", async () => {
+      await expect(new YouTubeMusic().next()).resolves.toBeUndefined();
     });
   });
 

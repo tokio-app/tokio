@@ -191,17 +191,28 @@ export class MusicQueue extends TokioEmitter {
     );
   }
 
+  // A request waits after the song playing
+  public hasNext() {
+    return this._currentIndex < this._queue.length - 1;
+  }
+
   // Skips `from` only while it still plays, so a Next that waited skips
   // nothing once another song started
   public async triggerNext(from = this.playing()) {
-    if (this.playing() !== from) return;
-    if (this._currentIndex < this._queue.length - 1) {
-      this.pause();
-      this._currentIndex++;
+    if (this.playing() !== from || !this.hasNext()) return;
+    await this.endCurrent(from);
+  }
 
-      await Promise.resolve();
-      this.play();
-    }
+  // Ends `from` while it still plays, the last song too, so a song the
+  // player skipped leaves the queue at once instead of within MOVED_CHECK_MS
+  public async endCurrent(from = this.playing()) {
+    if (!from || this.playing() !== from) return;
+    this.pause();
+    this._currentIndex++;
+
+    await Promise.resolve();
+    // Plays a request that came meanwhile, else sends the change
+    this.play();
   }
 
   public async triggerPrevious() {

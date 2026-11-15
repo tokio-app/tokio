@@ -205,6 +205,11 @@ export class Spotify extends MusicProvider {
     await this.fetchApi(`/me/player/play?device_id=${deviceId}`, "PUT", body);
   }
 
+  public async next(): Promise<void> {
+    if (!this._isActive) return;
+    await this.fetchApi("/me/player/next", "POST");
+  }
+
   public async playerStatus(): Promise<CurrentSongInfo | null> {
     if (!this._isActive) return null;
     const searchRes = await this.fetchApi(`/me/player`);

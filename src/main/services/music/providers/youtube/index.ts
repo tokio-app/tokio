@@ -9,6 +9,7 @@ import {
 import {
   KEEP_PLAYING_WORLD,
   KeepPlayingJSCode,
+  NextJSCode,
   parseSongRenderer,
   PlayerStateJSCode,
   PlayJSCode,
@@ -165,6 +166,13 @@ export class YouTubeMusic extends MusicProvider {
     if (!played) {
       throw new Error(`Nothing to play for ${info.track} on YouTube Music.`);
     }
+  }
+
+  public async next() {
+    if (!this._ytView) return;
+    const pressed =
+      await this._ytView.webContents.executeJavaScript(NextJSCode);
+    if (!pressed) throw new Error("YouTube Music's page has no Next.");
   }
 
   public async playerStatus(): Promise<CurrentSongInfo | null> {
