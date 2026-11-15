@@ -10,6 +10,11 @@
   gap: var(--space-2);
 }
 
+/* The clear button's place without a shortcut, as AlertItem keeps its own */
+.unused {
+  visibility: hidden;
+}
+
 /* A field, like CopyField's. Two classes to win over Btn's styles */
 .field.field {
   flex: 1;

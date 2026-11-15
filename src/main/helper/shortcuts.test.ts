@@ -84,7 +84,7 @@ describe("warnTaken", () => {
     warnTaken(notifier, ["stopTts"]);
 
     expect(sent[0]?.message).toBe(
-      "Otra app ya usa el atajo de Detener TTS. Elige otro en Configuración → Atajos.",
+      "Otra app ya usa el atajo de Detener TTS. Elige otro en Configuración → Atajos de teclado.",
     );
   });
 

@@ -55,6 +55,8 @@ export function warnTaken(notifier: Notifier, taken: ControlAction[]) {
         taken.map((action) => t(`main.shortcuts.${action}`)),
       ),
       settings: t("nav.settings"),
+      // The section's own title, so the two can't drift apart
+      section: t("settings.shortcuts.title"),
     }),
     { key: `shortcuts:${taken.join(",")}` },
   );

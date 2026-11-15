@@ -97,6 +97,7 @@ export function ShortcutField({ value, onChange }: Props) {
     onChange(result.accelerator);
   };
 
+  const clearable = value !== "" && !recording;
   const shown = acceleratorKeys(value, platform)
     .map((k) =>
       "label" in k ? t(`components.shortcutField.keys.${k.label}`) : k.text,
@@ -136,15 +137,20 @@ export function ShortcutField({ value, onChange }: Props) {
             </span>
           )}
         </Btn>
-        {value && !recording && (
+        {/* Kept without a shortcut too, so every field is as wide */}
+        <span
+          className={cx(!clearable && styles.unused)}
+          aria-hidden={!clearable || undefined}
+        >
           <Btn
             variant="icon"
             title={t("components.shortcutField.clear")}
+            disabled={!clearable}
             onClick={() => onChange("")}
           >
             <FiX size={18} />
           </Btn>
-        )}
+        </span>
       </div>
       <p
         className={cx(styles.message, refusal && styles.refused)}

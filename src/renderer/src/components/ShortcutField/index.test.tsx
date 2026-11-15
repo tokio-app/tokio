@@ -27,7 +27,11 @@ describe("ShortcutField", () => {
 
     setup();
     expect(screen.getByTitle("Change shortcut")).toHaveTextContent("Not set");
-    expect(screen.queryByTitle("Remove shortcut")).not.toBeInTheDocument();
+    // Its place stays, hidden, so every field is as wide
+    expect(
+      screen.queryByRole("button", { name: "Remove shortcut" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTitle("Remove shortcut")).toBeDisabled();
   });
 
   it("suspends Tokio's shortcuts while it records, and records a combination", async () => {
