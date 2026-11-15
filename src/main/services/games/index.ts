@@ -123,7 +123,13 @@ export class GamesService extends Service {
     switched = false,
   ): void {
     this._games = games;
-    if (switched) this._switches++;
+    if (switched) this.stopRuns();
+  }
+
+  // Drops every run still waiting, as a switch does: a pause plays nothing
+  // from before it later
+  public stopRuns(): void {
+    this._switches++;
   }
 
   /** Turns the connections on or off. False when one can't listen. */
