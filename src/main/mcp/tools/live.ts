@@ -166,6 +166,12 @@ async function setKey(
 ): Promise<CallToolResult> {
   const { storeManagerService, ttsService } = handler;
   const key = typed.trim();
+  // Only MCP can send one (Settings' fields are single-line): fetch would log it
+  if (/[\s\p{Cc}]/u.test(key)) {
+    return fail(
+      "A key has no spaces or line breaks inside. Nothing was saved.",
+    );
+  }
   if (service === "tiktok") {
     const { error } = await invokeOk(
       handler,

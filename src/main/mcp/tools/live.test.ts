@@ -549,6 +549,23 @@ describe("live MCP tools", () => {
       return { h, store };
     };
 
+    it("refuses a key with a line break inside, without repeating it", async () => {
+      const { h, store } = voiceSetup();
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("set_key", {
+        service: "voice_engine",
+        engine: "elevenlabs",
+        key: "sec\nret",
+      });
+
+      expect(res.isError).toBe(true);
+      expect(res.text).not.toContain("sec");
+      expect(invoke).not.toHaveBeenCalled();
+      expect(store.updateVoiceKey).not.toHaveBeenCalled();
+    });
+
     it("saves a voice engine's key, and an empty one removes its voices", async () => {
       const { h, store } = voiceSetup();
       const { call } = await mcpClient(h.handler);
