@@ -632,9 +632,13 @@ export class HistoryService extends Service {
         return;
       }
       for (const { userId, coins, gifts } of record.gifters) {
-        // Gone when the cap dropped them
+        // Gone when the cap dropped them. Below this LIVE's numbers, the cap
+        // dropped them and later gifts brought them back without it.
+        // shortcut: one whose later gifts reach this LIVE's still loses this
+        // LIVE's numbers from them, an undercount. Track when each all-time
+        // entry began if that ever matters.
         const gifter = this._gifters.get(userId);
-        if (!gifter) continue;
+        if (!gifter || gifter.coins < coins || gifter.gifts < gifts) continue;
         const left = {
           ...gifter,
           coins: gifter.coins - coins,

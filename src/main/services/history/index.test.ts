@@ -899,6 +899,28 @@ describe("HistoryService", () => {
       expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
     });
 
+    it("keeps a gifter the cap dropped and a later gift brought back", async () => {
+      const history = await loaded();
+      history.start("kai", 1000);
+      for (let i = 0; i < MAX_GIFTERS; i++)
+        gifts(history, [1100, gift(viewer(String(i)), 5)]);
+      history.end(2000);
+      // The fewest coins, so the cap drops x
+      history.start("kai", 3000);
+      gifts(history, [3100, gift(viewer("x"), 3)]);
+      history.end(4000);
+      expect(await history.deleteLive(1000)).toBe(true);
+      history.start("kai", 5000);
+      gifts(history, [5100, gift(viewer("x"), 1)]);
+      history.end(6000);
+
+      // x's all time holds only the last LIVE's gift
+      expect(await history.deleteLive(3000)).toBe(true);
+      expect(history.getHistory().gifters).toEqual([
+        expect.objectContaining({ userId: "x", coins: 1, gifts: 1 }),
+      ]);
+    });
+
     it("leaves the index when its file doesn't load, keeping all time's gifts", async () => {
       const history = await twoLives();
       await writeFile(join(dir, "a", "1000.json"), "{ broken");
