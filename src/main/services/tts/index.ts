@@ -223,8 +223,10 @@ export class TTSService extends ProviderService<TTSProvider> {
       [username, handle, comment.typed, comment.translation ?? ""].join("\n"),
       settings,
     );
+    // Either may be read, so both count
     const over_length =
-      chat.comment.content.length > settings.protection.comment_length;
+      Math.max(chat.comment.content.length, comment.translation?.length ?? 0) >
+      settings.protection.comment_length;
 
     if (banned || over_length) return false;
 

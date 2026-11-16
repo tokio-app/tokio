@@ -628,6 +628,18 @@ describe("TTSService", () => {
 
       expect(await say(translated("tonto", "idiot"), s)).toEqual([]);
     });
+
+    it("skips a message whose translation is over the max length", async () => {
+      const s = settings((s) => {
+        s.format.translate = true;
+        s.protection.comment_length = 10;
+      });
+
+      expect(await say(translated("hola", "hello there friends"), s)).toEqual(
+        [],
+      );
+      expect(await say(translated("hola", "hello"), s)).toEqual(["hello"]);
+    });
   });
 
   describe("text", () => {

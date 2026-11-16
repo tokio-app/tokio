@@ -65,7 +65,7 @@ export const sections: Sections = {
       "filters: speed and pitch 0.5-2 (1 is normal), volume 0-100.",
       "permissions: who is read. all lets everyone; otherwise followers, superfans, moderators, or a minimum level (level.enabled, level.value). With list.enabled, handles in list.black are never read and a non-empty list.white alone decides.",
       "format.template: what's read, with the variables {username}, {handle}, {comment} and {translation}. format.trigger: mode any reads every message; dot, slash and custom read only messages starting with value ('.', '/', or a custom command such as '!tts'), which is cut off. remove_emojis leaves emojis out. translate reads the chat translation in {comment}'s place, when chat translation is on (app section).",
-      "protection: cooldown seconds between messages, queue_length messages waiting at most, comment_length characters read at most, banned words that stop a message.",
+      "protection: cooldown seconds between messages, queue_length messages waiting at most, comment_length characters at most in a message and in its translation (a longer one isn't read), banned words that stop a message.",
       "replacements: whole words replaced before reading ({ old, new }).",
       "user_voices: special users, { handle, voice } each: chat from that handle is read in that voice.",
       "Engine keys are set with set_key, and voice_engines lists which engines have one.",
