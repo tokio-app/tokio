@@ -19,6 +19,7 @@ import { LogsSection } from "./sections/LogsSection";
 import { CloneProfileModal, NewProfileModal } from "./sections/ProfileModals";
 import { ProfileSection } from "./sections/ProfileSection";
 import { ProvidersSection } from "./sections/ProvidersSection";
+import { RemoteSection } from "./sections/RemoteSection";
 import { ServerSection } from "./sections/ServerSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { TranslationSection } from "./sections/TranslationSection";
@@ -177,6 +178,17 @@ export function Settings() {
           shortcuts={store.settings.shortcuts}
           taken={taken}
           onChange={setShortcut}
+        />
+
+        <RemoteSection
+          remote={store.settings.remote}
+          serverEnabled={store.settings.server.enabled}
+          onChange={(enabled) => {
+            updateStore((s) => {
+              s.settings.remote.enabled = enabled;
+            });
+            window.api.emit(APP_EVENTS.SET_REMOTE, { enabled });
+          }}
         />
 
         <VoiceKeysSection />

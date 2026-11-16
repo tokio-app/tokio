@@ -88,6 +88,8 @@ export enum APP_EVENTS_RESPONSE {
   REQ_FQDN = "app:settings:res:fqdn",
   GET_NETWORK_ADDRESSES = "app:settings:res:network",
   SET_SHORTCUTS = "app:settings:res:set:shortcuts",
+  SET_REMOTE = "app:settings:res:set:remote",
+  NEW_REMOTE_KEY = "app:settings:res:new:remote-key",
 
   // LIVE CONTROLS
   CONTROL = "app:controls:res:run",
@@ -283,6 +285,9 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES]: { addresses: string[] };
   // The actions whose shortcut another app holds, which don't fire
   [APP_EVENTS_RESPONSE.SET_SHORTCUTS]: Reply<{ taken: ControlAction[] }>;
+  // The key comes in the GET_SETTINGS echo sent before them
+  [APP_EVENTS_RESPONSE.SET_REMOTE]: Reply;
+  [APP_EVENTS_RESPONSE.NEW_REMOTE_KEY]: Reply;
 
   // LIVE CONTROLS
   // done is false when there was nothing to do, such as no alert to replay.

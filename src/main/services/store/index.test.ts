@@ -928,6 +928,42 @@ describe("StoreManagerService", () => {
     });
   });
 
+  describe("remote", () => {
+    const off = { enabled: false, key: "" };
+
+    it("is off with no key in stores saved before the setting", async () => {
+      const { remote: _remote, ...settings } = defaultStoreData.settings;
+      await writeFile(
+        storeFile,
+        JSON.stringify({ ...defaultStoreData, settings }),
+      );
+
+      const store = await init();
+
+      expect(store.wasRebuilt()).toBe(false);
+      expect(store.getSettings().remote).toEqual(off);
+    });
+
+    it("saves both fields", async () => {
+      const store = await init();
+      const remote = { enabled: true, key: "abc" };
+
+      expect(await store.updateRemote(remote)).toBe(true);
+
+      expect((await readJSON(storeFile)).settings.remote).toEqual(remote);
+      expect((await init()).getSettings().remote).toEqual(remote);
+    });
+
+    it("refuses a bad value without changing the store", async () => {
+      const store = await init();
+
+      await expect(store.updateRemote({ enabled: "yes" })).rejects.toThrow();
+
+      expect(store.getSettings().remote).toEqual(off);
+      expect(await store.updateTraySettings(false)).toBe(true);
+    });
+  });
+
   describe("live state", () => {
     afterEach(() => {
       vi.useRealTimers();

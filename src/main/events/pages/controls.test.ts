@@ -1,4 +1,4 @@
-import { ShortcutsSchema } from "@/common/schemas";
+import { RemoteSettingsSchema, ShortcutsSchema } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
@@ -7,6 +7,7 @@ import {
 } from "@/common/types";
 import { defaultStoreData } from "@/common/util";
 import { t } from "@/helper/i18n";
+import Logger from "@/logger";
 import type { AlertAudio } from "@/services/alerts";
 import { ControlsService } from "@/services/controls";
 import { globalShortcut } from "@test/electron";
@@ -290,6 +291,141 @@ describe("SET_SHORTCUTS", () => {
     });
     expect(h.notices).toEqual([expect.objectContaining(failure)]);
     expect(globalShortcut.isRegistered("F9")).toBe(true);
+  });
+});
+
+describe("remote", () => {
+  // The store's own parse, as updateRemote does
+  const setupRemote = ({ saved = true, server = true } = {}) => {
+    const settings = {
+      remote: RemoteSettingsSchema.parse({}),
+      server: { enabled: server },
+    };
+    const store = {
+      getSettings: () => settings,
+      getProfiles: () => [],
+      updateRemote: vi.fn(async (value: unknown) => {
+        settings.remote = RemoteSettingsSchema.parse(value);
+        return saved;
+      }),
+    };
+    const h = createHandler(
+      { storeManagerService: store },
+      { stack: controls },
+    );
+    return { h, settings };
+  };
+
+  const setRemote = (h: ReturnType<typeof createHandler>, enabled: boolean) =>
+    h.invoke(controls, APP_EVENTS.SET_REMOTE, { enabled });
+
+  it("makes a key the first time it's on, and keeps it after", async () => {
+    const { h, settings } = setupRemote();
+
+    await setRemote(h, true);
+    const { key } = settings.remote;
+    expect(key).toMatch(/^[\w-]{24}$/);
+    expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({
+          settings: expect.objectContaining({
+            remote: { enabled: true, key },
+          }),
+        }),
+      }),
+    ]);
+    expect(h.replies(APP_EVENTS_RESPONSE.SET_REMOTE)).toEqual([
+      { success: true },
+    ]);
+
+    await setRemote(h, false);
+    await setRemote(h, true);
+
+    expect(settings.remote).toEqual({ enabled: true, key });
+    expect(h.notices).toEqual([
+      expect.objectContaining({
+        level: "success",
+        code: FEEDBACK_CODES.REMOTE_ENABLED,
+        message: t("main.remote.on"),
+      }),
+      expect.objectContaining({
+        level: "info",
+        code: FEEDBACK_CODES.REMOTE_DISABLED,
+        message: t("main.remote.off"),
+      }),
+      expect.objectContaining({ code: FEEDBACK_CODES.REMOTE_ENABLED }),
+    ]);
+  });
+
+  it("says it needs the overlay server when that's off", async () => {
+    const { h } = setupRemote({ server: false });
+
+    await setRemote(h, true);
+
+    expect(h.notices).toEqual([
+      expect.objectContaining({ message: t("main.remote.onServerOff") }),
+    ]);
+  });
+
+  it("replaces the key, keeping the switch", async () => {
+    const { h, settings } = setupRemote();
+    await setRemote(h, true);
+    const { key } = settings.remote;
+
+    await h.invoke(controls, APP_EVENTS.NEW_REMOTE_KEY, undefined);
+
+    expect(settings.remote.enabled).toBe(true);
+    expect(settings.remote.key).toMatch(/^[\w-]{24}$/);
+    expect(settings.remote.key).not.toBe(key);
+    expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(2);
+    expect(h.replies(APP_EVENTS_RESPONSE.NEW_REMOTE_KEY)).toEqual([
+      { success: true },
+    ]);
+    expect(h.notices.at(-1)).toEqual(
+      expect.objectContaining({
+        level: "success",
+        code: FEEDBACK_CODES.REMOTE_KEY_RENEWED,
+        message: t("main.remote.keyRenewed"),
+      }),
+    );
+  });
+
+  it.each([
+    [APP_EVENTS.SET_REMOTE, APP_EVENTS_RESPONSE.SET_REMOTE],
+    [APP_EVENTS.NEW_REMOTE_KEY, APP_EVENTS_RESPONSE.NEW_REMOTE_KEY],
+  ] as const)(
+    "%s reports a change the store couldn't write, after the settings main holds",
+    async (event, response) => {
+      const { h } = setupRemote({ saved: false });
+
+      await h.invoke(controls, event, { enabled: true });
+
+      const failure = {
+        code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+        message: t("main.saveFailed"),
+      };
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_SETTINGS)).toHaveLength(1);
+      expect(h.replies(response)).toEqual([{ success: false, error: failure }]);
+      expect(h.notices).toEqual([expect.objectContaining(failure)]);
+    },
+  );
+
+  it("never logs the key", async () => {
+    const logs = [
+      vi.spyOn(Logger, "debug"),
+      vi.spyOn(Logger, "info"),
+      vi.spyOn(Logger, "warn"),
+      vi.spyOn(Logger, "error"),
+    ];
+    const { h, settings } = setupRemote({ saved: false });
+
+    await setRemote(h, true);
+    await h.invoke(controls, APP_EVENTS.NEW_REMOTE_KEY, undefined);
+
+    const { key } = settings.remote;
+    expect(key).not.toBe("");
+    const logged = JSON.stringify(logs.flatMap((log) => log.mock.calls));
+    expect(logged).not.toContain(key);
   });
 });
 

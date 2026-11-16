@@ -1,0 +1,16 @@
+/* Raw colors on purpose: a camera reads black on white, whatever the theme */
+.qr {
+  display: block;
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+}
+
+.light {
+  fill: #fff;
+}
+
+.dark {
+  fill: #000;
+}

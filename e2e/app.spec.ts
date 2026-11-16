@@ -497,3 +497,31 @@ test("registers a shortcut recorded in Settings, and resumes a pause from Home",
   await paused.getByRole("button", { name: "Resume" }).click();
   await expect(paused).toBeHidden();
 });
+
+test("serves the phone remote, whose API takes only its key", async () => {
+  const remote = "http://127.0.0.1:37891/remote";
+  const res = await fetch(`${remote}/`);
+  expect(res.ok).toBe(true);
+  expect(await res.text()).toContain('"title":"Tokio remote"');
+
+  // Off until turned on
+  expect((await fetch(`${remote}/api/state`)).status).toBe(403);
+
+  await page.evaluate(() =>
+    Reflect.get(globalThis, "api").emit("app:settings:set:remote", {
+      enabled: true,
+    }),
+  );
+  const savedKey = async () =>
+    String(
+      JSON.parse(await readFile(data("settings", "tokio.json"), "utf8"))
+        .settings.remote.key,
+    );
+  await expect.poll(savedKey).not.toBe("");
+
+  expect((await fetch(`${remote}/api/state`)).status).toBe(401);
+  const state = await fetch(`${remote}/api/state`, {
+    headers: { Authorization: `Bearer ${await savedKey()}` },
+  });
+  expect(await state.json()).toEqual({ paused: false });
+});

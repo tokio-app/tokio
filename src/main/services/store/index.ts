@@ -10,6 +10,7 @@ import {
   OverlayMetadata,
   Profile,
   ProfileSchema,
+  RemoteSettingsSchema,
   SavedEmote,
   ShortcutsSchema,
   StoreSchema,
@@ -526,6 +527,13 @@ export class StoreManagerService extends Service {
   public async updateShortcuts(shortcuts: unknown): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.shortcuts = ShortcutsSchema.parse(shortcuts);
+    return this._queueSave();
+  }
+
+  // Throws on settings the schema refuses, like updateGamesSettings
+  public async updateRemote(remote: unknown): Promise<boolean> {
+    this._ensureInitialized();
+    this._storeData!.settings.remote = RemoteSettingsSchema.parse(remote);
     return this._queueSave();
   }
 

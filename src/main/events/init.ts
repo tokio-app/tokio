@@ -51,6 +51,7 @@ import { MAX_BACKLOG } from "@/services/games";
 import { HISTORY_EVENTS } from "@/services/history";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { OverlayUpdates } from "@/services/overlay";
+import { createRemoteRoutes, remoteLabels } from "@/services/server/remote";
 import { TIMER_EVENTS } from "@/services/timer";
 import { chatCommands } from "@/services/translation/commands";
 import { reasonKey } from "@/services/translation/common";
@@ -1160,6 +1161,14 @@ const startApp = async (handler: AppHandlerVariables) => {
   if (!wired.has(handler)) {
     wired.add(handler);
     serverService.initEvents(connectorService, musicService);
+    serverService.setControlRoutes(
+      createRemoteRoutes({
+        remote: () => storeManagerService.getSettings().remote,
+        paused: () => handler.controlsService.isPaused(),
+        invoke: handler.invoke,
+        labels: remoteLabels,
+      }),
+    );
     registerConnectorEvents(handler);
     registerControls(handler);
     registerTimer(handler);

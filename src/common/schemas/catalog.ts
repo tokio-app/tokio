@@ -2,9 +2,21 @@ import { z } from "zod";
 import {
   ALERTS_PATH,
   GAMES_PATH,
+  REMOTE_PATH,
   STUDIO_PATH,
   TIMER_PATH,
 } from "../util/constants/server";
+
+// Paths Tokio serves itself: the phone remote and its API at /remote/, and
+// the MCP server at /mcp
+const RESERVED_IDS = [
+  ALERTS_PATH,
+  TIMER_PATH,
+  GAMES_PATH,
+  STUDIO_PATH,
+  REMOTE_PATH,
+  "mcp",
+];
 
 /**
  * An official overlay in the catalog that tokio-app/overlays publishes with
@@ -14,13 +26,12 @@ import {
 export const CatalogOverlaySchema = z.object({
   // Its folder name there, and its folder and URL path here. Never changes.
   // The alerts' overlays are served under /alerts/, the countdown timer's at
-  // /timer/, the games overlay at /games/ and Overlay Studio's under /studio/.
+  // /timer/, the games overlay at /games/ and Overlay Studio's under /studio/
+  // (RESERVED_IDS).
   id: z
     .string()
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-    .refine(
-      (id) => ![ALERTS_PATH, TIMER_PATH, GAMES_PATH, STUDIO_PATH].includes(id),
-    ),
+    .refine((id) => !RESERVED_IDS.includes(id)),
   name: z.string(),
   version: z.string(),
   description: z.string(),

@@ -5,11 +5,13 @@ import {
   ControlAction,
   FEEDBACK_CODES,
 } from "@/common/types";
-import { createStack } from "@/helper/events";
+import { createStack, replyFailure } from "@/helper/events";
 import { saveFailure } from "@/helper/feedback";
+import { t } from "@/helper/i18n";
 import { applyStoredShortcuts, warnTaken } from "@/helper/shortcuts";
 import { AppHandlerVariables } from "@/types";
 import { globalShortcut } from "electron";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { replySettings } from "./settings";
 
@@ -143,6 +145,71 @@ events.push(
     globalShortcut.setSuspended(suspended);
   },
   { notify: false },
+);
+
+// The remote's key, never logged: the only gate the phone page and the API
+// have on the LAN
+const newRemoteKey = () => randomBytes(18).toString("base64url");
+
+events.push(
+  APP_EVENTS.SET_REMOTE,
+  async ({ storeManagerService: store, notifier }, e, { enabled }) => {
+    const { key } = store.getSettings().remote;
+    const saved = await store.updateRemote({
+      enabled,
+      key: enabled && !key ? newRemoteKey() : key,
+    });
+    replySettings(e, store);
+    if (!saved) throw saveFailure();
+    e.reply(APP_EVENTS_RESPONSE.SET_REMOTE, { success: true });
+    if (enabled) {
+      notifier.success(
+        "system",
+        FEEDBACK_CODES.REMOTE_ENABLED,
+        t(
+          store.getSettings().server.enabled
+            ? "main.remote.on"
+            : "main.remote.onServerOff",
+        ),
+      );
+    } else {
+      notifier.info(
+        "system",
+        FEEDBACK_CODES.REMOTE_DISABLED,
+        t("main.remote.off"),
+      );
+    }
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "main.failure.setRemote",
+    },
+    onError: replyFailure(APP_EVENTS_RESPONSE.SET_REMOTE),
+  },
+);
+
+events.push(
+  APP_EVENTS.NEW_REMOTE_KEY,
+  async ({ storeManagerService: store, notifier }, e) => {
+    const { enabled } = store.getSettings().remote;
+    const saved = await store.updateRemote({ enabled, key: newRemoteKey() });
+    replySettings(e, store);
+    if (!saved) throw saveFailure();
+    e.reply(APP_EVENTS_RESPONSE.NEW_REMOTE_KEY, { success: true });
+    notifier.success(
+      "system",
+      FEEDBACK_CODES.REMOTE_KEY_RENEWED,
+      t("main.remote.keyRenewed"),
+    );
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "main.failure.newRemoteKey",
+    },
+    onError: replyFailure(APP_EVENTS_RESPONSE.NEW_REMOTE_KEY),
+  },
 );
 
 export default events;

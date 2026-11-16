@@ -509,4 +509,101 @@ describe("Settings", () => {
       expect(sent(APP_EVENTS.SET_SHORTCUTS).at(-1)!.shortcuts.pause).toBe("");
     });
   });
+  describe("Remote control", () => {
+    const remote = () => section("Remote control");
+    const key = "s3cr3t-key";
+    const on = settingsReply((s) => {
+      s.settings.server.enabled = true;
+      s.settings.remote = { enabled: true, key };
+    });
+    const addresses = (list: string[]) =>
+      send(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, { addresses: list });
+
+    it("turns it on and off", async () => {
+      const { user } = await setup();
+      const box = remote().getByRole("checkbox", {
+        name: "Enable remote control",
+      });
+
+      await user.click(box);
+      expect(box).toBeChecked();
+      await user.click(box);
+
+      expect(sent(APP_EVENTS.SET_REMOTE)).toEqual([
+        { enabled: true },
+        { enabled: false },
+      ]);
+    });
+
+    it("says the phone needs the overlay server while it is off", async () => {
+      await setup();
+      const hint = /The overlay server is off/;
+      expect(remote().getByText(hint)).toBeVisible();
+
+      await send(APP_EVENTS_RESPONSE.GET_SETTINGS, on);
+      expect(remote().queryByText(hint)).not.toBeInTheDocument();
+    });
+
+    it("shows the QR code, link and key only after Show", async () => {
+      const { user } = await setup(on);
+      await addresses(["192.168.1.20"]);
+      const link = "http://192.168.1.20:37891/remote/#key=s3cr3t-key";
+
+      expect(remote().queryByRole("img")).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toContain(key);
+
+      await user.click(
+        remote().getByRole("button", { name: "Show QR code and key" }),
+      );
+      expect(
+        remote().getByRole("img", {
+          name: "QR code of the remote control link",
+        }),
+      ).toBeInTheDocument();
+      expect(remote().getByTitle("Copy link")).toHaveTextContent(link);
+      expect(remote().getByTitle("Copy key")).toHaveTextContent(key);
+
+      await user.click(remote().getByRole("button", { name: "Hide" }));
+      expect(remote().queryByRole("img")).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toContain(key);
+    });
+
+    it("picks the address the link uses", async () => {
+      const { user, container } = await setup(on);
+      await addresses(["192.168.1.20", "10.0.0.5"]);
+      await user.click(
+        remote().getByRole("button", { name: "Show QR code and key" }),
+      );
+      expect(remote().getByTitle("Copy link")).toHaveTextContent(
+        "http://192.168.1.20:37891/",
+      );
+
+      await user.click(remote().getByText("192.168.1.20"));
+      await user.click(inList(container, "10.0.0.5")!);
+
+      expect(remote().getByTitle("Copy link")).toHaveTextContent(
+        "http://10.0.0.5:37891/remote/#key=s3cr3t-key",
+      );
+    });
+
+    it("says when there is no network, and still shows the key", async () => {
+      const { user } = await setup(on);
+      await addresses([]);
+      await user.click(
+        remote().getByRole("button", { name: "Show QR code and key" }),
+      );
+
+      expect(remote().getByText(/No network address found/)).toBeVisible();
+      expect(remote().queryByRole("img")).not.toBeInTheDocument();
+      expect(remote().getByTitle("Copy key")).toHaveTextContent(key);
+    });
+
+    it("makes a new key from the title row", async () => {
+      const { user } = await setup(on);
+
+      await user.click(remote().getByTitle("New key (old links stop working)"));
+
+      expect(sent(APP_EVENTS.NEW_REMOTE_KEY)).toEqual([undefined]);
+    });
+  });
 });

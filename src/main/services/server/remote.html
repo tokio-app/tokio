@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="__LANG__">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#121212" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Tokio</title>
+    <style>
+      /* Inlined by the server, so the phone needs nothing else */
+      @font-face {
+        font-family: "Archivo Variable";
+        font-style: normal;
+        font-display: swap;
+        font-weight: 100 900;
+        font-stretch: 62% 125%;
+        src: url(__ARCHIVO__) format("woff2-variations");
+      }
+
+      /* Tokio's Panel, Paper and Rose (src/ui/styles/tokens.css) */
+      :root {
+        --page: #121212;
+        --panel: #18181b;
+        --panel-pressed: #3f3f46;
+        --border: #27272a;
+        --paper: #f1f5f9;
+        --secondary: #a1a1aa;
+        --rose: #f43f5e;
+        --rose-light: #fb7185;
+        --rose-soft: rgba(244, 63, 94, 0.12);
+        --gutter: 20px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--page);
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        padding: max(var(--gutter), env(safe-area-inset-top))
+          max(var(--gutter), env(safe-area-inset-right))
+          max(var(--gutter), env(safe-area-inset-bottom))
+          max(var(--gutter), env(safe-area-inset-left));
+        /* A faint rose wash from the top, stronger while paused */
+        background: linear-gradient(
+            180deg,
+            var(--rose-soft) 0,
+            rgba(244, 63, 94, 0) 220px
+          )
+          no-repeat;
+        color: var(--paper);
+        font-family: "Archivo Variable", system-ui, sans-serif;
+        line-height: 1.35;
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.2s ease-out;
+      }
+
+      body.paused {
+        background-color: #1a1114;
+      }
+
+      main {
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      h1 {
+        margin: 8px 0 0;
+        font-size: 26px;
+        font-weight: 700;
+        font-stretch: 112%;
+        letter-spacing: -0.01em;
+      }
+
+      #paused {
+        margin: 12px 0 0;
+        color: var(--rose-light);
+        font-size: 16px;
+      }
+
+      #status {
+        min-height: 1.35em;
+        margin: 12px 0 0;
+        color: var(--secondary);
+        font-size: 16px;
+      }
+
+      #status.warn {
+        color: var(--rose-light);
+      }
+
+      /* At the bottom, where a thumb reaches */
+      .controls {
+        margin-top: auto;
+        padding-top: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      button {
+        width: 100%;
+        min-height: 64px;
+        padding: 0 20px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--panel);
+        color: var(--paper);
+        font: inherit;
+        font-size: 20px;
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
+        touch-action: manipulation;
+        transition:
+          background-color 0.15s ease-out,
+          border-color 0.15s ease-out;
+      }
+
+      button:active:not(:disabled) {
+        background: var(--panel-pressed);
+      }
+
+      button:focus-visible {
+        outline: 2px solid var(--rose-light);
+        outline-offset: 2px;
+      }
+
+      button:disabled {
+        color: #71717a;
+        cursor: default;
+      }
+
+      button[aria-busy="true"] {
+        border-color: var(--secondary);
+      }
+
+      /* Set apart from the others, since it stops more than one thing */
+      #pause {
+        min-height: 80px;
+        margin-top: 12px;
+        border-color: var(--rose);
+        font-size: 22px;
+        font-weight: 700;
+      }
+
+      body.paused #pause {
+        background: var(--rose);
+        color: var(--paper);
+      }
+
+      body.paused #pause:active:not(:disabled) {
+        background: var(--rose-light);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        body,
+        button {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 data-label="title"></h1>
+      <p id="paused" data-label="paused" hidden></p>
+      <p id="status" role="status" aria-live="polite"></p>
+      <div class="controls">
+        <button
+          type="button"
+          data-action="skip-song"
+          data-label="skipSong"
+          disabled
+        ></button>
+        <button
+          type="button"
+          data-action="stop-tts"
+          data-label="stopTts"
+          disabled
+        ></button>
+        <button
+          type="button"
+          data-action="replay-alert"
+          data-label="replayAlert"
+          disabled
+        ></button>
+        <button
+          type="button"
+          id="pause"
+          data-action="pause"
+          data-label="pause"
+          aria-pressed="false"
+          disabled
+        ></button>
+      </div>
+    </main>
+    <script type="application/json" id="labels">
+      __LABELS__
+    </script>
+    <script>
+      (function () {
+        var text = JSON.parse(document.getElementById("labels").textContent);
+        var status = document.getElementById("status");
+        var pausedText = document.getElementById("paused");
+        var pauseButton = document.getElementById("pause");
+        var buttons = document.querySelectorAll("button[data-action]");
+        // Only in the link: every overlay Tokio serves shares this origin, so
+        // storage would hand it to them
+        var key = new URLSearchParams(location.hash.slice(1)).get("key") || "";
+        var paused = false;
+        // Whether the status shows a failure the next good answer clears
+        var failing = false;
+
+        document.title = text.title;
+        document.querySelectorAll("[data-label]").forEach(function (el) {
+          el.textContent = text[el.getAttribute("data-label")];
+        });
+
+        function say(message, warn) {
+          status.textContent = message;
+          status.className = warn ? "warn" : "";
+          failing = Boolean(warn);
+        }
+
+        function setPaused(value) {
+          paused = value;
+          document.body.classList.toggle("paused", paused);
+          pausedText.hidden = !paused;
+          pauseButton.textContent = paused ? text.resume : text.pause;
+          pauseButton.setAttribute("aria-pressed", String(paused));
+        }
+
+        function setEnabled(enabled) {
+          buttons.forEach(function (b) {
+            b.disabled = !enabled;
+          });
+        }
+
+        // What a refused or failed answer says, or null for a good one
+        function failure(res, body) {
+          if (res.status === 401) return text.newLink;
+          if (res.status === 403) return text.off;
+          if (!res.ok) return (body && body.error) || text.unreachable;
+          return null;
+        }
+
+        function call(method, path, body) {
+          var init = {
+            method: method,
+            headers: { Authorization: "Bearer " + key },
+            cache: "no-store",
+          };
+          if (body) {
+            init.headers["Content-Type"] = "application/json";
+            init.body = JSON.stringify(body);
+          }
+          return fetch("/remote/api/" + path, init).then(function (res) {
+            return res
+              .json()
+              .catch(function () {
+                return null;
+              })
+              .then(function (json) {
+                return { res: res, json: json };
+              });
+          });
+        }
+
+        function refresh() {
+          if (!key) return;
+          call("GET", "state").then(
+            function (answer) {
+              var message = failure(answer.res, answer.json);
+              if (message) {
+                setEnabled(false);
+                say(message, true);
+                return;
+              }
+              setEnabled(true);
+              setPaused(Boolean(answer.json.paused));
+              if (failing) say("", false);
+            },
+            function () {
+              setEnabled(false);
+              say(text.unreachable, true);
+            },
+          );
+        }
+
+        function press(button) {
+          var action = button.getAttribute("data-action");
+          say("", false);
+          button.setAttribute("aria-busy", "true");
+          button.disabled = true;
+          var body = action === "pause" ? { paused: !paused } : null;
+          call("POST", action, body)
+            .then(
+              function (answer) {
+                var message = failure(answer.res, answer.json);
+                if (message) return say(message, true);
+                var done = answer.json.done;
+                setPaused(Boolean(answer.json.paused));
+                if (!done && action === "skip-song") say(text.noMusic, false);
+                else if (!done && action === "replay-alert")
+                  say(text.nothingToReplay, false);
+                else say(text.done, false);
+              },
+              function () {
+                say(text.unreachable, true);
+              },
+            )
+            .then(function () {
+              button.removeAttribute("aria-busy");
+              button.disabled = false;
+              refresh();
+            });
+        }
+
+        buttons.forEach(function (b) {
+          b.addEventListener("click", function () {
+            press(b);
+          });
+        });
+
+        if (!key) {
+          say(text.noKey, true);
+          return;
+        }
+
+        refresh();
+        setInterval(function () {
+          if (document.visibilityState === "visible") refresh();
+        }, 3000);
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "visible") refresh();
+        });
+      })();
+    </script>
+  </body>
+</html>

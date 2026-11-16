@@ -95,6 +95,16 @@ describe("parseCatalog", () => {
     expect(dropped).toEqual(["studio"]);
   });
 
+  it("drops overlays named remote or mcp, paths the controls use", () => {
+    const { overlays, dropped } = parseCatalog({
+      schema: 1,
+      overlays: [entry({ id: "remote" }), entry({ id: "mcp" }), entry()],
+    });
+
+    expect(overlays.map((o) => o.id)).toEqual(["gift-jar"]);
+    expect(dropped).toEqual(["remote", "mcp"]);
+  });
+
   it("drops previews from anywhere else", () => {
     const { overlays } = parseCatalog({
       schema: 1,

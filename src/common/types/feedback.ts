@@ -33,6 +33,9 @@ export enum FEEDBACK_CODES {
   // LIVE CONTROLS
   SHORTCUT_TAKEN = "shortcut_taken",
   CONTROL_FAILED = "control_failed",
+  REMOTE_ENABLED = "remote_enabled",
+  REMOTE_DISABLED = "remote_disabled",
+  REMOTE_KEY_RENEWED = "remote_key_renewed",
 
   // UPDATES
   UPDATE_AVAILABLE = "update_available",
