@@ -997,6 +997,8 @@ export class StoreManagerService extends Service {
       newFileName,
     );
 
+    // Any profile can have updates queued, like the timer's or a sweep's
+    await this._jsonManagerService.whenWritten(refPath);
     const existingData = await this._jsonManagerService.loadFile(
       refPath,
       ProfileSchema,
@@ -1041,8 +1043,10 @@ export class StoreManagerService extends Service {
       return false;
     }
 
+    const refPath = join(this._pathManagerService.folders.profilesFolder, ref);
+    await this._jsonManagerService.whenWritten(refPath);
     const data = await this._jsonManagerService.loadFile(
-      join(this._pathManagerService.folders.profilesFolder, ref),
+      refPath,
       ProfileSchema,
     );
     if (!data) {

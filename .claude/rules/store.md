@@ -16,6 +16,7 @@ paths:
 - A profile switch or a new listing (`addProfile`) that can't be saved is undone. The store is then saved once more so the file matches memory: an earlier queued save may have written it. An undone switch reads the active profile from its file again, since an update to it may have landed during the save.
 - Profile files, an import's too (after the picked file's name), are named by `profileFileFor`: the name in safe characters, numbered when the file is taken. The store never writes over a profile's file. An export into the profiles folder is refused: the save dialog starts in the last folder used, which an import can make that one.
 - Creating or cloning a profile under a name another one has is refused (`PROFILE_EXISTS`).
+- A clone or an export waits for the updates queued on the profile's file (`whenWritten`) before reading it: any profile can have some, like the timer's or a sweep's, not only the active one.
 - An import is listed under the name saved in it, trimmed, and numbered ("Name 2") when another profile has that name in any case. One whose trimmed name is too short is listed as "Imported profile".
 
 ## The active profile

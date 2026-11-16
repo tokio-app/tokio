@@ -1115,6 +1115,23 @@ describe("StoreManagerService", () => {
       expect(copy?.connector.username).toBe("streamer");
     });
 
+    it("clones a profile with the update still writing to it", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+
+      const saving = store.updateProfileData(
+        { connector: { username: "streamer" } },
+        "stream.json",
+      );
+      await store.cloneProfile("stream.json", "copy.json", "Copy");
+      expect(await saving).toBe(true);
+
+      const copy = await readJSON(
+        join(paths.folders.profilesFolder, "copy.json"),
+      );
+      expect(copy.connector.username).toBe("streamer");
+    });
+
     it("refuses to switch to a profile that isn't listed", async () => {
       const store = await init();
       await store.createNewProfile("stream.json", "Stream");
@@ -1470,6 +1487,21 @@ describe("StoreManagerService", () => {
       const dest = join(elsewhere, "backup.json");
 
       expect(await store.exportProfile("default.json", dest)).toBe(true);
+
+      expect((await readJSON(dest)).connector.username).toBe("streamer");
+    });
+
+    it("exports a profile with the update still writing to it", async () => {
+      const store = await init();
+      await store.createNewProfile("stream.json", "Stream");
+      const dest = join(elsewhere, "backup.json");
+
+      const saving = store.updateProfileData(
+        { connector: { username: "streamer" } },
+        "stream.json",
+      );
+      expect(await store.exportProfile("stream.json", dest)).toBe(true);
+      expect(await saving).toBe(true);
 
       expect((await readJSON(dest)).connector.username).toBe("streamer");
     });
