@@ -16,6 +16,10 @@ const ADBLOCK_LISTS = DEFAULT_LISTS.filter(
   (list) => list.id !== "urlhaus-1" && list.id !== "plowe-0",
 );
 
+// Lists expire in days, and every Music autosave asks for an update, which
+// reads every saved list
+const UPDATE_EVERY_MS = 60 * 60_000;
+
 const hasLists = (blocker: ElectronBlocker) =>
   Object.keys(blocker.engine.stats).length > 0;
 
@@ -26,6 +30,8 @@ export class AdBlocker {
   private _blocker: ElectronBlocker | null = null;
   // The saved lists being brought up to date, before any blocker needs them
   private _updating: Promise<unknown> | undefined;
+  // When the last update finished, from performance.now()
+  private _updatedAt: number | undefined;
   private readonly _logged = new Set<string>();
 
   constructor(private readonly logFile: () => string) {}
@@ -47,11 +53,14 @@ export class AdBlocker {
   // call). A blocker in use keeps its own lists up to date.
   public update(): void {
     if (this._blocker || this._updating) return;
+    const at = this._updatedAt;
+    if (at !== undefined && performance.now() - at < UPDATE_EVERY_MS) return;
     this._updating = updateLists({
       lists: ADBLOCK_LISTS,
       storage: this.storage(),
       onError: this.onError,
     }).finally(() => {
+      this._updatedAt = performance.now();
       this._updating = undefined;
     });
   }

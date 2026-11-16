@@ -193,4 +193,23 @@ describe("AdBlocker", () => {
     await expect(adBlocker.ready(wanted)).rejects.toThrow();
     expect(made().update).not.toHaveBeenCalled();
   });
+
+  it("checks the saved lists at most once an hour", async () => {
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const checked = () => new Promise((resolve) => setTimeout(resolve));
+
+    adBlocker.update();
+    await checked();
+    now += 59 * 60_000;
+    adBlocker.update();
+    await checked();
+
+    expect(mocks.updateLists).toHaveBeenCalledOnce();
+
+    now += 2 * 60_000;
+    adBlocker.update();
+
+    expect(mocks.updateLists).toHaveBeenCalledTimes(2);
+  });
 });
