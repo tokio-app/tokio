@@ -52,7 +52,11 @@ import { MAX_BACKLOG } from "@/services/games";
 import { HISTORY_EVENTS } from "@/services/history";
 import { ACTIVITY_EVENTS } from "@/services/live";
 import { OverlayUpdates } from "@/services/overlay";
-import { createRemoteRoutes, remoteLabels } from "@/services/server/remote";
+import {
+  createRemoteRoutes,
+  remoteLabels,
+  remoteState,
+} from "@/services/server/remote";
 import { TIMER_EVENTS } from "@/services/timer";
 import { chatCommands } from "@/services/translation/commands";
 import { reasonKey } from "@/services/translation/common";
@@ -1168,7 +1172,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     control.use(
       createRemoteRoutes({
         remote: () => storeManagerService.getSettings().remote,
-        paused: () => handler.controlsService.isPaused(),
+        state: () => remoteState(handler),
         invoke: handler.invoke,
         labels: remoteLabels,
       }),
