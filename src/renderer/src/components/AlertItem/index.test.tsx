@@ -1,6 +1,6 @@
 import { Alert } from "@/common/schemas";
 import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
-import { createAlert } from "@/pages/Alerts/helper";
+import { createAlert } from "@/common/util";
 import { intersect } from "@test/dom";
 import { alertClip, alertMedia, gift, voice } from "@test/fixtures";
 import { fireEvent, render, screen } from "@testing-library/react";

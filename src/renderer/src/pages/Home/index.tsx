@@ -13,7 +13,7 @@ import {
   useServerSwitch,
 } from "@/hooks";
 import { useT } from "@/ui/i18n";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import styles from "./home.module.css";
 import { NO_SESSION } from "./helper";
 import { ActivitySection } from "./sections/ActivitySection";
@@ -26,6 +26,7 @@ import { PausedSection } from "./sections/PausedSection";
 export function Home() {
   const t = useT();
   const [username, setUsername] = useState(defaultProfile.connector.username);
+  const usernameField = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState(defaultProfile);
   const [features, updateFeatures, setFeatures] = useImmerState(
     defaultStoreData.settings.activeFeatures,
@@ -66,7 +67,10 @@ export function Home() {
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
     if (!res?.success) return;
     setProfile(res.profile!);
-    setUsername(res.profile!.connector.username);
+    // A profile pushed while the streamer types a username keeps what they typed
+    if (document.activeElement !== usernameField.current) {
+      setUsername(res.profile!.connector.username);
+    }
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
@@ -164,6 +168,7 @@ export function Home() {
 
             <DashboardSection
               username={username}
+              usernameRef={usernameField}
               connected={connected}
               loading={loading}
               needsKey={needsKey}

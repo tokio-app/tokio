@@ -24,6 +24,7 @@ The source and the distributed app are MIT, with one LGPL file (see Licensing in
 6. After a removal, drop the rows and entries it had in the notices, and its name from that `files` pattern.
 7. `npx fallow dead-code` finds code that only a removed package used. It follows dynamic `import()`s (`electron-updater`'s); a package it still calls unused that the app loads goes in `ignoreDependencies` in `.fallowrc.json`.
 8. Verify: `yarn test src/renderer/src/pages/About/notices.test.ts`, `yarn typecheck`, `yarn lint` and `yarn build`.
+9. Upgrading `@modelcontextprotocol/server` or `@modelcontextprotocol/core`: they compile other packages into their `dist`. List them from its `//#region ../../node_modules/…` lines and update `LICENSES/MCP-SDK-bundled.txt`, the notices' section and About's component when the list or a version changes.
 
 ## Traps
 

@@ -22,13 +22,11 @@ import {
   MINECRAFT_NAMES,
   MINECRAFT_PORT,
   NETHERITE_KIT,
+  StepKind,
   TIME_NAMES,
   WEATHER_NAMES,
 } from "@/common/util";
 import { SelectOption, TRIGGER_OPTIONS } from "@/components";
-
-export type StepKind = GameStep["type"];
-type Step<K extends StepKind> = Extract<GameStep, { type: K }>;
 
 export const EDITIONS: SelectOption<MinecraftEdition>[] = [
   { value: "bedrock", label: "Bedrock" },
@@ -135,66 +133,6 @@ export const HELPS = GAME_HELPS.map((value) => ({
   value,
   label: HELP_NAMES[value],
 }));
-
-const NEW_STEPS: { [K in StepKind]: Step<K> } = {
-  spawn: { type: "spawn", mob: "zombie", amount: 1, name: "" },
-  // Until turned back, the user's call
-  morph: { type: "morph", mob: "zombie", seconds: null },
-  unmorph: { type: "unmorph" },
-  give: {
-    type: "give",
-    item: "diamond",
-    amount: 1,
-    enchanted: false,
-    replace: false,
-  },
-  weather: { type: "weather", weather: "clear" },
-  time: { type: "time", time: "day" },
-  hazard: {
-    type: "hazard",
-    hazard: "tnt",
-    amount: 1,
-    fuse: 4,
-    height: 50,
-    seconds: 1,
-    duration: 10,
-    distance: 1000,
-    depth: 10,
-  },
-  help: {
-    type: "help",
-    help: "netherite_armor",
-    duration: 30,
-    enchanted: false,
-    replace: false,
-  },
-  command: { type: "command", command: "" },
-};
-
-export const createStep = (kind: StepKind): GameStep => ({
-  ...NEW_STEPS[kind],
-});
-
-export function createAction(edition: MinecraftEdition): GameAction {
-  return {
-    id: crypto.randomUUID(),
-    enabled: true,
-    edition,
-    trigger: {
-      type: TOKIO_EVENTS.FOLLOW,
-      gifts: [],
-      every_gift: false,
-      emotes: [],
-      keyword: "",
-      user: "",
-      min_coins: 0,
-      roles: [],
-    },
-    likes_every: 100,
-    steps: [createStep("spawn")],
-    overlay: { show: true, image: null, event: "", name: "", column: 1 },
-  };
-}
 
 // Bedrock and Java ids for the same thing whose English names differ too
 const PAIRS = [

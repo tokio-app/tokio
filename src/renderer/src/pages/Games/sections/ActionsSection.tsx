@@ -13,7 +13,12 @@ import {
   CustomGift,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { COUNTED_HAZARDS, countedVariables } from "@/common/util";
+import {
+  COUNTED_HAZARDS,
+  countedVariables,
+  createAction,
+  createStep,
+} from "@/common/util";
 import {
   Btn,
   Check,
@@ -48,8 +53,6 @@ import {
 } from "react-icons/fi";
 import styles from "../games.module.css";
 import {
-  createAction,
-  createStep,
   EDITIONS,
   enchantmentsText,
   GAME_TRIGGERS,

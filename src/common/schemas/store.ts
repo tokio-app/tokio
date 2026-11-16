@@ -34,7 +34,7 @@ const TestOverlaySchema = z.object({
 
 // The events the Home page's activity feed shows, by the kinds of
 // ActivityItem. Kinds added later are shown.
-const ActivityFeedSchema = z.object({
+export const ActivityFeedSchema = z.object({
   chat: z.boolean().default(true),
   gift: z.boolean().default(true),
   follow: z.boolean().default(true),

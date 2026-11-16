@@ -37,6 +37,11 @@ const DOCUMENTS: (LicenseDocument & { title: MessageKey; file: string })[] = [
     title: "main.licenses.ccBy4",
     file: "LICENSES/CC-BY-4.0.txt",
   },
+  {
+    id: "MCP-SDK-bundled",
+    title: "main.licenses.mcpBundled",
+    file: "LICENSES/MCP-SDK-bundled.txt",
+  },
 ];
 
 const PACKAGE_NAME = /^(@[\w.-]+\/)?[\w.-]+$/;

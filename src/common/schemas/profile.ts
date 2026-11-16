@@ -139,23 +139,23 @@ const withSavedMedia = (alert: unknown) => {
   };
 };
 
-const AlertSchema = z.preprocess(
-  withSavedMedia,
-  z.object({
-    id: z.string(),
-    // To find it by, see alertName
-    name: z.string().default(""),
-    enabled: z.boolean(),
-    trigger: TriggerSchema,
-    sound: AlertClipSchema.nullable(),
-    // Spoken instead of the sound when set
-    tts: AlertTtsSchema.nullable().default(null),
-    // Shown on the alert's overlay, with the sound or message or alone
-    media: AlertMediaSchema.nullable().default(null),
-    // The sound's or message's
-    volume: z.number().min(0).max(100),
-  }),
-);
+// An alert as saved now, without the preprocess that reads older ones
+export const AlertItemSchema = z.object({
+  id: z.string(),
+  // To find it by, see alertName
+  name: z.string().default(""),
+  enabled: z.boolean(),
+  trigger: TriggerSchema,
+  sound: AlertClipSchema.nullable(),
+  // Spoken instead of the sound when set
+  tts: AlertTtsSchema.nullable().default(null),
+  // Shown on the alert's overlay, with the sound or message or alone
+  media: AlertMediaSchema.nullable().default(null),
+  // The sound's or message's
+  volume: z.number().min(0).max(100),
+});
+
+const AlertSchema = z.preprocess(withSavedMedia, AlertItemSchema);
 
 // Room Users alerts are no longer possible. Dropping the saved ones keeps
 // the profile loading.

@@ -881,6 +881,38 @@ describe("MusicService", () => {
       });
     });
 
+    describe("as the host", () => {
+      it("requests, revokes and goes back without chat or cooldown", async () => {
+        const { service, played, queue } = setup();
+
+        expect(service.request("A", "host")).toBe(true);
+        expect(service.request("B", "host")).toBe(true);
+        expect(service.request("C", "host")).toBe(true);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(queue()).toEqual(["A (playing)", "B", "C"]);
+
+        expect(service.revoke("c")).toBe(true);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(queue()).toEqual(["A (playing)", "B"]);
+
+        service.skip();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(service.previous()).toBe(true);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(played()).toEqual(["A", "B", "A"]);
+      });
+
+      it("does nothing while not connected", () => {
+        const { service, provider } = setup();
+        provider.isActive.mockReturnValue(false);
+
+        expect(service.request("A", "host")).toBe(false);
+        expect(service.revoke("A")).toBe(false);
+        expect(service.previous()).toBe(false);
+        expect(provider.searchSong).not.toHaveBeenCalled();
+      });
+    });
+
     it("goes back to the last song", async () => {
       const { request, played, queue } = setup();
       await request("!play A");

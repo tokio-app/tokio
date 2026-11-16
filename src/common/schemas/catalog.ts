@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   ALERTS_PATH,
   GAMES_PATH,
+  MCP_PATH,
   REMOTE_PATH,
   STUDIO_PATH,
   TIMER_PATH,
@@ -15,7 +16,7 @@ const RESERVED_IDS = [
   GAMES_PATH,
   STUDIO_PATH,
   REMOTE_PATH,
-  "mcp",
+  MCP_PATH,
 ];
 
 /**

@@ -4,7 +4,7 @@ import { renderWithProviders } from "@test/render";
 import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, Mock, vi } from "vitest";
 import { AlertEditor } from "./AlertEditor";
-import { createAlert } from "./helper";
+import { createAlert } from "@/common/util";
 
 const CLIP = { name: "Clip", file: "clip.webm" };
 const REEL = { name: "Reel", file: "reel.mp4" };

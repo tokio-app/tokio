@@ -75,6 +75,34 @@ const authorized = (header: string | undefined, key: string) => {
 };
 
 /**
+ * Remote control on (403 otherwise) and its key (401), before anything reads
+ * the body. The control API and MCP share it.
+ */
+export const remoteGuard =
+  (remote: () => RemoteSettings): RequestHandler =>
+  (req, res, next) => {
+    const { enabled, key } = remote();
+    if (!enabled) {
+      res.status(403).json({ error: "off" });
+      return;
+    }
+    if (!authorized(req.headers.authorization, key)) {
+      res.status(401).json({ error: "key" });
+      return;
+    }
+    next();
+  };
+
+// A body express.json can't read, or one too big
+export const bodyError: ErrorRequestHandler = (err, _req, res, _next) => {
+  const status =
+    typeof err === "object" && err !== null && "status" in err
+      ? Number(err.status)
+      : 500;
+  res.status(status).json({ error: status < 500 ? "body" : "failed" });
+};
+
+/**
  * The phone remote at /remote/ and the control API under /remote/api/. The
  * key is the API's only gate on the LAN. No CORS headers: a page on another
  * origin can't send the Authorization header without a preflight, which fails.
@@ -97,21 +125,8 @@ export function createRemoteRoutes(deps: RemoteDeps): Router {
       );
   });
 
-  const guard: RequestHandler = (req, res, next) => {
-    const { enabled, key } = deps.remote();
-    if (!enabled) {
-      res.status(403).json({ error: "off" });
-      return;
-    }
-    if (!authorized(req.headers.authorization, key)) {
-      res.status(401).json({ error: "key" });
-      return;
-    }
-    next();
-  };
-
   const api = express.Router();
-  api.use(guard);
+  api.use(remoteGuard(deps.remote));
   api.get("/state", (_req, res) => {
     res.json({ paused: deps.paused() });
   });
@@ -145,14 +160,6 @@ export function createRemoteRoutes(deps: RemoteDeps): Router {
   api.use((_req, res) => {
     res.status(404).json({ error: "not found" });
   });
-  // A body express.json can't read, or one too big
-  const bodyError: ErrorRequestHandler = (err, _req, res, _next) => {
-    const status =
-      typeof err === "object" && err !== null && "status" in err
-        ? Number(err.status)
-        : 500;
-    res.status(status).json({ error: status < 500 ? "body" : "failed" });
-  };
   api.use(bodyError);
   router.use(`/${REMOTE_PATH}/api`, api);
 

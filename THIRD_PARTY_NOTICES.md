@@ -25,9 +25,24 @@ This file generates the `Sec-MS-GEC` token required by Microsoft Edge's Read Alo
 
 ## Other dependencies
 
-All other npm dependencies are under permissive licenses, except the font files of the Archivo typeface (`@fontsource-variable/archivo`), which are under the SIL Open Font License 1.1: it allows bundling them with any software, and only modified versions of the fonts must stay under the OFL. A scan of the 135 production packages on 2026-10-22 found MIT, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, BlueOak-1.0.0, Python-2.0 and OFL-1.1. Among them, `@tokioapp/connector` (MIT, <https://github.com/tokio-app/connector>) connects to TikTok LIVE and provides the stream events. Their license files are shipped with the application as described above, including those of libraries bundled into the user interface (such as React). That scan reads package-level licenses only. Content inside a package can carry its own license, as the icons below do.
+All other npm dependencies are under permissive licenses, except the font files of the Archivo typeface (`@fontsource-variable/archivo`), which are under the SIL Open Font License 1.1: it allows bundling them with any software, and only modified versions of the fonts must stay under the OFL. A scan of the 135 production packages on 2026-10-22 found MIT, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, BlueOak-1.0.0, Python-2.0 and OFL-1.1. Among them, `@tokioapp/connector` (MIT, <https://github.com/tokio-app/connector>) connects to TikTok LIVE and provides the stream events. Since then, the MCP server SDK (`@modelcontextprotocol/server` and `@modelcontextprotocol/core`) came in under Apache-2.0, with MIT for the contributions made before its relicensing: its license file holds both. Their license files are shipped with the application as described above, including those of libraries bundled into the user interface (such as React). That scan reads package-level licenses only. Content inside a package can carry its own license, as the icons below do.
 
 Re-check when adding or upgrading dependencies, since licenses can change between versions. Electron's and Chromium's licenses are included by Electron as `LICENSE.electron.txt` and `LICENSES.chromium.html` in the installation folder.
+
+## Code bundled in the MCP SDK
+
+The MCP server SDK compiles these packages into its own files and ships them without their license files, so their texts are in [`LICENSES/MCP-SDK-bundled.txt`](LICENSES/MCP-SDK-bundled.txt):
+
+| Package                     | Author                                  | License      |
+| --------------------------- | --------------------------------------- | ------------ |
+| ajv 8.18.0                  | Evgeny Poberezkin                       | MIT          |
+| ajv-formats 3.0.1           | Evgeny Poberezkin                       | MIT          |
+| json-schema-traverse 1.0.0  | Evgeny Poberezkin                       | MIT          |
+| @cfworker/json-schema 4.1.1 | Jeremy Danyow                           | MIT          |
+| fast-uri 3.1.8              | Gary Court and the Fastify team         | BSD-3-Clause |
+| json-schema-typed 8.0.2     | Remy Rylan, and the JSON Schema authors | BSD-2-Clause |
+
+It also compiles in content-type and fast-deep-equal (MIT), which the app ships as packages with their own license files too.
 
 ## Icons
 

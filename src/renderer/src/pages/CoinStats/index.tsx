@@ -79,6 +79,10 @@ export function CoinStats() {
   const [clearing, setClearing] = useState(false);
   // The next LIVES is another profile's, which starts from its newest LIVE
   const switched = useRef(false);
+  // The profile the last GET_PROFILE named. It also comes as a resync (an MCP
+  // write), which isn't a switch. The first one counts, since a switch may
+  // have come before it.
+  const profile = useRef<string | null>(null);
 
   const range = dateRange(filter, now);
   const visible = (lives: LiveSummary[]) =>
@@ -147,7 +151,8 @@ export function CoinStats() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
-    if (!res?.success) return;
+    if (!res?.success || res.profile?.name === profile.current) return;
+    profile.current = res.profile?.name ?? null;
     switched.current = true;
     // The last profile's, which the same dates or search would still match
     setDatesReply(undefined);

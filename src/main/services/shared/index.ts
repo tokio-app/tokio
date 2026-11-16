@@ -13,6 +13,39 @@ export interface ServiceResult<T = undefined> {
   data?: T;
 }
 
+/**
+ * `source` merged onto `target`: objects merge key by key, arrays and anything
+ * else replace, and undefined keeps the value.
+ */
+export function deepMerge(target: unknown, source: unknown): unknown {
+  if (target === source) return target;
+  const isObject = (item: unknown): item is Record<string, unknown> =>
+    Boolean(item && typeof item === "object" && !Array.isArray(item));
+
+  if (!isObject(target) || !isObject(source)) {
+    return source !== undefined ? source : target;
+  }
+
+  const output = { ...target };
+
+  for (const key of Object.keys(source)) {
+    const targetVal = output[key];
+    const sourceVal = source[key];
+
+    if (sourceVal === undefined || sourceVal === targetVal) {
+      continue;
+    }
+
+    if (isObject(targetVal) && isObject(sourceVal)) {
+      output[key] = deepMerge(targetVal, sourceVal);
+    } else {
+      output[key] = sourceVal;
+    }
+  }
+
+  return output;
+}
+
 export abstract class Service {
   protected _logFile: string;
 
@@ -167,7 +200,7 @@ export abstract class BaseFileManagerService extends Service {
 
         const mergedData = this._validate(
           schema,
-          this._deepMerge(existingData, updates),
+          deepMerge(existingData, updates),
           filePath,
           "saving",
         );
@@ -218,34 +251,5 @@ export abstract class BaseFileManagerService extends Service {
       return null;
     }
     return validation.data;
-  }
-
-  private _deepMerge(target: unknown, source: unknown): unknown {
-    if (target === source) return target;
-    const isObject = (item: unknown): item is Record<string, unknown> =>
-      Boolean(item && typeof item === "object" && !Array.isArray(item));
-
-    if (!isObject(target) || !isObject(source)) {
-      return source !== undefined ? source : target;
-    }
-
-    const output = { ...target };
-
-    for (const key of Object.keys(source)) {
-      const targetVal = output[key];
-      const sourceVal = source[key];
-
-      if (sourceVal === undefined || sourceVal === targetVal) {
-        continue;
-      }
-
-      if (isObject(targetVal) && isObject(sourceVal)) {
-        output[key] = this._deepMerge(targetVal, sourceVal);
-      } else {
-        output[key] = sourceVal;
-      }
-    }
-
-    return output;
   }
 }

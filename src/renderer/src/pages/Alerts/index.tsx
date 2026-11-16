@@ -1,6 +1,6 @@
 import { Alert, AlertSound, MEDIA_DURATION, MediaFile } from "@/common/schemas";
 import { APP_EVENTS_RESPONSE } from "@/common/types";
-import { defaultProfile } from "@/common/util";
+import { createAlert, defaultProfile } from "@/common/util";
 import { Btn, MediaPicker, Page, SoundPicker } from "@/components";
 import {
   useAlertTest,
@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { MdOutlineAddAlert } from "react-icons/md";
 import { AlertEditor } from "./AlertEditor";
 import styles from "./alerts.module.css";
-import { createAlert, soundClip, ttsDefaultsOf } from "./helper";
+import { soundClip, ttsDefaultsOf } from "./helper";
 import { HeaderSection } from "./sections/HeaderSection";
 import { ItemsSection } from "./sections/ItemsSection";
 import { useTriggerChoices } from "./useTriggerChoices";

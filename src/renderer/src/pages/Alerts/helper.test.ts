@@ -1,9 +1,8 @@
 import { TOKIO_EVENTS } from "@/common/types";
-import { defaultProfile } from "@/common/util";
+import { createAlert, defaultProfile } from "@/common/util";
 import { alertClip, alertSound, gift } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
-  createAlert,
   emoteOptions,
   giftOptions,
   soundClip,

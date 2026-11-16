@@ -1,3 +1,4 @@
+import type { Alert } from "../schemas/profile";
 import {
   AlertTrigger,
   AppEvents,
@@ -129,6 +130,29 @@ export function formatAlertMessage(
 
 // The name an alert gets from its place in the list, counted from 1
 export const defaultAlertName = (index: number) => `alert-${index + 1}`;
+
+// A new alert, named by its place in the list
+export function createAlert(index = 0): Alert {
+  return {
+    id: crypto.randomUUID(),
+    name: defaultAlertName(index),
+    enabled: true,
+    trigger: {
+      type: TOKIO_EVENTS.FOLLOW,
+      gifts: [],
+      every_gift: false,
+      emotes: [],
+      keyword: "",
+      user: "",
+      min_coins: 0,
+      roles: [],
+    },
+    sound: null,
+    tts: null,
+    media: null,
+    volume: 100,
+  };
+}
 
 // The name an alert shows, its default while it has none
 export const alertName = (name: string, index: number) =>

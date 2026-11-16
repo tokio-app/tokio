@@ -1,4 +1,4 @@
-import { AlertSound, AlertTts, MediaFile } from "@/common/schemas";
+import { AlertSound, AlertTts } from "@/common/schemas";
 import {
   AlertTrigger,
   AppError,
@@ -17,6 +17,7 @@ import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
+import { upload } from "@/helper/library";
 import { sendStudioOverlays } from "@/helper/studio";
 import type { ServiceResult } from "@/services/shared";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
@@ -348,41 +349,6 @@ events.push(
       }),
   },
 );
-
-// Copies the files into a library, then lists them with one save. One bad
-// file doesn't stop the others, the service logs each failure. Throws when the
-// library couldn't be saved.
-const upload = async (
-  paths: string[],
-  importFile: (path: string) => Promise<ServiceResult<MediaFile>>,
-  library: {
-    list: () => MediaFile[];
-    add: (files: MediaFile[]) => Promise<boolean>;
-  },
-) => {
-  let failed = 0;
-  const imported: MediaFile[] = [];
-  for (const path of paths) {
-    const entry = (await importFile(path)).data;
-    if (entry) imported.push(entry);
-    else failed++;
-  }
-  // Files are named by content: one in the library, or picked twice, isn't new.
-  const known = new Set(library.list().map((f) => f.file));
-  const added = imported.filter((f) => {
-    const isNew = !known.has(f.file);
-    known.add(f.file);
-    return isNew;
-  }).length;
-  // shortcut: a quit in the middle of a big add saves none of it (the copied
-  // files stay in the folder), save in chunks if that bites.
-  // Added even with nothing new: a failed save may have left one out of the
-  // store file.
-  if (imported.length > 0 && !(await library.add(imported))) {
-    throw saveFailure();
-  }
-  return { failed, added };
-};
 
 // The sound library shows its failures itself.
 events.push(

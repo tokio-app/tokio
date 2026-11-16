@@ -1,6 +1,8 @@
 import { MESSAGES } from "@/common/i18n";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { forgetDecoded } from "@/helper/audio";
+import { useFlush } from "@/hooks/useEditableSettings";
+import { defaultProfile } from "@/common/util";
 import { createAudio } from "@test/audio";
 import { send, sent, sentEvents } from "@test/ipc";
 import { render, screen } from "@testing-library/react";
@@ -15,6 +17,7 @@ vi.mock("@/helper/audio", async (importOriginal) => ({
 }));
 
 const data = new Uint8Array([1, 2, 3]);
+const ttsSave = { settings: defaultProfile.tts };
 
 function setup() {
   const audio = createAudio();
@@ -377,5 +380,30 @@ describe("AppProvider", () => {
     await send(APP_EVENTS_RESPONSE.ALERT_CLEAR);
 
     expect(audio.value.stopQueues).toHaveBeenCalledWith("alerts");
+  });
+
+  it("sends the saves still waiting before it answers a flush", async () => {
+    const audio = createAudio();
+    // A page with a change still waiting to be saved
+    function Page() {
+      useFlush(() => window.api.emit(APP_EVENTS.UPDATE_TTS_SETTINGS, ttsSave));
+      return null;
+    }
+    render(
+      <AudioContext.Provider value={audio.value}>
+        <AppProvider>
+          <Page />
+        </AppProvider>
+      </AudioContext.Provider>,
+    );
+    await send(APP_EVENTS_RESPONSE.LOAD_APP, { success: true });
+
+    await send(APP_EVENTS_RESPONSE.FLUSH_SETTINGS, { id: "f1" });
+
+    const events = sentEvents();
+    expect(
+      events.slice(events.indexOf(APP_EVENTS.UPDATE_TTS_SETTINGS)),
+    ).toEqual([APP_EVENTS.UPDATE_TTS_SETTINGS, APP_EVENTS.SETTINGS_FLUSHED]);
+    expect(sent(APP_EVENTS.SETTINGS_FLUSHED)).toEqual([{ id: "f1" }]);
   });
 });

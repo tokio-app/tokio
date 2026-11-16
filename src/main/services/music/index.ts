@@ -162,6 +162,30 @@ export class MusicService extends ProviderService<MusicProvider> {
     });
   }
 
+  /**
+   * Searches `query` and queues it, for the host (MCP): behind the song
+   * searches, with no cooldown, permissions or one-per-viewer. False when not
+   * connected or the search queue is full.
+   */
+  public request(query: string, by: string): boolean {
+    if (!this.isActive() || !query.trim()) return false;
+    return this._queue.enqueue(() =>
+      this._request({ query, by, unique: false, refund: () => {} }),
+    );
+  }
+
+  // Takes every waiting request for the song out, whoever asked, as the host
+  public revoke(query: string): boolean {
+    if (!this.isActive()) return false;
+    return this._queue.enqueue(() => this._music_queue.revoke(query));
+  }
+
+  // Plays the song before the one playing again, as the host's !last does
+  public previous(): boolean {
+    if (!this.isActive()) return false;
+    return this._queue.enqueue(() => this._music_queue.triggerPrevious());
+  }
+
   // The host is the handle of the LIVE's account
   public handle(chat: ChatEvent, settings: Profile["music"], host = "") {
     const match = this._match(settings, chat);

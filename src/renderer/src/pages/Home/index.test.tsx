@@ -1,6 +1,6 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, LiveSession } from "@/common/types";
 import { EULER_SIGNUP_URL } from "@/common/util";
-import { createAlert } from "@/pages/Alerts/helper";
+import { createAlert } from "@/common/util";
 import {
   liveSession,
   profileReply,
@@ -83,6 +83,25 @@ describe("Home", () => {
     expect(page().getByRole("checkbox", { name: "TTS" })).toBeChecked();
     expect(page().getByRole("checkbox", { name: "Music" })).not.toBeChecked();
     expect(page().getByRole("checkbox", { name: "Alerts" })).toBeChecked();
+  });
+
+  it("keeps the username being typed when main sends the profile", async () => {
+    const { user } = await renderApp();
+    const withUsername = (name: string) =>
+      profileReply((p) => {
+        p.connector.username = name;
+      });
+
+    await user.type(username(), "@typing");
+    // An MCP write sends the profile again
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, withUsername("@saved"));
+
+    expect(username()).toHaveValue("@typing");
+
+    await user.click(page().getByRole("checkbox", { name: "TTS" }));
+    await send(APP_EVENTS_RESPONSE.GET_PROFILE, withUsername("@saved"));
+
+    expect(username()).toHaveValue("@saved");
   });
 
   it("connects with the username, loading until main answers", async () => {

@@ -6,32 +6,8 @@ import {
   SavedEmote,
 } from "@/common/schemas";
 import { translate } from "@/common/i18n";
-import { CustomGift, TOKIO_EVENTS } from "@/common/types";
-import { defaultAlertName } from "@/common/util";
+import { CustomGift } from "@/common/types";
 import { EmoteOption } from "@/components";
-
-// A new alert, named by its place in the list
-export function createAlert(index = 0): Alert {
-  return {
-    id: crypto.randomUUID(),
-    name: defaultAlertName(index),
-    enabled: true,
-    trigger: {
-      type: TOKIO_EVENTS.FOLLOW,
-      gifts: [],
-      every_gift: false,
-      emotes: [],
-      keyword: "",
-      user: "",
-      min_coins: 0,
-      roles: [],
-    },
-    sound: null,
-    tts: null,
-    media: null,
-    volume: 100,
-  };
-}
 
 // A new TTS message starts with the TTS page's voice, speed and pitch.
 export function ttsDefaultsOf(tts: Profile["tts"]): Omit<AlertTts, "message"> {

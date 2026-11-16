@@ -568,6 +568,28 @@ describe("Settings", () => {
       expect(document.body.textContent).not.toContain(key);
     });
 
+    it("shows the MCP address and Claude Code's command after Show", async () => {
+      const { user } = await setup(on);
+      await addresses(["192.168.1.20"]);
+      expect(remote().queryByTitle("Copy MCP address")).not.toBeInTheDocument();
+
+      await user.click(
+        remote().getByRole("button", { name: "Show QR code and key" }),
+      );
+
+      expect(remote().getByTitle("Copy MCP address")).toHaveTextContent(
+        "http://127.0.0.1:37891/mcp",
+      );
+      expect(remote().getByTitle("Copy command")).toHaveTextContent(
+        `claude mcp add --transport http tokio http://127.0.0.1:37891/mcp --header "Authorization: Bearer ${key}"`,
+      );
+      expect(
+        remote().getByText(
+          "AI assistants can connect from this computer only.",
+        ),
+      ).toBeVisible();
+    });
+
     it("picks the address the link uses", async () => {
       const { user, container } = await setup(on);
       await addresses(["192.168.1.20", "10.0.0.5"]);

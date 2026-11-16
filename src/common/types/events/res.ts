@@ -95,6 +95,9 @@ export enum APP_EVENTS_RESPONSE {
   CONTROL = "app:controls:res:run",
   CONTROLS = "app:controls:res:state",
 
+  // MCP
+  FLUSH_SETTINGS = "app:mcp:res:flush",
+
   //HOME
   CONNECTED = "app:home:res:connect",
   VIEWS = "app:home:res:views",
@@ -299,6 +302,10 @@ export interface AppEventsResponseMap {
   }>;
   // The reply to GET_CONTROLS, pushed again on every change
   [APP_EVENTS_RESPONSE.CONTROLS]: ControlState;
+
+  // MCP
+  // Before an MCP write: send the saves still waiting, then SETTINGS_FLUSHED
+  [APP_EVENTS_RESPONSE.FLUSH_SETTINGS]: { id: string };
 
   // HOME
   // success while connecting or connected, which locks the profile; live
