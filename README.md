@@ -50,6 +50,7 @@ Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok
 </table>
 
 - [Music](https://tokio.ialfaro.com/docs/features/music-requests/): viewers request songs from chat, played on YouTube or Spotify.
+- [Chat translation](https://tokio.ialfaro.com/docs/features/chat-translation/): messages in other languages translated into yours, on Home, in TTS, alerts and overlays.
 - [Live controls](https://tokio.ialfaro.com/docs/features/live-controls/): skip a song, stop TTS, replay an alert or pause everything with a shortcut from any app, or from your phone.
 - [MCP](https://tokio.ialfaro.com/docs/developers/mcp/): AI assistants like Claude Code can set up Tokio and drive it for you.
 - [Coin stats](https://tokio.ialfaro.com/docs/features/coin-stats/): the coins and gifts of every LIVE and who sent them. Overlays can show your top gifters.

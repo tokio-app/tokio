@@ -10,8 +10,10 @@
 // The README's are 1200x800 whatever the scale; the docs' are crops of what
 // each section describes, at the device scale, so --scale 2 keeps them sharp.
 // It installs official overlays, so it needs the network, and takes its gifts
-// from ~/.tokio/extra/gifts.json, which drive.mjs copies. Every viewer in the
-// shots is made up.
+// from ~/.tokio/extra/gifts.json, which drive.mjs copies. The phone remote's
+// page is shot in the installed Microsoft Edge (Playwright's msedge channel).
+// Every viewer, key and network address in the shots is made up.
+import { chromium } from "@playwright/test";
 import {
   copyFileSync,
   cpSync,
@@ -57,8 +59,34 @@ const TYPED = {
     "this song is a vibe 🎶": "esta canción es un temazo 🎶",
     "hi from Lisbon 👋": "saludos desde Lima 👋",
     "{likes} likes": "{likes} me gusta",
+    "My voice": "Mi voz",
+    "my-voice.wav": "mi-voz.wav",
   },
 };
+
+// Chat translation's test, by the app's language: a viewer's message in
+// another language, the language Google names and its translation
+const TRANSLATED = {
+  en: {
+    to: "en",
+    text: "que música boa! qual é o nome?",
+    from: "pt",
+    translation: "what a good song! what's it called?",
+  },
+  es: {
+    to: "es",
+    text: "what a good song! what's it called?",
+    from: "en",
+    translation: "¡qué buena canción! ¿cómo se llama?",
+  },
+};
+
+// The phone remote's song cover, made up and served at a made-up https
+// address: the page loads covers only from https
+const COVER = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2b3a67"/><stop offset="1" stop-color="#e86a92"/></linearGradient></defs>
+<rect width="120" height="120" fill="url(#g)"/><circle cx="78" cy="44" r="22" fill="#ffd58a" opacity=".9"/>
+<path d="M0 92 L38 64 L62 84 L88 58 L120 86 L120 120 L0 120Z" fill="#141826" opacity=".85"/></svg>`;
 
 // Three quiet chimes that fade out, two seconds as a 16-bit mono WAV, so the
 // alert editor's waveform has a shape. The library names sounds by their
@@ -497,6 +525,14 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await editor.getByRole("button", { name: tr("Done") }).click();
   await dialog.waitFor({ state: "detached" });
 
+  // Main's voice engines as the TTS page gets them, kept for the clone
+  // dialog's shot
+  await page.evaluate(() =>
+    Reflect.get(globalThis, "api").on("app:settings:res:voice-keys", (res) => {
+      globalThis.__voiceKeys = res;
+    }),
+  );
+
   // Text-to-speech: pick a voice, then show the list around it
   await open(tr("TTS"), tr("Voice"));
   const voice = page
@@ -515,6 +551,33 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     .getByPlaceholder(tr("Type a message to test how the TTS sounds..."))
     .fill(say("brb, getting a drink"));
   await crop("tts-voice", body(tr("Voice")));
+  // Clone a voice shows once an engine that clones has a key: made-up keys
+  // for two, in the reply the page reads them from, so main never gets them
+  const keys = await page.evaluate(() => globalThis.__voiceKeys);
+  await push("app:settings:res:voice-keys", {
+    ...keys,
+    engines: keys.engines.map((engine) =>
+      ["ElevenLabs", "FishAudio"].includes(engine.id)
+        ? { ...engine, key: "made-up" }
+        : engine,
+    ),
+  });
+  await page.getByRole("button", { name: tr("Clone a voice") }).click();
+  await dialog
+    .getByRole("textbox", { name: tr("Name", "tts.cloneVoice.name") })
+    .fill(say("My voice"));
+  await pick(tone(join(home, say("my-voice.wav")), 330));
+  await dialog.getByRole("button", { name: tr("Add files") }).click();
+  await dialog.getByText(say("my-voice.wav"), { exact: true }).waitFor();
+  await dialog
+    .getByRole("checkbox", {
+      name: tr(en["tts.cloneVoice.consent"], "tts.cloneVoice.consent"),
+    })
+    .check();
+  await crop("tts-clone", dialog);
+  await dialog.getByRole("button", { name: tr("Cancel") }).click();
+  await dialog.waitFor({ state: "detached" });
+  await push("app:settings:res:voice-keys", keys);
   // Special users, on voices of two engines
   for (const [handle, name] of [
     ["@lucia.lima", "Dalia"],
@@ -531,7 +594,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     await dialog.waitFor({ state: "detached" });
   }
   await crop("tts-special-users", body(tr("Special users")));
-  await crop("tts-format", body(tr("Format")));
+  // Format waits for chat translation, in Settings below
   const replacements = [
     ["brb", "be right back"],
     ["gg", "good game"],
@@ -947,10 +1010,13 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     const select = page.getByRole("combobox", { name: tr(field), exact: true });
     const name = tr(option, key);
     if ((await select.innerText()).trim() === name) return;
-    await select.click();
-    await page
-      .getByRole("option", { name, exact: true })
-      .dispatchEvent("click");
+    const item = page.getByRole("option", { name, exact: true });
+    // A click while the last list closes can leave this one shut
+    for (let tries = 0; tries < 3 && !(await item.isVisible()); tries++) {
+      await select.click();
+      await item.waitFor({ timeout: 3000 }).catch(() => {});
+    }
+    await item.dispatchEvent("click");
   };
   await studioRow(say("Thanks for the follow, {username}!")).click();
   await choose("Trigger", "Follow", "triggers.follow");
@@ -1020,19 +1086,184 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   });
   await crop("fans", toolSection(tr("Fans")));
 
-  // Settings, with a made-up network address
+  // Settings, with a made-up network address in place of main's, for the
+  // overlay server and the remote control's link and QR code
   await open(tr("Settings"), tr("Live profiles"));
   await section(tr("Overlay server"))
     .getByText(/^\d+\.\d+\.\d+\.\d+$/)
-    .evaluate((el) => (el.textContent = "192.168.1.20"));
+    .first()
+    .waitFor();
+  await push("app:settings:res:network", { addresses: ["192.168.1.20"] });
+  await section(tr("Overlay server"))
+    .getByText("192.168.1.20", { exact: true })
+    .waitFor();
   await crop("settings-tiktok-live", section("TikTok LIVE"), { width: 640 });
   await crop("settings-overlay-server", section(tr("Overlay server")), {
     width: 640,
   });
-  await crop("settings", [section("TikTok LIVE"), section(tr("Tray"))], {
+  // Chat translation off, as it starts. Down to Updates: with Tray too, the
+  // sections are taller than the window.
+  await crop("settings", [section("TikTok LIVE"), section(tr("Updates"))], {
     width: 640,
   });
   await crop("settings-profiles", section(tr("Live profiles")));
+
+  // Chat translation, tested with a message in another language. Google's
+  // answer is pushed after main's, so the shot doesn't depend on it.
+  const translated = TRANSLATED[base];
+  const translation = section(tr("Chat translation"));
+  // Through IPC, which main answers with the settings: the list would close
+  // as the page scrolls to its search box
+  await page.evaluate(
+    (language) =>
+      Reflect.get(globalThis, "api").emit("app:settings:set:translation", {
+        language,
+      }),
+    translated.to,
+  );
+  await translation
+    .getByPlaceholder(tr("Type a message in another language..."))
+    .fill(translated.text);
+  const test = translation.getByRole("button", {
+    name: tr("Test", "common.test"),
+    exact: true,
+  });
+  await test.click();
+  // Main's own answer, or its failure, ends the loading
+  await page.waitForFunction(
+    (button) => !button.querySelector('[role="status"]'),
+    await test.elementHandle(),
+  );
+  await push("app:settings:res:test:translation", {
+    success: true,
+    // The window numbers its tests from 1
+    id: "translation-test:1",
+    data: {
+      kind: "translated",
+      translation: {
+        text: translated.translation,
+        from: translated.from,
+        to: translated.to,
+      },
+    },
+  });
+  await translation.getByText(translated.translation).waitFor();
+  // The new Settings shots show a section's controls alone, at the docs'
+  // column width
+  await crop("settings-translation", body(tr("Chat translation")));
+
+  // Shortcuts: F13 to F16, which a macro pad sends and no keyboard has, so
+  // the run takes no keys from other apps
+  const shortcuts = section(tr("Shortcuts"));
+  for (const [action, key] of [
+    ["skipSong", "F13"],
+    ["stopTts", "F14"],
+    ["replayAlert", "F15"],
+    ["pause", "F16"],
+  ]) {
+    const name = `settings.shortcuts.${action}`;
+    const field = shortcuts
+      .getByRole("group", { name: tr(en[name], name) })
+      .getByRole("button")
+      .first();
+    await field.click();
+    await field.dispatchEvent("keydown", { key, code: key, bubbles: true });
+    await shortcuts.getByText(key, { exact: true }).waitFor();
+  }
+  await crop("settings-shortcuts", body(tr("Shortcuts")));
+
+  // Remote control, on, with its QR code: its link holds the address above
+  const remote = section(tr("Remote control"));
+  const remoteOn = remote.getByRole("checkbox", {
+    name: tr("Enable remote control"),
+  });
+  await remoteOn.check();
+  await remote
+    .getByRole("button", { name: tr("Show QR code and key") })
+    .click();
+  const qr = remote.getByRole("img", {
+    name: tr("QR code of the remote control link"),
+  });
+  await qr.waitFor();
+  // From the switch to the code and its fields
+  await crop("settings-remote", [remoteOn, qr.locator("..")]);
+  // The AI assistants' block under it, at Claude Code, the first
+  await crop(
+    "settings-mcp",
+    remote
+      .getByRole("group", { name: tr("AI assistant"), exact: true })
+      .locator(".."),
+  );
+
+  // Voice engines, with the + menu of the engines it can add. At the top of
+  // the window, so the menu opens down over its own section.
+  const voiceKeys = section(tr("Voice engines"));
+  await voiceKeys.evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await voiceKeys
+    .getByRole("button", { name: tr("Add a voice engine") })
+    .click();
+  const engineMenu = voiceKeys.getByRole("menu");
+  // The other sections hidden: the menu reaches over the next one
+  const others = (visibility) =>
+    voiceKeys.evaluate((own, value) => {
+      for (const el of document.querySelectorAll("main section")) {
+        if (el !== own) el.style.visibility = value;
+      }
+    }, visibility);
+  await others("hidden");
+  await crop("settings-voice-engines", [voiceKeys, engineMenu], {
+    width: 640,
+  });
+  await others("");
+  await page.keyboard.press("Escape");
+
+  // The phone remote, as a phone's browser shows it. Nothing is live here,
+  // so its state is made up: a LIVE, a song and an alert to replay.
+  if (web) {
+    const { key } = JSON.parse(
+      readFileSync(join(home, ".tokio", "settings", "tokio.json"), "utf8"),
+    ).settings.remote;
+    const browser = await chromium.launch({ channel: "msedge" });
+    // A 390×844 phone's browser, under its address and tool bars
+    const phone = await browser.newPage({
+      viewport: { width: 390, height: 664 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+      reducedMotion: "reduce",
+    });
+    await phone.route("**/remote/api/state", (route) =>
+      route.fulfill({
+        json: {
+          paused: false,
+          live: "tokio.demo",
+          music: true,
+          song: {
+            title: "Blinding Lights - The Weeknd",
+            thumbnail: "https://cover.example/blinding-lights.svg",
+          },
+          canReplay: true,
+        },
+      }),
+    );
+    await phone.route("https://cover.example/**", (route) =>
+      route.fulfill({ contentType: "image/svg+xml", body: COVER }),
+    );
+    await phone.goto(
+      `http://127.0.0.1:37891/remote/#key=${encodeURIComponent(key)}`,
+    );
+    await phone.getByText("@tokio.demo").waitFor();
+    await phone.waitForFunction(() =>
+      [...document.images].every((img) => img.complete),
+    );
+    await phone.waitForTimeout(500);
+    await phone.screenshot({ path: join(docs, "remote.png") });
+    await browser.close();
+  }
+
+  // Format, now with Read translations to check
+  await open(tr("TTS"), tr("Voice"));
+  await crop("tts-format", body(tr("Format")));
   // An overlay of your own, the e2e fixture under the docs' example name
   const own = join(home, "likes-counter");
   cpSync(join(repo, "test", "fixtures", "overlay"), own, { recursive: true });
@@ -1223,4 +1454,15 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await bell.click();
   await behind("hidden");
   await crop("notifications", [bell, menu], { pad: 8, top: 0 });
+  await behind("");
+  await bell.click();
+
+  // Paused, as a shortcut or the phone would: Home says so at its top
+  await page.evaluate(() =>
+    Reflect.get(globalThis, "api").emit("app:controls:run", {
+      action: "pause",
+      paused: true,
+    }),
+  );
+  await crop("home-paused", section(tr("Tokio is paused")));
 };

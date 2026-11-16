@@ -26,13 +26,15 @@ argument-hint: "[what to check]"
 4. It refuses to start while port 37891 is in use. Ask the user to quit Tokio or stop `yarn dev`; don't stop them yourself.
 5. Look at the screenshots, and at what the script printed: renderer errors come out as `[page]` and `[console]` lines, and it exits with 1 when a step throws.
 
-`scripts/screenshots.mjs` is a steps file that retakes the README's screenshots into `.github/screenshots/` (the whole window, 1200×800) and the website docs' into `../tokio-web/src/assets/screenshots/` (crops of what each docs section describes), with made-up viewers: `node .claude/skills/drive-app/scripts/drive.mjs --scale 2 --fake-camera .claude/skills/drive-app/scripts/screenshots.mjs`. It needs the network for the official overlays, and `--fake-camera` for Overlay Studio's camera, which it waits for. A docs crop is named after its file, which the docs reference; a new one needs a line in the docs page that shows it.
+`scripts/screenshots.mjs` is a steps file that retakes the README's screenshots into `.github/screenshots/` (the whole window, 1200×800) and the website docs' into `../tokio-web/src/assets/screenshots/` (crops of what each docs section describes), with made-up viewers: `node .claude/skills/drive-app/scripts/drive.mjs --scale 2 --fake-camera .claude/skills/drive-app/scripts/screenshots.mjs`. It needs the network for the official overlays, `--fake-camera` for Overlay Studio's camera, which it waits for, and Microsoft Edge for the phone remote's page (Playwright's `msedge` channel, as a phone shows it). A docs crop is named after its file, which the docs reference; a new one needs a line in the docs page that shows it.
 
 The website is in English and Spanish, so retake both:
 
 - Add `--lang es-419` to the same command for the Spanish crops. They go to `../tokio-web/src/assets/screenshots/es/`, and the README stays English.
 - Every UI text the script looks for goes through `tr()`: the text is found in `en.json`, and its key is read in the run's language. A text with `{params}`, or one whose keys translate differently, passes its key.
 - What a streamer or viewer typed goes through `say()`, with its Spanish in `TYPED`. A new typed text that a picture shows needs a line there. The Spanish docs' alt texts name what the Spanish pictures show.
+
+A run rewrites every picture, and most differ only by chance: made-up IDs and keys, dates counted from today, sample names and photos, animation frames, a blinking caret. Compare each with the committed one and keep only the changes you meant; `git checkout` the rest, so a pull request shows only real changes.
 
 ## Helpers
 
