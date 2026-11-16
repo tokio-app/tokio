@@ -835,6 +835,7 @@ describe("HistoryService", () => {
       expect(await read<unknown>("index.json")).toEqual({
         lives: history.getHistory().lives,
         gifters: history.getHistory().gifters,
+        newest: 3000,
       });
       expect(await history.getLive(1000)).toBeNull();
       expect(await history.getLive(3000)).toEqual(
@@ -882,6 +883,20 @@ describe("HistoryService", () => {
       expect((await loaded()).getHistory().lives).toEqual([
         expect.objectContaining({ startedAt: 1000 }),
       ]);
+    });
+
+    it("doesn't take the newest back on a load when a quit left its file", async () => {
+      const history = await twoLives();
+      vi.mocked(rm).mockRejectedValueOnce(new Error("EBUSY"));
+
+      expect(await history.deleteLive(3000)).toBe(true);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(true);
+
+      // No save before the quit
+      expect((await loaded()).getHistory().lives).toEqual([
+        expect.objectContaining({ startedAt: 1000 }),
+      ]);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
     });
 
     it("leaves the index when its file doesn't load, keeping all time's gifts", async () => {
