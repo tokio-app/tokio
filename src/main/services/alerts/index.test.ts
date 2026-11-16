@@ -704,6 +704,8 @@ describe("AlertsService", () => {
         expect(generateBuffer).toHaveBeenCalledExactlyOnceWith(
           "Thanks Viewer for the Rose",
           voice,
+          // So an engine that refused its account isn't asked
+          { live: true },
         );
         expect(sent).toHaveLength(1);
         expect(said(sent[0])).toBe("Thanks Viewer for the Rose");

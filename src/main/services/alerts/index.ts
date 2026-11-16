@@ -573,7 +573,10 @@ export class AlertsService extends Service {
         return { success: true, data: cached };
       }
 
-      const res = await this._speaker.generateBuffer(text, tts.voice);
+      // Live alerts aren't logged here; a paused engine fails them at once
+      const res = await this._speaker.generateBuffer(text, tts.voice, {
+        live: !log,
+      });
       if (!res.success || !res.buffer) {
         throw res.error ?? new Error("The engine returned no audio.");
       }
