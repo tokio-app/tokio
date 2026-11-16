@@ -8,6 +8,7 @@ import {
   fail,
   invokeOk,
   ok,
+  profileOf,
   pushProfile,
 } from "../common";
 import {
@@ -32,12 +33,6 @@ const MusicSettings = Music.extend({
     queue_length: z.number().int().min(1),
   }),
 });
-
-const profileOf = async ({ storeManagerService }: Handler) => {
-  const profile = await storeManagerService.getProfileData();
-  if (!profile) throw new Error("The active profile couldn't be read.");
-  return profile;
-};
 
 // Song titles are viewers' requests: viewer data
 const queueOf = ({ musicService }: Handler) =>

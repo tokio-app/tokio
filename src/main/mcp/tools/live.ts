@@ -8,6 +8,7 @@ import {
 } from "@/common/types";
 import { z } from "zod";
 import {
+  activeProfile,
   type CallToolResult,
   fail,
   guardProfile,
@@ -204,7 +205,7 @@ async function setKey(
 
   // The Spotify Client ID is the profile's music provider key
   const changed = guardProfile(handler);
-  const profile = await storeManagerService.getProfileData();
+  const profile = await activeProfile(handler);
   if (!profile) return fail("Tokio couldn't read the active profile.");
   const parsed = ProfileSchema.shape.music.safeParse({
     ...profile.music,
@@ -272,9 +273,7 @@ export const tools: ToolDef<any>[] = [
         return error ?? ok({ connected: false });
       }
       const name =
-        username?.trim() ||
-        (await handler.storeManagerService.getProfileData())?.connector
-          .username;
+        username?.trim() || (await activeProfile(handler))?.connector.username;
       if (!name) return fail("Give the @username to connect to.");
       const { error, data } = await invokeOk(
         handler,

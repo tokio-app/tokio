@@ -29,6 +29,7 @@ paths:
 - Writes run the existing handlers through `invoke`, one at a time on the `write()` chain, each after `flushWindow`. The window first sends its pending autosaves (`FLUSH_SETTINGS`, then `flushSettings()`, then `SETTINGS_FLUSHED`), so a page's stale copy can't land after the write, or in another profile.
 - The registry already runs every non-read-only tool, and the generic save, test and remove, on the chain. Area code that calls `write()` again deadlocks.
 - A read-modify-write takes `guardProfile` before reading and checks it right before `invoke`, with no `await` between.
+- Tools read the profile through `activeProfile` or `profileOf` (`common.ts`), which read it `fresh`. The store updates its copy only once a write ends, so a plain read right after the flush gets the section from before the page's save, and the write saves it back over the page's change.
 - After a write, the window gets what shows it:
   - Profile sections: `pushProfile`, so open pages resync instead of saving their copy over it.
   - `ACTIVE_FEATURES` and `SET_ACTIVITY_FEED`: `pushSettings`.

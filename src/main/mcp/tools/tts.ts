@@ -3,12 +3,11 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { MULTILINGUAL } from "@/common/util";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { fail, invalid, invokeOk, ok, pushProfile } from "../common";
+import { fail, invalid, invokeOk, ok, profileOf, pushProfile } from "../common";
 import {
   defineKind,
   defineSection,
   defineTool,
-  type Handler,
   type Kinds,
   READ,
   type Sections,
@@ -36,12 +35,6 @@ const TtsSection = Tts.extend({
 
 const VOICE_LIMIT = 50;
 const VOICE_MAX = 200;
-
-const profileOf = async ({ storeManagerService }: Handler) => {
-  const profile = await storeManagerService.getProfileData();
-  if (!profile) throw new Error("The active profile couldn't be read.");
-  return profile;
-};
 
 export const sections: Sections = {
   tts: defineSection({

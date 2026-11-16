@@ -24,6 +24,7 @@ import { importPictures, upload } from "@/helper/library";
 import { z } from "zod";
 import {
   type CallToolResult,
+  activeProfile,
   checkPath,
   deepMerge,
   fail,
@@ -57,9 +58,6 @@ const AlertsSettingsSchema = ProfileSchema.shape.alerts
 
 // What save_item can change: the id is the alert's for good
 const AlertChangesSchema = AlertItemSchema.omit({ id: true });
-
-const activeProfile = async ({ storeManagerService }: Handler) =>
-  storeManagerService.getProfileData();
 
 const NO_PROFILE = "The active profile isn't loaded.";
 

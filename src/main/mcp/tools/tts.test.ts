@@ -1,9 +1,20 @@
-import { Profile } from "@/common/schemas";
+import { Profile, ProfileSchema } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { defaultProfile } from "@/common/util";
 import tts from "@/events/pages/tts";
+import { settle } from "@/helper/quit";
+import { settingsFlushed } from "@/mcp/common";
+import { TikTokConnectorService } from "@/services/connector";
+import { JSONManagerService } from "@/services/json";
+import { PathManagerService } from "@/services/path";
+import { StoreManagerService } from "@/services/store";
+import { TranslationService } from "@/services/translation";
+import { TTSService } from "@/services/tts";
 import { createHandler } from "@test/handler";
 import { mcpClient } from "@test/mcp";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 const setup = (stubs: Parameters<typeof createHandler>[0] = {}) => {
@@ -92,6 +103,62 @@ describe("tts MCP tools", () => {
 
       expect(res.isError).toBe(true);
       expect(updateProfileData).not.toHaveBeenCalled();
+    });
+
+    it("keeps the page's change the flush saved just before the write", async () => {
+      const home = await mkdtemp(join(tmpdir(), "tokio-test-"));
+      const ttsService = new TTSService();
+      try {
+        const paths = new PathManagerService();
+        await paths.initialize(home, ".tokio");
+        const store = new StoreManagerService();
+        await store.initialize(
+          "store",
+          {
+            tts: ttsService,
+            connector: new TikTokConnectorService(),
+            translation: new TranslationService(),
+          },
+          new JSONManagerService(),
+          paths,
+        );
+        const h = createHandler({ storeManagerService: store }, { stack: tts });
+        const { call } = await mcpClient(h.handler);
+        const before = (await store.getProfileData())!.tts;
+        // The fake records channels as strings
+        const flush: string = APP_EVENTS_RESPONSE.FLUSH_SETTINGS;
+        // The window: the TTS page's pending save goes out, then SETTINGS_FLUSHED
+        h.win.webContents.send.mockImplementation((channel, data) => {
+          if (channel !== flush) return;
+          void h.handler.invoke(APP_EVENTS.UPDATE_TTS_SETTINGS, {
+            settings: { ...before, filters: { ...before.filters, volume: 30 } },
+          });
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- its payload
+          const { id } = data as { id: string };
+          queueMicrotask(() => settingsFlushed(id));
+        });
+
+        const res = await call("update_settings", {
+          section: "tts",
+          changes: { protection: { cooldown: 9 } },
+        });
+
+        expect(res.isError).toBe(false);
+        const file = join(
+          paths.folders.profilesFolder,
+          store.getSettings().activeProfile.file,
+        );
+        const saved = ProfileSchema.parse(
+          JSON.parse(await readFile(file, "utf-8")),
+        );
+        expect(saved.tts.protection.cooldown).toBe(9);
+        expect(saved.tts.filters.volume).toBe(30);
+      } finally {
+        ttsService.dispose();
+        // The store's writes, before the folder goes
+        await settle(1000);
+        await rm(home, { recursive: true, force: true });
+      }
     });
   });
 
