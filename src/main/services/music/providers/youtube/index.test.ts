@@ -413,6 +413,21 @@ describe("YouTubeMusic", () => {
       await expect(pending).resolves.toEqual({ success: true });
     });
 
+    it("frees the blocker when the session ends, for the next connect to build", async () => {
+      const { blocker: ready } = blocker();
+      const provider = new YouTubeMusic();
+      stubReady(provider)(ready);
+      const { pending, finishLoad } = open(provider, { blockAds: true });
+      await vi.advanceTimersByTimeAsync(0);
+      finishLoad();
+      await pending;
+      const dispose = vi.spyOn(provider.adBlocker, "dispose");
+
+      provider.disconnect();
+
+      expect(dispose).toHaveBeenCalledOnce();
+    });
+
     it("stops blocking and frees the blocker when it connects without it", () => {
       const provider = new YouTubeMusic();
       const dispose = vi.spyOn(provider.adBlocker, "dispose");

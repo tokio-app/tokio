@@ -23,12 +23,15 @@ const mocks = vi.hoisted(() => {
     }
   }
   const made: FakeBlocker[] = [];
-  return { FakeBlocker, made };
+  const updateLists =
+    vi.fn<(options: { lists: { id: string }[] }) => Promise<boolean>>();
+  return { FakeBlocker, made, updateLists };
 });
 
 vi.mock("@tokioapp/adblock", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tokioapp/adblock")>()),
   ElectronBlocker: mocks.FakeBlocker,
+  updateLists: mocks.updateLists,
 }));
 
 describe("AdBlocker", () => {
@@ -38,6 +41,7 @@ describe("AdBlocker", () => {
 
   beforeEach(async () => {
     mocks.made.length = 0;
+    mocks.updateLists.mockReset().mockResolvedValue(false);
     folder = await mkdtemp(join(tmpdir(), "tokio-adblock-"));
     adBlocker = new AdBlocker(() => "music.log");
     adBlocker.folder = folder;
@@ -127,5 +131,40 @@ describe("AdBlocker", () => {
 
     expect(fake.dispose).toHaveBeenCalledOnce();
     expect(adBlocker.get()).not.toBe(first);
+  });
+
+  it("updates the saved lists without building a blocker", () => {
+    adBlocker.update();
+    adBlocker.update();
+
+    expect(mocks.made).toHaveLength(0);
+    expect(mocks.updateLists).toHaveBeenCalledOnce();
+    expect(
+      mocks.updateLists.mock.calls[0]?.[0].lists.map((list) => list.id),
+    ).toEqual(
+      DEFAULT_LISTS.map((list) => list.id).filter(
+        (id) => id !== "urlhaus-1" && id !== "plowe-0",
+      ),
+    );
+  });
+
+  it("builds after an update still running, and leaves a blocker in use to update itself", async () => {
+    let finish = () => {};
+    mocks.updateLists.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        finish = () => resolve(true);
+      }),
+    );
+    adBlocker.update();
+    const ready = adBlocker.ready();
+    await Promise.resolve();
+    expect(mocks.made).toHaveLength(0);
+
+    finish();
+
+    await expect(ready).rejects.toThrow("No filter list could be loaded");
+    expect(mocks.made).toHaveLength(1);
+    adBlocker.update();
+    expect(mocks.updateLists).toHaveBeenCalledOnce();
   });
 });

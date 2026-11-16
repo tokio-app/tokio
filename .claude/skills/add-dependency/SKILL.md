@@ -30,6 +30,10 @@ The source and the distributed app are MIT, with one LGPL file (see Licensing in
 
 - On Windows, VS Code's Fallow extension runs its language server from `node_modules/@fallow-cli/<platform>/fallow.exe`, which Yarn can't replace while it runs (EPERM). Before an install that changes `fallow`, ask the user to disable the extension; **Fallow: Restart Language Server** locks the new binary at once.
 - `yarn upgrade electron` replaces the package folder but doesn't run the root `postinstall`, so the Electron binary is missing until you run `yarn install`, which runs `install-electron`.
+- On Windows, VS Code can hold `node_modules/electron/dist/resources/default_app.asar`: Electron keeps an `.asar` open once anything reads a path inside it. Windows' Restart Manager names `Code.exe`, and only quitting VS Code frees it.
+  - A `yarn add` relinks Electron's folder, so it then fails with EBUSY halfway. By then it has deleted `node_modules/.bin` and the rest of Electron's `dist`.
+  - Before such an install, check the file isn't held; if it is, run the install in a worktree and copy `package.json` and `yarn.lock` back.
+  - To repair the checkout, unzip Electron's zip from `%LOCALAPPDATA%\electron\Cache` over `dist`, all but that file (the same version's, byte for byte), and copy `.bin` from a worktree with the same lockfile. Run `yarn install` once VS Code is closed.
 
 ## Done when
 

@@ -85,6 +85,8 @@ export class YouTubeMusic extends MusicProvider {
       if (this._ytView !== view) return;
       this._ytView = null;
       this._isActive = false;
+      // Its rules take tens of MB: the next connect builds them again
+      this.adBlocker.dispose();
       this.emit(TOKIO_EVENTS.MUSIC_PROCCESS_ENDED);
     });
 

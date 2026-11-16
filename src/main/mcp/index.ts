@@ -2,13 +2,14 @@ import { formatError, MCP_PATH } from "@/common/util";
 import Logger from "@/logger";
 import { bodyError, remoteGuard } from "@/services/server/remote";
 import type { AppHandlerVariables } from "@/types";
-import { createMcpHandler } from "@modelcontextprotocol/server";
+import type { createMcpHandler } from "@modelcontextprotocol/server";
 import express, { Request, RequestHandler, Response, Router } from "express";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
-import { createMcpServer, REGISTRY } from "./registry";
 import type { Registry } from "./defs";
+
+type McpHandler = ReturnType<typeof createMcpHandler>;
 
 // Only this computer. The phone sends the key unencrypted over Wi-Fi, so the
 // LAN gets the controls (/remote/api) and never the whole app.
@@ -48,16 +49,33 @@ const toWebRequest = (req: Request, signal: AbortSignal) => {
 /**
  * MCP at /mcp, stateless, one server per request. In order: no Origin and
  * loopback (403), remote control on (403) and its key (401), then the body.
+ * `registry` defaults to every area's tools (`REGISTRY`).
  */
 export function createMcpRoutes(
   handler: AppHandlerVariables,
-  registry: Registry = REGISTRY,
+  registry?: Registry,
 ): Router {
   const log = () => handler.pathManagerService.files?.logs.system;
-  const mcp = createMcpHandler(() => createMcpServer(handler, registry), {
-    responseMode: "json",
-    onerror: (error) => Logger.debug(`<MCP> ${formatError(error)}`, log()),
-  });
+  // The SDK and the tools load with the first request past the checks: most
+  // streamers never use MCP, and they would hold 8 MB of main's heap from
+  // startup on. A failed load is tried again on the next request.
+  let loading: Promise<McpHandler> | undefined;
+  const load = () =>
+    (loading ??= Promise.all([
+      import("@modelcontextprotocol/server"),
+      import("./registry"),
+    ]).then(
+      ([{ createMcpHandler }, { createMcpServer, REGISTRY }]) =>
+        createMcpHandler(() => createMcpServer(handler, registry ?? REGISTRY), {
+          responseMode: "json",
+          onerror: (error) =>
+            Logger.debug(`<MCP> ${formatError(error)}`, log()),
+        }),
+      (error: unknown) => {
+        loading = undefined;
+        throw error;
+      },
+    ));
 
   const serve = async (req: Request, res: Response) => {
     const abort = new AbortController();
@@ -65,6 +83,7 @@ export function createMcpRoutes(
       if (!res.writableFinished) abort.abort();
     });
     try {
+      const mcp = await load();
       const response = await mcp.fetch(
         toWebRequest(req, abort.signal),
         req.body === undefined ? {} : { parsedBody: req.body },

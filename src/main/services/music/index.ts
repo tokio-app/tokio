@@ -75,10 +75,11 @@ export class MusicService extends ProviderService<MusicProvider> {
     this._youtube.adBlocker.folder = folder;
   }
 
-  // Starts loading YouTube's ad blocker's lists before a connect needs them.
-  // A failure comes back when YouTube connects, which tries again.
+  // Downloads YouTube's ad blocker's lists that expired before a connect
+  // needs them, without building it: the connect does. A failure comes back
+  // when YouTube connects, which tries again.
   public prepareAdBlocker() {
-    this._youtube.adBlocker.get();
+    this._youtube.adBlocker.update();
   }
 
   public connect(options?: ConnectOptions): Promise<ConnectionResponse> {
