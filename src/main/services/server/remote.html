@@ -21,17 +21,19 @@
         src: url(__ARCHIVO__) format("woff2-variations");
       }
 
-      /* Tokio's Panel, Paper and Rose (src/ui/styles/tokens.css) */
+      /* Tokio's Ink, Field, Iron, Paper and Rose (src/ui/styles/tokens.css) */
       :root {
         --page: #121212;
-        --panel: #18181b;
-        --panel-pressed: #3f3f46;
+        /* Ink with a little rose in it, while paused */
+        --page-paused: #1c1215;
+        --key: #1e1e1e;
+        --iron: #3f3f46;
         --border: #27272a;
         --paper: #f1f5f9;
         --secondary: #a1a1aa;
+        --muted: #71717a;
         --rose: #f43f5e;
         --rose-light: #fb7185;
-        --rose-soft: rgba(244, 63, 94, 0.12);
         --gutter: 20px;
       }
 
@@ -40,8 +42,13 @@
       }
 
       html {
-        background: var(--page);
+        background-color: var(--page);
         -webkit-text-size-adjust: 100%;
+        transition: background-color 0.25s ease-out;
+      }
+
+      html.paused {
+        background-color: var(--page-paused);
       }
 
       body {
@@ -54,162 +61,652 @@
           max(var(--gutter), env(safe-area-inset-right))
           max(var(--gutter), env(safe-area-inset-bottom))
           max(var(--gutter), env(safe-area-inset-left));
-        /* A faint rose wash from the top, stronger while paused */
-        background: linear-gradient(
-            180deg,
-            var(--rose-soft) 0,
-            rgba(244, 63, 94, 0) 220px
-          )
-          no-repeat;
+        background-repeat: no-repeat;
+        background-size: 100% 360px;
         color: var(--paper);
         font-family: "Archivo Variable", system-ui, sans-serif;
-        line-height: 1.35;
+        font-size: 16px;
+        line-height: 1.4;
         -webkit-tap-highlight-color: transparent;
-        transition: background-color 0.2s ease-out;
       }
 
-      body.paused {
-        background-color: #1a1114;
+      /* The light the tally casts while Tokio is on a LIVE */
+      html.live body {
+        background-image: radial-gradient(
+          50% 100% at 50% 0,
+          rgba(244, 63, 94, 0.14),
+          rgba(244, 63, 94, 0)
+        );
+      }
+
+      /* The app's tally: a rose line at the top's center, with no label */
+      .tally {
+        position: fixed;
+        top: env(safe-area-inset-top, 0px);
+        left: 20%;
+        right: 20%;
+        height: 3px;
+        background: linear-gradient(
+          90deg,
+          rgba(244, 63, 94, 0),
+          var(--rose) 35%,
+          var(--rose) 65%,
+          rgba(244, 63, 94, 0)
+        );
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease-out;
+      }
+
+      html.live .tally {
+        opacity: 1;
+      }
+
+      .sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
       }
 
       main {
-        width: 100%;
-        max-width: 480px;
-        margin: 0 auto;
         flex: 1;
         display: flex;
         flex-direction: column;
+        width: 100%;
+        max-width: 560px;
+        margin: 0 auto;
       }
 
-      h1 {
-        margin: 8px 0 0;
-        font-size: 26px;
-        font-weight: 700;
+      .who {
+        margin: 12px 0 0;
+        overflow: hidden;
+        font-size: 28px;
+        font-weight: 600;
         font-stretch: 112%;
+        line-height: 1.2;
         letter-spacing: -0.01em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
-      #paused {
-        margin: 12px 0 0;
-        color: var(--rose-light);
-        font-size: 16px;
+      /* Not on a LIVE, or what keeps the page from working */
+      .who.quiet,
+      .who.warn {
+        font-size: 21px;
+        font-weight: 500;
+        font-stretch: 100%;
+        line-height: 1.35;
+        letter-spacing: 0;
+        white-space: normal;
       }
 
-      #status {
-        min-height: 1.35em;
-        margin: 12px 0 0;
+      .who.quiet {
         color: var(--secondary);
-        font-size: 16px;
       }
 
-      #status.warn {
+      .who.warn {
         color: var(--rose-light);
       }
 
-      /* At the bottom, where a thumb reaches */
-      .controls {
-        margin-top: auto;
-        padding-top: 32px;
+      /* Home's Now playing */
+      .song {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      .song[hidden] {
+        display: none;
+      }
+
+      .cover {
+        flex-shrink: 0;
+        width: 52px;
+        height: 52px;
+        border-radius: 6px;
+        background: var(--key);
+        object-fit: cover;
+      }
+
+      .song-text {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 2px;
+        min-width: 0;
+        margin: 0;
       }
 
-      button {
+      .song-name,
+      .song-artist {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .song-name {
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      .song-artist {
+        color: var(--secondary);
+        font-size: 14px;
+      }
+
+      .song-artist:empty {
+        display: none;
+      }
+
+      /* Three bars that move while the song plays, each on its own beat */
+      .bars {
+        display: flex;
+        flex-shrink: 0;
+        align-items: flex-end;
+        gap: 3px;
+        height: 20px;
+        margin-left: auto;
+      }
+
+      .bars span {
+        width: 3px;
+        height: 100%;
+        border-radius: 999px;
+        background: var(--rose);
+        transform-origin: bottom;
+        animation: bar 0.9s ease-in-out infinite alternate;
+      }
+
+      .bars span:nth-child(2) {
+        animation-duration: 0.7s;
+        animation-delay: -0.3s;
+      }
+
+      .bars span:nth-child(3) {
+        animation-duration: 1.1s;
+        animation-delay: -0.6s;
+      }
+
+      @keyframes bar {
+        from {
+          transform: scaleY(0.25);
+        }
+      }
+
+      /* The same bars, standing still */
+      .paused-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        margin-top: 24px;
+      }
+
+      .paused-note[hidden] {
+        display: none;
+      }
+
+      .still {
+        display: flex;
+        flex-shrink: 0;
+        gap: 5px;
+        height: 26px;
+        margin-top: 1px;
+      }
+
+      .still span {
+        width: 6px;
+        border-radius: 999px;
+        background: var(--rose);
+      }
+
+      .paused-note h2 {
+        margin: 0;
+        font-size: 21px;
+        font-weight: 600;
+        line-height: 1.3;
+      }
+
+      .paused-note p {
+        max-width: 62ch;
+        margin: 4px 0 0;
+        color: var(--secondary);
+      }
+
+      .failure {
+        margin: 20px 0 0;
+        color: var(--rose-light);
+      }
+
+      .failure:empty {
+        display: none;
+      }
+
+      /* At the bottom, where a thumb reaches, growing on tall phones */
+      .deck {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 10px;
+        padding-top: 28px;
+      }
+
+      .key,
+      .bar {
+        flex: 1 1 0;
+        display: flex;
+        align-items: center;
+        gap: 16px;
         width: 100%;
-        min-height: 64px;
-        padding: 0 20px;
+        min-height: 76px;
+        max-height: 100px;
+        padding: 12px 20px;
         border: 1px solid var(--border);
-        border-radius: 10px;
-        background: var(--panel);
+        border-radius: 12px;
+        background: var(--key);
         color: var(--paper);
         font: inherit;
-        font-size: 20px;
-        font-weight: 600;
         text-align: left;
         cursor: pointer;
         touch-action: manipulation;
         transition:
           background-color 0.15s ease-out,
-          border-color 0.15s ease-out;
+          border-color 0.15s ease-out,
+          transform 0.1s ease-out;
       }
 
-      button:active:not(:disabled) {
-        background: var(--panel-pressed);
+      .key:active:not(:disabled),
+      .bar:active:not(:disabled) {
+        background: var(--iron);
+        transform: scale(0.985);
       }
 
-      button:focus-visible {
+      .key:focus-visible,
+      .bar:focus-visible {
         outline: 2px solid var(--rose-light);
         outline-offset: 2px;
       }
 
-      button:disabled {
-        color: #71717a;
+      .key:disabled,
+      .bar:disabled {
+        color: var(--muted);
         cursor: default;
       }
 
-      button[aria-busy="true"] {
-        border-color: var(--secondary);
+      .key[aria-busy="true"] {
+        border-color: var(--iron);
       }
 
-      /* Set apart from the others, since it stops more than one thing */
-      #pause {
-        min-height: 80px;
-        margin-top: 12px;
-        border-color: var(--rose);
-        font-size: 22px;
-        font-weight: 700;
+      .glyph {
+        position: relative;
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
       }
 
-      body.paused #pause {
-        background: var(--rose);
+      .glyph svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        fill: currentColor;
+      }
+
+      .line {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .key-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .label {
+        font-size: 21px;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .note,
+      .done {
+        color: var(--secondary);
+        font-size: 14px;
+      }
+
+      .note:empty {
+        display: none;
+      }
+
+      /* A moment after a press: a tick, and what it did */
+      .tick,
+      .done,
+      .key[data-done] .icon,
+      .key[data-done] .note {
+        display: none;
+      }
+
+      .key[data-done] .tick {
+        display: block;
+        color: var(--rose);
+      }
+
+      .key[data-done] .done {
+        display: block;
         color: var(--paper);
       }
 
-      body.paused #pause:active:not(:disabled) {
+      /* Set apart, since it stops more than one thing */
+      .bar {
+        flex-grow: 1.3;
+        min-height: 92px;
+        max-height: 128px;
+        margin-top: 6px;
+        border: 2px solid var(--rose);
+        border-radius: 16px;
+      }
+
+      .bar .glyph {
+        width: 30px;
+        height: 30px;
+        color: var(--rose);
+      }
+
+      .bar .label {
+        font-size: 24px;
+        font-weight: 700;
+        font-stretch: 118%;
+      }
+
+      .bar:disabled {
+        border-color: var(--border);
+      }
+
+      .bar:disabled .glyph {
+        color: var(--muted);
+      }
+
+      .play,
+      html.paused .bar .pause {
+        display: none;
+      }
+
+      html.paused .bar .play {
+        display: block;
+      }
+
+      html.paused .bar {
+        background: var(--rose);
+      }
+
+      html.paused .bar .glyph {
+        color: var(--paper);
+      }
+
+      html.paused .bar:active:not(:disabled) {
         background: var(--rose-light);
       }
 
+      @media (hover: hover) {
+        .key:hover:not(:disabled) {
+          border-color: var(--iron);
+        }
+
+        .bar:hover:not(:disabled) {
+          background: var(--iron);
+        }
+
+        html.paused .bar:hover:not(:disabled) {
+          background: var(--rose-light);
+        }
+      }
+
+      /* A computer, a tablet or a phone on its side: a row of keys with the
+         pause under them, like a space bar */
+      @media (min-width: 720px) {
+        :root {
+          --gutter: 32px;
+        }
+
+        main {
+          max-width: 880px;
+          justify-content: center;
+        }
+
+        .who {
+          font-size: 36px;
+        }
+
+        /* As wide as the song, so the bars stay beside its name */
+        .song {
+          width: fit-content;
+          max-width: 100%;
+          gap: 16px;
+        }
+
+        .cover {
+          width: 60px;
+          height: 60px;
+        }
+
+        .song-name {
+          font-size: 21px;
+        }
+
+        .song-artist {
+          font-size: 16px;
+        }
+
+        .bars {
+          margin-left: 8px;
+        }
+
+        .deck {
+          flex: 0 0 auto;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          padding-top: 40px;
+        }
+
+        .key {
+          flex-direction: column;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 24px;
+          min-height: 148px;
+          max-height: none;
+          padding: 20px;
+        }
+
+        .key .glyph {
+          width: 32px;
+          height: 32px;
+        }
+
+        .bar {
+          grid-column: 1 / -1;
+          min-height: 96px;
+          max-height: none;
+          margin-top: 4px;
+          padding: 16px 24px;
+        }
+      }
+
+      /* An OBS dock or a small phone: "Pause everything" on one line */
+      @media (max-width: 360px) {
+        .label {
+          font-size: 19px;
+        }
+
+        .bar .label {
+          font-size: 20px;
+          font-stretch: 112%;
+        }
+      }
+
+      @media (min-width: 720px) and (max-height: 540px) {
+        .deck {
+          padding-top: 24px;
+        }
+
+        .key {
+          gap: 12px;
+          min-height: 104px;
+          padding: 16px;
+        }
+
+        .bar {
+          min-height: 76px;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
-        body,
-        button {
+        html,
+        .tally,
+        .key,
+        .bar {
           transition: none;
+        }
+
+        .key:active:not(:disabled),
+        .bar:active:not(:disabled) {
+          transform: none;
+        }
+
+        /* Still, short to tall */
+        .bars span {
+          animation: none;
+        }
+
+        .bars span:nth-child(1) {
+          transform: scaleY(0.4);
+        }
+
+        .bars span:nth-child(2) {
+          transform: scaleY(0.7);
         }
       }
     </style>
   </head>
   <body>
+    <div class="tally" aria-hidden="true"></div>
     <main>
-      <h1 data-label="title"></h1>
-      <p id="paused" data-label="paused" hidden></p>
-      <p id="status" role="status" aria-live="polite"></p>
-      <div class="controls">
+      <h1 class="sr" data-label="title"></h1>
+      <header>
+        <!-- The line says it on screen, this says it to screen readers -->
+        <span class="sr" id="on-air" hidden>LIVE</span>
+        <p class="who" id="who"></p>
+        <div class="song" id="song" hidden>
+          <img class="cover" id="cover" alt="" hidden />
+          <p class="song-text">
+            <span class="song-name" id="song-name"></span>
+            <span class="song-artist" id="song-artist"></span>
+          </p>
+          <span class="bars" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        </div>
+        <section
+          class="paused-note"
+          id="paused"
+          aria-labelledby="paused-title"
+          hidden
+        >
+          <span class="still" aria-hidden="true">
+            <span></span>
+            <span></span>
+          </span>
+          <div>
+            <h2 id="paused-title" data-label="pausedTitle"></h2>
+            <p data-label="paused"></p>
+          </div>
+        </section>
+      </header>
+      <p class="failure" id="failure" role="alert"></p>
+      <p class="sr" id="said" role="status"></p>
+      <div class="deck">
+        <button type="button" class="key" data-action="skip-song" disabled>
+          <span class="glyph" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path
+                d="M5.5 5.6c0-.8.9-1.3 1.6-.8l8.4 6c.6.5.6 1.4 0 1.8l-8.4 6c-.7.5-1.6 0-1.6-.8Z"
+              />
+              <rect x="17.5" y="5" width="2.6" height="14" rx="1.3" />
+            </svg>
+            <svg class="tick" viewBox="0 0 24 24">
+              <path class="line" d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          </span>
+          <span class="key-text">
+            <span class="label" data-label="skipSong"></span>
+            <span class="note"></span>
+            <span class="done" data-label="skipped"></span>
+          </span>
+        </button>
+        <button type="button" class="key" data-action="stop-tts" disabled>
+          <span class="glyph" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 24 24">
+              <rect x="6" y="6" width="12" height="12" rx="2.5" />
+            </svg>
+            <svg class="tick" viewBox="0 0 24 24">
+              <path class="line" d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          </span>
+          <span class="key-text">
+            <span class="label" data-label="stopTts"></span>
+            <span class="note"></span>
+            <span class="done" data-label="stopped"></span>
+          </span>
+        </button>
+        <button type="button" class="key" data-action="replay-alert" disabled>
+          <span class="glyph" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path class="line" d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" />
+              <path class="line" d="M6.2 3.2v4.2h4.2" />
+            </svg>
+            <svg class="tick" viewBox="0 0 24 24">
+              <path class="line" d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          </span>
+          <span class="key-text">
+            <span class="label" data-label="replayAlert"></span>
+            <span class="note"></span>
+            <span class="done" data-label="replayed"></span>
+          </span>
+        </button>
         <button
           type="button"
-          data-action="skip-song"
-          data-label="skipSong"
-          disabled
-        ></button>
-        <button
-          type="button"
-          data-action="stop-tts"
-          data-label="stopTts"
-          disabled
-        ></button>
-        <button
-          type="button"
-          data-action="replay-alert"
-          data-label="replayAlert"
-          disabled
-        ></button>
-        <button
-          type="button"
+          class="bar"
           id="pause"
           data-action="pause"
-          data-label="pause"
           aria-pressed="false"
           disabled
-        ></button>
+        >
+          <span class="glyph" aria-hidden="true">
+            <svg class="pause" viewBox="0 0 24 24">
+              <rect x="6" y="5" width="4" height="14" rx="2" />
+              <rect x="14" y="5" width="4" height="14" rx="2" />
+            </svg>
+            <svg class="play" viewBox="0 0 24 24">
+              <path
+                d="M7.5 5.4c0-.8.9-1.3 1.6-.8l9.3 6.6c.6.4.6 1.3 0 1.6l-9.3 6.6c-.7.5-1.6 0-1.6-.8Z"
+              />
+            </svg>
+          </span>
+          <span class="label" data-label="pause"></span>
+        </button>
       </div>
     </main>
     <script type="application/json" id="labels">
@@ -218,40 +715,110 @@
     <script>
       (function () {
         var text = JSON.parse(document.getElementById("labels").textContent);
-        var status = document.getElementById("status");
-        var pausedText = document.getElementById("paused");
-        var pauseButton = document.getElementById("pause");
+        var root = document.documentElement;
+        var theme = document.querySelector('meta[name="theme-color"]');
+        var onAir = document.getElementById("on-air");
+        var who = document.getElementById("who");
+        var song = document.getElementById("song");
+        var cover = document.getElementById("cover");
+        var songName = document.getElementById("song-name");
+        var songArtist = document.getElementById("song-artist");
+        var pausedNote = document.getElementById("paused");
+        var failureLine = document.getElementById("failure");
+        var said = document.getElementById("said");
         var buttons = document.querySelectorAll("button[data-action]");
+        var skip = document.querySelector('[data-action="skip-song"]');
+        var replay = document.querySelector('[data-action="replay-alert"]');
+        var pauseButton = document.getElementById("pause");
+        var pauseLabel = pauseButton.querySelector(".label");
+        // What each key says a moment after it worked
+        var DONE = {
+          "skip-song": text.skipped,
+          "stop-tts": text.stopped,
+          "replay-alert": text.replayed,
+        };
+        var DONE_MS = 1600;
         // Only in the link: every overlay Tokio serves shares this origin, so
         // storage would hand it to them
         var key = new URLSearchParams(location.hash.slice(1)).get("key") || "";
         var paused = false;
-        // Whether the status shows a failure the next good answer clears
-        var failing = false;
+        var timers = {};
 
         document.title = text.title;
         document.querySelectorAll("[data-label]").forEach(function (el) {
           el.textContent = text[el.getAttribute("data-label")];
         });
 
-        function say(message, warn) {
-          status.textContent = message;
-          status.className = warn ? "warn" : "";
-          failing = Boolean(warn);
+        cover.addEventListener("error", function () {
+          cover.hidden = true;
+        });
+
+        // A key pressed a moment ago stays off until its answer comes
+        function enable(button, on) {
+          button.disabled = !on || button.getAttribute("aria-busy") === "true";
+        }
+
+        function note(button, message) {
+          button.querySelector(".note").textContent = message;
         }
 
         function setPaused(value) {
           paused = value;
-          document.body.classList.toggle("paused", paused);
-          pausedText.hidden = !paused;
-          pauseButton.textContent = paused ? text.resume : text.pause;
+          root.classList.toggle("paused", paused);
+          pausedNote.hidden = !paused;
+          pauseLabel.textContent = paused ? text.resume : text.pause;
           pauseButton.setAttribute("aria-pressed", String(paused));
+          theme.setAttribute("content", paused ? "#1c1215" : "#121212");
         }
 
-        function setEnabled(enabled) {
+        // What keeps the page from working, and how to fix it
+        function block(message) {
+          root.classList.remove("live");
+          onAir.hidden = true;
+          who.className = "who warn";
+          who.textContent = message;
+          song.hidden = true;
+          pausedNote.hidden = true;
+          failureLine.textContent = "";
           buttons.forEach(function (b) {
-            b.disabled = !enabled;
+            b.disabled = true;
           });
+        }
+
+        // "Name - Artist", split as Home splits it
+        function showSong(playing) {
+          song.hidden = !playing;
+          if (!playing) return;
+          var at = playing.title.lastIndexOf(" - ");
+          songName.textContent =
+            at === -1 ? playing.title : playing.title.slice(0, at);
+          songArtist.textContent = at === -1 ? "" : playing.title.slice(at + 3);
+          // A cover is always a web address; anything else isn't loaded
+          var src = /^https:\/\//.test(playing.thumbnail)
+            ? playing.thumbnail
+            : "";
+          if (cover.getAttribute("src") !== src) {
+            if (src) cover.setAttribute("src", src);
+            else cover.removeAttribute("src");
+          }
+          cover.hidden = !src;
+        }
+
+        function render(state) {
+          root.classList.toggle("live", Boolean(state.live));
+          onAir.hidden = !state.live;
+          who.className = state.live ? "who" : "who quiet";
+          who.textContent = state.live ? "@" + state.live : text.notLive;
+          showSong(state.music ? state.song : null);
+          // A key that can't do anything says why
+          enable(skip, state.music);
+          note(skip, state.music ? "" : text.noMusic);
+          enable(replay, state.canReplay);
+          note(replay, state.canReplay ? "" : text.nothingToReplay);
+          buttons.forEach(function (b) {
+            if (b !== skip && b !== replay) enable(b, true);
+          });
+          setPaused(Boolean(state.paused));
         }
 
         // What a refused or failed answer says, or null for a good one
@@ -285,29 +852,39 @@
         }
 
         function refresh() {
-          if (!key) return;
           call("GET", "state").then(
             function (answer) {
               var message = failure(answer.res, answer.json);
-              if (message) {
-                setEnabled(false);
-                say(message, true);
-                return;
-              }
-              setEnabled(true);
-              setPaused(Boolean(answer.json.paused));
-              if (failing) say("", false);
+              if (message) return block(message);
+              render(answer.json);
             },
             function () {
-              setEnabled(false);
-              say(text.unreachable, true);
+              block(text.unreachable);
             },
           );
         }
 
+        // A short buzz on phones that have one, as a key would click
+        function buzz() {
+          try {
+            if (navigator.vibrate) navigator.vibrate(10);
+          } catch (e) {}
+        }
+
+        function showDone(button, action) {
+          clearTimeout(timers[action]);
+          button.setAttribute("data-done", "");
+          said.textContent = DONE[action];
+          timers[action] = setTimeout(function () {
+            button.removeAttribute("data-done");
+            // So the same press again is said again
+            if (said.textContent === DONE[action]) said.textContent = "";
+          }, DONE_MS);
+        }
+
         function press(button) {
           var action = button.getAttribute("data-action");
-          say("", false);
+          failureLine.textContent = "";
           button.setAttribute("aria-busy", "true");
           button.disabled = true;
           var body = action === "pause" ? { paused: !paused } : null;
@@ -315,21 +892,26 @@
             .then(
               function (answer) {
                 var message = failure(answer.res, answer.json);
-                if (message) return say(message, true);
-                var done = answer.json.done;
+                if (answer.res.status === 401 || answer.res.status === 403) {
+                  return block(message);
+                }
+                if (message) {
+                  failureLine.textContent = message;
+                  return;
+                }
                 setPaused(Boolean(answer.json.paused));
-                if (!done && action === "skip-song") say(text.noMusic, false);
-                else if (!done && action === "replay-alert")
-                  say(text.nothingToReplay, false);
-                else say(text.done, false);
+                if (action === "pause") buzz();
+                else if (answer.json.done) {
+                  buzz();
+                  showDone(button, action);
+                }
               },
               function () {
-                say(text.unreachable, true);
+                failureLine.textContent = text.unreachable;
               },
             )
             .then(function () {
               button.removeAttribute("aria-busy");
-              button.disabled = false;
               refresh();
             });
         }
@@ -341,7 +923,7 @@
         });
 
         if (!key) {
-          say(text.noKey, true);
+          block(text.noKey);
           return;
         }
 

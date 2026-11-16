@@ -568,8 +568,8 @@ describe("Settings", () => {
       expect(document.body.textContent).not.toContain(key);
     });
 
-    it("shows the MCP address and Claude Code's command after Show", async () => {
-      const { user } = await setup(on);
+    it("shows the MCP address and each assistant's setup after Show", async () => {
+      const { user, container } = await setup(on);
       await addresses(["192.168.1.20"]);
       expect(remote().queryByTitle("Copy MCP address")).not.toBeInTheDocument();
 
@@ -580,9 +580,20 @@ describe("Settings", () => {
       expect(remote().getByTitle("Copy MCP address")).toHaveTextContent(
         "http://127.0.0.1:37891/mcp",
       );
-      expect(remote().getByTitle("Copy command")).toHaveTextContent(
+      expect(
+        remote().getByTitle("Copy the Claude Code setup"),
+      ).toHaveTextContent(
         `claude mcp add --transport http tokio http://127.0.0.1:37891/mcp --header "Authorization: Bearer ${key}"`,
       );
+      expect(remote().getByText("Run it in a terminal.")).toBeVisible();
+
+      await user.click(remote().getByText("Claude Code"));
+      await user.click(inList(container, "Cursor")!);
+
+      expect(remote().getByTitle("Copy the Cursor setup")).toHaveTextContent(
+        `"Authorization": "Bearer ${key}"`,
+      );
+      expect(remote().getByText("Add it to ~/.cursor/mcp.json.")).toBeVisible();
       expect(
         remote().getByText(
           "AI assistants can connect from this computer only.",

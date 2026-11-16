@@ -2,7 +2,7 @@ import type { RemoteSettings } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, ControlAction } from "@/common/types";
 import { REMOTE_PATH } from "@/common/util";
 import { language, t } from "@/helper/i18n";
-import type { Invoke } from "@/types";
+import type { AppHandlerVariables, Invoke } from "@/types";
 import ARCHIVO from "@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2?inline";
 import express, { ErrorRequestHandler, RequestHandler, Router } from "express";
 import { timingSafeEqual } from "node:crypto";
@@ -24,13 +24,17 @@ const BodySchema = z.object({ paused: z.boolean().optional() }).strict();
 // The page's texts, keyed as remote.html reads them
 const LABELS = [
   "title",
+  "notLive",
   "skipSong",
   "stopTts",
   "replayAlert",
   "pause",
   "resume",
+  "pausedTitle",
   "paused",
-  "done",
+  "skipped",
+  "stopped",
+  "replayed",
   "nothingToReplay",
   "noMusic",
   "unreachable",
@@ -59,10 +63,52 @@ export const remoteLabels = (): RemoteLabels => {
   };
 };
 
+/**
+ * What `GET /remote/api/state` answers. Stream Deck setups read it, so
+ * fields are only ever added.
+ */
+export interface RemoteState {
+  paused: boolean;
+  // The @username of the LIVE Tokio is on, or null
+  live: string | null;
+  // Whether a music player is connected
+  music: boolean;
+  // The song it plays: viewers' requests, so the page sets it as text
+  song: { title: string; thumbnail: string } | null;
+  // Whether Replay last alert has something to play
+  canReplay: boolean;
+}
+
+type StateServices = Pick<
+  AppHandlerVariables,
+  "controlsService" | "connectorService" | "liveService" | "musicService"
+>;
+
+/** Read straight from the services, never through invoke. */
+export const remoteState = ({
+  controlsService,
+  connectorService,
+  liveService,
+  musicService,
+}: StateServices): RemoteState => {
+  const music = musicService.isActive();
+  const song = music ? musicService.songs().find((s) => s.playing) : undefined;
+  return {
+    paused: controlsService.isPaused(),
+    // As Home's tally: a connect still in progress isn't on the LIVE yet
+    live:
+      liveService.getSession().startedAt === null
+        ? null
+        : connectorService.username,
+    music,
+    song: song ? { title: song.title, thumbnail: song.thumbnail } : null,
+    canReplay: controlsService.lastAlerts().length > 0,
+  };
+};
+
 export interface RemoteDeps {
   remote: () => RemoteSettings;
-  // Read straight from the service, never through invoke
-  paused: () => boolean;
+  state: () => RemoteState;
   invoke: Invoke;
   labels: () => RemoteLabels;
 }
@@ -128,7 +174,7 @@ export function createRemoteRoutes(deps: RemoteDeps): Router {
   const api = express.Router();
   api.use(remoteGuard(deps.remote));
   api.get("/state", (_req, res) => {
-    res.json({ paused: deps.paused() });
+    res.json(deps.state());
   });
   api.post("/:action", express.json({ limit: "1kb" }), async (req, res) => {
     const action = ACTIONS.get(req.params.action);

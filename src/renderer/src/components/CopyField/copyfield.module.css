@@ -27,6 +27,7 @@
 
 /* Btn's fixed height and no-wrap would cut a long command */
 .code.code {
+  align-items: flex-start;
   height: auto;
   min-height: var(--control-height);
   padding-block: var(--space-2);
@@ -38,6 +39,12 @@
 .code .value {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* In the top right corner, centered on the first line */
+.code > svg {
+  flex-shrink: 0;
+  margin-top: calc((1lh - 16px) / 2);
 }
 
 .copied {

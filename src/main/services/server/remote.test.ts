@@ -1,5 +1,5 @@
 import { RemoteSettings } from "@/common/schemas";
-import { APP_EVENTS } from "@/common/types";
+import { APP_EVENTS, MusicInfo } from "@/common/types";
 import controls from "@/events/pages/controls";
 import { t } from "@/helper/i18n";
 import { ControlsService } from "@/services/controls";
@@ -7,14 +7,87 @@ import { createHandler } from "@test/handler";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ServerService } from "./index";
-import { createRemoteRoutes, RemoteLabels, remoteLabels } from "./remote";
+import {
+  createRemoteRoutes,
+  RemoteLabels,
+  remoteLabels,
+  RemoteState,
+  remoteState,
+} from "./remote";
 
 const KEY = "k3y-for-the-remote-tests";
+
+const LIVE: RemoteState = {
+  paused: false,
+  live: "lucia.lima",
+  music: true,
+  song: {
+    title: "Midnight Drive - Luna Park",
+    thumbnail: "https://i.ytimg.com/vi/x/hqdefault.jpg",
+  },
+  canReplay: true,
+};
+
+describe("remoteState", () => {
+  const SONGS: MusicInfo[] = [
+    { title: "Played", thumbnail: "", playing: false, played: true },
+    {
+      title: "Now - Band",
+      thumbnail: "https://a/b.jpg",
+      playing: true,
+      played: false,
+    },
+  ];
+
+  const read = ({
+    startedAt = null as number | null,
+    active = false,
+    alerts = 0,
+  } = {}) => {
+    const controlsService = new ControlsService();
+    controlsService.recordAlerts(
+      Array.from({ length: alerts }, () => ({
+        volume: 1,
+        channel: "alerts",
+        maxQueueLength: 5,
+        id: "a",
+      })),
+    );
+    const { handler } = createHandler({
+      controlsService,
+      connectorService: { username: "lucia.lima" },
+      liveService: { getSession: () => ({ startedAt }) },
+      musicService: { isActive: () => active, songs: () => SONGS },
+    });
+    return remoteState(handler);
+  };
+
+  it("gives the LIVE, the song playing and whether there's an alert", () => {
+    expect(read({ startedAt: 1, active: true, alerts: 1 })).toEqual({
+      paused: false,
+      live: "lucia.lima",
+      music: true,
+      song: { title: "Now - Band", thumbnail: "https://a/b.jpg" },
+      canReplay: true,
+    });
+  });
+
+  it("has no LIVE while connecting, and no song while music is off", () => {
+    expect(read()).toEqual({
+      paused: false,
+      live: null,
+      music: false,
+      song: null,
+      canReplay: false,
+    });
+  });
+});
 
 describe("remote routes", () => {
   let server: ServerService;
   let remote: RemoteSettings;
   let labels: RemoteLabels;
+  let state: RemoteState;
 
   const setup = () => {
     const controlsService = new ControlsService();
@@ -33,7 +106,7 @@ describe("remote routes", () => {
     server.setControlRoutes(
       createRemoteRoutes({
         remote: () => remote,
-        paused: () => controlsService.isPaused(),
+        state: () => ({ ...state, paused: controlsService.isPaused() }),
         invoke,
         labels: () => labels,
       }),
@@ -59,6 +132,7 @@ describe("remote routes", () => {
   beforeEach(async () => {
     remote = { enabled: true, key: KEY };
     labels = remoteLabels();
+    state = { ...LIVE };
     server = new ServerService(0);
     await server.start();
   });
@@ -150,7 +224,7 @@ describe("remote routes", () => {
     const res = await api("state");
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ paused: true });
+    expect(await res.json()).toEqual({ ...LIVE, paused: true });
   });
 
   it.each([
@@ -242,9 +316,13 @@ describe("remote routes", () => {
     let dom: JSDOM;
     let requests: { path: string; init?: RequestInit }[];
     const doc = () => dom.window.document;
-    const status = () => doc().getElementById("status")!.textContent;
+    const byId = (id: string) => doc().getElementById(id)!;
+    // The header: who Tokio is on, or what keeps the page from working
+    const who = () => byId("who").textContent;
     const button = (action: string) =>
       doc().querySelector<HTMLButtonElement>(`[data-action="${action}"]`)!;
+    const part = (action: string, name: string) =>
+      button(action).querySelector(`.${name}`)!;
 
     const open = async (hash: string) => {
       const page = url("/remote/");
@@ -265,6 +343,11 @@ describe("remote routes", () => {
       });
     };
 
+    const ready = async () => {
+      await open(`#key=${KEY}`);
+      await vi.waitFor(() => expect(button("pause").disabled).toBe(false));
+    };
+
     afterEach(() => {
       dom?.window.close();
     });
@@ -272,8 +355,7 @@ describe("remote routes", () => {
     it("sends the key from the link, and never stores it", async () => {
       setup();
 
-      await open(`#key=${encodeURIComponent(KEY)}`);
-      await vi.waitFor(() => expect(button("pause").disabled).toBe(false));
+      await ready();
 
       expect(requests[0]).toEqual({
         path: "/remote/api/state",
@@ -296,10 +378,69 @@ describe("remote routes", () => {
 
       await open(`#key=${KEY}`);
 
-      expect(button("skip-song").textContent).toBe("Skip <b>now</b>");
-      expect(button("skip-song").children).toHaveLength(0);
+      expect(part("skip-song", "label").textContent).toBe("Skip <b>now</b>");
+      expect(part("skip-song", "label").children).toHaveLength(0);
       expect(doc().title).toBe("<i>T");
       expect(doc().querySelector("h1")!.textContent).toBe("<i>T");
+    });
+
+    it("shows the LIVE and the song playing, as text", async () => {
+      setup();
+      state = {
+        ...LIVE,
+        live: "<b>lucia",
+        song: { ...LIVE.song!, title: "<i>Midnight Drive - Luna Park" },
+      };
+
+      await ready();
+
+      expect(who()).toBe("@<b>lucia");
+      expect(byId("who").children).toHaveLength(0);
+      expect(doc().documentElement.classList.contains("live")).toBe(true);
+      expect(byId("on-air").hidden).toBe(false);
+      expect(byId("song").hidden).toBe(false);
+      expect(byId("song-name").textContent).toBe("<i>Midnight Drive");
+      expect(byId("song-artist").textContent).toBe("Luna Park");
+      expect(byId("cover").getAttribute("src")).toBe(LIVE.song!.thumbnail);
+    });
+
+    it("loads a cover only from a web address", async () => {
+      setup();
+      state = {
+        ...LIVE,
+        song: { title: "Song", thumbnail: "javascript:alert(1)" },
+      };
+
+      await ready();
+
+      expect(byId("cover").hasAttribute("src")).toBe(false);
+      expect(byId("cover").hidden).toBe(true);
+      expect(byId("song-artist").textContent).toBe("");
+    });
+
+    it("says when Tokio isn't on a LIVE, and why a key can't work", async () => {
+      setup();
+      state = {
+        ...LIVE,
+        live: null,
+        music: false,
+        song: null,
+        canReplay: false,
+      };
+
+      await ready();
+
+      expect(who()).toBe(labels.text.notLive);
+      expect(doc().documentElement.classList.contains("live")).toBe(false);
+      expect(byId("on-air").hidden).toBe(true);
+      expect(byId("song").hidden).toBe(true);
+      expect(button("skip-song").disabled).toBe(true);
+      expect(part("skip-song", "note").textContent).toBe(labels.text.noMusic);
+      expect(button("replay-alert").disabled).toBe(true);
+      expect(part("replay-alert", "note").textContent).toBe(
+        labels.text.nothingToReplay,
+      );
+      expect(button("stop-tts").disabled).toBe(false);
     });
 
     it("says a link without a key won't work", async () => {
@@ -307,7 +448,7 @@ describe("remote routes", () => {
 
       await open("");
 
-      expect(status()).toBe(labels.text.noKey);
+      expect(who()).toBe(labels.text.noKey);
       expect(button("pause").disabled).toBe(true);
       expect(requests).toEqual([]);
     });
@@ -317,7 +458,7 @@ describe("remote routes", () => {
 
       await open("#key=old");
 
-      await vi.waitFor(() => expect(status()).toBe(labels.text.newLink));
+      await vi.waitFor(() => expect(who()).toBe(labels.text.newLink));
       expect(button("pause").disabled).toBe(true);
     });
 
@@ -327,27 +468,29 @@ describe("remote routes", () => {
 
       await open(`#key=${KEY}`);
 
-      await vi.waitFor(() => expect(status()).toBe(labels.text.off));
+      await vi.waitFor(() => expect(who()).toBe(labels.text.off));
     });
 
     it("pauses and resumes, showing the paused state", async () => {
       const { controlsService } = setup();
-      await open(`#key=${KEY}`);
+      await ready();
       const pause = button("pause");
-      await vi.waitFor(() => expect(pause.disabled).toBe(false));
-      expect(pause.textContent).toBe(labels.text.pause);
-      expect(doc().getElementById("paused")!.hidden).toBe(true);
+      const label = () => pause.querySelector(".label")!.textContent;
+      const theme = () =>
+        doc()
+          .querySelector('meta[name="theme-color"]')!
+          .getAttribute("content");
+      expect(label()).toBe(labels.text.pause);
+      expect(byId("paused").hidden).toBe(true);
 
       pause.click();
 
-      await vi.waitFor(() =>
-        expect(pause.textContent).toBe(labels.text.resume),
-      );
+      await vi.waitFor(() => expect(label()).toBe(labels.text.resume));
       expect(controlsService.isPaused()).toBe(true);
       expect(pause.getAttribute("aria-pressed")).toBe("true");
-      expect(doc().body.classList.contains("paused")).toBe(true);
-      expect(doc().getElementById("paused")!.hidden).toBe(false);
-      expect(status()).toBe(labels.text.done);
+      expect(doc().documentElement.classList.contains("paused")).toBe(true);
+      expect(byId("paused").hidden).toBe(false);
+      expect(theme()).not.toBe("#121212");
       expect(requests.find((r) => r.init?.method === "POST")?.init?.body).toBe(
         JSON.stringify({ paused: true }),
       );
@@ -357,32 +500,48 @@ describe("remote routes", () => {
       dom.window.document.dispatchEvent(
         new dom.window.Event("visibilitychange"),
       );
-      await vi.waitFor(() => expect(pause.textContent).toBe(labels.text.pause));
+      await vi.waitFor(() => expect(label()).toBe(labels.text.pause));
+      expect(theme()).toBe("#121212");
     });
 
-    it("says when there's nothing to replay", async () => {
+    it("shows on the key what it did", async () => {
       setup();
-      await open(`#key=${KEY}`);
-      await vi.waitFor(() =>
-        expect(button("replay-alert").disabled).toBe(false),
-      );
+      await ready();
 
-      button("replay-alert").click();
+      button("skip-song").click();
 
       await vi.waitFor(() =>
-        expect(status()).toBe(labels.text.nothingToReplay),
+        expect(button("skip-song").hasAttribute("data-done")).toBe(true),
       );
+      expect(part("skip-song", "done").textContent).toBe(labels.text.skipped);
+      expect(byId("said").textContent).toBe(labels.text.skipped);
+      await vi.waitFor(() => expect(button("skip-song").disabled).toBe(false));
+    });
+
+    it("shows a control's failure above the keys", async () => {
+      const { musicService } = setup();
+      musicService.skip.mockImplementation(() => {
+        throw new Error("boom");
+      });
+      await ready();
+
+      button("skip-song").click();
+
+      await vi.waitFor(() =>
+        expect(byId("failure").textContent).toBe(t("main.failure.control")),
+      );
+      expect(button("skip-song").hasAttribute("data-done")).toBe(false);
     });
 
     it("says when it can't reach Tokio", async () => {
       setup();
-      await open(`#key=${KEY}`);
-      await vi.waitFor(() => expect(button("stop-tts").disabled).toBe(false));
+      await ready();
       server.stop();
 
       button("stop-tts").click();
 
-      await vi.waitFor(() => expect(status()).toBe(labels.text.unreachable));
+      await vi.waitFor(() => expect(who()).toBe(labels.text.unreachable));
+      expect(button("stop-tts").disabled).toBe(true);
     });
   });
 });

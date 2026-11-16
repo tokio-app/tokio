@@ -527,7 +527,13 @@ test("serves the phone remote, whose API takes only its key", async () => {
   const state = await fetch(`${remote}/api/state`, {
     headers: { Authorization: `Bearer ${await savedKey()}` },
   });
-  expect(await state.json()).toEqual({ paused: false });
+  expect(await state.json()).toEqual({
+    paused: false,
+    live: null,
+    music: false,
+    song: null,
+    canReplay: false,
+  });
 });
 
 test("serves MCP on this computer, with the remote's key", async () => {
