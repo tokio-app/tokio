@@ -1346,10 +1346,10 @@
   resolved "https://registry.yarnpkg.com/@testing-library/user-event/-/user-event-14.6.8.tgz#9433b5008d8aff4cdf60c177f5789ce32062b763"
   integrity sha512-vgSSqnANMnkcYR/vUNDbwS7aM3OErRLNUG8vCVVlj4oc6cKffUrccX7UAS5AmJQQNZTSibi9z5GvvRZ0aYgUCQ==
 
-"@tokioapp/adblock@0.2.0":
-  version "0.2.0"
-  resolved "https://registry.yarnpkg.com/@tokioapp/adblock/-/adblock-0.2.0.tgz#1e856f338f293ee1a1599d6d4d970464aa41fa33"
-  integrity sha512-t08GZLDHdq81fYPIOGx78Nwza7ntc7xd1VbfXepPUxYiQGyEYNhB87JmRcwcy+96h6i42Y0gYYY7zDDHj/l24w==
+"@tokioapp/adblock@0.2.1":
+  version "0.2.1"
+  resolved "https://registry.yarnpkg.com/@tokioapp/adblock/-/adblock-0.2.1.tgz#2ff18bd3e0365ea8200f78fc5d27a45db365c45b"
+  integrity sha512-zIQDHLNi6GAGFCSRp2/sDKsBnfJ/o1gpW4jTUZGzuQQwqW022zkI6SVpPE0YIMUnXUReDSpOoqYr2fDmfToTpw==
 
 "@tokioapp/connector@0.2.1":
   version "0.2.1"
