@@ -1,13 +1,10 @@
 import { VoiceSample } from "@/common/types";
-import { MULTILINGUAL } from "@/common/util";
+import { baseLanguage, MULTILINGUAL } from "@/common/util";
 import { Buffer } from "node:buffer";
 import { ProviderVoice } from "../../common";
 import { appendSamples, KeyedTTSProvider } from "../../common/keyed";
 import config from "./config";
 import { CloneResponse, ErrorResponse, VoicesResponse } from "./types";
-
-// "en-US" is "en": Cartesia takes the base language
-const baseLanguage = (lang: string) => lang.split(/[-_]/)[0].toLowerCase();
 
 export class CartesiaTTS extends KeyedTTSProvider {
   public readonly label = "Cartesia";

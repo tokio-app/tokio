@@ -8,6 +8,10 @@ export * from "./samples";
 export * from "./studio";
 export * from "./timer";
 
+/** The language without its script or region, lowercase: zh-Hans is zh. */
+export const baseLanguage = (code: string) =>
+  code.split(/[-_]/)[0].toLowerCase();
+
 export function formatError(error: unknown): string {
   return describeError(error, 0);
 }

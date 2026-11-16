@@ -27,10 +27,6 @@ export const reasonKey = (error: unknown): MessageKey =>
     ? "translation.reason.busy"
     : "translation.reason.failed";
 
-/** The language without its script or region, lowercase: zh-Hans is zh. */
-export const baseLanguage = (code: string) =>
-  code.split(/[-_]/)[0].toLowerCase();
-
 /** Google's code for a language Settings picked, where it has its own. */
 export const codeFor = (language: string, codes: Record<string, string>) =>
   codes[language] ?? language;

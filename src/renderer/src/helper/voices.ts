@@ -1,6 +1,6 @@
 import { translate } from "@/common/i18n";
 import { VoiceData, VoiceEngine } from "@/common/types";
-import { MULTILINGUAL } from "@/common/util/constants";
+import { baseLanguage, MULTILINGUAL } from "@/common/util";
 import type { SelectOption } from "@/components/Elements";
 
 export const voiceKey = (voice: VoiceData) =>
@@ -8,9 +8,6 @@ export const voiceKey = (voice: VoiceData) =>
 
 // Language names in each window language, made once
 const displayNames = new Map<string, Intl.DisplayNames>();
-
-// Base language of a locale: "en" for "en-US", and for TikTok's "en".
-const languageOf = (lang: string) => lang.split(/[-_]/)[0].toLowerCase();
 
 // "English" for "en", "English (United States)" for "en-US", named in the
 // window's language. Tags Intl can't read are shown as they are.
@@ -92,7 +89,7 @@ export function voiceEntries(
       return {
         voice,
         key: voiceKey(voice),
-        language: languageOf(voice.lang),
+        language: baseLanguage(voice.lang),
         details,
         text: `${voice.name} ${voice.lang} ${details}`.toLowerCase(),
       };
