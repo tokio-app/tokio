@@ -1390,6 +1390,7 @@
   "main.remote.onServerOff": "El control remoto está activado. También necesita el servidor de overlays, que está desactivado.",
   "main.remote.off": "El control remoto está desactivado. Su enlace no controla Tokio hasta que lo vuelvas a activar.",
   "main.remote.keyRenewed": "Tokio creó una clave nueva. Los dispositivos con el enlace anterior ya no pueden controlarlo.",
+  "main.overlays.versionChanged": "{name} {version} acaba de salir y cambia cómo funciona el overlay. Revísalo y vuelve a actualizarlo.",
   "minecraft.weather.clear": "Despejado",
   "minecraft.weather.rain": "Lluvia",
   "minecraft.weather.thunder": "Tormenta",

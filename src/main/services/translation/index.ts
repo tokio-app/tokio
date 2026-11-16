@@ -1,8 +1,8 @@
 import { ChatEvent, ChatTranslation, TranslationTest } from "@/common/types";
-import { delay, TRANSLATION_LANGUAGES } from "@/common/util";
+import { baseLanguage, delay, TRANSLATION_LANGUAGES } from "@/common/util";
 import { hasKeyword, startsWithCommand } from "@/helper/chat";
 import { Service } from "../shared";
-import { baseLanguage, Translated, TranslationError } from "./common";
+import { Translated, TranslationError } from "./common";
 import { translateWithGoogle } from "./providers/google";
 
 // Repeats like "hi" are translated once

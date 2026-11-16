@@ -16,6 +16,10 @@ const ADBLOCK_LISTS = DEFAULT_LISTS.filter(
   (list) => list.id !== "urlhaus-1" && list.id !== "plowe-0",
 );
 
+// Lists expire in days, and every Music autosave asks for an update, which
+// reads every saved list
+const UPDATE_EVERY_MS = 60 * 60_000;
+
 const hasLists = (blocker: ElectronBlocker) =>
   Object.keys(blocker.engine.stats).length > 0;
 
@@ -26,6 +30,8 @@ export class AdBlocker {
   private _blocker: ElectronBlocker | null = null;
   // The saved lists being brought up to date, before any blocker needs them
   private _updating: Promise<unknown> | undefined;
+  // When the last update finished, from performance.now()
+  private _updatedAt: number | undefined;
   private readonly _logged = new Set<string>();
 
   constructor(private readonly logFile: () => string) {}
@@ -47,11 +53,14 @@ export class AdBlocker {
   // call). A blocker in use keeps its own lists up to date.
   public update(): void {
     if (this._blocker || this._updating) return;
+    const at = this._updatedAt;
+    if (at !== undefined && performance.now() - at < UPDATE_EVERY_MS) return;
     this._updating = updateLists({
       lists: ADBLOCK_LISTS,
       storage: this.storage(),
       onError: this.onError,
     }).finally(() => {
+      this._updatedAt = performance.now();
       this._updating = undefined;
     });
   }
@@ -70,12 +79,20 @@ export class AdBlocker {
 
   // The blocker once its lists are in effect. Rejects when none is saved and
   // none downloads, after trying again: the one at startup may have failed.
-  public async ready(): Promise<ElectronBlocker> {
+  // Also rejects once wanted() is false, so an ended connect builds nothing.
+  public async ready(wanted = () => true): Promise<ElectronBlocker> {
+    const needed = () => {
+      if (!wanted()) throw new Error("The ad blocker is no longer needed");
+    };
     // After an update still running, so no list is downloaded twice
     await this._updating;
+    needed();
     const blocker = this.get();
     await blocker.ready;
-    if (!hasLists(blocker)) await blocker.update();
+    if (!hasLists(blocker)) {
+      needed();
+      await blocker.update();
+    }
     if (!hasLists(blocker)) throw new Error("No filter list could be loaded");
     return blocker;
   }

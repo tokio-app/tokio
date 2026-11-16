@@ -107,6 +107,20 @@ export function guardProfile({ storeManagerService }: AppHandlerVariables) {
         );
 }
 
+/**
+ * The active profile, or null when it can't be read. Fresh: the store sets
+ * its copy only after a write ends, so a save the flush just sent shows here.
+ */
+export const activeProfile = ({ storeManagerService }: AppHandlerVariables) =>
+  storeManagerService.getProfileData({ fresh: true });
+
+/** The active profile, as activeProfile; throws when it can't be read. */
+export async function profileOf(handler: AppHandlerVariables) {
+  const profile = await activeProfile(handler);
+  if (!profile) throw new Error("The active profile couldn't be read.");
+  return profile;
+}
+
 /** Sends the window the active profile, as GET_PROFILE answers. Pages resync on it. */
 export async function pushProfile({
   storeManagerService,

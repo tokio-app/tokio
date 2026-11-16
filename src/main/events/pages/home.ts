@@ -59,7 +59,10 @@ events.push(
     e,
     { username },
   ) => {
-    const name = toUsername(username);
+    // Connected or connecting, the connector stays on its account
+    const name = connectorService.isConnected()
+      ? connectorService.username
+      : toUsername(username);
     const handle = `@${name}`;
     const saved = await storeManagerService.updateProfileData({
       connector: {

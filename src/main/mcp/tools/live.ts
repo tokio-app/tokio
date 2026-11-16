@@ -8,6 +8,7 @@ import {
 } from "@/common/types";
 import { z } from "zod";
 import {
+  activeProfile,
   type CallToolResult,
   fail,
   guardProfile,
@@ -165,6 +166,12 @@ async function setKey(
 ): Promise<CallToolResult> {
   const { storeManagerService, ttsService } = handler;
   const key = typed.trim();
+  // Only MCP can send one (Settings' fields are single-line): fetch would log it
+  if (/[\s\p{Cc}]/u.test(key)) {
+    return fail(
+      "A key has no spaces or line breaks inside. Nothing was saved.",
+    );
+  }
   if (service === "tiktok") {
     const { error } = await invokeOk(
       handler,
@@ -204,7 +211,7 @@ async function setKey(
 
   // The Spotify Client ID is the profile's music provider key
   const changed = guardProfile(handler);
-  const profile = await storeManagerService.getProfileData();
+  const profile = await activeProfile(handler);
   if (!profile) return fail("Tokio couldn't read the active profile.");
   const parsed = ProfileSchema.shape.music.safeParse({
     ...profile.music,
@@ -254,7 +261,7 @@ export const tools: ToolDef<any>[] = [
     name: "live",
     title: "Connect to a LIVE",
     description:
-      "connect joins a TikTok LIVE by @username (or a LIVE link) and saves it as the profile's username; without `username` it uses the saved one. The account must be live now, and Tokio needs the TikTok key (set_key). disconnect leaves it. Ask the streamer before either.",
+      "connect joins a TikTok LIVE by @username (or a LIVE link) and saves it as the profile's username; without `username` it uses the saved one. While connected, connect keeps the LIVE it's on: disconnect first to join another. The account must be live now, and Tokio needs the TikTok key (set_key). disconnect leaves it. Ask the streamer before either.",
     input: z
       .object({
         action: z.enum(["connect", "disconnect"]),
@@ -272,9 +279,7 @@ export const tools: ToolDef<any>[] = [
         return error ?? ok({ connected: false });
       }
       const name =
-        username?.trim() ||
-        (await handler.storeManagerService.getProfileData())?.connector
-          .username;
+        username?.trim() || (await activeProfile(handler))?.connector.username;
       if (!name) return fail("Give the @username to connect to.");
       const { error, data } = await invokeOk(
         handler,

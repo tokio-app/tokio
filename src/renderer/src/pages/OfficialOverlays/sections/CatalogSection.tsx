@@ -59,15 +59,16 @@ export function CatalogSection({ overlays }: Props) {
     if (res) setInstalling((ids) => ids.filter((id) => id !== res.id));
   });
 
-  const install = (id: string) => {
+  // With the version shown, so main refuses a breaking one out since then
+  const install = ({ id, version }: CatalogOverlay) => {
     setInstalling((ids) => [...ids, id]);
-    window.api.emit(APP_EVENTS.INSTALL_OVERLAY, { id });
+    window.api.emit(APP_EVENTS.INSTALL_OVERLAY, { id, version });
   };
 
   // A breaking update (a new first version number) asks first
   const choose = (entry: CatalogOverlay) => {
     if (catalogState(entry, overlays) === "breaking") setConfirming(entry);
-    else install(entry.id);
+    else install(entry);
   };
 
   const retry = () => {
@@ -90,7 +91,7 @@ export function CatalogSection({ overlays }: Props) {
           confirmText={t("overlays.official.update")}
           onClose={() => setConfirming(null)}
           onConfirm={() => {
-            install(confirming.id);
+            install(confirming);
             setConfirming(null);
           }}
         />

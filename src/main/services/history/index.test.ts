@@ -835,6 +835,7 @@ describe("HistoryService", () => {
       expect(await read<unknown>("index.json")).toEqual({
         lives: history.getHistory().lives,
         gifters: history.getHistory().gifters,
+        newest: 3000,
       });
       expect(await history.getLive(1000)).toBeNull();
       expect(await history.getLive(3000)).toEqual(
@@ -881,6 +882,42 @@ describe("HistoryService", () => {
       expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
       expect((await loaded()).getHistory().lives).toEqual([
         expect.objectContaining({ startedAt: 1000 }),
+      ]);
+    });
+
+    it("doesn't take the newest back on a load when a quit left its file", async () => {
+      const history = await twoLives();
+      vi.mocked(rm).mockRejectedValueOnce(new Error("EBUSY"));
+
+      expect(await history.deleteLive(3000)).toBe(true);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(true);
+
+      // No save before the quit
+      expect((await loaded()).getHistory().lives).toEqual([
+        expect.objectContaining({ startedAt: 1000 }),
+      ]);
+      expect(existsSync(join(dir, "a", "3000.json"))).toBe(false);
+    });
+
+    it("keeps a gifter the cap dropped and a later gift brought back", async () => {
+      const history = await loaded();
+      history.start("kai", 1000);
+      for (let i = 0; i < MAX_GIFTERS; i++)
+        gifts(history, [1100, gift(viewer(String(i)), 5)]);
+      history.end(2000);
+      // The fewest coins, so the cap drops x
+      history.start("kai", 3000);
+      gifts(history, [3100, gift(viewer("x"), 3)]);
+      history.end(4000);
+      expect(await history.deleteLive(1000)).toBe(true);
+      history.start("kai", 5000);
+      gifts(history, [5100, gift(viewer("x"), 1)]);
+      history.end(6000);
+
+      // x's all time holds only the last LIVE's gift
+      expect(await history.deleteLive(3000)).toBe(true);
+      expect(history.getHistory().gifters).toEqual([
+        expect.objectContaining({ userId: "x", coins: 1, gifts: 1 }),
       ]);
     });
 

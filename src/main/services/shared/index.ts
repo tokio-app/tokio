@@ -178,6 +178,14 @@ export abstract class BaseFileManagerService extends Service {
     }
   }
 
+  // Resolves once the updates queued on the file are done, whatever they gave.
+  public async whenWritten(filePath: string): Promise<void> {
+    await this._writeLocks.get(filePath)?.then(
+      () => {},
+      () => {},
+    );
+  }
+
   public async updateFile<T>(
     filePath: string,
     schema: z.ZodType<T>,

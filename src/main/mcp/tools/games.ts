@@ -25,6 +25,7 @@ import {
   invalid,
   invokeOk,
   ok,
+  profileOf,
   pushProfile,
 } from "../common";
 import {
@@ -35,12 +36,6 @@ import {
   type Sections,
   type ToolDef,
 } from "../defs";
-
-const profileOf = async ({ storeManagerService }: Handler) => {
-  const profile = await storeManagerService.getProfileData();
-  if (!profile) throw new Error("The active profile couldn't be read.");
-  return profile;
-};
 
 /**
  * Saves the profile's games with `actions`, the stored look kept, through

@@ -8,9 +8,11 @@ import {
   describe,
   expect,
   it,
+  Mock,
   onTestFinished,
   vi,
 } from "vitest";
+import { TTSProvider, TTSRequestError } from "./common";
 import { TTSService } from "./index";
 
 // Real providers spawn PowerShell or call online services.
@@ -294,6 +296,67 @@ describe("TTSService", () => {
       service.setEngineKey("Default", " session\n");
 
       expect(tiktok).toHaveBeenCalledExactlyOnceWith("session");
+    });
+  });
+
+  describe("an engine that refused the account", () => {
+    const voice = { engine: "ElevenLabs", name: "Ava", lang: "mul", id: "v1" };
+    const keyed = () =>
+      settings((s) => {
+        s.voice = voice;
+      });
+    let now: number;
+    let eleven: Mock<TTSProvider["generateBuffer"]>;
+
+    beforeEach(() => {
+      now = 1000;
+      vi.spyOn(performance, "now").mockImplementation(() => now);
+      eleven = vi.fn<TTSProvider["generateBuffer"]>(async () => ({
+        success: false,
+        error: new TTSRequestError("ElevenLabs", "402", "No credits.", 402),
+      }));
+      engine("ElevenLabs").generateBuffer = eleven;
+    });
+
+    it("isn't asked for chat for 60 s", async () => {
+      await say("hello", keyed());
+      await say("hello again", keyed());
+      const res = await service.generateBuffer("hi", voice, { live: true });
+
+      expect(eleven).toHaveBeenCalledOnce();
+      expect(res.error).toBeInstanceOf(TTSRequestError);
+
+      now += 60_000;
+      await say("hello", keyed());
+
+      expect(eleven).toHaveBeenCalledTimes(2);
+    });
+
+    it("is asked again once its key changes", async () => {
+      await say("hello", keyed());
+      service.setEngineKey("ElevenLabs", "new key");
+      await say("hello", keyed());
+
+      expect(eleven).toHaveBeenCalledTimes(2);
+    });
+
+    it("is still asked by the tester and the previews", async () => {
+      await say("hello", keyed());
+      await service.generateBuffer("hi", voice);
+
+      expect(eleven).toHaveBeenCalledTimes(2);
+    });
+
+    it("isn't paused by a failure that isn't the account's", async () => {
+      eleven.mockResolvedValue({
+        success: false,
+        error: new TTSRequestError("ElevenLabs", "500", "Down.", 500),
+      });
+
+      await say("hello", keyed());
+      await say("hello", keyed());
+
+      expect(eleven).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -627,6 +690,18 @@ describe("TTSService", () => {
       });
 
       expect(await say(translated("tonto", "idiot"), s)).toEqual([]);
+    });
+
+    it("skips a message whose translation is over the max length", async () => {
+      const s = settings((s) => {
+        s.format.translate = true;
+        s.protection.comment_length = 10;
+      });
+
+      expect(await say(translated("hola", "hello there friends"), s)).toEqual(
+        [],
+      );
+      expect(await say(translated("hola", "hello"), s)).toEqual(["hello"]);
     });
   });
 

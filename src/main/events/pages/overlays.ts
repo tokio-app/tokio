@@ -5,6 +5,7 @@ import {
   AppError,
   FEEDBACK_CODES,
 } from "@/common/types";
+import { catalogState } from "@/common/util";
 import { showOpenDialog } from "@/helper/dialog";
 import { createStack, replyFailure } from "@/helper/events";
 import { AppFailure, LoggedError, saveFailure } from "@/helper/feedback";
@@ -114,15 +115,40 @@ events.push(
 
 events.push(
   APP_EVENTS.INSTALL_OVERLAY,
-  async (handler, e, { id }) => {
+  async (handler, e, { id, version }) => {
     const { overlayService, storeManagerService, notifier } = handler;
     // From the store, as installFromCatalog decides it: an overlay served
     // but never saved is installed, not updated.
     const updating = storeManagerService
       .getSettings()
       .overlays.some((o) => o.id === id && !o.external);
+    // The catalog is read again after a while, so it may hold a breaking
+    // version the user never saw.
+    const catalog = await overlayService.getCatalog();
+    const entry = catalog.data?.find((o) => o.id === id);
+    if (
+      entry &&
+      entry.version !== version &&
+      catalogState(entry, overlayService.getOverlays()) === "breaking"
+    ) {
+      // The page then shows it and asks first
+      e.reply(APP_EVENTS_RESPONSE.GET_OVERLAY_CATALOG, {
+        success: true,
+        data: catalog.data,
+      });
+      throw new AppFailure(
+        updating
+          ? FEEDBACK_CODES.OVERLAY_UPDATE_FAILED
+          : FEEDBACK_CODES.OVERLAY_INSTALL_FAILED,
+        t("main.overlays.versionChanged", {
+          name: entry.name,
+          version: entry.version,
+        }),
+        { level: "warning" },
+      );
+    }
     const gifts = await overlayService.getGifts();
-    const res = await overlayService.installFromCatalog(id, gifts);
+    const res = await overlayService.installFromCatalog(id, gifts, entry);
     if (!res.success) {
       throw new AppFailure(
         updating

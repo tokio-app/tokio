@@ -29,6 +29,7 @@ paths:
 - Writes run the existing handlers through `invoke`, one at a time on the `write()` chain, each after `flushWindow`. The window first sends its pending autosaves (`FLUSH_SETTINGS`, then `flushSettings()`, then `SETTINGS_FLUSHED`), so a page's stale copy can't land after the write, or in another profile.
 - The registry already runs every non-read-only tool, and the generic save, test and remove, on the chain. Area code that calls `write()` again deadlocks.
 - A read-modify-write takes `guardProfile` before reading and checks it right before `invoke`, with no `await` between.
+- Tools read the profile through `activeProfile` or `profileOf` (`common.ts`), which read it `fresh`. The store updates its copy only once a write ends, so a plain read right after the flush gets the section from before the page's save, and the write saves it back over the page's change.
 - After a write, the window gets what shows it:
   - Profile sections: `pushProfile`, so open pages resync instead of saving their copy over it.
   - `ACTIVE_FEATURES` and `SET_ACTIVITY_FEED`: `pushSettings`.
@@ -50,6 +51,7 @@ Paths to import (`add_to_library`) go through `checkPath`: absolute, a file, and
 ## Gotchas
 
 - The SDK and the tools load with the first request past the checks (`createMcpRoutes`), not at startup, where they held 8 MB of main's heap for a feature most streamers never use. Code that runs at startup imports only `@/mcp` (the route) and `@/mcp/common`, which takes only types from the SDK: a value import of the SDK, `registry.ts` or `tools/*` from anywhere else loads them all again (`lazy.test.ts` checks it).
+- `set_key` refuses a key with whitespace or a control character inside, and trims only the ends. Node's fetch rejects such a header value with the whole value in its error message, which the engines and the connector library log. Settings' key fields are single-line, so MCP is the only way one gets in.
 - `music`'s `connect` returns at once and lets `CONNECT_MUSIC` finish on its own. Spotify waits for the streamer to log in, and holding the chain would stall every other write.
 - `refuseUnknown` stops at arrays. Overlay Studio's save checks each item itself; a game step's unknown keys are still dropped quietly.
 - An overlay settings save from MCP closes that overlay's settings dialog if it's open, since the page closes the dialog its save reply is for.

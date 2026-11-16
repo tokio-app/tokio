@@ -35,7 +35,7 @@ paths:
 
 ## Google
 
-- Its endpoint is undocumented, like Edge's Read Aloud. The URL, the 2 s timeout and the code map sit in `providers/google/config`; the reply's shape is checked.
+- Its endpoint is undocumented, like Edge's Read Aloud. The URL, the 3 s timeout and the code map sit in `providers/google/config`; the reply's shape is checked.
 - A failure pauses translation for `PAUSE_MS`, and chat goes on as typed meanwhile. `test()` skips the language gate, the cache, the pause and the turns.
 - Requests take turns (the user asked for a delay when there are too many): `RATE_PER_SECOND` after a burst of `RATE_BURST`, and a message that would wait over `MAX_WAIT_MS` goes on as typed, with no request and no notice. Measured on 2026-11-15: Google answered 429 ("Sorry...") to 3 requests a second after about 60, recovered within 20 s, and took 1 a second for minutes, bursts of 10 included. Measure again before raising them (`rate-test.mjs`'s method: rising steady rates, stopping at the first refusal).
 - `TRANSLATION_LANGUAGES` are the languages the picker offers, all of them Google's.

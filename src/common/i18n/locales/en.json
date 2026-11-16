@@ -1390,6 +1390,7 @@
   "main.remote.onServerOff": "Remote control is on. It also needs the overlay server, which is off.",
   "main.remote.off": "Remote control is off. Its link can't control Tokio until you turn it back on.",
   "main.remote.keyRenewed": "Tokio made a new key. Devices with the old link can't control it anymore.",
+  "main.overlays.versionChanged": "{name} {version} just came out and changes how the overlay works. Look it over, then update again.",
   "minecraft.weather.clear": "Clear",
   "minecraft.weather.rain": "Rain",
   "minecraft.weather.thunder": "Thunder",

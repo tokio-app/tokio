@@ -295,7 +295,12 @@ describe("overlays MCP tools", () => {
         url: "http://tokio-app.local:37891/gift-jar/",
         state: "installed",
       });
-      expect(installFromCatalog).toHaveBeenCalledOnce();
+      // With the entry it judged
+      expect(installFromCatalog).toHaveBeenCalledExactlyOnceWith(
+        "gift-jar",
+        expect.anything(),
+        entry(),
+      );
       expect(h.pushed(APP_EVENTS_RESPONSE.INSTALL_OVERLAY)).toEqual([
         { success: true, id: "gift-jar" },
       ]);

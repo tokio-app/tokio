@@ -16,7 +16,7 @@ import {
 import { hasPermission } from "@/helper/permissions";
 import Logger from "@/logger";
 import { ProviderService } from "../shared";
-import { GenerationResponse, TTSProvider } from "./common";
+import { failureKey, GenerationResponse, TTSProvider } from "./common";
 import {
   CartesiaTTS,
   EdgeTTS,
@@ -30,6 +30,17 @@ import {
 // A message the window never says it played stops holding the next ones
 // after this long, like the ones it had when it reloaded or crashed.
 const HOLD_TIMEOUT_MS = 2 * 60_000;
+
+// An engine that refused its key or account isn't asked for live speech for
+// this long, as chat translation's PAUSE_MS
+const PAUSE_MS = 60_000;
+const PAUSING = new Set([
+  "main.tts.keyMissing",
+  "main.tts.keyRejected",
+  "main.tts.noCredits",
+  "main.tts.keyPermissions",
+  "main.tts.notAllowed",
+]);
 
 // Edge sends no audio for text of only punctuation ("?", "..."), so it isn't sent
 const SPEAKABLE = /[\p{L}\p{N}\p{Extended_Pictographic}]/u;
@@ -69,6 +80,8 @@ export class TTSService extends ProviderService<TTSProvider> {
   private _lastId = 0;
   // Messages sent that the window hasn't finished playing
   private _held = new Set<number>();
+  // Engines paused until then, with the error that paused them
+  private _paused = new Map<TTSProvider, { until: number; error?: Error }>();
 
   constructor() {
     super();
@@ -99,7 +112,10 @@ export class TTSService extends ProviderService<TTSProvider> {
   }
 
   public setEngineKey(engine: string, key: string) {
-    this._providerPool.get(engine)?.setKey(key.trim());
+    const provider = this._providerPool.get(engine);
+    if (!provider) return;
+    provider.setKey(key.trim());
+    this._paused.delete(provider);
   }
 
   // The voices of every engine. An engine that fails is left out, and given to
@@ -148,16 +164,32 @@ export class TTSService extends ProviderService<TTSProvider> {
     return engine || this._current.provider;
   }
 
+  // live is set for chat and live alerts, which a paused engine fails at once.
+  // The tester and previews always ask.
   public async generateBuffer(
     text: string,
     voice?: VoiceData,
+    { live = false } = {},
   ): Promise<GenerationResponse> {
-    return await this._engineOf(voice).generateBuffer(
+    const engine = this._engineOf(voice);
+    const pause = live ? this._pauseOf(engine) : undefined;
+    if (pause) return { success: false, error: pause.error };
+    const res = await engine.generateBuffer(
       text,
       voice?.lang,
       // Engines without ids list them empty
       voice?.id || voice?.name,
     );
+    if (live && !res.success && PAUSING.has(failureKey(res.error) ?? "")) {
+      const until = performance.now() + PAUSE_MS;
+      this._paused.set(engine, { until, error: res.error });
+    }
+    return res;
+  }
+
+  private _pauseOf(engine: TTSProvider) {
+    const pause = this._paused.get(engine);
+    return pause && performance.now() < pause.until ? pause : undefined;
   }
 
   // The error is the engine's, whose status says why it failed. language is
@@ -223,8 +255,10 @@ export class TTSService extends ProviderService<TTSProvider> {
       [username, handle, comment.typed, comment.translation ?? ""].join("\n"),
       settings,
     );
+    // Either may be read, so both count
     const over_length =
-      chat.comment.content.length > settings.protection.comment_length;
+      Math.max(chat.comment.content.length, comment.translation?.length ?? 0) >
+      settings.protection.comment_length;
 
     if (banned || over_length) return false;
 
@@ -355,6 +389,8 @@ export class TTSService extends ProviderService<TTSProvider> {
     const voice =
       settings.user_voices.find((u) => sameHandle(u.handle, chat.user.handle))
         ?.voice ?? settings.voice;
+    // Skipped without taking a place in the queue
+    if (this._pauseOf(this._engineOf(voice))) return;
     const run = this._run;
     this._queue.enqueue(async () => {
       // The window gets one message to play and the next one ready. The rest
@@ -372,7 +408,7 @@ export class TTSService extends ProviderService<TTSProvider> {
       }
       if (run !== this._run) return;
 
-      const res = await this.generateBuffer(text, voice);
+      const res = await this.generateBuffer(text, voice, { live: true });
       // Cleared while it was being made
       if (run !== this._run) return;
       if (res.success) {

@@ -72,6 +72,9 @@ const LiveRecordSchema: z.ZodType<LiveRecord> = LiveSummarySchema.extend({
 const IndexSchema = z.object({
   lives: z.array(LiveSummarySchema),
   gifters: z.array(GifterSchema),
+  // The newest startedAt ever listed, so a deleted newest LIVE's file isn't
+  // taken for a crash's leftover
+  newest: z.number().optional(),
 });
 
 type Index = z.infer<typeof IndexSchema>;
@@ -153,8 +156,10 @@ export class HistoryService extends Service {
   // Final records of LIVEs that ended, until their file is written
   private _ended: LiveRecord[] = [];
   // Files of LIVEs a delete or the cap dropped, until an index without them
-  // is saved: a load takes a file newer than every listed LIVE back
+  // is saved: an index on disk must never list a LIVE whose file is gone
   private _dropped: string[] = [];
+  // The newest startedAt ever listed, deleted LIVEs included
+  private _newest = -Infinity;
   private _indexUnsaved = false;
   private _saving: Promise<boolean> = Promise.resolve(true);
   private _listeners: (() => void)[] = [];
@@ -212,6 +217,7 @@ export class HistoryService extends Service {
     this._ended = [];
     // Their LIVEs are still in the index on disk, which keeps the files
     this._dropped = [];
+    this._newest = -Infinity;
     this._indexUnsaved = false;
 
     await this._removeCleared(name);
@@ -227,13 +233,16 @@ export class HistoryService extends Service {
     }
 
     const lives = index.lives;
-    const newest = lives.at(-1)?.startedAt ?? -Infinity;
+    const newest = Math.max(
+      index.newest ?? -Infinity,
+      lives.at(-1)?.startedAt ?? -Infinity,
+    );
     const listed = new Set(lives.map((live) => live.startedAt));
     const left: number[] = [];
     for (const file of await readdir(dir).catch(() => [])) {
       const startedAt = Number(LIVE_FILE.exec(file)?.[1] ?? NaN);
       if (Number.isNaN(startedAt) || listed.has(startedAt)) continue;
-      // Newer than every listed LIVE, a quit or a crash left it. Older, a
+      // Newer than every LIVE ever listed, a quit or a crash left it. Older, a
       // delete did.
       if (startedAt > newest) left.push(startedAt);
       else await this._remove(join(dir, file));
@@ -247,6 +256,7 @@ export class HistoryService extends Service {
 
     this._dir = dir;
     this._lives = lives;
+    this._newest = newest;
     this._gifters = new Map(index.gifters.map((g) => [g.userId, g]));
     for (const record of recovered) this._finish(record);
     this._rank();
@@ -457,6 +467,7 @@ export class HistoryService extends Service {
       this._best = [];
       this._ended = [];
       this._dropped = [];
+      this._newest = -Infinity;
       // An empty index, written after any save that raced the move
       this._indexUnsaved = true;
       this._emit();
@@ -487,7 +498,11 @@ export class HistoryService extends Service {
     const records = [...this._ended];
     if (live) records.push(this._record(live, Date.now()));
     const index: Index | null = this._indexUnsaved
-      ? { lives: [...this._lives], gifters: [...this._gifters.values()] }
+      ? {
+          lives: [...this._lives],
+          gifters: [...this._gifters.values()],
+          ...(Number.isFinite(this._newest) && { newest: this._newest }),
+        }
       : null;
     if (!records.length && !index) return this._saving;
     this._ended = [];
@@ -520,8 +535,8 @@ export class HistoryService extends Service {
         const file = join(dir, "index.json");
         // An index on disk must never list a LIVE whose file isn't written
         if (!endFailed && (await json.saveFile(file, IndexSchema, index))) {
-          // A file left over would come back on a load as a crash's leftover.
-          // Not a failed save: a held file mustn't refuse a profile switch.
+          // One left over goes on the next save or load. Not a failed save:
+          // a held file mustn't refuse a profile switch.
           for (const path of dropped) {
             if ((await this._remove(path)) || this._dir !== dir) continue;
             this._indexUnsaved = true;
@@ -574,6 +589,7 @@ export class HistoryService extends Service {
   // minutes stay in its file.
   private _finish({ gifters, minutes: _minutes, ...summary }: LiveRecord) {
     this._lives.push(summary);
+    this._newest = Math.max(this._newest, summary.startedAt);
     for (const gifter of gifters) {
       const past = this._gifters.get(gifter.userId);
       this._gifters.set(gifter.userId, {
@@ -616,9 +632,13 @@ export class HistoryService extends Service {
         return;
       }
       for (const { userId, coins, gifts } of record.gifters) {
-        // Gone when the cap dropped them
+        // Gone when the cap dropped them. Below this LIVE's numbers, the cap
+        // dropped them and later gifts brought them back without it.
+        // shortcut: one whose later gifts reach this LIVE's still loses this
+        // LIVE's numbers from them, an undercount. Track when each all-time
+        // entry began if that ever matters.
         const gifter = this._gifters.get(userId);
-        if (!gifter) continue;
+        if (!gifter || gifter.coins < coins || gifter.gifts < gifts) continue;
         const left = {
           ...gifter,
           coins: gifter.coins - coins,
