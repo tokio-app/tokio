@@ -265,6 +265,7 @@ describe("live MCP tools", () => {
             disconnect: vi.fn(async () => {}),
             on: vi.fn(),
             off: vi.fn(),
+            isConnected: () => false,
             username: "streamer",
           },
         },

@@ -32,6 +32,8 @@ describe("home events", () => {
           during();
           return result;
         }),
+        isConnected: vi.fn(() => false),
+        username: "",
       };
       const storeManagerService = {
         updateProfileData: vi.fn(async () => true),
@@ -78,6 +80,22 @@ describe("home events", () => {
       });
       expect(connectorService.connect).toHaveBeenCalledWith("mia");
       expect(h.notices[0].message).toBe("Connected to @mia.");
+    });
+
+    it("keeps the LIVE it's on when asked for another account", async () => {
+      const { h, connectorService, storeManagerService } = setup({
+        success: true,
+      });
+      connectorService.isConnected.mockReturnValue(true);
+      connectorService.username = "first";
+
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "second" });
+
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        connector: { username: "first" },
+      });
+      expect(connectorService.connect).toHaveBeenCalledWith("first");
+      expect(h.notices[0].message).toBe("Connected to @first.");
     });
 
     it("connects but warns when the username can't be saved", async () => {

@@ -255,7 +255,7 @@ export const tools: ToolDef<any>[] = [
     name: "live",
     title: "Connect to a LIVE",
     description:
-      "connect joins a TikTok LIVE by @username (or a LIVE link) and saves it as the profile's username; without `username` it uses the saved one. The account must be live now, and Tokio needs the TikTok key (set_key). disconnect leaves it. Ask the streamer before either.",
+      "connect joins a TikTok LIVE by @username (or a LIVE link) and saves it as the profile's username; without `username` it uses the saved one. While connected, connect keeps the LIVE it's on: disconnect first to join another. The account must be live now, and Tokio needs the TikTok key (set_key). disconnect leaves it. Ask the streamer before either.",
     input: z
       .object({
         action: z.enum(["connect", "disconnect"]),
