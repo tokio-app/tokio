@@ -167,4 +167,30 @@ describe("AdBlocker", () => {
     adBlocker.update();
     expect(mocks.updateLists).toHaveBeenCalledOnce();
   });
+
+  it("builds nothing when its connect ended during an update", async () => {
+    let finish = () => {};
+    mocks.updateLists.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        finish = () => resolve(true);
+      }),
+    );
+    let wanted = true;
+    adBlocker.update();
+    const ready = adBlocker.ready(() => wanted);
+
+    wanted = false;
+    finish();
+
+    await expect(ready).rejects.toThrow();
+    expect(mocks.made).toHaveLength(0);
+  });
+
+  it("downloads no list again when its connect ended", async () => {
+    adBlocker.get();
+    const wanted = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
+
+    await expect(adBlocker.ready(wanted)).rejects.toThrow();
+    expect(made().update).not.toHaveBeenCalled();
+  });
 });

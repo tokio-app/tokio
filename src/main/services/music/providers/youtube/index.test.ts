@@ -486,10 +486,15 @@ describe("YouTubeMusic", () => {
         blockAds: true,
       });
 
+      const [wanted] = vi.spyOn(provider.adBlocker, "ready").mock.calls[0];
+      expect(wanted?.()).toBe(true);
+
       shell.close();
       finish(ready);
       await vi.advanceTimersByTimeAsync(0);
 
+      // So the blocker isn't built for it
+      expect(wanted?.()).toBe(false);
       await expect(pending).resolves.toMatchObject({ success: false });
       expect(fake.enable).not.toHaveBeenCalled();
       expect(loads(view, config.YTM_URL)).toBe(0);

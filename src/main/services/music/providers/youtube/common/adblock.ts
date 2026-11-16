@@ -70,12 +70,20 @@ export class AdBlocker {
 
   // The blocker once its lists are in effect. Rejects when none is saved and
   // none downloads, after trying again: the one at startup may have failed.
-  public async ready(): Promise<ElectronBlocker> {
+  // Also rejects once wanted() is false, so an ended connect builds nothing.
+  public async ready(wanted = () => true): Promise<ElectronBlocker> {
+    const needed = () => {
+      if (!wanted()) throw new Error("The ad blocker is no longer needed");
+    };
     // After an update still running, so no list is downloaded twice
     await this._updating;
+    needed();
     const blocker = this.get();
     await blocker.ready;
-    if (!hasLists(blocker)) await blocker.update();
+    if (!hasLists(blocker)) {
+      needed();
+      await blocker.update();
+    }
     if (!hasLists(blocker)) throw new Error("No filter list could be loaded");
     return blocker;
   }

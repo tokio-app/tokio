@@ -116,7 +116,7 @@ export class YouTubeMusic extends MusicProvider {
         // Before the page loads: only pages loaded after get its preload.
         // It owns the session's webRequest listeners, one per event.
         this.adBlocker
-          .ready()
+          .ready(current)
           .then((blocker) => {
             if (current()) blocker.enable(session);
           })
