@@ -2050,6 +2050,23 @@ describe("StoreManagerService", () => {
       await writeFile(defaultProfileFile, "{ oops");
       expect(await store.removeFromGames("tnt.png")).toBe(true);
     });
+
+    it("still cleans the other profiles after one it can't read", async () => {
+      vi.spyOn(Logger, "error");
+      const first = await init();
+      await first.createNewProfile("stream.json", "Stream");
+      await first.updateProfileData(
+        withActions(gameAction("a", tnt)),
+        "stream.json",
+      );
+      // Nothing in memory, so the sweep reads the held file first
+      const store = await init();
+      held.add(defaultProfileFile);
+
+      expect(await store.removeFromGames("tnt.png")).toBe(false);
+      const stream = join(paths.folders.profilesFolder, "stream.json");
+      expect(images(await readJSON(stream))).toEqual([null]);
+    });
   });
 
   describe("test overlays", () => {

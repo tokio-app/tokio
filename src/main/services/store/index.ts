@@ -717,7 +717,7 @@ export class StoreManagerService extends Service {
       if (!updates) continue;
 
       // Through updateProfileData, which keeps the active one in memory
-      saved &&= await this.updateProfileData(updates, profileFile);
+      saved = (await this.updateProfileData(updates, profileFile)) && saved;
     }
     return saved;
   }
