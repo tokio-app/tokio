@@ -67,6 +67,8 @@ export function useRecorder(
         const blob = new Blob(chunks, { type: MIME_TYPE });
         recorded.current(new Uint8Array(await blob.arrayBuffer()));
       };
+      // Before the timers: it throws when it can't record, and they'd stay
+      recorder.start();
       // Not Date.now(), so a clock change can't skew the time shown
       const started = performance.now();
       session.current = {
@@ -82,7 +84,6 @@ export function useRecorder(
       stream
         .getAudioTracks()[0]
         ?.addEventListener("ended", () => end(true), { once: true });
-      recorder.start();
       setSeconds(0);
       setState("recording");
     } catch (e) {

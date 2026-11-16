@@ -259,6 +259,27 @@ describe("CloneVoiceModal", () => {
       expect(dialog().getByText("Recording 1.webm")).toBeInTheDocument();
     });
 
+    it("leaves no timer behind when a recording fails to start", async () => {
+      vi.useFakeTimers();
+      vi.spyOn(FakeRecorder.prototype, "start").mockImplementationOnce(() => {
+        throw new DOMException("", "NotSupportedError");
+      });
+      setup();
+
+      fireEvent.click(button("Record"));
+      await granted();
+      await act(async () => {});
+      await act(async () => vi.advanceTimersByTime(60_000));
+      fireEvent.click(button("Record"));
+      await granted();
+      await act(async () => {});
+      // Past the first attempt's 2:00
+      await act(async () => vi.advanceTimersByTime(65_000));
+
+      expect(FakeRecorder.made[1].state).toBe("recording");
+      expect(dialog().getByText("1:05 of 2:00")).toBeInTheDocument();
+    });
+
     it("says the microphone is blocked when main says so", async () => {
       const { user } = setup();
 
