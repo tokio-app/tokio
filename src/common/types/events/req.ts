@@ -397,8 +397,9 @@ export interface AppEventsMap {
   [APP_EVENTS.REMOVE_OVERLAY]: { id: string };
   [APP_EVENTS.GET_OVERLAY_CATALOG]: void;
   // Installs the catalog's version of an official overlay, or updates the
-  // installed one
-  [APP_EVENTS.INSTALL_OVERLAY]: { id: string };
+  // installed one. `version` is the one the page showed, so a breaking
+  // version out since then isn't installed unasked.
+  [APP_EVENTS.INSTALL_OVERLAY]: { id: string; version: string };
 
   // TOOLS
   [APP_EVENTS.GET_TEST_OVERLAYS]: void;

@@ -184,7 +184,9 @@ describe("OfficialOverlays", () => {
 
     await user.click(install);
 
-    expect(sent(APP_EVENTS.INSTALL_OVERLAY)).toEqual([{ id: "gift-jar" }]);
+    expect(sent(APP_EVENTS.INSTALL_OVERLAY)).toEqual([
+      { id: "gift-jar", version: "1.2.0" },
+    ]);
     expect(install).toHaveAttribute("aria-busy", "true");
     expect(
       card(TOP_LIKES).getByRole("button", { name: "Install" }),
@@ -231,7 +233,9 @@ describe("OfficialOverlays", () => {
 
     await user.click(update);
 
-    expect(sent(APP_EVENTS.INSTALL_OVERLAY)).toEqual([{ id: "gift-jar" }]);
+    expect(sent(APP_EVENTS.INSTALL_OVERLAY)).toEqual([
+      { id: "gift-jar", version: "1.2.0" },
+    ]);
     expect(update).toHaveAttribute("aria-busy", "true");
     expect(
       card(GIFT_JAR).getByRole("button", { name: "Remove" }),
@@ -281,7 +285,9 @@ describe("OfficialOverlays", () => {
       }),
     );
 
-    expect(sent(APP_EVENTS.INSTALL_OVERLAY)).toEqual([{ id: "gift-jar" }]);
+    expect(sent(APP_EVENTS.INSTALL_OVERLAY)).toEqual([
+      { id: "gift-jar", version: "2.0.0" },
+    ]);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(update).toHaveAttribute("aria-busy", "true");
   });

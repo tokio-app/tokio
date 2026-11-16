@@ -404,7 +404,7 @@ export const tools: ToolDef<any>[] = [
       const { error } = await invokeOk(
         handler,
         APP_EVENTS.INSTALL_OVERLAY,
-        { id },
+        { id, version: entry.version },
         APP_EVENTS_RESPONSE.INSTALL_OVERLAY,
       );
       return (

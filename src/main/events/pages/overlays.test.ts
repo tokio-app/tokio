@@ -359,10 +359,22 @@ describe("overlays events", () => {
         getOverlays: vi.fn(() => installed),
         getGifts: vi.fn(async () => gifts),
         getCustomGifts: async () => [],
-        installFromCatalog: vi.fn(async (_id: string, _gifts: CustomGift[]) => {
-          if (success) overlayService.getOverlays.mockReturnValue(after);
-          return { success, saved };
-        }),
+        getCatalog: vi.fn(
+          async (): Promise<{ success: boolean; data?: CatalogOverlay[] }> => ({
+            success: true,
+            data: [catalogEntry],
+          }),
+        ),
+        installFromCatalog: vi.fn(
+          async (
+            _id: string,
+            _gifts: CustomGift[],
+            _entry?: CatalogOverlay,
+          ) => {
+            if (success) overlayService.getOverlays.mockReturnValue(after);
+            return { success, saved };
+          },
+        ),
       };
       const services = studioServices();
       const storeManagerService = {
@@ -380,7 +392,10 @@ describe("overlays events", () => {
     it("shows it again on the studio overlays that embed it", async () => {
       const { h, sendToClient } = setup([imported]);
 
-      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
+        id: "gift-jar",
+        version: "1.1.0",
+      });
 
       expect(embedSrcs(sendToClient)).toEqual(["/gift-jar/"]);
     });
@@ -388,11 +403,15 @@ describe("overlays events", () => {
     it("installs an overlay that isn't installed", async () => {
       const { h, overlayService, after } = setup([imported]);
 
-      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
+        id: "gift-jar",
+        version: "1.1.0",
+      });
 
       expect(overlayService.installFromCatalog).toHaveBeenCalledExactlyOnceWith(
         "gift-jar",
         gifts,
+        catalogEntry,
       );
       expect(h.replies(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([
         { success: true, data: after },
@@ -413,7 +432,10 @@ describe("overlays events", () => {
     it("updates an installed official overlay", async () => {
       const { h } = setup([overlay(), imported]);
 
-      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
+        id: "gift-jar",
+        version: "1.1.0",
+      });
 
       expect(h.replies(APP_EVENTS_RESPONSE.INSTALL_OVERLAY)).toEqual([
         { success: true, id: "gift-jar" },
@@ -428,10 +450,67 @@ describe("overlays events", () => {
       ]);
     });
 
+    it("refuses a breaking version that came out after the page showed another", async () => {
+      const { h, overlayService } = setup([overlay(), imported]);
+      const breaking = { ...catalogEntry, version: "2.0.0" };
+      overlayService.getCatalog.mockResolvedValue({
+        success: true,
+        data: [breaking],
+      });
+
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
+        id: "gift-jar",
+        version: "1.1.0",
+      });
+
+      const failure = {
+        code: FEEDBACK_CODES.OVERLAY_UPDATE_FAILED,
+        message:
+          "Gift Jar 2.0.0 just came out and changes how the overlay works. Look it over, then update again.",
+      };
+      expect(overlayService.installFromCatalog).not.toHaveBeenCalled();
+      // The page then shows the new version and asks first
+      expect(h.replies(APP_EVENTS_RESPONSE.GET_OVERLAY_CATALOG)).toEqual([
+        { success: true, data: [breaking] },
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.INSTALL_OVERLAY)).toEqual([
+        { success: false, error: failure, id: "gift-jar" },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({ level: "warning", ...failure }),
+      ]);
+    });
+
+    it("installs a newer version that isn't breaking", async () => {
+      const { h, overlayService } = setup([overlay(), imported]);
+      const newer = { ...catalogEntry, version: "1.2.0" };
+      overlayService.getCatalog.mockResolvedValue({
+        success: true,
+        data: [newer],
+      });
+
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
+        id: "gift-jar",
+        version: "1.1.0",
+      });
+
+      expect(overlayService.installFromCatalog).toHaveBeenCalledExactlyOnceWith(
+        "gift-jar",
+        gifts,
+        newer,
+      );
+      expect(h.replies(APP_EVENTS_RESPONSE.INSTALL_OVERLAY)).toEqual([
+        { success: true, id: "gift-jar" },
+      ]);
+    });
+
     it("says installed for an overlay served but not in the store", async () => {
       const { h } = setup([overlay(), imported], true, true, [imported]);
 
-      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
+        id: "gift-jar",
+        version: "1.1.0",
+      });
 
       expect(h.notices).toEqual([
         expect.objectContaining({ code: FEEDBACK_CODES.OVERLAY_INSTALLED }),
@@ -442,7 +521,10 @@ describe("overlays events", () => {
       // installFromCatalog refuses to replace it
       const { h } = setup([overlay({ external: true })], false);
 
-      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
+        id: "gift-jar",
+        version: "1.1.0",
+      });
 
       expect(h.notices).toEqual([
         expect.objectContaining({
@@ -454,7 +536,10 @@ describe("overlays events", () => {
     it("answers with the overlays before the install", async () => {
       const { h } = setup([]);
 
-      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
+        id: "gift-jar",
+        version: "1.1.0",
+      });
 
       expect(h.sent().map(([channel]) => channel)).toEqual([
         APP_EVENTS_RESPONSE.GET_OVERLAYS,
@@ -481,6 +566,7 @@ describe("overlays events", () => {
 
         await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
           id: "gift-jar",
+          version: "1.1.0",
         });
 
         const failure = {
@@ -501,7 +587,10 @@ describe("overlays events", () => {
     it("reports a store that can't be saved, with the overlays main has", async () => {
       const { h, after } = setup([imported], true, false);
 
-      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, { id: "gift-jar" });
+      await h.invoke(overlays, APP_EVENTS.INSTALL_OVERLAY, {
+        id: "gift-jar",
+        version: "1.1.0",
+      });
 
       expect(h.replies(APP_EVENTS_RESPONSE.GET_OVERLAYS)).toEqual([
         { success: true, data: after },
