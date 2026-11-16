@@ -61,4 +61,5 @@ Paths to import (`add_to_library`) go through `checkPath`: absolute, a file, and
 ## Coupling
 
 - A new user-facing setting or action needs its section field, kind or tool in its area's file, with a test.
+- Settings → Remote control shows each assistant's setup with the key in it (`ASSISTANTS`, `src/renderer/src/pages/Settings/helper.ts`), and the website's MCP page has a tab for each: change both when a client changes how it adds an HTTP server. Codex takes a static header only in `config.toml`, and Claude Desktop only through `mcp-remote`.
 - The SDK compiles other packages into its files (`THIRD_PARTY_NOTICES.md`, "Code bundled in the MCP SDK"). On an upgrade, list them from its `dist`'s `//#region ../../node_modules/…` lines and update `LICENSES/MCP-SDK-bundled.txt`, the notices and About's component.
