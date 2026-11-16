@@ -63,6 +63,8 @@ export const CATALOG_TTL_MS = 15 * 60 * 1000;
 // Folders of installs in progress, inside the overlays folder so they can be
 // renamed into place. See installFromCatalog.
 const STAGING_FOLDER = /^\.(install|old)-/;
+// An installed version moved out by an update or a remove: .old-<id>.<uuid>
+const OLD_FOLDER = /^\.old-([^.]+)\.[0-9a-f-]+$/;
 
 export interface OverlayResult<T = undefined> {
   success: boolean;
@@ -444,7 +446,7 @@ export class OverlayService extends Service {
 
     // Moved out first, so a folder another program holds stays whole. load()
     // deletes the .old-* folder if the rm below can't.
-    const old = join(this._folder, `.old-${randomUUID()}`);
+    const old = this._oldDir(id);
     try {
       await renameWithRetry(this._dir(id), old);
     } catch (error) {
@@ -790,7 +792,7 @@ export class OverlayService extends Service {
           update,
           gifts,
         );
-        await this._swap(staging, this._dir(id));
+        await this._swap(staging, id);
         this._commands.set(id, commands);
         return {
           success: true,
@@ -872,8 +874,9 @@ export class OverlayService extends Service {
    * renamed within the overlays folder, so the old version stays whole until
    * the new one is in place.
    */
-  private async _swap(staging: string, dir: string): Promise<void> {
-    const old = join(this._folder, `.old-${randomUUID()}`);
+  private async _swap(staging: string, id: string): Promise<void> {
+    const dir = this._dir(id);
+    const old = this._oldDir(id);
     const replacing = await isSaved(dir);
     if (replacing) await renameWithRetry(dir, old);
 
@@ -881,7 +884,7 @@ export class OverlayService extends Service {
       await renameWithRetry(staging, dir);
     } catch (error) {
       if (replacing) {
-        // The next start deletes .old-* folders, so say where it was left.
+        // The next start tries again (_removeStaging); say where it was left.
         await renameWithRetry(old, dir).catch((undo) =>
           Logger.error(
             `<Overlays> Unable to put back ${dir}, the installed version is in ${old} -- ${formatError(undo)}`,
@@ -898,14 +901,45 @@ export class OverlayService extends Service {
     }
   }
 
-  // Folders left by an install that was cut short.
+  // Ids never contain dots, so the id can be read back from the name.
+  private _oldDir(id: string): string {
+    return join(this._folder, `.old-${id}.${randomUUID()}`);
+  }
+
+  /**
+   * Deletes the folders an install, update or remove cut short left behind,
+   * except an installed version a crash left out of place, which goes back.
+   */
   private async _removeStaging(): Promise<void> {
     const entries = await readdir(this._folder, { withFileTypes: true }).catch(
       () => [],
     );
     for (const entry of entries) {
       if (!entry.isDirectory() || !STAGING_FOLDER.test(entry.name)) continue;
-      await rm(join(this._folder, entry.name), {
+      const path = join(this._folder, entry.name);
+      const id = OLD_FOLDER.exec(entry.name)?.[1];
+      // A rebuilt store is empty until findOverlays reads the folder back.
+      if (
+        id &&
+        (this._store.wasRebuilt() || this._isStored(id)) &&
+        (await access(this._dir(id)).then(() => false, isMissing))
+      ) {
+        try {
+          await renameWithRetry(path, this._dir(id));
+          Logger.info(
+            `<Overlays> Put back overlay ${id}, which an update or a remove left in ${path}.`,
+            this._logFile,
+          );
+        } catch (error) {
+          Logger.error(
+            `<Overlays> Unable to put back overlay ${id}, it's left in ${path} -- ${formatError(error)}`,
+            this._logFile,
+            error,
+          );
+        }
+        continue;
+      }
+      await rm(path, {
         recursive: true,
         force: true,
       }).catch(() => {});

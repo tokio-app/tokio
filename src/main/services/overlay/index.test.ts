@@ -380,6 +380,54 @@ describe("OverlayService", () => {
       expect(await readdir(folder)).toEqual([]);
       expect(stored).toEqual([]);
     });
+
+    describe("after a crash between an update's renames", () => {
+      const old = ".old-gift-jar.0b5c6a52-3f7e-4c1a-9d0e-2a4b6c8d0e1f";
+
+      it("puts back the installed version", async () => {
+        await configurable(join(folder, old));
+        stored = [
+          { id: "gift-jar", name: "Title", version: "1.0.0", config: true },
+        ];
+
+        await service.load(gifts);
+
+        expect(await readdir(folder)).toEqual(["gift-jar"]);
+        expect(stored.map((o) => o.id)).toEqual(["gift-jar"]);
+        expect(mount).toHaveBeenCalledExactlyOnceWith(
+          "gift-jar",
+          join(folder, "gift-jar"),
+          false,
+        );
+        expect(
+          (await service.getConfig("gift-jar")).data!.fields[0].attributes
+            .value,
+        ).toBe("Saved");
+      });
+
+      it("puts it back when the store was rebuilt", async () => {
+        await configurable(join(folder, old));
+        rebuilt = true;
+
+        await service.load(gifts);
+
+        expect(await readdir(folder)).toEqual(["gift-jar"]);
+        expect(stored).toMatchObject([{ id: "gift-jar", external: false }]);
+        expect(mount).toHaveBeenCalledOnce();
+      });
+
+      it("deletes it when the overlay's folder is there", async () => {
+        await configurable(join(folder, "gift-jar"));
+        await configurable(join(folder, old));
+        stored = [
+          { id: "gift-jar", name: "Title", version: "1.0.0", config: true },
+        ];
+
+        await service.load(gifts);
+
+        expect(await readdir(folder)).toEqual(["gift-jar"]);
+      });
+    });
   });
 
   describe("gifts", () => {
