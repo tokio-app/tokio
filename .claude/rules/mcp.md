@@ -49,6 +49,7 @@ Paths to import (`add_to_library`) go through `checkPath`: absolute, a file, and
 
 ## Gotchas
 
+- The SDK and the tools load with the first request past the checks (`createMcpRoutes`), not at startup, where they held 8 MB of main's heap for a feature most streamers never use. Code that runs at startup imports only `@/mcp` (the route) and `@/mcp/common`, which takes only types from the SDK: a value import of the SDK, `registry.ts` or `tools/*` from anywhere else loads them all again (`lazy.test.ts` checks it).
 - `music`'s `connect` returns at once and lets `CONNECT_MUSIC` finish on its own. Spotify waits for the streamer to log in, and holding the chain would stall every other write.
 - `refuseUnknown` stops at arrays. Overlay Studio's save checks each item itself; a game step's unknown keys are still dropped quietly.
 - An overlay settings save from MCP closes that overlay's settings dialog if it's open, since the page closes the dialog its save reply is for.
