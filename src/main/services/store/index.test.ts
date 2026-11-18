@@ -2172,6 +2172,26 @@ describe("StoreManagerService", () => {
       expect((await init()).getStudio()).toEqual([added]);
     });
 
+    it("adds a copy of an overlay with everything it holds", async () => {
+      const store = await init();
+      const source = StudioOverlaySchema.parse({
+        id,
+        name: "Main",
+        size: "landscape",
+        rulers: true,
+        guides: { x: [10], y: [20], locked: true },
+        items: [group("L1", media("m", "confetti.gif"))],
+      });
+
+      expect(await store.addStudioOverlay(other, "Main copy", source)).toBe(
+        true,
+      );
+
+      const copy = { ...source, id: other, name: "Main copy" };
+      expect(store.getStudio()).toEqual([copy]);
+      expect((await init()).getStudio()).toEqual([copy]);
+    });
+
     it("refuses an id that isn't a UUID or is taken", async () => {
       const store = await init();
       await store.addStudioOverlay(id, "Overlay 1");

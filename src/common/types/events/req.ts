@@ -417,8 +417,9 @@ export interface AppEventsMap {
   // OVERLAY STUDIO
   // Each is answered by STUDIO, failures included
   [APP_EVENTS.GET_STUDIO]: void;
-  // The page picks the id (a new UUID) and the name ("Overlay N")
-  [APP_EVENTS.ADD_STUDIO_OVERLAY]: { id: string; name: string };
+  // The page picks the id (a new UUID) and the name ("Overlay N"). copy is
+  // the id of the overlay to duplicate, whose name is then "<name> copy"
+  [APP_EVENTS.ADD_STUDIO_OVERLAY]: { id: string; name: string; copy?: string };
   // The editor's autosave
   [APP_EVENTS.SAVE_STUDIO_OVERLAY]: { overlay: StudioOverlay };
   [APP_EVENTS.REMOVE_STUDIO_OVERLAY]: { id: string };

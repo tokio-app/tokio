@@ -380,16 +380,18 @@ export class StoreManagerService extends Service {
   }
 
   /**
-   * Adds an empty Portrait studio overlay. Null when the id is taken; throws
-   * when the schema refuses it (the id must be a UUID: it becomes the URL).
-   * Otherwise whether the store file was written.
+   * Adds an empty Portrait studio overlay, or a copy of `from` with everything
+   * it holds (element ids too). Null when the id is taken; throws when the
+   * schema refuses it (the id must be a UUID: it becomes the URL). Otherwise
+   * whether the store file was written.
    */
   public async addStudioOverlay(
     id: string,
     name: string,
+    from?: StudioOverlay,
   ): Promise<boolean | null> {
     this._ensureInitialized();
-    const overlay = StudioOverlaySchema.parse({ id, name });
+    const overlay = StudioOverlaySchema.parse({ ...from, id, name });
     const { settings } = this._storeData!;
     if (settings.studio.some((o) => o.id === id)) return null;
     settings.studio = [...settings.studio, overlay];
