@@ -914,7 +914,7 @@ export function createStage(
     switch (element.kind) {
       case "text": {
         const text = only(body, HTMLDivElement, newText);
-        const words = text.firstElementChild as HTMLElement;
+        const words = text.firstElementChild!;
         if (words.textContent !== element.text) {
           words.textContent = element.text;
         }
