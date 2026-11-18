@@ -9,9 +9,11 @@ import {
   type StudioItem,
   type StudioOverlay,
   StudioOverlaySchema,
+  StudioTriggerSchema,
 } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, AppEventsMap } from "@/common/types";
 import {
+  ALERT_MESSAGE_VARIABLES,
   catalogState,
   countedVariables,
   getOverlayURL,
@@ -71,13 +73,33 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const elementSchema = (kind: unknown) =>
   StudioElementSchema.options.find((o) => o.shape.kind.value === kind);
 
-const unknownElementKeys = (element: unknown, prefix: string) =>
-  unknownKeys(
+// unknownKeys stops at arrays, so each of an item's also_triggers is
+// checked here
+const unknownTriggerKeys = (item: unknown, prefix: string): string[] =>
+  isRecord(item) && Array.isArray(item.also_triggers)
+    ? item.also_triggers.flatMap((trigger: unknown, i) =>
+        unknownKeys(
+          StudioTriggerSchema,
+          trigger,
+          `${prefix}also_triggers.${i}.`,
+        ),
+      )
+    : [];
+
+const unknownElementKeys = (element: unknown, prefix: string) => [
+  ...unknownKeys(
     elementSchema(isRecord(element) ? element.kind : undefined) ??
       StudioElementSchema,
     element,
     prefix,
-  );
+  ),
+  ...unknownTriggerKeys(element, prefix),
+];
+
+const unknownGroupKeys = (group: unknown, prefix: string) => [
+  ...unknownKeys(StudioGroupSchema, group, prefix),
+  ...unknownTriggerKeys(group, prefix),
+];
 
 // unknownKeys stops at arrays, and a studio overlay is mostly its items: a
 // typo in an element would be dropped and reported as saved
@@ -87,7 +109,7 @@ function unknownItemKeysOf(item: unknown, prefix: string): string[] {
   }
   const elements: unknown[] = Array.isArray(item.elements) ? item.elements : [];
   return [
-    ...unknownKeys(StudioGroupSchema, item, prefix),
+    ...unknownGroupKeys(item, prefix),
     ...elements.flatMap((element, j) =>
       unknownElementKeys(element, `${prefix}elements.${j}.`),
     ),
@@ -100,6 +122,36 @@ const unknownItemKeys = (items: unknown): string[] =>
         unknownItemKeysOf(item, `items.${i}.`),
       )
     : [];
+
+const CounterSchema = StudioOverlaySchema.shape.counters.unwrap().element;
+
+const unknownCounterKeys = (counters: unknown): string[] =>
+  Array.isArray(counters)
+    ? counters.flatMap((counter: unknown, i) =>
+        unknownKeys(CounterSchema, counter, `counters.${i}.`),
+      )
+    : [];
+
+// The names a text already fills: a counter named so would never show
+const TAKEN_NAMES = new Set<string>([
+  ...STUDIO_NUMBERS,
+  ...Object.values(ALERT_MESSAGE_VARIABLES).flat(),
+]);
+
+// The schema takes any counter name, since the editor saves one while it's
+// typed and warns about it. Here no one sees a warning.
+function counterProblem(counters: StudioOverlay["counters"]) {
+  const seen = new Set<string>();
+  for (const [i, { name }] of counters.entries()) {
+    if (name === "") return `counters.${i} needs a name.`;
+    if (TAKEN_NAMES.has(name)) {
+      return `counters.${i}: {${name}} is a LIVE number or an event's variable, pick another name.`;
+    }
+    if (seen.has(name)) return `counters.${i}: another counter is ${name}.`;
+    seen.add(name);
+  }
+  return undefined;
+}
 
 // The first "Overlay N" no studio overlay is named, as the Studio page picks
 function newStudioName({ storeManagerService }: Handler) {
@@ -262,7 +314,10 @@ export const kinds: Kinds = {
       return ok({ ...overlay, url: getStudioOverlayURL(id) });
     },
     save: async (handler, id, changes) => {
-      const unknown = unknownItemKeys(changes.items);
+      const unknown = [
+        ...unknownItemKeys(changes.items),
+        ...unknownCounterKeys(changes.counters),
+      ];
       if (unknown.length > 0) {
         return fail(
           `Unknown settings: ${unknown.join(", ")}. Nothing was saved: see describe for the fields.`,
@@ -277,6 +332,12 @@ export const kinds: Kinds = {
       const parsed = StudioOverlaySchema.safeParse(deepMerge(stored, changes));
       if (!parsed.success) return invalid(parsed.error);
       const overlay = parsed.data;
+      // Only the ones sent: the editor's may be mid-typing
+      const problem =
+        changes.counters === undefined
+          ? undefined
+          : counterProblem(overlay.counters);
+      if (problem) return fail(`${problem} Nothing was saved.`);
 
       if (id === undefined) {
         const error = await studioInvoke(
@@ -628,7 +689,7 @@ function applyEdit(
     const { item } = found;
     const unknown =
       item.kind === "group"
-        ? unknownKeys(StudioGroupSchema, set, `${path}.set.`)
+        ? unknownGroupKeys(set, `${path}.set.`)
         : unknownElementKeys({ ...set, kind: item.kind }, `${path}.set.`);
     if (unknown.length > 0) {
       throw new EditError(`Unknown settings: ${unknown.join(", ")}.`);
