@@ -14,6 +14,16 @@
         src: url(__ARCHIVO__) format("woff2-variations");
       }
 
+      /* Its own italic: without it Chromium slants the upright letters */
+      @font-face {
+        font-family: "Archivo Variable";
+        font-style: italic;
+        font-display: block;
+        font-weight: 100 900;
+        font-stretch: 62% 125%;
+        src: url(__ARCHIVO_ITALIC__) format("woff2-variations");
+      }
+
       html,
       body,
       #stage {
@@ -100,6 +110,10 @@
       // failed or timed out: the count it resolves with) and is painted
       const draw = async (view) => {
         stage.update(view);
+        // Laid out now, so the texts' fonts start loading before fonts.ready
+        // is read: with font-display: block a text stays invisible until its
+        // font is in, and ready, read before, has nothing to wait for
+        root.getBoundingClientRect();
         const nodes = root.querySelectorAll("img, video, iframe");
         const results = await Promise.all([
           Promise.race([document.fonts.ready, wait(LOAD_MS)]).then(() => true),

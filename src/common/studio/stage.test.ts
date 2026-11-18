@@ -29,6 +29,8 @@ const BASE: Omit<TextView, "id" | "kind" | keyof typeof TEXT> = {
   flip_y: false,
   z: 0,
   opacity: 1,
+  shadow: null,
+  blur: 0,
   when: "always",
   seconds: 5,
   entrance: "pop",
@@ -45,12 +47,23 @@ const TEXT = {
   align: "center",
   bold: true,
   halo: true,
+  gradient: null,
+  outline: null,
+  letter_spacing: 0,
+  line_height: 115,
+  italic: false,
+  caps: false,
 } as const;
 
 // What a picture element draws when it keeps all of itself
 const PICTURE = { crop: null, rounding: 0 };
 // A shape element's rectangle
-const RECTANGLE = { shape: "rectangle", sides: 3, points: 5 } as const;
+const RECTANGLE = {
+  shape: "rectangle",
+  sides: 3,
+  points: 5,
+  gradient: null,
+} as const;
 
 // A media element's whole video, looping at full volume
 const MEDIA = { start: 0, end: null, loop: true, volume: 100 };
@@ -163,6 +176,74 @@ describe("on stream", () => {
       el(id).querySelector<HTMLElement>(".studio-text")!.style.fontFamily;
     expect(font("named")).toContain('"Comic\\"; color: red"');
     expect(font("plain")).toContain("Archivo Variable");
+  });
+
+  it("draws a text's words in one span, copied plain for its underlay", () => {
+    draw(view(text("t", { text: "<b>{username}</b>" })));
+    const shown = el("t").querySelector<HTMLElement>(".studio-text")!;
+    const words = shown.querySelector<HTMLElement>(".studio-words")!;
+    expect(shown.children).toHaveLength(1);
+    expect(words.textContent).toBe("<b>{username}</b>");
+    expect(shown.dataset.text).toBe("<b>{username}</b>");
+
+    // The same span, its words and copy rewritten
+    draw(view(text("t", { text: "Thanks" })));
+    expect(shown.querySelector(".studio-words")).toBe(words);
+    expect(words.textContent).toBe("Thanks");
+    expect(shown.dataset.text).toBe("Thanks");
+  });
+
+  it("styles a text's words, and clears each style it drops", () => {
+    draw(
+      view(
+        text("t", {
+          align: "right",
+          halo: false,
+          outline: { color: "#18181b", width: 4 },
+          gradient: { color: "#f43f5e", angle: 45 },
+          letter_spacing: 10,
+          line_height: 150,
+          italic: true,
+          caps: true,
+        }),
+      ),
+    );
+    const shown = el("t").querySelector<HTMLElement>(".studio-text")!;
+    const variable = (name: string) => el("t").style.getPropertyValue(name);
+    expect(shown.className).toBe(
+      "studio-text studio-bold studio-outline studio-gradient",
+    );
+    expect(shown.style.letterSpacing).toBe("0.1em");
+    expect(shown.style.lineHeight).toBe("1.5");
+    expect(shown.style.fontStyle).toBe("italic");
+    expect(shown.style.textTransform).toBe("uppercase");
+    expect(shown.style.textAlign).toBe("right");
+    expect(shown.style.justifyItems).toBe("right");
+    expect(variable("--studio-outline-color")).toBe("#18181b");
+    expect(variable("--studio-outline-width")).toBe("4px");
+    expect(variable("--studio-color-2")).toBe("#f43f5e");
+    expect(variable("--studio-angle")).toBe("45deg");
+
+    // The halo alone keeps the underlay; the rest goes
+    draw(view(text("t")));
+    expect(shown.className).toBe("studio-text studio-bold studio-halo");
+    expect(shown.style.letterSpacing).toBe("0em");
+    expect(shown.style.lineHeight).toBe("1.15");
+    expect(shown.style.fontStyle).toBe("");
+    expect(shown.style.textTransform).toBe("");
+    expect(shown.style.justifyItems).toBe("center");
+    for (const name of [
+      "--studio-outline-color",
+      "--studio-outline-width",
+      "--studio-color-2",
+      "--studio-angle",
+    ]) {
+      expect(variable(name)).toBe("");
+    }
+
+    // Neither: no underlay
+    draw(view(text("t", { halo: false, bold: false })));
+    expect(shown.className).toBe("studio-text");
   });
 
   it("stacks each layer over the whole canvas, its elements inside it", () => {
@@ -505,6 +586,42 @@ describe("on stream", () => {
     expect(el("s").style.getPropertyValue("--studio-radius")).toBe("24px");
   });
 
+  it("paints a shape's gradient on its body, or on its figure under an unfilled path", () => {
+    const shape = (fields: Partial<ShapeView>): ShapeView => ({
+      ...BASE,
+      id: "s",
+      kind: "shape",
+      ...RECTANGLE,
+      color: "#18181b",
+      gradient: { color: "#f43f5e", angle: 45 },
+      radius: 0,
+      border: null,
+      ...fields,
+    });
+    draw(view(shape({})));
+    expect(el("s").classList).toContain("studio-gradient");
+    expect(el("s").style.getPropertyValue("--studio-color")).toBe("#18181b");
+    expect(el("s").style.getPropertyValue("--studio-color-2")).toBe("#f43f5e");
+    expect(el("s").style.getPropertyValue("--studio-angle")).toBe("45deg");
+
+    draw(view(shape({ shape: "star", border: { color: "#fff", width: 4 } })));
+    const figure = el("s").querySelector("svg")!;
+    const path = figure.querySelector("path")!;
+    // The figure paints it: the body stays clear
+    expect(el("s").classList).not.toContain("studio-gradient");
+    expect(figure.classList).toContain("studio-gradient");
+    expect(figure.style.getPropertyValue("--studio-color")).toBe("#18181b");
+    expect(path.getAttribute("fill")).toBe("none");
+    expect(path.getAttribute("stroke")).toBe("#fff");
+
+    // Without a fill there's no gradient (the view's is null)
+    draw(view(shape({ shape: "star", color: null, gradient: null })));
+    expect(figure.classList).not.toContain("studio-gradient");
+    expect(path.getAttribute("fill")).toBe("none");
+    draw(view(shape({ color: null, gradient: null })));
+    expect(el("s").classList).not.toContain("studio-gradient");
+  });
+
   it("shows on an emote element the emote its event sent", () => {
     draw(
       view({
@@ -570,6 +687,52 @@ describe("on stream", () => {
     stage.destroy();
     expect(root.innerHTML).toBe("");
     expect(root.classList).not.toContain("studio-stage");
+  });
+});
+
+describe("effects", () => {
+  beforeEach(() => {
+    stage = createStage(root);
+  });
+
+  const SHADOW = { color: "#ff00ff", blur: 12, x: 10, y: 0 };
+
+  it("blurs and shadows the element's node, not its body, and clears them", () => {
+    draw(view(text("t", { blur: 4, shadow: SHADOW })));
+    expect(el("t").style.filter).toBe(
+      "blur(4px) drop-shadow(10px 0px 12px var(--studio-shadow))",
+    );
+    expect(el("t").style.getPropertyValue("--studio-shadow")).toBe("#ff00ff");
+    expect(body("t").style.filter).toBe("");
+
+    draw(view(text("t", { shadow: { ...SHADOW, x: 0, y: 0 } })));
+    // A glow: no offset, and no blur of its own
+    expect(el("t").style.filter).toBe(
+      "drop-shadow(0px 0px 12px var(--studio-shadow))",
+    );
+
+    draw(view(text("t")));
+    expect(el("t").style.filter).toBe("");
+    expect(el("t").style.getPropertyValue("--studio-shadow")).toBe("");
+  });
+
+  it("turns the offset back for a rotated or flipped element, so it falls the same way", () => {
+    // Turned a quarter clockwise, its own up is the screen's right
+    draw(view(text("t", { rotation: 90, shadow: SHADOW })));
+    expect(el("t").style.filter).toBe(
+      "drop-shadow(0px -10px 12px var(--studio-shadow))",
+    );
+
+    // Mirrored, its own left is the screen's right
+    draw(view(text("t", { flip_x: true, shadow: SHADOW })));
+    expect(el("t").style.filter).toBe(
+      "drop-shadow(-10px 0px 12px var(--studio-shadow))",
+    );
+
+    draw(view(text("t", { rotation: 90, flip_y: true, shadow: SHADOW })));
+    expect(el("t").style.filter).toBe(
+      "drop-shadow(0px 10px 12px var(--studio-shadow))",
+    );
   });
 });
 

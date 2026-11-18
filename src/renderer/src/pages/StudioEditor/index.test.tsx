@@ -817,6 +817,99 @@ describe("StudioEditor", () => {
     );
   });
 
+  it("grows a text's box to its words when italic or its spacing changes", async () => {
+    const words = text({
+      text: "Hello",
+      align: "center",
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 100,
+    });
+    const { user } = await open(scene(words));
+    await user.click(row(/^Hello/));
+    sized();
+    // At half size on screen: its longest word 200 px, its lines 120 px tall
+    const shown = drawn(words.id).querySelector<HTMLElement>(".studio-text")!;
+    const wide = vi
+      .spyOn(shown, "getBoundingClientRect")
+      .mockReturnValue(new DOMRect(0, 0, 200, 60));
+    const tall = vi
+      .spyOn(Range.prototype, "getBoundingClientRect")
+      .mockReturnValue(new DOMRect(0, 0, 200, 120));
+
+    await user.click(page().getByRole("checkbox", { name: "Italic" }));
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        italic: true,
+        x: 50,
+        y: 130,
+        width: 400,
+        height: 240,
+      }),
+    );
+    await studio(lastSave()!);
+
+    // Wider and taller with its letters spread
+    wide.mockReturnValue(new DOMRect(0, 0, 250, 60));
+    tall.mockReturnValue(new DOMRect(0, 0, 250, 150));
+    const spacing = field("Letter spacing (%)").getByRole("spinbutton");
+    await user.clear(spacing);
+    await user.type(spacing, "20");
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        letter_spacing: 20,
+        x: 0,
+        y: 100,
+        width: 500,
+        height: 300,
+      }),
+    );
+  });
+
+  it("saves a text's outline, gradient, spacing, italic and caps", async () => {
+    const words = text({ text: "Hello" });
+    const { user } = await open(scene(words));
+    await user.click(row(/^Hello/));
+
+    await user.click(page().getByRole("checkbox", { name: "Outline" }));
+    const width = page().getByRole("spinbutton", { name: "Outline width" });
+    await user.clear(width);
+    await user.type(width, "12");
+    await user.click(page().getByRole("checkbox", { name: "Gradient" }));
+    const angle = page().getByRole("spinbutton", { name: "Gradient angle" });
+    await user.clear(angle);
+    await user.type(angle, "45");
+    const height = field("Line height (%)").getByRole("spinbutton");
+    await user.clear(height);
+    await user.type(height, "150");
+    const spacing = field("Letter spacing (%)").getByRole("spinbutton");
+    await user.clear(spacing);
+    await user.type(spacing, "-5");
+    await user.click(page().getByRole("checkbox", { name: "Italic" }));
+    await user.click(page().getByRole("checkbox", { name: "All caps" }));
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        outline: true,
+        outline_width: 12,
+        gradient: true,
+        gradient_angle: 45,
+        line_height: 150,
+        letter_spacing: -5,
+        italic: true,
+        caps: true,
+      }),
+    );
+    const shown = drawn(words.id).querySelector<HTMLElement>(".studio-text")!;
+    expect(shown.className).toMatch(/studio-outline studio-gradient/);
+    expect(shown.style.fontStyle).toBe("italic");
+    expect(shown.style.textTransform).toBe("uppercase");
+    expect(
+      drawn(words.id).style.getPropertyValue("--studio-outline-width"),
+    ).toBe("12px");
+  });
+
   it("keeps a text's box fields to its words, its height following its width", async () => {
     const words = text({
       text: "Hello there",
@@ -1636,6 +1729,60 @@ describe("StudioEditor", () => {
     );
     expect(drawn(shape.id).style.getPropertyValue("--studio-border")).toMatch(
       /^12px solid/,
+    );
+  });
+
+  it("fades a shape's fill into a gradient, offered only with a fill", async () => {
+    const shape = elementOf("shape");
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Rectangle/));
+
+    await user.click(page().getByRole("checkbox", { name: "Gradient" }));
+    const angle = page().getByRole("spinbutton", { name: "Gradient angle" });
+    await user.clear(angle);
+    await user.type(angle, "45");
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        gradient: true,
+        gradient_angle: 45,
+      }),
+    );
+    expect(drawn(shape.id).classList).toContain("studio-gradient");
+
+    await user.click(page().getByRole("checkbox", { name: "Fill" }));
+    expect(
+      page().queryByRole("checkbox", { name: "Gradient" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("gives any kind a shadow and a blur", async () => {
+    const element = elementOf("emote");
+    const { user } = await open(scene(element));
+    await user.click(row(/^Emote/));
+
+    const shadow = within(page().getByRole("group", { name: "Shadow" }));
+    expect(shadow.queryByRole("spinbutton")).not.toBeInTheDocument();
+    await user.click(shadow.getByRole("checkbox", { name: "Shadow" }));
+    const softness = shadow.getByRole("spinbutton", { name: "Softness" });
+    await user.clear(softness);
+    await user.type(softness, "30");
+    const down = shadow.getByRole("spinbutton", { name: "Y" });
+    await user.clear(down);
+    await user.type(down, "-12");
+    const blur = page().getByRole("spinbutton", { name: "Blur" });
+    await user.clear(blur);
+    await user.type(blur, "6");
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        shadow: true,
+        shadow_blur: 30,
+        shadow_y: -12,
+        blur: 6,
+      }),
+    );
+    expect(drawn(element.id).style.filter).toMatch(
+      /^blur\(6px\) drop-shadow\(0px -12px 30px/,
     );
   });
 

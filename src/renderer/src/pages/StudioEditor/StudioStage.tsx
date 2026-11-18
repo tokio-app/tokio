@@ -1,6 +1,8 @@
 // The stream's own stylesheet, global as on its page, like the games
 // overlay's preview: the canvas can't drift from what's on stream
 import "@/common/studio/overlay.css";
+// Archivo's own italic, which only the canvas's texts use, as on stream
+import "@fontsource-variable/archivo/wdth-italic.css";
 import {
   STUDIO_MAX_GUIDES,
   StudioCrop,
@@ -644,7 +646,9 @@ export function StudioStage({
    */
   const textHeight = (id: string, width: number, scale: number) => {
     const node = nodeOf(id);
-    const text = node?.querySelector(".studio-text");
+    // The words' lines: over .studio-text the range would count the span's
+    // line boxes too, a little taller
+    const text = node?.querySelector(".studio-words");
     if (!node || !text || !scale) return 1;
     // Unturned, so the range's box is the words' own height
     const { width: keptWidth, transform } = node.style;

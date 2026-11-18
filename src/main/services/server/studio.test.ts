@@ -23,6 +23,8 @@ const BASE = {
   flip_y: false,
   z: 0,
   opacity: 1,
+  shadow: null,
+  blur: 0,
   when: "always",
   seconds: 5,
   entrance: "pop",
@@ -50,6 +52,12 @@ const TEXT = {
   align: "center",
   bold: true,
   halo: true,
+  gradient: null,
+  outline: null,
+  letter_spacing: 0,
+  line_height: 115,
+  italic: false,
+  caps: false,
 } as const;
 
 const viewOf = (...layers: StudioLayerView[]): StudioView => ({
@@ -65,7 +73,12 @@ const view = (...elements: StudioElementView[]) =>
 // What a picture element draws when it keeps all of itself
 const PICTURE = { crop: null, rounding: 0 };
 // A shape element's rectangle
-const RECTANGLE = { shape: "rectangle", sides: 3, points: 5 } as const;
+const RECTANGLE = {
+  shape: "rectangle",
+  sides: 3,
+  points: 5,
+  gradient: null,
+} as const;
 // A media element's whole video, looping at full volume
 const MEDIA = { start: 0, end: null, loop: true, volume: 100 };
 
@@ -89,10 +102,11 @@ describe("studio overlay page", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toMatch(/^text\/html/);
       const html = await res.text();
-      expect(html).toContain("url(data:font/woff2;base64,");
+      // Archivo, upright and italic
+      expect(html.match(/url\(data:font\/woff2;base64,/g)).toHaveLength(2);
       expect(html).toContain(STYLES);
       expect(html).toContain(STAGE);
-      expect(html).not.toMatch(/__ARCHIVO__|__STYLES__|__STAGE__/);
+      expect(html).not.toMatch(/__ARCHIVO|__STYLES__|__STAGE__/);
       // Only its own two scripts end: the stage can't close one early
       expect(html.match(/<\/script/gi)).toHaveLength(2);
     }

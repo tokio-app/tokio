@@ -98,7 +98,16 @@ import { useHistory } from "./useHistory";
 let requests = 0;
 
 // A text's fields that change how much room its words take
-const WORDS = ["text", "font", "size", "bold"] as const;
+const WORDS = [
+  "text",
+  "font",
+  "size",
+  "bold",
+  "italic",
+  "caps",
+  "letter_spacing",
+  "line_height",
+] as const;
 
 // Fields typed in, which keep their own Ctrl+Z. Number fields take the
 // editor's, like checkboxes, radios and sliders.

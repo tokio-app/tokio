@@ -58,6 +58,8 @@ Paths to import (`add_to_library`) go through `checkPath`: absolute, a file, and
 - An overlay settings save from MCP closes that overlay's settings dialog if it's open, since the page closes the dialog its save reply is for.
 - A voice saved through `tts` replaces the whole voice: a partial one would keep the last engine's `id` (`.claude/rules/tts.md`).
 - `preview_studio_overlay` (`tools/studio.ts`) draws the stored overlay, never the editor's unsaved copy, since it's read-only and doesn't flush. It loads the page's `?preview` in a hidden window on its own in-memory partition, `studio-preview`: the app's session cancels every WebSocket to the overlay server (`initSession`), and embeds need theirs. Permissions, new windows, navigation and sound are refused there. One preview runs at a time and its window is always destroyed, after 15 s at most; destroying it can't quit the app, since the main window only hides. Only `tools/studio.ts` imports `helper/studioPreview.ts`.
+  - Windows clamps a window to the screen, hidden or offscreen (a 1080×1920 one came out 1080×1080), which squeezed the canvas. So the window takes the picture's shape within the work area, the capture is of the canvas's rect alone, and it's resized to the size asked: softer when the screen is smaller than the picture.
+  - A hidden page rasters only when a capture asks, so the first capture of a busy canvas missed its texts: it's thrown away, and the second, `SETTLE_MS` later, is kept. Measured with drive-app's `--scale 2` on a 1920×1080 screen.
 - The `shortcuts` section refuses what the recorder refuses (`shortcutProblem` in `tools/settings.ts`, `.claude/rules/controls.md`): `SET_SHORTCUTS` itself takes any string.
 
 ## Coupling

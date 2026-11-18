@@ -60,6 +60,8 @@ export function LayerThumb({
             color: element.color,
             fontFamily: element.font ? JSON.stringify(element.font) : undefined,
             fontWeight: element.bold ? 700 : 400,
+            fontStyle: element.italic ? "italic" : undefined,
+            textTransform: element.caps ? "uppercase" : undefined,
           }}
         >
           {t("studio.editor.textSample")}
@@ -71,6 +73,10 @@ export function LayerThumb({
       const width = Math.max(2, element.width * scale);
       const height = Math.max(2, element.height * scale);
       const border = Math.max(1, element.border_width * scale);
+      const gradient =
+        element.fill && element.gradient
+          ? `linear-gradient(${element.gradient_angle}deg, ${element.color}, ${element.gradient_color})`
+          : undefined;
       if (shape === "rectangle" || shape === "ellipse") {
         return (
           <span className={styles.thumb} aria-hidden>
@@ -81,7 +87,8 @@ export function LayerThumb({
                 height,
                 borderRadius:
                   shape === "ellipse" ? "50%" : element.radius * scale,
-                backgroundColor: element.fill ? element.color : "transparent",
+                background:
+                  gradient ?? (element.fill ? element.color : "transparent"),
                 border: element.border
                   ? `${border}px solid ${element.border_color}`
                   : undefined,
@@ -101,11 +108,11 @@ export function LayerThumb({
             width={width}
             height={height}
             viewBox={`0 0 ${width} ${height}`}
-            style={{ clipPath: `path("${d}")` }}
+            style={{ clipPath: `path("${d}")`, background: gradient }}
           >
             <path
               d={d}
-              fill={element.fill ? element.color : "none"}
+              fill={element.fill && !gradient ? element.color : "none"}
               stroke={element.border ? element.border_color : "none"}
               strokeWidth={element.border ? border * 2 : 0}
             />

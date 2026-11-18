@@ -23,6 +23,7 @@ import {
   TIMER_PATH,
 } from "@/common/util";
 import ARCHIVO from "@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2?inline";
+import ARCHIVO_ITALIC from "@fontsource-variable/archivo/files/archivo-latin-wdth-italic.woff2?inline";
 import Logger from "@/logger";
 import express, { Express, Router } from "express";
 import { randomUUID, timingSafeEqual } from "node:crypto";
@@ -51,6 +52,7 @@ const GAMES_PAGE = GAMES_HTML.replace("__ARCHIVO__", () => ARCHIVO).replace(
 
 // With the look and the renderer it shares with Overlay Studio's editor
 const STUDIO_PAGE = STUDIO_HTML.replace("__ARCHIVO__", () => ARCHIVO)
+  .replace("__ARCHIVO_ITALIC__", () => ARCHIVO_ITALIC)
   .replace("/* __STYLES__ */", () => STUDIO_STYLES)
   .replace("/* __STAGE__ */", () => STAGE);
 

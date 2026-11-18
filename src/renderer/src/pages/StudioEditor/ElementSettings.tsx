@@ -2,6 +2,7 @@ import { MessageKey } from "@/common/i18n";
 import {
   STUDIO_MAX_BORDER,
   STUDIO_MAX_FONT_SIZE,
+  STUDIO_MAX_OUTLINE,
   STUDIO_NAME_MAX_LENGTH,
   STUDIO_TEXT_MAX_LENGTH,
   StudioAlign,
@@ -37,6 +38,8 @@ import { useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
 import { BoxFields } from "./BoxFields";
 import { CameraFields } from "./CameraFields";
+import { EffectsFields } from "./EffectsFields";
+import { GradientFields } from "./GradientFields";
 import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
 import { PictureFields } from "./PictureFields";
 import { ReactionFields, WHENS } from "./ReactionFields";
@@ -218,6 +221,71 @@ export function ElementSettings({
               />
             </Field>
           </div>
+          {/* Each on or off, its color beside it, as a shape's paint */}
+          <div className={styles.paint}>
+            <GradientFields value={element} onChange={onChange} />
+            <div
+              role="group"
+              aria-label={t("studio.fields.outline")}
+              className={styles.paint_row}
+            >
+              <Check
+                label={t("studio.fields.outline")}
+                checked={element.outline}
+                onChange={(e) =>
+                  onChange({ ...element, outline: e.target.checked })
+                }
+              />
+              {element.outline && (
+                <>
+                  <Color
+                    value={element.outline_color}
+                    onChange={(outline_color) =>
+                      onChange({ ...element, outline_color })
+                    }
+                  />
+                  <NumberInput
+                    className={styles.number}
+                    scrub
+                    aria-label={t("studio.fields.outlineWidth")}
+                    integer
+                    min={1}
+                    max={STUDIO_MAX_OUTLINE}
+                    value={element.outline_width}
+                    onChange={(outline_width) =>
+                      onChange({ ...element, outline_width })
+                    }
+                  />
+                </>
+              )}
+            </div>
+          </div>
+          <div className={styles.pair}>
+            <Field label={t("studio.fields.letterSpacing")}>
+              <NumberInput
+                scrub
+                integer
+                min={-20}
+                max={100}
+                value={element.letter_spacing}
+                onChange={(letter_spacing) =>
+                  onChange({ ...element, letter_spacing })
+                }
+              />
+            </Field>
+            <Field label={t("studio.fields.lineHeight")}>
+              <NumberInput
+                scrub
+                integer
+                min={50}
+                max={300}
+                value={element.line_height}
+                onChange={(line_height) =>
+                  onChange({ ...element, line_height })
+                }
+              />
+            </Field>
+          </div>
           <Field label={t("studio.fields.align")} className={styles.inline}>
             <RadioGroup
               name={`studio-align-${element.id}`}
@@ -231,6 +299,18 @@ export function ElementSettings({
               label={t("studio.fields.bold")}
               checked={element.bold}
               onChange={(e) => onChange({ ...element, bold: e.target.checked })}
+            />
+            <Check
+              label={t("studio.fields.italic")}
+              checked={element.italic}
+              onChange={(e) =>
+                onChange({ ...element, italic: e.target.checked })
+              }
+            />
+            <Check
+              label={t("studio.fields.caps")}
+              checked={element.caps}
+              onChange={(e) => onChange({ ...element, caps: e.target.checked })}
             />
             <Check
               label={t("studio.fields.halo")}
@@ -354,6 +434,9 @@ export function ElementSettings({
                 />
               )}
             </div>
+            {element.fill && (
+              <GradientFields value={element} onChange={onChange} />
+            )}
             <div
               role="group"
               aria-label={t("studio.fields.border")}
@@ -430,6 +513,7 @@ export function ElementSettings({
           onRounding={(rounding) => onChange({ ...element, rounding })}
         />
       )}
+      <EffectsFields element={element} onChange={onChange} />
 
       <BoxFields
         box={element}

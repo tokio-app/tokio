@@ -27,6 +27,10 @@ type StudioElementViewBase = {
   flip_y: boolean;
   z: number;
   opacity: number;
+  // Its drop shadow or glow, in px of the canvas, null without one; and its
+  // blur, 0 for none
+  shadow: { color: string; blur: number; x: number; y: number } | null;
+  blur: number;
   when: StudioWhen;
   seconds: number;
   entrance: StudioEntrance;
@@ -38,6 +42,9 @@ type StudioElementViewBase = {
 // A picture's part it keeps, null for all of it, and its corners' rounding,
 // a % of the shorter side of what shows
 type StudioPictureView = { crop: StudioCrop | null; rounding: number };
+
+// A color's fade into another, at an angle in CSS's degrees; null without one
+export type StudioGradientView = { color: string; angle: number } | null;
 
 /**
  * One element as the stage draws it (studioView), everything resolved. A
@@ -55,6 +62,14 @@ export type StudioElementView = StudioElementViewBase &
         align: StudioAlign;
         bold: boolean;
         halo: boolean;
+        gradient: StudioGradientView;
+        // Around its letters, null without one
+        outline: { color: string; width: number } | null;
+        // % of its size
+        letter_spacing: number;
+        line_height: number;
+        italic: boolean;
+        caps: boolean;
       }
     | ({
         kind: "media";
@@ -73,14 +88,16 @@ export type StudioElementView = StudioElementViewBase &
     | ({ kind: "camera"; src: string | null } & StudioPictureView)
     | ({ kind: "gift"; src: string | null } & StudioPictureView)
     | ({ kind: "emote"; src: string | null } & StudioPictureView)
-    // color null without a fill, border null without one; sides are a
-    // polygon's, points a star's and radius a rectangle's or a bubble's
+    // color null without a fill, and gradient with it; border null without
+    // one; sides are a polygon's, points a star's and radius a rectangle's
+    // or a bubble's
     | {
         kind: "shape";
         shape: StudioShape;
         sides: number;
         points: number;
         color: string | null;
+        gradient: StudioGradientView;
         radius: number;
         border: { color: string; width: number } | null;
       }
