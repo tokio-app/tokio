@@ -59,7 +59,7 @@ export function liveNumbers({
 }
 
 // Where the overlay server serves an embed
-export const embedPath = (source: StudioSource) => {
+const embedPath = (source: StudioSource) => {
   if (source.type === "installed") return `/${encodeURIComponent(source.id)}/`;
   if (source.type === "alert") {
     return `/${ALERTS_PATH}/${encodeURIComponent(source.id)}/`;

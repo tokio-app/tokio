@@ -402,11 +402,11 @@ const sampleOf = (element: StudioElement, samples: Samples) =>
   reactsToEvents(element) ? samples.of(element.trigger.type) : null;
 
 /** The picture of the gift or emote its trigger's sample sent, "" for none. */
-export const sampleSentOf = (element: StudioElement, samples: Samples) =>
+const sampleSentOf = (element: StudioElement, samples: Samples) =>
   sentPicture(element, sampleOf(element, samples));
 
 /** A text element's text with the sample numbers and its trigger's sample. */
-export const sampleText = (
+const sampleText = (
   element: StudioElementOf<"text">,
   samples: Samples,
   language: string,
@@ -419,7 +419,7 @@ export const sampleText = (
   });
 
 /** The picture and name a viewer element shows, its trigger's sample's. */
-export const sampleViewerOf = (element: StudioElement, samples: Samples) =>
+const sampleViewerOf = (element: StudioElement, samples: Samples) =>
   sampleViewer(samples.of(element.trigger.type));
 
 /** What Test plays on the stage for an element that reacts to an event. */
