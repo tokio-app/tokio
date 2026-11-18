@@ -137,9 +137,21 @@ export const sendStudioReact = (
     data: react,
   });
 
-// Whether one of its texts shows a live number, sent again as they change
+// Whether one of its texts shows a live number or one of its counters, sent
+// again as they change
 export const showsNumbers = (overlay: StudioOverlay) =>
-  studioElements(overlay).some((e) => e.kind === "text" && usesNumbers(e.text));
+  studioElements(overlay).some(
+    (e) =>
+      e.kind === "text" &&
+      (usesNumbers(e.text) ||
+        overlay.counters.some((c) => e.text.includes(`{${c.name}}`))),
+  );
+
+// Whether one of its texts shows {uptime}, sent again every second while LIVE
+export const showsUptime = (overlay: StudioOverlay) =>
+  studioElements(overlay).some(
+    (e) => e.kind === "text" && e.text.includes("{uptime}"),
+  );
 
 /**
  * Sends the studio overlays' pages what to draw: every overlay, or those
