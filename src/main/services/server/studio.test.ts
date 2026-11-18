@@ -422,13 +422,11 @@ describe("studio overlay page", () => {
 
     it("draws the view with waiting elements shown, once its media loaded", async () => {
       const { document } = dom.window;
-      const draw = (
-        dom.window as unknown as {
-          TokioPreview: (view: StudioView) => Promise<number>;
-        }
-      ).TokioPreview;
+      type Preview = { TokioPreview: (view: StudioView) => Promise<number> };
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page's global
+      const page = dom.window as unknown as Preview;
 
-      const drawn = draw(
+      const drawn = page.TokioPreview(
         view(
           element("t", TEXT),
           element("w", TEXT, { when: "event" }),
