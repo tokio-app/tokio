@@ -31,6 +31,8 @@ paths:
 - A cropped or rounded picture is laid out by the stage from its own size (`layoutPicture`), since Chromium 103 has no `object-view-box`, and clipped with `clip-path: inset(… round …)`. It's hidden until its size is read, so it never shows uncut, and laid out again on `load` or `loadedmetadata` (a sent gift, a new file), and a camera's on `resize` too. A viewer's crop covers its circle instead (`layoutAvatar`).
 - Shapes other than a rectangle or an ellipse draw as `svg.studio-figure`, one path from `shapePath` in px of the box, so nothing scales its stroke; the editor's thumbnails draw it the same way. A star's inner corners sit at Figma's ratio (`STAR_RATIO`).
 - Their border is a stroke at twice the width, cut to the inside by `clip-path: path()` with the same path: a border inside the edge for any shape, convex or not, with no ids to keep unique.
+- Their gradient is the svg's own CSS background (`.studio-gradient`), under a path filled `none`, cut by the same clip-path: no `<linearGradient>`, so no ids either. A rectangle's or an ellipse's is its body's background. The variables (`--studio-angle`, `--studio-color`, `--studio-color-2`) are the text gradient's too.
+- An element's blur and shadow are one `filter` on its node (`effects`), never on `.studio-body`, whose blur entrance and exit animate `filter` and whose wipe sets `clip-path`, nor on a clipped figure or cropped picture, whose clip-path would cut the shadow off. A filter works before the node's transform, so the offset is turned back by the rotation and mirrored by the flips to fall the same way on screen.
 
 ## Video and sound
 
