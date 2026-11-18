@@ -366,9 +366,27 @@ const newFigure = () => {
 
 type BarView = Extract<StudioElementView, { kind: "bar" }>;
 
-// A goal bar's track and its fill (PR 4's bar work draws them)
-const fillBar = (body: HTMLElement, _bar: BarView) => {
-  body.firstElementChild?.remove();
+/**
+ * A goal bar: its body is the track, and its one child the fill, from the
+ * left or the bottom. The fill's length eases in the stylesheet; a new fill
+ * draws at once, with no style to ease from, so a reload doesn't replay it
+ * from empty. Its gradient is sized to the whole track, so the second color
+ * shows as it fills.
+ */
+const fillBar = (el: HTMLElement, body: HTMLElement, bar: BarView) => {
+  const fill = only(body, HTMLDivElement, () => div("studio-bar-fill"));
+  const length = `${hundredths(bar.fill * 100)}%`;
+  fill.style.width = bar.vertical ? "100%" : length;
+  fill.style.height = bar.vertical ? length : "100%";
+  fill.style.backgroundSize = `${bar.width}px ${bar.height}px`;
+  el.classList.toggle("studio-gradient", !!bar.gradient);
+  setVariables(el, {
+    "--studio-color": bar.color,
+    "--studio-track": bar.track,
+    "--studio-radius": `${hundredths((bar.rounding / 100) * Math.min(bar.width, bar.height))}px`,
+    "--studio-color-2": bar.gradient?.color,
+    "--studio-angle": bar.gradient && `${bar.gradient.angle}deg`,
+  });
 };
 
 // Chromium keeps a detached player that still has a source alive
@@ -1065,7 +1083,7 @@ export function createStage(
         break;
       }
       case "bar":
-        fillBar(body, element);
+        fillBar(el, body, element);
         break;
       case "list":
         fillList(body, element);

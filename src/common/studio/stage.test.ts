@@ -18,6 +18,7 @@ import { createStage, EXIT_MS, Figure, shapePath, Stage } from "./stage";
 
 type TextView = Extract<StudioElementView, { kind: "text" }>;
 type ShapeView = Extract<StudioElementView, { kind: "shape" }>;
+type BarView = Extract<StudioElementView, { kind: "bar" }>;
 
 const BASE: Omit<TextView, "id" | "kind" | keyof typeof TEXT> = {
   x: 10,
@@ -620,6 +621,60 @@ describe("on stream", () => {
     expect(path.getAttribute("fill")).toBe("none");
     draw(view(shape({ color: null, gradient: null })));
     expect(el("s").classList).not.toContain("studio-gradient");
+  });
+
+  it("draws a goal bar's track and fill, and fills it in place", () => {
+    const bar = (fields: Partial<BarView> = {}): BarView => ({
+      ...BASE,
+      id: "b",
+      kind: "bar",
+      width: 720,
+      height: 56,
+      fill: 0.25,
+      color: "#f43f5e",
+      gradient: null,
+      track: "#18181bd9",
+      rounding: 50,
+      vertical: false,
+      ...fields,
+    });
+    draw(view(bar()));
+    const fill = body("b").querySelector<HTMLElement>(".studio-bar-fill")!;
+    expect(body("b").children).toHaveLength(1);
+    expect(fill.style.width).toBe("25%");
+    expect(fill.style.height).toBe("100%");
+    // The gradient spans the whole track, whatever the fill
+    expect(fill.style.backgroundSize).toBe("720px 56px");
+    expect(el("b").style.getPropertyValue("--studio-color")).toBe("#f43f5e");
+    expect(el("b").style.getPropertyValue("--studio-track")).toBe("#18181bd9");
+    // Half the shorter side: a pill
+    expect(el("b").style.getPropertyValue("--studio-radius")).toBe("28px");
+    expect(el("b").classList).not.toContain("studio-gradient");
+
+    draw(
+      view(
+        bar({
+          fill: 1,
+          rounding: 25,
+          gradient: { color: "#f1f5f9", angle: 90 },
+        }),
+      ),
+    );
+    // The same node, so its length eases
+    expect(body("b").querySelector(".studio-bar-fill")).toBe(fill);
+    expect(fill.style.width).toBe("100%");
+    expect(el("b").style.getPropertyValue("--studio-radius")).toBe("14px");
+    expect(el("b").classList).toContain("studio-gradient");
+    expect(el("b").style.getPropertyValue("--studio-color-2")).toBe("#f1f5f9");
+    expect(el("b").style.getPropertyValue("--studio-angle")).toBe("90deg");
+
+    // From the bottom up
+    draw(view(bar({ width: 56, height: 720, fill: 0.6, vertical: true })));
+    expect(fill.style.width).toBe("100%");
+    expect(fill.style.height).toBe("60%");
+    expect(fill.style.backgroundSize).toBe("56px 720px");
+    expect(el("b").classList).not.toContain("studio-gradient");
+    expect(el("b").style.getPropertyValue("--studio-color-2")).toBe("");
   });
 
   it("shows on an emote element the emote its event sent", () => {

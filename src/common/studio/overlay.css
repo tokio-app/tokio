@@ -34,7 +34,10 @@
  *                      px of the box, clipped to itself
  *             viewer   .studio-avatar (.studio-has-picture), sized inline,
  *                      holding an img and .studio-initial
- *             bar      (PR 4's bar work)
+ *             bar      the body is the track; .studio-bar-fill, its width
+ *                      (or height with vertical) inline as a %, and its
+ *                      background-size the track's px; the element has
+ *                      --studio-track, and --studio-radius in px
  *             list     (PR 4's list work)
  *             overlay  iframe.studio-embed on stream, .studio-slot in the
  *                      editor, nothing when it can't load
@@ -214,6 +217,37 @@
 .studio-shape.studio-gradient > .studio-body,
 .studio-figure.studio-gradient {
   background: linear-gradient(
+    var(--studio-angle),
+    var(--studio-color),
+    var(--studio-color-2)
+  );
+}
+
+/* A goal bar: the track clips its fill to its corners, so a short fill
+   still follows the track's rounded end */
+.studio-bar > .studio-body {
+  overflow: hidden;
+  background: var(--studio-track);
+  border-radius: var(--studio-radius);
+}
+
+/* From the left, or the bottom when its height is set. Width and height
+   ease, not a clip-path, so resizing the box in the editor doesn't lag. */
+.studio-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  background: var(--studio-color) 0 100% / auto no-repeat;
+  border-radius: var(--studio-radius);
+  transition:
+    width 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Sized to the whole track inline, so the second color shows as it fills */
+.studio-bar.studio-gradient .studio-bar-fill {
+  background-color: transparent;
+  background-image: linear-gradient(
     var(--studio-angle),
     var(--studio-color),
     var(--studio-color-2)
