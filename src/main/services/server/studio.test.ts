@@ -23,6 +23,8 @@ const BASE = {
   flip_y: false,
   z: 0,
   opacity: 1,
+  shadow: null,
+  blur: 0,
   when: "always",
   seconds: 5,
   entrance: "pop",
@@ -50,6 +52,12 @@ const TEXT = {
   align: "center",
   bold: true,
   halo: true,
+  gradient: null,
+  outline: null,
+  letter_spacing: 0,
+  line_height: 115,
+  italic: false,
+  caps: false,
 } as const;
 
 const viewOf = (...layers: StudioLayerView[]): StudioView => ({
@@ -65,7 +73,12 @@ const view = (...elements: StudioElementView[]) =>
 // What a picture element draws when it keeps all of itself
 const PICTURE = { crop: null, rounding: 0 };
 // A shape element's rectangle
-const RECTANGLE = { shape: "rectangle", sides: 3, points: 5 } as const;
+const RECTANGLE = {
+  shape: "rectangle",
+  sides: 3,
+  points: 5,
+  gradient: null,
+} as const;
 // A media element's whole video, looping at full volume
 const MEDIA = { start: 0, end: null, loop: true, volume: 100 };
 

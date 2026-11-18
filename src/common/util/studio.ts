@@ -21,6 +21,7 @@ import {
 import type { CustomGift } from "../types/overlay";
 import type {
   StudioElementView,
+  StudioGradientView,
   StudioNumbers,
   StudioReact,
   StudioView,
@@ -127,6 +128,14 @@ export type StudioViewDeps = {
   label: (source: StudioSource) => string;
 };
 
+// A text's or a shape's fade, null with it off
+const gradientOf = (
+  element: StudioElementOf<"text" | "shape">,
+): StudioGradientView =>
+  element.gradient
+    ? { color: element.gradient_color, angle: element.gradient_angle }
+    : null;
+
 function elementView(
   element: StudioElement,
   z: number,
@@ -143,6 +152,15 @@ function elementView(
     flip_y: element.flip_y,
     z,
     opacity: element.opacity,
+    shadow: element.shadow
+      ? {
+          color: element.shadow_color,
+          blur: element.shadow_blur,
+          x: element.shadow_x,
+          y: element.shadow_y,
+        }
+      : null,
+    blur: element.blur,
     when: element.when,
     seconds: element.seconds,
     entrance: element.entrance,
@@ -162,6 +180,7 @@ function elementView(
   switch (element.kind) {
     case "text": {
       const { font, size, color, align, bold, halo } = element;
+      const { letter_spacing, line_height, italic, caps } = element;
       return {
         ...base,
         kind: element.kind,
@@ -172,6 +191,14 @@ function elementView(
         align,
         bold,
         halo,
+        gradient: gradientOf(element),
+        outline: element.outline
+          ? { color: element.outline_color, width: element.outline_width }
+          : null,
+        letter_spacing,
+        line_height,
+        italic,
+        caps,
       };
     }
     case "media": {
@@ -229,6 +256,7 @@ function elementView(
         sides: element.sides,
         points: element.points,
         color: element.fill ? element.color : null,
+        gradient: element.fill ? gradientOf(element) : null,
         radius: element.radius,
         border: element.border
           ? { color: element.border_color, width: element.border_width }

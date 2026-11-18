@@ -846,6 +846,8 @@
   "studio.duplicate": "Duplicar overlay",
   "studio.copyName": "Copia de {name}",
   "studio.copyNameNumber": "Copia {number} de {name}",
+  "studio.fields.gradient": "Degradado",
+  "studio.fields.gradientAngle": "Ángulo del degradado",
   "alerts.editor.title": "Alerta: {trigger}",
   "tts.voice.title": "Voz",
   "tts.voice.description": "La voz que lee el chat en voz alta.",

@@ -98,6 +98,13 @@ export const STUDIO_MAX_SECONDS = 60;
 export const STUDIO_MAX_FONT_SIZE = 400;
 // The widest shape border, in px of the canvas
 export const STUDIO_MAX_BORDER = 100;
+// The widest text outline, in px of the canvas
+export const STUDIO_MAX_OUTLINE = 40;
+// The softest shadow, and the farthest it falls, in px of the canvas
+export const STUDIO_MAX_SHADOW_BLUR = 100;
+export const STUDIO_MAX_SHADOW_OFFSET = 200;
+// The strongest blur, in px of the canvas
+export const STUDIO_MAX_BLUR = 50;
 // The most sides a polygon has, and points a star
 export const STUDIO_MAX_CORNERS = 12;
 // The most guides an overlay keeps across, and as many down
@@ -150,11 +157,36 @@ const ELEMENT = {
   flip_x: z.boolean().default(false),
   flip_y: z.boolean().default(false),
   opacity: z.number().min(0).max(1).default(1),
+  // A drop shadow behind what it shows, a glow with no offset, in px of the
+  // canvas: it falls the same way however the element turns
+  shadow: z.boolean().default(false),
+  shadow_color: ColorSchema.default("#000000b3"),
+  shadow_blur: z.number().min(0).max(STUDIO_MAX_SHADOW_BLUR).default(16),
+  shadow_x: z
+    .number()
+    .min(-STUDIO_MAX_SHADOW_OFFSET)
+    .max(STUDIO_MAX_SHADOW_OFFSET)
+    .default(0),
+  shadow_y: z
+    .number()
+    .min(-STUDIO_MAX_SHADOW_OFFSET)
+    .max(STUDIO_MAX_SHADOW_OFFSET)
+    .default(8),
+  // px of the canvas, 0 for none
+  blur: z.number().min(0).max(STUDIO_MAX_BLUR).default(0),
   // The editor's canvas can't pick, move, resize or rotate it
   locked: z.boolean().default(false),
   // Off the canvas and the stream
   hidden: z.boolean().default(false),
   ...REACTION,
+};
+
+// A text's or a shape's color fading into gradient_color, at gradient_angle
+// degrees as CSS turns them: 90 runs left to right
+const GRADIENT = {
+  gradient: z.boolean().default(false),
+  gradient_color: ColorSchema.default("#f43f5e"),
+  gradient_angle: z.number().min(0).max(360).default(90),
 };
 
 // What a picture keeps of itself: fractions of its own width and height cut
@@ -203,6 +235,17 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     bold: z.boolean().default(true),
     // A soft dark shadow that keeps it legible over bright video
     halo: z.boolean().default(true),
+    ...GRADIENT,
+    // A line around its letters, outside them, in px of the canvas
+    outline: z.boolean().default(false),
+    outline_color: ColorSchema.default("#18181b"),
+    outline_width: z.number().min(1).max(STUDIO_MAX_OUTLINE).default(4),
+    // % of its size, between letters and from line to line
+    letter_spacing: z.number().min(-20).max(100).default(0),
+    line_height: z.number().min(50).max(300).default(115),
+    italic: z.boolean().default(false),
+    // Shown in capitals; the text keeps the case it was typed in
+    caps: z.boolean().default(false),
   }),
   // An image or video from the media library. A video plays its cut (CUT,
   // as an alert's), at its volume, and again from its start when it ends
@@ -254,9 +297,11 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     // A polygon's, and a star's
     sides: z.number().int().min(3).max(STUDIO_MAX_CORNERS).default(3),
     points: z.number().int().min(3).max(STUDIO_MAX_CORNERS).default(5),
-    // Painted inside, unless fill is off
+    // Painted inside, unless fill is off, fading into gradient_color with
+    // gradient on
     fill: z.boolean().default(true),
     color: ColorSchema.default("#18181b"),
+    ...GRADIENT,
     // A line inside its edge, px of the canvas
     border: z.boolean().default(false),
     border_color: ColorSchema.default("#f1f5f9"),
