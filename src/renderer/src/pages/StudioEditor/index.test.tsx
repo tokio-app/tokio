@@ -1639,6 +1639,60 @@ describe("StudioEditor", () => {
     );
   });
 
+  it("fades a shape's fill into a gradient, offered only with a fill", async () => {
+    const shape = elementOf("shape");
+    const { user } = await open(scene(shape));
+    await user.click(row(/^Rectangle/));
+
+    await user.click(page().getByRole("checkbox", { name: "Gradient" }));
+    const angle = page().getByRole("spinbutton", { name: "Gradient angle" });
+    await user.clear(angle);
+    await user.type(angle, "45");
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        gradient: true,
+        gradient_angle: 45,
+      }),
+    );
+    expect(drawn(shape.id).classList).toContain("studio-gradient");
+
+    await user.click(page().getByRole("checkbox", { name: "Fill" }));
+    expect(
+      page().queryByRole("checkbox", { name: "Gradient" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("gives any kind a shadow and a blur", async () => {
+    const element = elementOf("emote");
+    const { user } = await open(scene(element));
+    await user.click(row(/^Emote/));
+
+    const shadow = within(page().getByRole("group", { name: "Shadow" }));
+    expect(shadow.queryByRole("spinbutton")).not.toBeInTheDocument();
+    await user.click(shadow.getByRole("checkbox", { name: "Shadow" }));
+    const softness = shadow.getByRole("spinbutton", { name: "Softness" });
+    await user.clear(softness);
+    await user.type(softness, "30");
+    const down = shadow.getByRole("spinbutton", { name: "Y" });
+    await user.clear(down);
+    await user.type(down, "-12");
+    const blur = page().getByRole("spinbutton", { name: "Blur" });
+    await user.clear(blur);
+    await user.type(blur, "6");
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        shadow: true,
+        shadow_blur: 30,
+        shadow_y: -12,
+        blur: 6,
+      }),
+    );
+    expect(drawn(element.id).style.filter).toMatch(
+      /^blur\(6px\) drop-shadow\(0px -12px 30px/,
+    );
+  });
+
   it("offers a viewer's picture only the event Whens", async () => {
     const { user } = await open(scene(elementOf("viewer")));
 

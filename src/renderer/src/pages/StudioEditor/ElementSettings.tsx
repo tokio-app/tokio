@@ -37,6 +37,8 @@ import { useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
 import { BoxFields } from "./BoxFields";
 import { CameraFields } from "./CameraFields";
+import { EffectsFields } from "./EffectsFields";
+import { GradientFields } from "./GradientFields";
 import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
 import { PictureFields } from "./PictureFields";
 import { ReactionFields, WHENS } from "./ReactionFields";
@@ -354,6 +356,9 @@ export function ElementSettings({
                 />
               )}
             </div>
+            {element.fill && (
+              <GradientFields value={element} onChange={onChange} />
+            )}
             <div
               role="group"
               aria-label={t("studio.fields.border")}
@@ -430,6 +435,7 @@ export function ElementSettings({
           onRounding={(rounding) => onChange({ ...element, rounding })}
         />
       )}
+      <EffectsFields element={element} onChange={onChange} />
 
       <BoxFields
         box={element}

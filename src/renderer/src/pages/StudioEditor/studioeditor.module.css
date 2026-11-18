@@ -855,6 +855,18 @@
   min-height: var(--control-height);
 }
 
+/* A shadow's softness and offset, and the blur, in thirds like the box's */
+.effects {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.effects label {
+  color: var(--font-secondary);
+  font-size: var(--font-xs);
+}
+
 /* X, Y, W and H on one line */
 /* X, Y, the width, its link to the height, then the height */
 .box {
