@@ -13,6 +13,8 @@ import {
   ALERTS_PATH,
   formatError,
   MINECRAFT_OVERLAY_PATH,
+  sampleDeps,
+  Samples,
   studioCameraPath,
   studioElements,
   studioSocketId,
@@ -21,6 +23,7 @@ import {
   TIMER_PATH,
   usesNumbers,
 } from "@/common/util";
+import { language } from "@/helper/i18n";
 import Logger from "@/logger";
 import { studioText } from "@/services/studio";
 import { AppHandlerVariables } from "@/types";
@@ -56,7 +59,7 @@ export function liveNumbers({
 }
 
 // Where the overlay server serves an embed
-const embedPath = (source: StudioSource) => {
+export const embedPath = (source: StudioSource) => {
   if (source.type === "installed") return `/${encodeURIComponent(source.id)}/`;
   if (source.type === "alert") {
     return `/${ALERTS_PATH}/${encodeURIComponent(source.id)}/`;
@@ -183,4 +186,29 @@ export async function sendStudioOverlay(services: Services, id: string) {
     return;
   }
   await sendStudioOverlays(services, (o) => o.id === id);
+}
+
+/**
+ * An overlay's view with the samples Test plays instead of the LIVE's
+ * values, for MCP's preview. No camera turns on for it.
+ */
+export async function studioSampleView(
+  { overlayService }: Pick<Services, "overlayService">,
+  overlay: StudioOverlay,
+): Promise<StudioView> {
+  // As sendStudioOverlays takes them
+  const gifts = [
+    ...(await overlayService.getGifts()),
+    ...(await overlayService.getCustomGifts()),
+  ];
+  const served = new Set(overlayService.getOverlays().map((o) => o.id));
+  return studioView(overlay, {
+    gifts,
+    served: (id) => served.has(id),
+    mediaURL: alertMediaPath,
+    embedPath,
+    camera: () => null,
+    label: () => "",
+    ...sampleDeps(new Samples(), language()),
+  });
 }
