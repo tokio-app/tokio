@@ -1,4 +1,4 @@
-import { StudioCrop, StudioElement } from "@/common/schemas";
+import { StudioCrop, StudioElement, StudioListSource } from "@/common/schemas";
 import { shapePath } from "@/common/studio/stage";
 import { CustomGift } from "@/common/types";
 import { SAMPLE_FILL } from "@/common/util";
@@ -11,11 +11,21 @@ import {
   LuCircleUserRound,
   LuGift,
   LuImage,
-  LuList,
+  LuMessagesSquare,
   LuSmile,
+  LuTrophy,
+  LuUserPlus,
   LuWebcam,
 } from "react-icons/lu";
 import styles from "./studioeditor.module.css";
+
+// A list's icon, by what it lists
+const LIST_ICONS: Record<StudioListSource, IconType> = {
+  gifters: LuTrophy,
+  followers: LuUserPlus,
+  gifts: LuGift,
+  chat: LuMessagesSquare,
+};
 
 // The px a shape's miniature takes on its longer side
 const SHAPE_PX = 18;
@@ -174,7 +184,7 @@ export function LayerThumb({
       );
     }
     case "list":
-      return icon(LuList);
+      return icon(LIST_ICONS[element.source]);
     // An embedded overlay
     default:
       return icon(LuAppWindow);

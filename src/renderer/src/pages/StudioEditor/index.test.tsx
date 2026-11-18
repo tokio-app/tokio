@@ -266,11 +266,13 @@ describe("StudioEditor", () => {
         .closest("ul")!
         .querySelectorAll("[class*=layer_name]"),
     ].map((name) => name.textContent);
-    // A shape goes by its shape
+    // A shape goes by its shape, a list by what it lists
+    const shown: Record<string, string> = {
+      Shape: "Rectangle",
+      List: "Top gifters this LIVE",
+    };
     expect(names).toEqual(
-      [...kinds]
-        .reverse()
-        .map((kind) => (kind === "Shape" ? "Rectangle" : kind)),
+      [...kinds].reverse().map((kind) => shown[kind] ?? kind),
     );
     // A viewer's picture waits for an event
     expect(overlay.items[6]).toMatchObject({ when: "event" });
@@ -4187,6 +4189,70 @@ describe("StudioEditor", () => {
       expect(row(/^Polygon/).querySelector("svg path")).toHaveAttribute(
         "d",
         expect.stringMatching(/^M[\d.]+ 0L/),
+      );
+    });
+  });
+  describe("lists", () => {
+    it("shows this LIVE's top gifters with their coins, named by what it lists", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+
+      await user.click(row(/^Top gifters this LIVE/));
+      const rows = drawn(list.id).querySelectorAll(".studio-row");
+      // Five sample rows by default, biggest first
+      expect(rows).toHaveLength(5);
+      expect(rows[0].querySelector(".studio-number")!.textContent).toBe(
+        "12.4K",
+      );
+      expect(page().getByRole("group", { name: "Number color" })).toBeVisible();
+    });
+
+    it("lists another source, with its own rows and fields", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+      await user.click(row(/^Top gifters/));
+
+      const shows = field("Shows").getByText("Top gifters this LIVE");
+      await user.click(shows);
+      await user.click(
+        inList(page().getByRole("group", { name: "Shows" }), "Chat")!,
+      );
+
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ source: "chat" }),
+      );
+      expect(row(/^Chat/)).toBeVisible();
+      // Chat has no numbers to color
+      expect(page().queryByRole("group", { name: "Number color" })).toBeNull();
+      const messages = drawn(list.id).querySelectorAll(".studio-message");
+      expect(messages[0].textContent).not.toBe("");
+    });
+
+    it("saves its rows, gap, size and pictures", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+      await user.click(row(/^Top gifters/));
+
+      await user.clear(field("Rows").getByRole("spinbutton"));
+      await user.type(field("Rows").getByRole("spinbutton"), "3");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ rows: 3 }),
+      );
+      await studio(lastSave()!);
+      expect(drawn(list.id).querySelectorAll(".studio-row")).toHaveLength(3);
+
+      await user.clear(field("Space between rows").getByRole("spinbutton"));
+      await user.type(field("Space between rows").getByRole("spinbutton"), "4");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ rows: 3, gap: 4 }),
+      );
+      await studio(lastSave()!);
+
+      await user.click(
+        page().getByRole("checkbox", { name: "Viewers' pictures" }),
+      );
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ pictures: false }),
       );
     });
   });

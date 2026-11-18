@@ -83,7 +83,7 @@ type NameContext = {
 
 /**
  * What the layers list calls an element with no label: what it shows (its
- * text, file, gift, emote, embed or shape), else its kind.
+ * text, file, gift, emote, embed, shape or list's source), else its kind.
  */
 export function elementName(
   element: StudioElement,
@@ -105,6 +105,8 @@ export function elementName(
         return element.source && context.label(element.source);
       case "shape":
         return context.t(`studio.shapes.${element.shape}`);
+      case "list":
+        return context.t(`studio.list.sources.${element.source}`);
       default:
         return "";
     }
