@@ -99,6 +99,37 @@ describe("Studio", () => {
     );
   });
 
+  it("duplicates an overlay with the next free name and stays on the list", async () => {
+    const { user, router } = await renderApp("/tools/studio");
+    await studio(MAIN, studioOverlay("Main scene copy"), CHAT);
+
+    await user.click(
+      row("Main scene").getByRole("button", { name: "Duplicate overlay" }),
+    );
+    await user.click(
+      row("Untitled overlay").getByRole("button", {
+        name: "Duplicate overlay",
+      }),
+    );
+
+    const [main, untitled] = sent(APP_EVENTS.ADD_STUDIO_OVERLAY);
+    expect(main).toEqual({
+      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      name: "Main scene copy 2",
+      copy: MAIN.id,
+    });
+    expect(untitled).toMatchObject({
+      name: "Untitled overlay copy",
+      copy: CHAT.id,
+    });
+
+    await studio(MAIN, CHAT, { ...MAIN, id: main.id, name: main.name });
+    expect(router.state.location.pathname).toBe("/tools/studio");
+    expect(
+      list().getByRole("link", { name: "Main scene copy 2" }),
+    ).toBeVisible();
+  });
+
   it("opens nothing when the add fails", async () => {
     const { user, router } = await renderApp("/tools/studio");
     await studio(MAIN);
