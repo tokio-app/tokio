@@ -56,7 +56,7 @@ export const SAMPLE_NUMBERS: StudioNumbers = {
 };
 
 // Made up too: each counter's sample count
-export const SAMPLE_COUNT = 12;
+const SAMPLE_COUNT = 12;
 
 // Whether a text shows a live number, so main sends it again as they change
 export const usesNumbers = (text: string) =>

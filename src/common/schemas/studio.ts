@@ -578,7 +578,6 @@ export const StoredStudioOverlaysSchema = z.preprocess(
 export type StudioOverlay = z.infer<typeof StudioOverlaySchema>;
 export type StudioCounter = z.infer<typeof StudioCounterSchema>;
 export type StudioTrigger = z.infer<typeof StudioTriggerSchema>;
-export type GoalTrigger = z.infer<typeof GoalTriggerSchema>;
 export type StudioGuides = z.infer<typeof StudioGuidesSchema>;
 export type StudioCrop = z.infer<typeof StudioCropSchema>;
 export type StudioGroup = z.infer<typeof StudioGroupSchema>;
