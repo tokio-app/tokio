@@ -54,7 +54,7 @@
     "@tanstack/react-router": "^1.170.23",
     "@tanstack/react-virtual": "^3.14.12",
     "@tokioapp/adblock": "0.2.1",
-    "@tokioapp/connector": "0.2.1",
+    "@tokioapp/connector": "0.2.2",
     "@vscode/sudo-prompt": "^9.3.2",
     "electron-updater": "^6.3.9",
     "express": "^5.2.1",

@@ -28,6 +28,7 @@ type Connection = {
   username: string;
   options: {
     requestTimeoutMs?: number;
+    signTimeoutMs?: number;
     reconnect?: unknown;
     logger?: (
       level: string,
@@ -196,13 +197,14 @@ describe("TikTokLiveConnector", () => {
       expect(connector.isConnected()).toBe(true);
     });
 
-    it("never gives up reconnecting, and tries every 15 s at most", async () => {
+    it("never gives up reconnecting, tries every 15 s at most, and gives a sign 20 s", async () => {
       await connected();
 
       expect(connection().options.reconnect).toEqual({
         maxAttempts: Infinity,
         maxDelayMs: 15_000,
       });
+      expect(connection().options.signTimeoutMs).toBe(20_000);
     });
 
     it("opens one connection when connect comes again while connecting", async () => {

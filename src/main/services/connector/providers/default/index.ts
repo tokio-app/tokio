@@ -43,6 +43,11 @@ const COMBO_END_MS = 4000;
 // every 7.5 to 15 s, so it's back soon after the network (the user's calls).
 const RECONNECT = { maxAttempts: Infinity, maxDelayMs: 15_000 };
 
+// Euler's signed connect took over 10 s on flaky networks, failing reconnects
+// and losing gaps; TikTok's own requests keep the library's 10 s, so a dead
+// network still fails a connect as fast (the user's call).
+const SIGN_TIMEOUT_MS = 20_000;
+
 // A connect that failed on the network is tried this many times in all, this
 // far apart. Any other failure is told at once (the user's call).
 const CONNECT_TRIES = 3;
@@ -106,6 +111,7 @@ export class TikTokLiveConnector extends ConnectorProvider {
       connection = new TikTokLiveConnection(name, {
         signer: new EulerSigner({ apiKey: this._key }),
         reconnect: RECONNECT,
+        signTimeoutMs: SIGN_TIMEOUT_MS,
         // Its warnings and errors explain drops and failed reconnects, and its
         // info lines when it connects, tries again and stops. The rest is
         // routine, so only Detailed logs write it.

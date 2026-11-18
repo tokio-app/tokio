@@ -1351,10 +1351,10 @@
   resolved "https://registry.yarnpkg.com/@tokioapp/adblock/-/adblock-0.2.1.tgz#2ff18bd3e0365ea8200f78fc5d27a45db365c45b"
   integrity sha512-zIQDHLNi6GAGFCSRp2/sDKsBnfJ/o1gpW4jTUZGzuQQwqW022zkI6SVpPE0YIMUnXUReDSpOoqYr2fDmfToTpw==
 
-"@tokioapp/connector@0.2.1":
-  version "0.2.1"
-  resolved "https://registry.yarnpkg.com/@tokioapp/connector/-/connector-0.2.1.tgz#7188ea2e2661c2af7aff07efc6940d237399cbfd"
-  integrity sha512-jNETq9HoEMNLmGiq/DdVU56fDLC2XiMmNXSzRnPHxP4XKla782NsH+Sp42v54s/+QJ7X1SLa1zSAto4hH3euFw==
+"@tokioapp/connector@0.2.2":
+  version "0.2.2"
+  resolved "https://registry.yarnpkg.com/@tokioapp/connector/-/connector-0.2.2.tgz#e89ebfb49a045b76d6e47a3c6d475e81c8741262"
+  integrity sha512-MR2sLqsAUkK9RWzxiPOx8HI+cR9aVVszfryBwYw5s+me1TPCix+aD12LTSy1xf8ksCGmOJFNfwQFH3G3Tul3Yg==
   dependencies:
     ws "^8.22.0"
 
