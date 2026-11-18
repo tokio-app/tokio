@@ -60,6 +60,8 @@ export function LayerThumb({
             color: element.color,
             fontFamily: element.font ? JSON.stringify(element.font) : undefined,
             fontWeight: element.bold ? 700 : 400,
+            fontStyle: element.italic ? "italic" : undefined,
+            textTransform: element.caps ? "uppercase" : undefined,
           }}
         >
           {t("studio.editor.textSample")}

@@ -646,7 +646,9 @@ export function StudioStage({
    */
   const textHeight = (id: string, width: number, scale: number) => {
     const node = nodeOf(id);
-    const text = node?.querySelector(".studio-text");
+    // The words' lines: over .studio-text the range would count the span's
+    // line boxes too, a little taller
+    const text = node?.querySelector(".studio-words");
     if (!node || !text || !scale) return 1;
     // Unturned, so the range's box is the words' own height
     const { width: keptWidth, transform } = node.style;
