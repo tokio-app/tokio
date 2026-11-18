@@ -101,6 +101,12 @@ describe("previewStudioOverlay", () => {
     expect(win.loadURL).toHaveBeenCalledWith(
       `http://127.0.0.1:37891/studio/${ID}/?preview`,
     );
+    // The first wakes the hidden page's raster; the second is kept
+    const canvas = { x: 0, y: 0, width: 540, height: 960 };
+    expect(win.webContents.capturePage.mock.calls).toEqual([
+      [canvas],
+      [canvas],
+    ]);
     const [[code]] = win.webContents.executeJavaScript.mock.calls;
     const view: unknown = JSON.parse(
       code.replace(/^TokioPreview\(/, "").replace(/\)$/, ""),
@@ -122,6 +128,23 @@ describe("previewStudioOverlay", () => {
 
     expect(shot).toMatchObject({ width: 1920, height: 1080, failed: 0 });
     expect(shot.png).toEqual(Buffer.from("png 1920x1080"));
+  });
+
+  it("draws a canvas taller than the screen in a window of its shape", async () => {
+    const shot = await previewStudioOverlay(services(), overlay(), 1);
+
+    // The fake work area is 1040 px tall: a window that size, as wide as
+    // the canvas's shape makes it, then the picture at the size asked
+    const [win] = windows();
+    expect(win.options).toMatchObject({ width: 585, height: 1040 });
+    expect(win.webContents.capturePage).toHaveBeenLastCalledWith({
+      x: 0,
+      y: 0,
+      width: 585,
+      height: 1040,
+    });
+    expect(shot).toMatchObject({ width: 1080, height: 1920 });
+    expect(shot.png).toEqual(Buffer.from("png 1080x1920"));
   });
 
   it("denies permissions, new windows, navigation and sound", async () => {

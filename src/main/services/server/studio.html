@@ -110,6 +110,10 @@
       // failed or timed out: the count it resolves with) and is painted
       const draw = async (view) => {
         stage.update(view);
+        // Laid out now, so the texts' fonts start loading before fonts.ready
+        // is read: with font-display: block a text stays invisible until its
+        // font is in, and ready, read before, has nothing to wait for
+        root.getBoundingClientRect();
         const nodes = root.querySelectorAll("img, video, iframe");
         const results = await Promise.all([
           Promise.race([document.fonts.ready, wait(LOAD_MS)]).then(() => true),

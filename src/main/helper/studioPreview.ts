@@ -1,6 +1,7 @@
 import { StudioOverlay } from "@/common/schemas";
+import { StudioView } from "@/common/types";
 import { AppHandlerVariables } from "@/types";
-import { BrowserWindow, session } from "electron";
+import { BrowserWindow, screen, session } from "electron";
 import { studioSampleView } from "./studio";
 
 type Services = Pick<AppHandlerVariables, "overlayService" | "serverService">;
@@ -17,9 +18,39 @@ export type StudioPreview = {
 // overlay server (initSession), and embedded overlays need theirs
 const PARTITION = "studio-preview";
 export const PREVIEW_TIMEOUT_MS = 15_000;
+// Between the capture that wakes the page's raster and the one kept: 300 ms
+// was enough for a busy canvas here
+const SETTLE_MS = 500;
 
 // The previews running and waiting, so calls can't stack windows
 let queue: Promise<unknown> = Promise.resolve();
+
+// The window, in the picture's shape but no bigger than the screen's work
+// area: Windows clamps a window to the screen, hidden or offscreen, which
+// squeezed the canvas into a window of the wrong shape
+const windowSize = (width: number, height: number) => {
+  const area = screen.getPrimaryDisplay().workAreaSize;
+  const fit = Math.min(1, area.width / width, area.height / height);
+  return {
+    width: Math.max(1, Math.floor(width * fit)),
+    height: Math.max(1, Math.floor(height * fit)),
+  };
+};
+
+// Where the page draws the canvas in the window: fitted and centered, as the
+// stage's fit() places it, in case the window still got another size
+const canvasRect = (view: StudioView, win: BrowserWindow) => {
+  const { width: w, height: h } = win.getContentBounds();
+  const scale = Math.min(w / view.width, h / view.height);
+  const width = Math.round(view.width * scale);
+  const height = Math.round(view.height * scale);
+  return {
+    x: Math.floor((w - width) / 2),
+    y: Math.floor((h - height) / 2),
+    width,
+    height,
+  };
+};
 
 /**
  * A PNG of a studio overlay as its page draws it, with Test's samples, at
@@ -53,8 +84,7 @@ async function capture(
 
   const win = new BrowserWindow({
     show: false,
-    width,
-    height,
+    ...windowSize(width, height),
     useContentSize: true,
     frame: false,
     skipTaskbar: true,
@@ -83,8 +113,19 @@ async function capture(
       const failed: unknown = await webContents.executeJavaScript(
         `TokioPreview(${JSON.stringify(view)})`,
       );
-      // It comes at the display's scale factor
-      const image = (await webContents.capturePage()).resize({ width, height });
+      // The canvas alone, at the display's scale factor: smaller than the
+      // picture when the screen is, then scaled up a little soft. A hidden
+      // page rasters what a capture shows only once one asks, so the first
+      // can miss the texts of a busy canvas: it's thrown away.
+      // shortcut: a fixed wait for the raster; if a slow PC still misses
+      // texts, capture until two pictures agree.
+      const rect = canvasRect(view, win);
+      await webContents.capturePage(rect);
+      await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+      const image = (await webContents.capturePage(rect)).resize({
+        width,
+        height,
+      });
       return {
         png: image.toPNG(),
         width,
