@@ -168,6 +168,18 @@
   height: 100%;
 }
 
+/* A fill fading into its gradient color: a rectangle's or an ellipse's body,
+   or a figure's own background under its unfilled path, which the figure's
+   clip-path cuts to the shape */
+.studio-shape.studio-gradient > .studio-body,
+.studio-figure.studio-gradient {
+  background: linear-gradient(
+    var(--studio-angle),
+    var(--studio-color),
+    var(--studio-color-2)
+  );
+}
+
 .studio-embed {
   display: block;
   width: 100%;

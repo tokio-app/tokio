@@ -327,6 +327,33 @@ export function shapePath(
   }
 }
 
+// Rounded, so a turned offset reads cleanly
+const px = (n: number) => `${Math.round(n * 100) / 100}px`;
+
+/**
+ * An element's blur and shadow, one filter on its node: on its body the blur
+ * entrance's filter and wipe's clip-path would replace or cut them, and on a
+ * clipped shape or picture its own clip-path would cut the shadow off. A
+ * filter works before the node's transform, so the offset is turned back by
+ * the rotation and mirrored by the flips to fall the same way on screen.
+ * Blur comes first, so the shadow is the blurred element's.
+ */
+const effects = (element: StudioElementView) => {
+  const parts = element.blur ? [`blur(${element.blur}px)`] : [];
+  const { shadow } = element;
+  if (shadow) {
+    const turn = (-element.rotation * Math.PI) / 180;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    const x = (shadow.x * cos - shadow.y * sin) * (element.flip_x ? -1 : 1);
+    const y = (shadow.x * sin + shadow.y * cos) * (element.flip_y ? -1 : 1);
+    parts.push(
+      `drop-shadow(${px(x)} ${px(y)} ${shadow.blur}px var(--studio-shadow))`,
+    );
+  }
+  return parts.join(" ");
+};
+
 const SVG = "http://www.w3.org/2000/svg";
 
 // A shape the body's paint can't draw: one path, in px of its box
@@ -857,6 +884,12 @@ export function createStage(
         ? `scale(${element.flip_x ? -1 : 1}, ${element.flip_y ? -1 : 1})`
         : "";
     el.style.transform = turn && flip ? `${turn} ${flip}` : turn || flip;
+    el.style.filter = effects(element);
+    if (element.shadow) {
+      el.style.setProperty("--studio-shadow", element.shadow.color);
+    } else {
+      el.style.removeProperty("--studio-shadow");
+    }
 
     switch (element.kind) {
       case "text": {
@@ -921,8 +954,13 @@ export function createStage(
       case "shape": {
         // A rectangle or an ellipse is its painted body, its border inside
         // it; the others draw as SVG
-        const { shape, color, border } = element;
+        const { shape, color, gradient, border } = element;
         const painted = shape === "rectangle" || shape === "ellipse";
+        el.classList.toggle("studio-gradient", painted && !!gradient);
+        if (gradient) {
+          el.style.setProperty("--studio-angle", `${gradient.angle}deg`);
+          el.style.setProperty("--studio-color-2", gradient.color);
+        }
         el.style.setProperty(
           "--studio-color",
           painted && color ? color : "transparent",
@@ -949,7 +987,11 @@ export function createStage(
           `0 0 ${element.width} ${element.height}`,
         );
         path.setAttribute("d", d);
-        path.setAttribute("fill", color ?? "none");
+        // A gradient is the svg's own background, which its clip-path cuts
+        // to the shape: no <linearGradient>, so no ids to keep unique
+        figure.classList.toggle("studio-gradient", !!gradient);
+        figure.style.setProperty("--studio-color", color ?? "transparent");
+        path.setAttribute("fill", gradient ? "none" : (color ?? "none"));
         // At twice its width, cut to the shape: a border inside its edge
         path.setAttribute("stroke", border?.color ?? "none");
         path.setAttribute("stroke-width", String((border?.width ?? 0) * 2));

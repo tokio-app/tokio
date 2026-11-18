@@ -518,6 +518,42 @@ describe("on stream", () => {
     expect(el("s").style.getPropertyValue("--studio-radius")).toBe("24px");
   });
 
+  it("paints a shape's gradient on its body, or on its figure under an unfilled path", () => {
+    const shape = (fields: Partial<ShapeView>): ShapeView => ({
+      ...BASE,
+      id: "s",
+      kind: "shape",
+      ...RECTANGLE,
+      color: "#18181b",
+      gradient: { color: "#f43f5e", angle: 45 },
+      radius: 0,
+      border: null,
+      ...fields,
+    });
+    draw(view(shape({})));
+    expect(el("s").classList).toContain("studio-gradient");
+    expect(el("s").style.getPropertyValue("--studio-color")).toBe("#18181b");
+    expect(el("s").style.getPropertyValue("--studio-color-2")).toBe("#f43f5e");
+    expect(el("s").style.getPropertyValue("--studio-angle")).toBe("45deg");
+
+    draw(view(shape({ shape: "star", border: { color: "#fff", width: 4 } })));
+    const figure = el("s").querySelector("svg")!;
+    const path = figure.querySelector("path")!;
+    // The figure paints it: the body stays clear
+    expect(el("s").classList).not.toContain("studio-gradient");
+    expect(figure.classList).toContain("studio-gradient");
+    expect(figure.style.getPropertyValue("--studio-color")).toBe("#18181b");
+    expect(path.getAttribute("fill")).toBe("none");
+    expect(path.getAttribute("stroke")).toBe("#fff");
+
+    // Without a fill there's no gradient (the view's is null)
+    draw(view(shape({ shape: "star", color: null, gradient: null })));
+    expect(figure.classList).not.toContain("studio-gradient");
+    expect(path.getAttribute("fill")).toBe("none");
+    draw(view(shape({ color: null, gradient: null })));
+    expect(el("s").classList).not.toContain("studio-gradient");
+  });
+
   it("shows on an emote element the emote its event sent", () => {
     draw(
       view({
@@ -583,6 +619,52 @@ describe("on stream", () => {
     stage.destroy();
     expect(root.innerHTML).toBe("");
     expect(root.classList).not.toContain("studio-stage");
+  });
+});
+
+describe("effects", () => {
+  beforeEach(() => {
+    stage = createStage(root);
+  });
+
+  const SHADOW = { color: "#ff00ff", blur: 12, x: 10, y: 0 };
+
+  it("blurs and shadows the element's node, not its body, and clears them", () => {
+    draw(view(text("t", { blur: 4, shadow: SHADOW })));
+    expect(el("t").style.filter).toBe(
+      "blur(4px) drop-shadow(10px 0px 12px var(--studio-shadow))",
+    );
+    expect(el("t").style.getPropertyValue("--studio-shadow")).toBe("#ff00ff");
+    expect(body("t").style.filter).toBe("");
+
+    draw(view(text("t", { shadow: { ...SHADOW, x: 0, y: 0 } })));
+    // A glow: no offset, and no blur of its own
+    expect(el("t").style.filter).toBe(
+      "drop-shadow(0px 0px 12px var(--studio-shadow))",
+    );
+
+    draw(view(text("t")));
+    expect(el("t").style.filter).toBe("");
+    expect(el("t").style.getPropertyValue("--studio-shadow")).toBe("");
+  });
+
+  it("turns the offset back for a rotated or flipped element, so it falls the same way", () => {
+    // Turned a quarter clockwise, its own up is the screen's right
+    draw(view(text("t", { rotation: 90, shadow: SHADOW })));
+    expect(el("t").style.filter).toBe(
+      "drop-shadow(0px -10px 12px var(--studio-shadow))",
+    );
+
+    // Mirrored, its own left is the screen's right
+    draw(view(text("t", { flip_x: true, shadow: SHADOW })));
+    expect(el("t").style.filter).toBe(
+      "drop-shadow(-10px 0px 12px var(--studio-shadow))",
+    );
+
+    draw(view(text("t", { rotation: 90, flip_y: true, shadow: SHADOW })));
+    expect(el("t").style.filter).toBe(
+      "drop-shadow(0px 10px 12px var(--studio-shadow))",
+    );
   });
 });
 
