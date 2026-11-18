@@ -77,6 +77,14 @@ export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
     return this._current.provider.isConnected();
   }
 
+  public isReconnecting(): boolean {
+    return this._current.provider.isReconnecting();
+  }
+
+  public isWaiting(): boolean {
+    return this._current.provider.isWaiting();
+  }
+
   public async fetchGifts(): Promise<GiftResponse> {
     const res = await this._current.provider.fetchGifts();
     if (!res.success) {

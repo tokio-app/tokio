@@ -39,6 +39,20 @@ const LOG_REPEAT_MS = 30_000;
 // ends this long after its last one.
 const COMBO_END_MS = 4000;
 
+// Never gives up while the user stays connected, and once a drop lasts, tries
+// every 7.5 to 15 s, so it's back soon after the network (the user's calls).
+const RECONNECT = { maxAttempts: Infinity, maxDelayMs: 15_000 };
+
+// A connect that failed on the network is tried this many times in all, this
+// far apart. Any other failure is told at once (the user's call).
+const CONNECT_TRIES = 3;
+const CONNECT_RETRY_MS = 3000;
+
+// After an abnormal stop, the LIVE is looked for this long, a try this often
+// (the user's call).
+const WAIT_MS = 120_000;
+const WAIT_TRY_MS = 10_000;
+
 export class TikTokLiveConnector extends ConnectorProvider {
   private _connection: TikTokLiveConnection | null = null;
   // The user's Euler Stream API key, which signs the connection
@@ -47,6 +61,11 @@ export class TikTokLiveConnector extends ConnectorProvider {
   private _logged = new Map<string, number>();
   // A connect during a connect gets this one, so only one connection opens
   private _connecting: Promise<ConnectorResponse> | null = null;
+  // Ends the wait between a connect's tries, for disconnect()
+  private _cancelRetry?: () => void;
+  // The look for the LIVE after an abnormal stop, and when it ends
+  private _waiting: { timer?: NodeJS.Timeout } | null = null;
+  private _waitUntil = 0;
 
   // --- PUBLIC API ---
 
@@ -54,14 +73,20 @@ export class TikTokLiveConnector extends ConnectorProvider {
     this._key = key;
   }
 
+  // One the user asked for replaces the look for the LIVE.
   public connect(username: string): Promise<ConnectorResponse> {
+    this._stopWaiting();
+    return this._open(username);
+  }
+
+  private _open(username: string): Promise<ConnectorResponse> {
     return (this._connecting ??= this._connect(username).finally(() => {
       this._connecting = null;
     }));
   }
 
   private async _connect(username: string): Promise<ConnectorResponse> {
-    if (this.isConnected()) return { success: true };
+    if (this._live()) return { success: true };
     const name = username.replace("@", "");
     if (!name) {
       return {
@@ -80,8 +105,10 @@ export class TikTokLiveConnector extends ConnectorProvider {
     try {
       connection = new TikTokLiveConnection(name, {
         signer: new EulerSigner({ apiKey: this._key }),
-        // Its warnings and errors explain drops and failed reconnects. The
-        // rest is routine, so only Detailed logs write it.
+        reconnect: RECONNECT,
+        // Its warnings and errors explain drops and failed reconnects, and its
+        // info lines when it connects, tries again and stops. The rest is
+        // routine, so only Detailed logs write it.
         logger: (level, message, data) => {
           if (level === "warn") {
             // A drop's error holds the close code and reason
@@ -95,6 +122,17 @@ export class TikTokLiveConnector extends ConnectorProvider {
             if (last !== undefined && now - last < LOG_REPEAT_MS) return;
             this._logged.set(code, now);
             Logger.error(`<Connector> ${message}`, this._logFile, error);
+          } else if (level === "info") {
+            const attempt =
+              typeof data?.attempt === "number" && data.attempt > 0
+                ? ` (attempt ${data.attempt})`
+                : "";
+            // A stop's failure, whose own line the repeat limit may have dropped
+            const why = data?.error ? ` -- ${formatError(data.error)}` : "";
+            Logger.info(
+              `<Connector> ${message}${attempt}${why}`,
+              this._logFile,
+            );
           } else {
             Logger.debug(`<Connector> ${message}`, this._logFile);
           }
@@ -103,8 +141,19 @@ export class TikTokLiveConnector extends ConnectorProvider {
       // Before connecting, so no event of the LIVE is missed.
       this._listen(connection);
       this._connection = connection;
-      await connection.connect();
-      return { success: true };
+      for (let tries = 1; ; tries++) {
+        try {
+          await connection.connect();
+          return { success: true };
+        } catch (err) {
+          if (tries === CONNECT_TRIES || !canRetry(err)) throw err;
+          Logger.info(
+            `<Connector> Connecting again in ${CONNECT_RETRY_MS / 1000} s -- ${formatError(err)}`,
+            this._logFile,
+          );
+          if (!(await this._pause(CONNECT_RETRY_MS))) throw err;
+        }
+      }
     } catch (err) {
       // A first connect that fails never emits disconnected.
       connection?.removeAllListeners();
@@ -114,18 +163,24 @@ export class TikTokLiveConnector extends ConnectorProvider {
   }
 
   public async disconnect(): Promise<void> {
+    this._stopWaiting();
+    this._cancelRetry?.();
     // The connection then emits disconnected, with reason "user".
     await this._connection?.disconnect();
   }
 
-  // Also while connecting and coming back, so a profile can't switch then.
+  // Also while connecting, coming back and looking for the LIVE again, so a
+  // profile can't switch then.
   public isConnected(): boolean {
-    const state = this._connection?.state;
-    return (
-      state === "connecting" ||
-      state === "connected" ||
-      state === "reconnecting"
-    );
+    return this._live() || this._connecting !== null || this._waiting !== null;
+  }
+
+  public override isReconnecting(): boolean {
+    return this._connection?.state === "reconnecting";
+  }
+
+  public override isWaiting(): boolean {
+    return this._waiting !== null;
   }
 
   public async fetchGifts(): Promise<GiftResponse> {
@@ -163,11 +218,103 @@ export class TikTokLiveConnector extends ConnectorProvider {
 
   // -- Private API --
 
+  // The connection's own state: connecting, connected or coming back
+  private _live(): boolean {
+    const state = this._connection?.state;
+    return (
+      state === "connecting" ||
+      state === "connected" ||
+      state === "reconnecting"
+    );
+  }
+
+  // The wait between a connect's tries: false when disconnect() ended it
+  private _pause(ms: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this._cancelRetry = undefined;
+        resolve(true);
+      }, ms);
+      this._cancelRetry = () => {
+        clearTimeout(timer);
+        this._cancelRetry = undefined;
+        resolve(false);
+      };
+    });
+  }
+
+  // Looks for the LIVE again after an abnormal stop, a try every WAIT_TRY_MS.
+  // A LIVE it connects to that stops again keeps the first stop's deadline, so
+  // a room that ends at once can't loop.
+  private _wait(username: string) {
+    const now = Date.now();
+    if (this._waitUntil <= now) this._waitUntil = now + WAIT_MS;
+    const until = this._waitUntil;
+    const waiting: { timer?: NodeJS.Timeout } = {};
+    this._waiting = waiting;
+    Logger.info(
+      `<Connector> Looking for @${username}'s LIVE for ${Math.round((until - now) / 1000)} s.`,
+      this._logFile,
+    );
+    const next = () => {
+      // The first try too, after the stop: the LIVE isn't back at once
+      waiting.timer = setTimeout(async () => {
+        const res = await this._open(username);
+        // A Connect, a Disconnect or another stop took over
+        if (this._waiting !== waiting) return;
+        const kind = res.error?.kind;
+        if (res.success) {
+          this._waiting = null;
+          this._onReconnect?.("reconnected");
+        } else if (
+          Date.now() >= until ||
+          kind === "noKey" ||
+          kind === "badKey" ||
+          kind === "premium"
+        ) {
+          this._waiting = null;
+          Logger.info(
+            `<Connector> Stopped looking for @${username}'s LIVE -- ${formatError(res.error)}`,
+            this._logFile,
+          );
+          this._onReconnect?.("stopped");
+        } else {
+          next();
+        }
+      }, WAIT_TRY_MS);
+    };
+    next();
+  }
+
+  // A Connect or a Disconnect ends the look, and the next stop gets all of it
+  private _stopWaiting() {
+    clearTimeout(this._waiting?.timer);
+    this._waiting = null;
+    this._waitUntil = 0;
+  }
+
   private _listen(connection: TikTokLiveConnection): void {
+    // Whether the LIVE ended while the connection was away: a reconnect found
+    // the room ended, or the end was in the batches a reconnect caught up
+    // with, which the library dispatches in the same tick as connected.
+    let catchingUp = false;
+    let endedAway = false;
+
     // Before the room's first messages, so the session starts before them.
     connection.on(WebcastEvent.CONNECTED, ({ reconnected }) => {
-      if (reconnected) this._onReconnect?.("reconnected");
-      else this.emit(TOKIO_EVENTS.CONNECTED);
+      if (!reconnected) {
+        this.emit(TOKIO_EVENTS.CONNECTED);
+        return;
+      }
+      catchingUp = true;
+      setImmediate(() => {
+        catchingUp = false;
+      });
+      this._onReconnect?.("reconnected");
+    });
+
+    connection.on(WebcastEvent.STREAM_END, () => {
+      endedAway = catchingUp || connection.state === "reconnecting";
     });
 
     connection.on(
@@ -179,6 +326,11 @@ export class TikTokLiveConnector extends ConnectorProvider {
         }
         connection.removeAllListeners();
         if (this._connection === connection) this._connection = null;
+        // Only an abnormal stop (the user's call): the connection was lost, or
+        // the LIVE ended while it was away. Before DISCONNECTED, which reads it.
+        if (why !== "user" && (why !== "streamEnd" || endedAway)) {
+          this._wait(connection.username);
+        }
         // Later, so the handlers of the batch it ended with finish first
         setImmediate(() => {
           if (why === "user") {
@@ -381,6 +533,13 @@ function getUserData(user?: User, userIdentity?: UserIdentity): UserData {
   };
 }
 
+// A failure trying again can fix (the network, a timeout, a refused socket,
+// Euler's 5xx), but not a rate limit, which the streamer waits out.
+const canRetry = (error: unknown) =>
+  isConnectorError(error) &&
+  error.retryable &&
+  !(error instanceof RateLimitError);
+
 // The library's error codes are stable, its messages are for logs.
 function toFailure(error: unknown): ConnectorFailure {
   if (!isConnectorError(error)) {
@@ -392,6 +551,8 @@ function toFailure(error: unknown): ConnectorFailure {
     case "OFFLINE":
       return fail("offline");
     case "ROOM_NOT_FOUND":
+      // Every lookup failed on the network, which doesn't mean no such user
+      return fail(error.retryable ? "network" : "notFound");
     case "INVALID_USERNAME":
       return fail("notFound");
     case "RATE_LIMITED": {
