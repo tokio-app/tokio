@@ -18,6 +18,7 @@ import tools from "@/events/pages/tools";
 import { createHandler } from "@test/handler";
 import { mcpClient } from "@test/mcp";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const app = (overrides: Partial<OverlayApp> = {}): OverlayApp => ({
   id: "gift-jar",
@@ -500,6 +501,162 @@ describe("overlays MCP tools", () => {
       expect(studioTest).toHaveBeenCalledOnce();
       await call("remove", { kind: "studio_overlay", id: ID });
       expect(held).toEqual([]);
+    });
+
+    describe("edit_studio_overlay", () => {
+      const Edited = z.object({
+        added: z.array(z.string()),
+        items: z.array(z.unknown()),
+      });
+      // Group g holding a and b, then t on its own in front
+      const seeded = () => {
+        const s = setup();
+        s.held[0] = StudioOverlaySchema.parse({
+          id: ID,
+          name: "Overlay 1",
+          items: [
+            {
+              kind: "group",
+              id: "g",
+              name: "Goals",
+              elements: [
+                { ...text, id: "a" },
+                { ...text, id: "b" },
+              ],
+            },
+            text,
+          ],
+        });
+        return s;
+      };
+      const idsOf = (overlay: StudioOverlay) =>
+        overlay.items.flatMap((i) =>
+          i.kind === "group" ? [i.id, ...i.elements.map((e) => e.id)] : [i.id],
+        );
+      const edit = async (h: ReturnType<typeof setup>["h"], ops: unknown[]) =>
+        (await mcpClient(h.handler)).call("edit_studio_overlay", {
+          id: ID,
+          ops,
+        });
+
+      it("adds items with their kind's defaults and new ids", async () => {
+        const { h, held } = seeded();
+
+        const res = await edit(h, [
+          { op: "add", item: { kind: "viewer" } },
+          { op: "add", item: { kind: "group", elements: [{ kind: "text" }] } },
+          { op: "add", item: { kind: "shape", id: "s" }, behind: "b" },
+        ]);
+
+        expect(res.isError).toBe(false);
+        const { added, items } = Edited.parse(res.value);
+        expect(added).toHaveLength(4);
+        expect(added[0]).toMatch(/^[0-9a-f]{8}$/);
+        const viewer = held[0].items.find((i) => i.id === added[0]);
+        expect(viewer).toMatchObject({ kind: "viewer", when: "event" });
+        expect(held[0].items[3]).toMatchObject({
+          kind: "group",
+          name: "Group 1",
+          elements: [{ id: added[2], kind: "text" }],
+        });
+        expect(items).toContainEqual({
+          id: "s",
+          kind: "shape",
+          label: "",
+          group: "g",
+        });
+        expect(
+          held[0].items[0].kind === "group" &&
+            held[0].items[0].elements.map((e) => e.id),
+        ).toEqual(["a", "s", "b"]);
+      });
+
+      it("changes, moves and removes items, in order", async () => {
+        const { h, held } = seeded();
+
+        const res = await edit(h, [
+          { op: "change", id: "a", set: { text: "hi", x: 5 } },
+          { op: "move", id: "t1", group: "g" },
+          { op: "move", id: "b", behind: "a" },
+          { op: "move", id: "a", group: null },
+          { op: "change", id: "g", set: { name: "Top" } },
+          { op: "remove", id: "t1" },
+        ]);
+
+        expect(res.isError).toBe(false);
+        expect(Edited.parse(res.value).items).toEqual([
+          { id: "g", kind: "group", name: "Top" },
+          { id: "b", kind: "text", label: "", group: "g" },
+          { id: "a", kind: "text", label: "" },
+        ]);
+        expect(held[0].items[1]).toMatchObject({ text: "hi", x: 5, y: 0 });
+      });
+
+      it("removes a group with its elements", async () => {
+        const { h, held } = seeded();
+
+        await edit(h, [{ op: "remove", id: "g" }]);
+
+        expect(held[0].items.map((i) => i.id)).toEqual(["t1"]);
+      });
+
+      it.each([
+        [[{ op: "remove", id: "nope" }], "No item nope"],
+        [
+          [{ op: "change", id: "a", set: { colour: "#fff" } }],
+          "ops.0.set.colour",
+        ],
+        [[{ op: "change", id: "a", set: { kind: "shape" } }], "kind"],
+        [[{ op: "change", id: "g", set: { elements: [] } }], "elements"],
+        [[{ op: "move", id: "g", behind: "a" }], "A group can't go into"],
+        [[{ op: "add", item: { kind: "group" }, group: "g" }], "into a group"],
+        [[{ op: "add", item: { kind: "text", id: "a" } }], "taken"],
+        [[{ op: "add", item: { kind: "text", rounding: 9 } }], "rounding"],
+      ])("refuses a bad op: %j", async (ops, message) => {
+        const { h, store } = seeded();
+
+        const res = await edit(h, ops);
+
+        expect(res.isError).toBe(true);
+        expect(res.text).toContain(message);
+        expect(store.saveStudioOverlay).not.toHaveBeenCalled();
+      });
+
+      it("saves nothing when a later op fails", async () => {
+        const { h, held, store } = seeded();
+
+        const res = await edit(h, [
+          { op: "remove", id: "a" },
+          { op: "change", id: "b", set: { width: -1 } },
+        ]);
+
+        expect(res.isError).toBe(true);
+        expect(res.text).toContain("ops.1 (change b)");
+        expect(store.saveStudioOverlay).not.toHaveBeenCalled();
+        expect(idsOf(held[0])).toEqual(["g", "a", "b", "t1"]);
+      });
+    });
+
+    it("duplicates with get and save_item", async () => {
+      const { h, held } = setup();
+      held[0] = StudioOverlaySchema.parse({ id: ID, items: [text] });
+      const { call } = await mcpClient(h.handler);
+
+      const {
+        id: _id,
+        url: _url,
+        ...fields
+      } = z
+        .record(z.string(), z.unknown())
+        .parse((await call("get", { kind: "studio_overlay", id: ID })).value);
+      const res = await call("save_item", {
+        kind: "studio_overlay",
+        changes: fields,
+      });
+
+      expect(res.isError).toBe(false);
+      expect(held[1].id).not.toBe(ID);
+      expect(held[1].items).toEqual(held[0].items);
     });
   });
 
