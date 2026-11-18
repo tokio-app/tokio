@@ -223,6 +223,8 @@ describe("StudioEditor", () => {
       "Emote",
       "Shape",
       "Viewer's picture",
+      "Goal bar",
+      "List",
       "Overlay",
     ];
 
@@ -241,7 +243,7 @@ describe("StudioEditor", () => {
 
     const overlay = await waitFor(() => {
       const last = lastSave();
-      expect(last?.items).toHaveLength(8);
+      expect(last?.items).toHaveLength(10);
       return last!;
     });
     // No group made for them
@@ -253,6 +255,8 @@ describe("StudioEditor", () => {
       "emote",
       "shape",
       "viewer",
+      "bar",
+      "list",
       "overlay",
     ]);
     // Front on top, with no group around them

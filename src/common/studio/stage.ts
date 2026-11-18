@@ -364,6 +364,13 @@ const newFigure = () => {
   return svg;
 };
 
+type BarView = Extract<StudioElementView, { kind: "bar" }>;
+
+// A goal bar's track and its fill (PR 4's bar work draws them)
+const fillBar = (body: HTMLElement, _bar: BarView) => {
+  body.firstElementChild?.remove();
+};
+
 // Chromium keeps a detached player that still has a source alive
 const release = (video: HTMLVideoElement) => {
   video.pause();
@@ -602,6 +609,13 @@ const newAvatar = () => {
   );
   avatar.append(img, div("studio-initial"));
   return avatar;
+};
+
+type ListView = Extract<StudioElementView, { kind: "list" }>;
+
+// A list's rows, updated in place (PR 4's list work draws them)
+const fillList = (body: HTMLElement, _list: ListView) => {
+  body.firstElementChild?.remove();
 };
 
 // A picture's own size, 0 by 0 until it's read
@@ -1050,6 +1064,12 @@ export function createStage(
         layoutAvatar(avatar.querySelector("img")!, side, element.crop);
         break;
       }
+      case "bar":
+        fillBar(body, element);
+        break;
+      case "list":
+        fillList(body, element);
+        break;
       case "overlay":
         if (slots) {
           only(body, HTMLDivElement, () => div("studio-slot"));

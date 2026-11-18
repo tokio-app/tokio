@@ -34,6 +34,8 @@
  *                      px of the box, clipped to itself
  *             viewer   .studio-avatar (.studio-has-picture), sized inline,
  *                      holding an img and .studio-initial
+ *             bar      (PR 4's bar work)
+ *             list     (PR 4's list work)
  *             overlay  iframe.studio-embed on stream, .studio-slot in the
  *                      editor, nothing when it can't load
  *           A picture that fails to load gets .studio-failed. One that's

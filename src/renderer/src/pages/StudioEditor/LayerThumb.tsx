@@ -7,9 +7,11 @@ import { CSSProperties } from "react";
 import { IconType } from "react-icons";
 import {
   LuAppWindow,
+  LuChartBarBig,
   LuCircleUserRound,
   LuGift,
   LuImage,
+  LuList,
   LuSmile,
   LuWebcam,
 } from "react-icons/lu";
@@ -141,6 +143,11 @@ export function LayerThumb({
       return icon(LuWebcam);
     case "viewer":
       return icon(LuCircleUserRound);
+    // PR 4's bar work may draw it in miniature
+    case "bar":
+      return icon(LuChartBarBig);
+    case "list":
+      return icon(LuList);
     // An embedded overlay
     default:
       return icon(LuAppWindow);

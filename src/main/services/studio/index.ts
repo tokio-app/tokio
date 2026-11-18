@@ -20,9 +20,9 @@ import {
   formatError,
   generateEmoteChatSample,
   generateTikTokEventSample,
+  goalValue,
   reactsToEvents,
   sentPicture,
-  STUDIO_NUMBERS,
   studioEventVariables,
   triggersOf,
 } from "@/common/util";
@@ -103,10 +103,6 @@ const likesOf = (payload: TokioEventMap[AppEvents]) =>
   typeof payload === "object" && payload !== null && "likeCount" in payload
     ? Math.max(0, payload.likeCount)
     : null;
-
-// A LIVE number a goal can watch: uptime only grows, so it has none
-const isGoalNumber = (name: string): name is keyof StudioNumbers =>
-  name !== "uptime" && (STUDIO_NUMBERS as string[]).includes(name);
 
 /**
  * Plays Overlay Studio's elements that react to live events: it matches their
@@ -205,10 +201,7 @@ export class StudioService extends Service {
         for (const trigger of triggersOf(item)) {
           if (trigger.type !== GOAL_TRIGGER) continue;
           const { number, goal } = trigger;
-          const value = isGoalNumber(number)
-            ? numbers[number]
-            : (counts[number] ?? 0);
-          if (value < goal) continue;
+          if (goalValue(number, numbers, counts) < goal) continue;
           // A changed goal can be reached again
           const key = JSON.stringify([item.id, number, goal]);
           const reached = mapOf(this._reached, overlay.id);

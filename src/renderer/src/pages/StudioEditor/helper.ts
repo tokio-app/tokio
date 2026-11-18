@@ -31,6 +31,8 @@ export const KIND_NAMES: Record<StudioElementKind, MessageKey> = {
   emote: "studio.kinds.emote",
   shape: "studio.kinds.shape",
   viewer: "studio.kinds.viewer",
+  bar: "studio.kinds.bar",
+  list: "studio.kinds.list",
   overlay: "studio.kinds.overlay",
 };
 

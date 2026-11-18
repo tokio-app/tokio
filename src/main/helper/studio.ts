@@ -12,6 +12,7 @@ import {
   alertMediaPath,
   ALERTS_PATH,
   formatError,
+  goalValue,
   MINECRAFT_OVERLAY_PATH,
   sampleCounts,
   sampleDeps,
@@ -110,6 +111,10 @@ function viewOf(
     },
     sent: (element) =>
       sentPicture(element, studio.kept(overlay.id, element)?.values ?? null),
+    fill: (element) =>
+      goalValue(element.number, numbers, studio.counts(overlay)) / element.goal,
+    // PR 4's list work fills them from the LIVE
+    rows: () => [],
     // The page doesn't show it; the editor names embeds itself
     label: () => "",
   });
@@ -137,14 +142,16 @@ export const sendStudioReact = (
     data: react,
   });
 
-// Whether one of its texts shows a live number or one of its counters, sent
-// again as they change
+// Whether it shows something the LIVE changes, sent again as it does: a
+// text with a live number or one of its counters, a goal bar or a list
 export const showsNumbers = (overlay: StudioOverlay) =>
   studioElements(overlay).some(
     (e) =>
-      e.kind === "text" &&
-      (usesNumbers(e.text) ||
-        overlay.counters.some((c) => e.text.includes(`{${c.name}}`))),
+      e.kind === "bar" ||
+      e.kind === "list" ||
+      (e.kind === "text" &&
+        (usesNumbers(e.text) ||
+          overlay.counters.some((c) => e.text.includes(`{${c.name}}`)))),
   );
 
 // Whether one of its texts shows {uptime}, sent again every second while LIVE

@@ -156,6 +156,49 @@ describe("StudioElementSchema", () => {
     });
   });
 
+  it("fills a goal bar toward 1000 likes in Rose on Panel, a pill", () => {
+    expect(StudioElementSchema.parse(element({ kind: "bar" }))).toMatchObject({
+      number: "likes",
+      goal: 1000,
+      color: "#f43f5e",
+      gradient: false,
+      gradient_color: "#f1f5f9",
+      track: "#18181bd9",
+      rounding: 50,
+      vertical: false,
+    });
+    for (const changes of [{ goal: 0 }, { goal: 1.5 }, { number: "{likes}" }]) {
+      expect(
+        StudioElementSchema.safeParse(element({ kind: "bar", ...changes }))
+          .success,
+      ).toBe(false);
+    }
+  });
+
+  it("lists this LIVE's top 5 gifters in Paper, their values in Rose", () => {
+    expect(StudioElementSchema.parse(element({ kind: "list" }))).toMatchObject({
+      source: "gifters",
+      rows: 5,
+      font: "",
+      size: 36,
+      color: "#f1f5f9",
+      value_color: "#f43f5e",
+      pictures: true,
+      gap: 16,
+    });
+    for (const changes of [
+      { rows: 0 },
+      { rows: 11 },
+      { source: "likes" },
+      { gap: 201 },
+    ]) {
+      expect(
+        StudioElementSchema.safeParse(element({ kind: "list", ...changes }))
+          .success,
+      ).toBe(false);
+    }
+  });
+
   it("shows the default camera at 720p, and refuses another quality or a long id or name", () => {
     expect(
       StudioElementSchema.parse(element({ kind: "camera" })),
