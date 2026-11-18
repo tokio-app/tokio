@@ -2,8 +2,11 @@ import {
   ALERT_TRIGGERS,
   localizeOverlayConfig,
   OverlayConfigSchema,
+  type StudioElement,
   StudioElementSchema,
   StudioGroupSchema,
+  type StudioItem,
+  type StudioOverlay,
   StudioOverlaySchema,
 } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, AppEventsMap } from "@/common/types";
@@ -12,10 +15,12 @@ import {
   countedVariables,
   getOverlayURL,
   getStudioOverlayURL,
+  newStudioElement,
+  newStudioGroup,
   STUDIO_NUMBERS,
 } from "@/common/util";
 import { language, t } from "@/helper/i18n";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import {
@@ -60,25 +65,40 @@ const findTestOverlay = ({ overlayService }: Handler, id: string) =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+// The schema of an element's own kind: the union's check passes a key only
+// another kind has, which the save then drops
+const elementSchema = (kind: unknown) =>
+  StudioElementSchema.options.find((o) => o.shape.kind.value === kind);
+
+const unknownElementKeys = (element: unknown, prefix: string) =>
+  unknownKeys(
+    elementSchema(isRecord(element) ? element.kind : undefined) ??
+      StudioElementSchema,
+    element,
+    prefix,
+  );
+
 // unknownKeys stops at arrays, and a studio overlay is mostly its items: a
 // typo in an element would be dropped and reported as saved
-function unknownItemKeys(items: unknown): string[] {
-  if (!Array.isArray(items)) return [];
-  return items.flatMap((item: unknown, i) => {
-    if (!isRecord(item) || item.kind !== "group") {
-      return unknownKeys(StudioElementSchema, item, `items.${i}.`);
-    }
-    const elements: unknown[] = Array.isArray(item.elements)
-      ? item.elements
-      : [];
-    return [
-      ...unknownKeys(StudioGroupSchema, item, `items.${i}.`),
-      ...elements.flatMap((element, j) =>
-        unknownKeys(StudioElementSchema, element, `items.${i}.elements.${j}.`),
-      ),
-    ];
-  });
+function unknownItemKeysOf(item: unknown, prefix: string): string[] {
+  if (!isRecord(item) || item.kind !== "group") {
+    return unknownElementKeys(item, prefix);
+  }
+  const elements: unknown[] = Array.isArray(item.elements) ? item.elements : [];
+  return [
+    ...unknownKeys(StudioGroupSchema, item, prefix),
+    ...elements.flatMap((element, j) =>
+      unknownElementKeys(element, `${prefix}elements.${j}.`),
+    ),
+  ];
 }
+
+const unknownItemKeys = (items: unknown): string[] =>
+  Array.isArray(items)
+    ? items.flatMap((item: unknown, i) =>
+        unknownItemKeysOf(item, `items.${i}.`),
+      )
+    : [];
 
 // The first "Overlay N" no studio overlay is named, as the Studio page picks
 function newStudioName({ storeManagerService }: Handler) {
@@ -214,6 +234,9 @@ export const kinds: Kinds = {
       "when: always (on screen), event (hidden until its trigger, then shows for seconds with its entrance and exit), animate (on screen, plays its animation on each trigger) or loop (on screen, plays idle forever). A group reacts as one, its elements keep their own when. On Like it reacts every likes_every likes from all viewers.",
       `Texts can say ${STUDIO_NUMBERS.map((n) => `{${n}}`).join(" ")} (the LIVE's numbers) and, while they react, their trigger's variables: ${TRIGGER_VARIABLES}. Trigger values and fields are the alert kind's (describe alert).`,
       "test plays every reacting element and group once on stream, with samples.",
+      "To change single items, use edit_studio_overlay instead of resending items.",
+      "preview_studio_overlay returns a picture of the overlay.",
+      "To duplicate one: get it, then save_item without id, sending its fields minus id and url.",
     ].join("\n"),
     list: ({ storeManagerService }, { query, limit }) => {
       const found = storeManagerService
@@ -375,7 +398,317 @@ const SaveSettingsInput = z
   })
   .strict();
 
+// One shape for every op, not a union: some clients choke on anyOf
+const EditOp = z
+  .object({
+    op: z
+      .enum(["add", "change", "remove", "move"])
+      .describe(
+        "add: a new item (item), placed by group or behind, else in front. change: deep-merges set into item id. remove: item id (a group goes with its elements). move: item id into group and/or right behind behind.",
+      ),
+    id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("The element or group to change, remove or move"),
+    item: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        'add: the new element or group. kind is required (an element kind, or "group" with its elements); the rest falls back to the kind\'s defaults, centered. Without id it gets a new one.',
+      ),
+    set: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("change: the fields to change. Not kind, id or elements."),
+    group: z
+      .string()
+      .nullable()
+      .optional()
+      .describe(
+        "add, move: the group to put it in, at the front of its elements. null (move): on its own, in front. Groups don't go into groups.",
+      ),
+    behind: z
+      .string()
+      .optional()
+      .describe(
+        "add, move: the item to put it right behind, in that item's group if it's in one",
+      ),
+  })
+  .strict();
+type EditOp = z.output<typeof EditOp>;
+
+const EditInput = z
+  .object({
+    id: z.string().describe("The studio overlay's id"),
+    ops: z
+      .array(EditOp)
+      .min(1)
+      .max(100)
+      .describe("Applied in order. If one fails, nothing is saved."),
+  })
+  .strict();
+
+const EDIT_FIELDS: Record<EditOp["op"], string[]> = {
+  add: ["item", "group", "behind"],
+  change: ["id", "set"],
+  remove: ["id"],
+  move: ["id", "group", "behind"],
+};
+
+// An op the model got wrong: ends the edit, nothing saved
+class EditError extends Error {}
+
+const parseItem = <T extends z.ZodType>(schema: T, value: unknown) => {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    throw new EditError(`Invalid values:\n${z.prettifyError(parsed.error)}`);
+  }
+  return parsed.data;
+};
+
+const idsOf = (items: StudioItem[]) =>
+  new Set(
+    items.flatMap((item) =>
+      item.kind === "group"
+        ? [item.id, ...item.elements.map((e) => e.id)]
+        : [item.id],
+    ),
+  );
+
+// The given id, or a short new one, unique in the overlay
+function takeId(raw: Record<string, unknown>, taken: Set<string>): string {
+  if (raw.id !== undefined && typeof raw.id !== "string") {
+    throw new EditError("An id must be a string.");
+  }
+  if (raw.id !== undefined && taken.has(raw.id)) {
+    throw new EditError(`The id ${raw.id} is taken.`);
+  }
+  let id = raw.id;
+  while (id === undefined || taken.has(id)) id = randomBytes(4).toString("hex");
+  taken.add(id);
+  return id;
+}
+
+// A new element from its kind's defaults, as the editor adds one
+function newElement(
+  raw: unknown,
+  size: StudioOverlay["size"],
+  taken: Set<string>,
+): StudioElement {
+  const kind = isRecord(raw) ? elementSchema(raw.kind)?.shape.kind.value : "";
+  if (!isRecord(raw) || !kind) {
+    throw new EditError("An element needs a known kind.");
+  }
+  const id = takeId(raw, taken);
+  return parseItem(
+    StudioElementSchema,
+    deepMerge(newStudioElement(kind, size), { ...raw, id }),
+  );
+}
+
+// "Group N", the first number no group's name uses, as the editor picks
+function newGroupName(items: StudioItem[]) {
+  const taken = new Set(
+    items.filter((i) => i.kind === "group").map((g) => g.name.trim()),
+  );
+  let number = 1;
+  while (taken.has(t("studio.editor.groupName", { number }))) number++;
+  return t("studio.editor.groupName", { number });
+}
+
+function locate(items: StudioItem[], id: string) {
+  for (const [index, item] of items.entries()) {
+    if (item.id === id) return { item, index, group: null };
+    if (item.kind !== "group") continue;
+    const at = item.elements.findIndex((e) => e.id === id);
+    if (at !== -1) return { item: item.elements[at], index: at, group: item };
+  }
+  throw new EditError(`No item ${id}.`);
+}
+
+// Puts item in front of its list, or right behind `behind` in its list
+function place(
+  items: StudioItem[],
+  item: StudioItem,
+  { group, behind }: Pick<EditOp, "group" | "behind">,
+) {
+  let holder: StudioItem | null = null;
+  let index: number | undefined;
+  if (behind !== undefined) {
+    const at = locate(items, behind);
+    if (group !== undefined && group !== (at.group?.id ?? null)) {
+      throw new EditError(
+        `${behind} is in ${at.group ? `group ${at.group.id}` : "no group"}, not the group given.`,
+      );
+    }
+    holder = at.group;
+    index = at.index;
+  } else if (group !== undefined && group !== null) {
+    holder = items.find((i) => i.kind === "group" && i.id === group) ?? null;
+    if (!holder) throw new EditError(`No group ${group}.`);
+  }
+  if (holder?.kind !== "group") {
+    items.splice(index ?? items.length, 0, item);
+  } else if (item.kind === "group") {
+    throw new EditError("A group can't go into a group.");
+  } else {
+    holder.elements.splice(index ?? holder.elements.length, 0, item);
+  }
+}
+
+// Applies one op to items in place; returns the ids it added
+function applyEdit(
+  items: StudioItem[],
+  op: EditOp,
+  path: string,
+  size: StudioOverlay["size"],
+): string[] {
+  const extra = Object.entries(op)
+    .filter(
+      ([key, value]) =>
+        key !== "op" &&
+        value !== undefined &&
+        !EDIT_FIELDS[op.op].includes(key),
+    )
+    .map(([key]) => key);
+  if (extra.length > 0) {
+    throw new EditError(`${op.op} doesn't take ${extra.join(", ")}.`);
+  }
+
+  if (op.op === "add") {
+    const raw = op.item;
+    if (!raw) throw new EditError("add needs item.");
+    const unknown = unknownItemKeysOf(raw, `${path}.item.`);
+    if (unknown.length > 0) {
+      throw new EditError(`Unknown settings: ${unknown.join(", ")}.`);
+    }
+    const taken = idsOf(items);
+    let added: StudioItem;
+    if (raw.kind === "group") {
+      const id = takeId(raw, taken);
+      if (raw.elements !== undefined && !Array.isArray(raw.elements)) {
+        throw new EditError("A group's elements must be a list.");
+      }
+      const given: unknown[] = Array.isArray(raw.elements) ? raw.elements : [];
+      const elements = given.map((e) => newElement(e, size, taken));
+      added = parseItem(
+        StudioGroupSchema,
+        deepMerge(newStudioGroup(newGroupName(items)), {
+          ...raw,
+          id,
+          elements,
+        }),
+      );
+    } else {
+      added = newElement(raw, size, taken);
+    }
+    place(items, added, op);
+    return added.kind === "group"
+      ? [added.id, ...added.elements.map((e) => e.id)]
+      : [added.id];
+  }
+
+  if (op.id === undefined) throw new EditError(`${op.op} needs id.`);
+  const found = locate(items, op.id);
+  const list = found.group ? found.group.elements : items;
+
+  if (op.op === "change") {
+    const { set } = op;
+    if (!set) throw new EditError("change needs set.");
+    const refused = ["kind", "id", "elements"].filter((k) =>
+      Object.hasOwn(set, k),
+    );
+    if (refused.length > 0) {
+      throw new EditError(`set can't change ${refused.join(", ")}.`);
+    }
+    const { item } = found;
+    const unknown =
+      item.kind === "group"
+        ? unknownKeys(StudioGroupSchema, set, `${path}.set.`)
+        : unknownElementKeys({ ...set, kind: item.kind }, `${path}.set.`);
+    if (unknown.length > 0) {
+      throw new EditError(`Unknown settings: ${unknown.join(", ")}.`);
+    }
+    const merged = deepMerge(item, set);
+    if (item.kind === "group") {
+      items[found.index] = parseItem(StudioGroupSchema, merged);
+    } else {
+      list[found.index] = parseItem(StudioElementSchema, merged);
+    }
+    return [];
+  }
+
+  if (op.op === "remove") {
+    list.splice(found.index, 1);
+    return [];
+  }
+  if (op.group === undefined && op.behind === undefined) {
+    throw new EditError("move needs group or behind.");
+  }
+  if (op.behind === op.id) {
+    throw new EditError("An item can't go behind itself.");
+  }
+  // Behind one of its own elements, which go with it
+  if (
+    op.behind !== undefined &&
+    locate(items, op.behind).group === found.item
+  ) {
+    throw new EditError("A group can't go into a group.");
+  }
+  list.splice(found.index, 1);
+  place(items, found.item, op);
+  return [];
+}
+
+// Every group and element, back to front: what the model needs to go on
+const itemList = (items: StudioItem[]) =>
+  items.flatMap((item): Record<string, string>[] =>
+    item.kind === "group"
+      ? [
+          { id: item.id, kind: item.kind, name: item.name },
+          ...item.elements.map((e) => ({
+            id: e.id,
+            kind: e.kind,
+            label: e.label,
+            group: item.id,
+          })),
+        ]
+      : [{ id: item.id, kind: item.kind, label: item.label }],
+  );
+
 export const tools: ToolDef<any>[] = [
+  defineTool({
+    name: "edit_studio_overlay",
+    title: "Edit a studio overlay's items",
+    description:
+      "Adds, changes, removes or moves single elements and groups of a studio overlay, without resending its items. Ops apply in order; if one fails, nothing is saved. Returns the ids added and every item back to front.",
+    input: EditInput,
+    annotations: WRITE,
+    run: async (handler, { id, ops }) => {
+      const stored = findStudio(handler, id);
+      if (!stored) return fail(`No studio overlay ${id}.`);
+      const items = structuredClone(stored.items);
+      const added: string[] = [];
+      for (const [i, op] of ops.entries()) {
+        try {
+          added.push(...applyEdit(items, op, `ops.${i}`, stored.size));
+        } catch (e) {
+          if (!(e instanceof EditError)) throw e;
+          const what = op.id === undefined ? op.op : `${op.op} ${op.id}`;
+          return fail(`ops.${i} (${what}): ${e.message} Nothing was saved.`);
+        }
+      }
+      const parsed = StudioOverlaySchema.safeParse({ ...stored, items });
+      if (!parsed.success) return invalid(parsed.error);
+      const error = await studioInvoke(
+        handler,
+        APP_EVENTS.SAVE_STUDIO_OVERLAY,
+        { overlay: parsed.data },
+      );
+      return error ?? ok({ added, items: itemList(parsed.data.items) });
+    },
+  }),
   defineTool({
     name: "install_overlay",
     title: "Install an official overlay",

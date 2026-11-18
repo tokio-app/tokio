@@ -56,17 +56,18 @@ paths:
 - An overlay also saves the editor's `rulers` (off for a new one) and `guides`. The stream never gets either.
 - The caps (`STUDIO_MAX_ELEMENTS`, `STUDIO_MAX_GROUPS` and the rest) stay tight: each autosave rewrites and flushes the whole `tokio.json`.
 - A media element saves a library basename; the only URL an element saves is an emote's `image`, kept to `https:`.
-- The list page picks the id (`crypto.randomUUID()`) and the name (`newOverlayName`), and opens a new overlay only once the `STUDIO` list holds it, so a failed add opens nothing. `addStudioOverlay` refuses an id that isn't a UUID or is taken, since it becomes the URL and the socket id; `saveStudioOverlay` and `removeStudioOverlay` refuse one they don't hold, and the handler then replies `STUDIO` with the list and warns `main.studio.missing`.
+- The list page picks the id (`crypto.randomUUID()`) and the name (`newOverlayName`), and opens a new overlay only once the `STUDIO` list holds it, so a failed add opens nothing.
+- Duplicate sends `ADD_STUDIO_OVERLAY` with `copy`, the source's id, and stays on the list (the user's call). The copy is "<name> copy", then "copy 2" and on (`copyName`), cut to `STUDIO_NAME_MAX_LENGTH` from the source's name. `addStudioOverlay` copies everything the source holds, element ids too, so an element id is unique only within its overlay: key anything per element by its overlay too. A source main no longer holds gets `main.studio.missing`. `addStudioOverlay` refuses an id that isn't a UUID or is taken, since it becomes the URL and the socket id; `saveStudioOverlay` and `removeStudioOverlay` refuse one they don't hold, and the handler then replies `STUDIO` with the list and warns `main.studio.missing`.
 - Every handler in `src/main/events/pages/studio.ts` replies `STUDIO` with the list main holds, failures included.
 
 ## Reactions
 
 - Each element and group reacts on its own: its `when` is `always`, `event` (hidden until its trigger, then `seconds` with its `entrance`, then its `exit`), `animate` (always on screen, plays its `animation` on each trigger) or `loop` (always on screen, plays its `idle` forever, with no trigger). `reactsToEvents` is the one check for a trigger, so a loop never counts as reacting.
 - `StudioService.handle` runs `streakOf` once per event, then `matchesTrigger` per reacting group and element, as alerts do (see `.claude/rules/alerts.md`), each group just before its elements. A group's react carries only its id (`StudioReact.element` names either) and keeps nothing.
-- On Like an element reacts each time the likes from every viewer pass another `likes_every`, the rest carried over, at most once per event, counted per element, as game actions count them (the user's call). So a Like offers no viewer or count variables (`countedVariables`, the user's call).
+- On Like an element reacts each time the likes from every viewer pass another `likes_every`, the rest carried over, at most once per event, counted per element of each overlay, as game actions count them (the user's call). So a Like offers no viewer or count variables (`countedVariables`, the user's call).
 - A viewer's picture offers only the triggers a viewer sends (not Envelope, Super Fan Box or Music change) and the event Whens (the user's call).
 - A gift or emote element shows one picked (an emote from the saved ones) or, with none (`gift: null`, `emote: null`, a new one's default), what its event sent; that choice offers only the Gift or Emote trigger and the event Whens, and sets both (the user's call). `sentPicture` reads the gift's `image`, or the emote its trigger names (else the first), for the react and, kept, for the view (`sent` in `StudioViewDeps`). Emote samples (`generateEmoteChatSample`) always hold an emote.
-- It keeps each element's last event values and viewer until Tokio quits, so a reloaded page shows them. `kept(element)` returns them only while the element's trigger type is the one they came from. Before the first event, the trigger's variables read `""`.
+- It keeps each element's last event values and viewer until Tokio quits, so a reloaded page shows them. `kept(overlay, element)` returns them only while the element's trigger type is the one they came from. What it keeps (values, Test samples, like counts) goes by overlay id, then element id: a duplicate holds its source's element ids. Before the first event, the trigger's variables read `""`.
 - Hidden elements, and those of a hidden group, still react and keep their values: their page ignores reacts for elements it doesn't draw, and they have the latest event when they show again.
 - `clear()` on `DISCONNECTED` drops the gift streaks and like counts, not the kept values.
 - Another react while an element shows restarts its entrance and its `seconds` with the newest values, and an `animate` element's animation from the start (the user's call). One during its exit enters again.
@@ -92,6 +93,7 @@ paths:
 - The page connects with the socket id `studio:<id>` (`studioSocketId`, `STUDIO_SOCKET_PREFIX`); `onConnect` sends it its view.
 - Two messages, private to the page like `tokio:timer` (not in `TokioPayload`): `tokio:studio` (`{ view: StudioView | null }`) and `tokio:studio:react` (`{ element, text?, picture?, name? }`).
 - A removed overlay, or an id main doesn't hold, gets `{ view: null }`, which clears the page.
+- `?preview` (MCP's preview, `helper/studioPreview.ts`) connects no socket: the page draws with `editing: true`, its root takes `studio-preview` (which holds every mover's animation, so a loop isn't caught mid-swing), and `window.TokioPreview(view)` resolves, with how many failed or took past 5 s, once its fonts, pictures, videos and embeds (each plus 0.5 s for its socket to draw it) have loaded and two frames were painted. Main builds that view with `studioSampleView`: Test's samples, no camera.
 
 ## Embeds
 

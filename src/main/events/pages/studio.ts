@@ -103,8 +103,8 @@ const options = (message: MessageKey) => ({
     }),
 });
 
-// The editor saved or tested, or the list deleted, an overlay that was deleted
-// meanwhile
+// The editor saved or tested, or the list deleted or duplicated, an overlay
+// that was deleted meanwhile
 const missing = () =>
   new AppFailure(FEEDBACK_CODES.STUDIO_FAILED, t("main.studio.missing"), {
     level: "warning",
@@ -118,13 +118,27 @@ events.push(
 
 events.push(
   APP_EVENTS.ADD_STUDIO_OVERLAY,
-  async (handler, e, { id, name }) => {
-    const saved = await handler.storeManagerService.addStudioOverlay(id, name);
+  async (handler, e, { id, name, copy }) => {
+    const { storeManagerService, notifier } = handler;
+    let source;
+    if (copy !== undefined) {
+      source = storeManagerService.getStudio().find((o) => o.id === copy);
+      if (!source) throw missing();
+    }
+    const saved = await storeManagerService.addStudioOverlay(id, name, source);
     if (saved === null) throw new Error(`Studio overlay ${id} is taken.`);
     // The page ignores the failure reply, so it keeps the list sent here.
     replyStudio(e, handler);
     if (!saved) throw saveFailure();
-    handler.notifier.success(
+    if (source) {
+      notifier.success(
+        "overlays",
+        FEEDBACK_CODES.STUDIO_OVERLAY_DUPLICATED,
+        t("main.studio.duplicated", { name: name.trim() }),
+      );
+      return;
+    }
+    notifier.success(
       "overlays",
       FEEDBACK_CODES.STUDIO_OVERLAY_ADDED,
       t("main.studio.added", { name: name.trim() }),

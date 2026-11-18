@@ -967,3 +967,10 @@
     animation: none;
   }
 }
+
+/* MCP's preview (studio.html?preview) takes one picture: loops held at rest,
+   not caught mid-swing. Movers are the only things that animate. */
+.studio-preview .studio-body,
+.studio-preview .studio-group {
+  animation: none !important;
+}

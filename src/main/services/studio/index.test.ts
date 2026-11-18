@@ -222,7 +222,7 @@ describe("StudioService", () => {
     expect(onReact.mock.calls).toEqual([
       ["o1", { element: "t", text: "3x Rose" }],
     ]);
-    expect(studio.kept(text)?.values).toMatchObject({
+    expect(studio.kept("o1", text)?.values).toMatchObject({
       gift: { comboCount: 3 },
     });
   });
@@ -256,7 +256,7 @@ describe("StudioService", () => {
       trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
     });
 
-    expect(studio.kept(text)).toBeNull();
+    expect(studio.kept("o1", text)).toBeNull();
     studio.handle(
       TOKIO_EVENTS.FOLLOW,
       { user: user("Ana") },
@@ -264,7 +264,7 @@ describe("StudioService", () => {
       numbers,
     );
 
-    expect(studio.kept(text)).toMatchObject({
+    expect(studio.kept("o1", text)).toMatchObject({
       picture: "https://cdn/Ana.png",
       name: "Ana",
       values: { user: { username: "Ana" } },
@@ -273,7 +273,7 @@ describe("StudioService", () => {
       ...text,
       trigger: { ...text.trigger, type: TOKIO_EVENTS.SHARE },
     });
-    expect(studio.kept(shared)).toBeNull();
+    expect(studio.kept("o1", shared)).toBeNull();
   });
 
   it("clears the streaks and like counts but keeps the values", () => {
@@ -296,7 +296,7 @@ describe("StudioService", () => {
     studio.handle(TOKIO_EVENTS.LIKE, likes, overlays, numbers);
 
     expect(onReact).toHaveBeenCalledTimes(1);
-    expect(studio.kept(like)).not.toBeNull();
+    expect(studio.kept("o1", like)).not.toBeNull();
   });
 
   it("reacts an element in a later layer", () => {
@@ -340,7 +340,7 @@ describe("StudioService", () => {
     );
 
     expect(onReact).toHaveBeenCalledWith("o1", { element: "t", text: "Ana" });
-    expect(studio.kept(text)).toMatchObject({ name: "Ana" });
+    expect(studio.kept("o1", text)).toMatchObject({ name: "Ana" });
   });
 
   it("forgets a removed overlay's elements", () => {
@@ -358,8 +358,42 @@ describe("StudioService", () => {
     );
     studio.forget("o1");
 
-    expect(studio.kept(a)).toBeNull();
-    expect(studio.kept(b)).not.toBeNull();
+    expect(studio.kept("o1", a)).toBeNull();
+    expect(studio.kept("o2", b)).not.toBeNull();
+  });
+
+  it("keeps the values and likes of the same ids apart per overlay", () => {
+    const { studio, onReact, numbers } = setup();
+    const viewer = element("v", { kind: "viewer" });
+    const like = element("l", {
+      trigger: { type: TOKIO_EVENTS.LIKE, gifts: [] },
+      likes_every: 10,
+    });
+    // A copy holds its source's element ids
+    const first = overlayOf(viewer, like);
+    const copy = { ...first, id: "o2" };
+    const likes = (likeCount: number) => ({
+      user: user("Ana"),
+      likeCount,
+      totalLikes: 0,
+    });
+
+    studio.handle(TOKIO_EVENTS.FOLLOW, { user: user("Ana") }, [first], numbers);
+    studio.handle(TOKIO_EVENTS.LIKE, likes(6), [first], numbers);
+    studio.handle(TOKIO_EVENTS.LIKE, likes(6), [copy], numbers);
+
+    expect(studio.kept("o1", viewer)).toMatchObject({ name: "Ana" });
+    expect(studio.kept("o2", viewer)).toBeNull();
+    // 6 likes each, not 12 shared
+    expect(onReact.mock.calls.filter(([, r]) => r.element === "l")).toEqual([]);
+
+    studio.handle(TOKIO_EVENTS.FOLLOW, { user: user("Bea") }, [copy], numbers);
+    studio.forget("o1");
+    expect(studio.kept("o1", viewer)).toBeNull();
+    expect(studio.kept("o2", viewer)).toMatchObject({ name: "Bea" });
+    // The copy's count stays: 6 + 4 reacts it
+    studio.handle(TOKIO_EVENTS.LIKE, likes(4), [copy], numbers);
+    expect(onReact).toHaveBeenLastCalledWith("o2", { element: "l" });
   });
 
   it("tests every element that reacts with samples, kept while they show", () => {
@@ -393,9 +427,9 @@ describe("StudioService", () => {
     });
     expect(onReact).not.toHaveBeenCalled();
     // Views re-sent meanwhile show the samples
-    expect(studio.kept(text)).toMatchObject({ trigger: EMOTE_TRIGGER });
-    expect(studio.kept(viewer)).toMatchObject({ name: reacts[1].name });
-    expect(studio.kept(always)).toBeNull();
+    expect(studio.kept("o1", text)).toMatchObject({ trigger: EMOTE_TRIGGER });
+    expect(studio.kept("o1", viewer)).toMatchObject({ name: reacts[1].name });
+    expect(studio.kept("o1", always)).toBeNull();
   });
 
   it("keeps a Test's sample for its seconds and exit, until a real event", () => {
@@ -413,17 +447,17 @@ describe("StudioService", () => {
     follow("Ana");
 
     const [sample] = studio.test(overlay, NUMBERS);
-    expect(studio.kept(viewer)).toMatchObject({ name: sample.name });
+    expect(studio.kept("o1", viewer)).toMatchObject({ name: sample.name });
     // A second past its seconds, for its exit
     now.mockReturnValue(1000 + 5999);
-    expect(studio.kept(viewer)).toMatchObject({ name: sample.name });
+    expect(studio.kept("o1", viewer)).toMatchObject({ name: sample.name });
     now.mockReturnValue(1000 + 6000);
-    expect(studio.kept(viewer)).toMatchObject({ name: "Ana" });
+    expect(studio.kept("o1", viewer)).toMatchObject({ name: "Ana" });
 
     // A real event wins over it
     studio.test(overlay, NUMBERS);
     follow("Bea");
-    expect(studio.kept(viewer)).toMatchObject({ name: "Bea" });
+    expect(studio.kept("o1", viewer)).toMatchObject({ name: "Bea" });
 
     // Not once its trigger changed, nor once its overlay is gone
     studio.test(overlay, NUMBERS);
@@ -431,10 +465,10 @@ describe("StudioService", () => {
       ...viewer,
       trigger: { ...viewer.trigger, type: TOKIO_EVENTS.SHARE },
     });
-    expect(studio.kept(shared)).toBeNull();
+    expect(studio.kept("o1", shared)).toBeNull();
     studio.test(overlay, NUMBERS);
     studio.forget("o1");
-    expect(studio.kept(viewer)).toBeNull();
+    expect(studio.kept("o1", viewer)).toBeNull();
   });
 
   it("reacts a group on its trigger with its id, and no values", () => {
@@ -467,7 +501,7 @@ describe("StudioService", () => {
       ["o1", { element: "G" }],
       ["o1", { element: "t", text: "Ana" }],
     ]);
-    expect(studio.kept(text)).not.toBeNull();
+    expect(studio.kept("o1", text)).not.toBeNull();
   });
 
   it("counts a group's likes apart from an element's on Like", () => {
@@ -512,7 +546,7 @@ describe("StudioService", () => {
     );
 
     expect(onReact).not.toHaveBeenCalled();
-    expect(studio.kept(loop)).toBeNull();
+    expect(studio.kept("o1", loop)).toBeNull();
   });
 
   it("tests the groups that react, not loops or always-on ones", () => {
@@ -548,7 +582,7 @@ describe("StudioService", () => {
       [overlayOf(text)],
       numbers,
     );
-    const values = studio.kept(text)?.values ?? null;
+    const values = studio.kept("o1", text)?.values ?? null;
     const loop = { ...text, when: "loop" as const };
 
     expect(studioText(text, NUMBERS, values)).toBe("Ana!");

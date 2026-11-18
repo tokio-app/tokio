@@ -17,7 +17,8 @@ import { useT } from "@/ui/i18n";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
-import { newOverlayName, sizeText } from "./helper";
+import { LuCopyPlus } from "react-icons/lu";
+import { copyName, newOverlayName, sizeText } from "./helper";
 import styles from "./studio.module.css";
 
 /**
@@ -60,6 +61,19 @@ export function Studio() {
     });
   };
 
+  // Stays on the list, unlike New overlay (the user's call). The rows show
+  // only once the list has loaded
+  const duplicate = (overlay: StudioOverlay, name: string) =>
+    window.api.emit(APP_EVENTS.ADD_STUDIO_OVERLAY, {
+      id: crypto.randomUUID(),
+      name: copyName(overlays ?? [], name, (name, number) =>
+        number === 1
+          ? t("studio.copyName", { name })
+          : t("studio.copyNameNumber", { name, number }),
+      ),
+      copy: overlay.id,
+    });
+
   let content;
   if (!overlays) {
     content = (
@@ -94,6 +108,14 @@ export function Studio() {
                   value={getStudioOverlayURL(overlay.id)}
                   title={t("studio.copyUrl")}
                 />
+                <Btn
+                  variant="icon"
+                  title={t("studio.duplicate")}
+                  aria-label={t("studio.duplicate")}
+                  onClick={() => duplicate(overlay, name)}
+                >
+                  <LuCopyPlus size={18} />
+                </Btn>
                 <Btn
                   variant="icon"
                   title={t("studio.delete")}

@@ -28,10 +28,21 @@ import * as live from "./tools/live";
 import * as music from "./tools/music";
 import * as overlays from "./tools/overlays";
 import * as settings from "./tools/settings";
+import * as studio from "./tools/studio";
 import * as tools from "./tools/tools";
 import * as tts from "./tools/tts";
 
-const AREAS = [live, settings, tts, music, alerts, games, overlays, tools];
+const AREAS = [
+  live,
+  settings,
+  tts,
+  music,
+  alerts,
+  games,
+  overlays,
+  studio,
+  tools,
+];
 
 /** Every area's sections, kinds and tools. */
 export const REGISTRY: Registry = {

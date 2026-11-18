@@ -123,6 +123,7 @@ export enum FEEDBACK_CODES {
   // OVERLAY STUDIO
   STUDIO_OVERLAY_ADDED = "studio_overlay_added",
   STUDIO_OVERLAY_REMOVED = "studio_overlay_removed",
+  STUDIO_OVERLAY_DUPLICATED = "studio_overlay_duplicated",
   STUDIO_FAILED = "studio_failed",
   CAMERA_FAILED = "camera_failed",
 

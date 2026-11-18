@@ -13,6 +13,7 @@ import {
   sendStudioOverlay,
   sendStudioOverlays,
   showsNumbers,
+  studioSampleView,
 } from "./studio";
 
 const ID = "6f1d2c1e-4b5a-4c3d-9e8f-0a1b2c3d4e5f";
@@ -273,5 +274,52 @@ describe("sendStudioOverlays", () => {
       "overlays.log",
       expect.any(Error),
     );
+  });
+});
+
+describe("studioSampleView", () => {
+  it("shows Test's samples with the server's paths and no camera", async () => {
+    const { handler } = setup([]);
+    const trigger = { type: TOKIO_EVENTS.FOLLOW, gifts: [] };
+    const gift = { type: TOKIO_EVENTS.GIFT, gifts: [] };
+
+    const view = await studioSampleView(
+      handler,
+      overlay(ID, [
+        element("t", {
+          kind: "text",
+          text: "{username} {likes}",
+          when: "event",
+          trigger,
+        }),
+        element("v", { kind: "viewer", when: "event", trigger }),
+        element("g", {
+          kind: "gift",
+          gift: null,
+          when: "event",
+          trigger: gift,
+        }),
+        element("r", { kind: "gift", gift: 2 }),
+        element("m", { kind: "media", file: "a.png" }),
+        element("c", { kind: "camera" }),
+        element("i", {
+          kind: "overlay",
+          source: { type: "installed", id: "gift jar" },
+        }),
+      ]),
+    );
+
+    const [text, viewer, sent, picked, media, camera, embed] =
+      view.layers[0].elements;
+    expect(viewer).toMatchObject({ kind: "viewer", src: /^https:/ });
+    const name = viewer.kind === "viewer" ? viewer.name : "";
+    expect(name).not.toBe("");
+    // The live numbers' samples, and the follow's own viewer
+    expect(text).toMatchObject({ text: `${name} 12.8K` });
+    expect(sent).toMatchObject({ src: /^https:/ });
+    expect(picked).toMatchObject({ src: "mystery.png" });
+    expect(media).toMatchObject({ src: "/alerts/media/a.png" });
+    expect(camera).toMatchObject({ kind: "camera", src: null });
+    expect(embed).toMatchObject({ src: "/gift%20jar/", label: "" });
   });
 });

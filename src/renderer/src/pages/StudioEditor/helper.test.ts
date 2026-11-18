@@ -5,7 +5,7 @@ import {
   StudioGroup,
   StudioItem,
 } from "@/common/schemas";
-import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
+import { TOKIO_EVENTS } from "@/common/types";
 import { newStudioElement, newStudioGroup, studioView } from "@/common/util";
 import { gift, studioOverlay } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
@@ -45,8 +45,6 @@ import {
   toCanvas,
   moveItem,
   roundBox,
-  sampleReact,
-  Samples,
   sourceOf,
   sourceValue,
   rulerTicks,
@@ -470,54 +468,6 @@ describe("turnTo and extent", () => {
       width: 3,
       height: 4,
     });
-  });
-});
-
-describe("Samples", () => {
-  it("makes each trigger's sample once, an emote's from chat", () => {
-    const samples = new Samples();
-
-    expect(samples.of(TOKIO_EVENTS.FOLLOW)).toBe(
-      samples.of(TOKIO_EVENTS.FOLLOW),
-    );
-    expect(samples.of(EMOTE_TRIGGER)).toHaveProperty("comment");
-  });
-
-  it("plays a text with its trigger's values and a viewer with its picture", () => {
-    const samples = new Samples();
-    const text = element("text", { text: "Hi {username}", when: "event" });
-    const viewer = element("viewer");
-    const follow = samples.of(TOKIO_EVENTS.FOLLOW);
-    const username =
-      typeof follow === "object" && follow && "user" in follow
-        ? follow.user.username
-        : "";
-
-    expect(username).not.toBe("");
-    expect(sampleReact(text, samples, "en")).toEqual({
-      element: text.id,
-      text: `Hi ${username}`,
-    });
-    expect(sampleReact(viewer, samples, "en")).toMatchObject({
-      element: viewer.id,
-      name: username,
-    });
-    expect(sampleReact(element("shape"), samples, "en")).toEqual({
-      element: expect.any(String),
-    });
-  });
-
-  it("takes no sample for one that moves all the time", () => {
-    const samples = new Samples();
-    const trigger = {
-      ...newStudioElement("gift", "portrait").trigger,
-      type: TOKIO_EVENTS.GIFT as const,
-    };
-    const sends = element("gift", { gift: null, when: "event", trigger });
-    const loops = element("gift", { gift: null, when: "loop", trigger });
-
-    expect(sampleReact(sends, samples, "en").picture).toMatch(/^https:/);
-    expect(sampleReact(loops, samples, "en").picture).toBe("");
   });
 });
 

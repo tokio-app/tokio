@@ -382,4 +382,76 @@ describe("studio overlay page", () => {
       await vi.waitFor(() => expect(body("t").textContent).toBe("Later"));
     });
   });
+
+  describe("preview", () => {
+    let dom: JSDOM;
+
+    beforeEach(async () => {
+      const page = url(`/studio/${encodeURIComponent(ID)}/?preview`);
+      dom = new JSDOM(await (await fetch(page)).text(), {
+        url: page,
+        runScripts: "dangerously",
+        // For requestAnimationFrame
+        pretendToBeVisual: true,
+        beforeParse(window) {
+          // jsdom has no FontFaceSet
+          Object.defineProperty(window.document, "fonts", {
+            value: { ready: Promise.resolve() },
+          });
+          window.HTMLMediaElement.prototype.play = () => Promise.resolve();
+          window.HTMLMediaElement.prototype.pause = () => {};
+          window.HTMLMediaElement.prototype.load = () => {};
+        },
+      });
+    });
+
+    afterEach(() => {
+      dom.window.close();
+    });
+
+    it("connects no socket", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(
+        server.sendToClient(SOCKET, {
+          type: "tokio:studio",
+          data: { view: null },
+        }),
+      ).toBe(false);
+    });
+
+    it("draws the view with waiting elements shown, once its media loaded", async () => {
+      const { document } = dom.window;
+      type Preview = { TokioPreview: (view: StudioView) => Promise<number> };
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page's global
+      const page = dom.window as unknown as Preview;
+
+      const drawn = page.TokioPreview(
+        view(
+          element("t", TEXT),
+          element("w", TEXT, { when: "event" }),
+          element("v", {
+            kind: "media",
+            ...PICTURE,
+            ...MEDIA,
+            src: "/alerts/media/a.webm",
+            video: true,
+          }),
+          element("g", { kind: "gift", ...PICTURE, src: "https://x/g.png" }),
+        ),
+      );
+      const media = (id: string, tag: string) =>
+        document.querySelector(`[data-element="${id}"] ${tag}`)!;
+      media("v", "video").dispatchEvent(new dom.window.Event("loadeddata"));
+      media("g", "img").dispatchEvent(new dom.window.Event("error"));
+
+      // The gift's picture failed
+      await expect(drawn).resolves.toBe(1);
+      expect(document.getElementById("stage")!.className).toContain(
+        "studio-preview",
+      );
+      const waits = document.querySelector('[data-element="w"] .studio-body')!;
+      expect(waits.classList.contains("studio-hidden")).toBe(false);
+    });
+  });
 });

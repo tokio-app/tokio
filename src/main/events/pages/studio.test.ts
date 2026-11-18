@@ -67,11 +67,13 @@ const store = (
 ) => ({
   getStudio: () => held,
   getLiveStats: () => ({ likes: 0, viewers: 0, views: 0 }),
-  addStudioOverlay: vi.fn(async (id: string, name: string) => {
-    if (result.add === null) return null;
-    held.push(overlay({ id, name }));
-    return result.add ?? true;
-  }),
+  addStudioOverlay: vi.fn(
+    async (id: string, name: string, from?: StudioOverlay) => {
+      if (result.add === null) return null;
+      held.push(overlay({ ...from, id, name }));
+      return result.add ?? true;
+    },
+  ),
   saveStudioOverlay: vi.fn(async (saved: unknown) => {
     if (result.save === null) return null;
     held.splice(0, 1, StudioOverlaySchema.parse(saved));
@@ -117,6 +119,7 @@ describe("studio events", () => {
       expect(storeManagerService.addStudioOverlay).toHaveBeenCalledWith(
         ID,
         " Overlay 1 ",
+        undefined,
       );
       expect(h.replies(APP_EVENTS_RESPONSE.STUDIO)).toEqual([
         { success: true, data: [overlay({ name: " Overlay 1 " })] },
@@ -176,6 +179,70 @@ describe("studio events", () => {
         ]);
         expect(h.notices).toMatchObject([{ level: "error", ...failure }]);
       }
+    });
+
+    it("duplicates a held overlay with its items under a new id and name", async () => {
+      const COPY = "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60";
+      const source = overlay({
+        name: "Main",
+        size: "landscape",
+        items: [
+          StudioElementSchema.parse({
+            id: "s",
+            kind: "shape",
+            x: 1,
+            y: 2,
+            width: 3,
+            height: 4,
+          }),
+        ],
+      });
+      const storeManagerService = store([source]);
+      const h = createHandler({ storeManagerService });
+
+      await h.invoke(studio, APP_EVENTS.ADD_STUDIO_OVERLAY, {
+        id: COPY,
+        name: "Main copy",
+        copy: ID,
+      });
+
+      expect(storeManagerService.addStudioOverlay).toHaveBeenCalledWith(
+        COPY,
+        "Main copy",
+        source,
+      );
+      const copied = { ...source, id: COPY, name: "Main copy" };
+      expect(h.replies(APP_EVENTS_RESPONSE.STUDIO)).toEqual([
+        { success: true, data: [source, copied] },
+      ]);
+      expect(h.notices).toMatchObject([
+        {
+          level: "success",
+          code: FEEDBACK_CODES.STUDIO_OVERLAY_DUPLICATED,
+          message: 'Overlay duplicated as "Main copy".',
+        },
+      ]);
+    });
+
+    it("refuses to duplicate an overlay it doesn't hold, replying the list", async () => {
+      const storeManagerService = store([overlay()]);
+      const h = createHandler({ storeManagerService });
+
+      await h.invoke(studio, APP_EVENTS.ADD_STUDIO_OVERLAY, {
+        id: "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60",
+        name: "Gone copy",
+        copy: "8b3f4e3a-6d7c-4e5f-9a0b-2c3d4e5f6071",
+      });
+
+      const failure = {
+        code: FEEDBACK_CODES.STUDIO_FAILED,
+        message: "This overlay no longer exists.",
+      };
+      expect(storeManagerService.addStudioOverlay).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.STUDIO)).toEqual([
+        { success: false, data: [overlay()], error: failure },
+      ]);
+      expect(h.notices).toMatchObject([{ level: "warning", ...failure }]);
     });
   });
 
