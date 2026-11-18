@@ -6,12 +6,10 @@ import {
   TriggerSchema,
 } from "@/common/schemas";
 import {
-  AppEvents,
   EMOTE_TRIGGER,
   GiftEvent,
   StudioNumbers,
   TOKIO_EVENTS,
-  TokioEventMap,
   UserData,
 } from "@/common/types";
 import Logger from "@/logger";
@@ -839,19 +837,28 @@ describe("StudioService's counters", () => {
       { name: "taps", trigger: { type: TOKIO_EVENTS.LIKE } },
       { name: "follows", trigger: { type: TOKIO_EVENTS.FOLLOW } },
     ]);
-    const handle = (type: AppEvents, payload: unknown) =>
-      studio.handle(
-        type,
-        payload as TokioEventMap[AppEvents],
-        [overlay],
-        numbers,
-      );
+    const overlays = [overlay];
 
-    handle(TOKIO_EVENTS.LIKE, likes(15));
-    handle(TOKIO_EVENTS.LIKE, likes(-3));
-    handle(TOKIO_EVENTS.FOLLOW, { user: user("Ana") });
-    handle(TOKIO_EVENTS.FOLLOW, { user: user("Bea") });
-    handle(TOKIO_EVENTS.SHARE, { user: user("Bea") });
+    studio.handle(TOKIO_EVENTS.LIKE, likes(15), overlays, numbers);
+    studio.handle(TOKIO_EVENTS.LIKE, likes(-3), overlays, numbers);
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user("Ana") },
+      overlays,
+      numbers,
+    );
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user("Bea") },
+      overlays,
+      numbers,
+    );
+    studio.handle(
+      TOKIO_EVENTS.SHARE,
+      { user: user("Bea"), shareCount: 1 },
+      overlays,
+      numbers,
+    );
 
     expect(studio.counts(overlay)).toEqual({ taps: 15, follows: 2 });
   });
