@@ -57,6 +57,7 @@ Paths to import (`add_to_library`) go through `checkPath`: absolute, a file, and
 - `edit_studio_overlay`'s ops are one object shape with optional fields, not a union: some clients choke on `anyOf`. They apply in order to a copy and save once, so a failed op saves nothing.
 - An overlay settings save from MCP closes that overlay's settings dialog if it's open, since the page closes the dialog its save reply is for.
 - A voice saved through `tts` replaces the whole voice: a partial one would keep the last engine's `id` (`.claude/rules/tts.md`).
+- `preview_studio_overlay` (`tools/studio.ts`) draws the stored overlay, never the editor's unsaved copy, since it's read-only and doesn't flush. It loads the page's `?preview` in a hidden window on its own in-memory partition, `studio-preview`: the app's session cancels every WebSocket to the overlay server (`initSession`), and embeds need theirs. Permissions, new windows, navigation and sound are refused there. One preview runs at a time and its window is always destroyed, after 15 s at most; destroying it can't quit the app, since the main window only hides. Only `tools/studio.ts` imports `helper/studioPreview.ts`.
 - The `shortcuts` section refuses what the recorder refuses (`shortcutProblem` in `tools/settings.ts`, `.claude/rules/controls.md`): `SET_SHORTCUTS` itself takes any string.
 
 ## Coupling

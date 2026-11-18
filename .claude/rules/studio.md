@@ -93,6 +93,7 @@ paths:
 - The page connects with the socket id `studio:<id>` (`studioSocketId`, `STUDIO_SOCKET_PREFIX`); `onConnect` sends it its view.
 - Two messages, private to the page like `tokio:timer` (not in `TokioPayload`): `tokio:studio` (`{ view: StudioView | null }`) and `tokio:studio:react` (`{ element, text?, picture?, name? }`).
 - A removed overlay, or an id main doesn't hold, gets `{ view: null }`, which clears the page.
+- `?preview` (MCP's preview, `helper/studioPreview.ts`) connects no socket: the page draws with `editing: true`, its root takes `studio-preview` (which holds every mover's animation, so a loop isn't caught mid-swing), and `window.TokioPreview(view)` resolves, with how many failed or took past 5 s, once its fonts, pictures, videos and embeds (each plus 0.5 s for its socket to draw it) have loaded and two frames were painted. Main builds that view with `studioSampleView`: Test's samples, no camera.
 
 ## Embeds
 
