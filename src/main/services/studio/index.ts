@@ -35,10 +35,15 @@ export type StudioKept = {
   name: string;
 };
 
-type Kept = StudioKept & { overlay: string };
-
 // A Test's sample, until its element's seconds and exit are over
-type Tested = { kept: StudioKept; overlay: string; until: number };
+type Tested = { kept: StudioKept; until: number };
+
+// The overlay's own map in one of the service's, made when missing
+function mapOf<T>(maps: Map<string, Map<string, T>>, overlay: string) {
+  let map = maps.get(overlay);
+  if (!map) maps.set(overlay, (map = new Map()));
+  return map;
+}
 
 /**
  * A text element's text: the live numbers, and the event's values when it
@@ -80,14 +85,16 @@ const viewerOf = (payload: TokioEventMap[AppEvents]) => {
 export class StudioService extends Service {
   // Each viewer's streak of a gift, see GiftStreaks
   private _streaks = new GiftStreaks();
-  // Likes toward each Like element's or group's next react, by its id
-  private _likes = new Map<string, number>();
-  // Each element's last event, by element id, until Tokio quits. A hidden
-  // layer's elements react too, so the layer shows the latest when shown
-  private _kept = new Map<string, Kept>();
-  // Each element's Test sample, by element id, while it shows: views come
-  // again on every numbers push, and would show its last event at once
-  private _tests = new Map<string, Tested>();
+  // The next three go by overlay id, then element or group id: a duplicated
+  // overlay holds its source's element ids.
+  // Likes toward each Like element's or group's next react
+  private _likes = new Map<string, Map<string, number>>();
+  // Each element's last event, until Tokio quits. A hidden layer's elements
+  // react too, so the layer shows the latest when shown
+  private _kept = new Map<string, Map<string, StudioKept>>();
+  // Each element's Test sample while it shows: views come again on every
+  // numbers push, and would show its last event at once
+  private _tests = new Map<string, Map<string, Tested>>();
   private _onReact?: (overlay: string, react: StudioReact) => void;
 
   // One listener, init.ts, which sends it to the overlay's page
@@ -117,7 +124,7 @@ export class StudioService extends Service {
         if (!matchesTrigger(item.trigger, type, payload, added, total)) {
           continue;
         }
-        if (!this._passes(item, payload)) continue;
+        if (!this._passes(overlay.id, item, payload)) continue;
         if (item.kind === "group") {
           this._onReact?.(overlay.id, { element: item.id });
           continue;
@@ -127,8 +134,8 @@ export class StudioService extends Service {
           values,
           ...viewerOf(payload),
         };
-        this._tests.delete(item.id);
-        this._kept.set(item.id, { ...kept, overlay: overlay.id });
+        this._tests.get(overlay.id)?.delete(item.id);
+        mapOf(this._kept, overlay.id).set(item.id, kept);
         this._onReact?.(overlay.id, this._react(item, kept, now));
       }
     }
@@ -138,16 +145,17 @@ export class StudioService extends Service {
    * What an element shows from its last event, or from a Test while it
    * shows, none before its first or once its trigger changed.
    */
-  public kept(element: StudioElement): StudioKept | null {
-    const tested = this._tests.get(element.id);
+  public kept(overlay: string, element: StudioElement): StudioKept | null {
+    const tests = this._tests.get(overlay);
+    const tested = tests?.get(element.id);
     if (tested) {
       const { kept, until } = tested;
       if (performance.now() < until && kept.trigger === element.trigger.type) {
         return kept;
       }
-      this._tests.delete(element.id);
+      tests!.delete(element.id);
     }
-    const kept = this._kept.get(element.id);
+    const kept = this._kept.get(overlay)?.get(element.id);
     return kept && kept.trigger === element.trigger.type ? kept : null;
   }
 
@@ -180,25 +188,22 @@ export class StudioService extends Service {
           values,
           ...viewerOf(values),
         };
-        this._tests.set(item.id, {
+        mapOf(this._tests, overlay.id).set(item.id, {
           kept: sample,
-          overlay: overlay.id,
           until: performance.now() + (item.seconds + 1) * 1000,
         });
         return this._react(item, sample, () => numbers);
       });
   }
 
-  /** Forgets what a removed overlay's elements kept, Test's samples too. */
+  /**
+   * Forgets what a removed overlay's elements kept, Test's samples and its
+   * like counts too.
+   */
   public forget(overlay: string) {
-    for (const [id, tested] of this._tests) {
-      if (tested.overlay === overlay) this._tests.delete(id);
-    }
-    for (const [id, kept] of this._kept) {
-      if (kept.overlay !== overlay) continue;
-      this._kept.delete(id);
-      this._likes.delete(id);
-    }
+    this._tests.delete(overlay);
+    this._kept.delete(overlay);
+    this._likes.delete(overlay);
   }
 
   /**
@@ -214,6 +219,7 @@ export class StudioService extends Service {
   // viewer pass another likes_every (the rest count toward the next), at
   // most once per event
   private _passes(
+    overlay: string,
     element: Pick<StudioElement, "id" | "trigger" | "likes_every">,
     payload: TokioEventMap[AppEvents],
   ) {
@@ -225,9 +231,10 @@ export class StudioService extends Service {
     ) {
       return true;
     }
+    const counts = mapOf(this._likes, overlay);
     const likes =
-      (this._likes.get(element.id) ?? 0) + Math.max(0, payload.likeCount);
-    this._likes.set(element.id, likes % element.likes_every);
+      (counts.get(element.id) ?? 0) + Math.max(0, payload.likeCount);
+    counts.set(element.id, likes % element.likes_every);
     return likes >= element.likes_every;
   }
 

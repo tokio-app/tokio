@@ -88,13 +88,17 @@ function viewOf(
         element.quality,
       ),
     text: (element) =>
-      studioText(element, numbers, studio.kept(element)?.values ?? null),
+      studioText(
+        element,
+        numbers,
+        studio.kept(overlay.id, element)?.values ?? null,
+      ),
     viewer: (element) => {
-      const kept = studio.kept(element);
+      const kept = studio.kept(overlay.id, element);
       return { src: kept?.picture ?? "", name: kept?.name ?? "" };
     },
     sent: (element) =>
-      sentPicture(element, studio.kept(element)?.values ?? null),
+      sentPicture(element, studio.kept(overlay.id, element)?.values ?? null),
     // The page doesn't show it; the editor names embeds itself
     label: () => "",
   });
