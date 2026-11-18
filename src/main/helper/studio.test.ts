@@ -2,6 +2,7 @@ import {
   StudioElementSchema,
   StudioGroupSchema,
   StudioOverlay,
+  TriggerSchema,
 } from "@/common/schemas";
 import { STUDIO_MESSAGE, StudioMessage, TOKIO_EVENTS } from "@/common/types";
 import Logger from "@/logger";
@@ -13,6 +14,7 @@ import {
   sendStudioOverlay,
   sendStudioOverlays,
   showsNumbers,
+  showsUptime,
   studioSampleView,
 } from "./studio";
 
@@ -39,6 +41,7 @@ const overlay = (
   size: "portrait",
   rulers: false,
   guides: { x: [], y: [], locked: false },
+  counters: [],
   items: [StudioGroupSchema.parse({ kind: "group", id: "L1", elements })],
 });
 
@@ -210,6 +213,8 @@ describe("sendStudioOverlays", () => {
       followers: 0,
       shares: 0,
       coins: 0,
+      gifts: 0,
+      uptime: 0,
     });
   });
 
@@ -223,6 +228,37 @@ describe("sendStudioOverlays", () => {
     await sendStudioOverlays(handler, showsNumbers);
 
     expect(views().map(([id]) => id)).toEqual([`studio:${ID}`]);
+  });
+
+  it("sends again the overlays whose texts show a number or a counter", () => {
+    const text = (text: string) => [element("t", { kind: "text", text })];
+    const counting = (text: string): StudioOverlay => ({
+      ...overlay(ID, [element("t", { kind: "text", text })]),
+      counters: [
+        {
+          name: "roses",
+          trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+        },
+      ],
+    });
+
+    expect(showsNumbers(overlay(ID, text("{gifts} gifts")))).toBe(true);
+    expect(showsNumbers(counting("{roses} roses"))).toBe(true);
+    expect(showsNumbers(counting("roses"))).toBe(false);
+    // Another overlay's counter isn't one
+    expect(showsNumbers(overlay(ID, text("{roses} roses")))).toBe(false);
+  });
+
+  it("finds the overlays whose texts show the LIVE's length", () => {
+    const uptime = overlay(ID, [
+      element("t", { kind: "text", text: "Live for {uptime}" }),
+    ]);
+    const likes = overlay(ID, [
+      element("t", { kind: "text", text: "{likes}" }),
+    ]);
+
+    expect(showsUptime(uptime)).toBe(true);
+    expect(showsUptime(likes)).toBe(false);
   });
 
   it("sends one overlay, or null when it's gone", async () => {

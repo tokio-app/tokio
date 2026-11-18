@@ -6,8 +6,11 @@ import {
   STUDIO_NAME_MAX_LENGTH,
   STUDIO_TEXT_MAX_LENGTH,
   StudioAlign,
+  StudioCounter,
   StudioCrop,
   StudioElement,
+  StudioTrigger,
+  GOAL_TRIGGER,
   Trigger,
 } from "@/common/schemas";
 import { CustomGift, EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
@@ -30,7 +33,6 @@ import {
   RadioGroup,
   Select,
   SelectOption,
-  TRIGGER_OPTIONS,
   VariableList,
 } from "@/components";
 import { useVariables } from "@/hooks";
@@ -40,9 +42,16 @@ import { BoxFields } from "./BoxFields";
 import { CameraFields } from "./CameraFields";
 import { EffectsFields } from "./EffectsFields";
 import { GradientFields } from "./GradientFields";
-import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
+import {
+  alignTo,
+  KIND_NAMES,
+  retype,
+  sourceOf,
+  sourceValue,
+  Words,
+} from "./helper";
 import { PictureFields } from "./PictureFields";
-import { ReactionFields, WHENS } from "./ReactionFields";
+import { ReactionFields, STUDIO_TRIGGERS, WHENS } from "./ReactionFields";
 import { ShapeFields } from "./ShapeFields";
 import styles from "./studioeditor.module.css";
 import { VideoFields } from "./VideoFields";
@@ -58,8 +67,10 @@ const EMOTE_PICTURES: Picture = [
   { value: "picked", label: "studio.fields.emotePicked" },
 ];
 
-// Events no viewer sends, so a viewer's picture can't react to them
-const NO_VIEWER: Trigger["type"][] = [
+// Events no viewer sends, so a viewer's picture can't react to them, nor
+// to a goal
+const NO_VIEWER: StudioTrigger["type"][] = [
+  GOAL_TRIGGER,
   TOKIO_EVENTS.ENVELOPE,
   TOKIO_EVENTS.SUPER_FAN_BOX,
   TOKIO_EVENTS.MUSIC_CHANGE,
@@ -85,6 +96,8 @@ type Props = {
   onChange: (element: StudioElement) => void;
   gifts: CustomGift[];
   emotes: EmoteOption[];
+  // The overlay's, which its texts show and its goals watch
+  counters: StudioCounter[];
   // What an overlay element can frame
   sources: SelectOption<string>[];
   // Opens the media library for a media element
@@ -112,6 +125,7 @@ export function ElementSettings({
   onChange,
   gifts,
   emotes,
+  counters,
   sources,
   onPickMedia,
   onCrop,
@@ -123,7 +137,7 @@ export function ElementSettings({
   const textRef = useRef<HTMLInputElement>(null);
   const aligns = useOptions(ALIGNS);
   const allWhens = useOptions(WHENS);
-  const allTriggers = useOptions(TRIGGER_OPTIONS);
+  const allTriggers = useOptions(STUDIO_TRIGGERS);
   const giftPictures = useOptions(GIFT_PICTURES);
   const emotePictures = useOptions(EMOTE_PICTURES);
   // The trigger that sends what the element shows: the gift or the emote sent
@@ -145,14 +159,16 @@ export function ElementSettings({
     element.kind === "viewer" || sends
       ? allWhens.filter((w) => reactsToEvents({ when: w.value }))
       : allWhens;
-  // What the event sends shows: on that event, never always or in a loop
+  // What the event sends shows: on that event alone, never always or in a
+  // loop
   const onSent = <E extends StudioElement>(
     changed: E,
     type: Trigger["type"],
   ) => ({
     ...changed,
     when: reactsToEvents(changed) ? changed.when : "event",
-    trigger: { ...changed.trigger, type },
+    trigger: retype(changed.trigger, type),
+    also_triggers: [],
   });
   const video =
     element.kind === "media" &&
@@ -162,6 +178,10 @@ export function ElementSettings({
   const untilEnd = video && element.kind === "media" && !element.loop;
 
   const eventVariables = useVariables(studioEventVariables(element));
+  // A counter goes in any text, as the LIVE numbers do
+  const liveVariables = [
+    ...new Set([...STUDIO_NUMBERS, ...counters.flatMap((c) => c.name || [])]),
+  ];
 
   let own: ReactNode = null;
   switch (element.kind) {
@@ -179,7 +199,7 @@ export function ElementSettings({
                 while it reacts to one */}
             <VariableList
               label={t("studio.variables.live")}
-              variables={STUDIO_NUMBERS}
+              variables={liveVariables}
               inputRef={textRef}
               value={element.text}
               maxLength={STUDIO_TEXT_MAX_LENGTH}
@@ -541,6 +561,7 @@ export function ElementSettings({
         untilEnd={untilEnd}
         gifts={gifts}
         emotes={emotes}
+        counters={counters}
         onChange={onChange}
       />
     </div>

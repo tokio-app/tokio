@@ -1,5 +1,10 @@
 import { DEFAULT_LANGUAGE, listOf, translate } from "@/common/i18n";
-import { ALERT_TRIGGERS, AppSettings, CatalogOverlay } from "@/common/schemas";
+import {
+  ALERT_TRIGGERS,
+  AppSettings,
+  CatalogOverlay,
+  GOAL_TRIGGER,
+} from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
   APP_EVENTS,
@@ -41,6 +46,7 @@ import {
   sendStudioOverlays,
   sendStudioReact,
   showsNumbers,
+  showsUptime,
 } from "@/helper/studio";
 import { applyStoredShortcuts, warnTaken } from "@/helper/shortcuts";
 import { throttle } from "@/helper/throttle";
@@ -809,19 +815,30 @@ const registerStudio = (handler: AppHandlerVariables) => {
     storeManagerService: store,
     studioService: studio,
     serverService: server,
+    liveService: live,
     notifier,
   } = handler;
 
   // Busy lives change them many times a second; the views are made when the
-  // push goes, so they're never old ones
-  const sendNumbers = throttle(
-    () => void sendStudioOverlays(handler, showsNumbers),
-    STATS_THROTTLE_MS,
-  );
-  const changesNumbers = new Set<TOKIO_EVENTS>([
-    TOKIO_EVENTS.LIKE,
-    ...ACTIVITY_EVENTS,
-  ]);
+  // push goes, so they're never old ones. The goals reached react first.
+  const sendNumbers = throttle(() => {
+    try {
+      studio.goals(store.getStudio(), liveNumbers(handler));
+    } catch (error) {
+      notifier.report({
+        source: "overlays",
+        error,
+        fallback: {
+          code: FEEDBACK_CODES.STUDIO_FAILED,
+          message: t("main.init.studioFailed", {
+            label: t("studio.goal.trigger"),
+          }),
+        },
+        context: GOAL_TRIGGER,
+      });
+    }
+    void sendStudioOverlays(handler, showsNumbers);
+  }, STATS_THROTTLE_MS);
 
   for (const trigger of ALERT_TRIGGERS) {
     // Not a live event, the service matches emote triggers on chat events.
@@ -845,7 +862,8 @@ const registerStudio = (handler: AppHandlerVariables) => {
           context: trigger,
         });
       }
-      if (changesNumbers.has(trigger)) sendNumbers();
+      // A counter can count any of them
+      sendNumbers();
     };
     // Once per song, as alerts take it
     if (trigger === TOKIO_EVENTS.MUSIC_CHANGE) {
@@ -855,14 +873,25 @@ const registerStudio = (handler: AppHandlerVariables) => {
     }
   }
   conn.on(TOKIO_EVENTS.ROOM_USER, () => sendNumbers());
-  conn.on(TOKIO_EVENTS.CONNECTED, () => sendNumbers());
+  conn.on(TOKIO_EVENTS.CONNECTED, () => {
+    studio.startLive();
+    sendNumbers();
+  });
   conn.on(TOKIO_EVENTS.DISCONNECTED, () => {
-    // Gift streaks' ends may be missed
+    // Gift streaks' ends may be missed; counters and goals start again
     studio.clear();
     // A late push would show the LIVE's numbers over the zeros
     sendNumbers.cancel();
     void sendStudioOverlays(handler, showsNumbers);
   });
+
+  // shortcut: a view a second for each overlay that shows {uptime}, not a
+  // clock on the page, since OBS on another PC has its own. Upgrade to a
+  // start time in the view if overlays that show it get heavy.
+  setInterval(() => {
+    if (live.getSession().startedAt === null) return;
+    void sendStudioOverlays(handler, showsUptime);
+  }, 1000).unref();
 
   studio.onReact((id, react) => sendStudioReact(handler, id, react));
   server.onConnect((id) => {

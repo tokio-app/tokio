@@ -367,7 +367,7 @@ describe("overlays MCP tools", () => {
           return true;
         }),
       };
-      const studioTest = vi.fn(() => [{ element: "a" }]);
+      const studioTest = vi.fn();
       const h = createHandler(
         {
           storeManagerService: store,
@@ -464,6 +464,76 @@ describe("overlays MCP tools", () => {
       expect(res.isError).toBe(true);
       expect(res.text).toContain("items.0.elements.0.colour");
       expect(store.saveStudioOverlay).not.toHaveBeenCalled();
+    });
+
+    it("refuses an unknown field inside also_triggers and counters", async () => {
+      const { h, store } = setup();
+      const { call } = await mcpClient(h.handler);
+      const share = { type: "tokio:event:share", gifts: [] };
+
+      const res = await call("save_item", {
+        kind: "studio_overlay",
+        id: ID,
+        changes: {
+          counters: [
+            { name: "shares_now", trigger: share },
+            { name: "x", trigger: share, every: 2 },
+          ],
+          items: [
+            {
+              kind: "group",
+              id: "g",
+              also_triggers: [{ ...share, delay: 1 }],
+              elements: [
+                {
+                  ...text,
+                  also_triggers: [
+                    share,
+                    { type: "tokio:studio:goal", number: "likes", goals: 5 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      expect(res.isError).toBe(true);
+      expect(res.text).toContain(
+        "items.0.also_triggers.0.delay, items.0.elements.0.also_triggers.1.goals, counters.1.every",
+      );
+      expect(store.saveStudioOverlay).not.toHaveBeenCalled();
+    });
+
+    it("refuses a counter with no name, a taken one or a repeated one", async () => {
+      const { h, held, store } = setup();
+      const { call } = await mcpClient(h.handler);
+      const save = (...names: string[]) =>
+        call("save_item", {
+          kind: "studio_overlay",
+          id: ID,
+          changes: {
+            counters: names.map((name) => ({
+              name,
+              trigger: { type: "tokio:event:gift", gifts: [] },
+            })),
+          },
+        });
+
+      for (const [names, text] of [
+        [["roses", ""], "counters.1 needs a name. Nothing was saved."],
+        [["likes"], "counters.0: {likes} is a LIVE number"],
+        [["username"], "counters.0: {username} is a LIVE number"],
+        [["roses", "roses"], "counters.1: another counter is roses."],
+      ] as const) {
+        const res = await save(...names);
+        expect(res.isError).toBe(true);
+        expect(res.text).toContain(text);
+      }
+      expect(store.saveStudioOverlay).not.toHaveBeenCalled();
+
+      expect((await save("roses", "lions")).isError).toBe(false);
+      expect(held[0].counters.map((c) => c.name)).toEqual(["roses", "lions"]);
     });
 
     it("adds nothing when the new overlay doesn't parse", async () => {
@@ -612,6 +682,25 @@ describe("overlays MCP tools", () => {
         [[{ op: "add", item: { kind: "group" }, group: "g" }], "into a group"],
         [[{ op: "add", item: { kind: "text", id: "a" } }], "taken"],
         [[{ op: "add", item: { kind: "text", rounding: 9 } }], "rounding"],
+        [
+          [
+            {
+              op: "change",
+              id: "g",
+              set: { also_triggers: [{ type: "tokio:event:share", x: 1 }] },
+            },
+          ],
+          "ops.0.set.also_triggers.0.x",
+        ],
+        [
+          [
+            {
+              op: "add",
+              item: { kind: "text", also_triggers: [{ type: "x", typo: 1 }] },
+            },
+          ],
+          "ops.0.item.also_triggers.0.typo",
+        ],
       ])("refuses a bad op: %j", async (ops, message) => {
         const { h, store } = seeded();
 

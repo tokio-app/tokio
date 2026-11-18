@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TriggerSchema } from "../schemas/profile";
 import {
   StudioElement,
   StudioElementOf,
@@ -6,7 +7,12 @@ import {
   StudioGroupSchema,
   StudioOverlay,
 } from "../schemas/studio";
-import { ChatEvent, EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
+import {
+  AlertTrigger,
+  ChatEvent,
+  EMOTE_TRIGGER,
+  TOKIO_EVENTS,
+} from "../types/connector";
 import {
   fillStudioText,
   newStudioElement,
@@ -29,6 +35,10 @@ const box = { x: 0, y: 0, width: 100, height: 100 };
 const element = (id: string, fields: object): StudioElement =>
   StudioElementSchema.parse({ id, ...box, ...fields });
 
+// An alert trigger of the type, as the schema fills one
+const triggerOf = (type: AlertTrigger) =>
+  TriggerSchema.parse({ type, gifts: [] });
+
 const chat = (content: string): ChatEvent => ({
   user: { username: "Sora", handle: "sora", profilePictures: [] },
   comment: { content, emotes: [], lang: "en" },
@@ -42,6 +52,7 @@ const fill = (
 ) =>
   fillStudioText(template, {
     numbers: SAMPLE_NUMBERS,
+    counters: {},
     values,
     variables,
     language,
@@ -89,7 +100,7 @@ describe("usesNumbers and studioEventVariables", () => {
       studioEventVariables({
         ...text,
         when: "event",
-        trigger: { ...text.trigger, type: TOKIO_EVENTS.GIFT },
+        trigger: triggerOf(TOKIO_EVENTS.GIFT),
       }),
     ).toEqual(["username", "handle", "gift", "count"]);
   });
@@ -111,7 +122,7 @@ describe("usesNumbers and studioEventVariables", () => {
       studioEventVariables({
         ...text,
         when: "event",
-        trigger: { ...text.trigger, type: TOKIO_EVENTS.LIKE },
+        trigger: triggerOf(TOKIO_EVENTS.LIKE),
       }),
     ).toEqual([]);
   });
@@ -141,6 +152,7 @@ describe("studioView", () => {
     size: "landscape",
     rulers: false,
     guides: { x: [], y: [], locked: false },
+    counters: [],
     items: [StudioGroupSchema.parse({ kind: "group", id: "l", elements })],
   });
 
@@ -500,41 +512,39 @@ describe("Samples", () => {
         : "";
 
     expect(username).not.toBe("");
-    expect(sampleReact(text, samples, "en")).toEqual({
+    expect(sampleReact(text, samples, "en", {})).toEqual({
       element: text.id,
       text: `Hi ${username}`,
     });
-    expect(sampleReact(viewer, samples, "en")).toMatchObject({
+    expect(sampleReact(viewer, samples, "en", {})).toMatchObject({
       element: viewer.id,
       name: username,
     });
-    expect(sampleReact(made("shape"), samples, "en")).toEqual({
+    expect(sampleReact(made("shape"), samples, "en", {})).toEqual({
       element: expect.any(String),
     });
   });
 
   it("takes no sample for one that moves all the time", () => {
     const samples = new Samples();
-    const trigger = {
-      ...newStudioElement("gift", "portrait").trigger,
-      type: TOKIO_EVENTS.GIFT as const,
-    };
+    const trigger = triggerOf(TOKIO_EVENTS.GIFT);
+
     const sends = made("gift", { gift: null, when: "event", trigger });
     const loops = made("gift", { gift: null, when: "loop", trigger });
 
-    expect(sampleReact(sends, samples, "en").picture).toMatch(/^https:/);
-    expect(sampleReact(loops, samples, "en").picture).toBe("");
+    expect(sampleReact(sends, samples, "en", {}).picture).toMatch(/^https:/);
+    expect(sampleReact(loops, samples, "en", {}).picture).toBe("");
   });
 
   it("gives a view the same samples Test plays", () => {
     const samples = new Samples();
-    const deps = sampleDeps(samples, "en");
+    const deps = sampleDeps(samples, "en", {});
     const text = made("text", { text: "Hi {username} {likes}", when: "event" });
     const viewer = made("viewer");
     const gift = made("gift", {
       gift: null,
       when: "event",
-      trigger: { ...viewer.trigger, type: TOKIO_EVENTS.GIFT },
+      trigger: triggerOf(TOKIO_EVENTS.GIFT),
     });
     if (
       text.kind !== "text" ||
@@ -544,13 +554,13 @@ describe("Samples", () => {
       throw new Error("made the wrong kind");
     }
 
-    expect(deps.text(text)).toBe(sampleReact(text, samples, "en").text);
+    expect(deps.text(text)).toBe(sampleReact(text, samples, "en", {}).text);
     expect(deps.text(text)).toContain(String(SAMPLE_NUMBERS.likes).slice(0, 2));
     expect(deps.viewer(viewer)).toEqual({
-      src: sampleReact(viewer, samples, "en").picture,
-      name: sampleReact(viewer, samples, "en").name,
+      src: sampleReact(viewer, samples, "en", {}).picture,
+      name: sampleReact(viewer, samples, "en", {}).name,
     });
-    expect(deps.sent(gift)).toBe(sampleReact(gift, samples, "en").picture);
+    expect(deps.sent(gift)).toBe(sampleReact(gift, samples, "en", {}).picture);
     expect(deps.sent(gift)).toMatch(/^https:/);
   });
 });

@@ -13,6 +13,7 @@ import {
   ALERTS_PATH,
   formatError,
   MINECRAFT_OVERLAY_PATH,
+  sampleCounts,
   sampleDeps,
   Samples,
   studioCameraPath,
@@ -39,13 +40,17 @@ type Services = Pick<
 >;
 
 /**
- * The live numbers studio texts show: the LIVE's likes and viewers, and the
- * session's totals, 0 while not LIVE so they reset with the others.
+ * The live numbers studio texts show: the LIVE's likes and viewers, the
+ * session's totals and how long it has run, 0 while not LIVE so they reset
+ * with the others.
  */
-export function liveNumbers({
-  storeManagerService,
-  liveService,
-}: Pick<Services, "storeManagerService" | "liveService">): StudioNumbers {
+export function liveNumbers(
+  {
+    storeManagerService,
+    liveService,
+  }: Pick<Services, "storeManagerService" | "liveService">,
+  now = Date.now(),
+): StudioNumbers {
   const { likes, viewers } = storeManagerService.getLiveStats();
   const { startedAt, totals } = liveService.getSession();
   const live = startedAt !== null;
@@ -55,6 +60,8 @@ export function liveNumbers({
     followers: live ? totals.followers : 0,
     shares: live ? totals.shares : 0,
     coins: live ? totals.coins : 0,
+    gifts: live ? totals.gifts : 0,
+    uptime: live ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0,
   };
 }
 
@@ -94,6 +101,7 @@ function viewOf(
       studioText(
         element,
         numbers,
+        studio.counts(overlay),
         studio.kept(overlay.id, element)?.values ?? null,
       ),
     viewer: (element) => {
@@ -129,9 +137,21 @@ export const sendStudioReact = (
     data: react,
   });
 
-// Whether one of its texts shows a live number, sent again as they change
+// Whether one of its texts shows a live number or one of its counters, sent
+// again as they change
 export const showsNumbers = (overlay: StudioOverlay) =>
-  studioElements(overlay).some((e) => e.kind === "text" && usesNumbers(e.text));
+  studioElements(overlay).some(
+    (e) =>
+      e.kind === "text" &&
+      (usesNumbers(e.text) ||
+        overlay.counters.some((c) => e.text.includes(`{${c.name}}`))),
+  );
+
+// Whether one of its texts shows {uptime}, sent again every second while LIVE
+export const showsUptime = (overlay: StudioOverlay) =>
+  studioElements(overlay).some(
+    (e) => e.kind === "text" && e.text.includes("{uptime}"),
+  );
 
 /**
  * Sends the studio overlays' pages what to draw: every overlay, or those
@@ -209,6 +229,6 @@ export async function studioSampleView(
     embedPath,
     camera: () => null,
     label: () => "",
-    ...sampleDeps(new Samples(), language()),
+    ...sampleDeps(new Samples(), language(), sampleCounts(overlay)),
   });
 }

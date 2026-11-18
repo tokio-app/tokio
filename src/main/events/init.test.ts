@@ -3,12 +3,14 @@ import {
   ALERT_TRIGGERS,
   CatalogOverlay,
   GameAction,
+  GOAL_TRIGGER,
   Profile,
   SavedEmote,
   StudioElementSchema,
   StudioGroupSchema,
   StudioOverlay,
   TimerSettingsSchema,
+  TriggerSchema,
 } from "@/common/schemas";
 import {
   AlertTrigger,
@@ -1124,16 +1126,27 @@ describe("init events", () => {
     const itemsOf = (elements: ReturnType<typeof element>[]) => [
       StudioGroupSchema.parse({ kind: "group", id: "L1", elements }),
     ];
-    const withOverlay = (s: Setup, elements: ReturnType<typeof element>[]) => {
+    const withOverlay = (
+      s: Setup,
+      elements: ReturnType<typeof element>[],
+      counters: StudioOverlay["counters"] = [],
+    ) => {
       s.studio.push({
         id: ID,
         name: "Main",
         size: "portrait",
         rulers: false,
         guides: { x: [], y: [], locked: false },
+        counters,
         items: itemsOf(elements),
       });
     };
+    const chats = [
+      {
+        name: "chats",
+        trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.CHAT, gifts: [] }),
+      },
+    ];
     // What the studio overlay's page got of a kind of message, in order
     const studioSent = (s: Setup, type: string) =>
       s.serverService.sendToClient.mock.calls.flatMap(([id, message]) =>
@@ -1241,6 +1254,7 @@ describe("init events", () => {
         size: "portrait",
         rulers: false,
         guides: { x: [], y: [], locked: false },
+        counters: [],
         items: itemsOf([element("p", { kind: "text", text: "Hi" })]),
       });
       s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>
@@ -1275,6 +1289,96 @@ describe("init events", () => {
       s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
 
       await vi.waitFor(() => expect(texts(s)).toEqual([["1 new"]]));
+    });
+
+    it("sends a counter's count on any trigger, from 0 on each LIVE", async () => {
+      const s = await live();
+      withOverlay(s, [element("t", { kind: "text", text: "{chats}" })], chats);
+      const startLive = vi.spyOn(s.studioService, "startLive");
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      expect(startLive).toHaveBeenCalled();
+      await flushPromises();
+      s.serverService.sendToClient.mockClear();
+
+      // Chat isn't a number the LIVE keeps
+      s.conn.emit(TOKIO_EVENTS.CHAT, chat("hi"));
+      await vi.waitFor(() => expect(texts(s)).toEqual([["1"]]));
+
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      await vi.waitFor(() => expect(texts(s)).toEqual([["1"], ["0"]]));
+    });
+
+    it("plays the goals reached before it sends the numbers", async () => {
+      const s = await live();
+      withOverlay(s, [
+        element("t", {
+          kind: "text",
+          when: "animate",
+          trigger: { type: GOAL_TRIGGER, number: "likes", goal: 1000 },
+          text: "{likes}!",
+        }),
+      ]);
+      s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>
+        Object.assign(s.stats, data),
+      );
+      s.serverService.sendToClient.mockClear();
+
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(1200));
+
+      await vi.waitFor(() => expect(texts(s)).toEqual([["1.2K!"]]));
+      const sent = s.serverService.sendToClient.mock.calls
+        .filter(([id]) => id === SOCKET)
+        .map(([, message]) => message.type);
+      expect(sent).toEqual(["tokio:studio:react", "tokio:studio"]);
+    });
+
+    it("reports goals that fail, and still sends the numbers", async () => {
+      const s = await live();
+      withOverlay(s, [element("t", { kind: "text", text: "{likes}" })]);
+      vi.spyOn(s.studioService, "goals").mockImplementation(() => {
+        throw new Error("boom");
+      });
+      s.serverService.sendToClient.mockClear();
+
+      s.conn.emit(TOKIO_EVENTS.LIKE, like(10));
+
+      await vi.waitFor(() => expect(texts(s)).toHaveLength(1));
+      expect(noticesFor(s, FEEDBACK_CODES.STUDIO_FAILED)).toMatchObject([
+        {
+          message:
+            "Unable to show the Goal reached event in your Overlay Studio overlays.",
+        },
+      ]);
+    });
+
+    it("sends {uptime} every second while LIVE, only where a text shows it", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      withOverlay(s, [element("t", { kind: "text", text: "{uptime}" })]);
+      s.studio.push({
+        ...s.studio[0],
+        id: "7a2e3d2f-5c6b-4d4e-8f9a-1b2c3d4e5f60",
+        items: itemsOf([element("p", { kind: "text", text: "{likes}" })]),
+      });
+      s.serverService.sendToClient.mockClear();
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(s.serverService.sendToClient).not.toHaveBeenCalled();
+
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      await vi.advanceTimersByTimeAsync(0);
+      s.serverService.sendToClient.mockClear();
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(texts(s)).toEqual([["00:00:01"], ["00:00:02"]]);
+      expect(
+        s.serverService.sendToClient.mock.calls.every(([id]) => id === SOCKET),
+      ).toBe(true);
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+      await vi.advanceTimersByTimeAsync(0);
+      s.serverService.sendToClient.mockClear();
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(texts(s)).toEqual([]);
     });
 
     it("sends zeros when the LIVE ends, after any push waiting", async () => {

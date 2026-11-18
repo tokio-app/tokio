@@ -70,6 +70,7 @@ const studio: StudioOverlay = {
   size: "portrait",
   rulers: false,
   guides: { x: [], y: [], locked: false },
+  counters: [],
   items: [
     StudioGroupSchema.parse({
       kind: "group",

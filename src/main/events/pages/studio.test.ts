@@ -12,7 +12,7 @@ import {
   CameraFailure,
   FEEDBACK_CODES,
   STUDIO_MESSAGE,
-  STUDIO_REACT_MESSAGE,
+  StudioNumbers,
 } from "@/common/types";
 import Logger from "@/logger";
 import { createHandler } from "@test/handler";
@@ -28,6 +28,7 @@ const overlay = (patch: Partial<StudioOverlay> = {}): StudioOverlay => ({
   size: "portrait",
   rulers: false,
   guides: { x: [], y: [], locked: false },
+  counters: [],
   items: [],
   ...patch,
 });
@@ -52,7 +53,11 @@ const viewServices = () => ({
       activity: [],
     }),
   },
-  studioService: { kept: () => null, forget: vi.fn(), test: vi.fn() },
+  studioService: {
+    kept: () => null,
+    forget: vi.fn(),
+    test: vi.fn((_overlay: StudioOverlay, _numbers: () => StudioNumbers) => {}),
+  },
   serverService: { sendToClient: vi.fn((_id: string, _data: unknown) => true) },
 });
 
@@ -416,10 +421,8 @@ describe("studio events", () => {
   });
 
   describe("TEST_STUDIO_OVERLAY", () => {
-    it("plays the test's reacts on its page", async () => {
+    it("plays the test, whose reacts onReact sends after their delay", async () => {
       const services = viewServices();
-      const reacts = [{ element: "t", text: "Hi Ana" }, { element: "s" }];
-      services.studioService.test.mockReturnValue(reacts);
       const h = createHandler({
         ...services,
         storeManagerService: store([overlay()]),
@@ -427,16 +430,19 @@ describe("studio events", () => {
 
       await h.invoke(studio, APP_EVENTS.TEST_STUDIO_OVERLAY, { id: ID });
 
-      expect(services.studioService.test).toHaveBeenCalledWith(overlay(), {
+      const [[tested, numbers]] = services.studioService.test.mock.calls;
+      expect(tested).toEqual(overlay());
+      // Read when each react plays
+      expect(numbers()).toEqual({
         likes: 0,
         viewers: 0,
         followers: 0,
         shares: 0,
         coins: 0,
+        gifts: 0,
+        uptime: 0,
       });
-      expect(services.serverService.sendToClient.mock.calls).toEqual(
-        reacts.map((data) => [SOCKET, { type: STUDIO_REACT_MESSAGE, data }]),
-      );
+      expect(services.serverService.sendToClient).not.toHaveBeenCalled();
       expect(h.replies(APP_EVENTS_RESPONSE.STUDIO)).toEqual([
         { success: true, data: [overlay()] },
       ]);

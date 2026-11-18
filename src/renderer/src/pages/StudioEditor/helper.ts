@@ -1,6 +1,8 @@
-import { MessageKey } from "@/common/i18n";
+import { listOf, MessageKey } from "@/common/i18n";
 import {
+  GOAL_TRIGGER,
   StudioAlign,
+  StudioCounter,
   StudioCrop,
   StudioElement,
   StudioElementKind,
@@ -9,9 +11,16 @@ import {
   StudioItem,
   StudioOverlay,
   StudioSource,
+  StudioTrigger,
+  StudioTriggerSchema,
 } from "@/common/schemas";
 import type { StageFit } from "@/common/studio/stage";
 import { ALERT_TRIGGER_LABELS, CustomGift, StudioView } from "@/common/types";
+import {
+  ALERT_MESSAGE_VARIABLES,
+  STUDIO_NUMBERS,
+  triggersOf,
+} from "@/common/util";
 import { EmoteOption } from "@/components";
 
 export const KIND_NAMES: Record<StudioElementKind, MessageKey> = {
@@ -88,18 +97,67 @@ export function elementName(
   return shown || context.t(KIND_NAMES[element.kind]);
 }
 
-/** An element's or a group's When, as the layers list says it. */
+/**
+ * The trigger with another type, schema-shaped: main's schema drops what
+ * another type left, and an autosave whose echo differs never settles. An
+ * alert trigger keeps its filters.
+ */
+export function retype(
+  trigger: StudioTrigger,
+  type: StudioTrigger["type"],
+): StudioTrigger {
+  if (type === GOAL_TRIGGER) return StudioTriggerSchema.parse({ type });
+  if (trigger.type === GOAL_TRIGGER) {
+    return StudioTriggerSchema.parse({ type, gifts: [] });
+  }
+  return { ...trigger, type };
+}
+
+/**
+ * An element's or a group's When, as the layers list says it, its triggers
+ * joined as the language joins alternatives.
+ */
 export function whenText(
-  item: Pick<StudioElement, "when" | "trigger">,
+  item: Pick<StudioElement, "when" | "trigger" | "also_triggers">,
   t: (key: MessageKey, params?: Record<string, string>) => string,
+  language: string,
 ) {
   if (item.when === "always") return t("studio.rows.always");
   if (item.when === "loop") return t("studio.rows.loop");
-  const trigger = t(ALERT_TRIGGER_LABELS[item.trigger.type]);
+  const names = triggersOf(item).map(({ type }) =>
+    type === GOAL_TRIGGER
+      ? t("studio.goal.trigger")
+      : t(ALERT_TRIGGER_LABELS[type]),
+  );
+  const trigger = listOf(language, [...new Set(names)], { type: "or" });
   return t(
     item.when === "event" ? "studio.rows.event" : "studio.rows.animate",
     { trigger },
   );
+}
+
+// Names a text already fills with something else: a LIVE number wins over
+// a counter, and a counter over the event's value
+const RESERVED = new Set<string>([
+  ...STUDIO_NUMBERS,
+  ...Object.values(ALERT_MESSAGE_VARIABLES).flat(),
+]);
+
+/**
+ * What's wrong with a counter's name, null for nothing. Warned, never
+ * refused: the name is half typed on every autosave.
+ */
+export function counterWarning(
+  counters: StudioCounter[],
+  index: number,
+): MessageKey | null {
+  const { name } = counters[index];
+  if (!name) return "studio.counters.noName";
+  if (RESERVED.has(name)) return "studio.counters.reserved";
+  if (counters.some((c, i) => i !== index && c.name === name)) {
+    return "studio.counters.taken";
+  }
+  return null;
 }
 
 /**

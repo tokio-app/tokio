@@ -326,6 +326,7 @@ export const studioOverlay = (
   size: "portrait",
   rulers: false,
   guides: { x: [], y: [], locked: false },
+  counters: [],
   items: [],
   ...patch,
 });

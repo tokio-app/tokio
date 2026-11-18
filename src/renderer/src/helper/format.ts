@@ -19,8 +19,8 @@ export const fontFamily = (font: string) =>
     ? `${JSON.stringify(font.trim())}, "Archivo Variable", sans-serif`
     : undefined;
 
-// Shared with main, which fills studio overlays' numbers with it
-export { formatStat } from "@/common/util/format";
+// Shared with main, which fills studio overlays' numbers with them
+export { formatDuration, formatStat } from "@/common/util/format";
 
 const DATE_STYLES = {
   // "Friday, October 31, 2026"
@@ -54,14 +54,3 @@ export function formatDate(ms: number, language: string, style: DateStyle) {
 // "45%", as the language writes it
 export const formatPercent = (percent: number, language: string) =>
   new Intl.NumberFormat(language, { style: "percent" }).format(percent / 100);
-
-// "00:42:13". Hours keep counting past a day.
-export function formatDuration(ms: number): string {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  const parts = [
-    Math.floor(seconds / 3600),
-    Math.floor((seconds % 3600) / 60),
-    seconds % 60,
-  ];
-  return parts.map((n) => String(n).padStart(2, "0")).join(":");
-}

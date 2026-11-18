@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   fontFamily,
   formatDate,
-  formatDuration,
   formatList,
   formatStat,
   parseList,
@@ -64,23 +63,6 @@ describe("formatDate", () => {
     expect(formatDate(night, "en", "long")).toMatch(/^Saturday/);
     expect(formatDate(night, "es-419", "long")).toMatch(/^sábado/);
     expect(formatDate(night, "en", "long")).toMatch(/^Saturday/);
-  });
-});
-
-describe("formatDuration", () => {
-  it("gives hours, minutes and seconds", () => {
-    expect(formatDuration(0)).toBe("00:00:00");
-    expect(formatDuration(65_999)).toBe("00:01:05");
-    expect(formatDuration((3 * 3600 + 2 * 60 + 1) * 1000)).toBe("03:02:01");
-  });
-
-  it("keeps counting hours past a day", () => {
-    expect(formatDuration(25 * 3600 * 1000)).toBe("25:00:00");
-  });
-
-  // The renderer's clock can be a little behind main's
-  it("never goes below zero", () => {
-    expect(formatDuration(-1500)).toBe("00:00:00");
   });
 });
 

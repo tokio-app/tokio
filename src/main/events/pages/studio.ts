@@ -15,7 +15,6 @@ import {
   liveNumbers,
   sendStudioMessage,
   sendStudioOverlay,
-  sendStudioReact,
 } from "@/helper/studio";
 import Logger from "@/logger";
 import { AppHandlerVariables, ReplyEvent } from "@/types";
@@ -188,9 +187,8 @@ events.push(
     const { storeManagerService, studioService } = handler;
     const overlay = storeManagerService.getStudio().find((o) => o.id === id);
     if (!overlay) throw missing();
-    for (const react of studioService.test(overlay, liveNumbers(handler))) {
-      sendStudioReact(handler, id, react);
-    }
+    // Its reacts go out through onReact, each after its delay
+    studioService.test(overlay, () => liveNumbers(handler));
     replyStudio(e, handler);
   },
   { ...options("main.failure.testOverlay"), notify: false },

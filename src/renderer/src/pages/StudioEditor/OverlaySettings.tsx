@@ -6,10 +6,12 @@ import {
   StudioGuides,
   StudioOverlay,
 } from "@/common/schemas";
+import { CustomGift } from "@/common/types";
 import { getStudioOverlayURL } from "@/common/util";
 import {
   Btn,
   CopyField,
+  EmoteOption,
   Field,
   Input,
   NumberInput,
@@ -21,19 +23,23 @@ import { useId } from "react";
 import { IconType } from "react-icons";
 import { FiLock, FiTrash2, FiUnlock, FiX } from "react-icons/fi";
 import { LuSeparatorHorizontal, LuSeparatorVertical } from "react-icons/lu";
+import { CountersFields } from "./CountersFields";
 import { Axis, AXES, withGuide } from "./helper";
 import styles from "./studioeditor.module.css";
 
 type Props = {
   overlay: StudioOverlay;
   onChange: (overlay: StudioOverlay) => void;
+  // What its counters can count
+  gifts: CustomGift[];
+  emotes: EmoteOption[];
 };
 
 /**
- * With nothing selected: the overlay's name, canvas and URL, and its guides
- * while the rulers show them.
+ * With nothing selected: the overlay's name, canvas and URL, its counters,
+ * and its guides while the rulers show them.
  */
-export function OverlaySettings({ overlay, onChange }: Props) {
+export function OverlaySettings({ overlay, onChange, gifts, emotes }: Props) {
   const t = useT();
   return (
     <div className={styles.settings}>
@@ -71,6 +77,12 @@ export function OverlaySettings({ overlay, onChange }: Props) {
           title={t("studio.copyUrl")}
         />
       </Field>
+      <CountersFields
+        counters={overlay.counters}
+        gifts={gifts}
+        emotes={emotes}
+        onChange={(counters) => onChange({ ...overlay, counters })}
+      />
       {overlay.rulers && (
         <Guides
           guides={overlay.guides}

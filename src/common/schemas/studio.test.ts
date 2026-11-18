@@ -41,6 +41,8 @@ describe("StudioElementSchema", () => {
         type: TOKIO_EVENTS.FOLLOW,
         gifts: [],
       }),
+      also_triggers: [],
+      delay: 0,
       likes_every: 100,
       seconds: 5,
       entrance: "pop",
@@ -285,6 +287,8 @@ describe("StudioGroupSchema", () => {
         type: TOKIO_EVENTS.FOLLOW,
         gifts: [],
       }),
+      also_triggers: [],
+      delay: 0,
       likes_every: 100,
       seconds: 5,
       entrance: "pop",
@@ -335,6 +339,7 @@ describe("StudioOverlaySchema", () => {
       size: "portrait",
       rulers: false,
       guides: { x: [], y: [], locked: false },
+      counters: [],
       items: [],
     });
   });
@@ -447,6 +452,7 @@ describe("StoredStudioOverlaysSchema", () => {
         size: "portrait",
         rulers: false,
         guides: { x: [], y: [], locked: false },
+        counters: [],
         items: [
           expect.objectContaining({
             kind: "group",
