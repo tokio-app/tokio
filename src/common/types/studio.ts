@@ -58,6 +58,12 @@ export type StudioListRow = {
   value: string;
 };
 
+// A row before its value is written in a language (listRow): a gifter's
+// coins or a gift's count, null for none
+export type StudioListEntry = Omit<StudioListRow, "value"> & {
+  value: number | null;
+};
+
 /**
  * One element as the stage draws it (studioView), everything resolved. A
  * `src: null` draws nothing on stream but keeps the element's place.

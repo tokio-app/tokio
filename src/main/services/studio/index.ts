@@ -1,8 +1,10 @@
 import {
   GOAL_TRIGGER,
+  STUDIO_MAX_LIST_ROWS,
   StudioElement,
   StudioElementOf,
   StudioItem,
+  StudioListSource,
   StudioOverlay,
   Trigger,
 } from "@/common/schemas";
@@ -10,6 +12,7 @@ import {
   AlertTrigger,
   AppEvents,
   EMOTE_TRIGGER,
+  StudioListEntry,
   StudioNumbers,
   StudioReact,
   TOKIO_EVENTS,
@@ -26,6 +29,7 @@ import {
   studioEventVariables,
   triggersOf,
 } from "@/common/util";
+import { isBlank } from "@/helper/chat";
 import { language } from "@/helper/i18n";
 import { GiftStreaks } from "@/helper/streaks";
 import { eventUser, matchesTrigger, streakOf } from "@/helper/triggers";
@@ -104,6 +108,15 @@ const likesOf = (payload: TokioEventMap[AppEvents]) =>
     ? Math.max(0, payload.likeCount)
     : null;
 
+// The sources main keeps for lists: top gifters come from the history
+type Kept = Exclude<StudioListSource, "gifters">;
+
+const noLists = (): Record<Kept, StudioListEntry[]> => ({
+  followers: [],
+  gifts: [],
+  chat: [],
+});
+
 /**
  * Plays Overlay Studio's elements that react to live events: it matches their
  * triggers, keeps each one's last event for its page, counts the overlays'
@@ -128,6 +141,9 @@ export class StudioService extends Service {
   private _counts = new Map<string, Map<string, number>>();
   // The goals reached this LIVE, by item, number and goal
   private _reached = new Map<string, Map<string, true>>();
+  // This LIVE's newest followers, ended gift streaks and chat messages for
+  // lists, newest first, one set for every overlay
+  private _lists = noLists();
   private _onReact?: (overlay: string, react: StudioReact) => void;
 
   // One listener, init.ts, which sends it to the overlay's page
@@ -150,6 +166,7 @@ export class StudioService extends Service {
     // Once per event, whichever elements it sets off
     const { added, total, values } = streakOf(this._streaks, type, payload);
     this._count(type, payload, overlays, added, total);
+    this._list(type, payload, total);
     // Read once for the texts it reacts now; one that waited reads its own
     let read: StudioNumbers | undefined;
     let later = false;
@@ -304,13 +321,19 @@ export class StudioService extends Service {
     );
   }
 
+  /** A list's rows of this LIVE, newest first, empty while not LIVE. */
+  public list(source: Kept): readonly StudioListEntry[] {
+    return this._lists[source];
+  }
+
   /**
-   * A new LIVE: the counters start from 0 and every goal can be reached
-   * again.
+   * A new LIVE: the counters start from 0, every goal can be reached again
+   * and the lists empty.
    */
   public startLive() {
     this._counts.clear();
     this._reached.clear();
+    this._lists = noLists();
   }
 
   /**
@@ -332,9 +355,10 @@ export class StudioService extends Service {
   /**
    * The LIVE ended: forgets the gift streaks, as their ends may be missed,
    * the likes counted toward each Like element, the counters, the goals
-   * reached and the reacts waiting. What the elements kept stays.
+   * reached, the lists and the reacts waiting. What the elements kept stays.
    */
   public clear() {
+    this._lists = noLists();
     this._streaks.clear();
     this._likes.clear();
     this._counts.clear();
@@ -407,6 +431,50 @@ export class StudioService extends Service {
         counts.set(name, (counts.get(name) ?? 0) + adds);
       }
     }
+  }
+
+  // Puts the event on top of its list: a follow (one who follows again
+  // only moves up, so unfollowing and following can't fill the list),
+  // a gift streak once it ends, with its total, and a chat message with
+  // words (one of emotes alone has none to show)
+  private _list(
+    type: AppEvents,
+    payload: TokioEventMap[AppEvents],
+    total: number,
+  ) {
+    const row = { ...viewerOf(payload), text: "", icon: "", value: null };
+    let source: Kept;
+    let entry: StudioListEntry;
+    if (type === TOKIO_EVENTS.FOLLOW) {
+      source = "followers";
+      entry = row;
+    } else if (
+      type === TOKIO_EVENTS.GIFT &&
+      typeof payload === "object" &&
+      payload !== null &&
+      "gift" in payload &&
+      payload.gift.repeatEnd
+    ) {
+      source = "gifts";
+      entry = { ...row, icon: payload.gift.image, value: total };
+    } else if (
+      type === TOKIO_EVENTS.CHAT &&
+      typeof payload === "object" &&
+      payload !== null &&
+      "comment" in payload &&
+      !isBlank(payload.comment.content)
+    ) {
+      source = "chat";
+      entry = { ...row, text: payload.comment.content };
+    } else {
+      return;
+    }
+    const others =
+      source === "followers"
+        ? // By the name it shows: TikTok's picture links change
+          this._lists.followers.filter((e) => e.name !== entry.name)
+        : this._lists[source];
+    this._lists[source] = [entry, ...others].slice(0, STUDIO_MAX_LIST_ROWS);
   }
 
   // Whether a matching item reacts: when the trigger it matched is a Like,

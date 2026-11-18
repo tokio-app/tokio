@@ -218,6 +218,7 @@ const registerConnectorEvents = ({
   studioService: studio,
   overlayService: overlays,
   liveService: live,
+  historyService: history,
   pathManagerService: paths,
   serverService: server,
   controlsService: controls,
@@ -600,6 +601,7 @@ const registerConnectorEvents = ({
         pathManagerService: paths,
         liveService: live,
         studioService: studio,
+        historyService: history,
       });
     }
   };
@@ -816,6 +818,7 @@ const registerStudio = (handler: AppHandlerVariables) => {
     studioService: studio,
     serverService: server,
     liveService: live,
+    historyService: history,
     notifier,
   } = handler;
 
@@ -873,6 +876,8 @@ const registerStudio = (handler: AppHandlerVariables) => {
     }
   }
   conn.on(TOKIO_EVENTS.ROOM_USER, () => sendNumbers());
+  // A list of top gifters follows this LIVE's
+  history.onChange(() => sendNumbers());
   conn.on(TOKIO_EVENTS.CONNECTED, () => {
     studio.startLive();
     sendNumbers();

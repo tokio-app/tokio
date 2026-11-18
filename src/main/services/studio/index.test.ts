@@ -1028,3 +1028,102 @@ describe("StudioService's goals", () => {
     }
   });
 });
+
+describe("StudioService's lists", () => {
+  const chat = (name: string, content: string) => ({
+    user: user(name),
+    comment: { content, emotes: [], lang: "en" },
+  });
+
+  it("keeps the newest follows, one row per viewer", () => {
+    const { studio, numbers } = setup();
+
+    for (const name of ["Ana", "Bo", "Ana"]) {
+      studio.handle(TOKIO_EVENTS.FOLLOW, { user: user(name) }, [], numbers);
+    }
+
+    // Ana followed again: she moves up, not in twice
+    expect(studio.list("followers")).toEqual([
+      {
+        picture: "https://cdn/Ana.png",
+        name: "Ana",
+        text: "",
+        icon: "",
+        value: null,
+      },
+      expect.objectContaining({ name: "Bo" }),
+    ]);
+  });
+
+  it("lists a gift streak once, as it ends, with its total", () => {
+    const { studio, numbers } = setup();
+    const rose = (count: number, end: boolean) => {
+      const event = gift(count, end);
+      event.gift.image = "https://g/rose.png";
+      return event;
+    };
+
+    studio.handle(TOKIO_EVENTS.GIFT, rose(2, false), [], numbers);
+    studio.handle(TOKIO_EVENTS.GIFT, rose(5, false), [], numbers);
+    expect(studio.list("gifts")).toEqual([]);
+    studio.handle(TOKIO_EVENTS.GIFT, rose(5, true), [], numbers);
+
+    expect(studio.list("gifts")).toEqual([
+      {
+        picture: "https://cdn/Ana.png",
+        name: "Ana",
+        text: "",
+        icon: "https://g/rose.png",
+        value: 5,
+      },
+    ]);
+  });
+
+  it("lists chat with words, not one of emotes alone", () => {
+    const { studio, numbers } = setup();
+
+    studio.handle(TOKIO_EVENTS.CHAT, chat("Ana", "hi"), [], numbers);
+    // As the connector sends an emote-only comment
+    studio.handle(TOKIO_EVENTS.CHAT, chat("Bo", ""), [], numbers);
+    studio.handle(TOKIO_EVENTS.CHAT, chat("Cy", " \u200b "), [], numbers);
+
+    expect(studio.list("chat")).toEqual([
+      expect.objectContaining({ name: "Ana", text: "hi" }),
+    ]);
+  });
+
+  it("keeps the newest ten of each, newest first", () => {
+    const { studio, numbers } = setup();
+
+    for (let i = 1; i <= 12; i++) {
+      studio.handle(TOKIO_EVENTS.CHAT, chat("Ana", `#${i}`), [], numbers);
+    }
+
+    const texts = studio.list("chat").map((e) => e.text);
+    expect(texts).toHaveLength(10);
+    expect(texts[0]).toBe("#12");
+    expect(texts.at(-1)).toBe("#3");
+  });
+
+  it("empties them for a new LIVE and when it ends", () => {
+    const { studio, numbers } = setup();
+    const fill = () => {
+      studio.handle(TOKIO_EVENTS.FOLLOW, { user: user("Ana") }, [], numbers);
+      studio.handle(TOKIO_EVENTS.CHAT, chat("Ana", "hi"), [], numbers);
+      studio.handle(TOKIO_EVENTS.GIFT, gift(1, true), [], numbers);
+    };
+    const empty = () =>
+      (["followers", "gifts", "chat"] as const).every(
+        (source) => studio.list(source).length === 0,
+      );
+
+    fill();
+    expect(empty()).toBe(false);
+    studio.startLive();
+    expect(empty()).toBe(true);
+
+    fill();
+    studio.clear();
+    expect(empty()).toBe(true);
+  });
+});

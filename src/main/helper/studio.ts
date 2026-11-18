@@ -13,6 +13,7 @@ import {
   ALERTS_PATH,
   formatError,
   goalValue,
+  listRow,
   MINECRAFT_OVERLAY_PATH,
   sampleCounts,
   sampleDeps,
@@ -37,6 +38,7 @@ type Services = Pick<
   | "serverService"
   | "liveService"
   | "studioService"
+  | "historyService"
   | "pathManagerService"
 >;
 
@@ -113,8 +115,18 @@ function viewOf(
       sentPicture(element, studio.kept(overlay.id, element)?.values ?? null),
     fill: (element) =>
       goalValue(element.number, numbers, studio.counts(overlay)) / element.goal,
-    // PR 4's list work fills them from the LIVE
-    rows: () => [],
+    // This LIVE's top gifters by coins, else the newest first
+    rows: ({ source }) =>
+      (source === "gifters"
+        ? services.historyService.top().live.map((g) => ({
+            picture: g.picture,
+            name: g.username || g.handle,
+            text: "",
+            icon: "",
+            value: g.live.coins,
+          }))
+        : studio.list(source)
+      ).map((entry) => listRow(entry, language())),
     // The page doesn't show it; the editor names embeds itself
     label: () => "",
   });

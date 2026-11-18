@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { TriggerSchema } from "../schemas/profile";
 import {
+  STUDIO_MAX_LIST_ROWS,
   StudioElement,
   StudioElementOf,
   StudioElementSchema,
   StudioGroupSchema,
+  StudioListSource,
   StudioOverlay,
 } from "../schemas/studio";
 import {
@@ -16,6 +18,7 @@ import {
 import {
   fillStudioText,
   goalValue,
+  listRow,
   newStudioElement,
   newStudioGroup,
   reactsToEvents,
@@ -29,6 +32,7 @@ import {
   StudioViewDeps,
   usesNumbers,
 } from "./studio";
+import { formatStat } from "./format";
 import { generateTikTokEventSample } from "./samples";
 
 const ID = "8f14e45f-ceea-4672-9a8e-1b2c3d4e5f60";
@@ -644,5 +648,44 @@ describe("Samples", () => {
     });
     expect(deps.sent(gift)).toBe(sampleReact(gift, samples, "en", {}).picture);
     expect(deps.sent(gift)).toMatch(/^https:/);
+  });
+
+  it("makes each list's rows once, values written in the language", () => {
+    const samples = new Samples();
+    const rows = (source: StudioListSource, language = "en") => {
+      const list = made("list", { source });
+      if (list.kind !== "list") throw new Error("made the wrong kind");
+      return sampleDeps(samples, language, {}).rows(list);
+    };
+
+    const gifters = rows("gifters");
+    expect(gifters).toHaveLength(STUDIO_MAX_LIST_ROWS);
+    // The same names on every render
+    expect(rows("gifters")).toEqual(gifters);
+    // Biggest first
+    expect(gifters.slice(0, 2).map((r) => r.value)).toEqual(["12.4K", "4.4K"]);
+    expect(rows("gifters", "es-419")[0].value).toBe(
+      formatStat(12_400, "es-419").short,
+    );
+    expect(gifters[0]).toMatchObject({ text: "", icon: "" });
+    expect(gifters[0].name).not.toBe("");
+
+    const [gift] = rows("gifts");
+    expect(gift.icon).toMatch(/^https:/);
+    expect(gift.value).toMatch(/^×\d/);
+    expect(rows("followers")[0]).toMatchObject({ text: "", value: "" });
+    const [chat] = rows("chat");
+    expect(chat.text).not.toBe("");
+    expect(chat.value).toBe("");
+  });
+});
+
+describe("listRow", () => {
+  it("writes a gifter's coins, and a gift's count after ×", () => {
+    const entry = { picture: "", name: "Ana", text: "", icon: "", value: 1234 };
+
+    expect(listRow(entry, "en").value).toBe("1.2K");
+    expect(listRow({ ...entry, icon: "rose.png" }, "en").value).toBe("×1.2K");
+    expect(listRow({ ...entry, value: null }, "en").value).toBe("");
   });
 });

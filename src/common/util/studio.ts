@@ -1,5 +1,6 @@
 import {
   GOAL_TRIGGER,
+  STUDIO_MAX_LIST_ROWS,
   STUDIO_SIZES,
   StudioElement,
   StudioElementKind,
@@ -7,6 +8,7 @@ import {
   StudioElementSchema,
   StudioGroup,
   StudioGroupSchema,
+  StudioListSource,
   StudioOverlay,
   StudioPictureKind,
   StudioSize,
@@ -19,11 +21,13 @@ import {
   type AlertTrigger,
   type AppEvents,
   type TokioEventMap,
+  type UserData,
 } from "../types/connector";
 import type { CustomGift } from "../types/overlay";
 import type {
   StudioElementView,
   StudioGradientView,
+  StudioListEntry,
   StudioListRow,
   StudioNumbers,
   StudioReact,
@@ -495,11 +499,55 @@ export const newStudioGroup = (name: string): StudioGroup =>
 type Sample = TokioEventMap[AppEvents];
 
 /**
+ * A list's row with its value written in the language, compact as {coins}
+ * is: a gift's count as ×12.
+ */
+export const listRow = (
+  { value, ...entry }: StudioListEntry,
+  language: string,
+): StudioListRow => ({
+  ...entry,
+  value:
+    value === null
+      ? ""
+      : `${entry.icon ? "×" : ""}${formatStat(value, language).short}`,
+});
+
+// A made-up row of the source, the index-th from the top
+function sampleEntry(source: StudioListSource, index: number): StudioListEntry {
+  const row = (
+    { profilePictures, username, handle }: UserData,
+    fields: Partial<StudioListEntry> = {},
+  ): StudioListEntry => ({
+    picture: profilePictures[0] ?? "",
+    name: username || handle,
+    text: "",
+    icon: "",
+    value: null,
+    ...fields,
+  });
+  if (source === "gifts") {
+    const { user, gift } = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
+    return row(user, { icon: gift.image, value: gift.comboCount });
+  }
+  if (source === "chat") {
+    const { user, comment } = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data;
+    return row(user, { text: comment.content });
+  }
+  const { user } = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
+  // A leaderboard's falling coins: 12.4K, 4.4K, 2.4K…
+  return source === "gifters"
+    ? row(user, { value: Math.round(12_400 / (index + 1) ** 1.5) })
+    : row(user);
+}
+
+/**
  * Each trigger's sample, made the first time an element asks for it, so its
  * names don't change on every render. Test starts a new one.
  */
 export class Samples {
   private made = new Map<AlertTrigger, Sample>();
+  private lists = new Map<StudioListSource, StudioListEntry[]>();
 
   of(type: AlertTrigger): Sample {
     let sample = this.made.get(type);
@@ -512,6 +560,18 @@ export class Samples {
       this.made.set(type, sample);
     }
     return sample;
+  }
+
+  /** The most rows a list of the source shows, made up. */
+  list(source: StudioListSource): StudioListEntry[] {
+    let entries = this.lists.get(source);
+    if (!entries) {
+      entries = Array.from({ length: STUDIO_MAX_LIST_ROWS }, (_, i) =>
+        sampleEntry(source, i),
+      );
+      this.lists.set(source, entries);
+    }
+    return entries;
   }
 }
 
@@ -595,6 +655,6 @@ export const sampleDeps = (
   viewer: (element) => sampleViewerOf(element, samples),
   sent: (element) => sampleSentOf(element, samples),
   fill: () => SAMPLE_FILL,
-  // PR 4's list work makes the sample rows
-  rows: () => [],
+  rows: (element) =>
+    samples.list(element.source).map((entry) => listRow(entry, language)),
 });
