@@ -27,6 +27,7 @@ import {
   newStudioElement,
   newStudioGroup,
   reactsToEvents,
+  sampleCounts,
   sampleDeps,
   sampleReact,
   Samples,
@@ -333,7 +334,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
         // its src only names the camera and its quality
         camera: (element) =>
           studioCameraPath("", element.camera, element.quality),
-        ...sampleDeps(samples, language),
+        ...sampleDeps(samples, language, sampleCounts(overlay)),
         label,
       }),
     // label reads installed, alerts, the games layout and t
@@ -592,7 +593,9 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     setSamples(fresh);
     for (const reacts of elements) {
       if (reactsToEvents(reacts)) {
-        stage.current?.react(sampleReact(reacts, fresh, language));
+        stage.current?.react(
+          sampleReact(reacts, fresh, language, sampleCounts(overlay)),
+        );
       }
     }
     for (const reacts of overlay.items) {

@@ -19,6 +19,7 @@ const overlay = (size: StudioOverlay["size"] = "portrait"): StudioOverlay => ({
   size,
   rulers: false,
   guides: { x: [], y: [], locked: false },
+  counters: [],
   items: [
     StudioElementSchema.parse({
       id: "t",

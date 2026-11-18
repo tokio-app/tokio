@@ -1131,6 +1131,7 @@ describe("init events", () => {
         size: "portrait",
         rulers: false,
         guides: { x: [], y: [], locked: false },
+        counters: [],
         items: itemsOf(elements),
       });
     };
@@ -1241,6 +1242,7 @@ describe("init events", () => {
         size: "portrait",
         rulers: false,
         guides: { x: [], y: [], locked: false },
+        counters: [],
         items: itemsOf([element("p", { kind: "text", text: "Hi" })]),
       });
       s.storeManagerService.updateLiveStats.mockImplementation((data: object) =>

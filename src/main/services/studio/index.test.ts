@@ -19,6 +19,8 @@ const NUMBERS: StudioNumbers = {
   followers: 2,
   shares: 1,
   coins: 99,
+  gifts: 7,
+  uptime: 65,
 };
 
 const user = (name: string, picture = `https://cdn/${name}.png`): UserData => ({
@@ -51,6 +53,7 @@ const overlayOf = (
   size: "portrait",
   rulers: false,
   guides: { x: [], y: [], locked: false },
+  counters: [],
   items: [groupOf("L1", { elements })],
 });
 
@@ -585,8 +588,8 @@ describe("StudioService", () => {
     const values = studio.kept("o1", text)?.values ?? null;
     const loop = { ...text, when: "loop" as const };
 
-    expect(studioText(text, NUMBERS, values)).toBe("Ana!");
+    expect(studioText(text, NUMBERS, {}, values)).toBe("Ana!");
     // A loop has no trigger's variables, so the name isn't filled in
-    expect(studioText(loop, NUMBERS, values)).toBe("{username}!");
+    expect(studioText(loop, NUMBERS, {}, values)).toBe("{username}!");
   });
 });

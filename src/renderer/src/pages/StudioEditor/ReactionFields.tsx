@@ -10,8 +10,9 @@ import {
   StudioEntrance,
   StudioExit,
   StudioIdle,
+  StudioTrigger,
   StudioWhen,
-  Trigger,
+  GOAL_TRIGGER,
 } from "@/common/schemas";
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
 import {
@@ -23,6 +24,7 @@ import {
   TriggerFilter,
 } from "@/components";
 import { rich, useOptions, useT } from "@/ui/i18n";
+import { retype } from "./helper";
 import styles from "./studioeditor.module.css";
 
 export const WHENS: { value: StudioWhen; label: MessageKey }[] =
@@ -67,7 +69,7 @@ type Props<R extends Reaction> = {
   value: R;
   // The Whens and triggers it may pick, already translated
   whens: { value: StudioWhen; label: string }[];
-  triggers: { value: Trigger["type"]; label: string }[];
+  triggers: { value: StudioTrigger["type"]; label: string }[];
   // A video without loop stays until it ends, not for seconds
   untilEnd: boolean;
   gifts: CustomGift[];
@@ -102,10 +104,12 @@ export function ReactionFields<R extends Reaction>({
         options={triggers}
         value={trigger.type}
         onChange={(type) =>
-          onChange({ ...value, trigger: { ...trigger, type } })
+          onChange({ ...value, trigger: retype(trigger, type) })
         }
       />
-      {trigger.type === TOKIO_EVENTS.LIKE ? (
+      {/* contract: a goal's number and value come with PR 3's editor work */}
+      {trigger.type === GOAL_TRIGGER ? null : trigger.type ===
+        TOKIO_EVENTS.LIKE ? (
         // Counted as game actions count them, from all viewers
         <span className={styles.likes}>
           {rich(t("studio.fields.likesEvery"), {

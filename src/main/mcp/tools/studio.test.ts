@@ -13,6 +13,7 @@ const OVERLAY: StudioOverlay = {
   size: "portrait",
   rulers: false,
   guides: { x: [], y: [], locked: false },
+  counters: [],
   items: [],
 };
 

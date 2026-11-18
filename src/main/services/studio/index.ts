@@ -1,4 +1,5 @@
 import {
+  GOAL_TRIGGER,
   StudioElement,
   StudioElementOf,
   StudioItem,
@@ -46,16 +47,19 @@ function mapOf<T>(maps: Map<string, Map<string, T>>, overlay: string) {
 }
 
 /**
- * A text element's text: the live numbers, and the event's values when it
- * reacts (its trigger's variables read "" before its first event).
+ * A text element's text: the live numbers, its overlay's counters, and the
+ * event's values when it reacts (its triggers' variables read "" before its
+ * first event).
  */
 export function studioText(
   element: StudioElementOf<"text">,
   numbers: StudioNumbers,
+  counters: Record<string, number>,
   values: TokioEventMap[AppEvents] | null,
 ) {
   return fillStudioText(element.text, {
     numbers,
+    counters,
     values: reactsToEvents(element) ? values : null,
     variables: studioEventVariables(element),
     language: language(),
@@ -121,6 +125,8 @@ export class StudioService extends Service {
     for (const overlay of overlays) {
       for (const item of itemsOf(overlay)) {
         if (!reactsToEvents(item)) continue;
+        // contract: goals and also_triggers come with PR 3's main work
+        if (item.trigger.type === GOAL_TRIGGER) continue;
         if (!matchesTrigger(item.trigger, type, payload, added, total)) {
           continue;
         }
@@ -136,7 +142,7 @@ export class StudioService extends Service {
         };
         this._tests.get(overlay.id)?.delete(item.id);
         mapOf(this._kept, overlay.id).set(item.id, kept);
-        this._onReact?.(overlay.id, this._react(item, kept, now));
+        this._onReact?.(overlay.id, this._react(overlay, item, kept, now));
       }
     }
   }
@@ -172,7 +178,10 @@ export class StudioService extends Service {
     return itemsOf(overlay)
       .filter(reactsToEvents)
       .map((item) => {
-        if (item.kind === "group") return { element: item.id };
+        // A goal sends no event to sample
+        if (item.kind === "group" || item.trigger.type === GOAL_TRIGGER) {
+          return { element: item.id };
+        }
         const { type } = item.trigger;
         let values = samples.get(type);
         if (!values) {
@@ -192,8 +201,16 @@ export class StudioService extends Service {
           kept: sample,
           until: performance.now() + (item.seconds + 1) * 1000,
         });
-        return this._react(item, sample, () => numbers);
+        return this._react(overlay, item, sample, () => numbers);
       });
+  }
+
+  /**
+   * The overlay's counters this LIVE, by name, 0 while not LIVE.
+   * contract: counts nothing yet; PR 3's main work counts them.
+   */
+  public counts(overlay: StudioOverlay): Record<string, number> {
+    return Object.fromEntries(overlay.counters.map((c) => [c.name, 0]));
   }
 
   /**
@@ -239,13 +256,16 @@ export class StudioService extends Service {
   }
 
   private _react(
+    overlay: StudioOverlay,
     element: StudioElement,
     { values, picture, name }: StudioKept,
     numbers: () => StudioNumbers,
   ): StudioReact {
     const { id } = element;
     if (element.kind === "text") {
-      return { element: id, text: studioText(element, numbers(), values) };
+      const counters = this.counts(overlay);
+      const text = studioText(element, numbers(), counters, values);
+      return { element: id, text };
     }
     if (element.kind === "viewer") return { element: id, picture, name };
     if (

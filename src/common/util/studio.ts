@@ -1,4 +1,5 @@
 import {
+  GOAL_TRIGGER,
   STUDIO_SIZES,
   StudioElement,
   StudioElementKind,
@@ -10,11 +11,12 @@ import {
   StudioPictureKind,
   StudioSize,
   StudioSource,
+  StudioTrigger,
 } from "../schemas/studio";
-import type { Trigger } from "../schemas/profile";
 import {
   EMOTE_TRIGGER,
   TOKIO_EVENTS,
+  type AlertTrigger,
   type AppEvents,
   type TokioEventMap,
 } from "../types/connector";
@@ -26,8 +28,8 @@ import type {
   StudioReact,
   StudioView,
 } from "../types/studio";
-import { countedVariables, formatAlertMessage, mediaKind } from "./alerts";
-import { formatStat } from "./format";
+import { countedVariables, mediaKind, messageValues } from "./alerts";
+import { formatDuration, formatStat } from "./format";
 import { generateEmoteChatSample, generateTikTokEventSample } from "./samples";
 
 // The live numbers any text can show, as {likes}
@@ -37,6 +39,8 @@ export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
   "followers",
   "shares",
   "coins",
+  "gifts",
+  "uptime",
 ];
 
 // Made up, for the editor, which shows samples instead of the LIVE's
@@ -46,7 +50,13 @@ export const SAMPLE_NUMBERS: StudioNumbers = {
   followers: 58,
   shares: 17,
   coins: 4_210,
+  gifts: 342,
+  // 01:23:00
+  uptime: 4_980,
 };
+
+// Made up too: each counter's sample count
+export const SAMPLE_COUNT = 12;
 
 // Whether a text shows a live number, so main sends it again as they change
 export const usesNumbers = (text: string) =>
@@ -57,10 +67,30 @@ export const usesNumbers = (text: string) =>
 export const reactsToEvents = (item: Pick<StudioElement, "when">) =>
   item.when === "event" || item.when === "animate";
 
-// The variables a text element gets from its trigger, none while it doesn't
-// react to one. The live numbers (STUDIO_NUMBERS) go in any text.
+// Every trigger an element or a group reacts to, its first first
+export const triggersOf = (
+  item: Pick<StudioElement, "trigger" | "also_triggers">,
+): StudioTrigger[] => [item.trigger, ...item.also_triggers];
+
+// The variables a text element gets from its triggers, all of theirs, none
+// while it doesn't react. A goal sends none. The live numbers
+// (STUDIO_NUMBERS) go in any text.
 export const studioEventVariables = (element: StudioElement): string[] =>
-  reactsToEvents(element) ? countedVariables(element.trigger.type) : [];
+  reactsToEvents(element)
+    ? [
+        ...new Set(
+          triggersOf(element).flatMap((trigger) =>
+            trigger.type === GOAL_TRIGGER ? [] : countedVariables(trigger.type),
+          ),
+        ),
+      ]
+    : [];
+
+// The overlay's counters as sample counts, for the editor and MCP's preview
+export const sampleCounts = (
+  overlay: Pick<StudioOverlay, "counters">,
+): Record<string, number> =>
+  Object.fromEntries(overlay.counters.map((c) => [c.name, SAMPLE_COUNT]));
 
 // Every element of the overlay, its layers' in order
 export const studioElements = (overlay: StudioOverlay): StudioElement[] =>
@@ -76,29 +106,40 @@ const isNumber = (
 
 type FillOptions = {
   numbers: StudioNumbers;
+  // The overlay's counters by name, after the live numbers
+  counters: Record<string, number>;
   // The event that set the element off, null before the first
   values: TokioEventMap[AppEvents] | null;
-  // The trigger's variables, which read "" while values is null
+  // Its triggers' variables, which read "" where the event has none
   variables: string[];
   language: string;
 };
 
 /**
- * A studio text with its variables filled: the live numbers first, compact
- * (1.2K), then the event's values in one pass, so a viewer's comment that
- * says {likes} stays as typed. Other variables stay as written.
+ * A studio text with its variables filled in one pass, so a viewer's
+ * comment that says {likes} stays as typed: the live numbers, compact (1.2K)
+ * and the LIVE's length as 01:02:03, then the counters by name, then the
+ * event's values. A variable of its triggers this event lacks reads "", and
+ * any other stays as written.
  */
 export function fillStudioText(
   template: string,
-  { numbers, values, variables, language }: FillOptions,
+  { numbers, counters, values, variables, language }: FillOptions,
 ): string {
-  const text = template.replace(/\{(\w+)\}/g, (match, name: string) => {
+  const sent = values === null ? null : messageValues(values);
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
     if (isNumber(numbers, name)) {
-      return formatStat(numbers[name], language).short;
+      return name === "uptime"
+        ? formatDuration(numbers.uptime * 1000)
+        : formatStat(numbers[name], language).short;
     }
-    return values === null && variables.includes(name) ? "" : match;
+    if (Object.hasOwn(counters, name)) {
+      return formatStat(counters[name], language).short;
+    }
+    const value = sent?.get(name);
+    if (value !== undefined) return value;
+    return variables.includes(name) ? "" : match;
   });
-  return values === null ? text : formatAlertMessage(text, values);
 }
 
 // What studioView needs from main or the editor
@@ -384,7 +425,7 @@ export function sentPicture(
   if (element.kind === "gift" && "gift" in values) return values.gift.image;
   if (element.kind !== "emote" || !("comment" in values)) return "";
   const { emotes } = values.comment;
-  const named = element.trigger.emotes;
+  const named = "emotes" in element.trigger ? element.trigger.emotes : [];
   // A sample's emotes aren't the ones named: it shows its first
   const emote = emotes.find((e) => named.includes(e.emoteID)) ?? emotes[0];
   return emote?.images[0] ?? "";
@@ -401,9 +442,9 @@ type Sample = TokioEventMap[AppEvents];
  * names don't change on every render. Test starts a new one.
  */
 export class Samples {
-  private made = new Map<Trigger["type"], Sample>();
+  private made = new Map<AlertTrigger, Sample>();
 
-  of(type: Trigger["type"]): Sample {
+  of(type: AlertTrigger): Sample {
     let sample = this.made.get(type);
     if (!sample) {
       // An emote comes in a chat message
@@ -426,21 +467,29 @@ function sampleViewer(sample: Sample) {
   return { src: user?.profilePictures[0] ?? "", name: user?.username ?? "" };
 }
 
+// Its first trigger's sample; a goal sends none
 const sampleOf = (element: StudioElement, samples: Samples) =>
-  reactsToEvents(element) ? samples.of(element.trigger.type) : null;
+  reactsToEvents(element) && element.trigger.type !== GOAL_TRIGGER
+    ? samples.of(element.trigger.type)
+    : null;
 
 /** The picture of the gift or emote its trigger's sample sent, "" for none. */
 const sampleSentOf = (element: StudioElement, samples: Samples) =>
   sentPicture(element, sampleOf(element, samples));
 
-/** A text element's text with the sample numbers and its trigger's sample. */
+/**
+ * A text element's text with the sample numbers and counts, and its first
+ * trigger's sample.
+ */
 const sampleText = (
   element: StudioElementOf<"text">,
   samples: Samples,
   language: string,
+  counters: Record<string, number>,
 ) =>
   fillStudioText(element.text, {
     numbers: SAMPLE_NUMBERS,
+    counters,
     values: sampleOf(element, samples),
     variables: studioEventVariables(element),
     language,
@@ -448,16 +497,19 @@ const sampleText = (
 
 /** The picture and name a viewer element shows, its trigger's sample's. */
 const sampleViewerOf = (element: StudioElement, samples: Samples) =>
-  sampleViewer(samples.of(element.trigger.type));
+  element.trigger.type === GOAL_TRIGGER
+    ? { src: "", name: "" }
+    : sampleViewer(samples.of(element.trigger.type));
 
 /** What Test plays on the stage for an element that reacts to an event. */
 export function sampleReact(
   element: StudioElement,
   samples: Samples,
   language: string,
+  counters: Record<string, number>,
 ): StudioReact {
   if (element.kind === "text") {
-    const text = sampleText(element, samples, language);
+    const text = sampleText(element, samples, language, counters);
     return { element: element.id, text };
   }
   if (element.kind === "viewer") {
@@ -473,12 +525,16 @@ export function sampleReact(
   return { element: element.id };
 }
 
-/** The sample parts of a view's deps: what Test and the editor show. */
+/**
+ * The sample parts of a view's deps: what Test and the editor show, the
+ * counters' sample counts (sampleCounts) included.
+ */
 export const sampleDeps = (
   samples: Samples,
   language: string,
+  counters: Record<string, number>,
 ): Pick<StudioViewDeps, "text" | "viewer" | "sent"> => ({
-  text: (element) => sampleText(element, samples, language),
+  text: (element) => sampleText(element, samples, language, counters),
   viewer: (element) => sampleViewerOf(element, samples),
   sent: (element) => sampleSentOf(element, samples),
 });

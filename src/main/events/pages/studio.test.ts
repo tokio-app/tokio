@@ -28,6 +28,7 @@ const overlay = (patch: Partial<StudioOverlay> = {}): StudioOverlay => ({
   size: "portrait",
   rulers: false,
   guides: { x: [], y: [], locked: false },
+  counters: [],
   items: [],
   ...patch,
 });
@@ -433,6 +434,8 @@ describe("studio events", () => {
         followers: 0,
         shares: 0,
         coins: 0,
+        gifts: 0,
+        uptime: 0,
       });
       expect(services.serverService.sendToClient.mock.calls).toEqual(
         reacts.map((data) => [SOCKET, { type: STUDIO_REACT_MESSAGE, data }]),

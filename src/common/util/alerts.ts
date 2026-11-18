@@ -82,7 +82,7 @@ export const countedVariables = (trigger: AlertTrigger): string[] =>
   trigger === TOKIO_EVENTS.LIKE ? [] : ALERT_MESSAGE_VARIABLES[trigger];
 
 // Read from the payload's shape, so emote alerts get the chat's values.
-function messageValues(payload: TokioEventMap[AppEvents]) {
+export function messageValues(payload: TokioEventMap[AppEvents]) {
   const values = new Map<string, string>();
   if (typeof payload !== "object" || payload === null) return values;
 

@@ -857,6 +857,7 @@
   "studio.fields.lineHeight": "Interlineado (%)",
   "studio.fields.italic": "Cursiva",
   "studio.fields.caps": "Todo en mayúsculas",
+  "studio.goal.trigger": "Meta alcanzada",
   "alerts.editor.title": "Alerta: {trigger}",
   "tts.voice.title": "Voz",
   "tts.voice.description": "La voz que lee el chat en voz alta.",

@@ -1,5 +1,5 @@
 import { TOKIO_EVENTS } from "@/common/types";
-import { reactsToEvents } from "@/common/util";
+import { reactsToEvents, triggersOf } from "@/common/util";
 import type { AppServices } from "@/types";
 import type { ChatCommands } from ".";
 
@@ -27,14 +27,19 @@ export async function chatCommands({
       ),
     )
     .filter(reactsToEvents);
-  // matchesTrigger reads a keyword only on Chat triggers
+  // matchesTrigger reads a keyword only on Chat triggers. A studio item
+  // reacts to each of its triggers.
   const keywords = [
-    ...(profile?.alerts.items ?? []).filter((alert) => alert.enabled),
-    ...(profile?.games.actions ?? []).filter((action) => action.enabled),
-    ...studio,
-  ]
-    .filter(({ trigger }) => trigger.type === TOKIO_EVENTS.CHAT)
-    .map(({ trigger }) => trigger.keyword);
+    ...(profile?.alerts.items ?? [])
+      .filter((alert) => alert.enabled)
+      .map((alert) => alert.trigger),
+    ...(profile?.games.actions ?? [])
+      .filter((action) => action.enabled)
+      .map((action) => action.trigger),
+    ...studio.flatMap(triggersOf),
+  ].flatMap((trigger) =>
+    trigger.type === TOKIO_EVENTS.CHAT ? [trigger.keyword] : [],
+  );
   const trigger = profile?.tts.format.trigger;
   // The timer reacts to its keyword only while chat adds time
   const timer = profile?.timer.settings;

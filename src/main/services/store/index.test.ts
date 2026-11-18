@@ -2166,6 +2166,7 @@ describe("StoreManagerService", () => {
         size: "portrait",
         rulers: false,
         guides: { x: [], y: [], locked: false },
+        counters: [],
         items: [],
       };
       expect(store.getStudio()).toEqual([added]);

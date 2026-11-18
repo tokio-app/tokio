@@ -39,6 +39,7 @@ const overlay = (
   size: "portrait",
   rulers: false,
   guides: { x: [], y: [], locked: false },
+  counters: [],
   items: [StudioGroupSchema.parse({ kind: "group", id: "L1", elements })],
 });
 
@@ -210,6 +211,8 @@ describe("sendStudioOverlays", () => {
       followers: 0,
       shares: 0,
       coins: 0,
+      gifts: 0,
+      uptime: 0,
     });
   });
 

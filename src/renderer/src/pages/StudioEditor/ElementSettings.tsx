@@ -40,7 +40,14 @@ import { BoxFields } from "./BoxFields";
 import { CameraFields } from "./CameraFields";
 import { EffectsFields } from "./EffectsFields";
 import { GradientFields } from "./GradientFields";
-import { alignTo, KIND_NAMES, sourceOf, sourceValue, Words } from "./helper";
+import {
+  alignTo,
+  KIND_NAMES,
+  retype,
+  sourceOf,
+  sourceValue,
+  Words,
+} from "./helper";
 import { PictureFields } from "./PictureFields";
 import { ReactionFields, WHENS } from "./ReactionFields";
 import { ShapeFields } from "./ShapeFields";
@@ -152,7 +159,7 @@ export function ElementSettings({
   ) => ({
     ...changed,
     when: reactsToEvents(changed) ? changed.when : "event",
-    trigger: { ...changed.trigger, type },
+    trigger: retype(changed.trigger, type),
   });
   const video =
     element.kind === "media" &&

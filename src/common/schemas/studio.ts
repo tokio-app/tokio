@@ -111,6 +111,13 @@ export const STUDIO_MAX_CORNERS = 12;
 export const STUDIO_MAX_GUIDES = 50;
 // The longest camera id or name a camera element keeps
 export const STUDIO_CAMERA_MAX_LENGTH = 256;
+// The longest wait between a trigger and what it plays, in seconds
+export const STUDIO_MAX_DELAY = 10;
+// The most triggers an element or a group reacts to, its first included
+export const STUDIO_MAX_TRIGGERS = 5;
+// The most counters an overlay keeps, and the longest name one takes
+export const STUDIO_MAX_COUNTERS = 10;
+export const STUDIO_COUNTER_NAME_MAX_LENGTH = 24;
 
 // The sizes a camera element's stream can come in, the smallest first: two
 // elements showing one camera share the larger one's
@@ -122,13 +129,49 @@ const LibraryFileSchema = z
   .refine((file) => !/[/\\]/.test(file) && !file.includes(".."))
   .default("");
 
+// A counter's or a LIVE number's name, as a text writes it in braces: word
+// characters only, so a counter is never refused while its name is typed
+// (the editor drops the rest) and {name} finds it
+const NumberNameSchema = z
+  .string()
+  .regex(/^\w*$/)
+  .max(STUDIO_COUNTER_NAME_MAX_LENGTH);
+
+// Overlay Studio's own trigger, not a live event: a LIVE number or one of
+// the overlay's counters reaching goal, once per LIVE
+export const GOAL_TRIGGER = "tokio:studio:goal";
+const GoalTriggerSchema = z.object({
+  type: z.literal(GOAL_TRIGGER),
+  // A STUDIO_NUMBERS name but uptime, or a counter's
+  number: NumberNameSchema.default("likes"),
+  goal: z.number().int().min(1).default(1000),
+});
+
+// What an element or a group reacts to: an alert's trigger, or a goal.
+// Alerts and game actions keep TriggerSchema.
+export const StudioTriggerSchema = z.discriminatedUnion("type", [
+  TriggerSchema,
+  GoalTriggerSchema,
+]);
+
 // How an element or a group reacts to the LIVE, and moves. Nothing here or
 // below trims, clamps or rounds: useAutosave settles a save only when main's
 // echo deep-equals what it sent.
 const REACTION = {
   when: z.enum(STUDIO_WHEN).default("always"),
   // Its type and gifts have no defaults
-  trigger: TriggerSchema.prefault({ type: TOKIO_EVENTS.FOLLOW, gifts: [] }),
+  trigger: StudioTriggerSchema.prefault({
+    type: TOKIO_EVENTS.FOLLOW,
+    gifts: [],
+  }),
+  // The others it reacts to as well, kept apart from trigger so an older
+  // Tokio still reacts to the first
+  also_triggers: z
+    .array(StudioTriggerSchema)
+    .max(STUDIO_MAX_TRIGGERS - 1)
+    .default([]),
+  // Seconds between a trigger and what it plays
+  delay: z.number().min(0).max(STUDIO_MAX_DELAY).default(0),
   // On Like, it reacts each time the likes of all viewers pass another
   // likes_every, as game actions and the timer count them
   likes_every: z.number().int().min(1).default(100),
@@ -411,6 +454,15 @@ const StudioGuidesSchema = z.object({
   locked: z.boolean().default(false),
 });
 
+// A count of a trigger during the LIVE, which the overlay's texts show as
+// {name}, and goals watch. A name that's empty, taken or a LIVE number's is
+// the editor's to warn about, never refused here: main would refuse every
+// autosave while it's typed.
+const StudioCounterSchema = z.object({
+  name: NumberNameSchema.default(""),
+  trigger: TriggerSchema.prefault({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+});
+
 // A studio overlay, served at getStudioOverlayURL(id). The strict schema,
 // for IPC and the store's mutators.
 export const StudioOverlaySchema = z.object({
@@ -422,6 +474,8 @@ export const StudioOverlaySchema = z.object({
   // The editor shows its rulers, and the guides with them
   rulers: z.boolean().default(false),
   guides: StudioGuidesSchema.prefault({}),
+  // Each counted from its LIVE's start
+  counters: z.array(StudioCounterSchema).max(STUDIO_MAX_COUNTERS).default([]),
   // Its groups and the elements in none, back to front: the first is the
   // back
   items: z
@@ -450,6 +504,8 @@ const StoredStudioGroupSchema = z.object({
   ...GROUP,
   when: orDefault(REACTION.when),
   trigger: orDefault(REACTION.trigger),
+  also_triggers: orDefault(REACTION.also_triggers),
+  delay: orDefault(REACTION.delay),
   likes_every: orDefault(REACTION.likes_every),
   seconds: orDefault(REACTION.seconds),
   entrance: orDefault(REACTION.entrance),
@@ -484,8 +540,8 @@ const withItems = (overlay: unknown): unknown =>
       }
     : overlay;
 
-// Drops an item that still doesn't parse instead of the overlay, and the
-// guides too
+// Drops an item, or a counter, that still doesn't parse instead of the
+// overlay, and the guides too
 const StoredStudioOverlaySchema = z.preprocess(
   withItems,
   StudioOverlaySchema.extend({
@@ -494,6 +550,12 @@ const StoredStudioOverlaySchema = z.preprocess(
       y: [],
       locked: false,
     })),
+    counters: z
+      .preprocess(
+        parsing(StudioCounterSchema),
+        z.array(StudioCounterSchema).max(STUDIO_MAX_COUNTERS),
+      )
+      .catch(() => []),
     items: z
       .preprocess(
         parsing(StoredStudioItemSchema),
@@ -514,6 +576,9 @@ export const StoredStudioOverlaysSchema = z.preprocess(
 );
 
 export type StudioOverlay = z.infer<typeof StudioOverlaySchema>;
+export type StudioCounter = z.infer<typeof StudioCounterSchema>;
+export type StudioTrigger = z.infer<typeof StudioTriggerSchema>;
+export type GoalTrigger = z.infer<typeof GoalTriggerSchema>;
 export type StudioGuides = z.infer<typeof StudioGuidesSchema>;
 export type StudioCrop = z.infer<typeof StudioCropSchema>;
 export type StudioGroup = z.infer<typeof StudioGroupSchema>;

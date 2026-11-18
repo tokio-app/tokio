@@ -142,6 +142,9 @@ export type StudioNumbers = {
   followers: number;
   shares: number;
   coins: number;
+  gifts: number;
+  // Seconds since the LIVE started
+  uptime: number;
 };
 
 // The studio page's messages, private to it like tokio:timer: they're not

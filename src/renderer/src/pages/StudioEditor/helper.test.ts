@@ -4,6 +4,7 @@ import {
   StudioElementSchema,
   StudioGroup,
   StudioItem,
+  TriggerSchema,
 } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
 import { newStudioElement, newStudioGroup, studioView } from "@/common/util";
@@ -118,10 +119,7 @@ describe("whenText", () => {
       whenText(
         element("shape", {
           when: "animate",
-          trigger: {
-            ...newStudioElement("shape", "portrait").trigger,
-            type: TOKIO_EVENTS.GIFT,
-          },
+          trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
         }),
         t,
       ),
@@ -574,6 +572,7 @@ describe("the canvas's geometry", () => {
     size: "portrait" as const,
     rulers: false,
     guides: { x: [], y: [], locked: false },
+    counters: [],
     items: [
       { ...newStudioGroup("Back"), id: "back", elements: [box("under", 0, 0)] },
       {

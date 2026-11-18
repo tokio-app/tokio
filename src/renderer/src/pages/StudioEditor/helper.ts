@@ -1,5 +1,6 @@
 import { MessageKey } from "@/common/i18n";
 import {
+  GOAL_TRIGGER,
   StudioAlign,
   StudioCrop,
   StudioElement,
@@ -9,6 +10,8 @@ import {
   StudioItem,
   StudioOverlay,
   StudioSource,
+  StudioTrigger,
+  StudioTriggerSchema,
 } from "@/common/schemas";
 import type { StageFit } from "@/common/studio/stage";
 import { ALERT_TRIGGER_LABELS, CustomGift, StudioView } from "@/common/types";
@@ -88,6 +91,22 @@ export function elementName(
   return shown || context.t(KIND_NAMES[element.kind]);
 }
 
+/**
+ * The trigger with another type, schema-shaped: main's schema drops what
+ * another type left, and an autosave whose echo differs never settles. An
+ * alert trigger keeps its filters.
+ */
+export function retype(
+  trigger: StudioTrigger,
+  type: StudioTrigger["type"],
+): StudioTrigger {
+  if (type === GOAL_TRIGGER) return StudioTriggerSchema.parse({ type });
+  if (trigger.type === GOAL_TRIGGER) {
+    return StudioTriggerSchema.parse({ type, gifts: [] });
+  }
+  return { ...trigger, type };
+}
+
 /** An element's or a group's When, as the layers list says it. */
 export function whenText(
   item: Pick<StudioElement, "when" | "trigger">,
@@ -95,7 +114,10 @@ export function whenText(
 ) {
   if (item.when === "always") return t("studio.rows.always");
   if (item.when === "loop") return t("studio.rows.loop");
-  const trigger = t(ALERT_TRIGGER_LABELS[item.trigger.type]);
+  const trigger =
+    item.trigger.type === GOAL_TRIGGER
+      ? t("studio.goal.trigger")
+      : t(ALERT_TRIGGER_LABELS[item.trigger.type]);
   return t(
     item.when === "event" ? "studio.rows.event" : "studio.rows.animate",
     { trigger },

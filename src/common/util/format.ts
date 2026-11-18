@@ -42,3 +42,14 @@ export function formatSeconds(language: string, seconds: number, max?: number) {
     ? format.format(seconds / per)
     : format.formatRange(seconds / per, max / per);
 }
+
+// "00:42:13". Hours keep counting past a day.
+export function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  const parts = [
+    Math.floor(seconds / 3600),
+    Math.floor((seconds % 3600) / 60),
+    seconds % 60,
+  ];
+  return parts.map((n) => String(n).padStart(2, "0")).join(":");
+}

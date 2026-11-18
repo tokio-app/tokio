@@ -1,5 +1,6 @@
 import {
   ALERT_TRIGGERS,
+  GOAL_TRIGGER,
   localizeOverlayConfig,
   OverlayConfigSchema,
   type StudioElement,
@@ -233,6 +234,7 @@ export const kinds: Kinds = {
       "Element kinds: text, media (file: a basename from list media), camera, gift (gift id or null for the one sent), emote, shape, viewer (the viewer who set it off), overlay (source: an installed overlay's id, an alert's id, the timer or the games overlay).",
       "Every element can have a shadow (shadow_x and shadow_y 0 make a glow) and a blur. Texts take an outline, letter_spacing and line_height (% of size), italic and caps; texts and shapes a gradient from color into gradient_color at gradient_angle (CSS degrees: 90 runs left to right).",
       "when: always (on screen), event (hidden until its trigger, then shows for seconds with its entrance and exit), animate (on screen, plays its animation on each trigger) or loop (on screen, plays idle forever). A group reacts as one, its elements keep their own when. On Like it reacts every likes_every likes from all viewers.",
+      `It also reacts to each of also_triggers (up to 4 more), and waits delay seconds (0 to 10) before it plays. A trigger of type ${GOAL_TRIGGER} reacts once per LIVE when number (a LIVE number but uptime, or a counter's name) reaches goal. counters (up to 10) count a trigger during the LIVE, a gift by its gifts and a Like by its likes, and texts show each as {name}: a name of word characters, not empty, taken or a LIVE number's.`,
       `Texts can say ${STUDIO_NUMBERS.map((n) => `{${n}}`).join(" ")} (the LIVE's numbers) and, while they react, their trigger's variables: ${TRIGGER_VARIABLES}. Trigger values and fields are the alert kind's (describe alert).`,
       "test plays every reacting element and group once on stream, with samples.",
       "To change single items, use edit_studio_overlay instead of resending items.",

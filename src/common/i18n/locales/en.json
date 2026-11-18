@@ -857,6 +857,7 @@
   "studio.fields.lineHeight": "Line height (%)",
   "studio.fields.italic": "Italic",
   "studio.fields.caps": "All caps",
+  "studio.goal.trigger": "Goal reached",
   "alerts.editor.title": "{trigger} alert",
   "tts.voice.title": "Voice",
   "tts.voice.description": "The voice that reads chat aloud.",
