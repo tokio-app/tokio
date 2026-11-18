@@ -178,6 +178,74 @@ describe("on stream", () => {
     expect(font("plain")).toContain("Archivo Variable");
   });
 
+  it("draws a text's words in one span, copied plain for its underlay", () => {
+    draw(view(text("t", { text: "<b>{username}</b>" })));
+    const shown = el("t").querySelector<HTMLElement>(".studio-text")!;
+    const words = shown.querySelector<HTMLElement>(".studio-words")!;
+    expect(shown.children).toHaveLength(1);
+    expect(words.textContent).toBe("<b>{username}</b>");
+    expect(shown.dataset.text).toBe("<b>{username}</b>");
+
+    // The same span, its words and copy rewritten
+    draw(view(text("t", { text: "Thanks" })));
+    expect(shown.querySelector(".studio-words")).toBe(words);
+    expect(words.textContent).toBe("Thanks");
+    expect(shown.dataset.text).toBe("Thanks");
+  });
+
+  it("styles a text's words, and clears each style it drops", () => {
+    draw(
+      view(
+        text("t", {
+          align: "right",
+          halo: false,
+          outline: { color: "#18181b", width: 4 },
+          gradient: { color: "#f43f5e", angle: 45 },
+          letter_spacing: 10,
+          line_height: 150,
+          italic: true,
+          caps: true,
+        }),
+      ),
+    );
+    const shown = el("t").querySelector<HTMLElement>(".studio-text")!;
+    const variable = (name: string) => el("t").style.getPropertyValue(name);
+    expect(shown.className).toBe(
+      "studio-text studio-bold studio-outline studio-gradient",
+    );
+    expect(shown.style.letterSpacing).toBe("0.1em");
+    expect(shown.style.lineHeight).toBe("1.5");
+    expect(shown.style.fontStyle).toBe("italic");
+    expect(shown.style.textTransform).toBe("uppercase");
+    expect(shown.style.textAlign).toBe("right");
+    expect(shown.style.justifyItems).toBe("right");
+    expect(variable("--studio-outline-color")).toBe("#18181b");
+    expect(variable("--studio-outline-width")).toBe("4px");
+    expect(variable("--studio-color-2")).toBe("#f43f5e");
+    expect(variable("--studio-angle")).toBe("45deg");
+
+    // The halo alone keeps the underlay; the rest goes
+    draw(view(text("t")));
+    expect(shown.className).toBe("studio-text studio-bold studio-halo");
+    expect(shown.style.letterSpacing).toBe("0em");
+    expect(shown.style.lineHeight).toBe("1.15");
+    expect(shown.style.fontStyle).toBe("");
+    expect(shown.style.textTransform).toBe("");
+    expect(shown.style.justifyItems).toBe("center");
+    for (const name of [
+      "--studio-outline-color",
+      "--studio-outline-width",
+      "--studio-color-2",
+      "--studio-angle",
+    ]) {
+      expect(variable(name)).toBe("");
+    }
+
+    // Neither: no underlay
+    draw(view(text("t", { halo: false, bold: false })));
+    expect(shown.className).toBe("studio-text");
+  });
+
   it("stacks each layer over the whole canvas, its elements inside it", () => {
     draw(
       layered(

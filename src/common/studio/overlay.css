@@ -17,8 +17,13 @@
  *                                    .studio-waits in the editor on one that
  *                                    waits for an event
  *           .studio-body             what moves: a mover (below)
- *             text     .studio-text (.studio-bold, .studio-halo), its font,
- *                      size and alignment inline
+ *             text     .studio-text (.studio-bold, .studio-halo,
+ *                      .studio-outline, .studio-gradient), its font, size,
+ *                      spacing, style and alignment inline, data-text its
+ *                      words for the underlay (::before); the element has
+ *                      --studio-outline-color, --studio-outline-width,
+ *                      --studio-color-2 and --studio-angle
+ *                        span.studio-words   the words
  *             media    img.studio-fill or video.studio-fill
  *             camera   video.studio-fill, muted, data-src its stream:
  *                      fragmented MP4 fed to a MediaSource
@@ -108,10 +113,12 @@
 
 /* Text */
 
+/* One cell, its row centered and its items placed by justify-items (inline,
+   from the alignment), each sized to its lines: the words, and under them the
+   underlay that draws the outline and the halo */
 .studio-text {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: grid;
+  align-content: center;
   height: 100%;
   color: var(--studio-color);
   font-weight: 400;
@@ -123,12 +130,43 @@
   font-weight: 700;
 }
 
-/* On the text itself: set higher up, its em would be that element's size */
-.studio-text.studio-halo {
+.studio-words {
+  grid-area: 1 / 1;
+}
+
+/* The words again, under them. Chromium 103 has no paint-order for HTML
+   text, so a stroke on the words would cover half of each letter: here the
+   words cover its inner half instead, and it's twice the outline's width. */
+.studio-text.studio-outline::before,
+.studio-text.studio-halo::before {
+  content: attr(data-text);
+  grid-area: 1 / 1;
+  -webkit-text-fill-color: transparent;
+}
+
+.studio-text.studio-outline::before {
+  -webkit-text-stroke: calc(var(--studio-outline-width) * 2)
+    var(--studio-outline-color);
+}
+
+/* Under the words, so it can't darken a gradient or the outline. On the text
+   itself: set higher up, its em would be that element's size. */
+.studio-text.studio-halo::before {
   text-shadow:
     0 0 0.05em var(--studio-halo),
     0 0.02em 0.12em var(--studio-halo),
     0 0 0.4em rgb(18 18 18 / 30%);
+}
+
+/* background-clip: text unprefixed only from Chrome 120 */
+.studio-text.studio-gradient > .studio-words {
+  background: linear-gradient(
+    var(--studio-angle),
+    var(--studio-color),
+    var(--studio-color-2)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Pictures, videos and embeds */

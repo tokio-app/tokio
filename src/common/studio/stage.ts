@@ -534,6 +534,26 @@ const newVideo = () => {
 
 const newPicture = () => picture("studio-fill");
 
+// A text's words in a span sized to its lines, so a gradient spans them
+const newText = () => {
+  const text = div("studio-text");
+  const words = document.createElement("span");
+  words.className = "studio-words";
+  text.append(words);
+  return text;
+};
+
+// Sets each variable, or clears it where it's left out
+const setVariables = (
+  node: HTMLElement,
+  variables: Record<string, string | null | undefined>,
+) => {
+  for (const [name, value] of Object.entries(variables)) {
+    if (value) node.style.setProperty(name, value);
+    else node.style.removeProperty(name);
+  }
+};
+
 // Transparent, with no border or scrollbars, filling its box
 const newFrame = () => {
   const frame = document.createElement("iframe");
@@ -893,14 +913,34 @@ export function createStage(
 
     switch (element.kind) {
       case "text": {
-        const text = only(body, HTMLDivElement, () => div("studio-text"));
-        if (text.textContent !== element.text) text.textContent = element.text;
+        const text = only(body, HTMLDivElement, newText);
+        const words = text.firstElementChild as HTMLElement;
+        if (words.textContent !== element.text) {
+          words.textContent = element.text;
+        }
+        // The underlay's copy: attr() renders it as plain text
+        text.dataset.text = element.text;
+        // On the text, so the words and the underlay inherit them alike
         text.style.fontFamily = fontFamily(element.font);
         text.style.fontSize = `${element.size}px`;
+        text.style.letterSpacing = `${element.letter_spacing / 100}em`;
+        text.style.lineHeight = String(element.line_height / 100);
+        text.style.fontStyle = element.italic ? "italic" : "";
+        text.style.textTransform = element.caps ? "uppercase" : "";
         text.style.textAlign = element.align;
+        text.style.justifyItems = element.align;
         text.classList.toggle("studio-bold", element.bold);
         text.classList.toggle("studio-halo", element.halo);
+        text.classList.toggle("studio-outline", !!element.outline);
+        text.classList.toggle("studio-gradient", !!element.gradient);
         el.style.setProperty("--studio-color", element.color);
+        setVariables(el, {
+          "--studio-outline-color": element.outline?.color,
+          "--studio-outline-width":
+            element.outline && `${element.outline.width}px`,
+          "--studio-color-2": element.gradient?.color,
+          "--studio-angle": element.gradient && `${element.gradient.angle}deg`,
+        });
         break;
       }
       case "media": {
