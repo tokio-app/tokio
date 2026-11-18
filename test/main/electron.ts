@@ -22,25 +22,43 @@ export function cancelableEvent<T extends object>(props: T) {
   return event;
 }
 
+type Size = { width: number; height: number };
+
+/** An image of the size, as capturePage gives: its PNG names its size. */
+export const fakeImage = (size: Size) => ({
+  getSize: () => size,
+  resize: (to: Partial<Size>) =>
+    fakeImage({
+      width: to.width ?? size.width,
+      height: to.height ?? size.height,
+    }),
+  toPNG: () => Buffer.from(`png ${size.width}x${size.height}`),
+});
+
+// A session's permission handlers, which deny or grant what pages ask
+const fakeSession = () => ({
+  setPermissionRequestHandler:
+    vi.fn<
+      (
+        handler: (
+          contents: unknown,
+          permission: string,
+          callback: (granted: boolean) => void,
+        ) => void,
+      ) => void
+    >(),
+  setPermissionCheckHandler:
+    vi.fn<
+      (handler: (contents: unknown, permission: string) => boolean) => void
+    >(),
+});
+
 export class FakeWebContents extends EventEmitter {
   // Messages from this page only, which main can handle without ipcMain
   readonly ipc = new EventEmitter();
   readonly session = {
     clearStorageData: vi.fn(async () => {}),
-    setPermissionRequestHandler:
-      vi.fn<
-        (
-          handler: (
-            contents: unknown,
-            permission: string,
-            callback: (granted: boolean) => void,
-          ) => void,
-        ) => void
-      >(),
-    setPermissionCheckHandler:
-      vi.fn<
-        (handler: (contents: unknown, permission: string) => boolean) => void
-      >(),
+    ...fakeSession(),
   };
   readonly send = vi.fn<(channel: string, ...args: unknown[]) => void>();
   readonly setWindowOpenHandler =
@@ -59,6 +77,10 @@ export class FakeWebContents extends EventEmitter {
   readonly sendInputEvent =
     vi.fn<(event: { type: string; keyCode: string }) => void>();
   readonly setAudioMuted = vi.fn<(muted: boolean) => void>();
+  // The page at its window's default size
+  readonly capturePage = vi.fn(async () =>
+    fakeImage({ width: 800, height: 600 }),
+  );
   readonly loadURL = vi.fn<(url: string) => Promise<void>>(async (url) => {
     this.url = url;
   });
@@ -164,6 +186,13 @@ export class FakeBrowserWindow extends EventEmitter {
     this.webContents.destroy();
     this.emit("closed");
   });
+  // At once, with no close event to cancel it
+  readonly destroy = vi.fn(() => {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.webContents.destroy();
+    this.emit("closed");
+  });
   readonly loadURL = vi.fn((url: string) => this.webContents.loadURL(url));
   readonly loadFile = vi.fn((file: string, options?: LoadFileOptions) =>
     this.webContents.loadFile(file, options),
@@ -184,6 +213,8 @@ export class FakeBrowserWindow extends EventEmitter {
     };
     this.visible = options.show ?? true;
     fakes.created.windows.push(this);
+    // As Electron tells, so a test can set up its page before it loads
+    fakes.app.emit("browser-window-created", {}, this);
   }
 
   getContentBounds() {
@@ -337,6 +368,15 @@ function createFakes() {
       getPreferredSystemLanguages: vi.fn(() => ["en-US"]),
     }),
     session: {
+      // One per partition, as Electron keeps them
+      partitions: new Map<string, ReturnType<typeof fakeSession>>(),
+      fromPartition: vi.fn((partition: string) => {
+        const { partitions } = fakes.session;
+        if (!partitions.has(partition)) {
+          partitions.set(partition, fakeSession());
+        }
+        return partitions.get(partition)!;
+      }),
       defaultSession: {
         webRequest: {
           onBeforeRequest:
@@ -487,6 +527,7 @@ export function resetElectron() {
   fakes.created.views.length = 0;
   fakes.created.trays.length = 0;
   fakes.created.notifications.length = 0;
+  fakes.session.partitions.clear();
   ipcMain.removeAllListeners();
   ipcRenderer.removeAllListeners();
   app.removeAllListeners();
