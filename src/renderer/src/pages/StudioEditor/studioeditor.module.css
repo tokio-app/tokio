@@ -1102,3 +1102,71 @@
 .guide_adds > button {
   flex: 1 1 auto;
 }
+
+/* An element's or a group's triggers: the first under its label, each other
+   under "Or" with its remove button, then Add */
+.triggers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.add_trigger {
+  align-self: flex-start;
+}
+
+/* A goal's number, as wide as the sentence leaves it */
+.goal_number {
+  flex: 1;
+  min-width: 0;
+}
+
+.counter_list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A counter's name and remove button, its warning, then what it counts */
+.counter_row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.counter_head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* In its braces, as a text writes it */
+.counter_name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--font-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.counter_name > input {
+  flex: 1;
+  min-width: 0;
+}
+
+.counter_warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  color: var(--warning);
+  font-size: var(--font-sm);
+}
+
+.counter_warning > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}

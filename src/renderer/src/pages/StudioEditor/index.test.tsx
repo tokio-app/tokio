@@ -1,4 +1,5 @@
 import {
+  GOAL_TRIGGER,
   StudioElement,
   StudioElementKind,
   StudioElementOf,
@@ -6,6 +7,7 @@ import {
   StudioGroup,
   StudioItem,
   StudioOverlay,
+  TriggerSchema,
 } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, TOKIO_EVENTS } from "@/common/types";
 import { newStudioElement, newStudioGroup } from "@/common/util";
@@ -1933,6 +1935,313 @@ describe("StudioEditor", () => {
     expect(
       page().queryByRole("radio", { name: "Moves all the time" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("waits its delay in seconds before it shows or moves", async () => {
+    const { user } = await open(scene(elementOf("shape")));
+    await user.click(row(/^Rectangle/));
+
+    await user.click(page().getByRole("radio", { name: "Shows on an event" }));
+    const delay = field("Delay (s)").getByRole("spinbutton");
+    expect(delay).toHaveValue(0);
+    await user.clear(delay);
+    await user.type(delay, "1.5");
+    await waitFor(() => expect(savedElement()).toMatchObject({ delay: 1.5 }));
+
+    await user.click(page().getByRole("radio", { name: "Moves on an event" }));
+    expect(field("Delay (s)").getByRole("spinbutton")).toHaveValue(1.5);
+    await user.click(page().getByRole("radio", { name: "Moves all the time" }));
+    expect(page().queryByRole("group", { name: "Delay (s)" })).toBeNull();
+  });
+
+  it("adds, retypes and removes trigger rows, each saved as the schema shapes it", async () => {
+    const counter = {
+      name: "roses",
+      trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+    };
+    const { user } = await open(
+      studioOverlay("Main", {
+        id: ID,
+        counters: [counter],
+        items: [group("Group 1", [elementOf("shape", { when: "event" })])],
+      }),
+    );
+    await user.click(row(/^Rectangle/));
+    const add = page().getByRole("button", { name: "Add a trigger" });
+
+    await user.click(add);
+    await waitFor(() =>
+      expect(savedElement()?.also_triggers).toEqual([
+        TriggerSchema.parse({ type: TOKIO_EVENTS.FOLLOW, gifts: [] }),
+      ]),
+    );
+    await pick(user, "Trigger 2", "Follow", "Gift");
+    await waitFor(() =>
+      expect(savedElement()?.also_triggers).toEqual([
+        TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+      ]),
+    );
+    expect(row(/^Rectangle/)).toHaveTextContent(
+      "Shape, shows on Follow or Gift",
+    );
+
+    // A goal watches a LIVE number, but the LIVE's length, or a counter
+    await pick(user, "Trigger 2", "Gift", "Goal reached");
+    await waitFor(() =>
+      expect(savedElement()?.also_triggers).toEqual([
+        { type: GOAL_TRIGGER, number: "likes", goal: 1000 },
+      ]),
+    );
+    const goal = page().getByRole("group", { name: "Trigger 2" });
+    await user.click(within(goal).getByText("{likes}"));
+    expect(inList(goal, "{coins}")).not.toBeNull();
+    expect(inList(goal, "{uptime}")).toBeNull();
+    await user.click(inList(goal, "{roses}")!);
+    const value = within(goal).getByRole("spinbutton", { name: "Goal" });
+    await user.clear(value);
+    await user.type(value, "500");
+    await waitFor(() =>
+      expect(savedElement()?.also_triggers).toEqual([
+        { type: GOAL_TRIGGER, number: "roses", goal: 500 },
+      ]),
+    );
+    expect(row(/^Rectangle/)).toHaveTextContent(
+      "Shape, shows on Follow or Goal reached",
+    );
+
+    // Back to an event, with the schema's defaults
+    await pick(user, "Trigger 2", "Goal reached", "Chat");
+    await waitFor(() =>
+      expect(savedElement()?.also_triggers).toEqual([
+        TriggerSchema.parse({ type: TOKIO_EVENTS.CHAT, gifts: [] }),
+      ]),
+    );
+
+    // Five in all
+    for (let i = 0; i < 3; i++) await user.click(add);
+    expect(add).toBeDisabled();
+    await waitFor(() => expect(savedElement()?.also_triggers).toHaveLength(4));
+    await user.click(page().getByRole("button", { name: "Remove trigger 2" }));
+    await waitFor(() => expect(savedElement()?.also_triggers).toHaveLength(3));
+    expect(savedElement()?.also_triggers[0]).toMatchObject({
+      type: TOKIO_EVENTS.FOLLOW,
+    });
+    expect(add).toBeEnabled();
+  });
+
+  it("shows the Likes per reaction once, with the first Like row", async () => {
+    const like = TriggerSchema.parse({ type: TOKIO_EVENTS.LIKE, gifts: [] });
+    const { user } = await open(
+      scene(
+        elementOf("shape", {
+          when: "event",
+          trigger: like,
+          also_triggers: [like],
+        }),
+      ),
+    );
+    await user.click(row(/^Rectangle/));
+
+    expect(
+      page().getAllByRole("spinbutton", { name: "Likes per reaction" }),
+    ).toHaveLength(1);
+    expect(
+      field("Trigger").getByRole("spinbutton", { name: "Likes per reaction" }),
+    ).toBeVisible();
+  });
+
+  it("offers a viewer's extra rows only the events a viewer sends, and no goal", async () => {
+    const { user } = await open(scene(elementOf("viewer")));
+    await user.click(row(/^Viewer's picture/));
+
+    const first = page().getByRole("group", { name: "Trigger" });
+    await user.click(within(first).getByText("Follow"));
+    expect(inList(first, "Goal reached")).toBeNull();
+    await user.keyboard("{Escape}");
+
+    await user.click(page().getByRole("button", { name: "Add a trigger" }));
+    const other = page().getByRole("group", { name: "Trigger 2" });
+    await user.click(within(other).getByRole("combobox"));
+    expect(inList(other, "Gift")).not.toBeNull();
+    for (const name of ["Envelope", "Super Fan Box", "Music change"]) {
+      expect(inList(other, name)).toBeNull();
+    }
+    expect(inList(other, "Goal reached")).toBeNull();
+  });
+
+  it("keeps one trigger for a gift that shows what's sent", async () => {
+    const element = elementOf("gift", {
+      gift: 5655,
+      when: "event",
+      also_triggers: [
+        TriggerSchema.parse({ type: TOKIO_EVENTS.FOLLOW, gifts: [] }),
+      ],
+    });
+    const { user } = await open(scene(element));
+    await send(APP_EVENTS_RESPONSE.GET_GIFTS, {
+      data: [gift(5655, "Rose")],
+    });
+    await user.click(row(/^Rose/));
+    expect(page().getByRole("group", { name: "Trigger 2" })).toBeVisible();
+
+    await user.click(
+      page().getByRole("radio", { name: "The gift a viewer sends" }),
+    );
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        gift: null,
+        trigger: { type: TOKIO_EVENTS.GIFT },
+        also_triggers: [],
+      }),
+    );
+    expect(page().queryByRole("group", { name: "Trigger 2" })).toBeNull();
+    expect(
+      page().queryByRole("button", { name: "Add a trigger" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("gives a group the same rows, a goal included", async () => {
+    const { user } = await open(scene(text({ text: "Hello" })));
+    await user.click(row(/^Group 1/));
+    await user.click(page().getByRole("radio", { name: "Moves on an event" }));
+
+    await user.click(page().getByRole("button", { name: "Add a trigger" }));
+    await pick(user, "Trigger 2", "Follow", "Goal reached");
+    const value = field("Trigger 2").getByRole("spinbutton", { name: "Goal" });
+    await user.clear(value);
+    await user.type(value, "20");
+
+    await waitFor(() =>
+      expect(savedGroup(0)).toMatchObject({
+        when: "animate",
+        also_triggers: [{ type: GOAL_TRIGGER, number: "likes", goal: 20 }],
+      }),
+    );
+    expect(row(/^Group 1/)).toHaveAccessibleName(
+      /Moves on Follow or Goal reached/,
+    );
+  });
+
+  it("adds, names, retypes and removes counters, warning about their names", async () => {
+    const { user } = await open(studioOverlay("Main", { id: ID }));
+    const counters = () => lastSave()?.counters;
+    expect(page().getByText(/^Count an event during each LIVE/)).toBeVisible();
+
+    const add = page().getByRole("button", { name: "Add a counter" });
+    await user.click(add);
+    await waitFor(() =>
+      expect(counters()).toEqual([
+        {
+          name: "",
+          trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+        },
+      ]),
+    );
+    const first = field("Counter 1");
+    const name = first.getByRole("textbox", { name: "Name" });
+    expect(name).toHaveAccessibleDescription("Name it to show it in a text.");
+
+    // Only what a text's {name} finds
+    await user.type(name, "big roses!");
+    await waitFor(() => expect(counters()?.[0].name).toBe("bigroses"));
+    expect(first.queryByText(/Name it/)).toBeNull();
+    await pick(user, "Counter 1", "Gift", "Follow");
+    await waitFor(() =>
+      expect(counters()?.[0].trigger).toEqual(
+        TriggerSchema.parse({ type: TOKIO_EVENTS.FOLLOW, gifts: [] }),
+      ),
+    );
+
+    await user.click(add);
+    const second = field("Counter 2").getByRole("textbox", { name: "Name" });
+    await user.type(second, "bigroses");
+    expect(second).toHaveAccessibleDescription(
+      "Another counter has this name. Texts show only one of them.",
+    );
+    expect(name).toHaveAccessibleDescription(/Another counter/);
+    await user.clear(second);
+    await user.type(second, "likes");
+    expect(second).toHaveAccessibleDescription(
+      /^A LIVE number or an event's value already has this name/,
+    );
+    await user.clear(second);
+    await user.type(second, "username");
+    expect(second).toHaveAccessibleDescription(/already has this name/);
+    // Warned, never refused
+    await waitFor(() => expect(counters()?.[1].name).toBe("username"));
+
+    await user.click(page().getByRole("button", { name: "Remove counter 1" }));
+    await waitFor(() =>
+      expect(counters()?.map((c) => c.name)).toEqual(["username"]),
+    );
+  });
+
+  it("lists the overlay's counters with the LIVE numbers, filled with samples", async () => {
+    const element = text({ text: "{roses} roses" });
+    const { user } = await open(
+      studioOverlay("Main", {
+        id: ID,
+        counters: [
+          {
+            name: "roses",
+            trigger: TriggerSchema.parse({
+              type: TOKIO_EVENTS.GIFT,
+              gifts: [],
+            }),
+          },
+        ],
+        items: [group("Group 1", [element])],
+      }),
+    );
+
+    expect(drawn(element.id)).toHaveTextContent("12 roses");
+    await user.click(row(/roses/));
+    const live = within(page().getByText("LIVE numbers:").closest("p")!);
+    expect(live.getByTitle("Insert {likes}")).toBeVisible();
+    expect(live.getByTitle("Insert {roses}")).toBeVisible();
+  });
+
+  it("tests each element and group after its own delay, the wait starting over with each Test", async () => {
+    const now = text({ text: "Now", when: "event" });
+    const later = text({ text: "Later", when: "event", delay: 2 });
+    const moves = group("Moves", [text({ text: "Other" })], {
+      when: "animate",
+      delay: 1,
+    });
+    await open(holding(group("Group 1", [now, later]), moves));
+    const entered = (id: string) =>
+      /studio-enter-/.test(drawn(id).querySelector(".studio-body")!.className);
+    const played = () =>
+      /studio-play-/.test(
+        canvas().querySelector<HTMLElement>(
+          `.studio-layer[data-layer="${moves.id}"] .studio-group`,
+        )!.className,
+      );
+    const testButton = page().getByRole("button", {
+      name: "Test the elements and groups that react to events",
+    });
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(testButton);
+      expect(entered(now.id)).toBe(true);
+      expect(entered(later.id)).toBe(false);
+      expect(played()).toBe(false);
+
+      act(() => vi.advanceTimersByTime(1000));
+      expect(played()).toBe(true);
+      expect(entered(later.id)).toBe(false);
+
+      // Another Test clears the waits the last one left
+      fireEvent.click(testButton);
+      act(() => vi.advanceTimersByTime(1500));
+      expect(entered(later.id)).toBe(false);
+      act(() => vi.advanceTimersByTime(500));
+      expect(entered(later.id)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("measures a text's words with every motion on the stage held still", async () => {

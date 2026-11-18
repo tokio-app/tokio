@@ -1,18 +1,22 @@
 import { translate } from "@/common/i18n";
 import {
+  GOAL_TRIGGER,
   StudioElement,
   StudioElementSchema,
   StudioGroup,
   StudioItem,
+  StudioTriggerSchema,
   TriggerSchema,
 } from "@/common/schemas";
-import { TOKIO_EVENTS } from "@/common/types";
+import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import { newStudioElement, newStudioGroup, studioView } from "@/common/util";
 import { gift, studioOverlay } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   alignTo,
   copyItem,
+  counterWarning,
+  retype,
   boxOn,
   cornerOf,
   cropDrag,
@@ -113,8 +117,8 @@ describe("elementName", () => {
 
 describe("whenText", () => {
   it("says when an element shows, with its trigger", () => {
-    expect(whenText(element("shape"), t)).toBe("always on screen");
-    expect(whenText(element("viewer"), t)).toBe("shows on Follow");
+    expect(whenText(element("shape"), t, "en")).toBe("always on screen");
+    expect(whenText(element("viewer"), t, "en")).toBe("shows on Follow");
     expect(
       whenText(
         element("shape", {
@@ -122,17 +126,99 @@ describe("whenText", () => {
           trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
         }),
         t,
+        "en",
       ),
     ).toBe("moves on Gift");
   });
 
   it("says a loop moves all the time, and a group's When too", () => {
-    expect(whenText(element("shape", { when: "loop" }), t)).toBe(
+    expect(whenText(element("shape", { when: "loop" }), t, "en")).toBe(
       "moves all the time",
     );
-    expect(whenText({ ...newStudioGroup("Group 1"), when: "event" }, t)).toBe(
-      "shows on Follow",
+    expect(
+      whenText({ ...newStudioGroup("Group 1"), when: "event" }, t, "en"),
+    ).toBe("shows on Follow");
+  });
+});
+
+describe("whenText with several triggers", () => {
+  const gift = TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] });
+  const goal = StudioTriggerSchema.parse({ type: GOAL_TRIGGER });
+
+  it("names them all as alternatives, a goal as Goal reached", () => {
+    const shape = element("shape", {
+      when: "event",
+      also_triggers: [gift, goal],
+    });
+    expect(whenText(shape, t, "en")).toBe(
+      "shows on Follow, Gift, or Goal reached",
     );
+    expect(whenText(shape, t, "es-419")).toBe(
+      "shows on Follow, Gift o Goal reached",
+    );
+  });
+
+  it("names a type once, however many rows have it", () => {
+    const shape = element("shape", {
+      when: "animate",
+      trigger: gift,
+      also_triggers: [{ ...gift, gifts: [5655] }],
+    });
+    expect(whenText(shape, t, "en")).toBe("moves on Gift");
+  });
+});
+
+describe("retype", () => {
+  const gift = TriggerSchema.parse({
+    type: TOKIO_EVENTS.GIFT,
+    gifts: [5655],
+    min_coins: 10,
+  });
+
+  // Main's echo of each must deep-equal it, or the autosave never settles
+  const shaped = (trigger: unknown) =>
+    expect(StudioTriggerSchema.parse(trigger)).toEqual(trigger);
+
+  it("keeps an alert trigger's filters", () => {
+    const chat = retype(gift, TOKIO_EVENTS.CHAT);
+    expect(chat).toMatchObject({ type: TOKIO_EVENTS.CHAT, gifts: [5655] });
+    shaped(chat);
+  });
+
+  it("makes a goal with its defaults, nothing of the alert's left", () => {
+    const goal = retype(gift, GOAL_TRIGGER);
+    expect(goal).toEqual({ type: GOAL_TRIGGER, number: "likes", goal: 1000 });
+    shaped(goal);
+  });
+
+  it("makes an alert trigger from a goal with the schema's defaults", () => {
+    const goal = StudioTriggerSchema.parse({ type: GOAL_TRIGGER, goal: 50 });
+    const emote = retype(goal, EMOTE_TRIGGER);
+    expect(emote).toEqual(
+      TriggerSchema.parse({ type: EMOTE_TRIGGER, gifts: [] }),
+    );
+    shaped(emote);
+  });
+});
+
+describe("counterWarning", () => {
+  const counter = (name: string) => ({
+    name,
+    trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+  });
+
+  it("warns about an empty name, a taken one and a reserved one", () => {
+    const counters = ["roses", "", "roses", "likes", "username", "lions"].map(
+      counter,
+    );
+    expect(counters.map((_, i) => counterWarning(counters, i))).toEqual([
+      "studio.counters.taken",
+      "studio.counters.noName",
+      "studio.counters.taken",
+      "studio.counters.reserved",
+      "studio.counters.reserved",
+      null,
+    ]);
   });
 });
 

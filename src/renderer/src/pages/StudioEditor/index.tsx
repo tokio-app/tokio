@@ -13,7 +13,12 @@ import {
   StudioSource,
 } from "@/common/schemas";
 import { Stage } from "@/common/studio/stage";
-import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
+import {
+  APP_EVENTS,
+  APP_EVENTS_RESPONSE,
+  OverlayApp,
+  StudioReact,
+} from "@/common/types";
 import {
   alertName,
   gameOverlayRows,
@@ -189,6 +194,8 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const asked = useRef(new Set<string>());
   const applied = useRef(new Map<string, number>());
   const stage = useRef<Stage | null>(null);
+  // What the last Test still has to play after each item's delay
+  const delayed = useRef(new Set<ReturnType<typeof setTimeout>>());
   // A text whose words its settings just changed: the canvas grows its box
   // to them once it has drawn them
   const fitting = useRef<string | null>(null);
@@ -406,7 +413,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     ...elements.map((element) => {
       const name = element.label.trim() || autoNames[element.id];
       const kind = t(`studio.kinds.${element.kind}`);
-      const when = whenText(element, t);
+      const when = whenText(element, t, language);
       // An element named after its kind doesn't say its kind twice
       const meta =
         name === kind
@@ -421,7 +428,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     ...overlay.items.flatMap((item) => {
       if (item.kind !== "group") return [];
       const name = item.name.trim() || t("studio.editor.untitledGroup");
-      const when = capitalize(whenText(item, t), language);
+      const when = capitalize(whenText(item, t, language), language);
       return [
         [
           item.id,
@@ -586,25 +593,45 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     changeElement(id, (e) => ({ ...e, ...box }));
 
   // Plays every element and group that reacts, elements with fresh
-  // samples, here and on stream
+  // samples, each after its delay as on stream, here and on stream
   const test = () => {
     flushSettings();
     const fresh = new Samples();
     setSamples(fresh);
+    for (const timer of delayed.current) clearTimeout(timer);
+    delayed.current.clear();
+    const later = (delay: number, react: StudioReact) => {
+      if (delay === 0) {
+        stage.current?.react(react);
+        return;
+      }
+      const timer = setTimeout(() => {
+        delayed.current.delete(timer);
+        stage.current?.react(react);
+      }, delay * 1000);
+      delayed.current.add(timer);
+    };
     for (const reacts of elements) {
       if (reactsToEvents(reacts)) {
-        stage.current?.react(
+        later(
+          reacts.delay,
           sampleReact(reacts, fresh, language, sampleCounts(overlay)),
         );
       }
     }
     for (const reacts of overlay.items) {
       if (reacts.kind === "group" && !reacts.hidden && reactsToEvents(reacts)) {
-        stage.current?.react({ element: reacts.id });
+        later(reacts.delay, { element: reacts.id });
       }
     }
     window.api.emit(APP_EVENTS.TEST_STUDIO_OVERLAY, { id: overlay.id });
   };
+  useEffect(() => {
+    const timers = delayed.current;
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, []);
 
   // Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo, Ctrl+C copies, Ctrl+X cuts
   // and Ctrl+V pastes, Cmd too. Not in a field that keeps its own, nor in a
@@ -786,6 +813,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 onFlip={(key) => flipGroup(group.id, key)}
                 gifts={giftChoices}
                 emotes={emoteChoices}
+                counters={overlay.counters}
                 onAlign={(to) => {
                   if (!frame) return;
                   const at = alignTo(frame, canvas, to);
@@ -823,6 +851,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 }}
                 gifts={giftChoices}
                 emotes={emoteChoices}
+                counters={overlay.counters}
                 sources={sources}
                 onPickMedia={() => setMediaFor(element.id)}
                 onCrop={(crop) => cropElement(element.id, crop)}
@@ -831,7 +860,12 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 onPlay={() => stage.current?.replay(element.id)}
               />
             ) : (
-              <OverlaySettings overlay={overlay} onChange={setOverlay} />
+              <OverlaySettings
+                overlay={overlay}
+                onChange={setOverlay}
+                gifts={giftChoices}
+                emotes={emoteChoices}
+              />
             )}
           </div>
         </div>

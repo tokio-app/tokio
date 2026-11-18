@@ -1,11 +1,15 @@
-import { STUDIO_NAME_MAX_LENGTH, StudioGroup } from "@/common/schemas";
+import {
+  STUDIO_NAME_MAX_LENGTH,
+  StudioCounter,
+  StudioGroup,
+} from "@/common/schemas";
 import { CustomGift } from "@/common/types";
-import { EmoteOption, Field, Input, TRIGGER_OPTIONS } from "@/components";
+import { EmoteOption, Field, Input } from "@/components";
 import { useOptions, useT } from "@/ui/i18n";
 import { useRef } from "react";
 import { BoxFields } from "./BoxFields";
 import { AlignTo, Turned } from "./helper";
-import { ReactionFields, WHENS } from "./ReactionFields";
+import { ReactionFields, STUDIO_TRIGGERS, WHENS } from "./ReactionFields";
 import styles from "./studioeditor.module.css";
 
 type Props = {
@@ -22,6 +26,7 @@ type Props = {
   onAlign: (to: AlignTo) => void;
   gifts: CustomGift[];
   emotes: EmoteOption[];
+  counters: StudioCounter[];
 };
 
 // The same turn, within a px: a frame comes back from its elements' whole px
@@ -47,10 +52,11 @@ export function GroupSettings({
   onAlign,
   gifts,
   emotes,
+  counters,
 }: Props) {
   const t = useT();
   const whens = useOptions(WHENS);
-  const triggers = useOptions(TRIGGER_OPTIONS);
+  const triggers = useOptions(STUDIO_TRIGGERS);
   // The frame a run of changes in its fields began from, and the last one
   // they asked for: while its frame is still that one, each change goes from
   // the first, so its elements' rounding doesn't add up over a dragged field
@@ -116,6 +122,7 @@ export function GroupSettings({
         untilEnd={false}
         gifts={gifts}
         emotes={emotes}
+        counters={counters}
         onChange={onChange}
       />
     </div>
