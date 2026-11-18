@@ -1,6 +1,8 @@
 // The stream's own stylesheet, global as on its page, like the games
 // overlay's preview: the canvas can't drift from what's on stream
 import "@/common/studio/overlay.css";
+// Archivo's own italic, which only the canvas's texts use, as on stream
+import "@fontsource-variable/archivo/wdth-italic.css";
 import {
   STUDIO_MAX_GUIDES,
   StudioCrop,

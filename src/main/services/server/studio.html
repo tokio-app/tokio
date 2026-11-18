@@ -14,6 +14,16 @@
         src: url(__ARCHIVO__) format("woff2-variations");
       }
 
+      /* Its own italic: without it Chromium slants the upright letters */
+      @font-face {
+        font-family: "Archivo Variable";
+        font-style: italic;
+        font-display: block;
+        font-weight: 100 900;
+        font-stretch: 62% 125%;
+        src: url(__ARCHIVO_ITALIC__) format("woff2-variations");
+      }
+
       html,
       body,
       #stage {

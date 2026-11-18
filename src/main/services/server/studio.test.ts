@@ -102,10 +102,11 @@ describe("studio overlay page", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toMatch(/^text\/html/);
       const html = await res.text();
-      expect(html).toContain("url(data:font/woff2;base64,");
+      // Archivo, upright and italic
+      expect(html.match(/url\(data:font\/woff2;base64,/g)).toHaveLength(2);
       expect(html).toContain(STYLES);
       expect(html).toContain(STAGE);
-      expect(html).not.toMatch(/__ARCHIVO__|__STYLES__|__STAGE__/);
+      expect(html).not.toMatch(/__ARCHIVO|__STYLES__|__STAGE__/);
       // Only its own two scripts end: the stage can't close one early
       expect(html.match(/<\/script/gi)).toHaveLength(2);
     }
