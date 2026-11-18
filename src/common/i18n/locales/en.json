@@ -1403,6 +1403,7 @@
   "main.overlays.versionChanged": "{name} {version} just came out and changes how the overlay works. Look it over, then update again.",
   "main.init.liveEndedAway": "The LIVE ended while Tokio was reconnecting. If it's back within 2 minutes, Tokio connects to it again.",
   "main.init.connectionLostLooking": "Tokio lost the connection to the LIVE and will keep trying for 2 minutes.",
+  "main.init.updateNotInstalled": "Tokio {version} didn't install. Download it from the title bar and run its installer yourself.",
   "minecraft.weather.clear": "Clear",
   "minecraft.weather.rain": "Rain",
   "minecraft.weather.thunder": "Thunder",

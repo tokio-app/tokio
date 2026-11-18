@@ -61,6 +61,10 @@ export class UpdaterService extends Service {
   private _status: UpdateStatus = { state: "idle" };
   private _checking?: Promise<ServiceResult>;
   private _installing?: Promise<void>;
+  // Set by install(): electron-updater's info lines are then the install's
+  private _installStarted = false;
+  // A version that failed to install last time, offered as a download
+  private _manualVersion?: string;
   private _startup?: NodeJS.Timeout;
   private _interval?: NodeJS.Timeout;
 
@@ -72,6 +76,19 @@ export class UpdaterService extends Service {
 
   private get manual() {
     return this._platform === "darwin";
+  }
+
+  private isManual(version: string) {
+    return this.manual || version === this._manualVersion;
+  }
+
+  private manualStatus(version: string): UpdateNotice {
+    return {
+      state: "available",
+      version,
+      manual: true,
+      url: `${REPOSITORY_URL}/releases/tag/v${version}`,
+    };
   }
 
   public async initialize(callbacks: UpdaterCallbacks = {}) {
@@ -105,7 +122,7 @@ export class UpdaterService extends Service {
       const status: UpdateNotice = {
         state: "available",
         version,
-        manual: this.manual,
+        manual: this.isManual(version),
         url: `${REPOSITORY_URL}/releases/tag/v${version}`,
       };
       this.setStatus(status);
@@ -119,6 +136,11 @@ export class UpdaterService extends Service {
       this.setStatus({ state: "downloading", version, percent: step });
     });
     updater.on("update-downloaded", ({ version }: UpdateInfo) => {
+      // Restarting would run the installer that already failed
+      if (version === this._manualVersion) {
+        this.setStatus(this.manualStatus(version));
+        return;
+      }
       const status: UpdateNotice = { state: "ready", version };
       this.setStatus(status);
       this._callbacks.onUpdate?.(status);
@@ -127,6 +149,20 @@ export class UpdaterService extends Service {
     updater.on("error", () => {});
 
     if (!updater.isUpdaterActive()) this.setStatus({ state: "unsupported" });
+  }
+
+  /**
+   * The update to `version` didn't install last time: offer its release page
+   * instead of restarting into the same installer. A newer one installs.
+   */
+  public markManual(version: string) {
+    this._manualVersion = version;
+    const status = this._status;
+    if (
+      (status.state === "ready" || status.state === "available") &&
+      status.version === version
+    )
+      this.setStatus(this.manualStatus(version));
   }
 
   public getStatus(): UpdateStatus {
@@ -179,6 +215,7 @@ export class UpdaterService extends Service {
       `<Updater> Restarting to install version ${status.version}.`,
       this._logFile,
     );
+    this._installStarted = true;
     const updater = this._updater;
     // The installer starts before the app quits, so a quit held for saves
     // would race it. Not awaited: the request that asked is one of them.
@@ -205,7 +242,7 @@ export class UpdaterService extends Service {
         this.setStatus({
           state: "available",
           version: result.updateInfo.version,
-          manual: false,
+          manual: this.isManual(result.updateInfo.version),
           url: `${REPOSITORY_URL}/releases/tag/v${result.updateInfo.version}`,
         });
         this._callbacks.onDownloadFailed?.(error);
@@ -226,7 +263,11 @@ export class UpdaterService extends Service {
   private logger(): UpdaterLogger {
     const text = (message: unknown) => `<Updater> ${String(message)}`;
     return {
-      info: (message) => Logger.debug(text(message), this._logFile),
+      // The install's lines say why an installer didn't run, checks' are noise
+      info: (message) =>
+        this._installStarted
+          ? Logger.info(text(message), this._logFile)
+          : Logger.debug(text(message), this._logFile),
       warn: (message) => Logger.warn(text(message), this._logFile),
       error: (message) => Logger.error(text(message), this._logFile),
     };

@@ -1,5 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatError, getOverlayURL, TaskQueue } from "./index";
+import {
+  compareVersions,
+  formatError,
+  getOverlayURL,
+  TaskQueue,
+} from "./index";
+
+describe("compareVersions", () => {
+  it.each([
+    ["0.1.3-beta.2", "0.1.3-beta.10"],
+    ["0.1.3-beta.10", "0.1.3"],
+    ["0.1.3", "0.1.10"],
+    ["0.1.5-beta.1", "0.2.0-beta.1"],
+  ])("orders %s before %s, as semver does", (older, newer) => {
+    expect(compareVersions(older, newer)).toBeLessThan(0);
+    expect(compareVersions(newer, older)).toBeGreaterThan(0);
+  });
+
+  it("says when they're the same", () => {
+    expect(compareVersions("0.2.0-beta.1", "0.2.0-beta.1")).toBe(0);
+  });
+});
 
 const deferred = () => {
   let resolve!: () => void;

@@ -1403,6 +1403,7 @@
   "main.overlays.versionChanged": "{name} {version} acaba de salir y cambia cómo funciona el overlay. Revísalo y vuelve a actualizarlo.",
   "main.init.liveEndedAway": "El LIVE terminó mientras Tokio se reconectaba. Si vuelve en los próximos 2 minutos, Tokio se conecta de nuevo.",
   "main.init.connectionLostLooking": "Tokio perdió la conexión con el LIVE y lo seguirá intentando durante 2 minutos.",
+  "main.init.updateNotInstalled": "Tokio {version} no se instaló. Descárgalo desde la barra de título y ejecuta el instalador tú mismo.",
   "minecraft.weather.clear": "Despejado",
   "minecraft.weather.rain": "Lluvia",
   "minecraft.weather.thunder": "Tormenta",

@@ -97,6 +97,63 @@ describe("UpdaterService", () => {
     ]);
   });
 
+  it("logs the library's info once the install starts", async () => {
+    const debug = vi.spyOn(Logger, "debug");
+    const info = vi.spyOn(Logger, "info").mockImplementation(() => {});
+    const service = await create();
+    updater.emit("update-downloaded", { version: "0.2.0" });
+
+    updater.logger?.info("Checking for update");
+    service.install();
+    updater.logger?.info("Cannot run installer");
+
+    expect(debug.mock.calls.map(([msg]) => msg)).toEqual([
+      expect.stringContaining("Checking for update"),
+    ]);
+    expect(info.mock.calls.map(([msg]) => msg)).toContainEqual(
+      expect.stringContaining("Cannot run installer"),
+    );
+  });
+
+  it("offers a version that didn't install as a download", async () => {
+    const onUpdate = vi.fn();
+    const service = await create("win32", { onUpdate });
+    const manual = {
+      state: "available",
+      version: "0.2.0",
+      manual: true,
+      url: `${REPOSITORY_URL}/releases/tag/v0.2.0`,
+    };
+
+    service.markManual("0.2.0");
+    updater.emit("update-available", { version: "0.2.0" });
+    updater.emit("update-downloaded", { version: "0.2.0" });
+
+    expect(statuses).toEqual([manual, manual]);
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(service.install()).toEqual({
+      success: true,
+      data: { url: manual.url },
+    });
+
+    updater.emit("update-downloaded", { version: "0.3.0" });
+
+    expect(service.getStatus()).toEqual({ state: "ready", version: "0.3.0" });
+    expect(onUpdate).toHaveBeenCalledWith({ state: "ready", version: "0.3.0" });
+  });
+
+  it("turns an update already downloaded into a download", async () => {
+    const service = await create();
+    updater.emit("update-downloaded", { version: "0.2.0" });
+
+    service.markManual("0.2.0");
+
+    expect(service.getStatus()).toMatchObject({
+      state: "available",
+      manual: true,
+    });
+  });
+
   it("reports the status of a download until it's ready", async () => {
     const onUpdate = vi.fn();
     const service = await create("win32", { onUpdate });

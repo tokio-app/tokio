@@ -212,6 +212,7 @@ function setup() {
     overlayUpdates: { auto: true },
     // The fake app's version
     lastVersion: "1.0.0",
+    installingVersion: "",
     tray: { enabled: true },
     language: "system",
     activityFeed: { ...defaultStoreData.settings.activityFeed },
@@ -319,6 +320,7 @@ function setup() {
     updateLiveStats: vi.fn(),
     updateServerSettings: vi.fn(async (_enabled: boolean) => true),
     updateLastVersion: vi.fn(async (_version: string) => true),
+    updateInstallingVersion: vi.fn(async (_version: string) => true),
     wasRebuilt: vi.fn(() => false),
     corruptedBackup: vi.fn((): string | null => null),
     recordEmotes: vi.fn(
@@ -344,6 +346,7 @@ function setup() {
       async (..._args: Parameters<UpdaterService["initialize"]>) => {},
     ),
     setAuto: vi.fn(),
+    markManual: vi.fn((_version: string) => {}),
   };
   const trayService = { setEnabled: vi.fn() };
   const urlManagerService = { setLogFile: vi.fn() };
@@ -3209,6 +3212,52 @@ describe("init events", () => {
       ]);
       expect(s.storeManagerService.updateLastVersion).not.toHaveBeenCalled();
     });
+
+    it("says once when the update Tokio restarted for didn't install", async () => {
+      const s = setup();
+      s.settings.installingVersion = "2.0.0";
+      const warn = vi.spyOn(Logger, "warn").mockImplementation(() => {});
+
+      await load(s);
+      await load(s);
+
+      expect(warn.mock.calls).toEqual([
+        [
+          "<Updater> The update to 2.0.0 didn't install: Tokio is still on 1.0.0.",
+          "system.log",
+        ],
+      ]);
+      expect(noticesFor(s, FEEDBACK_CODES.UPDATE_NOT_INSTALLED)).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "system",
+          message:
+            "Tokio 2.0.0 didn't install. Download it from the title bar and run its installer yourself.",
+        }),
+      ]);
+      expect(s.updaterService.markManual).toHaveBeenCalledExactlyOnceWith(
+        "2.0.0",
+      );
+      expect(
+        s.storeManagerService.updateInstallingVersion,
+      ).toHaveBeenCalledExactlyOnceWith("");
+    });
+
+    it.each(["1.0.0", "1.0.0-beta.2"])(
+      "clears an update that installed, or a newer one put in by hand (%s), without a notice",
+      async (installing) => {
+        const s = setup();
+        s.settings.installingVersion = installing;
+
+        await load(s);
+
+        expect(noticesFor(s, FEEDBACK_CODES.UPDATE_NOT_INSTALLED)).toEqual([]);
+        expect(s.updaterService.markManual).not.toHaveBeenCalled();
+        expect(
+          s.storeManagerService.updateInstallingVersion,
+        ).toHaveBeenCalledExactlyOnceWith("");
+      },
+    );
 
     it("sets up the folders in the home folder and hands out the log files", async () => {
       const s = setup();

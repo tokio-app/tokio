@@ -508,6 +508,12 @@ export class StoreManagerService extends Service {
     return this._queueSave();
   }
 
+  public async updateInstallingVersion(version: string): Promise<boolean> {
+    this._ensureInitialized();
+    this._storeData!.settings.installingVersion = version;
+    return this._queueSave();
+  }
+
   public async updateActivityFeed(feed: ActivityFeed): Promise<boolean> {
     this._ensureInitialized();
     this._storeData!.settings.activityFeed = { ...feed };

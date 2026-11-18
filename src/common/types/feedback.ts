@@ -47,6 +47,7 @@ export enum FEEDBACK_CODES {
   UPDATE_CHECK_FAILED = "update_check_failed",
   UPDATE_DOWNLOAD_FAILED = "update_download_failed",
   UPDATE_INSTALL_FAILED = "update_install_failed",
+  UPDATE_NOT_INSTALLED = "update_not_installed",
 
   // SERVER
   SERVER_STARTED = "server_started",

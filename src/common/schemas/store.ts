@@ -94,6 +94,9 @@ const AppSettingsSchema = z.object({
   // The version Tokio last ran as, to show what's new after an update. "" in
   // stores from before it was kept.
   lastVersion: z.string().default(""),
+  // The update Tokio restarted to install, checked on the next start. ""
+  // when none is pending.
+  installingVersion: z.string().default(""),
   tray: z
     .object({
       // Closing the window keeps Tokio running, with an icon in the tray

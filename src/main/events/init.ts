@@ -19,6 +19,7 @@ import {
 import {
   ALERTS_PATH,
   EMPTY_LIVE_STATS,
+  compareVersions,
   formatError,
   STUDIO_SOCKET_PREFIX,
   GAMES_PATH,
@@ -1312,6 +1313,35 @@ function versionChange({ app, storeManagerService }: AppHandlerVariables) {
   return storeManagerService.wasRebuilt() ? undefined : last;
 }
 
+// The update Tokio restarted to install last run. When Tokio is still on an
+// older version, Windows likely refused the unsigned installer: the update
+// button then downloads it, since restarting would fail the same way.
+function installCheck({
+  app,
+  storeManagerService,
+  updaterService,
+  pathManagerService,
+  notifier,
+}: AppHandlerVariables) {
+  const installing = storeManagerService.getSettings().installingVersion;
+  if (!installing) return;
+  // A failed save was logged, and the check repeats on the next start
+  void storeManagerService.updateInstallingVersion("");
+  const version = app.getVersion();
+  // That version, or a newer one the streamer installed by hand
+  if (compareVersions(version, installing) >= 0) return;
+  Logger.warn(
+    `<Updater> The update to ${installing} didn't install: Tokio is still on ${version}.`,
+    pathManagerService.files.logs.system,
+  );
+  notifier.warn(
+    "system",
+    FEEDBACK_CODES.UPDATE_NOT_INSTALLED,
+    t("main.init.updateNotInstalled", { version: installing }),
+  );
+  updaterService.markManual(installing);
+}
+
 events.push(
   APP_EVENTS.LOAD_APP,
   async (handler, e) => {
@@ -1356,6 +1386,7 @@ events.push(
     handler.trayService.setEnabled(settings.tray.enabled);
     warnTaken(handler.notifier, applyStoredShortcuts(handler));
     await initUpdater(handler);
+    installCheck(handler);
     handler.updaterService.setAuto(settings.updates.auto);
     handler.overlayService.onUpdates((updates) =>
       reportOverlayUpdates(handler, updates),
