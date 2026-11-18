@@ -1,16 +1,21 @@
 import {
+  GOAL_TRIGGER,
   StudioElementSchema,
   StudioGroupSchema,
   StudioOverlay,
+  TriggerSchema,
 } from "@/common/schemas";
 import {
+  AppEvents,
   EMOTE_TRIGGER,
   GiftEvent,
   StudioNumbers,
   TOKIO_EVENTS,
+  TokioEventMap,
   UserData,
 } from "@/common/types";
-import { describe, expect, it, vi } from "vitest";
+import Logger from "@/logger";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioService, studioText } from "./index";
 
 const NUMBERS: StudioNumbers = {
@@ -411,11 +416,10 @@ describe("StudioService", () => {
     // On the viewer's trigger, as a follow alert's picture and text are
     const thanks = element("f", { kind: "text", text: "{username}" });
 
-    const reacts = studio.test(
-      overlayOf(text, viewer, always, thanks),
-      NUMBERS,
-    );
+    studio.test(overlayOf(text, viewer, always, thanks), () => NUMBERS);
+    const reacts = onReact.mock.calls.map(([, react]) => react);
 
+    expect(onReact.mock.calls.every(([id]) => id === "o1")).toBe(true);
     expect(reacts).toHaveLength(3);
     // One sample per trigger: the same viewer
     expect(reacts[2]).toEqual({ element: "f", text: reacts[1].name });
@@ -428,7 +432,6 @@ describe("StudioService", () => {
       picture: expect.stringMatching(/^https:/),
       name: expect.any(String),
     });
-    expect(onReact).not.toHaveBeenCalled();
     // Views re-sent meanwhile show the samples
     expect(studio.kept("o1", text)).toMatchObject({ trigger: EMOTE_TRIGGER });
     expect(studio.kept("o1", viewer)).toMatchObject({ name: reacts[1].name });
@@ -436,7 +439,7 @@ describe("StudioService", () => {
   });
 
   it("keeps a Test's sample for its seconds and exit, until a real event", () => {
-    const { studio, numbers } = setup();
+    const { studio, onReact, numbers } = setup();
     const now = vi.spyOn(performance, "now").mockReturnValue(1000);
     const viewer = element("v", { kind: "viewer", seconds: 5 });
     const overlay = overlayOf(viewer);
@@ -449,7 +452,8 @@ describe("StudioService", () => {
       );
     follow("Ana");
 
-    const [sample] = studio.test(overlay, NUMBERS);
+    studio.test(overlay, () => NUMBERS);
+    const [, sample] = onReact.mock.lastCall!;
     expect(studio.kept("o1", viewer)).toMatchObject({ name: sample.name });
     // A second past its seconds, for its exit
     now.mockReturnValue(1000 + 5999);
@@ -458,18 +462,18 @@ describe("StudioService", () => {
     expect(studio.kept("o1", viewer)).toMatchObject({ name: "Ana" });
 
     // A real event wins over it
-    studio.test(overlay, NUMBERS);
+    studio.test(overlay, () => NUMBERS);
     follow("Bea");
     expect(studio.kept("o1", viewer)).toMatchObject({ name: "Bea" });
 
     // Not once its trigger changed, nor once its overlay is gone
-    studio.test(overlay, NUMBERS);
+    studio.test(overlay, () => NUMBERS);
     const shared = StudioElementSchema.parse({
       ...viewer,
       trigger: { ...viewer.trigger, type: TOKIO_EVENTS.SHARE },
     });
     expect(studio.kept("o1", shared)).toBeNull();
-    studio.test(overlay, NUMBERS);
+    studio.test(overlay, () => NUMBERS);
     studio.forget("o1");
     expect(studio.kept("o1", viewer)).toBeNull();
   });
@@ -563,11 +567,12 @@ describe("StudioService", () => {
       items: [always, reacting, loop, mover, element("e", {})],
     };
 
-    expect(studio.test(overlay, NUMBERS)).toEqual([
-      { element: "R" },
-      { element: "e" },
+    studio.test(overlay, () => NUMBERS);
+
+    expect(onReact.mock.calls).toEqual([
+      ["o1", { element: "R" }],
+      ["o1", { element: "e" }],
     ]);
-    expect(onReact).not.toHaveBeenCalled();
   });
 
   it("shows a loop text none of an earlier event's values", () => {
@@ -591,5 +596,428 @@ describe("StudioService", () => {
     expect(studioText(text, NUMBERS, {}, values)).toBe("Ana!");
     // A loop has no trigger's variables, so the name isn't filled in
     expect(studioText(loop, NUMBERS, {}, values)).toBe("{username}!");
+  });
+});
+
+const chat = (content: string) => ({
+  user: user("Ana"),
+  comment: { content, lang: "en", emotes: [] },
+});
+
+describe("StudioService's triggers", () => {
+  const follow = { user: user("Ana") };
+
+  it("reacts when any of its triggers matches, and keeps what each sent", () => {
+    const { studio, onReact, numbers } = setup();
+    const text = element("t", {
+      kind: "text",
+      text: "{username}",
+      trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+      also_triggers: [
+        { type: GOAL_TRIGGER },
+        { type: TOKIO_EVENTS.SHARE, gifts: [] },
+      ],
+    });
+    const overlays = [overlayOf(text)];
+
+    studio.handle(
+      TOKIO_EVENTS.SHARE,
+      { user: user("Bea"), shareCount: 1 },
+      overlays,
+      numbers,
+    );
+    studio.handle(TOKIO_EVENTS.CHAT, chat("hi"), overlays, numbers);
+
+    expect(onReact.mock.calls).toEqual([["o1", { element: "t", text: "Bea" }]]);
+    expect(studio.kept("o1", text)).toMatchObject({
+      trigger: TOKIO_EVENTS.SHARE,
+      name: "Bea",
+    });
+    // Kept while Share is one of its triggers, first or not
+    const first = StudioElementSchema.parse({
+      ...text,
+      trigger: { type: TOKIO_EVENTS.SHARE, gifts: [] },
+      also_triggers: [],
+    });
+    expect(studio.kept("o1", first)).toMatchObject({ name: "Bea" });
+    const without = StudioElementSchema.parse({ ...text, also_triggers: [] });
+    expect(studio.kept("o1", without)).toBeNull();
+  });
+
+  it("counts likes only toward a Like trigger", () => {
+    const { studio, onReact, numbers } = setup();
+    const both = element("b", {
+      trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+      also_triggers: [{ type: TOKIO_EVENTS.LIKE, gifts: [] }],
+      likes_every: 10,
+    });
+    const overlays = [overlayOf(both)];
+    const likes = (likeCount: number) => ({
+      user: user("Ana"),
+      likeCount,
+      totalLikes: 0,
+    });
+
+    studio.handle(TOKIO_EVENTS.FOLLOW, follow, overlays, numbers);
+    studio.handle(TOKIO_EVENTS.LIKE, likes(6), overlays, numbers);
+    studio.handle(TOKIO_EVENTS.FOLLOW, follow, overlays, numbers);
+    studio.handle(TOKIO_EVENTS.LIKE, likes(4), overlays, numbers);
+
+    // Each follow, then the 10th like
+    expect(onReact).toHaveBeenCalledTimes(3);
+    expect(studio.kept("o1", both)).toMatchObject({
+      trigger: TOKIO_EVENTS.LIKE,
+    });
+  });
+});
+
+describe("StudioService's delay", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const text = element("t", {
+    kind: "text",
+    text: "{username} {likes}",
+    trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+    delay: 2,
+  });
+  const follow = (
+    { studio, numbers }: ReturnType<typeof setup>,
+    name: string,
+    overlay = overlayOf(text),
+  ) =>
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user(name) },
+      [overlay],
+      numbers,
+    );
+
+  it("plays and keeps the event after the delay, with the numbers then", () => {
+    const s = setup();
+    follow(s, "Ana");
+
+    vi.advanceTimersByTime(1999);
+    expect(s.onReact).not.toHaveBeenCalled();
+    // Views sent meanwhile show what it had
+    expect(s.studio.kept("o1", text)).toBeNull();
+
+    s.numbers.mockReturnValue({ ...NUMBERS, likes: 5 });
+    vi.advanceTimersByTime(1);
+    expect(s.onReact.mock.calls).toEqual([
+      ["o1", { element: "t", text: "Ana 5" }],
+    ]);
+    expect(s.studio.kept("o1", text)).toMatchObject({ name: "Ana" });
+  });
+
+  it("shows the newest match without starting the wait over", () => {
+    const s = setup();
+    follow(s, "Ana");
+    vi.advanceTimersByTime(1500);
+    follow(s, "Bea");
+
+    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(5000);
+
+    expect(s.onReact.mock.calls).toEqual([
+      ["o1", { element: "t", text: "Bea 1.2K" }],
+    ]);
+  });
+
+  it("delays a group's react too", () => {
+    const s = setup();
+    const group = groupOf("G", {
+      when: "event",
+      trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+      delay: 1.5,
+    });
+    follow(s, "Ana", { ...overlayOf(), items: [group] });
+
+    vi.advanceTimersByTime(1499);
+    expect(s.onReact).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(s.onReact.mock.calls).toEqual([["o1", { element: "G" }]]);
+  });
+
+  it("drops the reacts waiting on clear and on forget", () => {
+    const s = setup();
+    follow(s, "Ana");
+    s.studio.clear();
+    follow(s, "Bea", { ...overlayOf(text), id: "o2" });
+    s.studio.forget("o2");
+
+    vi.advanceTimersByTime(5000);
+
+    expect(s.onReact).not.toHaveBeenCalled();
+    // A new match waits again
+    follow(s, "Cai");
+    vi.advanceTimersByTime(2000);
+    expect(s.onReact).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs a react that fails when it plays", () => {
+    const s = setup();
+    const error = vi.spyOn(Logger, "error").mockImplementation(() => {});
+    s.studio.setLogFile("overlays.log");
+    s.onReact.mockImplementation(() => {
+      throw new Error("boom");
+    });
+    follow(s, "Ana");
+
+    vi.advanceTimersByTime(2000);
+
+    expect(error).toHaveBeenCalledWith(
+      expect.stringMatching(/^<Studio> .*boom/),
+      "overlays.log",
+      expect.any(Error),
+    );
+  });
+
+  it("plays a Test after the delay, keeping its sample from then", () => {
+    const s = setup();
+    const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+    const viewer = element("v", { kind: "viewer", seconds: 5, delay: 2 });
+    const overlay = overlayOf(viewer);
+
+    s.studio.test(overlay, () => NUMBERS);
+    expect(s.onReact).not.toHaveBeenCalled();
+    expect(s.studio.kept("o1", viewer)).toBeNull();
+
+    now.mockReturnValue(3000);
+    vi.advanceTimersByTime(2000);
+    const [[, sample]] = s.onReact.mock.calls;
+    expect(sample).toMatchObject({ element: "v", name: expect.any(String) });
+    // Its seconds and exit count from when it played
+    now.mockReturnValue(3000 + 5999);
+    expect(s.studio.kept("o1", viewer)).toMatchObject({ name: sample.name });
+    now.mockReturnValue(3000 + 6000);
+    expect(s.studio.kept("o1", viewer)).toBeNull();
+  });
+});
+
+describe("StudioService's counters", () => {
+  const counted = (
+    counters: { name: string; trigger: object }[],
+    id = "o1",
+  ): StudioOverlay => ({
+    ...overlayOf(),
+    id,
+    counters: counters.map(({ name, trigger }) => ({
+      name,
+      trigger: TriggerSchema.parse({ gifts: [], ...trigger }),
+    })),
+  });
+  const likes = (likeCount: number) => ({
+    user: user("Ana"),
+    likeCount,
+    totalLikes: 0,
+  });
+
+  it("counts a streak's gifts once, with every_gift or at its end", () => {
+    const { studio, numbers } = setup();
+    const overlay = counted([
+      { name: "each", trigger: { type: TOKIO_EVENTS.GIFT, every_gift: true } },
+      { name: "ends", trigger: { type: TOKIO_EVENTS.GIFT } },
+      { name: "lions", trigger: { type: TOKIO_EVENTS.GIFT, gifts: [6369] } },
+    ]);
+
+    for (const event of [gift(1, false), gift(3, false), gift(3, true)]) {
+      studio.handle(TOKIO_EVENTS.GIFT, event, [overlay], numbers);
+    }
+
+    expect(studio.counts(overlay)).toEqual({ each: 3, ends: 3, lions: 0 });
+  });
+
+  it("counts a Like's likes and one for any other event", () => {
+    const { studio, numbers } = setup();
+    const overlay = counted([
+      { name: "taps", trigger: { type: TOKIO_EVENTS.LIKE } },
+      { name: "follows", trigger: { type: TOKIO_EVENTS.FOLLOW } },
+    ]);
+    const handle = (type: AppEvents, payload: unknown) =>
+      studio.handle(
+        type,
+        payload as TokioEventMap[AppEvents],
+        [overlay],
+        numbers,
+      );
+
+    handle(TOKIO_EVENTS.LIKE, likes(15));
+    handle(TOKIO_EVENTS.LIKE, likes(-3));
+    handle(TOKIO_EVENTS.FOLLOW, { user: user("Ana") });
+    handle(TOKIO_EVENTS.FOLLOW, { user: user("Bea") });
+    handle(TOKIO_EVENTS.SHARE, { user: user("Bea") });
+
+    expect(studio.counts(overlay)).toEqual({ taps: 15, follows: 2 });
+  });
+
+  it("keeps each overlay's counts apart, and resets them for a new LIVE", () => {
+    const { studio, numbers } = setup();
+    const trigger = { type: TOKIO_EVENTS.FOLLOW };
+    const first = counted([{ name: "fans", trigger }]);
+    const other = counted([{ name: "fans", trigger }], "o2");
+    const follow = (overlays: StudioOverlay[]) =>
+      studio.handle(
+        TOKIO_EVENTS.FOLLOW,
+        { user: user("Ana") },
+        overlays,
+        numbers,
+      );
+
+    follow([first, other]);
+    follow([first]);
+    expect(studio.counts(first)).toEqual({ fans: 2 });
+    expect(studio.counts(other)).toEqual({ fans: 1 });
+
+    studio.startLive();
+    expect(studio.counts(first)).toEqual({ fans: 0 });
+    follow([first]);
+    studio.clear();
+    expect(studio.counts(first)).toEqual({ fans: 0 });
+  });
+
+  it("shows the counts in a text's react", () => {
+    const { studio, onReact, numbers } = setup();
+    const text = element("t", {
+      kind: "text",
+      text: "{fans} fans",
+      trigger: { type: TOKIO_EVENTS.FOLLOW, gifts: [] },
+    });
+    const overlay = {
+      ...counted([{ name: "fans", trigger: { type: TOKIO_EVENTS.FOLLOW } }]),
+      items: [text],
+    };
+
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user("Ana") },
+      [overlay],
+      numbers,
+    );
+
+    // Counted before it reacts
+    expect(onReact).toHaveBeenCalledWith("o1", {
+      element: "t",
+      text: "1 fans",
+    });
+  });
+});
+
+describe("StudioService's goals", () => {
+  const goal = (number: string, value: number) => ({
+    type: GOAL_TRIGGER,
+    number,
+    goal: value,
+  });
+  const text = element("t", {
+    kind: "text",
+    text: "{username} {likes}",
+    trigger: goal("likes", 1000),
+    also_triggers: [{ type: TOKIO_EVENTS.FOLLOW, gifts: [] }],
+  });
+  const at = (likes: number) => ({ ...NUMBERS, likes });
+
+  it("reacts once per LIVE when a LIVE number reaches the goal, with what it kept", () => {
+    const { studio, onReact, numbers } = setup();
+    const overlays = [overlayOf(text)];
+    studio.handle(
+      TOKIO_EVENTS.FOLLOW,
+      { user: user("Ana") },
+      overlays,
+      numbers,
+    );
+    onReact.mockClear();
+
+    studio.goals(overlays, at(999));
+    expect(onReact).not.toHaveBeenCalled();
+    studio.goals(overlays, at(1000));
+    studio.goals(overlays, at(1500));
+    expect(onReact.mock.calls).toEqual([
+      ["o1", { element: "t", text: "Ana 1K" }],
+    ]);
+
+    studio.startLive();
+    studio.goals(overlays, at(1000));
+    expect(onReact).toHaveBeenCalledTimes(2);
+    studio.clear();
+    studio.goals(overlays, at(1000));
+    expect(onReact).toHaveBeenCalledTimes(3);
+  });
+
+  it("reacts again once its goal changed", () => {
+    const { studio, onReact } = setup();
+    studio.goals([overlayOf(text)], at(1200));
+    const lowered = StudioElementSchema.parse({
+      ...text,
+      trigger: goal("likes", 1100),
+    });
+
+    studio.goals([overlayOf(lowered)], at(1200));
+
+    expect(onReact).toHaveBeenCalledTimes(2);
+  });
+
+  it("watches a counter by its name, never uptime", () => {
+    const { studio, onReact, numbers } = setup();
+    const group = groupOf("G", {
+      when: "event",
+      trigger: goal("roses", 2),
+      also_triggers: [goal("uptime", 1)],
+    });
+    const overlay: StudioOverlay = {
+      ...overlayOf(),
+      counters: [
+        {
+          name: "roses",
+          trigger: TriggerSchema.parse({
+            type: TOKIO_EVENTS.GIFT,
+            gifts: [],
+            every_gift: true,
+          }),
+        },
+      ],
+      items: [group],
+    };
+    const goals = () => studio.goals([overlay], { ...NUMBERS, uptime: 9999 });
+
+    studio.handle(TOKIO_EVENTS.GIFT, gift(1, false), [overlay], numbers);
+    goals();
+    expect(onReact).not.toHaveBeenCalled();
+    studio.handle(TOKIO_EVENTS.GIFT, gift(2, false), [overlay], numbers);
+    goals();
+    goals();
+
+    expect(onReact.mock.calls).toEqual([["o1", { element: "G" }]]);
+  });
+
+  it("waits the item's delay, behind an event's react already waiting", () => {
+    vi.useFakeTimers();
+    try {
+      const { studio, onReact, numbers } = setup();
+      const late = StudioElementSchema.parse({ ...text, delay: 1 });
+      const overlays = [overlayOf(late)];
+
+      studio.handle(
+        TOKIO_EVENTS.FOLLOW,
+        { user: user("Ana") },
+        overlays,
+        numbers,
+      );
+      studio.goals(overlays, at(1000));
+      vi.advanceTimersByTime(1000);
+
+      // One react, the event's, which keeps it
+      expect(onReact.mock.calls).toEqual([
+        ["o1", { element: "t", text: "Ana 1.2K" }],
+      ]);
+      expect(studio.kept("o1", late)).toMatchObject({ name: "Ana" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
