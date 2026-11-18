@@ -12,6 +12,9 @@ import {
   newStudioElement,
   newStudioGroup,
   reactsToEvents,
+  sampleDeps,
+  sampleReact,
+  Samples,
   sentPicture,
   SAMPLE_NUMBERS,
   studioEventVariables,
@@ -463,5 +466,91 @@ describe("newStudioGroup", () => {
       elements: [],
     });
     expect(a.id).not.toBe(newStudioGroup("Group 1").id);
+  });
+});
+
+// A new element of the kind, as the editor adds it
+const made = <K extends StudioElement["kind"]>(
+  kind: K,
+  patch: Partial<Extract<StudioElement, { kind: K }>> = {},
+) =>
+  StudioElementSchema.parse({
+    ...newStudioElement(kind, "portrait"),
+    ...patch,
+  });
+
+describe("Samples", () => {
+  it("makes each trigger's sample once, an emote's from chat", () => {
+    const samples = new Samples();
+
+    expect(samples.of(TOKIO_EVENTS.FOLLOW)).toBe(
+      samples.of(TOKIO_EVENTS.FOLLOW),
+    );
+    expect(samples.of(EMOTE_TRIGGER)).toHaveProperty("comment");
+  });
+
+  it("plays a text with its trigger's values and a viewer with its picture", () => {
+    const samples = new Samples();
+    const text = made("text", { text: "Hi {username}", when: "event" });
+    const viewer = made("viewer");
+    const follow = samples.of(TOKIO_EVENTS.FOLLOW);
+    const username =
+      typeof follow === "object" && follow && "user" in follow
+        ? follow.user.username
+        : "";
+
+    expect(username).not.toBe("");
+    expect(sampleReact(text, samples, "en")).toEqual({
+      element: text.id,
+      text: `Hi ${username}`,
+    });
+    expect(sampleReact(viewer, samples, "en")).toMatchObject({
+      element: viewer.id,
+      name: username,
+    });
+    expect(sampleReact(made("shape"), samples, "en")).toEqual({
+      element: expect.any(String),
+    });
+  });
+
+  it("takes no sample for one that moves all the time", () => {
+    const samples = new Samples();
+    const trigger = {
+      ...newStudioElement("gift", "portrait").trigger,
+      type: TOKIO_EVENTS.GIFT as const,
+    };
+    const sends = made("gift", { gift: null, when: "event", trigger });
+    const loops = made("gift", { gift: null, when: "loop", trigger });
+
+    expect(sampleReact(sends, samples, "en").picture).toMatch(/^https:/);
+    expect(sampleReact(loops, samples, "en").picture).toBe("");
+  });
+
+  it("gives a view the same samples Test plays", () => {
+    const samples = new Samples();
+    const deps = sampleDeps(samples, "en");
+    const text = made("text", { text: "Hi {username} {likes}", when: "event" });
+    const viewer = made("viewer");
+    const gift = made("gift", {
+      gift: null,
+      when: "event",
+      trigger: { ...viewer.trigger, type: TOKIO_EVENTS.GIFT },
+    });
+    if (
+      text.kind !== "text" ||
+      viewer.kind !== "viewer" ||
+      gift.kind !== "gift"
+    ) {
+      throw new Error("made the wrong kind");
+    }
+
+    expect(deps.text(text)).toBe(sampleReact(text, samples, "en").text);
+    expect(deps.text(text)).toContain(String(SAMPLE_NUMBERS.likes).slice(0, 2));
+    expect(deps.viewer(viewer)).toEqual({
+      src: sampleReact(viewer, samples, "en").picture,
+      name: sampleReact(viewer, samples, "en").name,
+    });
+    expect(deps.sent(gift)).toBe(sampleReact(gift, samples, "en").picture);
+    expect(deps.sent(gift)).toMatch(/^https:/);
   });
 });

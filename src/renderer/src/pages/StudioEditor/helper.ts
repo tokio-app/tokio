@@ -9,27 +9,9 @@ import {
   StudioItem,
   StudioOverlay,
   StudioSource,
-  Trigger,
 } from "@/common/schemas";
 import type { StageFit } from "@/common/studio/stage";
-import {
-  ALERT_TRIGGER_LABELS,
-  AppEvents,
-  CustomGift,
-  EMOTE_TRIGGER,
-  StudioReact,
-  StudioView,
-  TokioEventMap,
-} from "@/common/types";
-import {
-  fillStudioText,
-  generateEmoteChatSample,
-  generateTikTokEventSample,
-  reactsToEvents,
-  SAMPLE_NUMBERS,
-  sentPicture,
-  studioEventVariables,
-} from "@/common/util";
+import { ALERT_TRIGGER_LABELS, CustomGift, StudioView } from "@/common/types";
 import { EmoteOption } from "@/components";
 
 export const KIND_NAMES: Record<StudioElementKind, MessageKey> = {
@@ -42,85 +24,6 @@ export const KIND_NAMES: Record<StudioElementKind, MessageKey> = {
   viewer: "studio.kinds.viewer",
   overlay: "studio.kinds.overlay",
 };
-
-type Sample = TokioEventMap[AppEvents];
-
-/**
- * Each trigger's sample, made the first time an element asks for it, so its
- * names don't change on every render. Test starts a new one.
- */
-export class Samples {
-  private made = new Map<Trigger["type"], Sample>();
-
-  of(type: Trigger["type"]): Sample {
-    let sample = this.made.get(type);
-    if (!sample) {
-      // An emote comes in a chat message
-      sample =
-        type === EMOTE_TRIGGER
-          ? generateEmoteChatSample()
-          : generateTikTokEventSample(type).data;
-      this.made.set(type, sample);
-    }
-    return sample;
-  }
-}
-
-// The viewer who set the sample off, as main takes them from an event
-function sampleViewer(sample: Sample) {
-  const user =
-    typeof sample === "object" && sample !== null && "user" in sample
-      ? sample.user
-      : null;
-  return { src: user?.profilePictures[0] ?? "", name: user?.username ?? "" };
-}
-
-const sampleOf = (element: StudioElement, samples: Samples) =>
-  reactsToEvents(element) ? samples.of(element.trigger.type) : null;
-
-/** The picture of the gift or emote its trigger's sample sent, "" for none. */
-export const sampleSentOf = (element: StudioElement, samples: Samples) =>
-  sentPicture(element, sampleOf(element, samples));
-
-/** A text element's text with the sample numbers and its trigger's sample. */
-export const sampleText = (
-  element: StudioElementOf<"text">,
-  samples: Samples,
-  language: string,
-) =>
-  fillStudioText(element.text, {
-    numbers: SAMPLE_NUMBERS,
-    values: sampleOf(element, samples),
-    variables: studioEventVariables(element),
-    language,
-  });
-
-/** The picture and name a viewer element shows, its trigger's sample's. */
-export const sampleViewerOf = (element: StudioElement, samples: Samples) =>
-  sampleViewer(samples.of(element.trigger.type));
-
-/** What Test plays on the stage for an element that reacts to an event. */
-export function sampleReact(
-  element: StudioElement,
-  samples: Samples,
-  language: string,
-): StudioReact {
-  if (element.kind === "text") {
-    const text = sampleText(element, samples, language);
-    return { element: element.id, text };
-  }
-  if (element.kind === "viewer") {
-    const { src, name } = sampleViewerOf(element, samples);
-    return { element: element.id, picture: src, name };
-  }
-  if (
-    (element.kind === "gift" && element.gift === null) ||
-    (element.kind === "emote" && element.emote === null)
-  ) {
-    return { element: element.id, picture: sampleSentOf(element, samples) };
-  }
-  return { element: element.id };
-}
 
 // An embed's source as a Select's value ("games:2" for one column), and back
 export function sourceValue(source: StudioSource | null) {

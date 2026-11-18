@@ -27,6 +27,9 @@ import {
   newStudioElement,
   newStudioGroup,
   reactsToEvents,
+  sampleDeps,
+  sampleReact,
+  Samples,
   studioCameraPath,
   studioElements,
   studioView,
@@ -75,11 +78,6 @@ import {
   moveItem,
   pictureSource,
   recrop,
-  sampleReact,
-  Samples,
-  sampleText,
-  sampleSentOf,
-  sampleViewerOf,
   sourceValue,
   stepElement,
   whenText,
@@ -326,9 +324,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
         // its src only names the camera and its quality
         camera: (element) =>
           studioCameraPath("", element.camera, element.quality),
-        text: (element) => sampleText(element, samples, language),
-        viewer: (element) => sampleViewerOf(element, samples),
-        sent: (element) => sampleSentOf(element, samples),
+        ...sampleDeps(samples, language),
         label,
       }),
     // label reads installed, alerts, the games layout and t
