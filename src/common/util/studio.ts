@@ -61,7 +61,7 @@ const SAMPLE_COUNT = 12;
 
 // How full the editor and MCP's preview show a goal bar, whatever its
 // number: the sample numbers would fill most bars, hiding the track
-const SAMPLE_FILL = 0.6;
+export const SAMPLE_FILL = 0.6;
 
 // Whether a text shows a live number, so main sends it again as they change
 export const usesNumbers = (text: string) =>

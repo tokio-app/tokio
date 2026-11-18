@@ -19,7 +19,7 @@ import {
   GOAL_TRIGGER,
 } from "@/common/schemas";
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
-import { STUDIO_NUMBERS, triggersOf } from "@/common/util";
+import { triggersOf } from "@/common/util";
 import {
   Btn,
   EmoteOption,
@@ -33,7 +33,7 @@ import {
 import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode } from "react";
 import { FiPlus, FiX } from "react-icons/fi";
-import { retype } from "./helper";
+import { goalNumbers, retype } from "./helper";
 import styles from "./studioeditor.module.css";
 
 export const WHENS: { value: StudioWhen; label: MessageKey }[] =
@@ -129,13 +129,7 @@ export function ReactionFields<R extends Reaction>({
   const rows = triggersOf(value);
   // likes_every is one for all the Like rows, shown with the first
   const likesRow = rows.findIndex((r) => r.type === TOKIO_EVENTS.LIKE);
-  // A goal watches a LIVE number, the LIVE's length aside, or a counter
-  const numbers = [
-    ...new Set([
-      ...STUDIO_NUMBERS.filter((name) => name !== "uptime"),
-      ...counters.flatMap((c) => c.name || []),
-    ]),
-  ].map((name) => ({ value: name, label: `{${name}}` }));
+  const numbers = goalNumbers(counters);
 
   const setRow = (index: number, changed: StudioTrigger) =>
     onChange(

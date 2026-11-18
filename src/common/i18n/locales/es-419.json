@@ -877,6 +877,8 @@
   "studio.counters.reserved": "Un número del LIVE o un dato del evento ya tiene este nombre. Elige otro.",
   "studio.kinds.bar": "Barra de meta",
   "studio.kinds.list": "Lista",
+  "studio.fields.track": "Fondo",
+  "studio.fields.vertical": "Vertical, se llena desde abajo",
   "alerts.editor.title": "Alerta: {trigger}",
   "tts.voice.title": "Voz",
   "tts.voice.description": "La voz que lee el chat en voz alta.",

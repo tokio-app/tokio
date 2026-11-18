@@ -395,6 +395,17 @@
   box-sizing: border-box;
 }
 
+/* A goal bar's track, its fill from the left or the bottom, as on stream */
+.thumb_bar {
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.thumb_bar > span {
+  border-radius: inherit;
+}
+
 /* THE CANVAS */
 
 .canvas_column {

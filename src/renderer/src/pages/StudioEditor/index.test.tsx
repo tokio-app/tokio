@@ -4191,3 +4191,107 @@ describe("StudioEditor", () => {
     });
   });
 });
+
+describe("a goal bar's fields", () => {
+  beforeEach(() => {
+    Element.prototype.setPointerCapture = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const roses = {
+    name: "roses",
+    trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+  };
+  const withBar = (bar: StudioElement, counters = [roses]) =>
+    studioOverlay("Main", { id: ID, counters, items: [bar] });
+
+  it("fills toward a LIVE number or a counter, shown as a text writes them", async () => {
+    const { user } = await open(withBar(elementOf("bar")));
+    await user.click(row(/^Goal bar/));
+
+    const number = field("Number");
+    await user.click(number.getByText("{likes}"));
+    expect(inList(number.getByText("{likes}"), "{coins}")).not.toBeNull();
+    expect(inList(number.getByText("{likes}"), "{uptime}")).toBeNull();
+    await user.click(inList(number.getByText("{likes}"), "{roses}")!);
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({ number: "roses" }),
+    );
+
+    await studio(lastSave()!);
+    const goal = field("Goal").getByRole("spinbutton");
+    await user.clear(goal);
+    await user.type(goal, "250");
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({ goal: 250 }),
+    );
+  });
+
+  it("shows no number for a counter since removed", async () => {
+    const { user } = await open(
+      withBar(elementOf("bar", { number: "roses" }), []),
+    );
+    await user.click(row(/^Goal bar/));
+
+    expect(field("Number").queryByText(/^\{/)).toBeNull();
+  });
+
+  it("draws its sample fill on the canvas and in its row, and fades it into a gradient", async () => {
+    const bar = elementOf("bar");
+    const { user } = await open(withBar(bar));
+    await user.click(row(/^Goal bar/));
+
+    // The editor shows it partly full, whatever its number
+    const fill = drawn(bar.id).querySelector<HTMLElement>(".studio-bar-fill")!;
+    expect(fill.style.width).toBe("60%");
+    expect(
+      row(/^Goal bar/).querySelector<HTMLElement>("[class*=thumb_bar] > span")!
+        .style.width,
+    ).toBe("60%");
+
+    await user.click(page().getByRole("checkbox", { name: "Gradient" }));
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({ gradient: true }),
+    );
+    expect(drawn(bar.id).classList).toContain("studio-gradient");
+  });
+
+  it("turns its box around its center when it goes vertical, in one step", async () => {
+    const bar = elementOf("bar", { x: 100, y: 500, width: 720, height: 56 });
+    const { user } = await open(withBar(bar));
+    await user.click(row(/^Goal bar/));
+
+    await user.click(
+      page().getByRole("checkbox", {
+        name: "Vertical, filling from the bottom",
+      }),
+    );
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({
+        vertical: true,
+        x: 432,
+        y: 168,
+        width: 56,
+        height: 720,
+      }),
+    );
+    const fill = drawn(bar.id).querySelector<HTMLElement>(".studio-bar-fill")!;
+    expect(fill.style.height).toBe("60%");
+
+    // Back where it was, in one undo
+    await studio(lastSave()!);
+    await user.click(undo());
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({
+        vertical: false,
+        x: 100,
+        y: 500,
+        width: 720,
+        height: 56,
+      }),
+    );
+  });
+});

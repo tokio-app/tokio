@@ -36,6 +36,19 @@ export const KIND_NAMES: Record<StudioElementKind, MessageKey> = {
   overlay: "studio.kinds.overlay",
 };
 
+/**
+ * What a goal or a goal bar can watch, as a Select's options shown the way a
+ * text writes them: the LIVE numbers but uptime, which only grows, then the
+ * overlay's named counters.
+ */
+export const goalNumbers = (counters: StudioCounter[]) =>
+  [
+    ...new Set([
+      ...STUDIO_NUMBERS.filter((name) => name !== "uptime"),
+      ...counters.flatMap((c) => c.name || []),
+    ]),
+  ].map((name) => ({ value: name, label: `{${name}}` }));
+
 // An embed's source as a Select's value ("games:2" for one column), and back
 export function sourceValue(source: StudioSource | null) {
   if (!source) return undefined;

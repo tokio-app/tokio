@@ -1,13 +1,13 @@
 import { StudioCrop, StudioElement } from "@/common/schemas";
 import { shapePath } from "@/common/studio/stage";
 import { CustomGift } from "@/common/types";
+import { SAMPLE_FILL } from "@/common/util";
 import { MediaThumbnail } from "@/components";
 import { useT } from "@/ui/i18n";
 import { CSSProperties } from "react";
 import { IconType } from "react-icons";
 import {
   LuAppWindow,
-  LuChartBarBig,
   LuCircleUserRound,
   LuGift,
   LuImage,
@@ -22,9 +22,9 @@ const SHAPE_PX = 18;
 
 /**
  * What a layer's row shows of it, on the canvas's own color: its picture,
- * its shape in miniature in its colors, or its text's font and color. What
- * only the stream knows (the gift or emote a viewer sends, a viewer's
- * picture, an embedded overlay) is an icon.
+ * its shape or goal bar in miniature in its colors, or its text's font and
+ * color. What only the stream knows (the gift or emote a viewer sends, a
+ * viewer's picture, an embedded overlay) is an icon.
  */
 export function LayerThumb({
   element,
@@ -143,9 +143,36 @@ export function LayerThumb({
       return icon(LuWebcam);
     case "viewer":
       return icon(LuCircleUserRound);
-    // PR 4's bar work may draw it in miniature
-    case "bar":
-      return icon(LuChartBarBig);
+    case "bar": {
+      // Thick enough to see its fill, which shows as the canvas's sample
+      const scale = SHAPE_PX / Math.max(element.width, element.height);
+      const width = Math.max(4, element.width * scale);
+      const height = Math.max(4, element.height * scale);
+      const length = `${SAMPLE_FILL * 100}%`;
+      return (
+        <span className={styles.thumb} aria-hidden>
+          <span
+            className={styles.thumb_bar}
+            style={{
+              width,
+              height,
+              borderRadius: (element.rounding / 100) * Math.min(width, height),
+              background: element.track,
+            }}
+          >
+            <span
+              style={{
+                width: element.vertical ? "100%" : length,
+                height: element.vertical ? length : "100%",
+                background: element.gradient
+                  ? `linear-gradient(${element.gradient_angle}deg, ${element.color}, ${element.gradient_color}) 0 100% / ${width}px ${height}px`
+                  : element.color,
+              }}
+            />
+          </span>
+        </span>
+      );
+    }
     case "list":
       return icon(LuList);
     // An embedded overlay
