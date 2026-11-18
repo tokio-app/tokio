@@ -312,7 +312,12 @@ describe("MCP registry", () => {
           }),
           getLiveStats: () => ({ likes: 3, views: 4, viewers: 5 }),
         },
-        connectorService: { isConnected: () => true, username: "host" },
+        connectorService: {
+          isConnected: () => true,
+          isReconnecting: () => true,
+          isWaiting: () => false,
+          username: "host",
+        },
         liveService: {
           getSession: () => ({
             startedAt: 0,
@@ -342,6 +347,8 @@ describe("MCP registry", () => {
     expect(value).toEqual({
       live: {
         connected: true,
+        reconnecting: true,
+        waiting: false,
         username: "host",
         startedAt: "1970-01-01T00:00:00.000Z",
         viewers: 5,

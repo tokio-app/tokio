@@ -26,6 +26,7 @@ export const defaultStoreData: StoreSchema = {
       auto: true,
     },
     lastVersion: "",
+    installingVersion: "",
     tray: {
       enabled: true,
     },

@@ -212,6 +212,7 @@ function setup() {
     overlayUpdates: { auto: true },
     // The fake app's version
     lastVersion: "1.0.0",
+    installingVersion: "",
     tray: { enabled: true },
     language: "system",
     activityFeed: { ...defaultStoreData.settings.activityFeed },
@@ -239,6 +240,9 @@ function setup() {
       (..._args: Parameters<TikTokConnectorService["setChatStage"]>) => {},
     ),
     onReconnect: vi.fn((_listener: (state: ReconnectState) => void) => {}),
+    isConnected: vi.fn(() => false),
+    isReconnecting: vi.fn(() => false),
+    isWaiting: vi.fn(() => false),
     fetchGifts: vi.fn(
       async (): Promise<{ success: boolean; data: Gift[] }> => ({
         success: true,
@@ -316,6 +320,7 @@ function setup() {
     updateLiveStats: vi.fn(),
     updateServerSettings: vi.fn(async (_enabled: boolean) => true),
     updateLastVersion: vi.fn(async (_version: string) => true),
+    updateInstallingVersion: vi.fn(async (_version: string) => true),
     wasRebuilt: vi.fn(() => false),
     corruptedBackup: vi.fn((): string | null => null),
     recordEmotes: vi.fn(
@@ -341,6 +346,7 @@ function setup() {
       async (..._args: Parameters<UpdaterService["initialize"]>) => {},
     ),
     setAuto: vi.fn(),
+    markManual: vi.fn((_version: string) => {}),
   };
   const trayService = { setEnabled: vi.fn() };
   const urlManagerService = { setLogFile: vi.fn() };
@@ -2163,7 +2169,13 @@ describe("init events", () => {
       expect(s.h.pushed(APP_EVENTS_RESPONSE.TTS_CLEAR)).toEqual([undefined]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.ALERT_CLEAR)).toEqual([undefined]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: false, live: false, stats: noStats },
+        {
+          success: false,
+          live: false,
+          reconnecting: false,
+          waiting: false,
+          stats: noStats,
+        },
       ]);
       expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith(
         noStats,
@@ -2213,11 +2225,83 @@ describe("init events", () => {
       ]);
     });
 
-    it("says while it reconnects, and once it's back, keeping the LIVE", async () => {
+    it("says when the connection was lost and it looks for the LIVE", async () => {
+      const s = await live();
+      s.connectorService.isConnected.mockReturnValue(true);
+      s.connectorService.isWaiting.mockReturnValue(true);
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "lost" });
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.CONNECTION_LOST,
+          message:
+            "Tokio lost the connection to the LIVE and will keep trying for 2 minutes.",
+        }),
+      ]);
+      // Home shows Waiting for the LIVE, with the profile still locked
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
+        {
+          success: true,
+          live: false,
+          reconnecting: false,
+          waiting: true,
+          stats: noStats,
+        },
+      ]);
+    });
+
+    it("says when the LIVE ended while it reconnected and it looks for it", async () => {
+      const s = await live();
+      s.connectorService.isWaiting.mockReturnValue(true);
+
+      s.conn.emit(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "info",
+          code: FEEDBACK_CODES.LIVE_ENDED,
+          message:
+            "The LIVE ended while Tokio was reconnecting. If it's back within 2 minutes, Tokio connects to it again.",
+        }),
+      ]);
+    });
+
+    it("warns when it stopped looking for the LIVE, and shows it offline", async () => {
       const s = await live();
       const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
 
+      reconnect("stopped");
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "connector",
+          code: FEEDBACK_CODES.RECONNECT_FAILED,
+          message: "Unable to reconnect to the LIVE. Connect again from Home.",
+        }),
+      ]);
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
+        {
+          success: false,
+          live: false,
+          reconnecting: false,
+          waiting: false,
+          stats: noStats,
+        },
+      ]);
+    });
+
+    it("says while it reconnects, and once it's back, keeping the LIVE", async () => {
+      const s = await live();
+      const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      s.connectorService.isConnected.mockReturnValue(true);
+      s.connectorService.isReconnecting.mockReturnValue(true);
+
       reconnect("reconnecting");
+      s.connectorService.isReconnecting.mockReturnValue(false);
       reconnect("reconnected");
 
       expect(s.h.notices).toEqual([
@@ -2234,6 +2318,26 @@ describe("init events", () => {
           message: "Reconnected to the LIVE.",
         }),
       ]);
+      // Home says Reconnecting… in place of the timer, then the LIVE again
+      const state = {
+        success: true,
+        live: true,
+        waiting: false,
+        stats: noStats,
+      };
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
+        { ...state, reconnecting: true },
+        { ...state, reconnecting: false },
+      ]);
+    });
+
+    it("pushes nothing to a closed window while it reconnects", async () => {
+      const s = await live();
+      const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
+      s.h.win.close();
+
+      reconnect("reconnecting");
+
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([]);
     });
 
@@ -3108,6 +3212,52 @@ describe("init events", () => {
       ]);
       expect(s.storeManagerService.updateLastVersion).not.toHaveBeenCalled();
     });
+
+    it("says once when the update Tokio restarted for didn't install", async () => {
+      const s = setup();
+      s.settings.installingVersion = "2.0.0";
+      const warn = vi.spyOn(Logger, "warn").mockImplementation(() => {});
+
+      await load(s);
+      await load(s);
+
+      expect(warn.mock.calls).toEqual([
+        [
+          "<Updater> The update to 2.0.0 didn't install: Tokio is still on 1.0.0.",
+          "system.log",
+        ],
+      ]);
+      expect(noticesFor(s, FEEDBACK_CODES.UPDATE_NOT_INSTALLED)).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          source: "system",
+          message:
+            "Tokio 2.0.0 didn't install. Download it from the title bar and run its installer yourself.",
+        }),
+      ]);
+      expect(s.updaterService.markManual).toHaveBeenCalledExactlyOnceWith(
+        "2.0.0",
+      );
+      expect(
+        s.storeManagerService.updateInstallingVersion,
+      ).toHaveBeenCalledExactlyOnceWith("");
+    });
+
+    it.each(["1.0.0", "1.0.0-beta.2"])(
+      "clears an update that installed, or a newer one put in by hand (%s), without a notice",
+      async (installing) => {
+        const s = setup();
+        s.settings.installingVersion = installing;
+
+        await load(s);
+
+        expect(noticesFor(s, FEEDBACK_CODES.UPDATE_NOT_INSTALLED)).toEqual([]);
+        expect(s.updaterService.markManual).not.toHaveBeenCalled();
+        expect(
+          s.storeManagerService.updateInstallingVersion,
+        ).toHaveBeenCalledExactlyOnceWith("");
+      },
+    );
 
     it("sets up the folders in the home folder and hands out the log files", async () => {
       const s = setup();

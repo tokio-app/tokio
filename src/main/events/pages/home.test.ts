@@ -26,20 +26,32 @@ describe("home events", () => {
       during = () => {},
     ) => {
       const live = eventSource();
+      // Connected, with a session, from the connect on, as the connector is
+      let on = false;
       const connectorService = {
         ...live,
         connect: vi.fn(async () => {
+          on = result.success;
           during();
           return result;
         }),
-        isConnected: vi.fn(() => false),
+        isConnected: vi.fn(() => on),
+        isReconnecting: vi.fn(() => false),
+        isWaiting: () => false,
         username: "",
       };
       const storeManagerService = {
         updateProfileData: vi.fn(async () => true),
-        getSettings: () => ({ liveStats: stats }),
+        getLiveStats: () => stats,
       };
-      const h = createHandler({ connectorService, storeManagerService });
+      const liveService = {
+        getSession: () => ({ startedAt: on ? 1000 : null }),
+      };
+      const h = createHandler({
+        connectorService,
+        storeManagerService,
+        liveService,
+      });
       return { h, live, connectorService, storeManagerService };
     };
 
@@ -55,7 +67,13 @@ describe("home events", () => {
       });
       expect(connectorService.connect).toHaveBeenCalledWith("streamer");
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: true, live: true, stats },
+        {
+          success: true,
+          live: true,
+          reconnecting: false,
+          waiting: false,
+          stats,
+        },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({
@@ -108,7 +126,13 @@ describe("home events", () => {
 
       expect(connectorService.connect).toHaveBeenCalledWith("streamer");
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: true, live: true, stats },
+        {
+          success: true,
+          live: true,
+          reconnecting: false,
+          waiting: false,
+          stats,
+        },
       ]);
       expect(h.notices).toEqual([
         expect.objectContaining({
@@ -254,10 +278,17 @@ describe("home events", () => {
 
   describe("IS_CONNECTED", () => {
     // A session starts once the connect worked
-    const connected = (startedAt: number | null) => ({
-      connectorService: { isConnected: () => true },
+    const connected = (
+      startedAt: number | null,
+      { reconnecting = false, waiting = false } = {},
+    ) => ({
+      connectorService: {
+        isConnected: () => true,
+        isReconnecting: () => reconnecting,
+        isWaiting: () => waiting,
+      },
       liveService: { getSession: () => ({ startedAt }) },
-      storeManagerService: { getSettings: () => ({ liveStats: stats }) },
+      storeManagerService: { getLiveStats: () => stats },
     });
 
     it("answers with the saved stats and whether the LIVE is connected", async () => {
@@ -266,7 +297,13 @@ describe("home events", () => {
       await h.invoke(home, APP_EVENTS.IS_CONNECTED);
 
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: true, live: true, stats },
+        {
+          success: true,
+          live: true,
+          reconnecting: false,
+          waiting: false,
+          stats,
+        },
       ]);
     });
 
@@ -276,7 +313,45 @@ describe("home events", () => {
       await h.invoke(home, APP_EVENTS.IS_CONNECTED);
 
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
-        { success: true, live: false, stats },
+        {
+          success: true,
+          live: false,
+          reconnecting: false,
+          waiting: false,
+          stats,
+        },
+      ]);
+    });
+
+    it("says when the connection is coming back, keeping the LIVE", async () => {
+      const h = createHandler(connected(1000, { reconnecting: true }));
+
+      await h.invoke(home, APP_EVENTS.IS_CONNECTED);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
+        {
+          success: true,
+          live: true,
+          reconnecting: true,
+          waiting: false,
+          stats,
+        },
+      ]);
+    });
+
+    it("says when it looks for a LIVE that stopped, with no session", async () => {
+      const h = createHandler(connected(null, { waiting: true }));
+
+      await h.invoke(home, APP_EVENTS.IS_CONNECTED);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
+        {
+          success: true,
+          live: false,
+          reconnecting: false,
+          waiting: true,
+          stats,
+        },
       ]);
     });
 
@@ -288,7 +363,7 @@ describe("home events", () => {
             throw new Error("no provider");
           },
         },
-        storeManagerService: { getSettings: () => ({ liveStats: stats }) },
+        storeManagerService: { getLiveStats: () => stats },
       });
 
       await h.invoke(home, APP_EVENTS.IS_CONNECTED);

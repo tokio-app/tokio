@@ -63,7 +63,8 @@ export function Layout() {
   const [namesHidden, setNamesHidden] = useState(false);
 
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
-  // Main pushes CONNECTED only on a disconnect, so ask after a reload too
+  // Main pushes CONNECTED only as the connection changes, so ask after a
+  // reload too
   useIpcRequest(APP_EVENTS.IS_CONNECTED);
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {

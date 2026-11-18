@@ -23,6 +23,24 @@ import {
 
 export type Stack = EventStack;
 
+/** What `CONNECTED` says about the LIVE connection, as main holds it now. */
+export const connectionState = ({
+  connectorService,
+  liveService,
+  storeManagerService,
+}: Pick<
+  AppHandlerVariables,
+  "connectorService" | "liveService" | "storeManagerService"
+>): AppEventsResponseMap[APP_EVENTS_RESPONSE.CONNECTED] => ({
+  // Connecting, connected, coming back or looking again: the profile lock
+  success: connectorService.isConnected(),
+  // A connect in progress, or a look for the LIVE, has no session
+  live: liveService.getSession().startedAt !== null,
+  reconnecting: connectorService.isReconnecting(),
+  waiting: connectorService.isWaiting(),
+  stats: storeManagerService.getLiveStats(),
+});
+
 class EventStack {
   // Handlers of different events, each checked against its event by push
   private evs: EventItem<any>[];

@@ -8,6 +8,22 @@ export * from "./samples";
 export * from "./studio";
 export * from "./timer";
 
+/** Orders versions as semver does: 0.1.3-beta.2 < 0.1.3-beta.10 < 0.1.3 < 0.1.10 */
+export function compareVersions(a: string, b: string): number {
+  const [coreA, preA] = a.split("-");
+  const [coreB, preB] = b.split("-");
+  const byNumbers = (x: string, y: string) =>
+    x.localeCompare(y, "en", { numeric: true });
+
+  const core = byNumbers(coreA, coreB);
+  if (core !== 0) return core;
+  // A release comes after its own prereleases
+  if (!preA && !preB) return 0;
+  if (!preA) return 1;
+  if (!preB) return -1;
+  return byNumbers(preA, preB);
+}
+
 /** The language without its script or region, lowercase: zh-Hans is zh. */
 export const baseLanguage = (code: string) =>
   code.split(/[-_]/)[0].toLowerCase();

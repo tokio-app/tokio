@@ -43,7 +43,12 @@ describe("MCP route", () => {
           }),
           getLiveStats: () => ({ likes: 0, views: 0, viewers: 0 }),
         },
-        connectorService: { isConnected: () => false, username: "" },
+        connectorService: {
+          isConnected: () => false,
+          isReconnecting: () => false,
+          isWaiting: () => false,
+          username: "",
+        },
         liveService: {
           getSession: () => ({
             startedAt: null,

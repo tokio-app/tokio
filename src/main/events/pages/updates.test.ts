@@ -94,6 +94,7 @@ describe("updates events", () => {
     it("warns when no update is ready", async () => {
       const h = createHandler({
         updaterService: {
+          getStatus: () => ({ state: "idle" }),
           install: () => ({
             success: false,
             error: "No update is ready to install.",
@@ -116,6 +117,12 @@ describe("updates events", () => {
     it("opens the release page of an update the app can't install", async () => {
       const h = createHandler({
         updaterService: {
+          getStatus: () => ({
+            state: "available",
+            version: "1.2.0",
+            manual: true,
+            url: release,
+          }),
           install: () => ({ success: true, data: { url: release } }),
         },
       });
@@ -128,12 +135,40 @@ describe("updates events", () => {
 
     it("opens nothing when the app installs the update itself", async () => {
       const install = vi.fn(() => ({ success: true }));
-      const h = createHandler({ updaterService: { install } });
+      const updateInstallingVersion = vi.fn(async (_v: string) => true);
+      const h = createHandler({
+        updaterService: {
+          getStatus: () => ({ state: "ready", version: "1.2.0" }),
+          install,
+        },
+        storeManagerService: { updateInstallingVersion },
+      });
+
+      await h.invoke(updates, APP_EVENTS.INSTALL_UPDATE);
+
+      expect(updateInstallingVersion).toHaveBeenCalledExactlyOnceWith("1.2.0");
+      // Saved first, for the next start to check
+      expect(updateInstallingVersion.mock.invocationCallOrder[0]).toBeLessThan(
+        install.mock.invocationCallOrder[0],
+      );
+      expect(install).toHaveBeenCalledOnce();
+      expect(shell.openExternal).not.toHaveBeenCalled();
+      expect(h.notices).toEqual([]);
+    });
+
+    it("installs when the version can't be saved", async () => {
+      const install = vi.fn(() => ({ success: true }));
+      const h = createHandler({
+        updaterService: {
+          getStatus: () => ({ state: "ready", version: "1.2.0" }),
+          install,
+        },
+        storeManagerService: { updateInstallingVersion: async () => false },
+      });
 
       await h.invoke(updates, APP_EVENTS.INSTALL_UPDATE);
 
       expect(install).toHaveBeenCalledOnce();
-      expect(shell.openExternal).not.toHaveBeenCalled();
       expect(h.notices).toEqual([]);
     });
   });

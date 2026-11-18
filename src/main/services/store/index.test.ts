@@ -744,6 +744,30 @@ describe("StoreManagerService", () => {
         auto: false,
       });
     });
+
+    it("has no install pending for stores saved before the field", async () => {
+      const { installingVersion: _installing, ...settings } =
+        defaultStoreData.settings;
+      await writeFile(
+        storeFile,
+        JSON.stringify({ ...defaultStoreData, settings }),
+      );
+
+      const store = await init();
+
+      expect(store.getSettings().installingVersion).toBe("");
+    });
+
+    it("saves the version being installed", async () => {
+      const store = await init();
+
+      expect(await store.updateInstallingVersion("2.0.0")).toBe(true);
+
+      expect((await readJSON(storeFile)).settings.installingVersion).toBe(
+        "2.0.0",
+      );
+      expect((await init()).getSettings().installingVersion).toBe("2.0.0");
+    });
   });
 
   describe("tray", () => {

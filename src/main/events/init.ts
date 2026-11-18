@@ -19,6 +19,7 @@ import {
 import {
   ALERTS_PATH,
   EMPTY_LIVE_STATS,
+  compareVersions,
   formatError,
   STUDIO_SOCKET_PREFIX,
   GAMES_PATH,
@@ -30,7 +31,7 @@ import {
 } from "@/common/util";
 import config from "@/config";
 import { globalShortcut, systemPreferences } from "electron";
-import { createStack, replyFailure } from "@/helper/events";
+import { connectionState, createStack, replyFailure } from "@/helper/events";
 import { AppFailure, REPEAT_NOTICE_MS, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
@@ -384,18 +385,36 @@ const registerConnectorEvents = ({
     pushSession();
   });
 
+  // What Home and the title bar show, as main holds it
+  const pushConnection = () => {
+    // The connection goes on reconnecting after the window closed on quit
+    if (win.isDestroyed()) return;
+    win.webContents.send(
+      APP_EVENTS_RESPONSE.CONNECTED,
+      connectionState({
+        connectorService: conn,
+        liveService: live,
+        storeManagerService: store,
+      }),
+    );
+  };
+
   conn.on(TOKIO_EVENTS.DISCONNECTED, (d) => {
+    // After an abnormal stop the connector looks for the LIVE again
+    const waiting = conn.isWaiting();
     if (d?.reason === "ended") {
       notifier.info(
         "connector",
         FEEDBACK_CODES.LIVE_ENDED,
-        t("main.init.liveEnded"),
+        t(waiting ? "main.init.liveEndedAway" : "main.init.liveEnded"),
       );
     } else if (d?.reason === "lost") {
       notifier.warn(
         "connector",
         FEEDBACK_CODES.CONNECTION_LOST,
-        t("main.init.connectionLost", { home: t("nav.home") }),
+        waiting
+          ? t("main.init.connectionLostLooking")
+          : t("main.init.connectionLost", { home: t("nav.home") }),
       );
     } else {
       notifier.info(
@@ -419,14 +438,11 @@ const registerConnectorEvents = ({
     if (!win.isDestroyed()) {
       win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
       win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
-      win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
-        success: false,
-        live: false,
-        stats: EMPTY_LIVE_STATS,
-      });
     }
+    pushConnection();
   });
-  // A drop the connector recovers from keeps the LIVE session going.
+  // A drop the connector recovers from keeps the LIVE session going. A LIVE
+  // found again after a stop started a new one with CONNECTED.
   conn.onReconnect((state) => {
     if (state === "reconnecting") {
       notifier.warn(
@@ -435,14 +451,22 @@ const registerConnectorEvents = ({
         t("main.init.reconnecting"),
         { key: "reconnect", windowMs: REPEAT_NOTICE_MS },
       );
-    } else {
+    } else if (state === "reconnected") {
       notifier.info(
         "connector",
         FEEDBACK_CODES.RECONNECTED,
         t("main.init.reconnected"),
         { key: "reconnected", windowMs: REPEAT_NOTICE_MS },
       );
+    } else {
+      // Only after an abnormal stop, so never after a LIVE ended on purpose
+      notifier.warn(
+        "connector",
+        FEEDBACK_CODES.RECONNECT_FAILED,
+        t("main.init.connectionLost", { home: t("nav.home") }),
+      );
     }
+    pushConnection();
   });
 
   const handleChat = async (d: ChatEvent) => {
@@ -1289,6 +1313,35 @@ function versionChange({ app, storeManagerService }: AppHandlerVariables) {
   return storeManagerService.wasRebuilt() ? undefined : last;
 }
 
+// The update Tokio restarted to install last run. When Tokio is still on an
+// older version, Windows likely refused the unsigned installer: the update
+// button then downloads it, since restarting would fail the same way.
+function installCheck({
+  app,
+  storeManagerService,
+  updaterService,
+  pathManagerService,
+  notifier,
+}: AppHandlerVariables) {
+  const installing = storeManagerService.getSettings().installingVersion;
+  if (!installing) return;
+  // A failed save was logged, and the check repeats on the next start
+  void storeManagerService.updateInstallingVersion("");
+  const version = app.getVersion();
+  // That version, or a newer one the streamer installed by hand
+  if (compareVersions(version, installing) >= 0) return;
+  Logger.warn(
+    `<Updater> The update to ${installing} didn't install: Tokio is still on ${version}.`,
+    pathManagerService.files.logs.system,
+  );
+  notifier.warn(
+    "system",
+    FEEDBACK_CODES.UPDATE_NOT_INSTALLED,
+    t("main.init.updateNotInstalled", { version: installing }),
+  );
+  updaterService.markManual(installing);
+}
+
 events.push(
   APP_EVENTS.LOAD_APP,
   async (handler, e) => {
@@ -1333,6 +1386,7 @@ events.push(
     handler.trayService.setEnabled(settings.tray.enabled);
     warnTaken(handler.notifier, applyStoredShortcuts(handler));
     await initUpdater(handler);
+    installCheck(handler);
     handler.updaterService.setAuto(settings.updates.auto);
     handler.overlayService.onUpdates((updates) =>
       reportOverlayUpdates(handler, updates),

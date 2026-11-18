@@ -12,17 +12,28 @@ import {
 } from "@tokioapp/connector";
 import Logger from "@/logger";
 import { app } from "@test/electron";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from "vitest";
+import type { ReconnectState } from "../../common";
 import { TikTokLiveConnector } from "./index";
 
 type Connection = {
   username: string;
   options: {
     requestTimeoutMs?: number;
+    signTimeoutMs?: number;
+    reconnect?: unknown;
     logger?: (
       level: string,
       message: string,
-      data?: { error?: unknown },
+      data?: { error?: unknown; attempt?: number },
     ) => void;
   };
   state: string;
@@ -146,7 +157,9 @@ describe("TikTokLiveConnector", () => {
     connector = new TikTokLiveConnector();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // A look for the LIVE leaves a timer
+    await connector.disconnect();
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
@@ -182,6 +195,16 @@ describe("TikTokLiveConnector", () => {
       expect(connection().username).toBe("streamer");
       expect(live.signers).toEqual([{ apiKey: "euler-key" }]);
       expect(connector.isConnected()).toBe(true);
+    });
+
+    it("never gives up reconnecting, tries every 15 s at most, and gives a sign 20 s", async () => {
+      await connected();
+
+      expect(connection().options.reconnect).toEqual({
+        maxAttempts: Infinity,
+        maxDelayMs: 15_000,
+      });
+      expect(connection().options.signTimeoutMs).toBe(20_000);
     });
 
     it("opens one connection when connect comes again while connecting", async () => {
@@ -238,6 +261,10 @@ describe("TikTokLiveConnector", () => {
     it.each([
       [new OfflineError("Not LIVE"), "offline"],
       [new RoomNotFoundError("No room"), "notFound"],
+      [
+        new RoomNotFoundError("No lookup answered", { retryable: true }),
+        "network",
+      ],
       [new InvalidUsernameError("Bad username"), "notFound"],
       [new SignError("Unauthorized", { status: 401 }), "badKey"],
       [new SignError("Forbidden", { status: 403 }), "badKey"],
@@ -249,10 +276,14 @@ describe("TikTokLiveConnector", () => {
       [new ConnectorError("PROTOCOL", "Garbled"), "unknown"],
       [new Error("A bug"), "unknown"],
     ])("reports %s as %s and stops listening", async (error, kind) => {
+      // A network failure is tried again first
+      vi.useFakeTimers();
       live.connect.error = error;
       const onConnected = capture(TOKIO_EVENTS.CONNECTED);
 
-      const res = await connected();
+      const pending = connected();
+      await vi.runAllTimersAsync();
+      const res = await pending;
 
       expect(res.success).toBe(false);
       expect(res.error).toMatchObject({ kind, cause: error });
@@ -273,9 +304,67 @@ describe("TikTokLiveConnector", () => {
         retryAfterSeconds: 13,
       });
     });
+
+    it("tries a connect that failed on the network 3 times, 3 s apart", async () => {
+      vi.useFakeTimers();
+      live.connect.error = new WebSocketError("The server answered 200");
+
+      const pending = connected();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(live.listening).toHaveLength(1);
+      // Still connecting, so the profile stays locked
+      expect(connector.isConnected()).toBe(true);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(live.listening).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect((await pending).error?.kind).toBe("network");
+      expect(live.listening).toHaveLength(3);
+      expect(live.connections).toHaveLength(1);
+      expect(connector.isConnected()).toBe(false);
+    });
+
+    it("connects when a later try works", async () => {
+      vi.useFakeTimers();
+      live.connect.error = new TimeoutError("Slow", { phase: "sign" });
+      const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+
+      const pending = connected();
+      await vi.advanceTimersByTimeAsync(0);
+      live.connect.error = undefined;
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(await pending).toEqual({ success: true });
+      expect(onConnected).toHaveBeenCalledOnce();
+    });
+
+    it.each([
+      new OfflineError("Not LIVE"),
+      new RateLimitError("Slow down"),
+      new SignError("Unauthorized", { status: 401 }),
+    ])("tells %s at once", async (error) => {
+      live.connect.error = error;
+
+      expect((await connected()).success).toBe(false);
+      expect(live.listening).toHaveLength(1);
+    });
+
+    it("stops trying when disconnected", async () => {
+      vi.useFakeTimers();
+      live.connect.error = new WebSocketError("Closed");
+
+      const pending = connected();
+      await vi.advanceTimersByTimeAsync(0);
+      await connector.disconnect();
+
+      expect((await pending).success).toBe(false);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(live.listening).toHaveLength(1);
+      expect(connector.isConnected()).toBe(false);
+    });
   });
 
-  it("logs the connection's warnings with their reason and errors, routine lines at debug", async () => {
+  it("logs the connection's warnings with their reason, errors, connects and stops, routine lines at debug", async () => {
     const warn = vi.spyOn(Logger, "warn");
     const error = vi.spyOn(Logger, "error");
     const info = vi.spyOn(Logger, "info");
@@ -291,7 +380,9 @@ describe("TikTokLiveConnector", () => {
     });
     log("warn", "The signer named a room id that isn't one");
     log("error", "Gave up reconnecting after 10 attempts", { error: cause });
-    log("info", "Connected to room 1");
+    log("info", "Connected to room 1", { attempt: 0 });
+    log("info", "Connected to room 1", { attempt: 3 });
+    log("info", "Disconnected (signError)", { error: kicked });
     log("debug", "Opening the WebSocket");
 
     expect(warn.mock.calls).toEqual([
@@ -309,12 +400,24 @@ describe("TikTokLiveConnector", () => {
       "connector.log",
       cause,
     );
-    expect(info).not.toHaveBeenCalled();
-    expect(debug.mock.calls).toEqual(
+    expect(info.mock.calls).toEqual(
       expect.arrayContaining([
         ["<Connector> Connected to room 1", "connector.log"],
+        ["<Connector> Connected to room 1 (attempt 3)", "connector.log"],
+        [
+          "<Connector> Disconnected (signError) -- Closed with code 4005 (kicked)",
+          "connector.log",
+        ],
+      ]),
+    );
+    expect(debug.mock.calls).toEqual(
+      expect.arrayContaining([
         ["<Connector> Opening the WebSocket", "connector.log"],
       ]),
+    );
+    expect(debug).not.toHaveBeenCalledWith(
+      "<Connector> Connected to room 1",
+      "connector.log",
     );
   });
 
@@ -372,12 +475,17 @@ describe("TikTokLiveConnector", () => {
       });
       expect(connection().listenerCount("chat")).toBe(0);
       expect(connector.isConnected()).toBe(false);
+      expect(connector.isWaiting()).toBe(false);
     });
 
     it.each(["giveUp", "signError", "wsClose"])(
-      "says the connection was lost (%s)",
+      "says the connection was lost (%s), and looks for the LIVE",
       async (reason) => {
         const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+        let waiting: boolean | undefined;
+        connector.on(TOKIO_EVENTS.DISCONNECTED, () => {
+          waiting = connector.isWaiting();
+        });
 
         connection().state = "disconnected";
         connection().emit("disconnected", { reason, willReconnect: false });
@@ -387,8 +495,153 @@ describe("TikTokLiveConnector", () => {
           reason: "lost",
         });
         expect(connection().listenerCount("chat")).toBe(0);
+        // Already looking when DISCONNECTED comes, for what it pushes
+        expect(waiting).toBe(true);
+        expect(connector.isConnected()).toBe(true);
       },
     );
+
+    describe("looks for the LIVE after an abnormal stop", () => {
+      let onReconnect: Mock<(state: ReconnectState) => void>;
+
+      const lose = (reason = "wsClose") => {
+        connection().state = "disconnected";
+        connection().emit("disconnected", { reason, willReconnect: false });
+      };
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+        onReconnect = vi.fn();
+        connector.onReconnect(onReconnect);
+      });
+
+      it("connects 10 s later when the LIVE is back, starting a new one", async () => {
+        const onConnected = capture(TOKIO_EVENTS.CONNECTED);
+
+        lose();
+        await vi.advanceTimersByTimeAsync(9_999);
+        expect(live.connections).toHaveLength(1);
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(live.connections).toHaveLength(2);
+        expect(onConnected).toHaveBeenCalledOnce();
+        expect(onReconnect).toHaveBeenCalledExactlyOnceWith("reconnected");
+        expect(connector.isWaiting()).toBe(false);
+        expect(connector.isConnected()).toBe(true);
+      });
+
+      it("gives up 2 minutes after the stop", async () => {
+        live.connect.error = new OfflineError("Not LIVE");
+
+        lose();
+        await vi.advanceTimersByTimeAsync(119_000);
+        expect(connector.isWaiting()).toBe(true);
+        expect(onReconnect).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1_000);
+
+        expect(onReconnect).toHaveBeenCalledExactlyOnceWith("stopped");
+        expect(connector.isWaiting()).toBe(false);
+        expect(connector.isConnected()).toBe(false);
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(live.connections).toHaveLength(13);
+      });
+
+      it("gives up at once when the key is refused", async () => {
+        live.connect.error = new SignError("Unauthorized", { status: 401 });
+
+        lose();
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(onReconnect).toHaveBeenCalledExactlyOnceWith("stopped");
+        expect(connector.isWaiting()).toBe(false);
+      });
+
+      it("keeps the first stop's deadline when the LIVE it found stops again", async () => {
+        lose();
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(live.connections).toHaveLength(2);
+
+        live.connect.error = new OfflineError("Not LIVE");
+        await vi.advanceTimersByTimeAsync(10_000);
+        lose();
+        await vi.advanceTimersByTimeAsync(99_000);
+        expect(connector.isWaiting()).toBe(true);
+        await vi.advanceTimersByTimeAsync(1_000);
+
+        expect(onReconnect).toHaveBeenLastCalledWith("stopped");
+        expect(connector.isWaiting()).toBe(false);
+      });
+
+      it("after a LIVE that ended while reconnecting", async () => {
+        const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
+
+        connection().state = "reconnecting";
+        connection().emit("streamEnd", { action: "ended" });
+        lose("streamEnd");
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(onDisconnected).toHaveBeenCalledExactlyOnceWith({
+          reason: "ended",
+        });
+        expect(connector.isWaiting()).toBe(true);
+      });
+
+      it("after a LIVE whose end came with what a reconnect caught up on", async () => {
+        connection().emit("connected", {
+          roomId: "1",
+          reconnected: true,
+          attempt: 2,
+        });
+        connection().emit("streamEnd", { action: "ended" });
+        lose("streamEnd");
+
+        expect(connector.isWaiting()).toBe(true);
+      });
+
+      it("not after a LIVE that ended on a working connection", async () => {
+        await vi.advanceTimersByTimeAsync(0);
+        connection().emit("connected", {
+          roomId: "1",
+          reconnected: true,
+          attempt: 1,
+        });
+        // The batches the reconnect caught up on came and went
+        await vi.advanceTimersByTimeAsync(0);
+        connection().emit("streamEnd", { action: "ended" });
+        lose("streamEnd");
+
+        expect(connector.isWaiting()).toBe(false);
+        expect(connector.isConnected()).toBe(false);
+      });
+
+      it("not after a Disconnect", async () => {
+        await connector.disconnect();
+
+        expect(connector.isWaiting()).toBe(false);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(live.connections).toHaveLength(1);
+      });
+
+      it("ends when Connect tries at once", async () => {
+        lose();
+
+        expect(await connector.connect("streamer")).toEqual({ success: true });
+        expect(connector.isWaiting()).toBe(false);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(live.connections).toHaveLength(2);
+        expect(onReconnect).not.toHaveBeenCalled();
+      });
+
+      it("ends on Disconnect", async () => {
+        lose();
+        await connector.disconnect();
+
+        expect(connector.isWaiting()).toBe(false);
+        expect(connector.isConnected()).toBe(false);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(live.connections).toHaveLength(1);
+      });
+    });
 
     it("ends the LIVE after the events that came with its end", async () => {
       const order: string[] = [];
@@ -428,6 +681,7 @@ describe("TikTokLiveConnector", () => {
 
       expect(onReconnect).toHaveBeenCalledExactlyOnceWith("reconnecting");
       expect(connector.isConnected()).toBe(true);
+      expect(connector.isReconnecting()).toBe(true);
 
       connection().state = "connected";
       connection().emit("connected", {
@@ -437,6 +691,7 @@ describe("TikTokLiveConnector", () => {
       });
 
       expect(onReconnect).toHaveBeenLastCalledWith("reconnected");
+      expect(connector.isReconnecting()).toBe(false);
       expect(onConnected).not.toHaveBeenCalled();
       expect(onDisconnected).not.toHaveBeenCalled();
       expect(connection().listenerCount("chat")).toBe(1);

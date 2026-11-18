@@ -47,6 +47,7 @@ export enum FEEDBACK_CODES {
   UPDATE_CHECK_FAILED = "update_check_failed",
   UPDATE_DOWNLOAD_FAILED = "update_download_failed",
   UPDATE_INSTALL_FAILED = "update_install_failed",
+  UPDATE_NOT_INSTALLED = "update_not_installed",
 
   // SERVER
   SERVER_STARTED = "server_started",
@@ -60,6 +61,8 @@ export enum FEEDBACK_CODES {
   RECONNECTING = "reconnecting",
   RECONNECTED = "reconnected",
   CONNECTION_LOST = "connection_lost",
+  // Looking for the LIVE after an abnormal stop gave up
+  RECONNECT_FAILED = "reconnect_failed",
   CONNECT_FAILED = "connect_failed",
   DISCONNECT_FAILED = "disconnect_failed",
   FEATURES_UPDATE_FAILED = "features_update_failed",

@@ -44,7 +44,12 @@ events.push(
 
 events.push(
   APP_EVENTS.INSTALL_UPDATE,
-  async ({ updaterService, shell }) => {
+  async ({ updaterService, storeManagerService, shell }) => {
+    // The next start checks it installed. install() waits for this save, and
+    // a failed one was logged by the store.
+    const status = updaterService.getStatus();
+    if (status.state === "ready")
+      void storeManagerService.updateInstallingVersion(status.version);
     const res = updaterService.install();
     if (!res.success) {
       throw new AppFailure(

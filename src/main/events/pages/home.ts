@@ -5,7 +5,7 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import { EMPTY_LIVE_STATS } from "@/common/util";
-import { createStack } from "@/helper/events";
+import { connectionState, createStack } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
 import { ConnectorFailure } from "@/services/connector/common";
@@ -55,7 +55,7 @@ const toUsername = (input: string) => {
 events.push(
   APP_EVENTS.CONNECT,
   async (
-    { storeManagerService, connectorService, notifier },
+    { storeManagerService, connectorService, liveService, notifier },
     e,
     { username },
   ) => {
@@ -77,18 +77,16 @@ events.push(
         t("main.home.usernameSaveFailed"),
       );
     }
-    const stats = storeManagerService.getSettings().liveStats;
-
     // The connected event comes before connect() resolves, answer on the first.
     let answered = false;
     const answer = () => {
       if (answered) return;
       answered = true;
-      e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
-        success: true,
-        live: true,
-        stats,
-      });
+      // As main holds it: a connect during a reconnect stays reconnecting
+      e.reply(
+        APP_EVENTS_RESPONSE.CONNECTED,
+        connectionState({ connectorService, liveService, storeManagerService }),
+      );
       notifier.success(
         "connector",
         FEEDBACK_CODES.CONNECTED,
@@ -154,14 +152,8 @@ events.push(
 
 events.push(
   APP_EVENTS.IS_CONNECTED,
-  async ({ connectorService, liveService, storeManagerService }, e) => {
-    e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
-      stats: storeManagerService.getSettings().liveStats,
-      // True while connecting too, which locks the profile
-      success: connectorService.isConnected(),
-      // A connect still in progress hasn't started the session
-      live: liveService.getSession().startedAt !== null,
-    });
+  async (services, e) => {
+    e.reply(APP_EVENTS_RESPONSE.CONNECTED, connectionState(services));
   },
   {
     notify: false,

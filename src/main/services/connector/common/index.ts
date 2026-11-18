@@ -25,7 +25,8 @@ export type GiftResponse = {
   data: Gift[];
   error?: Error;
 };
-export type ReconnectState = "reconnecting" | "reconnected";
+// "stopped": looking for the LIVE again after it stopped gave up
+export type ReconnectState = "reconnecting" | "reconnected" | "stopped";
 // Takes a chat before listeners get it: null sends it on at once, a promise
 // once it settles. The promise never rejects.
 export type ChatStage = (chat: ChatEvent) => Promise<ChatEvent> | null;
@@ -55,9 +56,20 @@ export abstract class ConnectorProvider extends TokioEmitter {
     this._logFile = logFile;
   }
 
-  // Called when the connection drops and is tried again, and once it's back.
+  // Called when the connection drops and is tried again, once it's back, and
+  // when looking for the LIVE again after a stop gives up.
   public onReconnect(listener: (state: ReconnectState) => void) {
     this._onReconnect = listener;
+  }
+
+  // The connection dropped and is coming back.
+  public isReconnecting(): boolean {
+    return false;
+  }
+
+  // The LIVE stopped on its own, and it's looked for again.
+  public isWaiting(): boolean {
+    return false;
   }
 
   // Chat translation, set once by init.ts

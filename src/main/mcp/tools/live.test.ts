@@ -250,23 +250,32 @@ describe("live MCP tools", () => {
       const updateProfileData = vi.fn(async () => true);
       const profile = structuredClone(defaultProfile);
       profile.connector.username = username;
+      // Connected, with a session, once a connect worked
+      let on = false;
       const h = createHandler(
         {
           storeManagerService: {
             updateProfileData,
             getProfileData: async () => profile,
             getProfiles: () => [],
-            getSettings: () => ({
-              liveStats: { likes: 0, views: 0, viewers: 0 },
-            }),
+            getLiveStats: () => ({ likes: 0, views: 0, viewers: 0 }),
           },
           connectorService: {
-            connect: vi.fn(connect),
+            connect: vi.fn(async () => {
+              const res = await connect();
+              on = "success" in res && res.success === true;
+              return res;
+            }),
             disconnect: vi.fn(async () => {}),
             on: vi.fn(),
             off: vi.fn(),
-            isConnected: () => false,
+            isConnected: () => on,
+            isReconnecting: () => false,
+            isWaiting: () => false,
             username: "streamer",
+          },
+          liveService: {
+            getSession: () => ({ startedAt: on ? 1000 : null }),
           },
         },
         { stack: home },

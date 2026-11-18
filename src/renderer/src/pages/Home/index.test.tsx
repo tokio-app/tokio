@@ -208,6 +208,53 @@ describe("Home", () => {
     expect(status()).toHaveTextContent(/^Offline$/);
   });
 
+  it("says Reconnecting… in place of the timer while the connection comes back", async () => {
+    vi.useFakeTimers({ now: 100_000 });
+    await renderApp();
+    await connected();
+    await session({ startedAt: 100_000 - 65_000 });
+
+    await send(APP_EVENTS_RESPONSE.CONNECTED, {
+      success: true,
+      live: true,
+      reconnecting: true,
+      stats: { views: 1234, viewers: 12, likes: 5 },
+    });
+
+    expect(page().getByText("Reconnecting…").closest("p")).toHaveTextContent(
+      /^Reconnecting…$/,
+    );
+    // The LIVE goes on: its numbers stay, and Disconnect still stops it
+    expect(page().queryByText("Coins")).toBeInTheDocument();
+    expect(page().getByRole("button", { name: "Disconnect" })).toBeEnabled();
+
+    await connected();
+    expect(status()).toHaveTextContent("LIVE 00:01:05");
+  });
+
+  it("says it's waiting for the LIVE while main looks for it, with Disconnect to stop", async () => {
+    const { user } = await renderApp();
+
+    await send(APP_EVENTS_RESPONSE.CONNECTED, {
+      success: true,
+      live: false,
+      waiting: true,
+      stats: { views: 0, viewers: 0, likes: 0 },
+    });
+
+    expect(page().getByText("Waiting for the LIVE…")).toBeInTheDocument();
+    expect(username()).toBeDisabled();
+    expect(page().queryByText("Coins")).not.toBeInTheDocument();
+    const disconnect = page().getByRole("button", { name: "Disconnect" });
+    expect(disconnect).not.toHaveAttribute("aria-busy");
+
+    await user.click(disconnect);
+    expect(sent(APP_EVENTS.DISCONNECT)).toHaveLength(1);
+
+    await disconnected();
+    expect(status()).toHaveTextContent(/^Offline$/);
+  });
+
   it("turns features on and off", async () => {
     const { user } = await renderApp();
     const music = page().getByRole("checkbox", { name: "Music" });

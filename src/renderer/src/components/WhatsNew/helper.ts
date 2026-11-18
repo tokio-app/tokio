@@ -1,23 +1,8 @@
 import { DEFAULT_LANGUAGE, MESSAGES, type MessageKey } from "@/common/i18n";
+import { compareVersions } from "@/common/util";
 
 // A page holds at least this many notes, unless the release has fewer
 const MIN_NOTES = 3;
-
-// Orders versions as semver does: 0.1.3-beta.2 < 0.1.3-beta.10 < 0.1.3 < 0.1.10
-function compareVersions(a: string, b: string): number {
-  const [coreA, preA] = a.split("-");
-  const [coreB, preB] = b.split("-");
-  const byNumbers = (x: string, y: string) =>
-    x.localeCompare(y, "en", { numeric: true });
-
-  const core = byNumbers(coreA, coreB);
-  if (core !== 0) return core;
-  // A release comes after its own prereleases
-  if (!preA && !preB) return 0;
-  if (!preA) return 1;
-  if (!preB) return -1;
-  return byNumbers(preA, preB);
-}
 
 /**
  * The key of the notes of version `to`, one change per line, after an update
