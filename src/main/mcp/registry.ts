@@ -76,7 +76,12 @@ const getStatus = ({
   const timer = timerService.get().state;
   return ok({
     live: {
+      // Also while connecting, reconnecting or waiting
       connected: connectorService.isConnected(),
+      // The connection dropped and is coming back; the LIVE goes on
+      reconnecting: connectorService.isReconnecting(),
+      // The LIVE stopped on its own and Tokio looks for it for 2 minutes
+      waiting: connectorService.isWaiting(),
       username: connectorService.username,
       startedAt: startedAt === null ? null : new Date(startedAt).toISOString(),
       viewers: stats.viewers,
@@ -134,7 +139,7 @@ function toolDefs({ sections, kinds, tools }: Registry): ToolDef<any>[] {
       name: "get_status",
       title: "Status",
       description:
-        "What Tokio is doing now: the LIVE connection and its stats, the features on, whether reactions are paused, the active profile, the music queue, Minecraft, the countdown timer, the overlay server and app updates.",
+        "What Tokio is doing now: the LIVE connection and its stats, the features on, whether reactions are paused, the active profile, the music queue, Minecraft, the countdown timer, the overlay server and app updates. live.connected is also true while connecting, while reconnecting after a drop (live.reconnecting), and for 2 minutes after the LIVE stopped on its own, while Tokio looks for it again (live.waiting, with no startedAt).",
       input: z.object({}).strict(),
       annotations: READ,
       run: getStatus,

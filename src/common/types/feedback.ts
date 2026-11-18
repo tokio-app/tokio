@@ -60,6 +60,8 @@ export enum FEEDBACK_CODES {
   RECONNECTING = "reconnecting",
   RECONNECTED = "reconnected",
   CONNECTION_LOST = "connection_lost",
+  // Looking for the LIVE after an abnormal stop gave up
+  RECONNECT_FAILED = "reconnect_failed",
   CONNECT_FAILED = "connect_failed",
   DISCONNECT_FAILED = "disconnect_failed",
   FEATURES_UPDATE_FAILED = "features_update_failed",

@@ -312,6 +312,10 @@ export interface AppEventsResponseMap {
   // once the LIVE has started
   [APP_EVENTS_RESPONSE.CONNECTED]: Reply<{
     live: boolean;
+    // The connection dropped and is coming back, the session goes on
+    reconnecting?: boolean;
+    // The LIVE stopped on its own and is looked for again, with no session
+    waiting?: boolean;
     stats: {
       views: number;
       viewers: number;

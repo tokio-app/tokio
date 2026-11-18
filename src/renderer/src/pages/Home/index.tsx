@@ -42,6 +42,8 @@ export function Home() {
   // Until settings load, so the hint doesn't flash
   const [needsKey, setNeedsKey] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [waiting, setWaiting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [likes, setLikes] = useState(0);
   const [views, setViews] = useState({ current: 0, total: 0 });
@@ -88,8 +90,11 @@ export function Home() {
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {
     if (!res) return;
     setConnected(res.live);
-    // A connect still in progress keeps its spinner
-    setLoading(res.success && !res.live);
+    setReconnecting(res.reconnecting ?? false);
+    setWaiting(res.waiting ?? false);
+    // A connect still in progress keeps its spinner, a look for the LIVE
+    // leaves Disconnect to press
+    setLoading(res.success && !res.live && !res.waiting);
     setLikes(res.stats.likes);
     setViews({ current: res.stats.viewers, total: res.stats.views });
   });
@@ -170,6 +175,8 @@ export function Home() {
               username={username}
               usernameRef={usernameField}
               connected={connected}
+              reconnecting={reconnecting}
+              waiting={waiting}
               loading={loading}
               needsKey={needsKey}
               startedAt={session.startedAt}

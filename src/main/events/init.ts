@@ -30,7 +30,7 @@ import {
 } from "@/common/util";
 import config from "@/config";
 import { globalShortcut, systemPreferences } from "electron";
-import { createStack, replyFailure } from "@/helper/events";
+import { connectionState, createStack, replyFailure } from "@/helper/events";
 import { AppFailure, REPEAT_NOTICE_MS, saveFailure } from "@/helper/feedback";
 import { sendGamesOverlay, sendGamesRun } from "@/helper/games";
 import { language, onLanguage, setLanguage, t } from "@/helper/i18n";
@@ -384,18 +384,36 @@ const registerConnectorEvents = ({
     pushSession();
   });
 
+  // What Home and the title bar show, as main holds it
+  const pushConnection = () => {
+    // The connection goes on reconnecting after the window closed on quit
+    if (win.isDestroyed()) return;
+    win.webContents.send(
+      APP_EVENTS_RESPONSE.CONNECTED,
+      connectionState({
+        connectorService: conn,
+        liveService: live,
+        storeManagerService: store,
+      }),
+    );
+  };
+
   conn.on(TOKIO_EVENTS.DISCONNECTED, (d) => {
+    // After an abnormal stop the connector looks for the LIVE again
+    const waiting = conn.isWaiting();
     if (d?.reason === "ended") {
       notifier.info(
         "connector",
         FEEDBACK_CODES.LIVE_ENDED,
-        t("main.init.liveEnded"),
+        t(waiting ? "main.init.liveEndedAway" : "main.init.liveEnded"),
       );
     } else if (d?.reason === "lost") {
       notifier.warn(
         "connector",
         FEEDBACK_CODES.CONNECTION_LOST,
-        t("main.init.connectionLost", { home: t("nav.home") }),
+        waiting
+          ? t("main.init.connectionLostLooking")
+          : t("main.init.connectionLost", { home: t("nav.home") }),
       );
     } else {
       notifier.info(
@@ -419,14 +437,11 @@ const registerConnectorEvents = ({
     if (!win.isDestroyed()) {
       win.webContents.send(APP_EVENTS_RESPONSE.TTS_CLEAR, undefined);
       win.webContents.send(APP_EVENTS_RESPONSE.ALERT_CLEAR, undefined);
-      win.webContents.send(APP_EVENTS_RESPONSE.CONNECTED, {
-        success: false,
-        live: false,
-        stats: EMPTY_LIVE_STATS,
-      });
     }
+    pushConnection();
   });
-  // A drop the connector recovers from keeps the LIVE session going.
+  // A drop the connector recovers from keeps the LIVE session going. A LIVE
+  // found again after a stop started a new one with CONNECTED.
   conn.onReconnect((state) => {
     if (state === "reconnecting") {
       notifier.warn(
@@ -435,14 +450,22 @@ const registerConnectorEvents = ({
         t("main.init.reconnecting"),
         { key: "reconnect", windowMs: REPEAT_NOTICE_MS },
       );
-    } else {
+    } else if (state === "reconnected") {
       notifier.info(
         "connector",
         FEEDBACK_CODES.RECONNECTED,
         t("main.init.reconnected"),
         { key: "reconnected", windowMs: REPEAT_NOTICE_MS },
       );
+    } else {
+      // Only after an abnormal stop, so never after a LIVE ended on purpose
+      notifier.warn(
+        "connector",
+        FEEDBACK_CODES.RECONNECT_FAILED,
+        t("main.init.connectionLost", { home: t("nav.home") }),
+      );
     }
+    pushConnection();
   });
 
   const handleChat = async (d: ChatEvent) => {

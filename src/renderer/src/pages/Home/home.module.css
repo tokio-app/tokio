@@ -95,6 +95,30 @@
   background-color: var(--accent-primary);
 }
 
+/* The connection is away: a ring where the dot was, breathing while main
+   tries. After .dot_live, which it overrides. */
+.dot_away {
+  border: 2px solid var(--font-muted);
+  background-color: transparent;
+  animation: home-away 2s ease-in-out infinite;
+}
+
+.dot_live.dot_away {
+  border-color: var(--accent-primary);
+}
+
+@keyframes home-away {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot_away {
+    animation: none;
+  }
+}
+
 .connect {
   display: flex;
   align-items: center;
