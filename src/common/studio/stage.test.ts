@@ -405,6 +405,128 @@ describe("on stream", () => {
     expect(avatar.querySelector(".studio-initial")!.textContent).toBe("S");
   });
 
+  describe("a list", () => {
+    type ListView = Extract<StudioElementView, { kind: "list" }>;
+    const row = (name: string, fields: object = {}) => ({
+      picture: `https://p/${name}.webp`,
+      name,
+      text: "",
+      icon: "",
+      value: "",
+      ...fields,
+    });
+    const list = (fields: Partial<ListView> = {}): ListView => ({
+      ...BASE,
+      id: "l",
+      kind: "list",
+      source: "gifters",
+      rows: [],
+      font: "",
+      size: 36,
+      color: "#f1f5f9",
+      value_color: "#f43f5e",
+      pictures: true,
+      gap: 16,
+      ...fields,
+    });
+    const rows = () => Array.from(root.querySelectorAll(".studio-row"));
+    const names = () =>
+      rows().map((r) => r.querySelector(".studio-name")!.textContent);
+
+    it("draws a row per viewer: picture, name, message and value", () => {
+      draw(
+        view(
+          list({
+            source: "gifts",
+            font: "Comic Sans MS",
+            gap: 8,
+            rows: [
+              row("ana", { icon: "https://g/rose.png", value: "×5" }),
+              row("bo", { picture: "" }),
+            ],
+          }),
+        ),
+      );
+      const node = root.querySelector<HTMLElement>(".studio-rows")!;
+
+      expect(node.style.fontFamily).toContain('"Comic Sans MS"');
+      expect(node.style.fontSize).toBe("36px");
+      expect(node.style.gap).toBe("8px");
+      expect(node.style.getPropertyValue("--studio-value-color")).toBe(
+        "#f43f5e",
+      );
+      expect(node.classList).not.toContain("studio-chat");
+      expect(names()).toEqual(["ana", "bo"]);
+      const [ana, bo] = rows();
+      expect(ana.querySelector("img")!.getAttribute("src")).toBe(
+        "https://p/ana.webp",
+      );
+      const icon = ana.querySelector<HTMLImageElement>(".studio-icon")!;
+      expect(icon.hidden).toBe(false);
+      expect(icon.getAttribute("src")).toBe("https://g/rose.png");
+      expect(ana.querySelector(".studio-number")!.textContent).toBe("×5");
+      // No picture: the initial
+      expect(bo.querySelector(".studio-initial")!.textContent).toBe("B");
+      expect(bo.querySelector("img")!.hasAttribute("src")).toBe(false);
+      expect(bo.querySelector<HTMLImageElement>(".studio-icon")!.hidden).toBe(
+        true,
+      );
+    });
+
+    it("keeps each viewer's row as rows move, adding and dropping the rest", () => {
+      draw(view(list({ rows: [row("ana"), row("bo"), row("cy")] })));
+      const [ana, bo] = rows();
+      const picture = ana.querySelector("img")!;
+      picture.dispatchEvent(new Event("load"));
+
+      draw(
+        view(
+          list({
+            rows: [row("dee"), row("ana", { value: "12" }), row("bo")],
+          }),
+        ),
+      );
+
+      expect(names()).toEqual(["dee", "ana", "bo"]);
+      expect(rows()[1]).toBe(ana);
+      expect(rows()[2]).toBe(bo);
+      // The same picture, still shown
+      expect(ana.querySelector("img")).toBe(picture);
+      expect(ana.querySelector(".studio-avatar")!.classList).toContain(
+        "studio-has-picture",
+      );
+      expect(ana.querySelector(".studio-number")!.textContent).toBe("12");
+    });
+
+    it("puts chat at the bottom, a message after its name", () => {
+      draw(
+        view(
+          list({
+            source: "chat",
+            rows: [row("ana", { text: "hi" }), row("bo", { text: "hey" })],
+          }),
+        ),
+      );
+
+      expect(root.querySelector(".studio-rows")!.classList).toContain(
+        "studio-chat",
+      );
+      expect(rows()[1].querySelector(".studio-message")!.textContent).toBe(
+        "hey",
+      );
+    });
+
+    it("loads no pictures with them off", () => {
+      draw(view(list({ pictures: false, rows: [row("ana")] })));
+
+      expect(root.querySelector(".studio-rows")!.classList).toContain(
+        "studio-no-pictures",
+      );
+      expect(rows()[0].querySelector("img")!.hasAttribute("src")).toBe(false);
+      expect(rows()[0].querySelector(".studio-initial")!.textContent).toBe("A");
+    });
+  });
+
   it("frees a video's player when its element goes", () => {
     draw(
       view({

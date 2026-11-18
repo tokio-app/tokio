@@ -38,7 +38,16 @@
  *                      (or height with vertical) inline as a %, and its
  *                      background-size the track's px; the element has
  *                      --studio-track, and --studio-radius in px
- *             list     (PR 4's list work)
+ *             list     .studio-rows (.studio-chat, .studio-no-pictures),
+ *                      its font, size and gap inline, --studio-color and
+ *                      --studio-value-color on it
+ *                        .studio-row         one per row, top to bottom
+ *                          .studio-avatar    as a viewer's
+ *                          .studio-row-text  span.studio-name and
+ *                                            span.studio-message
+ *                          .studio-value     img.studio-icon (hidden
+ *                                            without one) and
+ *                                            span.studio-number
  *             overlay  iframe.studio-embed on stream, .studio-slot in the
  *                      editor, nothing when it can't load
  *           A picture that fails to load gets .studio-failed. One that's
@@ -305,6 +314,92 @@
 
 .studio-has-picture .studio-initial {
   display: none;
+}
+
+/* A list: rows in one fixed layout, with no card behind them. What doesn't
+   fit is cut at the box's edge: chat's oldest at the top, as it reads down to
+   its newest, the others' last at the bottom. */
+
+.studio-rows {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  color: var(--studio-color);
+  line-height: 1.15;
+}
+
+.studio-rows.studio-chat {
+  justify-content: flex-end;
+}
+
+.studio-row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: 0.4em;
+}
+
+/* The words and the value are padded to the picture's middle, so a chat's
+   long message wraps down from its name */
+.studio-row > .studio-avatar {
+  width: 1.6em;
+  height: 1.6em;
+}
+
+.studio-row .studio-initial {
+  font-size: 0.72em;
+}
+
+.studio-no-pictures .studio-avatar {
+  display: none;
+}
+
+.studio-row-text {
+  flex: 1;
+  min-width: 0;
+  padding: 0.225em 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.studio-chat .studio-row-text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.studio-name {
+  font-weight: 600;
+}
+
+.studio-message {
+  margin-left: 0.3em;
+}
+
+.studio-message:empty {
+  display: none;
+}
+
+/* Tokio's readout, whatever the list's font: Archivo narrowed, bold, with
+   figures that line up down the column */
+.studio-value {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.2em;
+  padding: 0.225em 0;
+  color: var(--studio-value-color);
+  font-family: "Archivo Variable", sans-serif;
+  font-stretch: 75%;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-icon {
+  width: 1.15em;
+  height: 1.15em;
+  object-fit: contain;
 }
 
 /* Entrances, for a mover that shows on an event. backwards only, so a
