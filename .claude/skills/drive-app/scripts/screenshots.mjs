@@ -945,8 +945,14 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await dialog.waitFor({ state: "detached" });
   await placeAt(390, 620, 300, 300);
 
-  // The editor with the star selected, its Shape picker showing
+  // The editor with the star selected, its Shape picker showing. Its
+  // settings start at the top: placing the logo scrolled them to the box.
   await studioRow(tr("Star")).click();
+  await page.evaluate(() => {
+    for (const panel of document.querySelectorAll('main [class*="panel"]')) {
+      panel.scrollTop = 0;
+    }
+  });
   await page.waitForTimeout(500);
   await crop("studio-editor", page.getByRole("main"), { pad: 0 });
   await shoot("overlay-studio");
