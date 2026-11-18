@@ -37,9 +37,13 @@
       // to draw (tokio:studio) and each element's reaction to the LIVE
       // (tokio:studio:react); the stage draws them, scaled to the source.
       const id = decodeURIComponent(location.pathname.split("/")[2] ?? "");
-      const stage = TokioStage.createStage(document.getElementById("stage"), {
+      // ?preview: MCP's preview draws the view it's given once, with the
+      // elements that wait for an event on screen, and connects no socket
+      const preview = new URLSearchParams(location.search).has("preview");
+      const root = document.getElementById("stage");
+      const stage = TokioStage.createStage(root, {
         slots: false,
-        editing: false,
+        editing: preview,
       });
 
       const connect = () => {
@@ -54,7 +58,70 @@
         };
         socket.onclose = () => setTimeout(connect, 2000);
       };
-      connect();
+
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const LOAD_MS = 5000;
+      // True when one of the events comes, false on error or past LOAD_MS
+      const loaded = (node, events) =>
+        new Promise((resolve) => {
+          const done = (ok) => {
+            clearTimeout(timer);
+            resolve(ok);
+          };
+          const timer = setTimeout(() => done(false), LOAD_MS);
+          for (const name of events) {
+            node.addEventListener(name, () => done(name !== "error"), {
+              once: true,
+            });
+          }
+        });
+
+      // Whether a picture, video or embed loaded; one with nothing to load
+      // counts as done
+      const settled = (node) => {
+        const src = node.getAttribute("src");
+        if (node instanceof HTMLImageElement) {
+          if (!src) return true;
+          if (node.complete) return node.naturalWidth > 0;
+          return loaded(node, ["load", "error"]);
+        }
+        if (node instanceof HTMLVideoElement) {
+          if (!src || node.readyState >= 2) return true;
+          if (node.error) return false;
+          return loaded(node, ["loadeddata", "error"]);
+        }
+        // An embed's page draws once its own socket sends it what to
+        return loaded(node, ["load"]).then((ok) =>
+          ok ? wait(500).then(() => ok) : ok,
+        );
+      };
+
+      // Draws the view, then resolves once what it shows has loaded (or
+      // failed or timed out: the count it resolves with) and is painted
+      const draw = async (view) => {
+        stage.update(view);
+        const nodes = root.querySelectorAll("img, video, iframe");
+        const results = await Promise.all([
+          Promise.race([document.fonts.ready, wait(LOAD_MS)]).then(() => true),
+          ...Array.from(nodes, settled),
+        ]);
+        // Two frames, so the last layout is painted; the timer in case a
+        // hidden window draws none
+        await Promise.race([
+          new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          ),
+          wait(200),
+        ]);
+        return results.filter((ok) => !ok).length;
+      };
+
+      if (preview) {
+        root.classList.add("studio-preview");
+        window.TokioPreview = draw;
+      } else {
+        connect();
+      }
     </script>
   </body>
 </html>
