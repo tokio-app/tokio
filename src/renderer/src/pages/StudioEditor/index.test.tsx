@@ -4361,3 +4361,189 @@ describe("a goal bar's fields", () => {
     );
   });
 });
+
+describe("selecting several on the canvas", () => {
+  beforeEach(() => {
+    Element.prototype.setPointerCapture = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // A named 100 × 100 shape at a point of the canvas
+  const shape = (label: string, x: number, y: number) =>
+    elementOf("shape", { label, x, y, width: 100, height: 100 });
+  const ann = shape("Ann", 100, 100);
+  const bob = shape("Bob", 400, 100);
+  const cat = shape("Cat", 100, 600);
+  type Keys = { shiftKey?: boolean; altKey?: boolean };
+  // A press and a release at a point of the canvas, in its px
+  const click = (x: number, y: number, keys: Keys = {}) => {
+    fireEvent.pointerDown(canvas(), {
+      button: 0,
+      clientX: x / 2,
+      clientY: y / 2,
+      ...keys,
+    });
+    fireEvent.pointerUp(canvas());
+  };
+  // A drag from one point of the canvas to another, in its px
+  const dragOn = (
+    from: [number, number],
+    to: [number, number],
+    keys: Keys = {},
+  ) => {
+    fireEvent.pointerDown(canvas(), {
+      button: 0,
+      clientX: from[0] / 2,
+      clientY: from[1] / 2,
+      ...keys,
+    });
+    fireEvent.pointerMove(canvas(), {
+      clientX: to[0] / 2,
+      clientY: to[1] / 2,
+      ...keys,
+    });
+    fireEvent.pointerUp(canvas());
+  };
+  const picked = () =>
+    ["Ann", "Bob", "Cat"].filter(
+      (name) =>
+        row(new RegExp(`^${name}`)).getAttribute("aria-pressed") === "true",
+    );
+  const outlines = () => canvas().querySelectorAll("[data-selected]");
+  const savedAt = (at: number) => lastSave()?.items[at];
+
+  it("adds and takes out with Shift, each outlined with no handles", async () => {
+    await open(holding(ann, bob, cat));
+    sized();
+
+    click(150, 150);
+    click(450, 150, { shiftKey: true });
+    expect(picked()).toEqual(["Ann", "Bob"]);
+    expect(outlines()).toHaveLength(2);
+    expect(canvas().querySelector("[data-selected-around]")).not.toBeNull();
+    expect(canvas().querySelector("[data-handle]")).toBeNull();
+
+    click(150, 150, { shiftKey: true });
+    expect(picked()).toEqual(["Bob"]);
+    // One again, with its handles
+    expect(outlines()).toHaveLength(0);
+    expect(handle("se")).not.toBeNull();
+
+    // Shift on empty canvas keeps the selection, a click there clears it
+    click(800, 1500, { shiftKey: true });
+    expect(picked()).toEqual(["Bob"]);
+    click(800, 1500);
+    expect(picked()).toEqual([]);
+  });
+
+  it("box selects what a drag from empty canvas touches, Shift adding, never a locked one", async () => {
+    const locked = { ...shape("Dot", 100, 350), locked: true };
+    await open(holding(ann, bob, cat, locked));
+    sized();
+
+    // Over Bob's corner, from the empty canvas past it
+    fireEvent.pointerDown(canvas(), { button: 0, clientX: 350, clientY: 25 });
+    fireEvent.pointerMove(canvas(), { clientX: 240, clientY: 60 });
+    expect(canvas().querySelector("[data-box-select]")).not.toBeNull();
+    fireEvent.pointerUp(canvas());
+    expect(canvas().querySelector("[data-box-select]")).toBeNull();
+    expect(picked()).toEqual(["Bob"]);
+
+    // Ann, the locked Dot between, and Cat, added
+    dragOn([50, 50], [160, 700], { shiftKey: true });
+    expect(picked()).toEqual(["Ann", "Bob", "Cat"]);
+    expect(row(/^Dot/)).toHaveAttribute("aria-pressed", "false");
+
+    // Without Shift it starts over
+    dragOn([50, 550], [160, 700]);
+    expect(picked()).toEqual(["Cat"]);
+  });
+
+  it("drags several in one step, a locked one staying, and a click picks one of them", async () => {
+    const { user } = await open(holding(ann, bob, cat));
+    sized();
+    click(150, 150);
+    click(450, 150, { shiftKey: true });
+    click(150, 650, { shiftKey: true });
+    await user.click(
+      rowOf(/^Cat/).getByRole("button", { name: "Lock element" }),
+    );
+    await waitFor(() => expect(savedAt(2)).toMatchObject({ locked: true }));
+    await studio(lastSave()!);
+    expect(picked()).toEqual(["Ann", "Bob", "Cat"]);
+
+    fireEvent.pointerDown(canvas(), { button: 0, clientX: 75, clientY: 75 });
+    fireEvent.pointerMove(canvas(), { clientX: 100, clientY: 75 });
+    fireEvent.pointerMove(canvas(), { clientX: 125, clientY: 90 });
+    fireEvent.pointerUp(canvas());
+    await waitFor(() => {
+      expect(savedAt(0)).toMatchObject({ x: 200, y: 130 });
+      expect(savedAt(1)).toMatchObject({ x: 500, y: 130 });
+    });
+    expect(savedAt(2)).toMatchObject({ x: 100, y: 600 });
+    expect(picked()).toEqual(["Ann", "Bob", "Cat"]);
+    await studio(lastSave()!);
+
+    await user.click(undo());
+    await waitFor(() => {
+      expect(savedAt(0)).toMatchObject({ x: 100, y: 100 });
+      expect(savedAt(1)).toMatchObject({ x: 400, y: 100 });
+    });
+    expect(savedAt(2)).toMatchObject({ locked: true });
+
+    // A click on one of them, that doesn't move, picks it alone
+    click(450, 150);
+    expect(picked()).toEqual(["Bob"]);
+  });
+
+  it("sticks several by the box around them, unless Alt is down", async () => {
+    await open(holding(ann, bob));
+    sized();
+    click(150, 150);
+    click(450, 150, { shiftKey: true });
+
+    // Their box's left edge 5 px from the canvas's
+    dragOn([150, 150], [55, 150]);
+    await waitFor(() => {
+      expect(savedAt(0)).toMatchObject({ x: 0, y: 100 });
+      expect(savedAt(1)).toMatchObject({ x: 300, y: 100 });
+    });
+    await studio(lastSave()!);
+
+    dragOn([50, 150], [58, 150], { altKey: true });
+    await waitFor(() => {
+      expect(savedAt(0)).toMatchObject({ x: 8, y: 100 });
+      expect(savedAt(1)).toMatchObject({ x: 308, y: 100 });
+    });
+  });
+
+  it("nudges several with the arrows, a locked one staying, and deletes the ones not locked", async () => {
+    const { user } = await open(holding(ann, bob, cat));
+    sized();
+    click(150, 150);
+    click(450, 150, { shiftKey: true });
+    click(150, 650, { shiftKey: true });
+    await user.click(
+      rowOf(/^Cat/).getByRole("button", { name: "Lock element" }),
+    );
+    await waitFor(() => expect(savedAt(2)).toMatchObject({ locked: true }));
+    await studio(lastSave()!);
+
+    canvas().focus();
+    await user.keyboard("{ArrowRight}{Shift>}{ArrowDown}{/Shift}");
+    await waitFor(() => {
+      expect(savedAt(0)).toMatchObject({ x: 101, y: 110 });
+      expect(savedAt(1)).toMatchObject({ x: 401, y: 110 });
+    });
+    expect(savedAt(2)).toMatchObject({ x: 100, y: 600 });
+    await studio(lastSave()!);
+
+    await user.keyboard("{Delete}");
+    await waitFor(() =>
+      expect(lastSave()?.items.map((item) => item.id)).toEqual([cat.id]),
+    );
+  });
+});

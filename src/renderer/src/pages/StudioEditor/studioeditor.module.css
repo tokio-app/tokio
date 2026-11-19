@@ -1181,3 +1181,20 @@
   flex-shrink: 0;
   margin-top: 2px;
 }
+
+/* Several selected: each keeps the selection's outline, and the box around
+   them all is a fainter hairline, a step out so it never covers theirs */
+.selection_around {
+  position: absolute;
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 50%, transparent);
+  outline-offset: 4px;
+  pointer-events: none;
+}
+
+/* A box select being dragged: a rose hairline over a faint wash */
+.box_select {
+  position: absolute;
+  border: 1px solid var(--accent-primary);
+  background-color: var(--accent-soft);
+  pointer-events: none;
+}

@@ -43,6 +43,8 @@ import {
   groupFrame,
   reframe,
   pickElement,
+  spanOf,
+  touching,
   fitText,
   resizeBox,
   rotateCursor,
@@ -750,6 +752,49 @@ describe("the canvas's geometry", () => {
     expect(pickElement(shown, new Set(["alone"]), { x: 10, y: 10 })).toBe(
       "under",
     );
+  });
+
+  it("spans a box select's drag either way", () => {
+    expect(spanOf({ x: 50, y: 10 }, { x: 20, y: 40 })).toEqual({
+      x: 20,
+      y: 10,
+      width: 30,
+      height: 30,
+    });
+  });
+
+  it("box selects what it touches, back to front, edges too", () => {
+    const span = { x: 140, y: 140, width: 100, height: 100 };
+    expect(touching(view, new Set(), span)).toEqual(["low"]);
+    expect(
+      touching(view, new Set(), { x: 70, y: 70, width: 5, height: 5 }),
+    ).toEqual(["under", "low", "high"]);
+    // Under's corner only
+    expect(
+      touching(view, new Set(), { x: 100, y: 100, width: 10, height: 10 }),
+    ).toEqual(["under", "low"]);
+    expect(
+      touching(view, new Set(), { x: 300, y: 300, width: 10, height: 10 }),
+    ).toEqual([]);
+  });
+
+  it("box selects a turned element by how it shows, never a locked one", () => {
+    // A bar 200 wide and 20 tall, turned upright: it shows from 90 to 110
+    const [under] = view.layers[0].elements;
+    const bar = { ...under, id: "bar", width: 200, height: 20, rotation: 90 };
+    const turned = {
+      ...view,
+      layers: [{ id: "only", z: 0, opacity: 1, group: null, elements: [bar] }],
+    };
+    const corner = { x: 150, y: 0, width: 40, height: 5 };
+    expect(touching(turned, new Set(), corner)).toEqual([]);
+    expect(
+      touching(turned, new Set(), { x: 105, y: -50, width: 5, height: 5 }),
+    ).toEqual(["bar"]);
+
+    const all = { x: 0, y: 0, width: 200, height: 200 };
+    expect(touching(view, new Set(["front"]), all)).toEqual(["under"]);
+    expect(touching(view, new Set(["low"]), all)).toEqual(["under", "high"]);
   });
 });
 

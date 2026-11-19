@@ -698,6 +698,40 @@ export function pickElement(
   return null;
 }
 
+/** The box a drag spans from one point to another. */
+export const spanOf = (a: Point, b: Point): Box => ({
+  x: Math.min(a.x, b.x),
+  y: Math.min(a.y, b.y),
+  width: Math.abs(a.x - b.x),
+  height: Math.abs(a.y - b.y),
+});
+
+/**
+ * The elements a box select touches, back to front: each one by how it
+ * shows (`extent`), edges touching too. Locked elements and those of locked
+ * groups are left out, as picking leaves them.
+ */
+export function touching(
+  view: StudioView,
+  locked: ReadonlySet<string>,
+  box: Box,
+): string[] {
+  return view.layers
+    .filter((layer) => !locked.has(layer.id))
+    .flatMap((layer) => layer.elements)
+    .filter((element) => {
+      if (locked.has(element.id)) return false;
+      const shown = extent(element);
+      return (
+        shown.x <= box.x + box.width &&
+        box.x <= shown.x + shown.width &&
+        shown.y <= box.y + box.height &&
+        box.y <= shown.y + shown.height
+      );
+    })
+    .map((element) => element.id);
+}
+
 /**
  * The overlay as a step of the history had it, with the editor's view as it
  * is now, which Undo leaves alone: each of its groups folded as now, and its
