@@ -7,6 +7,7 @@ import {
   StudioElement,
   StudioElementKind,
   StudioElementOf,
+  StudioGroup,
   StudioGuides,
   StudioItem,
   StudioOverlay,
@@ -471,6 +472,22 @@ export function extent({ x, y, width, height, rotation }: Turned): Box {
   };
 }
 
+/**
+ * The smallest box around unturned ones, null for none: several selected
+ * items' extents, which move, stick and line up as one.
+ */
+export function unionBox(boxes: Box[]): Box | null {
+  if (boxes.length === 0) return null;
+  const x = Math.min(...boxes.map((b) => b.x));
+  const y = Math.min(...boxes.map((b) => b.y));
+  return {
+    x,
+    y,
+    width: Math.max(...boxes.map((b) => b.x + b.width)) - x,
+    height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
+  };
+}
+
 // The canvas's edges and middles an element lines up with
 export type AlignTo = "left" | "center" | "right" | "top" | "middle" | "bottom";
 
@@ -507,6 +524,127 @@ export function alignTo(
     x: Math.round(box.x + x - shown.x),
     y: Math.round(box.y + y - shown.y),
   };
+}
+
+// Each line's axis, and where along the box around them all it sits
+const ALIGN_AT: Record<AlignTo, ["x" | "y", number]> = {
+  left: ["x", 0],
+  center: ["x", 0.5],
+  right: ["x", 1],
+  top: ["y", 0],
+  middle: ["y", 0.5],
+  bottom: ["y", 1],
+};
+
+// A step along one axis, in whole px, never -0
+const stepOn = (axis: "x" | "y", by: number): Point => {
+  const px = Math.round(by) || 0;
+  return axis === "x" ? { x: px, y: 0 } : { x: 0, y: px };
+};
+
+/**
+ * How far each box moves, in whole px, to line up its edge or middle with
+ * the box around them all: several items' extents, aligned to each other.
+ */
+export function alignEach(boxes: Box[], to: AlignTo): Point[] {
+  const all = unionBox(boxes);
+  const [axis, at] = ALIGN_AT[to];
+  const size = axis === "x" ? "width" : "height";
+  return boxes.map((box) =>
+    stepOn(
+      axis,
+      all ? all[axis] + (all[size] - box[size]) * at - box[axis] : 0,
+    ),
+  );
+}
+
+/**
+ * How far each box moves, in whole px, so the gaps between them are equal
+ * across (x) or down (y): the two outermost, by their middles, stay, and the
+ * ones between move. None moves with fewer than 3.
+ */
+export function spaceEvenly(boxes: Box[], axis: "x" | "y"): Point[] {
+  const steps = boxes.map(() => stepOn(axis, 0));
+  if (boxes.length < 3) return steps;
+  const size = axis === "x" ? "width" : "height";
+  const middle = (i: number) => boxes[i][axis] + boxes[i][size] / 2;
+  const order = boxes.map((_, i) => i).sort((a, b) => middle(a) - middle(b));
+  const first = boxes[order[0]];
+  const last = boxes[order[order.length - 1]];
+  const between = order.slice(1, -1);
+  const taken = between.reduce((sum, i) => sum + boxes[i][size], 0);
+  const gap =
+    (last[axis] - first[axis] - first[size] - taken) / (order.length - 1);
+  // Where the next one starts, unrounded, so rounding doesn't add up
+  let at = first[axis] + first[size] + gap;
+  for (const i of between) {
+    steps[i] = stepOn(axis, at - boxes[i][axis]);
+    at += boxes[i][size] + gap;
+  }
+  return steps;
+}
+
+/**
+ * Groups and elements moved by whole px, each by its own step. A group
+ * takes its elements, locked ones too, as when it moves alone; a locked
+ * group or element stays, and so does an element of a locked group.
+ */
+export function moveItems(
+  items: StudioItem[],
+  steps: Map<string, Point>,
+): StudioItem[] {
+  const moved = <E extends StudioElement>(e: E, step: Point | undefined): E =>
+    step ? { ...e, x: e.x + step.x, y: e.y + step.y } : e;
+  return items.map((item) => {
+    if (item.kind !== "group") {
+      return item.locked ? item : moved(item, steps.get(item.id));
+    }
+    if (item.locked) return item;
+    const all = steps.get(item.id);
+    return {
+      ...item,
+      elements: item.elements.map((e) =>
+        all ? moved(e, all) : e.locked ? e : moved(e, steps.get(e.id)),
+      ),
+    };
+  });
+}
+
+/**
+ * The elements put in `group`, back to front as they were, where the
+ * front-most of them was: in its place on its own, or in front of the group
+ * it was in, since groups don't nest. They leave the groups they were in.
+ */
+export function groupElements(
+  items: StudioItem[],
+  ids: string[],
+  group: StudioGroup,
+): StudioItem[] {
+  const taking = new Set(ids);
+  const taken: StudioElement[] = [];
+  // The item the front-most one was, or was in
+  let front = -1;
+  const kept = items.map((item, i): StudioItem | null => {
+    if (item.kind !== "group") {
+      if (!taking.has(item.id)) return item;
+      taken.push(item);
+      front = i;
+      return null;
+    }
+    const leaving = item.elements.filter((e) => taking.has(e.id));
+    if (leaving.length === 0) return item;
+    taken.push(...leaving);
+    front = i;
+    return {
+      ...item,
+      elements: item.elements.filter((e) => !taking.has(e.id)),
+    };
+  });
+  if (taken.length === 0) return items;
+  return kept.flatMap((item, i) => [
+    ...(item ? [item] : []),
+    ...(i === front ? [{ ...group, elements: taken }] : []),
+  ]);
 }
 
 // Whether a turned box holds a point: the point turned back into its sides
@@ -680,6 +818,40 @@ export function pickElement(
     if (element) return element.id;
   }
   return null;
+}
+
+/** The box a drag spans from one point to another. */
+export const spanOf = (a: Point, b: Point): Box => ({
+  x: Math.min(a.x, b.x),
+  y: Math.min(a.y, b.y),
+  width: Math.abs(a.x - b.x),
+  height: Math.abs(a.y - b.y),
+});
+
+/**
+ * The elements a box select touches, back to front: each one by how it
+ * shows (`extent`), edges touching too. Locked elements and those of locked
+ * groups are left out, as picking leaves them.
+ */
+export function touching(
+  view: StudioView,
+  locked: ReadonlySet<string>,
+  box: Box,
+): string[] {
+  return view.layers
+    .filter((layer) => !locked.has(layer.id))
+    .flatMap((layer) => layer.elements)
+    .filter((element) => {
+      if (locked.has(element.id)) return false;
+      const shown = extent(element);
+      return (
+        shown.x <= box.x + box.width &&
+        box.x <= shown.x + shown.width &&
+        shown.y <= box.y + box.height &&
+        box.y <= shown.y + shown.height
+      );
+    })
+    .map((element) => element.id);
 }
 
 /**

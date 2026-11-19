@@ -51,6 +51,7 @@ import {
   CropFrames,
   cropOf,
   CropSide,
+  extent,
   fitText,
   guideAt,
   holdsTurned,
@@ -67,10 +68,13 @@ import {
   SnapLine,
   SnapLines,
   snapLines,
+  spanOf,
   stickCorner,
   toCanvas,
+  touching,
   turnTo,
   Turned,
+  unionBox,
   WHOLE,
   withGuide,
   Words,
@@ -103,20 +107,23 @@ type Props = {
   // The selected text's words, measured each time they change, null for
   // none
   onWords: (words: Words | null) => void;
-  // A group's id or an element's
-  selected: string | null;
+  // The selected groups' and elements' ids
+  selected: string[];
   // The locked groups and elements, which the canvas can't pick, move,
   // resize or rotate
   locked: ReadonlySet<string>;
-  onSelect: (id: string | null) => void;
+  // Picks these groups and elements, [] for none
+  onSelect: (ids: string[]) => void;
   // An element moved or resized, rounded to whole px
   onBox: (id: string, box: Box) => void;
   // An element turned, in whole degrees
   onRotate: (id: string, rotation: number) => void;
   // Every element of a group moved by whole px
   onShift: (groupId: string, dx: number, dy: number) => void;
-  // The selected group's frame, around its elements as they show
-  groupFrame: Turned | null;
+  // Groups and elements moved together by whole px, locked ones staying
+  onNudge: (ids: string[], dx: number, dy: number) => void;
+  // Each shown group's frame, around its elements as they show
+  frames: ReadonlyMap<string, Turned>;
   // A group resized or turned from the frame it had when the drag began
   onGroupFrame: (groupId: string, from: Turned, to: Turned) => void;
   // The corners keep the width and height in proportion
@@ -131,8 +138,8 @@ type Props = {
   // A drag on the canvas begins (true) and ends: every change in between is
   // one step of the history
   onHold: (held: boolean) => void;
-  // Deletes a group with its elements, or an element
-  onDelete: (id: string) => void;
+  // Deletes groups with their elements, and elements
+  onDelete: (ids: string[]) => void;
   // The element being cropped on the canvas, and a double-click asking to
   // crop one
   cropping: string | null;
@@ -186,8 +193,11 @@ type Drag =
       moved: boolean;
     }
   | {
+      // The selected group, or several selected items, moving as one
       kind: "group";
-      id: string;
+      // What moves, and the one the press was on
+      ids: string[];
+      on: string;
       x: number;
       y: number;
       scale: number;
@@ -196,9 +206,21 @@ type Drag =
       moved: boolean;
       // The whole px already sent
       sent: [number, number];
-      // Its frame when it began, and what that sticks to
+      // The box around what moves when it began, and what that sticks to
       frame: Turned;
       lines: SnapLines;
+    }
+  | {
+      // A box select from empty canvas
+      kind: "box";
+      x: number;
+      y: number;
+      moved: boolean;
+      // Where it began and where it is, on the canvas
+      from: Point;
+      to: Point;
+      // What it adds to: the selection with Shift, else nothing
+      adding: string[];
     }
   | {
       kind: "pan";
@@ -233,7 +255,7 @@ type Drag =
 
 // The cursor a drag keeps on the whole stage: a guide's is its axis's, a
 // crop frame's handle's its side's or corner's
-type Held = "rotate" | "move" | "pan" | Axis | CropSide;
+type Held = "rotate" | "move" | "pan" | "box" | Axis | CropSide;
 
 // The kinds a double-click crops on the canvas: not a viewer's picture,
 // which fills its circle, so only its fields crop it
@@ -277,6 +299,7 @@ const HANDLES: Record<Corner, string> = {
 const CURSORS: Record<Exclude<Held, "rotate">, string> = {
   move: "move",
   pan: "grabbing",
+  box: "default",
   x: "col-resize",
   y: "row-resize",
   nw: "nwse-resize",
@@ -313,12 +336,13 @@ const NUDGES: Record<string, [number, number]> = {
 /**
  * The overlay drawn by the stream's own renderer (stage.ts), with what the
  * editor adds over it: the selection's outline and resize handle, dragging,
- * the arrows and Delete. A selected group moves as one. Embeds are React's
- * previews, portaled into the stage's slots, which stay put so iframes don't
- * reload. It zooms and scrolls, with rulers and guides while they're on, and
- * its bar under it holds the zoom. A drag sticks to the canvas's edges and
- * middle, the other elements' and the guides, with rose lines for what it
- * lines up with, unless Alt is down.
+ * the arrows and Delete. A selected group, or several selected items, move
+ * as one; Shift picks several, and so does a drag from empty canvas. Embeds
+ * are React's previews, portaled into the stage's slots, which stay put so
+ * iframes don't reload. It zooms and scrolls, with rulers and guides while
+ * they're on, and its bar under it holds the zoom. A drag sticks to the
+ * canvas's edges and middle, the other elements' and the guides, with rose
+ * lines for what it lines up with, unless Alt is down.
  */
 export function StudioStage({
   view,
@@ -331,7 +355,8 @@ export function StudioStage({
   onBox,
   onRotate,
   onShift,
-  groupFrame,
+  onNudge,
+  frames,
   onGroupFrame,
   linked,
   rulers,
@@ -346,6 +371,8 @@ export function StudioStage({
   embed,
   children,
 }: Props) {
+  // The one selected, null for none or several
+  const single = selected.length === 1 ? selected[0] : null;
   const t = useT();
   const language = useLanguage();
   const root = useRef<HTMLDivElement>(null);
@@ -374,6 +401,8 @@ export function StudioStage({
   // The guide being dragged, and the rose lines of what a drag lines up with
   const [moving, setMoving] = useState<Moving | null>(null);
   const [met, setMet] = useState<MetLine[]>([]);
+  // A box select's box as it's dragged, on the canvas
+  const [spanned, setSpanned] = useState<Box | null>(null);
   // The crop being made on the canvas, in its element's box's own px
   const [draft, setDraft] = useState<(CropFrames & { id: string }) | null>(
     null,
@@ -515,9 +544,9 @@ export function StudioStage({
 
   // Selecting something else keeps it too
   const keepOnSelect = useEffectEvent(() => {
-    if (draft && selected !== draft.id) keepCrop();
+    if (draft && single !== draft.id) keepCrop();
   });
-  useEffect(() => keepOnSelect(), [selected]);
+  useEffect(() => keepOnSelect(), [single]);
 
   // After a zoom: the outline at once, not a frame late, and the canvas point
   // the zoom kept back where it was on screen
@@ -703,9 +732,7 @@ export function StudioStage({
   // For its fields, which keep to them as a corner drag does
   const measured = useRef<{ key: string } | null>(null);
   useLayoutEffect(() => {
-    const text = elements.find(
-      ({ element }) => element.id === selected,
-    )?.element;
+    const text = elements.find(({ element }) => element.id === single)?.element;
     const scale = stageRef.current?.fit().scale;
     const words: Words | null =
       text?.kind === "text" && scale
@@ -724,12 +751,14 @@ export function StudioStage({
     onWords(words);
   });
 
-  const chosen = elements.find(({ element }) => element.id === selected);
+  const chosen = elements.find(({ element }) => element.id === single);
   // A group's layer only: an element on its own has its layer's id, and
   // stays an element
   const chosenGroup = chosen
     ? undefined
-    : view.layers.find((layer) => layer.id === selected);
+    : view.layers.find((layer) => layer.id === single);
+  // The selected group's frame, null for none or a hidden one
+  const groupFrame = (chosenGroup && frames.get(chosenGroup.id)) ?? null;
   // The selection's outline: an element's box, or a group's frame, turned
   const frame = chosen
     ? boxOf(chosen.element)
@@ -739,9 +768,32 @@ export function StudioStage({
   const rotation = chosen
     ? chosen.element.rotation
     : (groupFrame?.rotation ?? 0);
-  const stuck = chosen
-    ? locked.has(chosen.layer) || locked.has(chosen.element.id)
-    : locked.has(chosenGroup?.id ?? "");
+  // Locked, or an element of a locked group: the canvas leaves it
+  const stuckOf = (id: string) =>
+    locked.has(id) ||
+    locked.has(elements.find(({ element }) => element.id === id)?.layer ?? "");
+  const stuck = single !== null && stuckOf(single);
+  // Each selected item that shows, by its outline: an element's box, a
+  // group's frame, turned
+  const parts = selected.flatMap((id) => {
+    const turned =
+      elements.find(({ element }) => element.id === id)?.element ??
+      frames.get(id);
+    return turned ? [{ id, turned }] : [];
+  });
+  // The box around several that show
+  const around =
+    parts.length > 1 ? unionBox(parts.map((p) => extent(p.turned))) : null;
+
+  // The selected item a press there would move, the front-most: a group by
+  // its frame, else the element picked, when selected. Not a locked one.
+  const selectedAt = (point: Point, picked: string | null) =>
+    [...view.layers].reverse().find((layer) => {
+      const f = selected.includes(layer.id) && frames.get(layer.id);
+      return f && !locked.has(layer.id) && holdsTurned(f, point);
+    })?.id ?? (picked !== null && selected.includes(picked) ? picked : null);
+  // A press on the selection moves all of it: several, or one group
+  const movesAll = selected.length > 1 || !!groupFrame;
 
   // A drag from a press, its cursor kept on the whole stage until it ends,
   // and one step of the history. The stage takes the pointer, so a press on
@@ -759,6 +811,7 @@ export function StudioStage({
     setHeld(null);
     setMoving(null);
     setMet([]);
+    setSpanned(null);
     onHold(false);
   };
 
@@ -944,24 +997,42 @@ export function StudioStage({
       return;
     }
 
-    if (
-      chosenGroup &&
-      frame &&
-      !stuck &&
-      holdsTurned({ ...frame, rotation }, point)
-    ) {
-      // A click until it moves
-      const group = chosenGroup.id;
+    const id = pickElement(view, locked, point);
+    const on = selectedAt(point, id);
+    // A box select from empty canvas, Shift's adding to the selection
+    const startBox = (adding: string[]) =>
+      start(
+        e,
+        { kind: "box", from: point, to: point, adding, moved: false, ...at },
+        "box",
+      );
+
+    // Shift takes what's under the press out of the selection, or adds it
+    if (e.shiftKey) {
+      if (on !== null) onSelect(selected.filter((s) => s !== on));
+      else if (id !== null) onSelect([...selected, id]);
+      else startBox(selected);
+      return;
+    }
+
+    if (movesAll && on !== null) {
+      // A click until it moves. Locked ones stay (onNudge), and the rest
+      // stick by the box around them.
+      const moves = new Set(selected.filter((s) => !stuckOf(s)));
+      const box = unionBox(
+        parts.filter((p) => moves.has(p.id)).map((p) => extent(p.turned)),
+      )!;
       start(
         e,
         {
           kind: "group",
-          id: group,
+          ids: selected,
+          on,
           point,
           moved: false,
           sent: [0, 0],
-          frame: { ...frame, rotation },
-          lines: linesBut((layer) => layer === group),
+          frame: { ...box, rotation: 0 },
+          lines: linesBut((layer, el) => moves.has(layer) || moves.has(el)),
           ...at,
         },
         "move",
@@ -969,10 +1040,12 @@ export function StudioStage({
       return;
     }
 
-    const id = pickElement(view, locked, point);
-    onSelect(id);
+    onSelect(id === null ? [] : [id]);
     const picked = elements.find(({ element }) => element.id === id);
-    if (!picked) return;
+    if (!picked) {
+      startBox([]);
+      return;
+    }
     start(
       e,
       {
@@ -1014,10 +1087,7 @@ export function StudioStage({
       const next: Over = guide
         ? guide.axis
         : pickElement(view, locked, point) !== null ||
-            (!!chosenGroup &&
-              !!frame &&
-              !stuck &&
-              holdsTurned({ ...frame, rotation }, point))
+            (movesAll && selectedAt(point, null) !== null)
           ? "move"
           : null;
       if (next !== over) setOver(next);
@@ -1072,6 +1142,17 @@ export function StudioStage({
     if (!d.moved) {
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < DRAG_START) return;
       d.moved = true;
+    }
+    if (d.kind === "box") {
+      const fitted = stageRef.current?.fit();
+      if (!fitted?.scale) return;
+      d.to = toCanvas(
+        { x: e.clientX, y: e.clientY },
+        root.current!.getBoundingClientRect(),
+        fitted,
+      );
+      setSpanned(spanOf(d.from, d.to));
+      return;
     }
     if (d.kind === "rotate") {
       // Shift turns it in steps of 15 degrees
@@ -1133,7 +1214,7 @@ export function StudioStage({
             ),
       );
       if (dx === d.sent[0] && dy === d.sent[1]) return;
-      onShift(d.id, dx - d.sent[0], dy - d.sent[1]);
+      onNudge(d.ids, dx - d.sent[0], dy - d.sent[1]);
       d.sent = [dx, dy];
       return;
     }
@@ -1180,8 +1261,14 @@ export function StudioStage({
   const onPointerUp = () => {
     const d = drag.current;
     end();
+    // A click on the selection: in one group, what's under it; among
+    // several, the one it was on
     if (d?.kind === "group" && !d.moved) {
-      onSelect(pickElement(view, locked, d.point));
+      const id = d.ids.length > 1 ? d.on : pickElement(view, locked, d.point);
+      onSelect(id === null ? [] : [id]);
+    }
+    if (d?.kind === "box" && d.moved) {
+      onSelect([...d.adding, ...touching(view, locked, spanOf(d.from, d.to))]);
     }
     // Saved once, where it was let go: nothing for one that didn't move
     if (d?.kind === "guide") {
@@ -1221,30 +1308,38 @@ export function StudioStage({
       }
       return;
     }
-    if (!selected) return;
+    if (selected.length === 0) return;
     if (e.key === "Escape") {
       e.stopPropagation();
-      onSelect(null);
+      onSelect([]);
       return;
     }
     // Backspace too, a Mac's delete key. Not a locked one, as the arrows
     // leave it: the list's Delete and the trash still take it.
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
-      if (!stuck) onDelete(selected);
+      const free = selected.filter((id) => !stuckOf(id));
+      if (free.length > 0) onDelete(free);
       return;
     }
     const nudge = NUDGES[e.key];
-    if (!nudge || !frame) return;
+    if (!nudge) return;
+    const step = e.shiftKey ? 10 : 1;
+    if (single === null) {
+      // Several, together: locked ones stay
+      e.preventDefault();
+      onNudge(selected, nudge[0] * step, nudge[1] * step);
+      return;
+    }
+    if (!frame) return;
     e.preventDefault();
     if (stuck) return;
-    const step = e.shiftKey ? 10 : 1;
     if (chosenGroup) {
       onShift(chosenGroup.id, nudge[0] * step, nudge[1] * step);
       return;
     }
     onBox(
-      selected,
+      single,
       roundBox({
         ...frame,
         x: frame.x + nudge[0] * step,
@@ -1253,15 +1348,15 @@ export function StudioStage({
     );
   };
 
-  const outline: CSSProperties | undefined = frame
-    ? {
-        left: fit.left + frame.x * fit.scale,
-        top: fit.top + frame.y * fit.scale,
-        width: frame.width * fit.scale,
-        height: frame.height * fit.scale,
-        transform: rotation ? `rotate(${rotation}deg)` : undefined,
-      }
-    : undefined;
+  // A box on the canvas, turned, in the root's px
+  const placed = (box: Box, turn = 0): CSSProperties => ({
+    left: fit.left + box.x * fit.scale,
+    top: fit.top + box.y * fit.scale,
+    width: box.width * fit.scale,
+    height: box.height * fit.scale,
+    transform: turn ? `rotate(${turn}deg)` : undefined,
+  });
+  const outline = frame ? placed(frame, rotation) : undefined;
 
   // The crop frame while cropping, turned with its element and rounded as
   // its picture will be
@@ -1446,6 +1541,32 @@ export function StudioStage({
                       </>
                     )}
                   </div>
+                )}
+                {/* Several: each one's outline, and a fainter box around
+                    them all. No handles: several don't resize or turn. */}
+                {!draft &&
+                  single === null &&
+                  parts.map(({ id, turned }) => (
+                    <div
+                      key={id}
+                      className={styles.selection}
+                      style={placed(turned, turned.rotation)}
+                      data-selected={id}
+                    />
+                  ))}
+                {!draft && around && (
+                  <div
+                    className={styles.selection_around}
+                    style={placed(around)}
+                    data-selected-around
+                  />
+                )}
+                {spanned && (
+                  <div
+                    className={styles.box_select}
+                    style={placed(spanned)}
+                    data-box-select
+                  />
                 )}
               </div>
             </div>

@@ -12,7 +12,14 @@ import { Btn } from "@/components";
 import { cx } from "@/helper/cx";
 import { useMenu } from "@/hooks";
 import { useT } from "@/ui/i18n";
-import { DragEvent, KeyboardEvent, useId, useRef, useState } from "react";
+import {
+  DragEvent,
+  KeyboardEvent,
+  MouseEvent,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { flushSync } from "react-dom";
 import {
   FiChevronDown,
@@ -35,8 +42,8 @@ export type ElementFlags = Partial<Pick<StudioElement, "locked" | "hidden">>;
 type Props = {
   // Back to front, as the overlay keeps them, and so are groups' elements
   items: StudioItem[];
-  // A group's id or an element's
-  selected: string | null;
+  // The selected groups' and elements' ids
+  selected: string[];
   // What each element's and group's row says: its name, its kind and When
   // for screen readers, and the event it reacts to, null when it doesn't
   names: Record<string, { name: string; meta: string; when: string | null }>;
@@ -44,12 +51,12 @@ type Props = {
   gifts: CustomGift[];
   // The group the menu adds to, none to add on its own
   target: StudioGroup | undefined;
-  // A group's id or an element's, null to let go of the selection
-  onSelect: (id: string | null) => void;
+  // Picks these groups and elements, [] to let go of the selection
+  onSelect: (ids: string[]) => void;
   onAddGroup: () => void;
   onAdd: (kind: StudioElementKind) => void;
-  // Deletes a group with its elements, or an element
-  onDelete: (id: string) => void;
+  // Deletes groups with their elements, and elements
+  onDelete: (ids: string[]) => void;
   // The list's view, which Undo leaves alone
   onFold: (groupId: string, folded: boolean) => void;
   onFlags: (groupId: string, flags: GroupFlags) => void;
@@ -100,9 +107,9 @@ const stepOf = (e: KeyboardEvent) =>
 
 /**
  * The overlay's groups and the elements on their own as a tree, the front
- * on top, each group with its elements under it: select one, fold, lock or
- * hide a group, lock or hide an element, drag a grip or use its arrows to
- * reorder, and add or delete from the header.
+ * on top, each group with its elements under it: select one or several,
+ * fold, lock or hide a group, lock or hide an element, drag a grip or use
+ * its arrows to reorder, and add or delete from the header.
  */
 export function LayersPanel({
   items,
@@ -189,14 +196,33 @@ export function LayersPanel({
     </>
   );
 
-  const selectedGroup = groups.find((g) => g.id === selected);
+  // The one selected, null for none or several
+  const single = selected.length === 1 ? selected[0] : null;
+  const selectedGroup = groups.find((g) => g.id === single);
   const selectedElement =
-    !selectedGroup && selected !== null && findElement(items, selected);
-  const remove = selectedGroup
-    ? t("studio.editor.deleteGroup")
-    : selectedElement
-      ? t("studio.editor.deleteElement")
-      : t("studio.editor.deleteNone");
+    !selectedGroup && single !== null && findElement(items, single);
+  const remove =
+    selected.length > 1
+      ? t("studio.multi.delete")
+      : selectedGroup
+        ? t("studio.editor.deleteGroup")
+        : selectedElement
+          ? t("studio.editor.deleteElement")
+          : t("studio.editor.deleteNone");
+
+  // Shift or Ctrl (Cmd) and a click toggles a row in or out of the
+  // selection; a plain click selects it alone. An element can't be selected
+  // with its group, so one toggled in takes its group's place, as a group
+  // toggled in takes its elements'.
+  const pick = (e: MouseEvent, id: string, holder: string | null) => {
+    if (!(e.shiftKey || e.ctrlKey || e.metaKey)) {
+      onSelect([id]);
+    } else if (selected.includes(id)) {
+      onSelect(selected.filter((s) => s !== id));
+    } else {
+      onSelect([...selected.filter((s) => s !== holder), id]);
+    }
+  };
 
   const plan = ((): Plan | null => {
     const over = drag?.over;
@@ -333,20 +359,22 @@ export function LayersPanel({
   };
 
   // Delete, and Backspace (a Mac's delete key), remove the selection as the
-  // trash does. The focus goes on to the row after it, or before it at the
-  // end, so the keyboard can go on.
+  // trash does. The focus goes on to the row after the last one going, or
+  // before it at the end, so the keyboard can go on.
   const removeByKey = (e: KeyboardEvent) => {
     if (e.key !== "Delete" && e.key !== "Backspace") return;
-    if (selected === null) return;
+    if (selected.length === 0) return;
     e.preventDefault();
     const gone = new Set([
-      selected,
-      ...(selectedGroup?.elements.map((element) => element.id) ?? []),
+      ...selected,
+      ...groups
+        .filter((g) => selected.includes(g.id))
+        .flatMap((g) => g.elements.map((element) => element.id)),
     ]);
     const ids = Array.from(
       list.current?.querySelectorAll<HTMLElement>("[data-select]") ?? [],
     ).map((button) => button.dataset.select!);
-    const at = ids.indexOf(selected);
+    const at = Math.max(...ids.map((id, i) => (gone.has(id) ? i : -1)));
     const next =
       ids.slice(at + 1).find((id) => !gone.has(id)) ??
       ids
@@ -389,7 +417,7 @@ export function LayersPanel({
           styles.layer,
           styles.element_row,
           element.hidden && styles.element_hidden,
-          element.id === selected && styles.layer_selected,
+          selected.includes(element.id) && styles.layer_selected,
           drag?.id === element.id && styles.layer_dragged,
           lineOf(element.id, !inGroup),
         )}
@@ -402,9 +430,9 @@ export function LayersPanel({
         <button
           type="button"
           className={styles.layer_select}
-          aria-pressed={element.id === selected}
+          aria-pressed={selected.includes(element.id)}
           data-select={element.id}
-          onClick={() => onSelect(element.id)}
+          onClick={(e) => pick(e, element.id, inGroup ? item : null)}
         >
           <LayerThumb element={element} gifts={gifts} />
           <span className={styles.layer_text}>
@@ -436,7 +464,7 @@ export function LayersPanel({
         key={group.id}
         className={cx(
           styles.group_item,
-          group.id === selected && styles.group_selected,
+          selected.includes(group.id) && styles.group_selected,
           group.hidden && styles.group_hidden,
           drag?.id === group.id && styles.layer_dragged,
           lineOf(group.id, true),
@@ -448,7 +476,7 @@ export function LayersPanel({
           className={cx(
             styles.layer,
             styles.group_row,
-            group.id === selected && styles.layer_selected,
+            selected.includes(group.id) && styles.layer_selected,
             lineOf(group.id, false),
           )}
           onDragOver={(e) => dragOver(e, { item: group.id })}
@@ -474,9 +502,9 @@ export function LayersPanel({
           <button
             type="button"
             className={styles.layer_select}
-            aria-pressed={group.id === selected}
+            aria-pressed={selected.includes(group.id)}
             data-select={group.id}
-            onClick={() => onSelect(group.id)}
+            onClick={(e) => pick(e, group.id, null)}
           >
             <span className={styles.layer_text}>
               <span className={styles.layer_name}>{name}</span>
@@ -586,10 +614,10 @@ export function LayersPanel({
             variant="icon"
             title={remove}
             aria-label={remove}
-            disabled={selected === null}
+            disabled={selected.length === 0}
             // At once, a group with its elements too: Undo brings it back
             onClick={() => {
-              if (selected !== null) onDelete(selected);
+              if (selected.length > 0) onDelete(selected);
             }}
           >
             <FiTrash2 size={18} />
@@ -636,7 +664,7 @@ export function LayersPanel({
               e.target instanceof Element &&
               !e.target.closest("[data-item]")
             ) {
-              onSelect(null);
+              onSelect([]);
             }
           }}
         >
