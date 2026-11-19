@@ -18,8 +18,10 @@ import {
 import { AlignTo, Box, Turned, Words } from "./helper";
 import styles from "./studioeditor.module.css";
 
-// The canvas's edges and middles, across then down
-const ALIGNS_TO: { to: AlignTo; label: MessageKey; Icon: IconType }[][] = [
+type AlignButton = { to: AlignTo; label: MessageKey; Icon: IconType };
+
+// The canvas's edges and middles, across then down, and several items' own
+export const ALIGNS_TO: AlignButton[][] = [
   [
     { to: "left", label: "studio.alignTo.left", Icon: LuAlignStartVertical },
     {

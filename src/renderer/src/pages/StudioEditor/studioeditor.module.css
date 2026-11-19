@@ -846,6 +846,11 @@
   padding: var(--space-4);
 }
 
+/* Under a title row with actions, as several selected have */
+.panel_header + .settings {
+  padding-top: var(--space-2);
+}
+
 /* Two fields side by side, like size and color */
 .pair {
   display: grid;

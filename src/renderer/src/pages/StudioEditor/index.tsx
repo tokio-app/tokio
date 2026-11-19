@@ -72,16 +72,22 @@ import { LuRedo2, LuUndo2 } from "react-icons/lu";
 import { ElementSettings } from "./ElementSettings";
 import { Embed } from "./Embed";
 import {
+  alignEach,
   alignTo,
   Box,
+  extent,
   flipInFrame,
+  groupElements,
   groupFrame,
   reframe,
+  spaceEvenly,
   Turned,
   elementName,
   mapElements,
   moveElement,
   moveItem,
+  moveItems,
+  Point,
   pictureSource,
   recrop,
   sourceValue,
@@ -94,6 +100,7 @@ import {
 import * as clipboard from "./clipboard";
 import { GroupSettings } from "./GroupSettings";
 import { ElementFlags, GroupFlags, LayersPanel } from "./LayersPanel";
+import { MultiSettings } from "./MultiSettings";
 import { OverlaySettings } from "./OverlaySettings";
 import { StudioStage } from "./StudioStage";
 import styles from "./studioeditor.module.css";
@@ -484,14 +491,17 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     }
   };
 
-  const addGroup = () => {
-    if (groups.length >= STUDIO_MAX_GROUPS) return;
-    // "Group N", the first number no group's name uses
-    const added = newStudioGroup(
+  // "Group N", the first number no group's name uses
+  const newGroup = () =>
+    newStudioGroup(
       newOverlayName(groups, (number) =>
         t("studio.editor.groupName", { number: String(number) }),
       ),
     );
+
+  const addGroup = () => {
+    if (groups.length >= STUDIO_MAX_GROUPS) return;
+    const added = newGroup();
     // In front of the rest
     setItems((items) => [...items, added]);
     setSelected([added.id]);
@@ -587,30 +597,10 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   // Groups and elements moved together by whole px, in one change. A group
   // takes its elements, locked ones too, as when it moves alone; a locked
   // group or element stays, and so does an element of a locked group.
-  const nudge = (ids: string[], dx: number, dy: number) => {
-    const moving = new Set(ids);
-    const moved = <E extends StudioElement>(e: E): E => ({
-      ...e,
-      x: e.x + dx,
-      y: e.y + dy,
-    });
+  const nudge = (ids: string[], dx: number, dy: number) =>
     setItems((items) =>
-      items.map((item) => {
-        if (item.kind !== "group") {
-          return moving.has(item.id) && !item.locked ? moved(item) : item;
-        }
-        if (item.locked) return item;
-        return {
-          ...item,
-          elements: item.elements.map((e) =>
-            moving.has(item.id) || (moving.has(e.id) && !e.locked)
-              ? moved(e)
-              : e,
-          ),
-        };
-      }),
+      moveItems(items, new Map(ids.map((id) => [id, { x: dx, y: dy }]))),
     );
-  };
 
   // A group's frame, around its elements as they show
   const frameOf = (g: StudioGroup) =>
@@ -627,6 +617,35 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     }),
   );
   const canvas = STUDIO_SIZES[overlay.size];
+
+  // Several selected move together, each by its own step from how they show
+  // (an element's turned box, a group's frame), in one change. A group with
+  // nothing shown has no place to go from.
+  const arrange = (steps: (boxes: Box[]) => Point[]) => {
+    const shown = selected.flatMap((id) => {
+      const g = groups.find((item) => item.id === id);
+      const turned = g ? frameOf(g) : elements.find((e) => e.id === id);
+      return turned ? [{ id, box: extent(turned) }] : [];
+    });
+    const by = steps(shown.map(({ box }) => box));
+    setItems((items) =>
+      moveItems(items, new Map(shown.map(({ id }, i) => [id, by[i]]))),
+    );
+  };
+
+  // Groups don't nest, and the overlay's groups have a cap
+  const noGroup = selected.some((id) => groups.some((g) => g.id === id))
+    ? "nested"
+    : groups.length >= STUDIO_MAX_GROUPS
+      ? "full"
+      : null;
+  // The selected elements in a new group, which is then the selection
+  const groupSelected = () => {
+    if (noGroup) return;
+    const added = newGroup();
+    setItems((items) => groupElements(items, selected, added));
+    setSelected([added.id]);
+  };
 
   // A group's elements when a change to its frame began, by the frame it
   // began from: every step of a drag, or of a run of changes in its fields,
@@ -868,7 +887,16 @@ function Editor({ saved }: { saved: StudioOverlay }) {
           </div>
 
           <div className={styles.panel}>
-            {group ? (
+            {selected.length > 1 ? (
+              <MultiSettings
+                count={selected.length}
+                noGroup={noGroup}
+                onAlign={(to) => arrange((boxes) => alignEach(boxes, to))}
+                onSpace={(axis) => arrange((boxes) => spaceEvenly(boxes, axis))}
+                onGroup={groupSelected}
+                onDelete={() => remove(selected)}
+              />
+            ) : group ? (
               <GroupSettings
                 key={group.id}
                 group={group}

@@ -4564,6 +4564,8 @@ describe("several selected", () => {
     await user.click(row(name));
     await user.keyboard(`{/${key}}`);
   };
+  const trash = () =>
+    page().getAllByRole("button", { name: "Delete the selection" });
   const pressed = (name: RegExp) => row(name).getAttribute("aria-pressed");
   const shape = (
     label: string,
@@ -4622,7 +4624,8 @@ describe("several selected", () => {
     // Top = front: Cal, Bob, Frame, Dee, Ann
     await user.click(row(/^Bob/));
     await toggle(user, /^Frame/);
-    expect(deleteButton("Delete the selection")).toBeEnabled();
+    // The Elements panel's trash, and the settings' own
+    expect(trash()).toHaveLength(2);
     await user.keyboard("{Delete}");
     await waitFor(() => expect(savedIds()).toEqual([ann.id, cal.id]));
     // The row after the last one going takes the focus
@@ -4642,7 +4645,7 @@ describe("several selected", () => {
     await studio(lastSave()!);
     await user.click(row(/^Ann/));
     await toggle(user, /^Cal/);
-    await user.click(deleteButton("Delete the selection"));
+    await user.click(trash()[0]);
     await waitFor(() =>
       expect(savedIds()).toEqual([[frame.id, frame.elements[0].id], bob.id]),
     );
@@ -4700,5 +4703,125 @@ describe("several selected", () => {
     await user.click(undo());
     await waitFor(() => expect(savedIds()?.[0]).toBe(ann.id));
     expect(savedNames()).toEqual(["Ann", "Frame", "Cal"]);
+  });
+
+  const action = (name: string) => page().getByRole("button", { name });
+
+  it("aligns them to each other, a group by its frame, the locked one staying, in one step", async () => {
+    const ann = shape("Ann", { x: 100, y: 100, width: 100, height: 50 });
+    const bob = shape("Bob", { x: 300, y: 400, width: 200, height: 100 });
+    const cal = shape("Cal", { x: 500, y: 0, locked: true });
+    const dee = shape("Dee", { x: 600, y: 50, width: 100, height: 100 });
+    const { user } = await open(holding(ann, bob, cal, group("Frame", [dee])));
+
+    await user.click(row(/^Ann/));
+    await toggle(user, /^Bob/);
+    await toggle(user, /^Cal/);
+    expect(page().getByRole("heading", { name: "3 selected" })).toBeVisible();
+    await user.click(
+      field("Align to each other").getByRole("button", { name: "Align left" }),
+    );
+    await waitFor(() =>
+      expect(lastSave()?.items.slice(0, 3)).toMatchObject([
+        { x: 100 },
+        { x: 100 },
+        { x: 500 },
+      ]),
+    );
+    await studio(lastSave()!);
+    await user.click(undo());
+    await waitFor(() =>
+      expect(lastSave()?.items[1]).toMatchObject({ x: 300, y: 400 }),
+    );
+
+    // The group's elements move with it; the box around them is 600–700
+    await studio(lastSave()!);
+    await user.click(row(/^Ann/));
+    await toggle(user, /^Frame/);
+    await user.click(action("Align right"));
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({ x: 600, y: 100 }),
+    );
+    await user.click(action("Align top"));
+    await waitFor(() => expect(lastSave()?.items[0]).toMatchObject({ y: 50 }));
+    expect(savedGroup(3)?.elements[0]).toMatchObject({ x: 600, y: 50 });
+  });
+
+  it("spaces three or more evenly, across and down, in one step", async () => {
+    const ann = shape("Ann", { x: 0, y: 0, width: 100, height: 100 });
+    const bob = shape("Bob", { x: 150, y: 150, width: 100, height: 100 });
+    const cal = shape("Cal", { x: 900, y: 1000, width: 100, height: 100 });
+    const { user } = await open(holding(ann, bob, cal));
+
+    await user.click(row(/^Ann/));
+    await toggle(user, /^Cal/);
+    const few = page().getAllByRole("button", {
+      name: "Select 3 or more to space them evenly",
+    });
+    expect(few).toHaveLength(2);
+    for (const button of few) expect(button).toBeDisabled();
+
+    await toggle(user, /^Bob/);
+    await user.click(action("Space evenly across"));
+    await waitFor(() =>
+      expect(lastSave()?.items[1]).toMatchObject({ x: 450, y: 150 }),
+    );
+    await user.click(action("Space evenly down"));
+    await waitFor(() =>
+      expect(lastSave()?.items[1]).toMatchObject({ x: 450, y: 500 }),
+    );
+    expect(lastSave()?.items[2]).toMatchObject({ x: 900, y: 1000 });
+
+    await studio(lastSave()!);
+    await user.click(undo());
+    await waitFor(() =>
+      expect(lastSave()?.items[1]).toMatchObject({ x: 450, y: 150 }),
+    );
+  });
+
+  it("puts the elements in a new group where the front-most was, in one step", async () => {
+    const ann = shape("Ann");
+    const bob = shape("Bob");
+    const cal = shape("Cal");
+    const dee = shape("Dee");
+    const frame = group("Group 1", [bob, cal]);
+    const { user } = await open(holding(ann, frame, dee));
+
+    await user.click(row(/^Dee/));
+    await toggle(user, /^Bob/);
+    await user.click(action("Put them in a new group"));
+
+    await waitFor(() =>
+      expect(savedIds()).toEqual([
+        ann.id,
+        [frame.id, cal.id],
+        [lastSave()!.items[2].id, bob.id, dee.id],
+      ]),
+    );
+    expect(savedNames()).toEqual(["Ann", "Group 1", "Group 2"]);
+    // The new group is the selection
+    expect(page().getByRole("heading", { name: "Group" })).toBeVisible();
+    expect(field("Name").getByRole("textbox")).toHaveValue("Group 2");
+
+    await studio(lastSave()!);
+    await user.click(undo());
+    await waitFor(() =>
+      expect(savedIds()).toEqual([ann.id, [frame.id, bob.id, cal.id], dee.id]),
+    );
+  });
+
+  it("doesn't group a group, as groups don't nest, and deletes them all", async () => {
+    const ann = shape("Ann");
+    const { user } = await open(holding(ann, group("Frame", [shape("Bob")])));
+
+    await user.click(row(/^Ann/));
+    await toggle(user, /^Frame/);
+    expect(action("A group can't go inside another group")).toBeDisabled();
+
+    await user.click(trash()[1]);
+    await waitFor(() => expect(lastSave()?.items).toEqual([]));
+    expect(
+      page().getByRole("heading", { name: "Overlay settings" }),
+    ).toBeVisible();
   });
 });
