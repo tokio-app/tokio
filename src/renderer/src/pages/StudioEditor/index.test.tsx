@@ -4647,4 +4647,58 @@ describe("several selected", () => {
       expect(savedIds()).toEqual([[frame.id, frame.elements[0].id], bob.id]),
     );
   });
+
+  const key = (key: string) =>
+    fireEvent.keyDown(document.body, { key, ctrlKey: true });
+
+  it("copies them back to front, an element from a group on its own, and pastes them all", async () => {
+    const ann = shape("Ann", { x: 100, y: 100 });
+    const cal = shape("Cal", { x: 300, y: 300 });
+    const frame = group("Frame", [shape("Bob"), cal]);
+    const { user } = await open(holding(ann, frame));
+
+    // Picked front first, taken back to front
+    await user.click(row(/^Cal/));
+    await toggle(user, /^Ann/);
+    key("c");
+    key("v");
+
+    await waitFor(() => expect(lastSave()?.items).toHaveLength(4));
+    const [annCopy, calCopy] = lastSave()!.items.slice(2);
+    expect(annCopy).toEqual({ ...ann, id: annCopy.id, x: 120, y: 120 });
+    expect(calCopy).toEqual({ ...cal, id: calCopy.id, x: 320, y: 320 });
+    expect(savedGroup(1)?.elements).toHaveLength(2);
+    // The copies are the selection
+    expect(
+      document.querySelector(`[data-select="${annCopy.id}"]`),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      document.querySelector(`[data-select="${calCopy.id}"]`),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("cuts them in one step, and pastes them where they were", async () => {
+    const ann = shape("Ann", { x: 100, y: 100 });
+    const frame = group("Frame", [shape("Bob", { x: 50, y: 50 })]);
+    const { user } = await open(holding(ann, frame, shape("Cal")));
+
+    await user.click(row(/^Ann/));
+    await toggle(user, /^Frame/);
+    key("x");
+    await waitFor(() => expect(savedNames()).toEqual(["Cal"]));
+
+    await studio(lastSave()!);
+    key("v");
+    await waitFor(() => expect(lastSave()?.items).toHaveLength(3));
+    expect(lastSave()!.items[1]).toMatchObject({ label: "Ann", x: 100 });
+    expect(groupIn(lastSave(), 2)?.elements[0]).toMatchObject({ x: 50 });
+
+    await studio(lastSave()!);
+    await user.click(undo());
+    await waitFor(() => expect(savedNames()).toEqual(["Cal"]));
+    await studio(lastSave()!);
+    await user.click(undo());
+    await waitFor(() => expect(savedIds()?.[0]).toBe(ann.id));
+    expect(savedNames()).toEqual(["Ann", "Frame", "Cal"]);
+  });
 });

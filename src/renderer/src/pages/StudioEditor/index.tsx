@@ -531,12 +531,19 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     setSelected((current) => current.filter((id) => !gone.has(id)));
   };
 
-  // The selected group, or element wherever it is, to copy or cut
+  // The selected groups and elements, back to front as the overlay keeps
+  // them, to copy or cut: an element from a group goes as an element
   const copy = (cut: boolean) => {
-    const item = group ?? element;
-    if (!item) return;
-    clipboard.copy([item], cut);
-    if (cut) remove([item.id]);
+    const taken = overlay.items.flatMap((item) =>
+      selected.includes(item.id)
+        ? [item]
+        : item.kind === "group"
+          ? item.elements.filter((e) => selected.includes(e.id))
+          : [],
+    );
+    if (taken.length === 0) return;
+    clipboard.copy(taken, cut);
+    if (cut) remove(selected);
   };
 
   // Copies with new ids where the + menu adds: elements into the selected
