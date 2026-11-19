@@ -299,6 +299,9 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  /* A Shift-click would select the names between, and Ctrl+C would copy
+     them as text instead of the selection */
+  user-select: none;
 }
 
 .group_row .layer_select {

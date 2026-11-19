@@ -4547,3 +4547,104 @@ describe("selecting several on the canvas", () => {
     );
   });
 });
+
+describe("several selected", () => {
+  beforeEach(() => {
+    Element.prototype.setPointerCapture = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  type User = Awaited<ReturnType<typeof open>>["user"];
+  // A click on a row with a key held: Shift, Control or Meta
+  const toggle = async (user: User, name: RegExp, key = "Shift") => {
+    await user.keyboard(`{${key}>}`);
+    await user.click(row(name));
+    await user.keyboard(`{/${key}}`);
+  };
+  const pressed = (name: RegExp) => row(name).getAttribute("aria-pressed");
+  const shape = (
+    label: string,
+    patch: Partial<StudioElementOf<"shape">> = {},
+  ) => elementOf("shape", { label, ...patch });
+
+  it("toggles rows in and out with Shift, Ctrl or Cmd, and a plain click picks one", async () => {
+    const { user } = await open(
+      holding(shape("Ann"), shape("Bob"), group("Frame", [shape("Cal")])),
+    );
+
+    await user.click(row(/^Ann/));
+    await toggle(user, /^Bob/);
+    expect(pressed(/^Ann/)).toBe("true");
+    expect(pressed(/^Bob/)).toBe("true");
+
+    await toggle(user, /^Frame/, "Control");
+    expect(pressed(/^Frame/)).toBe("true");
+    await toggle(user, /^Bob/, "Meta");
+    expect(pressed(/^Bob/)).toBe("false");
+    expect(pressed(/^Frame/)).toBe("true");
+
+    await user.click(row(/^Cal/));
+    expect(pressed(/^Ann/)).toBe("false");
+    expect(pressed(/^Frame/)).toBe("false");
+    expect(pressed(/^Cal/)).toBe("true");
+    expect(field("Name").getByRole("textbox")).toHaveValue("Cal");
+  });
+
+  it("takes a group's place for an element of it toggled in, and the other way", async () => {
+    const { user } = await open(
+      holding(shape("Ann"), group("Frame", [shape("Cal"), shape("Dee")])),
+    );
+
+    await user.click(row(/^Ann/));
+    await toggle(user, /^Frame/);
+    await toggle(user, /^Cal/);
+    expect(pressed(/^Frame/)).toBe("false");
+    expect(pressed(/^Cal/)).toBe("true");
+    expect(pressed(/^Ann/)).toBe("true");
+
+    await toggle(user, /^Dee/);
+    await toggle(user, /^Frame/);
+    expect(pressed(/^Frame/)).toBe("true");
+    expect(pressed(/^Cal/)).toBe("false");
+    expect(pressed(/^Dee/)).toBe("false");
+  });
+
+  it("deletes them all from the list, locked ones too, in one step", async () => {
+    const ann = shape("Ann");
+    const bob = shape("Bob", { locked: true });
+    const cal = shape("Cal");
+    const frame = group("Frame", [shape("Dee")]);
+    const { user } = await open(holding(ann, frame, bob, cal));
+
+    // Top = front: Cal, Bob, Frame, Dee, Ann
+    await user.click(row(/^Bob/));
+    await toggle(user, /^Frame/);
+    expect(deleteButton("Delete the selection")).toBeEnabled();
+    await user.keyboard("{Delete}");
+    await waitFor(() => expect(savedIds()).toEqual([ann.id, cal.id]));
+    // The row after the last one going takes the focus
+    expect(row(/^Ann/)).toHaveFocus();
+
+    await studio(lastSave()!);
+    await user.click(undo());
+    await waitFor(() =>
+      expect(savedIds()).toEqual([
+        ann.id,
+        [frame.id, frame.elements[0].id],
+        bob.id,
+        cal.id,
+      ]),
+    );
+
+    await studio(lastSave()!);
+    await user.click(row(/^Ann/));
+    await toggle(user, /^Cal/);
+    await user.click(deleteButton("Delete the selection"));
+    await waitFor(() =>
+      expect(savedIds()).toEqual([[frame.id, frame.elements[0].id], bob.id]),
+    );
+  });
+});

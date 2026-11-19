@@ -12,7 +12,14 @@ import { Btn } from "@/components";
 import { cx } from "@/helper/cx";
 import { useMenu } from "@/hooks";
 import { useT } from "@/ui/i18n";
-import { DragEvent, KeyboardEvent, useId, useRef, useState } from "react";
+import {
+  DragEvent,
+  KeyboardEvent,
+  MouseEvent,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { flushSync } from "react-dom";
 import {
   FiChevronDown,
@@ -100,9 +107,9 @@ const stepOf = (e: KeyboardEvent) =>
 
 /**
  * The overlay's groups and the elements on their own as a tree, the front
- * on top, each group with its elements under it: select one, fold, lock or
- * hide a group, lock or hide an element, drag a grip or use its arrows to
- * reorder, and add or delete from the header.
+ * on top, each group with its elements under it: select one or several,
+ * fold, lock or hide a group, lock or hide an element, drag a grip or use
+ * its arrows to reorder, and add or delete from the header.
  */
 export function LayersPanel({
   items,
@@ -194,11 +201,28 @@ export function LayersPanel({
   const selectedGroup = groups.find((g) => g.id === single);
   const selectedElement =
     !selectedGroup && single !== null && findElement(items, single);
-  const remove = selectedGroup
-    ? t("studio.editor.deleteGroup")
-    : selectedElement
-      ? t("studio.editor.deleteElement")
-      : t("studio.editor.deleteNone");
+  const remove =
+    selected.length > 1
+      ? t("studio.multi.delete")
+      : selectedGroup
+        ? t("studio.editor.deleteGroup")
+        : selectedElement
+          ? t("studio.editor.deleteElement")
+          : t("studio.editor.deleteNone");
+
+  // Shift or Ctrl (Cmd) and a click toggles a row in or out of the
+  // selection; a plain click selects it alone. An element can't be selected
+  // with its group, so one toggled in takes its group's place, as a group
+  // toggled in takes its elements'.
+  const pick = (e: MouseEvent, id: string, holder: string | null) => {
+    if (!(e.shiftKey || e.ctrlKey || e.metaKey)) {
+      onSelect([id]);
+    } else if (selected.includes(id)) {
+      onSelect(selected.filter((s) => s !== id));
+    } else {
+      onSelect([...selected.filter((s) => s !== holder), id]);
+    }
+  };
 
   const plan = ((): Plan | null => {
     const over = drag?.over;
@@ -335,28 +359,29 @@ export function LayersPanel({
   };
 
   // Delete, and Backspace (a Mac's delete key), remove the selection as the
-  // trash does. The focus goes on to the row after it, or before it at the
-  // end, so the keyboard can go on.
+  // trash does. The focus goes on to the row after the last one going, or
+  // before it at the end, so the keyboard can go on.
   const removeByKey = (e: KeyboardEvent) => {
     if (e.key !== "Delete" && e.key !== "Backspace") return;
-    // Several: PR 5's list work
-    if (single === null) return;
+    if (selected.length === 0) return;
     e.preventDefault();
     const gone = new Set([
-      single,
-      ...(selectedGroup?.elements.map((element) => element.id) ?? []),
+      ...selected,
+      ...groups
+        .filter((g) => selected.includes(g.id))
+        .flatMap((g) => g.elements.map((element) => element.id)),
     ]);
     const ids = Array.from(
       list.current?.querySelectorAll<HTMLElement>("[data-select]") ?? [],
     ).map((button) => button.dataset.select!);
-    const at = ids.indexOf(single);
+    const at = Math.max(...ids.map((id, i) => (gone.has(id) ? i : -1)));
     const next =
       ids.slice(at + 1).find((id) => !gone.has(id)) ??
       ids
         .slice(0, Math.max(at, 0))
         .reverse()
         .find((id) => !gone.has(id));
-    flushSync(() => onDelete([single]));
+    flushSync(() => onDelete(selected));
     if (next) {
       list.current
         ?.querySelector<HTMLElement>(`[data-select="${next}"]`)
@@ -407,7 +432,7 @@ export function LayersPanel({
           className={styles.layer_select}
           aria-pressed={selected.includes(element.id)}
           data-select={element.id}
-          onClick={() => onSelect([element.id])}
+          onClick={(e) => pick(e, element.id, inGroup ? item : null)}
         >
           <LayerThumb element={element} gifts={gifts} />
           <span className={styles.layer_text}>
@@ -479,7 +504,7 @@ export function LayersPanel({
             className={styles.layer_select}
             aria-pressed={selected.includes(group.id)}
             data-select={group.id}
-            onClick={() => onSelect([group.id])}
+            onClick={(e) => pick(e, group.id, null)}
           >
             <span className={styles.layer_text}>
               <span className={styles.layer_name}>{name}</span>
