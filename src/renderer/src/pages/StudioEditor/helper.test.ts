@@ -14,6 +14,7 @@ import { gift, studioOverlay } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   alignTo,
+  alignEach,
   copyItem,
   counterWarning,
   retype,
@@ -52,6 +53,9 @@ import {
   turnTo,
   toCanvas,
   moveItem,
+  moveItems,
+  groupElements,
+  spaceEvenly,
   roundBox,
   sourceOf,
   sourceValue,
@@ -477,6 +481,178 @@ describe("alignTo", () => {
     expect(alignTo(turned, canvas, "left")).toEqual({ x: -100, y: 200 });
     expect(alignTo(turned, canvas, "top")).toEqual({ x: 100, y: 100 });
     expect(alignTo(turned, canvas, "bottom")).toEqual({ x: 100, y: 1720 });
+  });
+});
+
+describe("alignEach", () => {
+  // Around them all: 0, 0 to 300, 200
+  const boxes = [
+    { x: 0, y: 50, width: 100, height: 50 },
+    { x: 200, y: 0, width: 100, height: 200 },
+    { x: 101, y: 120, width: 50, height: 25 },
+  ];
+
+  it("lines each box up with an edge or middle of the box around them all", () => {
+    expect(alignEach(boxes, "left")).toEqual([
+      { x: 0, y: 0 },
+      { x: -200, y: 0 },
+      { x: -101, y: 0 },
+    ]);
+    // Their middles to 150, in whole px
+    expect(alignEach(boxes, "center")).toEqual([
+      { x: 100, y: 0 },
+      { x: -100, y: 0 },
+      { x: 24, y: 0 },
+    ]);
+    expect(alignEach(boxes, "right").map((p) => p.x)).toEqual([200, 0, 149]);
+    expect(alignEach(boxes, "top").map((p) => p.y)).toEqual([-50, 0, -120]);
+    // -32.5 rounds up, as Math.round does
+    expect(alignEach(boxes, "middle").map((p) => p.y)).toEqual([25, 0, -32]);
+    expect(alignEach(boxes, "bottom")).toEqual([
+      { x: 0, y: 100 },
+      { x: 0, y: 0 },
+      { x: 0, y: 55 },
+    ]);
+  });
+});
+
+describe("spaceEvenly", () => {
+  const at = (x: number, width = 100) => ({ x, y: 0, width, height: 10 });
+
+  it("gives the ones between the outermost two equal gaps, in whole px", () => {
+    // 0–100 and 900–1000 stay, and the 200 and 100 wide ones between leave
+    // 500 px: gaps of 166.67, so they start at 266.67 and 633.33
+    expect(
+      spaceEvenly([at(900), at(500), at(0), at(100, 200)], "x").map((p) => p.x),
+    ).toEqual([0, 133, 0, 167]);
+  });
+
+  it("spaces down too, by their middles", () => {
+    const down = (y: number, height: number) => ({
+      x: 0,
+      y,
+      width: 10,
+      height,
+    });
+    // The tall one starts before the one at 20, but its middle comes after
+    expect(
+      spaceEvenly(
+        [down(0, 10), down(5, 100), down(300, 10), down(20, 10)],
+        "y",
+      ),
+    ).toEqual([
+      { x: 0, y: 0 },
+      // 290 px of room less 110 taken: three gaps of 60
+      { x: 0, y: 135 },
+      { x: 0, y: 0 },
+      { x: 0, y: 50 },
+    ]);
+  });
+
+  it("moves none with fewer than 3", () => {
+    expect(spaceEvenly([at(0), at(500)], "x")).toEqual([
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ]);
+  });
+});
+
+// A group holding the elements, back to front
+const groupWith = (
+  name: string,
+  elements: StudioElement[] = [],
+  patch: Partial<StudioGroup> = {},
+): StudioGroup => ({ ...newStudioGroup(name), elements, ...patch });
+// A group's elements, none for an element
+const elementsOf = (item: StudioItem) =>
+  item.kind === "group" ? item.elements : [];
+
+describe("moveItems", () => {
+  const shape = (patch: Partial<StudioElement> = {}) =>
+    StudioElementSchema.parse({
+      ...newStudioElement("shape", "portrait"),
+      x: 10,
+      y: 10,
+      ...patch,
+    });
+
+  it("moves each by its own step, a group with its locked elements too", () => {
+    const alone = shape();
+    const locked = shape({ locked: true });
+    const inside = shape({ locked: true });
+    const frame = groupWith("Frame", [inside]);
+    const other = shape();
+    const items = [alone, locked, frame, groupWith("Other", [other])];
+
+    const moved = moveItems(
+      items,
+      new Map([
+        [alone.id, { x: 5, y: 0 }],
+        [locked.id, { x: 5, y: 0 }],
+        [frame.id, { x: 0, y: -3 }],
+        [other.id, { x: 1, y: 1 }],
+      ]),
+    );
+
+    expect(moved[0]).toMatchObject({ x: 15, y: 10 });
+    expect(moved[1]).toBe(locked);
+    expect(elementsOf(moved[2])[0]).toMatchObject({
+      x: 10,
+      y: 7,
+    });
+    expect(elementsOf(moved[3])[0]).toMatchObject({
+      x: 11,
+      y: 11,
+    });
+  });
+
+  it("leaves a locked group's elements, and a group's locked one", () => {
+    const a = shape();
+    const b = shape({ locked: true });
+    const shut = groupWith("Shut", [a], { locked: true });
+    const open = groupWith("Open", [b]);
+    const step = { x: 5, y: 5 };
+
+    const moved = moveItems(
+      [shut, open],
+      new Map([
+        [shut.id, step],
+        [a.id, step],
+        [b.id, step],
+      ]),
+    );
+
+    expect(moved[0]).toBe(shut);
+    expect(elementsOf(moved[1])[0]).toEqual(b);
+  });
+});
+
+describe("groupElements", () => {
+  const a = element("shape");
+  const b = element("text");
+  const c = element("emote");
+  const d = element("gift");
+  const added = groupWith("Group 2");
+
+  it("puts them in the group in the front-most one's place, back to front", () => {
+    const items: StudioItem[] = [a, b, c, d];
+
+    expect(groupElements(items, [c.id, a.id], added)).toEqual([
+      b,
+      { ...added, elements: [a, c] },
+      d,
+    ]);
+  });
+
+  it("takes them out of their groups, in front of the front-most one's", () => {
+    const back = groupWith("Back", [a, b]);
+    const front = groupWith("Front", [c]);
+
+    expect(groupElements([back, d, front], [b.id, d.id, c.id], added)).toEqual([
+      { ...back, elements: [a] },
+      { ...front, elements: [] },
+      { ...added, elements: [b, d, c] },
+    ]);
   });
 });
 
