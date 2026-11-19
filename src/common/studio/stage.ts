@@ -364,6 +364,31 @@ const newFigure = () => {
   return svg;
 };
 
+type BarView = Extract<StudioElementView, { kind: "bar" }>;
+
+/**
+ * A goal bar: its body is the track, and its one child the fill, from the
+ * left or the bottom. The fill's length eases in the stylesheet; a new fill
+ * draws at once, with no style to ease from, so a reload doesn't replay it
+ * from empty. Its gradient is sized to the whole track, so the second color
+ * shows as it fills.
+ */
+const fillBar = (el: HTMLElement, body: HTMLElement, bar: BarView) => {
+  const fill = only(body, HTMLDivElement, () => div("studio-bar-fill"));
+  const length = `${hundredths(bar.fill * 100)}%`;
+  fill.style.width = bar.vertical ? "100%" : length;
+  fill.style.height = bar.vertical ? length : "100%";
+  fill.style.backgroundSize = `${bar.width}px ${bar.height}px`;
+  el.classList.toggle("studio-gradient", !!bar.gradient);
+  setVariables(el, {
+    "--studio-color": bar.color,
+    "--studio-track": bar.track,
+    "--studio-radius": `${hundredths((bar.rounding / 100) * Math.min(bar.width, bar.height))}px`,
+    "--studio-color-2": bar.gradient?.color,
+    "--studio-angle": bar.gradient && `${bar.gradient.angle}deg`,
+  });
+};
+
 // Chromium keeps a detached player that still has a source alive
 const release = (video: HTMLVideoElement) => {
   video.pause();
@@ -602,6 +627,80 @@ const newAvatar = () => {
   );
   avatar.append(img, div("studio-initial"));
   return avatar;
+};
+
+type ListView = Extract<StudioElementView, { kind: "list" }>;
+
+const span = (className: string) => {
+  const el = document.createElement("span");
+  el.className = className;
+  return el;
+};
+
+// A row's picture or initial, name, message, and its value on the right
+const newRow = () => {
+  const row = div("studio-row");
+  const words = div("studio-row-text");
+  words.append(span("studio-name"), span("studio-message"));
+  const value = div("studio-value");
+  value.append(picture("studio-icon"), span("studio-number"));
+  row.append(newAvatar(), words, value);
+  return row;
+};
+
+// Whose row a node shows, so a row that moves keeps its node and picture
+const rowViewers = new WeakMap<Element, string>();
+
+const setText = (node: Element, text: string) => {
+  if (node.textContent !== text) node.textContent = text;
+};
+
+/**
+ * A list's rows, top to bottom. A viewer's row keeps its node as it moves,
+ * so their picture doesn't load again when a new row comes in on top.
+ */
+const fillList = (body: HTMLElement, list: ListView) => {
+  const rows = only(body, HTMLDivElement, () => div("studio-rows"));
+  rows.classList.toggle("studio-chat", list.source === "chat");
+  rows.classList.toggle("studio-no-pictures", !list.pictures);
+  rows.style.fontFamily = fontFamily(list.font);
+  rows.style.fontSize = `${list.size}px`;
+  rows.style.gap = `${list.gap}px`;
+  setVariables(rows, {
+    "--studio-color": list.color,
+    "--studio-value-color": list.value_color,
+  });
+
+  const old = Array.from(rows.children);
+  const free = new Map<string, Element[]>();
+  for (const node of old) {
+    const viewer = rowViewers.get(node) ?? "";
+    free.set(viewer, [...(free.get(viewer) ?? []), node]);
+  }
+  const nodes = list.rows.map((row) => {
+    const viewer = JSON.stringify([row.name, row.picture]);
+    const node = free.get(viewer)?.shift() ?? newRow();
+    rowViewers.set(node, viewer);
+    // Off, the pictures don't load at all
+    setViewer(
+      node.querySelector<HTMLElement>(".studio-avatar")!,
+      list.pictures ? row.picture : "",
+      row.name,
+    );
+    setText(node.querySelector(".studio-name")!, row.name);
+    setText(node.querySelector(".studio-message")!, row.text);
+    const icon = node.querySelector<HTMLImageElement>(".studio-icon")!;
+    icon.hidden = !row.icon;
+    if (row.icon) setPicture(icon, row.icon);
+    setText(node.querySelector(".studio-number")!, row.value);
+    return node;
+  });
+  for (const node of old) if (!nodes.includes(node)) node.remove();
+  // In order, moving only what's out of place
+  nodes.forEach((node, i) => {
+    const at = rows.children.item(i);
+    if (at !== node) rows.insertBefore(node, at);
+  });
 };
 
 // A picture's own size, 0 by 0 until it's read
@@ -1050,6 +1149,12 @@ export function createStage(
         layoutAvatar(avatar.querySelector("img")!, side, element.crop);
         break;
       }
+      case "bar":
+        fillBar(el, body, element);
+        break;
+      case "list":
+        fillList(body, element);
+        break;
       case "overlay":
         if (slots) {
           only(body, HTMLDivElement, () => div("studio-slot"));

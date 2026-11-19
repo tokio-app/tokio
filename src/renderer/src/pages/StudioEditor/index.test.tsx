@@ -223,6 +223,8 @@ describe("StudioEditor", () => {
       "Emote",
       "Shape",
       "Viewer's picture",
+      "Goal bar",
+      "List",
       "Overlay",
     ];
 
@@ -241,7 +243,7 @@ describe("StudioEditor", () => {
 
     const overlay = await waitFor(() => {
       const last = lastSave();
-      expect(last?.items).toHaveLength(8);
+      expect(last?.items).toHaveLength(10);
       return last!;
     });
     // No group made for them
@@ -253,6 +255,8 @@ describe("StudioEditor", () => {
       "emote",
       "shape",
       "viewer",
+      "bar",
+      "list",
       "overlay",
     ]);
     // Front on top, with no group around them
@@ -262,11 +266,13 @@ describe("StudioEditor", () => {
         .closest("ul")!
         .querySelectorAll("[class*=layer_name]"),
     ].map((name) => name.textContent);
-    // A shape goes by its shape
+    // A shape goes by its shape, a list by what it lists
+    const shown: Record<string, string> = {
+      Shape: "Rectangle",
+      List: "Top gifters this LIVE",
+    };
     expect(names).toEqual(
-      [...kinds]
-        .reverse()
-        .map((kind) => (kind === "Shape" ? "Rectangle" : kind)),
+      [...kinds].reverse().map((kind) => shown[kind] ?? kind),
     );
     // A viewer's picture waits for an event
     expect(overlay.items[6]).toMatchObject({ when: "event" });
@@ -4185,5 +4191,173 @@ describe("StudioEditor", () => {
         expect.stringMatching(/^M[\d.]+ 0L/),
       );
     });
+  });
+  describe("lists", () => {
+    it("shows this LIVE's top gifters with their coins, named by what it lists", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+
+      await user.click(row(/^Top gifters this LIVE/));
+      const rows = drawn(list.id).querySelectorAll(".studio-row");
+      // Five sample rows by default, biggest first
+      expect(rows).toHaveLength(5);
+      expect(rows[0].querySelector(".studio-number")!.textContent).toBe(
+        "12.4K",
+      );
+      expect(page().getByRole("group", { name: "Number color" })).toBeVisible();
+    });
+
+    it("lists another source, with its own rows and fields", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+      await user.click(row(/^Top gifters/));
+
+      const shows = field("Shows").getByText("Top gifters this LIVE");
+      await user.click(shows);
+      await user.click(
+        inList(page().getByRole("group", { name: "Shows" }), "Chat")!,
+      );
+
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ source: "chat" }),
+      );
+      expect(row(/^Chat/)).toBeVisible();
+      // Chat has no numbers to color
+      expect(page().queryByRole("group", { name: "Number color" })).toBeNull();
+      const messages = drawn(list.id).querySelectorAll(".studio-message");
+      expect(messages[0].textContent).not.toBe("");
+    });
+
+    it("saves its rows, gap, size and pictures", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+      await user.click(row(/^Top gifters/));
+
+      await user.clear(field("Rows").getByRole("spinbutton"));
+      await user.type(field("Rows").getByRole("spinbutton"), "3");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ rows: 3 }),
+      );
+      await studio(lastSave()!);
+      expect(drawn(list.id).querySelectorAll(".studio-row")).toHaveLength(3);
+
+      await user.clear(field("Space between rows").getByRole("spinbutton"));
+      await user.type(field("Space between rows").getByRole("spinbutton"), "4");
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ rows: 3, gap: 4 }),
+      );
+      await studio(lastSave()!);
+
+      await user.click(
+        page().getByRole("checkbox", { name: "Viewers' pictures" }),
+      );
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ pictures: false }),
+      );
+    });
+  });
+});
+
+describe("a goal bar's fields", () => {
+  beforeEach(() => {
+    Element.prototype.setPointerCapture = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const roses = {
+    name: "roses",
+    trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] }),
+  };
+  const withBar = (bar: StudioElement, counters = [roses]) =>
+    studioOverlay("Main", { id: ID, counters, items: [bar] });
+
+  it("fills toward a LIVE number or a counter, shown as a text writes them", async () => {
+    const { user } = await open(withBar(elementOf("bar")));
+    await user.click(row(/^Goal bar/));
+
+    const number = field("Number");
+    await user.click(number.getByText("{likes}"));
+    expect(inList(number.getByText("{likes}"), "{coins}")).not.toBeNull();
+    expect(inList(number.getByText("{likes}"), "{uptime}")).toBeNull();
+    await user.click(inList(number.getByText("{likes}"), "{roses}")!);
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({ number: "roses" }),
+    );
+
+    await studio(lastSave()!);
+    const goal = field("Goal").getByRole("spinbutton");
+    await user.clear(goal);
+    await user.type(goal, "250");
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({ goal: 250 }),
+    );
+  });
+
+  it("shows no number for a counter since removed", async () => {
+    const { user } = await open(
+      withBar(elementOf("bar", { number: "roses" }), []),
+    );
+    await user.click(row(/^Goal bar/));
+
+    expect(field("Number").queryByText(/^\{/)).toBeNull();
+  });
+
+  it("draws its sample fill on the canvas and in its row, and fades it into a gradient", async () => {
+    const bar = elementOf("bar");
+    const { user } = await open(withBar(bar));
+    await user.click(row(/^Goal bar/));
+
+    // The editor shows it partly full, whatever its number
+    const fill = drawn(bar.id).querySelector<HTMLElement>(".studio-bar-fill")!;
+    expect(fill.style.width).toBe("60%");
+    expect(
+      row(/^Goal bar/).querySelector<HTMLElement>("[class*=thumb_bar] > span")!
+        .style.width,
+    ).toBe("60%");
+
+    await user.click(page().getByRole("checkbox", { name: "Gradient" }));
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({ gradient: true }),
+    );
+    expect(drawn(bar.id).classList).toContain("studio-gradient");
+  });
+
+  it("turns its box around its center when it goes vertical, in one step", async () => {
+    const bar = elementOf("bar", { x: 100, y: 500, width: 720, height: 56 });
+    const { user } = await open(withBar(bar));
+    await user.click(row(/^Goal bar/));
+
+    await user.click(
+      page().getByRole("checkbox", {
+        name: "Vertical, filling from the bottom",
+      }),
+    );
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({
+        vertical: true,
+        x: 432,
+        y: 168,
+        width: 56,
+        height: 720,
+      }),
+    );
+    const fill = drawn(bar.id).querySelector<HTMLElement>(".studio-bar-fill")!;
+    expect(fill.style.height).toBe("60%");
+
+    // Back where it was, in one undo
+    await studio(lastSave()!);
+    await user.click(undo());
+    await waitFor(() =>
+      expect(lastSave()?.items[0]).toMatchObject({
+        vertical: false,
+        x: 100,
+        y: 500,
+        width: 720,
+        height: 56,
+      }),
+    );
   });
 });

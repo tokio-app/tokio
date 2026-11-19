@@ -4,7 +4,14 @@ import {
   StudioOverlay,
   TriggerSchema,
 } from "@/common/schemas";
-import { STUDIO_MESSAGE, StudioMessage, TOKIO_EVENTS } from "@/common/types";
+import {
+  STUDIO_MESSAGE,
+  StudioMessage,
+  TOKIO_EVENTS,
+  TopGifter,
+} from "@/common/types";
+import { formatStat } from "@/common/util";
+import { setLanguage } from "@/helper/i18n";
 import Logger from "@/logger";
 import { StudioService } from "@/services/studio";
 import { createHandler } from "@test/handler";
@@ -56,7 +63,12 @@ const setup = (
   {
     startedAt = 1,
     studio = new StudioService(),
-  }: { startedAt?: number | null; studio?: StudioService } = {},
+    gifters = [],
+  }: {
+    startedAt?: number | null;
+    studio?: StudioService;
+    gifters?: TopGifter[];
+  } = {},
 ) => {
   const sendToClient = vi.fn((_id: string, _data: unknown) => true);
   const h = createHandler({
@@ -77,6 +89,7 @@ const setup = (
     },
     serverService: { sendToClient, cameraKey: "k3y" },
     studioService: studio,
+    historyService: { top: () => ({ live: gifters, allTime: [] }) },
     pathManagerService: { files: { logs: { overlays: "overlays.log" } } },
   });
   const views = () =>
@@ -247,6 +260,150 @@ describe("sendStudioOverlays", () => {
     expect(showsNumbers(counting("roses"))).toBe(false);
     // Another overlay's counter isn't one
     expect(showsNumbers(overlay(ID, text("{roses} roses")))).toBe(false);
+    // Goal bars and lists follow the LIVE whatever they show
+    expect(showsNumbers(overlay(ID, [element("b", { kind: "bar" })]))).toBe(
+      true,
+    );
+    expect(showsNumbers(overlay(ID, [element("l", { kind: "list" })]))).toBe(
+      true,
+    );
+  });
+
+  it("fills a goal bar toward its goal from the LIVE's number or a counter", async () => {
+    const studio = new StudioService();
+    const roses = TriggerSchema.parse({ type: TOKIO_EVENTS.GIFT, gifts: [] });
+    const bars: StudioOverlay = {
+      ...overlay(ID, [
+        element("likes", { kind: "bar", number: "likes", goal: 25_680 }),
+        element("roses", { kind: "bar", number: "roses", goal: 4 }),
+        element("gone", { kind: "bar", number: "lilies", goal: 4 }),
+      ]),
+      counters: [{ name: "roses", trigger: roses }],
+    };
+    studio.handle(
+      TOKIO_EVENTS.GIFT,
+      {
+        user: { username: "Ana", handle: "ana", profilePictures: [] },
+        gift: {
+          id: "5655",
+          name: "Rose",
+          coins: 1,
+          type: 1,
+          comboCount: 3,
+          repeatEnd: true,
+          image: "rose.png",
+        },
+      },
+      [bars],
+      () => liveNumbers(setup([]).handler),
+    );
+    const { handler, views } = setup([bars], { studio });
+
+    await sendStudioOverlays(handler);
+
+    const [[, view]] = views();
+    expect(view?.layers[0].elements).toMatchObject([
+      { fill: 0.5 },
+      { fill: 0.75 },
+      { fill: 0 },
+    ]);
+  });
+
+  it("fills a list with this LIVE's top gifters, coins in the app's language", async () => {
+    const gifter = (username: string, coins: number): TopGifter => ({
+      userId: username,
+      username,
+      handle: username.toLowerCase(),
+      picture: "",
+      live: { coins, gifts: 1 },
+      allTime: { coins, gifts: 1 },
+      giftedAt: 0,
+    });
+    const { handler, views } = setup(
+      [overlay(ID, [element("l", { kind: "list", rows: 2 })])],
+      {
+        gifters: [
+          gifter("Ana", 12_400),
+          { ...gifter("", 950), handle: "bo" },
+          gifter("Cy", 3),
+        ],
+      },
+    );
+    setLanguage("es-419");
+
+    await sendStudioOverlays(handler);
+
+    const [[, view]] = views();
+    expect(view?.layers[0].elements[0]).toMatchObject({
+      kind: "list",
+      rows: [
+        {
+          picture: "",
+          name: "Ana",
+          text: "",
+          icon: "",
+          value: formatStat(12_400, "es-419").short,
+        },
+        // No name: the handle
+        { name: "bo", value: "950" },
+      ],
+    });
+  });
+
+  it("fills a list with the LIVE's newest followers, gifts or chat", async () => {
+    const studio = new StudioService();
+    const ana = { username: "Ana", handle: "ana", profilePictures: ["a.png"] };
+    const numbers = () => liveNumbers(setup([]).handler);
+    studio.handle(TOKIO_EVENTS.FOLLOW, { user: ana }, [], numbers);
+    studio.handle(
+      TOKIO_EVENTS.CHAT,
+      { user: ana, comment: { content: "hi", emotes: [], lang: "en" } },
+      [],
+      numbers,
+    );
+    studio.handle(
+      TOKIO_EVENTS.GIFT,
+      {
+        user: ana,
+        gift: {
+          id: "5655",
+          name: "Rose",
+          coins: 1,
+          type: 1,
+          comboCount: 1200,
+          repeatEnd: true,
+          image: "rose.png",
+        },
+      },
+      [],
+      numbers,
+    );
+    const { handler, views } = setup(
+      [
+        overlay(ID, [
+          element("f", { kind: "list", source: "followers" }),
+          element("g", { kind: "list", source: "gifts" }),
+          element("c", { kind: "list", source: "chat" }),
+        ]),
+      ],
+      { studio },
+    );
+
+    await sendStudioOverlays(handler);
+
+    const [[, view]] = views();
+    const row = {
+      picture: "a.png",
+      name: "Ana",
+      text: "",
+      icon: "",
+      value: "",
+    };
+    expect(view?.layers[0].elements).toMatchObject([
+      { rows: [row] },
+      { rows: [{ ...row, icon: "rose.png", value: "×1.2K" }] },
+      { rows: [{ ...row, text: "hi" }] },
+    ]);
   });
 
   it("finds the overlays whose texts show the LIVE's length", () => {

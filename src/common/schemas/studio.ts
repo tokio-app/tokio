@@ -18,6 +18,8 @@ export const STUDIO_KINDS = [
   "emote",
   "shape",
   "viewer",
+  "bar",
+  "list",
   "overlay",
 ] as const;
 
@@ -83,6 +85,15 @@ export const STUDIO_SHAPES = [
   "bubble",
 ] as const;
 
+// What a list shows a row of: this LIVE's top gifters, or its newest
+// followers, gifts or chat messages
+export const STUDIO_LIST_SOURCES = [
+  "gifters",
+  "followers",
+  "gifts",
+  "chat",
+] as const;
+
 // The most groups an overlay holds
 export const STUDIO_MAX_GROUPS = 100;
 // The most elements an overlay holds, in groups or on their own: each
@@ -118,6 +129,10 @@ export const STUDIO_MAX_TRIGGERS = 5;
 // The most counters an overlay keeps, and the longest name one takes
 export const STUDIO_MAX_COUNTERS = 10;
 export const STUDIO_COUNTER_NAME_MAX_LENGTH = 24;
+// The most rows a list shows: main keeps as many of each source
+export const STUDIO_MAX_LIST_ROWS = 10;
+// The widest gap between a list's rows, in px of the canvas
+export const STUDIO_MAX_LIST_GAP = 200;
 
 // The sizes a camera element's stream can come in, the smallest first: two
 // elements showing one camera share the larger one's
@@ -361,6 +376,49 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     kind: z.literal("viewer"),
     rounding: z.number().min(0).max(50).default(50),
   }),
+  // A goal bar: a track that fills as far as a LIVE number or one of the
+  // overlay's counters has come to its goal, full past it. Its words are a
+  // text of their own.
+  z.object({
+    ...ELEMENT,
+    kind: z.literal("bar"),
+    // A STUDIO_NUMBERS name but uptime, or a counter's, as a goal watches;
+    // 0 for one that's neither
+    number: NumberNameSchema.default("likes"),
+    goal: z.number().int().min(1).default(1000),
+    // The fill's, fading into gradient_color across the whole track with
+    // gradient on, so the second color shows as it fills
+    color: ColorSchema.default("#f43f5e"),
+    ...GRADIENT,
+    gradient_color: ColorSchema.default("#f1f5f9"),
+    track: ColorSchema.default("#18181bd9"),
+    // Its corners, a % of its shorter side: at 50 it's a pill
+    rounding: z.number().min(0).max(50).default(50),
+    // Fills from the bottom up, not from the left
+    vertical: z.boolean().default(false),
+  }),
+  // A row per viewer or event of its source, in a fixed layout: their
+  // picture or initial, their name, then a chat's message, and a value on
+  // the right (a gifter's coins, a gift's picture and count). Chat's newest
+  // is at the bottom, the others' newest or biggest on top.
+  z.object({
+    ...ELEMENT,
+    kind: z.literal("list"),
+    source: z.enum(STUDIO_LIST_SOURCES).default("gifters"),
+    // How many it shows at most
+    rows: z.number().int().min(1).max(STUDIO_MAX_LIST_ROWS).default(5),
+    // As a text's: a font installed where the streaming app runs, Archivo
+    // when empty, and its size in px of the canvas
+    font: z.string().max(FONT_MAX_LENGTH).default(""),
+    size: z.number().min(1).max(STUDIO_MAX_FONT_SIZE).default(36),
+    color: ColorSchema.default("#f1f5f9"),
+    // The values', in Tokio's readout
+    value_color: ColorSchema.default("#f43f5e"),
+    // The viewers' pictures, or their initials, before their names
+    pictures: z.boolean().default(true),
+    // Between rows, in px of the canvas
+    gap: z.number().min(0).max(STUDIO_MAX_LIST_GAP).default(16),
+  }),
   // An installed overlay, an alert's overlay, the countdown timer or the
   // games overlay, framed at its own path
   z.object({
@@ -602,6 +660,7 @@ export type StudioMotion = Pick<
 >;
 export type StudioAlign = StudioElementOf<"text">["align"];
 export type StudioShape = StudioElementOf<"shape">["shape"];
+export type StudioListSource = (typeof STUDIO_LIST_SOURCES)[number];
 // What an overlay element frames
 export type StudioSource = NonNullable<StudioElementOf<"overlay">["source"]>;
 export type StudioCamera = z.infer<typeof StudioCameraSchema>;

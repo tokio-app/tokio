@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { TriggerSchema } from "../schemas/profile";
 import {
+  STUDIO_MAX_LIST_ROWS,
   StudioElement,
   StudioElementOf,
   StudioElementSchema,
   StudioGroupSchema,
+  StudioListSource,
   StudioOverlay,
 } from "../schemas/studio";
 import {
@@ -15,6 +17,8 @@ import {
 } from "../types/connector";
 import {
   fillStudioText,
+  goalValue,
+  listRow,
   newStudioElement,
   newStudioGroup,
   reactsToEvents,
@@ -28,6 +32,7 @@ import {
   StudioViewDeps,
   usesNumbers,
 } from "./studio";
+import { formatStat } from "./format";
 import { generateTikTokEventSample } from "./samples";
 
 const ID = "8f14e45f-ceea-4672-9a8e-1b2c3d4e5f60";
@@ -86,6 +91,21 @@ describe("fillStudioText", () => {
   });
 });
 
+describe("goalValue", () => {
+  it("reads a LIVE number but uptime, then a counter, else 0", () => {
+    const counters = { roses: 7, uptime: 3 };
+
+    expect(goalValue("likes", SAMPLE_NUMBERS, counters)).toBe(12_840);
+    expect(goalValue("roses", SAMPLE_NUMBERS, counters)).toBe(7);
+    // Uptime only grows: a counter of that name, else nothing
+    expect(goalValue("uptime", SAMPLE_NUMBERS, counters)).toBe(3);
+    expect(goalValue("uptime", SAMPLE_NUMBERS, {})).toBe(0);
+    // Own keys only
+    expect(goalValue("constructor", SAMPLE_NUMBERS, {})).toBe(0);
+    expect(goalValue("gone", SAMPLE_NUMBERS, counters)).toBe(0);
+  });
+});
+
 describe("usesNumbers and studioEventVariables", () => {
   it("spots a live number", () => {
     expect(usesNumbers("Goal: {coins}/5000")).toBe(true);
@@ -141,6 +161,8 @@ describe("studioView", () => {
     text: (l) => l.text.toUpperCase(),
     viewer: () => ({ src: "", name: "Sora" }),
     sent: () => "",
+    fill: () => 0.25,
+    rows: () => [],
     label: (source) => source.type,
     ...changes,
   });
@@ -211,6 +233,70 @@ describe("studioView", () => {
     expect(layers[5]).toMatchObject({ src: null });
     expect(layers[6]).toMatchObject({ src: "https://e/1.webp" });
     expect(layers[7]).toMatchObject({ src: "", name: "Sora", when: "event" });
+  });
+
+  it("fills a goal bar as far as its deps say, from 0 to full", () => {
+    const fills: Record<string, number> = { half: 0.5, past: 3, none: NaN };
+    const {
+      layers: [{ elements }],
+    } = studioView(
+      overlay([
+        element("half", { kind: "bar", gradient: true }),
+        element("past", { kind: "bar", vertical: true }),
+        element("none", { kind: "bar" }),
+      ]),
+      deps({ fill: (e) => fills[e.id] }),
+    );
+
+    expect(elements).toMatchObject([
+      {
+        kind: "bar",
+        fill: 0.5,
+        color: "#f43f5e",
+        gradient: { color: "#f1f5f9", angle: 90 },
+        track: "#18181bd9",
+        rounding: 50,
+        vertical: false,
+      },
+      { fill: 1, gradient: null, vertical: true },
+      { fill: 0 },
+    ]);
+  });
+
+  it("keeps a list's rows, chat's newest at the bottom", () => {
+    const row = (name: string) => ({
+      picture: "",
+      name,
+      text: "",
+      icon: "",
+      value: "",
+    });
+    // Newest or biggest first, as deps give them
+    const rows = () => ["a", "b", "c", "d"].map(row);
+    const {
+      layers: [{ elements }],
+    } = studioView(
+      overlay([
+        element("top", { kind: "list", rows: 3 }),
+        element("chat", { kind: "list", source: "chat", rows: 3 }),
+      ]),
+      deps({ rows }),
+    );
+
+    expect(elements[0]).toMatchObject({
+      kind: "list",
+      source: "gifters",
+      font: "",
+      size: 36,
+      color: "#f1f5f9",
+      value_color: "#f43f5e",
+      pictures: true,
+      gap: 16,
+    });
+    const names = (e: (typeof elements)[number]) =>
+      e.kind === "list" ? e.rows.map((r) => r.name) : [];
+    expect(names(elements[0])).toEqual(["a", "b", "c"]);
+    expect(names(elements[1])).toEqual(["c", "b", "a"]);
   });
 
   it("streams a camera from where its deps say, cropped and rounded", () => {
@@ -562,5 +648,44 @@ describe("Samples", () => {
     });
     expect(deps.sent(gift)).toBe(sampleReact(gift, samples, "en", {}).picture);
     expect(deps.sent(gift)).toMatch(/^https:/);
+  });
+
+  it("makes each list's rows once, values written in the language", () => {
+    const samples = new Samples();
+    const rows = (source: StudioListSource, language = "en") => {
+      const list = made("list", { source });
+      if (list.kind !== "list") throw new Error("made the wrong kind");
+      return sampleDeps(samples, language, {}).rows(list);
+    };
+
+    const gifters = rows("gifters");
+    expect(gifters).toHaveLength(STUDIO_MAX_LIST_ROWS);
+    // The same names on every render
+    expect(rows("gifters")).toEqual(gifters);
+    // Biggest first
+    expect(gifters.slice(0, 2).map((r) => r.value)).toEqual(["12.4K", "4.4K"]);
+    expect(rows("gifters", "es-419")[0].value).toBe(
+      formatStat(12_400, "es-419").short,
+    );
+    expect(gifters[0]).toMatchObject({ text: "", icon: "" });
+    expect(gifters[0].name).not.toBe("");
+
+    const [gift] = rows("gifts");
+    expect(gift.icon).toMatch(/^https:/);
+    expect(gift.value).toMatch(/^×\d/);
+    expect(rows("followers")[0]).toMatchObject({ text: "", value: "" });
+    const [chat] = rows("chat");
+    expect(chat.text).not.toBe("");
+    expect(chat.value).toBe("");
+  });
+});
+
+describe("listRow", () => {
+  it("writes a gifter's coins, and a gift's count after ×", () => {
+    const entry = { picture: "", name: "Ana", text: "", icon: "", value: 1234 };
+
+    expect(listRow(entry, "en").value).toBe("1.2K");
+    expect(listRow({ ...entry, icon: "rose.png" }, "en").value).toBe("×1.2K");
+    expect(listRow({ ...entry, value: null }, "en").value).toBe("");
   });
 });

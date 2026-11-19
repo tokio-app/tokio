@@ -3,9 +3,9 @@ import { Check, Color, NumberInput } from "@/components";
 import { useT } from "@/ui/i18n";
 import styles from "./studioeditor.module.css";
 
-// What a text and a shape share of a gradient
+// What a text, a shape and a goal bar share of a gradient
 type Gradient = Pick<
-  StudioElementOf<"text" | "shape">,
+  StudioElementOf<"text" | "shape" | "bar">,
   "gradient" | "gradient_color" | "gradient_angle"
 >;
 
@@ -15,8 +15,8 @@ type Props<G extends Gradient> = {
 };
 
 /**
- * A text's or a shape's gradient, a paint row: on or off, then the color its
- * own fades into and the angle, as CSS turns it.
+ * A text's, a shape's or a goal bar's gradient, a paint row: on or off,
+ * then the color its own fades into and the angle, as CSS turns it.
  */
 export function GradientFields<G extends Gradient>({
   value,

@@ -38,6 +38,7 @@ import {
 import { useVariables } from "@/hooks";
 import { useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
+import { BarFields } from "./BarFields";
 import { BoxFields } from "./BoxFields";
 import { CameraFields } from "./CameraFields";
 import { EffectsFields } from "./EffectsFields";
@@ -50,6 +51,7 @@ import {
   sourceValue,
   Words,
 } from "./helper";
+import { ListFields } from "./ListFields";
 import { PictureFields } from "./PictureFields";
 import { ReactionFields, STUDIO_TRIGGERS, WHENS } from "./ReactionFields";
 import { ShapeFields } from "./ShapeFields";
@@ -495,6 +497,14 @@ export function ElementSettings({
           </div>
         </>
       );
+      break;
+    case "bar":
+      own = (
+        <BarFields element={element} counters={counters} onChange={onChange} />
+      );
+      break;
+    case "list":
+      own = <ListFields element={element} onChange={onChange} />;
       break;
     case "overlay":
       own = (

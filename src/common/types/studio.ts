@@ -6,6 +6,7 @@ import type {
   StudioEntrance,
   StudioExit,
   StudioIdle,
+  StudioListSource,
   StudioMotion,
   StudioShape,
   StudioSource,
@@ -45,6 +46,23 @@ type StudioPictureView = { crop: StudioCrop | null; rounding: number };
 
 // A color's fade into another, at an angle in CSS's degrees; null without one
 export type StudioGradientView = { color: string; angle: number } | null;
+
+// A list's row: the viewer's picture ("" for none: their initial shows) and
+// name, a chat's message after the name, and on the right a gift's picture
+// and the value (a gifter's coins, a gift's count), "" where it has none
+export type StudioListRow = {
+  picture: string;
+  name: string;
+  text: string;
+  icon: string;
+  value: string;
+};
+
+// A row before its value is written in a language (listRow): a gifter's
+// coins or a gift's count, null for none
+export type StudioListEntry = Omit<StudioListRow, "value"> & {
+  value: number | null;
+};
 
 /**
  * One element as the stage draws it (studioView), everything resolved. A
@@ -103,6 +121,30 @@ export type StudioElementView = StudioElementViewBase &
       }
     // src is "" without a picture, which shows the name's initial
     | ({ kind: "viewer"; src: string; name: string } & StudioPictureView)
+    // fill is how far its number has come to its goal, 0 to 1; rounding a
+    // % of its shorter side; gradient spans the whole track
+    | {
+        kind: "bar";
+        fill: number;
+        color: string;
+        gradient: StudioGradientView;
+        track: string;
+        rounding: number;
+        vertical: boolean;
+      }
+    // rows top to bottom, at most its rows: chat's newest last, the other
+    // sources' newest or biggest first
+    | {
+        kind: "list";
+        source: StudioListSource;
+        rows: StudioListRow[];
+        font: string;
+        size: number;
+        color: string;
+        value_color: string;
+        pictures: boolean;
+        gap: number;
+      }
     | {
         kind: "overlay";
         source: StudioSource | null;

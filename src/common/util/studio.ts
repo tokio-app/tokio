@@ -1,5 +1,6 @@
 import {
   GOAL_TRIGGER,
+  STUDIO_MAX_LIST_ROWS,
   STUDIO_SIZES,
   StudioElement,
   StudioElementKind,
@@ -7,6 +8,7 @@ import {
   StudioElementSchema,
   StudioGroup,
   StudioGroupSchema,
+  StudioListSource,
   StudioOverlay,
   StudioPictureKind,
   StudioSize,
@@ -19,11 +21,14 @@ import {
   type AlertTrigger,
   type AppEvents,
   type TokioEventMap,
+  type UserData,
 } from "../types/connector";
 import type { CustomGift } from "../types/overlay";
 import type {
   StudioElementView,
   StudioGradientView,
+  StudioListEntry,
+  StudioListRow,
   StudioNumbers,
   StudioReact,
   StudioView,
@@ -57,6 +62,10 @@ export const SAMPLE_NUMBERS: StudioNumbers = {
 
 // Made up too: each counter's sample count
 const SAMPLE_COUNT = 12;
+
+// How full the editor and MCP's preview show a goal bar, whatever its
+// number: the sample numbers would fill most bars, hiding the track
+export const SAMPLE_FILL = 0.6;
 
 // Whether a text shows a live number, so main sends it again as they change
 export const usesNumbers = (text: string) =>
@@ -103,6 +112,21 @@ const isNumber = (
   numbers: StudioNumbers,
   name: string,
 ): name is keyof StudioNumbers => Object.hasOwn(numbers, name);
+
+/**
+ * What a goal or a goal bar watches, now: the LIVE number of that name but
+ * uptime, which only grows, else the overlay's counter of that name, else 0.
+ */
+export const goalValue = (
+  name: string,
+  numbers: StudioNumbers,
+  counters: Record<string, number>,
+) =>
+  name !== "uptime" && isNumber(numbers, name)
+    ? numbers[name]
+    : Object.hasOwn(counters, name)
+      ? counters[name]
+      : 0;
 
 type FillOptions = {
   numbers: StudioNumbers;
@@ -165,13 +189,19 @@ export type StudioViewDeps = {
   // The picture of the gift or emote a gift or emote element's last event
   // sent, "" for none (sentPicture)
   sent: (element: StudioElementOf<"gift" | "emote">) => string;
+  // How far a goal bar's number has come to its goal (goalValue over goal),
+  // clamped to 0 to 1 by studioView
+  fill: (element: StudioElementOf<"bar">) => number;
+  // A list's rows, its source's newest or biggest first, up to
+  // STUDIO_MAX_LIST_ROWS: studioView keeps its rows and turns chat's over
+  rows: (element: StudioElementOf<"list">) => StudioListRow[];
   // An embed's name, for the editor
   label: (source: StudioSource) => string;
 };
 
-// A text's or a shape's fade, null with it off
+// A text's, a shape's or a bar's fade, null with it off
 const gradientOf = (
-  element: StudioElementOf<"text" | "shape">,
+  element: StudioElementOf<"text" | "shape" | "bar">,
 ): StudioGradientView =>
   element.gradient
     ? { color: element.gradient_color, angle: element.gradient_angle }
@@ -310,6 +340,34 @@ function elementView(
         kind: element.kind,
         ...deps.viewer(element),
       };
+    case "bar":
+      return {
+        ...base,
+        kind: element.kind,
+        fill: Math.min(1, Math.max(0, deps.fill(element) || 0)),
+        color: element.color,
+        gradient: gradientOf(element),
+        track: element.track,
+        rounding: element.rounding,
+        vertical: element.vertical,
+      };
+    case "list": {
+      const rows = deps.rows(element).slice(0, element.rows);
+      const { font, size, color, value_color, pictures, gap } = element;
+      return {
+        ...base,
+        kind: element.kind,
+        source: element.source,
+        // Chat reads down to its newest
+        rows: element.source === "chat" ? rows.reverse() : rows,
+        font,
+        size,
+        color,
+        value_color,
+        pictures,
+        gap,
+      };
+    }
     // overlay
     default: {
       const { source } = element;
@@ -380,6 +438,9 @@ const NEW_BOXES: Record<StudioElementKind, { width: number; height: number }> =
     emote: { width: 200, height: 200 },
     shape: { width: 640, height: 320 },
     viewer: { width: 240, height: 240 },
+    bar: { width: 720, height: 56 },
+    // Five rows at the default size and gap
+    list: { width: 640, height: 360 },
     overlay: { width: 720, height: 720 },
   };
 
@@ -438,11 +499,55 @@ export const newStudioGroup = (name: string): StudioGroup =>
 type Sample = TokioEventMap[AppEvents];
 
 /**
+ * A list's row with its value written in the language, compact as {coins}
+ * is: a gift's count as ×12.
+ */
+export const listRow = (
+  { value, ...entry }: StudioListEntry,
+  language: string,
+): StudioListRow => ({
+  ...entry,
+  value:
+    value === null
+      ? ""
+      : `${entry.icon ? "×" : ""}${formatStat(value, language).short}`,
+});
+
+// A made-up row of the source, the index-th from the top
+function sampleEntry(source: StudioListSource, index: number): StudioListEntry {
+  const row = (
+    { profilePictures, username, handle }: UserData,
+    fields: Partial<StudioListEntry> = {},
+  ): StudioListEntry => ({
+    picture: profilePictures[0] ?? "",
+    name: username || handle,
+    text: "",
+    icon: "",
+    value: null,
+    ...fields,
+  });
+  if (source === "gifts") {
+    const { user, gift } = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
+    return row(user, { icon: gift.image, value: gift.comboCount });
+  }
+  if (source === "chat") {
+    const { user, comment } = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data;
+    return row(user, { text: comment.content });
+  }
+  const { user } = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
+  // A leaderboard's falling coins: 12.4K, 4.4K, 2.4K…
+  return source === "gifters"
+    ? row(user, { value: Math.round(12_400 / (index + 1) ** 1.5) })
+    : row(user);
+}
+
+/**
  * Each trigger's sample, made the first time an element asks for it, so its
  * names don't change on every render. Test starts a new one.
  */
 export class Samples {
   private made = new Map<AlertTrigger, Sample>();
+  private lists = new Map<StudioListSource, StudioListEntry[]>();
 
   of(type: AlertTrigger): Sample {
     let sample = this.made.get(type);
@@ -455,6 +560,18 @@ export class Samples {
       this.made.set(type, sample);
     }
     return sample;
+  }
+
+  /** The most rows a list of the source shows, made up. */
+  list(source: StudioListSource): StudioListEntry[] {
+    let entries = this.lists.get(source);
+    if (!entries) {
+      entries = Array.from({ length: STUDIO_MAX_LIST_ROWS }, (_, i) =>
+        sampleEntry(source, i),
+      );
+      this.lists.set(source, entries);
+    }
+    return entries;
   }
 }
 
@@ -533,8 +650,11 @@ export const sampleDeps = (
   samples: Samples,
   language: string,
   counters: Record<string, number>,
-): Pick<StudioViewDeps, "text" | "viewer" | "sent"> => ({
+): Pick<StudioViewDeps, "text" | "viewer" | "sent" | "fill" | "rows"> => ({
   text: (element) => sampleText(element, samples, language, counters),
   viewer: (element) => sampleViewerOf(element, samples),
   sent: (element) => sampleSentOf(element, samples),
+  fill: () => SAMPLE_FILL,
+  rows: (element) =>
+    samples.list(element.source).map((entry) => listRow(entry, language)),
 });

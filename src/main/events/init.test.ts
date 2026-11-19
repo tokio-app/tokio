@@ -1291,6 +1291,38 @@ describe("init events", () => {
       await vi.waitFor(() => expect(texts(s)).toEqual([["1 new"]]));
     });
 
+    it("sends a list again when this LIVE's top gifters change", async () => {
+      const s = await live();
+      withOverlay(s, [element("l", { kind: "list" })]);
+      s.serverService.sendToClient.mockClear();
+      s.historyService.top.mockReturnValue({
+        live: [
+          {
+            userId: "1",
+            username: "Ana",
+            handle: "ana",
+            picture: "",
+            live: { coins: 50, gifts: 1 },
+            allTime: { coins: 50, gifts: 1 },
+            giftedAt: 0,
+          },
+        ],
+        allTime: [],
+      });
+
+      for (const [listener] of s.historyService.onChange.mock.calls) listener();
+
+      await vi.waitFor(() =>
+        expect(
+          studioSent(s, "tokio:studio").map(
+            (data: any) => data.view.layers[0].elements[0].rows,
+          ),
+        ).toEqual([
+          [{ picture: "", name: "Ana", text: "", icon: "", value: "50" }],
+        ]),
+      );
+    });
+
     it("sends a counter's count on any trigger, from 0 on each LIVE", async () => {
       const s = await live();
       withOverlay(s, [element("t", { kind: "text", text: "{chats}" })], chats);
