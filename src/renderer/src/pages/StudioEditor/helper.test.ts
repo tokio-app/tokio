@@ -38,6 +38,7 @@ import {
   findElement,
   moveElement,
   extent,
+  unionBox,
   flipInFrame,
   groupFrame,
   reframe,
@@ -433,6 +434,24 @@ describe("resizeBox", () => {
       resizeBox(box, "sw", 500, 0, { minWidth: 120, minHeight: words }),
     ).toEqual({ x: 280, y: 200, width: 120, height: 150 });
     expect(heights).toEqual([120]);
+  });
+});
+
+describe("unionBox", () => {
+  it("takes the box around several, none for none", () => {
+    expect(
+      unionBox([
+        { x: 10, y: 40, width: 20, height: 10 },
+        { x: -5, y: 50, width: 10, height: 30 },
+      ]),
+    ).toEqual({ x: -5, y: 40, width: 35, height: 40 });
+    expect(unionBox([{ x: 1, y: 2, width: 3, height: 4 }])).toEqual({
+      x: 1,
+      y: 2,
+      width: 3,
+      height: 4,
+    });
+    expect(unionBox([])).toBeNull();
   });
 });
 

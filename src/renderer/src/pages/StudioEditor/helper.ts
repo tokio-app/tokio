@@ -471,6 +471,22 @@ export function extent({ x, y, width, height, rotation }: Turned): Box {
   };
 }
 
+/**
+ * The smallest box around unturned ones, null for none: several selected
+ * items' extents, which move, stick and line up as one.
+ */
+export function unionBox(boxes: Box[]): Box | null {
+  if (boxes.length === 0) return null;
+  const x = Math.min(...boxes.map((b) => b.x));
+  const y = Math.min(...boxes.map((b) => b.y));
+  return {
+    x,
+    y,
+    width: Math.max(...boxes.map((b) => b.x + b.width)) - x,
+    height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
+  };
+}
+
 // The canvas's edges and middles an element lines up with
 export type AlignTo = "left" | "center" | "right" | "top" | "middle" | "bottom";
 

@@ -173,9 +173,12 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const [overlay, setSaved] = useAutosave(saved, (changed) =>
     window.api.emit(APP_EVENTS.SAVE_STUDIO_OVERLAY, { overlay: changed }),
   );
-  const [selected, setSelected] = useState<string | null>(null);
+  // The selected groups' and elements' ids, in the order they were picked
+  const [selected, setSelected] = useState<string[]>([]);
+  // The one selected, null for none or several
+  const single = selected.length === 1 ? selected[0] : null;
   // Every change below goes in the history, but folding a group
-  const history = useHistory(overlay, setSaved, selected);
+  const history = useHistory(overlay, setSaved, selected.join(" "));
   const setOverlay = history.change;
   const [installed, setInstalled] = useState<OverlayApp[]>([]);
   const [profile, setProfile] = useState<Pick<Profile, "alerts" | "games">>();
@@ -439,14 +442,14 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   ]);
 
   const groups = overlay.items.filter((item) => item.kind === "group");
-  const group = groups.find((g) => g.id === selected);
-  const element = elements.find((e) => e.id === selected);
+  const group = groups.find((g) => g.id === single);
+  const element = elements.find((e) => e.id === single);
   // The group an element is in, none on its own
   const holderOf = (id: string | null) =>
     groups.find((g) => g.elements.some((e) => e.id === id));
   // Where the menu adds: the selected group, the selected element's, else
-  // on its own
-  const target = group ?? holderOf(selected);
+  // on its own. With several selected, on its own.
+  const target = group ?? holderOf(single);
   // The locked groups' and elements' ids: unique across both
   const locked = useMemo(
     () =>
@@ -467,11 +470,18 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       ),
     }));
 
-  // An element picked in a folded group unfolds it
-  const select = (id: string | null) => {
-    setSelected(id);
-    const holder = holderOf(id);
-    if (holder?.folded) fold(holder.id, false);
+  // Picks these groups and elements, [] for none. An element whose group is
+  // picked too goes with it, and one in a folded group unfolds it.
+  const select = (ids: string[]) => {
+    const picked = [...new Set(ids)].filter((id) => {
+      const holder = holderOf(id);
+      return !holder || !ids.includes(holder.id);
+    });
+    setSelected(picked);
+    for (const id of picked) {
+      const holder = holderOf(id);
+      if (holder?.folded) fold(holder.id, false);
+    }
   };
 
   const addGroup = () => {
@@ -484,7 +494,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     );
     // In front of the rest
     setItems((items) => [...items, added]);
-    setSelected(added.id);
+    setSelected([added.id]);
   };
 
   const add = (kind: StudioElementKind) => {
@@ -500,51 +510,65 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     } else {
       setItems((items) => [...items, added]);
     }
-    setSelected(added.id);
+    setSelected([added.id]);
   };
 
-  // A group with its elements, or one element
-  const remove = (id: string) => {
+  // Groups with their elements, and elements, in one step
+  const remove = (ids: string[]) => {
+    const gone = new Set(ids);
     setItems((items) =>
       items
-        .filter((item) => item.id !== id)
+        .filter((item) => !gone.has(item.id))
         .map((item) =>
-          item.kind === "group" && item.elements.some((e) => e.id === id)
-            ? { ...item, elements: item.elements.filter((e) => e.id !== id) }
+          item.kind === "group" && item.elements.some((e) => gone.has(e.id))
+            ? {
+                ...item,
+                elements: item.elements.filter((e) => !gone.has(e.id)),
+              }
             : item,
         ),
     );
-    setSelected((current) => (current === id ? null : current));
+    setSelected((current) => current.filter((id) => !gone.has(id)));
   };
 
   // The selected group, or element wherever it is, to copy or cut
   const copy = (cut: boolean) => {
     const item = group ?? element;
     if (!item) return;
-    clipboard.copy(item, cut);
-    if (cut) remove(item.id);
+    clipboard.copy([item], cut);
+    if (cut) remove([item.id]);
   };
 
-  // A copy with new ids where the + menu adds: an element into the selected
-  // group or the selected element's group, which unfolds, else on its own in
-  // front, and a group on its own in front. Not past the caps.
+  // Copies with new ids where the + menu adds: elements into the selected
+  // group or the selected element's group, which unfolds, else on their own
+  // in front, and groups on their own in front. Not past the caps.
   const paste = () => {
-    const pasted = clipboard.paste((item) => {
-      const count = item.kind === "group" ? item.elements.length : 1;
-      if (elements.length + count > STUDIO_MAX_ELEMENTS) return false;
-      return item.kind !== "group" || groups.length < STUDIO_MAX_GROUPS;
+    const pasted = clipboard.paste((items) => {
+      const isGroup = (item: StudioItem) => item.kind === "group";
+      const count = items.reduce(
+        (sum, item) => sum + (item.kind === "group" ? item.elements.length : 1),
+        0,
+      );
+      return (
+        elements.length + count <= STUDIO_MAX_ELEMENTS &&
+        groups.length + items.filter(isGroup).length <= STUDIO_MAX_GROUPS
+      );
     });
     if (!pasted) return;
-    if (pasted.kind !== "group" && target) {
-      changeGroup(target.id, (g) => ({
-        ...g,
-        folded: false,
-        elements: [...g.elements, pasted],
-      }));
-    } else {
-      setItems((items) => [...items, pasted]);
-    }
-    setSelected(pasted.id);
+    const into = target
+      ? pasted.flatMap((item) => (item.kind === "group" ? [] : [item]))
+      : [];
+    setItems((items) => [
+      ...items.map((item) =>
+        item.kind === "group" && item.id === target?.id && into.length > 0
+          ? { ...item, folded: false, elements: [...item.elements, ...into] }
+          : item,
+      ),
+      ...(into.length > 0
+        ? pasted.filter((item) => item.kind === "group")
+        : pasted),
+    ]);
+    setSelected(pasted.map((item) => item.id));
   };
 
   const shift = (id: string, dx: number, dy: number) =>
@@ -553,6 +577,34 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       elements: g.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })),
     }));
 
+  // Groups and elements moved together by whole px, in one change. A group
+  // takes its elements, locked ones too, as when it moves alone; a locked
+  // group or element stays, and so does an element of a locked group.
+  const nudge = (ids: string[], dx: number, dy: number) => {
+    const moving = new Set(ids);
+    const moved = <E extends StudioElement>(e: E): E => ({
+      ...e,
+      x: e.x + dx,
+      y: e.y + dy,
+    });
+    setItems((items) =>
+      items.map((item) => {
+        if (item.kind !== "group") {
+          return moving.has(item.id) && !item.locked ? moved(item) : item;
+        }
+        if (item.locked) return item;
+        return {
+          ...item,
+          elements: item.elements.map((e) =>
+            moving.has(item.id) || (moving.has(e.id) && !e.locked)
+              ? moved(e)
+              : e,
+          ),
+        };
+      }),
+    );
+  };
+
   // A group's frame, around its elements as they show
   const frameOf = (g: StudioGroup) =>
     groupFrame(
@@ -560,6 +612,13 @@ function Editor({ saved }: { saved: StudioOverlay }) {
       g.rotation,
     );
   const frame = group ? frameOf(group) : null;
+  // Every shown group's frame, for the canvas's outlines
+  const frames = new Map(
+    groups.flatMap((g) => {
+      const f = g.hidden ? null : frameOf(g);
+      return f ? [[g.id, f] as const] : [];
+    }),
+  );
   const canvas = STUDIO_SIZES[overlay.size];
 
   // A group's elements when a change to its frame began, by the frame it
@@ -755,7 +814,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               onWords={setWords}
               selected={selected}
               locked={locked}
-              groupFrame={group && !group.hidden ? frame : null}
+              frames={frames}
               onGroupFrame={reframeGroup}
               linked={linked}
               onSelect={select}
@@ -764,6 +823,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
                 changeElement(id, (e) => ({ ...e, rotation }))
               }
               onShift={shift}
+              onNudge={nudge}
               rulers={overlay.rulers}
               // The editor's view, which Undo leaves alone, as folding
               onRulers={(rulers) => setSaved((o) => ({ ...o, rulers }))}
@@ -773,7 +833,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
               onDelete={remove}
               cropping={cropping}
               onCropStart={(id) => {
-                select(id);
+                select([id]);
                 setCropping(id);
               }}
               // Kept, one step of the history

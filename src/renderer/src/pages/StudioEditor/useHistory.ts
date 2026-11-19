@@ -25,8 +25,9 @@ type Steps = {
 export function useHistory(
   overlay: StudioOverlay,
   setOverlay: Dispatch<SetStateAction<StudioOverlay>>,
-  // The selected group or element, whose changes go together
-  selected: string | null,
+  // The selected groups' and elements' ids, joined: changes to one
+  // selection go together
+  selection: string,
 ) {
   const [steps, setSteps] = useState<Steps>({ past: [], future: [] });
   // The next change starts a step
@@ -37,8 +38,8 @@ export function useHistory(
   const last = useRef<{
     at: number;
     from: Element | null;
-    selected: string | null;
-  }>({ at: 0, from: null, selected: null });
+    selection: string;
+  }>({ at: 0, from: null, selection: "" });
 
   // A change from the editor, a step of its own or part of the last one
   const change = (update: SetStateAction<StudioOverlay>) => {
@@ -48,7 +49,7 @@ export function useHistory(
       holding.current ||
       (at - last.current.at <= MERGE_MS &&
         from === last.current.from &&
-        selected === last.current.selected);
+        selection === last.current.selection);
     if (fresh.current || !joins) {
       // Here, not in an updater, which StrictMode runs twice
       setSteps(({ past }) => ({
@@ -57,7 +58,7 @@ export function useHistory(
       }));
       fresh.current = false;
     }
-    last.current = { at, from, selected };
+    last.current = { at, from, selection };
     setOverlay(update);
   };
 

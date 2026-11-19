@@ -35,8 +35,8 @@ export type ElementFlags = Partial<Pick<StudioElement, "locked" | "hidden">>;
 type Props = {
   // Back to front, as the overlay keeps them, and so are groups' elements
   items: StudioItem[];
-  // A group's id or an element's
-  selected: string | null;
+  // The selected groups' and elements' ids
+  selected: string[];
   // What each element's and group's row says: its name, its kind and When
   // for screen readers, and the event it reacts to, null when it doesn't
   names: Record<string, { name: string; meta: string; when: string | null }>;
@@ -44,12 +44,12 @@ type Props = {
   gifts: CustomGift[];
   // The group the menu adds to, none to add on its own
   target: StudioGroup | undefined;
-  // A group's id or an element's, null to let go of the selection
-  onSelect: (id: string | null) => void;
+  // Picks these groups and elements, [] to let go of the selection
+  onSelect: (ids: string[]) => void;
   onAddGroup: () => void;
   onAdd: (kind: StudioElementKind) => void;
-  // Deletes a group with its elements, or an element
-  onDelete: (id: string) => void;
+  // Deletes groups with their elements, and elements
+  onDelete: (ids: string[]) => void;
   // The list's view, which Undo leaves alone
   onFold: (groupId: string, folded: boolean) => void;
   onFlags: (groupId: string, flags: GroupFlags) => void;
@@ -189,9 +189,11 @@ export function LayersPanel({
     </>
   );
 
-  const selectedGroup = groups.find((g) => g.id === selected);
+  // The one selected, null for none or several
+  const single = selected.length === 1 ? selected[0] : null;
+  const selectedGroup = groups.find((g) => g.id === single);
   const selectedElement =
-    !selectedGroup && selected !== null && findElement(items, selected);
+    !selectedGroup && single !== null && findElement(items, single);
   const remove = selectedGroup
     ? t("studio.editor.deleteGroup")
     : selectedElement
@@ -337,23 +339,24 @@ export function LayersPanel({
   // end, so the keyboard can go on.
   const removeByKey = (e: KeyboardEvent) => {
     if (e.key !== "Delete" && e.key !== "Backspace") return;
-    if (selected === null) return;
+    // Several: PR 5's list work
+    if (single === null) return;
     e.preventDefault();
     const gone = new Set([
-      selected,
+      single,
       ...(selectedGroup?.elements.map((element) => element.id) ?? []),
     ]);
     const ids = Array.from(
       list.current?.querySelectorAll<HTMLElement>("[data-select]") ?? [],
     ).map((button) => button.dataset.select!);
-    const at = ids.indexOf(selected);
+    const at = ids.indexOf(single);
     const next =
       ids.slice(at + 1).find((id) => !gone.has(id)) ??
       ids
         .slice(0, Math.max(at, 0))
         .reverse()
         .find((id) => !gone.has(id));
-    flushSync(() => onDelete(selected));
+    flushSync(() => onDelete([single]));
     if (next) {
       list.current
         ?.querySelector<HTMLElement>(`[data-select="${next}"]`)
@@ -389,7 +392,7 @@ export function LayersPanel({
           styles.layer,
           styles.element_row,
           element.hidden && styles.element_hidden,
-          element.id === selected && styles.layer_selected,
+          selected.includes(element.id) && styles.layer_selected,
           drag?.id === element.id && styles.layer_dragged,
           lineOf(element.id, !inGroup),
         )}
@@ -402,9 +405,9 @@ export function LayersPanel({
         <button
           type="button"
           className={styles.layer_select}
-          aria-pressed={element.id === selected}
+          aria-pressed={selected.includes(element.id)}
           data-select={element.id}
-          onClick={() => onSelect(element.id)}
+          onClick={() => onSelect([element.id])}
         >
           <LayerThumb element={element} gifts={gifts} />
           <span className={styles.layer_text}>
@@ -436,7 +439,7 @@ export function LayersPanel({
         key={group.id}
         className={cx(
           styles.group_item,
-          group.id === selected && styles.group_selected,
+          selected.includes(group.id) && styles.group_selected,
           group.hidden && styles.group_hidden,
           drag?.id === group.id && styles.layer_dragged,
           lineOf(group.id, true),
@@ -448,7 +451,7 @@ export function LayersPanel({
           className={cx(
             styles.layer,
             styles.group_row,
-            group.id === selected && styles.layer_selected,
+            selected.includes(group.id) && styles.layer_selected,
             lineOf(group.id, false),
           )}
           onDragOver={(e) => dragOver(e, { item: group.id })}
@@ -474,9 +477,9 @@ export function LayersPanel({
           <button
             type="button"
             className={styles.layer_select}
-            aria-pressed={group.id === selected}
+            aria-pressed={selected.includes(group.id)}
             data-select={group.id}
-            onClick={() => onSelect(group.id)}
+            onClick={() => onSelect([group.id])}
           >
             <span className={styles.layer_text}>
               <span className={styles.layer_name}>{name}</span>
@@ -586,10 +589,10 @@ export function LayersPanel({
             variant="icon"
             title={remove}
             aria-label={remove}
-            disabled={selected === null}
+            disabled={selected.length === 0}
             // At once, a group with its elements too: Undo brings it back
             onClick={() => {
-              if (selected !== null) onDelete(selected);
+              if (selected.length > 0) onDelete(selected);
             }}
           >
             <FiTrash2 size={18} />
@@ -636,7 +639,7 @@ export function LayersPanel({
               e.target instanceof Element &&
               !e.target.closest("[data-item]")
             ) {
-              onSelect(null);
+              onSelect([]);
             }
           }}
         >

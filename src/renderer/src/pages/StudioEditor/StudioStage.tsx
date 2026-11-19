@@ -103,20 +103,23 @@ type Props = {
   // The selected text's words, measured each time they change, null for
   // none
   onWords: (words: Words | null) => void;
-  // A group's id or an element's
-  selected: string | null;
+  // The selected groups' and elements' ids
+  selected: string[];
   // The locked groups and elements, which the canvas can't pick, move,
   // resize or rotate
   locked: ReadonlySet<string>;
-  onSelect: (id: string | null) => void;
+  // Picks these groups and elements, [] for none
+  onSelect: (ids: string[]) => void;
   // An element moved or resized, rounded to whole px
   onBox: (id: string, box: Box) => void;
   // An element turned, in whole degrees
   onRotate: (id: string, rotation: number) => void;
   // Every element of a group moved by whole px
   onShift: (groupId: string, dx: number, dy: number) => void;
-  // The selected group's frame, around its elements as they show
-  groupFrame: Turned | null;
+  // Groups and elements moved together by whole px, locked ones staying
+  onNudge: (ids: string[], dx: number, dy: number) => void;
+  // Each shown group's frame, around its elements as they show
+  frames: ReadonlyMap<string, Turned>;
   // A group resized or turned from the frame it had when the drag began
   onGroupFrame: (groupId: string, from: Turned, to: Turned) => void;
   // The corners keep the width and height in proportion
@@ -131,8 +134,8 @@ type Props = {
   // A drag on the canvas begins (true) and ends: every change in between is
   // one step of the history
   onHold: (held: boolean) => void;
-  // Deletes a group with its elements, or an element
-  onDelete: (id: string) => void;
+  // Deletes groups with their elements, and elements
+  onDelete: (ids: string[]) => void;
   // The element being cropped on the canvas, and a double-click asking to
   // crop one
   cropping: string | null;
@@ -331,7 +334,7 @@ export function StudioStage({
   onBox,
   onRotate,
   onShift,
-  groupFrame,
+  frames,
   onGroupFrame,
   linked,
   rulers,
@@ -346,6 +349,8 @@ export function StudioStage({
   embed,
   children,
 }: Props) {
+  // The one selected, null for none or several
+  const single = selected.length === 1 ? selected[0] : null;
   const t = useT();
   const language = useLanguage();
   const root = useRef<HTMLDivElement>(null);
@@ -515,9 +520,9 @@ export function StudioStage({
 
   // Selecting something else keeps it too
   const keepOnSelect = useEffectEvent(() => {
-    if (draft && selected !== draft.id) keepCrop();
+    if (draft && single !== draft.id) keepCrop();
   });
-  useEffect(() => keepOnSelect(), [selected]);
+  useEffect(() => keepOnSelect(), [single]);
 
   // After a zoom: the outline at once, not a frame late, and the canvas point
   // the zoom kept back where it was on screen
@@ -703,9 +708,7 @@ export function StudioStage({
   // For its fields, which keep to them as a corner drag does
   const measured = useRef<{ key: string } | null>(null);
   useLayoutEffect(() => {
-    const text = elements.find(
-      ({ element }) => element.id === selected,
-    )?.element;
+    const text = elements.find(({ element }) => element.id === single)?.element;
     const scale = stageRef.current?.fit().scale;
     const words: Words | null =
       text?.kind === "text" && scale
@@ -724,12 +727,14 @@ export function StudioStage({
     onWords(words);
   });
 
-  const chosen = elements.find(({ element }) => element.id === selected);
+  const chosen = elements.find(({ element }) => element.id === single);
   // A group's layer only: an element on its own has its layer's id, and
   // stays an element
   const chosenGroup = chosen
     ? undefined
-    : view.layers.find((layer) => layer.id === selected);
+    : view.layers.find((layer) => layer.id === single);
+  // The selected group's frame, null for none or a hidden one
+  const groupFrame = (chosenGroup && frames.get(chosenGroup.id)) ?? null;
   // The selection's outline: an element's box, or a group's frame, turned
   const frame = chosen
     ? boxOf(chosen.element)
@@ -970,7 +975,7 @@ export function StudioStage({
     }
 
     const id = pickElement(view, locked, point);
-    onSelect(id);
+    onSelect(id === null ? [] : [id]);
     const picked = elements.find(({ element }) => element.id === id);
     if (!picked) return;
     start(
@@ -1181,7 +1186,8 @@ export function StudioStage({
     const d = drag.current;
     end();
     if (d?.kind === "group" && !d.moved) {
-      onSelect(pickElement(view, locked, d.point));
+      const id = pickElement(view, locked, d.point);
+      onSelect(id === null ? [] : [id]);
     }
     // Saved once, where it was let go: nothing for one that didn't move
     if (d?.kind === "guide") {
@@ -1221,17 +1227,19 @@ export function StudioStage({
       }
       return;
     }
-    if (!selected) return;
+    if (selected.length === 0) return;
     if (e.key === "Escape") {
       e.stopPropagation();
-      onSelect(null);
+      onSelect([]);
       return;
     }
+    // Several: PR 5's canvas work
+    if (single === null) return;
     // Backspace too, a Mac's delete key. Not a locked one, as the arrows
     // leave it: the list's Delete and the trash still take it.
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
-      if (!stuck) onDelete(selected);
+      if (!stuck) onDelete([single]);
       return;
     }
     const nudge = NUDGES[e.key];
@@ -1244,7 +1252,7 @@ export function StudioStage({
       return;
     }
     onBox(
-      selected,
+      single,
       roundBox({
         ...frame,
         x: frame.x + nudge[0] * step,
