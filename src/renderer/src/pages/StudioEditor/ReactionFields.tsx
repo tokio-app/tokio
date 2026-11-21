@@ -5,7 +5,6 @@ import {
   STUDIO_LOOPS,
   STUDIO_MAX_DELAY,
   STUDIO_MAX_SECONDS,
-  STUDIO_MAX_TRIGGERS,
   STUDIO_WHEN,
   StudioAnimation,
   StudioCounter,
@@ -21,7 +20,6 @@ import {
 import { CustomGift, TOKIO_EVENTS } from "@/common/types";
 import { triggersOf } from "@/common/util";
 import {
-  Btn,
   EmoteOption,
   Field,
   NumberInput,
@@ -29,10 +27,11 @@ import {
   Select,
   TRIGGER_OPTIONS,
   TriggerFilter,
+  TriggerRows,
+  TriggerRow,
 } from "@/components";
 import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode } from "react";
-import { FiPlus, FiX } from "react-icons/fi";
 import { goalNumbers, retype } from "./helper";
 import styles from "./studioeditor.module.css";
 
@@ -143,7 +142,7 @@ export function ReactionFields<R extends Reaction>({
           },
     );
 
-  const row = (index: number, label: string) => {
+  const row = (index: number, label: string): TriggerRow => {
     const trigger = rows[index];
     let filter: ReactNode;
     if (trigger.type === GOAL_TRIGGER) {
@@ -202,7 +201,7 @@ export function ReactionFields<R extends Reaction>({
         />
       );
     }
-    return (
+    const main = (
       <>
         <Select
           aria-label={label}
@@ -213,61 +212,29 @@ export function ReactionFields<R extends Reaction>({
         {filter}
       </>
     );
+    return { main };
   };
 
-  // With one trigger to pick, another row would only repeat it
-  const adds = triggers.length > 1;
   const triggerFields = (
-    <div className={styles.triggers}>
-      <Field label={t("studio.fields.trigger")}>
-        {row(0, t("studio.fields.trigger"))}
-      </Field>
-      {value.also_triggers.map((_, i) => {
-        const number = String(i + 2);
-        const name = t("studio.triggers.row", { number });
-        const remove = t("studio.triggers.remove", { number });
-        return (
-          <div key={i} className={styles.titled} role="group" aria-label={name}>
-            <div className={styles.titled_head}>
-              <span className={styles.titled_name}>
-                {t("studio.triggers.or")}
-              </span>
-              <Btn
-                variant="icon"
-                title={remove}
-                aria-label={remove}
-                onClick={() =>
-                  onChange({
-                    ...value,
-                    also_triggers: value.also_triggers.filter(
-                      (_, j) => j !== i,
-                    ),
-                  })
-                }
-              >
-                <FiX size={16} />
-              </Btn>
-            </div>
-            {row(i + 1, name)}
-          </div>
-        );
-      })}
-      {adds && (
-        <Btn
-          className={styles.add_trigger}
-          disabled={rows.length >= STUDIO_MAX_TRIGGERS}
-          onClick={() =>
-            onChange({
-              ...value,
-              also_triggers: [...value.also_triggers, newTrigger()],
-            })
-          }
-        >
-          <FiPlus size={16} aria-hidden />
-          {t("studio.triggers.add")}
-        </Btn>
-      )}
-    </div>
+    <TriggerRows
+      count={rows.length}
+      label={t("studio.fields.trigger")}
+      row={row}
+      // With one trigger to pick, another row would only repeat it
+      addable={triggers.length > 1}
+      onAdd={() =>
+        onChange({
+          ...value,
+          also_triggers: [...value.also_triggers, newTrigger()],
+        })
+      }
+      onRemove={(index) =>
+        onChange({
+          ...value,
+          also_triggers: value.also_triggers.filter((_, j) => j !== index - 1),
+        })
+      }
+    />
   );
 
   const delayField = (

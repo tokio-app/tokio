@@ -245,6 +245,7 @@ describe("alerts MCP tools", () => {
             name: "Roses",
             enabled: true,
             trigger: { type: TOKIO_EVENTS.GIFT, gifts: [2] },
+            also_triggers: [],
             sound: null,
             message: null,
             media: { name: "Party", file: "party.png" },
@@ -292,6 +293,83 @@ describe("alerts MCP tools", () => {
         sound: { name: "Bell", file: "bell.mp3", start: 0, end: null },
       });
       expect(s.h.pushed(APP_EVENTS_RESPONSE.GET_PROFILE)).toHaveLength(1);
+    });
+
+    describe("with Or triggers", () => {
+      it("saves also_triggers, then lists and gets them", async () => {
+        const s = setup();
+        const { call } = await mcpClient(s.h.handler);
+
+        const res = await call("save_item", {
+          kind: "alert",
+          id: "a1",
+          changes: {
+            also_triggers: [
+              { type: TOKIO_EVENTS.GIFT, gifts: [2], min_coins: 5 },
+              { type: TOKIO_EVENTS.SHARE },
+            ],
+          },
+        });
+
+        expect(res.isError).toBe(false);
+        expect(s.profile.alerts.items[0].also_triggers).toHaveLength(2);
+        const listed = (await call("list", { kind: "alert" })).value;
+        expect(listed).toMatchObject({
+          alerts: [
+            {
+              also_triggers: [
+                { type: TOKIO_EVENTS.GIFT, gifts: [2], min_coins: 5 },
+                { type: TOKIO_EVENTS.SHARE },
+              ],
+            },
+          ],
+        });
+        const got = (await call("get", { kind: "alert", id: "a1" })).value;
+        expect(got).toMatchObject({
+          also_triggers: [
+            { type: TOKIO_EVENTS.GIFT, gifts: [2], min_coins: 5 },
+            { type: TOKIO_EVENTS.SHARE },
+          ],
+        });
+      });
+
+      it("refuses an unknown field inside one, saving nothing", async () => {
+        const s = setup();
+        const { call } = await mcpClient(s.h.handler);
+
+        const res = await call("save_item", {
+          kind: "alert",
+          id: "a1",
+          changes: {
+            also_triggers: [
+              { type: TOKIO_EVENTS.SHARE },
+              { type: TOKIO_EVENTS.FOLLOW, keywords: "hi" },
+            ],
+          },
+        });
+
+        expect(res.isError).toBe(true);
+        expect(res.text).toContain("also_triggers.1.keywords");
+        expect(s.updateProfileData).not.toHaveBeenCalled();
+      });
+
+      it("refuses more than 4, saving nothing", async () => {
+        const s = setup();
+        const { call } = await mcpClient(s.h.handler);
+
+        const res = await call("save_item", {
+          kind: "alert",
+          id: "a1",
+          changes: {
+            also_triggers: Array.from({ length: 5 }, () => ({
+              type: TOKIO_EVENTS.SHARE,
+            })),
+          },
+        });
+
+        expect(res.isError).toBe(true);
+        expect(s.updateProfileData).not.toHaveBeenCalled();
+      });
     });
 
     it("keeps the cut for the same sound and drops it for another", async () => {

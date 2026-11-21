@@ -23,6 +23,7 @@ const alert = (
   name: keyword,
   enabled,
   trigger: trigger(keyword, type),
+  also_triggers: [],
   sound: null,
   tts: null,
   media: null,
@@ -105,6 +106,21 @@ describe("chatCommands", () => {
       "jump",
       "inner",
       "time",
+    ]);
+  });
+
+  it("keeps the keywords of an alert's Or rows", async () => {
+    const profile = structuredClone(defaultProfile);
+    profile.alerts.items = [
+      {
+        ...alert("first", true, TOKIO_EVENTS.FOLLOW),
+        also_triggers: [trigger("second")],
+      },
+      { ...alert("off", false), also_triggers: [trigger("hidden")] },
+    ];
+
+    expect((await chatCommands(services(profile))).keywords).toEqual([
+      "second",
     ]);
   });
 

@@ -28,7 +28,7 @@ paths:
 ## What's translated
 
 - Only messages TikTok tagged (`comment.lang` not empty) with another base language than the target's, with a letter, while translation isn't paused. That gate reads nothing else; `chatCommands` (`commands.ts`) is read only past it.
-- `chatCommands`: the active profile's TTS trigger and enabled music commands (`startsWithCommand`), the keywords of the alerts, game actions and Studio elements that are on with a Chat trigger (`matchesTrigger` reads no keyword on Emote), the timer's while chat adds time (`hasKeyword`), and `OverlayService.chatCommands()`.
+- `chatCommands`: the active profile's TTS trigger and enabled music commands (`startsWithCommand`), the keywords of the alerts, game actions and Studio elements that are on with a Chat trigger (any row of an alert's or a Studio item's; `matchesTrigger` reads no keyword on Emote), the timer's while chat adds time (`hasKeyword`), and `OverlayService.chatCommands()`.
 - Overlays register commands with `command: true` on an `input` field or table column, and `info.yaml`'s `commands`. `OverlayService` keeps them per overlay, refreshed whenever it reads or writes an overlay's files.
 - Mentions at the ends are cut and put back; middle ones become `<n>` stand-ins, swapped back. A lost stand-in, or typed text that looks like one, drops the translation. A handle confuses detection: Google read `@kenji hi` as Japanese.
 - A translation is dropped when Google detects the target language. Promises are cached by target and text (`CACHE_SIZE`); a failed one leaves the cache.

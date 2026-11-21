@@ -4,6 +4,7 @@ import {
   AlertTts,
   MediaFile,
   Profile,
+  Trigger,
 } from "@/common/schemas";
 import {
   APP_EVENTS,
@@ -23,6 +24,7 @@ import {
   MEDIA_EXTENSIONS,
   mediaKind,
   TaskQueue,
+  triggersOf,
 } from "@/common/util";
 import { writeFileAtomic } from "@/helper/fs";
 import { hash, importFile, isSaved } from "@/helper/library";
@@ -416,7 +418,7 @@ export class AlertsService extends Service {
     profile: Pick<Profile, "alerts" | "tts">,
     send: (audio: AlertAudio) => void,
     // Called for an alert whose sound can't be read or spoken
-    onError?: (alert: Alert, error?: string) => void,
+    onError?: (alert: Alert, error: string | undefined, row: Trigger) => void,
   ) {
     const settings = profile.alerts;
     const run = this._run;
@@ -430,17 +432,19 @@ export class AlertsService extends Service {
       if (!alert.enabled || (!alert.sound && !alert.tts && !alert.media)) {
         continue;
       }
-      if (!matchesTrigger(alert.trigger, type, payload, added, total)) continue;
+      // The first row that takes the event decides the repeat and the channel
+      const row = triggersOf(alert).find((trigger) =>
+        matchesTrigger(trigger, type, payload, added, total),
+      );
+      if (!row) continue;
 
       // An alert on every gift plays once for each, as many as the queue takes
       const times =
-        alert.trigger.type === TOKIO_EVENTS.GIFT && alert.trigger.every_gift
+        row.type === TOKIO_EVENTS.GIFT && row.every_gift
           ? Math.min(added, settings.queue_length)
           : 1;
-      // By the alert's trigger, emote alerts come with chat events.
-      const channel = settings.simultaneous
-        ? `alerts:${alert.trigger.type}`
-        : "alerts";
+      // By the row's trigger, emote alerts come with chat events.
+      const channel = settings.simultaneous ? `alerts:${row.type}` : "alerts";
       const { tts, sound, media } = alert;
       // A viewer on the TTS block list loses only the message
       const speak =
@@ -471,7 +475,7 @@ export class AlertsService extends Service {
       // A message is spoken instead of the sound.
       if (speak) {
         this._queueSpeech(speak, speech, profile.tts, play, (error) =>
-          onError?.(alert, error),
+          onError?.(alert, error, row),
         );
         continue;
       }
@@ -486,7 +490,7 @@ export class AlertsService extends Service {
       // Cleared while it was checked
       if (run !== this._run) return;
       if (missing) {
-        onError?.(alert, missing);
+        onError?.(alert, missing, row);
         continue;
       }
       // By key: the window asks for the bytes only when it hasn't decoded them

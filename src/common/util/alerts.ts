@@ -43,6 +43,13 @@ export const getSoundPreviewURL = (file: string) =>
 export const getPicturePreviewURL = (file: string) =>
   `${MEDIA_SCHEME}:///games/minecraft/${encodeURIComponent(file)}`;
 
+// Every trigger an alert, or a Studio element or group, reacts to, its first
+// first
+export const triggersOf = <T>(item: {
+  trigger: T;
+  also_triggers: T[];
+}): T[] => [item.trigger, ...item.also_triggers];
+
 // Triggers a role can narrow: only these events carry the viewer's roles
 // (emotes the chat's). A new trigger offers none until its event has them.
 const ROLE_TRIGGERS: AlertTrigger[] = [
@@ -147,6 +154,7 @@ export function createAlert(index = 0): Alert {
       min_coins: 0,
       roles: [],
     },
+    also_triggers: [],
     sound: null,
     tts: null,
     media: null,

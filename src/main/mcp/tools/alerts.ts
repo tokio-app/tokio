@@ -6,6 +6,7 @@ import {
   type MediaFile,
   type Profile,
   ProfileSchema,
+  TriggerSchema,
 } from "@/common/schemas";
 import {
   APP_EVENTS,
@@ -33,6 +34,7 @@ import {
   invokeOk,
   ok,
   pushProfile,
+  unknownKeys,
 } from "../common";
 import {
   defineKind,
@@ -106,6 +108,7 @@ const alertRow = (alert: Alert) => ({
   name: alert.name,
   enabled: alert.enabled,
   trigger: triggerSummary(alert.trigger),
+  also_triggers: alert.also_triggers.map(triggerSummary),
   sound: fileOf(alert.sound),
   message: alert.tts?.message ?? null,
   media: fileOf(alert.media),
@@ -141,6 +144,12 @@ function mergeAlert(
   const merged = deepMerge(base, changes);
   if (!isRecord(merged))
     return { error: fail("The changes must be an object.") };
+  // Arrays replace: a new row has no stored gifts to merge onto
+  if (Array.isArray(merged.also_triggers)) {
+    merged.also_triggers = merged.also_triggers.map((row: unknown) =>
+      isRecord(row) ? { gifts: [], ...row } : row,
+    );
+  }
   const { sound, media: shown } = merged;
   if (isRecord(sound)) {
     const listed = sounds.find((s) => s.file === sound.file);
@@ -176,6 +185,14 @@ function mergeAlert(
     ? { alert: parsed.data }
     : { error: invalid(parsed.error) };
 }
+
+// unknownKeys stops at arrays, so each of also_triggers is checked here
+const unknownTriggerKeys = (changes: Record<string, unknown>) =>
+  Array.isArray(changes.also_triggers)
+    ? changes.also_triggers.flatMap((trigger: unknown, i) =>
+        unknownKeys(TriggerSchema, trigger, `also_triggers.${i}.`),
+      )
+    : [];
 
 const VARIABLES = ALERT_TRIGGERS.map(
   (trigger) =>
@@ -232,7 +249,7 @@ export const kinds: Kinds = {
   alert: defineKind({
     schema: AlertChangesSchema,
     notes: [
-      "An alert of the active profile: when its trigger matches a LIVE event and it's enabled, it plays its sound, or speaks its tts message instead when tts is set, and shows its media on its own overlay (overlayURL, a browser source in OBS). An empty name shows as alert-<place>.",
+      "An alert of the active profile: when its trigger, or any one of also_triggers (up to 4 more, each shaped like trigger), matches a LIVE event and it's enabled, it plays its sound, or speaks its tts message instead when tts is set, and shows its media on its own overlay (overlayURL, a browser source in OBS). An empty name shows as alert-<place>.",
       `trigger.type is one of: ${ALERT_TRIGGERS.join(", ")}. gifts (gift ids from list gifts, empty for any), every_gift and min_coins are for gift triggers; min_coins only for any gift. emotes (ids from list emotes, empty for any) for the emote trigger; keyword (whole words) for chat; user (a handle or name) for member and super fan joins; roles (follower, moderator, superfan) only for chat, emote and gift.`,
       "sound and media take a file from list sounds and list media ({ file } is enough; the name comes from the library). A sound plays from start to end seconds (end null: to its end); media shows for duration seconds (1–60), at least while the sound plays, and a video plays its cut at its own volume. Ask the streamer which sound or picture they want; add_to_library adds new ones. null clears one.",
       `tts: { voice, message, speed, pitch }, voice from list_voices ({ engine, name, lang, id }). The message can hold its trigger's variables: ${VARIABLES}. {count} is a gift streak's total, or a like batch's likes. volume (0–100) is the sound's or message's.`,
@@ -259,6 +276,12 @@ export const kinds: Kinds = {
       });
     },
     save: async (handler, id, changes) => {
+      const unknown = unknownTriggerKeys(changes);
+      if (unknown.length > 0) {
+        return fail(
+          `Unknown settings: ${unknown.join(", ")}. Nothing was saved: see describe for the fields.`,
+        );
+      }
       const changed = guardProfile(handler);
       const { storeManagerService } = handler;
       const profile = await activeProfile(handler);

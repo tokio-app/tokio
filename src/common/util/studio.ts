@@ -13,7 +13,6 @@ import {
   StudioPictureKind,
   StudioSize,
   StudioSource,
-  StudioTrigger,
 } from "../schemas/studio";
 import {
   EMOTE_TRIGGER,
@@ -33,7 +32,12 @@ import type {
   StudioReact,
   StudioView,
 } from "../types/studio";
-import { countedVariables, mediaKind, messageValues } from "./alerts";
+import {
+  countedVariables,
+  mediaKind,
+  messageValues,
+  triggersOf,
+} from "./alerts";
 import { formatDuration, formatStat } from "./format";
 import { generateEmoteChatSample, generateTikTokEventSample } from "./samples";
 
@@ -75,11 +79,6 @@ export const usesNumbers = (text: string) =>
 // screen or moves all the time has none
 export const reactsToEvents = (item: Pick<StudioElement, "when">) =>
   item.when === "event" || item.when === "animate";
-
-// Every trigger an element or a group reacts to, its first first
-export const triggersOf = (
-  item: Pick<StudioElement, "trigger" | "also_triggers">,
-): StudioTrigger[] => [item.trigger, ...item.also_triggers];
 
 // The variables a text element gets from its triggers, all of theirs, none
 // while it doesn't react. A goal sends none. The live numbers

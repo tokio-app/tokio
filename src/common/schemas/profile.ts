@@ -93,6 +93,10 @@ const AlertTtsSchema = z.object({
 // The flags a viewer has in UserData
 export const VIEWER_ROLES = ["follower", "moderator", "superfan"] as const;
 
+// The most triggers an alert, or a Studio element or group, reacts to, its
+// first included
+export const MAX_TRIGGERS = 5;
+
 // What an alert or a game action reacts to
 export const TriggerSchema = z.object({
   type: AlertTriggerSchema,
@@ -146,6 +150,12 @@ export const AlertItemSchema = z.object({
   name: z.string().default(""),
   enabled: z.boolean(),
   trigger: TriggerSchema,
+  // The others it plays on too, any one of them (Or), kept apart from trigger
+  // so an older Tokio still plays on the first
+  also_triggers: z
+    .array(TriggerSchema)
+    .max(MAX_TRIGGERS - 1)
+    .default([]),
   sound: AlertClipSchema.nullable(),
   // Spoken instead of the sound when set
   tts: AlertTtsSchema.nullable().default(null),

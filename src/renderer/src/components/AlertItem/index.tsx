@@ -12,6 +12,7 @@ import {
   getAlertOverlayURL,
   giftNames,
   takesRoles,
+  triggersOf,
 } from "@/common/util";
 import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
@@ -25,6 +26,8 @@ import { MediaThumbnail } from "../MediaPicker";
 import { PlayButton, TestState, testProps } from "../PlayButton";
 import { SoundLength } from "../SoundPicker/SoundLength";
 import styles from "./alertitem.module.css";
+
+export { TriggerRows, type TriggerRow } from "./TriggerRows";
 
 // The triggers, their labels keys (see useOptions)
 export const TRIGGER_OPTIONS: { value: Trigger["type"]; label: MessageKey }[] =
@@ -121,6 +124,13 @@ export function TriggerFilter({
 // The most gifts or emotes a summary names or shows, the rest counted
 const NAMED = 3;
 
+// Between the triggers' conditions: each can hold commas and "or" already,
+// so another "or" would blur which goes with which
+const ROWS = " · ";
+
+const capitalize = (text: string, language: string) =>
+  text.charAt(0).toLocaleUpperCase(language) + text.slice(1);
+
 // The gifts or emotes picked, as the summary names them, null while the
 // lists don't have any of them
 function pickedNames(
@@ -140,24 +150,34 @@ function pickedNames(
     : null;
 }
 
-/**
- * The pictures of the gifts or emotes picked, at most NAMED, and how many
- * more are picked. Null when the lists have none of their pictures, so the
- * summary names them instead.
- */
-function triggerPictures(
+// The pictures of a trigger's picked gifts or emotes, undefined for one the
+// lists have none of
+const pictureList = (
   trigger: Trigger,
   gifts: CustomGift[],
   emotes: EmoteOption[],
+) =>
+  trigger.type === TOKIO_EVENTS.GIFT
+    ? trigger.gifts.map((id) => gifts.find((gift) => gift.value === id)?.img)
+    : trigger.type === EMOTE_TRIGGER
+      ? trigger.emotes.map(
+          (id) => emotes.find((emote) => emote.value === id)?.img,
+        )
+      : [];
+
+/**
+ * The pictures of the gifts or emotes picked by any of the triggers, at most
+ * NAMED, and how many more are picked. Null when the lists have none of their
+ * pictures, so the summary names them instead.
+ */
+function triggerPictures(
+  triggers: Trigger[],
+  gifts: CustomGift[],
+  emotes: EmoteOption[],
 ): { shown: string[]; more: number } | null {
-  const pictures =
-    trigger.type === TOKIO_EVENTS.GIFT
-      ? trigger.gifts.map((id) => gifts.find((gift) => gift.value === id)?.img)
-      : trigger.type === EMOTE_TRIGGER
-        ? trigger.emotes.map(
-            (id) => emotes.find((emote) => emote.value === id)?.img,
-          )
-        : [];
+  const pictures = triggers.flatMap((trigger) =>
+    pictureList(trigger, gifts, emotes),
+  );
   const shown = pictures.filter((img): img is string => !!img).slice(0, NAMED);
   // The rest counts the ones without a picture too, the trigger reacts to them
   return shown.length > 0
@@ -166,16 +186,16 @@ function triggerPictures(
 }
 
 /**
- * What narrows the trigger, as one sentence in the language: "Rose or Lion,
- * when the streak ends, worth 100+ coins, from Followers". Empty when nothing
- * does. Pictured leaves out the gifts or emotes, which their pictures show.
+ * What narrows a trigger, in the language: "Rose or Lion, when the streak
+ * ends, worth 100+ coins, from Followers". Empty when nothing does. Pictured
+ * leaves out the gifts or emotes, which their pictures show.
  */
-export function triggerSummary(
+function rowSummary(
   trigger: Trigger,
   gifts: CustomGift[],
   emotes: EmoteOption[],
   language: string,
-  pictured = false,
+  pictured: boolean,
 ): string {
   const t = (key: MessageKey, params?: Params) =>
     translate(language, key, params);
@@ -239,8 +259,48 @@ export function triggerSummary(
     );
     parts.push(t("components.alertItem.fromRoles", { roles }));
   }
-  const text = parts.join(", ");
-  return text.charAt(0).toLocaleUpperCase(language) + text.slice(1);
+  return parts.join(", ");
+}
+
+/**
+ * What narrows the triggers, in the language: each trigger's conditions, as
+ * a clause of their own (ROWS between them). Empty when nothing does.
+ * Pictured leaves out the gifts and emotes of a trigger whose pictures show.
+ */
+export function triggerSummary(
+  triggers: Trigger[],
+  gifts: CustomGift[],
+  emotes: EmoteOption[],
+  language: string,
+  pictured = false,
+): string {
+  const rows = triggers
+    .map((trigger) =>
+      rowSummary(
+        trigger,
+        gifts,
+        emotes,
+        language,
+        pictured && pictureList(trigger, gifts, emotes).some(Boolean),
+      ),
+    )
+    .filter(Boolean);
+  return rows.map((row) => capitalize(row, language)).join(ROWS);
+}
+
+/**
+ * The events that set the alert off, said once each and joined as the
+ * language joins alternatives: "Follow or Gift".
+ */
+export function triggerLabel(
+  alert: Pick<Alert, "trigger" | "also_triggers">,
+  t: (key: MessageKey) => string,
+  language: string,
+): string {
+  const names = triggersOf(alert).map(({ type }) =>
+    t(ALERT_TRIGGER_LABELS[type]),
+  );
+  return listOf(language, [...new Set(names)], { type: "or" });
 }
 
 /** The test of what the alert plays and shows, null when it has nothing. */
@@ -288,17 +348,18 @@ export function AlertItem({
   const t = useT();
   const language = useLanguage();
   const { sound, tts, media } = alert;
-  const pictures = triggerPictures(alert.trigger, gifts, emotes);
-  const detail = triggerSummary(
-    alert.trigger,
-    gifts,
-    emotes,
-    language,
-    !!pictures,
-  );
+  const triggers = triggersOf(alert);
+  const pictures = triggerPictures(triggers, gifts, emotes);
+  const detail = triggerSummary(triggers, gifts, emotes, language, !!pictures);
   // What the pictures show, for screen readers and on hover
   const names = pictures
-    ? (pickedNames(alert.trigger, gifts, emotes, language) ?? undefined)
+    ? triggers
+        .flatMap((trigger) =>
+          pictureList(trigger, gifts, emotes).some(Boolean)
+            ? (pickedNames(trigger, gifts, emotes, language) ?? [])
+            : [],
+        )
+        .join(ROWS) || undefined
     : undefined;
   const test = alertTest(alert);
 
@@ -320,7 +381,7 @@ export function AlertItem({
           <span className={styles.name}>{alertName(alert.name, index)}</span>
           <span className={styles.trigger}>
             <span className={styles.event}>
-              {t(ALERT_TRIGGER_LABELS[alert.trigger.type])}
+              {triggerLabel(alert, t, language)}
             </span>
             {pictures && (
               <span

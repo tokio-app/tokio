@@ -1,6 +1,7 @@
 import { MessageKey } from "@/common/i18n";
 import { Alert, AlertSound, AlertTts } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { triggersOf } from "@/common/util";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useIpcListener } from "@/hooks/useIpcListener";
 import { useIpcRequest } from "@/hooks/useIpcRequest";
@@ -166,7 +167,7 @@ export function SoundPicker({
         {speaking && (
           <TtsTab
             alertId={id}
-            trigger={alert.trigger}
+            triggers={triggersOf(alert)}
             value={tts}
             onChange={setTts}
             testing={testing}
