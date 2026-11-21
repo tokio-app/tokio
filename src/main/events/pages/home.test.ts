@@ -2,6 +2,9 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
+  Platform,
+  PLATFORMS,
+  PlatformStatus,
   TOKIO_EVENTS,
 } from "@/common/types";
 import Logger from "@/logger";
@@ -38,10 +41,18 @@ describe("home events", () => {
         isConnected: vi.fn(() => on),
         isReconnecting: vi.fn(() => false),
         isWaiting: () => false,
+        status: vi.fn((): Partial<Record<Platform, PlatformStatus>> => ({})),
+        channel: vi.fn((_platform: Platform) => ""),
         username: "",
       };
+      const profile = {
+        platforms: ["tiktok"] as Platform[],
+        channels: {},
+      };
       const storeManagerService = {
-        updateProfileData: vi.fn(async () => true),
+        updateProfileData: vi.fn(async (_updates: unknown) => true),
+        getProfileData: vi.fn(async () => profile),
+        getTwitchAccount: () => ({ id: "twitch:1", login: "mia", key: "x" }),
         getLiveStats: () => stats,
       };
       const liveService = {
@@ -52,7 +63,7 @@ describe("home events", () => {
         storeManagerService,
         liveService,
       });
-      return { h, live, connectorService, storeManagerService };
+      return { h, live, connectorService, storeManagerService, profile };
     };
 
     it("saves the username and answers with the saved stats", async () => {
@@ -65,13 +76,16 @@ describe("home events", () => {
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
         connector: { username: "streamer" },
       });
-      expect(connectorService.connect).toHaveBeenCalledWith("streamer");
+      expect(connectorService.connect).toHaveBeenCalledWith({
+        tiktok: "streamer",
+      });
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
         {
           success: true,
           live: true,
           reconnecting: false,
           waiting: false,
+          platforms: {},
           stats,
         },
       ]);
@@ -96,7 +110,7 @@ describe("home events", () => {
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
         connector: { username: "mia" },
       });
-      expect(connectorService.connect).toHaveBeenCalledWith("mia");
+      expect(connectorService.connect).toHaveBeenCalledWith({ tiktok: "mia" });
       expect(h.notices[0].message).toBe("Connected to @mia.");
     });
 
@@ -105,14 +119,17 @@ describe("home events", () => {
         success: true,
       });
       connectorService.isConnected.mockReturnValue(true);
-      connectorService.username = "first";
+      connectorService.status.mockReturnValue({ tiktok: "connected" });
+      connectorService.channel.mockReturnValue("first");
 
       await h.invoke(home, APP_EVENTS.CONNECT, { username: "second" });
 
       expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
         connector: { username: "first" },
       });
-      expect(connectorService.connect).toHaveBeenCalledWith("first");
+      expect(connectorService.connect).toHaveBeenCalledWith({
+        tiktok: "first",
+      });
       expect(h.notices[0].message).toBe("Connected to @first.");
     });
 
@@ -124,13 +141,16 @@ describe("home events", () => {
 
       await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
 
-      expect(connectorService.connect).toHaveBeenCalledWith("streamer");
+      expect(connectorService.connect).toHaveBeenCalledWith({
+        tiktok: "streamer",
+      });
       expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
         {
           success: true,
           live: true,
           reconnecting: false,
           waiting: false,
+          platforms: {},
           stats,
         },
       ]);
@@ -239,6 +259,263 @@ describe("home events", () => {
     });
   });
 
+  describe("CONNECT on several platforms", () => {
+    const both = (
+      results: Partial<
+        Record<Platform, { success: boolean; error?: ConnectorFailure }>
+      >,
+    ) => {
+      const live = eventSource();
+      const status: Partial<Record<Platform, PlatformStatus>> = {};
+      const connectorService = {
+        ...live,
+        connect: vi.fn(
+          async (
+            channels: Partial<Record<Platform, string>>,
+            onResult?: (
+              platform: Platform,
+              res: { success: boolean; error?: ConnectorFailure },
+            ) => void,
+          ) => {
+            for (const platform of PLATFORMS.filter((p) => p in channels)) {
+              const res = results[platform] ?? { success: true };
+              if (res.success) {
+                status[platform] = "connected";
+                // The session starts with the first one up
+                if (Object.keys(status).length === 1) {
+                  live.emit(TOKIO_EVENTS.CONNECTED, undefined);
+                }
+              }
+              onResult?.(platform, res);
+            }
+            return { success: true };
+          },
+        ),
+        isConnected: () => Object.keys(status).length > 0,
+        isReconnecting: () => false,
+        isWaiting: () => false,
+        status: () => ({ ...status }),
+        channel: (_platform: Platform) => "",
+        username: "",
+      };
+      const storeManagerService = {
+        updateProfileData: vi.fn(async (_updates: unknown) => true),
+        getProfileData: async () => ({
+          platforms: ["tiktok", "twitch"] as Platform[],
+          channels: {},
+        }),
+        getTwitchAccount: () => ({ id: "twitch:1", login: "mia", key: "x" }),
+        getLiveStats: () => stats,
+      };
+      const liveService = {
+        getSession: () => ({
+          startedAt: Object.keys(status).length > 0 ? 1000 : null,
+        }),
+      };
+      const h = createHandler({
+        connectorService,
+        storeManagerService,
+        liveService,
+      });
+      return { h, live, connectorService, storeManagerService, status };
+    };
+
+    it("connects every platform, each with its own notice", async () => {
+      const { h, connectorService, storeManagerService } = both({});
+
+      await h.invoke(home, APP_EVENTS.CONNECT, {
+        username: "@streamer",
+        channels: {},
+      });
+
+      expect(connectorService.connect).toHaveBeenCalledWith(
+        { tiktok: "streamer", twitch: "mia" },
+        expect.any(Function),
+      );
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        connector: { username: "streamer" },
+        channels: {},
+      });
+      // The session's start, then each platform's result
+      const replies = h.replies(APP_EVENTS_RESPONSE.CONNECTED);
+      expect(replies).toHaveLength(3);
+      expect(replies[0]).toMatchObject({
+        success: true,
+        live: true,
+        platforms: { tiktok: "connected" },
+      });
+      expect(replies[2]).toMatchObject({
+        platforms: { tiktok: "connected", twitch: "connected" },
+      });
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "success",
+          code: FEEDBACK_CODES.CONNECTED,
+          message: "Connected to @streamer on TikTok.",
+        }),
+        expect.objectContaining({
+          level: "success",
+          message: "Connected to @mia on Twitch.",
+        }),
+      ]);
+    });
+
+    it("says why one failed while the other connects", async () => {
+      const { h } = both({
+        twitch: { success: false, error: connectFailure("noKey", "") },
+      });
+
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          message: "Connected to @streamer on TikTok.",
+        }),
+        expect.objectContaining({
+          level: "error",
+          code: FEEDBACK_CODES.CONNECT_FAILED,
+          message:
+            "Tokio needs your Twitch account to connect. Sign in with Twitch in Settings.",
+        }),
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED).at(-1)).toMatchObject({
+        success: true,
+        platforms: { tiktok: "connected" },
+      });
+    });
+
+    it("replies the state without a failure of its own when all fail", async () => {
+      const { h } = both({
+        tiktok: { success: false, error: connectFailure("offline", "") },
+        twitch: { success: false, error: connectFailure("badKey", "") },
+      });
+
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      expect(h.notices.map((n) => n.message)).toEqual([
+        "@streamer isn't LIVE on TikTok right now. Connect once the LIVE has started.",
+        "Twitch signed Tokio out. Sign in with Twitch again in Settings.",
+      ]);
+      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
+        expect.objectContaining({ success: false, live: false }),
+        expect.objectContaining({ success: false, live: false }),
+      ]);
+    });
+
+    it("tells nothing again for a platform that was already up", async () => {
+      const { h, status } = both({});
+      status.tiktok = "connected";
+
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      expect(h.notices.map((n) => n.message)).toEqual([
+        "Connected to @mia on Twitch.",
+      ]);
+    });
+
+    it.each([
+      [
+        connectFailure("network", ""),
+        "Unable to reach Twitch. Check your internet connection.",
+      ],
+      [
+        connectFailure("notFound", ""),
+        "Couldn't find @mia on Twitch. Check the username.",
+      ],
+      [
+        connectFailure("rateLimited", ""),
+        "Unable to connect to @mia on Twitch. Try again in a moment.",
+      ],
+    ])("names the platform a failure is from (%#)", async (error, message) => {
+      const { h } = both({ twitch: { success: false, error } });
+
+      await h.invoke(home, APP_EVENTS.CONNECT, { username: "streamer" });
+
+      expect(h.notices.at(-1)?.message).toBe(message);
+    });
+  });
+
+  describe("SET_PLATFORMS", () => {
+    const setup = (connected = false, saved = true) => {
+      const profile = { platforms: ["tiktok"] as Platform[] };
+      const storeManagerService = {
+        updateProfileData: vi.fn(async (_updates: unknown) => saved),
+        getProfileData: async () => profile,
+      };
+      const timerService = { setPlatforms: vi.fn((_p: Platform[]) => {}) };
+      const h = createHandler({
+        connectorService: { isConnected: () => connected },
+        storeManagerService,
+        timerService,
+      });
+      return { h, storeManagerService, timerService };
+    };
+
+    it("saves the known ones in Home's order, with no notice", async () => {
+      const { h, storeManagerService, timerService } = setup();
+
+      await h.invoke(home, APP_EVENTS.SET_PLATFORMS, {
+        platforms: [
+          "twitch",
+          // A newer Tokio's
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+          "kick" as Platform,
+          "tiktok",
+          "twitch",
+        ],
+      });
+
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        platforms: ["tiktok", "twitch"],
+      });
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_PLATFORMS)).toEqual([
+        { success: true, platforms: ["tiktok", "twitch"] },
+      ]);
+      expect(timerService.setPlatforms).toHaveBeenCalledWith([
+        "tiktok",
+        "twitch",
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("refuses while connected, replying what the profile has", async () => {
+      const { h, storeManagerService } = setup(true);
+
+      await h.invoke(home, APP_EVENTS.SET_PLATFORMS, { platforms: ["twitch"] });
+
+      expect(storeManagerService.updateProfileData).not.toHaveBeenCalled();
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.PROFILE_LOCKED,
+          message: "Disconnect from the LIVE before changing platforms.",
+        }),
+      ]);
+      await vi.waitFor(() =>
+        expect(h.replies(APP_EVENTS_RESPONSE.SET_PLATFORMS)).toEqual([
+          expect.objectContaining({ success: false, platforms: ["tiktok"] }),
+        ]),
+      );
+    });
+
+    it("says when the platforms can't be saved", async () => {
+      vi.spyOn(Logger, "error");
+      const { h, timerService } = setup(false, false);
+
+      await h.invoke(home, APP_EVENTS.SET_PLATFORMS, { platforms: ["twitch"] });
+
+      expect(h.notices).toEqual([
+        expect.objectContaining({ code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED }),
+      ]);
+      expect(timerService.setPlatforms).not.toHaveBeenCalled();
+      await vi.waitFor(() =>
+        expect(h.replies(APP_EVENTS_RESPONSE.SET_PLATFORMS)).toEqual([
+          expect.objectContaining({ success: false, platforms: ["tiktok"] }),
+        ]),
+      );
+    });
+  });
+
   describe("DISCONNECT", () => {
     it("disconnects and answers empty stats", async () => {
       const disconnect = vi.fn(async () => {});
@@ -286,6 +563,7 @@ describe("home events", () => {
         isConnected: () => true,
         isReconnecting: () => reconnecting,
         isWaiting: () => waiting,
+        status: () => ({}),
       },
       liveService: { getSession: () => ({ startedAt }) },
       storeManagerService: { getLiveStats: () => stats },
@@ -302,6 +580,7 @@ describe("home events", () => {
           live: true,
           reconnecting: false,
           waiting: false,
+          platforms: {},
           stats,
         },
       ]);
@@ -318,6 +597,7 @@ describe("home events", () => {
           live: false,
           reconnecting: false,
           waiting: false,
+          platforms: {},
           stats,
         },
       ]);
@@ -334,6 +614,7 @@ describe("home events", () => {
           live: true,
           reconnecting: true,
           waiting: false,
+          platforms: {},
           stats,
         },
       ]);
@@ -350,6 +631,7 @@ describe("home events", () => {
           live: false,
           reconnecting: false,
           waiting: true,
+          platforms: {},
           stats,
         },
       ]);

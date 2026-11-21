@@ -6,6 +6,7 @@ import {
   TimerStatus,
 } from "@/common/schemas";
 import {
+  Platform,
   TimerState,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -26,6 +27,9 @@ export const TIMER_EVENTS = [
   TOKIO_EVENTS.FOLLOW,
   TOKIO_EVENTS.SHARE,
   TOKIO_EVENTS.CHAT,
+  TOKIO_EVENTS.SUBSCRIBE,
+  TOKIO_EVENTS.GIFT_SUB,
+  TOKIO_EVENTS.CHEER,
 ] as const;
 
 type TimerEvent = (typeof TIMER_EVENTS)[number];
@@ -75,6 +79,8 @@ export class TimerService extends Service {
   private _unsaved = false;
   private _listeners: ((deltaMs: number) => void)[] = [];
   private _onSaveFailed?: () => void;
+  // The profile's platforms, whose triggers the overlay's carousel lists
+  private _platforms: Platform[] = ["tiktok"];
 
   private readonly _triggers: Triggers = {
     [TOKIO_EVENTS.GIFT]: (event) => {
@@ -96,6 +102,10 @@ export class TimerService extends Service {
       hasKeyword(comment.content, this._settings.chat.keyword)
         ? this._once(user, this._seconds().chat)
         : 0,
+    [TOKIO_EVENTS.SUBSCRIBE]: () => this._seconds().sub,
+    [TOKIO_EVENTS.GIFT_SUB]: ({ count }) =>
+      Math.max(0, count) * this._seconds().gift_sub,
+    [TOKIO_EVENTS.CHEER]: ({ bits }) => Math.max(0, bits) * this._seconds().bit,
   };
 
   public initialize({ store }: { store: Store }) {
@@ -109,9 +119,14 @@ export class TimerService extends Service {
   }
 
   /** Takes a profile's timer and the file it came from. Running comes back paused. */
-  public load(timer: TimerProfile, file: string) {
+  public load(
+    timer: TimerProfile,
+    file: string,
+    platforms: Platform[] = ["tiktok"],
+  ) {
     this._clearTimeout();
     this._file = file;
+    this._platforms = platforms;
     this._settings = timer.settings;
     this._status = timer.status === "running" ? "paused" : timer.status;
     this._remaining =
@@ -120,6 +135,16 @@ export class TimerService extends Service {
     this._cooldowns.clear();
     this._unsaved = false;
     this._emit(0);
+  }
+
+  /** The profile's platforms changed: listeners get the timer again. */
+  public setPlatforms(platforms: Platform[]) {
+    this._platforms = platforms;
+    this._emit(0);
+  }
+
+  public platforms(): readonly Platform[] {
+    return this._platforms;
   }
 
   public get(): { settings: TimerSettings; state: TimerState } {

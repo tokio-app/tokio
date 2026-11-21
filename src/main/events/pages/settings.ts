@@ -206,7 +206,7 @@ const switchProfile = async (
   const profile = await storeManagerService.getProfileData();
   const profiles = storeManagerService.getProfiles();
   if (!profile || !profiles) throw new Error(`Unable to load ${file}.`);
-  timerService.load(profile.timer, file);
+  timerService.load(profile.timer, file, profile.platforms);
   // Overlays get the new profile's fans once they load
   if (!(await services.fansService.load(file))) {
     notifier.warn(
@@ -786,6 +786,102 @@ events.push(
     notify: false,
     onError: (e) =>
       e.reply(APP_EVENTS_RESPONSE.GET_NETWORK_ADDRESSES, { addresses: [] }),
+  },
+);
+
+// The Twitch sign-in waiting for the streamer, which a newer one or a
+// sign-out aborts. The attempt drops a reply that came after a newer one.
+let twitchAttempt = 0;
+let twitchSignIn: AbortController | null = null;
+
+const cancelTwitchSignIn = () => {
+  twitchAttempt++;
+  twitchSignIn?.abort();
+  twitchSignIn = null;
+};
+
+// The account itself is saved by the store, through onTwitchAccount
+events.push(
+  APP_EVENTS.TWITCH_SIGN_IN,
+  async ({ connectorService, notifier, shell, win }, e) => {
+    cancelTwitchSignIn();
+    const current = twitchAttempt;
+    const abort = new AbortController();
+    twitchSignIn = abort;
+    const account = await connectorService
+      .signInTwitch((code) => {
+        if (current !== twitchAttempt) return;
+        if (!win.isDestroyed()) {
+          win.webContents.send(APP_EVENTS_RESPONSE.TWITCH_CODE, code);
+        }
+        // Twitch's page with the code filled in
+        void shell.openExternal(code.uri);
+      }, abort.signal)
+      // Canceled, by a newer sign-in or a sign-out: not a failure
+      .catch((error: unknown) => {
+        if (abort.signal.aborted) return null;
+        throw error;
+      });
+    if (current !== twitchAttempt || !account) return;
+    twitchSignIn = null;
+    e.reply(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, {
+      success: true,
+      login: account.login,
+    });
+    notifier.success(
+      "system",
+      FEEDBACK_CODES.TWITCH_SIGNED_IN,
+      t("main.settings.twitchSignedIn", { login: account.login }),
+    );
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.TWITCH_SIGN_IN_FAILED,
+      message: "main.failure.twitchSignIn",
+    },
+    onError: (e, error, _data, { storeManagerService }) =>
+      e.reply(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, {
+        success: false,
+        error,
+        login: storeManagerService.getTwitchAccount().login,
+      }),
+  },
+);
+
+// Also cancels a sign-in that waits, which the window's Cancel sends
+events.push(
+  APP_EVENTS.TWITCH_SIGN_OUT,
+  async ({ connectorService, storeManagerService, notifier }, e) => {
+    cancelTwitchSignIn();
+    if (connectorService.status().twitch) {
+      throw new AppFailure(
+        FEEDBACK_CODES.PROFILE_LOCKED,
+        t("main.settings.twitchLocked"),
+        { level: "warning" },
+      );
+    }
+    const signedIn = storeManagerService.getTwitchAccount().login !== "";
+    await connectorService.signOutTwitch();
+    e.reply(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, { success: true, login: "" });
+    // A canceled sign-in had nothing to sign out of
+    if (!signedIn) return;
+    notifier.success(
+      "system",
+      FEEDBACK_CODES.TWITCH_SIGNED_OUT,
+      t("main.settings.twitchSignedOut"),
+    );
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.UNKNOWN,
+      message: "main.failure.twitchSignOut",
+    },
+    onError: (e, error, _data, { storeManagerService }) =>
+      e.reply(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, {
+        success: false,
+        error,
+        login: storeManagerService.getTwitchAccount().login,
+      }),
   },
 );
 
