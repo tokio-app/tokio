@@ -85,7 +85,7 @@ export type Mapped = {
 const emotePicture = (id: string) =>
   `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/2.0`;
 
-export function twitchUser(
+function twitchUser(
   id: string | null | undefined,
   login: string | null | undefined,
   name: string | null | undefined,

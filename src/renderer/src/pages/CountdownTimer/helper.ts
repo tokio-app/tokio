@@ -62,7 +62,7 @@ export function timerStatusText(
 // The triggers that add time, as rows that read "Follows [30] seconds each".
 // Likes have the likes per cycle in theirs, and chat its keyword and cooldown.
 // Their keys name their names in the carousel too.
-export const TRIGGERS: {
+const TRIGGERS: {
   key: keyof TimerSettings["look"]["names"];
   label: MessageKey;
   // With the seconds field as {input}, and the likes per cycle as {likes}

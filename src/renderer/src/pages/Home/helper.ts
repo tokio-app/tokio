@@ -27,7 +27,7 @@ export const PLATFORM_ICONS: Record<Platform, IconType> = {
 
 // The kinds of events the feed can show, as its settings list them, with
 // the event each comes from
-export const FEED_KINDS: {
+const FEED_KINDS: {
   kind: keyof ActivityFeed;
   label: MessageKey;
   trigger: AlertTrigger;

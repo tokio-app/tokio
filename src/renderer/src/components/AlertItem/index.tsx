@@ -30,7 +30,7 @@ import { SoundLength } from "../SoundPicker/SoundLength";
 import styles from "./alertitem.module.css";
 
 export { TriggerRows, type TriggerRow } from "./TriggerRows";
-export { eventsFor, TriggerSelect, withPlatform } from "./TriggerSelect";
+export { TriggerSelect } from "./TriggerSelect";
 
 // The triggers, their labels keys (see useOptions)
 export const TRIGGER_OPTIONS: { value: Trigger["type"]; label: MessageKey }[] =
