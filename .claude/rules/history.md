@@ -12,7 +12,7 @@ paths:
 ## Recording
 
 - A LIVE runs from `CONNECTED` to `DISCONNECTED`, the span of Home's session (`.claude/rules/live-session.md`). Drops the connector recovers from stay in it; a connection lost for good starts a new LIVE on the next connect.
-- `start(username)` gets the @username from `TikTokConnectorService.username`, set before the provider connects because `CONNECTED` comes before `connect()` resolves.
+- `start(username)` gets the @username from `ConnectorService.username`, set before the provider connects because `CONNECTED` comes before `connect()` resolves.
 - `HISTORY_EVENTS` is only gifts (the user's call), through the service's own `GiftStreaks`: `added × max(0, coins)` coins, as Home counts them. A treasure chest carries no data and a Super Fan event only the viewer, so neither counts as coins.
 - Gifters are keyed by `UserData.userId`; a gift without one counts in the totals only. Name, handle and picture follow the latest gift, and a gift without a picture keeps the last one.
 - Each gift also goes in its clock minute (`GiftMinute`) under its gifter's id (`""` without one), so dates that cut a LIVE count only its gifts in them.

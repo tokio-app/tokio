@@ -53,7 +53,7 @@ import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { createMcpRoutes } from "@/mcp";
 import type { AlertAudio } from "@/services/alerts";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import { FAN_EVENTS } from "@/services/fans";
 import { MAX_BACKLOG } from "@/services/games";
 import { HISTORY_EVENTS } from "@/services/history";
@@ -91,7 +91,7 @@ const events = createStack("system");
 
 // Gifts in the shape overlays use, none when TikTok can't be reached.
 const fetchOverlayGifts = async (
-  conn: TikTokConnectorService,
+  conn: ConnectorService,
 ): Promise<CustomGift[]> => {
   const gifts = await conn.fetchGifts();
   if (!gifts.success) return [];

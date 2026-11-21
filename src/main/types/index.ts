@@ -9,7 +9,7 @@ import {
 } from "@/common/types";
 import type { Notifier } from "@/helper/feedback";
 import { AlertsService } from "@/services/alerts";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import { ControlsService } from "@/services/controls";
 import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
@@ -51,7 +51,7 @@ export type CustomBrowserWindow = Omit<BrowserWindow, "webContents"> & {
 };
 
 export interface AppServices {
-  readonly connectorService: TikTokConnectorService;
+  readonly connectorService: ConnectorService;
   readonly ttsService: TTSService;
   readonly musicService: MusicService;
   readonly serverService: ServerService;

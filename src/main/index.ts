@@ -13,7 +13,7 @@ import {
 import { hasPending, settle } from "@/helper/quit";
 import Logger from "@/logger";
 import { AlertsService } from "@/services/alerts";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import { ControlsService } from "@/services/controls";
 import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
@@ -99,7 +99,7 @@ const services: AppServices = {
   urlManagerService: new URLManagerService(),
   jsonManagerService: new JSONManagerService(),
   pathManagerService: new PathManagerService(),
-  connectorService: new TikTokConnectorService(),
+  connectorService: new ConnectorService(),
   storeManagerService: new StoreManagerService(),
   yamlManagerService: new YAMLManagerService(),
   licensesService: new LicensesService(),

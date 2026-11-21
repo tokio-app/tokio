@@ -13,7 +13,7 @@ import { safeStorage } from "@test/electron";
 import { defaultProfile } from "@/common/util";
 import { defaultStoreData } from "@/common/util/constants/store";
 import { hasPending, settle } from "@/helper/quit";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
@@ -71,7 +71,7 @@ describe("StoreManagerService", () => {
   let paths: PathManagerService;
   let json: JSONManagerService;
   let tts: TTSService;
-  let connector: TikTokConnectorService;
+  let connector: ConnectorService;
   let translation: TranslationService;
   let storeFile: string;
   let defaultProfileFile: string;
@@ -82,7 +82,7 @@ describe("StoreManagerService", () => {
     await paths.initialize(home, ".tokio");
     json = new JSONManagerService();
     tts = new TTSService();
-    connector = new TikTokConnectorService();
+    connector = new ConnectorService();
     translation = new TranslationService();
     storeFile = join(paths.folders.settingsFolder, "store.json");
     defaultProfileFile = join(paths.folders.profilesFolder, "default.json");

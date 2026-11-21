@@ -61,7 +61,7 @@ import type { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
 import type { TimerService } from "@/services/timer";
 import { TIMER_EVENTS } from "@/services/timer";
-import type { TikTokConnectorService } from "@/services/connector";
+import type { ConnectorService } from "@/services/connector";
 import type { TranslationService } from "@/services/translation";
 import { TranslationError } from "@/services/translation/common";
 import type { TTSService } from "@/services/tts";
@@ -241,7 +241,7 @@ function setup() {
     username: "streamer",
     setLogFile: vi.fn(),
     setChatStage: vi.fn(
-      (..._args: Parameters<TikTokConnectorService["setChatStage"]>) => {},
+      (..._args: Parameters<ConnectorService["setChatStage"]>) => {},
     ),
     onReconnect: vi.fn((_listener: (state: ReconnectState) => void) => {}),
     isConnected: vi.fn(() => false),

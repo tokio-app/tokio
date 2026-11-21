@@ -14,7 +14,7 @@ import {
   SERVER_PORT,
 } from "@/common/util";
 import Logger from "@/logger";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
@@ -1451,7 +1451,7 @@ describe("settings events", () => {
           "store",
           {
             tts,
-            connector: new TikTokConnectorService(),
+            connector: new ConnectorService(),
             translation: new TranslationService(),
           },
           new JSONManagerService(),

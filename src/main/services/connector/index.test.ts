@@ -8,7 +8,7 @@ import {
   ConnectorResponse,
   GiftResponse,
 } from "./common";
-import { TikTokConnectorService } from "./index";
+import { ConnectorService } from "./index";
 
 class FakeConnector extends ConnectorProvider {
   setKey = vi.fn();
@@ -34,14 +34,14 @@ const chatOf = (content: string, lang = "en"): ChatEvent => ({
 });
 
 const setup = () => {
-  const service = new TikTokConnectorService();
+  const service = new ConnectorService();
   service.setLogFile("connector.log");
   const provider = new FakeConnector();
   service.addProvider("Fake", provider, true);
   return { service, provider };
 };
 
-describe("TikTokConnectorService", () => {
+describe("ConnectorService", () => {
   it("connects through the active provider and logs it", async () => {
     const debug = vi.spyOn(Logger, "debug");
     const info = vi.spyOn(Logger, "info");
@@ -247,7 +247,7 @@ describe("TikTokConnectorService", () => {
   });
 
   it("starts with the default provider", () => {
-    const service = new TikTokConnectorService();
+    const service = new ConnectorService();
 
     expect(service.providerNames()).toEqual(["Default"]);
     expect(service.isConnected()).toBe(false);

@@ -31,7 +31,7 @@ import { Server as HttpServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import type { WebSocket } from "ws";
 import { z } from "zod";
-import { TikTokConnectorService } from "../connector";
+import { ConnectorService } from "../connector";
 import { MusicService } from "../music";
 import { Service } from "../shared";
 import ALERT_PAGE from "./alert.html?raw";
@@ -313,7 +313,7 @@ export class ServerService extends Service {
   }
 
   public initEvents(
-    connectorService: TikTokConnectorService,
+    connectorService: ConnectorService,
     musicService: MusicService,
   ) {
     if (!connectorService) {

@@ -11,7 +11,7 @@ import {
 } from "./common";
 import { TikTokLiveConnector } from "./providers";
 
-export class TikTokConnectorService extends ProviderService<ConnectorProvider> {
+export class ConnectorService extends ProviderService<ConnectorProvider> {
   private _username = "";
 
   constructor() {

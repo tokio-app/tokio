@@ -12,7 +12,7 @@ import { NetworkInterfaceInfo, networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
-import { TikTokConnectorService } from "../connector";
+import { ConnectorService } from "../connector";
 import { ConnectorProvider } from "../connector/common";
 import { MusicService } from "../music";
 import { ServerService } from "./index";
@@ -896,11 +896,11 @@ describe("ServerService", () => {
 
   describe("websocket", () => {
     let provider: FakeConnector;
-    let connector: TikTokConnectorService;
+    let connector: ConnectorService;
 
     beforeEach(async () => {
       provider = new FakeConnector();
-      connector = new TikTokConnectorService();
+      connector = new ConnectorService();
       connector.addProvider("Fake", provider, true);
       musicSongs.current = [];
       server.initEvents(connector, new MusicService());

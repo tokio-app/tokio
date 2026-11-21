@@ -37,7 +37,7 @@ import { t } from "@/helper/i18n";
 import { isInside } from "@/helper/path";
 import { track } from "@/helper/quit";
 import Logger from "@/logger";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { TranslationService } from "@/services/translation";
@@ -51,7 +51,7 @@ import { Service } from "../shared";
 
 type Providers = {
   tts: TTSService;
-  connector: TikTokConnectorService;
+  connector: ConnectorService;
   translation: TranslationService;
 };
 

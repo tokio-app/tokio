@@ -41,7 +41,7 @@ vi.mock("@/services/path", () => ({
   PathManagerService: mocks.service("path"),
 }));
 vi.mock("@/services/connector", () => ({
-  TikTokConnectorService: mocks.service("connector"),
+  ConnectorService: mocks.service("connector"),
 }));
 vi.mock("@/services/store", () => ({
   StoreManagerService: mocks.service("store"),

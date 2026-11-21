@@ -10,7 +10,7 @@ import {
   stayOnPage,
 } from "@/helper/network";
 import { AlertsService } from "@/services/alerts";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import { ControlsService } from "@/services/controls";
 import { FansService } from "@/services/fans";
 import { GamesService } from "@/services/games";
@@ -57,7 +57,7 @@ export class AppHandler implements AppHandlerDeps {
   public readonly ipcMain: IpcMain;
   public readonly shell: Shell;
   public readonly session: typeof Session;
-  public readonly connectorService: TikTokConnectorService;
+  public readonly connectorService: ConnectorService;
   public readonly ttsService: TTSService;
   public readonly musicService: MusicService;
   public readonly serverService: ServerService;

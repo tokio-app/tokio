@@ -4,7 +4,7 @@ import { defaultProfile } from "@/common/util";
 import tts from "@/events/pages/tts";
 import { settle } from "@/helper/quit";
 import { settingsFlushed } from "@/mcp/common";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { StoreManagerService } from "@/services/store";
@@ -116,7 +116,7 @@ describe("tts MCP tools", () => {
           "store",
           {
             tts: ttsService,
-            connector: new TikTokConnectorService(),
+            connector: new ConnectorService(),
             translation: new TranslationService(),
           },
           new JSONManagerService(),
