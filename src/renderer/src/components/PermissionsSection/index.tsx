@@ -73,6 +73,7 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
       {others.length > 0 && (
         <p className={styles.note}>
           {t("components.permissions.noFollowers", {
+            count: others.length,
             platforms: listOf(
               language,
               others.map((p) => PLATFORM_LABELS[p]),

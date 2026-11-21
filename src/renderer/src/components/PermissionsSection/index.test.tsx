@@ -165,6 +165,19 @@ describe("PermissionsSection with other platforms", () => {
     );
   });
 
+  it("names YouTube next to Twitch", () => {
+    const initial = structuredClone(defaultProfile.tts.permissions);
+    render(
+      <PlatformsContext value={["tiktok", "twitch", "youtube"]}>
+        <PermissionsForm initial={initial} />
+      </PlatformsContext>,
+    );
+
+    expect(screen.getByText(/don't say who follows/)).toHaveTextContent(
+      "Twitch and YouTube don't say who follows or send fan levels, so their chat never passes Followers only or Minimum fan level.",
+    );
+  });
+
   it("says nothing with TikTok alone", () => {
     setup();
 

@@ -81,6 +81,21 @@ describe("CountdownTimer", () => {
     ]);
     expect(added.getByText("seconds per gifted sub")).toBeVisible();
     expect(added.getByText("seconds per Bit")).toBeVisible();
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.platforms = ["youtube"];
+      }),
+    );
+
+    expect(rows()).toEqual([
+      "Coins",
+      "Chat messages",
+      "New subs",
+      "Gifted subs",
+      "Super Chats",
+    ]);
   });
 
   it("shows its header and a loader until the timer comes", async () => {
