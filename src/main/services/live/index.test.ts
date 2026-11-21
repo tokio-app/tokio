@@ -236,6 +236,49 @@ describe("LiveService", () => {
     });
   });
 
+  it("lists YouTube's Super Chats and Super Stickers without coins", () => {
+    const user = viewer("kai", { platform: "youtube" });
+    const kai = { ...shown("kai"), platform: "youtube" };
+
+    live.record(TOKIO_EVENTS.SUPER_CHAT, {
+      user,
+      amount: "$4.99",
+      message: "hi",
+      sticker: "",
+    });
+    live.record(TOKIO_EVENTS.SUPER_CHAT, {
+      user,
+      amount: "MX$100.00",
+      message: "",
+      sticker: "https://example.com/sticker.png",
+    });
+
+    expect(live.getSession().activity).toEqual([
+      {
+        id: 2,
+        type: "superchat",
+        user: kai,
+        amount: "MX$100.00",
+        text: "",
+        sticker: "https://example.com/sticker.png",
+      },
+      {
+        id: 1,
+        type: "superchat",
+        user: kai,
+        amount: "$4.99",
+        text: "hi",
+        sticker: "",
+      },
+    ]);
+    expect(live.getSession().totals).toEqual({
+      followers: 0,
+      shares: 0,
+      gifts: 0,
+      coins: 0,
+    });
+  });
+
   it("puts joins in a row in one item, naming the first two", () => {
     for (const handle of ["kai", "yui", "ren"]) {
       expect(join(live, handle)).toBe(true);

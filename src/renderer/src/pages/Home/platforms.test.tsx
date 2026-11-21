@@ -287,6 +287,50 @@ describe("Home's platforms", () => {
     ]);
   });
 
+  it("renders YouTube's Super Chats and Super Stickers", async () => {
+    await renderApp();
+    const user = (name: string) => ({
+      handle: name,
+      name,
+      picture: "",
+      platform: "youtube" as const,
+    });
+    await send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+      data: liveSession({
+        activity: [
+          {
+            id: 2,
+            type: "superchat",
+            user: user("Ann"),
+            amount: "€5.00",
+            text: "",
+            sticker: "https://example.com/sticker.png",
+          },
+          {
+            id: 1,
+            type: "superchat",
+            user: user("Bo"),
+            amount: "$4.99",
+            text: "hello",
+            sticker: "",
+          },
+        ],
+      }),
+    });
+
+    const items = within(
+      page().getByRole("list", { name: "Activity" }),
+    ).getAllByRole("listitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "AAnn sent a €5.00 Super Sticker ",
+      "BBo sent a $4.99 Super Chathello",
+    ]);
+    expect(items[0].querySelector("img")).toHaveAttribute(
+      "src",
+      "https://example.com/sticker.png",
+    );
+  });
+
   it("offers only the feed kinds the profile's platforms send", async () => {
     const { user } = await renderApp();
     const dialog = () => within(screen.getByRole("dialog"));
@@ -321,6 +365,16 @@ describe("Home's platforms", () => {
       "Bits",
       "Raids",
       "Channel points",
+    ]);
+
+    await usingPlatforms(["youtube"]);
+
+    expect(await open()).toEqual([
+      "Chats",
+      "Gifts",
+      "New subs",
+      "Gifted subs",
+      "Super Chats",
     ]);
   });
 });

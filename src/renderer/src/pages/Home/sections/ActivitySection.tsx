@@ -142,6 +142,25 @@ function Action({
       return rich(t("home.activity.giftsub", { count: item.count }), { name });
     case "raid":
       return rich(t("home.activity.raid", { count: item.viewers }), { name });
+    case "superchat":
+      if (item.sticker) {
+        return (
+          <>
+            {rich(t("home.activity.superSticker", { amount: item.amount }), {
+              name,
+            })}
+            <img className={styles.inline_img} src={item.sticker} alt="" />{" "}
+          </>
+        );
+      }
+      return (
+        <>
+          {rich(t("home.activity.superchat", { amount: item.amount }), {
+            name,
+          })}
+          {item.text && <p className={styles.event_message}>{item.text}</p>}
+        </>
+      );
     case "sub":
     case "cheer":
     case "redeem":

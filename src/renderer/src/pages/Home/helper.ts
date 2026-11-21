@@ -52,6 +52,11 @@ const FEED_KINDS: {
   { kind: "cheer", label: "home.feed.cheer", trigger: TOKIO_EVENTS.CHEER },
   { kind: "raid", label: "home.feed.raid", trigger: TOKIO_EVENTS.RAID },
   { kind: "redeem", label: "home.feed.redeem", trigger: TOKIO_EVENTS.REDEEM },
+  {
+    kind: "superchat",
+    label: "home.feed.superchat",
+    trigger: TOKIO_EVENTS.SUPER_CHAT,
+  },
 ];
 
 // The kinds the platforms send
