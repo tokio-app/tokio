@@ -177,8 +177,11 @@ export class YouTubeConnector extends ConnectorProvider {
     return this._wait(answer.timeoutMs);
   }
 
+  // What YouTube asks, at most POLL_MS and at least a third of it, so a
+  // timeoutMs of 0 can't poll in a loop
   private _wait(timeoutMs = Infinity) {
-    return Math.min(timeoutMs, this._config.POLL_MS);
+    const { POLL_MS } = this._config;
+    return Math.max(POLL_MS / 3, Math.min(timeoutMs, POLL_MS));
   }
 
   // Until the chat ends or a stop. A failed poll reconnects, the wait
@@ -314,6 +317,8 @@ export class YouTubeConnector extends ConnectorProvider {
   }
 }
 
+// shortcut: these helpers, and the connect retries, waits and stops above,
+// copy Twitch's provider; share them when Kick's adds a third copy
 const fail = (
   kind: ConnectorFailure["kind"],
   message: string,

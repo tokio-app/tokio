@@ -162,28 +162,26 @@ const fromPaidSticker = (e: PaidSticker): Mapped => ({
   },
 });
 
+// The first number in a text, "1,000" included, or 1 when it has none
+const firstNumber = (text?: Text) => {
+  const digits = textOf(text).match(/\d[\d,]*/)?.[0];
+  return digits ? Number(digits.replace(/,/g, "")) : 1;
+};
+
 // A milestone's header says "Member for 6 months"; a new member has none
-function fromMembership(e: Membership): Mapped {
-  const months = (e.headerPrimaryText?.runs ?? [])
-    .map((run) => run.text?.trim() ?? "")
-    .find((text) => /^\d+$/.test(text));
-  return {
-    event: TOKIO_EVENTS.SUBSCRIBE,
-    data: {
-      user: youtubeUser(e),
-      tier: "",
-      months: months ? Number(months) : 1,
-      message: textOf(e.message).trim(),
-    },
-  };
-}
+const fromMembership = (e: Membership): Mapped => ({
+  event: TOKIO_EVENTS.SUBSCRIBE,
+  data: {
+    user: youtubeUser(e),
+    tier: "",
+    months: firstNumber(e.headerPrimaryText),
+    message: textOf(e.message).trim(),
+  },
+});
 
 // "Sent 20 Channel gift memberships": the count is the first number
 function fromGiftPurchase(e: GiftPurchase): Mapped {
   const header = e.header?.liveChatSponsorshipsHeaderRenderer ?? {};
-  const count = (header.primaryText?.runs ?? [])
-    .map((run) => run.text?.trim() ?? "")
-    .find((text) => /^\d+$/.test(text));
   return {
     event: TOKIO_EVENTS.GIFT_SUB,
     data: {
@@ -191,7 +189,7 @@ function fromGiftPurchase(e: GiftPurchase): Mapped {
         ...header,
         authorExternalChannelId: e.authorExternalChannelId,
       }),
-      count: count ? Number(count) : 1,
+      count: firstNumber(header.primaryText),
       tier: "",
     },
   };

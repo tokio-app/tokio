@@ -192,6 +192,12 @@ describe("fromAction", () => {
       months: 6,
       message: "Half a year!",
     });
+    // The same header as one plain text
+    const plain = add("liveChatMembershipItemRenderer", {
+      ...author,
+      headerPrimaryText: { simpleText: "Member for 13 months" },
+    });
+    expect(fromAction(plain)?.data).toMatchObject({ months: 13 });
   });
 
   it("maps gifted memberships with their count, once", () => {
@@ -221,6 +227,10 @@ describe("fromAction", () => {
       event: TOKIO_EVENTS.GIFT_SUB,
       data: { user: viewer, count: 20, tier: "" },
     });
+    expect(
+      fromAction(purchase([{ text: "Sent 1,000 Channel gift memberships" }]))
+        ?.data,
+    ).toMatchObject({ count: 1000 });
     expect(
       fromAction(purchase([{ text: "Sent a Channel gift membership" }]))?.data,
     ).toMatchObject({ count: 1 });
