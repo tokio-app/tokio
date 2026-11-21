@@ -53,7 +53,8 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 ## What other platforms don't send
 
 - Followers and fan levels: a Twitch chatter's `follower` is false and `fanLevel` missing, so **Followers** and **Minimum fan level** never pass them. Moderators and Super Fans work (Twitch's broadcaster and moderators, subscribers and founders). The permissions section and the website say so in one line.
-- Chat language: translation stays TikTok's (`.claude/rules/translation.md`).
+- Chat language: translation stays TikTok's (the user's call: letting Google detect Twitch's messages would spend its rate limit on the streamer's own language; `.claude/rules/translation.md`).
+- Follows: every follow counts, a viewer's repeat follows in one LIVE included (the user's call). Twitch sends one each time a viewer follows again after unfollowing.
 - Chat pictures: Twitch chat goes without (`shortcut:` in `providers/twitch/index.ts`), `Avatar` shows the initial. Follows, subs, cheers and redeems look their picture up once and cache it.
 - Fans stay TikTok's (`.claude/rules/fans.md`).
 
