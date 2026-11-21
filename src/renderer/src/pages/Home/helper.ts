@@ -1,6 +1,15 @@
 import { listOf, MessageKey, translate } from "@/common/i18n";
 import { ActivityFeed, Alert } from "@/common/schemas";
-import { ActivityUser, LiveSession } from "@/common/types";
+import {
+  ActivityUser,
+  AlertTrigger,
+  LiveSession,
+  Platform,
+  TOKIO_EVENTS,
+} from "@/common/types";
+import { PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
+import type { IconType } from "react-icons";
+import { FaTiktok, FaTwitch } from "react-icons/fa";
 
 // Until main answers
 export const NO_SESSION: LiveSession = {
@@ -10,15 +19,66 @@ export const NO_SESSION: LiveSession = {
   viewers: [],
 };
 
-// The kinds of events the feed can show, as its settings list them
-export const FEED_KINDS: { kind: keyof ActivityFeed; label: MessageKey }[] = [
-  { kind: "chat", label: "home.feed.chat" },
-  { kind: "gift", label: "home.feed.gift" },
-  { kind: "follow", label: "home.feed.follow" },
-  { kind: "share", label: "home.feed.share" },
-  { kind: "superfan", label: "home.feed.superfan" },
-  { kind: "join", label: "home.feed.join" },
+// The platforms' logos, Font Awesome's
+export const PLATFORM_ICONS: Record<Platform, IconType> = {
+  tiktok: FaTiktok,
+  twitch: FaTwitch,
+};
+
+// The kinds of events the feed can show, as its settings list them, with
+// the event each comes from
+export const FEED_KINDS: {
+  kind: keyof ActivityFeed;
+  label: MessageKey;
+  trigger: AlertTrigger;
+}[] = [
+  { kind: "chat", label: "home.feed.chat", trigger: TOKIO_EVENTS.CHAT },
+  { kind: "gift", label: "home.feed.gift", trigger: TOKIO_EVENTS.GIFT },
+  { kind: "follow", label: "home.feed.follow", trigger: TOKIO_EVENTS.FOLLOW },
+  { kind: "share", label: "home.feed.share", trigger: TOKIO_EVENTS.SHARE },
+  {
+    kind: "superfan",
+    label: "home.feed.superfan",
+    trigger: TOKIO_EVENTS.SUPER_FAN,
+  },
+  { kind: "join", label: "home.feed.join", trigger: TOKIO_EVENTS.MEMBER_JOIN },
+  { kind: "sub", label: "home.feed.sub", trigger: TOKIO_EVENTS.SUBSCRIBE },
+  {
+    kind: "giftsub",
+    label: "home.feed.giftsub",
+    trigger: TOKIO_EVENTS.GIFT_SUB,
+  },
+  { kind: "cheer", label: "home.feed.cheer", trigger: TOKIO_EVENTS.CHEER },
+  { kind: "raid", label: "home.feed.raid", trigger: TOKIO_EVENTS.RAID },
+  { kind: "redeem", label: "home.feed.redeem", trigger: TOKIO_EVENTS.REDEEM },
 ];
+
+// The kinds the platforms send
+export const feedKinds = (platforms: readonly Platform[]) => {
+  const sent = triggersFor(platforms);
+  return FEED_KINDS.filter(({ trigger }) => sent.includes(trigger));
+};
+
+// The stats the platforms have: likes and shares are TikTok's, gifts and
+// coins come with a platform that sends gifts
+export function liveStats(
+  platforms: readonly Platform[],
+  values: Record<"likes" | "views" | keyof LiveSession["totals"], number>,
+): Stat[] {
+  const tiktok = platforms.includes("tiktok");
+  const gifts = platforms.some((p) =>
+    PLATFORM_TRIGGERS[p].includes(TOKIO_EVENTS.GIFT),
+  );
+  const stats: (Stat | false)[] = [
+    tiktok && { label: "home.stats.likes", value: values.likes },
+    { label: "home.stats.totalViews", value: values.views },
+    { label: "home.totals.followers", value: values.followers },
+    tiktok && { label: "home.totals.shares", value: values.shares },
+    gifts && { label: "home.totals.gifts", value: values.gifts },
+    gifts && { label: "home.totals.coins", value: values.coins },
+  ];
+  return stats.filter((stat) => stat !== false);
+}
 
 export type Stat = { label: MessageKey; value: number };
 

@@ -2,6 +2,8 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   MusicInfo,
+  Platform,
+  PlatformStatus,
   TopGifter,
 } from "@/common/types";
 import { defaultProfile, defaultStoreData } from "@/common/util";
@@ -15,7 +17,7 @@ import {
 import { useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import styles from "./home.module.css";
-import { NO_SESSION } from "./helper";
+import { feedKinds, liveStats, NO_SESSION } from "./helper";
 import { ActivitySection } from "./sections/ActivitySection";
 import { DashboardSection } from "./sections/DashboardSection";
 import { FeaturesSection } from "./sections/FeaturesSection";
@@ -41,7 +43,14 @@ export function Home() {
   const [musicConnected, setMusicConnected] = useState(false);
   // Until settings load, so the hint doesn't flash
   const [needsKey, setNeedsKey] = useState(false);
+  const [platforms, setPlatforms] = useState(defaultProfile.platforms);
+  const [twitchLogin, setTwitchLogin] = useState("");
   const [connected, setConnected] = useState(false);
+  // Main holds a connection, which locks the platforms
+  const [locked, setLocked] = useState(false);
+  const [status, setStatus] = useState<
+    Partial<Record<Platform, PlatformStatus>>
+  >({});
   const [reconnecting, setReconnecting] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -69,6 +78,7 @@ export function Home() {
   useIpcListener(APP_EVENTS_RESPONSE.GET_PROFILE, (res) => {
     if (!res?.success) return;
     setProfile(res.profile!);
+    setPlatforms(res.profile!.platforms);
     // A profile pushed while the streamer types a username keeps what they typed
     if (document.activeElement !== usernameField.current) {
       setUsername(res.profile!.connector.username);
@@ -81,6 +91,7 @@ export function Home() {
     setFeatures(settings.activeFeatures);
     setFeed(settings.activityFeed);
     setNeedsKey(!settings.activeConnProvider.key);
+    setTwitchLogin(settings.accounts.twitch.login);
     setServer({
       enabled: settings.server.enabled,
       overlays: settings.overlays.length,
@@ -90,6 +101,8 @@ export function Home() {
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {
     if (!res) return;
     setConnected(res.live);
+    setLocked(res.success);
+    setStatus(res.platforms ?? {});
     setReconnecting(res.reconnecting ?? false);
     setWaiting(res.waiting ?? false);
     // A connect still in progress keeps its spinner, a look for the LIVE
@@ -97,6 +110,15 @@ export function Home() {
     setLoading(res.success && !res.live && !res.waiting);
     setLikes(res.stats.likes);
     setViews({ current: res.stats.viewers, total: res.stats.views });
+  });
+
+  // What main holds, also when it refused the change
+  useIpcListener(APP_EVENTS_RESPONSE.SET_PLATFORMS, (res) => {
+    if (res) setPlatforms(res.platforms);
+  });
+
+  useIpcListener(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, (res) => {
+    if (res?.success) setTwitchLogin(res.login);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.VIEWS, (res) => {
@@ -145,6 +167,7 @@ export function Home() {
       {editingFeed && (
         <FeedModal
           feed={feed}
+          platforms={platforms}
           onClose={() => setEditingFeed(false)}
           onSave={(saved) => {
             // Main answers with the feed's events, without the hidden ones
@@ -180,9 +203,26 @@ export function Home() {
               loading={loading}
               needsKey={needsKey}
               startedAt={session.startedAt}
+              platforms={platforms}
+              locked={locked}
+              status={status}
+              twitchLogin={twitchLogin}
+              onPlatformsChange={(picked) => {
+                setPlatforms(picked);
+                window.api.emit(APP_EVENTS.SET_PLATFORMS, {
+                  platforms: picked,
+                });
+              }}
+              onRetry={() => window.api.emit(APP_EVENTS.CONNECT, { username })}
               onUsernameChange={setUsername}
               onConnect={() => {
-                if (!username.replace("@", "").trim()) return;
+                // TikTok needs the channel, Twitch's is the account
+                if (
+                  platforms.includes("tiktok") &&
+                  !username.replace("@", "").trim()
+                ) {
+                  return;
+                }
                 setLoading(true);
                 window.api.emit(APP_EVENTS.CONNECT, { username });
               }}
@@ -196,14 +236,11 @@ export function Home() {
               <LiveSection
                 viewers={views.current}
                 minutes={session.viewers}
-                stats={[
-                  { label: "home.stats.likes", value: likes },
-                  { label: "home.stats.totalViews", value: views.total },
-                  { label: "home.totals.followers", value: totals.followers },
-                  { label: "home.totals.shares", value: totals.shares },
-                  { label: "home.totals.gifts", value: totals.gifts },
-                  { label: "home.totals.coins", value: totals.coins },
-                ]}
+                stats={liveStats(platforms, {
+                  ...totals,
+                  likes,
+                  views: views.total,
+                })}
                 gifters={gifters}
               />
             )}
@@ -229,7 +266,8 @@ export function Home() {
         <ActivitySection
           connected={connected}
           activity={session.activity}
-          feedOff={!Object.values(feed).some(Boolean)}
+          feedOff={!feedKinds(platforms).some(({ kind }) => feed[kind])}
+          showPlatform={platforms.length > 1}
           onFeedSettings={() => setEditingFeed(true)}
           song={song}
         />
