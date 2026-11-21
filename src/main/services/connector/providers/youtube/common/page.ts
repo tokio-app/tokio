@@ -21,7 +21,7 @@ export type ChatAnswer = {
 };
 
 // A failed request, with YouTube's status when it answered
-export type RequestFailure = ConnectorFailure & { status?: number };
+type RequestFailure = ConnectorFailure & { status?: number };
 
 const VIDEO_ID = /^[\w-]{11}$/;
 const YOUTUBE_URL =
