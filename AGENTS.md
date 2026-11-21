@@ -2,7 +2,7 @@
 
 ## Project
 
-Tokio is an Electron desktop app for Windows, macOS and Linux that connects to a TikTok LIVE stream and reacts to its events with text-to-speech, music requests (Spotify/YouTube), alerts (sounds, images and videos), game actions (Minecraft commands), and browser-source overlays served over a local HTTP/WebSocket server.
+Tokio is an Electron desktop app for Windows, macOS and Linux that connects to a TikTok LIVE and a Twitch stream, one or both at once, and reacts to their events with text-to-speech, music requests (Spotify/YouTube), alerts (sounds, images and videos), game actions (Minecraft commands), and browser-source overlays served over a local HTTP/WebSocket server.
 
 Stack: Electron 45, electron-vite, React 19, TypeScript, TanStack Router, Express 5 + `ws`, Zod 4, Yarn 1, Node >= 24.
 
@@ -70,6 +70,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `ci.md`: CI, packaging and releases
 - `updates.md`: the auto-updater
 - `connector.md`: the TikTok connector and its key
+- `platforms.md`: several platforms in one LIVE session, Twitch, trigger platforms and namespaced ids
 - `live-session.md`: the LIVE session and activity feed on Home
 - `controls.md`: the live controls (skip song, stop TTS, replay alert, pause), their global shortcuts and the phone remote
 - `mcp.md`: the MCP server at `/mcp`, its tools and what it must never expose
@@ -101,7 +102,7 @@ Procedures live in `.claude/skills/<name>/SKILL.md`. Claude Code offers each one
 - `optimize-docs`: measure, audit and trim the agent docs
 - `drive-app`: launch the built app to check a change or take screenshots
 - `add-dependency`: add, upgrade or remove a package, with the license checks
-- `live-event`: add or change a TikTok LIVE event end to end
+- `live-event`: add or change a LIVE event (TikTok's or another platform's) end to end
 - `ipc-event`: add an IPC request, reply or push, with its tests
 - `new-page`: add a page to the main window
 - `minecraft-lists`: regenerate the Minecraft mob and item lists
@@ -124,7 +125,7 @@ Tokio is in English and Spanish, following the system's language unless **Settin
 ### Services (main process)
 
 - Each service lives in `src/main/services/<name>/index.ts` and extends `Service` (or `ProviderService<T>`) from `src/main/services/shared`. It's created once in `src/main/index.ts`, added to `AppServices` (`src/main/types`) and injected into `AppHandler`.
-- Swappable backends (connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)` (without a key the provider keeps its own; `""` clears it). Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. Each service starts a provider in its constructor, so `_current` is always set. TTS uses every provider at once, as engines (`.claude/rules/tts.md`).
+- Swappable backends (TikTok's connector, TTS, music) use providers: `addProvider(name, provider, start?)` / `setProvider(name, key?)` (without a key the provider keeps its own; `""` clears it). Providers live in `services/<name>/providers/<provider>/` with `common/` and `config/` subfolders. Each service starts a provider in its constructor, so `_current` is always set. TTS uses every provider at once, as engines (`.claude/rules/tts.md`).
 - Classes that send live events to listeners (`MusicProvider` in `services/music/common`, `MusicQueue`, `ConnectorProvider`) extend `TokioEmitter` (`services/shared/emitter`): a typed `on`/`off` and a protected `emit`. `createWindow(view)` places a provider's page under the music window's title bar.
 - Log through `Logger` (`@/logger`) with the service's `_logFile` and a `<ServiceName>` prefix, e.g. ``Logger.error(`<Connector> ...`, this._logFile)``. Format errors with `formatError` from `@/common/util`. Routine traffic goes to `Logger.debug`, which only Detailed logs writes (`.claude/rules/logging.md`).
 - Fallible service methods return `ServiceResult<T>` (`{ success, error?, data? }`, in `services/shared`) instead of throwing.
@@ -140,7 +141,7 @@ All renderer ↔ main communication is typed. The `ipc-event` skill has the step
 - Handlers open file dialogs with `showOpenDialog` / `showSaveDialog` from `@/helper/dialog`, which start in the last folder used. Electron's own start in Downloads.
 - A request about one item (an overlay, a document, a test) gets its id back in the reply, failures included, so the renderer ignores a late reply for another one (see `GET_OVERLAY_CONFIG`).
 
-Live stream events (`TOKIO_EVENTS` / `TokioEventMap`) come from the connector. `ServerService` forwards them to overlays over WebSocket, and they drive TTS, music requests, alerts and game actions. The `live-event` skill adds or changes one.
+Live stream events (`TOKIO_EVENTS` / `TokioEventMap`) come from the connector, which runs one LIVE session across the profile's platforms (`ConnectorService`, `.claude/rules/platforms.md`). `ServerService` forwards them to overlays over WebSocket, and they drive TTS, music requests, alerts and game actions. The `live-event` skill adds or changes one.
 
 ### Feedback
 
@@ -166,7 +167,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 - `updateProfileData` throws until the store has loaded. It writes the active profile unless given a file.
 - What a profile collects that isn't settings, like its fans or its LIVEs, goes in its own file or folder named after the profile's (`fans/<profile file>`, `history/<profile name>/`): exports, clones and `GET_PROFILE` carry the whole profile.
 - Services that hold a profile's data in memory (the countdown timer, fans, history) take the file and the data before any `await`, so a save racing a profile switch lands in the file the data came from (the timer passes it to `updateProfileData`). They save on an interval and before a `SET_PROFILE` switch, which a failed save refuses, and never on quit (`shortcut:`): a quit or crash loses up to one interval. A later `load` wins over one still reading.
-- Provider keys (the Euler key, voice engine keys) are saved encrypted with `safeStorage`'s async calls. The store decrypts them once at startup and reads them from memory, so `getSettings` stays synchronous. Never log a provider key, and never ship a shared one.
+- Provider keys (the Euler key, voice engine keys, Twitch's refresh token) are saved encrypted with `safeStorage`'s async calls. The store decrypts them once at startup and reads them from memory, so `getSettings` stays synchronous. Never log a provider key, and never ship a shared one.
 - Quitting waits up to 3s for IPC handlers and file writes still running (`track`/`settle`, `src/main/helper/quit.ts`, `.claude/rules/app-lifecycle.md`).
 - Write files through `writeFileAtomic` (`src/main/helper/fs.ts`) or the file managers, so a quit waits for them and a quit or crash midway leaves the old file whole. `writeFileAtomic` flushes the temp file to disk before the rename, so a power cut can't leave a file of NULs, and runs writes to one file in the order they came.
 
@@ -175,7 +176,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 Tokio's source is MIT; treat license compliance as part of every change.
 
 - **LGPL code stays isolated.** `src/main/services/tts/providers/edge/common/drm-v2.ts` is LGPL-3.0-only (derived from edge-tts). Code ported from edge-tts goes only into its own LGPL file with the same header (SPDX line, upstream commit, authors, dated modification notice). Never copy upstream code into MIT files.
-- **The distributed app is MIT too**, with that one LGPL file and the Archivo font files (`@fontsource-variable/archivo`). The font stays under the SIL OFL 1.1, which the user approved: it allows bundling with any software. Keep it that way: no other copyleft dependency, and no code from `tiktok-live-connector` 2.4.1 or later or `tiktok-live-proto` 0.2.4 or later (AGPL).
+- **The distributed app is MIT too**, with that one LGPL file and the Archivo font files (`@fontsource-variable/archivo`). The font stays under the SIL OFL 1.1, which the user approved: it allows bundling with any software. Keep it that way: no other copyleft dependency, and no code from `tiktok-live-connector` 2.4.1 or later or `tiktok-live-proto` 0.2.4 or later (AGPL). Twitch connects through its official API with each user's own sign-in. No code is copied from any Twitch, YouTube or Kick library: read only MIT, BSD or Apache ones as references.
 - **The ad blocker's filter lists are other authors' data under the GPL-3.0 or CC BY-SA.** Each user's Tokio downloads them at runtime (`@tokioapp/adblock`, ours, MIT). Never ship them in the app, bundle a copy for a first start, or commit them.
 - **Check licenses when adding or upgrading a dependency**, even minor bumps (tiktok-live-connector went MIT → AGPL in 2.4.1), with the `add-dependency` skill. Ask before adding anything copyleft (GPL, AGPL, LGPL, MPL, CC BY-SA).
 - **react-icons:** only use the sets listed under Icons in `THIRD_PARTY_NOTICES.md`, and add a row for any new set.
@@ -193,8 +194,8 @@ Tokio's source is MIT; treat license compliance as part of every change.
 
 The website (`https://tokio.ialfaro.com`, repo `tokio-app/website`, locally `../tokio-web`) has its own `AGENTS.md`. Update it, in English and Spanish (the `sync-docs` skill says where), when any of these change:
 
-- features, settings, chat commands or install steps (its docs describe them in full; the README only sums them up)
-- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, `TOKIO_EVENTS` names and payloads, or the other messages overlays get (`TokioPayload`)
+- features, settings, the platforms Tokio connects to and their setup, chat commands or install steps (its docs describe them in full; the README only sums them up)
+- the overlay format (`info.yaml`, `OverlayConfigSchema`, the `tokio-setup` script block), the server port or hostname, `TOKIO_EVENTS` names and payloads (including `platform` on users and gifters), or the other messages overlays get (`TokioPayload`)
 - the URL or behavior of Tokio's own overlays: the alerts' (`getAlertOverlayURL`), the countdown timer's (`TIMER_PATH`), Minecraft's (`getMinecraftOverlayURL`) and Overlay Studio's (`getStudioOverlayURL`), the phone remote's page and API (`getRemoteURL`, `/remote/api/*`), and the MCP server's address and tools (`MCP_URL`)
 - package file names (its `src/lib/release.ts` matches them)
 - the Services list in `THIRD_PARTY_NOTICES.md` or the licensing

@@ -39,6 +39,7 @@ paths:
 
 ## Never exposed
 
+- Twitch's sign-in and sign-out (`TWITCH_SIGN_IN`, `TWITCH_SIGN_OUT`): they need the streamer at a browser, with a code to type. `get_status` only says whether it's signed in (`live.twitch`) and each platform's state (`live.platforms`), never the token.
 - The dialog handlers, since they'd open dialogs on stream.
 - `EXPORT_*`, `IMPORT_OVERLAY`, `REQ_FQDN`, `INSTALL_UPDATE`, `LOAD_APP` and the window events.
 - `SET_SERVER`, which would cut MCP and every overlay, and the remote settings.
@@ -65,6 +66,7 @@ Paths to import (`add_to_library`) go through `checkPath`: absolute, a file, and
 
 ## Coupling
 
+- The `platforms` section (through `SET_PLATFORMS`) is the profile's platforms, refused while connected. `connect` joins them all, and the alert and game action kinds describe a trigger's `platform` from `PLATFORM_NOTE`, built from `PLATFORM_TRIGGERS`, so a new platform needs nothing there.
 - A new user-facing setting or action needs its section field, kind or tool in its area's file, with a test.
 - Settings → Remote control shows each assistant's setup with the key in it (`ASSISTANTS`, `src/renderer/src/pages/Settings/helper.ts`), and the website's MCP page has a tab for each: change both when a client changes how it adds an HTTP server. Codex takes a static header only in `config.toml`, and Claude Desktop only through `mcp-remote`.
 - The SDK compiles other packages into its files (`THIRD_PARTY_NOTICES.md`, "Code bundled in the MCP SDK"). On an upgrade, list them from its `dist`'s `//#region ../../node_modules/…` lines and update `LICENSES/MCP-SDK-bundled.txt`, the notices and About's component.

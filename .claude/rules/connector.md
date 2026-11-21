@@ -7,6 +7,8 @@ paths:
 
 # Connector
 
+This is TikTok's connector. The service that runs one LIVE across platforms, `ConnectorService`, and Twitch are in `.claude/rules/platforms.md`.
+
 ## The Euler Stream key
 
 - The connector's provider key is the user's own Euler Stream API key, which signs the connection (`SET_PROVIDER`).
@@ -32,7 +34,7 @@ paths:
   - A streakable gift (type 1, like Rose): TikTok sends the count so far (`repeatCount`, skipping numbers when it batches them) and ends the streak itself 3 to 4 s after its last gift.
   - A gift that isn't streakable but has `gift.combo` (like Hand Heart): TikTok sends one message per gift, each with `repeatCount` 1 and the combo's `groupId`, and never ends it. `_listen` adds them up by sender and gift and ends the combo `COMBO_END_MS` (4 s) after its last gift, waiting 4 s more each time while the connection is `reconnecting`: a reconnect delivers the gap's gifts as it turns `connected`. A new `groupId` ends the last combo first. The end of a connection that stopped is dropped, since its listeners already forgot their streaks.
   - Any other gift ends at once (`isStreakEnd`).
-- Chat goes out through `emitChat`, which runs Chat translation's stage first (`.claude/rules/translation.md`). Emitting `CHAT` directly would skip it.
+- Chat goes out through `emitChat` (every platform's provider, Twitch's too), which runs Chat translation's stage first (`.claude/rules/translation.md`). Emitting `CHAT` directly would skip it.
 - A comment made only of emotes is its own TikTok message (`emote`, never also a `chat`). `_listen` maps it to `CHAT` with an empty `content` and `lang`, each emote at `index` 0, so Emote alerts and game actions fire and its emotes are saved.
 - A failed connect's `error.kind` (`ConnectErrorKind`, `services/connector/common`) picks the message `home.ts` shows.
 - The library's warnings and errors go to `connector.log` through its `logger` option, with the error they carry, and so do its info lines (connects with their attempt, reconnect attempts, the LIVE's end, stops with their error), so a connection that stopped says why. Its debug lines go to `Logger.debug`. An error with the same code is logged once per `LOG_REPEAT_MS`.

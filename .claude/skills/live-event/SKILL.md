@@ -1,12 +1,14 @@
 ---
 name: live-event
-description: "Add a TikTok LIVE event (a new TOKIO_EVENTS entry) or change an event's payload, end to end: connector, types, samples, alerts, the Home feed, overlays, the overlay SDK and the website. Use when the connector should emit a new kind of event, or an event's data changes."
+description: "Add a LIVE event (a new TOKIO_EVENTS entry) or change an event's payload, end to end: connector, types, samples, alerts, the Home feed, overlays, the overlay SDK and the website. Use when the connector should emit a new kind of event, or an event's data changes."
 argument-hint: "<event>"
 ---
 
 # Add or change a live event
 
 Event names (`tokio:event:<name>`) and payloads are public: overlays, saved alerts and the website depend on them. Never rename an event or remove a payload field; add new ones instead.
+
+Each platform's provider (`.claude/rules/platforms.md`) maps its own events to `TOKIO_EVENTS`. An event TikTok has no equivalent for, like Twitch's Bits, is still one `TOKIO_EVENTS` entry.
 
 ## In this repo
 
@@ -18,16 +20,16 @@ Event names (`tokio:event:<name>`) and payloads are public: overlays, saved aler
    Also give it a place in `createTestLive` (same file), the LIVE an overlay's Test button plays one press at a time. Its test fails until each press sends every live event.
 
 2. An internal event, one that doesn't come from the LIVE, goes instead in the `AppEvents` exclusions and in `INTERNAL_EVENTS` (same file; they mirror each other), and in the `exclude` list of `AlertTriggerSchema` (`src/common/schemas/profile.ts`). It then reaches neither overlays nor alerts.
-3. The connector: listen to the `@tokioapp/connector` event (`WebcastEvent.<NAME>`, payloads in its README) in `_listen` of `src/main/services/connector/providers/default/index.ts`, and `this.emit(TOKIO_EVENTS.<NAME>, data)` with only the fields of the payload type. Candidates it already decodes: `subNotify`, `emote`, `roomPin`, `imDelete`, `questionNew`, `goalUpdate`, `pollMessage`, `linkMicBattle` and `linkMicArmies`, `giftBroadcast`, `controlMessage`.
+3. The platforms that send it, each in its own provider: TikTok's `_listen` in `src/main/services/connector/providers/default/index.ts`, Twitch's `common/mapping.ts` in `providers/twitch/`. TikTok: listen to the `@tokioapp/connector` event (`WebcastEvent.<NAME>`, payloads in its README) in `_listen` of `src/main/services/connector/providers/default/index.ts`, and `this.emit(TOKIO_EVENTS.<NAME>, data)` with only the fields of the payload type. Every provider sets `user.platform`, and namespaces the ids it sends (`twitch:<id>`). Then add the event to each sending platform's row in `PLATFORM_TRIGGERS` (`src/common/util/platforms.ts`): the trigger pickers, the Home feed's kinds, the stat tiles and the timer rows all follow it, and its test fails for a trigger on no platform. Candidates it already decodes: `subNotify`, `emote`, `roomPin`, `imDelete`, `questionNew`, `goalUpdate`, `pollMessage`, `linkMicBattle` and `linkMicArmies`, `giftBroadcast`, `controlMessage`.
 4. Alerts and game actions: every live trigger reaches `AlertsService.handle` and `GamesService.handle` on its own (`registerConnectorEvents`, `src/main/events/init.ts`). If the trigger needs a filter or a picker, like gifts, keywords or users have, add it to `matchesTrigger` (`src/main/helper/triggers.ts`, shared by both) and to `TriggerFilter` (`src/renderer/src/components/AlertItem/`, which the Games page uses too). An event that comes in combos fires once, on `repeatEnd`, like gifts.
 5. The Home feed, when the event belongs in Activity:
    - `ACTIVITY_EVENTS` and its item in `src/main/services/live/index.ts`, and the `Activity` type in `src/common/types/live.ts`
    - its kind in `ActivityFeedSchema` (`src/common/schemas/store.ts`), with its default in `src/common/util/constants/store.ts`
-   - `FeedModal` (`src/renderer/src/pages/Home/sections/`)
+   - its row in `FEED_KINDS` (`src/renderer/src/pages/Home/helper.ts`), which `FeedModal` lists
 6. The countdown timer, when viewers doing it should add time:
    - its trigger in `TIMER_EVENTS` (`src/main/services/timer/index.ts`)
    - a field in the `seconds` and `names` groups of `TimerSettingsSchema` (`src/common/schemas/timer.ts`), its automatic name as `timer.names.<field>` in the locale files, and its carousel item in `timerTriggers` (`src/common/util/timer.ts`)
-   - its row in `TRIGGERS` (`src/renderer/src/pages/CountdownTimer/helper.ts`)
+   - its event in `TIMER_TRIGGERS` (`src/common/util/timer.ts`) and its row in `TRIGGERS` (`src/renderer/src/pages/CountdownTimer/helper.ts`)
 
    See `.claude/rules/timer.md`.
 

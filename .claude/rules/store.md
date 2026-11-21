@@ -33,3 +33,8 @@ paths:
 - One that doesn't parse or validate is backed up from the bytes read to `tokio.corrupted-<time>.json` next to it and replaced by the defaults. `startApp` warns naming the backup (`corruptedBackup()`, `SETTINGS_LOAD_FAILED`), and LOAD_APP's `newStore` (the tour) is only for a store file that wasn't there.
 - One that can't be read (locked, no access) or backed up stops startup ("Tokio couldn't start") and is left as it is.
 - A rebuilt store keeps a valid `default.json`. An invalid one is backed up as `default.corrupted-<time>.json` before it's replaced, and one that can't be read stops startup too. So does another profile file it can't read, or a sounds, media or pictures folder that's there but can't be read. Profiles that don't load are left out.
+
+## The Twitch account
+
+- `settings.accounts.twitch` (`id`, `login`, `key`) is the account Tokio signed in to, the same for every profile. `key` is the refresh token, encrypted like the provider keys (`_encryptProviderKey`, `_withKey`) and decrypted once at startup into Twitch's provider. A token that can't be decrypted reads as signed out.
+- `getSettings()` blanks `key`, so the window, the logs, MCP and exports never get it. `getTwitchAccount()` and `updateTwitchAccount` are for main only. `updateTwitchAccount` saves each rotated token before the provider uses it (`.claude/rules/platforms.md`).

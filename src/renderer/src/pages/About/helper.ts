@@ -93,6 +93,10 @@ export const SERVICES: { name: string; note: string }[] = [
     note: "Signs the connection to TikTok LIVE, with each user's own API key.",
   },
   {
+    name: "Twitch",
+    note: "LIVE events, chat and viewer counts through Twitch's official API (id.twitch.tv, api.twitch.tv, eventsub.wss.twitch.tv), with each user's own sign-in.",
+  },
+  {
     name: "Microsoft",
     note: "Edge's Read Aloud service (the Edge voices), which isn't an official public API.",
   },
