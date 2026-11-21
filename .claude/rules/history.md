@@ -14,9 +14,9 @@ paths:
 - A LIVE runs from `CONNECTED` to `DISCONNECTED`, the span of Home's session (`.claude/rules/live-session.md`). Drops the connector recovers from stay in it; a connection lost for good starts a new LIVE on the next connect.
 - `start(username)` gets the @username from `ConnectorService.username`, set before the provider connects because `CONNECTED` comes before `connect()` resolves.
 - `HISTORY_EVENTS` is only gifts (the user's call), through the service's own `GiftStreaks`: `added × max(0, coins)` coins, as Home counts them. A treasure chest carries no data and a Super Fan event only the viewer, so neither counts as coins.
-- Gifters are keyed by `UserData.userId`; a gift without one counts in the totals only. Name, handle and picture follow the latest gift, and a gift without a picture keeps the last one.
-- A gifter keeps their `platform` (missing is TikTok). Ids are namespaced by platform (`.claude/rules/platforms.md`), so gifters of two platforms never merge. Only TikTok sends gifts for now.
-- Each gift also goes in its clock minute (`GiftMinute`) under its gifter's id (`""` without one), so dates that cut a LIVE count only its gifts in them.
+- Gifters are keyed by `UserData.userId`; a gift without one, or worth 0 coins (YouTube's Gifts), counts in the totals only, so no one shows as a gifter with 0 coins. Name, handle and picture follow the latest gift, and a gift without a picture keeps the last one.
+- A gifter keeps their `platform` (missing is TikTok). Ids are namespaced by platform (`.claude/rules/platforms.md`), so gifters of two platforms never merge. Only TikTok's gifts have coins for now.
+- Each gift also goes in its clock minute (`GiftMinute`) under its gifter's id (`""` without one or without coins), so dates that cut a LIVE count only its gifts in them.
 - Pictures are saved although TikTok's links expire within days (the user's call): overlays and the page fall back to the initial.
 - Nothing is recorded before a load, or for a profile whose index doesn't load.
 
