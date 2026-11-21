@@ -50,7 +50,7 @@ export const sections: Sections = {
       return error ?? ok("Saved.");
     },
     notes:
-      "The platforms the active profile's Connect joins, as one LIVE: tiktok (the profile's @username) and twitch (the account signed in to in Settings, see get_status live.twitch). Refused while connected. An empty list connects TikTok.",
+      "The platforms the active profile's Connect joins, as one LIVE: tiktok (the profile's @username), twitch (the account signed in to in Settings, see get_status live.twitch) and youtube (the profile's YouTube channel). Refused while connected. An empty list connects TikTok.",
   }),
 };
 
@@ -326,15 +326,16 @@ export const tools: ToolDef<any>[] = [
     name: "live",
     title: "Connect to a LIVE",
     description:
-      "connect joins the active profile's platforms (settings section platforms) as one LIVE: TikTok by @username (or a LIVE link), saved as the profile's username (without `username` it uses the saved one), and Twitch with the account signed in to in Settings. With several, it succeeds when any of them connects, and each one's result is a notice in the app; get_status live.platforms says which are on. While connected, connect keeps the LIVE each platform is on, joining only the ones that are down: disconnect first to join another. While Tokio looks for a LIVE that stopped on its own (get_status live.waiting), connect tries at once and ends the look, even when it fails. TikTok's account must be live now, and Tokio needs the TikTok key (set_key). disconnect leaves every platform, and ends the look. Ask the streamer before either.",
+      "connect joins the active profile's platforms (settings section platforms) as one LIVE: TikTok by @username (or a LIVE link), saved as the profile's username (without `username` it uses the saved one), Twitch with the account signed in to in Settings, and YouTube by the profile's YouTube channel: `youtube`, a channel handle or LIVE link, saved per profile like the username (without it, the saved one). With several, it succeeds when any of them connects, and each one's result is a notice in the app; get_status live.platforms says which are on. While connected, connect keeps the LIVE each platform is on, joining only the ones that are down: disconnect first to join another. While Tokio looks for a LIVE that stopped on its own (get_status live.waiting), connect tries at once and ends the look, even when it fails. TikTok's account must be live now, and Tokio needs the TikTok key (set_key). disconnect leaves every platform, and ends the look. Ask the streamer before either.",
     input: z
       .object({
         action: z.enum(["connect", "disconnect"]),
         username: z.string().optional(),
+        youtube: z.string().optional(),
       })
       .strict(),
     annotations: { ...WRITE, openWorldHint: true },
-    run: async (handler, { action, username }) => {
+    run: async (handler, { action, username, youtube }) => {
       if (action === "disconnect") {
         const { error } = await invokeOk(
           handler,
@@ -349,10 +350,18 @@ export const tools: ToolDef<any>[] = [
       const tiktok =
         !profile?.platforms.length || profile.platforms.includes("tiktok");
       if (!name && tiktok) return fail("Give the @username to connect to.");
+      const channel = youtube?.trim();
+      if (
+        !channel &&
+        !profile?.channels.youtube &&
+        profile?.platforms.includes("youtube")
+      ) {
+        return fail("Give the YouTube channel or LIVE link to connect to.");
+      }
       const { error, data } = await invokeOk(
         handler,
         APP_EVENTS.CONNECT,
-        { username: name },
+        { username: name, ...(channel && { channels: { youtube: channel } }) },
         APP_EVENTS_RESPONSE.CONNECTED,
       );
       // The connect saved the username, even when it failed
