@@ -118,7 +118,8 @@ events.push(
     }
     const saved = await storeManagerService.updateProfileData({
       ...(platforms.includes("tiktok") && { connector: { username: name } }),
-      ...(channels && { channels }),
+      // Over the saved ones: MCP sends only the channel it was given
+      ...(channels && { channels: { ...profile?.channels, ...channels } }),
     });
     // The LIVE matters more than remembering the username: connect anyway.
     if (!saved) {

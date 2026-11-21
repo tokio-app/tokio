@@ -257,6 +257,20 @@ describe("home events", () => {
         }),
       ]);
     });
+    it("saves the channel typed over the profile's others", async () => {
+      const { h, profile, storeManagerService } = setup({ success: true });
+      profile.platforms = ["youtube"];
+      profile.channels = { youtube: "old", other: "kept" };
+
+      await h.invoke(home, APP_EVENTS.CONNECT, {
+        username: "",
+        channels: { youtube: "@new" },
+      });
+
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        channels: { youtube: "@new", other: "kept" },
+      });
+    });
     it.each([
       [
         connectFailure("noChat", ""),
