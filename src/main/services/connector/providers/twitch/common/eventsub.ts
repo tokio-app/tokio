@@ -125,6 +125,12 @@ export class EventSub {
       return;
     }
     const { metadata, payload } = message;
+    // Detailed logs say what came, keepalives aside
+    if (metadata && metadata.message_type !== "session_keepalive") {
+      this._handlers.log(
+        `EventSub ${metadata.message_type}${metadata.subscription_type ? ` ${metadata.subscription_type}` : ""}`,
+      );
+    }
     switch (metadata?.message_type) {
       case "session_welcome": {
         const session = payload?.session;
