@@ -44,6 +44,7 @@ const alert = (id: string, patch: Partial<Alert> = {}): Alert => ({
     min_coins: 0,
     roles: [],
   },
+  also_triggers: [],
   sound: whole(airhorn),
   tts: null,
   media: null,
@@ -158,6 +159,7 @@ describe("Alerts", () => {
       alert("alert-2", {
         enabled: false,
         trigger: trigger(TOKIO_EVENTS.SHARE),
+        also_triggers: [],
         sound: null,
         tts: speech("Thanks for sharing"),
         volume: 40,
@@ -203,6 +205,7 @@ describe("Alerts", () => {
             name: "alert-1",
             enabled: true,
             trigger: trigger(TOKIO_EVENTS.FOLLOW),
+            also_triggers: [],
             sound: null,
             tts: null,
             media: null,

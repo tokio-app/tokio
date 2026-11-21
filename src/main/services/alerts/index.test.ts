@@ -67,6 +67,7 @@ const alert = (overrides: Partial<Alert> = {}): Alert => ({
   name: "alert-1",
   enabled: true,
   trigger: trigger(TOKIO_EVENTS.FOLLOW),
+  also_triggers: [],
   sound: { name: "Ding", file: "ding.mp3", start: 0, end: null },
   tts: null,
   media: null,

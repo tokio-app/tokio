@@ -5,7 +5,7 @@ import {
   STUDIO_LOOPS,
   STUDIO_MAX_DELAY,
   STUDIO_MAX_SECONDS,
-  STUDIO_MAX_TRIGGERS,
+  MAX_TRIGGERS,
   STUDIO_WHEN,
   StudioAnimation,
   StudioCounter,
@@ -255,7 +255,7 @@ export function ReactionFields<R extends Reaction>({
       {adds && (
         <Btn
           className={styles.add_trigger}
-          disabled={rows.length >= STUDIO_MAX_TRIGGERS}
+          disabled={rows.length >= MAX_TRIGGERS}
           onClick={() =>
             onChange({
               ...value,

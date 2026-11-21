@@ -23,6 +23,7 @@ const alert = (
   name: keyword,
   enabled,
   trigger: trigger(keyword, type),
+  also_triggers: [],
   sound: null,
   tts: null,
   media: null,

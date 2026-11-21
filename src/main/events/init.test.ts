@@ -187,6 +187,7 @@ const alert = (overrides: Partial<Alert> = {}): Alert => ({
     min_coins: 0,
     roles: [],
   },
+  also_triggers: [],
   sound: { name: "Ding", file: "ding.mp3", start: 0, end: null },
   tts: null,
   media: null,

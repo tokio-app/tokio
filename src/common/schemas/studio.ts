@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { TOKIO_EVENTS } from "../types/connector";
-import { CUT, GAMES_OVERLAY_MAX_COLUMNS, TriggerSchema } from "./profile";
+import {
+  CUT,
+  GAMES_OVERLAY_MAX_COLUMNS,
+  MAX_TRIGGERS,
+  TriggerSchema,
+} from "./profile";
 import { ColorSchema, FONT_MAX_LENGTH } from "./timer";
 
 // Overlay Studio's canvases, in px: one browser source each
@@ -124,8 +129,6 @@ export const STUDIO_MAX_GUIDES = 50;
 export const STUDIO_CAMERA_MAX_LENGTH = 256;
 // The longest wait between a trigger and what it plays, in seconds
 export const STUDIO_MAX_DELAY = 10;
-// The most triggers an element or a group reacts to, its first included
-export const STUDIO_MAX_TRIGGERS = 5;
 // The most counters an overlay keeps, and the longest name one takes
 export const STUDIO_MAX_COUNTERS = 10;
 export const STUDIO_COUNTER_NAME_MAX_LENGTH = 24;
@@ -183,7 +186,7 @@ const REACTION = {
   // Tokio still reacts to the first
   also_triggers: z
     .array(StudioTriggerSchema)
-    .max(STUDIO_MAX_TRIGGERS - 1)
+    .max(MAX_TRIGGERS - 1)
     .default([]),
   // Seconds between a trigger and what it plays
   delay: z.number().min(0).max(STUDIO_MAX_DELAY).default(0),

@@ -26,6 +26,7 @@ describe("createAlert", () => {
         min_coins: 0,
         roles: [],
       },
+      also_triggers: [],
       sound: null,
       tts: null,
       media: null,
