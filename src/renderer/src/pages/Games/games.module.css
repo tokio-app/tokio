@@ -187,6 +187,11 @@
   width: 200px;
 }
 
+/* With its platform before it */
+.trigger:has(> * + *) {
+  width: 376px;
+}
+
 /* The trigger's filter, beside it. A gift's gifts and when it runs sit in a
    row here, not stacked as in the alerts' table. */
 .filter {

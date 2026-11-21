@@ -29,6 +29,7 @@ import {
   TriggerFilter,
   TriggerRows,
   TriggerRow,
+  TriggerSelect,
 } from "@/components";
 import { rich, useOptions, useT } from "@/ui/i18n";
 import { ReactNode } from "react";
@@ -203,11 +204,12 @@ export function ReactionFields<R extends Reaction>({
     }
     const main = (
       <>
-        <Select
+        <TriggerSelect
           aria-label={label}
           options={triggers}
-          value={trigger.type}
-          onChange={(type) => setRow(index, retype(trigger, type))}
+          trigger={trigger}
+          retype={retype}
+          onChange={(changed) => setRow(index, changed)}
         />
         {filter}
       </>

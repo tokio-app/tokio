@@ -4,6 +4,7 @@ import {
   ALERT_TRIGGER_LABELS,
   CustomGift,
   EMOTE_TRIGGER,
+  Platform,
   TOKIO_EVENTS,
 } from "@/common/types";
 import {
@@ -11,6 +12,7 @@ import {
   formatAdded,
   getAlertOverlayURL,
   giftNames,
+  PLATFORM_LABELS,
   takesRoles,
   triggersOf,
 } from "@/common/util";
@@ -28,6 +30,7 @@ import { SoundLength } from "../SoundPicker/SoundLength";
 import styles from "./alertitem.module.css";
 
 export { TriggerRows, type TriggerRow } from "./TriggerRows";
+export { eventsFor, TriggerSelect, withPlatform } from "./TriggerSelect";
 
 // The triggers, their labels keys (see useOptions)
 export const TRIGGER_OPTIONS: { value: Trigger["type"]; label: MessageKey }[] =
@@ -101,6 +104,16 @@ export function TriggerFilter({
         <Input
           className={styles.fill}
           placeholder={t("common.anyMessage")}
+          value={trigger.keyword}
+          onChange={(e) => onChange({ ...trigger, keyword: e.target.value })}
+        />
+      );
+    // The reward's title, matched as chat's keyword
+    case TOKIO_EVENTS.REDEEM:
+      return (
+        <Input
+          className={styles.fill}
+          placeholder={t("components.alertItem.anyReward")}
           value={trigger.keyword}
           onChange={(e) => onChange({ ...trigger, keyword: e.target.value })}
         />
@@ -240,6 +253,15 @@ function rowSummary(
       );
       break;
     }
+    case TOKIO_EVENTS.REDEEM: {
+      const reward = trigger.keyword.trim();
+      parts.push(
+        reward
+          ? t("components.alertItem.reward", { reward })
+          : t("components.alertItem.anyReward"),
+      );
+      break;
+    }
     case TOKIO_EVENTS.MEMBER_JOIN:
     case TOKIO_EVENTS.SUPER_FAN_JOIN: {
       const user = trigger.user.trim();
@@ -289,17 +311,32 @@ export function triggerSummary(
 }
 
 /**
+ * A trigger's event as rows name it, with its platform when it has one:
+ * "Follow on Twitch".
+ */
+export function eventName(
+  { type, platform }: { type: Trigger["type"]; platform?: Platform },
+  t: (key: MessageKey, params?: Params) => string,
+): string {
+  const event = t(ALERT_TRIGGER_LABELS[type]);
+  return platform
+    ? t("components.triggers.onPlatform", {
+        event,
+        platform: PLATFORM_LABELS[platform],
+      })
+    : event;
+}
+
+/**
  * The events that set the alert off, said once each and joined as the
  * language joins alternatives: "Follow or Gift".
  */
 export function triggerLabel(
   alert: Pick<Alert, "trigger" | "also_triggers">,
-  t: (key: MessageKey) => string,
+  t: (key: MessageKey, params?: Params) => string,
   language: string,
 ): string {
-  const names = triggersOf(alert).map(({ type }) =>
-    t(ALERT_TRIGGER_LABELS[type]),
-  );
+  const names = triggersOf(alert).map((trigger) => eventName(trigger, t));
   return listOf(language, [...new Set(names)], { type: "or" });
 }
 

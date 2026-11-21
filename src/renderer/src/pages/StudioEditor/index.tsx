@@ -17,6 +17,7 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   OverlayApp,
+  Platform,
   StudioReact,
 } from "@/common/types";
 import {
@@ -64,6 +65,7 @@ import { capitalize } from "@/pages/CoinStats/helper";
 import { useTimerPush } from "@/pages/CountdownTimer/helper";
 import { newOverlayName, sizeText } from "@/pages/Studio/helper";
 import toolsStyles from "@/pages/Tools/tools.module.css";
+import { PlatformsContext } from "@/context/platforms";
 import { useLanguage, useT } from "@/ui/i18n";
 import { useParams } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
@@ -189,6 +191,9 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   const setOverlay = history.change;
   const [installed, setInstalled] = useState<OverlayApp[]>([]);
   const [profile, setProfile] = useState<Pick<Profile, "alerts" | "games">>();
+  // The trigger pickers follow the active profile's, though overlays are
+  // every profile's
+  const [platforms, setPlatforms] = useState<Platform[]>(["tiktok"]);
   const { giftChoices, emoteChoices, emotes, setEmotes } = useTriggerChoices();
   // A new one per Test, so its samples are fresh
   const [samples, setSamples] = useState(() => new Samples());
@@ -226,6 +231,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
     if (!res?.success || !res.profile) return;
     setEmotes(res.profile.emotes);
     setProfile({ alerts: res.profile.alerts, games: res.profile.games });
+    setPlatforms(res.profile.platforms);
   });
 
   const setItems = (change: (items: StudioItem[]) => StudioItem[]) =>
@@ -753,7 +759,7 @@ function Editor({ saved }: { saved: StudioOverlay }) {
   );
 
   return (
-    <>
+    <PlatformsContext value={platforms}>
       <Section
         icon={<BackButton to="/tools/studio" title={t("studio.back")} />}
         title={overlay.name.trim() || t("studio.untitled")}
@@ -982,6 +988,6 @@ function Editor({ saved }: { saved: StudioOverlay }) {
           onClose={() => setMediaFor(null)}
         />
       )}
-    </>
+    </PlatformsContext>
   );
 }

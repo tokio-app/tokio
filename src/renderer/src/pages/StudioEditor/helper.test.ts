@@ -67,7 +67,7 @@ import {
 
 const t = (
   key: Parameters<typeof translate>[1],
-  params?: Record<string, string>,
+  params?: Parameters<typeof translate>[2],
 ) => translate("en", key, params);
 const context = {
   gifts: [gift(5655, "Rose")],

@@ -31,6 +31,7 @@ import {
   Tabs,
   Toggle,
   TriggerFilter,
+  TriggerSelect,
   VariableList,
 } from "@/components";
 import {
@@ -272,14 +273,12 @@ function ActionItem({
           value={action.edition}
           onChange={(edition) => onChange(withEdition(action, edition))}
         />
-        <Select
+        <TriggerSelect
           className={styles.trigger}
           aria-label={t("games.actions.trigger")}
           options={triggers}
-          value={trigger.type}
-          onChange={(type) =>
-            onChange({ ...action, trigger: { ...trigger, type } })
-          }
+          trigger={trigger}
+          onChange={(changed) => onChange({ ...action, trigger: changed })}
         />
         <div className={styles.filter}>
           {trigger.type === TOKIO_EVENTS.LIKE ? (

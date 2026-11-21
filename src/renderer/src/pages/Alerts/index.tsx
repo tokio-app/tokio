@@ -8,6 +8,7 @@ import {
   useEditableSettings,
   useIpcListener,
 } from "@/hooks";
+import { PlatformsContext } from "@/context/platforms";
 import { useT } from "@/ui/i18n";
 import { useEffect, useRef, useState } from "react";
 import { MdOutlineAddAlert } from "react-icons/md";
@@ -51,10 +52,12 @@ export function Alerts() {
   // Shows only the alerts whose names have it
   const [search, setSearch] = useState("");
 
+  const [platforms, setPlatforms] = useState(defaultProfile.platforms);
   const { settings, update } = useEditableSettings(
     "alerts",
     (profile, switched) => {
       setEmotes(profile.emotes);
+      setPlatforms(profile.platforms);
       setTtsDefaults(ttsDefaultsOf(profile.tts));
       // A clone has the same alert ids: a reply for the last profile mustn't
       // land in this one
@@ -170,7 +173,7 @@ export function Alerts() {
   const mediaAlert = settings.items.find((a) => a.id === mediaFor);
 
   return (
-    <>
+    <PlatformsContext value={platforms}>
       <Page width="wide">
         <HeaderSection
           simultaneous={settings.simultaneous}
@@ -252,6 +255,6 @@ export function Alerts() {
           onClose={() => setMediaFor(null)}
         />
       )}
-    </>
+    </PlatformsContext>
   );
 }

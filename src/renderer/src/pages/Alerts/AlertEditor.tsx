@@ -31,7 +31,6 @@ import {
   PlayButton,
   ROLE_NAMES,
   useVideoURL,
-  Select,
   Slider,
   Tabs,
   TestState,
@@ -40,6 +39,7 @@ import {
   TriggerFilter,
   TriggerRow,
   TriggerRows,
+  TriggerSelect,
   triggerLabel,
 } from "@/components";
 import thumbs from "@/components/MediaPicker/mediapicker.module.css";
@@ -79,6 +79,7 @@ const FILTER_LABELS: Partial<Record<Trigger["type"], MessageKey>> = {
   [TOKIO_EVENTS.GIFT]: "alerts.editor.filters.gifts",
   [EMOTE_TRIGGER]: "alerts.editor.filters.emotes",
   [TOKIO_EVENTS.CHAT]: "alerts.editor.filters.keyword",
+  [TOKIO_EVENTS.REDEEM]: "alerts.editor.filters.reward",
   [TOKIO_EVENTS.MEMBER_JOIN]: "alerts.editor.filters.viewer",
   [TOKIO_EVENTS.SUPER_FAN_JOIN]: "alerts.editor.filters.viewer",
 };
@@ -217,11 +218,11 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
 
     return {
       main: (
-        <Select
+        <TriggerSelect
           aria-label={name}
           options={triggers}
-          value={trigger.type}
-          onChange={(type) => change({ ...trigger, type })}
+          trigger={trigger}
+          onChange={change}
         />
       ),
       more: (
