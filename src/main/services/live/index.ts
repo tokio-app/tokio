@@ -33,6 +33,11 @@ export const ACTIVITY_EVENTS = [
   TOKIO_EVENTS.SHARE,
   TOKIO_EVENTS.SUPER_FAN,
   TOKIO_EVENTS.MEMBER_JOIN,
+  TOKIO_EVENTS.SUBSCRIBE,
+  TOKIO_EVENTS.GIFT_SUB,
+  TOKIO_EVENTS.CHEER,
+  TOKIO_EVENTS.RAID,
+  TOKIO_EVENTS.REDEEM,
 ] as const;
 
 type ActivityEvent = (typeof ACTIVITY_EVENTS)[number];
@@ -53,10 +58,12 @@ const activityUser = ({
   handle,
   username,
   profilePictures,
+  platform,
 }: UserData): ActivityUser => ({
   handle,
   name: username || handle,
   picture: profilePictures[0] ?? "",
+  ...(platform && { platform }),
 });
 
 /**
@@ -123,6 +130,26 @@ export class LiveService extends Service {
     [TOKIO_EVENTS.SUPER_FAN]: ({ user }) =>
       this._add({ type: "superfan", user: activityUser(user) }),
     [TOKIO_EVENTS.MEMBER_JOIN]: ({ user }) => this._join(activityUser(user)),
+    [TOKIO_EVENTS.SUBSCRIBE]: ({ user, months }) =>
+      this._add({ type: "sub", user: activityUser(user), months }),
+    [TOKIO_EVENTS.GIFT_SUB]: ({ user, count }) =>
+      this._add({ type: "giftsub", user: activityUser(user), count }),
+    [TOKIO_EVENTS.CHEER]: ({ user, bits, message }) =>
+      this._add({
+        type: "cheer",
+        user: activityUser(user),
+        bits,
+        text: message,
+      }),
+    [TOKIO_EVENTS.RAID]: ({ user, viewers }) =>
+      this._add({ type: "raid", user: activityUser(user), viewers }),
+    [TOKIO_EVENTS.REDEEM]: ({ user, reward, input }) =>
+      this._add({
+        type: "redeem",
+        user: activityUser(user),
+        reward: reward.title,
+        text: input,
+      }),
   };
 
   /** Starts a LIVE, clearing the last one's totals and feed. */

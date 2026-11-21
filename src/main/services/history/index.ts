@@ -4,6 +4,7 @@ import {
   LiveHistory,
   LiveRecord,
   LiveSummary,
+  PLATFORMS,
   RankedGifter,
   TOKIO_EVENTS,
   TokioEventMap,
@@ -48,6 +49,8 @@ const GifterSchema: z.ZodType<Gifter> = z.object({
   coins: z.number(),
   gifts: z.number(),
   giftedAt: z.number(),
+  // One a newer Tokio saved that this one doesn't know reads as TikTok
+  platform: z.enum(PLATFORMS).optional().catch(undefined),
 });
 
 const LiveSummarySchema = z.object({
@@ -187,6 +190,7 @@ export class HistoryService extends Service {
           coins: (last?.coins ?? 0) + coins,
           gifts: (last?.gifts ?? 0) + added,
           giftedAt: Date.now(),
+          ...(user.platform && { platform: user.platform }),
         });
       }
       this._emit();
@@ -695,6 +699,7 @@ export class HistoryService extends Service {
         gifts: (past?.gifts ?? 0) + (live?.gifts ?? 0),
       },
       giftedAt: gifter.giftedAt,
+      ...(gifter.platform && { platform: gifter.platform }),
     };
   }
 

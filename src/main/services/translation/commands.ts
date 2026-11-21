@@ -27,8 +27,9 @@ export async function chatCommands({
       ),
     )
     .filter(reactsToEvents);
-  // matchesTrigger reads a keyword only on Chat triggers. An alert or a
-  // studio item reacts to each of its triggers.
+  // matchesTrigger reads a chat's keyword only on Chat triggers (a Redeem's
+  // is a reward's title). An alert or a studio item reacts to each of its
+  // triggers.
   const keywords = [
     ...(profile?.alerts.items ?? [])
       .filter((alert) => alert.enabled)

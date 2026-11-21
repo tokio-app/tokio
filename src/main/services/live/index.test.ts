@@ -195,6 +195,41 @@ describe("LiveService", () => {
     ]);
   });
 
+  it("lists Twitch's subs, gifted subs, cheers, raids and redeems, with the platform", () => {
+    const user = viewer("kai", { platform: "twitch" });
+    const kai = { ...shown("kai"), platform: "twitch" };
+
+    live.record(TOKIO_EVENTS.SUBSCRIBE, {
+      user,
+      tier: "1000",
+      months: 3,
+      message: "",
+    });
+    live.record(TOKIO_EVENTS.GIFT_SUB, { user, count: 5, tier: "1000" });
+    live.record(TOKIO_EVENTS.CHEER, { user, bits: 100, message: "gg" });
+    live.record(TOKIO_EVENTS.RAID, { user, viewers: 42 });
+    live.record(TOKIO_EVENTS.REDEEM, {
+      user,
+      reward: { id: "r1", title: "Hydrate", cost: 100 },
+      input: "water",
+    });
+
+    expect(live.getSession().activity).toEqual([
+      { id: 5, type: "redeem", user: kai, reward: "Hydrate", text: "water" },
+      { id: 4, type: "raid", user: kai, viewers: 42 },
+      { id: 3, type: "cheer", user: kai, bits: 100, text: "gg" },
+      { id: 2, type: "giftsub", user: kai, count: 5 },
+      { id: 1, type: "sub", user: kai, months: 3 },
+    ]);
+    // Neither coins nor gifts
+    expect(live.getSession().totals).toEqual({
+      followers: 0,
+      shares: 0,
+      gifts: 0,
+      coins: 0,
+    });
+  });
+
   it("puts joins in a row in one item, naming the first two", () => {
     for (const handle of ["kai", "yui", "ren"]) {
       expect(join(live, handle)).toBe(true);

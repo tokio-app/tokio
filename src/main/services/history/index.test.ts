@@ -167,6 +167,45 @@ describe("HistoryService", () => {
     ]);
   });
 
+  it("keeps a gifter's platform, through a save and a load", async () => {
+    const history = await loaded();
+    history.start("kai", 0);
+    gifts(history, [1, gift({ ...viewer("twitch:1"), platform: "twitch" }, 5)]);
+
+    expect(history.top().live[0].platform).toBe("twitch");
+    history.end(10);
+    expect(await history.save()).toBe(true);
+
+    const again = await loaded();
+    expect(again.getHistory().gifters[0].platform).toBe("twitch");
+    expect(again.top().allTime[0].platform).toBe("twitch");
+  });
+
+  it("reads a platform it doesn't know as TikTok's", async () => {
+    await mkdir(join(dir, "a"), { recursive: true });
+    const gifter = {
+      userId: "1",
+      username: "ana",
+      handle: "ana",
+      picture: "",
+      coins: 1,
+      gifts: 1,
+      giftedAt: 1,
+    };
+    await writeFile(
+      join(dir, "a", "index.json"),
+      JSON.stringify({
+        lives: [],
+        gifters: [{ ...gifter, platform: "rumble" }],
+        newest: 0,
+      }),
+    );
+
+    const history = await loaded();
+
+    expect(history.getHistory().gifters).toEqual([gifter]);
+  });
+
   it("keeps a gifter's picture from an earlier LIVE", async () => {
     const history = await loaded();
     history.start("kai", 0);
