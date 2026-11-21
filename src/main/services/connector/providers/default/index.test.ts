@@ -129,6 +129,7 @@ const mappedUser = {
   fanLevel: 12,
   fanBadge: "https://img/lv10.png",
   userId: "1",
+  platform: "tiktok",
 };
 
 describe("TikTokLiveConnector", () => {
@@ -1039,6 +1040,7 @@ describe("TikTokLiveConnector", () => {
           fanLevel: 0,
           fanBadge: "",
           userId: "",
+          platform: "tiktok",
         },
       });
     });

@@ -1,12 +1,22 @@
-import { ChatEvent, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import {
+  ChatEvent,
+  Platform,
+  RoomUserEvent,
+  TOKIO_EVENTS,
+  TokioEventMap,
+} from "@/common/types";
 import { generateTikTokEventSample } from "@/common/util";
 import Logger from "@/logger";
 import { describe, expect, it, vi } from "vitest";
 import {
+  AccountProvider,
   connectFailure,
   ConnectorProvider,
   ConnectorResponse,
+  DeviceCode,
   GiftResponse,
+  PlatformAccount,
+  ReconnectState,
 } from "./common";
 import { ConnectorService } from "./index";
 
@@ -25,7 +35,35 @@ class FakeConnector extends ConnectorProvider {
   chat(data: ChatEvent, current = () => true) {
     this.emitChat(data, current);
   }
+  reconnect(state: ReconnectState) {
+    this._onReconnect?.(state);
+  }
 }
+
+// Twitch's provider stands in for any other platform's
+class FakeAccountConnector extends FakeConnector implements AccountProvider {
+  setAccount = vi.fn((_account: PlatformAccount) => {});
+  onAccount = vi.fn(
+    (_listener: (account: PlatformAccount) => Promise<boolean>) => {},
+  );
+  signIn = vi.fn(
+    async (_onCode: (code: DeviceCode) => void, _signal: AbortSignal) =>
+      account,
+  );
+  signOut = vi.fn(async () => {});
+}
+
+class TestService extends ConnectorService {
+  add(platform: Platform, provider: ConnectorProvider) {
+    this._addPlatform(platform, provider);
+  }
+}
+
+const account: PlatformAccount = {
+  id: "twitch:1",
+  login: "mia",
+  key: "refresh",
+};
 
 const viewer = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data.user;
 const chatOf = (content: string, lang = "en"): ChatEvent => ({
@@ -47,7 +85,7 @@ describe("ConnectorService", () => {
     const info = vi.spyOn(Logger, "info");
     const { service, provider } = setup();
 
-    const res = await service.connect("streamer");
+    const res = await service.connect({ tiktok: "streamer" });
 
     expect(res).toEqual({ success: true });
     expect(provider.connect).toHaveBeenCalledWith("streamer");
@@ -70,8 +108,8 @@ describe("ConnectorService", () => {
     });
 
     expect(service.username).toBe("");
-    await service.connect("streamer");
-    await service.connect("other");
+    await service.connect({ tiktok: "streamer" });
+    await service.connect({ tiktok: "other" });
 
     expect(during).toBe("other");
     expect(service.username).toBe("other");
@@ -83,7 +121,7 @@ describe("ConnectorService", () => {
     const cause = connectFailure("offline", "User is offline");
     provider.connect.mockResolvedValue({ success: false, error: cause });
 
-    const res = await service.connect("streamer");
+    const res = await service.connect({ tiktok: "streamer" });
 
     expect(res).toEqual({ success: false, error: cause });
     expect(error).toHaveBeenCalledWith(
@@ -99,7 +137,7 @@ describe("ConnectorService", () => {
     const cause = connectFailure("unknown", "Something broke");
     provider.connect.mockResolvedValue({ success: false, error: cause });
 
-    await service.connect("streamer");
+    await service.connect({ tiktok: "streamer" });
 
     expect(error).toHaveBeenCalledWith(
       expect.stringContaining("Something broke"),
@@ -110,23 +148,47 @@ describe("ConnectorService", () => {
 
   it("passes everything else to the active provider", async () => {
     const { service, provider } = setup();
-    const listener = (_: TokioEventMap[TOKIO_EVENTS.CHAT]) => {};
+    const listener = vi.fn();
     const onReconnect = vi.fn();
-    const reconnect = vi.spyOn(provider, "onReconnect");
-    const on = vi.spyOn(provider, "on");
-    const off = vi.spyOn(provider, "off");
+    const follow = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
 
-    service.on(TOKIO_EVENTS.CHAT, listener);
-    service.off(TOKIO_EVENTS.CHAT, listener);
+    service.on(TOKIO_EVENTS.FOLLOW, listener);
     service.onReconnect(onReconnect);
+    provider.fire(TOKIO_EVENTS.FOLLOW, follow);
+    service.off(TOKIO_EVENTS.FOLLOW, listener);
+    provider.fire(TOKIO_EVENTS.FOLLOW, follow);
+    provider.reconnect("reconnecting");
     await service.disconnect();
 
-    expect(on).toHaveBeenCalledWith(TOKIO_EVENTS.CHAT, listener);
-    expect(off).toHaveBeenCalledWith(TOKIO_EVENTS.CHAT, listener);
-    expect(reconnect).toHaveBeenCalledWith(onReconnect);
+    expect(listener).toHaveBeenCalledExactlyOnceWith(follow);
+    expect(onReconnect).toHaveBeenCalledExactlyOnceWith(
+      "reconnecting",
+      "tiktok",
+    );
     expect(provider.disconnect).toHaveBeenCalledOnce();
     expect(service.isConnected()).toBe(true);
     expect(await service.fetchGifts()).toEqual({ success: true, data: [] });
+  });
+
+  it("forwards only the current provider's events, whoever listened first", () => {
+    const service = new ConnectorService();
+    const received = vi.fn();
+    const reconnect = vi.fn();
+    service.on(TOKIO_EVENTS.FOLLOW, received);
+    service.onReconnect(reconnect);
+    const first = new FakeConnector();
+    const second = new FakeConnector();
+    const follow = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
+
+    service.addProvider("First", first, true);
+    service.addProvider("Second", second, true);
+    first.fire(TOKIO_EVENTS.FOLLOW, follow);
+    first.reconnect("reconnecting");
+    second.fire(TOKIO_EVENTS.FOLLOW, follow);
+    second.reconnect("reconnected");
+
+    expect(received).toHaveBeenCalledExactlyOnceWith(follow);
+    expect(reconnect).toHaveBeenCalledExactlyOnceWith("reconnected", "tiktok");
   });
 
   it("logs gifts it can't fetch", async () => {
@@ -243,6 +305,286 @@ describe("ConnectorService", () => {
       await Promise.resolve();
 
       expect(received).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("a LIVE across platforms", () => {
+    const room = (
+      viewers: number,
+      views: number,
+      ranks = 0,
+    ): RoomUserEvent => ({
+      ranks: Array.from({ length: ranks }, (_, i) => ({
+        username: `top ${i}`,
+        handle: `top${i}`,
+        profilePictures: [],
+        userId: `${i}`,
+        score: 10,
+        position: i + 1,
+      })),
+      viewers,
+      views,
+    });
+
+    const both = () => {
+      const service = new TestService();
+      service.setLogFile("connector.log");
+      const tiktok = new FakeConnector();
+      service.addProvider("Fake", tiktok, true);
+      const twitch = new FakeAccountConnector();
+      service.add("twitch", twitch);
+      const connected = vi.fn();
+      const disconnected = vi.fn();
+      const rooms = vi.fn();
+      const onPlatform = vi.fn();
+      service.on(TOKIO_EVENTS.CONNECTED, connected);
+      service.on(TOKIO_EVENTS.DISCONNECTED, disconnected);
+      service.on(TOKIO_EVENTS.ROOM_USER, rooms);
+      service.onPlatform(onPlatform);
+      return {
+        service,
+        tiktok,
+        twitch,
+        connected,
+        disconnected,
+        rooms,
+        onPlatform,
+      };
+    };
+
+    it("starts with the first platform up and ends with the last one down", () => {
+      const { tiktok, twitch, connected, disconnected, onPlatform } = both();
+
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+      tiktok.fire(TOKIO_EVENTS.DISCONNECTED, undefined);
+      expect(disconnected).not.toHaveBeenCalled();
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "lost" });
+
+      expect(connected).toHaveBeenCalledOnce();
+      expect(disconnected).toHaveBeenCalledExactlyOnceWith({ reason: "lost" });
+      expect(onPlatform.mock.calls).toEqual([
+        ["twitch", "up"],
+        ["twitch", "ended"],
+        ["twitch", "up"],
+        ["tiktok", "stopped"],
+      ]);
+    });
+
+    it("tells no platform's stop while a Disconnect stops them all", async () => {
+      const { service, tiktok, twitch, disconnected, onPlatform } = both();
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+      onPlatform.mockClear();
+      // Each stop arrives later, as the providers' do
+      for (const provider of [tiktok, twitch]) {
+        provider.disconnect.mockImplementation(async () => {
+          setImmediate(() => provider.fire(TOKIO_EVENTS.DISCONNECTED));
+        });
+      }
+
+      await service.disconnect();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(onPlatform).not.toHaveBeenCalled();
+      expect(disconnected).toHaveBeenCalledOnce();
+      expect(tiktok.disconnect).toHaveBeenCalledOnce();
+      expect(twitch.disconnect).toHaveBeenCalledOnce();
+
+      // The next session tells them again
+      await service.connect({ tiktok: "streamer" });
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "lost" });
+      expect(onPlatform).toHaveBeenLastCalledWith("twitch", "lost");
+    });
+
+    it("merges the platforms' rooms: TikTok's ranks, everyone's viewers", () => {
+      const { tiktok, twitch, rooms } = both();
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+
+      tiktok.fire(TOKIO_EVENTS.ROOM_USER, room(10, 100, 2));
+      // TikTok alone comes out as it was sent
+      expect(rooms).toHaveBeenLastCalledWith(room(10, 100, 2));
+      twitch.fire(TOKIO_EVENTS.ROOM_USER, room(5, 0));
+      expect(rooms).toHaveBeenLastCalledWith(room(15, 100, 2));
+
+      // A platform that goes down leaves the count
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+      expect(rooms).toHaveBeenLastCalledWith(room(10, 100, 2));
+      tiktok.fire(TOKIO_EVENTS.DISCONNECTED, undefined);
+      expect(rooms).toHaveBeenCalledTimes(3);
+    });
+
+    it("says how each platform is doing", () => {
+      const { service, tiktok, twitch } = both();
+      tiktok.isConnected.mockReturnValue(false);
+      twitch.isConnected.mockReturnValue(false);
+      expect(service.status()).toEqual({});
+      expect(service.isConnected()).toBe(false);
+
+      twitch.isConnected.mockReturnValue(true);
+      expect(service.status()).toEqual({ twitch: "connecting" });
+      expect(service.isConnected()).toBe(true);
+
+      tiktok.isConnected.mockReturnValue(true);
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+      expect(service.status()).toEqual({
+        tiktok: "connected",
+        twitch: "connected",
+      });
+
+      vi.spyOn(tiktok, "isReconnecting").mockReturnValue(true);
+      expect(service.status().tiktok).toBe("reconnecting");
+      // Only when every platform up is coming back
+      expect(service.isReconnecting()).toBe(false);
+      vi.spyOn(twitch, "isReconnecting").mockReturnValue(true);
+      expect(service.isReconnecting()).toBe(true);
+    });
+
+    it("waits for TikTok's LIVE only without a session", () => {
+      const { service, tiktok, twitch } = both();
+      const waiting = vi.spyOn(tiktok, "isWaiting").mockReturnValue(true);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+
+      expect(service.status().tiktok).toBe("waiting");
+      expect(service.isWaiting()).toBe(false);
+
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+      expect(service.isWaiting()).toBe(true);
+      waiting.mockReturnValue(false);
+      expect(service.isWaiting()).toBe(false);
+    });
+
+    it("names the session after the platform that started it", async () => {
+      const { service, tiktok, twitch } = both();
+      let during = "";
+      twitch.connect.mockImplementation(async () => {
+        twitch.fire(TOKIO_EVENTS.CONNECTED);
+        during = service.username;
+        return { success: true };
+      });
+      tiktok.connect.mockImplementation(async () => {
+        await new Promise((resolve) => setImmediate(resolve));
+        tiktok.fire(TOKIO_EVENTS.CONNECTED);
+        return { success: true };
+      });
+
+      await service.connect({ tiktok: "streamer", twitch: "mia" });
+
+      expect(during).toBe("mia");
+      expect(service.username).toBe("mia");
+      expect(service.channel("tiktok")).toBe("streamer");
+      expect(service.channel("twitch")).toBe("mia");
+    });
+
+    it("connects the platforms at once, and answers with a success", async () => {
+      const error = vi.spyOn(Logger, "error");
+      const { service, tiktok, twitch } = both();
+      const failure = connectFailure("noKey", "Not signed in");
+      twitch.connect.mockResolvedValue({ success: false, error: failure });
+      const onResult = vi.fn();
+
+      const res = await service.connect(
+        { tiktok: "streamer", twitch: "mia" },
+        onResult,
+      );
+
+      expect(res).toEqual({ success: true });
+      expect(tiktok.connect).toHaveBeenCalledWith("streamer");
+      expect(onResult).toHaveBeenCalledWith("tiktok", { success: true });
+      expect(onResult).toHaveBeenCalledWith("twitch", {
+        success: false,
+        error: failure,
+      });
+      expect(error).toHaveBeenCalledWith(
+        "<Connector> Unable to connect to mia on Twitch -- Not signed in",
+        "connector.log",
+        undefined,
+      );
+
+      // All failed: the first one
+      tiktok.connect.mockResolvedValue({
+        success: false,
+        error: connectFailure("offline", "Offline"),
+      });
+      const failed = await service.connect({ tiktok: "streamer", twitch: "" });
+      expect(failed.error?.kind).toBe("offline");
+    });
+
+    it("joins only the platforms that are down", async () => {
+      const { service, tiktok, twitch } = both();
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      const onResult = vi.fn();
+
+      await service.connect({ tiktok: "other", twitch: "mia" }, onResult);
+
+      expect(tiktok.connect).not.toHaveBeenCalled();
+      expect(twitch.connect).toHaveBeenCalledWith("mia");
+      expect(onResult).toHaveBeenCalledWith("tiktok", { success: true });
+    });
+
+    it("fails to connect a platform without a provider", async () => {
+      const { service } = setup();
+
+      const res = await service.connect({ twitch: "mia" });
+
+      expect(res.success).toBe(false);
+      expect(res.error?.message).toBe("Twitch isn't available.");
+    });
+
+    it("gives other platforms its log file and chat stage", () => {
+      const service = new TestService();
+      service.setLogFile("connector.log");
+      const stage = vi.fn(() => null);
+      service.setChatStage(stage);
+      const twitch = new FakeAccountConnector();
+      const setLogFile = vi.spyOn(twitch, "setLogFile");
+      const setChatStage = vi.spyOn(twitch, "setChatStage");
+
+      service.add("twitch", twitch);
+      service.setLogFile("other.log");
+
+      expect(setLogFile.mock.calls).toEqual([["connector.log"], ["other.log"]]);
+      expect(setChatStage).toHaveBeenCalledExactlyOnceWith(stage);
+      // Not a TikTok backend
+      expect(service.providerNames()).toEqual(["Default"]);
+    });
+  });
+
+  describe("the Twitch account", () => {
+    it("is kept and used by Twitch's provider", async () => {
+      const service = new TestService();
+      const onAccount = vi.fn(async () => true);
+      service.onTwitchAccount(onAccount);
+      const twitch = new FakeAccountConnector();
+      service.add("twitch", twitch);
+      const onCode = vi.fn();
+      const { signal } = new AbortController();
+
+      service.setTwitchAccount(account);
+      const signedIn = await service.signInTwitch(onCode, signal);
+      await service.signOutTwitch();
+
+      expect(twitch.onAccount).toHaveBeenCalledExactlyOnceWith(onAccount);
+      expect(twitch.setAccount).toHaveBeenCalledExactlyOnceWith(account);
+      expect(twitch.signIn).toHaveBeenCalledExactlyOnceWith(onCode, signal);
+      expect(signedIn).toEqual(account);
+      expect(twitch.signOut).toHaveBeenCalledOnce();
+    });
+
+    it("fails to sign in without Twitch's provider", () => {
+      const service = new ConnectorService();
+
+      // Startup hands the account over all the same
+      service.setTwitchAccount(account);
+      expect(() =>
+        service.signInTwitch(vi.fn(), new AbortController().signal),
+      ).toThrow("Twitch's provider isn't registered.");
     });
   });
 
