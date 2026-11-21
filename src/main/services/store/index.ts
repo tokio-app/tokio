@@ -19,6 +19,7 @@ import {
   StudioOverlay,
   StudioOverlaySchema,
   TestOverlay,
+  TwitchAccount,
 } from "@/common/schemas";
 import type { MessageKey } from "@/common/i18n";
 import { Emotes } from "@/common/types";
@@ -181,6 +182,9 @@ export class StoreManagerService extends Service {
         await this._decryptKeys(data.settings);
         const conn_p = this._withKey(data.settings.activeConnProvider);
         this._providers.connector.setProvider(conn_p.name, conn_p.key);
+        this._providers.connector.setTwitchAccount(
+          this._twitchAccount(data.settings),
+        );
         // Speaks the voices saved before the engines were combined.
         this._providers.tts.setProvider(data.settings.activeTTSProvider.name);
         for (const saved of data.settings.providers.tts) {
@@ -339,8 +343,30 @@ export class StoreManagerService extends Service {
     clonedSettings.activeTTSProvider = this._withKey(
       clonedSettings.activeTTSProvider,
     );
+    // The window, MCP and exports never get the Twitch token
+    clonedSettings.accounts.twitch = {
+      ...this._twitchAccount(clonedSettings),
+      key: "",
+    };
 
     return clonedSettings;
+  }
+
+  // The Twitch account signed in to, its token decrypted
+  public getTwitchAccount(): TwitchAccount {
+    this._ensureInitialized();
+    return this._twitchAccount(this._storeData!.settings);
+  }
+
+  // Each sign-in, sign-out and refresh's new token, encrypted. Never logged.
+  public async updateTwitchAccount(account: TwitchAccount): Promise<boolean> {
+    this._ensureInitialized();
+    const { key } = await this._encryptProviderKey({
+      name: "twitch",
+      key: account.key,
+    });
+    this._storeData!.settings.accounts.twitch = { ...account, key };
+    return this._queueSave();
   }
 
   // Registered providers that were never saved still need to be selectable.
@@ -1320,6 +1346,7 @@ export class StoreManagerService extends Service {
         ...settings.providers.tts,
         settings.activeConnProvider,
         settings.activeTTSProvider,
+        settings.accounts.twitch,
       ]
         .map((p) => p.key)
         .filter(isEncrypted),
@@ -1347,5 +1374,14 @@ export class StoreManagerService extends Service {
   private _withKey(provider: AppProvider): AppProvider {
     if (!isEncrypted(provider.key)) return provider;
     return { ...provider, key: this._keys.get(provider.key) ?? "" };
+  }
+
+  // A token that couldn't be decrypted reads as signed out
+  private _twitchAccount(settings: AppSettings): TwitchAccount {
+    const { id, login, key } = settings.accounts.twitch;
+    const decrypted = this._withKey({ name: "twitch", key }).key;
+    return decrypted
+      ? { id, login, key: decrypted }
+      : { id: "", login: "", key: "" };
   }
 }

@@ -697,6 +697,49 @@ describe("StoreManagerService", () => {
     });
   });
 
+  describe("the Twitch account", () => {
+    const account = { id: "twitch:1", login: "mia", key: "refresh-token" };
+
+    it("saves the token encrypted, and never hands it to the window", async () => {
+      const store = await init();
+
+      expect(await store.updateTwitchAccount(account)).toBe(true);
+
+      expect(await readFile(storeFile, "utf-8")).not.toContain("refresh-token");
+      expect(store.getTwitchAccount()).toEqual(account);
+      expect(store.getSettings().accounts.twitch).toEqual({
+        ...account,
+        key: "",
+      });
+    });
+
+    it("hands the saved account to the connector at startup", async () => {
+      const first = await init();
+      await first.updateTwitchAccount(account);
+      const setTwitchAccount = vi.spyOn(connector, "setTwitchAccount");
+
+      const store = await init();
+
+      expect(setTwitchAccount).toHaveBeenCalledExactlyOnceWith(account);
+      expect(store.getTwitchAccount()).toEqual(account);
+    });
+
+    it("reads a token it can't decrypt as signed out", async () => {
+      const first = await init();
+      await first.updateTwitchAccount(account);
+      vi.spyOn(safeStorage, "decryptStringAsync").mockRejectedValue(
+        new Error("Decryption failed"),
+      );
+      const setTwitchAccount = vi.spyOn(connector, "setTwitchAccount");
+
+      const store = await init();
+
+      const none = { id: "", login: "", key: "" };
+      expect(setTwitchAccount).toHaveBeenCalledExactlyOnceWith(none);
+      expect(store.getSettings().accounts.twitch).toEqual(none);
+    });
+  });
+
   describe("updates", () => {
     it("turns automatic checks on for stores saved before the setting", async () => {
       const { updates: _updates, ...settings } = defaultStoreData.settings;
