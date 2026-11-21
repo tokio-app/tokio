@@ -1,5 +1,6 @@
 import { Permissions } from "@/common/schemas";
 import { defaultProfile } from "@/common/util";
+import { PlatformsContext } from "@/context/platforms";
 import { useImmerState } from "@/hooks/useImmerState";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -145,5 +146,28 @@ describe("PermissionsSection", () => {
 
     expect(current().list.white).toEqual(["alice", "bob"]);
     expect(current().list.black).toEqual(["spammer", "troll"]);
+  });
+});
+
+describe("PermissionsSection with other platforms", () => {
+  const note = /doesn't say who follows/;
+
+  it("says Twitch's chat never passes the follower and fan level roles", () => {
+    const initial = structuredClone(defaultProfile.tts.permissions);
+    render(
+      <PlatformsContext value={["tiktok", "twitch"]}>
+        <PermissionsForm initial={initial} />
+      </PlatformsContext>,
+    );
+
+    expect(screen.getByText(note)).toHaveTextContent(
+      "Twitch doesn't say who follows or send fan levels, so its chat never passes Followers only or Minimum fan level.",
+    );
+  });
+
+  it("says nothing with TikTok alone", () => {
+    setup();
+
+    expect(screen.queryByText(note)).not.toBeInTheDocument();
   });
 });
