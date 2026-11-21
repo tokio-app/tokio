@@ -120,7 +120,11 @@ export const SERVICES: { name: string; note: string }[] = [
     name: "Google",
     note: "Chat translation, through Google Translate's web service (translate.googleapis.com), which isn't an official public API. It gets the text of each message to translate.",
   },
-  { name: "Spotify and YouTube", note: "Music requests." },
+  { name: "Spotify", note: "Music requests." },
+  {
+    name: "YouTube",
+    note: "Music requests, and a LIVE's chat, Super Chats, memberships, Gifts and viewer count (www.youtube.com), read from YouTube's public pages the way youtube.com does, which isn't an official API.",
+  },
   {
     name: "uBlock Origin's filter lists",
     note: "The YouTube player's ad blocker, when Block ads is on (ublockorigin.github.io, then its mirrors ublockorigin.pages.dev and cdn.jsdelivr.net). uBlock Origin's own lists and its copies of EasyList and EasyPrivacy belong to their authors, are under the GPL-3.0 or CC BY-SA 3.0, and aren't covered by Tokio's license. Tokio downloads them on the user's machine and doesn't ship them.",

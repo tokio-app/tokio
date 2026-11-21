@@ -2,7 +2,7 @@
 
 ## Project
 
-Tokio is an Electron desktop app for Windows, macOS and Linux that connects to a TikTok LIVE and a Twitch stream, one or both at once, and reacts to their events with text-to-speech, music requests (Spotify/YouTube), alerts (sounds, images and videos), game actions (Minecraft commands), and browser-source overlays served over a local HTTP/WebSocket server.
+Tokio is an Electron desktop app for Windows, macOS and Linux that connects to a TikTok LIVE, a Twitch stream and a YouTube LIVE, any of them at once, and reacts to their events with text-to-speech, music requests (Spotify/YouTube), alerts (sounds, images and videos), game actions (Minecraft commands), and browser-source overlays served over a local HTTP/WebSocket server.
 
 Stack: Electron 45, electron-vite, React 19, TypeScript, TanStack Router, Express 5 + `ws`, Zod 4, Yarn 1, Node >= 24.
 
@@ -70,7 +70,7 @@ Notes for one area live in `.claude/rules/`. Claude Code loads each one when it 
 - `ci.md`: CI, packaging and releases
 - `updates.md`: the auto-updater
 - `connector.md`: the TikTok connector and its key
-- `platforms.md`: several platforms in one LIVE session, Twitch, trigger platforms and namespaced ids
+- `platforms.md`: several platforms in one LIVE session, Twitch, YouTube, trigger platforms and namespaced ids
 - `live-session.md`: the LIVE session and activity feed on Home
 - `controls.md`: the live controls (skip song, stop TTS, replay alert, pause), their global shortcuts and the phone remote
 - `mcp.md`: the MCP server at `/mcp`, its tools and what it must never expose
@@ -176,7 +176,7 @@ Main tells the renderer what failed so it can show notifications. Types are in `
 Tokio's source is MIT; treat license compliance as part of every change.
 
 - **LGPL code stays isolated.** `src/main/services/tts/providers/edge/common/drm-v2.ts` is LGPL-3.0-only (derived from edge-tts). Code ported from edge-tts goes only into its own LGPL file with the same header (SPDX line, upstream commit, authors, dated modification notice). Never copy upstream code into MIT files.
-- **The distributed app is MIT too**, with that one LGPL file and the Archivo font files (`@fontsource-variable/archivo`). The font stays under the SIL OFL 1.1, which the user approved: it allows bundling with any software. Keep it that way: no other copyleft dependency, and no code from `tiktok-live-connector` 2.4.1 or later or `tiktok-live-proto` 0.2.4 or later (AGPL). Twitch connects through its official API with each user's own sign-in. No code is copied from any Twitch, YouTube or Kick library: read only MIT, BSD or Apache ones as references.
+- **The distributed app is MIT too**, with that one LGPL file and the Archivo font files (`@fontsource-variable/archivo`). The font stays under the SIL OFL 1.1, which the user approved: it allows bundling with any software. Keep it that way: no other copyleft dependency, and no code from `tiktok-live-connector` 2.4.1 or later or `tiktok-live-proto` 0.2.4 or later (AGPL). Twitch connects through its official API with each user's own sign-in, and YouTube by reading a LIVE's public chat the way youtube.com does. No code is copied from any Twitch, YouTube or Kick library: read only MIT, BSD or Apache ones as references.
 - **The ad blocker's filter lists are other authors' data under the GPL-3.0 or CC BY-SA.** Each user's Tokio downloads them at runtime (`@tokioapp/adblock`, ours, MIT). Never ship them in the app, bundle a copy for a first start, or commit them.
 - **Check licenses when adding or upgrading a dependency**, even minor bumps (tiktok-live-connector went MIT → AGPL in 2.4.1), with the `add-dependency` skill. Ask before adding anything copyleft (GPL, AGPL, LGPL, MPL, CC BY-SA).
 - **react-icons:** only use the sets listed under Icons in `THIRD_PARTY_NOTICES.md`, and add a row for any new set.

@@ -55,7 +55,7 @@
   "titlebar.maximize": "Maximize",
   "titlebar.restore": "Restore",
   "splash.starting": "Starting up...",
-  "splash.disclaimer": "Not affiliated with, endorsed by, or associated with TikTok, ByteDance Ltd. or Twitch.",
+  "splash.disclaimer": "Not affiliated with, endorsed by, or associated with TikTok, ByteDance Ltd., Twitch, YouTube or Google.",
   "app.startFailed": "Tokio couldn't start. Check the logs folder for details.",
   "triggers.chat": "Chat",
   "triggers.emote": "Emote",
