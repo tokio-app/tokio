@@ -5,7 +5,7 @@ import {
   type AlertTrigger,
   type Platform,
 } from "../types/connector";
-import { triggersFor } from "./platforms";
+import { countsCoins, triggersFor } from "./platforms";
 
 // The event each trigger of the timer counts, so a profile's platforms say
 // which ones apply
@@ -21,6 +21,15 @@ export const TIMER_TRIGGERS = {
   bit: TOKIO_EVENTS.CHEER,
   superchat: TOKIO_EVENTS.SUPER_CHAT,
 } as const satisfies Record<keyof TimerSettings["look"]["names"], AlertTrigger>;
+
+// Which timer triggers apply to the platforms: the ones they send, coins
+// only when a platform's gifts have a price
+export const timerTriggersOn = (platforms: readonly Platform[]) => {
+  const sent = triggersFor(platforms);
+  const coins = countsCoins(platforms);
+  return (key: keyof typeof TIMER_TRIGGERS) =>
+    sent.includes(TIMER_TRIGGERS[key]) && (key !== "coin" || coins);
+};
 
 // "5s", "0.5s", "1:30", "1:00:00", as the countdown timer shows time added.
 // The sign is the caller's.
@@ -56,7 +65,7 @@ export function timerTriggers(
   // TikTok alone until a caller passes the profile's
   platforms: readonly Platform[] = ["tiktok"],
 ): TimerTrigger[] {
-  const sent = triggersFor(platforms);
+  const applies = timerTriggersOn(platforms);
   const name = (key: keyof typeof look.names) =>
     look.names[key].trim() || translate(language, `timer.names.${key}`);
   const keyword = chat.keyword.trim();
@@ -78,9 +87,7 @@ export function timerTriggers(
     ["superchat", name("superchat"), seconds.superchat],
   ];
   return triggers
-    .filter(
-      ([key, , s]) => s * multiplier > 0 && sent.includes(TIMER_TRIGGERS[key]),
-    )
+    .filter(([key, , s]) => s * multiplier > 0 && applies(key))
     .map(([, label, s]) => ({
       label: label.trim(),
       value: `+${formatAdded(s * multiplier * 1000)}`,

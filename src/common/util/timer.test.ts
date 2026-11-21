@@ -72,10 +72,10 @@ describe("timerTriggers", () => {
     ]);
   });
 
-  it("lists a Super Chat for a YouTube profile", () => {
+  it("lists a Super Chat, and no coins, for a YouTube profile", () => {
     expect(
       timerTriggers(settings(), "en", ["youtube"]).map((t) => t.label),
-    ).toEqual(["1 coin", "New sub", "Gifted sub", "Super Chat"]);
+    ).toEqual(["New sub", "Gifted sub", "Super Chat"]);
   });
 
   it("uses the streamer's names, and shows the chat keyword viewers need", () => {

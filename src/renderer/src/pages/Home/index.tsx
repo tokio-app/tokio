@@ -8,6 +8,7 @@ import {
 } from "@/common/types";
 import {
   defaultProfile,
+  countsCoins,
   defaultStoreData,
   isPlatform,
   PLATFORM_INPUT,
@@ -22,7 +23,7 @@ import {
 import { useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import styles from "./home.module.css";
-import { feedKinds, liveStats, NO_SESSION, sendsGifts } from "./helper";
+import { feedKinds, liveStats, NO_SESSION } from "./helper";
 import { ActivitySection } from "./sections/ActivitySection";
 import { DashboardSection } from "./sections/DashboardSection";
 import { FeaturesSection } from "./sections/FeaturesSection";
@@ -264,7 +265,7 @@ export function Home() {
                   likes,
                   views: views.total,
                 })}
-                gifters={sendsGifts(platforms) ? gifters : null}
+                gifters={countsCoins(platforms) ? gifters : null}
               />
             )}
 

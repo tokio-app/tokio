@@ -7,7 +7,7 @@ import {
   Platform,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
+import { countsCoins, PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
 import type { IconType } from "react-icons";
 import { FaTiktok, FaTwitch, FaYoutube } from "react-icons/fa";
 
@@ -76,14 +76,19 @@ export function liveStats(
 ): Stat[] {
   const tiktok = platforms.includes("tiktok");
   const gifts = sendsGifts(platforms);
+  // YouTube sends no follows
+  const follows = triggersFor(platforms).includes(TOKIO_EVENTS.FOLLOW);
   const stats: (Stat | false)[] = [
     tiktok && { label: "home.stats.likes", value: values.likes },
     // Only TikTok counts a LIVE's total views; Twitch sends 0
     tiktok && { label: "home.stats.totalViews", value: values.views },
-    { label: "home.totals.followers", value: values.followers },
+    follows && { label: "home.totals.followers", value: values.followers },
     tiktok && { label: "home.totals.shares", value: values.shares },
     gifts && { label: "home.totals.gifts", value: values.gifts },
-    gifts && { label: "home.totals.coins", value: values.coins },
+    countsCoins(platforms) && {
+      label: "home.totals.coins",
+      value: values.coins,
+    },
   ];
   return stats.filter((stat) => stat !== false);
 }

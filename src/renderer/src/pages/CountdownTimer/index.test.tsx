@@ -89,8 +89,8 @@ describe("CountdownTimer", () => {
       }),
     );
 
+    // YouTube's gifts have no price
     expect(rows()).toEqual([
-      "Coins",
       "Chat messages",
       "New subs",
       "Gifted subs",

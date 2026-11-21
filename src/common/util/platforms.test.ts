@@ -2,6 +2,7 @@ import { ALERT_TRIGGERS } from "@/common/schemas";
 import { EMOTE_TRIGGER, PLATFORMS, TOKIO_EVENTS } from "@/common/types";
 import { describe, expect, it } from "vitest";
 import {
+  countsCoins,
   isPlatform,
   PLATFORM_TRIGGERS,
   platformOf,
@@ -59,6 +60,13 @@ describe("platforms", () => {
       TOKIO_EVENTS.SUPER_CHAT,
       TOKIO_EVENTS.MUSIC_CHANGE,
     ]);
+  });
+
+  it("counts coins only with a platform whose gifts have a price", () => {
+    expect(countsCoins(["tiktok"])).toBe(true);
+    expect(countsCoins(["youtube", "tiktok"])).toBe(true);
+    expect(countsCoins(["youtube"])).toBe(false);
+    expect(countsCoins(["twitch", "youtube"])).toBe(false);
   });
 
   it("reads a viewer without a platform as TikTok's", () => {

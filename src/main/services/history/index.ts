@@ -175,15 +175,16 @@ export class HistoryService extends Service {
       const coins = added * Math.max(0, gift.coins);
       live.gifts += added;
       live.coins += coins;
-      // A gift without a user id counts in its minute's totals only
-      const id = user.userId ?? "";
+      // A gift without a user id or a price counts in its minute's totals only
+      const gifter = coins > 0 ? user.userId : undefined;
+      const id = gifter ?? "";
       const { gifters } = this._minute(live);
       const [sent, count] = gifters[id] ?? [0, 0];
       gifters[id] = [sent + coins, count + added];
-      if (user.userId) {
-        const last = this._liveGifters.get(user.userId);
-        this._liveGifters.set(user.userId, {
-          userId: user.userId,
+      if (gifter) {
+        const last = this._liveGifters.get(gifter);
+        this._liveGifters.set(gifter, {
+          userId: gifter,
           username: user.username,
           handle: user.handle,
           picture: user.profilePictures[0] || (last?.picture ?? ""),

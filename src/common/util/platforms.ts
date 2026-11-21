@@ -60,6 +60,17 @@ export const PLATFORM_INPUT: Record<Platform, "channel" | "account"> = {
   youtube: "channel",
 };
 
+// Whether a platform's gifts say what they cost: YouTube's don't
+export const GIFT_COINS: Record<Platform, boolean> = {
+  tiktok: true,
+  twitch: false,
+  youtube: false,
+};
+
+// Coins, and gifters ranked by them, need a platform whose gifts have a price
+export const countsCoins = (platforms: readonly Platform[]) =>
+  platforms.some((p) => GIFT_COINS[p]);
+
 export const isPlatform = (value: unknown): value is Platform =>
   (PLATFORMS as readonly unknown[]).includes(value);
 

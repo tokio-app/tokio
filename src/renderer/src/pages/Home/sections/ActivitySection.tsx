@@ -219,8 +219,9 @@ const Event = memo(function Event({
       <div className={styles.event_body}>
         <Action item={item} mark={mark} />
       </div>
-      {/* At the row's end, after the body's trailing space */}
-      {item.type === "gift" && (
+      {/* At the row's end, after the body's trailing space. A gift without
+          a price, like YouTube's, shows none. */}
+      {item.type === "gift" && item.gift.coins > 0 && (
         <span className={styles.coins}>
           {coinsLabel(item.gift.coins, language)}
         </span>
