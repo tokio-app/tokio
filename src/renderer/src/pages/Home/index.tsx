@@ -6,7 +6,12 @@ import {
   PlatformStatus,
   TopGifter,
 } from "@/common/types";
-import { defaultProfile, defaultStoreData } from "@/common/util";
+import {
+  defaultProfile,
+  defaultStoreData,
+  isPlatform,
+  PLATFORM_INPUT,
+} from "@/common/util";
 import { Modal } from "@/components";
 import {
   useImmerState,
@@ -29,6 +34,7 @@ export function Home() {
   const t = useT();
   const [username, setUsername] = useState(defaultProfile.connector.username);
   const usernameField = useRef<HTMLInputElement>(null);
+  const [channels, setChannels] = useState(defaultProfile.channels);
   const [profile, setProfile] = useState(defaultProfile);
   const [features, updateFeatures, setFeatures] = useImmerState(
     defaultStoreData.settings.activeFeatures,
@@ -83,6 +89,15 @@ export function Home() {
     if (document.activeElement !== usernameField.current) {
       setUsername(res.profile!.connector.username);
     }
+    // The same for a channel being typed
+    const focused = document.activeElement;
+    const typing =
+      focused instanceof HTMLElement ? focused.dataset.channel : undefined;
+    setChannels((now) =>
+      isPlatform(typing)
+        ? { ...res.profile!.channels, [typing]: now[typing] ?? "" }
+        : res.profile!.channels,
+    );
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
@@ -213,18 +228,26 @@ export function Home() {
                   platforms: picked,
                 });
               }}
-              onRetry={() => window.api.emit(APP_EVENTS.CONNECT, { username })}
+              channels={channels}
+              onRetry={() =>
+                window.api.emit(APP_EVENTS.CONNECT, { username, channels })
+              }
               onUsernameChange={setUsername}
+              onChannelChange={(platform, channel) =>
+                setChannels((c) => ({ ...c, [platform]: channel }))
+              }
               onConnect={() => {
-                // TikTok needs the channel, Twitch's is the account
-                if (
-                  platforms.includes("tiktok") &&
-                  !username.replace("@", "").trim()
-                ) {
-                  return;
-                }
+                // TikTok and YouTube need the channel, Twitch's is the account
+                const missing = platforms.some(
+                  (p) =>
+                    PLATFORM_INPUT[p] === "channel" &&
+                    !(p === "tiktok" ? username : (channels[p] ?? ""))
+                      .replace("@", "")
+                      .trim(),
+                );
+                if (missing) return;
                 setLoading(true);
-                window.api.emit(APP_EVENTS.CONNECT, { username });
+                window.api.emit(APP_EVENTS.CONNECT, { username, channels });
               }}
               onDisconnect={() => {
                 setLoading(true);

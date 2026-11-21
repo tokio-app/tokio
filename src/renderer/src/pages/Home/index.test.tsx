@@ -111,7 +111,9 @@ describe("Home", () => {
     await user.type(username(), "@streamer");
     await user.click(connect);
 
-    expect(sent(APP_EVENTS.CONNECT)).toEqual([{ username: "@streamer" }]);
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      { username: "@streamer", channels: {} },
+    ]);
     expect(connect).toHaveAttribute("aria-busy", "true");
 
     await connected();

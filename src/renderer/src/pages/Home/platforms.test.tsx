@@ -118,7 +118,40 @@ describe("Home's platforms", () => {
 
     // Twitch's channel is the account
     await user.click(page().getByRole("button", { name: "Connect" }));
-    expect(sent(APP_EVENTS.CONNECT)).toEqual([{ username: "@streamer" }]);
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      { username: "@streamer", channels: {} },
+    ]);
+  });
+
+  it("gives YouTube a row with the saved channel, and connects with it", async () => {
+    const { user } = await renderApp();
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.platforms = ["tiktok", "youtube"];
+        p.connector.username = "@streamer";
+        p.channels = { youtube: "@saved" };
+      }),
+    );
+    const channel = page().getByPlaceholderText("@channel or LIVE link");
+    expect(channel).toHaveValue("@saved");
+
+    await user.clear(channel);
+    await user.type(channel, "@typed");
+    await user.click(page().getByRole("button", { name: "Connect" }));
+
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      { username: "@streamer", channels: { youtube: "@typed" } },
+    ]);
+  });
+
+  it("doesn't connect YouTube without a channel", async () => {
+    const { user } = await renderApp();
+    await usingPlatforms(["youtube"]);
+
+    await user.click(page().getByRole("button", { name: "Connect" }));
+
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([]);
   });
 
   it("says how each platform is doing, with Try again for one that's down", async () => {
@@ -134,7 +167,9 @@ describe("Home's platforms", () => {
     expect(within(twitch).getByText("Not connected")).toBeVisible();
 
     await user.click(within(twitch).getByRole("button", { name: "Try again" }));
-    expect(sent(APP_EVENTS.CONNECT)).toEqual([{ username: "@streamer" }]);
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      { username: "@streamer", channels: {} },
+    ]);
 
     await live({ tiktok: "reconnecting", twitch: "connecting" });
     expect(within(tiktok).getByText("Reconnecting…")).toBeVisible();
