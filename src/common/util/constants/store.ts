@@ -53,7 +53,13 @@ export const defaultStoreData: StoreSchema = {
       share: true,
       superfan: true,
       join: true,
+      sub: true,
+      giftsub: true,
+      cheer: true,
+      raid: true,
+      redeem: true,
     },
+    accounts: { twitch: { id: "", login: "", key: "" } },
     games: {
       minecraft: { enabled: false },
     },

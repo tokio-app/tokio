@@ -131,28 +131,19 @@ export const sections: Sections = {
 
   activity_feed: defineSection({
     schema: ActivityFeedSchema.strict(),
-    read: ({ storeManagerService }) => {
-      const { chat, gift, follow, share, superfan, join } =
-        storeManagerService.getSettings().activityFeed;
-      return { chat, gift, follow, share, superfan, join };
-    },
+    read: ({ storeManagerService }) => ({
+      ...storeManagerService.getSettings().activityFeed,
+    }),
     write: async (handler, values) => {
       const { error } = await invokeOk(handler, APP_EVENTS.SET_ACTIVITY_FEED, {
-        feed: {
-          chat: values.chat,
-          gift: values.gift,
-          follow: values.follow,
-          share: values.share,
-          superfan: values.superfan,
-          join: values.join,
-        },
+        feed: values,
       });
       // Its handler replies only the feed
       pushSettings(handler);
       return error ?? ok("Saved.");
     },
     notes:
-      "The kinds of events Home's activity feed keeps, for every profile. Hiding one drops its items already in the feed; they still count toward the LIVE's totals.",
+      "The kinds of events Home's activity feed keeps, for every profile. Hiding one drops its items already in the feed; they still count toward the LIVE's totals. sub, giftsub, cheer, raid and redeem come from Twitch.",
   }),
 
   app: defineSection({

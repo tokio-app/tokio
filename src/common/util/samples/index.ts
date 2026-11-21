@@ -1,13 +1,18 @@
 import {
   AppEvents,
   ChatEvent,
+  CheerEvent,
   Emotes,
   Fan,
   GiftEvent,
+  GiftSubEvent,
   LikeEvent,
   MusicInfo,
+  RaidEvent,
+  RedeemEvent,
   RoomUserEvent,
   ShareEvent,
+  SubscribeEvent,
   TOKIO_EVENTS,
   TokioEventMap,
   TokioPayload,
@@ -72,6 +77,70 @@ const userFactory = (): UserData => {
     fanLevel,
     fanBadge: fanLevel ? fanBadgeOf(fanLevel) : "",
     userId: String(randomInt(1e9, 9e9)),
+    platform: "tiktok",
+  };
+};
+
+// A Twitch viewer, as its events show them: a namespaced id and no fan level
+const twitchUserFactory = (): UserData => {
+  const noun = pickRandom(NOUNS);
+  const handle = `${pickRandom(ADJECTIVES).toLowerCase()}_${noun.toLowerCase()}${randomInt(1, 999)}`;
+  return {
+    username: handle,
+    handle,
+    profilePictures: [`https://picsum.photos/seed/${handle}/200/200`],
+    follower: false,
+    superfan: randomBool(0.3),
+    moderator: randomBool(0.05),
+    userId: `twitch:${randomInt(1e7, 9e8)}`,
+    platform: "twitch",
+  };
+};
+
+const TWITCH_TIERS = ["1000", "1000", "1000", "2000", "3000", "prime"];
+const TWITCH_REWARDS = [
+  { title: "Hydrate!", cost: 100 },
+  { title: "Pick the next song", cost: 500 },
+  { title: "Say hi in a funny voice", cost: 1000 },
+];
+
+const subscribeEventFactory = (user = twitchUserFactory()): SubscribeEvent => {
+  const months = randomBool(0.4) ? 1 : randomInt(2, 36);
+  return {
+    user,
+    tier: pickRandom(TWITCH_TIERS),
+    months,
+    message: months > 1 && randomBool(0.6) ? pickRandom(CHAT_MESSAGES) : "",
+  };
+};
+
+const giftSubEventFactory = (user = twitchUserFactory()): GiftSubEvent => ({
+  user,
+  count: pickRandom([1, 1, 5, 10, 20]),
+  tier: "1000",
+});
+
+const cheerEventFactory = (user = twitchUserFactory()): CheerEvent => ({
+  user,
+  bits: pickRandom([1, 100, 100, 500, 1000, 5000]),
+  message: randomBool(0.7) ? pickRandom(CHAT_MESSAGES) : "",
+});
+
+// The user is the raiding channel's streamer
+const raidEventFactory = (user = twitchUserFactory()): RaidEvent => ({
+  user,
+  viewers: randomInt(2, 400),
+});
+
+const redeemEventFactory = (user = twitchUserFactory()): RedeemEvent => {
+  const reward = pickRandom(TWITCH_REWARDS);
+  return {
+    user,
+    reward: { id: `reward-${reward.cost}`, ...reward },
+    input:
+      reward.cost === 500
+        ? `${pickRandom(ADJECTIVES)} ${pickRandom(NOUNS)}`
+        : "",
   };
 };
 
@@ -182,6 +251,11 @@ const TIKTOK_EVENT_SAMPLES: {
   [TOKIO_EVENTS.ENVELOPE]: () => {},
   [TOKIO_EVENTS.SUPER_FAN_BOX]: () => {},
   [TOKIO_EVENTS.GIFT]: giftEventFactory,
+  [TOKIO_EVENTS.SUBSCRIBE]: subscribeEventFactory,
+  [TOKIO_EVENTS.GIFT_SUB]: giftSubEventFactory,
+  [TOKIO_EVENTS.CHEER]: cheerEventFactory,
+  [TOKIO_EVENTS.RAID]: raidEventFactory,
+  [TOKIO_EVENTS.REDEEM]: redeemEventFactory,
   [TOKIO_EVENTS.MUSIC_CHANGE]: musicFactory,
 };
 
@@ -230,6 +304,8 @@ export const createTestLive = () => {
       ];
     }),
   );
+  // Twitch's events come from a few viewers of their own
+  const twitch = Array.from({ length: 3 }, twitchUserFactory);
   let viewers = randomInt(20, 200);
   let views = viewers + randomInt(50, 2000);
   let totalLikes = randomInt(500, 20000);
@@ -363,6 +439,20 @@ export const createTestLive = () => {
       // A super fan box comes as both events.
       { type: TOKIO_EVENTS.SUPER_FAN_BOX, data: undefined },
       { type: TOKIO_EVENTS.ENVELOPE, data: undefined },
+      {
+        type: TOKIO_EVENTS.SUBSCRIBE,
+        data: subscribeEventFactory(pickRandom(twitch)),
+      },
+      {
+        type: TOKIO_EVENTS.GIFT_SUB,
+        data: giftSubEventFactory(pickRandom(twitch)),
+      },
+      { type: TOKIO_EVENTS.CHEER, data: cheerEventFactory(pickRandom(twitch)) },
+      { type: TOKIO_EVENTS.RAID, data: raidEventFactory() },
+      {
+        type: TOKIO_EVENTS.REDEEM,
+        data: redeemEventFactory(pickRandom(twitch)),
+      },
       { type: TOKIO_EVENTS.MUSIC_CHANGE, data: musicFactory() },
       { type: TOKIO_EVENTS.ROOM_USER, data: { viewers, views, ranks } },
       {

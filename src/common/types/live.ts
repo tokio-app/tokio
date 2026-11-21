@@ -1,14 +1,16 @@
 // The LIVE Tokio is connected to, for the Home page: when it started, what
 // viewers did in it and how much.
 
-import type { ChatTranslation } from "./connector";
+import type { ChatTranslation, Platform } from "./connector";
 
 export type ActivityUser = {
   handle: string;
   // The nickname, or the handle when there's none
   name: string;
-  // Empty when TikTok sent no avatar
+  // Empty when the platform sent no avatar
   picture: string;
+  // Missing means TikTok
+  platform?: Platform;
 };
 
 // Something a viewer did
@@ -27,6 +29,12 @@ export type Activity =
       gift: { name: string; image: string; count: number; coins: number };
     }
   | { type: "follow" | "share" | "superfan"; user: ActivityUser }
+  | { type: "sub"; user: ActivityUser; months: number }
+  | { type: "giftsub"; user: ActivityUser; count: number }
+  // text is the cheer's message, or a redeem's input
+  | { type: "cheer"; user: ActivityUser; bits: number; text: string }
+  | { type: "raid"; user: ActivityUser; viewers: number }
+  | { type: "redeem"; user: ActivityUser; reward: string; text: string }
   // Joins in a row share one item: the first users and how many joined
   | { type: "join"; users: ActivityUser[]; count: number };
 
@@ -52,8 +60,8 @@ export type LiveSession = {
   viewers: number[];
 };
 
-// A viewer who sent gifts, keyed by TikTok's user id. Name, handle and
-// picture are their latest gift's.
+// A viewer who sent gifts, keyed by their user id (see UserData). Name,
+// handle and picture are their latest gift's.
 export type Gifter = {
   userId: string;
   username: string;
@@ -64,6 +72,8 @@ export type Gifter = {
   gifts: number;
   // When their last gift came, in ms since the epoch
   giftedAt: number;
+  // Missing means TikTok
+  platform?: Platform;
 };
 
 // A LIVE the profile kept, from the connect to the disconnect like Home's

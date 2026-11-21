@@ -25,6 +25,11 @@ const TimerSecondsSchema = z.object({
   follow: addedSeconds(30),
   share: addedSeconds(10),
   chat: addedSeconds(0),
+  // Per subscription, and per sub given to others
+  sub: addedSeconds(300),
+  gift_sub: addedSeconds(300),
+  // Per Bit, as per coin
+  bit: addedSeconds(1),
 });
 
 // Which chat messages add time
@@ -48,6 +53,9 @@ const TimerNamesSchema = z.object({
   follow: name,
   share: name,
   chat: name,
+  sub: name,
+  gift_sub: name,
+  bit: name,
 });
 
 // How the overlay shows the timer

@@ -76,6 +76,14 @@ export const ALERT_MESSAGE_VARIABLES: Record<AlertTrigger, string[]> = {
   [TOKIO_EVENTS.SUPER_FAN_BOX]: [],
   [TOKIO_EVENTS.SUPER_FAN_JOIN]: USER,
   [TOKIO_EVENTS.MEMBER_JOIN]: USER,
+  // The months so far, and what the viewer wrote with it
+  [TOKIO_EVENTS.SUBSCRIBE]: [...USER, "count", "comment"],
+  [TOKIO_EVENTS.GIFT_SUB]: [...USER, "count"],
+  [TOKIO_EVENTS.CHEER]: [...USER, "count", "comment"],
+  // The raiders, and the raiding streamer as the user
+  [TOKIO_EVENTS.RAID]: [...USER, "count"],
+  // The reward, and what the viewer typed for it
+  [TOKIO_EVENTS.REDEEM]: [...USER, "reward", "comment"],
   [TOKIO_EVENTS.MUSIC_CHANGE]: ["song"],
 };
 
@@ -115,6 +123,20 @@ export function messageValues(payload: TokioEventMap[AppEvents]) {
     values.set("count", String(payload.gift.comboCount));
   }
   if ("likeCount" in payload) values.set("count", String(payload.likeCount));
+  // Subscribe and Cheer write a message, Redeem an input
+  if ("message" in payload) values.set("comment", payload.message);
+  if ("months" in payload) values.set("count", String(payload.months));
+  if ("bits" in payload) values.set("count", String(payload.bits));
+  if ("tier" in payload && "count" in payload) {
+    values.set("count", String(payload.count));
+  }
+  if ("user" in payload && "viewers" in payload) {
+    values.set("count", String(payload.viewers));
+  }
+  if ("reward" in payload) {
+    values.set("reward", payload.reward.title);
+    values.set("comment", payload.input);
+  }
   return values;
 }
 

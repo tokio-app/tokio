@@ -631,6 +631,11 @@ describe("Home", () => {
             share: false,
             superfan: false,
             join: false,
+            sub: false,
+            giftsub: false,
+            cheer: false,
+            raid: false,
+            redeem: false,
           };
         }),
       );
@@ -689,6 +694,11 @@ describe("Home", () => {
             share: true,
             superfan: true,
             join: false,
+            sub: true,
+            giftsub: true,
+            cheer: true,
+            raid: true,
+            redeem: true,
           },
         },
       ]);

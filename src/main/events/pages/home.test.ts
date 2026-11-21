@@ -465,6 +465,11 @@ describe("home events", () => {
       share: true,
       superfan: true,
       join: false,
+      sub: true,
+      giftsub: true,
+      cheer: true,
+      raid: true,
+      redeem: true,
     };
 
     it("saves the feed and replies with the events it still shows", async () => {
