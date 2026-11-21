@@ -127,7 +127,11 @@ export abstract class ConnectorProvider extends TokioEmitter {
           ? ` ${payload.gift.name} x${payload.gift.comboCount}${payload.gift.repeatEnd ? " (end)" : ""}`
           : "";
       const who =
-        payload && "user" in payload ? ` from @${payload.user.handle}` : "";
+        payload && "user" in payload
+          ? payload.user.handle
+            ? ` from @${payload.user.handle}`
+            : " from an anonymous viewer"
+          : "";
       Logger.debug(`<Connector> ${event}${what}${who}`, this._logFile);
     }
     super.emit(event, data);

@@ -29,9 +29,9 @@ export type Activity =
       gift: { name: string; image: string; count: number; coins: number };
     }
   | { type: "follow" | "share" | "superfan"; user: ActivityUser }
-  | { type: "sub"; user: ActivityUser; months: number }
+  // text is a resub's or cheer's message, or a redeem's input
+  | { type: "sub"; user: ActivityUser; months: number; text: string }
   | { type: "giftsub"; user: ActivityUser; count: number }
-  // text is the cheer's message, or a redeem's input
   | { type: "cheer"; user: ActivityUser; bits: number; text: string }
   | { type: "raid"; user: ActivityUser; viewers: number }
   | { type: "redeem"; user: ActivityUser; reward: string; text: string }

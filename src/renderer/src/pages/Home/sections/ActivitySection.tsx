@@ -138,25 +138,23 @@ function Action({
         </>
       );
     }
-    case "sub":
-      return rich(
-        item.months > 1
-          ? t("home.activity.resub", { count: item.months })
-          : t("home.activity.sub"),
-        { name },
-      );
     case "giftsub":
       return rich(t("home.activity.giftsub", { count: item.count }), { name });
     case "raid":
       return rich(t("home.activity.raid", { count: item.viewers }), { name });
+    case "sub":
     case "cheer":
     case "redeem":
       return (
         <>
           {rich(
-            item.type === "cheer"
-              ? t("home.activity.cheer", { count: item.bits })
-              : t("home.activity.redeem", { reward: item.reward }),
+            item.type === "sub"
+              ? item.months > 1
+                ? t("home.activity.resub", { count: item.months })
+                : t("home.activity.sub")
+              : item.type === "cheer"
+                ? t("home.activity.cheer", { count: item.bits })
+                : t("home.activity.redeem", { reward: item.reward }),
             { name },
           )}
           {/* What the viewer wrote, as a chat's message */}

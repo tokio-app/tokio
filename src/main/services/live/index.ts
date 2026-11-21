@@ -130,8 +130,13 @@ export class LiveService extends Service {
     [TOKIO_EVENTS.SUPER_FAN]: ({ user }) =>
       this._add({ type: "superfan", user: activityUser(user) }),
     [TOKIO_EVENTS.MEMBER_JOIN]: ({ user }) => this._join(activityUser(user)),
-    [TOKIO_EVENTS.SUBSCRIBE]: ({ user, months }) =>
-      this._add({ type: "sub", user: activityUser(user), months }),
+    [TOKIO_EVENTS.SUBSCRIBE]: ({ user, months, message }) =>
+      this._add({
+        type: "sub",
+        user: activityUser(user),
+        months,
+        text: message,
+      }),
     [TOKIO_EVENTS.GIFT_SUB]: ({ user, count }) =>
       this._add({ type: "giftsub", user: activityUser(user), count }),
     [TOKIO_EVENTS.CHEER]: ({ user, bits, message }) =>

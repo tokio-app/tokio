@@ -171,6 +171,10 @@ describe("Home's platforms", () => {
       expect(stat("New followers")).toBeInTheDocument();
       for (const label of shown) expect(stat(label)).toBeInTheDocument();
       for (const label of hidden) expect(stat(label)).not.toBeInTheDocument();
+      // Top gifters come with gifts
+      expect(page().queryByText("Top gifters") !== null).toBe(
+        shown.includes("Gifts"),
+      );
     },
   );
 
@@ -219,8 +223,8 @@ describe("Home's platforms", () => {
     await send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
       data: liveSession({
         activity: [
-          { id: 6, type: "sub", user: user("Ann"), months: 1 },
-          { id: 5, type: "sub", user: user("Bo"), months: 7 },
+          { id: 6, type: "sub", user: user("Ann"), months: 1, text: "" },
+          { id: 5, type: "sub", user: user("Bo"), months: 7, text: "hi" },
           { id: 4, type: "giftsub", user: user("Cy"), count: 5 },
           { id: 3, type: "cheer", user: user("Di"), bits: 100, text: "gg" },
           { id: 2, type: "raid", user: user("Ed"), viewers: 42 },
@@ -240,7 +244,7 @@ describe("Home's platforms", () => {
     ).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
       "AAnn subscribed",
-      "BBo subscribed for 7 months",
+      "BBo subscribed for 7 monthshi",
       "CCy gifted 5 subs",
       "DDi cheered 100 Bitsgg",
       "EEd raided with 42 viewers",

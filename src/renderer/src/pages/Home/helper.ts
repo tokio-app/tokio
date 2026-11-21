@@ -59,16 +59,17 @@ export const feedKinds = (platforms: readonly Platform[]) => {
   return FEED_KINDS.filter(({ trigger }) => sent.includes(trigger));
 };
 
-// The stats the platforms have: likes and shares are TikTok's, gifts and
-// coins come with a platform that sends gifts
+// Gifts, their coins and top gifters come with a platform that sends gifts
+export const sendsGifts = (platforms: readonly Platform[]) =>
+  platforms.some((p) => PLATFORM_TRIGGERS[p].includes(TOKIO_EVENTS.GIFT));
+
+// The stats the platforms have: likes and shares are TikTok's
 export function liveStats(
   platforms: readonly Platform[],
   values: Record<"likes" | "views" | keyof LiveSession["totals"], number>,
 ): Stat[] {
   const tiktok = platforms.includes("tiktok");
-  const gifts = platforms.some((p) =>
-    PLATFORM_TRIGGERS[p].includes(TOKIO_EVENTS.GIFT),
-  );
+  const gifts = sendsGifts(platforms);
   const stats: (Stat | false)[] = [
     tiktok && { label: "home.stats.likes", value: values.likes },
     // Only TikTok counts a LIVE's total views; Twitch sends 0

@@ -14,8 +14,8 @@ interface Props {
   minutes: number[];
   // The LIVE's other numbers, TikTok's and counted since connecting
   stats: Stat[];
-  // This LIVE's, most coins first
-  gifters: TopGifter[];
+  // This LIVE's, most coins first. Null hides them: no platform sends gifts.
+  gifters: TopGifter[] | null;
 }
 
 // Short, with the exact number on hover, as the language writes them
@@ -52,37 +52,39 @@ export function LiveSection({ viewers, minutes, stats, gifters }: Props) {
         ))}
       </div>
 
-      <Section title={t("home.gifters.title")}>
-        {gifters.length === 0 ? (
-          <p className={styles.quiet}>{t("home.gifters.empty")}</p>
-        ) : (
-          <ol className={styles.gifters} aria-label={t("home.gifters.title")}>
-            {gifters.slice(0, 3).map((gifter, i) => {
-              const name = gifter.username || gifter.handle;
-              return (
-                <li key={gifter.userId} className={styles.gifter}>
-                  {/* The list's order already says it to screen readers */}
-                  <span className={styles.rank} aria-hidden="true">
-                    {i + 1}
-                  </span>
-                  <Avatar name={name} picture={gifter.picture} />
-                  <span className={styles.gifter_body}>
-                    <span
-                      className={styles.gifter_name}
-                      title={`@${gifter.handle}`}
-                    >
-                      {name}
+      {gifters && (
+        <Section title={t("home.gifters.title")}>
+          {gifters.length === 0 ? (
+            <p className={styles.quiet}>{t("home.gifters.empty")}</p>
+          ) : (
+            <ol className={styles.gifters} aria-label={t("home.gifters.title")}>
+              {gifters.slice(0, 3).map((gifter, i) => {
+                const name = gifter.username || gifter.handle;
+                return (
+                  <li key={gifter.userId} className={styles.gifter}>
+                    {/* The list's order already says it to screen readers */}
+                    <span className={styles.rank} aria-hidden="true">
+                      {i + 1}
                     </span>
-                    <span className={styles.gifter_coins}>
-                      {coinsLabel(gifter.live.coins, language)}
+                    <Avatar name={name} picture={gifter.picture} />
+                    <span className={styles.gifter_body}>
+                      <span
+                        className={styles.gifter_name}
+                        title={`@${gifter.handle}`}
+                      >
+                        {name}
+                      </span>
+                      <span className={styles.gifter_coins}>
+                        {coinsLabel(gifter.live.coins, language)}
+                      </span>
                     </span>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </Section>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </Section>
+      )}
     </div>
   );
 }

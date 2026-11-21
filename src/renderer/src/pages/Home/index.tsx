@@ -17,7 +17,7 @@ import {
 import { useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import styles from "./home.module.css";
-import { feedKinds, liveStats, NO_SESSION } from "./helper";
+import { feedKinds, liveStats, NO_SESSION, sendsGifts } from "./helper";
 import { ActivitySection } from "./sections/ActivitySection";
 import { DashboardSection } from "./sections/DashboardSection";
 import { FeaturesSection } from "./sections/FeaturesSection";
@@ -241,7 +241,7 @@ export function Home() {
                   likes,
                   views: views.total,
                 })}
-                gifters={gifters}
+                gifters={sendsGifts(platforms) ? gifters : null}
               />
             )}
 

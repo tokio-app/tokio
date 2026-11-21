@@ -203,7 +203,7 @@ describe("LiveService", () => {
       user,
       tier: "1000",
       months: 3,
-      message: "",
+      message: "three months",
     });
     live.record(TOKIO_EVENTS.GIFT_SUB, { user, count: 5, tier: "1000" });
     live.record(TOKIO_EVENTS.CHEER, { user, bits: 100, message: "gg" });
@@ -219,7 +219,13 @@ describe("LiveService", () => {
       { id: 4, type: "raid", user: kai, viewers: 42 },
       { id: 3, type: "cheer", user: kai, bits: 100, text: "gg" },
       { id: 2, type: "giftsub", user: kai, count: 5 },
-      { id: 1, type: "sub", user: kai, months: 3 },
+      {
+        id: 1,
+        type: "sub",
+        user: kai,
+        months: 3,
+        text: "three months",
+      },
     ]);
     // Neither coins nor gifts
     expect(live.getSession().totals).toEqual({
