@@ -26,7 +26,8 @@ paths:
 - Gift alerts fire once per combo, on `repeatEnd`, or with `every_gift` once per gift, at most `queue_length` times per event.
 - `GiftStreaks` (`src/main/helper/streaks.ts`, also used by `LiveService`, `GamesService` and the timer) counts what each gift event adds to its sender's streak. `AlertsService` runs it only while alerts are on, so alerts turned on mid-streak play the whole count so far.
 - Matching is `matchesTrigger` (`src/main/helper/triggers.ts`), shared with `GamesService`. Both get `added` and `total` from `streakOf` (same file), which counts the event in their `GiftStreaks` once; `total` is the `{count}`. `AlertsService` keeps `enabled` and the sound, message or media check.
-- Alerts and Games share `TriggerSchema`, `TriggerFilter` and `TRIGGER_OPTIONS`; Games leaves five out (`GAME_TRIGGERS`).
+- An alert plays on its `trigger` or any of its `also_triggers` (Or rows, `MAX_TRIGGERS` in all, kept apart from `trigger` so an older Tokio still plays on the first). `handle` takes the first row that matches (`triggersOf(alert).find`): it decides `every_gift`'s repeat and the `alerts:<type>` queue, and `onError` gets it, so a notice names the row that fired (an Emote row on a chat still says Emote).
+- Alerts and Games share `TriggerSchema`, `TriggerFilter` and `TRIGGER_OPTIONS`; Games leaves five out (`GAME_TRIGGERS`). Game actions keep one trigger.
 - Only the Alerts editor offers these; game actions keep the defaults, which match everything:
   - `min_coins`: the streak's worth when it ends (`gift.coins × total`), or each gift's with `every_gift`. Only for any gift: picked gifts are the alert's choice, so the matcher, the editor and the summary ignore it then.
   - `roles` (`[]` is anyone): only Chat, Emote and Gift carry the viewer's roles, so `takesRoles` (`src/common/util/alerts.ts`, shared by the matcher, the editor and the summary) allows only them. Other triggers' saved roles are ignored.
@@ -40,13 +41,15 @@ paths:
 
 ## Page
 
-- The row's summary is one sentence (`triggerSummary`), naming at most `NAMED` gifts or emotes. There are no condition columns: a new condition goes in the editor and the sentence.
-- Picked gifts and emotes show as pictures before the sentence (`triggerPictures`), at most `NAMED` then `+N`, so more picks don't widen the row; with none of their pictures known, the sentence names them.
+- The row's summary is one sentence per trigger (`triggerSummary`), each naming at most `NAMED` gifts or emotes, joined by `ROWS` (" · "): a trigger's conditions hold commas and "or" already, so another "or" between them blurred which went with which. A trigger that narrows nothing says nothing. There are no condition columns: a new condition goes in the editor and the sentence.
+- The row names every trigger's event once, joined with `listOf`'s `or` (`triggerLabel`), and so does the editor's title.
+- Picked gifts and emotes, every trigger's, show as pictures before the sentence (`triggerPictures`), at most `NAMED` then `+N`, so more picks don't widen the row; with none of their pictures known, the sentence names them.
 - No arrows between the row's columns, and sound and media aren't stacked in one column (the user's call). A long sentence wraps rather than hide a condition.
 - A row without media keeps its **Copy overlay URL** slot, hidden and disabled, so the rows' actions line up.
 - An empty `name` shows its place's default (`alertName`); a new alert gets `defaultAlertName(index)`. Defaults count the place when made, so after a delete two alerts can share one. The search keeps each alert's list index for that, and adding an alert clears it, since it would hide the new one.
 - The alert's `volume` is the sound's or message's; a video has its own (`AlertMediaSchema.volume`), and another file keeps it and the duration.
 - `AlertEditor`'s panel `min-height` is the gift Trigger tab's, the tallest, so the dialog doesn't move between tabs. The pickers render after it, so they open over it and Escape closes the picker first.
+- The Trigger tab draws its rows with `TriggerRows` (`components/AlertItem`), shared with Overlay Studio: the first under **Event**, each other under **Or** with a remove button, then **Add a trigger**, `MAX_TRIGGERS` in all. Each row keeps its own filter, minimum coins and roles. With more rows than the panel holds, the tab scrolls inside it (`.scrolls`), so the dialog never outgrows the window.
 - A space between a picker tile's name and its length keeps the button's name "Clip 12s".
 
 ## Sounds
