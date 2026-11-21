@@ -1,4 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from "vitest";
+import type { PlatformAccount } from "../../../common";
 import config from "../config";
 import { NO_ACCOUNT, TwitchAuth } from "./auth";
 
@@ -33,7 +42,7 @@ const tokenCalls = (calls: Call[]) =>
 
 describe("TwitchAuth", () => {
   let auth: TwitchAuth;
-  let saved: ReturnType<typeof vi.fn>;
+  let saved: Mock<(account: PlatformAccount) => Promise<boolean>>;
 
   beforeEach(() => {
     auth = new TwitchAuth({ ...config, CLIENT_ID: "client" }, () => "");
