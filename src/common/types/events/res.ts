@@ -1,6 +1,13 @@
 import { AboutInfo, LicenseText } from "../about";
 import { MyInstantsSound } from "../alerts";
-import { Fan, MusicInfo, TokioPayload, TopGifter } from "../connector";
+import {
+  Fan,
+  MusicInfo,
+  Platform,
+  PlatformStatus,
+  TokioPayload,
+  TopGifter,
+} from "../connector";
 import { ControlAction, ControlState } from "../controls";
 import { CustomGift, OverlayConfigRedux } from "../overlay";
 import {
@@ -90,6 +97,10 @@ export enum APP_EVENTS_RESPONSE {
   SET_SHORTCUTS = "app:settings:res:set:shortcuts",
   SET_REMOTE = "app:settings:res:set:remote",
   NEW_REMOTE_KEY = "app:settings:res:new:remote-key",
+  // The code to type at Twitch's page while a sign-in waits, pushed
+  TWITCH_CODE = "app:settings:res:twitch:code",
+  // The account signed in to, "" once signed out
+  TWITCH_ACCOUNT = "app:settings:res:twitch:account",
 
   // LIVE CONTROLS
   CONTROL = "app:controls:res:run",
@@ -105,6 +116,7 @@ export enum APP_EVENTS_RESPONSE {
   LIVE_SESSION = "app:home:res:session",
   LIVE_GIFTERS = "app:home:res:gifters",
   SONGS = "app:home:res:songs",
+  SET_PLATFORMS = "app:home:res:set:platforms",
 
   // LIVES
   LIVES = "app:lives:res:get",
@@ -291,6 +303,13 @@ export interface AppEventsResponseMap {
   // The key comes in the GET_SETTINGS echo sent before them
   [APP_EVENTS_RESPONSE.SET_REMOTE]: Reply;
   [APP_EVENTS_RESPONSE.NEW_REMOTE_KEY]: Reply;
+  // uri is Twitch's page with the code filled in, which Tokio opens
+  [APP_EVENTS_RESPONSE.TWITCH_CODE]: {
+    code: string;
+    uri: string;
+    expiresAt: number;
+  };
+  [APP_EVENTS_RESPONSE.TWITCH_ACCOUNT]: Reply<{ login: string }>;
 
   // LIVE CONTROLS
   // done is false when there was nothing to do, such as no alert to replay.
@@ -316,12 +335,17 @@ export interface AppEventsResponseMap {
     reconnecting?: boolean;
     // The LIVE stopped on its own and is looked for again, with no session
     waiting?: boolean;
+    // How each platform that's on is doing; the ones off are missing
+    platforms?: Partial<Record<Platform, PlatformStatus>>;
     stats: {
       views: number;
       viewers: number;
       likes: number;
     };
   }>;
+
+  // The platforms as main holds them, failures included
+  [APP_EVENTS_RESPONSE.SET_PLATFORMS]: Reply<{ platforms: Platform[] }>;
 
   [APP_EVENTS_RESPONSE.VIEWS]: {
     data: {

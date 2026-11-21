@@ -31,6 +31,29 @@ export type ReconnectState = "reconnecting" | "reconnected" | "stopped";
 // once it settles. The promise never rejects.
 export type ChatStage = (chat: ChatEvent) => Promise<ChatEvent> | null;
 
+// The account a platform signs in with (Twitch's): key is the refresh token,
+// which the store keeps encrypted and nothing logs
+export type PlatformAccount = { id: string; login: string; key: string };
+
+// What a sign-in shows while it waits: the code, and the platform's page
+// with it filled in
+export type DeviceCode = { code: string; uri: string; expiresAt: number };
+
+// A provider that connects with the streamer's account instead of a key
+export interface AccountProvider {
+  // The account the store kept, at startup
+  setAccount(account: PlatformAccount): void;
+  // A sign-in, a sign-out or a refresh changed it: the store saves it, before
+  // the provider uses a new access token, as each refresh token works once
+  onAccount(listener: (account: PlatformAccount) => Promise<boolean>): void;
+  // Waits for the streamer to approve the code, until signal aborts it
+  signIn(
+    onCode: (code: DeviceCode) => void,
+    signal: AbortSignal,
+  ): Promise<PlatformAccount>;
+  signOut(): Promise<void>;
+}
+
 export const connectFailure = (
   kind: ConnectErrorKind,
   message: string,
@@ -104,7 +127,11 @@ export abstract class ConnectorProvider extends TokioEmitter {
           ? ` ${payload.gift.name} x${payload.gift.comboCount}${payload.gift.repeatEnd ? " (end)" : ""}`
           : "";
       const who =
-        payload && "user" in payload ? ` from @${payload.user.handle}` : "";
+        payload && "user" in payload
+          ? payload.user.handle
+            ? ` from @${payload.user.handle}`
+            : " from an anonymous viewer"
+          : "";
       Logger.debug(`<Connector> ${event}${what}${who}`, this._logFile);
     }
     super.emit(event, data);

@@ -3,7 +3,9 @@ import {
   APP_EVENTS_RESPONSE,
   AppEventsMap,
   AppEventsResponseMap,
+  PLATFORMS,
 } from "@/common/types";
+import { PLATFORM_TRIGGERS } from "@/common/util";
 import { replySettings } from "@/events/pages/settings";
 import type { AppHandlerVariables } from "@/types";
 import type { CallToolResult } from "@modelcontextprotocol/server";
@@ -14,6 +16,9 @@ import { z } from "zod";
 
 export { deepMerge } from "@/services/shared";
 export type { CallToolResult };
+
+/** What a trigger's platform means, for the alert and game action kinds. */
+export const PLATFORM_NOTE = `trigger.platform (${PLATFORMS.join(" or ")}) takes only that platform's events; left out, any platform's. What each one sends: ${PLATFORMS.map((p) => `${p}: ${PLATFORM_TRIGGERS[p].join(", ")}`).join("; ")}. On redeem, keyword is the reward's title (empty for any).`;
 
 // How long a write waits for the window's FLUSH_SETTINGS answer
 export const FLUSH_MS = 1000;

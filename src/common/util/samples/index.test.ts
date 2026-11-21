@@ -114,7 +114,8 @@ describe("createTestLive", () => {
 
         for (const payload of press) {
           const viewer = viewerOf(payload);
-          if (!viewer) continue;
+          // Twitch's events come from viewers of their own
+          if (!viewer || viewer.platform === "twitch") continue;
           expect(joined).toContain(viewer.handle);
           if (payload.type !== TOKIO_EVENTS.CHAT) {
             expect(viewer).toMatchObject({

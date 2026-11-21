@@ -40,6 +40,7 @@ describe("MCP route", () => {
             activeProfile: { name: "Main", file: "main.json" },
             activeFeatures: { tts: true, music: true, alerts: true },
             server: { enabled: true },
+            accounts: { twitch: { id: "", login: "", key: "" } },
           }),
           getLiveStats: () => ({ likes: 0, views: 0, viewers: 0 }),
         },
@@ -47,6 +48,7 @@ describe("MCP route", () => {
           isConnected: () => false,
           isReconnecting: () => false,
           isWaiting: () => false,
+          status: () => ({}),
           username: "",
         },
         liveService: {

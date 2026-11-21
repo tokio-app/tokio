@@ -41,7 +41,23 @@ export const ActivityFeedSchema = z.object({
   share: z.boolean().default(true),
   superfan: z.boolean().default(true),
   join: z.boolean().default(true),
+  sub: z.boolean().default(true),
+  giftsub: z.boolean().default(true),
+  cheer: z.boolean().default(true),
+  raid: z.boolean().default(true),
+  redeem: z.boolean().default(true),
 });
+
+// The Twitch account Tokio signed in to, the same for every profile. key is
+// the refresh token, encrypted like the provider keys: never sent to the
+// window, logged or exported.
+const TwitchAccountSchema = z
+  .object({
+    id: z.string().default(""),
+    login: z.string().default(""),
+    key: z.string().default(""),
+  })
+  .prefault({});
 
 // Game connections, the same for every profile. Keyed by game, each off
 // until turned on, so stores saved before games load.
@@ -134,14 +150,9 @@ const AppSettingsSchema = z.object({
     music: z.boolean(),
     alerts: z.boolean(),
   }),
-  activityFeed: ActivityFeedSchema.default({
-    chat: true,
-    gift: true,
-    follow: true,
-    share: true,
-    superfan: true,
-    join: true,
-  }),
+  activityFeed: ActivityFeedSchema.prefault({}),
+  // Accounts signed in to on platforms that need one
+  accounts: z.object({ twitch: TwitchAccountSchema }).prefault({}),
   games: GamesSettingsSchema,
   shortcuts: ShortcutsSchema,
   remote: RemoteSettingsSchema,
@@ -169,6 +180,7 @@ export type EntityMetadata = z.infer<typeof EntityMetadataSchema>;
 export type OverlayMetadata = z.infer<typeof OverlayMetaSchema>;
 export type TestOverlay = z.infer<typeof TestOverlaySchema>;
 export type ActivityFeed = z.infer<typeof ActivityFeedSchema>;
+export type TwitchAccount = z.infer<typeof TwitchAccountSchema>;
 export type GamesSettings = z.infer<typeof GamesSettingsSchema>;
 export type Shortcuts = z.infer<typeof ShortcutsSchema>;
 export type RemoteSettings = z.infer<typeof RemoteSettingsSchema>;

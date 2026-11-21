@@ -1,5 +1,11 @@
 import { MessageKey } from "@/common/i18n";
-import { ActivityItem, ChatTranslation, MusicInfo } from "@/common/types";
+import {
+  ActivityItem,
+  ActivityUser,
+  ChatTranslation,
+  MusicInfo,
+} from "@/common/types";
+import { PLATFORM_LABELS, platformOf } from "@/common/util";
 import { languageName } from "@/helper/voices";
 import { Avatar, Btn } from "@/components";
 import { cx } from "@/helper";
@@ -9,10 +15,12 @@ import { memo } from "react";
 import { FiSettings } from "react-icons/fi";
 import { MdTranslate } from "react-icons/md";
 import styles from "../home.module.css";
-import { joinedText, songParts } from "../helper";
+import { joinedText, PLATFORM_ICONS, songParts } from "../helper";
 
 interface Props {
   connected: boolean;
+  // The profile uses two or more platforms, so each row shows its own
+  showPlatform?: boolean;
   // Newest first
   activity: ActivityItem[];
   // Every kind of event is hidden
@@ -29,6 +37,30 @@ const DID: Record<"follow" | "share" | "superfan", MessageKey> = {
 };
 
 type ChatItem = Extract<ActivityItem, { type: "chat" }>;
+
+// The viewer's platform, by their name
+function PlatformMark({ user }: { user: ActivityUser }) {
+  const platform = platformOf(user);
+  const Icon = PLATFORM_ICONS[platform];
+  return (
+    <Icon
+      className={styles.event_platform}
+      size={14}
+      role="img"
+      aria-label={PLATFORM_LABELS[platform]}
+    />
+  );
+}
+
+// The viewer's name, after their platform's logo when the feed shows it
+function Name({ user, mark }: { user: ActivityUser; mark?: boolean }) {
+  return (
+    <span className={styles.event_name} title={`@${user.handle}`}>
+      {mark && <PlatformMark user={user} />}
+      {user.name}
+    </span>
+  );
+}
 
 // What a message got translated into, under it: the glyph marks it, and a
 // screen reader hears where it came from first
@@ -59,14 +91,15 @@ export function ChatRow({
   text,
   emotes,
   translation,
-}: Pick<ChatItem, "user" | "text" | "emotes" | "translation">) {
+  mark,
+}: Pick<ChatItem, "user" | "text" | "emotes" | "translation"> & {
+  mark?: boolean;
+}) {
   return (
     <li className={styles.event}>
       <Avatar name={user.name} picture={user.picture} />
       <div className={styles.event_body}>
-        <span className={styles.event_name} title={`@${user.handle}`}>
-          {user.name}
-        </span>{" "}
+        <Name user={user} mark={mark} />{" "}
         <p className={styles.event_message}>
           {text}
           {emotes.map((emote, i) => (
@@ -82,44 +115,75 @@ export function ChatRow({
 // The viewer's name and what they did, in the language's order
 function Action({
   item,
+  mark,
 }: {
   item: Exclude<ActivityItem, { type: "join" | "chat" }>;
+  mark?: boolean;
 }) {
   const t = useT();
-  const name = (
-    <span className={styles.event_name} title={`@${item.user.handle}`}>
-      {item.user.name}
-    </span>
-  );
-  if (item.type === "gift") {
-    const { count } = item.gift;
-    const sent =
-      count > 1
-        ? t("home.activity.giftCount", { gift: item.gift.name, count })
-        : t("home.activity.gift", { gift: item.gift.name });
-    return (
-      <>
-        {rich(sent, { name })}
-        {item.gift.image && (
-          <img className={styles.inline_img} src={item.gift.image} alt="" />
-        )}{" "}
-      </>
-    );
+  const name = <Name user={item.user} mark={mark} />;
+  switch (item.type) {
+    case "gift": {
+      const { count } = item.gift;
+      const sent =
+        count > 1
+          ? t("home.activity.giftCount", { gift: item.gift.name, count })
+          : t("home.activity.gift", { gift: item.gift.name });
+      return (
+        <>
+          {rich(sent, { name })}
+          {item.gift.image && (
+            <img className={styles.inline_img} src={item.gift.image} alt="" />
+          )}{" "}
+        </>
+      );
+    }
+    case "giftsub":
+      return rich(t("home.activity.giftsub", { count: item.count }), { name });
+    case "raid":
+      return rich(t("home.activity.raid", { count: item.viewers }), { name });
+    case "sub":
+    case "cheer":
+    case "redeem":
+      return (
+        <>
+          {rich(
+            item.type === "sub"
+              ? item.months > 1
+                ? t("home.activity.resub", { count: item.months })
+                : t("home.activity.sub")
+              : item.type === "cheer"
+                ? t("home.activity.cheer", { count: item.bits })
+                : t("home.activity.redeem", { reward: item.reward }),
+            { name },
+          )}
+          {/* What the viewer wrote, as a chat's message */}
+          {item.text && <p className={styles.event_message}>{item.text}</p>}
+        </>
+      );
+    default:
+      return rich(t(DID[item.type]), { name });
   }
-  return rich(t(DID[item.type]), { name });
 }
 
 // Each push brings every item as a new object, so a row renders again only
 // when its item changed: main never changes an item, but a join's count
 // (its users grow with it)
 const sameItem = (
-  { item: a }: { item: ActivityItem },
-  { item: b }: { item: ActivityItem },
+  { item: a, mark: markA }: { item: ActivityItem; mark?: boolean },
+  { item: b, mark: markB }: { item: ActivityItem; mark?: boolean },
 ) =>
   a.id === b.id &&
+  markA === markB &&
   (a.type !== "join" || (b.type === "join" && a.count === b.count));
 
-const Event = memo(function Event({ item }: { item: ActivityItem }) {
+const Event = memo(function Event({
+  item,
+  mark,
+}: {
+  item: ActivityItem;
+  mark?: boolean;
+}) {
   const language = useLanguage();
   if (item.type === "join") {
     return (
@@ -129,12 +193,12 @@ const Event = memo(function Event({ item }: { item: ActivityItem }) {
       </li>
     );
   }
-  if (item.type === "chat") return <ChatRow {...item} />;
+  if (item.type === "chat") return <ChatRow {...item} mark={mark} />;
   return (
     <li className={styles.event}>
       <Avatar name={item.user.name} picture={item.user.picture} />
       <div className={styles.event_body}>
-        <Action item={item} />
+        <Action item={item} mark={mark} />
       </div>
       {/* At the row's end, after the body's trailing space */}
       {item.type === "gift" && (
@@ -155,6 +219,7 @@ function emptyText(connected: boolean, feedOff: boolean): MessageKey {
 // The rail: the feed as tall as the window, the song playing at its foot
 export function ActivitySection({
   connected,
+  showPlatform,
   activity,
   feedOff,
   onFeedSettings,
@@ -181,7 +246,7 @@ export function ActivitySection({
         // Not a live region, a busy chat would flood screen readers
         <ol className={styles.feed_list} aria-label={t("home.activity.title")}>
           {activity.map((item) => (
-            <Event key={item.id} item={item} />
+            <Event key={item.id} item={item} mark={showPlatform} />
           ))}
         </ol>
       )}

@@ -7,7 +7,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { AlertItem, TriggerFilter, triggerSummary } from ".";
+import { Params, translate } from "@/common/i18n";
+import { AlertItem, TriggerFilter, triggerLabel, triggerSummary } from ".";
 
 const GIFTS = [gift(5655, "Rose"), gift(6064, "GG")];
 const EMOTES = [
@@ -456,5 +457,51 @@ describe("TriggerFilter", () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("Redeem and platforms", () => {
+  const t = (key: Parameters<typeof translate>[1], params?: Params) =>
+    translate("en", key, params);
+
+  it("narrows a Redeem row to the reward's title", () => {
+    const sum = (keyword: string) =>
+      triggerSummary(
+        [alert({}, { type: TOKIO_EVENTS.REDEEM, keyword }).trigger],
+        GIFTS,
+        EMOTES,
+        "en",
+      );
+
+    expect(sum("")).toBe("Any reward");
+    expect(sum(" Hydrate ")).toBe("Reward “Hydrate”");
+  });
+
+  it("types the reward in the filter", async () => {
+    const onChange = vi.fn();
+    render(
+      <TriggerFilter
+        trigger={alert({}, { type: TOKIO_EVENTS.REDEEM }).trigger}
+        gifts={GIFTS}
+        emotes={EMOTES}
+        onChange={onChange}
+      />,
+    );
+
+    await userEvent.type(screen.getByPlaceholderText("Any reward"), "H");
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: "H" }),
+    );
+  });
+
+  it("names a row's platform", () => {
+    const base = alert({}, { type: TOKIO_EVENTS.FOLLOW, platform: "twitch" });
+    const withGift = {
+      ...base,
+      also_triggers: [alert({}, { type: TOKIO_EVENTS.GIFT }).trigger],
+    };
+
+    expect(triggerLabel(withGift, t, "en")).toBe("Follow on Twitch or Gift");
   });
 });

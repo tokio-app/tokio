@@ -7,7 +7,7 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
-import { takesRoles } from "@/common/util";
+import { platformOf, takesRoles } from "@/common/util";
 import { hasKeyword, isUser } from "@/helper/chat";
 import type { GiftStreaks } from "@/helper/streaks";
 
@@ -26,6 +26,12 @@ export function matchesTrigger(
   total: number,
 ) {
   const user = eventUser(payload);
+  // Events without a viewer are TikTok's, but Music change is Tokio's own,
+  // so only a trigger for any platform takes it
+  if (trigger.platform) {
+    if (type === TOKIO_EVENTS.MUSIC_CHANGE) return false;
+    if (platformOf(user) !== trigger.platform) return false;
+  }
   const { roles } = trigger;
   const narrowed = roles.length > 0 && takesRoles(trigger.type);
   if (user && narrowed && !roles.some((role) => user[role])) return false;
@@ -50,6 +56,12 @@ export function matchesTrigger(
   if (trigger.type !== type) return false;
 
   if (chat) return hasKeyword(chat.content, trigger.keyword);
+
+  // A redeem's keyword is the reward's title, in any case
+  if (type === TOKIO_EVENTS.REDEEM && payload && "reward" in payload) {
+    const title = trigger.keyword.trim().toLowerCase();
+    return !title || payload.reward.title.trim().toLowerCase() === title;
+  }
 
   if (
     (type === TOKIO_EVENTS.MEMBER_JOIN ||

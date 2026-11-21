@@ -27,6 +27,7 @@ import {
   ok,
   profileOf,
   pushProfile,
+  PLATFORM_NOTE,
 } from "../common";
 import {
   defineKind,
@@ -179,6 +180,7 @@ export const kinds: Kinds = {
       .strict(),
     notes: [
       "What a LIVE event does in Minecraft, in the active profile: when its trigger fires, its steps run in order, in a game of its edition (bedrock or java) that's connected. trigger works as an alert's: type is the event, gifts are gift ids (list gifts) with every_gift to run once per gift instead of once per streak, emotes are emote ids (list emotes), keyword is the chat's. On like, the action runs once every likes_every likes from all viewers.",
+      PLATFORM_NOTE,
       "Mob and item ids are the game's own, like zombie or diamond_sword (chicken_jockey is Tokio's), and differ between the editions; an unknown one is refused. morph, unmorph and the meteor and laser hazards are the Tokio mod's, Java only. amount is how many (1 to the step's max). A command step is typed as in the game's chat and runs as the player.",
       `Text in a command, a spawned mob's name and the overlay's texts can hold the trigger's variables: ${VARIABLES}.`,
       "overlay sets its row on the games overlay: show, image (a {name, file} from list minecraft_pictures, or null), event and name (empty for automatic texts) and column. steps replace whole when changed. Ask before adding hazards that can kill the player or wreck their world (tnt, lava_lake, hole, random_boss, clear_inventory).",

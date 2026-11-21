@@ -14,16 +14,17 @@ import {
   SERVER_PORT,
 } from "@/common/util";
 import Logger from "@/logger";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import { JSONManagerService } from "@/services/json";
 import { PathManagerService } from "@/services/path";
 import { ServerService } from "@/services/server";
 import { StoreManagerService } from "@/services/store";
 import { TranslationService } from "@/services/translation";
 import { TranslationError } from "@/services/translation/common";
+import type { DeviceCode, PlatformAccount } from "@/services/connector/common";
 import { TTSService } from "@/services/tts";
 import { language } from "@/helper/i18n";
-import { app, dialog } from "@test/electron";
+import { app, dialog, shell } from "@test/electron";
 import { createHandler } from "@test/handler";
 import { strFromU8, unzipSync } from "fflate";
 import {
@@ -576,6 +577,8 @@ describe("settings events", () => {
       expect(timerService.load).toHaveBeenCalledExactlyOnceWith(
         timer,
         "stream.json",
+        // The profile's platforms, none in this one
+        undefined,
       );
       expect(fansService.load).toHaveBeenCalledExactlyOnceWith("stream.json");
       expect(log).toEqual([
@@ -1451,7 +1454,7 @@ describe("settings events", () => {
           "store",
           {
             tts,
-            connector: new TikTokConnectorService(),
+            connector: new ConnectorService(),
             translation: new TranslationService(),
           },
           new JSONManagerService(),
@@ -2124,6 +2127,155 @@ describe("settings events", () => {
         { addresses: [] },
       ]);
       expect(h.notices).toEqual([]);
+    });
+  });
+  describe("Twitch", () => {
+    const account = { id: "twitch:1", login: "mia", key: "token" };
+    const code = {
+      code: "ABCD-EFGH",
+      uri: "https://www.twitch.tv/activate?device-code=ABCDEFGH",
+      expiresAt: 1000,
+    };
+
+    const setup = ({ login = "", twitch = false } = {}) => {
+      // Each sign-in waits until the test settles it or its signal aborts
+      const waiting: {
+        onCode: (code: DeviceCode) => void;
+        signal: AbortSignal;
+        resolve: (account: PlatformAccount) => void;
+        reject: (error: unknown) => void;
+      }[] = [];
+      const connectorService = {
+        signInTwitch: vi.fn(
+          (onCode: (code: DeviceCode) => void, signal: AbortSignal) =>
+            new Promise<PlatformAccount>((resolve, reject) => {
+              signal.addEventListener("abort", () =>
+                reject(new Error("aborted")),
+              );
+              waiting.push({ onCode, signal, resolve, reject });
+            }),
+        ),
+        signOutTwitch: vi.fn(async () => {}),
+        status: () => (twitch ? { twitch: "connected" as const } : {}),
+      };
+      const storeManagerService = {
+        getTwitchAccount: () => ({ id: "", login, key: "" }),
+      };
+      const h = createHandler({ connectorService, storeManagerService });
+      return { h, connectorService, waiting };
+    };
+
+    it("signs in: shows the code, opens Twitch's page, then replies the login", async () => {
+      const { h, waiting } = setup();
+
+      const signingIn = h.invoke(settings, APP_EVENTS.TWITCH_SIGN_IN);
+      await vi.waitFor(() => expect(waiting).toHaveLength(1));
+      waiting[0].onCode(code);
+      waiting[0].resolve(account);
+      await signingIn;
+
+      expect(h.pushed(APP_EVENTS_RESPONSE.TWITCH_CODE)).toEqual([code]);
+      expect(shell.openExternal).toHaveBeenCalledExactlyOnceWith(code.uri);
+      expect(h.replies(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT)).toEqual([
+        { success: true, login: "mia" },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "success",
+          code: FEEDBACK_CODES.TWITCH_SIGNED_IN,
+          message: "Signed in to Twitch as @mia.",
+        }),
+      ]);
+    });
+
+    it("drops a sign-in a newer one replaced", async () => {
+      const { h, waiting } = setup();
+
+      const first = h.invoke(settings, APP_EVENTS.TWITCH_SIGN_IN);
+      await vi.waitFor(() => expect(waiting).toHaveLength(1));
+      const second = h.invoke(settings, APP_EVENTS.TWITCH_SIGN_IN);
+      await vi.waitFor(() => expect(waiting).toHaveLength(2));
+      // The first one's code comes late
+      waiting[0].onCode(code);
+      waiting[1].resolve(account);
+      await Promise.all([first, second]);
+
+      expect(waiting[0].signal.aborted).toBe(true);
+      expect(h.pushed(APP_EVENTS_RESPONSE.TWITCH_CODE)).toEqual([]);
+      expect(h.replies(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT)).toEqual([
+        { success: true, login: "mia" },
+      ]);
+      expect(h.notices).toHaveLength(1);
+    });
+
+    it("says when the sign-in failed", async () => {
+      vi.spyOn(Logger, "error");
+      const { h, waiting } = setup({ login: "old" });
+
+      const signingIn = h.invoke(settings, APP_EVENTS.TWITCH_SIGN_IN);
+      await vi.waitFor(() => expect(waiting).toHaveLength(1));
+      waiting[0].reject(new Error("expired"));
+      await signingIn;
+
+      const failure = {
+        code: FEEDBACK_CODES.TWITCH_SIGN_IN_FAILED,
+        message: "Unable to sign in with Twitch.",
+      };
+      expect(h.replies(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT)).toEqual([
+        { success: false, error: failure, login: "old" },
+      ]);
+      expect(h.notices).toEqual([expect.objectContaining(failure)]);
+    });
+
+    it("signs out, ending a sign-in that waits", async () => {
+      const { h, connectorService, waiting } = setup({ login: "mia" });
+
+      const signingIn = h.invoke(settings, APP_EVENTS.TWITCH_SIGN_IN);
+      await vi.waitFor(() => expect(waiting).toHaveLength(1));
+      await h.invoke(settings, APP_EVENTS.TWITCH_SIGN_OUT);
+      await signingIn;
+
+      expect(waiting[0].signal.aborted).toBe(true);
+      expect(connectorService.signOutTwitch).toHaveBeenCalledOnce();
+      // The canceled sign-in says nothing
+      expect(h.replies(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT)).toEqual([
+        { success: true, login: "" },
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "success",
+          code: FEEDBACK_CODES.TWITCH_SIGNED_OUT,
+          message: "Signed out of Twitch.",
+        }),
+      ]);
+    });
+
+    it("cancels a sign-in without a notice when there was no account", async () => {
+      const { h } = setup();
+
+      await h.invoke(settings, APP_EVENTS.TWITCH_SIGN_OUT);
+
+      expect(h.replies(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT)).toEqual([
+        { success: true, login: "" },
+      ]);
+      expect(h.notices).toEqual([]);
+    });
+
+    it("refuses to sign out while Twitch is connected", async () => {
+      const { h, connectorService } = setup({ login: "mia", twitch: true });
+
+      await h.invoke(settings, APP_EVENTS.TWITCH_SIGN_OUT);
+
+      expect(connectorService.signOutTwitch).not.toHaveBeenCalled();
+      expect(h.replies(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT)).toEqual([
+        expect.objectContaining({ success: false, login: "mia" }),
+      ]);
+      expect(h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          message: "Disconnect from Twitch before signing out.",
+        }),
+      ]);
     });
   });
 });

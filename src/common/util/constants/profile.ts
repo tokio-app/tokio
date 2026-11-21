@@ -5,6 +5,8 @@ export const defaultProfile: Profile = {
   connector: {
     username: "",
   },
+  platforms: ["tiktok"],
+  channels: {},
   music: {
     permissions: {
       all: true,

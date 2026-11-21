@@ -49,7 +49,6 @@ import config from "@/config";
 import { language, setLanguage } from "@/helper/i18n";
 import Logger from "@/logger";
 import type { AlertAudio, AlertsService } from "@/services/alerts";
-import type { ReconnectState } from "@/services/connector/common";
 import { ControlsService } from "@/services/controls";
 import { FAN_EVENTS, type FansService } from "@/services/fans";
 import type { GamesService } from "@/services/games";
@@ -61,7 +60,7 @@ import type { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
 import type { TimerService } from "@/services/timer";
 import { TIMER_EVENTS } from "@/services/timer";
-import type { TikTokConnectorService } from "@/services/connector";
+import type { ConnectorService } from "@/services/connector";
 import type { TranslationService } from "@/services/translation";
 import { TranslationError } from "@/services/translation/common";
 import type { TTSService } from "@/services/tts";
@@ -241,9 +240,18 @@ function setup() {
     username: "streamer",
     setLogFile: vi.fn(),
     setChatStage: vi.fn(
-      (..._args: Parameters<TikTokConnectorService["setChatStage"]>) => {},
+      (..._args: Parameters<ConnectorService["setChatStage"]>) => {},
     ),
-    onReconnect: vi.fn((_listener: (state: ReconnectState) => void) => {}),
+    onReconnect: vi.fn(
+      (..._args: Parameters<ConnectorService["onReconnect"]>) => {},
+    ),
+    onPlatform: vi.fn(
+      (..._args: Parameters<ConnectorService["onPlatform"]>) => {},
+    ),
+    onTwitchAccount: vi.fn(
+      (..._args: Parameters<ConnectorService["onTwitchAccount"]>) => {},
+    ),
+    status: vi.fn((): ReturnType<ConnectorService["status"]> => ({})),
     isConnected: vi.fn(() => false),
     isReconnecting: vi.fn(() => false),
     isWaiting: vi.fn(() => false),
@@ -322,6 +330,11 @@ function setup() {
     getProfileData: vi.fn(async (): Promise<Profile | null> => profile),
     getProfiles: vi.fn(() => profiles),
     updateLiveStats: vi.fn(),
+    updateTwitchAccount: vi.fn(
+      async (
+        ..._args: Parameters<StoreManagerService["updateTwitchAccount"]>
+      ) => true,
+    ),
     updateServerSettings: vi.fn(async (_enabled: boolean) => true),
     updateLastVersion: vi.fn(async (_version: string) => true),
     updateInstallingVersion: vi.fn(async (_version: string) => true),
@@ -368,6 +381,7 @@ function setup() {
     handle: vi.fn((..._args: Parameters<TimerService["handle"]>) => {}),
     disconnected: vi.fn(() => false),
     get: vi.fn(() => timer),
+    platforms: vi.fn((): ReturnType<TimerService["platforms"]> => ["tiktok"]),
     onChange: vi.fn((_listener: (deltaMs: number) => void) => {}),
     onSaveFailed: vi.fn((_listener: () => void) => {}),
   };
@@ -1880,6 +1894,27 @@ describe("init events", () => {
       ]);
     });
 
+    it("lists in the carousel only what the profile's platforms send", async () => {
+      const s = await live();
+      s.timer.settings.look.show_triggers = true;
+      s.timer.settings.seconds.bit = 1;
+      s.timerService.platforms.mockReturnValue(["twitch"]);
+      s.serverService.sendToClient.mockClear();
+
+      change(s, 0);
+
+      const triggers = timerTriggers(s.timer.settings, "en", ["twitch"]);
+      expect(triggers).toContainEqual({ label: "1 Bit", value: "+1s" });
+      expect(triggers).not.toContainEqual(
+        expect.objectContaining({ label: "Share" }),
+      );
+      expect(overlayPushes(s)).toEqual([
+        expect.objectContaining({
+          data: expect.objectContaining({ triggers }),
+        }),
+      ]);
+    });
+
     it("sends the carousel to the overlay again in a new language", async () => {
       const s = await live();
       s.timer.settings.look.show_triggers = true;
@@ -1967,6 +2002,7 @@ describe("init events", () => {
       expect(s.timerService.load).toHaveBeenCalledExactlyOnceWith(
         profile.timer,
         "stream.json",
+        profile.platforms,
       );
     });
 
@@ -2339,6 +2375,7 @@ describe("init events", () => {
           live: false,
           reconnecting: false,
           waiting: false,
+          platforms: {},
           stats: noStats,
         },
       ]);
@@ -2412,6 +2449,7 @@ describe("init events", () => {
           live: false,
           reconnecting: false,
           waiting: true,
+          platforms: {},
           stats: noStats,
         },
       ]);
@@ -2437,7 +2475,7 @@ describe("init events", () => {
       const s = await live();
       const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
 
-      reconnect("stopped");
+      reconnect("stopped", "tiktok");
 
       expect(s.h.notices).toEqual([
         expect.objectContaining({
@@ -2453,6 +2491,7 @@ describe("init events", () => {
           live: false,
           reconnecting: false,
           waiting: false,
+          platforms: {},
           stats: noStats,
         },
       ]);
@@ -2465,9 +2504,9 @@ describe("init events", () => {
       s.connectorService.isConnected.mockReturnValue(true);
       s.connectorService.isReconnecting.mockReturnValue(true);
 
-      reconnect("reconnecting");
+      reconnect("reconnecting", "tiktok");
       s.connectorService.isReconnecting.mockReturnValue(false);
-      reconnect("reconnected");
+      reconnect("reconnected", "tiktok");
 
       expect(s.h.notices).toEqual([
         expect.objectContaining({
@@ -2488,6 +2527,7 @@ describe("init events", () => {
         success: true,
         live: true,
         waiting: false,
+        platforms: {},
         stats: noStats,
       };
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
@@ -2501,7 +2541,7 @@ describe("init events", () => {
       const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
       s.h.win.close();
 
-      reconnect("reconnecting");
+      reconnect("reconnecting", "tiktok");
 
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([]);
     });
@@ -2511,8 +2551,8 @@ describe("init events", () => {
       const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
 
       for (let i = 0; i < 3; i++) {
-        reconnect("reconnecting");
-        reconnect("reconnected");
+        reconnect("reconnecting", "tiktok");
+        reconnect("reconnected", "tiktok");
       }
 
       expect(s.h.notices.map((n) => n.code)).toEqual([
@@ -2526,17 +2566,106 @@ describe("init events", () => {
       const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
       vi.useFakeTimers();
 
-      reconnect("reconnecting");
-      reconnect("reconnected");
+      reconnect("reconnecting", "tiktok");
+      reconnect("reconnected", "tiktok");
       vi.advanceTimersByTime(10_000);
-      reconnect("reconnecting");
+      reconnect("reconnecting", "tiktok");
       vi.advanceTimersByTime(21_000);
-      reconnect("reconnecting");
+      reconnect("reconnecting", "tiktok");
 
       expect(s.h.notices.map((n) => n.code)).toEqual([
         FEEDBACK_CODES.RECONNECTING,
         FEEDBACK_CODES.RECONNECTED,
         FEEDBACK_CODES.RECONNECTING,
+      ]);
+    });
+
+    it("names the platform in its reconnect notices while others are on", async () => {
+      const s = await live();
+      const [reconnect] = s.connectorService.onReconnect.mock.calls[0];
+      s.connectorService.status.mockReturnValue({
+        tiktok: "reconnecting",
+        twitch: "connected",
+      });
+
+      reconnect("reconnecting", "tiktok");
+      // Its own key, so TikTok's doesn't hide it
+      reconnect("reconnecting", "twitch");
+      reconnect("reconnected", "tiktok");
+      s.connectorService.status.mockReturnValue({ twitch: "connected" });
+      reconnect("stopped", "tiktok");
+
+      expect(s.h.notices.map((n) => n.message)).toEqual([
+        "The connection to TikTok dropped. Reconnecting…",
+        "The connection to Twitch dropped. Reconnecting…",
+        "Reconnected to TikTok.",
+        "Unable to reconnect to TikTok. Connect again from Home.",
+      ]);
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toHaveLength(4);
+    });
+
+    it("says when a platform ends, drops or stops while the LIVE goes on", async () => {
+      const s = await live();
+      const [changed] = s.connectorService.onPlatform.mock.calls[0];
+
+      changed("twitch", "up");
+      changed("twitch", "ended");
+      changed("twitch", "lost");
+      changed("twitch", "stopped");
+      // TikTok looks for its LIVE again after an abnormal stop
+      s.connectorService.status.mockReturnValue({ tiktok: "waiting" });
+      changed("tiktok", "lost");
+      changed("tiktok", "ended");
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "info",
+          code: FEEDBACK_CODES.LIVE_ENDED,
+          message: "The LIVE on Twitch has ended.",
+        }),
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.CONNECTION_LOST,
+          message: "Unable to reconnect to Twitch. Connect again from Home.",
+        }),
+        expect.objectContaining({
+          level: "info",
+          code: FEEDBACK_CODES.DISCONNECTED,
+          message: "Disconnected from Twitch.",
+        }),
+        expect.objectContaining({
+          message:
+            "Tokio lost the connection to TikTok and will keep trying for 2 minutes.",
+        }),
+        expect.objectContaining({
+          message:
+            "The LIVE on TikTok ended while Tokio was reconnecting. If it's back within 2 minutes, Tokio connects to it again.",
+        }),
+      ]);
+      // Up too, so Home shows it
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toHaveLength(6);
+      // The session goes on
+      expect(s.alertsService.clear).not.toHaveBeenCalled();
+    });
+
+    it("saves each change to the Twitch account, warning when it can't", async () => {
+      const s = await live();
+      const [save] = s.connectorService.onTwitchAccount.mock.calls[0];
+      const account = { id: "twitch:1", login: "mia", key: "token" };
+
+      expect(await save(account)).toBe(true);
+      expect(s.storeManagerService.updateTwitchAccount).toHaveBeenCalledWith(
+        account,
+      );
+      expect(s.h.notices).toEqual([]);
+
+      s.storeManagerService.updateTwitchAccount.mockResolvedValue(false);
+      expect(await save(account)).toBe(false);
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          level: "warning",
+          code: FEEDBACK_CODES.TWITCH_TOKEN_SAVE_FAILED,
+        }),
       ]);
     });
 

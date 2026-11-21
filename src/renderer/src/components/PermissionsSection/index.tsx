@@ -1,6 +1,9 @@
+import { listOf } from "@/common/i18n";
 import { Permissions } from "@/common/schemas";
+import { PLATFORM_LABELS } from "@/common/util";
+import { usePlatforms } from "@/context/platforms";
 import { Updater } from "@/hooks/useImmerState";
-import { useT } from "@/ui/i18n";
+import { useLanguage, useT } from "@/ui/i18n";
 import { Check, ListTextarea, NumberInput } from "../Elements";
 import { Field, Section } from "../Page";
 import styles from "./permissionssection.module.css";
@@ -21,6 +24,9 @@ const ROLES = [
 
 export function PermissionsSection({ permissions, update, feature }: Props) {
   const t = useT();
+  const language = useLanguage();
+  // Only TikTok says who follows and sends fan levels
+  const others = usePlatforms().filter((p) => p !== "tiktok");
   return (
     <Section
       title={t("components.permissions.title")}
@@ -64,6 +70,16 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
           }
         />
       </div>
+      {others.length > 0 && (
+        <p className={styles.note}>
+          {t("components.permissions.noFollowers", {
+            platforms: listOf(
+              language,
+              others.map((p) => PLATFORM_LABELS[p]),
+            ),
+          })}
+        </p>
+      )}
 
       <Check
         label={t("components.permissions.list")}

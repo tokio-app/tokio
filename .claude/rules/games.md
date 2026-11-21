@@ -132,6 +132,7 @@ Checked against Java 26.3's command tree, registries and decompiled commands (Vi
 
 - The Java steps link to `MINECRAFT_MOD_DOCS_URL`, the website's `#java-edition` anchor: keep that heading there.
 - The trigger picker offers `GAME_TRIGGERS`: `TRIGGER_OPTIONS` without Super Fan join, Member join, Envelope, Super Fan Box and Music change (the user's call). The schema still takes them, so an action saved with one keeps running.
+- A game action's trigger has a platform like an alert's (`.claude/rules/platforms.md`); the picker's events follow it and the profile's platforms, within `GAME_TRIGGERS`.
 - `TriggerFilter` and `useTriggerChoices` come from Alerts; Like shows `likes_every` in the filter's place. `min_coins` and `roles` aren't offered: actions keep defaults that match everything.
 - **Actions** opens on the connected game's edition, else Bedrock unless only Java has actions, remounting per profile (`key={loads}`). It turns to a game's edition when one connects; one that leaves keeps the tab. An action whose edition changes takes the tab with it, so it stays in view.
 - Its title folds it, so the overlay gets the room; the body is `hidden` so actions keep their state. Its one **Add action** sits in the body under the tab's actions, none in the header (the user's call).

@@ -1,4 +1,4 @@
-import { listOf, MessageKey } from "@/common/i18n";
+import { listOf, MessageKey, Params } from "@/common/i18n";
 import {
   GOAL_TRIGGER,
   StudioAlign,
@@ -16,13 +16,13 @@ import {
   StudioTriggerSchema,
 } from "@/common/schemas";
 import type { StageFit } from "@/common/studio/stage";
-import { ALERT_TRIGGER_LABELS, CustomGift, StudioView } from "@/common/types";
+import { CustomGift, StudioView } from "@/common/types";
 import {
   ALERT_MESSAGE_VARIABLES,
   STUDIO_NUMBERS,
   triggersOf,
 } from "@/common/util";
-import { EmoteOption } from "@/components";
+import { EmoteOption, eventName } from "@/components";
 
 export const KIND_NAMES: Record<StudioElementKind, MessageKey> = {
   text: "studio.kinds.text",
@@ -137,15 +137,15 @@ export function retype(
  */
 export function whenText(
   item: Pick<StudioElement, "when" | "trigger" | "also_triggers">,
-  t: (key: MessageKey, params?: Record<string, string>) => string,
+  t: (key: MessageKey, params?: Params) => string,
   language: string,
 ) {
   if (item.when === "always") return t("studio.rows.always");
   if (item.when === "loop") return t("studio.rows.loop");
-  const names = triggersOf(item).map(({ type }) =>
-    type === GOAL_TRIGGER
+  const names = triggersOf(item).map((trigger) =>
+    trigger.type === GOAL_TRIGGER
       ? t("studio.goal.trigger")
-      : t(ALERT_TRIGGER_LABELS[type]),
+      : eventName(trigger, t),
   );
   const trigger = listOf(language, [...new Set(names)], { type: "or" });
   return t(

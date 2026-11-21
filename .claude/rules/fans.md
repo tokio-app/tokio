@@ -13,6 +13,7 @@ paths:
 - A fan is keyed by `UserData.userId`, since handles change. Viewers without one are skipped.
 - The user of each `FAN_EVENTS` event with a fan level of 1 or more updates their entry: name, handle, level, `fanBadge` and `seenAt`. A level of 0 changes nothing, since a missing badge isn't proof they left the fan club. ROOM_USER's ranks carry no badges, so they're left out.
 - `superfan`: chat and gifts carry TikTok's flag (`isSubscriberOfAnchor`), so they set it either way, and `SUPER_FAN` and `SUPER_FAN_JOIN` set it. The other events keep what's known, since the connector fills their flag with `false` (`SUPERFAN`).
+- Other platforms never set a fan level, which `record` already skips, so fans stay TikTok's.
 - A new live event with a `user` goes in `FAN_EVENTS`, and in `SUPERFAN` when it tells whether they're a Super Fan.
 - Up to `MAX_FANS` per profile. The one not seen for the longest is dropped first, in the `Map`'s order, which the file keeps.
 - No profile pictures (the user's call): TikTok signs their links (`x-expires`) and they expire about 2 days after they're sent. An overlay takes a fan's picture from their live events.

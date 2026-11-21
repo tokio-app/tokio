@@ -1,16 +1,19 @@
 import { ActivityFeed } from "@/common/schemas";
+import { Platform } from "@/common/types";
 import { Modal, Toggle } from "@/components";
 import { useT } from "@/ui/i18n";
 import { useState } from "react";
-import { FEED_KINDS } from "../helper";
+import { feedKinds } from "../helper";
 
 interface Props {
   feed: ActivityFeed;
+  // The profile's: the feed offers the kinds they send
+  platforms: readonly Platform[];
   onClose: () => void;
   onSave: (feed: ActivityFeed) => void;
 }
 
-export function FeedModal({ feed, onClose, onSave }: Props) {
+export function FeedModal({ feed, platforms, onClose, onSave }: Props) {
   const t = useT();
   const [shown, setShown] = useState(feed);
 
@@ -22,7 +25,7 @@ export function FeedModal({ feed, onClose, onSave }: Props) {
       onClose={onClose}
       onConfirm={() => onSave(shown)}
     >
-      {FEED_KINDS.map(({ kind, label }) => (
+      {feedKinds(platforms).map(({ kind, label }) => (
         <Toggle
           key={kind}
           label={t(label)}

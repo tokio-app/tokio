@@ -38,6 +38,7 @@ export const connectionState = ({
   live: liveService.getSession().startedAt !== null,
   reconnecting: connectorService.isReconnecting(),
   waiting: connectorService.isWaiting(),
+  platforms: connectorService.status(),
   stats: storeManagerService.getLiveStats(),
 });
 

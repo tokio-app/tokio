@@ -144,6 +144,11 @@ describe("settings MCP sections", () => {
         share: true,
         superfan: true,
         join: false,
+        sub: true,
+        giftsub: true,
+        cheer: true,
+        raid: true,
+        redeem: true,
       };
       expect(updateActivityFeed).toHaveBeenCalledExactlyOnceWith(feed);
       expect(setFeed).toHaveBeenCalledWith(feed);

@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { AlertTrigger, EMOTE_TRIGGER, TOKIO_EVENTS } from "../types/connector";
+import {
+  AlertTrigger,
+  EMOTE_TRIGGER,
+  PLATFORMS,
+  TOKIO_EVENTS,
+  type Platform,
+} from "../types/connector";
 import { defaultAlertName, mediaKind } from "../util/alerts";
 import { ColorSchema, FONT_MAX_LENGTH, TimerProfileSchema } from "./timer";
 
@@ -118,6 +124,9 @@ export const TriggerSchema = z.object({
   // The viewer has one of them. Empty means anyone, and events without a
   // viewer ignore it.
   roles: z.array(z.enum(VIEWER_ROLES)).default([]),
+  // The platform whose event it takes, missing for any. One a newer Tokio
+  // saved that this one doesn't know reads as any.
+  platform: z.enum(PLATFORMS).optional().catch(undefined),
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -439,8 +448,22 @@ const SavedEmoteSchema = z.object({
 export const ProfileSchema = z.object({
   name: z.string().min(3),
   connector: z.object({
+    // TikTok's @username
     username: z.string(),
   }),
+  // The platforms Connect joins, picked on Home. One a newer Tokio saved
+  // that this one doesn't know is left out, so the profile still loads.
+  platforms: z
+    .array(z.string())
+    .transform((list) =>
+      list.filter((p): p is Platform =>
+        (PLATFORMS as readonly string[]).includes(p),
+      ),
+    )
+    .default(["tiktok"]),
+  // The channel typed for each platform that takes one, TikTok's username
+  // aside (connector)
+  channels: z.record(z.string(), z.string()).default({}),
   music: z.object({
     permissions: PermissionsSchema,
     protection: z.object({

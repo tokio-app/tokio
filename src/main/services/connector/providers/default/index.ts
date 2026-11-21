@@ -536,6 +536,7 @@ function getUserData(user?: User, userIdentity?: UserIdentity): UserData {
     fanLevel: Number.isFinite(level) ? level : 0,
     fanBadge: fanBadge?.combine?.icon?.urlList[0] ?? "",
     userId: user?.userId ?? "",
+    platform: "tiktok",
   };
 }
 

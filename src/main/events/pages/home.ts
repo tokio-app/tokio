@@ -2,9 +2,16 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
+  Platform,
+  PLATFORMS,
+  PlatformStatus,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { EMPTY_LIVE_STATS } from "@/common/util";
+import {
+  EMPTY_LIVE_STATS,
+  PLATFORM_INPUT,
+  PLATFORM_LABELS,
+} from "@/common/util";
 import { connectionState, createStack } from "@/helper/events";
 import { AppFailure, saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
@@ -13,14 +20,43 @@ import { normalizeUsername } from "@tokioapp/connector";
 
 const events = createStack("connector");
 
+// A platform the session already has, which a connect leaves as it is
+const isUp = (status?: PlatformStatus) =>
+  status === "connected" || status === "reconnecting";
+
 // What to tell the user about a connect that failed, by what went wrong.
-const connectMessage = (handle: string, error?: ConnectorFailure) => {
+// With several platforms, the texts that could be any of them name it.
+const connectMessage = (
+  platform: Platform,
+  handle: string,
+  error: ConnectorFailure | undefined,
+  several = false,
+) => {
   const settings = t("nav.settings");
+  const name = PLATFORM_LABELS[platform];
+  const failed = () =>
+    several || platform !== "tiktok"
+      ? t("main.home.connect.failedOn", { handle, platform: name })
+      : t("main.home.connect.failed", { handle });
+  if (platform === "twitch" && error?.kind === "noKey") {
+    return t("main.home.connect.twitchNoKey", { settings });
+  }
+  if (platform === "twitch" && error?.kind === "badKey") {
+    return t("main.home.connect.twitchBadKey", { settings });
+  }
   switch (error?.kind) {
     case "offline":
-      return t("main.home.connect.offline", { handle });
+      return several
+        ? t("main.home.connect.offlineOn", { handle, platform: name })
+        : t("main.home.connect.offline", { handle });
     case "notFound":
-      return t("main.home.connect.notFound", { handle });
+      return t("main.home.connect.notFound", { handle, platform: name });
+    case "network":
+      return t("main.home.connect.network", { platform: name });
+  }
+  // The rest are Euler Stream's, which only TikTok's connection uses
+  if (platform !== "tiktok") return failed();
+  switch (error?.kind) {
     case "rateLimited": {
       const wait = error.retryAfterSeconds;
       return wait
@@ -35,10 +71,8 @@ const connectMessage = (handle: string, error?: ConnectorFailure) => {
       return t("main.home.connect.premium");
     case "sign":
       return t("main.home.connect.sign");
-    case "network":
-      return t("main.home.connect.network");
     default:
-      return t("main.home.connect.failed", { handle });
+      return failed();
   }
 };
 
@@ -54,20 +88,31 @@ const toUsername = (input: string) => {
 
 events.push(
   APP_EVENTS.CONNECT,
-  async (
-    { storeManagerService, connectorService, liveService, notifier },
-    e,
-    { username },
-  ) => {
-    // Connected or connecting, the connector stays on its account
-    const name = connectorService.isConnected()
-      ? connectorService.username
-      : toUsername(username);
-    const handle = `@${name}`;
+  async (services, e, { username, channels }) => {
+    const { storeManagerService, connectorService, notifier } = services;
+    const profile = await storeManagerService.getProfileData();
+    const platforms: Platform[] = profile?.platforms.length
+      ? profile.platforms
+      : ["tiktok"];
+    // Connected or connecting, a platform stays on its channel
+    const on = connectorService.status();
+    const channelOf = (platform: Platform, typed: string) =>
+      on[platform] ? connectorService.channel(platform) : typed;
+    const name = channelOf("tiktok", toUsername(username));
+    // Each platform's channel, or the account signed in to for Twitch
+    const targets: Partial<Record<Platform, string>> = {};
+    for (const platform of platforms) {
+      const typed = channels?.[platform] ?? profile?.channels[platform] ?? "";
+      targets[platform] =
+        platform === "tiktok"
+          ? name
+          : PLATFORM_INPUT[platform] === "account"
+            ? storeManagerService.getTwitchAccount().login
+            : channelOf(platform, typed.trim().replace(/^@/, ""));
+    }
     const saved = await storeManagerService.updateProfileData({
-      connector: {
-        username: name,
-      },
+      ...(platforms.includes("tiktok") && { connector: { username: name } }),
+      ...(channels && { channels }),
     });
     // The LIVE matters more than remembering the username: connect anyway.
     if (!saved) {
@@ -77,35 +122,68 @@ events.push(
         t("main.home.usernameSaveFailed"),
       );
     }
+    const handleOf = (platform: Platform) => `@${targets[platform] ?? ""}`;
+    // As main holds it: a connect during a reconnect stays reconnecting
+    const replyState = () =>
+      e.reply(APP_EVENTS_RESPONSE.CONNECTED, connectionState(services));
+    const several = platforms.length > 1;
     // The connected event comes before connect() resolves, answer on the first.
     let answered = false;
     const answer = () => {
       if (answered) return;
       answered = true;
-      // As main holds it: a connect during a reconnect stays reconnecting
-      e.reply(
-        APP_EVENTS_RESPONSE.CONNECTED,
-        connectionState({ connectorService, liveService, storeManagerService }),
-      );
+      replyState();
+      // With several platforms, each one's result says it
+      if (several) return;
       notifier.success(
         "connector",
         FEEDBACK_CODES.CONNECTED,
-        t("main.home.connected", { handle }),
+        t("main.home.connected", { handle: handleOf(platforms[0]) }),
       );
     };
     // Answers this connect only, so connects don't pile up listeners.
     connectorService.on(TOKIO_EVENTS.CONNECTED, answer);
 
     try {
-      const res = await connectorService.connect(name);
-      if (!res.success) {
-        throw new AppFailure(
-          FEEDBACK_CODES.CONNECT_FAILED,
-          connectMessage(handle, res.error),
-          { logged: true },
-        );
+      if (!several) {
+        const [platform] = platforms;
+        const res = await connectorService.connect({
+          [platform]: targets[platform],
+        });
+        if (!res.success) {
+          throw new AppFailure(
+            FEEDBACK_CODES.CONNECT_FAILED,
+            connectMessage(platform, handleOf(platform), res.error),
+            { logged: true },
+          );
+        }
+        answer();
+        return;
       }
-      answer();
+      // Each platform's result is its own notice, and the state goes again.
+      // All of them failing throws nothing, which would add a notice.
+      await connectorService.connect(targets, (platform, res) => {
+        const key = `connect:${platform}`;
+        if (!res.success) {
+          notifier.error(
+            "connector",
+            FEEDBACK_CODES.CONNECT_FAILED,
+            connectMessage(platform, handleOf(platform), res.error, true),
+            { key },
+          );
+        } else if (!isUp(on[platform])) {
+          notifier.success(
+            "connector",
+            FEEDBACK_CODES.CONNECTED,
+            t("main.home.connectedOn", {
+              handle: handleOf(platform),
+              platform: PLATFORM_LABELS[platform],
+            }),
+            { key },
+          );
+        }
+        replyState();
+      });
     } finally {
       connectorService.off(TOKIO_EVENTS.CONNECTED, answer);
     }
@@ -122,6 +200,53 @@ events.push(
         stats: EMPTY_LIVE_STATS,
         error,
       }),
+  },
+);
+
+// The profile's platforms, picked on Home. No notice: the toggles show them.
+events.push(
+  APP_EVENTS.SET_PLATFORMS,
+  async (
+    { storeManagerService, connectorService, timerService },
+    e,
+    { platforms },
+  ) => {
+    if (connectorService.isConnected()) {
+      throw new AppFailure(
+        FEEDBACK_CODES.PROFILE_LOCKED,
+        t("main.home.platformsLocked"),
+        { level: "warning" },
+      );
+    }
+    // Known ones once each, in Home's order
+    const picked = PLATFORMS.filter((p) => platforms.includes(p));
+    if (!(await storeManagerService.updateProfileData({ platforms: picked }))) {
+      throw saveFailure();
+    }
+    e.reply(APP_EVENTS_RESPONSE.SET_PLATFORMS, {
+      success: true,
+      platforms: picked,
+    });
+    // The countdown's overlay lists only what they send
+    timerService.setPlatforms(picked);
+  },
+  {
+    failure: {
+      code: FEEDBACK_CODES.SETTINGS_SAVE_FAILED,
+      message: "main.failure.setPlatforms",
+    },
+    // What main holds, so the toggles go back
+    onError: (e, error, _data, { storeManagerService }) =>
+      void storeManagerService
+        .getProfileData()
+        .catch(() => null)
+        .then((profile) =>
+          e.reply(APP_EVENTS_RESPONSE.SET_PLATFORMS, {
+            success: false,
+            error,
+            platforms: profile?.platforms ?? ["tiktok"],
+          }),
+        ),
   },
 );
 

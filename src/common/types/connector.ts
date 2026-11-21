@@ -1,6 +1,16 @@
 import type { MessageKey } from "../i18n";
 import { OverlayConfigRedux } from "./overlay";
 
+// The platforms Tokio connects to, in the order Home lists them. A new one
+// gets its provider, its row in PLATFORM_TRIGGERS and its texts.
+export const PLATFORMS = ["tiktok", "twitch"] as const;
+export type Platform = (typeof PLATFORMS)[number];
+
+// How a platform's connection is doing while it's on: connecting, connected,
+// coming back after a drop, or looking for a LIVE that stopped on its own
+export type PlatformStatus =
+  "connecting" | "connected" | "reconnecting" | "waiting";
+
 export interface UserData {
   username: string;
   handle: string;
@@ -12,8 +22,13 @@ export interface UserData {
   // The picture of the fan level's badge, a heart that changes every 10
   // levels, without the number
   fanBadge?: string;
-  // TikTok's id for the account, which stays when the handle changes
+  // The platform's id for the account, which stays when the handle changes.
+  // Other platforms' start with their name ("twitch:1234"), so they never
+  // match TikTok's, which are saved bare.
   userId?: string;
+  // Where the viewer is. Missing means TikTok, as everything sent or saved
+  // before other platforms.
+  platform?: Platform;
 }
 
 // A fan the active profile keeps, sent to overlays with tokio:fans. No
@@ -44,6 +59,8 @@ export interface TopGifter {
   allTime: { coins: number; gifts: number };
   // When their last gift came, in ms since the epoch
   giftedAt: number;
+  // Missing means TikTok
+  platform?: Platform;
 }
 
 // A chat message translated into the language Settings → Chat translation
@@ -116,6 +133,47 @@ export interface LikeEvent {
   totalLikes: number;
 }
 
+// A paid subscription or membership, new or renewed
+export interface SubscribeEvent {
+  user: UserData;
+  // The platform's own tier, like Twitch's "1000", "2000", "3000" or "prime";
+  // "" when it has none
+  tier: string;
+  // Months subscribed so far, 1 for a new one
+  months: number;
+  // What the viewer wrote with it, "" for nothing
+  message: string;
+}
+
+// Subscriptions or memberships a viewer gave to others, all at once
+export interface GiftSubEvent {
+  user: UserData;
+  count: number;
+  tier: string;
+}
+
+// Bits a viewer spent on Twitch: a cheer, or a Power-up
+export interface CheerEvent {
+  user: UserData;
+  bits: number;
+  // A cheer's message without its cheermotes, "" for none
+  message: string;
+}
+
+// Another channel sending its viewers over: the user is its streamer
+export interface RaidEvent {
+  user: UserData;
+  viewers: number;
+}
+
+// A channel points reward a viewer redeemed
+export interface RedeemEvent {
+  user: UserData;
+  reward: { id: string; title: string; cost: number };
+  // What the reward asked the viewer to type, "" for none
+  input: string;
+}
+
 export interface Gift {
   id: number;
   name: string;
@@ -129,7 +187,8 @@ export enum TOKIO_EVENTS {
   DISCONNECTED = "tokio:event:disconnected",
   MUSIC_PROCCESS_ENDED = "tokio:event:music:ended",
 
-  // EXTERNAL - TIKTOK
+  // EXTERNAL - TikTok's names, also for other platforms' events like them
+  // (PLATFORM_TRIGGERS says who sends each)
   CHAT = "tokio:event:chat",
   SHARE = "tokio:event:share",
   FOLLOW = "tokio:event:follow",
@@ -141,6 +200,13 @@ export enum TOKIO_EVENTS {
   SUPER_FAN_JOIN = "tokio:event:superfanjoin",
   MEMBER_JOIN = "tokio:event:memberjoin",
   ROOM_USER = "tokio:event:roomuser",
+
+  // EXTERNAL - TikTok has none of these
+  SUBSCRIBE = "tokio:event:subscribe",
+  GIFT_SUB = "tokio:event:giftsub",
+  CHEER = "tokio:event:cheer",
+  RAID = "tokio:event:raid",
+  REDEEM = "tokio:event:redeem",
 
   // EXTERNAL - MUSIC
   MUSIC_CHANGE = "tokio:event:music:change",
@@ -162,7 +228,7 @@ export interface TokioEventMap {
   [TOKIO_EVENTS.DISCONNECTED]: { reason?: "ended" | "lost" } | undefined;
   [TOKIO_EVENTS.MUSIC_PROCCESS_ENDED]: void;
 
-  // EXTERNAL - TIKTOK
+  // EXTERNAL
   [TOKIO_EVENTS.CHAT]: ChatEvent;
   [TOKIO_EVENTS.SHARE]: ShareEvent;
   [TOKIO_EVENTS.FOLLOW]: FollowEvent;
@@ -174,6 +240,11 @@ export interface TokioEventMap {
   [TOKIO_EVENTS.MEMBER_JOIN]: MemberEvent;
   [TOKIO_EVENTS.SUPER_FAN_JOIN]: SuperFanJoinEvent;
   [TOKIO_EVENTS.ROOM_USER]: RoomUserEvent;
+  [TOKIO_EVENTS.SUBSCRIBE]: SubscribeEvent;
+  [TOKIO_EVENTS.GIFT_SUB]: GiftSubEvent;
+  [TOKIO_EVENTS.CHEER]: CheerEvent;
+  [TOKIO_EVENTS.RAID]: RaidEvent;
+  [TOKIO_EVENTS.REDEEM]: RedeemEvent;
 
   // EXTERNAL - MUSIC
   [TOKIO_EVENTS.MUSIC_CHANGE]: MusicInfo[];
@@ -218,6 +289,11 @@ export const ALERT_TRIGGER_LABELS: Record<AlertTrigger, MessageKey> = {
   [TOKIO_EVENTS.SUPER_FAN_BOX]: "triggers.superfanBox",
   [TOKIO_EVENTS.SUPER_FAN_JOIN]: "triggers.superfanJoin",
   [TOKIO_EVENTS.MEMBER_JOIN]: "triggers.memberJoin",
+  [TOKIO_EVENTS.SUBSCRIBE]: "triggers.subscribe",
+  [TOKIO_EVENTS.GIFT_SUB]: "triggers.giftSub",
+  [TOKIO_EVENTS.CHEER]: "triggers.cheer",
+  [TOKIO_EVENTS.RAID]: "triggers.raid",
+  [TOKIO_EVENTS.REDEEM]: "triggers.redeem",
   [TOKIO_EVENTS.MUSIC_CHANGE]: "triggers.musicChange",
 };
 

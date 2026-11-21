@@ -1,4 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { defaultProfile } from "@/common/util";
 import { Page, PermissionsSection, ProtectionSection } from "@/components";
 import {
   scopeUpdater,
@@ -6,6 +7,7 @@ import {
   useEditableSettings,
   useIpcListener,
 } from "@/hooks";
+import { PlatformsContext } from "@/context/platforms";
 import { useT } from "@/ui/i18n";
 import { useEffect, useRef, useState } from "react";
 import { FormatSection } from "./sections/FormatSection";
@@ -28,12 +30,15 @@ export function TTS() {
   // The latest test's id: only its reply plays
   const pending = useRef<string | null>(null);
 
-  const { settings, update } = useEditableSettings("tts", ({ tts }) =>
+  // For the permissions' note on platforms that don't say who follows
+  const [platforms, setPlatforms] = useState(defaultProfile.platforms);
+  const { settings, update } = useEditableSettings("tts", (profile) => {
+    setPlatforms(profile.platforms);
     testQueue.setFilters({
-      ...tts.filters,
-      volume: tts.filters.volume / 100,
-    }),
-  );
+      ...profile.tts.filters,
+      volume: profile.tts.filters.volume / 100,
+    });
+  });
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_TTS_TEST, (res) => {
     if (!res || res.id !== pending.current) return;
@@ -48,58 +53,60 @@ export function TTS() {
   useEffect(() => () => testQueue.stop(), [testQueue]);
 
   return (
-    <Page width="wide" layout="aside">
-      <VoiceSection
-        settings={settings}
-        testLoading={testLoading}
-        testQueue={testQueue}
-        update={update}
-        onTest={(text) => {
-          setTestLoading(true);
-          pending.current = `${TEST_ID}${++tests}`;
-          // Read like chat, with the settings on the page, saved or not
-          window.api.emit(APP_EVENTS.GET_TTS_TEST, {
-            id: pending.current,
-            text,
-            voice: settings.voice,
-            settings,
-          });
-        }}
-      />
+    <PlatformsContext value={platforms}>
+      <Page width="wide" layout="aside">
+        <VoiceSection
+          settings={settings}
+          testLoading={testLoading}
+          testQueue={testQueue}
+          update={update}
+          onTest={(text) => {
+            setTestLoading(true);
+            pending.current = `${TEST_ID}${++tests}`;
+            // Read like chat, with the settings on the page, saved or not
+            window.api.emit(APP_EVENTS.GET_TTS_TEST, {
+              id: pending.current,
+              text,
+              voice: settings.voice,
+              settings,
+            });
+          }}
+        />
 
-      <UserVoicesSection
-        userVoices={settings.user_voices}
-        voice={settings.voice}
-        filters={settings.filters}
-        update={scopeUpdater(update, "user_voices")}
-      />
+        <UserVoicesSection
+          userVoices={settings.user_voices}
+          voice={settings.voice}
+          filters={settings.filters}
+          update={scopeUpdater(update, "user_voices")}
+        />
 
-      <FormatSection
-        format={settings.format}
-        update={scopeUpdater(update, "format")}
-      />
+        <FormatSection
+          format={settings.format}
+          update={scopeUpdater(update, "format")}
+        />
 
-      <PermissionsSection
-        feature={t("nav.tts")}
-        permissions={settings.permissions}
-        update={scopeUpdater(update, "permissions")}
-      />
+        <PermissionsSection
+          feature={t("nav.tts")}
+          permissions={settings.permissions}
+          update={scopeUpdater(update, "permissions")}
+        />
 
-      <ProtectionSection
-        feature={t("nav.tts")}
-        protection={settings.protection}
-        update={scopeUpdater(update, "protection")}
-      >
-        <ProtectionFields
+        <ProtectionSection
+          feature={t("nav.tts")}
           protection={settings.protection}
           update={scopeUpdater(update, "protection")}
-        />
-      </ProtectionSection>
+        >
+          <ProtectionFields
+            protection={settings.protection}
+            update={scopeUpdater(update, "protection")}
+          />
+        </ProtectionSection>
 
-      <ReplacementsSection
-        replacements={settings.replacements}
-        update={scopeUpdater(update, "replacements")}
-      />
-    </Page>
+        <ReplacementsSection
+          replacements={settings.replacements}
+          update={scopeUpdater(update, "replacements")}
+        />
+      </Page>
+    </PlatformsContext>
   );
 }

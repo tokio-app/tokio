@@ -9,9 +9,9 @@ import {
   Btn,
   EmoteOption,
   Input,
-  Select,
   TRIGGER_OPTIONS,
   TriggerFilter,
+  TriggerSelect,
 } from "@/components";
 import { useOptions, useT } from "@/ui/i18n";
 import { useId } from "react";
@@ -103,12 +103,12 @@ export function CountersFields({ counters, gifts, emotes, onChange }: Props) {
                     {t(warning)}
                   </p>
                 )}
-                <Select
+                <TriggerSelect
                   aria-label={t("studio.counters.counts")}
                   options={triggers}
-                  value={trigger.type}
-                  onChange={(type) =>
-                    set(index, { ...counter, trigger: { ...trigger, type } })
+                  trigger={trigger}
+                  onChange={(changed) =>
+                    set(index, { ...counter, trigger: changed })
                   }
                 />
                 <TriggerFilter

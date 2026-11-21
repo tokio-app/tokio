@@ -77,6 +77,9 @@ const settings = (
       superfan: 0,
       follow: 0,
       share: 0,
+      sub: 0,
+      gift_sub: 0,
+      bit: 0,
       ...seconds,
     },
   });
@@ -265,12 +268,34 @@ describe("TimerService", () => {
       [TOKIO_EVENTS.FOLLOW, "follow", { user: viewer("a") }],
       [TOKIO_EVENTS.SHARE, "share", { user: viewer("a"), shareCount: 1 }],
       [TOKIO_EVENTS.CHAT, "chat", chat("a")],
+      [
+        TOKIO_EVENTS.SUBSCRIBE,
+        "sub",
+        { user: viewer("a"), tier: "1000", months: 3, message: "" },
+      ],
     ] as const)("adds the seconds of %s", (event, key, data) => {
       ready(settings({}, { [key]: 7 }));
 
       handle(timer, event, data);
 
       expect(changes).toEqual([7000]);
+    });
+
+    it("adds the seconds per gifted sub and per Bit", () => {
+      ready(settings({}, { gift_sub: 60, bit: 0.5 }));
+
+      timer.handle(TOKIO_EVENTS.GIFT_SUB, {
+        user: viewer("a"),
+        count: 5,
+        tier: "1000",
+      });
+      timer.handle(TOKIO_EVENTS.CHEER, {
+        user: viewer("a"),
+        bits: 100,
+        message: "",
+      });
+
+      expect(changes).toEqual([300_000, 50_000]);
     });
 
     it("adds nothing for a trigger at 0", () => {

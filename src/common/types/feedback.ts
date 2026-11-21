@@ -67,6 +67,11 @@ export enum FEEDBACK_CODES {
   DISCONNECT_FAILED = "disconnect_failed",
   FEATURES_UPDATE_FAILED = "features_update_failed",
   ACTIVITY_FEED_UPDATED = "activity_feed_updated",
+  TWITCH_SIGNED_IN = "twitch_signed_in",
+  TWITCH_SIGNED_OUT = "twitch_signed_out",
+  TWITCH_SIGN_IN_FAILED = "twitch_sign_in_failed",
+  // A refresh's new token couldn't be saved, so the next start signs out
+  TWITCH_TOKEN_SAVE_FAILED = "twitch_token_save_failed",
 
   // TTS
   TTS_VOICES_FAILED = "tts_voices_failed",

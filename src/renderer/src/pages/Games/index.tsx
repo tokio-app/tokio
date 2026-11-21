@@ -1,6 +1,8 @@
 import { MediaFile } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, GamesData } from "@/common/types";
+import { defaultProfile } from "@/common/util";
 import { Page } from "@/components";
+import { PlatformsContext } from "@/context/platforms";
 import {
   useEditableSettings,
   useIpcListener,
@@ -34,10 +36,12 @@ export function Games() {
   // edition that has some
   const [loads, setLoads] = useState(0);
 
+  const [platforms, setPlatforms] = useState(defaultProfile.platforms);
   const { settings, update } = useEditableSettings(
     "games",
     (profile, switched) => {
       setEmotes(profile.emotes);
+      setPlatforms(profile.platforms);
       if (switched) {
         // A clone has the same action ids: a browse for the last profile
         // mustn't land in this one
@@ -85,7 +89,7 @@ export function Games() {
   const pictureAction = settings.actions.find((a) => a.id === pictureFor);
 
   return (
-    <>
+    <PlatformsContext value={platforms}>
       <Page width="wide">
         {games && (
           <MinecraftSection
@@ -139,6 +143,6 @@ export function Games() {
           onClose={() => setPictureFor(null)}
         />
       )}
-    </>
+    </PlatformsContext>
   );
 }

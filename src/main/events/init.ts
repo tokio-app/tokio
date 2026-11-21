@@ -31,6 +31,7 @@ import {
   MINECRAFT_PICTURES_PATH,
   MINECRAFT_PORT,
   SERVER_PORT,
+  PLATFORM_LABELS,
   TIMER_PATH,
   timerTriggers,
 } from "@/common/util";
@@ -53,7 +54,7 @@ import { throttle } from "@/helper/throttle";
 import Logger from "@/logger";
 import { createMcpRoutes } from "@/mcp";
 import type { AlertAudio } from "@/services/alerts";
-import { TikTokConnectorService } from "@/services/connector";
+import { ConnectorService } from "@/services/connector";
 import { FAN_EVENTS } from "@/services/fans";
 import { MAX_BACKLOG } from "@/services/games";
 import { HISTORY_EVENTS } from "@/services/history";
@@ -91,7 +92,7 @@ const events = createStack("system");
 
 // Gifts in the shape overlays use, none when TikTok can't be reached.
 const fetchOverlayGifts = async (
-  conn: TikTokConnectorService,
+  conn: ConnectorService,
 ): Promise<CustomGift[]> => {
   const gifts = await conn.fetchGifts();
   if (!gifts.success) return [];
@@ -450,31 +451,93 @@ const registerConnectorEvents = ({
     pushConnection();
   });
   // A drop the connector recovers from keeps the LIVE session going. A LIVE
-  // found again after a stop started a new one with CONNECTED.
-  conn.onReconnect((state) => {
+  // found again after a stop started a new one with CONNECTED. With other
+  // platforms on, the notices name the platform, each keyed apart.
+  conn.onReconnect((state, platform) => {
+    const several = new Set([...Object.keys(conn.status()), platform]).size > 1;
+    const params = { platform: PLATFORM_LABELS[platform] };
+    const key = (name: string) => (several ? `${name}:${platform}` : name);
     if (state === "reconnecting") {
       notifier.warn(
         "connector",
         FEEDBACK_CODES.RECONNECTING,
-        t("main.init.reconnecting"),
-        { key: "reconnect", windowMs: REPEAT_NOTICE_MS },
+        several
+          ? t("main.init.reconnectingOn", params)
+          : t("main.init.reconnecting"),
+        { key: key("reconnect"), windowMs: REPEAT_NOTICE_MS },
       );
     } else if (state === "reconnected") {
       notifier.info(
         "connector",
         FEEDBACK_CODES.RECONNECTED,
-        t("main.init.reconnected"),
-        { key: "reconnected", windowMs: REPEAT_NOTICE_MS },
+        several
+          ? t("main.init.reconnectedOn", params)
+          : t("main.init.reconnected"),
+        { key: key("reconnected"), windowMs: REPEAT_NOTICE_MS },
       );
     } else {
       // Only after an abnormal stop, so never after a LIVE ended on purpose
+      const home = t("nav.home");
       notifier.warn(
         "connector",
         FEEDBACK_CODES.RECONNECT_FAILED,
-        t("main.init.connectionLost", { home: t("nav.home") }),
+        several
+          ? t("main.init.connectionLostOn", { ...params, home })
+          : t("main.init.connectionLost", { home }),
+        several ? { key: `stopped:${platform}` } : undefined,
       );
     }
     pushConnection();
+  });
+  // A platform up or down while the session goes on with the others. Coming
+  // up says nothing: its connect or its reconnect already did.
+  conn.onPlatform((platform, change) => {
+    const params = { platform: PLATFORM_LABELS[platform] };
+    // Apart from the session's own, which can come right after
+    const options = { key: `${change}:${platform}` };
+    // After an abnormal stop the connector looks for its LIVE again
+    const waiting = conn.status()[platform] === "waiting";
+    if (change === "ended") {
+      notifier.info(
+        "connector",
+        FEEDBACK_CODES.LIVE_ENDED,
+        waiting
+          ? t("main.init.platformEndedAway", params)
+          : t("main.init.platformEnded", params),
+        options,
+      );
+    } else if (change === "lost") {
+      notifier.warn(
+        "connector",
+        FEEDBACK_CODES.CONNECTION_LOST,
+        waiting
+          ? t("main.init.platformLostLooking", params)
+          : t("main.init.connectionLostOn", { ...params, home: t("nav.home") }),
+        options,
+      );
+    } else if (change === "stopped") {
+      notifier.info(
+        "connector",
+        FEEDBACK_CODES.DISCONNECTED,
+        t("main.init.platformStopped", params),
+        options,
+      );
+    }
+    pushConnection();
+  });
+  // Each sign-in, sign-out and refresh's new token is saved before Twitch's
+  // provider uses it. The store logged a failed save.
+  conn.onTwitchAccount(async (account) => {
+    const saved = await store.updateTwitchAccount(account);
+    if (!saved) {
+      notifier.warn(
+        "connector",
+        FEEDBACK_CODES.TWITCH_TOKEN_SAVE_FAILED,
+        t("main.init.twitchTokenSaveFailed"),
+        { key: "twitch-token", windowMs: REPEAT_NOTICE_MS },
+      );
+    }
+    return saved;
   });
 
   const handleChat = async (d: ChatEvent) => {
@@ -780,7 +843,7 @@ const registerTimer = ({
         look: settings.look,
         // The carousel's items, none while it's off
         triggers: settings.look.show_triggers
-          ? timerTriggers(settings, language())
+          ? timerTriggers(settings, language(), timer.platforms())
           : [],
       },
     };
@@ -1253,7 +1316,13 @@ const startApp = async (handler: AppHandlerVariables) => {
   const settings = storeManagerService.getSettings();
   liveService.setFeed(settings.activityFeed);
   const profile = await storeManagerService.getProfileData();
-  if (profile) timerService.load(profile.timer, settings.activeProfile.file);
+  if (profile) {
+    timerService.load(
+      profile.timer,
+      settings.activeProfile.file,
+      profile.platforms,
+    );
+  }
   // Its lists update now, so connecting YouTube doesn't wait for them
   if (profile?.music.provider.block_ads) musicService.prepareAdBlocker();
   // Its own file, so the fans load even when the profile doesn't

@@ -65,6 +65,7 @@ Tokio talks to these online services. None of them is covered by Tokio's license
 - **TikTok:** TikTok LIVE, through @tokioapp/connector, and TikTok's text-to-speech (the TikTok voices), when the user has added a TikTok session ID. Neither is an official public API.
 - **TikTok TTS proxy** (`ottsy.weilbyte.dev`): the TikTok voices when no session ID is set. It gets the text of each message to read and its voice. It's run by a third party, not by TikTok or Tokio.
 - **Euler Stream** (`tiktok.eulerstream.com`): signs the connection to TikTok LIVE, with each user's own API key.
+- **Twitch** (`id.twitch.tv`, `api.twitch.tv`, `eventsub.wss.twitch.tv`): LIVE events, chat and viewer counts through Twitch's official API, with each user's own sign-in.
 - **Microsoft:** Edge's Read Aloud service (the Edge voices), which isn't an official public API.
 - **ElevenLabs** (`api.elevenlabs.io`): the ElevenLabs voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
 - **Fish Audio** (`api.fish.audio`): the Fish Audio voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.

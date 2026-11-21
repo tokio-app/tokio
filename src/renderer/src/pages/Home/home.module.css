@@ -119,6 +119,123 @@
   }
 }
 
+/* The status line, with the platforms' logos at its end */
+.slate_head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.platforms {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* A logo, Paper over a rose line while picked, as a tab is */
+.platform {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--font-muted);
+  cursor: pointer;
+}
+
+.platform:hover:not(:disabled) {
+  background-color: var(--background-secondary-hover);
+  color: var(--font-secondary);
+}
+
+.platform[aria-pressed="true"] {
+  color: var(--font-primary);
+}
+
+.platform[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  bottom: 2px;
+  left: 8px;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-primary);
+}
+
+.platform:disabled {
+  cursor: default;
+}
+
+/* Locked while connected: the picks stay readable, the rest fade */
+.platform:disabled[aria-pressed="false"] {
+  opacity: 0.5;
+}
+
+/* With several platforms, a row each: its logo, its channel or account,
+   and how it's doing */
+.rows {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height-lg);
+}
+
+.row_icon {
+  flex-shrink: 0;
+  color: var(--font-secondary);
+}
+
+/* The account signed in to, as the handle reads */
+.account {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--font-primary);
+  font-size: var(--font-2xl);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account_missing {
+  flex: 1;
+  min-width: 0;
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+}
+
+.account_missing a {
+  color: var(--accent-primary);
+}
+
+.platform_state {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.platform_up {
+  color: var(--font-primary);
+}
+
 .connect {
   display: flex;
   align-items: center;
@@ -571,6 +688,13 @@
 
 .event_name {
   font-weight: 600;
+}
+
+/* The viewer's platform, before their name, when the profile uses several */
+.event_platform {
+  margin-right: var(--space-1);
+  color: var(--font-muted);
+  vertical-align: -2px;
 }
 
 .event_message {

@@ -1,4 +1,4 @@
-import { AlertTrigger, TokioPayload } from "../connector";
+import { AlertTrigger, Platform, TokioPayload } from "../connector";
 import { ControlAction } from "../controls";
 import { CameraChunk, CameraFailure } from "../studio";
 import {
@@ -83,6 +83,10 @@ export enum APP_EVENTS {
   SUSPEND_SHORTCUTS = "app:settings:suspend:shortcuts",
   SET_REMOTE = "app:settings:set:remote",
   NEW_REMOTE_KEY = "app:settings:new:remote-key",
+  // Signs in to Twitch with a device code, replying TWITCH_ACCOUNT. Another
+  // sign-in or a sign-out ends one waiting.
+  TWITCH_SIGN_IN = "app:settings:twitch:sign-in",
+  TWITCH_SIGN_OUT = "app:settings:twitch:sign-out",
 
   // LIVE CONTROLS
   CONTROL = "app:controls:run",
@@ -100,6 +104,8 @@ export enum APP_EVENTS {
   SET_ACTIVITY_FEED = "app:home:set:feed",
   GET_LIVE_GIFTERS = "app:home:gifters",
   GET_SONGS = "app:home:songs",
+  // The platforms the profile connects to, picked on Home
+  SET_PLATFORMS = "app:home:set:platforms",
 
   // LIVES
   GET_LIVES = "app:lives:get",
@@ -338,6 +344,8 @@ export interface AppEventsMap {
   [APP_EVENTS.SET_REMOTE]: { enabled: boolean };
   // Replaces the key, so every device with the old link stops working
   [APP_EVENTS.NEW_REMOTE_KEY]: void;
+  [APP_EVENTS.TWITCH_SIGN_IN]: void;
+  [APP_EVENTS.TWITCH_SIGN_OUT]: void;
 
   // LIVE CONTROLS
   // pause toggles without paused, and sets it with
@@ -350,8 +358,11 @@ export interface AppEventsMap {
   [APP_EVENTS.SETTINGS_FLUSHED]: { id: string };
 
   // HOME
+  // The profile's platforms connect: username is TikTok's, channels the
+  // others' that take one (Twitch's is the account signed in to)
   [APP_EVENTS.CONNECT]: {
     username: string;
+    channels?: Partial<Record<Platform, string>>;
   };
   [APP_EVENTS.DISCONNECT]: void;
   [APP_EVENTS.IS_CONNECTED]: void;
@@ -365,6 +376,7 @@ export interface AppEventsMap {
   [APP_EVENTS.SET_ACTIVITY_FEED]: { feed: ActivityFeed };
   [APP_EVENTS.GET_LIVE_GIFTERS]: void;
   [APP_EVENTS.GET_SONGS]: void;
+  [APP_EVENTS.SET_PLATFORMS]: { platforms: Platform[] };
 
   // LIVES
   [APP_EVENTS.GET_LIVES]: void;
