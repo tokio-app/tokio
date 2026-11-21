@@ -427,6 +427,40 @@ describe("live MCP tools", () => {
       expect(res.isError).toBe(false);
     });
 
+    it("connects and saves the YouTube channel it's given", async () => {
+      const { h, profile, updateProfileData } = setup();
+      profile.platforms = ["youtube"];
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("live", {
+        action: "connect",
+        youtube: " @creator ",
+      });
+
+      expect(res.isError).toBe(false);
+      expect(invoke).toHaveBeenCalledWith(APP_EVENTS.CONNECT, {
+        username: "",
+        channels: { youtube: "@creator" },
+      });
+      expect(updateProfileData).toHaveBeenCalledWith({
+        channels: { youtube: "@creator" },
+      });
+    });
+
+    it("needs a YouTube channel when the profile has none", async () => {
+      const { h, profile } = setup();
+      profile.platforms = ["youtube"];
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      expect((await call("live", { action: "connect" })).isError).toBe(true);
+      expect(invoke).not.toHaveBeenCalled();
+
+      profile.channels = { youtube: "saved" };
+      expect((await call("live", { action: "connect" })).isError).toBe(false);
+    });
+
     it("needs a username when the profile has none", async () => {
       const { h } = setup();
       const invoke = vi.spyOn(h.handler, "invoke");

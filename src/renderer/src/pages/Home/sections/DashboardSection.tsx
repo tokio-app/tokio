@@ -1,6 +1,10 @@
 import { MessageKey } from "@/common/i18n";
 import { PLATFORMS, Platform, PlatformStatus } from "@/common/types";
-import { EULER_SIGNUP_URL, PLATFORM_LABELS } from "@/common/util";
+import {
+  EULER_SIGNUP_URL,
+  PLATFORM_INPUT,
+  PLATFORM_LABELS,
+} from "@/common/util";
 import { Btn, Input } from "@/components";
 import { cx, formatDuration } from "@/helper";
 import { rich, useT } from "@/ui/i18n";
@@ -13,6 +17,8 @@ import { PLATFORM_ICONS } from "../helper";
 interface Props {
   username: string;
   usernameRef?: Ref<HTMLInputElement>;
+  // The channel typed for each platform that takes one, TikTok's aside
+  channels: Partial<Record<Platform, string>>;
   connected: boolean;
   // The connection dropped and is coming back, the LIVE goes on
   reconnecting: boolean;
@@ -35,6 +41,7 @@ interface Props {
   // Connects the platforms that are down
   onRetry: () => void;
   onUsernameChange: (username: string) => void;
+  onChannelChange: (platform: Platform, channel: string) => void;
   onConnect: () => void;
   onDisconnect: () => void;
 }
@@ -108,6 +115,7 @@ function PlatformPicker({
 export function DashboardSection({
   username,
   usernameRef,
+  channels,
   connected,
   reconnecting,
   waiting,
@@ -121,6 +129,7 @@ export function DashboardSection({
   onPlatformsChange,
   onRetry,
   onUsernameChange,
+  onChannelChange,
   onConnect,
   onDisconnect,
 }: Props) {
@@ -140,6 +149,15 @@ export function DashboardSection({
         value={username}
         disabled={busy}
         onChange={(e) => onUsernameChange(e.target.value)}
+      />
+    ) : PLATFORM_INPUT[platform] === "channel" ? (
+      <Input
+        className={styles.username}
+        data-channel={platform}
+        placeholder={t("home.dashboard.youtubeChannel")}
+        value={channels[platform] ?? ""}
+        disabled={busy}
+        onChange={(e) => onChannelChange(platform, e.target.value)}
       />
     ) : twitchLogin ? (
       <span className={styles.account}>{`@${twitchLogin}`}</span>

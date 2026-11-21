@@ -181,6 +181,25 @@ describe("HistoryService", () => {
     expect(again.top().allTime[0].platform).toBe("twitch");
   });
 
+  it("counts a gift without a price in the totals only, with no gifter", async () => {
+    const history = await loaded();
+    history.start("kai", 0);
+    const yui = { ...viewer("youtube:UC1"), platform: "youtube" as const };
+    gifts(history, [1, gift(yui, 0)], [2, gift(yui, 0)]);
+
+    expect(history.top().live).toEqual([]);
+    history.end(10);
+    await history.save();
+
+    expect(history.getHistory()).toMatchObject({
+      lives: [{ coins: 0, gifts: 2 }],
+      gifters: [],
+    });
+    expect((await read<LiveRecord>("0.json")).minutes).toEqual([
+      { minute: 0, gifters: { "": [0, 2] } },
+    ]);
+  });
+
   it("reads a platform it doesn't know as TikTok's", async () => {
     await mkdir(join(dir, "a"), { recursive: true });
     const gifter = {

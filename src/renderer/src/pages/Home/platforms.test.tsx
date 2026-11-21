@@ -118,7 +118,40 @@ describe("Home's platforms", () => {
 
     // Twitch's channel is the account
     await user.click(page().getByRole("button", { name: "Connect" }));
-    expect(sent(APP_EVENTS.CONNECT)).toEqual([{ username: "@streamer" }]);
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      { username: "@streamer", channels: {} },
+    ]);
+  });
+
+  it("gives YouTube a row with the saved channel, and connects with it", async () => {
+    const { user } = await renderApp();
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.platforms = ["tiktok", "youtube"];
+        p.connector.username = "@streamer";
+        p.channels = { youtube: "@saved" };
+      }),
+    );
+    const channel = page().getByPlaceholderText("@channel or LIVE link");
+    expect(channel).toHaveValue("@saved");
+
+    await user.clear(channel);
+    await user.type(channel, "@typed");
+    await user.click(page().getByRole("button", { name: "Connect" }));
+
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      { username: "@streamer", channels: { youtube: "@typed" } },
+    ]);
+  });
+
+  it("doesn't connect YouTube without a channel", async () => {
+    const { user } = await renderApp();
+    await usingPlatforms(["youtube"]);
+
+    await user.click(page().getByRole("button", { name: "Connect" }));
+
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([]);
   });
 
   it("says how each platform is doing, with Try again for one that's down", async () => {
@@ -134,7 +167,9 @@ describe("Home's platforms", () => {
     expect(within(twitch).getByText("Not connected")).toBeVisible();
 
     await user.click(within(twitch).getByRole("button", { name: "Try again" }));
-    expect(sent(APP_EVENTS.CONNECT)).toEqual([{ username: "@streamer" }]);
+    expect(sent(APP_EVENTS.CONNECT)).toEqual([
+      { username: "@streamer", channels: {} },
+    ]);
 
     await live({ tiktok: "reconnecting", twitch: "connecting" });
     expect(within(tiktok).getByText("Reconnecting…")).toBeVisible();
@@ -161,6 +196,11 @@ describe("Home's platforms", () => {
       ["Likes", "Total views", "Shares", "Gifts", "Coins"],
       [],
     ],
+    [
+      ["youtube"],
+      ["Gifts"],
+      ["New followers", "Likes", "Total views", "Shares", "Coins"],
+    ],
   ] as [Platform[], string[], string[]][])(
     "shows the stats %j has",
     async (platforms, shown, hidden) => {
@@ -168,12 +208,14 @@ describe("Home's platforms", () => {
       await usingPlatforms(platforms);
       await live({});
 
-      expect(stat("New followers")).toBeInTheDocument();
+      expect(stat("New followers") !== null).toBe(
+        !hidden.includes("New followers"),
+      );
       for (const label of shown) expect(stat(label)).toBeInTheDocument();
       for (const label of hidden) expect(stat(label)).not.toBeInTheDocument();
-      // Top gifters come with gifts
+      // Top gifters come with coins
       expect(page().queryByText("Top gifters") !== null).toBe(
-        shown.includes("Gifts"),
+        shown.includes("Coins"),
       );
     },
   );
@@ -252,6 +294,58 @@ describe("Home's platforms", () => {
     ]);
   });
 
+  it("renders YouTube's gifts, Super Chats and Super Stickers", async () => {
+    await renderApp();
+    const user = (name: string) => ({
+      handle: name,
+      name,
+      picture: "",
+      platform: "youtube" as const,
+    });
+    await send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+      data: liveSession({
+        activity: [
+          {
+            id: 3,
+            type: "gift",
+            user: user("Cy"),
+            gift: { name: "Heart", image: "", count: 1, coins: 0 },
+          },
+          {
+            id: 2,
+            type: "superchat",
+            user: user("Ann"),
+            amount: "€5.00",
+            text: "",
+            sticker: "https://example.com/sticker.png",
+          },
+          {
+            id: 1,
+            type: "superchat",
+            user: user("Bo"),
+            amount: "$4.99",
+            text: "hello",
+            sticker: "",
+          },
+        ],
+      }),
+    });
+
+    const items = within(
+      page().getByRole("list", { name: "Activity" }),
+    ).getAllByRole("listitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      // No "0 coins" for a gift without a price
+      "CCy sent Heart ",
+      "AAnn sent a €5.00 Super Sticker ",
+      "BBo sent a $4.99 Super Chathello",
+    ]);
+    expect(items[1].querySelector("img")).toHaveAttribute(
+      "src",
+      "https://example.com/sticker.png",
+    );
+  });
+
   it("offers only the feed kinds the profile's platforms send", async () => {
     const { user } = await renderApp();
     const dialog = () => within(screen.getByRole("dialog"));
@@ -286,6 +380,16 @@ describe("Home's platforms", () => {
       "Bits",
       "Raids",
       "Channel points",
+    ]);
+
+    await usingPlatforms(["youtube"]);
+
+    expect(await open()).toEqual([
+      "Chats",
+      "Gifts",
+      "New subs",
+      "Gifted subs",
+      "Super Chats",
     ]);
   });
 });

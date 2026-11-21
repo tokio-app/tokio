@@ -257,6 +257,66 @@ describe("home events", () => {
         }),
       ]);
     });
+    it("saves the channel typed over the profile's others", async () => {
+      const { h, profile, storeManagerService } = setup({ success: true });
+      profile.platforms = ["youtube"];
+      profile.channels = { youtube: "old", other: "kept" };
+
+      await h.invoke(home, APP_EVENTS.CONNECT, {
+        username: "",
+        channels: { youtube: "@new" },
+      });
+
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        channels: { youtube: "@new", other: "kept" },
+      });
+    });
+    it.each([
+      [
+        connectFailure("noChat", ""),
+        "@streamer",
+        "The chat is off on @streamer's LIVE. Turn it on in YouTube Studio, then connect again.",
+      ],
+      [
+        connectFailure("rateLimited", "", { retryAfterSeconds: 42 }),
+        "@streamer",
+        "YouTube is limiting Tokio's requests. Try again in a few minutes.",
+      ],
+      [
+        connectFailure("notFound", ""),
+        "@streamer",
+        "Couldn't find @streamer on YouTube. Check the username.",
+      ],
+      [
+        connectFailure("offline", ""),
+        "https://youtube.com/watch?v=abc",
+        "https://youtube.com/watch?v=abc isn't LIVE right now. Connect once the LIVE has started.",
+      ],
+    ])(
+      "says what YouTube's failures mean (%#)",
+      async (error, channel, message) => {
+        const { h, connectorService, profile } = setup({
+          success: false,
+          error,
+        });
+        profile.platforms = ["youtube"];
+
+        await h.invoke(home, APP_EVENTS.CONNECT, {
+          username: "",
+          channels: { youtube: channel },
+        });
+
+        expect(connectorService.connect).toHaveBeenCalledWith({
+          youtube: channel.replace(/^@/, ""),
+        });
+        expect(h.notices).toEqual([
+          expect.objectContaining({
+            code: FEEDBACK_CODES.CONNECT_FAILED,
+            message,
+          }),
+        ]);
+      },
+    );
   });
 
   describe("CONNECT on several platforms", () => {
@@ -752,6 +812,7 @@ describe("home events", () => {
       cheer: true,
       raid: true,
       redeem: true,
+      superchat: true,
     };
 
     it("saves the feed and replies with the events it still shows", async () => {

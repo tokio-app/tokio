@@ -7,7 +7,7 @@ import {
   TimerData,
   TimerState,
 } from "@/common/types";
-import { TIMER_TRIGGERS, triggersFor } from "@/common/util";
+import { timerTriggersOn } from "@/common/util";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
 
@@ -85,10 +85,15 @@ const TRIGGERS: {
     rule: "tools.rules.perGiftSub",
   },
   { key: "bit", label: "tools.triggers.bit", rule: "tools.rules.perBit" },
+  {
+    key: "superchat",
+    label: "tools.triggers.superchat",
+    rule: "tools.rules.each",
+  },
 ];
 
 // The rows whose events one of the platforms sends
 export const triggersOn = (platforms: readonly Platform[]) => {
-  const sent = triggersFor(platforms);
-  return TRIGGERS.filter(({ key }) => sent.includes(TIMER_TRIGGERS[key]));
+  const applies = timerTriggersOn(platforms);
+  return TRIGGERS.filter(({ key }) => applies(key));
 };

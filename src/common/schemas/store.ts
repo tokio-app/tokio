@@ -46,6 +46,7 @@ export const ActivityFeedSchema = z.object({
   cheer: z.boolean().default(true),
   raid: z.boolean().default(true),
   redeem: z.boolean().default(true),
+  superchat: z.boolean().default(true),
 });
 
 // The Twitch account Tokio signed in to, the same for every profile. key is

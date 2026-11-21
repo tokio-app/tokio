@@ -7,9 +7,9 @@ import {
   Platform,
   TOKIO_EVENTS,
 } from "@/common/types";
-import { PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
+import { countsCoins, PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
 import type { IconType } from "react-icons";
-import { FaTiktok, FaTwitch } from "react-icons/fa";
+import { FaTiktok, FaTwitch, FaYoutube } from "react-icons/fa";
 
 // Until main answers
 export const NO_SESSION: LiveSession = {
@@ -23,6 +23,7 @@ export const NO_SESSION: LiveSession = {
 export const PLATFORM_ICONS: Record<Platform, IconType> = {
   tiktok: FaTiktok,
   twitch: FaTwitch,
+  youtube: FaYoutube,
 };
 
 // The kinds of events the feed can show, as its settings list them, with
@@ -51,6 +52,11 @@ const FEED_KINDS: {
   { kind: "cheer", label: "home.feed.cheer", trigger: TOKIO_EVENTS.CHEER },
   { kind: "raid", label: "home.feed.raid", trigger: TOKIO_EVENTS.RAID },
   { kind: "redeem", label: "home.feed.redeem", trigger: TOKIO_EVENTS.REDEEM },
+  {
+    kind: "superchat",
+    label: "home.feed.superchat",
+    trigger: TOKIO_EVENTS.SUPER_CHAT,
+  },
 ];
 
 // The kinds the platforms send
@@ -60,7 +66,7 @@ export const feedKinds = (platforms: readonly Platform[]) => {
 };
 
 // Gifts, their coins and top gifters come with a platform that sends gifts
-export const sendsGifts = (platforms: readonly Platform[]) =>
+const sendsGifts = (platforms: readonly Platform[]) =>
   platforms.some((p) => PLATFORM_TRIGGERS[p].includes(TOKIO_EVENTS.GIFT));
 
 // The stats the platforms have: likes and shares are TikTok's
@@ -70,14 +76,19 @@ export function liveStats(
 ): Stat[] {
   const tiktok = platforms.includes("tiktok");
   const gifts = sendsGifts(platforms);
+  // YouTube sends no follows
+  const follows = triggersFor(platforms).includes(TOKIO_EVENTS.FOLLOW);
   const stats: (Stat | false)[] = [
     tiktok && { label: "home.stats.likes", value: values.likes },
     // Only TikTok counts a LIVE's total views; Twitch sends 0
     tiktok && { label: "home.stats.totalViews", value: values.views },
-    { label: "home.totals.followers", value: values.followers },
+    follows && { label: "home.totals.followers", value: values.followers },
     tiktok && { label: "home.totals.shares", value: values.shares },
     gifts && { label: "home.totals.gifts", value: values.gifts },
-    gifts && { label: "home.totals.coins", value: values.coins },
+    countsCoins(platforms) && {
+      label: "home.totals.coins",
+      value: values.coins,
+    },
   ];
   return stats.filter((stat) => stat !== false);
 }

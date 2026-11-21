@@ -35,6 +35,14 @@ export type Activity =
   | { type: "cheer"; user: ActivityUser; bits: number; text: string }
   | { type: "raid"; user: ActivityUser; viewers: number }
   | { type: "redeem"; user: ActivityUser; reward: string; text: string }
+  // amount as YouTube shows it, sticker a Super Sticker's picture or ""
+  | {
+      type: "superchat";
+      user: ActivityUser;
+      amount: string;
+      text: string;
+      sticker: string;
+    }
   // Joins in a row share one item: the first users and how many joined
   | { type: "join"; users: ActivityUser[]; count: number };
 

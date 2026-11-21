@@ -38,6 +38,7 @@ export const ACTIVITY_EVENTS = [
   TOKIO_EVENTS.CHEER,
   TOKIO_EVENTS.RAID,
   TOKIO_EVENTS.REDEEM,
+  TOKIO_EVENTS.SUPER_CHAT,
 ] as const;
 
 type ActivityEvent = (typeof ACTIVITY_EVENTS)[number];
@@ -154,6 +155,15 @@ export class LiveService extends Service {
         user: activityUser(user),
         reward: reward.title,
         text: input,
+      }),
+    // Not in the coins: its amount is in the viewer's currency
+    [TOKIO_EVENTS.SUPER_CHAT]: ({ user, amount, message, sticker }) =>
+      this._add({
+        type: "superchat",
+        user: activityUser(user),
+        amount,
+        text: message,
+        sticker,
       }),
   };
 

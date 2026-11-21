@@ -30,6 +30,8 @@ const TimerSecondsSchema = z.object({
   gift_sub: addedSeconds(300),
   // Per Bit, as per coin
   bit: addedSeconds(1),
+  // Per Super Chat or Super Sticker, whatever it cost: currencies differ
+  superchat: addedSeconds(300),
 });
 
 // Which chat messages add time
@@ -56,6 +58,7 @@ const TimerNamesSchema = z.object({
   sub: name,
   gift_sub: name,
   bit: name,
+  superchat: name,
 });
 
 // How the overlay shows the timer

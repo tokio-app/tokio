@@ -3,7 +3,7 @@ import { OverlayConfigRedux } from "./overlay";
 
 // The platforms Tokio connects to, in the order Home lists them. A new one
 // gets its provider, its row in PLATFORM_TRIGGERS and its texts.
-export const PLATFORMS = ["tiktok", "twitch"] as const;
+export const PLATFORMS = ["tiktok", "twitch", "youtube"] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
 // How a platform's connection is doing while it's on: connecting, connected,
@@ -174,6 +174,17 @@ export interface RedeemEvent {
   input: string;
 }
 
+// A Super Chat or Super Sticker a viewer bought on YouTube
+export interface SuperChatEvent {
+  user: UserData;
+  // As YouTube shows it, in the viewer's currency: "$5.00", "MX$100.00"
+  amount: string;
+  // What the viewer wrote, "" for none or a sticker
+  message: string;
+  // A Super Sticker's picture, "" for a Super Chat
+  sticker: string;
+}
+
 export interface Gift {
   id: number;
   name: string;
@@ -207,6 +218,7 @@ export enum TOKIO_EVENTS {
   CHEER = "tokio:event:cheer",
   RAID = "tokio:event:raid",
   REDEEM = "tokio:event:redeem",
+  SUPER_CHAT = "tokio:event:superchat",
 
   // EXTERNAL - MUSIC
   MUSIC_CHANGE = "tokio:event:music:change",
@@ -245,6 +257,7 @@ export interface TokioEventMap {
   [TOKIO_EVENTS.CHEER]: CheerEvent;
   [TOKIO_EVENTS.RAID]: RaidEvent;
   [TOKIO_EVENTS.REDEEM]: RedeemEvent;
+  [TOKIO_EVENTS.SUPER_CHAT]: SuperChatEvent;
 
   // EXTERNAL - MUSIC
   [TOKIO_EVENTS.MUSIC_CHANGE]: MusicInfo[];
@@ -294,6 +307,7 @@ export const ALERT_TRIGGER_LABELS: Record<AlertTrigger, MessageKey> = {
   [TOKIO_EVENTS.CHEER]: "triggers.cheer",
   [TOKIO_EVENTS.RAID]: "triggers.raid",
   [TOKIO_EVENTS.REDEEM]: "triggers.redeem",
+  [TOKIO_EVENTS.SUPER_CHAT]: "triggers.superChat",
   [TOKIO_EVENTS.MUSIC_CHANGE]: "triggers.musicChange",
 };
 

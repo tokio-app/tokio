@@ -13,7 +13,7 @@ paths:
 
 # Platforms
 
-Tokio connects to TikTok and Twitch (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`. YouTube and Kick come later (the user's call): YouTube without a key, Kick through its site's socket. YouTube's Gifts and Kick's Kicks will count as `GIFT`, with their price as coins. Twitch's Bits are `CHEER`.
+Tokio connects to TikTok, Twitch and YouTube (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`. Kick comes later, through its site's socket (the user's call), its Kicks counting as `GIFT` with their price as coins. Twitch's Bits are `CHEER`, YouTube's Super Chats and Super Stickers `SUPER_CHAT`, and YouTube's Gifts `GIFT`.
 
 ## What the user chose
 
@@ -22,6 +22,7 @@ Tokio connects to TikTok and Twitch (`PLATFORMS`, `src/common/types/connector.ts
 - A trigger row is `[platform] [event]` (the user's call). The platform select shows only once the profile uses two or more platforms, or when the row already has one saved.
 - Twitch connects through the streamer's sign-in: Twitch's official EventSub over WebSocket and Helix, the device code flow, a public client. The client ID isn't a secret and ships in `providers/twitch/config`. Nothing else of Twitch's is shipped, and no code is copied from any Twitch, YouTube or Kick library, only MIT, BSD and Apache references are read (Licensing in `AGENTS.md`).
 - One Twitch account for every profile; a profile only picks whether to use it.
+- YouTube connects with no key and no sign-in (the user's call): Tokio reads the LIVE's public chat the way youtube.com does, accepting YouTube's terms and that a change to its site can break it. The profile's `channels.youtube` is the handle or link typed on Home.
 
 ## The session across platforms
 
@@ -54,8 +55,8 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 
 - Followers and fan levels: a Twitch chatter's `follower` is false and `fanLevel` missing, so **Followers** and **Minimum fan level** never pass them. Moderators and Super Fans work (Twitch's broadcaster and moderators, subscribers and founders). The permissions section and the website say so in one line.
 - Chat language: translation stays TikTok's (the user's call: letting Google detect Twitch's messages would spend its rate limit on the streamer's own language; `.claude/rules/translation.md`).
-- Follows: every follow counts, a viewer's repeat follows in one LIVE included (the user's call). Twitch sends one each time a viewer follows again after unfollowing.
-- Chat pictures: Twitch chat goes without (`shortcut:` in `providers/twitch/index.ts`), `Avatar` shows the initial. Follows, subs, cheers and redeems look their picture up once and cache it.
+- Follows: every follow counts, a viewer's repeat follows in one LIVE included (the user's call). Twitch sends one each time a viewer follows again after unfollowing. YouTube sends none: new channel subscribers don't show in its chat.
+- Chat pictures: Twitch chat goes without (`shortcut:` in `providers/twitch/index.ts`), `Avatar` shows the initial. Follows, subs, cheers and redeems look their picture up once and cache it. YouTube's chat carries every author's picture.
 - Fans stay TikTok's (`.claude/rules/fans.md`).
 
 ## Twitch
@@ -72,6 +73,18 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - Anonymous gifters and cheerers get a user with `platform` and no id.
 - The sign-in code stays hidden until **Show** (`TwitchSection`): streamers show their screen, and a viewer who typed it would sign Tokio into their own account. Sign-in and sign-out are never in MCP (`.claude/rules/mcp.md`), since they need the streamer at a browser, and Sign out is refused while Twitch is connected.
 - `CLIENT_ID` in `providers/twitch/config` is the Tokio app the user registered on dev.twitch.tv: a public client (no secret), its only redirect `http://localhost`, which the device flow never uses. It isn't a secret.
+
+## YouTube
+
+- Everything comes from YouTube's public pages, as youtube.com reads them: `/@handle/live` finds the LIVE (a 404 is `notFound`; a canonical link to `/channel/…`, or `isUpcoming`, is `offline`), the chat page gives the **Live chat** continuation (Top chat filters messages), `get_live_chat` is polled, and `updated_metadata` gives the viewers every 30 s. Bare input is a handle, since an 11-character handle looks like a video id; only links give a video id.
+- Every request sends a desktop Chrome user agent, `hl=en&gl=US` and the `SOCS` cookie. The mapping reads English text ("Sent 20 … gift memberships", "sent Vice City heart", "Member for 6 months") and amounts as en-US shows them ("$4.99", "MX$100.00"), and the cookie answers the EU consent page, which would otherwise come instead of the LIVE.
+- The first `get_live_chat` answer is the chat's recent history and is dropped whole: Gifts carry no timestamp, so a time filter would let old ones through.
+- The end shows first in `updated_metadata`: within 30 s its viewership renderer loses `isLive` (it doesn't turn false) and counts the video's views ("72,481 views", "Streamed live …"), while the chat keeps answering for minutes. A missing `isLive` ends the connection with `ended`, and its count is never sent as viewers; a chat answer without a continuation ends it too.
+- Gifts (`giftMessageViewModel`) carry no price and no channel id. They arrive as `GIFT` with `coins: 0` (`shortcut:` in `providers/youtube`), a sender id `youtube:@handle` and a gift id from the picture's file name. Everyone else's id is `youtube:<channel id>`, so one viewer has two ids.
+- `GIFT_COINS` (`src/common/util/platforms.ts`) says whose gifts have a price, a `Record` so a new platform has to decide. Coins, Top gifters and the timer's coin row need one (`countsCoins`), and a gift worth 0 coins never makes its sender a gifter (the user's call: hide the zero, `.claude/rules/history.md`).
+- A gifted membership counts once, from its purchase announcement, with the count read from its text; each recipient's redemption is dropped.
+- Super Chat amounts stay as YouTube shows them (`amount`). The timer adds the same seconds per Super Chat whatever it cost, since currencies differ, and Coin stats leave them out.
+- Placeholder items (`liveChatPlaceholderItemRenderer`) are messages held from readers and never filled in: ignored.
 
 ## The window
 

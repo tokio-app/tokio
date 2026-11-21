@@ -34,6 +34,7 @@ describe("TimerSettingsSchema's names", () => {
       sub: "",
       gift_sub: "",
       bit: "",
+      superchat: "",
     });
     // An English name in a Spanish Tokio too
     expect(names({ follow: "Follow", share: "Compartir" })).toMatchObject({
@@ -69,6 +70,12 @@ describe("timerTriggers", () => {
       { label: "Follow", value: "+1:00" },
       { label: "Share", value: "+20s" },
     ]);
+  });
+
+  it("lists a Super Chat, and no coins, for a YouTube profile", () => {
+    expect(
+      timerTriggers(settings(), "en", ["youtube"]).map((t) => t.label),
+    ).toEqual(["New sub", "Gifted sub", "Super Chat"]);
   });
 
   it("uses the streamer's names, and shows the chat keyword viewers need", () => {

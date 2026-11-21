@@ -1562,12 +1562,12 @@ describe("OverlayService", () => {
     const test = (id: string) => {
       const payloads = service.getTestPayloads(id);
       const join = payloads.find((p) => p.type === TOKIO_EVENTS.MEMBER_JOIN);
-      // Twitch's events come from viewers of their own
+      // Twitch's and YouTube's events come from viewers of their own
       const viewers = payloads.flatMap((p) =>
         p.type !== "tokio:config" &&
         p.data &&
         "user" in p.data &&
-        p.data.user.platform !== "twitch"
+        (p.data.user.platform ?? "tiktok") === "tiktok"
           ? [p.data.user.handle]
           : [],
       );

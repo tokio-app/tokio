@@ -2,6 +2,7 @@ import { ALERT_TRIGGERS } from "@/common/schemas";
 import { EMOTE_TRIGGER, PLATFORMS, TOKIO_EVENTS } from "@/common/types";
 import { describe, expect, it } from "vitest";
 import {
+  countsCoins,
   isPlatform,
   PLATFORM_TRIGGERS,
   platformOf,
@@ -34,8 +35,11 @@ describe("platforms", () => {
   });
 
   it("joins the triggers of several platforms in the triggers' order", () => {
-    const both = triggersFor(["twitch", "tiktok"]);
-    expect(both).toEqual(ALERT_TRIGGERS);
+    const all = triggersFor(["youtube", "twitch", "tiktok"]);
+    expect(all).toEqual(ALERT_TRIGGERS);
+    expect(triggersFor(["twitch", "tiktok"])).toEqual(
+      ALERT_TRIGGERS.filter((t) => t !== TOKIO_EVENTS.SUPER_CHAT),
+    );
     expect(triggersFor(["twitch"])).toEqual([
       TOKIO_EVENTS.CHAT,
       EMOTE_TRIGGER,
@@ -47,6 +51,22 @@ describe("platforms", () => {
       TOKIO_EVENTS.REDEEM,
       TOKIO_EVENTS.MUSIC_CHANGE,
     ]);
+    expect(triggersFor(["youtube"])).toEqual([
+      TOKIO_EVENTS.CHAT,
+      EMOTE_TRIGGER,
+      TOKIO_EVENTS.GIFT,
+      TOKIO_EVENTS.SUBSCRIBE,
+      TOKIO_EVENTS.GIFT_SUB,
+      TOKIO_EVENTS.SUPER_CHAT,
+      TOKIO_EVENTS.MUSIC_CHANGE,
+    ]);
+  });
+
+  it("counts coins only with a platform whose gifts have a price", () => {
+    expect(countsCoins(["tiktok"])).toBe(true);
+    expect(countsCoins(["youtube", "tiktok"])).toBe(true);
+    expect(countsCoins(["youtube"])).toBe(false);
+    expect(countsCoins(["twitch", "youtube"])).toBe(false);
   });
 
   it("reads a viewer without a platform as TikTok's", () => {
