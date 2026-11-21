@@ -140,3 +140,44 @@
   color: var(--font-secondary);
   font-size: var(--font-sm);
 }
+
+/* TWITCH: the account signed in to, and the sign-in's code */
+
+.twitch_account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--font-primary);
+  font-weight: 500;
+}
+
+.twitch_code {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.twitch_label {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+.twitch_value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* The code as Twitch's page shows it, in the readout */
+.twitch_digits {
+  min-width: 8ch;
+  color: var(--font-primary);
+  font-size: var(--font-2xl);
+  font-stretch: var(--stretch-readout);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}

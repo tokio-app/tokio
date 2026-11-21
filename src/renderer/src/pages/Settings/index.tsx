@@ -24,6 +24,7 @@ import { ServerSection } from "./sections/ServerSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { TranslationSection } from "./sections/TranslationSection";
 import { TraySection } from "./sections/TraySection";
+import { TwitchSection } from "./sections/TwitchSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { VoiceKeysSection } from "./sections/VoiceKeysSection";
 
@@ -57,6 +58,13 @@ export function Settings() {
 
   useIpcListener(APP_EVENTS_RESPONSE.GET_SETTINGS, (res) => {
     if (res?.success) setStore(res.data!);
+  });
+
+  useIpcListener(APP_EVENTS_RESPONSE.TWITCH_ACCOUNT, (res) => {
+    if (!res?.success) return;
+    updateStore((s) => {
+      s.settings.accounts.twitch.login = res.login;
+    });
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.SET_SHORTCUTS, (res) => {
@@ -121,6 +129,8 @@ export function Settings() {
       <Page width="wide" layout="aside">
         {/* First: connecting needs its key */}
         <ProvidersSection settings={store.settings} />
+
+        <TwitchSection login={store.settings.accounts.twitch.login} />
 
         <ServerSection
           enabled={store.settings.server.enabled}
