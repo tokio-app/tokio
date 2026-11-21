@@ -30,6 +30,7 @@ export const TIMER_EVENTS = [
   TOKIO_EVENTS.SUBSCRIBE,
   TOKIO_EVENTS.GIFT_SUB,
   TOKIO_EVENTS.CHEER,
+  TOKIO_EVENTS.SUPER_CHAT,
 ] as const;
 
 type TimerEvent = (typeof TIMER_EVENTS)[number];
@@ -106,6 +107,8 @@ export class TimerService extends Service {
     [TOKIO_EVENTS.GIFT_SUB]: ({ count }) =>
       Math.max(0, count) * this._seconds().gift_sub,
     [TOKIO_EVENTS.CHEER]: ({ bits }) => Math.max(0, bits) * this._seconds().bit,
+    // Once each, whatever its amount: currencies differ
+    [TOKIO_EVENTS.SUPER_CHAT]: () => this._seconds().superchat,
   };
 
   public initialize({ store }: { store: Store }) {

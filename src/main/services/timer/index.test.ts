@@ -80,6 +80,7 @@ const settings = (
       sub: 0,
       gift_sub: 0,
       bit: 0,
+      superchat: 0,
       ...seconds,
     },
   });
@@ -272,6 +273,11 @@ describe("TimerService", () => {
         TOKIO_EVENTS.SUBSCRIBE,
         "sub",
         { user: viewer("a"), tier: "1000", months: 3, message: "" },
+      ],
+      [
+        TOKIO_EVENTS.SUPER_CHAT,
+        "superchat",
+        { user: viewer("a"), amount: "$100.00", message: "", sticker: "" },
       ],
     ] as const)("adds the seconds of %s", (event, key, data) => {
       ready(settings({}, { [key]: 7 }));
