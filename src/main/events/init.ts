@@ -248,12 +248,13 @@ const registerConnectorEvents = ({
         if (win.isDestroyed()) return;
         win.webContents.send(APP_EVENTS_RESPONSE.ALERT_AUDIO, audio);
       },
-      (alert, error) => {
-        const label = t(ALERT_TRIGGER_LABELS[alert.trigger.type]);
+      (alert, error, row) => {
+        // The row that fired: an Or row can differ from the alert's first
+        const label = t(ALERT_TRIGGER_LABELS[row.type]);
         // Logs stay English
         const logged = translate(
           DEFAULT_LANGUAGE,
-          ALERT_TRIGGER_LABELS[alert.trigger.type],
+          ALERT_TRIGGER_LABELS[row.type],
         );
         const options = {
           key: `alert:${alert.id}`,

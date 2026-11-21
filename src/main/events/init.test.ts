@@ -10,6 +10,7 @@ import {
   StudioGroupSchema,
   StudioOverlay,
   TimerSettingsSchema,
+  Trigger,
   TriggerSchema,
 } from "@/common/schemas";
 import {
@@ -684,8 +685,14 @@ describe("init events", () => {
       await vi.waitFor(() => {
         expect(s.alertsService.handle).toHaveBeenCalled();
       });
-      const callback = s.alertsService.handle.mock.calls[0][4];
-      if (!callback) throw new Error("The alerts got no failure callback.");
+      const onError = s.alertsService.handle.mock.calls[0][4];
+      if (!onError) throw new Error("The alerts got no failure callback.");
+      // The row that fired is the alert's own unless a test gives another
+      const callback = (
+        failed: Alert,
+        error?: string,
+        row: Trigger = failed.trigger,
+      ) => onError(failed, error, row);
       return { s, callback };
     }
 
@@ -701,6 +708,27 @@ describe("init events", () => {
           code: FEEDBACK_CODES.ALERT_TTS_FAILED,
           message:
             "Unable to speak the Follow alert. Try another voice in Alerts.",
+        }),
+      ]);
+    });
+
+    it("names the Or row that fired, not the alert's first", async () => {
+      const { s, callback } = await onFailure();
+      const first = alert();
+
+      callback(
+        {
+          ...first,
+          also_triggers: [{ ...first.trigger, type: EMOTE_TRIGGER }],
+        },
+        undefined,
+        { ...first.trigger, type: EMOTE_TRIGGER },
+      );
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          message:
+            "The sound of the Emote alert is missing. Pick it again in Alerts.",
         }),
       ]);
     });

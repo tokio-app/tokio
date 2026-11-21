@@ -284,7 +284,11 @@ describe("AlertsService", () => {
         onError,
       );
 
-      expect(onError).toHaveBeenCalledExactlyOnceWith(gone, expect.any(String));
+      expect(onError).toHaveBeenCalledExactlyOnceWith(
+        gone,
+        expect.any(String),
+        gone.trigger,
+      );
       expect(sent.map((a) => a.id)).toEqual(["alert-1"]);
       expect(logError).not.toHaveBeenCalled();
     });
@@ -471,6 +475,141 @@ describe("AlertsService", () => {
         await run(TOKIO_EVENTS.CHAT, chat("Hi there!"), alerts),
       ).toHaveLength(1);
       expect(await run(TOKIO_EVENTS.CHAT, chat("this"), alerts)).toEqual([]);
+    });
+
+    describe("with Or triggers", () => {
+      const either = (items: Partial<Alert>[], simultaneous = false) =>
+        settings(
+          items.map((item) =>
+            alert({
+              trigger: trigger(TOKIO_EVENTS.FOLLOW),
+              also_triggers: [trigger(TOKIO_EVENTS.SHARE)],
+              ...item,
+            }),
+          ),
+          simultaneous,
+        );
+
+      it("plays on any of its triggers, and on no other event", async () => {
+        const alerts = either([{}]);
+
+        expect(await run(TOKIO_EVENTS.FOLLOW, { user }, alerts)).toHaveLength(
+          1,
+        );
+        expect(
+          await run(TOKIO_EVENTS.SHARE, { user, shareCount: 1 }, alerts),
+        ).toHaveLength(1);
+        expect(await run(TOKIO_EVENTS.CHAT, chat("hi"), alerts)).toEqual([]);
+      });
+
+      it("plays once when several rows take the event", async () => {
+        const alerts = either([
+          { also_triggers: [trigger(TOKIO_EVENTS.FOLLOW)] },
+        ]);
+
+        expect(await run(TOKIO_EVENTS.FOLLOW, { user }, alerts)).toHaveLength(
+          1,
+        );
+      });
+
+      it("skips a row whose filter fails", async () => {
+        const alerts = either([
+          {
+            trigger: trigger(TOKIO_EVENTS.CHAT, { keyword: "hi" }),
+            also_triggers: [trigger(TOKIO_EVENTS.GIFT, { gifts: [1] })],
+          },
+        ]);
+
+        expect(await run(TOKIO_EVENTS.CHAT, chat("hi"), alerts)).toHaveLength(
+          1,
+        );
+        expect(await run(TOKIO_EVENTS.CHAT, chat("bye"), alerts)).toEqual([]);
+        expect(await run(TOKIO_EVENTS.GIFT, gift("2", true), alerts)).toEqual(
+          [],
+        );
+        expect(
+          await run(TOKIO_EVENTS.GIFT, gift("1", true), alerts),
+        ).toHaveLength(1);
+      });
+
+      it("lets the row that matched decide the channel", async () => {
+        const [follow, share] = [
+          await run(TOKIO_EVENTS.FOLLOW, { user }, either([{}], true)),
+          await run(
+            TOKIO_EVENTS.SHARE,
+            { user, shareCount: 1 },
+            either([{}], true),
+          ),
+        ];
+
+        expect(follow[0].channel).toBe(`alerts:${TOKIO_EVENTS.FOLLOW}`);
+        expect(share[0].channel).toBe(`alerts:${TOKIO_EVENTS.SHARE}`);
+      });
+
+      it("lets the row that matched decide the repeat on every gift", async () => {
+        vi.useFakeTimers();
+        const alerts = either([
+          {
+            trigger: trigger(TOKIO_EVENTS.GIFT),
+            also_triggers: [trigger(TOKIO_EVENTS.GIFT, { every_gift: true })],
+          },
+        ]);
+        const repeats = async (event: GiftEvent) =>
+          (await run(TOKIO_EVENTS.GIFT, event, alerts)).map((a) => a.repeat);
+
+        // The streak's update only suits the second row, which repeats
+        expect(await repeats(gift("5655", false, { comboCount: 3 }))).toEqual([
+          3,
+        ]);
+        // Its end suits the first, which plays once
+        expect(await repeats(gift("5655", true, { comboCount: 3 }))).toEqual([
+          1,
+        ]);
+        vi.useRealTimers();
+      });
+
+      it("gives the matched row to onError", async () => {
+        const gone = alert({
+          trigger: trigger(TOKIO_EVENTS.CHAT),
+          also_triggers: [trigger(EMOTE_TRIGGER)],
+          sound: { name: "Gone", file: "gone.mp3", start: 0, end: null },
+        });
+        const onError = vi.fn();
+
+        await service.handle(
+          TOKIO_EVENTS.CHAT,
+          chat("", "e1"),
+          settings([gone]),
+          () => {},
+          onError,
+        );
+
+        // The Chat row takes any message first
+        expect(onError).toHaveBeenCalledExactlyOnceWith(
+          gone,
+          expect.any(String),
+          gone.trigger,
+        );
+        onError.mockClear();
+        const emoteOnly = {
+          ...gone,
+          trigger: trigger(TOKIO_EVENTS.CHAT, { keyword: "zzz" }),
+        };
+
+        await service.handle(
+          TOKIO_EVENTS.CHAT,
+          chat("", "e1"),
+          settings([emoteOnly]),
+          () => {},
+          onError,
+        );
+
+        expect(onError).toHaveBeenCalledExactlyOnceWith(
+          emoteOnly,
+          expect.any(String),
+          emoteOnly.also_triggers[0],
+        );
+      });
     });
 
     it("fires emote alerts without picks on chats with any emote", async () => {
@@ -821,7 +960,11 @@ describe("AlertsService", () => {
 
         await speak(gift("5655", true), withTts([failing]));
 
-        expect(onError).toHaveBeenCalledExactlyOnceWith(failing, "offline");
+        expect(onError).toHaveBeenCalledExactlyOnceWith(
+          failing,
+          "offline",
+          failing.trigger,
+        );
       });
 
       it("leaves a failed message's log to the caller, but logs a preview's", async () => {

@@ -109,6 +109,21 @@ describe("chatCommands", () => {
     ]);
   });
 
+  it("keeps the keywords of an alert's Or rows", async () => {
+    const profile = structuredClone(defaultProfile);
+    profile.alerts.items = [
+      {
+        ...alert("first", true, TOKIO_EVENTS.FOLLOW),
+        also_triggers: [trigger("second")],
+      },
+      { ...alert("off", false), also_triggers: [trigger("hidden")] },
+    ];
+
+    expect((await chatCommands(services(profile))).keywords).toEqual([
+      "second",
+    ]);
+  });
+
   it("leaves out the timer's keyword while chat adds no time", async () => {
     const profile = structuredClone(defaultProfile);
     profile.timer.settings.chat.keyword = "time";
