@@ -636,6 +636,7 @@ describe("Home", () => {
             cheer: false,
             raid: false,
             redeem: false,
+            superchat: false,
           };
         }),
       );
@@ -699,6 +700,7 @@ describe("Home", () => {
             cheer: true,
             raid: true,
             redeem: true,
+            superchat: true,
           },
         },
       ]);

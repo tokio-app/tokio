@@ -149,6 +149,7 @@ describe("settings MCP sections", () => {
         cheer: true,
         raid: true,
         redeem: true,
+        superchat: true,
       };
       expect(updateActivityFeed).toHaveBeenCalledExactlyOnceWith(feed);
       expect(setFeed).toHaveBeenCalledWith(feed);

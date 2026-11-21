@@ -19,6 +19,7 @@ export const TIMER_TRIGGERS = {
   sub: TOKIO_EVENTS.SUBSCRIBE,
   gift_sub: TOKIO_EVENTS.GIFT_SUB,
   bit: TOKIO_EVENTS.CHEER,
+  superchat: TOKIO_EVENTS.SUPER_CHAT,
 } as const satisfies Record<keyof TimerSettings["look"]["names"], AlertTrigger>;
 
 // "5s", "0.5s", "1:30", "1:00:00", as the countdown timer shows time added.
@@ -74,6 +75,7 @@ export function timerTriggers(
     ["sub", name("sub"), seconds.sub],
     ["gift_sub", name("gift_sub"), seconds.gift_sub],
     ["bit", `1 ${name("bit")}`, seconds.bit],
+    ["superchat", name("superchat"), seconds.superchat],
   ];
   return triggers
     .filter(

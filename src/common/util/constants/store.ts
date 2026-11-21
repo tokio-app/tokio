@@ -58,6 +58,7 @@ export const defaultStoreData: StoreSchema = {
       cheer: true,
       raid: true,
       redeem: true,
+      superchat: true,
     },
     accounts: { twitch: { id: "", login: "", key: "" } },
     games: {

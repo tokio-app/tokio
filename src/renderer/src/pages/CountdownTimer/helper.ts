@@ -85,6 +85,11 @@ const TRIGGERS: {
     rule: "tools.rules.perGiftSub",
   },
   { key: "bit", label: "tools.triggers.bit", rule: "tools.rules.perBit" },
+  {
+    key: "superchat",
+    label: "tools.triggers.superchat",
+    rule: "tools.rules.each",
+  },
 ];
 
 // The rows whose events one of the platforms sends

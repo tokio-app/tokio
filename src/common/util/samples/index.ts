@@ -13,6 +13,7 @@ import {
   RoomUserEvent,
   ShareEvent,
   SubscribeEvent,
+  SuperChatEvent,
   TOKIO_EVENTS,
   TokioEventMap,
   TokioPayload,
@@ -144,6 +145,43 @@ const redeemEventFactory = (user = twitchUserFactory()): RedeemEvent => {
   };
 };
 
+// A YouTube viewer: a handle for a name, a namespaced channel id, no fan
+// level and no follower flag
+const youtubeUserFactory = (): UserData => {
+  const handle = `${pickRandom(ADJECTIVES)}${pickRandom(NOUNS)}${randomInt(1, 9999)}`;
+  return {
+    username: handle,
+    handle,
+    profilePictures: [`https://picsum.photos/seed/${handle}/200/200`],
+    follower: false,
+    superfan: randomBool(0.3),
+    moderator: randomBool(0.05),
+    userId: `youtube:UC${randomInt(1e8, 9e8)}`,
+    platform: "youtube",
+  };
+};
+
+const SUPER_CHAT_AMOUNTS = [
+  "$2.00",
+  "$5.00",
+  "$5.00",
+  "$10.00",
+  "€5.00",
+  "MX$100.00",
+];
+
+const superChatEventFactory = (user = youtubeUserFactory()): SuperChatEvent => {
+  const sticker = randomBool(0.2);
+  return {
+    user,
+    amount: pickRandom(SUPER_CHAT_AMOUNTS),
+    message: sticker ? "" : pickRandom(CHAT_MESSAGES),
+    sticker: sticker
+      ? `https://picsum.photos/seed/${user.handle}-sticker/200/200`
+      : "",
+  };
+};
+
 const singleUserFactory = () => ({
   user: userFactory(),
 });
@@ -256,6 +294,7 @@ const TIKTOK_EVENT_SAMPLES: {
   [TOKIO_EVENTS.CHEER]: cheerEventFactory,
   [TOKIO_EVENTS.RAID]: raidEventFactory,
   [TOKIO_EVENTS.REDEEM]: redeemEventFactory,
+  [TOKIO_EVENTS.SUPER_CHAT]: superChatEventFactory,
   [TOKIO_EVENTS.MUSIC_CHANGE]: musicFactory,
 };
 
@@ -306,6 +345,7 @@ export const createTestLive = () => {
   );
   // Twitch's events come from a few viewers of their own
   const twitch = Array.from({ length: 3 }, twitchUserFactory);
+  const youtube = Array.from({ length: 3 }, youtubeUserFactory);
   let viewers = randomInt(20, 200);
   let views = viewers + randomInt(50, 2000);
   let totalLikes = randomInt(500, 20000);
@@ -452,6 +492,10 @@ export const createTestLive = () => {
       {
         type: TOKIO_EVENTS.REDEEM,
         data: redeemEventFactory(pickRandom(twitch)),
+      },
+      {
+        type: TOKIO_EVENTS.SUPER_CHAT,
+        data: superChatEventFactory(pickRandom(youtube)),
       },
       { type: TOKIO_EVENTS.MUSIC_CHANGE, data: musicFactory() },
       { type: TOKIO_EVENTS.ROOM_USER, data: { viewers, views, ranks } },

@@ -114,8 +114,8 @@ describe("createTestLive", () => {
 
         for (const payload of press) {
           const viewer = viewerOf(payload);
-          // Twitch's events come from viewers of their own
-          if (!viewer || viewer.platform === "twitch") continue;
+          // Twitch's and YouTube's events come from viewers of their own
+          if (!viewer || (viewer.platform ?? "tiktok") !== "tiktok") continue;
           expect(joined).toContain(viewer.handle);
           if (payload.type !== TOKIO_EVENTS.CHAT) {
             expect(viewer).toMatchObject({

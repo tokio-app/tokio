@@ -12,6 +12,8 @@ export type ConnectErrorKind =
   // The Euler Stream plan doesn't include the connection
   | "premium"
   | "sign"
+  // The LIVE has its chat turned off
+  | "noChat"
   | "network"
   | "unknown";
 export type ConnectorFailure = Error & {

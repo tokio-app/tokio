@@ -34,6 +34,7 @@ describe("TimerSettingsSchema's names", () => {
       sub: "",
       gift_sub: "",
       bit: "",
+      superchat: "",
     });
     // An English name in a Spanish Tokio too
     expect(names({ follow: "Follow", share: "Compartir" })).toMatchObject({

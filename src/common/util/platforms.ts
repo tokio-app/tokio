@@ -34,12 +34,22 @@ export const PLATFORM_TRIGGERS: Record<Platform, readonly AlertTrigger[]> = {
     TOKIO_EVENTS.RAID,
     TOKIO_EVENTS.REDEEM,
   ],
+  // Gifts are YouTube's Gifts (Jewels), subscriptions its memberships
+  youtube: [
+    TOKIO_EVENTS.CHAT,
+    EMOTE_TRIGGER,
+    TOKIO_EVENTS.GIFT,
+    TOKIO_EVENTS.SUBSCRIBE,
+    TOKIO_EVENTS.GIFT_SUB,
+    TOKIO_EVENTS.SUPER_CHAT,
+  ],
 };
 
 // Their names, the platforms' own, never translated
 export const PLATFORM_LABELS: Record<Platform, string> = {
   tiktok: "TikTok",
   twitch: "Twitch",
+  youtube: "YouTube",
 };
 
 // What a profile types for each on Home: a channel's name, or nothing for
@@ -47,6 +57,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
 export const PLATFORM_INPUT: Record<Platform, "channel" | "account"> = {
   tiktok: "channel",
   twitch: "account",
+  youtube: "channel",
 };
 
 export const isPlatform = (value: unknown): value is Platform =>
