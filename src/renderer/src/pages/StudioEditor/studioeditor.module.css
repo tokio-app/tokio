@@ -1122,14 +1122,7 @@
   flex: 1 1 auto;
 }
 
-/* An element's or a group's triggers: the first under its label, each other
-   under "Or" with its remove button, then Add */
-.triggers {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
+/* An Add button, on the left under its rows */
 .add_trigger {
   align-self: flex-start;
 }

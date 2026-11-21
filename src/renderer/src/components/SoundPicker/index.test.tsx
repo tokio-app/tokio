@@ -521,6 +521,47 @@ describe("SoundPicker", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("lists the variables of every trigger, once", async () => {
+      const base = alert({}, TOKIO_EVENTS.CHAT);
+      await openTts({
+        ...base,
+        also_triggers: [
+          { ...base.trigger, type: TOKIO_EVENTS.GIFT },
+          { ...base.trigger, type: TOKIO_EVENTS.FOLLOW },
+        ],
+      });
+
+      const names = ["username", "handle", "comment", "gift", "count"];
+      for (const name of names) {
+        expect(
+          screen.getAllByRole("button", { name: `{${name}}` }),
+        ).toHaveLength(1);
+      }
+    });
+
+    it("offers the count when any gift trigger has one", async () => {
+      const base = alert({}, TOKIO_EVENTS.GIFT);
+      const every = { ...base.trigger, every_gift: true };
+      const { unmount } = await openTts({
+        ...base,
+        trigger: every,
+        also_triggers: [{ ...every, type: TOKIO_EVENTS.FOLLOW }],
+      });
+      expect(
+        screen.queryByRole("button", { name: "{count}" }),
+      ).not.toBeInTheDocument();
+      unmount();
+
+      await openTts({
+        ...base,
+        trigger: every,
+        also_triggers: [{ ...every, every_gift: false }],
+      });
+      expect(
+        screen.getByRole("button", { name: "{count}" }),
+      ).toBeInTheDocument();
+    });
+
     it("says when the trigger has no variables", async () => {
       await openTts(alert({}, TOKIO_EVENTS.ENVELOPE));
 

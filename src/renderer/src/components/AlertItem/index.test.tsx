@@ -199,6 +199,47 @@ describe("AlertItem", () => {
     ).toBeInTheDocument();
   });
 
+  it("names every event an alert has, once, and what each narrows", () => {
+    const base = alert({}, { type: TOKIO_EVENTS.GIFT, gifts: [] });
+    setup({
+      ...base,
+      also_triggers: [
+        { ...base.trigger, type: TOKIO_EVENTS.CHAT, keyword: "hi" },
+        { ...base.trigger, type: TOKIO_EVENTS.GIFT, gifts: [5655] },
+        { ...base.trigger, type: TOKIO_EVENTS.FOLLOW },
+      ],
+    });
+
+    expect(summary()).toHaveTextContent("Gift, Chat, or Follow");
+    // The follow row narrows nothing, so it says nothing
+    expect(
+      screen.getByText(
+        "Any gift, when the streak ends · Messages with “hi” · When the streak ends",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Rose" })).toBeInTheDocument();
+  });
+
+  it("pictures the gifts of every row, three at most", () => {
+    const base = alert({}, { type: TOKIO_EVENTS.GIFT, gifts: [5655, 6064] });
+    setup(
+      {
+        ...base,
+        also_triggers: [
+          { ...base.trigger, gifts: [1, 2] },
+          { ...base.trigger, type: EMOTE_TRIGGER, emotes: ["emote-1"] },
+        ],
+      },
+      { gifts: [...GIFTS, gift(1, "Lion"), gift(2, "Galaxy")] },
+    );
+
+    const pictures = screen.getByRole("img", {
+      name: "Rose or GG · Lion or Galaxy · Emote 1",
+    });
+    expect(pictures.querySelectorAll("img")).toHaveLength(3);
+    expect(pictures).toHaveTextContent("+2");
+  });
+
   it("shows three gifts' or emotes' pictures at most, and names them without any", () => {
     const gifts = [
       ...GIFTS,
@@ -316,7 +357,7 @@ describe("AlertItem", () => {
 
 describe("triggerSummary", () => {
   const sum = (trigger: Partial<Alert["trigger"]>) =>
-    triggerSummary(alert({}, trigger).trigger, GIFTS, EMOTES, "en");
+    triggerSummary([alert({}, trigger).trigger], GIFTS, EMOTES, "en");
 
   it("counts the coins only for any gift", () => {
     expect(sum({ type: TOKIO_EVENTS.GIFT, min_coins: 100 })).toBe(
@@ -357,7 +398,7 @@ describe("triggerSummary", () => {
     const gifts = [...GIFTS, gift(1, "Lion"), gift(2, "Galaxy")];
     const emotes = [...EMOTES, ...EMOTES.map((e) => ({ ...e, value: "x" }))];
     const of = (trigger: Partial<Alert["trigger"]>) =>
-      triggerSummary(alert({}, trigger).trigger, gifts, emotes, "en");
+      triggerSummary([alert({}, trigger).trigger], gifts, emotes, "en");
 
     expect(of({ type: TOKIO_EVENTS.GIFT, gifts: [5655, 6064, 1, 2] })).toBe(
       "Rose, GG, or 2 more, when the streak ends",
@@ -370,6 +411,35 @@ describe("triggerSummary", () => {
   it("counts on gifts the lists don't have yet", () => {
     expect(sum({ type: TOKIO_EVENTS.GIFT, gifts: [1] })).toBe(
       "Some gifts, when the streak ends",
+    );
+  });
+});
+
+describe("triggerSummary with several triggers", () => {
+  const rows = [
+    alert({}, { type: TOKIO_EVENTS.GIFT, min_coins: 100 }).trigger,
+    alert({}, { type: TOKIO_EVENTS.CHAT, keyword: "hi" }).trigger,
+    alert({}, { type: TOKIO_EVENTS.FOLLOW }).trigger,
+  ];
+
+  it("gives each trigger's conditions a clause, and skips empty ones", () => {
+    expect(triggerSummary(rows, GIFTS, EMOTES, "en")).toBe(
+      "Any gift, when the streak ends, worth 100+ coins · Messages with “hi”",
+    );
+    expect(triggerSummary(rows.slice(2), GIFTS, EMOTES, "en")).toBe("");
+  });
+
+  it("leaves out a row's gifts only when its pictures show", () => {
+    const picked = { ...rows[0], gifts: [5655, 2], min_coins: 0 };
+    const gifts = [...GIFTS, gift(2, "Galaxy")];
+
+    expect(triggerSummary([picked, rows[1]], gifts, EMOTES, "en", true)).toBe(
+      "When the streak ends · Messages with “hi”",
+    );
+    // Neither has a picture, so the sentence names them
+    const bare = gifts.map((g) => ({ ...g, img: "" }));
+    expect(triggerSummary([picked], bare, EMOTES, "en", true)).toBe(
+      "Rose or Galaxy, when the streak ends",
     );
   });
 });

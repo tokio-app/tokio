@@ -450,6 +450,86 @@ describe("Alerts", () => {
     });
   });
 
+  it("adds other triggers, each with its own filters, and saves them", async () => {
+    const { user, container } = await load([alert("alert-1")]);
+
+    const opened = await edit(user, 0);
+    await user.click(opened.getByRole("combobox", { name: "Event" }));
+    await user.click(inList(container, "Chat")!);
+    await user.type(opened.getByPlaceholderText("Any message"), "hello");
+    await user.click(opened.getByRole("button", { name: "Add a trigger" }));
+    const other = within(opened.getByRole("group", { name: "Trigger 2" }));
+    // A new trigger starts as a Follow, with nothing to narrow
+    expect(other.getByRole("combobox")).toHaveTextContent("Follow");
+    expect(other.queryByPlaceholderText("Any message")).toBeNull();
+
+    await user.click(other.getByRole("combobox"));
+    await user.click(inList(container, "Gift")!);
+    fireEvent.change(other.getByRole("spinbutton", { name: "Coins" }), {
+      target: { value: "50" },
+    });
+
+    // Each row keeps its own: the chat's keyword, the gift's coins
+    expect(opened.getByPlaceholderText("Any message")).toHaveValue("hello");
+    expect(opened.getAllByRole("spinbutton", { name: "Coins" })).toHaveLength(
+      1,
+    );
+    expect(dialogs()[0]).toHaveAccessibleName("Chat or Gift alert");
+    await wait(300);
+    expect(saves().at(-1)?.items[0]).toMatchObject({
+      trigger: { ...trigger(TOKIO_EVENTS.CHAT), keyword: "hello" },
+      also_triggers: [{ ...trigger(TOKIO_EVENTS.GIFT), min_coins: 50 }],
+    });
+
+    await user.click(opened.getByRole("button", { name: "Done" }));
+    expect(summary(0)).toHaveTextContent("Chat or Gift");
+    expect(summary(0)).toHaveTextContent("Messages with “hello”");
+    expect(summary(0)).toHaveTextContent("worth 50+ coins");
+  });
+
+  it("removes one trigger and keeps the others", async () => {
+    const { user } = await load([
+      alert("alert-1", {
+        also_triggers: [
+          trigger(TOKIO_EVENTS.SHARE),
+          trigger(TOKIO_EVENTS.GIFT),
+        ],
+      }),
+    ]);
+
+    const opened = await edit(user, 0);
+    await user.click(opened.getByRole("button", { name: "Remove trigger 2" }));
+
+    expect(opened.getByRole("group", { name: "Trigger 2" })).toHaveTextContent(
+      "Any gift",
+    );
+    expect(opened.queryByRole("group", { name: "Trigger 3" })).toBeNull();
+    await wait(300);
+    expect(saves().at(-1)?.items[0].also_triggers).toEqual([
+      trigger(TOKIO_EVENTS.GIFT),
+    ]);
+  });
+
+  it("stops adding triggers at five", async () => {
+    const { user } = await load([
+      alert("alert-1", {
+        also_triggers: [
+          trigger(TOKIO_EVENTS.SHARE),
+          trigger(TOKIO_EVENTS.SHARE),
+          trigger(TOKIO_EVENTS.SHARE),
+        ],
+      }),
+    ]);
+
+    const opened = await edit(user, 0);
+    const add = opened.getByRole("button", { name: "Add a trigger" });
+    expect(add).toBeEnabled();
+    await user.click(add);
+
+    expect(opened.getByRole("group", { name: "Trigger 5" })).toBeVisible();
+    expect(add).toBeDisabled();
+  });
+
   it("picks the gifts of a gift alert from main's list", async () => {
     const { user } = await load([
       alert("alert-1", { trigger: trigger(TOKIO_EVENTS.GIFT) }),

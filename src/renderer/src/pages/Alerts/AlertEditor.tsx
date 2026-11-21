@@ -4,14 +4,10 @@ import {
   AlertMedia,
   MEDIA_MAX_DURATION,
   Trigger,
+  TriggerSchema,
   VIEWER_ROLES,
 } from "@/common/schemas";
-import {
-  ALERT_TRIGGER_LABELS,
-  CustomGift,
-  EMOTE_TRIGGER,
-  TOKIO_EVENTS,
-} from "@/common/types";
+import { CustomGift, EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import {
   cutPart,
   defaultAlertName,
@@ -19,6 +15,7 @@ import {
   getAlertOverlayURL,
   mediaKind,
   takesRoles,
+  triggersOf,
 } from "@/common/util";
 import {
   alertTest,
@@ -41,11 +38,15 @@ import {
   testProps,
   TRIGGER_OPTIONS,
   TriggerFilter,
+  TriggerRow,
+  TriggerRows,
+  triggerLabel,
 } from "@/components";
 import thumbs from "@/components/MediaPicker/mediapicker.module.css";
+import { cx } from "@/helper/cx";
 import { releaseOnUnmount } from "@/helper/media";
 import { AlertTestRequest } from "@/hooks";
-import { rich, useOptions, useT } from "@/ui/i18n";
+import { rich, useLanguage, useOptions, useT } from "@/ui/i18n";
 import {
   ReactNode,
   RefObject,
@@ -116,6 +117,7 @@ export function AlertEditor({
   onClose,
 }: Props) {
   const t = useT();
+  const language = useLanguage();
   const [tab, setTab] = useState<Tab>("trigger");
   const test = alertTest(alert);
   const tabs = useOptions(TABS);
@@ -123,7 +125,7 @@ export function AlertEditor({
   return (
     <Modal
       title={t("alerts.editor.title", {
-        trigger: t(ALERT_TRIGGER_LABELS[alert.trigger.type]),
+        trigger: triggerLabel(alert, t, language),
       })}
       maxWidth="720px"
       onClose={onClose}
@@ -146,13 +148,13 @@ export function AlertEditor({
 
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
 
-      <div className={styles.panel}>
+      <div className={cx(styles.panel, tab === "trigger" && styles.scrolls)}>
         {tab === "trigger" && (
           <TriggerTab
-            trigger={alert.trigger}
+            alert={alert}
             gifts={gifts}
             emotes={emotes}
-            onChange={(trigger) => onChange({ ...alert, trigger })}
+            onChange={onChange}
           />
         )}
         {tab === "sound" && (
@@ -179,90 +181,137 @@ export function AlertEditor({
 }
 
 type TriggerTabProps = {
-  trigger: Trigger;
+  alert: Alert;
   gifts: CustomGift[];
   emotes: EmoteOption[];
-  onChange: (trigger: Trigger) => void;
+  onChange: (alert: Alert) => void;
 };
 
-function TriggerTab({ trigger, gifts, emotes, onChange }: TriggerTabProps) {
+// What a new trigger row starts as, the schema's default
+const newTrigger = () =>
+  TriggerSchema.parse({ type: TOKIO_EVENTS.FOLLOW, gifts: [] });
+
+function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
   const t = useT();
   const triggers = useOptions(TRIGGER_OPTIONS);
-  const filter = FILTER_LABELS[trigger.type];
-  const { roles } = trigger;
+  const rows = triggersOf(alert);
 
-  return (
-    <>
-      <Field label={t("alerts.editor.event")}>
+  // Row 0 is the alert's trigger, the others its also_triggers
+  const setRow = (index: number, changed: Trigger) =>
+    onChange(
+      index === 0
+        ? { ...alert, trigger: changed }
+        : {
+            ...alert,
+            also_triggers: alert.also_triggers.map((other, i) =>
+              i === index - 1 ? changed : other,
+            ),
+          },
+    );
+
+  const row = (index: number, name: string): TriggerRow => {
+    const trigger = rows[index];
+    const filter = FILTER_LABELS[trigger.type];
+    const { roles } = trigger;
+    const change = (changed: Trigger) => setRow(index, changed);
+
+    return {
+      main: (
         <Select
-          aria-label={t("alerts.editor.event")}
+          aria-label={name}
           options={triggers}
           value={trigger.type}
-          onChange={(type) => onChange({ ...trigger, type })}
+          onChange={(type) => change({ ...trigger, type })}
         />
-      </Field>
-
-      {filter && (
-        <Field label={t(filter)}>
-          <TriggerFilter
-            trigger={trigger}
-            gifts={gifts}
-            emotes={emotes}
-            onChange={onChange}
-          />
-        </Field>
-      )}
-
-      {/* Picked gifts are the alert's choice already */}
-      {trigger.type === TOKIO_EVENTS.GIFT && trigger.gifts.length === 0 && (
-        <Field label={t("alerts.editor.minCoins")}>
-          <span className={styles.inline}>
-            {rich(t("alerts.editor.minCoinsInput"), {
-              input: (
-                <NumberInput
-                  integer
-                  min={0}
-                  className={styles.number}
-                  aria-label={t("common.coins")}
-                  value={trigger.min_coins}
-                  onChange={(min_coins) => onChange({ ...trigger, min_coins })}
-                />
-              ),
-            })}
-          </span>
-          <p className={styles.note}>
-            {t(
-              trigger.every_gift
-                ? "alerts.editor.everyGiftNote"
-                : "alerts.editor.streakNote",
-            )}
-          </p>
-        </Field>
-      )}
-
-      {takesRoles(trigger.type) && (
-        <Field label={t("alerts.editor.from")}>
-          <div className={styles.roles}>
-            {VIEWER_ROLES.map((role) => (
-              <Check
-                key={role}
-                label={t(ROLE_NAMES[role])}
-                checked={roles.includes(role)}
-                onChange={(e) =>
-                  onChange({
-                    ...trigger,
-                    roles: e.target.checked
-                      ? [...roles, role]
-                      : roles.filter((r) => r !== role),
-                  })
-                }
+      ),
+      more: (
+        <>
+          {filter && (
+            <Field label={t(filter)}>
+              <TriggerFilter
+                trigger={trigger}
+                gifts={gifts}
+                emotes={emotes}
+                onChange={change}
               />
-            ))}
-          </div>
-          <p className={styles.note}>{t("alerts.editor.rolesNote")}</p>
-        </Field>
-      )}
-    </>
+            </Field>
+          )}
+
+          {/* Picked gifts are the alert's choice already */}
+          {trigger.type === TOKIO_EVENTS.GIFT && trigger.gifts.length === 0 && (
+            <Field label={t("alerts.editor.minCoins")}>
+              <span className={styles.inline}>
+                {rich(t("alerts.editor.minCoinsInput"), {
+                  input: (
+                    <NumberInput
+                      integer
+                      min={0}
+                      className={styles.number}
+                      aria-label={t("common.coins")}
+                      value={trigger.min_coins}
+                      onChange={(min_coins) =>
+                        change({ ...trigger, min_coins })
+                      }
+                    />
+                  ),
+                })}
+              </span>
+              <p className={styles.note}>
+                {t(
+                  trigger.every_gift
+                    ? "alerts.editor.everyGiftNote"
+                    : "alerts.editor.streakNote",
+                )}
+              </p>
+            </Field>
+          )}
+
+          {takesRoles(trigger.type) && (
+            <Field label={t("alerts.editor.from")}>
+              <div className={styles.roles}>
+                {VIEWER_ROLES.map((role) => (
+                  <Check
+                    key={role}
+                    label={t(ROLE_NAMES[role])}
+                    checked={roles.includes(role)}
+                    onChange={(e) =>
+                      change({
+                        ...trigger,
+                        roles: e.target.checked
+                          ? [...roles, role]
+                          : roles.filter((r) => r !== role),
+                      })
+                    }
+                  />
+                ))}
+              </div>
+              <p className={styles.note}>{t("alerts.editor.rolesNote")}</p>
+            </Field>
+          )}
+        </>
+      ),
+    };
+  };
+
+  return (
+    <TriggerRows
+      className={styles.rows}
+      count={rows.length}
+      label={t("alerts.editor.event")}
+      row={row}
+      onAdd={() =>
+        onChange({
+          ...alert,
+          also_triggers: [...alert.also_triggers, newTrigger()],
+        })
+      }
+      onRemove={(index) =>
+        onChange({
+          ...alert,
+          also_triggers: alert.also_triggers.filter((_, i) => i !== index - 1),
+        })
+      }
+    />
   );
 }
 

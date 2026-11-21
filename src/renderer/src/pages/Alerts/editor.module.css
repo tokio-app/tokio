@@ -25,6 +25,21 @@
   padding-top: var(--space-2);
 }
 
+/* The trigger tab scrolls inside the panel once its rows outgrow the window,
+   so the dialog stays in it. The padding keeps the focus rings from being
+   cut. */
+.scrolls {
+  overflow-y: auto;
+  margin-inline: calc(-1 * var(--space-1));
+  padding: var(--space-2) var(--space-1) var(--space-1);
+}
+
+/* The trigger rows, as far apart as the tab's other fields */
+.rows {
+  --rows-gap: var(--space-5);
+  --rows-inner-gap: var(--space-4);
+}
+
 .inline {
   display: flex;
   flex-wrap: wrap;
