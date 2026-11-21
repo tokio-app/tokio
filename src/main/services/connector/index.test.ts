@@ -528,13 +528,14 @@ describe("ConnectorService", () => {
       expect(onResult).toHaveBeenCalledWith("tiktok", { success: true });
     });
 
-    it("fails to connect a platform without a provider", async () => {
+    it("says to sign in to Twitch before connecting to it", async () => {
       const { service } = setup();
 
+      // Twitch's own provider, with no account: no request goes out
       const res = await service.connect({ twitch: "mia" });
 
       expect(res.success).toBe(false);
-      expect(res.error?.message).toBe("Twitch isn't available.");
+      expect(res.error?.kind).toBe("noKey");
     });
 
     it("gives other platforms its log file and chat stage", () => {
@@ -575,16 +576,6 @@ describe("ConnectorService", () => {
       expect(twitch.signIn).toHaveBeenCalledExactlyOnceWith(onCode, signal);
       expect(signedIn).toEqual(account);
       expect(twitch.signOut).toHaveBeenCalledOnce();
-    });
-
-    it("fails to sign in without Twitch's provider", () => {
-      const service = new ConnectorService();
-
-      // Startup hands the account over all the same
-      service.setTwitchAccount(account);
-      expect(() =>
-        service.signInTwitch(vi.fn(), new AbortController().signal),
-      ).toThrow("Twitch's provider isn't registered.");
     });
   });
 

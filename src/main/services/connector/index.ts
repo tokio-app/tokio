@@ -21,7 +21,7 @@ import {
   PlatformAccount,
   ReconnectState,
 } from "./common";
-import { TikTokLiveConnector } from "./providers";
+import { TikTokLiveConnector, TwitchConnector } from "./providers";
 
 // What a platform did while the session went on without it: came up, or
 // stopped with its reason ("stopped" for none)
@@ -65,6 +65,7 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   constructor() {
     super();
     this.addProvider("Default", new TikTokLiveConnector(), true); // NOTE: DO NOT CHANGE, Add your providers below.
+    this._addPlatform("twitch", new TwitchConnector());
   }
 
   // TikTok's backends forward only while they're the current one

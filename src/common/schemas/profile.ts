@@ -456,7 +456,9 @@ export const ProfileSchema = z.object({
   platforms: z
     .array(z.string())
     .transform((list) =>
-      list.filter((p): p is Platform => PLATFORMS.includes(p as Platform)),
+      list.filter((p): p is Platform =>
+        (PLATFORMS as readonly string[]).includes(p),
+      ),
     )
     .default(["tiktok"]),
   // The channel typed for each platform that takes one, TikTok's username

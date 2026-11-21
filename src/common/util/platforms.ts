@@ -50,7 +50,7 @@ export const PLATFORM_INPUT: Record<Platform, "channel" | "account"> = {
 };
 
 export const isPlatform = (value: unknown): value is Platform =>
-  PLATFORMS.includes(value as Platform);
+  (PLATFORMS as readonly unknown[]).includes(value);
 
 // The platform a viewer is on: missing means TikTok
 export const platformOf = (user?: Pick<UserData, "platform"> | null) =>
