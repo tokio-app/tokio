@@ -16,6 +16,7 @@ import {
   Section,
 } from "@/components";
 import { cx } from "@/helper";
+import { usePlatforms } from "@/context/platforms";
 import { flushSettings, scopeUpdater, Updater, useAutosave } from "@/hooks";
 import homeStyles from "@/pages/Home/home.module.css";
 import { rich, useLanguage, useT } from "@/ui/i18n";
@@ -30,7 +31,7 @@ import {
   FiSquare,
 } from "react-icons/fi";
 import styles from "../countdowntimer.module.css";
-import { timerStatusText, TimerPush, TRIGGERS } from "../helper";
+import { timerStatusText, TimerPush, triggersOn } from "../helper";
 import { TimerPreview } from "./TimerPreview";
 
 interface SectionProps {
@@ -311,8 +312,9 @@ function TriggerNames({ settings, update }: SectionProps) {
   const t = useT();
   const { seconds, look } = settings;
   const id = useId();
+  const platforms = usePlatforms();
   // As timerTriggers keeps them, so a multiplier of 0 hides them all
-  const shown = TRIGGERS.filter(
+  const shown = triggersOn(platforms).filter(
     ({ key }) => seconds[key] * settings.multiplier > 0,
   );
 
@@ -331,7 +333,11 @@ function TriggerNames({ settings, update }: SectionProps) {
                 row, so the fields line up, never empty so the row has a
                 baseline for its label. */}
             <span className={styles.count}>
-              {key === "coin" ? 1 : key === "likes" ? seconds.likes_every : " "}
+              {key === "coin" || key === "bit"
+                ? 1
+                : key === "likes"
+                  ? seconds.likes_every
+                  : " "}
             </span>
             <Input
               id={`${id}-${key}`}
@@ -361,6 +367,7 @@ function TimeAddedSection({ settings, update }: SectionProps) {
   const id = useId();
   const seconds = scopeUpdater(update, "seconds");
   const chat = scopeUpdater(update, "chat");
+  const platforms = usePlatforms();
 
   return (
     <Section
@@ -393,7 +400,7 @@ function TimeAddedSection({ settings, update }: SectionProps) {
       </FormGrid>
 
       <ul className={styles.triggers}>
-        {TRIGGERS.map(({ key, label, rule }) => (
+        {triggersOn(platforms).map(({ key, label, rule }) => (
           <li key={key} className={styles.trigger}>
             <label htmlFor={`${id}-${key}`} className={styles.trigger_label}>
               {t(label)}

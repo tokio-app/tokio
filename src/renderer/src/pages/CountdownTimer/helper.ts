@@ -3,9 +3,11 @@ import { TimerSettings, TimerStatus } from "@/common/schemas";
 import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
+  Platform,
   TimerData,
   TimerState,
 } from "@/common/types";
+import { TIMER_TRIGGERS, triggersFor } from "@/common/util";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import { useState } from "react";
 
@@ -76,4 +78,17 @@ export const TRIGGERS: {
   { key: "follow", label: "tools.triggers.follow", rule: "tools.rules.each" },
   { key: "share", label: "tools.triggers.share", rule: "tools.rules.each" },
   { key: "chat", label: "tools.triggers.chat", rule: "tools.rules.each" },
+  { key: "sub", label: "tools.triggers.sub", rule: "tools.rules.each" },
+  {
+    key: "gift_sub",
+    label: "tools.triggers.gift_sub",
+    rule: "tools.rules.perGiftSub",
+  },
+  { key: "bit", label: "tools.triggers.bit", rule: "tools.rules.perBit" },
 ];
+
+// The rows whose events one of the platforms sends
+export const triggersOn = (platforms: readonly Platform[]) => {
+  const sent = triggersFor(platforms);
+  return TRIGGERS.filter(({ key }) => sent.includes(TIMER_TRIGGERS[key]));
+};

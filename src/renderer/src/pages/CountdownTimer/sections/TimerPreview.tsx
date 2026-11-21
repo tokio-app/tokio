@@ -1,6 +1,7 @@
 import { TimerSettings } from "@/common/schemas";
 import { formatAdded, timerTriggers } from "@/common/util";
 import { cx, fontFamily, formatDuration } from "@/helper";
+import { usePlatforms } from "@/context/platforms";
 import { useLanguage } from "@/ui/i18n";
 import { useEffect, useState } from "react";
 import styles from "../countdowntimer.module.css";
@@ -54,7 +55,10 @@ export function TimerPreview({ timer, settings, bare }: Props) {
   }, [slot]);
 
   // The carousel turns while it has more than one trigger
-  const triggers = look.show_triggers ? timerTriggers(settings, language) : [];
+  const platforms = usePlatforms();
+  const triggers = look.show_triggers
+    ? timerTriggers(settings, language, platforms)
+    : [];
   const [turn, setTurn] = useState(0);
   useEffect(() => {
     if (triggers.length < 2) return undefined;

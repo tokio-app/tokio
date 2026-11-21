@@ -1,6 +1,11 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE, TimerData } from "@/common/types";
 import { getOverlayURL, TIMER_PATH } from "@/common/util";
-import { failure, settingsReply, timerReply } from "@test/fixtures";
+import {
+  failure,
+  profileReply,
+  settingsReply,
+  timerReply,
+} from "@test/fixtures";
 import { send, sent, sentEvents } from "@test/ipc";
 import { section } from "@test/queries";
 import { renderApp, renderWithProviders } from "@test/render";
@@ -32,13 +37,50 @@ describe("CountdownTimer", () => {
     vi.useRealTimers();
   });
 
-  it("asks main for the settings and the timer", () => {
+  it("asks main for the settings, the timer and the profile", () => {
     renderWithProviders(<CountdownTimer />);
 
     expect(sentEvents()).toEqual([
       APP_EVENTS.GET_SETTINGS,
       APP_EVENTS.GET_TIMER,
+      APP_EVENTS.GET_PROFILE,
     ]);
+  });
+
+  it("lists the triggers the profile's platforms send", async () => {
+    renderWithProviders(<CountdownTimer />);
+    await timer();
+    const added = section("Time added");
+    const rows = () =>
+      added
+        .getAllByRole("listitem")
+        .map((row) => row.querySelector("label")?.textContent);
+
+    expect(rows()).toEqual([
+      "Coins",
+      "Likes",
+      "New Super Fans",
+      "Follows",
+      "Shares",
+      "Chat messages",
+    ]);
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.platforms = ["twitch"];
+      }),
+    );
+
+    expect(rows()).toEqual([
+      "Follows",
+      "Chat messages",
+      "New subs",
+      "Gifted subs",
+      "Bits",
+    ]);
+    expect(added.getByText("seconds per gifted sub")).toBeVisible();
+    expect(added.getByText("seconds per Bit")).toBeVisible();
   });
 
   it("shows its header and a loader until the timer comes", async () => {
