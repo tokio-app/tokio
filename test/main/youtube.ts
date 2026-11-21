@@ -7,7 +7,7 @@ import { vi } from "vitest";
 type Channel = { videoId: string; author: string } | "offline" | "upcoming";
 // An answer to a poll: actions with the next continuation, the chat's end,
 // a status YouTube answered with, or a network failure
-export type PollAnswer = { actions: unknown[] } | "ended" | number | Error;
+type PollAnswer = { actions: unknown[] } | "ended" | number | Error;
 
 export type FakeYouTube = ReturnType<typeof fakeYouTube>;
 

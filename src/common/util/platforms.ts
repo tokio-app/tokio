@@ -61,7 +61,7 @@ export const PLATFORM_INPUT: Record<Platform, "channel" | "account"> = {
 };
 
 // Whether a platform's gifts say what they cost: YouTube's don't
-export const GIFT_COINS: Record<Platform, boolean> = {
+const GIFT_COINS: Record<Platform, boolean> = {
   tiktok: true,
   twitch: false,
   youtube: false,

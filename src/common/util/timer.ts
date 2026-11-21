@@ -9,7 +9,7 @@ import { countsCoins, triggersFor } from "./platforms";
 
 // The event each trigger of the timer counts, so a profile's platforms say
 // which ones apply
-export const TIMER_TRIGGERS = {
+const TIMER_TRIGGERS = {
   coin: TOKIO_EVENTS.GIFT,
   likes: TOKIO_EVENTS.LIKE,
   superfan: TOKIO_EVENTS.SUPER_FAN,

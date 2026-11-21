@@ -66,7 +66,7 @@ export const feedKinds = (platforms: readonly Platform[]) => {
 };
 
 // Gifts, their coins and top gifters come with a platform that sends gifts
-export const sendsGifts = (platforms: readonly Platform[]) =>
+const sendsGifts = (platforms: readonly Platform[]) =>
   platforms.some((p) => PLATFORM_TRIGGERS[p].includes(TOKIO_EVENTS.GIFT));
 
 // The stats the platforms have: likes and shares are TikTok's

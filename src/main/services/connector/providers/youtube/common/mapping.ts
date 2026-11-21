@@ -119,7 +119,7 @@ function youtubeUser(author: Author): UserData {
   return user;
 }
 
-export function toChat(e: TextMessage): ChatEvent {
+function toChat(e: TextMessage): ChatEvent {
   // TikTok's shape: content without the custom emoji, each at its place in it
   let content = "";
   let emotes: Emotes[] = [];
