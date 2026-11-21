@@ -1,6 +1,6 @@
 const config = {
   // Tokio's app on dev.twitch.tv, a public client: its id isn't a secret
-  CLIENT_ID: "",
+  CLIENT_ID: "brjks26o7j8vq80et6yfq1vwheeeg2",
   SCOPES:
     "user:read:chat moderator:read:followers bits:read channel:read:redemptions",
 

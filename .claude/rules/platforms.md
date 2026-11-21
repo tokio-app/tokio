@@ -70,7 +70,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - A **Redeem** row's keyword is the reward's title, matched in any case, empty for any (`matchesTrigger`).
 - Anonymous gifters and cheerers get a user with `platform` and no id.
 - The sign-in code stays hidden until **Show** (`TwitchSection`): streamers show their screen, and a viewer who typed it would sign Tokio into their own account. Sign-in and sign-out are never in MCP (`.claude/rules/mcp.md`), since they need the streamer at a browser, and Sign out is refused while Twitch is connected.
-- `CLIENT_ID` in `providers/twitch/config` is the Tokio app registered on dev.twitch.tv, a public client with the device flow. A connect with it empty can't sign in.
+- `CLIENT_ID` in `providers/twitch/config` is the Tokio app the user registered on dev.twitch.tv: a public client (no secret), its only redirect `http://localhost`, which the device flow never uses. It isn't a secret.
 
 ## The window
 

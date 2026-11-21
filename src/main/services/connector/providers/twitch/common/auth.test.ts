@@ -141,7 +141,7 @@ describe("TwitchAuth", () => {
 
     it("needs Tokio's client ID", async () => {
       const calls = stubFetch(() => json(200, device));
-      auth = new TwitchAuth(config, () => "");
+      auth = new TwitchAuth({ ...config, CLIENT_ID: "" }, () => "");
 
       await expect(
         auth.signIn(vi.fn(), new AbortController().signal),
