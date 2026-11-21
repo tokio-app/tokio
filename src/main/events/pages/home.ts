@@ -44,6 +44,10 @@ const connectMessage = (
   if (platform === "twitch" && error?.kind === "badKey") {
     return t("main.home.connect.twitchBadKey", { settings });
   }
+  // YouTube's own limit, not Euler Stream's
+  if (platform === "youtube" && error?.kind === "rateLimited") {
+    return t("main.home.connect.youtubeLimited");
+  }
   switch (error?.kind) {
     case "offline":
       return several
@@ -53,6 +57,8 @@ const connectMessage = (
       return t("main.home.connect.notFound", { handle, platform: name });
     case "network":
       return t("main.home.connect.network", { platform: name });
+    case "noChat":
+      return t("main.home.connect.noChat", { handle });
   }
   // The rest are Euler Stream's, which only TikTok's connection uses
   if (platform !== "tiktok") return failed();
@@ -122,7 +128,11 @@ events.push(
         t("main.home.usernameSaveFailed"),
       );
     }
-    const handleOf = (platform: Platform) => `@${targets[platform] ?? ""}`;
+    // A LIVE link shows as typed, not as "@https://…"
+    const handleOf = (platform: Platform) => {
+      const target = targets[platform] ?? "";
+      return target.includes("/") ? target : `@${target}`;
+    };
     // As main holds it: a connect during a reconnect stays reconnecting
     const replyState = () =>
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, connectionState(services));

@@ -1319,6 +1319,7 @@
   "main.home.connect.twitchNoKey": "Tokio needs your Twitch account to connect. Sign in with Twitch in {settings}.",
   "main.home.connect.twitchBadKey": "Twitch signed Tokio out. Sign in with Twitch again in {settings}.",
   "main.home.connect.noChat": "The chat is off on {handle}'s LIVE. Turn it on in YouTube Studio, then connect again.",
+  "main.home.connect.youtubeLimited": "YouTube is limiting Tokio's requests. Try again in a few minutes.",
   "main.home.usernameSaveFailed": "Tokio couldn't save the username. Check the logs folder for details.",
   "main.home.connected": "Connected to {handle}.",
   "main.home.connectedOn": "Connected to {handle} on {platform}.",
