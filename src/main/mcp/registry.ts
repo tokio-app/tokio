@@ -93,6 +93,9 @@ const getStatus = ({
       reconnecting: connectorService.isReconnecting(),
       // The LIVE stopped on its own and Tokio looks for it for 2 minutes
       waiting: connectorService.isWaiting(),
+      // How each platform that's on is doing: connecting, connected,
+      // reconnecting or waiting
+      platforms: connectorService.status(),
       username: connectorService.username,
       startedAt: startedAt === null ? null : new Date(startedAt).toISOString(),
       viewers: stats.viewers,
@@ -102,6 +105,11 @@ const getStatus = ({
       shares: totals.shares,
       gifts: totals.gifts,
       coins: totals.coins,
+      // The account Twitch connects with, signed in to in Settings
+      twitch: {
+        signedIn: settings.accounts.twitch.login !== "",
+        login: settings.accounts.twitch.login,
+      },
     },
     features: {
       tts: settings.activeFeatures.tts,
@@ -150,7 +158,7 @@ function toolDefs({ sections, kinds, tools }: Registry): ToolDef<any>[] {
       name: "get_status",
       title: "Status",
       description:
-        "What Tokio is doing now: the LIVE connection and its stats, the features on, whether reactions are paused, the active profile, the music queue, Minecraft, the countdown timer, the overlay server and app updates. live.connected is also true while connecting, while reconnecting after a drop (live.reconnecting), and for 2 minutes after the LIVE stopped on its own, while Tokio looks for it again (live.waiting, with no startedAt).",
+        "What Tokio is doing now: the LIVE connection and its stats, the features on, whether reactions are paused, the active profile, the music queue, Minecraft, the countdown timer, the overlay server and app updates. live.connected is also true while connecting, while reconnecting after a drop (live.reconnecting), and for 2 minutes after the LIVE stopped on its own, while Tokio looks for it again (live.waiting, with no startedAt). A LIVE can span the profile's platforms (TikTok, Twitch): live.platforms says how each one that's on is doing, live.username names the one that started it, and live.twitch whether Tokio is signed in to Twitch.",
       input: z.object({}).strict(),
       annotations: READ,
       run: getStatus,

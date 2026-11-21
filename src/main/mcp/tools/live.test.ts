@@ -4,6 +4,7 @@ import {
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
 } from "@/common/types";
+import type { Profile } from "@/common/schemas";
 import { defaultProfile } from "@/common/util";
 import controls from "@/events/pages/controls";
 import home from "@/events/pages/home";
@@ -16,6 +17,80 @@ import { mcpClient } from "@test/mcp";
 import { describe, expect, it, vi } from "vitest";
 
 describe("live MCP tools", () => {
+  describe("platforms section", () => {
+    const setup = (connected = false) => {
+      const profile: Profile = structuredClone(defaultProfile);
+      const updateProfileData = vi.fn(async (data: Partial<Profile>) => {
+        Object.assign(profile, data);
+        return true;
+      });
+      const setPlatforms = vi.fn();
+      const h = createHandler(
+        {
+          storeManagerService: {
+            getProfileData: async () => profile,
+            getProfiles: () => [],
+            getSettings: () => ({
+              activeProfile: { name: "Main", file: "main.json" },
+            }),
+            updateProfileData,
+          },
+          connectorService: { isConnected: () => connected },
+          timerService: { setPlatforms },
+        },
+        { stack: home },
+      );
+      return { h, updateProfileData, setPlatforms };
+    };
+
+    it("reads the profile's platforms", async () => {
+      const { h } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("get_settings", { section: "platforms" });
+
+      expect(res.value).toEqual({ values: { platforms: ["tiktok"] } });
+    });
+
+    it("saves them through SET_PLATFORMS, then sends the profile", async () => {
+      const { h, updateProfileData, setPlatforms } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("update_settings", {
+        section: "platforms",
+        changes: { platforms: ["twitch", "tiktok"] },
+      });
+
+      expect(res).toMatchObject({ isError: false, text: "Saved." });
+      expect(updateProfileData).toHaveBeenCalledExactlyOnceWith({
+        platforms: ["tiktok", "twitch"],
+      });
+      expect(setPlatforms).toHaveBeenCalledOnce();
+      expect(h.pushed(APP_EVENTS_RESPONSE.GET_PROFILE)).toHaveLength(1);
+    });
+
+    it("refuses them while connected, and an unknown platform", async () => {
+      const { h, updateProfileData } = setup(true);
+      const { call } = await mcpClient(h.handler);
+
+      const locked = await call("update_settings", {
+        section: "platforms",
+        changes: { platforms: ["twitch"] },
+      });
+      const unknown = await call("update_settings", {
+        section: "platforms",
+        changes: { platforms: ["kick"] },
+      });
+
+      expect(locked).toMatchObject({
+        isError: true,
+        text: "Disconnect from the LIVE before changing platforms.",
+      });
+      expect(unknown.isError).toBe(true);
+      expect(updateProfileData).not.toHaveBeenCalled();
+    });
+  });
+
   describe("profiles", () => {
     const store = () => ({
       getSettings: () => ({
@@ -259,6 +334,7 @@ describe("live MCP tools", () => {
             getProfileData: async () => profile,
             getProfiles: () => [],
             getLiveStats: () => ({ likes: 0, views: 0, viewers: 0 }),
+            getTwitchAccount: () => ({ id: "", login: "", key: "" }),
           },
           connectorService: {
             connect: vi.fn(async () => {
@@ -272,6 +348,8 @@ describe("live MCP tools", () => {
             isConnected: () => on,
             isReconnecting: () => false,
             isWaiting: () => false,
+            status: () => (on ? { tiktok: "connected" } : {}),
+            channel: () => "streamer",
             username: "streamer",
           },
           liveService: {
@@ -280,7 +358,7 @@ describe("live MCP tools", () => {
         },
         { stack: home },
       );
-      return { h, updateProfileData };
+      return { h, updateProfileData, profile };
     };
 
     it("connects through CONNECT, then sends the profile", async () => {
@@ -296,6 +374,7 @@ describe("live MCP tools", () => {
         connected: true,
         live: true,
         username: "streamer",
+        platforms: { tiktok: "connected" },
       });
       expect(updateProfileData).toHaveBeenCalledWith({
         connector: { username: "streamer" },
@@ -336,6 +415,16 @@ describe("live MCP tools", () => {
       });
       // The username was saved anyway
       expect(h.pushed(APP_EVENTS_RESPONSE.GET_PROFILE)).toHaveLength(1);
+    });
+
+    it("connects a profile on Twitch alone without a username", async () => {
+      const { h, profile } = setup();
+      profile.platforms = ["twitch"];
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("live", { action: "connect" });
+
+      expect(res.isError).toBe(false);
     });
 
     it("needs a username when the profile has none", async () => {
