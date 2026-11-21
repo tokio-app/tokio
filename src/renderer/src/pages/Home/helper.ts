@@ -71,7 +71,8 @@ export function liveStats(
   );
   const stats: (Stat | false)[] = [
     tiktok && { label: "home.stats.likes", value: values.likes },
-    { label: "home.stats.totalViews", value: values.views },
+    // Only TikTok counts a LIVE's total views; Twitch sends 0
+    tiktok && { label: "home.stats.totalViews", value: values.views },
     { label: "home.totals.followers", value: values.followers },
     tiktok && { label: "home.totals.shares", value: values.shares },
     gifts && { label: "home.totals.gifts", value: values.gifts },

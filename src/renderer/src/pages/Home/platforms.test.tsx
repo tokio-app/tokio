@@ -154,9 +154,13 @@ describe("Home's platforms", () => {
   });
 
   it.each([
-    [["tiktok"], ["Likes", "Shares", "Gifts", "Coins"], []],
-    [["twitch"], [], ["Likes", "Shares", "Gifts", "Coins"]],
-    [["tiktok", "twitch"], ["Likes", "Shares", "Gifts", "Coins"], []],
+    [["tiktok"], ["Likes", "Total views", "Shares", "Gifts", "Coins"], []],
+    [["twitch"], [], ["Likes", "Total views", "Shares", "Gifts", "Coins"]],
+    [
+      ["tiktok", "twitch"],
+      ["Likes", "Total views", "Shares", "Gifts", "Coins"],
+      [],
+    ],
   ] as [Platform[], string[], string[]][])(
     "shows the stats %j has",
     async (platforms, shown, hidden) => {
@@ -164,7 +168,6 @@ describe("Home's platforms", () => {
       await usingPlatforms(platforms);
       await live({});
 
-      expect(stat("Total views")).toBeInTheDocument();
       expect(stat("New followers")).toBeInTheDocument();
       for (const label of shown) expect(stat(label)).toBeInTheDocument();
       for (const label of hidden) expect(stat(label)).not.toBeInTheDocument();
