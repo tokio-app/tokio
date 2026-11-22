@@ -85,6 +85,7 @@ const TRIGGERS: {
     rule: "tools.rules.perGiftSub",
   },
   { key: "bit", label: "tools.triggers.bit", rule: "tools.rules.perBit" },
+  { key: "kick", label: "tools.triggers.kick", rule: "tools.rules.perKick" },
   {
     key: "superchat",
     label: "tools.triggers.superchat",

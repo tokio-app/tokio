@@ -96,6 +96,18 @@ describe("CountdownTimer", () => {
       "Gifted subs",
       "Super Chats",
     ]);
+
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => {
+        p.platforms = ["kick"];
+      }),
+    );
+
+    // Kick's gifts are counted in Kicks, never as coins
+    expect(rows()).toContain("Kicks");
+    expect(rows()).not.toContain("Coins");
+    expect(added.getByText("seconds per Kick")).toBeVisible();
   });
 
   it("shows its header and a loader until the timer comes", async () => {
