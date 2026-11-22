@@ -251,7 +251,7 @@ describe("Gift stats", () => {
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       from: since,
-      totals: { coins: 900, kicks: 0, gifts: 70 },
+      totals: { coins: 900, kicks: 0, gifts: 70, platforms: {} },
     });
 
     expect(stat("Coins")).toHaveTextContent("900");
@@ -636,7 +636,7 @@ describe("Gift stats", () => {
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       from: since,
-      totals: { coins: 900, kicks: 0, gifts: 70 },
+      totals: { coins: 900, kicks: 0, gifts: 70, platforms: {} },
       data: [{ ...gifter("Ana", 300, 30), rank: 1 }],
     });
     expect(stat("Coins")).toHaveTextContent("900");

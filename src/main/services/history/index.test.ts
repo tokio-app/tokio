@@ -269,6 +269,7 @@ describe("HistoryService", () => {
       coins: 8,
       kicks: 110,
       gifts: 4,
+      platforms: {},
     });
   });
 
@@ -719,6 +720,7 @@ describe("HistoryService", () => {
       coins: 111,
       kicks: 0,
       gifts: 4,
+      platforms: {},
     });
     expect(await history.getGifters(since)).toEqual([
       expect.objectContaining({ userId: "2", coins: 101, gifts: 2, rank: 1 }),
@@ -731,6 +733,7 @@ describe("HistoryService", () => {
       coins: 5,
       kicks: 0,
       gifts: 1,
+      platforms: {},
     });
     expect(await history.getGifters(until)).toEqual([
       expect.objectContaining({ userId: "1", coins: 5, rank: 1 }),
@@ -742,6 +745,7 @@ describe("HistoryService", () => {
       coins: 115,
       kicks: 0,
       gifts: 4,
+      platforms: {},
     });
 
     // Whole LIVEs come from the list, as do the dates of one LIVE
@@ -749,6 +753,7 @@ describe("HistoryService", () => {
       coins: 116,
       kicks: 0,
       gifts: 5,
+      platforms: {},
     });
     expect(
       await history.getGifters({ from: start, to: start + 120_000 }),
@@ -760,6 +765,7 @@ describe("HistoryService", () => {
       coins: 0,
       kicks: 0,
       gifts: 0,
+      platforms: {},
     });
   });
 
@@ -846,6 +852,7 @@ describe("HistoryService", () => {
       coins: 0,
       kicks: 0,
       gifts: 0,
+      platforms: {},
     });
     expect(await service().getGifters(range)).toEqual([]);
   });

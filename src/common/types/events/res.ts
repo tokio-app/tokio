@@ -388,12 +388,12 @@ export interface AppEventsResponseMap {
     data?: LiveRecord;
   }>;
   // The range and query it was asked for, failures included. Dates without a
-  // query get their coins and gifts first, then again with the gifters.
+  // query get their totals first, then again with the gifters.
   [APP_EVENTS_RESPONSE.GIFTERS]: Reply<{
     from?: number;
     to?: number;
     query?: string;
-    totals?: Pick<LiveSummary, "coins" | "kicks" | "gifts">;
+    totals?: Pick<LiveSummary, "coins" | "kicks" | "gifts" | "platforms">;
     data?: RankedGifter[];
   }>;
 

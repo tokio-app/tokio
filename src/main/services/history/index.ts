@@ -425,9 +425,13 @@ export class HistoryService extends Service {
    */
   public async getTotals(
     range: DateRange,
-  ): Promise<Pick<LiveSummary, "coins" | "kicks" | "gifts"> | null> {
+  ): Promise<Pick<
+    LiveSummary,
+    "coins" | "kicks" | "gifts" | "platforms"
+  > | null> {
     const dir = this._dir;
-    const totals = { coins: 0, kicks: 0, gifts: 0 };
+    const totals: Pick<LiveSummary, "coins" | "kicks" | "gifts" | "platforms"> =
+      { coins: 0, kicks: 0, gifts: 0, platforms: {} };
     if (dir === null) return totals;
     for (const live of this._lives.filter((l) => inRange(l, range))) {
       if (allInRange(live, range)) {
