@@ -1,4 +1,5 @@
 import { ChatEvent, Gift, TOKIO_EVENTS, TokioEventMap } from "@/common/types";
+import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { TokioEmitter } from "../../shared/emitter";
 
@@ -65,6 +66,27 @@ export const connectFailure = (
     kind,
     retryAfterSeconds: options?.retryAfterSeconds,
   });
+
+// A failed connect's result
+export const fail = (
+  kind: ConnectErrorKind,
+  message: string,
+): ConnectorResponse => ({
+  success: false,
+  error: connectFailure(kind, message),
+});
+
+const isFailure = (error: unknown): error is ConnectorFailure =>
+  error instanceof Error && "kind" in error && typeof error.kind === "string";
+
+export const kindOf = (error: unknown) =>
+  isFailure(error) ? error.kind : undefined;
+
+// What a connect answers for anything it threw
+export const toFailure = (error: unknown): ConnectorFailure =>
+  isFailure(error)
+    ? error
+    : connectFailure("unknown", formatError(error), { cause: error });
 
 export abstract class ConnectorProvider extends TokioEmitter {
   protected _onReconnect?: (state: ReconnectState) => void;

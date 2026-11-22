@@ -44,9 +44,9 @@ const connectMessage = (
   if (platform === "twitch" && error?.kind === "badKey") {
     return t("main.home.connect.twitchBadKey", { settings });
   }
-  // YouTube's own limit, not Euler Stream's
-  if (platform === "youtube" && error?.kind === "rateLimited") {
-    return t("main.home.connect.youtubeLimited");
+  // The platform's own limit, not Euler Stream's
+  if (platform !== "tiktok" && error?.kind === "rateLimited") {
+    return t("main.home.connect.limitedOn", { platform: name });
   }
   switch (error?.kind) {
     case "offline":

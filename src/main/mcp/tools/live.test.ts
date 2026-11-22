@@ -79,7 +79,7 @@ describe("live MCP tools", () => {
       });
       const unknown = await call("update_settings", {
         section: "platforms",
-        changes: { platforms: ["kick"] },
+        changes: { platforms: ["trovo"] },
       });
 
       expect(locked).toMatchObject({
@@ -446,6 +446,34 @@ describe("live MCP tools", () => {
       expect(updateProfileData).toHaveBeenCalledWith({
         channels: { youtube: "@creator" },
       });
+    });
+
+    it("connects and saves the Kick channel it's given", async () => {
+      const { h, profile, updateProfileData } = setup();
+      profile.platforms = ["kick"];
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("live", { action: "connect", kick: " westcol " });
+
+      expect(res.isError).toBe(false);
+      expect(invoke).toHaveBeenCalledWith(APP_EVENTS.CONNECT, {
+        username: "",
+        channels: { kick: "westcol" },
+      });
+      expect(updateProfileData).toHaveBeenCalledWith({
+        channels: { kick: "westcol" },
+      });
+    });
+
+    it("needs a Kick channel when the profile has none", async () => {
+      const { h, profile } = setup();
+      profile.platforms = ["kick"];
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      expect((await call("live", { action: "connect" })).isError).toBe(true);
+      expect(invoke).not.toHaveBeenCalled();
     });
 
     it("needs a YouTube channel when the profile has none", async () => {

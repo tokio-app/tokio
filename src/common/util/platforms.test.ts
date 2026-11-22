@@ -60,6 +60,16 @@ describe("platforms", () => {
       TOKIO_EVENTS.SUPER_CHAT,
       TOKIO_EVENTS.MUSIC_CHANGE,
     ]);
+    expect(triggersFor(["kick"])).toEqual([
+      TOKIO_EVENTS.CHAT,
+      EMOTE_TRIGGER,
+      TOKIO_EVENTS.GIFT,
+      TOKIO_EVENTS.SUBSCRIBE,
+      TOKIO_EVENTS.GIFT_SUB,
+      TOKIO_EVENTS.RAID,
+      TOKIO_EVENTS.REDEEM,
+      TOKIO_EVENTS.MUSIC_CHANGE,
+    ]);
   });
 
   it("counts coins only with a platform whose gifts have a price", () => {
@@ -67,6 +77,7 @@ describe("platforms", () => {
     expect(countsCoins(["youtube", "tiktok"])).toBe(true);
     expect(countsCoins(["youtube"])).toBe(false);
     expect(countsCoins(["twitch", "youtube"])).toBe(false);
+    expect(countsCoins(["youtube", "kick"])).toBe(true);
   });
 
   it("reads a viewer without a platform as TikTok's", () => {

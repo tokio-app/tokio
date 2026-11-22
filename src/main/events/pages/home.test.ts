@@ -317,6 +317,30 @@ describe("home events", () => {
         ]);
       },
     );
+
+    it.each([
+      [
+        connectFailure("rateLimited", ""),
+        "Kick is limiting Tokio's requests. Try again in a few minutes.",
+      ],
+      [
+        connectFailure("notFound", ""),
+        "Couldn't find @streamer on Kick. Check the username.",
+      ],
+    ])("says what Kick's failures mean (%#)", async (error, message) => {
+      const { h, connectorService, profile } = setup({ success: false, error });
+      profile.platforms = ["kick"];
+
+      await h.invoke(home, APP_EVENTS.CONNECT, {
+        username: "",
+        channels: { kick: "@streamer" },
+      });
+
+      expect(connectorService.connect).toHaveBeenCalledWith({
+        kick: "streamer",
+      });
+      expect(h.notices).toEqual([expect.objectContaining({ message })]);
+    });
   });
 
   describe("CONNECT on several platforms", () => {
@@ -484,6 +508,10 @@ describe("home events", () => {
       ],
       [
         connectFailure("rateLimited", ""),
+        "Twitch is limiting Tokio's requests. Try again in a few minutes.",
+      ],
+      [
+        connectFailure("premium", ""),
         "Unable to connect to @mia on Twitch. Try again in a moment.",
       ],
     ])("names the platform a failure is from (%#)", async (error, message) => {
@@ -519,7 +547,7 @@ describe("home events", () => {
           "twitch",
           // A newer Tokio's
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-          "kick" as Platform,
+          "trovo" as Platform,
           "tiktok",
           "twitch",
         ],

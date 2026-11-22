@@ -3,7 +3,7 @@ import { OverlayConfigRedux } from "./overlay";
 
 // The platforms Tokio connects to, in the order Home lists them. A new one
 // gets its provider, its row in PLATFORM_TRIGGERS and its texts.
-export const PLATFORMS = ["tiktok", "twitch", "youtube"] as const;
+export const PLATFORMS = ["tiktok", "twitch", "youtube", "kick"] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
 // How a platform's connection is doing while it's on: connecting, connected,

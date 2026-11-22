@@ -13,7 +13,7 @@ paths:
 
 # Platforms
 
-Tokio connects to TikTok, Twitch and YouTube (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`. Kick comes later, through its site's socket (the user's call), its Kicks counting as `GIFT` with their price as coins. Twitch's Bits are `CHEER`, YouTube's Super Chats and Super Stickers `SUPER_CHAT`, and YouTube's Gifts `GIFT`.
+Tokio connects to TikTok, Twitch, YouTube and Kick (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`. Twitch's Bits are `CHEER`, YouTube's Super Chats and Super Stickers `SUPER_CHAT`, YouTube's Gifts `GIFT` with 0 coins, and Kick's Kicks `GIFT` with their price as coins (the user's call).
 
 ## What the user chose
 
@@ -23,6 +23,7 @@ Tokio connects to TikTok, Twitch and YouTube (`PLATFORMS`, `src/common/types/con
 - Twitch connects through the streamer's sign-in: Twitch's official EventSub over WebSocket and Helix, the device code flow, a public client. The client ID isn't a secret and ships in `providers/twitch/config`. Nothing else of Twitch's is shipped, and no code is copied from any Twitch, YouTube or Kick library, only MIT, BSD and Apache references are read (Licensing in `AGENTS.md`).
 - One Twitch account for every profile; a profile only picks whether to use it.
 - YouTube connects with no key and no sign-in (the user's call): Tokio reads the LIVE's public chat the way youtube.com does, accepting YouTube's terms and that a change to its site can break it. The profile's `channels.youtube` is the handle or link typed on Home.
+- Kick connects with no key and no sign-in, through our own provider rather than the `kicksdk-js` package (the user's call): Kick's website API and its chat feed, read the way kick.com's page does. The profile's `channels.kick` is the channel's name or kick.com link.
 
 ## The session across platforms
 
@@ -55,8 +56,8 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 
 - Followers and fan levels: a Twitch chatter's `follower` is false and `fanLevel` missing, so **Followers** and **Minimum fan level** never pass them. Moderators and Super Fans work (Twitch's broadcaster and moderators, subscribers and founders). The permissions section and the website say so in one line.
 - Chat language: translation stays TikTok's (the user's call: letting Google detect Twitch's messages would spend its rate limit on the streamer's own language; `.claude/rules/translation.md`).
-- Follows: every follow counts, a viewer's repeat follows in one LIVE included (the user's call). Twitch sends one each time a viewer follows again after unfollowing. YouTube sends none: new channel subscribers don't show in its chat.
-- Chat pictures: Twitch chat goes without (`shortcut:` in `providers/twitch/index.ts`), `Avatar` shows the initial. Follows, subs, cheers and redeems look their picture up once and cache it. YouTube's chat carries every author's picture.
+- Follows: every follow counts, a viewer's repeat follows in one LIVE included (the user's call). Twitch sends one each time a viewer follows again after unfollowing. YouTube sends none: new channel subscribers don't show in its chat. Kick has no Follow either (the user's call): no feed Kick's own page joins names a follower (checked in its scripts), its signed-in user feed only carries viewer notices, and named follows come only from Kick's official webhooks, which need a public server. Its follower total moves live (in the lookup, and in a follower goal's `GoalProgressUpdateEvent`), but the user chose not to turn it into follows without names.
+- Chat pictures: Twitch chat goes without (`shortcut:` in `providers/twitch/index.ts`), `Avatar` shows the initial. Follows, subs, cheers and redeems look their picture up once and cache it. YouTube's chat carries every author's picture. Kick's chat has none (initials); a Kick's sender comes with theirs.
 - Fans stay TikTok's (`.claude/rules/fans.md`).
 
 ## Twitch
@@ -85,6 +86,16 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - A gifted membership counts once, from its purchase announcement, with the count read from its text; each recipient's redemption is dropped.
 - Super Chat amounts stay as YouTube shows them (`amount`). The timer adds the same seconds per Super Chat whatever it cost, since currencies differ, and Coin stats leave them out.
 - Placeholder items (`liveChatPlaceholderItemRenderer`) are messages held from readers and never filled in: ignored.
+
+## Kick
+
+- Everything goes through kick.com's own API and chat feed, as a guest: `GET kick.com/api/v2/channels/<slug>` gives the channel id, the chatroom id (a different number) and whether it's live; `web.kick.com/api/v1/realtime` gives the feed's server and a 45-minute guest token; the socket is Kick's Centrifugo server. Kick's notes come from kicksdk's `docs/KICK.md` (Apache-2.0, read as a reference, never copied).
+- Every request and the socket send `User-Agent: Tokio/<version>`. Kick answers a non-browser that sends a browser's user agent with 403 "Request blocked by security policy", so never make Tokio pretend to be a browser. The socket also has to send `Origin: https://kick.com`, or its handshake gets a 403.
+- The feeds are `chatrooms.<chatroom>.v2` (chat, subs, hosts), `chatroom_<chatroom>` (gifted subs, reward redemptions), `channel.<channel>` (live and offline) and `channel_<channel>` (Kicks). Never `chatrooms.<chatroom>`: it repeats every host. A publication's `data` is a JSON string inside the JSON.
+- The token is refreshed at 80% of its life for the same client id. Closes coded 3500-3999 and 4500-4999 are terminal: wait 5 minutes, doubling up to 30, then come back as a new client id. Any other drop reconnects from 1 s, doubling up to 30 s, never giving up; a reconnect redoes the lookup, which is how it learns the stream ended while away.
+- It connects while the channel is offline (the chat is the channel's), like Twitch, and `StopStreamBroadcast` ends the connection only for a stream seen live. Viewers come from the lookup every 60 s while live.
+- Each Kick is its own `GIFT`, its id `kick:<gift slug>` (`rage_quit`) and its `amount` as coins. Subs, gifted subs, hosts and redemptions name the viewer only by username, so they have no `userId`. Chat has no pictures; a Kick's sender has one.
+- The feed is unofficial and changed from Pusher to Centrifugo in October 2026. An event Tokio can't read is dropped and logged once per name, never thrown out of the socket's listener.
 
 ## The window
 
