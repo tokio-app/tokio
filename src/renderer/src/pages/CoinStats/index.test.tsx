@@ -51,8 +51,17 @@ const selected = () =>
     .getAttribute("aria-label");
 // The summary's title, after the page's
 const heading = () => screen.getAllByRole("heading", { level: 2 })[1];
-// The value shown above a stat's label
-const stat = (label: string) => screen.getByText(label).previousElementSibling;
+// The value shown above a stat's label, not the currency switch's tab
+const stat = (label: string) =>
+  screen.getByText(label, { ignore: "[role=tab]" }).previousElementSibling;
+// A LIVE's bar, scaled to the best LIVE
+const bar = (name: RegExp) =>
+  option(name).querySelector<HTMLElement>("[style]")?.style.width;
+const kicker = (name: string, kicks: number, gifts = 1): Gifter => ({
+  ...gifter(name, kicks, gifts),
+  userId: `kick:${name}`,
+  platform: "kick",
+});
 const gifterRows = (name: string) =>
   within(screen.getByRole("list", { name }))
     .getAllByRole("listitem")
@@ -501,6 +510,68 @@ describe("Gift stats", () => {
     expect(
       screen.getByRole("button", { name: "Clear history" }),
     ).toBeDisabled();
+  });
+
+  it("counts in Kicks a history with only Kicks, with no switch", async () => {
+    renderWithProviders(<CoinStats />);
+
+    await lives([liveSummary(SATURDAY, { kicks: 300, gifts: 3 })]);
+    await record(saturday, [kicker("Bea", 300, 3)]);
+
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(options()).toEqual([
+      "All time, 300 Kicks",
+      expect.stringMatching(/^Saturday.*, 300 Kicks$/),
+    ]);
+    expect(stat("Kicks")).toHaveTextContent("300");
+    expect(screen.queryByText("Coins")).not.toBeInTheDocument();
+    expect(gifterRows("Gifters")).toEqual(["1BBea@bea300 Kicks3 gifts"]);
+  });
+
+  it("switches between coins and Kicks when the history has both", async () => {
+    const { user } = renderWithProviders(<CoinStats />);
+    const both = { ...friday, kicks: 200 };
+    await lives(
+      [saturday, both],
+      [gifter("Ana", 5200), kicker("Bea", 200), gifter("Kai", 10)],
+    );
+    await record(saturday, [gifter("Yui", 600, 40)]);
+
+    const tabs = screen.getByRole("tablist", { name: "Counted in" });
+    expect(
+      within(tabs)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["Coins", "Kicks"]);
+    expect(within(tabs).getByRole("tab", { selected: true })).toHaveTextContent(
+      "Coins",
+    );
+    expect(options()[0]).toBe("All time, 13,000 coins");
+
+    await user.click(within(tabs).getByRole("tab", { name: "Kicks" }));
+
+    expect(options()).toEqual([
+      "All time, 200 Kicks",
+      expect.stringMatching(/^Saturday.*, 0 Kicks$/),
+      expect.stringMatching(/^Friday.*, 200 Kicks$/),
+    ]);
+    expect(bar(/^Friday/)).toBe("100%");
+    expect(bar(/^Saturday/)).toBe("0%");
+    expect(stat("Kicks")).toHaveTextContent("0");
+    // Gifts stays every platform's
+    expect(stat("Gifts")).toHaveTextContent("40");
+    // The LIVE had no Kick gifters
+    expect(screen.getByText(/^No gifts yet\./)).toBeInTheDocument();
+
+    await user.click(option(/^All time/));
+    expect(stat("Kicks")).toHaveAttribute("title", "200");
+    expect(gifterRows("Top gifters")).toEqual(["1BBea@bea200 Kicks1 gift"]);
+
+    await user.click(within(tabs).getByRole("tab", { name: "Coins" }));
+    expect(gifterRows("Top gifters")).toEqual([
+      expect.stringMatching(/^1AAna/),
+      expect.stringMatching(/^2KKai/),
+    ]);
   });
 
   it("says what fills an empty history", async () => {

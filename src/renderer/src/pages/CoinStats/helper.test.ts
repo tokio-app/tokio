@@ -121,12 +121,18 @@ describe("periodText", () => {
 describe("allTime", () => {
   const lives = [
     liveSummary(day(30, 20), { coins: 100, gifts: 10, endedAt: day(30, 22) }),
-    liveSummary(day(29, 20), { coins: 25, gifts: 5, endedAt: day(29, 21) }),
+    liveSummary(day(29, 20), {
+      coins: 25,
+      kicks: 40,
+      gifts: 5,
+      endedAt: day(29, 21),
+    }),
   ];
 
-  it("adds up every LIVE's coins, gifts and length", () => {
+  it("adds up every LIVE's coins, Kicks, gifts and length", () => {
     expect(allTime(lives)).toEqual({
       coins: 125,
+      kicks: 40,
       gifts: 15,
       length: 3 * HOUR,
     });
@@ -136,13 +142,19 @@ describe("allTime", () => {
     // From 8:30 PM on the 29th: half an hour of one LIVE, all of the other
     expect(allTime(lives, { from: day(29, 20, 30) })).toEqual({
       coins: 100,
+      kicks: 0,
       gifts: 10,
       length: 2 * HOUR + HOUR / 2,
     });
   });
 
   it("is all zeros without LIVEs", () => {
-    expect(allTime([])).toEqual({ coins: 0, gifts: 0, length: 0 });
+    expect(allTime([])).toEqual({
+      coins: 0,
+      kicks: 0,
+      gifts: 0,
+      length: 0,
+    });
   });
 });
 

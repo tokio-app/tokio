@@ -2,10 +2,18 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   AppEventsResponseMap,
+  Gifter,
   LiveHistory,
   LiveSummary,
 } from "@/common/types";
-import { DateRange, inRange } from "@/common/util";
+import {
+  DateRange,
+  GIFT_CURRENCIES,
+  GIFT_CURRENCY,
+  GiftCurrency,
+  inRange,
+  platformOf,
+} from "@/common/util";
 import {
   BackButton,
   Btn,
@@ -14,6 +22,7 @@ import {
   Page,
   Section,
   Spinner,
+  Tabs,
 } from "@/components";
 import { formatDate, formatDuration } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
@@ -41,8 +50,20 @@ type GiftersReply = AppEventsResponseMap[APP_EVENTS_RESPONSE.GIFTERS];
 // reads many LIVEs' files
 const SEARCH_DELAY_MS = 250;
 
+// Each currency's name on the switch
+const CURRENCY_LABELS = {
+  coins: "coinStats.stats.coins",
+  kicks: "coinStats.stats.kicks",
+} as const;
+
 // The header row, with the dashboard or the spinner under it
-function Frame({ children }: { children: ReactNode }) {
+function Frame({
+  actions,
+  children,
+}: {
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   const t = useT();
   return (
     <Page width="wide">
@@ -50,6 +71,7 @@ function Frame({ children }: { children: ReactNode }) {
         <Section
           icon={<BackButton to="/tools" title={t("tools.back")} />}
           title={t("coinStats.title")}
+          actions={actions}
         >
           {children}
         </Section>
@@ -77,6 +99,8 @@ export function CoinStats() {
   const [searchReply, setSearchReply] = useState<GiftersReply>();
   const [deleting, setDeleting] = useState<LiveSummary>();
   const [clearing, setClearing] = useState(false);
+  // The currency picked on the switch, kept while the history lacks it
+  const [picked, setPicked] = useState<GiftCurrency>("coins");
   // The next LIVES is another profile's, which starts from its newest LIVE
   const switched = useRef(false);
   // The profile the last GET_PROFILE named. It also comes as a resync (an MCP
@@ -181,6 +205,18 @@ export function CoinStats() {
     );
   }
 
+  // Never added together: the page counts in one at a time, the one picked
+  // when the history has it
+  const currencies = GIFT_CURRENCIES.filter((c) =>
+    history.lives.some((l) => l[c] > 0),
+  );
+  const currency = currencies.includes(picked)
+    ? picked
+    : (currencies[0] ?? "coins");
+  // A list's gifters of that currency, in main's order and with its ranks
+  const paid = <G extends Gifter>(list?: G[]) =>
+    list?.filter((g) => GIFT_CURRENCY[platformOf(g)] === currency);
+
   const dates = isDates(datesReply) ? datesReply : undefined;
   // Main adds up the gifts in the dates of a LIVE they cut
   const total = { ...allTime(shown, range ?? {}), ...dates?.totals };
@@ -190,7 +226,7 @@ export function CoinStats() {
     if (searching) {
       const found = isSearch(searchReply) ? searchReply : undefined;
       return {
-        gifters: found?.data,
+        gifters: paid(found?.data),
         empty: t("coinStats.gifters.noMatch", { query: search.trim() }),
         failed:
           found?.success === false
@@ -201,7 +237,7 @@ export function CoinStats() {
     if (live) {
       const got = reply?.startedAt === live.startedAt ? reply : undefined;
       return {
-        gifters: got?.data?.gifters,
+        gifters: paid(got?.data?.gifters),
         empty: t("coinStats.gifters.empty"),
         failed:
           got?.success === false ? t("coinStats.gifters.failed") : undefined,
@@ -209,7 +245,7 @@ export function CoinStats() {
     }
     if (range) {
       return {
-        gifters: dates?.data,
+        gifters: paid(dates?.data),
         empty: t("coinStats.gifters.emptyDates"),
         failed:
           dates?.success === false
@@ -217,7 +253,10 @@ export function CoinStats() {
             : undefined,
       };
     }
-    return { gifters: history.gifters, empty: t("coinStats.gifters.empty") };
+    return {
+      gifters: paid(history.gifters),
+      empty: t("coinStats.gifters.empty"),
+    };
   };
 
   return (
@@ -230,7 +269,22 @@ export function CoinStats() {
       )}
       {clearing && <ClearHistoryModal onClose={() => setClearing(false)} />}
 
-      <Frame>
+      <Frame
+        actions={
+          currencies.length > 1 && (
+            <Tabs
+              variant="pill"
+              label={t("coinStats.currency")}
+              tabs={currencies.map((value) => ({
+                value,
+                label: t(CURRENCY_LABELS[value]),
+              }))}
+              value={currency}
+              onChange={setPicked}
+            />
+          )
+        }
+      >
         <div className={styles.dashboard}>
           {/* Swapped at once on a new selection, with no motion */}
           <div className={styles.column}>
@@ -259,6 +313,7 @@ export function CoinStats() {
                   </Btn>
                 }
                 totals={live}
+                currency={currency}
               />
             ) : (
               <SummarySection
@@ -286,6 +341,7 @@ export function CoinStats() {
                   )
                 }
                 totals={total}
+                currency={currency}
               />
             )}
             {/* One in both cases, so an open search stays open */}
@@ -294,6 +350,7 @@ export function CoinStats() {
                 live ? "coinStats.gifters.title" : "coinStats.gifters.top",
               )}
               {...gifters()}
+              currency={currency}
               search={search}
               onSearch={setSearch}
             />
@@ -302,7 +359,8 @@ export function CoinStats() {
           <ListSection
             lives={shown}
             title={periodText(filter, language, now)}
-            coins={total.coins}
+            amount={total[currency]}
+            currency={currency}
             filter={filter}
             filtered={!!range}
             selected={live ? live.startedAt : null}

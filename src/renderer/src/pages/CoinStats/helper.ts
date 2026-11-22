@@ -1,31 +1,38 @@
 import { MessageKey, translate } from "@/common/i18n";
 import { LiveSummary } from "@/common/types";
-import { allInRange, DateRange } from "@/common/util";
+import { allInRange, DateRange, GiftCurrency } from "@/common/util";
 import { DateTimeValue, NO_DATE } from "@/components";
 import { formatDate } from "@/helper";
 
-export type Totals = Pick<LiveSummary, "coins" | "gifts">;
+export type Totals = Pick<LiveSummary, "coins" | "kicks" | "gifts">;
 
-export const READOUT: { key: keyof Totals; label: MessageKey }[] = [
-  { key: "coins", label: "coinStats.stats.coins" },
-  { key: "gifts", label: "coinStats.stats.gifts" },
-];
+type Stat = { key: keyof Totals; label: MessageKey };
+
+const GIFTS: Stat = { key: "gifts", label: "coinStats.stats.gifts" };
+
+// The summary's stats in each currency: what it was worth, then every
+// platform's gifts
+export const READOUT: Record<GiftCurrency, Stat[]> = {
+  coins: [{ key: "coins", label: "coinStats.stats.coins" }, GIFTS],
+  kicks: [{ key: "kicks", label: "coinStats.stats.kicks" }, GIFTS],
+};
 
 /**
- * The LIVEs' coins and gifts added up, and how long they ran in ms. With
- * dates, how long they ran in them, and only the coins and gifts of the LIVEs
- * all in them: main adds up the gifts in them of a LIVE they cut.
+ * The LIVEs' coins, Kicks and gifts added up, and how long they ran in ms.
+ * With dates, how long they ran in them, and only the totals of the LIVEs all
+ * in them: main adds up the gifts in them of a LIVE they cut.
  */
 export function allTime(
   lives: LiveSummary[],
   range: DateRange = {},
 ): Totals & { length: number } {
   const { from = -Infinity, to = Infinity } = range;
-  const sum = { coins: 0, gifts: 0, length: 0 };
+  const sum = { coins: 0, kicks: 0, gifts: 0, length: 0 };
   for (const live of lives) {
     sum.length += Math.min(live.endedAt, to) - Math.max(live.startedAt, from);
     if (!allInRange(live, range)) continue;
     sum.coins += live.coins;
+    sum.kicks += live.kicks;
     sum.gifts += live.gifts;
   }
   return sum;

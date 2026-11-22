@@ -205,6 +205,21 @@ describe("Tools", () => {
     expect(within(row("Countdown")).getByText("01:30:00")).toBeVisible();
   });
 
+  it("shows the newest LIVE's Kicks only when it had no coins", async () => {
+    await renderApp("/tools");
+
+    await lives(liveSummary(OCT_31, { kicks: 1 }));
+    expect(
+      within(row("Gift stats")).getByText("Kick on Oct 31, 2026"),
+    ).toBeVisible();
+
+    await lives(liveSummary(OCT_31, { coins: 20, kicks: 300 }));
+    expect(within(row("Gift stats")).getByText("20")).toBeVisible();
+    expect(
+      within(row("Gift stats")).getByText("coins on Oct 31, 2026"),
+    ).toBeVisible();
+  });
+
   it("asks for the LIVEs and the fans again when the profile changes", async () => {
     await renderApp("/tools");
     await lives(liveSummary(OCT_31, { coins: 1234 }));

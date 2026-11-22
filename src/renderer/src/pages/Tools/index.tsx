@@ -16,7 +16,8 @@ import styles from "./tools.module.css";
 
 /**
  * The tools, one row each, with what each holds now: the time left, how
- * many studio overlays there are, the newest LIVE's coins, and how many fans
+ * many studio overlays there are, the newest LIVE's coins (or Kicks, when it
+ * had only those), and how many fans
  * and test overlays there are.
  */
 export function Tools() {
@@ -57,6 +58,8 @@ export function Tools() {
   });
 
   const newest = lives?.[0];
+  // Never added together: Kicks only when the LIVE had no coins
+  const unit = newest && !newest.coins && newest.kicks ? "kicks" : "coins";
 
   return (
     <Page>
@@ -74,12 +77,12 @@ export function Tools() {
             to="/tools/coin-stats"
             name={t("coinStats.title")}
             description={t("coinStats.description")}
-            value={newest && formatStat(newest.coins, language).full}
+            value={newest && formatStat(newest[unit], language).full}
             label={
               lives &&
               (newest
-                ? t("tools.list.coins", {
-                    count: newest.coins,
+                ? t(`tools.list.${unit}`, {
+                    count: newest[unit],
                     date: formatDate(newest.startedAt, language, "short"),
                   })
                 : t("tools.list.noLives"))

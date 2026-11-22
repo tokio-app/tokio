@@ -1,7 +1,8 @@
 import { LiveSummary } from "@/common/types";
+import { GiftCurrency } from "@/common/util";
 import { DateTimePicker, EmptyState, Select } from "@/components";
 import { cx, formatDate, formatDuration, formatStat } from "@/helper";
-import { coinsLabel } from "@/helper/gifts";
+import { amountLabel } from "@/helper/gifts";
 import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { KeyboardEvent } from "react";
 import styles from "../coinstats.module.css";
@@ -12,7 +13,9 @@ interface Props {
   lives: LiveSummary[];
   // The first row's: All time, or the days the filter keeps
   title: string;
-  coins: number;
+  // The first row's, in the currency the page counts in
+  amount: number;
+  currency: GiftCurrency;
   filter: DateFilter;
   // The filter keeps only some of the LIVEs
   filtered: boolean;
@@ -86,7 +89,8 @@ const MOVES: Record<string, (index: number, last: number) => number> = {
 export function ListSection({
   lives,
   title,
-  coins,
+  amount,
+  currency,
   filter,
   filtered,
   selected,
@@ -97,7 +101,8 @@ export function ListSection({
   const language = useLanguage();
   const options = [null, ...lives.map((live) => live.startedAt)];
   // The bars are scaled to the best LIVE
-  const best = lives.reduce((max, live) => Math.max(max, live.coins), 0);
+  const best = lives.reduce((max, live) => Math.max(max, live[currency]), 0);
+  const label = (value: number) => amountLabel(value, currency, language);
 
   const onKeyDown = (e: KeyboardEvent<HTMLUListElement>) => {
     const move = MOVES[e.key];
@@ -118,7 +123,7 @@ export function ListSection({
     onClick: () => onSelect(value),
   });
 
-  const total = formatStat(coins, language);
+  const total = formatStat(amount, language);
   return (
     <div className={styles.side}>
       <DateFilterBar filter={filter} onChange={onFilter} />
@@ -132,7 +137,7 @@ export function ListSection({
           {...option(null)}
           aria-label={t("coinStats.list.option", {
             date: title,
-            coins: coinsLabel(coins, language),
+            coins: label(amount),
           })}
         >
           <span className={styles.all_time}>{title}</span>
@@ -141,14 +146,14 @@ export function ListSection({
           </span>
         </li>
         {lives.map((live) => {
-          const { short, full } = formatStat(live.coins, language);
+          const { short, full } = formatStat(live[currency], language);
           return (
             <li
               key={live.startedAt}
               {...option(live.startedAt)}
               aria-label={t("coinStats.list.option", {
                 date: formatDate(live.startedAt, language, "dateTime"),
-                coins: coinsLabel(live.coins, language),
+                coins: label(live[currency]),
               })}
             >
               <span className={styles.date}>
@@ -165,7 +170,9 @@ export function ListSection({
               </span>
               <span
                 className={styles.bar}
-                style={{ width: best ? `${(live.coins / best) * 100}%` : 0 }}
+                style={{
+                  width: best ? `${(live[currency] / best) * 100}%` : 0,
+                }}
               />
             </li>
           );

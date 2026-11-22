@@ -1,4 +1,5 @@
 import { Gifter, RankedGifter } from "@/common/types";
+import { GiftCurrency } from "@/common/util";
 import {
   Avatar,
   EmptyState,
@@ -6,13 +7,13 @@ import {
   Section,
   Spinner,
 } from "@/components";
-import { coinsLabel, giftsLabel } from "@/helper/gifts";
+import { amountLabel, giftsLabel } from "@/helper/gifts";
 import { useLanguage, useT } from "@/ui/i18n";
 import styles from "../coinstats.module.css";
 
 export interface GiftersList {
-  // The most coins first, undefined until main sends them. A search's come
-  // with their place among all of them.
+  // One currency's, the most first, undefined until main sends them. A
+  // search's come with their place among all of that currency's.
   gifters?: (Gifter | RankedGifter)[];
   // What to say when there are none
   empty: string;
@@ -22,6 +23,7 @@ export interface GiftersList {
 
 interface Props extends GiftersList {
   title: string;
+  currency: GiftCurrency;
   search: string;
   onSearch: (search: string) => void;
 }
@@ -31,6 +33,7 @@ export function GiftersSection({
   gifters,
   empty,
   failed,
+  currency,
   search,
   onSearch,
 }: Props) {
@@ -68,7 +71,7 @@ export function GiftersSection({
               <span className={styles.handle}>{`@${gifter.handle}`}</span>
             </span>
             <span className={styles.amount}>
-              {coinsLabel(gifter.coins, language)}
+              {amountLabel(gifter.coins, currency, language)}
             </span>
             <span className={styles.amount}>
               {giftsLabel(gifter.gifts, language)}

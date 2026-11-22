@@ -1,3 +1,4 @@
+import { GiftCurrency } from "@/common/util";
 import { Section } from "@/components";
 import { formatStat } from "@/helper";
 import { useLanguage, useT } from "@/ui/i18n";
@@ -12,10 +13,18 @@ interface Props {
   // The icon button on the title's row
   action: ReactNode;
   totals: Totals;
+  // The currency the page counts in
+  currency: GiftCurrency;
 }
 
 // A LIVE or All time as Home showed it: when, and what it counted
-export function SummarySection({ title, lines, action, totals }: Props) {
+export function SummarySection({
+  title,
+  lines,
+  action,
+  totals,
+  currency,
+}: Props) {
   const t = useT();
   const language = useLanguage();
   return (
@@ -29,7 +38,7 @@ export function SummarySection({ title, lines, action, totals }: Props) {
       actions={action}
     >
       <div className={styles.readout}>
-        {READOUT.map(({ key, label }) => {
+        {READOUT[currency].map(({ key, label }) => {
           const { short, full } = formatStat(totals[key], language);
           return (
             <div key={key} className={styles.stat}>
