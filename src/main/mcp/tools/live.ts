@@ -1,5 +1,5 @@
 import { ProfileSchema } from "@/common/schemas";
-import { PLATFORMS } from "@/common/types";
+import { Platform, PLATFORMS } from "@/common/types";
 import {
   ActivityItem,
   ActivityUser,
@@ -40,18 +40,25 @@ export const sections: Sections = {
       platforms: [...(await profileOf(handler)).platforms],
     }),
     write: async (handler, { platforms }) => {
-      const { error } = await invokeOk(
+      const { error, data } = await invokeOk(
         handler,
         APP_EVENTS.SET_PLATFORMS,
         { platforms },
         APP_EVENTS_RESPONSE.SET_PLATFORMS,
       );
-      // Home's toggles resync
+      // Home's list resyncs
       await pushProfile(handler);
-      return error ?? ok("Saved.");
+      if (error) return error;
+      // Main keeps a platform that's on
+      const kept = data.platforms.filter((p) => !platforms.includes(p));
+      return kept.length
+        ? fail(
+            `Disconnect from ${kept.map((p) => PLATFORM_LABELS[p]).join(", ")} before removing it; the rest was saved.`,
+          )
+        : ok("Saved.");
     },
     notes:
-      "The platforms the active profile's Connect joins, as one LIVE: tiktok (the profile's @username), twitch (the account signed in to in Settings, see get_status live.twitch), youtube (the profile's YouTube channel) and kick (the profile's Kick channel). Refused while connected. An empty list connects TikTok.",
+      "The platforms the active profile's Connect joins, as one LIVE: tiktok (the profile's @username), twitch (the account signed in to in Settings, see get_status live.twitch), youtube (the profile's YouTube channel) and kick (the profile's Kick channel). A platform can be added while connected; one that's on stays until it's disconnected (live disconnect with `platform`). An empty list connects TikTok.",
   }),
 };
 
@@ -327,40 +334,45 @@ export const tools: ToolDef<any>[] = [
     name: "live",
     title: "Connect to a LIVE",
     description:
-      "connect joins the active profile's platforms (settings section platforms) as one LIVE: TikTok by @username (or a LIVE link), saved as the profile's username (without `username` it uses the saved one), Twitch with the account signed in to in Settings, YouTube by the profile's YouTube channel (`youtube`, a channel handle or LIVE link) and Kick by its Kick channel (`kick`, a channel name or kick.com link), each saved per profile like the username (without it, the saved one). With several, it succeeds when any of them connects, and each one's result is a notice in the app; get_status live.platforms says which are on. While connected, connect keeps the LIVE each platform is on, joining only the ones that are down: disconnect first to join another. While Tokio looks for a LIVE that stopped on its own (get_status live.waiting), connect tries at once and ends the look, even when it fails. TikTok's account must be live now, and Tokio needs the TikTok key (set_key). disconnect leaves every platform, and ends the look. Ask the streamer before either.",
+      "connect joins the active profile's platforms (settings section platforms) as one LIVE: TikTok by @username (or a LIVE link), saved as the profile's username (without `username` it uses the saved one), Twitch with the account signed in to in Settings, YouTube by the profile's YouTube channel (`youtube`, a channel handle or LIVE link) and Kick by its Kick channel (`kick`, a channel name or kick.com link), each saved per profile like the username (without it, the saved one). With several, it succeeds when any of them connects, and each one's result is a notice in the app; get_status live.platforms says which are on. `platforms` connects only those of the profile's (without it, all of them). While connected, connect keeps the LIVE each platform is on, joining only the ones that are down: disconnect that platform first to join another of its channels. While Tokio looks for a LIVE that stopped on its own (get_status live.waiting), connect tries at once and ends the look, even when it fails. TikTok's account must be live now, and Tokio needs the TikTok key (set_key). disconnect leaves every platform and ends the look, or with `platform` leaves that one while the others stay on. Ask the streamer before either.",
     input: z
       .object({
         action: z.enum(["connect", "disconnect"]),
         username: z.string().optional(),
         youtube: z.string().optional(),
         kick: z.string().optional(),
+        // connect: only these; disconnect: this one
+        platforms: z.array(z.enum(PLATFORMS)).optional(),
+        platform: z.enum(PLATFORMS).optional(),
       })
       .strict(),
     annotations: { ...WRITE, openWorldHint: true },
-    run: async (handler, { action, username, youtube, kick }) => {
+    run: async (
+      handler,
+      { action, username, youtube, kick, platforms, platform },
+    ) => {
       if (action === "disconnect") {
         const { error } = await invokeOk(
           handler,
           APP_EVENTS.DISCONNECT,
-          undefined,
+          platform ? { platform } : undefined,
         );
         return error ?? ok({ connected: false });
       }
       const profile = await activeProfile(handler);
       const name = username?.trim() || profile?.connector.username || "";
       // TikTok connects when the profile has no platform
-      const tiktok =
-        !profile?.platforms.length || profile.platforms.includes("tiktok");
-      if (!name && tiktok) return fail("Give the @username to connect to.");
-      // The channels given, each needed when the profile uses its platform
-      // and has none saved
+      const used = profile?.platforms.length ? profile.platforms : ["tiktok"];
+      const joins = (p: Platform) =>
+        used.includes(p) && (!platforms || platforms.includes(p));
+      if (!name && joins("tiktok")) {
+        return fail("Give the @username to connect to.");
+      }
+      // The channels given, each needed when its platform joins and the
+      // profile has none saved
       const given = { youtube: youtube?.trim(), kick: kick?.trim() };
       for (const p of ["youtube", "kick"] as const) {
-        if (
-          !given[p] &&
-          !profile?.channels[p] &&
-          profile?.platforms.includes(p)
-        ) {
+        if (!given[p] && !profile?.channels[p] && joins(p)) {
           return fail(
             `Give the ${PLATFORM_LABELS[p]} channel or link to connect to.`,
           );
@@ -375,6 +387,7 @@ export const tools: ToolDef<any>[] = [
         {
           username: name,
           ...(Object.keys(channels).length > 0 && { channels }),
+          ...(platforms && { platforms }),
         },
         APP_EVENTS_RESPONSE.CONNECTED,
       );

@@ -1343,14 +1343,10 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await crop("home-feed-settings", dialog);
   await dialog.getByRole("button", { name: tr("Cancel") }).click();
   await page.getByPlaceholder(tr("@username")).fill("@tokio.demo");
-  // The box alone: with no Euler key saved, a hint shows under it
-  await crop(
-    "home-connect",
-    page.getByPlaceholder(tr("@username")).locator(".."),
-    {
-      pad: 16,
-    },
-  );
+  // The box alone: its row, Add a platform and Connect
+  await crop("home-connect", page.locator('[data-tour="connect"]'), {
+    pad: 16,
+  });
   // A downloaded update, then a state that shows no button
   await push("app:updates:res:status", { state: "ready", version: "1.5.0" });
   await crop("update-button", titleBar, { left: 600, top: 0 });

@@ -168,7 +168,13 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     );
   }
 
-  public async disconnect(): Promise<void> {
+  // Every platform, or one while the others stay on. One alone isn't
+  // _stopping, so its stop is told as that platform's (onPlatform).
+  public async disconnect(platform?: Platform): Promise<void> {
+    if (platform) {
+      await this._provider(platform)?.disconnect();
+      return;
+    }
     // Cleared when the last stop arrives, on setImmediate
     this._stopping = this._up.size > 0;
     await Promise.all(this._sources().map(([, p]) => p.disconnect()));

@@ -363,8 +363,11 @@ export interface AppEventsMap {
   [APP_EVENTS.CONNECT]: {
     username: string;
     channels?: Partial<Record<Platform, string>>;
+    // Only these of the profile's platforms, all of them when missing
+    platforms?: Platform[];
   };
-  [APP_EVENTS.DISCONNECT]: void;
+  // One platform, the others staying on, or every one without it
+  [APP_EVENTS.DISCONNECT]: { platform?: Platform } | void;
   [APP_EVENTS.IS_CONNECTED]: void;
   [APP_EVENTS.ACTIVE_FEATURES]: {
     tts?: boolean;

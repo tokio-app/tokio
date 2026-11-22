@@ -318,6 +318,21 @@ describe("home events", () => {
       },
     );
 
+    it("connects only the platforms asked for, as a row's Connect does", async () => {
+      const { h, connectorService, profile } = setup({ success: true });
+      profile.platforms = ["tiktok", "kick"];
+
+      await h.invoke(home, APP_EVENTS.CONNECT, {
+        username: "@streamer",
+        channels: { kick: "westcol" },
+        platforms: ["kick"],
+      });
+
+      expect(connectorService.connect).toHaveBeenCalledWith({
+        kick: "westcol",
+      });
+    });
+
     it.each([
       [
         connectFailure("rateLimited", ""),
@@ -524,7 +539,10 @@ describe("home events", () => {
   });
 
   describe("SET_PLATFORMS", () => {
-    const setup = (connected = false, saved = true) => {
+    const setup = (
+      on: Partial<Record<Platform, PlatformStatus>> = {},
+      saved = true,
+    ) => {
       const profile = { platforms: ["tiktok"] as Platform[] };
       const storeManagerService = {
         updateProfileData: vi.fn(async (_updates: unknown) => saved),
@@ -532,7 +550,7 @@ describe("home events", () => {
       };
       const timerService = { setPlatforms: vi.fn((_p: Platform[]) => {}) };
       const h = createHandler({
-        connectorService: { isConnected: () => connected },
+        connectorService: { status: () => on },
         storeManagerService,
         timerService,
       });
@@ -566,29 +584,23 @@ describe("home events", () => {
       expect(h.notices).toEqual([]);
     });
 
-    it("refuses while connected, replying what the profile has", async () => {
-      const { h, storeManagerService } = setup(true);
+    it("adds a platform while live, and keeps one that's on", async () => {
+      const { h, storeManagerService } = setup({ tiktok: "connected" });
 
-      await h.invoke(home, APP_EVENTS.SET_PLATFORMS, { platforms: ["twitch"] });
+      await h.invoke(home, APP_EVENTS.SET_PLATFORMS, { platforms: ["kick"] });
 
-      expect(storeManagerService.updateProfileData).not.toHaveBeenCalled();
-      expect(h.notices).toEqual([
-        expect.objectContaining({
-          level: "warning",
-          code: FEEDBACK_CODES.PROFILE_LOCKED,
-          message: "Disconnect from the LIVE before changing platforms.",
-        }),
+      expect(storeManagerService.updateProfileData).toHaveBeenCalledWith({
+        platforms: ["tiktok", "kick"],
+      });
+      expect(h.replies(APP_EVENTS_RESPONSE.SET_PLATFORMS)).toEqual([
+        { success: true, platforms: ["tiktok", "kick"] },
       ]);
-      await vi.waitFor(() =>
-        expect(h.replies(APP_EVENTS_RESPONSE.SET_PLATFORMS)).toEqual([
-          expect.objectContaining({ success: false, platforms: ["tiktok"] }),
-        ]),
-      );
+      expect(h.notices).toEqual([]);
     });
 
     it("says when the platforms can't be saved", async () => {
       vi.spyOn(Logger, "error");
-      const { h, timerService } = setup(false, false);
+      const { h, timerService } = setup({}, false);
 
       await h.invoke(home, APP_EVENTS.SET_PLATFORMS, { platforms: ["twitch"] });
 
@@ -616,6 +628,32 @@ describe("home events", () => {
         { success: false, live: false, stats: noStats },
       ]);
       expect(h.notices).toEqual([]);
+    });
+
+    it("disconnects one platform and answers what main holds", async () => {
+      const disconnect = vi.fn(async (_platform?: Platform) => {});
+      const h = createHandler({
+        connectorService: {
+          disconnect,
+          isConnected: () => true,
+          isReconnecting: () => false,
+          isWaiting: () => false,
+          status: () => ({ twitch: "connected" }),
+        },
+        liveService: { getSession: () => ({ startedAt: 1000 }) },
+        storeManagerService: { getLiveStats: () => stats },
+      });
+
+      await h.invoke(home, APP_EVENTS.DISCONNECT, { platform: "kick" });
+
+      expect(disconnect).toHaveBeenCalledWith("kick");
+      expect(h.replies(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
+        expect.objectContaining({
+          success: true,
+          live: true,
+          platforms: { twitch: "connected" },
+        }),
+      ]);
     });
 
     it("replies and notifies when disconnecting fails", async () => {

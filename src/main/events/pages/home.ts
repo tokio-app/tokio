@@ -94,12 +94,14 @@ const toUsername = (input: string) => {
 
 events.push(
   APP_EVENTS.CONNECT,
-  async (services, e, { username, channels }) => {
+  async (services, e, { username, channels, platforms: only }) => {
     const { storeManagerService, connectorService, notifier } = services;
     const profile = await storeManagerService.getProfileData();
-    const platforms: Platform[] = profile?.platforms.length
+    const used: Platform[] = profile?.platforms.length
       ? profile.platforms
       : ["tiktok"];
+    // A row's Connect asks for its platform alone
+    const platforms = only ? used.filter((p) => only.includes(p)) : used;
     // Connected or connecting, a platform stays on its channel
     const on = connectorService.status();
     const channelOf = (platform: Platform, typed: string) =>
@@ -222,15 +224,12 @@ events.push(
     e,
     { platforms },
   ) => {
-    if (connectorService.isConnected()) {
-      throw new AppFailure(
-        FEEDBACK_CODES.PROFILE_LOCKED,
-        t("main.home.platformsLocked"),
-        { level: "warning" },
-      );
-    }
-    // Known ones once each, in Home's order
-    const picked = PLATFORMS.filter((p) => platforms.includes(p));
+    // Known ones once each, in Home's order. One that's on stays: it's
+    // disconnected first.
+    const on = connectorService.status();
+    const picked = PLATFORMS.filter(
+      (p) => platforms.includes(p) || on[p] !== undefined,
+    );
     if (!(await storeManagerService.updateProfileData({ platforms: picked }))) {
       throw saveFailure();
     }
@@ -263,8 +262,14 @@ events.push(
 
 events.push(
   APP_EVENTS.DISCONNECT,
-  async ({ connectorService }, e) => {
-    await connectorService.disconnect();
+  async (services, e, data) => {
+    const platform = data ? data.platform : undefined;
+    await services.connectorService.disconnect(platform);
+    // The others go on: what main holds now
+    if (platform) {
+      e.reply(APP_EVENTS_RESPONSE.CONNECTED, connectionState(services));
+      return;
+    }
     e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
       success: false,
       live: false,

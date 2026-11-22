@@ -11,7 +11,6 @@ import {
   countsCoins,
   defaultStoreData,
   isPlatform,
-  PLATFORM_INPUT,
 } from "@/common/util";
 import { Modal } from "@/components";
 import {
@@ -53,8 +52,6 @@ export function Home() {
   const [platforms, setPlatforms] = useState(defaultProfile.platforms);
   const [twitchLogin, setTwitchLogin] = useState("");
   const [connected, setConnected] = useState(false);
-  // Main holds a connection, which locks the platforms
-  const [locked, setLocked] = useState(false);
   const [status, setStatus] = useState<
     Partial<Record<Platform, PlatformStatus>>
   >({});
@@ -117,7 +114,6 @@ export function Home() {
   useIpcListener(APP_EVENTS_RESPONSE.CONNECTED, (res) => {
     if (!res) return;
     setConnected(res.live);
-    setLocked(res.success);
     setStatus(res.platforms ?? {});
     setReconnecting(res.reconnecting ?? false);
     setWaiting(res.waiting ?? false);
@@ -220,7 +216,6 @@ export function Home() {
               needsKey={needsKey}
               startedAt={session.startedAt}
               platforms={platforms}
-              locked={locked}
               status={status}
               twitchLogin={twitchLogin}
               onPlatformsChange={(picked) => {
@@ -230,27 +225,24 @@ export function Home() {
                 });
               }}
               channels={channels}
-              onRetry={() =>
-                window.api.emit(APP_EVENTS.CONNECT, { username, channels })
-              }
               onUsernameChange={setUsername}
               onChannelChange={(platform, channel) =>
                 setChannels((c) => ({ ...c, [platform]: channel }))
               }
-              onConnect={() => {
-                // TikTok and YouTube need the channel, Twitch's is the account
-                const missing = platforms.some(
-                  (p) =>
-                    PLATFORM_INPUT[p] === "channel" &&
-                    !(p === "tiktok" ? username : (channels[p] ?? ""))
-                      .replace("@", "")
-                      .trim(),
-                );
-                if (missing) return;
-                setLoading(true);
-                window.api.emit(APP_EVENTS.CONNECT, { username, channels });
+              onConnect={(only) => {
+                // A row's Connect shows its own spinner
+                if (!only) setLoading(true);
+                window.api.emit(APP_EVENTS.CONNECT, {
+                  username,
+                  channels,
+                  ...(only && { platforms: only }),
+                });
               }}
-              onDisconnect={() => {
+              onDisconnect={(platform) => {
+                if (platform) {
+                  window.api.emit(APP_EVENTS.DISCONNECT, { platform });
+                  return;
+                }
                 setLoading(true);
                 window.api.emit(APP_EVENTS.DISCONNECT);
               }}

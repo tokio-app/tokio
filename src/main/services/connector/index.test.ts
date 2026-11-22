@@ -401,6 +401,24 @@ describe("ConnectorService", () => {
       expect(onPlatform).toHaveBeenLastCalledWith("twitch", "lost");
     });
 
+    it("stops one platform alone, told as that platform's stop", async () => {
+      const { service, tiktok, twitch, disconnected, onPlatform } = both();
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+      onPlatform.mockClear();
+      twitch.disconnect.mockImplementation(async () => {
+        setImmediate(() => twitch.fire(TOKIO_EVENTS.DISCONNECTED));
+      });
+
+      await service.disconnect("twitch");
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(twitch.disconnect).toHaveBeenCalledOnce();
+      expect(tiktok.disconnect).not.toHaveBeenCalled();
+      expect(onPlatform).toHaveBeenCalledExactlyOnceWith("twitch", "stopped");
+      expect(disconnected).not.toHaveBeenCalled();
+    });
+
     it("merges the platforms' rooms: TikTok's ranks, everyone's viewers", () => {
       const { tiktok, twitch, rooms } = both();
       tiktok.fire(TOKIO_EVENTS.CONNECTED);
