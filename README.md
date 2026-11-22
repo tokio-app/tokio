@@ -1,7 +1,7 @@
 <div align="center">
   <img src="resources/icon.png" alt="Tokio logo" width="96" />
   <h1>Tokio</h1>
-  <p>Make your TikTok, Twitch or YouTube LIVE react to chat, gifts, subs, Super Chats and more: text-to-speech, music requests, alerts, Minecraft actions, a countdown and overlays.</p>
+  <p>Make your TikTok, Twitch, YouTube or Kick LIVE react to chat, gifts, subs, Super Chats and more: text-to-speech, music requests, alerts, Minecraft actions, a countdown and overlays.</p>
   <p>
     <a href="https://tokio.ialfaro.com/download/">Download</a> ·
     <a href="https://tokio.ialfaro.com/docs/">Docs</a> ·
@@ -12,7 +12,7 @@
 
 ![Tokio's Home during a LIVE: the viewers with their line, the LIVE's numbers and top gifters, the features, and the activity feed with the song playing](.github/screenshots/dashboard.png)
 
-Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok, Twitch or YouTube LIVE, or several at once, and reacts to what happens in it. Its overlays work in OBS, TikTok LIVE Studio and any streaming app that can show a web page.
+Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok, Twitch, YouTube or Kick LIVE, or several at once, and reacts to what happens in it. Its overlays work in OBS, TikTok LIVE Studio and any streaming app that can show a web page.
 
 ## Features
 
@@ -63,7 +63,7 @@ Tokio is in English and Spanish. It follows your system's language, and **Settin
 
 1. [Download Tokio](https://tokio.ialfaro.com/download/) for Windows, macOS or Linux. The [install guide](https://tokio.ialfaro.com/docs/install/) covers the warnings shown the first time it opens.
 2. Get a free API key from [Euler Stream](https://www.eulerstream.com/register) and paste it in **Settings → TikTok LIVE**.
-3. Start your LIVE, enter your `@username` on the **Home** page and connect. For Twitch, sign in once in **Settings → Twitch**, pick its logo on **Home** and connect. For YouTube, pick its logo and type your channel's `@handle` or a link to the LIVE.
+3. Start your LIVE, enter your `@username` on the **Home** page and connect. For Twitch, sign in once in **Settings → Twitch**, pick its logo on **Home** and connect. For YouTube, pick its logo and type your channel's `@handle` or a link to the LIVE, and for Kick, your channel's name or its kick.com link.
 
 [What you need](https://tokio.ialfaro.com/docs/#what-you-need) lists the rest, like a streaming app for the overlays. The [docs](https://tokio.ialfaro.com/docs/) cover every feature, the [chat commands](https://tokio.ialfaro.com/docs/features/chat-commands/) your viewers can type and how to [add an overlay](https://tokio.ialfaro.com/docs/guides/adding-an-overlay/) to your streaming app.
 
@@ -88,8 +88,8 @@ To contribute, read [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct]
 
 Tokio's source code is licensed under the [MIT License](LICENSE). One file is an exception: `src/main/services/tts/providers/edge/common/drm-v2.ts` is derived from [edge-tts](https://github.com/rany2/edge-tts) and is licensed under the [GNU LGPL v3.0](LICENSES/LGPL-3.0.txt), which builds on the [GNU GPL v3.0](LICENSES/GPL-3.0.txt).
 
-Tokio connects to TikTok LIVE through [@tokioapp/connector](https://github.com/tokio-app/connector), which is also MIT-licensed, to Twitch through Twitch's official API, and to YouTube by reading a LIVE's public chat, which isn't an official API.
+Tokio connects to TikTok LIVE through [@tokioapp/connector](https://github.com/tokio-app/connector), which is also MIT-licensed, to Twitch through Twitch's official API, and to YouTube and Kick by reading a LIVE's public chat, which isn't an official API.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details. The **About** page in the app shows the same notices.
 
-Tokio is not affiliated with or endorsed by TikTok, ByteDance, Twitch, YouTube or Google.
+Tokio is not affiliated with or endorsed by TikTok, ByteDance, Twitch, YouTube, Google or Kick.

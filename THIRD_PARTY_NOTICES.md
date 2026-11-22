@@ -55,6 +55,7 @@ The [react-icons](https://github.com/react-icons/react-icons) package (MIT) bund
 | Material Design icons 4.0.0 (`md`)               | Google, <https://github.com/google/material-design-icons>             | [Apache-2.0](LICENSES/Apache-2.0.txt)                                                                                                                             |
 | Feather (`fi`), Octicons (`go`), Phosphor (`pi`) | Their respective authors                                              | MIT                                                                                                                                                               |
 | Lucide (`lu`)                                    | Lucide contributors                                                   | ISC                                                                                                                                                               |
+| Simple Icons 12.14.0 (`si`)                      | Simple Icons contributors, <https://simpleicons.org>                  | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/); each logo stays its owner's trademark                                                              |
 
 Check this table when adding an icon set: react-icons also contains sets under CC BY-SA, MPL-2.0 and other licenses with extra conditions.
 
@@ -72,6 +73,7 @@ Tokio talks to these online services. None of them is covered by Tokio's license
 - **Cartesia** (`api.cartesia.ai`): the Cartesia voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
 - **Inworld** (`api.inworld.ai`): the Inworld voices and voice cloning, with each user's own API key. It gets the text of each message to read, and the samples of a voice to clone.
 - **Google** (`translate.googleapis.com`): chat translation, through Google Translate's web service, which isn't an official public API. It gets the text of each message to translate.
+- **Kick** (`kick.com`, `web.kick.com`, `realtime.*.platform.kick.com`): a channel's chat, subscriptions, Kicks, hosts and viewer count, read from Kick's website and its chat feed the way kick.com's page does, which isn't an official API.
 - **Spotify:** music requests.
 - **YouTube** (`www.youtube.com`): music requests, and a LIVE's chat, Super Chats, memberships, Gifts and viewer count, read from YouTube's public pages the way youtube.com does, which isn't an official API.
 - **uBlock Origin's filter lists** (`ublockorigin.github.io`, then its mirrors `ublockorigin.pages.dev` and `cdn.jsdelivr.net`): the YouTube player's ad blocker, when **Block ads** is on. uBlock Origin's own lists and its copies of EasyList and EasyPrivacy belong to their authors, are under the GPL-3.0 or CC BY-SA 3.0, and aren't covered by Tokio's license. Tokio downloads them on the user's machine and doesn't ship them.

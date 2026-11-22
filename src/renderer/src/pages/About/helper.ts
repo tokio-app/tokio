@@ -55,6 +55,13 @@ export const COMPONENTS: Component[] = [
     doc: "Apache-2.0",
   },
   {
+    name: "Simple Icons 12.14.0",
+    author: "Simple Icons contributors",
+    license: "CC0 1.0",
+    url: "https://simpleicons.org",
+    note: "The Kick logo, converted from SVG to a React component by react-icons. It stays Kick's trademark.",
+  },
+  {
     name: "Feather, Octicons, Phosphor, Lucide",
     author: "Their respective authors",
     license: "MIT, ISC",
@@ -119,6 +126,10 @@ export const SERVICES: { name: string; note: string }[] = [
   {
     name: "Google",
     note: "Chat translation, through Google Translate's web service (translate.googleapis.com), which isn't an official public API. It gets the text of each message to translate.",
+  },
+  {
+    name: "Kick",
+    note: "A channel's chat, subscriptions, Kicks, hosts and viewer count (kick.com, web.kick.com, realtime.*.platform.kick.com), read from Kick's website and its chat feed the way kick.com's page does, which isn't an official API.",
   },
   { name: "Spotify", note: "Music requests." },
   {

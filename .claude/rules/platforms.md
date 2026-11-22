@@ -13,7 +13,7 @@ paths:
 
 # Platforms
 
-Tokio connects to TikTok, Twitch and YouTube (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`. Kick comes later, through its site's socket (the user's call), its Kicks counting as `GIFT` with their price as coins. Twitch's Bits are `CHEER`, YouTube's Super Chats and Super Stickers `SUPER_CHAT`, and YouTube's Gifts `GIFT`.
+Tokio connects to TikTok, Twitch, YouTube and Kick (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`. Twitch's Bits are `CHEER`, YouTube's Super Chats and Super Stickers `SUPER_CHAT`, YouTube's Gifts `GIFT` with 0 coins, and Kick's Kicks `GIFT` with their price as coins (the user's call).
 
 ## What the user chose
 
@@ -23,6 +23,7 @@ Tokio connects to TikTok, Twitch and YouTube (`PLATFORMS`, `src/common/types/con
 - Twitch connects through the streamer's sign-in: Twitch's official EventSub over WebSocket and Helix, the device code flow, a public client. The client ID isn't a secret and ships in `providers/twitch/config`. Nothing else of Twitch's is shipped, and no code is copied from any Twitch, YouTube or Kick library, only MIT, BSD and Apache references are read (Licensing in `AGENTS.md`).
 - One Twitch account for every profile; a profile only picks whether to use it.
 - YouTube connects with no key and no sign-in (the user's call): Tokio reads the LIVE's public chat the way youtube.com does, accepting YouTube's terms and that a change to its site can break it. The profile's `channels.youtube` is the handle or link typed on Home.
+- Kick connects with no key and no sign-in, through our own provider rather than the `kicksdk-js` package (the user's call): Kick's website API and its chat feed, read the way kick.com's page does. The profile's `channels.kick` is the channel's name or kick.com link.
 
 ## The session across platforms
 
@@ -55,8 +56,8 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 
 - Followers and fan levels: a Twitch chatter's `follower` is false and `fanLevel` missing, so **Followers** and **Minimum fan level** never pass them. Moderators and Super Fans work (Twitch's broadcaster and moderators, subscribers and founders). The permissions section and the website say so in one line.
 - Chat language: translation stays TikTok's (the user's call: letting Google detect Twitch's messages would spend its rate limit on the streamer's own language; `.claude/rules/translation.md`).
-- Follows: every follow counts, a viewer's repeat follows in one LIVE included (the user's call). Twitch sends one each time a viewer follows again after unfollowing. YouTube sends none: new channel subscribers don't show in its chat.
-- Chat pictures: Twitch chat goes without (`shortcut:` in `providers/twitch/index.ts`), `Avatar` shows the initial. Follows, subs, cheers and redeems look their picture up once and cache it. YouTube's chat carries every author's picture.
+- Follows: every follow counts, a viewer's repeat follows in one LIVE included (the user's call). Twitch sends one each time a viewer follows again after unfollowing. YouTube sends none: new channel subscribers don't show in its chat. Kick's chat feed carries none either (its follows are webhook-only).
+- Chat pictures: Twitch chat goes without (`shortcut:` in `providers/twitch/index.ts`), `Avatar` shows the initial. Follows, subs, cheers and redeems look their picture up once and cache it. YouTube's chat carries every author's picture. Kick's chat has none (initials); a Kick's sender comes with theirs.
 - Fans stay TikTok's (`.claude/rules/fans.md`).
 
 ## Twitch
