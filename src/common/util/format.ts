@@ -31,6 +31,9 @@ const moneyFormats = new Map<
   { cents: Intl.NumberFormat; compact: Intl.NumberFormat }
 >();
 
+// Stands in for dollars before the exchange rates load
+export const NO_MONEY = "—";
+
 /**
  * US dollars as short text ($57.40, then $1.23K from a thousand on, never
  * rounded up) and in full ($1,234.56), as the language writes them.

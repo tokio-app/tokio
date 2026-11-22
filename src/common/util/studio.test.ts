@@ -15,9 +15,9 @@ import {
   EMOTE_TRIGGER,
   TOKIO_EVENTS,
 } from "../types/connector";
+import { NO_MONEY } from "./format";
 import {
   fillStudioText,
-  NO_MONEY,
   goalValue,
   listRow,
   newStudioElement,

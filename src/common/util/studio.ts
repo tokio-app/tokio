@@ -38,7 +38,7 @@ import {
   messageValues,
   triggersOf,
 } from "./alerts";
-import { formatDuration, formatMoney, formatStat } from "./format";
+import { formatDuration, formatMoney, formatStat, NO_MONEY } from "./format";
 import { generateEmoteChatSample, generateTikTokEventSample } from "./samples";
 
 // The live numbers any text can show, as {likes}
@@ -112,9 +112,6 @@ export const studioElements = (overlay: StudioOverlay): StudioElement[] =>
     item.kind === "group" ? item.elements : [item],
   );
 
-// {superchats} until the exchange rates load
-export const NO_MONEY = "—";
-
 // Own keys only, so {constructor} isn't a number
 const isNumber = (
   numbers: StudioNumbers,
@@ -150,9 +147,9 @@ type FillOptions = {
 /**
  * A studio text with its variables filled in one pass, so a viewer's
  * comment that says {likes} stays as typed: the live numbers, compact (1.2K),
- * the Super Chats' dollars and the LIVE's length as 01:02:03, then the counters by name, then the
- * event's values. A variable of its triggers this event lacks reads "", and
- * any other stays as written.
+ * the Super Chats' dollars and the LIVE's length as 01:02:03, then the
+ * counters by name, then the event's values. A variable of its triggers this
+ * event lacks reads "", and any other stays as written.
  */
 export function fillStudioText(
   template: string,

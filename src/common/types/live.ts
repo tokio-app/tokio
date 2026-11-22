@@ -124,7 +124,8 @@ export type LiveSummary = {
 export type GiftMinute = {
   // Counted from the minute the LIVE started in
   minute: number;
-  // What each gifter sent in it, by user id ("" for gifts without one)
+  // What each gifter sent in it, by user id, in their platform's gift
+  // currency. Gifts without an id go under "", a Kick one's under "kick:".
   gifters: Record<string, [coins: number, gifts: number]>;
 };
 

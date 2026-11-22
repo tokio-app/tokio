@@ -20,7 +20,12 @@ export const fontFamily = (font: string) =>
     : undefined;
 
 // Shared with main, which fills studio overlays' numbers with them
-export { formatDuration, formatMoney, formatStat } from "@/common/util/format";
+export {
+  formatDuration,
+  formatMoney,
+  formatStat,
+  NO_MONEY,
+} from "@/common/util/format";
 
 const DATE_STYLES = {
   // "Friday, October 31, 2026"

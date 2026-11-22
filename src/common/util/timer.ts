@@ -64,10 +64,11 @@ export interface TimerTrigger {
 }
 
 /**
- * The triggers that add time, in the timer page's order, as the carousel shows them:
- * the streamer's name for each (the language's when blank), counted for coins,
- * likes, Bits and Kicks, and the time it adds with the multiplier. Triggers that add
- * nothing, or that none of the profile's platforms send, are left out.
+ * The triggers that add time, in the timer page's order, as the carousel
+ * shows them: the streamer's name for each (the language's when blank),
+ * counted for coins, likes, Bits and Kicks, and the time it adds with the
+ * multiplier. Triggers that add nothing, or that none of the profile's
+ * platforms send, are left out.
  */
 export function timerTriggers(
   { seconds, multiplier, chat, look }: TimerSettings,

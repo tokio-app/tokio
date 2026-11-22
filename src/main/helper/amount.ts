@@ -24,13 +24,13 @@ function codeOf(symbol: string): string | undefined {
 
 const AMOUNT = /^(.*?)\s?(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)$/;
 
+// shortcut: en-US amounts with the symbol first only, since YouTube is
+// fetched with hl=en&gl=US; upgrade if YouTube changes how it writes them.
 /**
  * A Super Chat's amount as YouTube shows it ("$4.99", "MX$100.00",
  * "ARS 1,000.00") as its currency code and value, or null when it can't be
  * read.
  */
-// shortcut: en-US amounts with the symbol first only, since YouTube is
-// fetched with hl=en&gl=US; upgrade if YouTube changes how it writes them.
 export function parseAmount(
   text: string,
 ): { currency: string; value: number } | null {

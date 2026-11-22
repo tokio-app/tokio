@@ -35,8 +35,9 @@ type Props = {
 };
 
 /**
- * A list's source (and whose top gifters, with Kick) and how many rows it shows, its text and the values' color
- * (top gifters' coins, gifts' counts), and its pictures.
+ * A list's source (and whose top gifters, with Kick) and how many rows it
+ * shows, its text and the values' color (top gifters' coins, gifts' counts),
+ * and its pictures.
  */
 export function ListFields({ element, onChange }: Props) {
   const t = useT();

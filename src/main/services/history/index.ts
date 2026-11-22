@@ -110,7 +110,8 @@ const currencyOf = (gifter: Gifter) => GIFT_CURRENCY[platformOf(gifter)];
 // A minute key's currency, from its id's platform prefix ("kick:..."). Bare
 // ids, "" included, are TikTok's.
 const keyCurrency = (key: string) => {
-  const prefix = key.slice(0, key.indexOf(":"));
+  const at = key.indexOf(":");
+  const prefix = at === -1 ? "" : key.slice(0, at);
   return GIFT_CURRENCY[isPlatform(prefix) ? prefix : "tiktok"];
 };
 
@@ -406,9 +407,10 @@ export class HistoryService extends Service {
   }
 
   /**
-   * The finished LIVEs' coins, Kicks and gifts in some dates: a LIVE all in them
-   * counts whole, and one they cut only its gifts in them, so only those take
-   * reading a file. Null when another profile loaded while they were read.
+   * The finished LIVEs' coins, Kicks and gifts in some dates: a LIVE all in
+   * them counts whole, and one they cut only its gifts in them, so only those
+   * take reading a file. Null when another profile loaded while they were
+   * read.
    */
   public async getTotals(
     range: DateRange,
@@ -439,10 +441,9 @@ export class HistoryService extends Service {
    * Each currency's top SHOWN_GIFTERS of the finished LIVEs in some dates,
    * counting only the gifts in them of a LIVE they cut, each with their place
    * among their currency's gifters, and with a query only the ones whose name
-   * or @handle has it. Every LIVE whole
-   * is all time's list; other dates are added up from the LIVEs' files,
-   * leaving out a file that doesn't load. Null when another profile loaded
-   * while they were read, or the signal aborted.
+   * or @handle has it. Every LIVE whole is all time's list; other dates are
+   * added up from the LIVEs' files, leaving out a file that doesn't load. Null
+   * when another profile loaded while they were read, or the signal aborted.
    */
   public async getGifters({
     from,
