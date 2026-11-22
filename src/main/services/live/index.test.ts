@@ -26,6 +26,7 @@ const noTotals = {
   kicks: 0,
   bits: 0,
   superChats: 0,
+  giftSubs: 0,
 };
 
 const viewer = (handle: string, patch: Partial<UserData> = {}): UserData => ({

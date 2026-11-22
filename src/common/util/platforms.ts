@@ -87,6 +87,17 @@ export const GIFT_CURRENCY: Record<Platform, GiftCurrency | null> = {
   kick: "kicks",
 };
 
+// What viewers spend on each platform, each counted on its own: TikTok's
+// coins and Kick's Kicks (their gifts' prices), Twitch's Bits (cheers) and
+// YouTube's Super Chats in US dollars
+export type Currency = GiftCurrency | "bits" | "usd";
+export const PLATFORM_CURRENCY: Record<Platform, Currency> = {
+  tiktok: "coins",
+  twitch: "bits",
+  youtube: "usd",
+  kick: "kicks",
+};
+
 // The gift currencies the platforms pay in, in GIFT_CURRENCIES' order
 export const giftCurrencies = (platforms: readonly Platform[]) =>
   GIFT_CURRENCIES.filter((currency) =>

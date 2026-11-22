@@ -140,6 +140,7 @@ export const liveTotals = (patch: Partial<LiveTotals> = {}): LiveTotals => ({
   kicks: 0,
   bits: 0,
   superChats: 0,
+  giftSubs: 0,
   ...patch,
 });
 
@@ -165,6 +166,7 @@ export const liveSummary = (
   coins: 0,
   kicks: 0,
   gifts: 0,
+  platforms: {},
   ...patch,
 });
 
@@ -176,6 +178,7 @@ export const gifter = (name: string, coins: number, gifts = 1): Gifter => ({
   picture: "",
   coins,
   gifts,
+  giftSubs: 0,
   giftedAt: 0,
 });
 

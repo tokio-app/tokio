@@ -1744,6 +1744,7 @@ describe("init events", () => {
       kicks: 0,
       bits: 0,
       superChats: 0,
+      giftSubs: 0,
     };
     // What the Home page got, oldest first
     const sessions = (s: Setup) =>

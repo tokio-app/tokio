@@ -184,6 +184,9 @@ export interface SuperChatEvent {
   message: string;
   // A Super Sticker's picture, "" for a Super Chat
   sticker: string;
+  // In US dollars at the day's exchange rates; null or missing when the
+  // amount can't be read or the rates haven't loaded
+  usd?: number | null;
 }
 
 export interface Gift {

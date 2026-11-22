@@ -122,6 +122,7 @@ describe("HistoryService", () => {
           coins: 115,
           kicks: 0,
           gifts: 4,
+          platforms: {},
         },
       ],
       gifters: [
@@ -132,6 +133,7 @@ describe("HistoryService", () => {
           picture: "https://p16/ana.jpg",
           coins: 15,
           gifts: 3,
+          giftSubs: 0,
           giftedAt: 1300,
         },
       ],
@@ -321,7 +323,9 @@ describe("HistoryService", () => {
 
     const history = await loaded();
 
-    expect(history.getHistory().lives).toEqual([{ ...live, kicks: 0 }]);
+    expect(history.getHistory().lives).toEqual([
+      { ...live, kicks: 0, platforms: {} },
+    ]);
     expect(await history.getLive(0)).toMatchObject({ kicks: 0 });
   });
 
@@ -347,7 +351,7 @@ describe("HistoryService", () => {
 
     const history = await loaded();
 
-    expect(history.getHistory().gifters).toEqual([gifter]);
+    expect(history.getHistory().gifters).toEqual([{ ...gifter, giftSubs: 0 }]);
   });
 
   it("keeps a gifter's picture from an earlier LIVE", async () => {
@@ -668,6 +672,7 @@ describe("HistoryService", () => {
         coins: 113,
         kicks: 0,
         gifts: 5,
+        platforms: {},
       },
     ]);
   });

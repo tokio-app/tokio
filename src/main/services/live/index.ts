@@ -77,6 +77,7 @@ const noTotals = (): LiveTotals => ({
   kicks: 0,
   bits: 0,
   superChats: 0,
+  giftSubs: 0,
 });
 
 // Keeps a minute's highest count. Minutes without a reading repeat the last

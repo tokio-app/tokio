@@ -17,6 +17,7 @@ const summary: LiveSummary = {
   coins: 10,
   kicks: 0,
   gifts: 2,
+  platforms: {},
 };
 const gifter = {
   userId: "42",
@@ -25,6 +26,7 @@ const gifter = {
   picture: "ana.png",
   coins: 10,
   gifts: 2,
+  giftSubs: 0,
   giftedAt: 2000,
 };
 const record: LiveRecord = { ...summary, gifters: [gifter], minutes: [] };

@@ -54,6 +54,8 @@ const GifterSchema: z.ZodType<Gifter> = z.object({
   picture: z.string(),
   coins: z.number(),
   gifts: z.number(),
+  // Gifted subs, since Twitch, YouTube and Kick came; older ones had none
+  giftSubs: z.number().default(0),
   giftedAt: z.number(),
   // One a newer Tokio saved that this one doesn't know reads as TikTok
   platform: z.enum(PLATFORMS).optional().catch(undefined),
@@ -67,6 +69,13 @@ const LiveSummarySchema = z.object({
   // Kick's gifts, since Kick came; older LIVEs had none
   kicks: z.number().default(0),
   gifts: z.number(),
+  // Each platform's part; older LIVEs, TikTok's alone, have none
+  platforms: z
+    .partialRecord(
+      z.enum(PLATFORMS),
+      z.object({ amount: z.number(), gifts: z.number(), giftSubs: z.number() }),
+    )
+    .default({}),
 }) satisfies z.ZodType<LiveSummary>;
 
 const GiftMinuteSchema = z.object({
@@ -228,6 +237,7 @@ export class HistoryService extends Service {
           picture: user.profilePictures[0] || (last?.picture ?? ""),
           coins: (last?.coins ?? 0) + amount,
           gifts: (last?.gifts ?? 0) + added,
+          giftSubs: last?.giftSubs ?? 0,
           giftedAt: Date.now(),
           ...(user.platform && { platform: user.platform }),
         });
@@ -327,6 +337,7 @@ export class HistoryService extends Service {
       coins: 0,
       kicks: 0,
       gifts: 0,
+      platforms: {},
     };
     this._liveGifters = new Map();
     this._minutes = [];

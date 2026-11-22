@@ -61,6 +61,8 @@ export type LiveTotals = {
   bits: number;
   // YouTube's Super Chats and Super Stickers, how many
   superChats: number;
+  // Gifted subs: Twitch's, YouTube's gifted memberships and Kick's
+  giftSubs: number;
 };
 
 // One platform's part of the LIVE
@@ -96,14 +98,21 @@ export type Gifter = {
   handle: string;
   // TikTok's link, which can expire. Empty when TikTok sent none.
   picture: string;
-  // In their platform's gift currency: TikTok's coins or Kick's Kicks
+  // In their platform's currency (PLATFORM_CURRENCY): TikTok's coins, Kick's
+  // Kicks, Twitch's Bits or YouTube's Super Chats in US dollars
   coins: number;
   gifts: number;
+  // Subs they gifted (Twitch, YouTube's memberships, Kick)
+  giftSubs: number;
   // When their last gift came, in ms since the epoch
   giftedAt: number;
   // Missing means TikTok
   platform?: Platform;
 };
+
+// One platform's part of a LIVE in the history: its money in its currency
+// (PLATFORM_CURRENCY), its gifts and its gifted subs
+export type HistoryTotals = { amount: number; gifts: number; giftSubs: number };
 
 // A LIVE the profile kept, from the connect to the disconnect like Home's
 // session
@@ -118,6 +127,8 @@ export type LiveSummary = {
   coins: number;
   kicks: number;
   gifts: number;
+  // Each platform's part; a LIVE saved without it was TikTok's alone
+  platforms: Partial<Record<Platform, HistoryTotals>>;
 };
 
 // A clock minute of a LIVE in which gifts came

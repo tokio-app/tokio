@@ -33,6 +33,7 @@ export const NO_SESSION: LiveSession = {
     kicks: 0,
     bits: 0,
     superChats: 0,
+    giftSubs: 0,
   },
   activity: [],
   viewers: [],

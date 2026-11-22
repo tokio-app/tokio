@@ -163,6 +163,7 @@ describe("tools MCP tools", () => {
       picture: "https://p16.tiktokcdn.com/kai.jpg",
       coins: 500,
       gifts: 3,
+      giftSubs: 0,
       giftedAt: 1000,
     };
     const kicker: Gifter = {
@@ -181,6 +182,7 @@ describe("tools MCP tools", () => {
       coins: 500,
       kicks: 200,
       gifts: 4,
+      platforms: {},
     };
     const setup = () => {
       const history = { lives: [live], gifters: [gifter, kicker] };
