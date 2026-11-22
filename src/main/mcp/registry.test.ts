@@ -323,7 +323,16 @@ describe("MCP registry", () => {
         liveService: {
           getSession: () => ({
             startedAt: 0,
-            totals: { followers: 1, shares: 2, gifts: 3, coins: 40 },
+            totals: {
+              followers: 1,
+              shares: 2,
+              gifts: 3,
+              coins: 40,
+              kicks: 12,
+              bits: 300,
+              superChats: 2,
+            },
+            usd: 12.345,
             activity: [],
             viewers: [],
           }),
@@ -361,6 +370,9 @@ describe("MCP registry", () => {
         shares: 2,
         gifts: 3,
         coins: 40,
+        kicks: 12,
+        bits: 300,
+        superChats: { count: 2, usd: 12.35 },
         twitch: { signedIn: true, login: "mia" },
       },
       features: { tts: true, music: false, alerts: true },

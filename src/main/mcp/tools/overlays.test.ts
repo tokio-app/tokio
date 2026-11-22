@@ -447,6 +447,33 @@ describe("overlays MCP tools", () => {
       });
     });
 
+    it("takes a gifters list's platform", async () => {
+      const { h, held } = setup();
+      const { call } = await mcpClient(h.handler);
+      const list = {
+        kind: "list",
+        id: "l1",
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 400,
+        platform: "kick",
+      };
+
+      const res = await call("save_item", {
+        kind: "studio_overlay",
+        id: ID,
+        changes: { items: [list] },
+      });
+
+      expect(res.isError).toBe(false);
+      expect(held[0].items[0]).toMatchObject({
+        kind: "list",
+        source: "gifters",
+        platform: "kick",
+      });
+    });
+
     it("refuses an unknown field inside an element", async () => {
       const { h, store } = setup();
       const { call } = await mcpClient(h.handler);
@@ -523,6 +550,7 @@ describe("overlays MCP tools", () => {
       for (const [names, text] of [
         [["roses", ""], "counters.1 needs a name. Nothing was saved."],
         [["likes"], "counters.0: {likes} is a LIVE number"],
+        [["kicks"], "counters.0: {kicks} is a LIVE number"],
         [["username"], "counters.0: {username} is a LIVE number"],
         [["roses", "roses"], "counters.1: another counter is roses."],
       ] as const) {

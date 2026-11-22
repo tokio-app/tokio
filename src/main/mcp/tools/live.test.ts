@@ -248,6 +248,26 @@ describe("live MCP tools", () => {
           coins: 5,
         },
       },
+      {
+        id: 6,
+        type: "gift",
+        user: { ...user("kai"), platform: "kick" },
+        gift: { name: "Hype", image: "", count: 1, coins: 100 },
+      },
+      {
+        id: 5,
+        type: "gift",
+        user: { ...user("yu"), platform: "youtube" },
+        gift: { name: "Jewels", image: "", count: 1, coins: 0 },
+      },
+      {
+        id: 7,
+        type: "superchat",
+        user: { ...user("su"), platform: "youtube" },
+        amount: "€5.00",
+        text: "hi",
+        sticker: "",
+      },
       { id: 2, type: "join", users: [user("cy")], count: 3 },
       { id: 1, type: "follow", user: user("di") },
     ];
@@ -262,8 +282,8 @@ describe("live MCP tools", () => {
           }),
         },
         historyService: {
-          top: () => ({
-            live: [
+          topByPlatform: () => ({
+            tiktok: [
               {
                 userId: "1",
                 username: "Bo",
@@ -274,7 +294,17 @@ describe("live MCP tools", () => {
                 giftedAt: 1,
               },
             ],
-            allTime: [],
+            kick: [
+              {
+                userId: "2",
+                username: "Kai",
+                handle: "kai",
+                picture: "",
+                live: { coins: 100, gifts: 1 },
+                allTime: { coins: 100, gifts: 1 },
+                giftedAt: 2,
+              },
+            ],
           }),
         },
       });
@@ -305,6 +335,30 @@ describe("live MCP tools", () => {
             coins: 5,
           },
           {
+            id: 6,
+            type: "gift",
+            handle: "kai",
+            nickname: "kai name",
+            giftName: "Hype",
+            count: 1,
+            kicks: 100,
+          },
+          {
+            id: 5,
+            type: "gift",
+            handle: "yu",
+            nickname: "yu name",
+            giftName: "Jewels",
+            count: 1,
+          },
+          {
+            id: 7,
+            type: "superchat",
+            handle: "su",
+            nickname: "su name",
+            amount: "€5.00",
+          },
+          {
             id: 2,
             type: "join",
             count: 3,
@@ -312,7 +366,10 @@ describe("live MCP tools", () => {
           },
           { id: 1, type: "follow", handle: "di", nickname: "di name" },
         ],
-        topGifters: [{ handle: "bo", nickname: "Bo", coins: 5, gifts: 5 }],
+        topGifters: {
+          coins: [{ handle: "bo", nickname: "Bo", coins: 5, gifts: 5 }],
+          kicks: [{ handle: "kai", nickname: "Kai", kicks: 100, gifts: 1 }],
+        },
       });
       expect(res.text).not.toContain("p.example");
     });
