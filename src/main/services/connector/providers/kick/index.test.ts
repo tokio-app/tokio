@@ -241,6 +241,29 @@ describe("KickConnector", () => {
       expect(JSON.stringify(debug.mock.calls)).not.toContain("secret words");
     });
 
+    it("drops an event whose shape changed and keeps reading", async () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const onSub = capture(TOKIO_EVENTS.SUBSCRIBE);
+      const onChat = capture(TOKIO_EVENTS.CHAT);
+      await connector.connect("streamer");
+
+      // No username, which a subscription always had
+      publish("chatrooms.20.v2", "App\\Events\\SubscriptionEvent", {
+        months: 3,
+      });
+      publish("chatrooms.20.v2", "App\\Events\\ChatMessageEvent", {
+        content: "still here",
+        sender: { id: 5, username: "Viewer", slug: "viewer" },
+      });
+
+      await vi.waitFor(() => expect(onChat).toHaveBeenCalled());
+      expect(onSub).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Couldn't read a SubscriptionEvent"),
+        expect.anything(),
+      );
+    });
+
     it("stays connected to an offline channel until a stream it saw ends", async () => {
       const onDisconnected = capture(TOKIO_EVENTS.DISCONNECTED);
       await connector.connect("streamer");

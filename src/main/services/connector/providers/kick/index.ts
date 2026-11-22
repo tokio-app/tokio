@@ -11,7 +11,7 @@ import {
   toFailure,
 } from "../../common";
 import { guestToken, lookup, parseInput, realtime } from "./common/api";
-import { eventName, fromPublication } from "./common/mapping";
+import { eventName, fromPublication, type Mapped } from "./common/mapping";
 import { isTerminal, KickSocket } from "./common/socket";
 import defaults, { type KickConfig } from "./config";
 
@@ -218,7 +218,18 @@ export class KickConnector extends ConnectorProvider {
         this._offline(conn);
         return;
     }
-    const mapped = fromPublication(event, data);
+    let mapped: Mapped | null;
+    try {
+      mapped = fromPublication(event, data);
+    } catch (err) {
+      // Kick's feed is unofficial: an event whose shape changed is dropped
+      // rather than thrown out of the socket's listener
+      this._logOnce(
+        `feed:${eventName(event)}`,
+        `Couldn't read a ${eventName(event)} -- ${formatError(err)}`,
+      );
+      return;
+    }
     if (!mapped) return;
     if (mapped.event === TOKIO_EVENTS.CHAT) {
       this.emitChat(mapped.data, () => this._conn === conn);
