@@ -3,6 +3,8 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   FEEDBACK_CODES,
+  type Platform,
+  type PlatformStatus,
 } from "@/common/types";
 import type { Profile } from "@/common/schemas";
 import { defaultProfile } from "@/common/util";
@@ -18,7 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 
 describe("live MCP tools", () => {
   describe("platforms section", () => {
-    const setup = (connected = false) => {
+    const setup = (on: Partial<Record<Platform, PlatformStatus>> = {}) => {
       const profile: Profile = structuredClone(defaultProfile);
       const updateProfileData = vi.fn(async (data: Partial<Profile>) => {
         Object.assign(profile, data);
@@ -35,7 +37,7 @@ describe("live MCP tools", () => {
             }),
             updateProfileData,
           },
-          connectorService: { isConnected: () => connected },
+          connectorService: { status: () => on },
           timerService: { setPlatforms },
         },
         { stack: home },
@@ -69,23 +71,33 @@ describe("live MCP tools", () => {
       expect(h.pushed(APP_EVENTS_RESPONSE.GET_PROFILE)).toHaveLength(1);
     });
 
-    it("refuses them while connected, and an unknown platform", async () => {
-      const { h, updateProfileData } = setup(true);
+    it("keeps a platform that's on and says so, saving the rest", async () => {
+      const { h, updateProfileData } = setup({ tiktok: "connected" });
       const { call } = await mcpClient(h.handler);
 
-      const locked = await call("update_settings", {
+      const res = await call("update_settings", {
         section: "platforms",
         changes: { platforms: ["twitch"] },
       });
+
+      expect(res).toMatchObject({
+        isError: true,
+        text: "Disconnect from TikTok before removing it; the rest was saved.",
+      });
+      expect(updateProfileData).toHaveBeenCalledExactlyOnceWith({
+        platforms: ["tiktok", "twitch"],
+      });
+    });
+
+    it("refuses an unknown platform", async () => {
+      const { h, updateProfileData } = setup();
+      const { call } = await mcpClient(h.handler);
+
       const unknown = await call("update_settings", {
         section: "platforms",
         changes: { platforms: ["trovo"] },
       });
 
-      expect(locked).toMatchObject({
-        isError: true,
-        text: "Disconnect from the LIVE before changing platforms.",
-      });
       expect(unknown.isError).toBe(true);
       expect(updateProfileData).not.toHaveBeenCalled();
     });
@@ -463,6 +475,43 @@ describe("live MCP tools", () => {
       });
       expect(updateProfileData).toHaveBeenCalledWith({
         channels: { kick: "westcol" },
+      });
+    });
+
+    it("connects only the platforms asked for, needing only their channels", async () => {
+      const { h, profile } = setup();
+      profile.platforms = ["tiktok", "kick"];
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      // No TikTok username, which only TikTok would need
+      const res = await call("live", {
+        action: "connect",
+        kick: "westcol",
+        platforms: ["kick"],
+      });
+
+      expect(res.isError).toBe(false);
+      expect(invoke).toHaveBeenCalledWith(APP_EVENTS.CONNECT, {
+        username: "",
+        channels: { kick: "westcol" },
+        platforms: ["kick"],
+      });
+    });
+
+    it("disconnects one platform", async () => {
+      const { h } = setup();
+      const invoke = vi.spyOn(h.handler, "invoke");
+      const { call } = await mcpClient(h.handler);
+
+      const res = await call("live", {
+        action: "disconnect",
+        platform: "kick",
+      });
+
+      expect(res.isError).toBe(false);
+      expect(invoke).toHaveBeenCalledWith(APP_EVENTS.DISCONNECT, {
+        platform: "kick",
       });
     });
 

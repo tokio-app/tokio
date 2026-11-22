@@ -1325,7 +1325,6 @@
   "main.home.usernameSaveFailed": "Tokio no pudo guardar el nombre de usuario. Revisa la carpeta logs para ver los detalles.",
   "main.home.connected": "Conectado a {handle}.",
   "main.home.connectedOn": "Conectado a {handle} en {platform}.",
-  "main.home.platformsLocked": "Desconéctate del LIVE antes de cambiar de plataformas.",
   "main.home.activityFeedUpdated": "Feed de actividad actualizado.",
   "main.updates.checkFailed": "No se pudo buscar actualizaciones. Revisa tu conexión.",
   "main.updates.notReady": "Todavía no hay ninguna actualización lista para instalar.",
