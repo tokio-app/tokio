@@ -12,7 +12,12 @@ import {
   TOKIO_EVENTS,
   TopGifter,
 } from "@/common/types";
-import { giftCurrencies, PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
+import {
+  GIFT_CURRENCY,
+  giftCurrencies,
+  GiftCurrency,
+  triggersFor,
+} from "@/common/util";
 import type { IconType } from "react-icons";
 import { FaTiktok, FaTwitch, FaYoutube } from "react-icons/fa";
 import { SiKick } from "react-icons/si";
@@ -82,35 +87,54 @@ export const feedKinds = (platforms: readonly Platform[]) => {
   return FEED_KINDS.filter(({ trigger }) => sent.includes(trigger));
 };
 
-// Gifts, their coins and top gifters come with a platform that sends gifts
-const sendsGifts = (platforms: readonly Platform[]) =>
-  platforms.some((p) => PLATFORM_TRIGGERS[p].includes(TOKIO_EVENTS.GIFT));
-
-// The stats the platforms have: likes and shares are TikTok's
+// The stats the platforms have: likes and shares are TikTok's, and each
+// currency gets its own tile, never added to another (the user's call)
 function liveStats(
   platforms: readonly Platform[],
   values: Record<"likes" | "views" | keyof LiveSession["totals"], number>,
+  usd: number | null,
 ): Stat[] {
   const tiktok = platforms.includes("tiktok");
-  const gifts = sendsGifts(platforms);
-  // YouTube sends no follows
-  const follows = triggersFor(platforms).includes(TOKIO_EVENTS.FOLLOW);
+  const sent = triggersFor(platforms);
+  const currencies = giftCurrencies(platforms);
   const stats: (Stat | false)[] = [
     tiktok && { label: "home.stats.likes", value: values.likes },
     // Only TikTok counts a LIVE's total views; Twitch sends 0
     tiktok && { label: "home.stats.totalViews", value: values.views },
-    follows && { label: "home.totals.followers", value: values.followers },
+    // YouTube sends no follows
+    sent.includes(TOKIO_EVENTS.FOLLOW) && {
+      label: "home.totals.followers",
+      value: values.followers,
+    },
     tiktok && { label: "home.totals.shares", value: values.shares },
-    gifts && { label: "home.totals.gifts", value: values.gifts },
-    giftCurrencies(platforms).length > 0 && {
+    sent.includes(TOKIO_EVENTS.GIFT) && {
+      label: "home.totals.gifts",
+      value: values.gifts,
+    },
+    currencies.includes("coins") && {
       label: "home.totals.coins",
       value: values.coins,
+    },
+    currencies.includes("kicks") && {
+      label: "home.totals.kicks",
+      value: values.kicks,
+    },
+    sent.includes(TOKIO_EVENTS.CHEER) && {
+      label: "home.totals.bits",
+      value: values.bits,
+    },
+    // In US dollars, null until the exchange rates load
+    sent.includes(TOKIO_EVENTS.SUPER_CHAT) && {
+      label: "home.totals.superChats",
+      value: usd,
+      money: true,
     },
   ];
   return stats.filter((stat) => stat !== false);
 }
 
-export type Stat = { label: MessageKey; value: number };
+// money: value is US dollars. null: not known yet.
+export type Stat = { label: MessageKey; value: number | null; money?: boolean };
 
 // The platforms in the LIVE, in Home's order: up now, or with numbers in it
 export const livePlatforms = (
@@ -134,12 +158,13 @@ export type Views = {
   platformViewers: Partial<Record<Platform, number>>;
 };
 
-// This LIVE's top gifters, all of them and each platform's
+// Each platform's top gifters in this LIVE
 export type LiveGifters =
   AppEventsResponseMap[APP_EVENTS_RESPONSE.LIVE_GIFTERS];
 
 // What a tab shows. All adds up the LIVE's platforms; likes, total views and
-// shares are TikTok's alone, so they're the same on both.
+// shares are TikTok's alone, so they're the same on both. Top gifters show
+// only on the tab of a platform whose gifts have a price, in its currency.
 export function liveView(
   tab: HomeTab,
   platforms: readonly Platform[],
@@ -153,22 +178,26 @@ export function liveView(
   viewers: number;
   minutes: number[];
   stats: Stat[];
-  gifters: TopGifter[] | null;
+  gifters: { currency: GiftCurrency; list: TopGifter[] } | null;
 } {
   const { session, views, likes, gifters } = numbers;
   const all = tab === "all";
   const shown = all ? platforms : [tab];
   // Either has the totals and each minute's viewers
   const part = all ? session : (session.platforms[tab] ?? NO_SESSION);
+  const currency = all ? null : GIFT_CURRENCY[tab];
   return {
     viewers: all ? views.current : (views.platformViewers[tab] ?? 0),
     minutes: part.viewers,
-    stats: liveStats(shown, { ...part.totals, likes, views: views.total }),
+    // Super Chats are YouTube's alone, so the session's dollars are its own
+    stats: liveStats(
+      shown,
+      { ...part.totals, likes, views: views.total },
+      session.usd,
+    ),
     gifters:
-      giftCurrencies(shown).length > 0
-        ? all
-          ? gifters.data
-          : (gifters.byPlatform[tab] ?? [])
+      currency && !all
+        ? { currency, list: gifters.byPlatform[tab] ?? [] }
         : null,
   };
 }

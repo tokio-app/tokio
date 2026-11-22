@@ -275,17 +275,25 @@ describe("Home's platforms", () => {
   });
 
   it.each([
-    [["tiktok"], ["Likes", "Total views", "Shares", "Gifts", "Coins"], []],
-    [["twitch"], [], ["Likes", "Total views", "Shares", "Gifts", "Coins"]],
+    [
+      ["tiktok"],
+      ["Likes", "Total views", "Shares", "Gifts", "Coins"],
+      ["Kicks", "Bits", "Super Chats"],
+    ],
+    [
+      ["twitch"],
+      ["Bits"],
+      ["Likes", "Total views", "Shares", "Gifts", "Coins", "Super Chats"],
+    ],
     [
       ["youtube"],
-      ["Gifts"],
-      ["New followers", "Likes", "Total views", "Shares", "Coins"],
+      ["Gifts", "Super Chats"],
+      ["New followers", "Likes", "Total views", "Shares", "Coins", "Bits"],
     ],
     [
       ["kick"],
-      ["Gifts", "Coins"],
-      ["New followers", "Likes", "Total views", "Shares"],
+      ["Gifts", "Kicks"],
+      ["New followers", "Likes", "Total views", "Shares", "Coins", "Bits"],
     ],
   ] as [Platform[], string[], string[]][])(
     "shows the stats %j has",
@@ -301,9 +309,9 @@ describe("Home's platforms", () => {
       );
       for (const label of shown) expect(stat(label)).toBeInTheDocument();
       for (const label of hidden) expect(stat(label)).not.toBeInTheDocument();
-      // Top gifters come with coins
+      // Top gifters come with a gift currency
       expect(page().queryByText("Top gifters") !== null).toBe(
-        shown.includes("Coins"),
+        shown.includes("Coins") || shown.includes("Kicks"),
       );
     },
   );
@@ -326,7 +334,13 @@ describe("Home's platforms", () => {
     await send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
       data: liveSession({
         startedAt: Date.now(),
-        totals: liveTotals({ followers: 3, shares: 1, gifts: 5, coins: 50 }),
+        totals: liveTotals({
+          followers: 3,
+          shares: 1,
+          gifts: 5,
+          coins: 20,
+          kicks: 30,
+        }),
         viewers: [60],
         platforms: {
           tiktok: {
@@ -339,12 +353,7 @@ describe("Home's platforms", () => {
             viewers: [40],
           },
           kick: {
-            totals: liveTotals({
-              followers: 0,
-              shares: 0,
-              gifts: 3,
-              coins: 30,
-            }),
+            totals: liveTotals({ gifts: 3, kicks: 30 }),
             viewers: [20],
           },
         },
@@ -353,7 +362,6 @@ describe("Home's platforms", () => {
     const ana = topGifter("Ana", 20);
     const kai = topGifter("Kai", 30, { platform: "kick" });
     await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
-      data: [kai, ana],
       byPlatform: { tiktok: [ana], kick: [kai] },
     });
     const value = (label: string) =>
@@ -369,6 +377,8 @@ describe("Home's platforms", () => {
     expect(value("Viewers")).toHaveTextContent("40");
     expect(value("Gifts")).toHaveTextContent("2");
     expect(value("Likes")).toHaveTextContent("7");
+    expect(value("Coins")).toHaveTextContent("20");
+    expect(stat("Kicks")).toBeNull();
     expect(gifters()).toEqual(["1AAna20 coins"]);
 
     // Not in the LIVE: its connection alone
@@ -377,17 +387,80 @@ describe("Home's platforms", () => {
 
     await user.click(tab("Kick"));
     expect(value("Viewers")).toHaveTextContent("20");
-    expect(value("Coins")).toHaveTextContent("30");
+    // Kick's gifts cost Kicks, never coins
+    expect(value("Kicks")).toHaveTextContent("30");
+    expect(stat("Coins")).toBeNull();
     // Kick sends no follows, likes or shares
     expect(stat("New followers")).toBeNull();
     expect(stat("Likes")).toBeNull();
-    expect(gifters()).toEqual(["1KKai30 coins"]);
+    expect(gifters()).toEqual(["1KKai30 Kicks"]);
 
+    // Each currency on its own, and no top gifters, which would mix them
     await user.click(tab("All"));
     expect(value("Viewers")).toHaveTextContent("60");
     expect(value("Gifts")).toHaveTextContent("5");
     expect(value("New followers")).toHaveTextContent("3");
-    expect(gifters()).toEqual(["1KKai30 coins", "2AAna20 coins"]);
+    expect(value("Coins")).toHaveTextContent("20");
+    expect(value("Kicks")).toHaveTextContent("30");
+    expect(page().queryByText("Top gifters")).toBeNull();
+  });
+
+  it("shows Twitch's Bits and YouTube's Super Chats in dollars, a dash until the rates load", async () => {
+    const { user } = await renderApp();
+    await usingPlatforms(["twitch", "youtube"]);
+    await live({ twitch: "connected", youtube: "connected" });
+    const session = (usd: number | null) =>
+      send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+        data: liveSession({
+          startedAt: Date.now(),
+          totals: liveTotals({ bits: 1500, superChats: 3 }),
+          usd,
+          platforms: {
+            twitch: { totals: liveTotals({ bits: 1500 }), viewers: [] },
+            youtube: { totals: liveTotals({ superChats: 3 }), viewers: [] },
+          },
+        }),
+      });
+    const value = (label: string) =>
+      page().getByText(label, { selector: "span" }).previousElementSibling;
+
+    await session(null);
+    await user.click(tab("All"));
+    expect(value("Bits")).toHaveTextContent("1.5K");
+    expect(value("Super Chats")).toHaveTextContent("—");
+    expect(value("Super Chats")).toHaveAttribute(
+      "title",
+      "Exchange rates haven't loaded yet",
+    );
+
+    await session(1234.5);
+    expect(value("Super Chats")).toHaveTextContent("$1.23K");
+    expect(value("Super Chats")).toHaveAttribute("title", "$1,234.50");
+
+    await user.click(tab("YouTube"));
+    expect(value("Super Chats")).toHaveTextContent("$1.23K");
+    expect(stat("Bits")).toBeNull();
+    // No price, so no top gifters
+    expect(page().queryByText("Top gifters")).toBeNull();
+  });
+
+  it("adds up only the profile's platforms on All", async () => {
+    await renderApp();
+    await usingPlatforms(["tiktok"]);
+    await live({ tiktok: "connected" });
+    // Kick left the profile mid-LIVE, its numbers still in the session
+    await send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+      data: liveSession({
+        startedAt: Date.now(),
+        platforms: {
+          tiktok: { totals: liveTotals(), viewers: [] },
+          kick: { totals: liveTotals({ kicks: 5 }), viewers: [] },
+        },
+      }),
+    });
+
+    expect(tabNames()).toEqual(["TikTok0"]);
+    expect(stat("Kicks")).toBeNull();
   });
 
   it("marks each event with its platform when the profile uses several", async () => {

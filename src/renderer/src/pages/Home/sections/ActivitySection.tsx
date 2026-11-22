@@ -5,11 +5,11 @@ import {
   ChatTranslation,
   MusicInfo,
 } from "@/common/types";
-import { PLATFORM_LABELS, platformOf } from "@/common/util";
+import { GIFT_CURRENCY, PLATFORM_LABELS, platformOf } from "@/common/util";
 import { languageName } from "@/helper/voices";
 import { Avatar, Btn } from "@/components";
 import { cx } from "@/helper";
-import { coinsLabel } from "@/helper/gifts";
+import { amountLabel } from "@/helper/gifts";
 import { rich, useLanguage, useT } from "@/ui/i18n";
 import { memo } from "react";
 import { FiSettings } from "react-icons/fi";
@@ -213,6 +213,8 @@ const Event = memo(function Event({
     );
   }
   if (item.type === "chat") return <ChatRow {...item} mark={mark} />;
+  // A gift's price is in its sender's platform's currency
+  const currency = GIFT_CURRENCY[platformOf(item.user)];
   return (
     <li className={styles.event}>
       <Avatar name={item.user.name} picture={item.user.picture} />
@@ -221,9 +223,9 @@ const Event = memo(function Event({
       </div>
       {/* At the row's end, after the body's trailing space. A gift without
           a price, like YouTube's, shows none. */}
-      {item.type === "gift" && item.gift.coins > 0 && (
+      {item.type === "gift" && item.gift.coins > 0 && currency && (
         <span className={styles.coins}>
-          {coinsLabel(item.gift.coins, language)}
+          {amountLabel(item.gift.coins, currency, language)}
         </span>
       )}
     </li>

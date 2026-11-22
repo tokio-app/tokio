@@ -327,7 +327,6 @@ events.push(
   APP_EVENTS.GET_LIVE_GIFTERS,
   ({ historyService }, e) => {
     e.reply(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
-      data: historyService.top().live,
       byPlatform: historyService.topByPlatform(),
     });
   },

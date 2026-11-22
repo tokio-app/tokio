@@ -422,7 +422,6 @@ describe("Home", () => {
         topGifter("Kai", 120),
       ];
       await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
-        data: top,
         byPlatform: { tiktok: top },
       });
 
@@ -442,10 +441,7 @@ describe("Home", () => {
       await renderApp();
       await connected();
 
-      await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
-        data: [],
-        byPlatform: {},
-      });
+      await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, { byPlatform: {} });
 
       expect(page().getByText("No gifts yet")).toBeInTheDocument();
     });

@@ -364,11 +364,9 @@ export interface AppEventsResponseMap {
   [APP_EVENTS_RESPONSE.LIVE_SESSION]: {
     data: LiveSession;
   };
-  // The reply to GET_LIVE_GIFTERS, pushed again as they change: this LIVE's
-  // top gifters, the most coins first, [] outside a LIVE. data is the
-  // overlays' list, byPlatform each platform's own.
+  // The reply to GET_LIVE_GIFTERS, pushed again as they change: each
+  // platform's top gifters in this LIVE, the most first, none outside a LIVE
   [APP_EVENTS_RESPONSE.LIVE_GIFTERS]: {
-    data: TopGifter[];
     byPlatform: Partial<Record<Platform, TopGifter[]>>;
   };
   // The reply to GET_SONGS, pushed again as the request queue changes, as

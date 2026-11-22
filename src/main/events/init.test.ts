@@ -2377,6 +2377,7 @@ describe("init events", () => {
 
       change(s);
       s.historyService.top.mockReturnValue(top([gifter]));
+      s.historyService.topByPlatform.mockReturnValue({ tiktok: [gifter] });
       change(s);
       change(s);
       expect(s.serverService.sendToAll.mock.calls).toEqual([[message()]]);
@@ -2387,10 +2388,10 @@ describe("init events", () => {
         [message()],
         [message(top([gifter]))],
       ]);
-      // Home gets this LIVE's with each push, and each platform's
+      // Home gets each platform's in this LIVE with each push
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
-        { data: [], byPlatform: {} },
-        { data: [gifter], byPlatform: {} },
+        { byPlatform: {} },
+        { byPlatform: { tiktok: [gifter] } },
       ]);
     });
 

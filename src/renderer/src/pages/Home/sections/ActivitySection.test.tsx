@@ -44,6 +44,35 @@ describe("ActivitySection", () => {
     expect(avatar).toHaveBeenCalledOnce();
   });
 
+  it("shows a gift's price in its sender's platform's currency", () => {
+    const gift = (
+      id: number,
+      platform: "tiktok" | "kick" | "youtube",
+      coins: number,
+    ): ActivityItem => ({
+      id,
+      type: "gift",
+      user: { ...user(platform), platform },
+      gift: { name: "Rose", image: "", count: 1, coins },
+    });
+    renderWithProviders(
+      section([
+        gift(3, "youtube", 5),
+        gift(2, "kick", 200),
+        gift(1, "tiktok", 1),
+      ]),
+    );
+
+    expect(
+      screen.getAllByRole("listitem").map((item) => item.textContent),
+    ).toEqual([
+      // YouTube's Gifts have no price
+      "Yyoutube sent Rose ",
+      "Kkick sent Rose 200 Kicks",
+      "Ttiktok sent Rose 1 coin",
+    ]);
+  });
+
   it("shows a chat's translation under it, led for screen readers", () => {
     const chat: ActivityItem = {
       id: 1,

@@ -1,11 +1,14 @@
 import { LiveSession, Platform } from "@/common/types";
 import { Avatar, Section } from "@/components";
-import { coinsLabel } from "@/helper/gifts";
+import { amountLabel } from "@/helper/gifts";
 import { useLanguage, useT } from "@/ui/i18n";
 import styles from "../home.module.css";
 import { LiveGifters, liveView, HomeTab, Views } from "../helper";
 import { StatValue } from "./StatValue";
 import { ViewersChart } from "./ViewersChart";
+
+// The tiles in a row, as home.module.css's .stats sets it
+const STATS_ROW = 6;
 
 interface Props {
   // The tab picked above: a platform in the LIVE, or all of them
@@ -40,10 +43,24 @@ export function LiveSection({ tab, platforms, ...numbers }: Props) {
         <ViewersChart viewers={minutes} liveCount={viewers} />
       </div>
 
-      <div className={styles.stats}>
-        {stats.map(({ label, value }) => (
+      <div
+        className={styles.stats}
+        // Past a row of six, two even rows: 4 and 3, 4 and 4, 5 and 4
+        style={
+          stats.length > STATS_ROW
+            ? {
+                gridTemplateColumns: `repeat(${Math.ceil(stats.length / 2)}, minmax(0, 1fr))`,
+              }
+            : undefined
+        }
+      >
+        {stats.map(({ label, value, money }) => (
           <div key={label} className={styles.stat}>
-            <StatValue value={value} className={styles.stat_value} />
+            <StatValue
+              value={value}
+              money={money}
+              className={styles.stat_value}
+            />
             <span className={styles.stat_label}>{t(label)}</span>
           </div>
         ))}
@@ -51,11 +68,11 @@ export function LiveSection({ tab, platforms, ...numbers }: Props) {
 
       {gifters && (
         <Section title={t("home.gifters.title")}>
-          {gifters.length === 0 ? (
+          {gifters.list.length === 0 ? (
             <p className={styles.quiet}>{t("home.gifters.empty")}</p>
           ) : (
             <ol className={styles.gifters} aria-label={t("home.gifters.title")}>
-              {gifters.slice(0, 3).map((gifter, i) => {
+              {gifters.list.slice(0, 3).map((gifter, i) => {
                 const name = gifter.username || gifter.handle;
                 return (
                   <li key={gifter.userId} className={styles.gifter}>
@@ -72,7 +89,11 @@ export function LiveSection({ tab, platforms, ...numbers }: Props) {
                         {name}
                       </span>
                       <span className={styles.gifter_coins}>
-                        {coinsLabel(gifter.live.coins, language)}
+                        {amountLabel(
+                          gifter.live.coins,
+                          gifters.currency,
+                          language,
+                        )}
                       </span>
                     </span>
                   </li>

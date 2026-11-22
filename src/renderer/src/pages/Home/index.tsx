@@ -66,10 +66,7 @@ export function Home() {
     platformViewers: {},
   });
   const [session, setSession] = useState(NO_SESSION);
-  const [gifters, setGifters] = useState<LiveGifters>({
-    data: [],
-    byPlatform: {},
-  });
+  const [gifters, setGifters] = useState<LiveGifters>({ byPlatform: {} });
   const [songs, setSongs] = useState<MusicInfo[]>([]);
   const [paused, setPaused] = useState(false);
   // The tab picked over the connection and the numbers, null for the first
@@ -178,8 +175,11 @@ export function Home() {
     if (res) setSongs(res.data);
   });
 
-  // The platforms in the LIVE: All adds them up once there are two
-  const live = connected ? livePlatforms(status, session) : [];
+  // The profile's platforms in the LIVE: All adds them up once there are two.
+  // One removed mid-LIVE keeps its numbers in the session but has no tab.
+  const live = connected
+    ? livePlatforms(status, session).filter((p) => platforms.includes(p))
+    : [];
   const tabs: HomeTab[] = live.length > 1 ? [...platforms, "all"] : platforms;
   // The one picked while it's there, else the first platform's
   const tab = picked !== null && tabs.includes(picked) ? picked : tabs[0];

@@ -812,7 +812,7 @@ describe("home events", () => {
   });
 
   describe("GET_LIVE_GIFTERS", () => {
-    it("replies with this LIVE's top gifters without a notice", async () => {
+    it("replies with each platform's top gifters in this LIVE without a notice", async () => {
       const gifter = {
         userId: "1",
         username: "Leo",
@@ -823,16 +823,13 @@ describe("home events", () => {
         giftedAt: 1000,
       };
       const h = createHandler({
-        historyService: {
-          top: () => ({ live: [gifter], allTime: [] }),
-          topByPlatform: () => ({ tiktok: [gifter] }),
-        },
+        historyService: { topByPlatform: () => ({ tiktok: [gifter] }) },
       });
 
       await h.invoke(home, APP_EVENTS.GET_LIVE_GIFTERS);
 
       expect(h.replies(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
-        { data: [gifter], byPlatform: { tiktok: [gifter] } },
+        { byPlatform: { tiktok: [gifter] } },
       ]);
       expect(h.notices).toEqual([]);
     });
@@ -858,7 +855,10 @@ describe("home events", () => {
   });
 
   it.each([
-    [APP_EVENTS.GET_LIVE_GIFTERS, { historyService: { top: () => fail() } }],
+    [
+      APP_EVENTS.GET_LIVE_GIFTERS,
+      { historyService: { topByPlatform: () => fail() } },
+    ],
     [APP_EVENTS.GET_SONGS, { musicService: { songs: () => fail() } }],
   ] as const)(
     "sends no reply and no notice when %s fails",

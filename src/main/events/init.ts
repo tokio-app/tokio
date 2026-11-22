@@ -1106,18 +1106,16 @@ const registerHistory = ({
     conn.on(type, (d) => history.record(type, d));
   }
 
-  const message = (top = history.top()): TokioPayload => ({
+  const message = (): TokioPayload => ({
     type: "tokio:gifters",
-    data: top,
+    data: history.top(),
   });
   // The lists are read when the push goes, so they're never old ones. Home's
-  // top gifters go with the overlays', so both show the same list.
+  // tabs get each platform's top gifters with the overlays' push.
   const push = throttle(() => {
-    const top = history.top();
-    server.sendToAll(message(top));
+    server.sendToAll(message());
     if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
-      data: top.live,
       byPlatform: history.topByPlatform(),
     });
   }, GIFTERS_PUSH_MS);
