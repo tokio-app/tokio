@@ -224,6 +224,7 @@ const registerConnectorEvents = ({
   pathManagerService: paths,
   serverService: server,
   controlsService: controls,
+  ratesService: rates,
   notifier,
 }: AppHandlerVariables) => {
   const dispatchAlert = async <K extends AppEvents>(
@@ -402,7 +403,11 @@ const registerConnectorEvents = ({
     live.start();
     sendSession.cancel();
     pushSession();
+    // So YouTube's Super Chats show in dollars from the first one
+    if (conn.status().youtube) void rates.refresh();
   });
+  // The Super Chats' dollars once the rates load
+  rates.onChange(() => sendSession());
 
   // What Home and the title bar show, as main holds it
   const pushConnection = () => {
@@ -502,6 +507,7 @@ const registerConnectorEvents = ({
   // A platform up or down while the session goes on with the others. Coming
   // up says nothing: its connect or its reconnect already did.
   conn.onPlatform((platform, change) => {
+    if (platform === "youtube" && change === "up") void rates.refresh();
     const params = { platform: PLATFORM_LABELS[platform] };
     // Apart from the session's own, which can come right after
     const options = { key: `${change}:${platform}` };
@@ -893,6 +899,7 @@ const registerStudio = (handler: AppHandlerVariables) => {
     serverService: server,
     liveService: live,
     historyService: history,
+    ratesService: rates,
     notifier,
   } = handler;
 
@@ -952,6 +959,8 @@ const registerStudio = (handler: AppHandlerVariables) => {
   conn.on(TOKIO_EVENTS.ROOM_USER, () => sendNumbers());
   // A list of top gifters follows this LIVE's
   history.onChange(() => sendNumbers());
+  // The Super Chats' dollars
+  rates.onChange(() => sendNumbers());
   conn.on(TOKIO_EVENTS.CONNECTED, () => {
     studio.startLive();
     sendNumbers();
@@ -1204,6 +1213,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     gamesService,
     studioService,
     translationService,
+    ratesService,
     notifier,
   } = handler;
 
@@ -1230,6 +1240,7 @@ const startApp = async (handler: AppHandlerVariables) => {
       gamesService.setLogFile(files.logs.games);
       studioService.setLogFile(files.logs.overlays);
       translationService.setLogFile(files.logs.translation);
+      ratesService.setLogFile(files.logs.system);
       notifier.setLogFiles(files.logs);
       musicService.setAdBlockFolder(folders.extraFolder);
       alertsService.setSoundsFolder(folders.soundsFolder);
@@ -1301,6 +1312,7 @@ const startApp = async (handler: AppHandlerVariables) => {
   storeManagerService.updateLiveStats(EMPTY_LIVE_STATS);
   if (!wired.has(handler)) {
     wired.add(handler);
+    liveService.setRates(ratesService);
     serverService.initEvents(connectorService, musicService);
     // One router: the phone remote and its API, and MCP
     const control = express.Router();

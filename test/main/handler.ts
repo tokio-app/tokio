@@ -55,6 +55,7 @@ const SERVICES: (keyof AppServices)[] = [
   "trayService",
   "translationService",
   "controlsService",
+  "ratesService",
 ];
 
 // Read by Vitest and Node when they print or await a value

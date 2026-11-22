@@ -56,6 +56,7 @@ import { HISTORY_EVENTS, type HistoryService } from "@/services/history";
 import { LiveService } from "@/services/live";
 import type { MusicService } from "@/services/music";
 import type { OverlayService } from "@/services/overlay";
+import type { RatesService } from "@/services/rates";
 import type { StoreManagerService } from "@/services/store";
 import { StudioService } from "@/services/studio";
 import type { TimerService } from "@/services/timer";
@@ -432,6 +433,17 @@ function setup() {
   const yamlManagerService = { setLogFile: vi.fn() };
   const studioService = new StudioService();
   const controlsService = new ControlsService();
+  const rateListeners: (() => void)[] = [];
+  const ratesService = {
+    setLogFile: vi.fn(),
+    refresh: vi.fn(async (_now?: number) => {}),
+    toUsd: vi.fn(
+      (..._args: Parameters<RatesService["toUsd"]>): number | null => 0,
+    ),
+    onChange: vi.fn((listener: () => void) => {
+      rateListeners.push(listener);
+    }),
+  };
   const translationService = {
     setLogFile: vi.fn(),
     forChat: vi.fn(
@@ -467,6 +479,7 @@ function setup() {
     yamlManagerService,
     translationService,
     controlsService,
+    ratesService,
   });
 
   return {
@@ -500,6 +513,8 @@ function setup() {
     yamlManagerService,
     translationService,
     controlsService,
+    ratesService,
+    rateListeners,
   };
 }
 
@@ -1328,6 +1343,20 @@ describe("init events", () => {
       ).toBe(true);
     });
 
+    it("sends the numbers again when the exchange rates load", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      withOverlay(s, [
+        element("t", { kind: "text", text: "{viewers} watching" }),
+      ]);
+      s.serverService.sendToClient.mockClear();
+
+      for (const listener of s.rateListeners) listener();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(texts(s)).toEqual([["0 watching"]]);
+    });
+
     it("counts the session's followers while LIVE", async () => {
       const s = await live();
       withOverlay(s, [element("t", { kind: "text", text: "{followers} new" })]);
@@ -1761,6 +1790,45 @@ describe("init events", () => {
           expect.objectContaining({ type: "follow" }),
         ],
       });
+    });
+
+    it("adds up the Super Chats in dollars, and pushes them again when the rates load", async () => {
+      vi.useFakeTimers();
+      const s = await live();
+      connect(s);
+      s.ratesService.toUsd.mockReturnValue(null);
+      s.conn.emit(TOKIO_EVENTS.SUPER_CHAT, {
+        user: { ...user, platform: "youtube" },
+        amount: "€5.00",
+        message: "",
+        sticker: "",
+      });
+      vi.advanceTimersByTime(250);
+      expect(sessions(s).at(-1)).toMatchObject({ usd: null });
+      expect(s.ratesService.toUsd).toHaveBeenLastCalledWith({ EUR: 5 });
+
+      s.ratesService.toUsd.mockReturnValue(5.75);
+      for (const listener of s.rateListeners) listener();
+      vi.advanceTimersByTime(250);
+
+      expect(sessions(s).at(-1)).toMatchObject({ usd: 5.75 });
+    });
+
+    it("loads the exchange rates when YouTube is in the LIVE", async () => {
+      const s = await live();
+      const [changed] = s.connectorService.onPlatform.mock.calls[0];
+
+      connect(s);
+      changed("twitch", "up");
+      expect(s.ratesService.refresh).not.toHaveBeenCalled();
+
+      s.connectorService.status.mockReturnValue({ youtube: "connected" });
+      connect(s);
+      expect(s.ratesService.refresh).toHaveBeenCalledOnce();
+      changed("youtube", "up");
+      changed("youtube", "ended");
+      expect(s.ratesService.refresh).toHaveBeenCalledTimes(2);
+      expect(s.ratesService.setLogFile).toHaveBeenCalledWith(files.logs.system);
     });
 
     it("pushes nothing for events that don't change it", async () => {
