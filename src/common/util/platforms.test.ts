@@ -2,7 +2,8 @@ import { ALERT_TRIGGERS } from "@/common/schemas";
 import { EMOTE_TRIGGER, PLATFORMS, TOKIO_EVENTS } from "@/common/types";
 import { describe, expect, it } from "vitest";
 import {
-  countsCoins,
+  GIFT_CURRENCY,
+  giftCurrencies,
   isPlatform,
   PLATFORM_TRIGGERS,
   platformOf,
@@ -72,12 +73,18 @@ describe("platforms", () => {
     ]);
   });
 
-  it("counts coins only with a platform whose gifts have a price", () => {
-    expect(countsCoins(["tiktok"])).toBe(true);
-    expect(countsCoins(["youtube", "tiktok"])).toBe(true);
-    expect(countsCoins(["youtube"])).toBe(false);
-    expect(countsCoins(["twitch", "youtube"])).toBe(false);
-    expect(countsCoins(["youtube", "kick"])).toBe(true);
+  it("prices TikTok's gifts in coins and Kick's in Kicks, each apart", () => {
+    expect(GIFT_CURRENCY).toEqual({
+      tiktok: "coins",
+      twitch: null,
+      youtube: null,
+      kick: "kicks",
+    });
+    expect(giftCurrencies(["kick", "youtube", "tiktok"])).toEqual([
+      "coins",
+      "kicks",
+    ]);
+    expect(giftCurrencies(["twitch", "youtube"])).toEqual([]);
   });
 
   it("reads a viewer without a platform as TikTok's", () => {

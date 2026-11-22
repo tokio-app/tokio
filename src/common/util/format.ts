@@ -26,6 +26,34 @@ export function formatStat(value: number, language: string) {
   };
 }
 
+const moneyFormats = new Map<
+  string,
+  { cents: Intl.NumberFormat; compact: Intl.NumberFormat }
+>();
+
+/**
+ * US dollars as short text ($57.40, then $1.23K from a thousand on, never
+ * rounded up) and in full ($1,234.56), as the language writes them.
+ */
+export function formatMoney(usd: number, language: string) {
+  let format = moneyFormats.get(language);
+  if (!format) {
+    const money = { style: "currency", currency: "USD" } as const;
+    format = {
+      cents: new Intl.NumberFormat(language, money),
+      compact: new Intl.NumberFormat(language, {
+        ...money,
+        notation: "compact",
+        maximumSignificantDigits: 3,
+        roundingMode: "trunc",
+      }),
+    };
+    moneyFormats.set(language, format);
+  }
+  const full = format.cents.format(usd);
+  return { short: usd < 1000 ? full : format.compact.format(usd), full };
+}
+
 /**
  * A length in whole minutes, else seconds, as the language writes it: "30
  * seconds", or with a max "1–2 minutes".

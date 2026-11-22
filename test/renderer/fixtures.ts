@@ -21,6 +21,7 @@ import {
   Gifter,
   LiveSession,
   LiveSummary,
+  LiveTotals,
   MusicInfo,
   MyInstantsSound,
   OverlayApp,
@@ -130,13 +131,26 @@ export const viewer = (name: string): ActivityUser => ({
   picture: `https://example.com/${slug(name)}.png`,
 });
 
+/** A LIVE's totals: nothing counted, changed by `patch`. */
+export const liveTotals = (patch: Partial<LiveTotals> = {}): LiveTotals => ({
+  followers: 0,
+  shares: 0,
+  gifts: 0,
+  coins: 0,
+  kicks: 0,
+  bits: 0,
+  superChats: 0,
+  ...patch,
+});
+
 /** LIVE_SESSION's data: no LIVE and nothing counted, changed by `patch`. */
 export const liveSession = (patch: Partial<LiveSession> = {}): LiveSession => ({
   startedAt: null,
-  totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
+  totals: liveTotals(),
   activity: [],
   viewers: [],
   platforms: {},
+  usd: 0,
   ...patch,
 });
 
@@ -149,6 +163,7 @@ export const liveSummary = (
   startedAt,
   endedAt: startedAt + 3_600_000,
   coins: 0,
+  kicks: 0,
   gifts: 0,
   ...patch,
 });

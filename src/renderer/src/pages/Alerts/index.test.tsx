@@ -1339,7 +1339,7 @@ describe("Alerts", () => {
         alert("alert-1", { trigger: trigger(TOKIO_EVENTS.GIFT) }),
       ]);
       const opened = await edit(user, 0);
-      expect(opened.getByText(/The whole streak's coins/)).toBeInTheDocument();
+      expect(opened.getByText(/The whole streak's price/)).toBeInTheDocument();
 
       fireEvent.change(opened.getByRole("spinbutton", { name: "Coins" }), {
         target: { value: "100" },

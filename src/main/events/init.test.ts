@@ -1708,7 +1708,15 @@ describe("init events", () => {
   });
 
   describe("live session", () => {
-    const noTotals = { followers: 0, shares: 0, gifts: 0, coins: 0 };
+    const noTotals = {
+      followers: 0,
+      shares: 0,
+      gifts: 0,
+      coins: 0,
+      kicks: 0,
+      bits: 0,
+      superChats: 0,
+    };
     // What the Home page got, oldest first
     const sessions = (s: Setup) =>
       s.h.pushed(APP_EVENTS_RESPONSE.LIVE_SESSION).map(({ data }) => data);
@@ -1728,6 +1736,7 @@ describe("init events", () => {
           activity: [],
           viewers: [],
           platforms: {},
+          usd: 0,
         },
       ]);
     });

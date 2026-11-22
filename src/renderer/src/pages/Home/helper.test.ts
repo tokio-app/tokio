@@ -1,5 +1,5 @@
 import { createAlert } from "@/common/util";
-import { liveSession, topGifter } from "@test/fixtures";
+import { liveSession, liveTotals, topGifter } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   alertsStatus,
@@ -12,12 +12,7 @@ import {
   songParts,
 } from "./helper";
 
-const totals = (gifts: number, coins: number) => ({
-  followers: 0,
-  shares: 0,
-  gifts,
-  coins,
-});
+const totals = (gifts: number, coins: number) => liveTotals({ gifts, coins });
 
 describe("livePlatforms", () => {
   it("lists the platforms up now or with numbers, in Home's order", () => {

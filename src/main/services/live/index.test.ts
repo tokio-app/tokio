@@ -17,7 +17,15 @@ import {
 
 const MINUTE = 60_000;
 
-const noTotals = { followers: 0, shares: 0, gifts: 0, coins: 0 };
+const noTotals = {
+  followers: 0,
+  shares: 0,
+  gifts: 0,
+  coins: 0,
+  kicks: 0,
+  bits: 0,
+  superChats: 0,
+};
 
 const viewer = (handle: string, patch: Partial<UserData> = {}): UserData => ({
   username: `${handle} name`,
@@ -78,6 +86,7 @@ describe("LiveService", () => {
       activity: [],
       viewers: [],
       platforms: {},
+      usd: 0,
     });
   });
 
@@ -186,10 +195,9 @@ describe("LiveService", () => {
 
     const session = live.getSession();
     expect(session.totals).toEqual({
+      ...noTotals,
       followers: 1,
       shares: 1,
-      gifts: 0,
-      coins: 0,
     });
     expect(session.activity).toEqual([
       { id: 3, type: "superfan", user: shown("yui") },
@@ -212,6 +220,7 @@ describe("LiveService", () => {
 
     const session = live.getSession();
     expect(session.totals).toEqual({
+      ...noTotals,
       followers: 2,
       shares: 1,
       gifts: 3,
@@ -219,7 +228,7 @@ describe("LiveService", () => {
     });
     expect(session.platforms).toEqual({
       tiktok: {
-        totals: { followers: 1, shares: 1, gifts: 1, coins: 1 },
+        totals: { ...noTotals, followers: 1, shares: 1, gifts: 1, coins: 1 },
         viewers: [],
       },
       twitch: { totals: { ...noTotals, followers: 1 }, viewers: [] },
@@ -260,12 +269,7 @@ describe("LiveService", () => {
       },
     ]);
     // Neither coins nor gifts
-    expect(live.getSession().totals).toEqual({
-      followers: 0,
-      shares: 0,
-      gifts: 0,
-      coins: 0,
-    });
+    expect(live.getSession().totals).toEqual(noTotals);
   });
 
   it("lists YouTube's Super Chats and Super Stickers without coins", () => {
@@ -303,12 +307,7 @@ describe("LiveService", () => {
         sticker: "",
       },
     ]);
-    expect(live.getSession().totals).toEqual({
-      followers: 0,
-      shares: 0,
-      gifts: 0,
-      coins: 0,
-    });
+    expect(live.getSession().totals).toEqual(noTotals);
   });
 
   it("puts joins in a row in one item, naming the first two", () => {
@@ -392,6 +391,7 @@ describe("LiveService", () => {
       activity: [],
       viewers: [],
       platforms: {},
+      usd: 0,
     });
   });
 
@@ -555,13 +555,14 @@ describe("LiveService", () => {
       );
       live.record(TOKIO_EVENTS.FOLLOW, { user: viewer("sora") });
 
-      const totals = { followers: 1, shares: 0, gifts: 2, coins: 2 };
+      const totals = { ...noTotals, followers: 1, gifts: 2, coins: 2 };
       expect(live.getSession()).toEqual({
         startedAt: null,
         totals,
         activity: [{ id: 1, type: "follow", user: shown("sora") }],
         viewers: [],
         platforms: { tiktok: { totals, viewers: [] } },
+        usd: 0,
       });
     });
 

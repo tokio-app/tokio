@@ -46,7 +46,7 @@ describe("Tools", () => {
     const names = [
       "Countdown",
       "Overlay Studio",
-      "Coin stats",
+      "Gift stats",
       "Fans",
       "Test overlays",
     ];
@@ -101,8 +101,8 @@ describe("Tools", () => {
       "A countdown viewers add time to. 01:00:00 Ready",
     );
     // The newest LIVE's
-    expect(row("Coin stats")).toHaveAccessibleDescription(
-      "The coins and gifts of every LIVE, and who sent them. 1,234 coins on Oct 31, 2026",
+    expect(row("Gift stats")).toHaveAccessibleDescription(
+      "The gifts of every LIVE, what they were worth and who sent them. 1,234 coins on Oct 31, 2026",
     );
     expect(row("Fans")).toHaveAccessibleDescription(
       "Viewers with a fan level, highest first. 2 fans",
@@ -120,7 +120,7 @@ describe("Tools", () => {
     await testOverlays();
 
     expect(
-      within(row("Coin stats")).getByText("coin on Oct 31, 2026"),
+      within(row("Gift stats")).getByText("coin on Oct 31, 2026"),
     ).toBeVisible();
     expect(within(row("Fans")).getByText("fan")).toBeVisible();
     expect(within(row("Test overlays")).getByText("0")).toBeVisible();
@@ -155,8 +155,8 @@ describe("Tools", () => {
 
     await lives();
 
-    expect(row("Coin stats")).toHaveAccessibleDescription(
-      "The coins and gifts of every LIVE, and who sent them. No LIVEs yet",
+    expect(row("Gift stats")).toHaveAccessibleDescription(
+      "The gifts of every LIVE, what they were worth and who sent them. No LIVEs yet",
     );
   });
 
@@ -191,7 +191,7 @@ describe("Tools", () => {
       t.state = { status: "running", remaining: 10_000 };
     });
     expect(row("Countdown").className).toMatch(/tool_live/);
-    expect(row("Coin stats").className).not.toMatch(/tool_live/);
+    expect(row("Gift stats").className).not.toMatch(/tool_live/);
   });
 
   it("shows the starting time while idle", async () => {
@@ -217,13 +217,13 @@ describe("Tools", () => {
     expect(sent(APP_EVENTS.GET_FANS)).toHaveLength(2);
 
     await lives();
-    expect(within(row("Coin stats")).getByText("No LIVEs yet")).toBeVisible();
+    expect(within(row("Gift stats")).getByText("No LIVEs yet")).toBeVisible();
   });
 
   it.each([
     ["Countdown", "/tools/timer"],
     ["Overlay Studio", "/tools/studio"],
-    ["Coin stats", "/tools/coin-stats"],
+    ["Gift stats", "/tools/coin-stats"],
     ["Fans", "/tools/fans"],
     ["Test overlays", "/tools/test-overlays"],
   ])("opens %s", async (name, path) => {

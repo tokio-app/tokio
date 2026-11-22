@@ -12,7 +12,7 @@ import {
   TOKIO_EVENTS,
   TopGifter,
 } from "@/common/types";
-import { countsCoins, PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
+import { giftCurrencies, PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
 import type { IconType } from "react-icons";
 import { FaTiktok, FaTwitch, FaYoutube } from "react-icons/fa";
 import { SiKick } from "react-icons/si";
@@ -20,10 +20,19 @@ import { SiKick } from "react-icons/si";
 // Until main answers
 export const NO_SESSION: LiveSession = {
   startedAt: null,
-  totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
+  totals: {
+    followers: 0,
+    shares: 0,
+    gifts: 0,
+    coins: 0,
+    kicks: 0,
+    bits: 0,
+    superChats: 0,
+  },
   activity: [],
   viewers: [],
   platforms: {},
+  usd: 0,
 };
 
 // The platforms' logos, Font Awesome's
@@ -93,7 +102,7 @@ function liveStats(
     follows && { label: "home.totals.followers", value: values.followers },
     tiktok && { label: "home.totals.shares", value: values.shares },
     gifts && { label: "home.totals.gifts", value: values.gifts },
-    countsCoins(platforms) && {
+    giftCurrencies(platforms).length > 0 && {
       label: "home.totals.coins",
       value: values.coins,
     },
@@ -155,11 +164,12 @@ export function liveView(
     viewers: all ? views.current : (views.platformViewers[tab] ?? 0),
     minutes: part.viewers,
     stats: liveStats(shown, { ...part.totals, likes, views: views.total }),
-    gifters: countsCoins(shown)
-      ? all
-        ? gifters.data
-        : (gifters.byPlatform[tab] ?? [])
-      : null,
+    gifters:
+      giftCurrencies(shown).length > 0
+        ? all
+          ? gifters.data
+          : (gifters.byPlatform[tab] ?? [])
+        : null,
   };
 }
 

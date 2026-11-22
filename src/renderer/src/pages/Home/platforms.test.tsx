@@ -6,6 +6,7 @@ import {
 } from "@/common/types";
 import {
   liveSession,
+  liveTotals,
   profileReply,
   settingsReply,
   topGifter,
@@ -325,15 +326,25 @@ describe("Home's platforms", () => {
     await send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
       data: liveSession({
         startedAt: Date.now(),
-        totals: { followers: 3, shares: 1, gifts: 5, coins: 50 },
+        totals: liveTotals({ followers: 3, shares: 1, gifts: 5, coins: 50 }),
         viewers: [60],
         platforms: {
           tiktok: {
-            totals: { followers: 3, shares: 1, gifts: 2, coins: 20 },
+            totals: liveTotals({
+              followers: 3,
+              shares: 1,
+              gifts: 2,
+              coins: 20,
+            }),
             viewers: [40],
           },
           kick: {
-            totals: { followers: 0, shares: 0, gifts: 3, coins: 30 },
+            totals: liveTotals({
+              followers: 0,
+              shares: 0,
+              gifts: 3,
+              coins: 30,
+            }),
             viewers: [20],
           },
         },

@@ -22,7 +22,8 @@ export type Activity =
       emotes: string[];
       translation?: ChatTranslation;
     }
-  // `coins` is what the whole combo cost
+  // `coins` is what the whole combo cost, in the sender's platform's gift
+  // currency: TikTok's coins or Kick's Kicks
   | {
       type: "gift";
       user: ActivityUser;
@@ -49,12 +50,17 @@ export type Activity =
 // `id` is unique across LIVEs
 export type ActivityItem = Activity & { id: number };
 
-// Counted since Tokio connected
+// Counted since Tokio connected. Each currency is its platform's alone, never
+// added to another: coins TikTok's, kicks Kick's, bits Twitch's cheers.
 export type LiveTotals = {
   followers: number;
   shares: number;
   gifts: number;
   coins: number;
+  kicks: number;
+  bits: number;
+  // YouTube's Super Chats and Super Stickers, how many
+  superChats: number;
 };
 
 // One platform's part of the LIVE
@@ -77,6 +83,9 @@ export type LiveSession = {
   // Each platform's own numbers, for the platforms that sent any in this
   // LIVE. totals and viewers count them all.
   platforms: Partial<Record<Platform, PlatformLive>>;
+  // YouTube's Super Chats in US dollars, at the day's exchange rates; null
+  // while they haven't loaded
+  usd: number | null;
 };
 
 // A viewer who sent gifts, keyed by their user id (see UserData). Name,
@@ -87,6 +96,7 @@ export type Gifter = {
   handle: string;
   // TikTok's link, which can expire. Empty when TikTok sent none.
   picture: string;
+  // In their platform's gift currency: TikTok's coins or Kick's Kicks
   coins: number;
   gifts: number;
   // When their last gift came, in ms since the epoch
@@ -103,8 +113,10 @@ export type LiveSummary = {
   startedAt: number;
   // While it goes on, when it was last saved
   endedAt: number;
-  // Counted since Tokio connected
+  // Counted since Tokio connected, each currency apart: TikTok's coins and
+  // Kick's Kicks. Gifts counts every platform's.
   coins: number;
+  kicks: number;
   gifts: number;
 };
 

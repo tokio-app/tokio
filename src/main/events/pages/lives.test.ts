@@ -15,6 +15,7 @@ const summary: LiveSummary = {
   startedAt: 1000,
   endedAt: 5000,
   coins: 10,
+  kicks: 0,
   gifts: 2,
 };
 const gifter = {

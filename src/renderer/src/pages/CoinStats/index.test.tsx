@@ -67,7 +67,7 @@ const dates = async (
   await user.click(screen.getByRole("option", { name: choice }));
 };
 
-describe("Coin stats", () => {
+describe("Gift stats", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -76,7 +76,7 @@ describe("Coin stats", () => {
     renderWithProviders(<CoinStats />);
 
     expect(
-      screen.getByRole("heading", { name: "Coin stats" }),
+      screen.getByRole("heading", { name: "Gift stats" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Back to Tools" }),
@@ -90,7 +90,7 @@ describe("Coin stats", () => {
     await lives([saturday, friday]);
 
     expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent(
-      "Coin stats",
+      "Gift stats",
     );
     expect(list()).toBeInTheDocument();
   });
@@ -242,7 +242,7 @@ describe("Coin stats", () => {
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       from: since,
-      totals: { coins: 900, gifts: 70 },
+      totals: { coins: 900, kicks: 0, gifts: 70 },
     });
 
     expect(stat("Coins")).toHaveTextContent("900");
@@ -516,7 +516,7 @@ describe("Coin stats", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "No gifts yet. Viewers who send gifts show up here, the most coins first.",
+        "No gifts yet. Viewers who send gifts show up here, the biggest gifters first.",
       ),
     ).toBeInTheDocument();
     expect(sent(APP_EVENTS.GET_LIVE)).toEqual([]);
@@ -565,7 +565,7 @@ describe("Coin stats", () => {
     await send(APP_EVENTS_RESPONSE.GIFTERS, {
       success: true,
       from: since,
-      totals: { coins: 900, gifts: 70 },
+      totals: { coins: 900, kicks: 0, gifts: 70 },
       data: [{ ...gifter("Ana", 300, 30), rank: 1 }],
     });
     expect(stat("Coins")).toHaveTextContent("900");

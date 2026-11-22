@@ -59,6 +59,8 @@ const LiveSummarySchema = z.object({
   startedAt: z.number(),
   endedAt: z.number(),
   coins: z.number(),
+  // Kick's gifts, since Kick came; older LIVEs had none
+  kicks: z.number().default(0),
   gifts: z.number(),
 }) satisfies z.ZodType<LiveSummary>;
 
@@ -283,7 +285,14 @@ export class HistoryService extends Service {
   public start(username: string, now = Date.now()) {
     if (this._dir === null) return;
     this.end(now);
-    this._live = { username, startedAt: now, endedAt: now, coins: 0, gifts: 0 };
+    this._live = {
+      username,
+      startedAt: now,
+      endedAt: now,
+      coins: 0,
+      kicks: 0,
+      gifts: 0,
+    };
     this._liveGifters = new Map();
     this._minutes = [];
     this._streaks.clear();
@@ -366,13 +375,14 @@ export class HistoryService extends Service {
    */
   public async getTotals(
     range: DateRange,
-  ): Promise<Pick<LiveSummary, "coins" | "gifts"> | null> {
+  ): Promise<Pick<LiveSummary, "coins" | "kicks" | "gifts"> | null> {
     const dir = this._dir;
-    const totals = { coins: 0, gifts: 0 };
+    const totals = { coins: 0, kicks: 0, gifts: 0 };
     if (dir === null) return totals;
     for (const live of this._lives.filter((l) => inRange(l, range))) {
       if (allInRange(live, range)) {
         totals.coins += live.coins;
+        totals.kicks += live.kicks;
         totals.gifts += live.gifts;
         continue;
       }

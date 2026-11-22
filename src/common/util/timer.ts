@@ -5,7 +5,7 @@ import {
   type AlertTrigger,
   type Platform,
 } from "../types/connector";
-import { countsCoins, triggersFor } from "./platforms";
+import { giftCurrencies, triggersFor } from "./platforms";
 
 // The event each trigger of the timer counts, so a profile's platforms say
 // which ones apply
@@ -26,7 +26,7 @@ const TIMER_TRIGGERS = {
 // only when a platform's gifts have a price
 export const timerTriggersOn = (platforms: readonly Platform[]) => {
   const sent = triggersFor(platforms);
-  const coins = countsCoins(platforms);
+  const coins = giftCurrencies(platforms).length > 0;
   return (key: keyof typeof TIMER_TRIGGERS) =>
     sent.includes(TIMER_TRIGGERS[key]) && (key !== "coin" || coins);
 };

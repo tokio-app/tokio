@@ -3,6 +3,7 @@ import { EULER_SIGNUP_URL } from "@/common/util";
 import { createAlert } from "@/common/util";
 import {
   liveSession,
+  liveTotals,
   profileReply,
   settingsReply,
   song,
@@ -302,7 +303,7 @@ describe("Home", () => {
       gifters: page().queryByRole("heading", { name: "Top gifters" }),
     });
     await session({
-      totals: { followers: 3, shares: 2, gifts: 1, coins: 1 },
+      totals: liveTotals({ followers: 3, shares: 2, gifts: 1, coins: 1 }),
     });
 
     expect(shown()).toEqual({ numbers: false, chart: null, gifters: null });
@@ -348,7 +349,12 @@ describe("Home", () => {
 
     await session({
       startedAt: Date.now(),
-      totals: { followers: 3, shares: 2, gifts: 1500, coins: 12_000 },
+      totals: liveTotals({
+        followers: 3,
+        shares: 2,
+        gifts: 1500,
+        coins: 12_000,
+      }),
     });
 
     expect(stat("New followers")).toHaveTextContent("3");

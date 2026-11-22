@@ -1,5 +1,6 @@
 import { MessageKey, translate } from "@/common/i18n";
 import { CustomGift } from "@/common/types";
+import type { GiftCurrency } from "@/common/util";
 
 export type CoinOperator =
   "any" | "eq" | "gt" | "gte" | "lt" | "lte" | "between";
@@ -111,6 +112,16 @@ export const coinUnit = (coins: number, language: string) =>
 // "1 coin", "1,000 coins"
 export const coinsLabel = (coins: number, language: string) =>
   translate(language, "gifts.coins", { count: coins });
+
+// "500 coins", "200 Kicks": an amount in the gift currency it was paid in
+export const amountLabel = (
+  amount: number,
+  currency: GiftCurrency,
+  language: string,
+) =>
+  translate(language, currency === "kicks" ? "gifts.kicks" : "gifts.coins", {
+    count: amount,
+  });
 
 export const giftsLabel = (count: number, language: string) =>
   translate(language, "gifts.gifts", { count });

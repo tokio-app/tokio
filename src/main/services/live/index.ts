@@ -55,6 +55,9 @@ const noTotals = (): LiveTotals => ({
   shares: 0,
   gifts: 0,
   coins: 0,
+  kicks: 0,
+  bits: 0,
+  superChats: 0,
 });
 
 // Keeps a minute's highest count. Minutes without a reading repeat the last
@@ -253,6 +256,7 @@ export class LiveService extends Service {
       activity: [...this._activity],
       viewers: [...this._viewers],
       platforms: structuredClone(this._platforms),
+      usd: 0,
     };
   }
 

@@ -47,7 +47,8 @@ export interface Fan {
 
 // A viewer in tokio:gifters' top 10s, with their coins and gifts in this LIVE
 // (0 when they sent none in it) and in all the profile's LIVEs, this one
-// included
+// included. Coins are in their platform's gift currency: TikTok's coins or
+// Kick's Kicks.
 export interface TopGifter {
   userId: string;
   username: string;

@@ -115,6 +115,7 @@ describe("HistoryService", () => {
           startedAt: 1000,
           endedAt: 2000,
           coins: 115,
+          kicks: 0,
           gifts: 4,
         },
       ],
@@ -560,6 +561,7 @@ describe("HistoryService", () => {
         startedAt: start,
         endedAt: start + 120_000,
         coins: 113,
+        kicks: 0,
         gifts: 5,
       },
     ]);
@@ -603,7 +605,11 @@ describe("HistoryService", () => {
 
     // The first LIVE from its second minute, and all of the second
     const since = { from: 11 * MINUTE };
-    expect(await history.getTotals(since)).toEqual({ coins: 111, gifts: 4 });
+    expect(await history.getTotals(since)).toEqual({
+      coins: 111,
+      kicks: 0,
+      gifts: 4,
+    });
     expect(await history.getGifters(since)).toEqual([
       expect.objectContaining({ userId: "2", coins: 101, gifts: 2, rank: 1 }),
       expect.objectContaining({ userId: "1", coins: 7, gifts: 1, rank: 2 }),
@@ -611,17 +617,29 @@ describe("HistoryService", () => {
 
     // The first LIVE's first minute
     const until = { to: 11 * MINUTE };
-    expect(await history.getTotals(until)).toEqual({ coins: 5, gifts: 1 });
+    expect(await history.getTotals(until)).toEqual({
+      coins: 5,
+      kicks: 0,
+      gifts: 1,
+    });
     expect(await history.getGifters(until)).toEqual([
       expect.objectContaining({ userId: "1", coins: 5, rank: 1 }),
     ]);
 
     // Both minutes the dates start and end in count
     const across = { from: 10 * MINUTE + 20_000, to: 11 * MINUTE + 20_000 };
-    expect(await history.getTotals(across)).toEqual({ coins: 115, gifts: 4 });
+    expect(await history.getTotals(across)).toEqual({
+      coins: 115,
+      kicks: 0,
+      gifts: 4,
+    });
 
     // Whole LIVEs come from the list, as do the dates of one LIVE
-    expect(await history.getTotals({})).toEqual({ coins: 116, gifts: 5 });
+    expect(await history.getTotals({})).toEqual({
+      coins: 116,
+      kicks: 0,
+      gifts: 5,
+    });
     expect(
       await history.getGifters({ from: start, to: start + 120_000 }),
     ).toEqual([
@@ -630,6 +648,7 @@ describe("HistoryService", () => {
     ]);
     expect(await history.getTotals({ from: 30 * MINUTE })).toEqual({
       coins: 0,
+      kicks: 0,
       gifts: 0,
     });
   });
@@ -713,7 +732,11 @@ describe("HistoryService", () => {
     expect(await totals).toBeNull();
     expect(await gifters).toBeNull();
     // Nothing loaded still gives a reply
-    expect(await service().getTotals(range)).toEqual({ coins: 0, gifts: 0 });
+    expect(await service().getTotals(range)).toEqual({
+      coins: 0,
+      kicks: 0,
+      gifts: 0,
+    });
     expect(await service().getGifters(range)).toEqual([]);
   });
 
