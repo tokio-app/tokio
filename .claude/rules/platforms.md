@@ -13,11 +13,11 @@ paths:
 
 # Platforms
 
-Tokio connects to TikTok, Twitch, YouTube and Kick (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`. Twitch's Bits are `CHEER`, YouTube's Super Chats and Super Stickers `SUPER_CHAT`, YouTube's Gifts `GIFT` with 0 coins, and Kick's Kicks `GIFT` with their price as coins (the user's call).
+Tokio connects to TikTok, Twitch, YouTube and Kick (`PLATFORMS`, `src/common/types/connector.ts`), several at once. TikTok's provider is in `.claude/rules/connector.md`. Twitch's Bits are `CHEER`, YouTube's Super Chats and Super Stickers `SUPER_CHAT`, YouTube's Gifts `GIFT` with 0 coins, and Kick's Kicks `GIFT` whose `coins` carries their price in Kicks (overlays read it there).
 
 ## What the user chose
 
-- One LIVE session spans every platform the profile uses (the user's call): one feed, one Coin stats record, one timer, one Studio, alerts, TTS, music and games for all.
+- One LIVE session spans every platform the profile uses (the user's call): one feed, one Gift stats record, one timer, one Studio, alerts, TTS, music and games for all.
 - The profile picks its platforms on Home, with the `+` after the tabs and each tab's remove (`SET_PLATFORMS`). A platform can be added while live and connected alone; one that's on stays until it's disconnected (main keeps it). Its `platforms` and `channels` are the profile's own, so each profile can use different ones.
 - A trigger row is `[platform] [event]` (the user's call). The platform select shows only once the profile uses two or more platforms, or when the row already has one saved.
 - Twitch connects through the streamer's sign-in: Twitch's official EventSub over WebSocket and Helix, the device code flow, a public client. The client ID isn't a secret and ships in `providers/twitch/config`. Nothing else of Twitch's is shipped, and no code is copied from any Twitch, YouTube or Kick library, only MIT, BSD and Apache references are read (Licensing in `AGENTS.md`).
@@ -50,7 +50,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - The profile's top-level `platforms` (default `["tiktok"]`) and `channels` (the name typed for each platform that takes one): unknown platforms are dropped when read, so an older Tokio still loads a newer profile. `connector.username` stays TikTok's.
 - `PLATFORM_TRIGGERS` (`src/common/util/platforms.ts`) is one row per platform, so a new platform touches only its own. Every trigger must be on a platform or be Music change (its test). The pickers, the feed kinds, the stat tiles and the timer rows all derive from it through `triggersFor`; don't list triggers by hand.
 - `TIMER_TRIGGERS` (`src/common/util/timer.ts`) names the event each timer trigger counts, so a profile's platforms say which timer rows and carousel items apply.
-- The feed, Coin stats and the overlays' payloads only add fields.
+- The feed, Gift stats and the overlays' payloads only add fields.
 
 ## What other platforms don't send
 
@@ -82,9 +82,9 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - The first `get_live_chat` answer is the chat's recent history and is dropped whole: Gifts carry no timestamp, so a time filter would let old ones through.
 - The end shows first in `updated_metadata`: within 30 s its viewership renderer loses `isLive` (it doesn't turn false) and counts the video's views ("72,481 views", "Streamed live …"), while the chat keeps answering for minutes. A missing `isLive` ends the connection with `ended`, and its count is never sent as viewers; a chat answer without a continuation ends it too.
 - Gifts (`giftMessageViewModel`) carry no price and no channel id. They arrive as `GIFT` with `coins: 0` (`shortcut:` in `providers/youtube`), a sender id `youtube:@handle` and a gift id from the picture's file name. Everyone else's id is `youtube:<channel id>`, so one viewer has two ids.
-- `GIFT_COINS` (`src/common/util/platforms.ts`) says whose gifts have a price, a `Record` so a new platform has to decide. Coins, Top gifters and the timer's coin row need one (`countsCoins`), and a gift worth 0 coins never makes its sender a gifter (the user's call: hide the zero, `.claude/rules/history.md`).
+- Each platform's currency is named and counted on its own, never added to another or ranked against it (the user's call): TikTok's coins, Kick's Kicks, Twitch's Bits, YouTube's Super Chats in US dollars. `GIFT_CURRENCY` (`src/common/util/platforms.ts`) says what each platform's gifts cost in (`coins`, `kicks` or none), a `Record` so a new platform has to decide; `giftCurrencies(platforms)` gives the ones a profile pays in. A gift without a currency counts as a gift, never as an amount, and never makes its sender a gifter (the user's call: hide the zero, `.claude/rules/history.md`).
 - A gifted membership counts once, from its purchase announcement, with the count read from its text; each recipient's redemption is dropped.
-- Super Chat amounts stay as YouTube shows them (`amount`). The timer adds the same seconds per Super Chat whatever it cost, since currencies differ, and Coin stats leave them out.
+- Super Chat amounts stay as YouTube shows them (`amount`), and `LiveService` adds them up in US dollars (`.claude/rules/live-session.md`). The timer adds the same seconds per Super Chat whatever it cost, and Gift stats leave them out.
 - Placeholder items (`liveChatPlaceholderItemRenderer`) are messages held from readers and never filled in: ignored.
 
 ## Kick
@@ -94,7 +94,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - The feeds are `chatrooms.<chatroom>.v2` (chat, subs, hosts), `chatroom_<chatroom>` (gifted subs, reward redemptions), `channel.<channel>` (live and offline) and `channel_<channel>` (Kicks). Never `chatrooms.<chatroom>`: it repeats every host. A publication's `data` is a JSON string inside the JSON.
 - The token is refreshed at 80% of its life for the same client id. Closes coded 3500-3999 and 4500-4999 are terminal: wait 5 minutes, doubling up to 30, then come back as a new client id. Any other drop reconnects from 1 s, doubling up to 30 s, never giving up; a reconnect redoes the lookup, which is how it learns the stream ended while away.
 - It connects while the channel is offline (the chat is the channel's), like Twitch, and `StopStreamBroadcast` ends the connection only for a stream seen live. Viewers come from the lookup every 60 s while live.
-- Each Kick is its own `GIFT`, its id `kick:<gift slug>` (`rage_quit`) and its `amount` as coins. Subs, gifted subs, hosts and redemptions name the viewer only by username, so they have no `userId`. Chat has no pictures; a Kick's sender has one.
+- Each Kick is its own `GIFT`, its id `kick:<gift slug>` (`rage_quit`) and its `amount` in `coins`, read as Kicks everywhere Tokio counts it. Subs, gifted subs, hosts and redemptions name the viewer only by username, so they have no `userId`. Chat has no pictures; a Kick's sender has one.
 - The feed is unofficial and changed from Pusher to Centrifugo in October 2026. An event Tokio can't read is dropped and logged once per name, never thrown out of the socket's listener.
 
 ## The window

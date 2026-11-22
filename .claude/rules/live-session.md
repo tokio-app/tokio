@@ -1,6 +1,8 @@
 ---
 paths:
   - "src/main/services/live/**"
+  - "src/main/services/rates/**"
+  - "src/main/helper/amount.ts"
   - "src/common/types/live.ts"
   - "src/renderer/src/pages/Home/**"
 ---
@@ -24,8 +26,14 @@ paths:
 - The feed and the viewers stay after the LIVE ends, until the next one starts.
 - Home shows the chart, the numbers and the top gifters only while LIVE (the user's call), each only with a platform that has it (`liveStats`, `sendsGifts` in `pages/Home/helper.ts`). Offline it's the platforms' tabs and the feature switches, beside the feed.
 - The numbers follow Home's tabs (`.claude/rules/platforms.md`): a platform's tab shows its own while it's in the LIVE (`livePlatforms`: up now, or with numbers in it, so one that left keeps them), each tab with its viewers now. With two or more in the LIVE, All comes after them and adds them up (the user's calls). Home picks the first platform's tab until another is picked. `liveView` picks a tab's viewers, minutes, stats and top gifters.
-- Home also asks `GET_LIVE_GIFTERS` (this LIVE's top gifters, `[]` outside one) and `GET_SONGS` (the queue as overlays get it), and `init.ts` pushes `LIVE_GIFTERS` with the overlays' `tokio:gifters` (see `.claude/rules/history.md`) and `SONGS` on every `MUSIC_CHANGE`, unthrottled. Now playing is the queue's playing song, while Music is connected.
-- The stat tiles follow the tab's platforms (`liveStats`; All's are the LIVE's): likes, total views and shares only with TikTok (Twitch has no total views and sends 0), New followers only with a platform that sends follows, gifts with one that sends gifts, and coins and Top gifters only with one whose gifts have a price (`countsCoins`). So YouTube alone shows Viewers and Gifts, and a gift row without a price shows no coins (the user's call: hide the zero). Feed rows show the platform's icon once the profile uses two or more, and the feed's kinds are the ones its platforms send (`feedKinds`). Twitch adds the kinds `sub`, `giftsub`, `cheer`, `raid` and `redeem`, and YouTube `superchat` (its memberships and gifted memberships use `sub` and `giftsub`). A Super Chat adds nothing to the coins.
+- Home also asks `GET_LIVE_GIFTERS` (this LIVE's top gifters on each platform, `byPlatform`, empty outside one) and `GET_SONGS` (the queue as overlays get it), and `init.ts` pushes `LIVE_GIFTERS` with the overlays' `tokio:gifters` (see `.claude/rules/history.md`) and `SONGS` on every `MUSIC_CHANGE`, unthrottled. Now playing is the queue's playing song, while Music is connected.
+- The stat tiles follow the tab's platforms (`liveStats`; All's are the LIVE's): likes, total views and shares only with TikTok (Twitch has no total views and sends 0), New followers only with a platform that sends follows, gifts with one that sends gifts, then one tile per currency, never added up (the user's call): Coins with TikTok, Kicks with Kick, Bits with Twitch and Super Chats in US dollars with YouTube. Top gifters show only on TikTok's tab, in coins, and Kick's, in Kicks (`amountLabel`), never on All, which would rank one currency against another. A feed gift row shows its price in the sender's currency, and nothing for YouTube's Gifts (the user's call: hide the zero). Past six tiles, `LiveSection` splits them over two rows. Feed rows show the platform's icon once the profile uses two or more, and the feed's kinds are the ones its platforms send (`feedKinds`). Twitch adds the kinds `sub`, `giftsub`, `cheer`, `raid` and `redeem`, and YouTube `superchat` (its memberships and gifted memberships use `sub` and `giftsub`). Bits and Super Chats count in the totals even while the feed hides them.
 - `settings.activityFeed` picks the kinds of events the feed keeps, for every profile, saved from Home's `FeedModal` with `SET_ACTIVITY_FEED`. `LiveService.setFeed` applies it when the app loads and on save, dropping the items it now hides.
 - Hidden events aren't kept but still count toward the totals.
 - Past LIVEs are kept by `HistoryService`, which counts the same span on its own: see `.claude/rules/history.md`.
+
+## Super Chats in US dollars
+
+- `LiveService` keeps each Super Chat's amount by currency (`parseAmount`, `src/main/helper/amount.ts`, which reads YouTube's en-US text with a symbol map built from `Intl`), and `getSession()` adds them up in US dollars through `RatesService.toUsd` (the user's calls: always USD, no setting). So a Super Chat that came before the rates loaded isn't lost: `usd` is null until they do, and Home's tile shows a dash (`NO_MONEY`).
+- `RatesService` (`src/main/services/rates`) reads Frankfurter's US dollar rates (`api.frankfurter.dev`, free, no key, listed in the notices), keeps them in memory for a day, sends one request at a time and backs off from a minute to an hour after a failure, with a warning and no notice. Dollars need no rates, so a LIVE without other currencies never fetches. A currency the rates lack is left out of the total, warned once.
+- Rates load on `CONNECTED` when YouTube is on and when it comes up later (the existing `onPlatform` callback, which holds one listener), and their arrival pushes the session and Studio's numbers again.

@@ -33,7 +33,7 @@ Each platform's provider (`.claude/rules/platforms.md`) maps its own events to `
 
    See `.claude/rules/timer.md`.
 
-7. A LIVE's record in Coin stats keeps only gifts (the user's call). An event that sends coins goes in `HISTORY_EVENTS` with its recorder in `src/main/services/history/index.ts`, which adds it to the LIVE and to its minute. See `.claude/rules/history.md`.
+7. A LIVE's record in Gift stats keeps only gifts (the user's call). An event that sends coins goes in `HISTORY_EVENTS` with its recorder in `src/main/services/history/index.ts`, which adds it to the LIVE and to its minute. See `.claude/rules/history.md`.
 8. Overlays get every live event on their own: `ServerService` broadcasts each one `isLiveEvent` lets through. An event whose payload has a `user` also goes in `FAN_EVENTS` (`src/main/services/fans/index.ts`), so the profile keeps its viewers' fan levels for `tokio:fans`, and in `SUPERFAN` there when it tells whether the viewer is a Super Fan (`.claude/rules/fans.md`).
 9. Tests next to each file you changed: the connector mapping, alerts, the live session, the timer and the history.
 

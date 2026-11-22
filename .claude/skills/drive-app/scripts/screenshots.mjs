@@ -121,7 +121,7 @@ function tone(file, hz) {
 
 const user = (name, handle) => ({ handle, name, picture: "" });
 
-// Coin stats' and Fans' data, sent as main's replies: the LIVEs newest first
+// Gift stats' and Fans' data, sent as main's replies: the LIVEs newest first
 // (days ago, minutes after 8 PM, hours, coins, gifts), the top gifters and
 // the fans
 const DAY = 86_400_000;
@@ -139,7 +139,7 @@ const LIVES = [
 ].map(([days, minutes, hours, coins, gifts]) => {
   const startedAt = evening - days * DAY + minutes * 60_000;
   const endedAt = startedAt + hours * 3_600_000;
-  return { username: "tokio.demo", startedAt, endedAt, coins, gifts };
+  return { username: "tokio.demo", startedAt, endedAt, coins, kicks: 0, gifts };
 });
 const GIFTERS = [
   ["Leo", "leo_on_air", 9870, 412],
@@ -434,10 +434,10 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       .getByRole("option", { name: tr(alert.trigger), exact: true })
       .click();
 
-    // The coins show only for any gift, before the gifts are picked
+    // The minimum shows only for any gift, before the gifts are picked
     if (alert.coins) {
       await editor
-        .getByRole("spinbutton", { name: tr("Coins") })
+        .getByRole("spinbutton", { name: tr("Worth at least") })
         .fill(alert.coins);
       await editor.getByRole("checkbox", { name: tr(alert.role) }).check();
       await crop("alerts-trigger", editor);
@@ -1069,8 +1069,8 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await page.getByTitle(tr("Create ID")).click();
   await crop("tools-test-overlays", toolSection(tr("Test overlays")));
 
-  // Coin stats on All time, once its own request found no LIVEs
-  await tool(tr("Coin stats"));
+  // Gift stats on All time, once its own request found no LIVEs
+  await tool(tr("Gift stats"));
   await page
     .getByText(tr(en["coinStats.list.empty"], "coinStats.list.empty"))
     .waitFor();
@@ -1080,7 +1080,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     .getByRole("option")
     .nth(1)
     .waitFor();
-  await crop("coin-stats", toolSection(tr("Coin stats")));
+  await crop("coin-stats", toolSection(tr("Gift stats")));
 
   // Fans, once its own request found none, with TikTok's badges loaded
   await tool(tr("Fans"));
@@ -1409,7 +1409,15 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       platformViewers: { tiktok: 342 },
     },
   });
-  const totals = { followers: 48, shares: 17, gifts: 126, coins: 3480 };
+  const totals = {
+    followers: 48,
+    shares: 17,
+    gifts: 126,
+    coins: 3480,
+    kicks: 0,
+    bits: 0,
+    superChats: 0,
+  };
   // Each minute's highest viewer count: a climb, a peak of 412, then
   // settling toward the 342 watching now
   const viewers = [
@@ -1427,6 +1435,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
       activity,
       viewers,
       platforms: { tiktok: { totals, viewers } },
+      usd: 0,
     },
   });
   // This LIVE's top gifters, from the feed's people
@@ -1443,10 +1452,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     allTime: { coins, gifts },
     giftedAt: Date.now() - (i + 1) * 60_000,
   }));
-  await push("app:home:res:gifters", {
-    data: gifters,
-    byPlatform: { tiktok: gifters },
-  });
+  await push("app:home:res:gifters", { byPlatform: { tiktok: gifters } });
   // A song playing, so the rail shows it at its foot
   await push("app:music:res:music:connected", { success: true });
   await push("app:home:res:songs", {

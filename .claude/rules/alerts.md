@@ -30,7 +30,7 @@ paths:
 - A trigger's `platform` limits it to that platform's events (missing is any; `.claude/rules/platforms.md`). The Redeem trigger's `keyword` is the reward's title, matched in any case, empty for any reward. Its variables are `{reward}`, with `{comment}` for what the viewer typed.
 - Alerts and Games share `TriggerSchema`, `TriggerFilter` and `TRIGGER_OPTIONS`; Games leaves five out (`GAME_TRIGGERS`). Game actions keep one trigger.
 - Only the Alerts editor offers these; game actions keep the defaults, which match everything:
-  - `min_coins`: the streak's worth when it ends (`gift.coins × total`), or each gift's with `every_gift`. Only for any gift: picked gifts are the alert's choice, so the matcher, the editor and the summary ignore it then.
+  - `min_coins`: the streak's worth when it ends (`gift.coins × total`), or each gift's with `every_gift`, in the gift's own currency. Only for any gift: picked gifts are the alert's choice, so the matcher, the editor and the summary ignore it then. The editor names its unit by the row (`minUnit`): coins on a TikTok row, Kicks on a Kick row, coins or Kicks on a row for any platform when the profile has both, and none on a YouTube row, whose gifts have no price, unless a minimum is already saved.
   - `roles` (`[]` is anyone): only Chat, Emote and Gift carry the viewer's roles, so `takesRoles` (`src/common/util/alerts.ts`, shared by the matcher, the editor and the summary) allows only them. Other triggers' saved roles are ignored.
 - The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: `matchesTrigger` matches it on `CHAT`. TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`.
 - Keywords (`hasKeyword`, `src/main/helper/chat.ts`) match whole words (`wholeWord`), except next to scripts written without spaces (Chinese, Japanese, Thai); an emoji between words counts as a space.
@@ -38,7 +38,7 @@ paths:
 ## Gifts
 
 - TikTok's gift list (`extra/gifts.json`) misses some, like other regions' gifts. `OverlayService.recordGift` saves the ones viewers send that aren't on it to `extra/custom-gifts.json`, shared by all profiles. It saves nothing while TikTok's list is empty, since every gift would look missing. After a failed save it writes nothing for `LOAD_RETRY_MS`, as emote saves do, so a file that can't be written isn't tried and logged on every gift. A file that's there but doesn't read is never written over (it fails instead), and a saved gift's details count as compared once a run only after their save went through.
-- The Alerts and Games pages read both through `useTriggerChoices` (`pages/Alerts`), with the emotes; `giftOptions` merges them. Overlay gift settings use TikTok's list only.
+- The Alerts and Games pages read both through `useTriggerChoices` (`pages/Alerts`), with the emotes; `giftOptions` merges them. Overlay gift settings use TikTok's list only. Picked gifts match TikTok's ids only, so `TriggerFilter` offers the picker on TikTok rows, on rows for any platform when the profile has TikTok, and wherever gifts are already picked, so they can be cleared.
 
 ## Page
 
@@ -50,7 +50,7 @@ paths:
 - An empty `name` shows its place's default (`alertName`); a new alert gets `defaultAlertName(index)`. Defaults count the place when made, so after a delete two alerts can share one. The search keeps each alert's list index for that, and adding an alert clears it, since it would hide the new one.
 - The alert's `volume` is the sound's or message's; a video has its own (`AlertMediaSchema.volume`), and another file keeps it and the duration.
 - `AlertEditor`'s panel `min-height` is the gift Trigger tab's, the tallest, so the dialog doesn't move between tabs. The pickers render after it, so they open over it and Escape closes the picker first.
-- The Trigger tab draws its rows with `TriggerRows` (`components/AlertItem`), shared with Overlay Studio: the first under **Event**, each other under **Or** with a remove button, then **Add a trigger**, `MAX_TRIGGERS` in all. Each row keeps its own filter, minimum coins and roles. With more rows than the panel holds, the tab scrolls inside it (`.scrolls`), so the dialog never outgrows the window.
+- The Trigger tab draws its rows with `TriggerRows` (`components/AlertItem`), shared with Overlay Studio: the first under **Event**, each other under **Or** with a remove button, then **Add a trigger**, `MAX_TRIGGERS` in all. Each row keeps its own filter, minimum and roles. With more rows than the panel holds, the tab scrolls inside it (`.scrolls`), so the dialog never outgrows the window.
 - A space between a picker tile's name and its length keeps the button's name "Clip 12s".
 
 ## Sounds

@@ -69,7 +69,7 @@ Builds on `.claude/rules/studio.md` (the stage and the data).
   - The length stays in the component's state: an effect writing the overlay would make an undo step and drop Redo.
 - **Shape** tiles (`ShapeFields`) are native radios, so the arrow keys move through them.
 - **A camera's settings** (`CameraFields`) list the window's cameras (`enumerateDevices`, again on `devicechange`). A saved camera shows by its id, else by its name, else as "(not connected)"; picking one saves this build's id. The canvas shows the camera from the window's own capture (`previewCamera`, see `.claude/rules/studio.md`), with the overlay server off too.
-- **A list** (`ListFields`) shows **Number color** only for top gifters and gifts, the sources with numbers. The canvas shows sample rows per source (`Samples.list`), the same until Test makes new samples. An unnamed list goes by its source in the Elements panel.
+- **A list** (`ListFields`) shows **Number color** only for top gifters and gifts, the sources with numbers, and a Platform select for top gifters (TikTok or Kick) when the profile uses Kick or the list saved another platform. The canvas shows sample rows per source (`Samples.list`), the same until Test makes new samples. An unnamed list goes by its source in the Elements panel.
 - **Canvas sound** plays the canvas's videos with their sound (`Stage.sound`), Test's included. It's off each time the editor opens (the user's call), isn't saved or an undo step.
 
 ## Embed previews
