@@ -15,25 +15,25 @@ type Sender = {
   identity?: { badges?: { type: string }[] };
 };
 
-export type ChatMessage = { content: string; sender: Sender };
+type ChatMessage = { content: string; sender: Sender };
 
-export type Subscription = { username: string; months?: number };
+type Subscription = { username: string; months?: number };
 
-export type GiftedSubscriptions = {
+type GiftedSubscriptions = {
   gifter_username: string;
   gifted_usernames: string[];
 };
 
-export type KicksGifted = {
+type KicksGifted = {
   sender: { id: number; username: string; profile_picture?: string | null };
   gift: { gift_id: string | number; name: string; amount: number };
 };
 
-export type StreamHost = { host_username: string; number_viewers: number };
+type StreamHost = { host_username: string; number_viewers: number };
 
 // Its shape has varied: the title flat or in reward, the redeemer flat or
 // in user
-export type RewardRedeemed = {
+type RewardRedeemed = {
   reward_title?: string;
   reward_id?: string | number;
   reward?: { id?: string | number; title?: string; cost?: number };
@@ -89,7 +89,7 @@ function named(username: string): UserData {
   };
 }
 
-export function toChat(e: ChatMessage): ChatEvent {
+function toChat(e: ChatMessage): ChatEvent {
   // TikTok's shape: content without the emotes, each at its place in it
   let content = "";
   let emotes: Emotes[] = [];

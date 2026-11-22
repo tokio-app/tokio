@@ -34,7 +34,7 @@ type Reply = {
 type SocketFailure = ConnectorFailure & { terminal?: boolean };
 
 // Centrifugo's codes that say reconnecting as before would be refused again
-export const isTerminalCode = (code: number) =>
+const isTerminalCode = (code: number) =>
   (code >= 3500 && code < 4000) || (code >= 4500 && code < 5000);
 
 export const isTerminal = (error: unknown) =>

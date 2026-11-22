@@ -76,7 +76,7 @@ export const fail = (
   error: connectFailure(kind, message),
 });
 
-export const isFailure = (error: unknown): error is ConnectorFailure =>
+const isFailure = (error: unknown): error is ConnectorFailure =>
   error instanceof Error && "kind" in error && typeof error.kind === "string";
 
 export const kindOf = (error: unknown) =>
