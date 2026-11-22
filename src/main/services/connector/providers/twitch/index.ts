@@ -4,12 +4,14 @@ import Logger from "@/logger";
 import {
   AccountProvider,
   connectFailure,
-  ConnectorFailure,
   ConnectorProvider,
   ConnectorResponse,
   DeviceCode,
+  fail,
   GiftResponse,
+  kindOf,
   PlatformAccount,
+  toFailure,
 } from "../../common";
 import { failureOf, TwitchAuth } from "./common/auth";
 import { EventSub } from "./common/eventsub";
@@ -485,21 +487,3 @@ export class TwitchConnector
     Logger.warn(`<Twitch> ${message}`, this._logFile);
   }
 }
-
-const fail = (
-  kind: ConnectorFailure["kind"],
-  message: string,
-): ConnectorResponse => ({
-  success: false,
-  error: connectFailure(kind, message),
-});
-
-const isFailure = (error: unknown): error is ConnectorFailure =>
-  error instanceof Error && "kind" in error && typeof error.kind === "string";
-
-const kindOf = (error: unknown) => (isFailure(error) ? error.kind : undefined);
-
-const toFailure = (error: unknown): ConnectorFailure =>
-  isFailure(error)
-    ? error
-    : connectFailure("unknown", formatError(error), { cause: error });

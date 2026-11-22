@@ -3,10 +3,12 @@ import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import {
   connectFailure,
-  ConnectorFailure,
   ConnectorProvider,
   ConnectorResponse,
+  fail,
   GiftResponse,
+  kindOf,
+  toFailure,
 } from "../../common";
 import { fromAction } from "./common/mapping";
 import {
@@ -317,20 +319,9 @@ export class YouTubeConnector extends ConnectorProvider {
   }
 }
 
-// shortcut: these helpers, and the connect retries, waits and stops above,
-// copy Twitch's provider; share them when Kick's adds a third copy
-const fail = (
-  kind: ConnectorFailure["kind"],
-  message: string,
-): ConnectorResponse => ({
-  success: false,
-  error: connectFailure(kind, message),
-});
-
-const isFailure = (error: unknown): error is ConnectorFailure =>
-  error instanceof Error && "kind" in error && typeof error.kind === "string";
-
-const kindOf = (error: unknown) => (isFailure(error) ? error.kind : undefined);
+// shortcut: the connect retries, waits, stops and _logOnce above copy
+// Twitch's and Kick's providers; share them when a fourth provider copies
+// them again
 
 // What YouTube answered a failed request with
 const statusOf = (error: unknown) =>
@@ -339,8 +330,3 @@ const statusOf = (error: unknown) =>
   typeof error.status === "number"
     ? error.status
     : undefined;
-
-const toFailure = (error: unknown): ConnectorFailure =>
-  isFailure(error)
-    ? error
-    : connectFailure("unknown", formatError(error), { cause: error });
