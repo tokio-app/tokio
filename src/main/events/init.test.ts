@@ -1373,8 +1373,8 @@ describe("init events", () => {
       const s = await live();
       withOverlay(s, [element("l", { kind: "list" })]);
       s.serverService.sendToClient.mockClear();
-      s.historyService.top.mockReturnValue({
-        live: [
+      s.historyService.topByPlatform.mockReturnValue({
+        tiktok: [
           {
             userId: "1",
             username: "Ana",
@@ -1385,7 +1385,6 @@ describe("init events", () => {
             giftedAt: 0,
           },
         ],
-        allTime: [],
       });
 
       for (const [listener] of s.historyService.onChange.mock.calls) listener();
