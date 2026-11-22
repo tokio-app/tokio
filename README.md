@@ -63,7 +63,7 @@ Tokio is in English and Spanish. It follows your system's language, and **Settin
 
 1. [Download Tokio](https://tokio.ialfaro.com/download/) for Windows, macOS or Linux. The [install guide](https://tokio.ialfaro.com/docs/install/) covers the warnings shown the first time it opens.
 2. Get a free API key from [Euler Stream](https://www.eulerstream.com/register) and paste it in **Settings → TikTok LIVE**.
-3. Start your LIVE, enter your `@username` on the **Home** page and connect. To stream on Twitch, YouTube or Kick too, click **Add a platform** on **Home**: Twitch needs you signed in once in **Settings → Twitch**, YouTube takes your channel's `@handle` or a link to the LIVE, and Kick your channel's name or its kick.com link.
+3. Start your LIVE, enter your `@username` on the **Home** page and connect. To stream on Twitch, YouTube or Kick too, add its tab with the **+** on **Home**: Twitch needs you signed in once in **Settings → Twitch**, YouTube takes your channel's `@handle` or a link to the LIVE, and Kick your channel's name or its kick.com link.
 
 [What you need](https://tokio.ialfaro.com/docs/#what-you-need) lists the rest, like a streaming app for the overlays. The [docs](https://tokio.ialfaro.com/docs/) cover every feature, the [chat commands](https://tokio.ialfaro.com/docs/features/chat-commands/) your viewers can type and how to [add an overlay](https://tokio.ialfaro.com/docs/guides/adding-an-overlay/) to your streaming app.
 

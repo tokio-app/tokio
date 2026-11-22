@@ -1343,7 +1343,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await crop("home-feed-settings", dialog);
   await dialog.getByRole("button", { name: tr("Cancel") }).click();
   await page.getByPlaceholder(tr("@username")).fill("@tokio.demo");
-  // The box alone: its row, Add a platform and Connect
+  // The box alone: the platform's tab with its +, and its connection
   await crop("home-connect", page.locator('[data-tour="connect"]'), {
     pad: 16,
   });
