@@ -27,7 +27,6 @@ import {
   OverlayApp,
   PackageLicense,
   TimerData,
-  TopGifter,
   VoiceData,
   VoiceEngine,
 } from "@/common/types";
@@ -171,7 +170,12 @@ export const liveSummary = (
 });
 
 /** A viewer who sent `coins` in `gifts` gifts, without a picture. */
-export const gifter = (name: string, coins: number, gifts = 1): Gifter => ({
+export const gifter = (
+  name: string,
+  coins: number,
+  gifts = 1,
+  patch: Partial<Gifter> = {},
+): Gifter => ({
   userId: `id-${slug(name)}`,
   username: name,
   handle: slug(name),
@@ -179,21 +183,6 @@ export const gifter = (name: string, coins: number, gifts = 1): Gifter => ({
   coins,
   gifts,
   giftSubs: 0,
-  giftedAt: 0,
-});
-
-/** A viewer who sent `coins` this LIVE in one gift, all they ever sent, without a picture. */
-export const topGifter = (
-  name: string,
-  coins: number,
-  patch: Partial<TopGifter> = {},
-): TopGifter => ({
-  userId: `id-${slug(name)}`,
-  username: name,
-  handle: slug(name),
-  picture: "",
-  live: { coins, gifts: 1 },
-  allTime: { coins, gifts: 1 },
   giftedAt: 0,
   ...patch,
 });

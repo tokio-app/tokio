@@ -5,12 +5,12 @@ import {
   AlertTrigger,
   APP_EVENTS_RESPONSE,
   AppEventsResponseMap,
+  Gifter,
   LiveSession,
   Platform,
   PLATFORMS,
   PlatformStatus,
   TOKIO_EVENTS,
-  TopGifter,
 } from "@/common/types";
 import {
   GIFT_CURRENCY,
@@ -179,7 +179,7 @@ export function liveView(
   viewers: number;
   minutes: number[];
   stats: Stat[];
-  gifters: { currency: GiftCurrency; list: TopGifter[] } | null;
+  gifters: { currency: GiftCurrency; list: Gifter[] } | null;
 } {
   const { session, views, likes, gifters } = numbers;
   const all = tab === "all";

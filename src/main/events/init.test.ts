@@ -29,6 +29,7 @@ import {
   GamesStatus,
   Gift,
   GiftEvent,
+  Gifter,
   LikeEvent,
   LiveHistory,
   MusicInfo,
@@ -1380,8 +1381,9 @@ describe("init events", () => {
             username: "Ana",
             handle: "ana",
             picture: "",
-            live: { coins: 50, gifts: 1 },
-            allTime: { coins: 50, gifts: 1 },
+            coins: 50,
+            gifts: 1,
+            giftSubs: 0,
             giftedAt: 0,
           },
         ],
@@ -2298,6 +2300,17 @@ describe("init events", () => {
       allTime: { coins: 105, gifts: 6 },
       giftedAt: 1000,
     };
+    // Ana's records in this LIVE, which Home gets
+    const record: Gifter = {
+      userId: "42",
+      username: "Ana",
+      handle: "ana",
+      picture: "ana.png",
+      coins: 5,
+      gifts: 5,
+      giftSubs: 0,
+      giftedAt: 1000,
+    };
     const top = (live: TopGifter[] = [], allTime: TopGifter[] = []) => ({
       live,
       allTime,
@@ -2377,7 +2390,7 @@ describe("init events", () => {
 
       change(s);
       s.historyService.top.mockReturnValue(top([gifter]));
-      s.historyService.topByPlatform.mockReturnValue({ tiktok: [gifter] });
+      s.historyService.topByPlatform.mockReturnValue({ tiktok: [record] });
       change(s);
       change(s);
       expect(s.serverService.sendToAll.mock.calls).toEqual([[message()]]);
@@ -2391,7 +2404,7 @@ describe("init events", () => {
       // Home gets each platform's in this LIVE with each push
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
         { byPlatform: {} },
-        { byPlatform: { tiktok: [gifter] } },
+        { byPlatform: { tiktok: [record] } },
       ]);
     });
 

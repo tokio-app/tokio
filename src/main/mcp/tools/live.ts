@@ -6,7 +6,7 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   ControlAction,
-  TopGifter,
+  Gifter,
 } from "@/common/types";
 import {
   GIFT_CURRENCY,
@@ -140,12 +140,12 @@ const viewer = ({ handle, name }: ActivityUser) => ({
 });
 
 // This LIVE's top gifters on one platform, with what they sent in its currency
-const gifters = (top: TopGifter[] = [], currency: GiftCurrency) =>
+const gifters = (top: Gifter[] = [], currency: GiftCurrency) =>
   top.map((g) => ({
     handle: g.handle,
     nickname: g.username,
-    [currency]: g.live.coins,
-    gifts: g.live.gifts,
+    [currency]: g.coins,
+    gifts: g.gifts,
   }));
 
 function activity(item: ActivityItem) {

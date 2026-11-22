@@ -5,10 +5,10 @@ import {
   TriggerSchema,
 } from "@/common/schemas";
 import {
+  Gifter,
   STUDIO_MESSAGE,
   StudioMessage,
   TOKIO_EVENTS,
-  TopGifter,
 } from "@/common/types";
 import { formatStat } from "@/common/util";
 import { setLanguage } from "@/helper/i18n";
@@ -78,8 +78,8 @@ const setup = (
     startedAt?: number | null;
     studio?: StudioService;
     // TikTok's, and Kick's when it has any
-    gifters?: TopGifter[];
-    kickGifters?: TopGifter[];
+    gifters?: Gifter[];
+    kickGifters?: Gifter[];
   } = {},
 ) => {
   const sendToClient = vi.fn((_id: string, _data: unknown) => true);
@@ -338,13 +338,14 @@ describe("sendStudioOverlays", () => {
   });
 
   it("fills a list with this LIVE's top gifters, coins in the app's language", async () => {
-    const gifter = (username: string, coins: number): TopGifter => ({
+    const gifter = (username: string, coins: number): Gifter => ({
       userId: username,
       username,
       handle: username.toLowerCase(),
       picture: "",
-      live: { coins, gifts: 1 },
-      allTime: { coins, gifts: 1 },
+      coins,
+      gifts: 1,
+      giftSubs: 0,
       giftedAt: 0,
     });
     const { handler, views } = setup(
@@ -379,14 +380,16 @@ describe("sendStudioOverlays", () => {
   });
 
   it("fills a gifters list with its platform's top gifters, none without any", async () => {
-    const kicker: TopGifter = {
+    const kicker: Gifter = {
       userId: "k",
       username: "Kai",
       handle: "kai",
       picture: "",
-      live: { coins: 40, gifts: 1 },
-      allTime: { coins: 40, gifts: 1 },
+      coins: 40,
+      gifts: 1,
+      giftSubs: 0,
       giftedAt: 0,
+      platform: "kick",
     };
     const { handler, views } = setup(
       [

@@ -1,5 +1,5 @@
 import { createAlert } from "@/common/util";
-import { liveSession, liveTotals, topGifter } from "@test/fixtures";
+import { gifter, liveSession, liveTotals } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   alertsStatus,
@@ -30,8 +30,8 @@ describe("livePlatforms", () => {
 });
 
 describe("liveView", () => {
-  const ana = topGifter("Ana", 20);
-  const kai = topGifter("Kai", 30, { platform: "kick" });
+  const ana = gifter("Ana", 20);
+  const kai = gifter("Kai", 30, 1, { platform: "kick" });
   const numbers = {
     session: liveSession({
       totals: liveTotals({ gifts: 5, coins: 20, kicks: 30 }),

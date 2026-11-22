@@ -6,7 +6,6 @@ import {
   Platform,
   PlatformStatus,
   TokioPayload,
-  TopGifter,
 } from "../connector";
 import { ControlAction, ControlState } from "../controls";
 import { CustomGift, OverlayConfigRedux } from "../overlay";
@@ -25,6 +24,7 @@ import {
 import { AppNotification, Reply } from "../feedback";
 import { CommandResult, GamesData } from "../games";
 import {
+  Gifter,
   LiveHistory,
   LiveRecord,
   LiveSession,
@@ -365,9 +365,10 @@ export interface AppEventsResponseMap {
     data: LiveSession;
   };
   // The reply to GET_LIVE_GIFTERS, pushed again as they change: each
-  // platform's top gifters in this LIVE, the most first, none outside a LIVE
+  // platform's top gifters in this LIVE, the most first, none outside a LIVE.
+  // Their numbers are this LIVE's.
   [APP_EVENTS_RESPONSE.LIVE_GIFTERS]: {
-    byPlatform: Partial<Record<Platform, TopGifter[]>>;
+    byPlatform: Partial<Record<Platform, Gifter[]>>;
   };
   // The reply to GET_SONGS, pushed again as the request queue changes, as
   // overlays get it

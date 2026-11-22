@@ -128,7 +128,7 @@ function viewOf(
               name: g.username || g.handle,
               text: "",
               icon: "",
-              value: g.live.coins,
+              value: g.coins,
             }),
           )
         : studio.list(source)

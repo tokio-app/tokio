@@ -818,8 +818,9 @@ describe("home events", () => {
         username: "Leo",
         handle: "leo",
         picture: "",
-        live: { coins: 1000, gifts: 1 },
-        allTime: { coins: 5000, gifts: 9 },
+        coins: 1000,
+        gifts: 1,
+        giftSubs: 0,
         giftedAt: 1000,
       };
       const h = createHandler({

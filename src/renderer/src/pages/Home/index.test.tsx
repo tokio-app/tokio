@@ -2,12 +2,12 @@ import { APP_EVENTS, APP_EVENTS_RESPONSE, LiveSession } from "@/common/types";
 import { EULER_SIGNUP_URL } from "@/common/util";
 import { createAlert } from "@/common/util";
 import {
+  gifter,
   liveSession,
   liveTotals,
   profileReply,
   settingsReply,
   song,
-  topGifter,
   viewer,
 } from "@test/fixtures";
 import { send, sent, sentEvents } from "@test/ipc";
@@ -416,10 +416,10 @@ describe("Home", () => {
       await connected();
 
       const top = [
-        topGifter("Leo", 1000),
-        topGifter("Ana", 480, { username: "" }),
-        topGifter("Sam", 300),
-        topGifter("Kai", 120),
+        gifter("Leo", 1000),
+        gifter("Ana", 480, 1, { username: "" }),
+        gifter("Sam", 300),
+        gifter("Kai", 120),
       ];
       await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
         byPlatform: { tiktok: top },

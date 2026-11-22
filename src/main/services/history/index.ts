@@ -387,13 +387,13 @@ export class HistoryService extends Service {
     };
   }
 
-  /** This LIVE's top gifters on each platform, for Home. */
-  public topByPlatform(): Partial<Record<Platform, TopGifter[]>> {
-    const tops: Partial<Record<Platform, TopGifter[]>> = {};
+  /** This LIVE's top gifters on each platform, for Home, Studio and MCP. */
+  public topByPlatform(): Partial<Record<Platform, Gifter[]>> {
+    const tops: Partial<Record<Platform, Gifter[]>> = {};
     for (const gifter of [...this._liveGifters.values()].sort(byCoins)) {
       // Missing means TikTok
       const top = (tops[gifter.platform ?? "tiktok"] ??= []);
-      if (top.length < TOP_GIFTERS) top.push(this._toTop(gifter));
+      if (top.length < TOP_GIFTERS) top.push({ ...gifter });
     }
     return tops;
   }

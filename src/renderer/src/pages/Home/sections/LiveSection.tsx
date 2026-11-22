@@ -89,11 +89,7 @@ export function LiveSection({ tab, platforms, ...numbers }: Props) {
                         {name}
                       </span>
                       <span className={styles.gifter_coins}>
-                        {amountLabel(
-                          gifter.live.coins,
-                          gifters.currency,
-                          language,
-                        )}
+                        {amountLabel(gifter.coins, gifters.currency, language)}
                       </span>
                     </span>
                   </li>

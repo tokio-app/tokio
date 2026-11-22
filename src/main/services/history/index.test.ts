@@ -203,7 +203,7 @@ describe("HistoryService", () => {
     const tops = history.topByPlatform();
     expect(tops.tiktok?.map((g) => g.userId)).toEqual(["ana"]);
     expect(tops.kick?.map((g) => g.userId)).toEqual(["kick:2", "kick:1"]);
-    expect(tops.kick?.[0]).toMatchObject({ live: { coins: 20, gifts: 1 } });
+    expect(tops.kick?.[0]).toMatchObject({ coins: 20, gifts: 1 });
 
     history.end(10);
     expect(history.topByPlatform()).toEqual({});

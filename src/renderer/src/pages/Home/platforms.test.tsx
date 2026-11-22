@@ -5,11 +5,11 @@ import {
   PlatformStatus,
 } from "@/common/types";
 import {
+  gifter,
   liveSession,
   liveTotals,
   profileReply,
   settingsReply,
-  topGifter,
 } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
@@ -359,8 +359,8 @@ describe("Home's platforms", () => {
         },
       }),
     });
-    const ana = topGifter("Ana", 20);
-    const kai = topGifter("Kai", 30, { platform: "kick" });
+    const ana = gifter("Ana", 20);
+    const kai = gifter("Kai", 30, 1, { platform: "kick" });
     await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
       byPlatform: { tiktok: [ana], kick: [kai] },
     });
