@@ -13,7 +13,7 @@ import { rich, useT } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
 import { type Ref, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { FiPlay, FiPlus, FiSquare, FiX } from "react-icons/fi";
+import { FiPlay, FiPlus, FiSquare } from "react-icons/fi";
 import styles from "../home.module.css";
 import { HomeTab, PLATFORM_ICONS, Views } from "../helper";
 import { StatValue } from "./StatValue";
@@ -231,7 +231,7 @@ export function DashboardSection(props: Props) {
   };
 
   const remove = (platform: Platform) => {
-    // The focus goes to Add, as the tab with its button leaves
+    // The focus goes to Add, as the tab with its × leaves
     flushSync(() => onPlatformsChange(platforms.filter((p) => p !== platform)));
     menu.toggleRef.current?.focus();
   };
@@ -337,33 +337,61 @@ export function DashboardSection(props: Props) {
           for this heading, so it's a 1px box, never display: none. */}
       <h2 className={styles.sr_only}>{t("home.dashboard.title")}</h2>
 
-      <p
-        className={cx(styles.status, connected && !away && styles.status_live)}
-      >
-        {/* A ring while the connection is away: rose while the LIVE goes on */}
-        <span
-          className={cx(
-            styles.dot,
-            connected && styles.dot_live,
-            away && styles.dot_away,
-          )}
-        />
-        {connected && !away ? (
-          <>
-            {/* Like the title bar's tally, said only to screen readers */}
-            <span className={styles.sr_only}>LIVE</span>{" "}
-            {startedAt !== null && <LiveTimer since={startedAt} />}
-          </>
-        ) : connected ? (
-          t("home.dashboard.reconnecting")
-        ) : waiting ? (
-          t("home.dashboard.waiting")
-        ) : (
-          t("home.dashboard.offline")
-        )}
-      </p>
-
       <div data-tour="connect" className={styles.connect_box}>
+        {/* Whether the LIVE is on, and the switch for every platform */}
+        <div className={styles.slate_head}>
+          <p
+            className={cx(
+              styles.status,
+              connected && !away && styles.status_live,
+            )}
+          >
+            {/* A ring while the connection is away: rose while the LIVE
+                goes on */}
+            <span
+              className={cx(
+                styles.dot,
+                connected && styles.dot_live,
+                away && styles.dot_away,
+              )}
+            />
+            {connected && !away ? (
+              <>
+                {/* Like the title bar's tally, said only to screen readers */}
+                <span className={styles.sr_only}>LIVE</span>{" "}
+                {startedAt !== null && <LiveTimer since={startedAt} />}
+              </>
+            ) : connected ? (
+              t("home.dashboard.reconnecting")
+            ) : waiting ? (
+              t("home.dashboard.waiting")
+            ) : (
+              t("home.dashboard.offline")
+            )}
+          </p>
+          {/* Alone, the platform's own Connect is all there is. Rose only
+              while connecting is the thing to do. */}
+          {several && (
+            <Btn
+              variant={anyOn ? "default" : "accent"}
+              size="lg"
+              className={styles.connect_btn}
+              loading={loading}
+              onClick={anyOn ? () => onDisconnect() : () => connect(platforms)}
+            >
+              {anyOn ? (
+                <>
+                  <FiSquare size={18} /> {t("home.dashboard.disconnectAll")}
+                </>
+              ) : (
+                <>
+                  <FiPlay size={18} /> {t("home.dashboard.connectAll")}
+                </>
+              )}
+            </Btn>
+          )}
+        </div>
+
         <div className={styles.tab_row}>
           <Tabs
             className={styles.platform_tabs}
@@ -392,8 +420,16 @@ export function DashboardSection(props: Props) {
               }
               const Icon = PLATFORM_ICONS[value];
               const up = status[value] === "connected";
+              const name = PLATFORM_LABELS[value];
               return {
                 value,
+                // Closing a tab removes the platform, never one that's on
+                // or the only one
+                onClose:
+                  several && !on(value) ? () => remove(value) : undefined,
+                closeLabel: t("home.dashboard.removePlatform", {
+                  platform: name,
+                }),
                 icon: <Icon className={cx(up && styles.up)} aria-hidden />,
                 // Rose while it's up, the picked one's too
                 accent: up ? "var(--accent-primary)" : undefined,
@@ -401,7 +437,7 @@ export function DashboardSection(props: Props) {
                   <>
                     {/* Red while it lacks what Connect needs */}
                     <span className={cx(missing[value] && styles.tab_need)}>
-                      {PLATFORM_LABELS[value]}
+                      {name}
                     </span>
                     {shown}
                   </>
@@ -412,26 +448,6 @@ export function DashboardSection(props: Props) {
             onChange={onTab}
           />
           <AddPlatform platforms={platforms} onAdd={add} menu={menu} />
-          {/* Alone, the platform's own Connect is all there is */}
-          {several && (
-            // Rose only while connecting is the thing to do
-            <Btn
-              variant={anyOn ? "default" : "accent"}
-              className={styles.connect_btn}
-              loading={loading}
-              onClick={anyOn ? () => onDisconnect() : () => connect(platforms)}
-            >
-              {anyOn ? (
-                <>
-                  <FiSquare size={16} /> {t("home.dashboard.disconnectAll")}
-                </>
-              ) : (
-                <>
-                  <FiPlay size={16} /> {t("home.dashboard.connectAll")}
-                </>
-              )}
-            </Btn>
-          )}
         </div>
 
         {tab !== "all" && (
@@ -441,29 +457,14 @@ export function DashboardSection(props: Props) {
               {state(tab)}
             </div>
             {several ? (
-              <>
-                <Btn
-                  className={styles.line_btn}
-                  loading={pending.includes(tab) && !status[tab]}
-                  aria-label={`${t(on(tab) ? "common.disconnect" : "common.connect")} ${PLATFORM_LABELS[tab]}`}
-                  onClick={() => (on(tab) ? onDisconnect(tab) : connect([tab]))}
-                >
-                  {t(on(tab) ? "common.disconnect" : "common.connect")}
-                </Btn>
-                <Btn
-                  variant="icon"
-                  title={t("home.dashboard.removePlatform", {
-                    platform: PLATFORM_LABELS[tab],
-                  })}
-                  aria-label={t("home.dashboard.removePlatform", {
-                    platform: PLATFORM_LABELS[tab],
-                  })}
-                  disabled={on(tab)}
-                  onClick={() => remove(tab)}
-                >
-                  <FiX size={16} />
-                </Btn>
-              </>
+              <Btn
+                className={styles.line_btn}
+                loading={pending.includes(tab) && !status[tab]}
+                aria-label={`${t(on(tab) ? "common.disconnect" : "common.connect")} ${PLATFORM_LABELS[tab]}`}
+                onClick={() => (on(tab) ? onDisconnect(tab) : connect([tab]))}
+              >
+                {t(on(tab) ? "common.disconnect" : "common.connect")}
+              </Btn>
             ) : (
               // The only platform: Home's Connect, rose until it's on
               <Btn

@@ -60,6 +60,15 @@
   gap: var(--space-3);
 }
 
+/* The status on the left, and with several platforms the switch for all of
+   them on the right, with room of its own above the tabs */
+.slate_head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
 .status {
   display: flex;
   align-items: center;
@@ -145,15 +154,11 @@
   color: var(--danger);
 }
 
-.tab_row .connect_btn {
-  margin-left: auto;
-}
-
 /* The picked platform's channel or account with how it's doing under it,
-   then its own Connect and Remove */
+   then its own Connect */
 .line {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: var(--space-3);
 }
@@ -203,7 +208,7 @@
   font-size: var(--font-sm);
 }
 
-/* As wide as either label, so Remove doesn't move */
+/* As wide as either label, so the field doesn't change width */
 .line_btn {
   min-width: 8.5rem;
 }
@@ -277,7 +282,7 @@
 
 /* As wide as either label, so the spinner doesn't move it */
 .connect_btn {
-  min-width: 152px;
+  min-width: 184px;
 }
 
 .key_hint {

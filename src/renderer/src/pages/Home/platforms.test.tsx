@@ -130,9 +130,10 @@ describe("Home's platforms", () => {
 
     await live({ tiktok: "connected" });
 
+    // On, it can't be removed: its tab has no ×
     expect(
-      page().getByRole("button", { name: "Remove TikTok" }),
-    ).toBeDisabled();
+      page().queryByRole("button", { name: "Remove TikTok" }),
+    ).not.toBeInTheDocument();
     await user.click(tab("Twitch"));
     expect(page().getByRole("button", { name: "Remove Twitch" })).toBeEnabled();
     expect(

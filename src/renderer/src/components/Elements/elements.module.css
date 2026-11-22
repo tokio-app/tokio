@@ -658,4 +658,37 @@
   background-color: var(--background-secondary-hover);
 }
 
+/* A tab that can be closed: its × sits in the tab's own right padding, so
+   the underline runs under both */
+.tab_closable {
+  position: relative;
+  display: flex;
+}
+
+.tabs_underline .tab_closable .tab {
+  padding-right: calc(var(--space-2) + 22px);
+}
+
+.tab_close {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  display: flex;
+  padding: 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--font-muted);
+  cursor: pointer;
+  translate: 0 -50%;
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.tab_close:hover {
+  background-color: var(--background-secondary-hover);
+  color: var(--font-primary);
+}
+
 /* TABS END */
