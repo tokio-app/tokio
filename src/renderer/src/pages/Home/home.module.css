@@ -119,42 +119,46 @@
   }
 }
 
-/* With several platforms, a row each: its logo and name, its channel or
-   account with how it's doing under it, its own Connect, and Remove. The
-   columns are fixed so the fields line up from row to row. */
-.rows {
+/* The platforms' tabs, Add after them and Connect all at the end, all on
+   one hairline, which the picked tab's underline sits on */
+.tab_row {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  list-style: none;
+  align-items: center;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border);
 }
 
-.row {
+/* The row draws the line under them all, over the tabs' own. The tabs,
+   taller than the buttons, stand on it; the buttons center on their labels. */
+.tab_row .platform_tabs {
+  align-self: flex-end;
+  border-bottom: none;
+}
+
+/* A platform that's up, its tab's logo and its state */
+.up {
+  color: var(--accent-primary);
+}
+
+/* A platform that lacks what Connect needs */
+.tab_need {
+  color: var(--danger);
+}
+
+.tab_row .connect_btn {
+  margin-left: auto;
+}
+
+/* The picked platform's channel or account with how it's doing under it,
+   then its own Connect and Remove */
+.line {
   display: grid;
-  grid-template-columns: 18px 4.5rem minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: start;
   gap: var(--space-3);
 }
 
-/* The only platform: no Connect or Remove of its own */
-.row_alone {
-  grid-template-columns: 18px 4.5rem minmax(0, 1fr);
-}
-
-/* Both centered on the field's line, not on the row with its state */
-.row_icon {
-  margin-top: calc((var(--control-height) - 18px) / 2);
-  color: var(--font-muted);
-}
-
-.row_name {
-  color: var(--font-secondary);
-  font-size: var(--font-md);
-  font-weight: 500;
-  line-height: var(--control-height);
-}
-
-.row_field {
+.line_field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -163,7 +167,7 @@
 
 /* While its platform is on, the channel reads as a name, not a field,
    lined up with its state under it */
-.row_input:disabled {
+.line_input:disabled {
   padding-inline: 0;
   border-color: transparent;
   background-color: transparent;
@@ -172,7 +176,7 @@
 }
 
 /* The account signed in to, where a field would be */
-.row_account {
+.line_account {
   display: flex;
   align-items: center;
   height: var(--control-height);
@@ -184,27 +188,23 @@
   white-space: nowrap;
 }
 
-.row_state {
+.line_state {
   color: var(--font-secondary);
   font-size: var(--font-sm);
 }
 
-.row_up {
+.line_state.up {
   color: var(--font-primary);
 }
 
-.row_icon.row_up {
-  color: var(--accent-primary);
-}
-
 /* What a platform needs before it can connect */
-.row_need {
+.line_need {
   color: var(--danger);
   font-size: var(--font-sm);
 }
 
-/* As wide as either label, so the columns don't move */
-.row_btn {
+/* As wide as either label, so Remove doesn't move */
+.line_btn {
   min-width: 8.5rem;
 }
 
@@ -232,18 +232,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-/* Add a platform on the left, Connect all on the right, also once every
-   platform is added and Add is gone */
-.connect_foot {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.connect_foot .connect_btn {
-  margin-left: auto;
 }
 
 /* The Add menu, under its button */
@@ -289,7 +277,7 @@
 
 /* As wide as either label, so the spinner doesn't move it */
 .connect_btn {
-  width: 168px;
+  min-width: 152px;
 }
 
 .key_hint {

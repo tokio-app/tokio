@@ -278,7 +278,7 @@
   "components.tour.settings": "Para conectarte a TikTok necesitas tu clave de API de Euler Stream. <link>Consigue una clave gratis</link> y pégala en Configuración, en TikTok LIVE. Ahí también inicias sesión en Twitch.",
   "components.tour.features": "Activa lo que necesitas para tu LIVE. Queda como lo dejes.",
   "components.tour.connectTitle": "Conéctate a tu LIVE",
-  "components.tour.connect": "Elige dónde transmites con los logos de TikTok y Twitch. Cuando estés en vivo, escribe tu @usuario de TikTok o inicia sesión en Twitch en Configuración, y haz clic en Conectar. Puedes volver a hacer este recorrido desde Acerca de.",
+  "components.tour.connect": "Cada plataforma donde transmites tiene aquí una pestaña, y el + agrega otra. En su pestaña, escribe tu @usuario de TikTok o tu canal, o inicia sesión en Twitch en Configuración. Cuando estés en vivo, haz clic en Conectar. Puedes volver a hacer este recorrido desde Acerca de.",
   "components.tour.step": "{step} de {total}",
   "components.tour.back": "Atrás",
   "components.tour.next": "Siguiente",

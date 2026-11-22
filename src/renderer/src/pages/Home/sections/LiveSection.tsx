@@ -1,22 +1,16 @@
 import { LiveSession, Platform } from "@/common/types";
-import { PLATFORM_LABELS } from "@/common/util";
-import { Avatar, Section, Tabs } from "@/components";
-import { formatStat } from "@/helper";
+import { Avatar, Section } from "@/components";
 import { coinsLabel } from "@/helper/gifts";
 import { useLanguage, useT } from "@/ui/i18n";
-import { useState } from "react";
 import styles from "../home.module.css";
-import {
-  LiveGifters,
-  liveView,
-  PLATFORM_ICONS,
-  StatsTab,
-  Views,
-} from "../helper";
+import { LiveGifters, liveView, HomeTab, Views } from "../helper";
+import { StatValue } from "./StatValue";
 import { ViewersChart } from "./ViewersChart";
 
 interface Props {
-  // The platforms in the LIVE, a tab each before All. One gets no tabs.
+  // The tab picked above: a platform in the LIVE, or all of them
+  tab: HomeTab;
+  // The platforms in the LIVE, which All adds up
   platforms: Platform[];
   session: LiveSession;
   views: Views;
@@ -25,69 +19,19 @@ interface Props {
   gifters: LiveGifters;
 }
 
-// Short, with the exact number on hover, as the language writes them
-function StatValue({ value, className }: { value: number; className: string }) {
-  const language = useLanguage();
-  const { short, full } = formatStat(value, language);
-  return (
-    <span className={className} title={full}>
-      {short}
-    </span>
-  );
-}
-
-// Only while LIVE: the viewers and their line, the numbers and top gifters,
-// for one platform or all of them
-export function LiveSection({ platforms, ...numbers }: Props) {
+// Only while LIVE: the viewers and their line, the numbers and top gifters
+// of the tab's platform, or of all of them
+export function LiveSection({ tab, platforms, ...numbers }: Props) {
   const t = useT();
   const language = useLanguage();
-  const [picked, setPicked] = useState<StatsTab | null>(null);
-  // The first platform until another tab is picked, or the picked one is gone
-  const tab: StatsTab =
-    platforms.length < 2
-      ? "all"
-      : picked === "all" || (picked && platforms.includes(picked))
-        ? picked
-        : platforms[0];
   const { viewers, minutes, stats, gifters } = liveView(
     tab,
     platforms,
     numbers,
   );
-  // Each tab says its viewers now, so every platform's show at once
-  const tabLabel = (name: string, count: number) => (
-    <>
-      {name}
-      <StatValue value={count} className={styles.tab_count} />
-    </>
-  );
 
   return (
     <div className={styles.live}>
-      {platforms.length > 1 && (
-        <Tabs
-          tabs={[
-            ...platforms.map((platform) => {
-              const Icon = PLATFORM_ICONS[platform];
-              return {
-                value: platform,
-                icon: <Icon aria-hidden="true" />,
-                label: tabLabel(
-                  PLATFORM_LABELS[platform],
-                  numbers.views.platformViewers[platform] ?? 0,
-                ),
-              };
-            }),
-            {
-              value: "all" as const,
-              label: tabLabel(t("home.stats.all"), numbers.views.current),
-            },
-          ]}
-          value={tab}
-          onChange={setPicked}
-        />
-      )}
-
       <div className={styles.pulse}>
         <div className={styles.hero}>
           <StatValue value={viewers} className={styles.hero_value} />

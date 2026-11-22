@@ -115,8 +115,8 @@ export const livePlatforms = (
       session.platforms[p] !== undefined,
   );
 
-// The LIVE section's tabs: a platform's own numbers, or all of them
-export type StatsTab = Platform | "all";
+// Home's tabs: a platform's connection and numbers, or all their numbers
+export type HomeTab = Platform | "all";
 
 // The viewers now (everyone's and each platform's) and TikTok's total views
 export type Views = {
@@ -132,7 +132,7 @@ export type LiveGifters =
 // What a tab shows. All adds up the LIVE's platforms; likes, total views and
 // shares are TikTok's alone, so they're the same on both.
 export function liveView(
-  tab: StatsTab,
+  tab: HomeTab,
   platforms: readonly Platform[],
   numbers: {
     session: LiveSession;

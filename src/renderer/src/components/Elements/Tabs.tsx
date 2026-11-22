@@ -23,6 +23,9 @@ type Props<T extends string> = {
   // underline: tabs over a panel, pill: a segmented switch
   variant?: "underline" | "pill";
   disabled?: boolean;
+  // Names the list for screen readers
+  label?: string;
+  className?: string;
 };
 
 export function Tabs<T extends string>({
@@ -31,14 +34,18 @@ export function Tabs<T extends string>({
   onChange,
   variant = "underline",
   disabled,
+  label,
+  className,
 }: Props<T>) {
   return (
     <div
       role="tablist"
+      aria-label={label}
       className={cx(
         styles.tabs,
         variant === "underline" ? styles.tabs_underline : styles.tabs_pill,
         disabled && styles.tabs_disabled,
+        className,
       )}
     >
       {tabs.map((tab) => (

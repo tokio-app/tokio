@@ -16,7 +16,12 @@ import type { UserEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const connected = (
-  stats = { views: 1234, viewers: 12, likes: 5, platformViewers: {} },
+  stats = {
+    views: 1234,
+    viewers: 12,
+    likes: 5,
+    platformViewers: { tiktok: 12 },
+  },
 ) =>
   send(APP_EVENTS_RESPONSE.CONNECTED, {
     success: true,
@@ -32,8 +37,14 @@ const disconnected = () =>
     stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
   });
 
-const session = (patch: Partial<LiveSession> = {}) =>
-  send(APP_EVENTS_RESPONSE.LIVE_SESSION, { data: liveSession(patch) });
+// As main sends it with TikTok alone, whose numbers are all of them
+const session = (patch: Partial<LiveSession> = {}) => {
+  const data = liveSession(patch);
+  const { totals, viewers } = data;
+  return send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+    data: { ...data, platforms: { tiktok: { totals, viewers } } },
+  });
+};
 
 const page = () => within(screen.getByRole("main"));
 const username = () => page().getByPlaceholderText("@username");
@@ -322,7 +333,7 @@ describe("Home", () => {
     expect(stat("Total views")).toHaveAttribute("title", "1,234");
 
     await send(APP_EVENTS_RESPONSE.VIEWS, {
-      data: { viewers: 40, views: 2000, platformViewers: {} },
+      data: { viewers: 40, views: 2000, platformViewers: { tiktok: 40 } },
     });
     await send(APP_EVENTS_RESPONSE.LIKES, { likes: 99 });
 
@@ -353,7 +364,7 @@ describe("Home", () => {
     const peak = () => page().getByText(/^Peak/);
     const views = (viewers: number) =>
       send(APP_EVENTS_RESPONSE.VIEWS, {
-        data: { viewers, views: 2000, platformViewers: {} },
+        data: { viewers, views: 2000, platformViewers: { tiktok: viewers } },
       });
 
     it("draws each minute, with the live count for this one", async () => {
@@ -398,14 +409,15 @@ describe("Home", () => {
       await renderApp();
       await connected();
 
+      const top = [
+        topGifter("Leo", 1000),
+        topGifter("Ana", 480, { username: "" }),
+        topGifter("Sam", 300),
+        topGifter("Kai", 120),
+      ];
       await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
-        data: [
-          topGifter("Leo", 1000),
-          topGifter("Ana", 480, { username: "" }),
-          topGifter("Sam", 300),
-          topGifter("Kai", 120),
-        ],
-        byPlatform: {},
+        data: top,
+        byPlatform: { tiktok: top },
       });
 
       expect(gifters().map((g) => g.textContent)).toEqual([

@@ -18,6 +18,7 @@ import { useRef, useState } from "react";
 import styles from "./home.module.css";
 import {
   feedKinds,
+  HomeTab,
   LiveGifters,
   livePlatforms,
   NO_SESSION,
@@ -71,6 +72,8 @@ export function Home() {
   });
   const [songs, setSongs] = useState<MusicInfo[]>([]);
   const [paused, setPaused] = useState(false);
+  // The tab picked over the connection and the numbers, null for the first
+  const [picked, setPicked] = useState<HomeTab | null>(null);
 
   useIpcRequest(APP_EVENTS.GET_PROFILE);
   useIpcRequest(APP_EVENTS.GET_SETTINGS);
@@ -175,6 +178,12 @@ export function Home() {
     if (res) setSongs(res.data);
   });
 
+  // The platforms in the LIVE: All adds them up once there are two
+  const live = connected ? livePlatforms(status, session) : [];
+  const tabs: HomeTab[] = live.length > 1 ? [...platforms, "all"] : platforms;
+  // The one picked while it's there, else the first platform's
+  const tab = picked !== null && tabs.includes(picked) ? picked : tabs[0];
+
   // The queue keeps its songs while the player is gone
   const song = musicConnected ? songs.find((s) => s.playing) : undefined;
 
@@ -232,6 +241,11 @@ export function Home() {
               platforms={platforms}
               status={status}
               twitchLogin={twitchLogin}
+              tabs={tabs}
+              tab={tab}
+              onTab={setPicked}
+              live={live}
+              views={views}
               onPlatformsChange={(picked) => {
                 setPlatforms(picked);
                 window.api.emit(APP_EVENTS.SET_PLATFORMS, {
@@ -262,9 +276,11 @@ export function Home() {
               }}
             />
 
-            {connected && (
+            {/* A platform's numbers while it's in the LIVE */}
+            {(tab === "all" || live.includes(tab)) && (
               <LiveSection
-                platforms={livePlatforms(status, session)}
+                tab={tab}
+                platforms={live}
                 session={session}
                 views={views}
                 likes={likes}
