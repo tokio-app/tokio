@@ -165,20 +165,30 @@ describe("tools MCP tools", () => {
       gifts: 3,
       giftedAt: 1000,
     };
+    const kicker: Gifter = {
+      ...gifter,
+      userId: "kick:2",
+      username: "Bea",
+      handle: "bea",
+      coins: 200,
+      gifts: 1,
+      platform: "kick",
+    };
     const live = {
       username: "streamer",
       startedAt: 1_000,
       endedAt: 61_000,
       coins: 500,
-      gifts: 3,
+      kicks: 200,
+      gifts: 4,
     };
     const setup = () => {
-      const history = { lives: [live], gifters: [gifter] };
+      const history = { lives: [live], gifters: [gifter, kicker] };
       const historyService = {
         getHistory: () => history,
         getLive: vi.fn(async (startedAt: number) =>
           startedAt === live.startedAt
-            ? { ...live, gifters: [gifter], minutes: [] }
+            ? { ...live, gifters: [gifter, kicker], minutes: [] }
             : null,
         ),
         deleteLive: vi.fn(async () => {
@@ -186,8 +196,12 @@ describe("tools MCP tools", () => {
           return true;
         }),
         clear: vi.fn(async () => true),
-        getTotals: vi.fn(async () => ({ coins: 500, gifts: 3 })),
-        getGifters: vi.fn(async () => [{ ...gifter, rank: 1 }]),
+        getTotals: vi.fn(async () => ({ coins: 500, kicks: 200, gifts: 4 })),
+        // Each ranked within their currency
+        getGifters: vi.fn(async () => [
+          { ...gifter, rank: 1 },
+          { ...kicker, rank: 1 },
+        ]),
       };
       const h = createHandler({ historyService }, { stack: lives });
       return { h, historyService };
@@ -197,6 +211,13 @@ describe("tools MCP tools", () => {
       handle: "kai",
       coins: 500,
       gifts: 3,
+      lastGiftAt: "1970-01-01T00:00:01.000Z",
+    };
+    const kickRow = {
+      nickname: "Bea",
+      handle: "bea",
+      kicks: 200,
+      gifts: 1,
       lastGiftAt: "1970-01-01T00:00:01.000Z",
     };
 
@@ -213,13 +234,18 @@ describe("tools MCP tools", () => {
             startedAt: "1970-01-01T00:00:01.000Z",
             endedAt: "1970-01-01T00:01:01.000Z",
             coins: 500,
-            gifts: 3,
+            kicks: 200,
+            gifts: 4,
           },
         ],
       });
       expect(
         (await call("get", { kind: "lives", id: "1000" })).value,
-      ).toMatchObject({ totalGifters: 1, gifters: [row] });
+      ).toMatchObject({
+        kicks: 200,
+        totalGifters: 2,
+        gifters: { coins: [row], kicks: [kickRow] },
+      });
       expect((await call("get", { kind: "lives", id: "5" })).isError).toBe(
         true,
       );
@@ -260,8 +286,15 @@ describe("tools MCP tools", () => {
       const from = new Date(2026, 10, 1).getTime();
       const to = Date.UTC(2026, 10, 2);
       expect(res.value).toEqual({
-        totals: { coins: 500, gifts: 3 },
+        currency: "coins",
+        totals: { coins: 500, kicks: 200, gifts: 4 },
         gifters: [{ rank: 1, ...row }],
+      });
+      expect(
+        (await call("get_gifters", { currency: "kicks" })).value,
+      ).toMatchObject({
+        currency: "kicks",
+        gifters: [{ rank: 1, ...kickRow }],
       });
       expect(historyService.getTotals).toHaveBeenCalledWith({ from, to });
       expect(historyService.getGifters).toHaveBeenCalledWith({

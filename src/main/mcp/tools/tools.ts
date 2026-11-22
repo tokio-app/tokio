@@ -1,6 +1,12 @@
 import { TIMER_ACTIONS, TimerSettingsSchema } from "@/common/schemas";
 import { APP_EVENTS, type Gifter } from "@/common/types";
-import { viewerMatcher } from "@/common/util";
+import {
+  GIFT_CURRENCIES,
+  GIFT_CURRENCY,
+  type GiftCurrency,
+  platformOf,
+  viewerMatcher,
+} from "@/common/util";
 import { MAX_FANS } from "@/services/fans";
 import { z } from "zod";
 import { fail, invokeOk, ok } from "../common";
@@ -25,14 +31,20 @@ const timerState = ({ timerService }: Handler) => {
   return { status, remainingSeconds: Math.round(remaining / 1000) };
 };
 
-// Viewer names are viewer data, in their own fields. No pictures.
-const gifterRow = ({ username, handle, coins, gifts, giftedAt }: Gifter) => ({
-  nickname: username,
-  handle,
-  coins,
-  gifts,
-  lastGiftAt: iso(giftedAt),
-});
+// Viewer names are viewer data, in their own fields. No pictures. The
+// amount is named after its currency, never added to another's.
+const gifterRow =
+  (currency: GiftCurrency) =>
+  ({ username, handle, coins, gifts, giftedAt }: Gifter) => ({
+    nickname: username,
+    handle,
+    [currency]: coins,
+    gifts,
+    lastGiftAt: iso(giftedAt),
+  });
+
+const paidIn = (currency: GiftCurrency) => (gifter: Gifter) =>
+  GIFT_CURRENCY[platformOf(gifter)] === currency;
 
 /**
  * A date or date-time in ms, or undefined when there's none. A day alone
@@ -63,7 +75,7 @@ export const sections: Sections = {
       return error ?? ok({ saved: true, timer: timerState(handler) });
     },
     notes:
-      "The active profile's countdown timer (Tools → Countdown), a subathon clock viewers add time to. start is the minutes it starts from and goes back to on reset; cap the minutes added time stops at (0, no limit); multiplier multiplies every trigger's seconds. seconds holds what each event adds: coin per coin of gifts, likes every likes_every likes, superfan, follow, share and chat (0 leaves one out); chat counts only messages with chat.keyword, once per viewer every chat.cooldown seconds. look sets its overlay at http://tokio-app.local:37891/timer/ (colors #rrggbb or #rrggbbaa; names empty for the app language's). The timer tool starts and adjusts it.",
+      "The active profile's countdown timer (Tools → Countdown), a subathon clock viewers add time to. start is the minutes it starts from and goes back to on reset; cap the minutes added time stops at (0, no limit); multiplier multiplies every trigger's seconds. seconds holds what each event adds: coin per coin of TikTok's gifts, kick per Kick of Kick's, likes every likes_every likes, superfan, follow, share and chat (0 leaves one out); chat counts only messages with chat.keyword, once per viewer every chat.cooldown seconds. look sets its overlay at http://tokio-app.local:37891/timer/ (colors #rrggbb or #rrggbbaa; names empty for the app language's). The timer tool starts and adjusts it.",
   }),
 };
 
@@ -91,7 +103,7 @@ export const kinds: Kinds = {
   }),
   lives: defineKind({
     notes:
-      "The active profile's finished LIVEs (Tools → Coin stats), newest first; the one going on joins when it ends. The id is when it started, in ms. query matches the @username Tokio connected to. get gives its top gifters. Removing one also takes its gifts out of the all-time ranking; it can't be undone.",
+      "The active profile's finished LIVEs (Tools → Gift stats), newest first; the one going on joins when it ends. The id is when it started, in ms. query matches the @username Tokio connected to. coins are TikTok's and kicks Kick's, never added together; gifts counts every platform's. get gives its top 50 gifters in each currency. Removing one also takes its gifts out of the all-time ranking; it can't be undone.",
     list: ({ historyService }, { query, limit }) => {
       const wanted = query?.trim().replace(/^@/, "").toLowerCase();
       const found = historyService
@@ -103,12 +115,13 @@ export const kinds: Kinds = {
         total: found.length,
         lives: found
           .slice(0, limit)
-          .map(({ username, startedAt, endedAt, coins, gifts }) => ({
+          .map(({ username, startedAt, endedAt, coins, kicks, gifts }) => ({
             id: String(startedAt),
             username,
             startedAt: iso(startedAt),
             endedAt: iso(endedAt),
             coins,
+            kicks,
             gifts,
           })),
       });
@@ -126,9 +139,18 @@ export const kinds: Kinds = {
         startedAt: iso(live.startedAt),
         endedAt: iso(live.endedAt),
         coins: live.coins,
+        kicks: live.kicks,
         gifts: live.gifts,
         totalGifters: live.gifters.length,
-        gifters: live.gifters.slice(0, 50).map(gifterRow),
+        gifters: Object.fromEntries(
+          GIFT_CURRENCIES.map((currency) => [
+            currency,
+            live.gifters
+              .filter(paidIn(currency))
+              .slice(0, 50)
+              .map(gifterRow(currency)),
+          ]),
+        ),
       });
     },
     remove: async (handler, id) => {
@@ -158,6 +180,7 @@ const GiftersInput = z
     from: z.string().optional(),
     to: z.string().optional(),
     query: z.string().optional(),
+    currency: z.enum(GIFT_CURRENCIES).optional(),
     limit: z.number().int().min(1).max(100).optional(),
   })
   .strict();
@@ -195,10 +218,13 @@ export const tools: ToolDef<any>[] = [
     name: "get_gifters",
     title: "Top gifters",
     description:
-      "The active profile's top gifters over its finished LIVEs, each with their rank, coins and gifts, plus the dates' total coins and gifts. from (included) and to (left out) are ISO dates or date-times; a date alone is midnight on this PC, and leaving both out means all time. query keeps the gifters whose nickname or @handle has it, ranks kept. The LIVE going on isn't counted until it ends: get_activity has its top gifters.",
+      "The active profile's top gifters over its finished LIVEs in one currency, coins (TikTok's, the default) or kicks (Kick's), each with their rank among that currency's gifters, what they sent in it and their gifts, plus the dates' totals: coins, kicks and every platform's gifts, never added together. from (included) and to (left out) are ISO dates or date-times; a date alone is midnight on this PC, and leaving both out means all time. query keeps the gifters whose nickname or @handle has it, ranks kept. The LIVE going on isn't counted until it ends: get_activity has its top gifters.",
     input: GiftersInput,
     annotations: READ,
-    run: async ({ historyService }, { from, to, query, limit = 50 }) => {
+    run: async (
+      { historyService },
+      { from, to, query, currency = "coins", limit = 50 },
+    ) => {
       const range = { from: toMs(from), to: toMs(to) };
       if (range.from === null || range.to === null) {
         return fail(
@@ -211,10 +237,12 @@ export const tools: ToolDef<any>[] = [
       const gifters = await historyService.getGifters({ ...dates, query });
       if (!gifters) return changedProfile();
       return ok({
+        currency,
         totals,
         gifters: gifters
+          .filter(paidIn(currency))
           .slice(0, limit)
-          .map((g) => ({ rank: g.rank, ...gifterRow(g) })),
+          .map((g) => ({ rank: g.rank, ...gifterRow(currency)(g) })),
       });
     },
   }),
@@ -222,7 +250,7 @@ export const tools: ToolDef<any>[] = [
     name: "clear_history",
     title: "Clear LIVE history",
     description:
-      "Deletes every LIVE the active profile kept and its gifters' all-time ranking (Tools → Coin stats). A LIVE going on carries on. It can't be undone: ask the streamer first.",
+      "Deletes every LIVE the active profile kept and its gifters' all-time ranking (Tools → Gift stats). A LIVE going on carries on. It can't be undone: ask the streamer first.",
     input: z.object({}).strict(),
     annotations: DESTROY,
     run: async (handler) => {
