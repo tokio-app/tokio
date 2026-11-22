@@ -154,7 +154,11 @@ export function DashboardSection({
       <Input
         className={styles.username}
         data-channel={platform}
-        placeholder={t("home.dashboard.youtubeChannel")}
+        placeholder={t(
+          platform === "kick"
+            ? "home.dashboard.kickChannel"
+            : "home.dashboard.youtubeChannel",
+        )}
         value={channels[platform] ?? ""}
         disabled={busy}
         onChange={(e) => onChannelChange(platform, e.target.value)}

@@ -519,7 +519,7 @@ describe("home events", () => {
           "twitch",
           // A newer Tokio's
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-          "kick" as Platform,
+          "trovo" as Platform,
           "tiktok",
           "twitch",
         ],

@@ -79,7 +79,7 @@ describe("live MCP tools", () => {
       });
       const unknown = await call("update_settings", {
         section: "platforms",
-        changes: { platforms: ["kick"] },
+        changes: { platforms: ["trovo"] },
       });
 
       expect(locked).toMatchObject({

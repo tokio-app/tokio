@@ -43,6 +43,16 @@ export const PLATFORM_TRIGGERS: Record<Platform, readonly AlertTrigger[]> = {
     TOKIO_EVENTS.GIFT_SUB,
     TOKIO_EVENTS.SUPER_CHAT,
   ],
+  // Gifts are Kick's Kicks, raids its hosts; its chat feed carries no follows
+  kick: [
+    TOKIO_EVENTS.CHAT,
+    EMOTE_TRIGGER,
+    TOKIO_EVENTS.GIFT,
+    TOKIO_EVENTS.SUBSCRIBE,
+    TOKIO_EVENTS.GIFT_SUB,
+    TOKIO_EVENTS.RAID,
+    TOKIO_EVENTS.REDEEM,
+  ],
 };
 
 // Their names, the platforms' own, never translated
@@ -50,6 +60,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   tiktok: "TikTok",
   twitch: "Twitch",
   youtube: "YouTube",
+  kick: "Kick",
 };
 
 // What a profile types for each on Home: a channel's name, or nothing for
@@ -58,13 +69,15 @@ export const PLATFORM_INPUT: Record<Platform, "channel" | "account"> = {
   tiktok: "channel",
   twitch: "account",
   youtube: "channel",
+  kick: "channel",
 };
 
-// Whether a platform's gifts say what they cost: YouTube's don't
+// Whether a platform's gifts say what they cost: YouTube's don't, Kicks do
 const GIFT_COINS: Record<Platform, boolean> = {
   tiktok: true,
   twitch: false,
   youtube: false,
+  kick: true,
 };
 
 // Coins, and gifters ranked by them, need a platform whose gifts have a price

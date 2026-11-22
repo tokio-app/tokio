@@ -201,6 +201,11 @@ describe("Home's platforms", () => {
       ["Gifts"],
       ["New followers", "Likes", "Total views", "Shares", "Coins"],
     ],
+    [
+      ["kick"],
+      ["Gifts", "Coins"],
+      ["New followers", "Likes", "Total views", "Shares"],
+    ],
   ] as [Platform[], string[], string[]][])(
     "shows the stats %j has",
     async (platforms, shown, hidden) => {

@@ -10,6 +10,7 @@ import {
 import { countsCoins, PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
 import type { IconType } from "react-icons";
 import { FaTiktok, FaTwitch, FaYoutube } from "react-icons/fa";
+import { SiKick } from "react-icons/si";
 
 // Until main answers
 export const NO_SESSION: LiveSession = {
@@ -24,6 +25,7 @@ export const PLATFORM_ICONS: Record<Platform, IconType> = {
   tiktok: FaTiktok,
   twitch: FaTwitch,
   youtube: FaYoutube,
+  kick: SiKick,
 };
 
 // The kinds of events the feed can show, as its settings list them, with

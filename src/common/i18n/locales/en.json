@@ -319,6 +319,7 @@
   "home.dashboard.offline": "Offline",
   "home.dashboard.username": "@username",
   "home.dashboard.youtubeChannel": "@channel or LIVE link",
+  "home.dashboard.kickChannel": "Channel or kick.com link",
   "home.dashboard.keyHint": "Connecting needs your Euler Stream API key. <link>Get a free key</link> and add it in <settings>Settings</settings>.",
   "home.dashboard.platforms": "Platforms",
   "home.dashboard.twitchSignIn": "First <settings>sign in to Twitch</settings> in Settings.",
