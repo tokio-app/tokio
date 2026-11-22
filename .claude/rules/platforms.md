@@ -87,6 +87,16 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - Super Chat amounts stay as YouTube shows them (`amount`). The timer adds the same seconds per Super Chat whatever it cost, since currencies differ, and Coin stats leave them out.
 - Placeholder items (`liveChatPlaceholderItemRenderer`) are messages held from readers and never filled in: ignored.
 
+## Kick
+
+- Everything goes through kick.com's own API and chat feed, as a guest: `GET kick.com/api/v2/channels/<slug>` gives the channel id, the chatroom id (a different number) and whether it's live; `web.kick.com/api/v1/realtime` gives the feed's server and a 45-minute guest token; the socket is Kick's Centrifugo server. Kick's notes come from kicksdk's `docs/KICK.md` (Apache-2.0, read as a reference, never copied).
+- Every request and the socket send `User-Agent: Tokio/<version>`. Kick answers a non-browser that sends a browser's user agent with 403 "Request blocked by security policy", so never make Tokio pretend to be a browser. The socket also has to send `Origin: https://kick.com`, or its handshake gets a 403.
+- The feeds are `chatrooms.<chatroom>.v2` (chat, subs, hosts), `chatroom_<chatroom>` (gifted subs, reward redemptions), `channel.<channel>` (live and offline) and `channel_<channel>` (Kicks). Never `chatrooms.<chatroom>`: it repeats every host. A publication's `data` is a JSON string inside the JSON.
+- The token is refreshed at 80% of its life for the same client id. Closes coded 3500-3999 and 4500-4999 are terminal: wait 5 minutes, doubling up to 30, then come back as a new client id. Any other drop reconnects from 1 s, doubling up to 30 s, never giving up; a reconnect redoes the lookup, which is how it learns the stream ended while away.
+- It connects while the channel is offline (the chat is the channel's), like Twitch, and `StopStreamBroadcast` ends the connection only for a stream seen live. Viewers come from the lookup every 60 s while live.
+- Each Kick is its own `GIFT`, its id `kick:<gift slug>` (`rage_quit`) and its `amount` as coins. Subs, gifted subs, hosts and redemptions name the viewer only by username, so they have no `userId`. Chat has no pictures; a Kick's sender has one.
+- The feed is unofficial and changed from Pusher to Centrifugo in October 2026. An event Tokio can't read is dropped and logged once per name, never thrown out of the socket's listener.
+
 ## The window
 
 - `PlatformsContext` (`src/renderer/src/context/platforms`) gives the trigger pickers the active profile's platforms. A page provides it from `useEditableSettings`' `onLoad(profile)`, or from one page-level `GET_PROFILE` (the Studio editor, Countdown). Never ask `GET_PROFILE` per component: its reply drops the page's unsaved autosave.
