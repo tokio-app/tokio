@@ -26,6 +26,8 @@ import {
   Field,
   Input,
   MediaThumbnail,
+  minUnit,
+  MinUnit,
   Modal,
   NumberInput,
   PlayButton,
@@ -43,6 +45,7 @@ import {
   triggerLabel,
 } from "@/components";
 import thumbs from "@/components/MediaPicker/mediapicker.module.css";
+import { usePlatforms } from "@/context/platforms";
 import { cx } from "@/helper/cx";
 import { releaseOnUnmount } from "@/helper/media";
 import { AlertTestRequest } from "@/hooks";
@@ -181,6 +184,13 @@ export function AlertEditor({
   );
 }
 
+// The minimum's input in its unit: "{input} coins"
+const MIN_INPUT: Record<MinUnit, MessageKey> = {
+  coins: "alerts.editor.minCoinsInput",
+  kicks: "alerts.editor.minKicksInput",
+  either: "alerts.editor.minEitherInput",
+};
+
 type TriggerTabProps = {
   alert: Alert;
   gifts: CustomGift[];
@@ -195,6 +205,7 @@ const newTrigger = () =>
 function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
   const t = useT();
   const triggers = useOptions(TRIGGER_OPTIONS);
+  const platforms = usePlatforms();
   const rows = triggersOf(alert);
 
   // Row 0 is the alert's trigger, the others its also_triggers
@@ -215,6 +226,7 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
     const filter = FILTER_LABELS[trigger.type];
     const { roles } = trigger;
     const change = (changed: Trigger) => setRow(index, changed);
+    const unit = minUnit(trigger, platforms);
 
     return {
       main: (
@@ -238,34 +250,37 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
             </Field>
           )}
 
-          {/* Picked gifts are the alert's choice already */}
-          {trigger.type === TOKIO_EVENTS.GIFT && trigger.gifts.length === 0 && (
-            <Field label={t("alerts.editor.minCoins")}>
-              <span className={styles.inline}>
-                {rich(t("alerts.editor.minCoinsInput"), {
-                  input: (
-                    <NumberInput
-                      integer
-                      min={0}
-                      className={styles.number}
-                      aria-label={t("common.coins")}
-                      value={trigger.min_coins}
-                      onChange={(min_coins) =>
-                        change({ ...trigger, min_coins })
-                      }
-                    />
-                  ),
-                })}
-              </span>
-              <p className={styles.note}>
-                {t(
-                  trigger.every_gift
-                    ? "alerts.editor.everyGiftNote"
-                    : "alerts.editor.streakNote",
-                )}
-              </p>
-            </Field>
-          )}
+          {/* Picked gifts are the alert's choice already, and a row with
+              no price (YouTube's) has nothing to reach */}
+          {trigger.type === TOKIO_EVENTS.GIFT &&
+            trigger.gifts.length === 0 &&
+            unit && (
+              <Field label={t("alerts.editor.minCoins")}>
+                <span className={styles.inline}>
+                  {rich(t(MIN_INPUT[unit]), {
+                    input: (
+                      <NumberInput
+                        integer
+                        min={0}
+                        className={styles.number}
+                        aria-label={t("alerts.editor.minCoins")}
+                        value={trigger.min_coins}
+                        onChange={(min_coins) =>
+                          change({ ...trigger, min_coins })
+                        }
+                      />
+                    ),
+                  })}
+                </span>
+                <p className={styles.note}>
+                  {t(
+                    trigger.every_gift
+                      ? "alerts.editor.everyGiftNote"
+                      : "alerts.editor.streakNote",
+                  )}
+                </p>
+              </Field>
+            )}
 
           {takesRoles(trigger.type) && (
             <Field label={t("alerts.editor.from")}>

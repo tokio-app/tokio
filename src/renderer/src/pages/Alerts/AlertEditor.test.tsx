@@ -1,4 +1,6 @@
 import { Alert } from "@/common/schemas";
+import { Platform, TOKIO_EVENTS } from "@/common/types";
+import { PlatformsContext } from "@/context/platforms";
 import { alertMedia, mediaFile } from "@test/fixtures";
 import { renderWithProviders } from "@test/render";
 import { fireEvent, screen } from "@testing-library/react";
@@ -262,5 +264,58 @@ describe("AlertEditor's video cut", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("AlertEditor's minimum", () => {
+  const gift = (patch: Partial<Alert["trigger"]> = {}) =>
+    alert({
+      trigger: {
+        ...createAlert().trigger,
+        type: TOKIO_EVENTS.GIFT,
+        ...patch,
+      },
+    });
+  const open = (item: Alert, platforms: Platform[]) =>
+    renderWithProviders(
+      <PlatformsContext value={platforms}>
+        <AlertEditor
+          alert={item}
+          index={0}
+          gifts={[]}
+          emotes={[]}
+          testing={null}
+          onTest={vi.fn()}
+          onChange={vi.fn()}
+          onPickSound={vi.fn()}
+          onPickMedia={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </PlatformsContext>,
+    );
+  const minimum = () => screen.queryByRole("group", { name: "Worth at least" });
+
+  it.each([
+    [["tiktok"], {}, "coins"],
+    [["kick"], {}, "Kicks"],
+    [["tiktok", "kick"], {}, "coins or Kicks"],
+    [["tiktok", "kick"], { platform: "kick" }, "Kicks"],
+    // A minimum saved on a row with no price stays to fix
+    [["youtube"], { min_coins: 10 }, "coins"],
+  ] as const)("names it for %j and %j in %s", (platforms, patch, unit) => {
+    open(gift(patch), [...platforms]);
+
+    expect(minimum()).toHaveTextContent(
+      new RegExp(`^Worth at least ${unit}The`),
+    );
+    expect(
+      screen.getByRole("spinbutton", { name: "Worth at least" }),
+    ).toBeInTheDocument();
+  });
+
+  it("has none for a row with no price", () => {
+    open(gift({ platform: "youtube" }), ["tiktok", "youtube"]);
+
+    expect(minimum()).toBeNull();
   });
 });

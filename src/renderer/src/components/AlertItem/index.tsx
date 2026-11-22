@@ -11,11 +11,13 @@ import {
   alertName,
   formatAdded,
   getAlertOverlayURL,
+  giftCurrencies,
   giftNames,
   PLATFORM_LABELS,
   takesRoles,
   triggersOf,
 } from "@/common/util";
+import { usePlatforms } from "@/context/platforms";
 import { cx } from "@/helper/cx";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useLanguage, useOptions, useT } from "@/ui/i18n";
@@ -52,6 +54,30 @@ export const ROLE_NAMES: Record<ViewerRole, MessageKey> = {
   superfan: "roles.superfan",
 };
 
+export type MinUnit = "coins" | "kicks" | "either";
+
+/**
+ * What a gift row's minimum is in: its platform's currency, or for any
+ * platform the profile's, "either" with both. Null without one (YouTube's
+ * Gifts have no price), unless a minimum is saved, so it stays to fix.
+ */
+export function minUnit(
+  trigger: Trigger,
+  profilePlatforms: readonly Platform[],
+): MinUnit | null {
+  const currencies = giftCurrencies(
+    trigger.platform ? [trigger.platform] : profilePlatforms,
+  );
+  if (currencies.length > 1) return "either";
+  return currencies[0] ?? (trigger.min_coins > 0 ? "coins" : null);
+}
+
+const WORTH: Record<MinUnit, MessageKey> = {
+  coins: "components.alertItem.worth",
+  kicks: "components.alertItem.worthKicks",
+  either: "components.alertItem.worthEither",
+};
+
 type FilterProps = {
   trigger: Trigger;
   gifts: CustomGift[];
@@ -69,16 +95,24 @@ export function TriggerFilter({
 }: FilterProps) {
   const t = useT();
   const plays = useOptions(GIFT_PLAYS);
+  const platforms = usePlatforms();
+  // TikTok's catalog, for rows its gifts can set off. Picks stay to clear.
+  const catalog =
+    (trigger.platform
+      ? trigger.platform === "tiktok"
+      : platforms.includes("tiktok")) || trigger.gifts.length > 0;
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
       return (
         <div className={styles.stack}>
-          <GiftMultiSelect
-            placeholder={t("common.anyGift")}
-            gifts={gifts}
-            value={trigger.gifts}
-            onChange={(ids) => onChange({ ...trigger, gifts: ids })}
-          />
+          {catalog && (
+            <GiftMultiSelect
+              placeholder={t("common.anyGift")}
+              gifts={gifts}
+              value={trigger.gifts}
+              onChange={(ids) => onChange({ ...trigger, gifts: ids })}
+            />
+          )}
           <Select
             className={styles.fill}
             aria-label={t("components.alertItem.whenItPlays")}
@@ -209,10 +243,12 @@ function rowSummary(
   emotes: EmoteOption[],
   language: string,
   pictured: boolean,
+  platforms: readonly Platform[],
 ): string {
   const t = (key: MessageKey, params?: Params) =>
     translate(language, key, params);
   const parts: string[] = [];
+  const unit = minUnit(trigger, platforms);
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
       if (!pictured) {
@@ -230,10 +266,8 @@ function rowSummary(
           : t("components.alertItem.streakEnds"),
       );
       // Only any gift has a worth to reach
-      if (trigger.gifts.length === 0 && trigger.min_coins > 0) {
-        parts.push(
-          t("components.alertItem.worth", { count: trigger.min_coins }),
-        );
+      if (trigger.gifts.length === 0 && trigger.min_coins > 0 && unit) {
+        parts.push(t(WORTH[unit], { count: trigger.min_coins }));
       }
       break;
     case EMOTE_TRIGGER:
@@ -288,6 +322,7 @@ function rowSummary(
  * What narrows the triggers, in the language: each trigger's conditions, as
  * a clause of their own (ROWS between them). Empty when nothing does.
  * Pictured leaves out the gifts and emotes of a trigger whose pictures show.
+ * The profile's platforms name a minimum's unit on rows for any platform.
  */
 export function triggerSummary(
   triggers: Trigger[],
@@ -295,6 +330,7 @@ export function triggerSummary(
   emotes: EmoteOption[],
   language: string,
   pictured = false,
+  platforms: readonly Platform[] = ["tiktok"],
 ): string {
   const rows = triggers
     .map((trigger) =>
@@ -304,6 +340,7 @@ export function triggerSummary(
         emotes,
         language,
         pictured && pictureList(trigger, gifts, emotes).some(Boolean),
+        platforms,
       ),
     )
     .filter(Boolean);
@@ -387,7 +424,15 @@ export function AlertItem({
   const { sound, tts, media } = alert;
   const triggers = triggersOf(alert);
   const pictures = triggerPictures(triggers, gifts, emotes);
-  const detail = triggerSummary(triggers, gifts, emotes, language, !!pictures);
+  const platforms = usePlatforms();
+  const detail = triggerSummary(
+    triggers,
+    gifts,
+    emotes,
+    language,
+    !!pictures,
+    platforms,
+  );
   // What the pictures show, for screen readers and on hover
   const names = pictures
     ? triggers

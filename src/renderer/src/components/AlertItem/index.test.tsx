@@ -1,5 +1,6 @@
 import { Alert } from "@/common/schemas";
-import { EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
+import { EMOTE_TRIGGER, Platform, TOKIO_EVENTS } from "@/common/types";
+import { PlatformsContext } from "@/context/platforms";
 import { createAlert } from "@/common/util";
 import { intersect } from "@test/dom";
 import { alertClip, alertMedia, gift, voice } from "@test/fixtures";
@@ -8,7 +9,13 @@ import userEvent from "@testing-library/user-event";
 import { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Params, translate } from "@/common/i18n";
-import { AlertItem, TriggerFilter, triggerLabel, triggerSummary } from ".";
+import {
+  AlertItem,
+  minUnit,
+  TriggerFilter,
+  triggerLabel,
+  triggerSummary,
+} from ".";
 
 const GIFTS = [gift(5655, "Rose"), gift(6064, "GG")];
 const EMOTES = [
@@ -503,5 +510,75 @@ describe("Redeem and platforms", () => {
     };
 
     expect(triggerLabel(withGift, t, "en")).toBe("Follow on Twitch or Gift");
+  });
+});
+
+describe("gift rows on each platform", () => {
+  const row = (patch: Partial<Alert["trigger"]> = {}) =>
+    alert({}, { type: TOKIO_EVENTS.GIFT, ...patch }).trigger;
+
+  it("takes the minimum in the row's currency", () => {
+    expect(minUnit(row(), ["tiktok"])).toBe("coins");
+    expect(minUnit(row(), ["kick", "youtube"])).toBe("kicks");
+    expect(minUnit(row(), ["tiktok", "kick"])).toBe("either");
+    // A row for one platform, whatever the profile has
+    expect(minUnit(row({ platform: "tiktok" }), ["tiktok", "kick"])).toBe(
+      "coins",
+    );
+    expect(minUnit(row({ platform: "youtube" }), ["tiktok"])).toBeNull();
+    // A minimum saved where gifts have no price stays to fix
+    expect(minUnit(row({ platform: "youtube", min_coins: 5 }), [])).toBe(
+      "coins",
+    );
+  });
+
+  it("sums up the minimum in it", () => {
+    const sum = (patch: Partial<Alert["trigger"]>, platforms: Platform[]) =>
+      triggerSummary(
+        [row({ min_coins: 100, ...patch })],
+        GIFTS,
+        EMOTES,
+        "en",
+        false,
+        platforms,
+      );
+
+    expect(sum({}, ["tiktok", "kick"])).toBe(
+      "Any gift, when the streak ends, worth 100+ coins or Kicks",
+    );
+    expect(sum({ platform: "kick" }, ["tiktok", "kick"])).toBe(
+      "Any gift, when the streak ends, worth 100+ Kicks",
+    );
+  });
+
+  it("offers TikTok's gifts only on rows they can set off, or with some picked", () => {
+    // Its text: the placeholder, or the gifts picked
+    const picker = (
+      trigger: Alert["trigger"],
+      platforms: Platform[],
+      text = "Any gift",
+    ) => {
+      const { unmount } = render(
+        <PlatformsContext value={platforms}>
+          <TriggerFilter
+            trigger={trigger}
+            gifts={GIFTS}
+            emotes={EMOTES}
+            onChange={vi.fn()}
+          />
+        </PlatformsContext>,
+      );
+      const shown = screen.queryByText(text) !== null;
+      unmount();
+      return shown;
+    };
+
+    expect(picker(row(), ["tiktok", "kick"])).toBe(true);
+    expect(picker(row(), ["kick", "youtube"])).toBe(false);
+    expect(picker(row({ platform: "tiktok" }), ["kick"])).toBe(true);
+    expect(picker(row({ platform: "kick" }), ["tiktok", "kick"])).toBe(false);
+    expect(
+      picker(row({ platform: "kick", gifts: [5655] }), ["kick"], "Rose"),
+    ).toBe(true);
   });
 });
