@@ -119,100 +119,101 @@
   }
 }
 
-/* The status line, with the platforms' logos at its end */
-.slate_head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.platforms {
-  display: flex;
-  gap: var(--space-1);
-}
-
-/* A logo, Paper over a rose line while picked, as a tab is */
-.platform {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--font-muted);
-  cursor: pointer;
-}
-
-.platform:hover:not(:disabled) {
-  background-color: var(--background-secondary-hover);
-  color: var(--font-secondary);
-}
-
-.platform[aria-pressed="true"] {
-  color: var(--font-primary);
-}
-
-.platform[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  right: 8px;
-  bottom: 2px;
-  left: 8px;
-  height: 2px;
-  border-radius: var(--radius-full);
-  background-color: var(--accent-primary);
-}
-
-.platform:disabled {
-  cursor: default;
-}
-
-/* Locked while connected: the picks stay readable, the rest fade */
-.platform:disabled[aria-pressed="false"] {
-  opacity: 0.5;
-}
-
-/* With several platforms, a row each: its logo, its channel or account,
-   and how it's doing */
+/* With several platforms, a row each: its logo and name, its channel or
+   account with how it's doing under it, its own Connect, and Remove. The
+   columns are fixed so the fields line up from row to row. */
 .rows {
   display: flex;
-  flex: 1;
   flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
+  gap: var(--space-3);
   list-style: none;
 }
 
 .row {
+  display: grid;
+  grid-template-columns: 18px 4.5rem minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+/* The only platform: no Connect or Remove of its own */
+.row_alone {
+  grid-template-columns: 18px 4.5rem minmax(0, 1fr);
+}
+
+/* Both centered on the field's line, not on the row with its state */
+.row_icon {
+  margin-top: calc((var(--control-height) - 18px) / 2);
+  color: var(--font-muted);
+}
+
+.row_name {
+  color: var(--font-secondary);
+  font-size: var(--font-md);
+  font-weight: 500;
+  line-height: var(--control-height);
+}
+
+.row_field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* While its platform is on, the channel reads as a name, not a field,
+   lined up with its state under it */
+.row_input:disabled {
+  padding-inline: 0;
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--font-primary);
+  cursor: default;
+}
+
+/* The account signed in to, where a field would be */
+.row_account {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  min-height: var(--control-height-lg);
-}
-
-.row_icon {
-  flex-shrink: 0;
-  color: var(--font-secondary);
-}
-
-/* The account signed in to, as the handle reads */
-.account {
-  flex: 1;
-  min-width: 0;
+  height: var(--control-height);
   overflow: hidden;
   color: var(--font-primary);
-  font-size: var(--font-2xl);
-  font-weight: 600;
+  font-size: var(--font-md);
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.row_state {
+  color: var(--font-secondary);
+  font-size: var(--font-sm);
+}
+
+.row_up {
+  color: var(--font-primary);
+}
+
+.row_icon.row_up {
+  color: var(--accent-primary);
+}
+
+/* What a platform needs before it can connect */
+.row_need {
+  color: var(--danger);
+  font-size: var(--font-sm);
+}
+
+/* As wide as either label, so the columns don't move */
+.row_btn {
+  min-width: 8.5rem;
+}
+
 .account_missing {
+  display: flex;
   flex: 1;
+  align-items: center;
   min-width: 0;
+  min-height: var(--control-height);
   color: var(--font-secondary);
   font-size: var(--font-md);
 }
@@ -221,45 +222,69 @@
   color: var(--accent-primary);
 }
 
-.platform_state {
+/* Red when it's what Twitch needs, at the sentence's own size */
+.account_missing.need {
+  color: var(--danger);
+  font-size: var(--font-md);
+}
+
+.connect_box {
   display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--font-secondary);
-  font-size: var(--font-sm);
-  font-weight: 500;
-  white-space: nowrap;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-.platform_up {
-  color: var(--font-primary);
-}
-
-.connect {
+/* Add a platform on the left, Connect all on the right, also once every
+   platform is added and Add is gone */
+.connect_foot {
   display: flex;
   align-items: center;
   gap: var(--space-4);
 }
 
-/* The handle as the slate's headline: a hairline under it, rose on focus
-   from the Input's own :focus */
-.connect .username {
-  flex: 1;
-  height: var(--control-height-lg);
-  padding: 0;
-  border-width: 0 0 1px;
-  border-radius: 0;
-  background-color: transparent;
-  font-size: var(--font-2xl);
-  font-weight: 600;
+.connect_foot .connect_btn {
+  margin-left: auto;
 }
 
-/* While LIVE the handle is the slate's title, not a field */
-.connect .username:disabled {
-  border-color: transparent;
+/* The Add menu, under its button */
+.add {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 200px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--background-secondary);
+  box-shadow: var(--shadow-popover);
+}
+
+.menu_item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
   color: var(--font-primary);
-  cursor: default;
+  font: inherit;
+  font-size: var(--font-md);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu_item:hover {
+  background-color: var(--background-secondary-hover);
 }
 
 /* As wide as either label, so the spinner doesn't move it */
