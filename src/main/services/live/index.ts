@@ -11,8 +11,16 @@ import {
   TokioEventMap,
   UserData,
 } from "@/common/types";
-import { defaultStoreData, isPlatform } from "@/common/util";
+import {
+  defaultStoreData,
+  GIFT_CURRENCY,
+  isPlatform,
+  platformOf,
+} from "@/common/util";
+import { parseAmount } from "@/helper/amount";
 import { GiftStreaks } from "@/helper/streaks";
+import Logger from "@/logger";
+import type { RatesService } from "../rates";
 import { Service } from "../shared";
 
 // The feed keeps this many of the latest events
@@ -46,6 +54,17 @@ export const ACTIVITY_EVENTS = [
 type ActivityEvent = (typeof ACTIVITY_EVENTS)[number];
 
 // What each event does to the session, true when it changes it
+// Converts amounts by currency to US dollars
+type Rates = Pick<RatesService, "toUsd">;
+
+// Until setRates, only dollars convert, so nothing fetches rates
+const dollarsOnly: Rates = {
+  toUsd: (amounts) =>
+    Object.keys(amounts).some((code) => code !== "USD")
+      ? null
+      : (amounts.USD ?? 0),
+};
+
 type Recorders = {
   [K in ActivityEvent]: (data: TokioEventMap[K]) => boolean;
 };
@@ -105,6 +124,11 @@ export class LiveService extends Service {
   private _viewers: number[] = [];
   // Each platform's own totals and viewers
   private _platforms: Partial<Record<Platform, PlatformLive>> = {};
+  // The Super Chats' amounts by currency code, added up in dollars on read
+  private _superChats: Record<string, number> = {};
+  // Super Chat amounts already warned about, once each
+  private _unread = new Set<string>();
+  private _rates: Rates = dollarsOnly;
 
   private readonly _recorders: Recorders = {
     [TOKIO_EVENTS.CHAT]: ({ user, comment }) =>
@@ -121,8 +145,10 @@ export class LiveService extends Service {
       const { added, total } = this._streaks.add(event);
       const { user, gift } = event;
       const unit = Math.max(0, gift.coins);
+      // A Kick gift's coins are Kicks, and YouTube's Gifts have no price
+      const currency = GIFT_CURRENCY[platformOf(user)];
       this._count(user, "gifts", added);
-      this._count(user, "coins", unit * added);
+      if (currency) this._count(user, currency, unit * added);
       const listed =
         gift.repeatEnd &&
         this._add({
@@ -159,13 +185,17 @@ export class LiveService extends Service {
       }),
     [TOKIO_EVENTS.GIFT_SUB]: ({ user, count }) =>
       this._add({ type: "giftsub", user: activityUser(user), count }),
-    [TOKIO_EVENTS.CHEER]: ({ user, bits, message }) =>
+    // True even when the feed hides cheers, since the Bits count
+    [TOKIO_EVENTS.CHEER]: ({ user, bits, message }) => {
+      this._count(user, "bits", Math.max(0, bits));
       this._add({
         type: "cheer",
         user: activityUser(user),
         bits,
         text: message,
-      }),
+      });
+      return true;
+    },
     [TOKIO_EVENTS.RAID]: ({ user, viewers }) =>
       this._add({ type: "raid", user: activityUser(user), viewers }),
     [TOKIO_EVENTS.REDEEM]: ({ user, reward, input }) =>
@@ -175,15 +205,19 @@ export class LiveService extends Service {
         reward: reward.title,
         text: input,
       }),
-    // Not in the coins: its amount is in the viewer's currency
-    [TOKIO_EVENTS.SUPER_CHAT]: ({ user, amount, message, sticker }) =>
+    // Its amount is added up apart, in its currency, and read in dollars
+    [TOKIO_EVENTS.SUPER_CHAT]: ({ user, amount, message, sticker }) => {
+      this._count(user, "superChats", 1);
+      this._addAmount(amount);
       this._add({
         type: "superchat",
         user: activityUser(user),
         amount,
         text: message,
         sticker,
-      }),
+      });
+      return true;
+    },
   };
 
   /** Starts a LIVE, clearing the last one's totals and feed. */
@@ -193,7 +227,13 @@ export class LiveService extends Service {
     this._activity = [];
     this._viewers = [];
     this._platforms = {};
+    this._superChats = {};
     this._streaks.clear();
+  }
+
+  /** Sets what converts the Super Chats to dollars. */
+  public setRates(rates: Rates) {
+    this._rates = rates;
   }
 
   /** Ends the LIVE. Its feed stays until the next one starts. */
@@ -256,7 +296,7 @@ export class LiveService extends Service {
       activity: [...this._activity],
       viewers: [...this._viewers],
       platforms: structuredClone(this._platforms),
-      usd: 0,
+      usd: this._rates.toUsd(this._superChats),
     };
   }
 
@@ -269,6 +309,20 @@ export class LiveService extends Service {
   private _count(user: UserData, total: keyof LiveTotals, n: number) {
     this._totals[total] += n;
     this._of(user.platform).totals[total] += n;
+  }
+
+  private _addAmount(text: string) {
+    const amount = parseAmount(text);
+    if (amount) {
+      this._superChats[amount.currency] =
+        (this._superChats[amount.currency] ?? 0) + amount.value;
+    } else if (!this._unread.has(text)) {
+      this._unread.add(text);
+      Logger.warn(
+        `<Live> Couldn't read the Super Chat amount ${JSON.stringify(text)}, left out of the total`,
+        this._logFile,
+      );
+    }
   }
 
   // False when the feed hides it

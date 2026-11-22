@@ -7,7 +7,8 @@ import {
   UserData,
 } from "@/common/types";
 import { defaultStoreData } from "@/common/util";
-import { beforeEach, describe, expect, it } from "vitest";
+import Logger from "@/logger";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ACTIVITY_LIMIT,
   JOIN_LIMIT,
@@ -224,7 +225,8 @@ describe("LiveService", () => {
       followers: 2,
       shares: 1,
       gifts: 3,
-      coins: 11,
+      coins: 1,
+      kicks: 10,
     });
     expect(session.platforms).toEqual({
       tiktok: {
@@ -232,8 +234,21 @@ describe("LiveService", () => {
         viewers: [],
       },
       twitch: { totals: { ...noTotals, followers: 1 }, viewers: [] },
-      kick: { totals: { ...noTotals, gifts: 2, coins: 10 }, viewers: [] },
+      kick: { totals: { ...noTotals, gifts: 2, kicks: 10 }, viewers: [] },
     });
+    // The feed keeps the name overlays read
+    expect(session.activity[1]).toMatchObject({
+      gift: { count: 2, coins: 10 },
+    });
+  });
+
+  it("counts YouTube's Gifts without a price", () => {
+    live.record(TOKIO_EVENTS.GIFT, {
+      ...gift({ comboCount: 3, coins: 7 }),
+      user: viewer("mia", { platform: "youtube" }),
+    });
+
+    expect(live.getSession().totals).toEqual({ ...noTotals, gifts: 3 });
   });
 
   it("lists Twitch's subs, gifted subs, cheers, raids and redeems, with the platform", () => {
@@ -268,11 +283,18 @@ describe("LiveService", () => {
         text: "three months",
       },
     ]);
-    // Neither coins nor gifts
-    expect(live.getSession().totals).toEqual(noTotals);
+    // Only the Bits
+    const totals = { ...noTotals, bits: 100 };
+    expect(live.getSession().totals).toEqual(totals);
+    expect(live.getSession().platforms.twitch).toEqual({
+      totals,
+      viewers: [],
+    });
   });
 
-  it("lists YouTube's Super Chats and Super Stickers without coins", () => {
+  it("lists YouTube's Super Chats and Super Stickers, adding them up by currency", () => {
+    const toUsd = vi.fn(() => 9.99);
+    live.setRates({ toUsd });
     const user = viewer("kai", { platform: "youtube" });
     const kai = { ...shown("kai"), platform: "youtube" };
 
@@ -307,7 +329,63 @@ describe("LiveService", () => {
         sticker: "",
       },
     ]);
-    expect(live.getSession().totals).toEqual(noTotals);
+    const totals = { ...noTotals, superChats: 2 };
+    expect(live.getSession()).toMatchObject({
+      totals,
+      platforms: { youtube: { totals } },
+      usd: 9.99,
+    });
+    expect(toUsd).toHaveBeenLastCalledWith({ USD: 4.99, MXN: 100 });
+  });
+
+  it("gives no dollars while the rates haven't loaded", () => {
+    live.setRates({ toUsd: () => null });
+    live.record(TOKIO_EVENTS.SUPER_CHAT, {
+      user: viewer("kai", { platform: "youtube" }),
+      amount: "€5.00",
+      message: "",
+      sticker: "",
+    });
+
+    expect(live.getSession().usd).toBeNull();
+  });
+
+  it("converts only dollars until it has the rates", () => {
+    const superChat = (amount: string) =>
+      live.record(TOKIO_EVENTS.SUPER_CHAT, {
+        user: viewer("kai", { platform: "youtube" }),
+        amount,
+        message: "",
+        sticker: "",
+      });
+
+    superChat("$4.99");
+    superChat("$5.01");
+    expect(live.getSession().usd).toBe(10);
+    superChat("€5.00");
+    expect(live.getSession().usd).toBeNull();
+  });
+
+  it("counts a Super Chat whose amount it can't read, warning once", () => {
+    const warn = vi.spyOn(Logger, "warn");
+    const toUsd = vi.fn(() => 0);
+    live.setRates({ toUsd });
+    for (let i = 0; i < 2; i++) {
+      live.record(TOKIO_EVENTS.SUPER_CHAT, {
+        user: viewer("kai", { platform: "youtube" }),
+        amount: "Free",
+        message: "",
+        sticker: "",
+      });
+    }
+
+    expect(live.getSession().totals.superChats).toBe(2);
+    expect(toUsd).toHaveBeenLastCalledWith({});
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/^<Live> .*"Free"/),
+      undefined,
+    );
   });
 
   it("puts joins in a row in one item, naming the first two", () => {
@@ -381,7 +459,15 @@ describe("LiveService", () => {
   });
 
   it("clears the last LIVE when another starts", () => {
+    const toUsd = vi.fn(() => 0);
+    live.setRates({ toUsd });
     live.record(TOKIO_EVENTS.FOLLOW, { user: viewer("sora") });
+    live.record(TOKIO_EVENTS.SUPER_CHAT, {
+      user: viewer("kai", { platform: "youtube" }),
+      amount: "$4.99",
+      message: "",
+      sticker: "",
+    });
 
     live.start(1000);
 
@@ -393,6 +479,7 @@ describe("LiveService", () => {
       platforms: {},
       usd: 0,
     });
+    expect(toUsd).toHaveBeenLastCalledWith({});
   });
 
   it("keeps the feed when the LIVE ends, until the next one starts", () => {
@@ -563,6 +650,32 @@ describe("LiveService", () => {
         viewers: [],
         platforms: { tiktok: { totals, viewers: [] } },
         usd: 0,
+      });
+    });
+
+    it("still counts hidden cheers and Super Chats, telling the session changed", () => {
+      live.setFeed(hiding("cheer", "superchat"));
+
+      expect(
+        live.record(TOKIO_EVENTS.CHEER, {
+          user: viewer("kai", { platform: "twitch" }),
+          bits: 50,
+          message: "",
+        }),
+      ).toBe(true);
+      expect(
+        live.record(TOKIO_EVENTS.SUPER_CHAT, {
+          user: viewer("kai", { platform: "youtube" }),
+          amount: "$2.00",
+          message: "",
+          sticker: "",
+        }),
+      ).toBe(true);
+
+      expect(live.getSession()).toMatchObject({
+        totals: { bits: 50, superChats: 1 },
+        activity: [],
+        usd: 2,
       });
     });
 
