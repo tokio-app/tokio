@@ -17,6 +17,7 @@ import {
 } from "../types/connector";
 import {
   fillStudioText,
+  NO_MONEY,
   goalValue,
   listRow,
   newStudioElement,
@@ -74,6 +75,20 @@ describe("fillStudioText", () => {
     );
   });
 
+  it("shows the Super Chats in dollars, and a dash until the rates load", () => {
+    expect(fill("{coins} {kicks} {bits} {superchats}", null)).toBe(
+      "4.2K 1.9K 2.5K $86.50",
+    );
+    const waiting = fillStudioText("{superchats}", {
+      numbers: { ...SAMPLE_NUMBERS, superchats: null },
+      counters: {},
+      values: null,
+      variables: [],
+      language: "en",
+    });
+    expect(waiting).toBe(NO_MONEY);
+  });
+
   it("fills the event's values, and a comment that says {likes} stays as typed", () => {
     expect(fill("{username}: {comment} ({likes})", chat("{likes}?"))).toBe(
       "Sora: {likes}? (12.8K)",
@@ -103,6 +118,10 @@ describe("goalValue", () => {
     // Own keys only
     expect(goalValue("constructor", SAMPLE_NUMBERS, {})).toBe(0);
     expect(goalValue("gone", SAMPLE_NUMBERS, counters)).toBe(0);
+    // Super Chats before the rates load
+    expect(
+      goalValue("superchats", { ...SAMPLE_NUMBERS, superchats: null }, {}),
+    ).toBe(0);
   });
 });
 

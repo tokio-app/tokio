@@ -55,7 +55,8 @@ export function liveNumbers(
   now = Date.now(),
 ): StudioNumbers {
   const { likes, viewers } = storeManagerService.getLiveStats();
-  const { startedAt, totals } = liveService.getSession();
+  const session = liveService.getSession();
+  const { startedAt, totals } = session;
   const live = startedAt !== null;
   return {
     likes,
@@ -63,6 +64,9 @@ export function liveNumbers(
     followers: live ? totals.followers : 0,
     shares: live ? totals.shares : 0,
     coins: live ? totals.coins : 0,
+    kicks: live ? totals.kicks : 0,
+    bits: live ? totals.bits : 0,
+    superchats: live ? session.usd : 0,
     gifts: live ? totals.gifts : 0,
     uptime: live ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0,
   };
@@ -115,16 +119,18 @@ function viewOf(
       sentPicture(element, studio.kept(overlay.id, element)?.values ?? null),
     fill: (element) =>
       goalValue(element.number, numbers, studio.counts(overlay)) / element.goal,
-    // This LIVE's top gifters by coins, else the newest first
-    rows: ({ source }) =>
+    // This LIVE's top gifters on the list's platform, else the newest first
+    rows: ({ source, platform }) =>
       (source === "gifters"
-        ? services.historyService.top().live.map((g) => ({
-            picture: g.picture,
-            name: g.username || g.handle,
-            text: "",
-            icon: "",
-            value: g.live.coins,
-          }))
+        ? (services.historyService.topByPlatform()[platform] ?? []).map(
+            (g) => ({
+              picture: g.picture,
+              name: g.username || g.handle,
+              text: "",
+              icon: "",
+              value: g.live.coins,
+            }),
+          )
         : studio.list(source)
       ).map((entry) => listRow(entry, language())),
     // The page doesn't show it; the editor names embeds itself

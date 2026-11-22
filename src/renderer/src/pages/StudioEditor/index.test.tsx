@@ -4207,6 +4207,29 @@ describe("StudioEditor", () => {
       expect(page().getByRole("group", { name: "Number color" })).toBeVisible();
     });
 
+    it("picks whose top gifters it shows once the profile uses Kick", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+      await user.click(row(/^Top gifters/));
+      // TikTok's alone: nothing to pick
+      expect(page().queryByRole("group", { name: "Platform" })).toBeNull();
+
+      await send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = ["tiktok", "kick"];
+        }),
+      );
+      await user.click(field("Platform").getByText("TikTok"));
+      await user.click(
+        inList(page().getByRole("group", { name: "Platform" }), "Kick")!,
+      );
+
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ platform: "kick" }),
+      );
+    });
+
     it("lists another source, with its own rows and fields", async () => {
       const list = elementOf("list");
       const { user } = await open(holding(list));

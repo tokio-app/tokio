@@ -13,6 +13,9 @@ import {
   NumberInput,
   Select,
 } from "@/components";
+import { PLATFORMS, Platform } from "@/common/types";
+import { GIFT_CURRENCY, PLATFORM_LABELS } from "@/common/util";
+import { usePlatforms } from "@/context/platforms";
 import { useOptions, useT } from "@/ui/i18n";
 import styles from "./studioeditor.module.css";
 
@@ -20,6 +23,9 @@ const SOURCES = STUDIO_LIST_SOURCES.map((value) => ({
   value,
   label: `studio.list.sources.${value}` as const,
 }));
+
+// The platforms whose gifts have a price, so their gifters can be ranked
+const GIFTING = PLATFORMS.filter((p) => GIFT_CURRENCY[p]);
 
 type List = StudioElementOf<"list">;
 
@@ -29,13 +35,21 @@ type Props = {
 };
 
 /**
- * A list's source and how many rows it shows, its text and the values' color
+ * A list's source (and whose top gifters, with Kick) and how many rows it shows, its text and the values' color
  * (top gifters' coins, gifts' counts), and its pictures.
  */
 export function ListFields({ element, onChange }: Props) {
   const t = useT();
   const sources = useOptions(SOURCES);
   const valued = element.source === "gifters" || element.source === "gifts";
+  const platforms = usePlatforms();
+  // Only once there's a choice: TikTok's gifters otherwise, as before Kick
+  const pickPlatform =
+    element.source === "gifters" &&
+    (platforms.includes("kick") || element.platform !== "tiktok");
+  const platformOptions = [
+    ...new Set<Platform>([...GIFTING, element.platform]),
+  ].map((value) => ({ value, label: PLATFORM_LABELS[value] }));
 
   return (
     <>
@@ -47,6 +61,16 @@ export function ListFields({ element, onChange }: Props) {
           onChange={(source) => onChange({ ...element, source })}
         />
       </Field>
+      {pickPlatform && (
+        <Field label={t("studio.list.platform")}>
+          <Select
+            aria-label={t("studio.list.platform")}
+            options={platformOptions}
+            value={element.platform}
+            onChange={(platform) => onChange({ ...element, platform })}
+          />
+        </Field>
+      )}
       <div className={styles.pair}>
         <Field label={t("studio.list.rows")}>
           <NumberInput

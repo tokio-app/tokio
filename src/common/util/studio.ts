@@ -38,7 +38,7 @@ import {
   messageValues,
   triggersOf,
 } from "./alerts";
-import { formatDuration, formatStat } from "./format";
+import { formatDuration, formatMoney, formatStat } from "./format";
 import { generateEmoteChatSample, generateTikTokEventSample } from "./samples";
 
 // The live numbers any text can show, as {likes}
@@ -48,6 +48,9 @@ export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
   "followers",
   "shares",
   "coins",
+  "kicks",
+  "bits",
+  "superchats",
   "gifts",
   "uptime",
 ];
@@ -59,6 +62,9 @@ export const SAMPLE_NUMBERS: StudioNumbers = {
   followers: 58,
   shares: 17,
   coins: 4_210,
+  kicks: 1_850,
+  bits: 2_500,
+  superchats: 86.5,
   gifts: 342,
   // 01:23:00
   uptime: 4_980,
@@ -106,6 +112,9 @@ export const studioElements = (overlay: StudioOverlay): StudioElement[] =>
     item.kind === "group" ? item.elements : [item],
   );
 
+// {superchats} until the exchange rates load
+export const NO_MONEY = "—";
+
 // Own keys only, so {constructor} isn't a number
 const isNumber = (
   numbers: StudioNumbers,
@@ -122,7 +131,7 @@ export const goalValue = (
   counters: Record<string, number>,
 ) =>
   name !== "uptime" && isNumber(numbers, name)
-    ? numbers[name]
+    ? (numbers[name] ?? 0)
     : Object.hasOwn(counters, name)
       ? counters[name]
       : 0;
@@ -140,8 +149,8 @@ type FillOptions = {
 
 /**
  * A studio text with its variables filled in one pass, so a viewer's
- * comment that says {likes} stays as typed: the live numbers, compact (1.2K)
- * and the LIVE's length as 01:02:03, then the counters by name, then the
+ * comment that says {likes} stays as typed: the live numbers, compact (1.2K),
+ * the Super Chats' dollars and the LIVE's length as 01:02:03, then the counters by name, then the
  * event's values. A variable of its triggers this event lacks reads "", and
  * any other stays as written.
  */
@@ -152,9 +161,13 @@ export function fillStudioText(
   const sent = values === null ? null : messageValues(values);
   return template.replace(/\{(\w+)\}/g, (match, name: string) => {
     if (isNumber(numbers, name)) {
-      return name === "uptime"
-        ? formatDuration(numbers.uptime * 1000)
-        : formatStat(numbers[name], language).short;
+      if (name === "uptime") return formatDuration(numbers.uptime * 1000);
+      if (name === "superchats") {
+        return numbers.superchats === null
+          ? NO_MONEY
+          : formatMoney(numbers.superchats, language).short;
+      }
+      return formatStat(numbers[name], language).short;
     }
     if (Object.hasOwn(counters, name)) {
       return formatStat(counters[name], language).short;

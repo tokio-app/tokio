@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TOKIO_EVENTS } from "../types/connector";
+import { PLATFORMS, TOKIO_EVENTS } from "../types/connector";
 import {
   CUT,
   GAMES_OVERLAY_MAX_COLUMNS,
@@ -408,6 +408,9 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     ...ELEMENT,
     kind: z.literal("list"),
     source: z.enum(STUDIO_LIST_SOURCES).default("gifters"),
+    // Whose top gifters a gifters list shows: each platform's currency is
+    // counted apart, and older overlays showed TikTok's
+    platform: z.enum(PLATFORMS).default("tiktok"),
     // How many it shows at most
     rows: z.number().int().min(1).max(STUDIO_MAX_LIST_ROWS).default(5),
     // As a text's: a font installed where the streaming app runs, Archivo
