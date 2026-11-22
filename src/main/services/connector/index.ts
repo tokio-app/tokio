@@ -215,6 +215,13 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     return status;
   }
 
+  /** Each platform's viewers now, from its last room numbers. */
+  public viewers(): Partial<Record<Platform, number>> {
+    return Object.fromEntries(
+      [...this._rooms].map(([platform, room]) => [platform, room.viewers]),
+    );
+  }
+
   public async fetchGifts(): Promise<GiftResponse> {
     const res = await this._current.provider.fetchGifts();
     if (!res.success) {

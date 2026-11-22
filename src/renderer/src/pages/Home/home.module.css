@@ -395,6 +395,7 @@
 .stat_value,
 .peak_value,
 .tooltip_value,
+.tab_count,
 .rank {
   font-stretch: var(--stretch-readout);
   font-weight: 700;
@@ -404,6 +405,8 @@
 
 .hero_value {
   grid-area: 1 / 1;
+  /* So switching tabs between 860 and 4.4K doesn't move the line */
+  min-width: 4ch;
   color: var(--font-primary);
   font-size: var(--font-4xl);
 }

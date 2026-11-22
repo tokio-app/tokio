@@ -17,6 +17,8 @@ import {
 
 const MINUTE = 60_000;
 
+const noTotals = { followers: 0, shares: 0, gifts: 0, coins: 0 };
+
 const viewer = (handle: string, patch: Partial<UserData> = {}): UserData => ({
   username: `${handle} name`,
   handle,
@@ -72,9 +74,10 @@ describe("LiveService", () => {
   it("starts without a LIVE", () => {
     expect(live.getSession()).toEqual({
       startedAt: null,
-      totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
+      totals: noTotals,
       activity: [],
       viewers: [],
+      platforms: {},
     });
   });
 
@@ -193,6 +196,35 @@ describe("LiveService", () => {
       { id: 2, type: "share", user: shown("ren") },
       { id: 1, type: "follow", user: shown("sora") },
     ]);
+  });
+
+  it("counts each platform's follows, shares, gifts and coins on its own too", () => {
+    live.record(TOKIO_EVENTS.FOLLOW, { user: viewer("sora") });
+    live.record(TOKIO_EVENTS.SHARE, { user: viewer("ren"), shareCount: 1 });
+    live.record(TOKIO_EVENTS.FOLLOW, {
+      user: viewer("kai", { platform: "twitch" }),
+    });
+    live.record(TOKIO_EVENTS.GIFT, {
+      ...gift({ comboCount: 2, coins: 5 }),
+      user: viewer("mia", { platform: "kick" }),
+    });
+    live.record(TOKIO_EVENTS.GIFT, gift());
+
+    const session = live.getSession();
+    expect(session.totals).toEqual({
+      followers: 2,
+      shares: 1,
+      gifts: 3,
+      coins: 11,
+    });
+    expect(session.platforms).toEqual({
+      tiktok: {
+        totals: { followers: 1, shares: 1, gifts: 1, coins: 1 },
+        viewers: [],
+      },
+      twitch: { totals: { ...noTotals, followers: 1 }, viewers: [] },
+      kick: { totals: { ...noTotals, gifts: 2, coins: 10 }, viewers: [] },
+    });
   });
 
   it("lists Twitch's subs, gifted subs, cheers, raids and redeems, with the platform", () => {
@@ -356,9 +388,10 @@ describe("LiveService", () => {
 
     expect(live.getSession()).toEqual({
       startedAt: 1000,
-      totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
+      totals: noTotals,
       activity: [],
       viewers: [],
+      platforms: {},
     });
   });
 
@@ -384,13 +417,16 @@ describe("LiveService", () => {
 
   it("gives a copy that later events don't change", () => {
     join(live, "kai");
+    live.record(TOKIO_EVENTS.SHARE, { user: viewer("ren"), shareCount: 1 });
     const before = live.getSession();
 
     join(live, "yui");
     live.record(TOKIO_EVENTS.FOLLOW, { user: viewer("sora") });
 
     expect(before.totals.followers).toBe(0);
+    expect(before.platforms.tiktok?.totals.followers).toBe(0);
     expect(before.activity).toEqual([
+      { id: 2, type: "share", user: shown("ren") },
       { id: 1, type: "join", users: [shown("kai")], count: 1 },
     ]);
   });
@@ -403,66 +439,96 @@ describe("LiveService", () => {
     });
 
     it("keeps each minute's highest count, true only as a later minute starts", () => {
-      expect(live.recordViewers(10, 0)).toBe(false);
-      expect(live.recordViewers(30, 20_000)).toBe(false);
-      expect(live.recordViewers(20, 59_999)).toBe(false);
-      expect(live.recordViewers(5, MINUTE)).toBe(true);
-      expect(live.recordViewers(8, MINUTE + 1)).toBe(false);
+      expect(live.recordViewers(10, {}, 0)).toBe(false);
+      expect(live.recordViewers(30, {}, 20_000)).toBe(false);
+      expect(live.recordViewers(20, {}, 59_999)).toBe(false);
+      expect(live.recordViewers(5, {}, MINUTE)).toBe(true);
+      expect(live.recordViewers(8, {}, MINUTE + 1)).toBe(false);
 
       expect(viewers()).toEqual([30, 8]);
     });
 
     it("repeats the last count over minutes without one", () => {
-      live.recordViewers(10, 0);
-      expect(live.recordViewers(40, 3 * MINUTE)).toBe(true);
+      live.recordViewers(10, {}, 0);
+      expect(live.recordViewers(40, {}, 3 * MINUTE)).toBe(true);
 
       expect(viewers()).toEqual([10, 10, 10, 40]);
     });
 
     it("fills the minutes before the first count with it", () => {
-      expect(live.recordViewers(7, 2 * MINUTE)).toBe(true);
+      expect(live.recordViewers(7, {}, 2 * MINUTE)).toBe(true);
 
       expect(viewers()).toEqual([7, 7, 7]);
     });
 
     it("ignores counts before a LIVE starts and after it ends", () => {
       const idle = new LiveService();
-      expect(idle.recordViewers(10, 0)).toBe(false);
+      expect(idle.recordViewers(10, {}, 0)).toBe(false);
       expect(idle.getSession().viewers).toEqual([]);
 
-      live.recordViewers(10, 0);
+      live.recordViewers(10, {}, 0);
       live.end();
-      expect(live.recordViewers(50, MINUTE)).toBe(false);
+      expect(live.recordViewers(50, {}, MINUTE)).toBe(false);
       expect(viewers()).toEqual([10]);
     });
 
     it("starts over with the next LIVE", () => {
-      live.recordViewers(10, 0);
-      live.recordViewers(20, MINUTE);
+      live.recordViewers(10, {}, 0);
+      live.recordViewers(20, {}, MINUTE);
 
       live.start(5 * MINUTE);
 
       expect(viewers()).toEqual([]);
-      expect(live.recordViewers(3, 5 * MINUTE)).toBe(false);
+      expect(live.recordViewers(3, {}, 5 * MINUTE)).toBe(false);
       expect(viewers()).toEqual([3]);
     });
 
     it("keeps a clock set back in the minute it reached", () => {
-      live.recordViewers(10, 0);
-      live.recordViewers(20, 2 * MINUTE);
+      live.recordViewers(10, {}, 0);
+      live.recordViewers(20, {}, 2 * MINUTE);
 
-      expect(live.recordViewers(50, MINUTE)).toBe(false);
-      expect(live.recordViewers(60, -MINUTE)).toBe(false);
+      expect(live.recordViewers(50, {}, MINUTE)).toBe(false);
+      expect(live.recordViewers(60, {}, -MINUTE)).toBe(false);
 
       expect(viewers()).toEqual([10, 10, 60]);
     });
 
-    it(`stops after ${VIEWER_MINUTES} minutes`, () => {
-      live.recordViewers(10, 0);
-      expect(live.recordViewers(20, (VIEWER_MINUTES - 1) * MINUTE)).toBe(true);
+    it("keeps each platform's viewers, 0 before its first count and once it's gone", () => {
+      live.recordViewers(10, { tiktok: 10 }, 0);
+      // Kick joins two minutes in, and leaves a minute later
+      expect(live.recordViewers(15, { tiktok: 10, kick: 5 }, 2 * MINUTE)).toBe(
+        true,
+      );
+      live.recordViewers(12, { tiktok: 12 }, 3 * MINUTE);
+      live.recordViewers(9, { tiktok: 9 }, 3 * MINUTE + 1);
 
-      expect(live.recordViewers(30, VIEWER_MINUTES * MINUTE)).toBe(false);
-      expect(live.recordViewers(40, (VIEWER_MINUTES + 5) * MINUTE)).toBe(false);
+      expect(viewers()).toEqual([10, 10, 15, 12]);
+      expect(live.getSession().platforms).toEqual({
+        tiktok: { totals: noTotals, viewers: [10, 10, 10, 12] },
+        kick: { totals: noTotals, viewers: [0, 0, 5, 0] },
+      });
+    });
+
+    it("gives a platform with events but no count yet 0 viewers", () => {
+      live.record(TOKIO_EVENTS.FOLLOW, {
+        user: viewer("kai", { platform: "twitch" }),
+      });
+
+      live.recordViewers(10, { tiktok: 10 }, MINUTE);
+
+      expect(live.getSession().platforms.twitch?.viewers).toEqual([0, 0]);
+    });
+
+    it(`stops after ${VIEWER_MINUTES} minutes`, () => {
+      live.recordViewers(10, {}, 0);
+      expect(live.recordViewers(20, {}, (VIEWER_MINUTES - 1) * MINUTE)).toBe(
+        true,
+      );
+
+      expect(live.recordViewers(30, {}, VIEWER_MINUTES * MINUTE)).toBe(false);
+      expect(live.recordViewers(40, {}, (VIEWER_MINUTES + 5) * MINUTE)).toBe(
+        false,
+      );
 
       expect(viewers()).toHaveLength(VIEWER_MINUTES);
       expect(viewers().at(-1)).toBe(20);
@@ -489,11 +555,13 @@ describe("LiveService", () => {
       );
       live.record(TOKIO_EVENTS.FOLLOW, { user: viewer("sora") });
 
+      const totals = { followers: 1, shares: 0, gifts: 2, coins: 2 };
       expect(live.getSession()).toEqual({
         startedAt: null,
-        totals: { followers: 1, shares: 0, gifts: 2, coins: 2 },
+        totals,
         activity: [{ id: 1, type: "follow", user: shown("sora") }],
         viewers: [],
+        platforms: { tiktok: { totals, viewers: [] } },
       });
     });
 

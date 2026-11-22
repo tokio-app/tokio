@@ -229,7 +229,7 @@ describe("About", () => {
     await send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: true,
       live: true,
-      stats: { views: 0, viewers: 0, likes: 0 },
+      stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
     });
 
     await user.click(screen.getByRole("button", { name: /Restart to update/ }));

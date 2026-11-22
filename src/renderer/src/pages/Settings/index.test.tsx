@@ -22,7 +22,7 @@ const connected = (success: boolean) =>
   send(APP_EVENTS_RESPONSE.CONNECTED, {
     success,
     live: success,
-    stats: { views: 0, viewers: 0, likes: 0 },
+    stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
   });
 
 async function setup(reply = profiles) {

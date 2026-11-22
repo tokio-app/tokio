@@ -110,6 +110,8 @@ const folders: Folders = {
 };
 
 const noStats = { likes: 0, viewers: 0, views: 0 };
+// What CONNECTED says without a LIVE
+const noLiveStats = { ...noStats, platformViewers: {} };
 const profile: Profile = { ...defaultProfile, name: "Stream" };
 const profiles = [{ name: "Stream", file: "stream.json" }];
 const tiktokRose: Gift = {
@@ -252,6 +254,7 @@ function setup() {
       (..._args: Parameters<ConnectorService["onTwitchAccount"]>) => {},
     ),
     status: vi.fn((): ReturnType<ConnectorService["status"]> => ({})),
+    viewers: vi.fn((): ReturnType<ConnectorService["viewers"]> => ({})),
     isConnected: vi.fn(() => false),
     isReconnecting: vi.fn(() => false),
     isWaiting: vi.fn(() => false),
@@ -407,6 +410,9 @@ function setup() {
       live: [],
       allTime: [],
     })),
+    topByPlatform: vi.fn(
+      (): ReturnType<HistoryService["topByPlatform"]> => ({}),
+    ),
     getHistory: vi.fn((): LiveHistory => ({ lives: [], gifters: [] })),
     save: vi.fn(async () => true),
     onChange: vi.fn((_listener: () => void) => {}),
@@ -1619,7 +1625,7 @@ describe("init events", () => {
         s.conn.emit(TOKIO_EVENTS.LIKE, like(n * 100));
       }
       expect(s.h.pushed(APP_EVENTS_RESPONSE.VIEWS)).toEqual([
-        { data: { views: 10, viewers: 1 } },
+        { data: { views: 10, viewers: 1, platformViewers: {} } },
       ]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIKES)).toEqual([{ likes: 100 }]);
 
@@ -1629,13 +1635,36 @@ describe("init events", () => {
 
       vi.advanceTimersByTime(1);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.VIEWS)).toEqual([
-        { data: { views: 10, viewers: 1 } },
-        { data: { views: 30, viewers: 3 } },
+        { data: { views: 10, viewers: 1, platformViewers: {} } },
+        { data: { views: 30, viewers: 3, platformViewers: {} } },
       ]);
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIKES)).toEqual([
         { likes: 100 },
         { likes: 300 },
       ]);
+    });
+
+    it("pushes each platform's viewers with the room's, and keeps their minutes", async () => {
+      vi.useFakeTimers({ now: 0 });
+      const s = await live();
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      s.connectorService.viewers.mockReturnValue({ tiktok: 6, kick: 2 });
+
+      s.conn.emit(TOKIO_EVENTS.ROOM_USER, roomUser(100, 8));
+
+      expect(s.h.pushed(APP_EVENTS_RESPONSE.VIEWS)).toEqual([
+        {
+          data: {
+            views: 100,
+            viewers: 8,
+            platformViewers: { tiktok: 6, kick: 2 },
+          },
+        },
+      ]);
+      expect(s.liveService.getSession()).toMatchObject({
+        viewers: [8],
+        platforms: { tiktok: { viewers: [6] }, kick: { viewers: [2] } },
+      });
     });
 
     it("keeps the likes from going down until the LIVE disconnects", async () => {
@@ -1693,7 +1722,13 @@ describe("init events", () => {
       connect(s);
 
       expect(sessions(s)).toEqual([
-        { startedAt: 5000, totals: noTotals, activity: [], viewers: [] },
+        {
+          startedAt: 5000,
+          totals: noTotals,
+          activity: [],
+          viewers: [],
+          platforms: {},
+        },
       ]);
     });
 
@@ -2275,10 +2310,10 @@ describe("init events", () => {
         [message()],
         [message(top([gifter]))],
       ]);
-      // Home gets this LIVE's with each push
+      // Home gets this LIVE's with each push, and each platform's
       expect(s.h.pushed(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
-        { data: [] },
-        { data: [gifter] },
+        { data: [], byPlatform: {} },
+        { data: [gifter], byPlatform: {} },
       ]);
     });
 
@@ -2376,7 +2411,7 @@ describe("init events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats: noStats,
+          stats: noLiveStats,
         },
       ]);
       expect(s.storeManagerService.updateLiveStats).toHaveBeenLastCalledWith(
@@ -2450,7 +2485,7 @@ describe("init events", () => {
           reconnecting: false,
           waiting: true,
           platforms: {},
-          stats: noStats,
+          stats: noLiveStats,
         },
       ]);
     });
@@ -2492,7 +2527,7 @@ describe("init events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats: noStats,
+          stats: noLiveStats,
         },
       ]);
     });
@@ -2528,7 +2563,7 @@ describe("init events", () => {
         live: true,
         waiting: false,
         platforms: {},
-        stats: noStats,
+        stats: noLiveStats,
       };
       expect(s.h.pushed(APP_EVENTS_RESPONSE.CONNECTED)).toEqual([
         { ...state, reconnecting: true },

@@ -4,14 +4,8 @@ import {
   MusicInfo,
   Platform,
   PlatformStatus,
-  TopGifter,
 } from "@/common/types";
-import {
-  defaultProfile,
-  countsCoins,
-  defaultStoreData,
-  isPlatform,
-} from "@/common/util";
+import { defaultProfile, defaultStoreData, isPlatform } from "@/common/util";
 import { Modal } from "@/components";
 import {
   useImmerState,
@@ -22,7 +16,13 @@ import {
 import { useT } from "@/ui/i18n";
 import { useRef, useState } from "react";
 import styles from "./home.module.css";
-import { feedKinds, liveStats, NO_SESSION } from "./helper";
+import {
+  feedKinds,
+  LiveGifters,
+  livePlatforms,
+  NO_SESSION,
+  Views,
+} from "./helper";
 import { ActivitySection } from "./sections/ActivitySection";
 import { DashboardSection } from "./sections/DashboardSection";
 import { FeaturesSection } from "./sections/FeaturesSection";
@@ -59,9 +59,16 @@ export function Home() {
   const [waiting, setWaiting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [likes, setLikes] = useState(0);
-  const [views, setViews] = useState({ current: 0, total: 0 });
+  const [views, setViews] = useState<Views>({
+    current: 0,
+    total: 0,
+    platformViewers: {},
+  });
   const [session, setSession] = useState(NO_SESSION);
-  const [gifters, setGifters] = useState<TopGifter[]>([]);
+  const [gifters, setGifters] = useState<LiveGifters>({
+    data: [],
+    byPlatform: {},
+  });
   const [songs, setSongs] = useState<MusicInfo[]>([]);
   const [paused, setPaused] = useState(false);
 
@@ -121,7 +128,11 @@ export function Home() {
     // leaves Disconnect to press
     setLoading(res.success && !res.live && !res.waiting);
     setLikes(res.stats.likes);
-    setViews({ current: res.stats.viewers, total: res.stats.views });
+    setViews({
+      current: res.stats.viewers,
+      total: res.stats.views,
+      platformViewers: res.stats.platformViewers,
+    });
   });
 
   // What main holds, also when it refused the change
@@ -135,7 +146,11 @@ export function Home() {
 
   useIpcListener(APP_EVENTS_RESPONSE.VIEWS, (res) => {
     if (res?.data) {
-      setViews({ current: res.data.viewers, total: res.data.views });
+      setViews({
+        current: res.data.viewers,
+        total: res.data.views,
+        platformViewers: res.data.platformViewers,
+      });
     }
   });
 
@@ -153,14 +168,13 @@ export function Home() {
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.LIVE_GIFTERS, (res) => {
-    if (res) setGifters(res.data);
+    if (res) setGifters(res);
   });
 
   useIpcListener(APP_EVENTS_RESPONSE.SONGS, (res) => {
     if (res) setSongs(res.data);
   });
 
-  const { totals } = session;
   // The queue keeps its songs while the player is gone
   const song = musicConnected ? songs.find((s) => s.playing) : undefined;
 
@@ -250,14 +264,11 @@ export function Home() {
 
             {connected && (
               <LiveSection
-                viewers={views.current}
-                minutes={session.viewers}
-                stats={liveStats(platforms, {
-                  ...totals,
-                  likes,
-                  views: views.total,
-                })}
-                gifters={countsCoins(platforms) ? gifters : null}
+                platforms={livePlatforms(status, session)}
+                session={session}
+                views={views}
+                likes={likes}
+                gifters={gifters}
               />
             )}
 

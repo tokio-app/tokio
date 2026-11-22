@@ -4,7 +4,12 @@ import {
   Platform,
   PlatformStatus,
 } from "@/common/types";
-import { liveSession, profileReply, settingsReply } from "@test/fixtures";
+import {
+  liveSession,
+  profileReply,
+  settingsReply,
+  topGifter,
+} from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
 import { screen, within } from "@testing-library/react";
@@ -44,7 +49,7 @@ const live = (platforms: Partial<Record<Platform, PlatformStatus>>) =>
     success: true,
     live: true,
     platforms,
-    stats: { views: 10, viewers: 2, likes: 3 },
+    stats: { views: 10, viewers: 2, likes: 3, platformViewers: {} },
   });
 
 describe("Home's platforms", () => {
@@ -237,11 +242,6 @@ describe("Home's platforms", () => {
     [["tiktok"], ["Likes", "Total views", "Shares", "Gifts", "Coins"], []],
     [["twitch"], [], ["Likes", "Total views", "Shares", "Gifts", "Coins"]],
     [
-      ["tiktok", "twitch"],
-      ["Likes", "Total views", "Shares", "Gifts", "Coins"],
-      [],
-    ],
-    [
       ["youtube"],
       ["Gifts"],
       ["New followers", "Likes", "Total views", "Shares", "Coins"],
@@ -256,7 +256,9 @@ describe("Home's platforms", () => {
     async (platforms, shown, hidden) => {
       await renderApp();
       await usingPlatforms(platforms);
-      await live({});
+      await live(Object.fromEntries(platforms.map((p) => [p, "connected"])));
+      // One platform gets no tabs
+      expect(page().queryByRole("tablist")).toBeNull();
 
       expect(stat("New followers") !== null).toBe(
         !hidden.includes("New followers"),
@@ -269,6 +271,80 @@ describe("Home's platforms", () => {
       );
     },
   );
+
+  it("gives each platform in the LIVE a tab with its viewers, then All", async () => {
+    const { user } = await renderApp();
+    // Twitch isn't connected and has no numbers: no tab
+    await usingPlatforms(["tiktok", "twitch", "kick"]);
+    await send(APP_EVENTS_RESPONSE.CONNECTED, {
+      success: true,
+      live: true,
+      platforms: { tiktok: "connected", kick: "reconnecting" },
+      stats: {
+        views: 900,
+        viewers: 60,
+        likes: 7,
+        platformViewers: { tiktok: 40, kick: 20 },
+      },
+    });
+    await send(APP_EVENTS_RESPONSE.LIVE_SESSION, {
+      data: liveSession({
+        startedAt: Date.now(),
+        totals: { followers: 3, shares: 1, gifts: 5, coins: 50 },
+        viewers: [60],
+        platforms: {
+          tiktok: {
+            totals: { followers: 3, shares: 1, gifts: 2, coins: 20 },
+            viewers: [40],
+          },
+          kick: {
+            totals: { followers: 0, shares: 0, gifts: 3, coins: 30 },
+            viewers: [20],
+          },
+        },
+      }),
+    });
+    const ana = topGifter("Ana", 20);
+    const kai = topGifter("Kai", 30, { platform: "kick" });
+    await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+      data: [kai, ana],
+      byPlatform: { tiktok: [ana], kick: [kai] },
+    });
+    const tab = (name: string) =>
+      page().getByRole("tab", { name: new RegExp(`^${name}`) });
+    const value = (label: string) =>
+      page().getByText(label, { selector: "span" }).previousElementSibling;
+    const gifters = () =>
+      within(page().getByRole("list", { name: "Top gifters" }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent);
+
+    expect(
+      page()
+        .getAllByRole("tab")
+        .map((t) => t.textContent),
+    ).toEqual(["TikTok40", "Kick20", "All60"]);
+    // The first platform's own numbers
+    expect(tab("TikTok")).toHaveAttribute("aria-selected", "true");
+    expect(value("Viewers")).toHaveTextContent("40");
+    expect(value("Gifts")).toHaveTextContent("2");
+    expect(value("Likes")).toHaveTextContent("7");
+    expect(gifters()).toEqual(["1AAna20 coins"]);
+
+    await user.click(tab("Kick"));
+    expect(value("Viewers")).toHaveTextContent("20");
+    expect(value("Coins")).toHaveTextContent("30");
+    // Kick sends no follows, likes or shares
+    expect(stat("New followers")).toBeNull();
+    expect(stat("Likes")).toBeNull();
+    expect(gifters()).toEqual(["1KKai30 coins"]);
+
+    await user.click(tab("All"));
+    expect(value("Viewers")).toHaveTextContent("60");
+    expect(value("Gifts")).toHaveTextContent("5");
+    expect(value("New followers")).toHaveTextContent("3");
+    expect(gifters()).toEqual(["1KKai30 coins", "2AAna20 coins"]);
+  });
 
   it("marks each event with its platform when the profile uses several", async () => {
     await renderApp();

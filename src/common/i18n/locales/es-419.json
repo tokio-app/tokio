@@ -333,6 +333,7 @@
   "home.dashboard.needUsername": "Escribe tu @usuario primero.",
   "home.dashboard.needChannel": "Escribe el canal primero.",
   "home.dashboard.needSignIn": "Inicia sesión en Twitch primero.",
+  "home.stats.all": "Todas",
   "home.stats.viewers": "Espectadores",
   "home.stats.likes": "Me gusta",
   "home.stats.totalViews": "Vistas totales",

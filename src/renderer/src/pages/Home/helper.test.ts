@@ -1,13 +1,85 @@
 import { createAlert } from "@/common/util";
+import { liveSession, topGifter } from "@test/fixtures";
 import { describe, expect, it } from "vitest";
 import {
   alertsStatus,
   chartPoints,
   joinedText,
+  livePlatforms,
+  liveView,
   nearestIndex,
   overlaysStatus,
   songParts,
 } from "./helper";
+
+const totals = (gifts: number, coins: number) => ({
+  followers: 0,
+  shares: 0,
+  gifts,
+  coins,
+});
+
+describe("livePlatforms", () => {
+  it("lists the platforms up now or with numbers, in Home's order", () => {
+    const session = liveSession({
+      platforms: { youtube: { totals: totals(1, 0), viewers: [] } },
+    });
+
+    expect(
+      livePlatforms(
+        { kick: "reconnecting", tiktok: "connected", twitch: "connecting" },
+        session,
+      ),
+    ).toEqual(["tiktok", "youtube", "kick"]);
+  });
+});
+
+describe("liveView", () => {
+  const ana = topGifter("Ana", 20);
+  const kai = topGifter("Kai", 30, { platform: "kick" });
+  const numbers = {
+    session: liveSession({
+      totals: totals(5, 50),
+      viewers: [60],
+      platforms: { kick: { totals: totals(3, 30), viewers: [20] } },
+    }),
+    views: { current: 60, total: 900, platformViewers: { kick: 20 } },
+    likes: 7,
+    gifters: { data: [kai, ana], byPlatform: { kick: [kai] } },
+  };
+
+  it("adds up the LIVE's platforms on All, TikTok's likes included", () => {
+    const view = liveView("all", ["tiktok", "kick"], numbers);
+
+    expect(view).toMatchObject({
+      viewers: 60,
+      minutes: [60],
+      gifters: [kai, ana],
+    });
+    expect(view.stats.map((stat) => stat.label)).toContain("home.stats.likes");
+  });
+
+  it("gives a platform its own numbers and stats", () => {
+    expect(liveView("kick", ["tiktok", "kick"], numbers)).toEqual({
+      viewers: 20,
+      minutes: [20],
+      stats: [
+        { label: "home.totals.gifts", value: 3 },
+        { label: "home.totals.coins", value: 30 },
+      ],
+      gifters: [kai],
+    });
+  });
+
+  it("gives a platform with nothing yet zeros, and no gifters without coins", () => {
+    expect(liveView("youtube", ["youtube", "kick"], numbers)).toEqual({
+      viewers: 0,
+      minutes: [],
+      stats: [{ label: "home.totals.gifts", value: 0 }],
+      gifters: null,
+    });
+  });
+});
 
 describe("chartPoints", () => {
   it("spreads the points across, from 0 on the baseline to the peak on top", () => {

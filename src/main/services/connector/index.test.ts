@@ -437,6 +437,20 @@ describe("ConnectorService", () => {
       expect(rooms).toHaveBeenCalledTimes(3);
     });
 
+    it("gives each platform's viewers, for as long as it's up", () => {
+      const { service, tiktok, twitch } = both();
+      tiktok.fire(TOKIO_EVENTS.CONNECTED);
+      twitch.fire(TOKIO_EVENTS.CONNECTED);
+      expect(service.viewers()).toEqual({});
+
+      tiktok.fire(TOKIO_EVENTS.ROOM_USER, room(10, 100, 2));
+      twitch.fire(TOKIO_EVENTS.ROOM_USER, room(5, 0));
+      expect(service.viewers()).toEqual({ tiktok: 10, twitch: 5 });
+
+      twitch.fire(TOKIO_EVENTS.DISCONNECTED, { reason: "ended" });
+      expect(service.viewers()).toEqual({ tiktok: 10 });
+    });
+
     it("says how each platform is doing", () => {
       const { service, tiktok, twitch } = both();
       tiktok.isConnected.mockReturnValue(false);

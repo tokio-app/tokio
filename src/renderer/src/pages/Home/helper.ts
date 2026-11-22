@@ -3,9 +3,14 @@ import { ActivityFeed, Alert } from "@/common/schemas";
 import {
   ActivityUser,
   AlertTrigger,
+  APP_EVENTS_RESPONSE,
+  AppEventsResponseMap,
   LiveSession,
   Platform,
+  PLATFORMS,
+  PlatformStatus,
   TOKIO_EVENTS,
+  TopGifter,
 } from "@/common/types";
 import { countsCoins, PLATFORM_TRIGGERS, triggersFor } from "@/common/util";
 import type { IconType } from "react-icons";
@@ -18,6 +23,7 @@ export const NO_SESSION: LiveSession = {
   totals: { followers: 0, shares: 0, gifts: 0, coins: 0 },
   activity: [],
   viewers: [],
+  platforms: {},
 };
 
 // The platforms' logos, Font Awesome's
@@ -72,7 +78,7 @@ const sendsGifts = (platforms: readonly Platform[]) =>
   platforms.some((p) => PLATFORM_TRIGGERS[p].includes(TOKIO_EVENTS.GIFT));
 
 // The stats the platforms have: likes and shares are TikTok's
-export function liveStats(
+function liveStats(
   platforms: readonly Platform[],
   values: Record<"likes" | "views" | keyof LiveSession["totals"], number>,
 ): Stat[] {
@@ -96,6 +102,66 @@ export function liveStats(
 }
 
 export type Stat = { label: MessageKey; value: number };
+
+// The platforms in the LIVE, in Home's order: up now, or with numbers in it
+export const livePlatforms = (
+  status: Partial<Record<Platform, PlatformStatus>>,
+  session: LiveSession,
+): Platform[] =>
+  PLATFORMS.filter(
+    (p) =>
+      status[p] === "connected" ||
+      status[p] === "reconnecting" ||
+      session.platforms[p] !== undefined,
+  );
+
+// The LIVE section's tabs: a platform's own numbers, or all of them
+export type StatsTab = Platform | "all";
+
+// The viewers now (everyone's and each platform's) and TikTok's total views
+export type Views = {
+  current: number;
+  total: number;
+  platformViewers: Partial<Record<Platform, number>>;
+};
+
+// This LIVE's top gifters, all of them and each platform's
+export type LiveGifters =
+  AppEventsResponseMap[APP_EVENTS_RESPONSE.LIVE_GIFTERS];
+
+// What a tab shows. All adds up the LIVE's platforms; likes, total views and
+// shares are TikTok's alone, so they're the same on both.
+export function liveView(
+  tab: StatsTab,
+  platforms: readonly Platform[],
+  numbers: {
+    session: LiveSession;
+    views: Views;
+    likes: number;
+    gifters: LiveGifters;
+  },
+): {
+  viewers: number;
+  minutes: number[];
+  stats: Stat[];
+  gifters: TopGifter[] | null;
+} {
+  const { session, views, likes, gifters } = numbers;
+  const all = tab === "all";
+  const shown = all ? platforms : [tab];
+  // Either has the totals and each minute's viewers
+  const part = all ? session : (session.platforms[tab] ?? NO_SESSION);
+  return {
+    viewers: all ? views.current : (views.platformViewers[tab] ?? 0),
+    minutes: part.viewers,
+    stats: liveStats(shown, { ...part.totals, likes, views: views.total }),
+    gifters: countsCoins(shown)
+      ? all
+        ? gifters.data
+        : (gifters.byPlatform[tab] ?? [])
+      : null,
+  };
+}
 
 // The chart's points, x and y from 0 to 100 with y down, as the SVG's viewBox
 // reads them: the peak at the top, 0 on the baseline, a lone point on the

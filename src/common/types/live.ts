@@ -57,6 +57,14 @@ export type LiveTotals = {
   coins: number;
 };
 
+// One platform's part of the LIVE
+export type PlatformLive = {
+  totals: LiveTotals;
+  // Each minute's highest viewer count on it, from the LIVE's first minute:
+  // 0 before its first count and after it left
+  viewers: number[];
+};
+
 export type LiveSession = {
   // When Tokio connected, null while it isn't
   startedAt: number | null;
@@ -66,6 +74,9 @@ export type LiveSession = {
   // Each minute's highest viewer count since startedAt, the last one still
   // counting. Kept like the feed.
   viewers: number[];
+  // Each platform's own numbers, for the platforms that sent any in this
+  // LIVE. totals and viewers count them all.
+  platforms: Partial<Record<Platform, PlatformLive>>;
 };
 
 // A viewer who sent gifts, keyed by their user id (see UserData). Name,

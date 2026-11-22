@@ -361,6 +361,7 @@ describe("live MCP tools", () => {
             isReconnecting: () => false,
             isWaiting: () => false,
             status: () => (on ? { tiktok: "connected" } : {}),
+            viewers: () => ({}),
             channel: () => "streamer",
             username: "streamer",
           },

@@ -4,6 +4,7 @@ import {
   LiveHistory,
   LiveRecord,
   LiveSummary,
+  Platform,
   PLATFORMS,
   RankedGifter,
   TOKIO_EVENTS,
@@ -329,6 +330,17 @@ export class HistoryService extends Service {
         )
         .slice(0, TOP_GIFTERS),
     };
+  }
+
+  /** This LIVE's top gifters on each platform, for Home. */
+  public topByPlatform(): Partial<Record<Platform, TopGifter[]>> {
+    const tops: Partial<Record<Platform, TopGifter[]>> = {};
+    for (const gifter of [...this._liveGifters.values()].sort(byCoins)) {
+      // Missing means TikTok
+      const top = (tops[gifter.platform ?? "tiktok"] ??= []);
+      if (top.length < TOP_GIFTERS) top.push(this._toTop(gifter));
+    }
+    return tops;
   }
 
   /** The finished LIVEs, newest first, and all time's top gifters. */

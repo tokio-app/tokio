@@ -341,6 +341,8 @@ export interface AppEventsResponseMap {
       views: number;
       viewers: number;
       likes: number;
+      // Each platform's viewers now, which viewers adds up
+      platformViewers: Partial<Record<Platform, number>>;
     };
   }>;
 
@@ -351,6 +353,8 @@ export interface AppEventsResponseMap {
     data: {
       views: number;
       viewers: number;
+      // Each platform's viewers now, which viewers adds up
+      platformViewers: Partial<Record<Platform, number>>;
     };
   };
   [APP_EVENTS_RESPONSE.LIKES]: {
@@ -361,9 +365,11 @@ export interface AppEventsResponseMap {
     data: LiveSession;
   };
   // The reply to GET_LIVE_GIFTERS, pushed again as they change: this LIVE's
-  // gifters, the most coins first, [] outside a LIVE
+  // top gifters, the most coins first, [] outside a LIVE. data is the
+  // overlays' list, byPlatform each platform's own.
   [APP_EVENTS_RESPONSE.LIVE_GIFTERS]: {
     data: TopGifter[];
+    byPlatform: Partial<Record<Platform, TopGifter[]>>;
   };
   // The reply to GET_SONGS, pushed again as the request queue changes, as
   // overlays get it

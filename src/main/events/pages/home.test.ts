@@ -14,7 +14,9 @@ import { describe, expect, it, vi } from "vitest";
 import home from "./home";
 
 const stats = { likes: 3, viewers: 2, views: 10 };
-const noStats = { likes: 0, viewers: 0, views: 0 };
+// What CONNECTED says: the saved stats, and each platform's viewers
+const replied = { ...stats, platformViewers: { tiktok: 2 } };
+const noStats = { likes: 0, viewers: 0, views: 0, platformViewers: {} };
 const noTotals = { followers: 0, shares: 0, gifts: 0, coins: 0 };
 const fail = (): never => {
   throw new Error("broken");
@@ -42,6 +44,7 @@ describe("home events", () => {
         isReconnecting: vi.fn(() => false),
         isWaiting: () => false,
         status: vi.fn((): Partial<Record<Platform, PlatformStatus>> => ({})),
+        viewers: () => ({ tiktok: 2 }),
         channel: vi.fn((_platform: Platform) => ""),
         username: "",
       };
@@ -86,7 +89,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
       expect(h.notices).toEqual([
@@ -151,7 +154,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
       expect(h.notices).toEqual([
@@ -394,6 +397,7 @@ describe("home events", () => {
         isReconnecting: () => false,
         isWaiting: () => false,
         status: () => ({ ...status }),
+        viewers: () => ({ tiktok: 2 }),
         channel: (_platform: Platform) => "",
         username: "",
       };
@@ -639,6 +643,7 @@ describe("home events", () => {
           isReconnecting: () => false,
           isWaiting: () => false,
           status: () => ({ twitch: "connected" }),
+          viewers: () => ({ twitch: 1 }),
         },
         liveService: { getSession: () => ({ startedAt: 1000 }) },
         storeManagerService: { getLiveStats: () => stats },
@@ -690,6 +695,7 @@ describe("home events", () => {
         isReconnecting: () => reconnecting,
         isWaiting: () => waiting,
         status: () => ({}),
+        viewers: () => ({ tiktok: 2 }),
       },
       liveService: { getSession: () => ({ startedAt }) },
       storeManagerService: { getLiveStats: () => stats },
@@ -707,7 +713,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
     });
@@ -724,7 +730,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
     });
@@ -741,7 +747,7 @@ describe("home events", () => {
           reconnecting: true,
           waiting: false,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
     });
@@ -758,7 +764,7 @@ describe("home events", () => {
           reconnecting: false,
           waiting: true,
           platforms: {},
-          stats,
+          stats: replied,
         },
       ]);
     });
@@ -817,13 +823,16 @@ describe("home events", () => {
         giftedAt: 1000,
       };
       const h = createHandler({
-        historyService: { top: () => ({ live: [gifter], allTime: [] }) },
+        historyService: {
+          top: () => ({ live: [gifter], allTime: [] }),
+          topByPlatform: () => ({ tiktok: [gifter] }),
+        },
       });
 
       await h.invoke(home, APP_EVENTS.GET_LIVE_GIFTERS);
 
       expect(h.replies(APP_EVENTS_RESPONSE.LIVE_GIFTERS)).toEqual([
-        { data: [gifter] },
+        { data: [gifter], byPlatform: { tiktok: [gifter] } },
       ]);
       expect(h.notices).toEqual([]);
     });

@@ -20,6 +20,9 @@ import { normalizeUsername } from "@tokioapp/connector";
 
 const events = createStack("connector");
 
+// What a failed or ended connection replies
+const NO_STATS = { ...EMPTY_LIVE_STATS, platformViewers: {} };
+
 // A platform the session already has, which a connect leaves as it is
 const isUp = (status?: PlatformStatus) =>
   status === "connected" || status === "reconnecting";
@@ -210,7 +213,7 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: EMPTY_LIVE_STATS,
+        stats: NO_STATS,
         error,
       }),
   },
@@ -273,7 +276,7 @@ events.push(
     e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
       success: false,
       live: false,
-      stats: EMPTY_LIVE_STATS,
+      stats: NO_STATS,
     });
   },
   {
@@ -285,7 +288,7 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: EMPTY_LIVE_STATS,
+        stats: NO_STATS,
         error,
       }),
   },
@@ -302,7 +305,7 @@ events.push(
       e.reply(APP_EVENTS_RESPONSE.CONNECTED, {
         success: false,
         live: false,
-        stats: EMPTY_LIVE_STATS,
+        stats: NO_STATS,
         error,
       }),
   },
@@ -325,6 +328,7 @@ events.push(
   ({ historyService }, e) => {
     e.reply(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
       data: historyService.top().live,
+      byPlatform: historyService.topByPlatform(),
     });
   },
   { notify: false },

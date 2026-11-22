@@ -15,14 +15,21 @@ import { act, screen, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const connected = (stats = { views: 1234, viewers: 12, likes: 5 }) =>
-  send(APP_EVENTS_RESPONSE.CONNECTED, { success: true, live: true, stats });
+const connected = (
+  stats = { views: 1234, viewers: 12, likes: 5, platformViewers: {} },
+) =>
+  send(APP_EVENTS_RESPONSE.CONNECTED, {
+    success: true,
+    live: true,
+    platforms: { tiktok: "connected" },
+    stats,
+  });
 
 const disconnected = () =>
   send(APP_EVENTS_RESPONSE.CONNECTED, {
     success: false,
     live: false,
-    stats: { views: 0, viewers: 0, likes: 0 },
+    stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
   });
 
 const session = (patch: Partial<LiveSession> = {}) =>
@@ -131,7 +138,7 @@ describe("Home", () => {
     await send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: true,
       live: false,
-      stats: { views: 0, viewers: 0, likes: 0 },
+      stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
     });
 
     expect(status()).toHaveTextContent("Offline");
@@ -220,12 +227,15 @@ describe("Home", () => {
       success: true,
       live: true,
       reconnecting: true,
-      stats: { views: 1234, viewers: 12, likes: 5 },
+      platforms: { tiktok: "reconnecting" },
+      stats: { views: 1234, viewers: 12, likes: 5, platformViewers: {} },
     });
 
-    expect(page().getByText("Reconnecting…").closest("p")).toHaveTextContent(
-      /^Reconnecting…$/,
-    );
+    // The status line, apart from the row's own
+    const line = page()
+      .getAllByText("Reconnecting…")
+      .find((text) => !text.closest("li"));
+    expect(line?.closest("p")).toHaveTextContent(/^Reconnecting…$/);
     // The LIVE goes on: its numbers stay, and Disconnect still stops it
     expect(page().queryByText("Coins")).toBeInTheDocument();
     expect(page().getByRole("button", { name: "Disconnect" })).toBeEnabled();
@@ -241,7 +251,7 @@ describe("Home", () => {
       success: true,
       live: false,
       waiting: true,
-      stats: { views: 0, viewers: 0, likes: 0 },
+      stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
     });
 
     expect(page().getByText("Waiting for the LIVE…")).toBeInTheDocument();
@@ -290,7 +300,7 @@ describe("Home", () => {
     await send(APP_EVENTS_RESPONSE.CONNECTED, {
       success: true,
       live: false,
-      stats: { views: 0, viewers: 0, likes: 0 },
+      stats: { views: 0, viewers: 0, likes: 0, platformViewers: {} },
     });
     expect(shown()).toEqual({ numbers: false, chart: null, gifters: null });
 
@@ -312,7 +322,7 @@ describe("Home", () => {
     expect(stat("Total views")).toHaveAttribute("title", "1,234");
 
     await send(APP_EVENTS_RESPONSE.VIEWS, {
-      data: { viewers: 40, views: 2000 },
+      data: { viewers: 40, views: 2000, platformViewers: {} },
     });
     await send(APP_EVENTS_RESPONSE.LIKES, { likes: 99 });
 
@@ -342,7 +352,9 @@ describe("Home", () => {
       page().getByRole("img", { name: "Viewers during the LIVE" });
     const peak = () => page().getByText(/^Peak/);
     const views = (viewers: number) =>
-      send(APP_EVENTS_RESPONSE.VIEWS, { data: { viewers, views: 2000 } });
+      send(APP_EVENTS_RESPONSE.VIEWS, {
+        data: { viewers, views: 2000, platformViewers: {} },
+      });
 
     it("draws each minute, with the live count for this one", async () => {
       await renderApp();
@@ -393,6 +405,7 @@ describe("Home", () => {
           topGifter("Sam", 300),
           topGifter("Kai", 120),
         ],
+        byPlatform: {},
       });
 
       expect(gifters().map((g) => g.textContent)).toEqual([
@@ -411,7 +424,10 @@ describe("Home", () => {
       await renderApp();
       await connected();
 
-      await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, { data: [] });
+      await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+        data: [],
+        byPlatform: {},
+      });
 
       expect(page().getByText("No gifts yet")).toBeInTheDocument();
     });

@@ -5,11 +5,13 @@ import {
   ActivityUser,
   LiveSession,
   LiveTotals,
+  Platform,
+  PlatformLive,
   TOKIO_EVENTS,
   TokioEventMap,
   UserData,
 } from "@/common/types";
-import { defaultStoreData } from "@/common/util";
+import { defaultStoreData, isPlatform } from "@/common/util";
 import { GiftStreaks } from "@/helper/streaks";
 import { Service } from "../shared";
 
@@ -55,6 +57,18 @@ const noTotals = (): LiveTotals => ({
   coins: 0,
 });
 
+// Keeps a minute's highest count. Minutes without a reading repeat the last
+// one, or `before` while there's none.
+function keepMinute(
+  values: number[],
+  minute: number,
+  count: number,
+  before: number,
+) {
+  while (values.length < minute) values.push(values.at(-1) ?? before);
+  values[minute] = Math.max(values[minute] ?? 0, count);
+}
+
 const activityUser = ({
   handle,
   username,
@@ -86,6 +100,8 @@ export class LiveService extends Service {
   private _feed: ActivityFeed = { ...defaultStoreData.settings.activityFeed };
   // Each minute's highest viewer count since the LIVE started
   private _viewers: number[] = [];
+  // Each platform's own totals and viewers
+  private _platforms: Partial<Record<Platform, PlatformLive>> = {};
 
   private readonly _recorders: Recorders = {
     [TOKIO_EVENTS.CHAT]: ({ user, comment }) =>
@@ -102,8 +118,8 @@ export class LiveService extends Service {
       const { added, total } = this._streaks.add(event);
       const { user, gift } = event;
       const unit = Math.max(0, gift.coins);
-      this._totals.gifts += added;
-      this._totals.coins += unit * added;
+      this._count(user, "gifts", added);
+      this._count(user, "coins", unit * added);
       const listed =
         gift.repeatEnd &&
         this._add({
@@ -119,12 +135,12 @@ export class LiveService extends Service {
       return added > 0 || listed;
     },
     [TOKIO_EVENTS.FOLLOW]: ({ user }) => {
-      this._totals.followers++;
+      this._count(user, "followers", 1);
       this._add({ type: "follow", user: activityUser(user) });
       return true;
     },
     [TOKIO_EVENTS.SHARE]: ({ user }) => {
-      this._totals.shares++;
+      this._count(user, "shares", 1);
       this._add({ type: "share", user: activityUser(user) });
       return true;
     },
@@ -173,6 +189,7 @@ export class LiveService extends Service {
     this._totals = noTotals();
     this._activity = [];
     this._viewers = [];
+    this._platforms = {};
     this._streaks.clear();
   }
 
@@ -199,10 +216,15 @@ export class LiveService extends Service {
   }
 
   /**
-   * Keeps the minute's highest viewer count. True when the count starts a
-   * minute after the first one, so Home's chart gets the minute that ended.
+   * Keeps the minute's highest viewer count, everyone's and each platform's.
+   * True when the count starts a minute after the first one, so Home's chart
+   * gets the minute that ended.
    */
-  public recordViewers(count: number, now = Date.now()): boolean {
+  public recordViewers(
+    count: number,
+    platforms: Partial<Record<Platform, number>>,
+    now = Date.now(),
+  ): boolean {
     if (this._startedAt === null) return false;
     const viewers = this._viewers;
     // A clock set back stays in the minute it reached
@@ -212,14 +234,15 @@ export class LiveService extends Service {
       Math.floor((now - this._startedAt) / MINUTE),
     );
     if (minute >= VIEWER_MINUTES) return false;
-    if (minute === viewers.length - 1) {
-      viewers[minute] = Math.max(viewers[minute], count);
-      return false;
+    const starts = minute >= viewers.length;
+    keepMinute(viewers, minute, count, count);
+    // A platform without a count, not up yet or gone, has 0 viewers
+    const counted = Object.keys({ ...this._platforms, ...platforms });
+    for (const platform of counted.filter(isPlatform)) {
+      const own = this._of(platform).viewers;
+      keepMinute(own, minute, platforms[platform] ?? 0, 0);
     }
-    // Minutes without a reading repeat the last one
-    while (viewers.length < minute) viewers.push(viewers.at(-1) ?? count);
-    viewers.push(count);
-    return viewers.length > 1;
+    return starts && viewers.length > 1;
   }
 
   /** A copy, so later events don't change what was sent. */
@@ -229,7 +252,19 @@ export class LiveService extends Service {
       totals: { ...this._totals },
       activity: [...this._activity],
       viewers: [...this._viewers],
+      platforms: structuredClone(this._platforms),
     };
+  }
+
+  // Missing means TikTok, as on users
+  private _of(platform: Platform = "tiktok"): PlatformLive {
+    return (this._platforms[platform] ??= { totals: noTotals(), viewers: [] });
+  }
+
+  // Counts toward the LIVE's totals and the viewer's platform's
+  private _count(user: UserData, total: keyof LiveTotals, n: number) {
+    this._totals[total] += n;
+    this._of(user.platform).totals[total] += n;
   }
 
   // False when the feed hides it

@@ -181,6 +181,27 @@ describe("HistoryService", () => {
     expect(again.top().allTime[0].platform).toBe("twitch");
   });
 
+  it("gives each platform's own top gifters in this LIVE", async () => {
+    const history = await loaded();
+    expect(history.topByPlatform()).toEqual({});
+    history.start("kai", 0);
+    const kick = (id: string) => ({ ...viewer(id), platform: "kick" as const });
+    gifts(
+      history,
+      [1, gift(viewer("ana"), 30)],
+      [2, gift(kick("kick:1"), 5)],
+      [3, gift(kick("kick:2"), 20)],
+    );
+
+    const tops = history.topByPlatform();
+    expect(tops.tiktok?.map((g) => g.userId)).toEqual(["ana"]);
+    expect(tops.kick?.map((g) => g.userId)).toEqual(["kick:2", "kick:1"]);
+    expect(tops.kick?.[0]).toMatchObject({ live: { coins: 20, gifts: 1 } });
+
+    history.end(10);
+    expect(history.topByPlatform()).toEqual({});
+  });
+
   it("counts a gift without a price in the totals only, with no gifter", async () => {
     const history = await loaded();
     history.start("kai", 0);

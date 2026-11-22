@@ -17,6 +17,7 @@ import {
   GiftEvent,
   MINECRAFT_CONNECT_COMMANDS,
   MINECRAFT_EDITION_NAMES,
+  Platform,
   TOKIO_EVENTS,
   TokioEventMap,
   TokioPayload,
@@ -348,12 +349,19 @@ const registerConnectorEvents = ({
 
   // Busy lives send many of these, the UI only needs the latest few a second.
   // A throttled push can come after the window closed on quit.
-  const sendViews = throttle((views: number, viewers: number) => {
-    if (win.isDestroyed()) return;
-    win.webContents.send(APP_EVENTS_RESPONSE.VIEWS, {
-      data: { views, viewers },
-    });
-  }, STATS_THROTTLE_MS);
+  const sendViews = throttle(
+    (
+      views: number,
+      viewers: number,
+      platformViewers: Partial<Record<Platform, number>>,
+    ) => {
+      if (win.isDestroyed()) return;
+      win.webContents.send(APP_EVENTS_RESPONSE.VIEWS, {
+        data: { views, viewers, platformViewers },
+      });
+    },
+    STATS_THROTTLE_MS,
+  );
   const sendLikes = throttle((likes: number) => {
     if (win.isDestroyed()) return;
     win.webContents.send(APP_EVENTS_RESPONSE.LIKES, { likes });
@@ -378,8 +386,10 @@ const registerConnectorEvents = ({
   // Home's chart gets the session again as each minute of viewers ends
   conn.on(TOKIO_EVENTS.ROOM_USER, (d) => {
     store.updateLiveStats({ viewers: d.viewers, views: d.views });
-    sendViews(d.views, d.viewers);
-    if (live.recordViewers(d.viewers)) sendSession();
+    // The room adds up the platforms' viewers; Home also shows each one's
+    const platformViewers = conn.viewers();
+    sendViews(d.views, d.viewers, platformViewers);
+    if (live.recordViewers(d.viewers, platformViewers)) sendSession();
   });
   for (const type of ACTIVITY_EVENTS) {
     conn.on(type, (d) => {
@@ -1097,7 +1107,10 @@ const registerHistory = ({
     const top = history.top();
     server.sendToAll(message(top));
     if (win.isDestroyed()) return;
-    win.webContents.send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, { data: top.live });
+    win.webContents.send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+      data: top.live,
+      byPlatform: history.topByPlatform(),
+    });
   }, GIFTERS_PUSH_MS);
   history.onChange(push);
   server.onConnect((id) => server.sendToClient(id, message()));
