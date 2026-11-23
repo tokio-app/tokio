@@ -105,7 +105,7 @@
 .gifter {
   display: grid;
   grid-template-columns: 28px 28px minmax(0, 1fr) 136px;
-  grid-auto-columns: 104px;
+  grid-auto-columns: 128px;
   grid-auto-flow: column;
   align-items: center;
   gap: var(--space-3);
@@ -158,8 +158,9 @@
   white-space: nowrap;
 }
 
-/* The counts after it can take two lines: Spanish's "suscripciones
-   regaladas" is longer than its column */
+/* The counts after it can take two lines: Spanish's "14 suscripciones
+   regaladas" is longer than its column, which keeps the number with its
+   first word up to three digits */
 .amount ~ .amount {
   white-space: normal;
 }
@@ -200,12 +201,13 @@
   list-style: none;
 }
 
-/* Date, start, length and coins in columns, so the times line up down the
-   list, and the coin bar on a row of its own */
+/* Date, start, length and amount in columns, so the times line up down the
+   list, and the bar on a row of its own. The amount's fits Spanish's "USD
+   999.99", the longest a tab's short amounts get. */
 .option {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 76px 60px 52px;
+  grid-template-columns: minmax(0, 1fr) 64px 60px 72px;
   align-items: baseline;
   gap: var(--space-2) var(--space-3);
   padding: var(--space-3) var(--space-4);
