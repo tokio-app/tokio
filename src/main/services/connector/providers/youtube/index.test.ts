@@ -165,6 +165,53 @@ describe("YouTubeConnector", () => {
       ]);
     });
 
+    it("sends a Gift under the channel id its handle chatted with, else under @handle", async () => {
+      const onGift = capture(TOKIO_EVENTS.GIFT);
+      const gift = (handle: string) => ({
+        addChatItemAction: {
+          item: {
+            giftMessageViewModel: {
+              text: { content: "sent Vice City heart" },
+              authorName: { content: handle },
+              giftImage: { sources: [{ url: "//x/gift/assets/heart.png" }] },
+            },
+          },
+        },
+      });
+      const paid = (handle: string, channel: string) => ({
+        addChatItemAction: {
+          item: {
+            liveChatPaidMessageRenderer: {
+              authorName: { simpleText: handle },
+              authorExternalChannelId: channel,
+              purchaseAmountText: { simpleText: "$5.00" },
+            },
+          },
+        },
+      });
+      youtube.state.polls = [
+        // The history's chat counts too, though it isn't sent
+        { actions: [chatAction("old")] },
+        {
+          actions: [
+            gift("@Viewer32"),
+            paid("@payer", "UCpayer"),
+            gift("@payer"),
+            gift("@stranger"),
+          ],
+        },
+      ];
+      await connector.connect("madeup");
+
+      await vi.waitFor(() => expect(onGift).toHaveBeenCalledTimes(3));
+      expect(onGift.mock.calls.map(([e]) => e.user.userId)).toEqual([
+        "youtube:UCviewer32",
+        "youtube:UCpayer",
+        "youtube:@stranger",
+      ]);
+      expect(onGift.mock.calls[0][0].user.handle).toBe("Viewer32");
+    });
+
     it("sends chat through the chat stage", async () => {
       connector.setChatStage((chat) =>
         Promise.resolve({
