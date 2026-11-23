@@ -4,9 +4,9 @@ import {
   AppSettings,
   CatalogOverlay,
   GOAL_TRIGGER,
+  Trigger,
 } from "@/common/schemas";
 import {
-  ALERT_TRIGGER_LABELS,
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   AppEvents,
@@ -22,6 +22,7 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
   TokioPayload,
+  UserData,
 } from "@/common/types";
 import {
   ALERTS_PATH,
@@ -36,6 +37,7 @@ import {
   PLATFORM_LABELS,
   TIMER_PATH,
   timerTriggers,
+  triggerName,
 } from "@/common/util";
 import config from "@/config";
 import { globalShortcut, systemPreferences } from "electron";
@@ -91,6 +93,17 @@ const HISTORY_SAVE_MS = 30_000;
 const UPDATE_NOTICE_MS = 24 * 60 * 60 * 1000;
 
 const events = createStack("system");
+
+// An event as a row for its platform names it, for the notices: a Kick gift
+// is Kicks
+const eventName = (
+  type: Trigger["type"],
+  data: { user?: Pick<UserData, "platform"> } | readonly unknown[] | void,
+) =>
+  triggerName({
+    type,
+    platform: data && "user" in data ? data.user?.platform : undefined,
+  });
 
 // Gifts in the shape overlays use, none when TikTok can't be reached.
 const fetchOverlayGifts = async (
@@ -254,12 +267,9 @@ const registerConnectorEvents = ({
       },
       (alert, error, row) => {
         // The row that fired: an Or row can differ from the alert's first
-        const label = t(ALERT_TRIGGER_LABELS[row.type]);
+        const label = t(triggerName(row));
         // Logs stay English
-        const logged = translate(
-          DEFAULT_LANGUAGE,
-          ALERT_TRIGGER_LABELS[row.type],
-        );
+        const logged = translate(DEFAULT_LANGUAGE, triggerName(row));
         const options = {
           key: `alert:${alert.id}`,
           windowMs: REPEAT_NOTICE_MS,
@@ -316,7 +326,7 @@ const registerConnectorEvents = ({
     // Not a live event, the services match emote triggers on chat events.
     if (trigger === EMOTE_TRIGGER) continue;
     const listener = (d: TokioEventMap[typeof trigger]) => {
-      const label = t(ALERT_TRIGGER_LABELS[trigger]);
+      const label = t(eventName(trigger, d));
       dispatchAlert(trigger, d).catch((error) => {
         notifier.report({
           source: "alerts",
@@ -739,12 +749,9 @@ const registerGames = (handler: AppHandlerVariables) => {
   });
   // Logged once per notice, as they can repeat on every event
   games.onError((action, { offline, full, message }) => {
-    const label = t(ALERT_TRIGGER_LABELS[action.trigger.type]);
+    const label = t(triggerName(action.trigger));
     // Logs stay English
-    const logged = translate(
-      DEFAULT_LANGUAGE,
-      ALERT_TRIGGER_LABELS[action.trigger.type],
-    );
+    const logged = translate(DEFAULT_LANGUAGE, triggerName(action.trigger));
     if (full) {
       if (
         notifier.warn(
@@ -943,7 +950,7 @@ const registerStudio = (handler: AppHandlerVariables) => {
           fallback: {
             code: FEEDBACK_CODES.STUDIO_FAILED,
             message: t("main.init.studioFailed", {
-              label: t(ALERT_TRIGGER_LABELS[trigger]),
+              label: t(eventName(trigger, d)),
             }),
           },
           context: trigger,

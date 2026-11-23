@@ -717,6 +717,25 @@ describe("init events", () => {
       );
     });
 
+    it("names a Kick gift's alert Kicks when it fails", async () => {
+      const s = await live();
+      s.alertsService.handle.mockRejectedValue(new Error("decode failed"));
+      const { data } = generateTikTokEventSample(TOKIO_EVENTS.GIFT);
+
+      s.conn.emit(TOKIO_EVENTS.GIFT, {
+        ...data,
+        user: { ...data.user, platform: "kick" },
+      });
+
+      await vi.waitFor(() => {
+        expect(s.h.notices).toEqual([
+          expect.objectContaining({
+            message: "Unable to play the Kicks alert.",
+          }),
+        ]);
+      });
+    });
+
     // The failure callback the alerts got for a follow
     async function onFailure() {
       const s = await live();
@@ -768,6 +787,24 @@ describe("init events", () => {
         expect.objectContaining({
           message:
             "The sound of the Emote alert is missing. Pick it again in Alerts.",
+        }),
+      ]);
+    });
+
+    it("names a Kick row's gift Kicks", async () => {
+      const { s, callback } = await onFailure();
+      const first = alert();
+
+      callback(first, undefined, {
+        ...first.trigger,
+        type: TOKIO_EVENTS.GIFT,
+        platform: "kick",
+      });
+
+      expect(s.h.notices).toEqual([
+        expect.objectContaining({
+          message:
+            "The sound of the Kicks alert is missing. Pick it again in Alerts.",
         }),
       ]);
     });
