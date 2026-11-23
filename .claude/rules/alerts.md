@@ -45,7 +45,7 @@ paths:
     - Bits, US dollars ("worth $5+", without cents, since a minimum is whole) or gifted subs on those events' rows.
   - `MinimumField` (`components/AlertItem`) draws it under a row, in the Alerts editor and Overlay Studio's reaction rows alike (the user's call).
   - `roles` (`[]` is anyone): only Chat, Emote and Gift carry the viewer's roles, so `takesRoles` (`src/common/util/alerts.ts`, shared by the matcher, the editor and the summary) allows only them. Other triggers' saved roles are ignored.
-    - The editor offers a row the roles its platforms' events say (`rowRoles`): TikTok's chat, emotes and gifts say all three; Twitch's, YouTube's and Kick's chat and emotes say Moderators and their subscribers or members, from badges, but never who follows; their gifts say none.
+    - The editor offers a row the roles its platforms' events say (`rowRoles`): TikTok's chat, emotes and gifts say followers, moderators and Super Fans; Twitch's, YouTube's and Kick's chat and emotes say Moderators and their subscribers or members, from badges, and Twitch's and Kick's VIPs (`vip`, the user's call), but never who follows; their gifts say none.
     - A role saved earlier stays shown to clear, and the matcher is unchanged.
     - `roleName` names the Super Fan role as the row's platforms call it: Subscribers on Twitch and Kick, Members on YouTube, and every term on a row for any platform ("Super Fans, subscribers, and members", the user's call).
 - The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: `matchesTrigger` matches it on `CHAT`. TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`.
