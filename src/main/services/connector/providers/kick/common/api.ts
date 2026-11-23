@@ -13,6 +13,8 @@ export type Channel = {
   chatroomId: number;
   // Null while offline
   viewers: number | null;
+  // The account's, the number chat's sender.id is; null when missing
+  userId: number | null;
 };
 
 const SLUG = /^[\w-]+$/;
@@ -31,6 +33,11 @@ export function parseInput(input: string): string | null {
   }
   return SLUG.test(slug) ? slug.toLowerCase() : null;
 }
+
+// A username's channel slug, as Kick writes it: lowercase, "_" as "-"
+// (sharkbait_34's is sharkbait-34; the username itself is a 404)
+export const slugOf = (username: string) =>
+  username.toLowerCase().replaceAll("_", "-");
 
 async function request(
   config: KickConfig,
@@ -97,6 +104,7 @@ export async function lookup(
     channelId,
     chatroomId,
     viewers: json.livestream ? Number(viewers) || 0 : null,
+    userId: typeof json.user_id === "number" ? json.user_id : null,
   };
 }
 

@@ -241,6 +241,63 @@ describe("KickConnector", () => {
       expect(JSON.stringify(debug.mock.calls)).not.toContain("secret words");
     });
 
+    it("sends gifted subs under their gifter's id, from chat, a lookup or its cache", async () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const onGiftSub = capture(TOKIO_EVENTS.GIFT_SUB);
+      kick.override = (url) => {
+        if (url.endsWith("/channels/new-gifter")) {
+          return json(200, {
+            id: 70,
+            user_id: 71,
+            slug: "new-gifter",
+            chatroom: { id: 72 },
+          });
+        }
+        return url.endsWith("/channels/gone") ? json(404, {}) : undefined;
+      };
+      await connector.connect("streamer");
+      const gifted = (gifter_username: string) =>
+        publish("chatroom_20", "App\\Events\\GiftedSubscriptionsEvent", {
+          gifter_username,
+          gifted_usernames: ["a", "b"],
+        });
+      const ids = () =>
+        onGiftSub.mock.calls.map(([e]) => [e.user.username, e.user.userId]);
+
+      // Known from chat, in any case: no lookup
+      publish("chatrooms.20.v2", "App\\Events\\ChatMessageEvent", {
+        content: "hi",
+        sender: { id: 5, username: "Viewer", slug: "viewer" },
+      });
+      gifted("viewer");
+      await vi.waitFor(() => expect(onGiftSub).toHaveBeenCalledTimes(1));
+      // Looked up once by its slug, then from the cache
+      gifted("New_Gifter");
+      gifted("new_gifter");
+      await vi.waitFor(() => expect(onGiftSub).toHaveBeenCalledTimes(3));
+      // A failed lookup sends it without one, logged once
+      gifted("gone");
+      gifted("Gone");
+      await vi.waitFor(() => expect(onGiftSub).toHaveBeenCalledTimes(5));
+
+      expect(ids()).toEqual([
+        ["viewer", "kick:5"],
+        ["New_Gifter", "kick:71"],
+        ["new_gifter", "kick:71"],
+        ["gone", undefined],
+        ["Gone", undefined],
+      ]);
+      expect(onGiftSub.mock.calls[1][0].count).toBe(2);
+      const lookups = (slug: string) =>
+        kick.urls.filter((url) => url.endsWith(`/channels/${slug}`)).length;
+      expect(lookups("viewer")).toBe(0);
+      expect(lookups("new-gifter")).toBe(1);
+      expect(lookups("gone")).toBe(1);
+      expect(
+        warn.mock.calls.filter(([m]) => m.includes("sub gifter")),
+      ).toHaveLength(1);
+    });
+
     it("drops an event whose shape changed and keeps reading", async () => {
       const warn = vi.spyOn(Logger, "warn");
       const onSub = capture(TOKIO_EVENTS.SUBSCRIBE);

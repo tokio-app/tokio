@@ -1,4 +1,4 @@
-import { TOKIO_EVENTS } from "@/common/types";
+import { GiftSubEvent, TOKIO_EVENTS } from "@/common/types";
 import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
@@ -10,7 +10,7 @@ import {
   kindOf,
   toFailure,
 } from "../../common";
-import { guestToken, lookup, parseInput, realtime } from "./common/api";
+import { guestToken, lookup, parseInput, realtime, slugOf } from "./common/api";
 import { eventName, fromPublication, type Mapped } from "./common/mapping";
 import { isTerminal, KickSocket } from "./common/socket";
 import defaults, { type KickConfig } from "./config";
@@ -33,6 +33,9 @@ type Connection = {
   // The wait before a connect's or a reconnect's next try, and its end
   retry?: NodeJS.Timeout;
   wake?: () => void;
+  // Each username's viewer id (kick:<id>) in this LIVE, by its lowercase,
+  // from chat and Kicks or a lookup; undefined after a failed lookup
+  ids: Map<string, Promise<string | undefined>>;
 };
 
 /**
@@ -141,6 +144,7 @@ export class KickConnector extends ConnectorProvider {
       reconnecting: false,
       live: false,
       wasLive: false,
+      ids: new Map(),
       socket: new KickSocket(this._config, {
         publication: (_feed, event, data) => this._notify(conn, event, data),
         drop: (why, terminal) => this._drop(conn, why, terminal),
@@ -231,11 +235,56 @@ export class KickConnector extends ConnectorProvider {
       return;
     }
     if (!mapped) return;
+    if (
+      mapped.event === TOKIO_EVENTS.CHAT ||
+      mapped.event === TOKIO_EVENTS.GIFT
+    ) {
+      const { username, userId } = mapped.data.user;
+      if (userId) conn.ids.set(username.toLowerCase(), Promise.resolve(userId));
+    }
     if (mapped.event === TOKIO_EVENTS.CHAT) {
       this.emitChat(mapped.data, () => this._conn === conn);
+    } else if (mapped.event === TOKIO_EVENTS.GIFT_SUB) {
+      void this._giftSub(conn, mapped.data);
     } else {
       this.emit(mapped.event, mapped.data);
     }
+  }
+
+  // Kick names a sub gifter by username alone: sent under their id, so the
+  // subs land on their record, or without one when it can't be found
+  private async _giftSub(conn: Connection, data: GiftSubEvent) {
+    const userId = await this._userId(conn, data.user.username);
+    if (this._conn !== conn) return;
+    this.emit(
+      TOKIO_EVENTS.GIFT_SUB,
+      userId ? { ...data, user: { ...data.user, userId } } : data,
+    );
+  }
+
+  // A username's id from this LIVE's chat and Kicks, else looked up once,
+  // a failure logged and kept too
+  private _userId(conn: Connection, username: string) {
+    const name = username.toLowerCase();
+    let id = conn.ids.get(name);
+    if (!id) {
+      id = name
+        ? lookup(this._config, slugOf(name))
+            .then(({ userId }) => {
+              if (userId === null) throw new Error("It came without its id.");
+              return `kick:${userId}`;
+            })
+            .catch((err: unknown) => {
+              Logger.warn(
+                `<Kick> Couldn't find the id of a sub gifter -- ${formatError(err)}`,
+                this._logFile,
+              );
+              return undefined;
+            })
+        : Promise.resolve(undefined);
+      conn.ids.set(name, id);
+    }
+    return id;
   }
 
   private _drop(conn: Connection, why: string, terminal: boolean) {
