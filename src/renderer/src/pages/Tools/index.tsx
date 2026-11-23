@@ -1,6 +1,18 @@
-import { APP_EVENTS, APP_EVENTS_RESPONSE, LiveSummary } from "@/common/types";
+import {
+  APP_EVENTS,
+  APP_EVENTS_RESPONSE,
+  LiveSummary,
+  PLATFORMS,
+} from "@/common/types";
+import { PLATFORM_CURRENCY, platformParts } from "@/common/util";
 import { Page, Section } from "@/components";
-import { cx, formatDate, formatDuration, formatStat } from "@/helper";
+import {
+  cx,
+  formatDate,
+  formatDuration,
+  formatMoney,
+  formatStat,
+} from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
 import {
   timeLeft,
@@ -16,9 +28,8 @@ import styles from "./tools.module.css";
 
 /**
  * The tools, one row each, with what each holds now: the time left, how
- * many studio overlays there are, the newest LIVE's coins (or Kicks, when it
- * had only those), and how many fans
- * and test overlays there are.
+ * many studio overlays there are, the newest LIVE's money on its first
+ * platform with any, and how many fans and test overlays there are.
  */
 export function Tools() {
   const t = useT();
@@ -58,8 +69,14 @@ export function Tools() {
   });
 
   const newest = lives?.[0];
-  // Never added together: Kicks only when the LIVE had no coins
-  const unit = newest && !newest.coins && newest.kicks ? "kicks" : "coins";
+  // Never added together: its first platform with money, in Home's order
+  const parts = newest ? platformParts(newest) : {};
+  const platform =
+    PLATFORMS.find((p) => (parts[p]?.amount ?? 0) > 0) ??
+    PLATFORMS.find((p) => parts[p]) ??
+    "tiktok";
+  const currency = PLATFORM_CURRENCY[platform];
+  const amount = parts[platform]?.amount ?? 0;
 
   return (
     <Page>
@@ -77,12 +94,16 @@ export function Tools() {
             to="/tools/coin-stats"
             name={t("coinStats.title")}
             description={t("coinStats.description")}
-            value={newest && formatStat(newest[unit], language).full}
+            value={
+              newest &&
+              (currency === "usd" ? formatMoney : formatStat)(amount, language)
+                .full
+            }
             label={
               lives &&
               (newest
-                ? t(`tools.list.${unit}`, {
-                    count: newest[unit],
+                ? t(TOOL_AMOUNTS[currency], {
+                    count: amount,
                     date: formatDate(newest.startedAt, language, "short"),
                   })
                 : t("tools.list.noLives"))
@@ -113,6 +134,14 @@ export function Tools() {
     </Page>
   );
 }
+
+// What the Gift stats row's number is: "coins on Oct 31, 2026"
+const TOOL_AMOUNTS = {
+  coins: "tools.list.coins",
+  kicks: "tools.list.kicks",
+  bits: "tools.list.bits",
+  usd: "tools.list.superChats",
+} as const;
 
 // The time left ticks between main's pushes, only while the timer runs
 function CountdownRow({ timer }: { timer: TimerPush | null }) {

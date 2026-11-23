@@ -205,19 +205,35 @@ describe("Tools", () => {
     expect(within(row("Countdown")).getByText("01:30:00")).toBeVisible();
   });
 
-  it("shows the newest LIVE's Kicks only when it had no coins", async () => {
+  it("shows the newest LIVE's money on its first platform with any, in its currency", async () => {
     await renderApp("/tools");
+    const part = (amount: number) => ({ amount, gifts: 0, giftSubs: 0 });
 
-    await lives(liveSummary(OCT_31, { kicks: 1 }));
+    await lives(liveSummary(OCT_31, { platforms: { kick: part(1) } }));
     expect(
       within(row("Gift stats")).getByText("Kick on Oct 31, 2026"),
     ).toBeVisible();
 
-    await lives(liveSummary(OCT_31, { coins: 20, kicks: 300 }));
-    expect(within(row("Gift stats")).getByText("20")).toBeVisible();
-    expect(
-      within(row("Gift stats")).getByText("coins on Oct 31, 2026"),
-    ).toBeVisible();
+    // TikTok's had none, so Twitch's Bits
+    await lives(
+      liveSummary(OCT_31, {
+        platforms: { tiktok: part(0), twitch: part(2500), kick: part(300) },
+      }),
+    );
+    expect(row("Gift stats")).toHaveAccessibleDescription(
+      /2,500 Bits on Oct 31, 2026$/,
+    );
+
+    await lives(liveSummary(OCT_31, { platforms: { youtube: part(57.4) } }));
+    expect(row("Gift stats")).toHaveAccessibleDescription(
+      /\$57\.40 in Super Chats on Oct 31, 2026$/,
+    );
+
+    // Nothing anywhere: the first platform's
+    await lives(liveSummary(OCT_31, { platforms: { kick: part(0) } }));
+    expect(row("Gift stats")).toHaveAccessibleDescription(
+      /0 Kicks on Oct 31, 2026$/,
+    );
   });
 
   it("asks for the LIVEs and the fans again when the profile changes", async () => {
