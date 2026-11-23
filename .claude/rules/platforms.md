@@ -17,7 +17,7 @@ Tokio connects to TikTok, Twitch, YouTube and Kick (`PLATFORMS`, `src/common/typ
 
 ## What the user chose
 
-- One LIVE session spans every platform the profile uses (the user's call): one feed, one Gift stats record, one timer, one Studio, alerts, TTS, music and games for all.
+- One LIVE session spans every platform the profile uses (the user's call): one feed, one LIVE history record, one timer, one Studio, alerts, TTS, music and games for all.
 - The profile picks its platforms on Home, with the `+` after the tabs and each tab's remove (`SET_PLATFORMS`). A platform can be added while live and connected alone; one that's on stays until it's disconnected (main keeps it). Its `platforms` and `channels` are the profile's own, so each profile can use different ones.
 - A trigger row is `[platform] [event]` (the user's call). The platform select shows only once the profile uses two or more platforms, or when the row already has one saved.
 - Twitch connects through the streamer's sign-in: Twitch's official EventSub over WebSocket and Helix, the device code flow, a public client. The client ID isn't a secret and ships in `providers/twitch/config`. Nothing else of Twitch's is shipped, and no code is copied from any Twitch, YouTube or Kick library, only MIT, BSD and Apache references are read (Licensing in `AGENTS.md`).
@@ -50,7 +50,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - The profile's top-level `platforms` (default `["tiktok"]`) and `channels` (the name typed for each platform that takes one): unknown platforms are dropped when read, so an older Tokio still loads a newer profile. `connector.username` stays TikTok's.
 - `PLATFORM_TRIGGERS` (`src/common/util/platforms.ts`) is one row per platform, so a new platform touches only its own. Every trigger must be on a platform or be Music change (its test). The pickers, the feed kinds, the stat tiles and the timer rows all derive from it through `triggersFor`; don't list triggers by hand.
 - `TIMER_TRIGGERS` (`src/common/util/timer.ts`) names the event each timer trigger counts, so a profile's platforms say which timer rows and carousel items apply.
-- The feed, Gift stats and the overlays' payloads only add fields.
+- The feed, LIVE history and the overlays' payloads only add fields.
 
 ## What other platforms don't send
 
@@ -86,7 +86,7 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
   - A handle it hasn't seen keeps `youtube:@handle`, with no lookup, since a Gift has no price and they come in bursts. That viewer then has two ids.
 - Each platform's currency is named and counted on its own, never added to another or ranked against it (the user's call): TikTok's coins, Kick's Kicks, Twitch's Bits, YouTube's Super Chats in US dollars.
 - **What names each currency:**
-  - `PLATFORM_CURRENCY` (`src/common/util/platforms.ts`) names each platform's money, which Home, Gift stats, history and MCP count it in: `coins`, `kicks`, `bits` or `usd`.
+  - `PLATFORM_CURRENCY` (`src/common/util/platforms.ts`) names each platform's money, which Home, LIVE history and MCP count it in: `coins`, `kicks`, `bits` or `usd`.
   - `GIFT_CURRENCY` says what each platform's gifts cost in (`coins`, `kicks` or none), and `giftCurrencies(platforms)` gives the ones a profile pays in.
   - Both are `Record`s, so a new platform has to decide.
 - A gift without a currency counts as a gift, never as an amount, and makes its sender a gifter only beside money or gifted subs (the user's call: hide the zero, `.claude/rules/history.md`).

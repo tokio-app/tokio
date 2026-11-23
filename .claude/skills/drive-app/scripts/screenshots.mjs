@@ -121,7 +121,7 @@ function tone(file, hz) {
 
 const user = (name, handle) => ({ handle, name, picture: "" });
 
-// Gift stats' and Fans' data, sent as main's replies: the LIVEs newest first
+// LIVE history's and Fans' data, sent as main's replies: the LIVEs newest first
 // (days ago, minutes after 8 PM, hours, coins, gifts), the top gifters and
 // the fans
 const DAY = 86_400_000;
@@ -1077,8 +1077,8 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
   await page.getByTitle(tr("Create ID")).click();
   await crop("tools-test-overlays", toolSection(tr("Test overlays")));
 
-  // Gift stats on All time, once its own request found no LIVEs
-  await tool(tr("Gift stats"));
+  // LIVE history on All time, once its own request found no LIVEs
+  await tool(tr("LIVE history"));
   await page
     .getByText(tr(en["coinStats.list.empty"], "coinStats.list.empty"))
     .waitFor();
@@ -1088,7 +1088,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     .getByRole("option")
     .nth(1)
     .waitFor();
-  await crop("coin-stats", toolSection(tr("Gift stats")));
+  await crop("coin-stats", toolSection(tr("LIVE history")));
 
   // Fans, once its own request found none, with TikTok's badges loaded
   await tool(tr("Fans"));

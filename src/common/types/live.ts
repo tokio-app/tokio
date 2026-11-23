@@ -152,6 +152,6 @@ export type LiveRecord = LiveSummary & {
 // gifters (1, the most)
 export type RankedGifter = Gifter & { rank: number };
 
-// For Gift stats: the finished LIVEs, newest first, and all time's top
+// For LIVE history: the finished LIVEs, newest first, and all time's top
 // gifters
 export type LiveHistory = { lives: LiveSummary[]; gifters: Gifter[] };

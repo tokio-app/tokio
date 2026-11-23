@@ -54,7 +54,7 @@ export const MAX_LIVES = 1500;
 export const MAX_GIFTERS = 10_000;
 // Overlays get this many of each list
 export const TOP_GIFTERS = 10;
-// Gift stats gets this many of each platform's
+// LIVE history gets this many of each platform's
 const SHOWN_GIFTERS = 100;
 
 const GifterSchema: z.ZodType<Gifter> = z.object({

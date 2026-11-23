@@ -76,7 +76,7 @@ const dates = async (
   await user.click(screen.getByRole("option", { name: choice }));
 };
 
-describe("Gift stats", () => {
+describe("LIVE history", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -85,7 +85,7 @@ describe("Gift stats", () => {
     renderWithProviders(<CoinStats />);
 
     expect(
-      screen.getByRole("heading", { name: "Gift stats" }),
+      screen.getByRole("heading", { name: "LIVE history" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Back to Tools" }),
@@ -99,7 +99,7 @@ describe("Gift stats", () => {
     await lives([saturday, friday]);
 
     expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent(
-      "Gift stats",
+      "LIVE history",
     );
     expect(list()).toBeInTheDocument();
   });

@@ -135,7 +135,7 @@ export function Tools() {
   );
 }
 
-// What the Gift stats row's number is: "coins on Oct 31, 2026"
+// What the LIVE history row's number is: "coins on Oct 31, 2026"
 const TOOL_AMOUNTS = {
   coins: "tools.list.coins",
   kicks: "tools.list.kicks",

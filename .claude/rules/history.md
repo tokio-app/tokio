@@ -7,7 +7,7 @@ paths:
 
 # LIVE history
 
-`HistoryService` (`src/main/services/history`) keeps each profile's LIVEs and the viewers who spent or gifted subs in them, for Gift stats (`/tools/coin-stats`, the route of its old name, Coin stats) and the top gifters overlays get as `tokio:gifters`. It holds the profile's data in memory as Persistence in `AGENTS.md` describes.
+`HistoryService` (`src/main/services/history`) keeps each profile's LIVEs and the viewers who spent or gifted subs in them, for LIVE history (`/tools/coin-stats`, the route of its first name, Coin stats) and the top gifters overlays get as `tokio:gifters`. It holds the profile's data in memory as Persistence in `AGENTS.md` describes.
 
 ## Recording
 
@@ -17,7 +17,7 @@ paths:
   - Gifts go through the service's own `GiftStreaks`: `added × max(0, coins)` in the sender's gift currency (`GIFT_CURRENCY`), as Home counts them. That's TikTok's coins and Kick's Kicks; YouTube's Gifts have no price. A treasure chest carries no data and a Super Fan event only the viewer, so neither counts.
   - Twitch's cheers count their Bits, YouTube's Super Chats their `usd`, and gifted subs their `count`.
 - A LIVE keeps each platform's part in `platforms` (`{ amount, gifts, giftSubs }`, the amount in `PLATFORM_CURRENCY`), never added together. `coins` stays TikTok's coins and `gifts` every platform's, so an older Tokio still reads a newer file. A LIVE saved without `platforms` was TikTok's alone: every reader goes through `platformParts` (`src/common/util/history.ts`).
-- Every platform the LIVE was on gets a part, zeros included, so Gift stats lists the LIVE under it even without gifts: `init.ts` calls `join` for each platform connected at `CONNECTED` and for each one that comes up later.
+- Every platform the LIVE was on gets a part, zeros included, so LIVE history lists the LIVE under it even without gifts: `init.ts` calls `join` for each platform connected at `CONNECTED` and for each one that comes up later.
 - **Super Chats before the rates:**
   - A Super Chat whose `usd` is null because the rates hadn't loaded waits for them (`setRates`, `onChange`), then counts in the minute it came in.
   - One still waiting when the LIVE ends is left out of its dollars, logged.
@@ -48,7 +48,7 @@ paths:
 - `MAX_GIFTERS` caps each platform's gifters of all time on its own: the fewest go first, then the fewest gifted subs, then the oldest last gift. The page shows only the top `SHOWN_GIFTERS` and each LIVE keeps all its own gifters, so nobody shown is dropped.
 - On a quit or crash the next load adds what the last save missed from the LIVE's file.
 - Saves run one after another through `_saving`, so an older index can't land after a newer one, as when a LIVE's end races the cap's drop.
-- Reading a LIVE (`_readLive`) waits for `_saving` too: a save takes the LIVEs that ended out of `_ended` before their files are written, so a read in between (Gift stats asks again as a LIVE ends) got the older file. A save never waits on a read.
+- Reading a LIVE (`_readLive`) waits for `_saving` too: a save takes the LIVEs that ended out of `_ended` before their files are written, so a read in between (LIVE history asks again as a LIVE ends) got the older file. A save never waits on a read.
 
 ## Loading, recovery, deleting and clearing
 
@@ -87,7 +87,7 @@ paths:
 
 ## The page
 
-- Gift stats (once Coin stats) is a row in Tools' list, not a sidebar entry (the user's call). The layout the user picked: the selected LIVE on the left as Home showed it when it ended, the list on the right.
+- LIVE history is a row in Tools' list, not a sidebar entry, named for every platform's money rather than gifts alone (the user's calls; it was Coin stats, then Gift stats). The layout the user picked: the selected LIVE on the left as Home showed it when it ended, the list on the right.
 - Both lists scroll inside the dashboard, so picking a LIVE with more gifters doesn't move the list.
 - **Tabs:** there's a tab per platform in the history (`historyPlatforms`, in `PLATFORMS` order, TikTok alone without LIVEs), then All with two or more (`statsTabs`), styled like Home's (the user's call: each platform in its own currency, never added up). With one platform there's no tab row.
 - **A platform's tab** (`readout`):

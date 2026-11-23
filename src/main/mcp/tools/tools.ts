@@ -120,7 +120,7 @@ export const kinds: Kinds = {
   }),
   lives: defineKind({
     notes:
-      "The active profile's finished LIVEs (Tools → Gift stats), newest first; the one going on joins when it ends. The id is when it started, in ms. query matches the @username Tokio connected to. platforms has each platform the LIVE was on: what viewers spent there in its own currency (coins on TikTok, kicks on Kick, bits on Twitch, usd for YouTube's Super Chats in US dollars), its gifts and its gifted subs (giftSubs). Currencies are never added together; gifts counts every platform's. get gives its top 50 gifters on each platform. Removing one also takes its gifts out of the all-time ranking; it can't be undone.",
+      "The active profile's finished LIVEs (Tools → LIVE history), newest first; the one going on joins when it ends. The id is when it started, in ms. query matches the @username Tokio connected to. platforms has each platform the LIVE was on: what viewers spent there in its own currency (coins on TikTok, kicks on Kick, bits on Twitch, usd for YouTube's Super Chats in US dollars), its gifts and its gifted subs (giftSubs). Currencies are never added together; gifts counts every platform's. get gives its top 50 gifters on each platform. Removing one also takes its gifts out of the all-time ranking; it can't be undone.",
     list: ({ historyService }, { query, limit }) => {
       const wanted = query?.trim().replace(/^@/, "").toLowerCase();
       const found = historyService
@@ -264,7 +264,7 @@ export const tools: ToolDef<any>[] = [
     name: "clear_history",
     title: "Clear LIVE history",
     description:
-      "Deletes every LIVE the active profile kept and its gifters' all-time ranking (Tools → Gift stats). A LIVE going on carries on. It can't be undone: ask the streamer first.",
+      "Deletes every LIVE the active profile kept and its gifters' all-time ranking (Tools → LIVE history). A LIVE going on carries on. It can't be undone: ask the streamer first.",
     input: z.object({}).strict(),
     annotations: DESTROY,
     run: async (handler) => {

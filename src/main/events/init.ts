@@ -519,7 +519,7 @@ const registerConnectorEvents = ({
   // up says nothing: its connect or its reconnect already did.
   conn.onPlatform((platform, change) => {
     if (platform === "youtube" && change === "up") void rates.refresh();
-    // Gift stats lists the LIVE under it, even if it sends nothing
+    // LIVE history lists the LIVE under it, even if it sends nothing
     if (change === "up") history.join(platform);
     const params = { platform: PLATFORM_LABELS[platform] };
     // Apart from the session's own, which can come right after

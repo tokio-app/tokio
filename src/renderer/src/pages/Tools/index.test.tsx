@@ -46,7 +46,7 @@ describe("Tools", () => {
     const names = [
       "Countdown",
       "Overlay Studio",
-      "Gift stats",
+      "LIVE history",
       "Fans",
       "Test overlays",
     ];
@@ -101,8 +101,8 @@ describe("Tools", () => {
       "A countdown viewers add time to. 01:00:00 Ready",
     );
     // The newest LIVE's
-    expect(row("Gift stats")).toHaveAccessibleDescription(
-      "The gifts of every LIVE, what they were worth and who sent them. 1,234 coins on Oct 31, 2026",
+    expect(row("LIVE history")).toHaveAccessibleDescription(
+      "Every LIVE, what viewers sent on each platform and who sent the most. 1,234 coins on Oct 31, 2026",
     );
     expect(row("Fans")).toHaveAccessibleDescription(
       "Viewers with a fan level, highest first. 2 fans",
@@ -120,7 +120,7 @@ describe("Tools", () => {
     await testOverlays();
 
     expect(
-      within(row("Gift stats")).getByText("coin on Oct 31, 2026"),
+      within(row("LIVE history")).getByText("coin on Oct 31, 2026"),
     ).toBeVisible();
     expect(within(row("Fans")).getByText("fan")).toBeVisible();
     expect(within(row("Test overlays")).getByText("0")).toBeVisible();
@@ -155,8 +155,8 @@ describe("Tools", () => {
 
     await lives();
 
-    expect(row("Gift stats")).toHaveAccessibleDescription(
-      "The gifts of every LIVE, what they were worth and who sent them. No LIVEs yet",
+    expect(row("LIVE history")).toHaveAccessibleDescription(
+      "Every LIVE, what viewers sent on each platform and who sent the most. No LIVEs yet",
     );
   });
 
@@ -191,7 +191,7 @@ describe("Tools", () => {
       t.state = { status: "running", remaining: 10_000 };
     });
     expect(row("Countdown").className).toMatch(/tool_live/);
-    expect(row("Gift stats").className).not.toMatch(/tool_live/);
+    expect(row("LIVE history").className).not.toMatch(/tool_live/);
   });
 
   it("shows the starting time while idle", async () => {
@@ -211,7 +211,7 @@ describe("Tools", () => {
 
     await lives(liveSummary(OCT_31, { platforms: { kick: part(1) } }));
     expect(
-      within(row("Gift stats")).getByText("Kick on Oct 31, 2026"),
+      within(row("LIVE history")).getByText("Kick on Oct 31, 2026"),
     ).toBeVisible();
 
     // TikTok's had none, so Twitch's Bits
@@ -220,18 +220,18 @@ describe("Tools", () => {
         platforms: { tiktok: part(0), twitch: part(2500), kick: part(300) },
       }),
     );
-    expect(row("Gift stats")).toHaveAccessibleDescription(
+    expect(row("LIVE history")).toHaveAccessibleDescription(
       /2,500 Bits on Oct 31, 2026$/,
     );
 
     await lives(liveSummary(OCT_31, { platforms: { youtube: part(57.4) } }));
-    expect(row("Gift stats")).toHaveAccessibleDescription(
+    expect(row("LIVE history")).toHaveAccessibleDescription(
       /\$57\.40 in Super Chats on Oct 31, 2026$/,
     );
 
     // Nothing anywhere: the first platform's
     await lives(liveSummary(OCT_31, { platforms: { kick: part(0) } }));
-    expect(row("Gift stats")).toHaveAccessibleDescription(
+    expect(row("LIVE history")).toHaveAccessibleDescription(
       /0 Kicks on Oct 31, 2026$/,
     );
   });
@@ -248,13 +248,13 @@ describe("Tools", () => {
     expect(sent(APP_EVENTS.GET_FANS)).toHaveLength(2);
 
     await lives();
-    expect(within(row("Gift stats")).getByText("No LIVEs yet")).toBeVisible();
+    expect(within(row("LIVE history")).getByText("No LIVEs yet")).toBeVisible();
   });
 
   it.each([
     ["Countdown", "/tools/timer"],
     ["Overlay Studio", "/tools/studio"],
-    ["Gift stats", "/tools/coin-stats"],
+    ["LIVE history", "/tools/coin-stats"],
     ["Fans", "/tools/fans"],
     ["Test overlays", "/tools/test-overlays"],
   ])("opens %s", async (name, path) => {
