@@ -1066,7 +1066,10 @@ const registerFans = ({
   notifier,
 }: AppHandlerVariables) => {
   for (const type of FAN_EVENTS) {
-    conn.on(type, (d) => fans.record(d.user, type));
+    // A sub's months; the others say theirs on the user, if at all
+    conn.on(type, (d) =>
+      fans.record(d.user, type, "months" in d ? d.months : undefined),
+    );
   }
 
   const message = (): TokioPayload => ({

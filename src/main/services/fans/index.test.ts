@@ -1,4 +1,4 @@
-import { Fan, TOKIO_EVENTS, UserData } from "@/common/types";
+import { Fan, Platform, TOKIO_EVENTS, UserData } from "@/common/types";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
 import { existsSync } from "node:fs";
@@ -16,6 +16,22 @@ const viewer = (userId: string, fanLevel = 5, handle = `fan${userId}`) =>
     profilePictures: [`https://p16/${handle}.jpg`, `https://p19/${handle}.jpg`],
     fanLevel,
     fanBadge: `https://p16/lv${fanLevel}.png`,
+  }) satisfies UserData;
+
+// A viewer on another platform, a subscriber or member when their badge says
+const sub = (
+  platform: Exclude<Platform, "tiktok">,
+  id: string,
+  extra: Partial<UserData> = {},
+) =>
+  ({
+    userId: `${platform}:${id}`,
+    username: `Sub ${id}`,
+    handle: `sub${id}`,
+    profilePictures: [],
+    superfan: true,
+    platform,
+    ...extra,
   }) satisfies UserData;
 
 describe("FansService", () => {
@@ -166,6 +182,134 @@ describe("FansService", () => {
     expect(ids).toHaveLength(MAX_FANS);
     expect(ids).not.toContain("1");
     expect(ids.slice(-2)).toEqual(["0", "new"]);
+  });
+
+  it("keeps the other platforms' subscribers and members, from their badge or a sub", async () => {
+    const fans = await loaded();
+    vi.setSystemTime(1000);
+    fans.record(sub("twitch", "1"), TOKIO_EVENTS.CHAT);
+    fans.record(sub("kick", "2", { subMonths: 3 }), TOKIO_EVENTS.CHAT);
+    fans.record(sub("youtube", "3"), TOKIO_EVENTS.SUPER_CHAT);
+    // A sub says so without the badge
+    fans.record(
+      sub("twitch", "4", { superfan: false }),
+      TOKIO_EVENTS.SUBSCRIBE,
+      5,
+    );
+    // Without the badge they're not one
+    fans.record(sub("kick", "5", { superfan: false }), TOKIO_EVENTS.CHAT);
+    fans.record(sub("youtube", "6", { userId: undefined }), TOKIO_EVENTS.CHAT);
+
+    expect(fans.all()).toEqual([
+      {
+        userId: "twitch:4",
+        username: "Sub 4",
+        handle: "sub4",
+        fanLevel: 0,
+        fanBadge: "",
+        superfan: true,
+        months: 5,
+        seenAt: 1000,
+        platform: "twitch",
+      },
+      expect.objectContaining({ userId: "twitch:1", platform: "twitch" }),
+      expect.objectContaining({ userId: "youtube:3", platform: "youtube" }),
+      expect.objectContaining({ userId: "kick:2", months: 3 }),
+    ]);
+    expect(fans.all()[1]).not.toHaveProperty("months");
+  });
+
+  it("keeps the most months known, from subs and badges", async () => {
+    const fans = await loaded();
+    const months = () => fans.all()[0].months;
+
+    fans.record(sub("youtube", "1", { subMonths: 12 }), TOKIO_EVENTS.CHAT);
+    expect(months()).toBe(12);
+    // A milestone message says more than the badge's "1 year"
+    fans.record(sub("youtube", "1"), TOKIO_EVENTS.SUBSCRIBE, 14);
+    expect(months()).toBe(14);
+    fans.record(sub("youtube", "1", { subMonths: 12 }), TOKIO_EVENTS.CHAT);
+    expect(months()).toBe(14);
+    fans.record(sub("youtube", "1", { subMonths: 24 }), TOKIO_EVENTS.CHAT);
+    expect(months()).toBe(24);
+  });
+
+  it("keeps a subscriber whose later chat shows no badge", async () => {
+    const fans = await loaded();
+    vi.setSystemTime(1000);
+    fans.record(sub("twitch", "1", { subMonths: 4 }), TOKIO_EVENTS.CHAT);
+    const before = fans.all();
+    vi.setSystemTime(2000);
+    fans.record(
+      sub("twitch", "1", { superfan: false, username: "Renamed" }),
+      TOKIO_EVENTS.CHAT,
+    );
+
+    expect(fans.all()).toEqual(before);
+  });
+
+  it("sends overlays only TikTok's fans, and lists every platform's in order", async () => {
+    const fans = await loaded();
+    vi.setSystemTime(1);
+    fans.record(sub("kick", "a"), TOKIO_EVENTS.CHAT);
+    fans.record(viewer("1", 2));
+    fans.record(sub("twitch", "a", { subMonths: 2 }), TOKIO_EVENTS.CHAT);
+    vi.setSystemTime(2);
+    fans.record(sub("twitch", "b"), TOKIO_EVENTS.CHAT);
+    fans.record(viewer("2", 9));
+    fans.record(sub("twitch", "c", { subMonths: 2 }), TOKIO_EVENTS.CHAT);
+    fans.record(sub("youtube", "a", { subMonths: 6 }), TOKIO_EVENTS.CHAT);
+
+    expect(fans.list().map((f) => f.userId)).toEqual(["2", "1"]);
+    expect(fans.all().map((f) => f.userId)).toEqual([
+      "2",
+      "1",
+      // By months, the most recently seen first, unknown last
+      "twitch:c",
+      "twitch:a",
+      "twitch:b",
+      "youtube:a",
+      "kick:a",
+    ]);
+  });
+
+  it(`keeps ${MAX_FANS} per platform, dropping that platform's one not seen for the longest`, async () => {
+    const fans = await loaded();
+    fans.record(sub("twitch", "old"), TOKIO_EVENTS.CHAT);
+    for (let i = 0; i < MAX_FANS; i++) fans.record(viewer(String(i)));
+    fans.record(sub("kick", "1"), TOKIO_EVENTS.CHAT);
+    fans.record(viewer("new"));
+    for (let i = 0; i < MAX_FANS; i++) {
+      fans.record(sub("kick", `k${i}`), TOKIO_EVENTS.CHAT);
+    }
+    await fans.save();
+
+    const ids = (await saved()).map((f) => f.userId);
+    expect(ids).toHaveLength(MAX_FANS * 2 + 1);
+    expect(ids).toContain("twitch:old");
+    expect(ids).not.toContain("0");
+    expect(ids).toContain("new");
+    expect(ids).not.toContain("kick:1");
+  });
+
+  it(`loads ${MAX_FANS} per platform, the last of each`, async () => {
+    const tiktok = Array.from({ length: MAX_FANS + 1 }, (_, i) => ({
+      userId: String(i),
+      username: "Ana",
+      handle: "ana",
+      fanLevel: 1,
+      seenAt: i,
+    }));
+    const twitch = { ...sub("twitch", "1"), fanLevel: 0, seenAt: 0 };
+    await writeFile(
+      join(dir, "a.json"),
+      JSON.stringify({ fans: [twitch, ...tiktok] }),
+    );
+
+    const ids = (await loaded()).all().map((f) => f.userId);
+    expect(ids).toHaveLength(MAX_FANS + 1);
+    expect(ids).not.toContain("0");
+    expect(ids).toContain("twitch:1");
   });
 
   it("saves the fans in their profile's file, and loads them back", async () => {

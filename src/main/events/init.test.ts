@@ -2223,6 +2223,20 @@ describe("init events", () => {
       expect(s.fansService.record).toHaveBeenCalledExactlyOnceWith(
         data.user,
         event,
+        "months" in data ? data.months : undefined,
+      );
+    });
+
+    it("records a sub with its months", async () => {
+      const s = await live();
+      const { data } = generateTikTokEventSample(TOKIO_EVENTS.SUBSCRIBE);
+
+      emitLive(s.conn, TOKIO_EVENTS.SUBSCRIBE, { ...data, months: 7 });
+
+      expect(s.fansService.record).toHaveBeenCalledExactlyOnceWith(
+        data.user,
+        TOKIO_EVENTS.SUBSCRIBE,
+        7,
       );
     });
 
