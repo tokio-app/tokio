@@ -187,9 +187,9 @@
   width: 200px;
 }
 
-/* With its platform before it */
+/* With its platform before it, as wide as the alerts' */
 .trigger:has(> * + *) {
-  width: 376px;
+  width: 408px;
 }
 
 /* The trigger's filter, beside it. A gift's gifts and when it runs sit in a
