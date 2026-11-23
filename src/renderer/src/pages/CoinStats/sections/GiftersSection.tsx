@@ -1,5 +1,6 @@
-import { Gifter, RankedGifter } from "@/common/types";
-import { GiftCurrency } from "@/common/util";
+import { translate } from "@/common/i18n";
+import { Gifter, Platform, RankedGifter, TOKIO_EVENTS } from "@/common/types";
+import { PLATFORM_CURRENCY, triggersFor } from "@/common/util";
 import {
   Avatar,
   EmptyState,
@@ -12,8 +13,8 @@ import { useLanguage, useT } from "@/ui/i18n";
 import styles from "../coinstats.module.css";
 
 export interface GiftersList {
-  // One currency's, the most first, undefined until main sends them. A
-  // search's come with their place among all of that currency's.
+  // One platform's, the most first, undefined until main sends them. A
+  // search's come with their place among all of that platform's.
   gifters?: (Gifter | RankedGifter)[];
   // What to say when there are none
   empty: string;
@@ -23,9 +24,23 @@ export interface GiftersList {
 
 interface Props extends GiftersList {
   title: string;
-  currency: GiftCurrency;
+  // Whose gifters, null on All, which would rank one currency against
+  // another
+  platform: Platform | null;
   search: string;
   onSearch: (search: string) => void;
+}
+
+// What each of the platform's gifters sent: their money, then their gifts
+// and gifted subs where it sends them
+function sentParts(platform: Platform, gifter: Gifter, language: string) {
+  const sent = triggersFor([platform]);
+  return [
+    amountLabel(gifter.coins, PLATFORM_CURRENCY[platform], language),
+    sent.includes(TOKIO_EVENTS.GIFT) && giftsLabel(gifter.gifts, language),
+    sent.includes(TOKIO_EVENTS.GIFT_SUB) &&
+      translate(language, "gifts.giftSubs", { count: gifter.giftSubs }),
+  ].filter((part) => part !== false);
 }
 
 export function GiftersSection({
@@ -33,7 +48,7 @@ export function GiftersSection({
   gifters,
   empty,
   failed,
-  currency,
+  platform,
   search,
   onSearch,
 }: Props) {
@@ -41,7 +56,9 @@ export function GiftersSection({
   const language = useLanguage();
 
   let content;
-  if (failed) {
+  if (!platform) {
+    content = <EmptyState>{t("coinStats.gifters.pickPlatform")}</EmptyState>;
+  } else if (failed) {
     content = <EmptyState>{failed}</EmptyState>;
   } else if (!gifters) {
     content = (
@@ -70,12 +87,11 @@ export function GiftersSection({
               </span>
               <span className={styles.handle}>{`@${gifter.handle}`}</span>
             </span>
-            <span className={styles.amount}>
-              {amountLabel(gifter.coins, currency, language)}
-            </span>
-            <span className={styles.amount}>
-              {giftsLabel(gifter.gifts, language)}
-            </span>
+            {sentParts(platform, gifter, language).map((part, n) => (
+              <span key={n} className={styles.amount}>
+                {part}
+              </span>
+            ))}
           </li>
         ))}
       </ol>
@@ -85,12 +101,15 @@ export function GiftersSection({
   return (
     <Section
       title={title}
+      // A search ranks too, so it waits for a platform
       actions={
-        <SearchToggle
-          placeholder={t("coinStats.gifters.search")}
-          value={search}
-          onChange={onSearch}
-        />
+        platform && (
+          <SearchToggle
+            placeholder={t("coinStats.gifters.search")}
+            value={search}
+            onChange={onSearch}
+          />
+        )
       }
     >
       {content}

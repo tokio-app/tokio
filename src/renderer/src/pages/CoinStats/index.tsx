@@ -5,14 +5,14 @@ import {
   Gifter,
   LiveHistory,
   LiveSummary,
+  PLATFORMS,
 } from "@/common/types";
 import {
   DateRange,
-  GIFT_CURRENCIES,
-  GIFT_CURRENCY,
-  GiftCurrency,
   inRange,
+  PLATFORM_LABELS,
   platformOf,
+  platformParts,
 } from "@/common/util";
 import {
   BackButton,
@@ -26,6 +26,7 @@ import {
 } from "@/components";
 import { formatDate, formatDuration } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
+import { PLATFORM_ICONS } from "@/pages/Home/helper";
 import { useLanguage, useT } from "@/ui/i18n";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
@@ -35,9 +36,13 @@ import {
   capitalize,
   DateFilter,
   dateRange,
+  historyPlatforms,
   keepSelection,
   NO_FILTER,
   periodText,
+  readout,
+  StatsTab,
+  statsTabs,
 } from "./helper";
 import { GiftersList, GiftersSection } from "./sections/GiftersSection";
 import { ListSection } from "./sections/ListSection";
@@ -49,12 +54,6 @@ type GiftersReply = AppEventsResponseMap[APP_EVENTS_RESPONSE.GIFTERS];
 // A search goes this long after the last key, since a wide range of dates
 // reads many LIVEs' files
 const SEARCH_DELAY_MS = 250;
-
-// Each currency's name on the switch
-const CURRENCY_LABELS = {
-  coins: "coinStats.stats.coins",
-  kicks: "coinStats.stats.kicks",
-} as const;
 
 // The header row, with the dashboard or the spinner under it
 function Frame({
@@ -99,8 +98,8 @@ export function CoinStats() {
   const [searchReply, setSearchReply] = useState<GiftersReply>();
   const [deleting, setDeleting] = useState<LiveSummary>();
   const [clearing, setClearing] = useState(false);
-  // The currency picked on the switch, kept while the history lacks it
-  const [picked, setPicked] = useState<GiftCurrency>("coins");
+  // The tab picked, kept while the history lacks it
+  const [picked, setPicked] = useState<StatsTab>();
   // The next LIVES is another profile's, which starts from its newest LIVE
   const switched = useRef(false);
   // The profile the last GET_PROFILE named. It also comes as a resync (an MCP
@@ -112,7 +111,16 @@ export function CoinStats() {
   const visible = (lives: LiveSummary[]) =>
     range ? lives.filter((live) => inRange(live, range)) : lives;
   const shown = visible(history?.lives ?? []);
-  const live = shown.find((l) => l.startedAt === selected);
+  // A tab per platform the history has, then All, the first until another
+  // is picked. Each platform's counts in its own currency, never added up.
+  const platforms = historyPlatforms(history?.lives ?? []);
+  const tabs = statsTabs(platforms);
+  const tab = picked && tabs.includes(picked) ? picked : tabs[0];
+  // A platform's tab lists the LIVEs that were on it
+  const tabLives =
+    tab === "all" ? shown : shown.filter((l) => platformParts(l)[tab]);
+  // One on another platform's tab alone shows the totals
+  const live = tabLives.find((l) => l.startedAt === selected);
   // The LIVEs the gifters come from: all of the selected one, or the filter's
   const scope: DateRange = live
     ? { from: live.startedAt, to: live.endedAt }
@@ -205,21 +213,20 @@ export function CoinStats() {
     );
   }
 
-  // Never added together: the page counts in one at a time, the one picked
-  // when the history has it
-  const currencies = GIFT_CURRENCIES.filter((c) =>
-    history.lives.some((l) => l[c] > 0),
-  );
-  const currency = currencies.includes(picked)
-    ? picked
-    : (currencies[0] ?? "coins");
-  // A list's gifters of that currency, in main's order and with its ranks
+  // A list's gifters on the tab's platform, in main's order and with its
+  // ranks. All ranks none.
   const paid = <G extends Gifter>(list?: G[]) =>
-    list?.filter((g) => GIFT_CURRENCY[platformOf(g)] === currency);
+    list?.filter((g) => platformOf(g) === tab);
 
   const dates = isDates(datesReply) ? datesReply : undefined;
+  const total = allTime(tabLives, range ?? {});
   // Main adds up the gifts in the dates of a LIVE they cut
-  const total = { ...allTime(shown, range ?? {}), ...dates?.totals };
+  const parts = dates?.totals ? platformParts(dates.totals) : total.parts;
+  // The first row's: the tab's money, or every gift on All
+  const amount =
+    tab === "all"
+      ? Object.values(parts).reduce((n, part) => n + part.gifts, 0)
+      : (parts[tab]?.amount ?? 0);
 
   // The gifters panel: a search's matches, or the selection's gifters
   const gifters = (): GiftersList => {
@@ -269,22 +276,24 @@ export function CoinStats() {
       )}
       {clearing && <ClearHistoryModal onClose={() => setClearing(false)} />}
 
-      <Frame
-        actions={
-          currencies.length > 1 && (
-            <Tabs
-              variant="pill"
-              label={t("coinStats.currency")}
-              tabs={currencies.map((value) => ({
+      <Frame>
+        {tabs.length > 1 && (
+          <Tabs
+            className={styles.tabs}
+            label={t("coinStats.platform")}
+            tabs={tabs.map((value) => {
+              if (value === "all") return { value, label: t("coinStats.all") };
+              const Icon = PLATFORM_ICONS[value];
+              return {
                 value,
-                label: t(CURRENCY_LABELS[value]),
-              }))}
-              value={currency}
-              onChange={setPicked}
-            />
-          )
-        }
-      >
+                icon: <Icon aria-hidden />,
+                label: PLATFORM_LABELS[value],
+              };
+            })}
+            value={tab}
+            onChange={setPicked}
+          />
+        )}
         <div className={styles.dashboard}>
           {/* Swapped at once on a new selection, with no motion */}
           <div className={styles.column}>
@@ -312,14 +321,18 @@ export function CoinStats() {
                     <FiTrash2 size={18} />
                   </Btn>
                 }
-                totals={live}
-                currency={currency}
+                // On All, the platforms it was on
+                stats={readout(
+                  tab,
+                  PLATFORMS.filter((p) => platformParts(live)[p]),
+                  platformParts(live),
+                )}
               />
             ) : (
               <SummarySection
                 title={periodText(filter, language, now)}
                 lines={[
-                  t("coinStats.allTime.count", { count: shown.length }),
+                  t("coinStats.allTime.count", { count: tabLives.length }),
                   t("coinStats.allTime.length", {
                     length: formatDuration(total.length),
                   }),
@@ -340,8 +353,7 @@ export function CoinStats() {
                     </Btn>
                   )
                 }
-                totals={total}
-                currency={currency}
+                stats={readout(tab, platforms, parts)}
               />
             )}
             {/* One in both cases, so an open search stays open */}
@@ -350,17 +362,17 @@ export function CoinStats() {
                 live ? "coinStats.gifters.title" : "coinStats.gifters.top",
               )}
               {...gifters()}
-              currency={currency}
+              platform={tab === "all" ? null : tab}
               search={search}
               onSearch={setSearch}
             />
           </div>
 
           <ListSection
-            lives={shown}
+            lives={tabLives}
             title={periodText(filter, language, now)}
-            amount={total[currency]}
-            currency={currency}
+            amount={amount}
+            tab={tab}
             filter={filter}
             filtered={!!range}
             selected={live ? live.startedAt : null}

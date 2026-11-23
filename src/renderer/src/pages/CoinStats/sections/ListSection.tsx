@@ -1,21 +1,28 @@
 import { LiveSummary } from "@/common/types";
-import { GiftCurrency } from "@/common/util";
+import { PLATFORM_CURRENCY } from "@/common/util";
 import { DateTimePicker, EmptyState, Select } from "@/components";
-import { cx, formatDate, formatDuration, formatStat } from "@/helper";
-import { amountLabel } from "@/helper/gifts";
+import { cx, formatDate, formatDuration } from "@/helper";
+import { amountLabel, giftsLabel } from "@/helper/gifts";
 import { useLanguage, useOptions, useT } from "@/ui/i18n";
 import { KeyboardEvent } from "react";
 import styles from "../coinstats.module.css";
-import { DATE_OPERATORS, DATE_PRESETS, DateFilter } from "../helper";
+import {
+  DATE_OPERATORS,
+  DATE_PRESETS,
+  DateFilter,
+  liveValue,
+  StatsTab,
+  statText,
+} from "../helper";
 
 interface Props {
-  // The ones the filter keeps, newest first
+  // The ones the filter keeps on the tab, newest first
   lives: LiveSummary[];
   // The first row's: All time, or the days the filter keeps
   title: string;
-  // The first row's, in the currency the page counts in
+  // The first row's: the tab's money, or every gift on All
   amount: number;
-  currency: GiftCurrency;
+  tab: StatsTab;
   filter: DateFilter;
   // The filter keeps only some of the LIVEs
   filtered: boolean;
@@ -90,7 +97,7 @@ export function ListSection({
   lives,
   title,
   amount,
-  currency,
+  tab,
   filter,
   filtered,
   selected,
@@ -100,9 +107,15 @@ export function ListSection({
   const t = useT();
   const language = useLanguage();
   const options = [null, ...lives.map((live) => live.startedAt)];
+  // The tab's money, or the gift count on All
+  const currency = tab === "all" ? undefined : PLATFORM_CURRENCY[tab];
+  const valueOf = (live: LiveSummary) => liveValue(live, tab);
   // The bars are scaled to the best LIVE
-  const best = lives.reduce((max, live) => Math.max(max, live[currency]), 0);
-  const label = (value: number) => amountLabel(value, currency, language);
+  const best = lives.reduce((max, live) => Math.max(max, valueOf(live)), 0);
+  const label = (value: number) =>
+    currency
+      ? amountLabel(value, currency, language)
+      : giftsLabel(value, language);
 
   const onKeyDown = (e: KeyboardEvent<HTMLUListElement>) => {
     const move = MOVES[e.key];
@@ -123,7 +136,7 @@ export function ListSection({
     onClick: () => onSelect(value),
   });
 
-  const total = formatStat(amount, language);
+  const total = statText(amount, currency, language);
   return (
     <div className={styles.side}>
       <DateFilterBar filter={filter} onChange={onFilter} />
@@ -146,14 +159,15 @@ export function ListSection({
           </span>
         </li>
         {lives.map((live) => {
-          const { short, full } = formatStat(live[currency], language);
+          const value = valueOf(live);
+          const { short, full } = statText(value, currency, language);
           return (
             <li
               key={live.startedAt}
               {...option(live.startedAt)}
               aria-label={t("coinStats.list.option", {
                 date: formatDate(live.startedAt, language, "dateTime"),
-                coins: label(live[currency]),
+                coins: label(value),
               })}
             >
               <span className={styles.date}>
@@ -171,7 +185,7 @@ export function ListSection({
               <span
                 className={styles.bar}
                 style={{
-                  width: best ? `${(live[currency] / best) * 100}%` : 0,
+                  width: best ? `${(value / best) * 100}%` : 0,
                 }}
               />
             </li>

@@ -25,6 +25,11 @@
   min-height: 0;
 }
 
+/* Home's platform tabs, over the whole dashboard */
+.tabs {
+  margin-bottom: calc(-1 * var(--space-2));
+}
+
 .column,
 .side {
   display: flex;
@@ -95,10 +100,13 @@
 }
 
 /* Rows out of view skip layout, so a LIVE with thousands of gifters opens
-   fast */
+   fast. The money, then a column for each count the platform has (gifts,
+   gifted subs), all in one row. */
 .gifter {
   display: grid;
-  grid-template-columns: 28px 28px minmax(0, 1fr) 136px 104px;
+  grid-template-columns: 28px 28px minmax(0, 1fr) 136px;
+  grid-auto-columns: 104px;
+  grid-auto-flow: column;
   align-items: center;
   gap: var(--space-3);
   min-height: 52px;
@@ -148,6 +156,12 @@
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
+}
+
+/* The counts after it can take two lines: Spanish's "suscripciones
+   regaladas" is longer than its column */
+.amount ~ .amount {
+  white-space: normal;
 }
 
 /* THE LIST */

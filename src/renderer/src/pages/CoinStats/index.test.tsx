@@ -512,11 +512,16 @@ describe("Gift stats", () => {
     ).toBeDisabled();
   });
 
-  it("counts in Kicks a history with only Kicks, with no switch", async () => {
+  it("counts a history of Kick's LIVEs alone in Kicks, with no tabs", async () => {
     renderWithProviders(<CoinStats />);
 
-    await lives([liveSummary(SATURDAY, { kicks: 300, gifts: 3 })]);
-    await record(saturday, [kicker("Bea", 300, 3)]);
+    await lives([
+      liveSummary(SATURDAY, {
+        gifts: 3,
+        platforms: { kick: { amount: 300, gifts: 3, giftSubs: 2 } },
+      }),
+    ]);
+    await record(saturday, [{ ...kicker("Bea", 300, 3), giftSubs: 2 }]);
 
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(options()).toEqual([
@@ -524,54 +529,138 @@ describe("Gift stats", () => {
       expect.stringMatching(/^Saturday.*, 300 Kicks$/),
     ]);
     expect(stat("Kicks")).toHaveTextContent("300");
+    expect(stat("Gifts")).toHaveTextContent("3");
+    expect(stat("Gifted subs")).toHaveTextContent("2");
     expect(screen.queryByText("Coins")).not.toBeInTheDocument();
-    expect(gifterRows("Gifters")).toEqual(["1BBea@bea300 Kicks3 gifts"]);
+    expect(gifterRows("Gifters")).toEqual([
+      "1BBea@bea300 Kicks3 gifts2 gifted subs",
+    ]);
   });
 
-  it("switches between coins and Kicks when the history has both", async () => {
+  it("gives each platform in the history its tab, in its currency, then All", async () => {
     const { user } = renderWithProviders(<CoinStats />);
-    const both = { ...friday, kicks: 200 };
-    await lives(
-      [saturday, both],
-      [gifter("Ana", 5200), kicker("Bea", 200), gifter("Kai", 10)],
-    );
-    await record(saturday, [gifter("Yui", 600, 40)]);
+    const part = (amount: number, gifts: number, giftSubs: number) => ({
+      amount,
+      gifts,
+      giftSubs,
+    });
+    // Saturday's was saved before Tokio kept each platform's part: TikTok's
+    const both = {
+      ...friday,
+      gifts: 1205,
+      platforms: {
+        tiktok: part(12_400, 1203, 0),
+        twitch: part(2500, 0, 4),
+        youtube: part(57.4, 2, 1),
+      },
+    };
+    const di: Gifter = {
+      ...gifter("Di", 2500, 0),
+      userId: "twitch:di",
+      platform: "twitch",
+      giftSubs: 4,
+    };
+    const yui: Gifter = {
+      ...gifter("Yui", 57.4, 2),
+      userId: "youtube:yui",
+      platform: "youtube",
+      giftSubs: 1,
+    };
+    await lives([saturday, both], [gifter("Ana", 5200), di, yui]);
+    await record(saturday, [gifter("Kai", 600, 40)]);
 
-    const tabs = screen.getByRole("tablist", { name: "Counted in" });
+    const tabs = screen.getByRole("tablist", { name: "Platform" });
+    const tab = (name: string) => within(tabs).getByRole("tab", { name });
     expect(
       within(tabs)
         .getAllByRole("tab")
-        .map((tab) => tab.textContent),
-    ).toEqual(["Coins", "Kicks"]);
-    expect(within(tabs).getByRole("tab", { selected: true })).toHaveTextContent(
-      "Coins",
-    );
+        .map((t) => t.textContent),
+    ).toEqual(["TikTok", "Twitch", "YouTube", "All"]);
+    expect(tab("TikTok")).toHaveAttribute("aria-selected", "true");
     expect(options()[0]).toBe("All time, 13,000 coins");
 
-    await user.click(within(tabs).getByRole("tab", { name: "Kicks" }));
-
+    // Only the LIVEs on Twitch, in Bits. Saturday's wasn't, so its totals.
+    await user.click(tab("Twitch"));
     expect(options()).toEqual([
-      "All time, 200 Kicks",
-      expect.stringMatching(/^Saturday.*, 0 Kicks$/),
-      expect.stringMatching(/^Friday.*, 200 Kicks$/),
+      "All time, 2,500 Bits",
+      expect.stringMatching(/^Friday.*, 2,500 Bits$/),
+    ]);
+    expect(selected()).toMatch(/^All time/);
+    expect(screen.getByText("1 LIVE")).toBeInTheDocument();
+    expect(stat("Bits")).toHaveAttribute("title", "2,500");
+    expect(stat("Gifted subs")).toHaveTextContent("4");
+    // Twitch has no gifts
+    expect(screen.queryByText("Gifts")).not.toBeInTheDocument();
+    expect(gifterRows("Top gifters")).toEqual([
+      "1DDi@di2,500 Bits4 gifted subs",
+    ]);
+
+    // A LIVE's gifters on the tab's platform alone
+    await user.click(option(/^Friday/));
+    await record(both, [gifter("Ana", 12_400, 1203), di, yui]);
+    expect(gifterRows("Gifters")).toEqual([expect.stringMatching(/^1DDi/)]);
+
+    await user.click(tab("YouTube"));
+    expect(selected()).toMatch(/^Friday/);
+    expect(stat("Super Chats")).toHaveTextContent("$57.40");
+    expect(stat("Gifts")).toHaveTextContent("2");
+    expect(stat("Gifted subs")).toHaveTextContent("1");
+    expect(gifterRows("Gifters")).toEqual([
+      "1YYui@yui$57.402 gifts1 gifted sub",
+    ]);
+
+    // Every currency on its own, the LIVEs by their gifts, and no ranking
+    await user.click(tab("All"));
+    expect(options()).toEqual([
+      "All time, 1,245 gifts",
+      expect.stringMatching(/^Saturday.*, 40 gifts$/),
+      expect.stringMatching(/^Friday.*, 1,205 gifts$/),
     ]);
     expect(bar(/^Friday/)).toBe("100%");
-    expect(bar(/^Saturday/)).toBe("0%");
-    expect(stat("Kicks")).toHaveTextContent("0");
-    // Gifts stays every platform's
-    expect(stat("Gifts")).toHaveTextContent("40");
-    // The LIVE had no Kick gifters
-    expect(screen.getByText(/^No gifts yet\./)).toBeInTheDocument();
+    expect(stat("Coins")).toHaveAttribute("title", "12,400");
+    expect(stat("Bits")).toHaveAttribute("title", "2,500");
+    expect(stat("Super Chats")).toHaveTextContent("$57.40");
+    expect(stat("Gifts")).toHaveAttribute("title", "1,205");
+    expect(stat("Gifted subs")).toHaveTextContent("5");
+    expect(
+      screen.getByText("Pick a platform to see who sent the most."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Search" }),
+    ).not.toBeInTheDocument();
 
-    await user.click(option(/^All time/));
-    expect(stat("Kicks")).toHaveAttribute("title", "200");
-    expect(gifterRows("Top gifters")).toEqual(["1BBea@bea200 Kicks1 gift"]);
+    // Saturday was TikTok's alone
+    await user.click(option(/^Saturday/));
+    expect(stat("Coins")).toHaveTextContent("600");
+    expect(screen.queryByText("Bits")).not.toBeInTheDocument();
+  });
 
-    await user.click(within(tabs).getByRole("tab", { name: "Coins" }));
-    expect(gifterRows("Top gifters")).toEqual([
-      expect.stringMatching(/^1AAna/),
-      expect.stringMatching(/^2KKai/),
+  it("takes each platform's totals for the dates from main", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 31, 21));
+    const since = new Date(2026, 9, 30, 21).getTime();
+    const { user } = renderWithProviders(<CoinStats />);
+    const kick = { amount: 80, gifts: 4, giftSubs: 1 };
+    await lives([
+      { ...saturday, platforms: { kick } },
+      { ...friday, platforms: { kick } },
     ]);
+
+    await dates(user, "Last 24 hours");
+    await send(APP_EVENTS_RESPONSE.GIFTERS, {
+      success: true,
+      from: since,
+      totals: {
+        coins: 0,
+        kicks: 0,
+        gifts: 9,
+        platforms: { kick: { amount: 120, gifts: 9, giftSubs: 3 } },
+      },
+    });
+
+    expect(options()[0]).toBe("Last 24 hours, 120 Kicks");
+    expect(stat("Kicks")).toHaveTextContent("120");
+    expect(stat("Gifted subs")).toHaveTextContent("3");
   });
 
   it("says what fills an empty history", async () => {
