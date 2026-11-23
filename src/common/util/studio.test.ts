@@ -19,6 +19,7 @@ import { NO_MONEY } from "./format";
 import {
   fillStudioText,
   goalValue,
+  listInUsd,
   listRow,
   newStudioElement,
   newStudioGroup,
@@ -76,8 +77,8 @@ describe("fillStudioText", () => {
   });
 
   it("shows the Super Chats in dollars, and a dash until the rates load", () => {
-    expect(fill("{coins} {kicks} {bits} {superchats}", null)).toBe(
-      "4.2K 1.9K 2.5K $86.50",
+    expect(fill("{coins} {kicks} {bits} {superchats} {giftsubs}", null)).toBe(
+      "4.2K 1.9K 2.5K $86.50 25",
     );
     const waiting = fillStudioText("{superchats}", {
       numbers: { ...SAMPLE_NUMBERS, superchats: null },
@@ -706,5 +707,14 @@ describe("listRow", () => {
     expect(listRow(entry, "en").value).toBe("1.2K");
     expect(listRow({ ...entry, icon: "rose.png" }, "en").value).toBe("×1.2K");
     expect(listRow({ ...entry, value: null }, "en").value).toBe("");
+  });
+
+  it("writes US dollars for YouTube's top gifters only", () => {
+    const entry = { picture: "", name: "Ana", text: "", icon: "", value: 57.4 };
+
+    expect(listRow(entry, "en", true).value).toBe("$57.40");
+    expect(listInUsd({ source: "gifters", platform: "youtube" })).toBe(true);
+    expect(listInUsd({ source: "gifters", platform: "twitch" })).toBe(false);
+    expect(listInUsd({ source: "chat", platform: "youtube" })).toBe(false);
   });
 });

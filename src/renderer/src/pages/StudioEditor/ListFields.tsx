@@ -13,8 +13,8 @@ import {
   NumberInput,
   Select,
 } from "@/components";
-import { PLATFORMS, Platform } from "@/common/types";
-import { GIFT_CURRENCY, PLATFORM_LABELS } from "@/common/util";
+import { PLATFORMS } from "@/common/types";
+import { PLATFORM_LABELS } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import { useOptions, useT } from "@/ui/i18n";
 import styles from "./studioeditor.module.css";
@@ -24,8 +24,11 @@ const SOURCES = STUDIO_LIST_SOURCES.map((value) => ({
   label: `studio.list.sources.${value}` as const,
 }));
 
-// The platforms whose gifts have a price, so their gifters can be ranked
-const GIFTING = PLATFORMS.filter((p) => GIFT_CURRENCY[p]);
+// Each ranks its gifters in its own currency
+const PLATFORM_OPTIONS = PLATFORMS.map((value) => ({
+  value,
+  label: PLATFORM_LABELS[value],
+}));
 
 type List = StudioElementOf<"list">;
 
@@ -35,7 +38,8 @@ type Props = {
 };
 
 /**
- * A list's source (and whose top gifters, with Kick) and how many rows it
+ * A list's source (and whose top gifters, with another platform than
+ * TikTok) and how many rows it
  * shows, its text and the values' color (top gifters' coins, gifts' counts),
  * and its pictures.
  */
@@ -44,13 +48,11 @@ export function ListFields({ element, onChange }: Props) {
   const sources = useOptions(SOURCES);
   const valued = element.source === "gifters" || element.source === "gifts";
   const platforms = usePlatforms();
-  // Only once there's a choice: TikTok's gifters otherwise, as before Kick
+  // Only once there's a choice: TikTok's gifters otherwise, as before the
+  // other platforms
   const pickPlatform =
     element.source === "gifters" &&
-    (platforms.includes("kick") || element.platform !== "tiktok");
-  const platformOptions = [
-    ...new Set<Platform>([...GIFTING, element.platform]),
-  ].map((value) => ({ value, label: PLATFORM_LABELS[value] }));
+    (platforms.some((p) => p !== "tiktok") || element.platform !== "tiktok");
 
   return (
     <>
@@ -66,7 +68,7 @@ export function ListFields({ element, onChange }: Props) {
         <Field label={t("studio.list.platform")}>
           <Select
             aria-label={t("studio.list.platform")}
-            options={platformOptions}
+            options={PLATFORM_OPTIONS}
             value={element.platform}
             onChange={(platform) => onChange({ ...element, platform })}
           />

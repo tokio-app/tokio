@@ -39,6 +39,7 @@ import {
   triggersOf,
 } from "./alerts";
 import { formatDuration, formatMoney, formatStat, NO_MONEY } from "./format";
+import { PLATFORM_CURRENCY } from "./platforms";
 import { generateEmoteChatSample, generateTikTokEventSample } from "./samples";
 
 // The live numbers any text can show, as {likes}
@@ -52,6 +53,7 @@ export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
   "bits",
   "superchats",
   "gifts",
+  "giftsubs",
   "uptime",
 ];
 
@@ -66,6 +68,7 @@ export const SAMPLE_NUMBERS: StudioNumbers = {
   bits: 2_500,
   superchats: 86.5,
   gifts: 342,
+  giftsubs: 25,
   // 01:23:00
   uptime: 4_980,
 };
@@ -509,18 +512,26 @@ type Sample = TokioEventMap[AppEvents];
 
 /**
  * A list's row with its value written in the language, compact as {coins}
- * is: a gift's count as ×12.
+ * is: a gift's count as ×12, and US dollars (YouTube's gifters) as $57.40.
  */
 export const listRow = (
   { value, ...entry }: StudioListEntry,
   language: string,
+  usd = false,
 ): StudioListRow => ({
   ...entry,
   value:
     value === null
       ? ""
-      : `${entry.icon ? "×" : ""}${formatStat(value, language).short}`,
+      : `${entry.icon ? "×" : ""}${(usd ? formatMoney : formatStat)(value, language).short}`,
 });
+
+// Whether a list's values are US dollars: YouTube's top gifters
+export const listInUsd = ({
+  source,
+  platform,
+}: Pick<StudioElementOf<"list">, "source" | "platform">) =>
+  source === "gifters" && PLATFORM_CURRENCY[platform] === "usd";
 
 // A made-up row of the source, the index-th from the top
 function sampleEntry(source: StudioListSource, index: number): StudioListEntry {
@@ -665,5 +676,7 @@ export const sampleDeps = (
   sent: (element) => sampleSentOf(element, samples),
   fill: () => SAMPLE_FILL,
   rows: (element) =>
-    samples.list(element.source).map((entry) => listRow(entry, language)),
+    samples
+      .list(element.source)
+      .map((entry) => listRow(entry, language, listInUsd(element))),
 });

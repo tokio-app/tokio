@@ -62,6 +62,7 @@ const session = (startedAt: number | null) => ({
     kicks: 250,
     bits: 700,
     superChats: 3,
+    giftSubs: 6,
   },
   usd: 42.5,
   activity: [],
@@ -74,12 +75,14 @@ const setup = (
     studio = new StudioService(),
     gifters = [],
     kickGifters,
+    youtubeGifters,
   }: {
     startedAt?: number | null;
     studio?: StudioService;
-    // TikTok's, and Kick's when it has any
+    // TikTok's, and Kick's or YouTube's when they have any
     gifters?: Gifter[];
     kickGifters?: Gifter[];
+    youtubeGifters?: Gifter[];
   } = {},
 ) => {
   const sendToClient = vi.fn((_id: string, _data: unknown) => true);
@@ -102,7 +105,11 @@ const setup = (
     serverService: { sendToClient, cameraKey: "k3y" },
     studioService: studio,
     historyService: {
-      topByPlatform: () => ({ tiktok: gifters, kick: kickGifters }),
+      topByPlatform: () => ({
+        tiktok: gifters,
+        kick: kickGifters,
+        youtube: youtubeGifters,
+      }),
     },
     pathManagerService: { files: { logs: { overlays: "overlays.log" } } },
   });
@@ -244,6 +251,7 @@ describe("sendStudioOverlays", () => {
       bits: 0,
       superchats: 0,
       gifts: 0,
+      giftsubs: 0,
       uptime: 0,
     });
   });
@@ -256,6 +264,7 @@ describe("sendStudioOverlays", () => {
       kicks: 250,
       bits: 700,
       superchats: 42.5,
+      giftsubs: 6,
     });
   });
 
@@ -396,9 +405,15 @@ describe("sendStudioOverlays", () => {
         overlay(ID, [
           element("k", { kind: "list", platform: "kick" }),
           element("y", { kind: "list", platform: "youtube" }),
+          element("t", { kind: "list", platform: "twitch" }),
         ]),
       ],
-      { gifters: [{ ...kicker, username: "Ana" }], kickGifters: [kicker] },
+      {
+        gifters: [{ ...kicker, username: "Ana" }],
+        kickGifters: [kicker],
+        // YouTube's Super Chats are in US dollars
+        youtubeGifters: [{ ...kicker, username: "Yui", coins: 57.4 }],
+      },
     );
 
     await sendStudioOverlays(handler);
@@ -406,6 +421,7 @@ describe("sendStudioOverlays", () => {
     const [[, view]] = views();
     expect(view?.layers[0].elements).toMatchObject([
       { rows: [{ name: "Kai", value: "40" }] },
+      { rows: [{ name: "Yui", value: "$57.40" }] },
       { rows: [] },
     ]);
   });

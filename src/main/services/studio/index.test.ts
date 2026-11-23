@@ -26,6 +26,7 @@ const NUMBERS: StudioNumbers = {
   bits: 0,
   superchats: null,
   gifts: 7,
+  giftsubs: 0,
   uptime: 65,
 };
 

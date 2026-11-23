@@ -443,6 +443,7 @@ describe("studio events", () => {
         bits: 0,
         superchats: 0,
         gifts: 0,
+        giftsubs: 0,
         uptime: 0,
       });
       expect(services.serverService.sendToClient).not.toHaveBeenCalled();

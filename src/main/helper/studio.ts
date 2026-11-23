@@ -13,6 +13,7 @@ import {
   ALERTS_PATH,
   formatError,
   goalValue,
+  listInUsd,
   listRow,
   MINECRAFT_OVERLAY_PATH,
   sampleCounts,
@@ -68,6 +69,7 @@ export function liveNumbers(
     bits: live ? totals.bits : 0,
     superchats: live ? session.usd : 0,
     gifts: live ? totals.gifts : 0,
+    giftsubs: live ? totals.giftSubs : 0,
     uptime: live ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0,
   };
 }
@@ -120,9 +122,9 @@ function viewOf(
     fill: (element) =>
       goalValue(element.number, numbers, studio.counts(overlay)) / element.goal,
     // This LIVE's top gifters on the list's platform, else the newest first
-    rows: ({ source, platform }) =>
-      (source === "gifters"
-        ? (services.historyService.topByPlatform()[platform] ?? []).map(
+    rows: (list) =>
+      (list.source === "gifters"
+        ? (services.historyService.topByPlatform()[list.platform] ?? []).map(
             (g) => ({
               picture: g.picture,
               name: g.username || g.handle,
@@ -131,8 +133,8 @@ function viewOf(
               value: g.coins,
             }),
           )
-        : studio.list(source)
-      ).map((entry) => listRow(entry, language())),
+        : studio.list(list.source)
+      ).map((entry) => listRow(entry, language(), listInUsd(list))),
     // The page doesn't show it; the editor names embeds itself
     label: () => "",
   });

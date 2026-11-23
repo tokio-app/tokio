@@ -4207,7 +4207,7 @@ describe("StudioEditor", () => {
       expect(page().getByRole("group", { name: "Number color" })).toBeVisible();
     });
 
-    it("picks whose top gifters it shows once the profile uses Kick", async () => {
+    it("picks whose top gifters it shows once the profile uses another platform", async () => {
       const list = elementOf("list");
       const { user } = await open(holding(list));
       await user.click(row(/^Top gifters/));
@@ -4217,16 +4217,23 @@ describe("StudioEditor", () => {
       await send(
         APP_EVENTS_RESPONSE.GET_PROFILE,
         profileReply((p) => {
-          p.platforms = ["tiktok", "kick"];
+          p.platforms = ["tiktok", "twitch"];
         }),
       );
       await user.click(field("Platform").getByText("TikTok"));
-      await user.click(
-        inList(page().getByRole("group", { name: "Platform" }), "Kick")!,
-      );
+      const platform = page().getByRole("group", { name: "Platform" });
+      // Every platform ranks its gifters, each in its own currency
+      for (const name of ["TikTok", "Twitch", "YouTube", "Kick"]) {
+        expect(inList(platform, name)).toBeTruthy();
+      }
+      await user.click(inList(platform, "YouTube")!);
 
       await waitFor(() =>
-        expect(lastSave()?.items[0]).toMatchObject({ platform: "kick" }),
+        expect(lastSave()?.items[0]).toMatchObject({ platform: "youtube" }),
+      );
+      // YouTube's in US dollars
+      expect(drawn(list.id).querySelector(".studio-number")!.textContent).toBe(
+        "$12.4K",
       );
     });
 

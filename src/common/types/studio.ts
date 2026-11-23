@@ -190,6 +190,8 @@ export type StudioNumbers = {
   // The Super Chats' US dollars, null until the exchange rates load
   superchats: number | null;
   gifts: number;
+  // Gifted subs: Twitch's, YouTube's gifted memberships and Kick's
+  giftsubs: number;
   // Seconds since the LIVE started
   uptime: number;
 };
