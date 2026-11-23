@@ -521,6 +521,35 @@ describe("SoundPicker", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("lists only what the row's platform fills", async () => {
+      const base = alert({}, TOKIO_EVENTS.SUBSCRIBE);
+      const { unmount } = await openTts({
+        ...base,
+        trigger: { ...base.trigger, platform: "kick" },
+      });
+      // Kick's subs carry no message
+      expect(
+        screen.queryByRole("button", { name: "{comment}" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "{count}" }),
+      ).toBeInTheDocument();
+      unmount();
+
+      const gift = alert({}, TOKIO_EVENTS.GIFT);
+      await openTts({
+        ...gift,
+        trigger: { ...gift.trigger, platform: "kick" },
+      });
+      // Kicks come one at a time
+      expect(
+        screen.queryByRole("button", { name: "{count}" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "{gift}" }),
+      ).toBeInTheDocument();
+    });
+
     it("lists the variables of every trigger, once", async () => {
       const base = alert({}, TOKIO_EVENTS.CHAT);
       await openTts({

@@ -1,6 +1,7 @@
 import { AlertTts, Trigger } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
-import { ALERT_MESSAGE_VARIABLES } from "@/common/util";
+import { ALERT_MESSAGE_VARIABLES, rowVariables } from "@/common/util";
+import { usePlatforms } from "@/context/platforms";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useVariables } from "@/hooks/useVariables";
 import { useT } from "@/ui/i18n";
@@ -39,16 +40,21 @@ export function TtsTab({
   const t = useT();
   const messageRef = useRef<HTMLInputElement>(null);
   const testId = `${alertId}:tts`;
+  const platforms = usePlatforms();
   // An alert on every gift speaks for each one, it has no count to say. The
-  // message can say what any of the triggers has.
+  // message can say what any of the triggers has on its platforms.
   const variables = useVariables([
     ...new Set(
       triggers.flatMap((trigger) =>
-        trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
-          ? ALERT_MESSAGE_VARIABLES[trigger.type].filter(
-              (name) => name !== "count",
-            )
-          : ALERT_MESSAGE_VARIABLES[trigger.type],
+        rowVariables(
+          trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
+            ? ALERT_MESSAGE_VARIABLES[trigger.type].filter(
+                (name) => name !== "count",
+              )
+            : ALERT_MESSAGE_VARIABLES[trigger.type],
+          trigger,
+          platforms,
+        ),
       ),
     ),
   ]);

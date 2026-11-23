@@ -1627,6 +1627,25 @@ describe("StudioEditor", () => {
     expect(page().getByText("This event has no variables.")).toBeVisible();
   });
 
+  it("lists only the variables the row's platform fills", async () => {
+    const element = text({
+      text: "Thanks",
+      when: "event",
+      trigger: TriggerSchema.parse({
+        type: TOKIO_EVENTS.GIFT,
+        gifts: [],
+        platform: "kick",
+      }),
+    });
+    const { user } = await open(scene(element));
+    await user.click(row(/^Thanks/));
+
+    // Kicks come one at a time: no count to say
+    const event = within(page().getByText("From the event:").closest("p")!);
+    expect(event.getByTitle("Insert {gift}")).toBeVisible();
+    expect(event.queryByTitle("Insert {count}")).toBeNull();
+  });
+
   it("makes an element show on an event, with its trigger, seconds and entrance", async () => {
     const element = text({ text: "Thanks {username}" });
     const { user } = await open(scene(element));

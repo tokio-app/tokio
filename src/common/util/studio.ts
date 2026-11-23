@@ -19,6 +19,7 @@ import {
   TOKIO_EVENTS,
   type AlertTrigger,
   type AppEvents,
+  type Platform,
   type TokioEventMap,
   type UserData,
 } from "../types/connector";
@@ -40,6 +41,7 @@ import {
 } from "./alerts";
 import { formatDuration, formatMoney, formatStat, NO_MONEY } from "./format";
 import { PLATFORM_CURRENCY } from "./platforms";
+import { rowVariables } from "./rows";
 import { generateEmoteChatSample, generateTikTokEventSample } from "./samples";
 
 // The live numbers any text can show, as {likes}
@@ -92,13 +94,22 @@ export const reactsToEvents = (item: Pick<StudioElement, "when">) =>
 // The variables a text element gets from its triggers, all of theirs, none
 // while it doesn't react. A goal sends none. The live numbers
 // (STUDIO_NUMBERS) go in any text.
-export const studioEventVariables = (element: StudioElement): string[] =>
+export const studioEventVariables = (
+  element: StudioElement,
+  // The editor's offer: only what each row's platforms fill (rowVariables).
+  // Without them, every one, which the texts are filled with.
+  profilePlatforms?: readonly Platform[],
+): string[] =>
   reactsToEvents(element)
     ? [
         ...new Set(
-          triggersOf(element).flatMap((trigger) =>
-            trigger.type === GOAL_TRIGGER ? [] : countedVariables(trigger.type),
-          ),
+          triggersOf(element).flatMap((trigger) => {
+            if (trigger.type === GOAL_TRIGGER) return [];
+            const all = countedVariables(trigger.type);
+            return profilePlatforms
+              ? rowVariables(all, trigger, profilePlatforms)
+              : all;
+          }),
         ),
       ]
     : [];

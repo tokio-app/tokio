@@ -4,7 +4,7 @@ import { PlatformsContext } from "@/context/platforms";
 import { createAlert } from "@/common/util";
 import { intersect } from "@test/dom";
 import { alertClip, alertMedia, gift, voice } from "@test/fixtures";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -576,9 +576,9 @@ describe("gift rows on each platform", () => {
     expect(sum({}, ["tiktok", "kick"])).toBe(
       "Any gift, when the streak ends, worth 100+ coins or Kicks",
     );
-    // A Kick row's gifts are Kicks
+    // A Kick row's gifts are Kicks, which come one at a time
     expect(sum({ platform: "kick" }, ["tiktok", "kick"])).toBe(
-      "Any Kick, when the streak ends, worth 100+ Kicks",
+      "Any Kick, worth 100+ Kicks",
     );
   });
 
@@ -611,5 +611,77 @@ describe("gift rows on each platform", () => {
     expect(
       picker(row({ platform: "kick", gifts: [5655] }), ["kick"], "Rose"),
     ).toBe(true);
+  });
+});
+
+describe("rows on their platforms", () => {
+  const ALL: Platform[] = ["tiktok", "twitch", "youtube", "kick"];
+  const SAVED = [
+    { value: "7001", label: "Heart", img: "a.png" },
+    { value: "twitch:25", label: "Kappa", img: "b.png" },
+    { value: "kick:9", label: "KEKW", img: "c.png" },
+    { value: "youtube:wave", label: "Wave", img: "d.png" },
+  ];
+  const NAMES = SAVED.map((emote) => emote.label);
+  const filter = (trigger: Alert["trigger"], platforms: Platform[]) =>
+    render(
+      <PlatformsContext value={platforms}>
+        <TriggerFilter
+          trigger={trigger}
+          gifts={GIFTS}
+          emotes={SAVED}
+          onChange={vi.fn()}
+        />
+      </PlatformsContext>,
+    );
+  const emoteRow = (patch: Partial<Alert["trigger"]> = {}) =>
+    alert({}, { type: EMOTE_TRIGGER, ...patch }).trigger;
+  // The emote picker's rows, by name
+  const pickable = async (trigger: Alert["trigger"], platforms: Platform[]) => {
+    const user = userEvent.setup();
+    const view = filter(trigger, platforms);
+    await user.click(within(view.container).getByRole("button"));
+    const names = within(screen.getByRole("dialog"))
+      .queryAllByTitle(/./)
+      .map((el) => el.title)
+      .filter((title) => NAMES.includes(title));
+    view.unmount();
+    return names;
+  };
+
+  it("offers a row only its platforms' emotes, and keeps picked ones", async () => {
+    expect(await pickable(emoteRow({ platform: "twitch" }), ALL)).toEqual([
+      "Kappa",
+    ]);
+    // Picked on another platform, to clear; the picker lists picks first
+    expect(
+      await pickable(emoteRow({ platform: "twitch", emotes: ["kick:9"] }), ALL),
+    ).toEqual(["KEKW", "Kappa"]);
+    // Any platform: the profile's
+    expect(await pickable(emoteRow(), ["tiktok", "kick"])).toEqual([
+      "Heart",
+      "KEKW",
+    ]);
+  });
+
+  it("has no streak choice where gifts come one at a time", () => {
+    const giftRow = (patch: Partial<Alert["trigger"]> = {}) =>
+      alert({}, { type: TOKIO_EVENTS.GIFT, ...patch }).trigger;
+    const plays = (trigger: Alert["trigger"], platforms: Platform[]) => {
+      const view = filter(trigger, platforms);
+      const shown =
+        screen.queryByRole("combobox", { name: "When it plays" }) !== null;
+      view.unmount();
+      return shown;
+    };
+
+    expect(plays(giftRow({ platform: "tiktok" }), ALL)).toBe(true);
+    expect(plays(giftRow(), ["tiktok", "kick"])).toBe(true);
+    // Kick's and YouTube's gifts come one at a time
+    expect(plays(giftRow({ platform: "kick" }), ALL)).toBe(false);
+    expect(plays(giftRow(), ["youtube", "kick"])).toBe(false);
+    // With nothing to pick, nothing at all
+    const view = filter(giftRow({ platform: "youtube" }), ALL);
+    expect(view.container).toBeEmptyDOMElement();
   });
 });

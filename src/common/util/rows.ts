@@ -124,3 +124,13 @@ export function rowVariables(
     platforms.some((p) => !UNFILLED[p]?.[row.type]?.includes(name)),
   );
 }
+
+/**
+ * Whether a gift row's gifts come in streaks, so it picks when to play:
+ * TikTok's do, Kick's and YouTube's come one at a time. TikTok's catalog,
+ * the one to pick from, goes with it.
+ */
+export const rowStreaks = (
+  row: Row,
+  profilePlatforms: readonly Platform[],
+): boolean => rowPlatforms(row, profilePlatforms).includes("tiktok");

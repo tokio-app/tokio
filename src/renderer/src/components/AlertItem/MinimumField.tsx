@@ -1,7 +1,7 @@
 import { MessageKey } from "@/common/i18n";
 import { Trigger } from "@/common/schemas";
 import { Platform, TOKIO_EVENTS } from "@/common/types";
-import { giftCurrencies } from "@/common/util";
+import { giftCurrencies, rowStreaks } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import { rich, useT } from "@/ui/i18n";
 import { NumberInput } from "../Elements";
@@ -79,7 +79,7 @@ export function MinimumField({ trigger, onChange }: Props) {
           ),
         })}
       </span>
-      {gift && (
+      {gift && rowStreaks(trigger, platforms) && (
         <p className={styles.minimum_note}>
           {t(
             trigger.every_gift

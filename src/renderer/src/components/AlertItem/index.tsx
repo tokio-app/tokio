@@ -1,5 +1,5 @@
 import { listOf, MessageKey, Params, translate } from "@/common/i18n";
-import { Alert, ALERT_TRIGGERS, Trigger, ViewerRole } from "@/common/schemas";
+import { Alert, ALERT_TRIGGERS, Trigger } from "@/common/schemas";
 import {
   ALERT_TRIGGER_LABELS,
   CustomGift,
@@ -12,7 +12,11 @@ import {
   formatAdded,
   getAlertOverlayURL,
   giftNames,
+  idPlatform,
   PLATFORM_LABELS,
+  roleName,
+  rowPlatforms,
+  rowStreaks,
   takesRoles,
   triggerName,
   triggersOf,
@@ -50,12 +54,6 @@ const GIFT_PLAYS: { value: "streak" | "gift"; label: MessageKey }[] = [
 ];
 
 // As the summary names them, keys translated where they show
-export const ROLE_NAMES: Record<ViewerRole, MessageKey> = {
-  follower: "roles.follower",
-  moderator: "roles.moderator",
-  superfan: "roles.superfan",
-};
-
 const WORTH: Record<MinUnit, MessageKey> = {
   coins: "components.alertItem.worth",
   kicks: "components.alertItem.worthKicks",
@@ -104,13 +102,13 @@ export function TriggerFilter({
   const t = useT();
   const plays = useOptions(GIFT_PLAYS);
   const platforms = usePlatforms();
+  const streaks = rowStreaks(trigger, platforms);
   // TikTok's catalog, for rows its gifts can set off. Picks stay to clear.
-  const catalog =
-    (trigger.platform
-      ? trigger.platform === "tiktok"
-      : platforms.includes("tiktok")) || trigger.gifts.length > 0;
+  const catalog = streaks || trigger.gifts.length > 0;
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
+      // Kick's and YouTube's gifts have neither
+      if (!catalog && !streaks) return null;
       return (
         <div className={styles.stack}>
           {catalog && (
@@ -121,26 +119,36 @@ export function TriggerFilter({
               onChange={(ids) => onChange({ ...trigger, gifts: ids })}
             />
           )}
-          <Select
-            className={styles.fill}
-            aria-label={t("components.alertItem.whenItPlays")}
-            options={plays}
-            value={trigger.every_gift ? "gift" : "streak"}
-            onChange={(play) =>
-              onChange({ ...trigger, every_gift: play === "gift" })
-            }
-          />
+          {streaks && (
+            <Select
+              className={styles.fill}
+              aria-label={t("components.alertItem.whenItPlays")}
+              options={plays}
+              value={trigger.every_gift ? "gift" : "streak"}
+              onChange={(play) =>
+                onChange({ ...trigger, every_gift: play === "gift" })
+              }
+            />
+          )}
         </div>
       );
-    case EMOTE_TRIGGER:
+    case EMOTE_TRIGGER: {
+      // The row's platforms' emotes. Picks stay to clear.
+      const covered = rowPlatforms(trigger, platforms);
+      const shown = emotes.filter(
+        (emote) =>
+          covered.includes(idPlatform(emote.value)) ||
+          trigger.emotes.includes(emote.value),
+      );
       return (
         <EmoteMultiSelect
           placeholder={t("components.alertItem.anyEmote")}
-          emotes={emotes}
+          emotes={shown}
           value={trigger.emotes}
           onChange={(ids) => onChange({ ...trigger, emotes: ids })}
         />
       );
+    }
     case TOKIO_EVENTS.CHAT:
       return (
         <Input
@@ -273,11 +281,14 @@ function rowSummary(
                 t("components.alertItem.someGifts")),
         );
       }
-      parts.push(
-        trigger.every_gift
-          ? t("components.alertItem.everyGift")
-          : t("components.alertItem.streakEnds"),
-      );
+      // Kick's and YouTube's gifts come one at a time
+      if (rowStreaks(trigger, platforms)) {
+        parts.push(
+          trigger.every_gift
+            ? t("components.alertItem.everyGift")
+            : t("components.alertItem.streakEnds"),
+        );
+      }
       // Only any gift has a worth to reach
       if (trigger.gifts.length === 0 && trigger.min_coins > 0 && unit) {
         parts.push(worthText(unit, trigger.min_coins, language, t));
@@ -330,7 +341,7 @@ function rowSummary(
   if (takesRoles(trigger.type) && trigger.roles.length > 0) {
     const roles = listOf(
       language,
-      trigger.roles.map((role) => t(ROLE_NAMES[role])),
+      trigger.roles.map((role) => roleName(role, trigger, platforms, language)),
       { type: "or" },
     );
     parts.push(t("components.alertItem.fromRoles", { roles }));

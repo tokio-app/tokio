@@ -35,6 +35,7 @@ import {
   SelectOption,
   VariableList,
 } from "@/components";
+import { usePlatforms } from "@/context/platforms";
 import { useVariables } from "@/hooks";
 import { useOptions, useT } from "@/ui/i18n";
 import { ReactNode, useRef } from "react";
@@ -179,7 +180,8 @@ export function ElementSettings({
   // On an event, a video without loop stays until it ends, not for seconds
   const untilEnd = video && element.kind === "media" && !element.loop;
 
-  const eventVariables = useVariables(studioEventVariables(element));
+  const platforms = usePlatforms();
+  const eventVariables = useVariables(studioEventVariables(element, platforms));
   // A counter goes in any text, as the LIVE numbers do
   const liveVariables = [
     ...new Set([...STUDIO_NUMBERS, ...counters.flatMap((c) => c.name || [])]),

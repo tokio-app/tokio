@@ -18,7 +18,9 @@ import {
   countedVariables,
   createAction,
   createStep,
+  rowVariables,
 } from "@/common/util";
+import { usePlatforms } from "@/context/platforms";
 import {
   Btn,
   Check,
@@ -240,11 +242,17 @@ function ActionItem({
     focused !== -1 && steps[focused] && stepText(steps[focused]) !== null
       ? focused
       : steps.findIndex((step) => stepText(step) !== null);
-  // A gift on every gift runs once for each, it has no count to say.
+  const platforms = usePlatforms();
+  // A gift on every gift runs once for each, it has no count to say, and the
+  // row says only what its platforms fill.
   const variables = shownVariables(
-    trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
-      ? countedVariables(trigger.type).filter((name) => name !== "count")
-      : countedVariables(trigger.type),
+    rowVariables(
+      trigger.type === TOKIO_EVENTS.GIFT && trigger.every_gift
+        ? countedVariables(trigger.type).filter((name) => name !== "count")
+        : countedVariables(trigger.type),
+      trigger,
+      platforms,
+    ),
     translation,
   );
 
