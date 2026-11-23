@@ -82,7 +82,7 @@ describe("Tools", () => {
       /^CountdownA countdown viewers add time to\.$/,
     );
     expect(row("Fans")).toHaveTextContent(
-      /^FansViewers with a fan level, highest first\.$/,
+      /^FansYour TikTok fan club, and your subscribers and members on other platforms\.$/,
     );
   });
 
@@ -104,7 +104,7 @@ describe("Tools", () => {
       "Every LIVE, what viewers sent on each platform and who sent the most. 2 LIVEs",
     );
     expect(row("Fans")).toHaveAccessibleDescription(
-      "Viewers with a fan level, highest first. 2 fans",
+      "Your TikTok fan club, and your subscribers and members on other platforms. 2 fans",
     );
     expect(row("Test overlays")).toHaveAccessibleDescription(
       "Send test events to an overlay you're building. 1 test overlay",

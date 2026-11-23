@@ -1,4 +1,4 @@
-import { Fan, TOKIO_EVENTS, UserData } from "@/common/types";
+import { Fan, PLATFORMS, TOKIO_EVENTS, UserData } from "@/common/types";
 import { isMissing } from "@/helper/fs";
 import Logger from "@/logger";
 import { access } from "node:fs/promises";
@@ -44,7 +44,11 @@ const FanSchema: z.ZodType<Fan> = z.object({
   fanLevel: z.number(),
   fanBadge: z.string().default(""),
   superfan: z.boolean().default(false),
+  // Saved since other platforms' fans counted; TikTok's have none
+  months: z.number().optional(),
   seenAt: z.number(),
+  // One a newer Tokio saved that this one doesn't know reads as TikTok
+  platform: z.enum(PLATFORMS).optional().catch(undefined),
 });
 
 // Least recently seen first

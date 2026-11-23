@@ -29,20 +29,32 @@ export interface UserData {
   // Where the viewer is. Missing means TikTok, as everything sent or saved
   // before other platforms.
   platform?: Platform;
+  // How long they've been subscribed (Twitch, Kick) or a member (YouTube), in
+  // months, when their chat badge says so. YouTube's badge says only its
+  // milestone: 1 year is 12.
+  subMonths?: number;
 }
 
-// A fan the active profile keeps, sent to overlays with tokio:fans. No
-// profile picture: TikTok's links expire within days. The badge's don't.
+// A fan the active profile keeps: TikTok's fan club, by level, and the other
+// platforms' subscribers (Twitch, Kick) and members (YouTube). Overlays get
+// TikTok's with tokio:fans. No profile picture: TikTok's links expire within
+// days. The badge's don't.
 export interface Fan {
   userId: string;
   username: string;
   handle: string;
+  // TikTok's; 0 on the other platforms
   fanLevel: number;
   fanBadge: string;
-  // A Super Fan subscriber, as their last chat, gift or Super Fan event said
+  // A Super Fan subscriber, as their last chat, gift or Super Fan event said.
+  // Always true on the other platforms, whose fans are their subscribers.
   superfan: boolean;
+  // Months subscribed or a member, on the other platforms, when known
+  months?: number;
   // When they were last seen in a LIVE, in ms since the epoch
   seenAt: number;
+  // Missing means TikTok
+  platform?: Platform;
 }
 
 // A viewer in tokio:gifters' top 10s, with their coins and gifts in this LIVE
