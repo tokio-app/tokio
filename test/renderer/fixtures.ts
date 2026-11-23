@@ -163,7 +163,6 @@ export const liveSummary = (
   startedAt,
   endedAt: startedAt + 3_600_000,
   coins: 0,
-  kicks: 0,
   gifts: 0,
   platforms: {},
   ...patch,

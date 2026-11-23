@@ -393,7 +393,7 @@ export interface AppEventsResponseMap {
     from?: number;
     to?: number;
     query?: string;
-    totals?: Pick<LiveSummary, "coins" | "kicks" | "gifts" | "platforms">;
+    totals?: Pick<LiveSummary, "coins" | "gifts" | "platforms">;
     data?: RankedGifter[];
   }>;
 

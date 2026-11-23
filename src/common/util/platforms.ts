@@ -74,7 +74,7 @@ export const PLATFORM_INPUT: Record<Platform, "channel" | "account"> = {
 
 // The currencies gifts are priced in, each counted on its own and never
 // added to another (the user's call)
-export const GIFT_CURRENCIES = ["coins", "kicks"] as const;
+const GIFT_CURRENCIES = ["coins", "kicks"] as const;
 export type GiftCurrency = (typeof GIFT_CURRENCIES)[number];
 
 // What each platform's gifts cost in: TikTok's coins, Kick's Kicks (a

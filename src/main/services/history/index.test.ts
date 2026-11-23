@@ -137,7 +137,6 @@ describe("HistoryService", () => {
           startedAt: 1000,
           endedAt: 2000,
           coins: 115,
-          kicks: 0,
           gifts: 4,
           platforms: { tiktok: { amount: 115, gifts: 4, giftSubs: 0 } },
         },
@@ -259,7 +258,14 @@ describe("HistoryService", () => {
     await history.save();
 
     expect(history.getHistory().lives).toEqual([
-      expect.objectContaining({ coins: 5, kicks: 210, gifts: 4 }),
+      expect.objectContaining({
+        coins: 5,
+        gifts: 4,
+        platforms: {
+          tiktok: { amount: 5, gifts: 1, giftSubs: 0 },
+          kick: { amount: 210, gifts: 3, giftSubs: 0 },
+        },
+      }),
     ]);
     expect((await read<LiveRecord>("0.json")).minutes).toEqual([
       {
@@ -288,7 +294,6 @@ describe("HistoryService", () => {
 
     expect(await history.getTotals({ from: 11 * MINUTE })).toEqual({
       coins: 8,
-      kicks: 110,
       gifts: 4,
       platforms: {
         tiktok: { amount: 8, gifts: 2, giftSubs: 0 },
@@ -328,7 +333,7 @@ describe("HistoryService", () => {
     expect(history.top().allTime.map((g) => g.userId)).toEqual(all);
   });
 
-  it("reads LIVEs saved before Kick as having no Kicks", async () => {
+  it("reads LIVEs saved before other platforms with no parts of their own", async () => {
     await mkdir(join(dir, "a"), { recursive: true });
     const live = {
       username: "kai",
@@ -348,10 +353,8 @@ describe("HistoryService", () => {
 
     const history = await loaded();
 
-    expect(history.getHistory().lives).toEqual([
-      { ...live, kicks: 0, platforms: {} },
-    ]);
-    expect(await history.getLive(0)).toMatchObject({ kicks: 0 });
+    expect(history.getHistory().lives).toEqual([{ ...live, platforms: {} }]);
+    expect(await history.getLive(0)).toMatchObject({ platforms: {} });
   });
 
   it("reads a platform it doesn't know as TikTok's", async () => {
@@ -695,7 +698,6 @@ describe("HistoryService", () => {
         startedAt: start,
         endedAt: start + 120_000,
         coins: 113,
-        kicks: 0,
         gifts: 5,
         platforms: { tiktok: { amount: 113, gifts: 5, giftSubs: 0 } },
       },
@@ -742,7 +744,6 @@ describe("HistoryService", () => {
     const since = { from: 11 * MINUTE };
     expect(await history.getTotals(since)).toEqual({
       coins: 111,
-      kicks: 0,
       gifts: 4,
       platforms: { tiktok: { amount: 111, gifts: 4, giftSubs: 0 } },
     });
@@ -755,7 +756,6 @@ describe("HistoryService", () => {
     const until = { to: 11 * MINUTE };
     expect(await history.getTotals(until)).toEqual({
       coins: 5,
-      kicks: 0,
       gifts: 1,
       platforms: { tiktok: { amount: 5, gifts: 1, giftSubs: 0 } },
     });
@@ -767,7 +767,6 @@ describe("HistoryService", () => {
     const across = { from: 10 * MINUTE + 20_000, to: 11 * MINUTE + 20_000 };
     expect(await history.getTotals(across)).toEqual({
       coins: 115,
-      kicks: 0,
       gifts: 4,
       platforms: { tiktok: { amount: 115, gifts: 4, giftSubs: 0 } },
     });
@@ -775,7 +774,6 @@ describe("HistoryService", () => {
     // Whole LIVEs come from the list, as do the dates of one LIVE
     expect(await history.getTotals({})).toEqual({
       coins: 116,
-      kicks: 0,
       gifts: 5,
       platforms: { tiktok: { amount: 116, gifts: 5, giftSubs: 0 } },
     });
@@ -787,7 +785,6 @@ describe("HistoryService", () => {
     ]);
     expect(await history.getTotals({ from: 30 * MINUTE })).toEqual({
       coins: 0,
-      kicks: 0,
       gifts: 0,
       platforms: {},
     });
@@ -874,7 +871,6 @@ describe("HistoryService", () => {
     // Nothing loaded still gives a reply
     expect(await service().getTotals(range)).toEqual({
       coins: 0,
-      kicks: 0,
       gifts: 0,
       platforms: {},
     });
@@ -1253,7 +1249,7 @@ describe("HistoryService", () => {
       await history.save();
 
       const [live] = history.getHistory().lives;
-      expect(live).toMatchObject({ coins: 0, kicks: 50, gifts: 1 });
+      expect(live).toMatchObject({ coins: 0, gifts: 1 });
       expect(live.platforms).toEqual({
         tiktok: { amount: 0, gifts: 0, giftSubs: 0 },
         youtube: { amount: 0, gifts: 0, giftSubs: 0 },
@@ -1487,7 +1483,6 @@ describe("HistoryService", () => {
         startedAt: 0,
         endedAt: 2 * MINUTE,
         coins: 7,
-        kicks: 0,
         gifts: 2,
       };
       const gifter = {
@@ -1526,7 +1521,6 @@ describe("HistoryService", () => {
       });
       expect(await history.getTotals({ from: MINUTE })).toEqual({
         coins: 2,
-        kicks: 0,
         gifts: 1,
         platforms: { tiktok: { amount: 2, gifts: 1, giftSubs: 0 } },
       });

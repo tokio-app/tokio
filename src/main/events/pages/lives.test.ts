@@ -15,7 +15,6 @@ const summary: LiveSummary = {
   startedAt: 1000,
   endedAt: 5000,
   coins: 10,
-  kicks: 0,
   gifts: 2,
   platforms: { tiktok: { amount: 10, gifts: 2, giftSubs: 0 } },
 };
@@ -33,7 +32,6 @@ const record: LiveRecord = { ...summary, gifters: [gifter], minutes: [] };
 // Each platform's part goes as it is
 const totals = {
   coins: 10,
-  kicks: 0,
   gifts: 2,
   platforms: {
     tiktok: { amount: 10, gifts: 2, giftSubs: 0 },

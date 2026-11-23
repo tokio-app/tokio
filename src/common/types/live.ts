@@ -122,10 +122,9 @@ export type LiveSummary = {
   startedAt: number;
   // While it goes on, when it was last saved
   endedAt: number;
-  // Counted since Tokio connected, each currency apart: TikTok's coins and
-  // Kick's Kicks. Gifts counts every platform's.
+  // Counted since Tokio connected: TikTok's coins, as Tokio kept them before
+  // other platforms came, and every platform's gifts
   coins: number;
-  kicks: number;
   gifts: number;
   // Each platform's part; a LIVE saved without it was TikTok's alone
   platforms: Partial<Record<Platform, HistoryTotals>>;

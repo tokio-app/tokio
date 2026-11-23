@@ -76,8 +76,6 @@ const LiveSummarySchema = z.object({
   startedAt: z.number(),
   endedAt: z.number(),
   coins: z.number(),
-  // Kick's gifts, since Kick came; older LIVEs had none
-  kicks: z.number().default(0),
   gifts: z.number(),
   // Each platform's part; older LIVEs, TikTok's alone, have none
   platforms: z
@@ -396,7 +394,6 @@ export class HistoryService extends Service {
       startedAt: now,
       endedAt: now,
       coins: 0,
-      kicks: 0,
       gifts: 0,
       platforms: {},
     };
@@ -494,7 +491,7 @@ export class HistoryService extends Service {
   }
 
   /**
-   * The finished LIVEs' coins, Kicks, gifts and each platform's part in some
+   * The finished LIVEs' TikTok coins, gifts and each platform's part in some
    * dates: a LIVE all in them counts whole, and one they cut only its gifts
    * in them, so only those take reading a file. Each platform a LIVE was on
    * is there, with zeros when it sent nothing in them. Null when another
@@ -502,13 +499,13 @@ export class HistoryService extends Service {
    */
   public async getTotals(
     range: DateRange,
-  ): Promise<Pick<
-    LiveSummary,
-    "coins" | "kicks" | "gifts" | "platforms"
-  > | null> {
+  ): Promise<Pick<LiveSummary, "coins" | "gifts" | "platforms"> | null> {
     const dir = this._dir;
-    const totals: Pick<LiveSummary, "coins" | "kicks" | "gifts" | "platforms"> =
-      { coins: 0, kicks: 0, gifts: 0, platforms: {} };
+    const totals: Pick<LiveSummary, "coins" | "gifts" | "platforms"> = {
+      coins: 0,
+      gifts: 0,
+      platforms: {},
+    };
     if (dir === null) return totals;
     for (const live of this._lives.filter((l) => inRange(l, range))) {
       const whole = allInRange(live, range);
@@ -519,7 +516,6 @@ export class HistoryService extends Service {
       }
       if (whole) {
         totals.coins += live.coins;
-        totals.kicks += live.kicks;
         totals.gifts += live.gifts;
         continue;
       }
@@ -531,7 +527,6 @@ export class HistoryService extends Service {
           const platform = keyPlatform(key);
           addPart(totals.platforms, platform, { amount, gifts, giftSubs });
           if (platform === "tiktok") totals.coins += amount;
-          if (platform === "kick") totals.kicks += amount;
           totals.gifts += gifts;
         }
       }
@@ -543,10 +538,10 @@ export class HistoryService extends Service {
    * Each platform's top SHOWN_GIFTERS of the finished LIVEs in some dates, in
    * one list in byAmount order, counting only the gifts in them of a LIVE
    * they cut, each with their place among their platform's gifters, and with
-   * a query only the ones whose name
-   * or @handle has it. Every LIVE whole is all time's list; other dates are
-   * added up from the LIVEs' files, leaving out a file that doesn't load. Null
-   * when another profile loaded while they were read, or the signal aborted.
+   * a query only the ones whose name or @handle has it. Every LIVE whole is
+   * all time's list; other dates are added up from the LIVEs' files, leaving
+   * out a file that doesn't load. Null when another profile loaded while they
+   * were read, or the signal aborted.
    */
   public async getGifters({
     from,
@@ -783,7 +778,6 @@ export class HistoryService extends Service {
     live.gifts += sent.gifts;
     // As Tokio kept them before other platforms
     if (platform === "tiktok") live.coins += sent.amount;
-    if (platform === "kick") live.kicks += sent.amount;
     const last = user.userId ? this._liveGifters.get(user.userId) : undefined;
     // A viewer gets a record with an amount or gifted subs. A gift without a
     // price (YouTube's Gifts) adds only to one they have.
