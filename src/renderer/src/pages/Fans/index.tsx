@@ -193,6 +193,17 @@ export function Fans() {
     );
   }
 
+  const several = tabs.length > 1;
+  // TikTok's alone: in the header with one platform, else by the tabs
+  const only = (
+    <Toggle
+      className={styles.only}
+      label={t("fans.superfansOnly")}
+      checked={superfansOnly}
+      onChange={(e) => setSuperfansOnly(e.target.checked)}
+    />
+  );
+
   return (
     <Page>
       <div className={styles.fans}>
@@ -207,33 +218,30 @@ export function Fans() {
                 value={search}
                 onChange={setSearch}
               />
-              {tiktok && (
-                <Toggle
-                  className={styles.only}
-                  label={t("fans.superfansOnly")}
-                  checked={superfansOnly}
-                  onChange={(e) => setSuperfansOnly(e.target.checked)}
-                />
-              )}
+              {!several && tiktok && only}
             </>
           }
         >
-          {tabs.length > 1 && (
-            <Tabs
-              className={styles.tabs}
-              label={t("fans.platform")}
-              tabs={tabs.map((value) => {
-                if (value === "all") return { value, label: t("fans.all") };
-                const Icon = PLATFORM_ICONS[value];
-                return {
-                  value,
-                  icon: <Icon aria-hidden />,
-                  label: PLATFORM_LABELS[value],
-                };
-              })}
-              value={tab}
-              onChange={setPicked}
-            />
+          {several && (
+            // The switch at the row's end, as Home's + beside its tabs
+            <div className={styles.tab_row}>
+              <Tabs
+                className={styles.tabs}
+                label={t("fans.platform")}
+                tabs={tabs.map((value) => {
+                  if (value === "all") return { value, label: t("fans.all") };
+                  const Icon = PLATFORM_ICONS[value];
+                  return {
+                    value,
+                    icon: <Icon aria-hidden />,
+                    label: PLATFORM_LABELS[value],
+                  };
+                })}
+                value={tab}
+                onChange={setPicked}
+              />
+              {tiktok && only}
+            </div>
           )}
           {content}
         </Section>

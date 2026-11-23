@@ -287,6 +287,14 @@ describe("Fans", () => {
       const only = () =>
         screen.queryByRole("checkbox", { name: "Super Fans only" });
 
+      // At the end of the tabs' row, out of the header
+      expect(screen.getByRole("tablist").parentElement).toContainElement(
+        only(),
+      );
+      expect(
+        screen.getByRole("heading", { name: "Fans" }).closest("header"),
+      ).not.toContainElement(only());
+
       await user.click(only()!);
       expect(names()).toEqual(["Jules Pixel"]);
 

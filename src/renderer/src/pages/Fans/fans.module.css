@@ -49,7 +49,7 @@
 /* The lead column fits "120 months", or "Suscriptor", in Spanish too, and
    on All the platform's icon before it */
 .wide .fan {
-  grid-template-columns: 104px minmax(0, 1fr) auto;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
 }
 
 .all .fan {
@@ -113,9 +113,24 @@
   color: var(--font-primary);
 }
 
-/* Home's platform tabs, as LIVE history's */
-.tabs {
+/* Home's platform tabs, as LIVE history's, with the Super Fans switch at
+   the end of their row. The tabs are taller, so it never moves them. */
+.tab_row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-bottom: calc(-1 * var(--space-2));
+  border-bottom: 1px solid var(--border);
+}
+
+/* The row draws the line under them all, as Home's does */
+.tabs {
+  align-self: flex-end;
+  border-bottom: none;
+}
+
+.tab_row .only {
+  margin-left: auto;
 }
 
 /* Only screen readers get it */
