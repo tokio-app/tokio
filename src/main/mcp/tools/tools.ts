@@ -1,10 +1,15 @@
 import { TIMER_ACTIONS, TimerSettingsSchema } from "@/common/schemas";
-import { APP_EVENTS, type Gifter } from "@/common/types";
 import {
-  GIFT_CURRENCIES,
-  GIFT_CURRENCY,
-  type GiftCurrency,
+  APP_EVENTS,
+  type Gifter,
+  type HistoryTotals,
+  type Platform,
+  PLATFORMS,
+} from "@/common/types";
+import {
+  PLATFORM_CURRENCY,
   platformOf,
+  platformParts,
   viewerMatcher,
 } from "@/common/util";
 import { MAX_FANS } from "@/services/fans";
@@ -32,19 +37,31 @@ const timerState = ({ timerService }: Handler) => {
 };
 
 // Viewer names are viewer data, in their own fields. No pictures. The
-// amount is named after its currency, never added to another's.
-const gifterRow =
-  (currency: GiftCurrency) =>
-  ({ username, handle, coins, gifts, giftedAt }: Gifter) => ({
-    nickname: username,
-    handle,
-    [currency]: coins,
-    gifts,
-    lastGiftAt: iso(giftedAt),
-  });
+// amount is named after its platform's currency, never added to another's.
+const gifterRow = (gifter: Gifter) => ({
+  nickname: gifter.username,
+  handle: gifter.handle,
+  [PLATFORM_CURRENCY[platformOf(gifter)]]: gifter.coins,
+  gifts: gifter.gifts,
+  giftSubs: gifter.giftSubs,
+  lastGiftAt: iso(gifter.giftedAt),
+});
 
-const paidIn = (currency: GiftCurrency) => (gifter: Gifter) =>
-  GIFT_CURRENCY[platformOf(gifter)] === currency;
+const on = (platform: Platform) => (gifter: Gifter) =>
+  platformOf(gifter) === platform;
+
+// Each platform's part, its amount named after its currency
+const platformTotals = (parts: Partial<Record<Platform, HistoryTotals>>) =>
+  Object.fromEntries(
+    PLATFORMS.flatMap((platform) => {
+      const part = parts[platform];
+      if (!part) return [];
+      const { amount, gifts, giftSubs } = part;
+      return [
+        [platform, { [PLATFORM_CURRENCY[platform]]: amount, gifts, giftSubs }],
+      ];
+    }),
+  );
 
 /**
  * A date or date-time in ms, or undefined when there's none. A day alone
@@ -103,7 +120,7 @@ export const kinds: Kinds = {
   }),
   lives: defineKind({
     notes:
-      "The active profile's finished LIVEs (Tools → Gift stats), newest first; the one going on joins when it ends. The id is when it started, in ms. query matches the @username Tokio connected to. coins are TikTok's and kicks Kick's, never added together; gifts counts every platform's. get gives its top 50 gifters in each currency. Removing one also takes its gifts out of the all-time ranking; it can't be undone.",
+      "The active profile's finished LIVEs (Tools → Gift stats), newest first; the one going on joins when it ends. The id is when it started, in ms. query matches the @username Tokio connected to. platforms has each platform the LIVE was on: what viewers spent there in its own currency (coins on TikTok, kicks on Kick, bits on Twitch, usd for YouTube's Super Chats in US dollars), its gifts and its gifted subs (giftSubs). Currencies are never added together; gifts counts every platform's. get gives its top 50 gifters on each platform. Removing one also takes its gifts out of the all-time ranking; it can't be undone.",
     list: ({ historyService }, { query, limit }) => {
       const wanted = query?.trim().replace(/^@/, "").toLowerCase();
       const found = historyService
@@ -113,17 +130,14 @@ export const kinds: Kinds = {
         );
       return ok({
         total: found.length,
-        lives: found
-          .slice(0, limit)
-          .map(({ username, startedAt, endedAt, coins, kicks, gifts }) => ({
-            id: String(startedAt),
-            username,
-            startedAt: iso(startedAt),
-            endedAt: iso(endedAt),
-            coins,
-            kicks,
-            gifts,
-          })),
+        lives: found.slice(0, limit).map((live) => ({
+          id: String(live.startedAt),
+          username: live.username,
+          startedAt: iso(live.startedAt),
+          endedAt: iso(live.endedAt),
+          gifts: live.gifts,
+          platforms: platformTotals(platformParts(live)),
+        })),
       });
     },
     get: async ({ historyService }, id) => {
@@ -133,23 +147,23 @@ export const kinds: Kinds = {
           `There's no LIVE ${id} or it can't be read: list lives gives the ids.`,
         );
       }
+      const parts = platformParts(live);
       return ok({
         id,
         username: live.username,
         startedAt: iso(live.startedAt),
         endedAt: iso(live.endedAt),
-        coins: live.coins,
-        kicks: live.kicks,
         gifts: live.gifts,
+        platforms: platformTotals(parts),
         totalGifters: live.gifters.length,
+        // In each platform's order
         gifters: Object.fromEntries(
-          GIFT_CURRENCIES.map((currency) => [
-            currency,
-            live.gifters
-              .filter(paidIn(currency))
-              .slice(0, 50)
-              .map(gifterRow(currency)),
-          ]),
+          PLATFORMS.filter((p) => parts[p] || live.gifters.some(on(p))).map(
+            (platform) => [
+              platform,
+              live.gifters.filter(on(platform)).slice(0, 50).map(gifterRow),
+            ],
+          ),
         ),
       });
     },
@@ -180,7 +194,7 @@ const GiftersInput = z
     from: z.string().optional(),
     to: z.string().optional(),
     query: z.string().optional(),
-    currency: z.enum(GIFT_CURRENCIES).optional(),
+    platform: z.enum(PLATFORMS).optional(),
     limit: z.number().int().min(1).max(100).optional(),
   })
   .strict();
@@ -218,12 +232,12 @@ export const tools: ToolDef<any>[] = [
     name: "get_gifters",
     title: "Top gifters",
     description:
-      "The active profile's top gifters over its finished LIVEs in one currency, coins (TikTok's, the default) or kicks (Kick's), each with their rank among that currency's gifters, what they sent in it and their gifts, plus the dates' totals: coins, kicks and every platform's gifts, never added together. from (included) and to (left out) are ISO dates or date-times; a date alone is midnight on this PC, and leaving both out means all time. query keeps the gifters whose nickname or @handle has it, ranks kept. The LIVE going on isn't counted until it ends: get_activity has its top gifters.",
+      "The active profile's top gifters over its finished LIVEs on one platform (tiktok, the default, twitch, youtube or kick), the most spent first, then the most gifted subs. Each has their rank among that platform's gifters, what they spent in its currency (coins on TikTok, bits on Twitch, usd for YouTube's Super Chats in US dollars, kicks on Kick), their gifts and their gifted subs (giftSubs). totals has each platform's in the dates, each in its own currency, never added together. from (included) and to (left out) are ISO dates or date-times; a date alone is midnight on this PC, and leaving both out means all time. query keeps the gifters whose nickname or @handle has it, ranks kept. The LIVE going on isn't counted until it ends: get_activity has its top gifters.",
     input: GiftersInput,
     annotations: READ,
     run: async (
       { historyService },
-      { from, to, query, currency = "coins", limit = 50 },
+      { from, to, query, platform = "tiktok", limit = 50 },
     ) => {
       const range = { from: toMs(from), to: toMs(to) };
       if (range.from === null || range.to === null) {
@@ -237,12 +251,12 @@ export const tools: ToolDef<any>[] = [
       const gifters = await historyService.getGifters({ ...dates, query });
       if (!gifters) return changedProfile();
       return ok({
-        currency,
-        totals,
+        platform,
+        totals: platformTotals(totals.platforms),
         gifters: gifters
-          .filter(paidIn(currency))
+          .filter(on(platform))
           .slice(0, limit)
-          .map((g) => ({ rank: g.rank, ...gifterRow(currency)(g) })),
+          .map((g) => ({ rank: g.rank, ...gifterRow(g) })),
       });
     },
   }),
