@@ -191,6 +191,37 @@ describe("ConnectorService", () => {
     expect(reconnect).toHaveBeenCalledExactlyOnceWith("reconnected", "tiktok");
   });
 
+  it("gives every listener a Super Chat's dollars, null without rates or a readable amount", () => {
+    const { service, provider } = setup();
+    const first = vi.fn();
+    const second = vi.fn();
+    service.on(TOKIO_EVENTS.SUPER_CHAT, first);
+    service.on(TOKIO_EVENTS.SUPER_CHAT, second);
+    const chat = (amount: string) => ({
+      user: viewer,
+      amount,
+      message: "hi",
+      sticker: "",
+    });
+
+    // Before setRates, as before the rates load
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("MX$100.00"));
+    let loaded = false;
+    const toUsd = vi.fn((amounts: Record<string, number>) =>
+      loaded ? (amounts.MXN ?? 0) / 20 : null,
+    );
+    service.setRates({ toUsd });
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("MX$100.00"));
+    loaded = true;
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("MX$100.00"));
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("100 bananas"));
+
+    expect(first.mock.calls.map(([d]) => d.usd)).toEqual([null, null, 5, null]);
+    expect(first.mock.calls[2][0]).toEqual({ ...chat("MX$100.00"), usd: 5 });
+    expect(second.mock.calls).toEqual(first.mock.calls);
+    expect(toUsd).toHaveBeenCalledWith({ MXN: 100 });
+  });
+
   it("logs gifts it can't fetch", async () => {
     const warn = vi.spyOn(Logger, "warn");
     const { service, provider } = setup();

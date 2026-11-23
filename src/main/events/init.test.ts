@@ -243,6 +243,7 @@ function setup() {
     ...conn,
     username: "streamer",
     setLogFile: vi.fn(),
+    setRates: vi.fn((..._args: Parameters<ConnectorService["setRates"]>) => {}),
     setChatStage: vi.fn(
       (..._args: Parameters<ConnectorService["setChatStage"]>) => {},
     ),
@@ -1792,6 +1793,11 @@ describe("init events", () => {
           expect.objectContaining({ type: "follow" }),
         ],
       });
+    });
+
+    it("gives the connector the rates, so every Super Chat carries its dollars", async () => {
+      const s = await live();
+      expect(s.connectorService.setRates).toHaveBeenCalledWith(s.ratesService);
     });
 
     it("adds up the Super Chats in dollars, and pushes them again when the rates load", async () => {

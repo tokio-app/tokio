@@ -7,7 +7,9 @@ import {
   TokioEventMap,
 } from "@/common/types";
 import { formatError, PLATFORM_LABELS } from "@/common/util";
+import { parseAmount } from "@/helper/amount";
 import Logger from "@/logger";
+import type { RatesService } from "../rates";
 import { ProviderService } from "../shared";
 import { TokioEmitter } from "../shared/emitter";
 import {
@@ -66,6 +68,8 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   private _onReconnect?: (state: ReconnectState, platform: Platform) => void;
   private _onPlatform?: (platform: Platform, change: PlatformChange) => void;
   private _onAccount?: (account: PlatformAccount) => Promise<boolean>;
+  // Converts a Super Chat's amount to US dollars
+  private _rates?: Pick<RatesService, "toUsd">;
 
   constructor() {
     super();
@@ -107,6 +111,11 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
     listener: (data: TokioEventMap[T]) => void,
   ): void {
     this._events.off(event, listener);
+  }
+
+  /** Sets what converts the Super Chats to dollars, which every listener gets. */
+  public setRates(rates: Pick<RatesService, "toUsd">) {
+    this._rates = rates;
   }
 
   // Every platform's drops, returns and give-ups
@@ -357,11 +366,22 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
       TOKIO_EVENTS.ROOM_USER,
     ];
     for (const event of Object.values(TOKIO_EVENTS)) {
-      if (SESSION.includes(event)) continue;
+      if (SESSION.includes(event) || event === TOKIO_EVENTS.SUPER_CHAT)
+        continue;
       provider.on(event, (data) => {
         if (forwards()) this._events.send(event, data);
       });
     }
+    // With its dollars, null when the amount can't be read or the rates
+    // haven't loaded
+    provider.on(TOKIO_EVENTS.SUPER_CHAT, (data) => {
+      if (!forwards()) return;
+      const amount = parseAmount(data.amount);
+      const usd = amount
+        ? (this._rates?.toUsd({ [amount.currency]: amount.value }) ?? null)
+        : null;
+      this._events.send(TOKIO_EVENTS.SUPER_CHAT, { ...data, usd });
+    });
     provider.on(TOKIO_EVENTS.CONNECTED, () => {
       if (forwards()) this._connected(platform);
     });

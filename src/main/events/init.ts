@@ -1311,6 +1311,7 @@ const startApp = async (handler: AppHandlerVariables) => {
   if (!wired.has(handler)) {
     wired.add(handler);
     liveService.setRates(ratesService);
+    connectorService.setRates(ratesService);
     serverService.initEvents(connectorService, musicService);
     // One router: the phone remote and its API, and MCP
     const control = express.Router();
