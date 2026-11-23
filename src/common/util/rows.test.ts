@@ -53,16 +53,23 @@ describe("rows on their platforms", () => {
       "moderator",
       "superfan",
     ]);
-    // The others never say who follows
-    expect(rowRoles(chat("twitch"), ALL)).toEqual(["moderator", "superfan"]);
+    // The others never say who follows; Twitch's and Kick's say VIPs
+    expect(rowRoles(chat("twitch"), ALL)).toEqual([
+      "moderator",
+      "superfan",
+      "vip",
+    ]);
+    expect(rowRoles(chat("youtube"), ALL)).toEqual(["moderator", "superfan"]);
     expect(rowRoles(chat(), ["youtube", "kick"])).toEqual([
       "moderator",
       "superfan",
+      "vip",
     ]);
     expect(rowRoles(chat(), ALL)).toEqual([
       "follower",
       "moderator",
       "superfan",
+      "vip",
     ]);
     // Kicks come without badges
     expect(rowRoles({ type: gift, platform: "kick" }, ALL)).toEqual([]);
@@ -95,6 +102,9 @@ describe("rows on their platforms", () => {
     );
     expect(roleName("follower", { type: TOKIO_EVENTS.CHAT }, ALL, "en")).toBe(
       "Followers",
+    );
+    expect(roleName("vip", { type: TOKIO_EVENTS.CHAT }, ALL, "en")).toBe(
+      "VIPs",
     );
   });
 });

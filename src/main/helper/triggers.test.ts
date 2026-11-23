@@ -72,6 +72,26 @@ describe("matchesTrigger", () => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     matchesTrigger(t, type, payload as TokioEventMap[AppEvents], 0, 0);
 
+  it("takes a chat from a VIP on a row from VIPs", () => {
+    const chat = (vip: boolean) => ({
+      user: {
+        username: "Rhea",
+        handle: "rhea_tv",
+        profilePictures: [],
+        platform: "twitch",
+        vip,
+      },
+      comment: { content: "hi", emotes: [], lang: "" },
+    });
+    const row = trigger(TOKIO_EVENTS.CHAT, {
+      platform: "twitch",
+      roles: ["vip"],
+    });
+
+    expect(matches(row, TOKIO_EVENTS.CHAT, chat(true))).toBe(true);
+    expect(matches(row, TOKIO_EVENTS.CHAT, chat(false))).toBe(false);
+  });
+
   it("takes any platform's event without a platform", () => {
     const any = trigger(TOKIO_EVENTS.FOLLOW);
 

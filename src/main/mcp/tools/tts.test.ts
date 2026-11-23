@@ -92,6 +92,42 @@ describe("tts MCP tools", () => {
       expect(saved?.filters).toEqual({ speed: 1, pitch: 1, volume: 50 });
     });
 
+    it("saves a platform's permissions apart from TikTok's", async () => {
+      const { h, updateProfileData } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      await call("update_settings", {
+        section: "tts",
+        changes: {
+          permissions: { platforms: { twitch: { all: false, vips: true } } },
+        },
+      });
+
+      const saved = updateProfileData.mock.calls[0][0].tts?.permissions;
+      expect(saved?.platforms).toEqual({
+        twitch: { all: false, superfans: false, moderators: false, vips: true },
+      });
+      expect(saved?.all).toBe(true);
+    });
+
+    it("describes each platform's permissions and the shared lists", async () => {
+      const { h } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const { value } = await call("describe", { name: "tts" });
+
+      for (const text of [
+        "base fields are TikTok's",
+        "Twitch's, YouTube's and Kick's own rules",
+        "one left out lets everyone",
+        "The lists apply on every platform",
+      ]) {
+        expect(value).toMatchObject({
+          section: { notes: expect.stringContaining(text) },
+        });
+      }
+    });
+
     it("refuses values out of the page's ranges", async () => {
       const { h, updateProfileData } = setup();
       const { call } = await mcpClient(h.handler);

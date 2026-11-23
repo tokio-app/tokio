@@ -8,6 +8,7 @@ import {
   fail,
   invokeOk,
   ok,
+  permissionsNote,
   profileOf,
   pushProfile,
 } from "../common";
@@ -66,7 +67,7 @@ export const sections: Sections = {
       "provider.name: YouTube or Spotify, used on the next connect. hasKey says whether Spotify's Client ID is set; set_key sets it.",
       "provider.block_ads: YouTube's ad blocker. Before turning it on, tell the user that blocking YouTube's ads breaks YouTube's Terms of Service and may stop playback, and turn it on only if they agree. Turning it off needs no warning.",
       "controls: play, next, last and revoke, each { enabled, command } (a chat command such as !play). play and revoke take a song after the command.",
-      "permissions: who may use them. all lets everyone; otherwise followers, superfans, moderators, or a minimum level (level.enabled, level.value). With list.enabled, handles in list.black are refused and a non-empty list.white alone decides.",
+      permissionsNote("who may use them", "are refused"),
       "protection: cooldown seconds between commands from anyone, queue_length songs waiting at most, one_per_viewer one waiting request per viewer and no song twice, limit_controls lets only the host and moderators use next, last and revoke on others' songs.",
     ].join("\n"),
   }),

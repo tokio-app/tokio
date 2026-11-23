@@ -21,9 +21,8 @@ import {
   Tabs,
   Toggle,
 } from "@/components";
-import { cx, formatDate } from "@/helper";
+import { cx, formatDate, PLATFORM_ICONS } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
-import { PLATFORM_ICONS } from "@/pages/Home/helper";
 import { useLanguage, useT } from "@/ui/i18n";
 import { useState } from "react";
 import styles from "./fans.module.css";

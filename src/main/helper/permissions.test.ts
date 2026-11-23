@@ -10,6 +10,7 @@ const permissions = (overrides: Partial<Permissions> = {}): Permissions => ({
   moderators: false,
   level: { enabled: false, value: 0 },
   list: { enabled: false, white: [], black: [] },
+  platforms: {},
   ...overrides,
 });
 
@@ -100,6 +101,76 @@ describe("hasPermission", () => {
         ),
       ).toBe(true);
     });
+  });
+});
+
+describe("hasPermission on other platforms", () => {
+  const twitch = (patch: Partial<UserData> = {}) =>
+    user({ platform: "twitch", userId: "twitch:1", ...patch });
+  // TikTok's rules: only followers with a fan level of 10
+  const tiktokOnly = {
+    all: false,
+    followers: true,
+    level: { enabled: true, value: 10 },
+  };
+
+  it("lets everyone in on a platform without its own rules", () => {
+    expect(hasPermission(permissions(tiktokOnly), twitch())).toBe(true);
+    expect(
+      hasPermission(permissions(tiktokOnly), user({ platform: "kick" })),
+    ).toBe(true);
+    // TikTok's own still apply to TikTok
+    expect(hasPermission(permissions(tiktokOnly), user())).toBe(false);
+  });
+
+  it("takes the platform's own roles: subscribers, moderators and VIPs", () => {
+    const rules = permissions({
+      platforms: {
+        twitch: { all: false, superfans: true, moderators: false, vips: true },
+        youtube: {
+          all: false,
+          superfans: false,
+          moderators: true,
+          vips: false,
+        },
+      },
+    });
+
+    expect(hasPermission(rules, twitch({ superfan: true }))).toBe(true);
+    expect(hasPermission(rules, twitch({ vip: true }))).toBe(true);
+    expect(hasPermission(rules, twitch({ moderator: true }))).toBe(false);
+    expect(hasPermission(rules, twitch())).toBe(false);
+    const youtube = (patch: Partial<UserData>) =>
+      user({ platform: "youtube", ...patch });
+    expect(hasPermission(rules, youtube({ moderator: true }))).toBe(true);
+    expect(hasPermission(rules, youtube({ superfan: true }))).toBe(false);
+  });
+
+  it("lets everyone in when the platform's rules require no role", () => {
+    const rules = permissions({
+      platforms: {
+        kick: { all: false, superfans: false, moderators: false, vips: false },
+      },
+    });
+    expect(hasPermission(rules, user({ platform: "kick" }))).toBe(true);
+  });
+
+  it("applies the lists on every platform", () => {
+    const lists = permissions({
+      all: true,
+      list: { enabled: true, white: [], black: ["troll"] },
+    });
+    expect(hasPermission(lists, twitch({ handle: "troll" }))).toBe(false);
+    expect(isBlocked(lists, twitch({ handle: "troll" }))).toBe(true);
+
+    const allowed = permissions({
+      list: { enabled: true, white: ["friend"], black: [] },
+      platforms: {
+        twitch: { all: true, superfans: false, moderators: false, vips: false },
+      },
+    });
+    expect(hasPermission(allowed, twitch({ handle: "friend" }))).toBe(true);
+    expect(hasPermission(allowed, twitch())).toBe(false);
   });
 });
 

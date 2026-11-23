@@ -18,6 +18,8 @@ export interface UserData {
   superfan?: boolean;
   follower?: boolean;
   moderator?: boolean;
+  // A VIP on Twitch or Kick, from their chat badge
+  vip?: boolean;
   fanLevel?: number;
   // The picture of the fan level's badge, a heart that changes every 10
   // levels, without the number

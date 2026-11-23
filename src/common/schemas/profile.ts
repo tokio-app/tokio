@@ -9,6 +9,18 @@ import {
 import { defaultAlertName, mediaKind } from "../util/alerts";
 import { ColorSchema, FONT_MAX_LENGTH, TimerProfileSchema } from "./timer";
 
+// Twitch's, YouTube's or Kick's own rules: superfans are its subscribers or
+// members, vips Twitch's and Kick's VIPs. One without them allows everyone
+// (the user's call).
+const PlatformPermissionsSchema = z.object({
+  all: z.boolean().default(true),
+  superfans: z.boolean().default(false),
+  moderators: z.boolean().default(false),
+  vips: z.boolean().default(false),
+});
+
+// The rules are TikTok's, which an older Tokio still reads, and platforms has
+// the others'. The lists hold handles on any platform.
 const PermissionsSchema = z.object({
   all: z.boolean(),
   followers: z.boolean(),
@@ -23,6 +35,12 @@ const PermissionsSchema = z.object({
     white: z.array(z.string()),
     black: z.array(z.string()),
   }),
+  platforms: z
+    .partialRecord(
+      z.enum(PLATFORMS).exclude(["tiktok"]),
+      PlatformPermissionsSchema,
+    )
+    .default({}),
 });
 
 const MusicControl = z.object({
@@ -97,7 +115,12 @@ const AlertTtsSchema = z.object({
 });
 
 // The flags a viewer has in UserData
-export const VIEWER_ROLES = ["follower", "moderator", "superfan"] as const;
+export const VIEWER_ROLES = [
+  "follower",
+  "moderator",
+  "superfan",
+  "vip",
+] as const;
 
 // The most triggers an alert, or a Studio element or group, reacts to, its
 // first included
@@ -554,6 +577,7 @@ export const ProfileSchema = z.object({
 
 export type Profile = z.infer<typeof ProfileSchema>;
 export type Permissions = z.infer<typeof PermissionsSchema>;
+export type PlatformPermissions = z.infer<typeof PlatformPermissionsSchema>;
 export type Trigger = z.infer<typeof TriggerSchema>;
 export type ViewerRole = Trigger["roles"][number];
 export type Alert = z.infer<typeof AlertSchema>;

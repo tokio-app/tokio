@@ -224,6 +224,24 @@ describe("alerts MCP tools", () => {
       }
     });
 
+    it("says which platforms' events carry VIPs", async () => {
+      const { h } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const { value } = await call("describe", { name: "alert" });
+
+      expect(value).toMatchObject({
+        kind: {
+          notes: expect.stringContaining(
+            "roles (follower, moderator, superfan, vip)",
+          ),
+        },
+      });
+      expect(value).toMatchObject({
+        kind: { notes: expect.stringContaining("Twitch's and Kick's vip too") },
+      });
+    });
+
     it("lists the alerts with their triggers' filters", async () => {
       const { h } = setup([
         alert(),

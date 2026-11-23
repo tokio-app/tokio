@@ -1,4 +1,18 @@
-import { GamesOverlaySchema, Profile, TimerProfileSchema } from "../../schemas";
+import {
+  GamesOverlaySchema,
+  PlatformPermissions,
+  Profile,
+  TimerProfileSchema,
+} from "../../schemas";
+
+// Twitch's, YouTube's or Kick's permissions before the streamer sets them:
+// everyone (the user's call)
+export const defaultPlatformPermissions: PlatformPermissions = {
+  all: true,
+  superfans: false,
+  moderators: false,
+  vips: false,
+};
 
 export const defaultProfile: Profile = {
   name: "Default",
@@ -22,6 +36,7 @@ export const defaultProfile: Profile = {
         white: [],
         black: [],
       },
+      platforms: {},
     },
     protection: {
       cooldown: 2,
@@ -78,6 +93,7 @@ export const defaultProfile: Profile = {
         white: [],
         black: [],
       },
+      platforms: {},
     },
     format: {
       template: "{username} {comment}",

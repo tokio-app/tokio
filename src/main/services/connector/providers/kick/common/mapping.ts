@@ -126,6 +126,7 @@ function toChat(e: ChatMessage): ChatEvent {
       // Music's host check reads it
       moderator: badges.has("broadcaster") || badges.has("moderator"),
       superfan: badges.has("subscriber") || badges.has("founder"),
+      vip: badges.has("vip"),
       ...(months > 0 && { subMonths: months }),
     },
     comment: { content, emotes, lang: "" },

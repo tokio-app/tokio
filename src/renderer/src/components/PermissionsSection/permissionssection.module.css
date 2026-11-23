@@ -20,8 +20,21 @@
   pointer-events: none;
 }
 
-/* Why some platforms' chat never passes two of the roles */
+/* As close to the rules as LIVE history's and Fans' tabs */
+.tabs {
+  margin-bottom: calc(-1 * var(--space-2));
+}
+
+/* The lists' check, with the line that every platform shares them */
+.lists {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Under the check's text, past the box and its gap */
 .note {
+  padding-left: calc(16px + var(--space-3));
   color: var(--font-secondary);
   font-size: var(--font-sm);
 }

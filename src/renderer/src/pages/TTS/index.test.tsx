@@ -614,6 +614,7 @@ describe("TTS", () => {
       moderators: true,
       level: { enabled: true, value: 10 },
       list: { enabled: true, white: ["alice", "bob"], black: ["troll"] },
+      platforms: {},
     });
   });
 });

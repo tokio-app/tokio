@@ -1,10 +1,13 @@
-import { listOf } from "@/common/i18n";
-import { Permissions } from "@/common/schemas";
-import { PLATFORM_LABELS } from "@/common/util";
+import { MessageKey } from "@/common/i18n";
+import { Permissions, PlatformPermissions } from "@/common/schemas";
+import { Platform, PLATFORMS } from "@/common/types";
+import { defaultPlatformPermissions, PLATFORM_LABELS } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
+import { PLATFORM_ICONS } from "@/helper";
 import { Updater } from "@/hooks/useImmerState";
-import { useLanguage, useT } from "@/ui/i18n";
-import { Check, ListTextarea, NumberInput } from "../Elements";
+import { useT } from "@/ui/i18n";
+import { useState } from "react";
+import { Check, ListTextarea, NumberInput, Tabs } from "../Elements";
 import { Field, Section } from "../Page";
 import styles from "./permissionssection.module.css";
 
@@ -15,25 +18,51 @@ interface Props {
   feature: string;
 }
 
-const ROLES = [
+const TIKTOK_ROLES = [
   { key: "all", label: "components.permissions.all" },
   { key: "followers", label: "components.permissions.followers" },
   { key: "superfans", label: "components.permissions.superfans" },
   { key: "moderators", label: "components.permissions.moderators" },
 ] as const;
 
+type Role = { key: keyof PlatformPermissions; label: MessageKey };
+
+// What the other platforms' chat says, from its badges: subscribers or
+// members, moderators, and Twitch's and Kick's VIPs. Never who follows.
+const SUBSCRIBERS: Role[] = [
+  { key: "all", label: "components.permissions.all" },
+  { key: "superfans", label: "components.permissions.subscribers" },
+  { key: "moderators", label: "components.permissions.moderators" },
+  { key: "vips", label: "components.permissions.vips" },
+];
+const PLATFORM_ROLES: Record<Exclude<Platform, "tiktok">, Role[]> = {
+  twitch: SUBSCRIBERS,
+  youtube: [
+    { key: "all", label: "components.permissions.all" },
+    { key: "superfans", label: "components.permissions.members" },
+    { key: "moderators", label: "components.permissions.moderators" },
+  ],
+  kick: SUBSCRIBERS,
+};
+
+/**
+ * Who can use TTS or music requests: a tab of rules for each of the
+ * profile's platforms (TikTok's are the saved base fields, the others' in
+ * platforms), then the allow and block lists, which every platform shares.
+ */
 export function PermissionsSection({ permissions, update, feature }: Props) {
   const t = useT();
-  const language = useLanguage();
-  // Only TikTok says who follows and sends fan levels
-  const others = usePlatforms().filter((p) => p !== "tiktok");
-  return (
-    <Section
-      title={t("components.permissions.title")}
-      description={t("components.permissions.description", { feature })}
-    >
+  const profilePlatforms = usePlatforms();
+  const tabs = PLATFORMS.filter((p) => profilePlatforms.includes(p));
+  const [picked, setPicked] = useState<Platform>();
+  const tab = (picked && tabs.includes(picked) ? picked : tabs[0]) ?? "tiktok";
+  const several = tabs.length > 1;
+
+  let rules;
+  if (tab === "tiktok") {
+    rules = (
       <div className={styles.grid}>
-        {ROLES.map(({ key, label }) => (
+        {TIKTOK_ROLES.map(({ key, label }) => (
           <Check
             key={key}
             label={t(label)}
@@ -70,27 +99,69 @@ export function PermissionsSection({ permissions, update, feature }: Props) {
           }
         />
       </div>
-      {others.length > 0 && (
-        <p className={styles.note}>
-          {t("components.permissions.noFollowers", {
-            count: others.length,
-            platforms: listOf(
-              language,
-              others.map((p) => PLATFORM_LABELS[p]),
-            ),
-          })}
-        </p>
-      )}
+    );
+  } else {
+    const saved = permissions.platforms[tab] ?? defaultPlatformPermissions;
+    rules = (
+      <div className={styles.grid}>
+        {PLATFORM_ROLES[tab].map(({ key, label }) => (
+          <Check
+            key={key}
+            label={t(label)}
+            checked={saved[key]}
+            onChange={(e) =>
+              update((p) => {
+                const own = (p.platforms[tab] ??= {
+                  ...defaultPlatformPermissions,
+                });
+                own[key] = e.target.checked;
+              })
+            }
+          />
+        ))}
+      </div>
+    );
+  }
 
-      <Check
-        label={t("components.permissions.list")}
-        checked={permissions.list.enabled}
-        onChange={(e) =>
-          update((p) => {
-            p.list.enabled = e.target.checked;
-          })
-        }
-      />
+  return (
+    <Section
+      title={t("components.permissions.title")}
+      description={t("components.permissions.description", { feature })}
+    >
+      {several && (
+        <Tabs
+          className={styles.tabs}
+          label={t("components.permissions.platform")}
+          tabs={tabs.map((value) => {
+            const Icon = PLATFORM_ICONS[value];
+            return {
+              value,
+              icon: <Icon aria-hidden />,
+              label: PLATFORM_LABELS[value],
+            };
+          })}
+          value={tab}
+          onChange={setPicked}
+        />
+      )}
+      {rules}
+
+      <div className={styles.lists}>
+        <Check
+          label={t("components.permissions.list")}
+          checked={permissions.list.enabled}
+          onChange={(e) =>
+            update((p) => {
+              p.list.enabled = e.target.checked;
+            })
+          }
+        />
+        {several && (
+          <p className={styles.note}>
+            {t("components.permissions.listsEverywhere")}
+          </p>
+        )}
+      </div>
 
       {permissions.list.enabled && (
         <>

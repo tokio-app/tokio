@@ -19,22 +19,28 @@ import { rowPlatforms } from "./platforms";
 type Row = Pick<Trigger, "type" | "platform">;
 
 // The roles each platform's events say. TikTok's chat, emotes and gifts say
-// all three. The others' chat says moderators and subscribers or members,
-// from their badges, but never who follows, and their gifts say none.
+// who follows, moderates or is a Super Fan. The others' chat says
+// moderators and subscribers or members, from their badges, and Twitch's
+// and Kick's VIPs, but never who follows; their gifts say none.
+const TIKTOK_ROLES: readonly ViewerRole[] = [
+  "follower",
+  "moderator",
+  "superfan",
+];
 const BADGES: readonly ViewerRole[] = ["moderator", "superfan"];
-const CHAT_BADGES = { [TOKIO_EVENTS.CHAT]: BADGES, [EMOTE_TRIGGER]: BADGES };
+const WITH_VIPS: readonly ViewerRole[] = [...BADGES, "vip"];
+const chatSays = (roles: readonly ViewerRole[]) => ({
+  [TOKIO_EVENTS.CHAT]: roles,
+  [EMOTE_TRIGGER]: roles,
+});
 const PLATFORM_ROLES: Record<
   Platform,
   Partial<Record<AlertTrigger, readonly ViewerRole[]>>
 > = {
-  tiktok: {
-    [TOKIO_EVENTS.CHAT]: VIEWER_ROLES,
-    [EMOTE_TRIGGER]: VIEWER_ROLES,
-    [TOKIO_EVENTS.GIFT]: VIEWER_ROLES,
-  },
-  twitch: CHAT_BADGES,
-  youtube: CHAT_BADGES,
-  kick: CHAT_BADGES,
+  tiktok: { ...chatSays(TIKTOK_ROLES), [TOKIO_EVENTS.GIFT]: TIKTOK_ROLES },
+  twitch: chatSays(WITH_VIPS),
+  youtube: chatSays(BADGES),
+  kick: chatSays(WITH_VIPS),
 };
 
 // The platforms of a row whose events say the role
@@ -59,6 +65,7 @@ export const rowRoles = (
 const ROLE_KEYS = {
   follower: "roles.follower",
   moderator: "roles.moderator",
+  vip: "roles.vips",
 } as const;
 
 // What each platform calls the people its Super Fan role means

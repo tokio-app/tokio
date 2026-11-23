@@ -7,7 +7,7 @@ import {
   PLATFORM_LABELS,
 } from "@/common/util";
 import { Btn, Input, Tabs } from "@/components";
-import { cx, formatDuration } from "@/helper";
+import { cx, formatDuration, PLATFORM_ICONS } from "@/helper";
 import { useMenu } from "@/hooks";
 import { rich, useT } from "@/ui/i18n";
 import { Link } from "@tanstack/react-router";
@@ -15,7 +15,7 @@ import { type Ref, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { FiPlay, FiPlus, FiSquare } from "react-icons/fi";
 import styles from "../home.module.css";
-import { HomeTab, PLATFORM_ICONS, Views } from "../helper";
+import { HomeTab, Views } from "../helper";
 import { StatValue } from "./StatValue";
 
 interface Props {

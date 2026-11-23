@@ -8,14 +8,14 @@ import {
 import { GIFT_CURRENCY, PLATFORM_LABELS, platformOf } from "@/common/util";
 import { languageName } from "@/helper/voices";
 import { Avatar, Btn } from "@/components";
-import { cx } from "@/helper";
+import { cx, PLATFORM_ICONS } from "@/helper";
 import { amountLabel } from "@/helper/gifts";
 import { rich, useLanguage, useT } from "@/ui/i18n";
 import { memo } from "react";
 import { FiSettings } from "react-icons/fi";
 import { MdTranslate } from "react-icons/md";
 import styles from "../home.module.css";
-import { joinedText, PLATFORM_ICONS, songParts } from "../helper";
+import { joinedText, songParts } from "../helper";
 
 interface Props {
   connected: boolean;

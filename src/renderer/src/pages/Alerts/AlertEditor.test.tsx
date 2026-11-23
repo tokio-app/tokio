@@ -391,7 +391,8 @@ describe("AlertEditor's rows on their platforms", () => {
     ]);
     unmount();
 
-    // Twitch never says who follows, and its Super Fans are subscribers
+    // Twitch never says who follows, its Super Fans are subscribers, and it
+    // has VIPs
     const twitch = open(
       row({ type: TOKIO_EVENTS.CHAT, platform: "twitch" }),
       ALL,
@@ -399,6 +400,7 @@ describe("AlertEditor's rows on their platforms", () => {
     expect(roles()).toEqual([
       ["Moderators", false],
       ["Subscribers", false],
+      ["VIPs", false],
     ]);
     twitch.unmount();
 
@@ -418,6 +420,7 @@ describe("AlertEditor's rows on their platforms", () => {
       ["Followers", false],
       ["Moderators", false],
       ["Super Fans, subscribers, and members", false],
+      ["VIPs", false],
     ]);
   });
 
@@ -431,6 +434,7 @@ describe("AlertEditor's rows on their platforms", () => {
       ["Followers", true],
       ["Moderators", false],
       ["Subscribers", false],
+      ["VIPs", false],
     ]);
   });
 

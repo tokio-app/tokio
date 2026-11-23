@@ -55,8 +55,17 @@ describe("toChat", () => {
     });
 
     expect(toChat(event, "1971641")).toEqual({
-      user: { ...viewer, moderator: true, superfan: true },
+      user: { ...viewer, moderator: true, superfan: true, vip: false },
       comment: { content: "Hi chat", emotes: [], lang: "" },
+    });
+  });
+
+  it("flags a VIP from their badge", () => {
+    const event = chat([text("hey")], { badges: [{ set_id: "vip" }] });
+
+    expect(toChat(event, "1")?.user).toMatchObject({
+      vip: true,
+      moderator: false,
     });
   });
 
@@ -72,6 +81,7 @@ describe("toChat", () => {
     expect(toChat(chat([text("hey")]), "1")?.user).toMatchObject({
       moderator: false,
       superfan: false,
+      vip: false,
     });
   });
 

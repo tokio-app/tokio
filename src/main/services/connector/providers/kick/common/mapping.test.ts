@@ -56,6 +56,7 @@ describe("Kick mapping", () => {
             platform: "kick",
             moderator: false,
             superfan: false,
+            vip: false,
           },
           comment: { content: "hello there", emotes: [], lang: "" },
         },
@@ -100,7 +101,7 @@ describe("Kick mapping", () => {
       });
     });
 
-    it("reads moderators and Super Fans from the badges", () => {
+    it("reads moderators, VIPs and Super Fans from the badges", () => {
       const user = (badges: string[]) => {
         const mapped = chat("hi", badges);
         return mapped?.event === TOKIO_EVENTS.CHAT
@@ -112,11 +113,13 @@ describe("Kick mapping", () => {
       expect(user(["moderator", "vip"])).toMatchObject({
         moderator: true,
         superfan: false,
+        vip: true,
       });
       expect(user(["subscriber"])).toMatchObject({ superfan: true });
       expect(user(["founder", "og"])).toMatchObject({
         moderator: false,
         superfan: true,
+        vip: false,
       });
     });
 

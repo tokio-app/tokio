@@ -24,9 +24,8 @@ import {
   Spinner,
   Tabs,
 } from "@/components";
-import { formatDate, formatDuration } from "@/helper";
+import { formatDate, formatDuration, PLATFORM_ICONS } from "@/helper";
 import { useIpcListener, useIpcRequest } from "@/hooks";
-import { PLATFORM_ICONS } from "@/pages/Home/helper";
 import { useLanguage, useT } from "@/ui/i18n";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
