@@ -13,8 +13,8 @@ import type { GiftStreaks } from "@/helper/streaks";
 
 /**
  * Whether a live event sets off a trigger, an alert's or a game action's,
- * with its filters: gifts and their coins, keyword, user, emotes and the
- * viewer's roles.
+ * with its filters: gifts and their coins, keyword, user, emotes, the
+ * viewer's roles, and Bits', Super Chats' and gifted subs' minimums.
  */
 export function matchesTrigger(
   trigger: Trigger,
@@ -83,7 +83,33 @@ export function matchesTrigger(
     return every_gift ? added > 0 : repeatEnd;
   }
 
-  return true;
+  // Bits, Super Chats and gifted subs have a minimum in their own unit
+  const worth = worthOf(type, payload);
+  return worth === null || worth >= trigger.min_coins;
+}
+
+/**
+ * A Bits, Super Chat or gift sub event's worth in its row's minimum: its
+ * Bits, US dollars or subs. Null for other events, and for a Super Chat
+ * without dollars, so a missing rate never silences it.
+ */
+function worthOf(
+  type: AppEvents,
+  payload: TokioEventMap[AppEvents],
+): number | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  if (type === TOKIO_EVENTS.CHEER && "bits" in payload) return payload.bits;
+  if (type === TOKIO_EVENTS.SUPER_CHAT && "sticker" in payload) {
+    return payload.usd ?? null;
+  }
+  if (
+    type === TOKIO_EVENTS.GIFT_SUB &&
+    "tier" in payload &&
+    "count" in payload
+  ) {
+    return payload.count;
+  }
+  return null;
 }
 
 /**
