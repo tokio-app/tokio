@@ -100,9 +100,8 @@ describe("Tools", () => {
     expect(row("Countdown")).toHaveAccessibleDescription(
       "A countdown viewers add time to. 01:00:00 Ready",
     );
-    // The newest LIVE's
     expect(row("LIVE history")).toHaveAccessibleDescription(
-      "Every LIVE, what viewers sent on each platform and who sent the most. 1,234 coins on Oct 31, 2026",
+      "Every LIVE, what viewers sent on each platform and who sent the most. 2 LIVEs",
     );
     expect(row("Fans")).toHaveAccessibleDescription(
       "Viewers with a fan level, highest first. 2 fans",
@@ -112,16 +111,14 @@ describe("Tools", () => {
     );
   });
 
-  it("counts one coin, one fan, and no test overlays", async () => {
+  it("counts one LIVE, one fan, and no test overlays", async () => {
     await renderApp("/tools");
 
     await lives(liveSummary(OCT_31, { coins: 1 }));
     await fans(fan("Jules", 32));
     await testOverlays();
 
-    expect(
-      within(row("LIVE history")).getByText("coin on Oct 31, 2026"),
-    ).toBeVisible();
+    expect(within(row("LIVE history")).getByText("LIVE")).toBeVisible();
     expect(within(row("Fans")).getByText("fan")).toBeVisible();
     expect(within(row("Test overlays")).getByText("0")).toBeVisible();
     expect(
@@ -150,13 +147,13 @@ describe("Tools", () => {
     expect(within(row("Overlay Studio")).getByText("overlay")).toBeVisible();
   });
 
-  it("says when there are no LIVEs yet, with no number", async () => {
+  it("counts no LIVEs before the first ends", async () => {
     await renderApp("/tools");
 
     await lives();
 
     expect(row("LIVE history")).toHaveAccessibleDescription(
-      "Every LIVE, what viewers sent on each platform and who sent the most. No LIVEs yet",
+      "Every LIVE, what viewers sent on each platform and who sent the most. 0 LIVEs",
     );
   });
 
@@ -205,37 +202,6 @@ describe("Tools", () => {
     expect(within(row("Countdown")).getByText("01:30:00")).toBeVisible();
   });
 
-  it("shows the newest LIVE's money on its first platform with any, in its currency", async () => {
-    await renderApp("/tools");
-    const part = (amount: number) => ({ amount, gifts: 0, giftSubs: 0 });
-
-    await lives(liveSummary(OCT_31, { platforms: { kick: part(1) } }));
-    expect(
-      within(row("LIVE history")).getByText("Kick on Oct 31, 2026"),
-    ).toBeVisible();
-
-    // TikTok's had none, so Twitch's Bits
-    await lives(
-      liveSummary(OCT_31, {
-        platforms: { tiktok: part(0), twitch: part(2500), kick: part(300) },
-      }),
-    );
-    expect(row("LIVE history")).toHaveAccessibleDescription(
-      /2,500 Bits on Oct 31, 2026$/,
-    );
-
-    await lives(liveSummary(OCT_31, { platforms: { youtube: part(57.4) } }));
-    expect(row("LIVE history")).toHaveAccessibleDescription(
-      /\$57\.40 in Super Chats on Oct 31, 2026$/,
-    );
-
-    // Nothing anywhere: the first platform's
-    await lives(liveSummary(OCT_31, { platforms: { kick: part(0) } }));
-    expect(row("LIVE history")).toHaveAccessibleDescription(
-      /0 Kicks on Oct 31, 2026$/,
-    );
-  });
-
   it("asks for the LIVEs and the fans again when the profile changes", async () => {
     await renderApp("/tools");
     await lives(liveSummary(OCT_31, { coins: 1234 }));
@@ -248,7 +214,7 @@ describe("Tools", () => {
     expect(sent(APP_EVENTS.GET_FANS)).toHaveLength(2);
 
     await lives();
-    expect(within(row("LIVE history")).getByText("No LIVEs yet")).toBeVisible();
+    expect(within(row("LIVE history")).getByText("0")).toBeVisible();
   });
 
   it.each([

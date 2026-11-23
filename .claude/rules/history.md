@@ -96,7 +96,7 @@ paths:
   - Its gifters are main's lists filtered by `platformOf`, in main's order and with its ranks, each with their amount and gifted subs.
 - **All:** a money tile per platform, every gift and gifted sub, and the list by gift count, whose totals row says so ("1.5K gifts", the user's call) so it isn't read as money. It has no ranking and no search: a line asks to pick a platform. A selected LIVE shows only its own platforms' tiles there.
 - A selected LIVE that isn't on the picked tab shows the totals row, and stays selected for when its tab comes back.
-- The Tools row shows the newest LIVE's first platform with money, in `PLATFORMS` order (else its first platform), in its currency.
+- The Tools row counts the LIVEs it keeps, as the other tools' rows count theirs (the user's call: a LIVE's money there stopped making sense once the page became the history).
 - The bar under each LIVE, in Iron and scaled to the best LIVE in the tab's money (gifts on All), is the page's one bold element. Hovered rows use Field (`--background-secondary`), since Iron would hide the bars.
 - Selection: the newest LIVE, or All time when there are none. After a delete, the one that took its place, or the one before when it was the last (`keepSelection`). A LIVE that ends and joins keeps the selection; another profile's `LIVES` starts from its newest.
 - The date presets count back from `now`, set with the filter and again when `LIVES` comes, so it doesn't move on every render; 12 months follow the calendar.
