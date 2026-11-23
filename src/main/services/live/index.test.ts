@@ -284,8 +284,8 @@ describe("LiveService", () => {
         text: "three months",
       },
     ]);
-    // Only the Bits
-    const totals = { ...noTotals, bits: 100 };
+    // Only the Bits and the gifted subs
+    const totals = { ...noTotals, bits: 100, giftSubs: 5 };
     expect(live.getSession().totals).toEqual(totals);
     expect(live.getSession().platforms.twitch).toEqual({
       totals,
@@ -654,9 +654,17 @@ describe("LiveService", () => {
       });
     });
 
-    it("still counts hidden cheers and Super Chats, telling the session changed", () => {
-      live.setFeed(hiding("cheer", "superchat"));
+    it("still counts hidden cheers, gifted subs and Super Chats, telling the session changed", () => {
+      live.setFeed(hiding("cheer", "giftsub", "superchat"));
 
+      expect(
+        live.record(TOKIO_EVENTS.GIFT_SUB, {
+          user: viewer("kai", { platform: "kick" }),
+          count: 3,
+          tier: "",
+        }),
+      ).toBe(true);
+      expect(live.getSession().platforms.kick?.totals.giftSubs).toBe(3);
       expect(
         live.record(TOKIO_EVENTS.CHEER, {
           user: viewer("kai", { platform: "twitch" }),
@@ -674,7 +682,7 @@ describe("LiveService", () => {
       ).toBe(true);
 
       expect(live.getSession()).toMatchObject({
-        totals: { bits: 50, superChats: 1 },
+        totals: { bits: 50, superChats: 1, giftSubs: 3 },
         activity: [],
         usd: 2,
       });

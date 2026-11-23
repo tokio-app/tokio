@@ -184,8 +184,12 @@ export class LiveService extends Service {
         months,
         text: message,
       }),
-    [TOKIO_EVENTS.GIFT_SUB]: ({ user, count }) =>
-      this._add({ type: "giftsub", user: activityUser(user), count }),
+    // True even when the feed hides gifted subs, since they count
+    [TOKIO_EVENTS.GIFT_SUB]: ({ user, count }) => {
+      this._count(user, "giftSubs", Math.max(0, count));
+      this._add({ type: "giftsub", user: activityUser(user), count });
+      return true;
+    },
     // True even when the feed hides cheers, since the Bits count
     [TOKIO_EVENTS.CHEER]: ({ user, bits, message }) => {
       this._count(user, "bits", Math.max(0, bits));
