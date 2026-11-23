@@ -15,6 +15,7 @@ import {
   giftNames,
   PLATFORM_LABELS,
   takesRoles,
+  triggerName,
   triggersOf,
 } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
@@ -54,17 +55,23 @@ export const ROLE_NAMES: Record<ViewerRole, MessageKey> = {
   superfan: "roles.superfan",
 };
 
-export type MinUnit = "coins" | "kicks" | "either";
+export type MinUnit = "coins" | "kicks" | "either" | "bits" | "usd" | "subs";
 
 /**
- * What a gift row's minimum is in: its platform's currency, or for any
- * platform the profile's, "either" with both. Null without one (YouTube's
- * Gifts have no price), unless a minimum is saved, so it stays to fix.
+ * What a row's minimum (min_coins) is in: Bits for Bits, US dollars for
+ * Super Chats, subs for gifted subs, and for a gift its platform's currency,
+ * or for any platform the profile's, "either" with both. Null for other
+ * events and gifts without a price (YouTube's), unless a gift minimum is
+ * saved, so it stays to fix.
  */
 export function minUnit(
   trigger: Trigger,
   profilePlatforms: readonly Platform[],
 ): MinUnit | null {
+  if (trigger.type === TOKIO_EVENTS.CHEER) return "bits";
+  if (trigger.type === TOKIO_EVENTS.SUPER_CHAT) return "usd";
+  if (trigger.type === TOKIO_EVENTS.GIFT_SUB) return "subs";
+  if (trigger.type !== TOKIO_EVENTS.GIFT) return null;
   const currencies = giftCurrencies(
     trigger.platform ? [trigger.platform] : profilePlatforms,
   );
@@ -76,7 +83,31 @@ const WORTH: Record<MinUnit, MessageKey> = {
   coins: "components.alertItem.worth",
   kicks: "components.alertItem.worthKicks",
   either: "components.alertItem.worthEither",
+  bits: "components.alertItem.worthBits",
+  usd: "components.alertItem.worthUsd",
+  subs: "components.alertItem.giftSubsAtLeast",
 };
+
+// "worth 100+ Bits", "worth $5+", "5+ gifted subs". A minimum is whole, so
+// its dollars have no cents.
+const worthText = (
+  unit: MinUnit,
+  min: number,
+  language: string,
+  t: (key: MessageKey, params?: Params) => string,
+) =>
+  t(
+    WORTH[unit],
+    unit === "usd"
+      ? {
+          amount: new Intl.NumberFormat(language, {
+            style: "currency",
+            currency: "USD",
+            trailingZeroDisplay: "stripIfInteger",
+          }).format(min),
+        }
+      : { count: min },
+  );
 
 type FilterProps = {
   trigger: Trigger;
@@ -267,7 +298,14 @@ function rowSummary(
       );
       // Only any gift has a worth to reach
       if (trigger.gifts.length === 0 && trigger.min_coins > 0 && unit) {
-        parts.push(t(WORTH[unit], { count: trigger.min_coins }));
+        parts.push(worthText(unit, trigger.min_coins, language, t));
+      }
+      break;
+    case TOKIO_EVENTS.CHEER:
+    case TOKIO_EVENTS.SUPER_CHAT:
+    case TOKIO_EVENTS.GIFT_SUB:
+      if (trigger.min_coins > 0 && unit) {
+        parts.push(worthText(unit, trigger.min_coins, language, t));
       }
       break;
     case EMOTE_TRIGGER:
@@ -349,13 +387,13 @@ export function triggerSummary(
 
 /**
  * A trigger's event as rows name it, with its platform when it has one:
- * "Follow on Twitch".
+ * "Follow on Twitch", "Kicks on Kick".
  */
 export function eventName(
   { type, platform }: { type: Trigger["type"]; platform?: Platform },
   t: (key: MessageKey, params?: Params) => string,
 ): string {
-  const event = t(ALERT_TRIGGER_LABELS[type]);
+  const event = t(triggerName({ type, platform }));
   return platform
     ? t("components.triggers.onPlatform", {
         event,

@@ -511,6 +511,36 @@ describe("Redeem and platforms", () => {
 
     expect(triggerLabel(withGift, t, "en")).toBe("Follow on Twitch or Gift");
   });
+
+  it("names a Kick row's gifts Kicks, any platform's still Gift", () => {
+    const kicks = alert({}, { type: TOKIO_EVENTS.GIFT, platform: "kick" });
+    const any = alert({}, { type: TOKIO_EVENTS.GIFT });
+
+    expect(triggerLabel(kicks, t, "en")).toBe("Kicks on Kick");
+    expect(triggerLabel(any, t, "en")).toBe("Gift");
+  });
+});
+
+describe("money rows' minimums", () => {
+  const sum = (type: Alert["trigger"]["type"], min_coins: number) =>
+    triggerSummary([alert({}, { type, min_coins }).trigger], [], [], "en");
+
+  it("takes each event's own unit, and none for events without money", () => {
+    const unit = (type: Alert["trigger"]["type"]) =>
+      minUnit(alert({}, { type }).trigger, ["twitch", "youtube"]);
+
+    expect(unit(TOKIO_EVENTS.CHEER)).toBe("bits");
+    expect(unit(TOKIO_EVENTS.SUPER_CHAT)).toBe("usd");
+    expect(unit(TOKIO_EVENTS.GIFT_SUB)).toBe("subs");
+    expect(unit(TOKIO_EVENTS.FOLLOW)).toBeNull();
+  });
+
+  it("sums up each minimum in its unit, and nothing at 0", () => {
+    expect(sum(TOKIO_EVENTS.CHEER, 100)).toBe("Worth 100+ Bits");
+    expect(sum(TOKIO_EVENTS.SUPER_CHAT, 5)).toBe("Worth $5+");
+    expect(sum(TOKIO_EVENTS.GIFT_SUB, 5)).toBe("5+ gifted subs");
+    expect(sum(TOKIO_EVENTS.CHEER, 0)).toBe("");
+  });
 });
 
 describe("gift rows on each platform", () => {

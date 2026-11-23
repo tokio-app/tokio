@@ -318,4 +318,24 @@ describe("AlertEditor's minimum", () => {
 
     expect(minimum()).toBeNull();
   });
+
+  it.each([
+    [TOKIO_EVENTS.CHEER, "Worth at least", "Bits"],
+    [TOKIO_EVENTS.SUPER_CHAT, "Worth at least", "USD"],
+    [TOKIO_EVENTS.GIFT_SUB, "At least", "gifted subs"],
+  ] as const)("takes %s's in its own unit", (type, label, unit) => {
+    open(gift({ type }), ["twitch", "youtube"]);
+
+    expect(screen.getByRole("group", { name: label })).toHaveTextContent(
+      new RegExp(`^${label} ${unit}$`),
+    );
+    expect(screen.getByRole("spinbutton", { name: label })).toBeInTheDocument();
+  });
+
+  it("has none for events without money", () => {
+    open(gift({ type: TOKIO_EVENTS.FOLLOW }), ["twitch"]);
+
+    expect(minimum()).toBeNull();
+    expect(screen.queryByRole("group", { name: "At least" })).toBeNull();
+  });
 });

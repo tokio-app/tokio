@@ -189,6 +189,9 @@ const MIN_INPUT: Record<MinUnit, MessageKey> = {
   coins: "alerts.editor.minCoinsInput",
   kicks: "alerts.editor.minKicksInput",
   either: "alerts.editor.minEitherInput",
+  bits: "alerts.editor.minBitsInput",
+  usd: "alerts.editor.minUsdInput",
+  subs: "alerts.editor.minSubsInput",
 };
 
 type TriggerTabProps = {
@@ -227,6 +230,11 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
     const { roles } = trigger;
     const change = (changed: Trigger) => setRow(index, changed);
     const unit = minUnit(trigger, platforms);
+    const gift = trigger.type === TOKIO_EVENTS.GIFT;
+    // "Worth at least 100 Bits", "At least 5 gifted subs"
+    const minLabel = t(
+      unit === "subs" ? "alerts.editor.atLeast" : "alerts.editor.minCoins",
+    );
 
     return {
       main: (
@@ -251,27 +259,26 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
           )}
 
           {/* Picked gifts are the alert's choice already, and a row with
-              no price (YouTube's) has nothing to reach */}
-          {trigger.type === TOKIO_EVENTS.GIFT &&
-            trigger.gifts.length === 0 &&
-            unit && (
-              <Field label={t("alerts.editor.minCoins")}>
-                <span className={styles.inline}>
-                  {rich(t(MIN_INPUT[unit]), {
-                    input: (
-                      <NumberInput
-                        integer
-                        min={0}
-                        className={styles.number}
-                        aria-label={t("alerts.editor.minCoins")}
-                        value={trigger.min_coins}
-                        onChange={(min_coins) =>
-                          change({ ...trigger, min_coins })
-                        }
-                      />
-                    ),
-                  })}
-                </span>
+              no price (YouTube's gifts) has nothing to reach */}
+          {unit && !(gift && trigger.gifts.length > 0) && (
+            <Field label={minLabel}>
+              <span className={styles.inline}>
+                {rich(t(MIN_INPUT[unit]), {
+                  input: (
+                    <NumberInput
+                      integer
+                      min={0}
+                      className={styles.number}
+                      aria-label={minLabel}
+                      value={trigger.min_coins}
+                      onChange={(min_coins) =>
+                        change({ ...trigger, min_coins })
+                      }
+                    />
+                  ),
+                })}
+              </span>
+              {gift && (
                 <p className={styles.note}>
                   {t(
                     trigger.every_gift
@@ -279,8 +286,9 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
                       : "alerts.editor.streakNote",
                   )}
                 </p>
-              </Field>
-            )}
+              )}
+            </Field>
+          )}
 
           {takesRoles(trigger.type) && (
             <Field label={t("alerts.editor.from")}>

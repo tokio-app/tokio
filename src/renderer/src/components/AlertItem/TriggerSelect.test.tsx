@@ -63,6 +63,17 @@ const pick = async (
 };
 
 describe("TriggerSelect", () => {
+  it("names a Kick row's gifts Kicks", async () => {
+    const { user } = render(
+      ["tiktok", "kick"],
+      trigger({ type: TOKIO_EVENTS.GIFT, platform: "kick" }),
+    );
+
+    expect(await events(user)).toContain("Kicks");
+    await pick(user, "Platform", "Any platform");
+    expect(await events(user)).toContain("Gift");
+  });
+
   it("has no platform with one, and only its events", async () => {
     const { user } = render(["tiktok"]);
 

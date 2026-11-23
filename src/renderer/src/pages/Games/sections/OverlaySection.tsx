@@ -9,12 +9,7 @@ import {
   Profile,
   SavedEmote,
 } from "@/common/schemas";
-import {
-  ALERT_TRIGGER_LABELS,
-  APP_EVENTS,
-  CustomGift,
-  TOKIO_EVENTS,
-} from "@/common/types";
+import { APP_EVENTS, CustomGift, TOKIO_EVENTS } from "@/common/types";
 import {
   gameEventPictures,
   gameCount,
@@ -24,6 +19,7 @@ import {
   gameStepsText,
   getMinecraftOverlayURL,
   getPicturePreviewURL,
+  triggerName,
 } from "@/common/util";
 import {
   Btn,
@@ -432,8 +428,8 @@ function RecipeRow({
     <span
       className={styles.recipe_gift}
       role="img"
-      aria-label={chat ? t(ALERT_TRIGGER_LABELS[trigger.type]) : eventText}
-      title={chat ? t(ALERT_TRIGGER_LABELS[trigger.type]) : eventText}
+      aria-label={chat ? t(triggerName(trigger)) : eventText}
+      title={chat ? t(triggerName(trigger)) : eventText}
     >
       {pictures.map((src, i) => (
         <img
