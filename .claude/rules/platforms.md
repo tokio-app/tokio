@@ -58,7 +58,11 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - Chat language: translation stays TikTok's (the user's call: letting Google detect Twitch's messages would spend its rate limit on the streamer's own language; `.claude/rules/translation.md`).
 - Follows: every follow counts, a viewer's repeat follows in one LIVE included (the user's call). Twitch sends one each time a viewer follows again after unfollowing. YouTube sends none: new channel subscribers don't show in its chat. Kick has no Follow either (the user's call): no feed Kick's own page joins names a follower (checked in its scripts), its signed-in user feed only carries viewer notices, and named follows come only from Kick's official webhooks, which need a public server. Its follower total moves live (in the lookup, and in a follower goal's `GoalProgressUpdateEvent`), but the user chose not to turn it into follows without names.
 - Chat pictures: Twitch chat goes without (`shortcut:` in `providers/twitch/index.ts`), `Avatar` shows the initial. Follows, subs, cheers and redeems look their picture up once and cache it. YouTube's chat carries every author's picture. Kick's chat has none (initials); a Kick's sender comes with theirs.
-- Fans stay TikTok's (`.claude/rules/fans.md`).
+- Fans lists each platform's (2026-11-23): TikTok's fan club, Twitch's and Kick's subscribers and YouTube's members, with All by last seen. Overlays' `tokio:fans` stays TikTok's (`.claude/rules/fans.md`).
+- A subscriber's or member's months come off their chat badge into `UserData.subMonths`, set only when it reads as a positive number:
+  - Twitch: the `subscriber` or `founder` badge's `info`, which Twitch documents as the months (not yet seen on a real subscriber's chat).
+  - Kick: the same badges' `count` (checked on kick.com's chat, 2026-11-23).
+  - YouTube: the member badge's tooltip, in English since requests ask `hl=en`. "Member (1 year)" is 12, and "New member" sets none.
 
 ## Twitch
 
@@ -102,8 +106,8 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - The feeds are `chatrooms.<chatroom>.v2` (chat, subs, hosts), `chatroom_<chatroom>` (gifted subs, reward redemptions), `channel.<channel>` (live and offline) and `channel_<channel>` (Kicks). Never `chatrooms.<chatroom>`: it repeats every host. A publication's `data` is a JSON string inside the JSON.
 - The token is refreshed at 80% of its life for the same client id. Closes coded 3500-3999 and 4500-4999 are terminal: wait 5 minutes, doubling up to 30, then come back as a new client id. Any other drop reconnects from 1 s, doubling up to 30 s, never giving up; a reconnect redoes the lookup, which is how it learns the stream ended while away.
 - It connects while the channel is offline (the chat is the channel's), like Twitch, and `StopStreamBroadcast` ends the connection only for a stream seen live. Viewers come from the lookup every 60 s while live.
-- Each Kick is its own `GIFT`, its id `kick:<gift slug>` (`rage_quit`) and its `amount` in `coins`, read as Kicks everywhere Tokio counts it. Subs, hosts and redemptions name the viewer only by username, so they have no `userId`. Chat has no pictures; a Kick's sender has one.
-- A gifted subs event names its gifter only by username too, so the provider finds their id (`kick:<id>`) in this LIVE's chat and Kicks, by username in any case, else with one lookup of their channel by `slugOf` (lowercase, `_` as `-`; the raw username is a 404). The lookup's `user_id` is chat's `sender.id` (checked 2026-11-22).
+- Each Kick is its own `GIFT`, its id `kick:<gift slug>` (`rage_quit`) and its `amount` in `coins`, read as Kicks everywhere Tokio counts it. Hosts and redemptions name the viewer only by username, so they have no `userId`. Chat has no pictures; a Kick's sender has one.
+- Subs and gifted subs name their viewer only by username too, so the provider finds their id (`_withId`) (`kick:<id>`) in this LIVE's chat and Kicks, by username in any case, else with one lookup of their channel by `slugOf` (lowercase, `_` as `-`; the raw username is a 404). The lookup's `user_id` is chat's `sender.id` (checked 2026-11-22).
   - The answer is kept for the connection, failures included, each failure logged once per name. After a failed lookup the event goes out without an id.
   - A lookup holds that event back by its round trip, so it can come after events that arrived behind it.
 - The feed is unofficial and changed from Pusher to Centrifugo in October 2026. An event Tokio can't read is dropped and logged once per name, never thrown out of the socket's listener.
