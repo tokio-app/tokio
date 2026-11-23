@@ -565,6 +565,8 @@
   "tools.rules.cooldown": "once per viewer every {input} seconds",
   "coinStats.list.title": "Your LIVEs",
   "coinStats.list.option": "{date}, {coins}",
+  "coinStats.list.gifts#one": "{amount} gift",
+  "coinStats.list.gifts#other": "{amount} gifts",
   "coinStats.list.empty": "No LIVEs yet. Connect on Home, and each LIVE shows up here when it ends.",
   "coinStats.allTime.title": "All time",
   "coinStats.allTime.count#one": "{count} LIVE",

@@ -581,6 +581,8 @@ describe("Gift stats", () => {
 
     // Only the LIVEs on Twitch, in Bits. Saturday's wasn't, so its totals.
     await user.click(tab("Twitch"));
+    // On a platform's tab, its money with no word after it
+    expect(option(/^All time/)).toHaveTextContent(/^All time2.5K$/);
     expect(options()).toEqual([
       "All time, 2,500 Bits",
       expect.stringMatching(/^Friday.*, 2,500 Bits$/),
@@ -617,6 +619,8 @@ describe("Gift stats", () => {
       expect.stringMatching(/^Friday.*, 1,205 gifts$/),
     ]);
     expect(bar(/^Friday/)).toBe("100%");
+    // The totals row says its number is gifts, not money
+    expect(option(/^All time/)).toHaveTextContent("All time1.2K gifts");
     expect(stat("Coins")).toHaveAttribute("title", "12,400");
     expect(stat("Bits")).toHaveAttribute("title", "2,500");
     expect(stat("Super Chats")).toHaveTextContent("$57.40");

@@ -94,7 +94,7 @@ paths:
   - Its money tile, then Gifts where it sends gifts (TikTok, YouTube, Kick) and Gifted subs where it sends them (Twitch, YouTube, Kick).
   - The list holds only the LIVEs that were on it, their amounts and bars in its money (`liveValue`), and the summary's count and length are theirs.
   - Its gifters are main's lists filtered by `platformOf`, in main's order and with its ranks, each with their amount and gifted subs.
-- **All:** a money tile per platform, every gift and gifted sub, and the list by gift count. It has no ranking and no search: a line asks to pick a platform. A selected LIVE shows only its own platforms' tiles there.
+- **All:** a money tile per platform, every gift and gifted sub, and the list by gift count, whose totals row says so ("1.5K gifts", the user's call) so it isn't read as money. It has no ranking and no search: a line asks to pick a platform. A selected LIVE shows only its own platforms' tiles there.
 - A selected LIVE that isn't on the picked tab shows the totals row, and stays selected for when its tab comes back.
 - The Tools row shows the newest LIVE's first platform with money, in `PLATFORMS` order (else its first platform), in its currency.
 - The bar under each LIVE, in Iron and scaled to the best LIVE in the tab's money (gifts on All), is the page's one bold element. Hovered rows use Field (`--background-secondary`), since Iron would hide the bars.

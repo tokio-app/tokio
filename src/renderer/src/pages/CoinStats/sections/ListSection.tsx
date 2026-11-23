@@ -3,7 +3,7 @@ import { PLATFORM_CURRENCY } from "@/common/util";
 import { DateTimePicker, EmptyState, Select } from "@/components";
 import { cx, formatDate, formatDuration } from "@/helper";
 import { amountLabel, giftsLabel } from "@/helper/gifts";
-import { useLanguage, useOptions, useT } from "@/ui/i18n";
+import { rich, useLanguage, useOptions, useT } from "@/ui/i18n";
 import { KeyboardEvent } from "react";
 import styles from "../coinstats.module.css";
 import {
@@ -137,6 +137,7 @@ export function ListSection({
   });
 
   const total = statText(amount, currency, language);
+  const all = tab === "all";
   return (
     <div className={styles.side}>
       <DateFilterBar filter={filter} onChange={onFilter} />
@@ -153,10 +154,21 @@ export function ListSection({
             coins: label(amount),
           })}
         >
-          <span className={styles.all_time}>{title}</span>
-          <span className={styles.coins} title={total.full}>
-            {total.short}
+          <span className={cx(styles.all_time, all && styles.all_time_gifts)}>
+            {title}
           </span>
+          {all ? (
+            // All counts gifts, named so they aren't read as money
+            <span className={styles.total_gifts} title={total.full}>
+              {rich(t("coinStats.list.gifts", { count: amount }), {
+                amount: <span className={styles.coins}>{total.short}</span>,
+              })}
+            </span>
+          ) : (
+            <span className={styles.coins} title={total.full}>
+              {total.short}
+            </span>
+          )}
         </li>
         {lives.map((live) => {
           const value = valueOf(live);
