@@ -405,6 +405,19 @@ describe("overlays MCP tools", () => {
       text: "{likes} likes",
     };
 
+    it("explains {giftsubs} and points to the alert kind's minimums", async () => {
+      const { h } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const { value } = await call("describe", { name: "studio_overlay" });
+
+      for (const text of ["{giftsubs}", "min_coins", "Kicks"]) {
+        expect(value).toMatchObject({
+          kind: { notes: expect.stringContaining(text) },
+        });
+      }
+    });
+
     it("creates one with ADD_STUDIO_OVERLAY, then saves the rest", async () => {
       const { h, held, store } = setup();
       const invoke = vi.spyOn(h.handler, "invoke");

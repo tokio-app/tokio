@@ -13,6 +13,7 @@ import {
   APP_EVENTS_RESPONSE,
   type AppEventsResponseMap,
   FEEDBACK_CODES,
+  TOKIO_EVENTS,
 } from "@/common/types";
 import {
   ALERT_MESSAGE_VARIABLES,
@@ -251,7 +252,7 @@ export const kinds: Kinds = {
     schema: AlertChangesSchema,
     notes: [
       "An alert of the active profile: when its trigger, or any one of also_triggers (up to 4 more, each shaped like trigger), matches a LIVE event and it's enabled, it plays its sound, or speaks its tts message instead when tts is set, and shows its media on its own overlay (overlayURL, a browser source in OBS). An empty name shows as alert-<place>.",
-      `trigger.type is one of: ${ALERT_TRIGGERS.join(", ")}. gifts (TikTok's gift ids from list gifts, empty for any), every_gift and min_coins are for gift triggers; min_coins only for any gift, in the gift's own currency (TikTok's coins or Kick's Kicks). YouTube's gifts have no price, so a min_coins above 0 never matches them. emotes (ids from list emotes, empty for any) for the emote trigger; keyword (whole words) for chat; user (a handle or name) for member and super fan joins; roles (follower, moderator, superfan) only for chat, emote and gift.`,
+      `trigger.type is one of: ${ALERT_TRIGGERS.join(", ")}. gifts (TikTok's gift ids from list gifts, empty for any) and every_gift are for gift triggers. min_coins is a trigger's minimum in its event's own unit, 0 for none: on ${TOKIO_EVENTS.GIFT}, only for any gift, the streak's worth when it ends (each gift's with every_gift) in the gift's own currency, TikTok's coins or Kick's Kicks (YouTube's gifts have no price, so a min_coins above 0 never matches them); on ${TOKIO_EVENTS.CHEER}, Bits; on ${TOKIO_EVENTS.SUPER_CHAT}, US dollars at the day's exchange rates (a Super Chat whose dollars aren't known, before the rates load or in a currency they lack, always matches); on ${TOKIO_EVENTS.GIFT_SUB}, the subs gifted at once. Other triggers ignore it. The app calls a kick gift trigger Kicks, Kick's name for its gifts. emotes (ids from list emotes, empty for any) for the emote trigger; keyword (whole words) for chat; user (a handle or name) for member and super fan joins; roles (follower, moderator, superfan) only for chat, emote and gift.`,
       `${PLATFORM_NOTE} Each of also_triggers has its own.`,
       "sound and media take a file from list sounds and list media ({ file } is enough; the name comes from the library). A sound plays from start to end seconds (end null: to its end); media shows for duration seconds (1–60), at least while the sound plays, and a video plays its cut at its own volume. Ask the streamer which sound or picture they want; add_to_library adds new ones. null clears one.",
       `tts: { voice, message, speed, pitch }, voice from list_voices ({ engine, name, lang, id }). The message can hold its trigger's variables: ${VARIABLES}. {count} is a gift streak's total, or a like batch's likes. volume (0–100) is the sound's or message's.`,

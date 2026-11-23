@@ -308,6 +308,19 @@ describe("live MCP tools", () => {
                 platform: "kick",
               },
             ],
+            youtube: [
+              {
+                userId: "youtube:UC3",
+                username: "Su",
+                handle: "su",
+                picture: "",
+                coins: 12.345,
+                gifts: 1,
+                giftSubs: 5,
+                giftedAt: 3,
+                platform: "youtube",
+              },
+            ],
           }),
         },
       });
@@ -370,8 +383,21 @@ describe("live MCP tools", () => {
           { id: 1, type: "follow", handle: "di", nickname: "di name" },
         ],
         topGifters: {
-          coins: [{ handle: "bo", nickname: "Bo", coins: 5, gifts: 5 }],
-          kicks: [{ handle: "kai", nickname: "Kai", kicks: 100, gifts: 1 }],
+          tiktok: [
+            { handle: "bo", nickname: "Bo", coins: 5, gifts: 5, giftSubs: 0 },
+          ],
+          youtube: [
+            { handle: "su", nickname: "Su", usd: 12.35, gifts: 1, giftSubs: 5 },
+          ],
+          kick: [
+            {
+              handle: "kai",
+              nickname: "Kai",
+              kicks: 100,
+              gifts: 1,
+              giftSubs: 0,
+            },
+          ],
         },
       });
       expect(res.text).not.toContain("p.example");

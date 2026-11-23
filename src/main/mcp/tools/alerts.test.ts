@@ -211,6 +211,19 @@ describe("alerts MCP tools", () => {
   });
 
   describe("alert", () => {
+    it("explains each minimum's unit and the Kicks name", async () => {
+      const { h } = setup();
+      const { call } = await mcpClient(h.handler);
+
+      const { value } = await call("describe", { name: "alert" });
+
+      for (const text of ["Bits", "US dollars", "subs gifted", "Kicks"]) {
+        expect(value).toMatchObject({
+          kind: { notes: expect.stringContaining(text) },
+        });
+      }
+    });
+
     it("lists the alerts with their triggers' filters", async () => {
       const { h } = setup([
         alert(),
