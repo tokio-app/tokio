@@ -207,19 +207,28 @@ describe("ConnectorService", () => {
     // Before setRates, as before the rates load
     provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("MX$100.00"));
     let loaded = false;
-    const toUsd = vi.fn((amounts: Record<string, number>) =>
-      loaded ? (amounts.MXN ?? 0) / 20 : null,
+    const usdOf = vi.fn((currency: string, value: number) =>
+      loaded && currency === "MXN" ? value / 20 : null,
     );
-    service.setRates({ toUsd });
+    service.setRates({ usdOf });
     provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("MX$100.00"));
     loaded = true;
     provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("MX$100.00"));
     provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("100 bananas"));
+    // Loaded, but without a rate for it
+    provider.fire(TOKIO_EVENTS.SUPER_CHAT, chat("ARS 1,000.00"));
 
-    expect(first.mock.calls.map(([d]) => d.usd)).toEqual([null, null, 5, null]);
+    expect(first.mock.calls.map(([d]) => d.usd)).toEqual([
+      null,
+      null,
+      5,
+      null,
+      null,
+    ]);
     expect(first.mock.calls[2][0]).toEqual({ ...chat("MX$100.00"), usd: 5 });
     expect(second.mock.calls).toEqual(first.mock.calls);
-    expect(toUsd).toHaveBeenCalledWith({ MXN: 100 });
+    expect(usdOf).toHaveBeenCalledWith("MXN", 100);
+    expect(usdOf).toHaveBeenCalledWith("ARS", 1000);
   });
 
   it("logs gifts it can't fetch", async () => {

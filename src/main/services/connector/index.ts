@@ -69,7 +69,7 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   private _onPlatform?: (platform: Platform, change: PlatformChange) => void;
   private _onAccount?: (account: PlatformAccount) => Promise<boolean>;
   // Converts a Super Chat's amount to US dollars
-  private _rates?: Pick<RatesService, "toUsd">;
+  private _rates?: Pick<RatesService, "usdOf">;
 
   constructor() {
     super();
@@ -114,7 +114,7 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
   }
 
   /** Sets what converts the Super Chats to dollars, which every listener gets. */
-  public setRates(rates: Pick<RatesService, "toUsd">) {
+  public setRates(rates: Pick<RatesService, "usdOf">) {
     this._rates = rates;
   }
 
@@ -372,13 +372,13 @@ export class ConnectorService extends ProviderService<ConnectorProvider> {
         if (forwards()) this._events.send(event, data);
       });
     }
-    // With its dollars, null when the amount can't be read or the rates
-    // haven't loaded
+    // With its dollars, null when the amount can't be read, or the rates
+    // haven't loaded or lack its currency
     provider.on(TOKIO_EVENTS.SUPER_CHAT, (data) => {
       if (!forwards()) return;
       const amount = parseAmount(data.amount);
       const usd = amount
-        ? (this._rates?.toUsd({ [amount.currency]: amount.value }) ?? null)
+        ? (this._rates?.usdOf(amount.currency, amount.value) ?? null)
         : null;
       this._events.send(TOKIO_EVENTS.SUPER_CHAT, { ...data, usd });
     });

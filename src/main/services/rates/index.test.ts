@@ -126,6 +126,14 @@ describe("RatesService", () => {
     );
   });
 
+  it("gives one amount's dollars, null without its rate", async () => {
+    expect(rates.usdOf("USD", 4.99, 0)).toBe(4.99);
+    expect(rates.usdOf("MXN", 100, 0)).toBeNull();
+    await rates.refresh(0);
+    expect(rates.usdOf("MXN", 100, 0)).toBe(5);
+    expect(rates.usdOf("XAF", 600, 0)).toBeNull();
+  });
+
   it("refuses a body it can't read", async () => {
     const warn = vi.spyOn(Logger, "warn");
     const listener = vi.fn();

@@ -65,6 +65,15 @@ export class RatesService extends Service {
   }
 
   /**
+   * One amount in US dollars, null while no rates have loaded or when they
+   * lack its currency, so a Super Chat's own dollars are never a made-up 0.
+   */
+  public usdOf(currency: string, value: number, now = Date.now()) {
+    const usd = this.toUsd({ [currency]: value }, now);
+    return currency === "USD" || this._rates.has(currency) ? usd : null;
+  }
+
+  /**
    * Loads the rates unless they're fresh, a load is in flight or the wait
    * after a failure hasn't passed.
    */
