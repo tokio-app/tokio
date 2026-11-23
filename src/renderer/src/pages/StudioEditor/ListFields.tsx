@@ -24,12 +24,6 @@ const SOURCES = STUDIO_LIST_SOURCES.map((value) => ({
   label: `studio.list.sources.${value}` as const,
 }));
 
-// Each ranks its gifters in its own currency
-const PLATFORM_OPTIONS = PLATFORMS.map((value) => ({
-  value,
-  label: PLATFORM_LABELS[value],
-}));
-
 type List = StudioElementOf<"list">;
 
 type Props = {
@@ -68,7 +62,11 @@ export function ListFields({ element, onChange }: Props) {
         <Field label={t("studio.list.platform")}>
           <Select
             aria-label={t("studio.list.platform")}
-            options={PLATFORM_OPTIONS}
+            // The profile's, and one saved that it no longer uses. Each
+            // ranks its gifters in its own currency.
+            options={PLATFORMS.filter(
+              (p) => platforms.includes(p) || p === element.platform,
+            ).map((value) => ({ value, label: PLATFORM_LABELS[value] }))}
             value={element.platform}
             onChange={(platform) => onChange({ ...element, platform })}
           />

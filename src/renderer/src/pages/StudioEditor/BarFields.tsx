@@ -1,5 +1,6 @@
 import { StudioCounter, StudioElementOf } from "@/common/schemas";
 import { Check, Color, Field, NumberInput, Select, Slider } from "@/components";
+import { usePlatforms } from "@/context/platforms";
 import { useT } from "@/ui/i18n";
 import { GradientFields } from "./GradientFields";
 import { goalNumbers } from "./helper";
@@ -21,6 +22,7 @@ type Props = {
  */
 export function BarFields({ element, counters, onChange }: Props) {
   const t = useT();
+  const platforms = usePlatforms();
   const corners = t("studio.fields.rounding", {
     rounding: String(element.rounding),
   });
@@ -43,7 +45,7 @@ export function BarFields({ element, counters, onChange }: Props) {
       <Field label={t("studio.goal.number")}>
         {/* A counter since removed shows none, as a goal row does */}
         <Select
-          options={goalNumbers(counters)}
+          options={goalNumbers(counters, platforms, [element.number])}
           value={element.number}
           onChange={(number) => onChange({ ...element, number })}
         />

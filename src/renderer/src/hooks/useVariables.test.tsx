@@ -1,4 +1,5 @@
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
+import { PlatformsContext } from "@/context/platforms";
 import { settingsReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderHook } from "@testing-library/react";
@@ -42,5 +43,19 @@ describe("useVariables", () => {
     await send(APP_EVENTS_RESPONSE.GET_SETTINGS, reply("es"));
 
     expect(result.current).toEqual(list);
+  });
+
+  it("drops it on a profile without TikTok, whose chat isn't translated", async () => {
+    const { result } = renderHook(() => useVariables(list), {
+      wrapper: ({ children }) => (
+        <PlatformsContext value={["twitch", "kick"]}>
+          {children}
+        </PlatformsContext>
+      ),
+    });
+
+    await send(APP_EVENTS_RESPONSE.GET_SETTINGS, reply("es"));
+
+    expect(result.current).toEqual(["username", "comment"]);
   });
 });

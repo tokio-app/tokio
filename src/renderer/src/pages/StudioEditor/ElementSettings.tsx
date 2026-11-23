@@ -17,8 +17,8 @@ import { CustomGift, EMOTE_TRIGGER, TOKIO_EVENTS } from "@/common/types";
 import {
   mediaKind,
   reactsToEvents,
-  STUDIO_NUMBERS,
   studioEventVariables,
+  studioNumbersFor,
 } from "@/common/util";
 import {
   Btn,
@@ -184,7 +184,10 @@ export function ElementSettings({
   const eventVariables = useVariables(studioEventVariables(element, platforms));
   // A counter goes in any text, as the LIVE numbers do
   const liveVariables = [
-    ...new Set([...STUDIO_NUMBERS, ...counters.flatMap((c) => c.name || [])]),
+    ...new Set([
+      ...studioNumbersFor(platforms),
+      ...counters.flatMap((c) => c.name || []),
+    ]),
   ];
 
   let own: ReactNode = null;

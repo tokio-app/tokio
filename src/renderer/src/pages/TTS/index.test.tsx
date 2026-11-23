@@ -463,6 +463,27 @@ describe("TTS", () => {
     expect((await saved()).format.translate).toBe(true);
   });
 
+  it("offers no translations on a profile without TikTok, whose chat alone is translated", async () => {
+    await setup(
+      profileReply((p) => {
+        p.platforms = ["kick"];
+      }),
+    );
+    await send(
+      APP_EVENTS_RESPONSE.GET_SETTINGS,
+      settingsReply((s) => {
+        s.settings.translation.language = "es";
+      }),
+    );
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Read translations" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "{translation}" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("adds a clicked variable to the template", async () => {
     const { user } = await setup();
 

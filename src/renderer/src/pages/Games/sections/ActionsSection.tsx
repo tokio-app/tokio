@@ -254,6 +254,7 @@ function ActionItem({
       platforms,
     ),
     translation,
+    platforms,
   );
 
   useIpcListener(APP_EVENTS_RESPONSE.TEST_GAME_ACTION, (res) => {

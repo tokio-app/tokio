@@ -2010,7 +2010,8 @@ describe("StudioEditor", () => {
       "Shape, shows on Follow or Gift",
     );
 
-    // A goal watches a LIVE number, but the LIVE's length, or a counter
+    // A goal watches a LIVE number the profile's platforms fill, but the
+    // LIVE's length, or a counter
     await pick(user, "Trigger 2", "Gift", "Goal reached");
     await waitFor(() =>
       expect(savedElement()?.also_triggers).toEqual([
@@ -2021,6 +2022,8 @@ describe("StudioEditor", () => {
     await user.click(within(goal).getByText("{likes}"));
     expect(inList(goal, "{coins}")).not.toBeNull();
     expect(inList(goal, "{uptime}")).toBeNull();
+    expect(inList(goal, "{kicks}")).toBeNull();
+    expect(inList(goal, "{bits}")).toBeNull();
     await user.click(inList(goal, "{roses}")!);
     const value = within(goal).getByRole("spinbutton", { name: "Goal" });
     await user.clear(value);
@@ -4268,15 +4271,15 @@ describe("StudioEditor", () => {
       await send(
         APP_EVENTS_RESPONSE.GET_PROFILE,
         profileReply((p) => {
-          p.platforms = ["tiktok", "twitch"];
+          p.platforms = ["tiktok", "youtube"];
         }),
       );
       await user.click(field("Platform").getByText("TikTok"));
       const platform = page().getByRole("group", { name: "Platform" });
-      // Every platform ranks its gifters, each in its own currency
-      for (const name of ["TikTok", "Twitch", "YouTube", "Kick"]) {
-        expect(inList(platform, name)).toBeTruthy();
-      }
+      // The profile's platforms, each ranking in its own currency
+      expect(inList(platform, "TikTok")).toBeTruthy();
+      expect(inList(platform, "Twitch")).toBeNull();
+      expect(inList(platform, "Kick")).toBeNull();
       await user.click(inList(platform, "YouTube")!);
 
       await waitFor(() =>
@@ -4286,6 +4289,13 @@ describe("StudioEditor", () => {
       expect(drawn(list.id).querySelector(".studio-number")!.textContent).toBe(
         "$12.4K",
       );
+
+      // A profile without YouTube keeps it shown, to change
+      await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
+      await user.click(field("Platform").getByText("YouTube"));
+      const kept = page().getByRole("group", { name: "Platform" });
+      expect(inList(kept, "TikTok")).toBeTruthy();
+      expect(inList(kept, "Kick")).toBeNull();
     });
 
     it("lists another source, with its own rows and fields", async () => {

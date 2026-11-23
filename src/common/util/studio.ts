@@ -40,7 +40,7 @@ import {
   triggersOf,
 } from "./alerts";
 import { formatDuration, formatMoney, formatStat, NO_MONEY } from "./format";
-import { PLATFORM_CURRENCY } from "./platforms";
+import { giftCurrencies, PLATFORM_CURRENCY, triggersFor } from "./platforms";
 import { rowVariables } from "./rows";
 import { generateEmoteChatSample, generateTikTokEventSample } from "./samples";
 
@@ -58,6 +58,32 @@ export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
   "giftsubs",
   "uptime",
 ];
+
+/**
+ * The LIVE numbers a profile's platforms fill, as Home's tiles: likes and
+ * shares are TikTok's, each currency its platform's, viewers and uptime
+ * every platform's. The editor offers only these; a text keeps any it has.
+ */
+export function studioNumbersFor(
+  platforms: readonly Platform[],
+): (keyof StudioNumbers)[] {
+  const sent = triggersFor(platforms);
+  const currencies = giftCurrencies(platforms);
+  const fills: Record<keyof StudioNumbers, boolean> = {
+    likes: sent.includes(TOKIO_EVENTS.LIKE),
+    viewers: true,
+    followers: sent.includes(TOKIO_EVENTS.FOLLOW),
+    shares: sent.includes(TOKIO_EVENTS.SHARE),
+    coins: currencies.includes("coins"),
+    kicks: currencies.includes("kicks"),
+    bits: sent.includes(TOKIO_EVENTS.CHEER),
+    superchats: sent.includes(TOKIO_EVENTS.SUPER_CHAT),
+    gifts: sent.includes(TOKIO_EVENTS.GIFT),
+    giftsubs: sent.includes(TOKIO_EVENTS.GIFT_SUB),
+    uptime: true,
+  };
+  return STUDIO_NUMBERS.filter((name) => fills[name]);
+}
 
 // Made up, for the editor, which shows samples instead of the LIVE's
 export const SAMPLE_NUMBERS: StudioNumbers = {

@@ -30,6 +30,7 @@ import {
   sentPicture,
   SAMPLE_NUMBERS,
   studioEventVariables,
+  studioNumbersFor,
   studioView,
   StudioViewDeps,
   usesNumbers,
@@ -165,6 +166,34 @@ describe("usesNumbers and studioEventVariables", () => {
         trigger: triggerOf(TOKIO_EVENTS.LIKE),
       }),
     ).toEqual([]);
+  });
+});
+
+describe("studioNumbersFor", () => {
+  it.each([
+    [
+      ["tiktok"],
+      ["likes", "viewers", "followers", "shares", "coins", "gifts", "uptime"],
+    ],
+    [["twitch"], ["viewers", "followers", "bits", "giftsubs", "uptime"]],
+    [["youtube"], ["viewers", "superchats", "gifts", "giftsubs", "uptime"]],
+    [["kick"], ["viewers", "kicks", "gifts", "giftsubs", "uptime"]],
+  ] as const)("offers on %j only what it fills", (platforms, numbers) => {
+    expect(studioNumbersFor(platforms)).toEqual(numbers);
+  });
+
+  it("offers every number the platforms fill together, in their order", () => {
+    expect(studioNumbersFor(["kick", "tiktok"])).toEqual([
+      "likes",
+      "viewers",
+      "followers",
+      "shares",
+      "coins",
+      "kicks",
+      "gifts",
+      "giftsubs",
+      "uptime",
+    ]);
   });
 });
 

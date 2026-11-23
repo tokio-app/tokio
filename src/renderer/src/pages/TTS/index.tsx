@@ -30,7 +30,7 @@ export function TTS() {
   // The latest test's id: only its reply plays
   const pending = useRef<string | null>(null);
 
-  // For the permissions' note on platforms that don't say who follows
+  // The permissions' tabs, one per platform
   const [platforms, setPlatforms] = useState(defaultProfile.platforms);
   const { settings, update } = useEditableSettings("tts", (profile) => {
     setPlatforms(profile.platforms);
