@@ -1,4 +1,4 @@
-import { APP_EVENTS, APP_EVENTS_RESPONSE, Fan } from "@/common/types";
+import { APP_EVENTS, APP_EVENTS_RESPONSE, Fan, Platform } from "@/common/types";
 import { fan, profileReply } from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp, renderWithProviders } from "@test/render";
@@ -26,7 +26,7 @@ describe("Fans", () => {
   it("shows the header and a spinner until the fans come", () => {
     renderWithProviders(<Fans />);
 
-    expect(sent(APP_EVENTS.GET_FANS)).toEqual([undefined]);
+    expect(sent(APP_EVENTS.GET_PROFILE)).toEqual([undefined]);
     expect(screen.getByRole("heading", { name: "Fans" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Back to Tools" }),
@@ -142,18 +142,201 @@ describe("Fans", () => {
     expect(screen.getByText(/^No fans yet\./)).toBeInTheDocument();
   });
 
-  it("asks again when the profile changes", async () => {
+  it("asks for the fans with the profile, and again on each switch", async () => {
     renderWithProviders(<Fans />);
-    await fans([jules]);
+    expect(sent(APP_EVENTS.GET_FANS)).toHaveLength(0);
 
+    // Even a failed one, so the list never waits on the profile
     await send(APP_EVENTS_RESPONSE.GET_PROFILE, { success: false });
-    expect(sent(APP_EVENTS.GET_FANS)).toHaveLength(1);
+    expect(sent(APP_EVENTS.GET_FANS)).toEqual([undefined]);
+    await fans([jules]);
 
     await send(APP_EVENTS_RESPONSE.GET_PROFILE, profileReply());
     expect(sent(APP_EVENTS.GET_FANS)).toHaveLength(2);
 
     await fans([sofi]);
     expect(names()).toEqual(["Sofi Rose"]);
+  });
+
+  describe("platforms", () => {
+    const profile = (...platforms: Platform[]) =>
+      send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = platforms;
+        }),
+      );
+    const tabs = () =>
+      within(screen.getByRole("tablist", { name: "Platform" }))
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent);
+    const pick = (name: string) => screen.getByRole("tab", { name });
+    // Another platform's fan, as main records them
+    const sub = (name: string, platform: Platform, patch: Partial<Fan> = {}) =>
+      fan(name, 0, { platform, superfan: true, fanBadge: "", ...patch });
+
+    const ana = sub("Ana Twitch", "twitch", { months: 14, seenAt: 3 });
+    const leo = sub("Leo Twitch", "twitch", { seenAt: 5 });
+    const mia = sub("Mia Tube", "youtube", { months: 1, seenAt: 4 });
+    const max = sub("Max Kick", "kick", { seenAt: 1 });
+
+    it("has no tab row with one platform", async () => {
+      renderWithProviders(<Fans />);
+      await profile("twitch");
+      await fans([ana]);
+
+      expect(screen.queryByRole("tablist")).toBeNull();
+      expect(names()).toEqual(["Ana Twitch"]);
+      expect(
+        screen.queryByRole("checkbox", { name: "Super Fans only" }),
+      ).toBeNull();
+    });
+
+    it("has a tab for the profile's platforms and the fans', then All", async () => {
+      renderWithProviders(<Fans />);
+      await profile("kick", "tiktok");
+      await fans([jules, mia]);
+
+      expect(tabs()).toEqual(["TikTok", "YouTube", "Kick", "All"]);
+      expect(pick("TikTok")).toHaveAttribute("aria-selected", "true");
+      expect(names()).toEqual(["Jules Pixel"]);
+    });
+
+    it("keeps the picked tab while it's there", async () => {
+      const { user } = renderWithProviders(<Fans />);
+      await profile("tiktok");
+      await fans([jules, mia]);
+
+      await user.click(pick("YouTube"));
+      await fans([sofi, mia]);
+      expect(pick("YouTube")).toHaveAttribute("aria-selected", "true");
+      expect(names()).toEqual(["Mia Tube"]);
+
+      // YouTube's fan went, and its tab with them
+      await fans([sofi]);
+      expect(screen.queryByRole("tablist")).toBeNull();
+      expect(names()).toEqual(["Sofi Rose"]);
+    });
+
+    it("leads another platform's rows with their months, else what they are", async () => {
+      const { user } = renderWithProviders(<Fans />);
+      await profile("tiktok", "twitch", "youtube", "kick");
+      await fans([jules, ana, leo, mia, max]);
+
+      await user.click(pick("Twitch"));
+      // Main's order
+      expect(names()).toEqual(["Ana Twitch", "Leo Twitch"]);
+      expect(row("Ana Twitch").getByText("14")).toBeInTheDocument();
+      expect(row("Ana Twitch").getByText("14").parentElement).toHaveTextContent(
+        /^14 months$/,
+      );
+      expect(row("Leo Twitch").getByText("Subscriber")).toBeInTheDocument();
+      expect(row("Ana Twitch").getByText("@ana-twitch")).toBeInTheDocument();
+      // Every one is a subscriber, so the word stays TikTok's
+      expect(screen.queryByText("Super Fan")).toBeNull();
+      expect(rows()[0].querySelector("img")).toBeNull();
+
+      await user.click(pick("YouTube"));
+      expect(row("Mia Tube").getByText("1").parentElement).toHaveTextContent(
+        /^1 month$/,
+      );
+
+      await user.click(pick("Kick"));
+      expect(row("Max Kick").getByText("Subscriber")).toBeInTheDocument();
+    });
+
+    it("says YouTube's are members", async () => {
+      const { user } = renderWithProviders(<Fans />);
+      await profile("tiktok", "youtube");
+      await fans([{ ...mia, months: undefined }]);
+
+      await user.click(pick("YouTube"));
+      expect(row("Mia Tube").getByText("Member")).toBeInTheDocument();
+    });
+
+    it("lists everyone on All, the most recently seen first, with their platform", async () => {
+      const { user } = renderWithProviders(<Fans />);
+      await profile("tiktok", "twitch", "youtube", "kick");
+      await fans([{ ...jules, seenAt: 2, superfan: true }, ana, leo, mia, max]);
+
+      await user.click(pick("All"));
+
+      expect(names()).toEqual([
+        "Leo Twitch",
+        "Mia Tube",
+        "Ana Twitch",
+        "Jules Pixel",
+        "Max Kick",
+      ]);
+      expect(row("Jules Pixel").getByText("Level 32")).toBeInTheDocument();
+      expect(row("Jules Pixel").getByText("Super Fan")).toBeInTheDocument();
+      expect(row("Jules Pixel").getByTitle("TikTok")).toBeInTheDocument();
+      // The icon stands in for the badge
+      expect(rows()[3].querySelector("img")).toBeNull();
+      expect(row("Ana Twitch").getByTitle("Twitch")).toBeInTheDocument();
+      expect(row("Ana Twitch").getByText("14")).toBeInTheDocument();
+      expect(row("Mia Tube").getByTitle("YouTube")).toBeInTheDocument();
+      expect(row("Max Kick").getByTitle("Kick")).toBeInTheDocument();
+      expect(row("Max Kick").getByText("Subscriber")).toBeInTheDocument();
+    });
+
+    it("shows the Super Fans switch on TikTok's tab alone", async () => {
+      const { user } = renderWithProviders(<Fans />);
+      await profile("tiktok", "twitch");
+      await fans([{ ...jules, superfan: true }, sofi, ana]);
+      const only = () =>
+        screen.queryByRole("checkbox", { name: "Super Fans only" });
+
+      await user.click(only()!);
+      expect(names()).toEqual(["Jules Pixel"]);
+
+      await user.click(pick("Twitch"));
+      expect(only()).toBeNull();
+      expect(names()).toEqual(["Ana Twitch"]);
+
+      // All lists everyone, whatever TikTok's switch says
+      await user.click(pick("All"));
+      expect(only()).toBeNull();
+      expect(names()).toHaveLength(3);
+    });
+
+    it("says what fills each tab when it's empty", async () => {
+      const { user } = renderWithProviders(<Fans />);
+      await profile("tiktok", "twitch", "youtube", "kick");
+      await fans([]);
+
+      expect(screen.getByText(/^No fans yet\. Viewers/)).toBeInTheDocument();
+      await user.click(pick("Twitch"));
+      expect(screen.getByText(/^No subscribers yet\./)).toBeInTheDocument();
+      await user.click(pick("Kick"));
+      expect(screen.getByText(/^No subscribers yet\./)).toBeInTheDocument();
+      await user.click(pick("YouTube"));
+      expect(screen.getByText(/^No members yet\./)).toBeInTheDocument();
+      await user.click(pick("All"));
+      expect(
+        screen.getByText(/^No fans yet\. TikTok fans/),
+      ).toBeInTheDocument();
+    });
+
+    it("searches the tab shown", async () => {
+      const { user } = renderWithProviders(<Fans />);
+      await profile("tiktok", "twitch");
+      await fans([jules, ana, leo]);
+
+      await user.click(pick("Twitch"));
+      await user.click(screen.getByRole("button", { name: "Search" }));
+      const input = screen.getByPlaceholderText("Name or @handle");
+
+      await user.type(input, "leo");
+      expect(names()).toEqual(["Leo Twitch"]);
+
+      await user.clear(input);
+      await user.type(input, "jules");
+      expect(screen.getByText("No fans match “jules”.")).toBeInTheDocument();
+
+      await user.click(pick("All"));
+      expect(names()).toEqual(["Jules Pixel"]);
+    });
   });
 
   it("goes back to Tools", async () => {

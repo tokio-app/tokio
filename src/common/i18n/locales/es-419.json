@@ -640,6 +640,7 @@
   "fans.member": "Miembro",
   "fans.emptySubscribers": "Todavía no hay suscriptores. Aparecen aquí cuando escriben en el chat o se suscriben durante un LIVE.",
   "fans.emptyMembers": "Todavía no hay miembros. Aparecen aquí cuando escriben en el chat o se hacen miembros durante un LIVE.",
+  "fans.emptyAll": "Todavía no hay fans. Los fans de TikTok, los suscriptores y los miembros aparecen aquí cuando participan en un LIVE.",
   "fans.platform": "Plataforma",
   "fans.all": "Todas",
   "studio.title": "Overlay Studio",
