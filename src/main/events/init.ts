@@ -18,6 +18,7 @@ import {
   MINECRAFT_CONNECT_COMMANDS,
   MINECRAFT_EDITION_NAMES,
   Platform,
+  PLATFORMS,
   TOKIO_EVENTS,
   TokioEventMap,
   TokioPayload,
@@ -508,6 +509,8 @@ const registerConnectorEvents = ({
   // up says nothing: its connect or its reconnect already did.
   conn.onPlatform((platform, change) => {
     if (platform === "youtube" && change === "up") void rates.refresh();
+    // Gift stats lists the LIVE under it, even if it sends nothing
+    if (change === "up") history.join(platform);
     const params = { platform: PLATFORM_LABELS[platform] };
     // Apart from the session's own, which can come right after
     const options = { key: `${change}:${platform}` };
@@ -1101,7 +1104,14 @@ const registerHistory = ({
   win,
   notifier,
 }: AppHandlerVariables) => {
-  conn.on(TOKIO_EVENTS.CONNECTED, () => history.start(conn.username));
+  conn.on(TOKIO_EVENTS.CONNECTED, () => {
+    history.start(conn.username);
+    // The platform that started it; the others join through onPlatform
+    const status = conn.status();
+    for (const platform of PLATFORMS) {
+      if (status[platform] === "connected") history.join(platform);
+    }
+  });
   for (const type of HISTORY_EVENTS) {
     conn.on(type, (d) => history.record(type, d));
   }
@@ -1312,6 +1322,7 @@ const startApp = async (handler: AppHandlerVariables) => {
     wired.add(handler);
     liveService.setRates(ratesService);
     connectorService.setRates(ratesService);
+    historyService.setRates(ratesService);
     serverService.initEvents(connectorService, musicService);
     // One router: the phone remote and its API, and MCP
     const control = express.Router();

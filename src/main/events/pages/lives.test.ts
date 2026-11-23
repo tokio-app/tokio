@@ -17,7 +17,7 @@ const summary: LiveSummary = {
   coins: 10,
   kicks: 0,
   gifts: 2,
-  platforms: {},
+  platforms: { tiktok: { amount: 10, gifts: 2, giftSubs: 0 } },
 };
 const gifter = {
   userId: "42",
@@ -30,7 +30,16 @@ const gifter = {
   giftedAt: 2000,
 };
 const record: LiveRecord = { ...summary, gifters: [gifter], minutes: [] };
-const totals = { coins: 10, gifts: 2 };
+// Each platform's part goes as it is
+const totals = {
+  coins: 10,
+  kicks: 0,
+  gifts: 2,
+  platforms: {
+    tiktok: { amount: 10, gifts: 2, giftSubs: 0 },
+    twitch: { amount: 300, gifts: 0, giftSubs: 4 },
+  },
+};
 const history: LiveHistory = { lives: [summary], gifters: [gifter] };
 const empty: LiveHistory = { lives: [], gifters: [] };
 

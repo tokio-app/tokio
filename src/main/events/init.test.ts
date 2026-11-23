@@ -407,6 +407,8 @@ function setup() {
     ),
     load: vi.fn(async (_file: string) => true),
     start: vi.fn((_username: string) => {}),
+    join: vi.fn((..._args: Parameters<HistoryService["join"]>) => {}),
+    setRates: vi.fn((..._args: Parameters<HistoryService["setRates"]>) => {}),
     record: vi.fn((..._args: Parameters<HistoryService["record"]>) => {}),
     end: vi.fn(() => {}),
     top: vi.fn((): { live: TopGifter[]; allTime: TopGifter[] } => ({
@@ -2332,6 +2334,26 @@ describe("init events", () => {
       expect(s.historyService.start).toHaveBeenCalledExactlyOnceWith(
         "streamer",
       );
+    });
+
+    it("tells the history each platform in the LIVE, the first one and those that come up later", async () => {
+      const s = await live();
+      s.connectorService.status.mockReturnValue({
+        kick: "connected",
+        twitch: "connecting",
+      });
+
+      s.conn.emit(TOKIO_EVENTS.CONNECTED, undefined);
+      expect(s.historyService.join.mock.calls).toEqual([["kick"]]);
+      expect(s.historyService.start).toHaveBeenCalledBefore(
+        s.historyService.join,
+      );
+
+      const [changed] = s.connectorService.onPlatform.mock.calls[0];
+      changed("twitch", "up");
+      changed("youtube", "lost");
+      expect(s.historyService.join.mock.calls).toEqual([["kick"], ["twitch"]]);
+      expect(s.historyService.setRates).toHaveBeenCalledWith(s.ratesService);
     });
 
     it.each(HISTORY_EVENTS)("records %s", async (event) => {

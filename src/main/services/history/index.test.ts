@@ -2,6 +2,7 @@ import {
   GiftEvent,
   LiveRecord,
   LiveSummary,
+  SuperChatEvent,
   TOKIO_EVENTS,
   UserData,
 } from "@/common/types";
@@ -39,6 +40,22 @@ const kicker = (userId: string, handle = `fan${userId}`) => ({
   ...viewer(userId, handle),
   platform: "kick" as const,
 });
+
+const twitcher = (userId: string, handle = `fan${userId}`) => ({
+  ...viewer(userId, handle),
+  platform: "twitch" as const,
+});
+
+const tuber = (userId: string, handle = `fan${userId}`) => ({
+  ...viewer(userId, handle),
+  platform: "youtube" as const,
+});
+
+const superChat = (
+  user: UserData,
+  amount: string,
+  usd?: number | null,
+): SuperChatEvent => ({ user, amount, message: "", sticker: "", usd });
 
 const MINUTE = 60_000;
 
@@ -122,7 +139,7 @@ describe("HistoryService", () => {
           coins: 115,
           kicks: 0,
           gifts: 4,
-          platforms: {},
+          platforms: { tiktok: { amount: 115, gifts: 4, giftSubs: 0 } },
         },
       ],
       gifters: [
@@ -224,7 +241,7 @@ describe("HistoryService", () => {
       gifters: [],
     });
     expect((await read<LiveRecord>("0.json")).minutes).toEqual([
-      { minute: 0, gifters: { "": [0, 2] } },
+      { minute: 0, gifters: { "youtube:": [0, 2, 0] } },
     ]);
   });
 
@@ -247,7 +264,11 @@ describe("HistoryService", () => {
     expect((await read<LiveRecord>("0.json")).minutes).toEqual([
       {
         minute: 0,
-        gifters: { 1: [5, 1], "kick:1": [200, 2], "kick:": [10, 1] },
+        gifters: {
+          1: [5, 1, 0],
+          "kick:1": [200, 2, 0],
+          "kick:": [10, 1, 0],
+        },
       },
     ]);
   });
@@ -269,11 +290,14 @@ describe("HistoryService", () => {
       coins: 8,
       kicks: 110,
       gifts: 4,
-      platforms: {},
+      platforms: {
+        tiktok: { amount: 8, gifts: 2, giftSubs: 0 },
+        kick: { amount: 110, gifts: 2, giftSubs: 0 },
+      },
     });
   });
 
-  it("ranks and lists each currency's gifters on their own", async () => {
+  it("ranks and lists each platform's gifters on their own", async () => {
     const history = await loaded();
     history.start("kai", 0);
     gifts(
@@ -660,9 +684,9 @@ describe("HistoryService", () => {
     await history.save();
 
     expect((await read<LiveRecord>(`${start}.json`)).minutes).toEqual([
-      { minute: 0, gifters: { 1: [10, 2] } },
-      { minute: 1, gifters: { 2: [100, 1], "": [1, 1] } },
-      { minute: 2, gifters: { 1: [2, 1] } },
+      { minute: 0, gifters: { 1: [10, 2, 0] } },
+      { minute: 1, gifters: { 2: [100, 1, 0], "": [1, 1, 0] } },
+      { minute: 2, gifters: { 1: [2, 1, 0] } },
     ]);
     const { lives } = await read<{ lives: LiveSummary[] }>("index.json");
     expect(lives).toEqual([
@@ -673,7 +697,7 @@ describe("HistoryService", () => {
         coins: 113,
         kicks: 0,
         gifts: 5,
-        platforms: {},
+        platforms: { tiktok: { amount: 113, gifts: 5, giftSubs: 0 } },
       },
     ]);
   });
@@ -692,8 +716,8 @@ describe("HistoryService", () => {
     await saving;
 
     expect((await read<LiveRecord>("0.json")).minutes).toEqual([
-      { minute: 0, gifters: { 1: [5, 1] } },
-      { minute: 1, gifters: { 1: [5, 1] } },
+      { minute: 0, gifters: { 1: [5, 1, 0] } },
+      { minute: 1, gifters: { 1: [5, 1, 0] } },
     ]);
   });
 
@@ -720,7 +744,7 @@ describe("HistoryService", () => {
       coins: 111,
       kicks: 0,
       gifts: 4,
-      platforms: {},
+      platforms: { tiktok: { amount: 111, gifts: 4, giftSubs: 0 } },
     });
     expect(await history.getGifters(since)).toEqual([
       expect.objectContaining({ userId: "2", coins: 101, gifts: 2, rank: 1 }),
@@ -733,7 +757,7 @@ describe("HistoryService", () => {
       coins: 5,
       kicks: 0,
       gifts: 1,
-      platforms: {},
+      platforms: { tiktok: { amount: 5, gifts: 1, giftSubs: 0 } },
     });
     expect(await history.getGifters(until)).toEqual([
       expect.objectContaining({ userId: "1", coins: 5, rank: 1 }),
@@ -745,7 +769,7 @@ describe("HistoryService", () => {
       coins: 115,
       kicks: 0,
       gifts: 4,
-      platforms: {},
+      platforms: { tiktok: { amount: 115, gifts: 4, giftSubs: 0 } },
     });
 
     // Whole LIVEs come from the list, as do the dates of one LIVE
@@ -753,7 +777,7 @@ describe("HistoryService", () => {
       coins: 116,
       kicks: 0,
       gifts: 5,
-      platforms: {},
+      platforms: { tiktok: { amount: 116, gifts: 5, giftSubs: 0 } },
     });
     expect(
       await history.getGifters({ from: start, to: start + 120_000 }),
@@ -1184,6 +1208,367 @@ describe("HistoryService", () => {
     await loaded();
 
     expect(await readdir(dir)).toEqual(["b.cleared-123"]);
+  });
+
+  describe("each platform's money and gifted subs", () => {
+    // Rates that load when the test says, 20 pesos to the dollar
+    const rates = () => {
+      let loaded = false;
+      const listeners: (() => void)[] = [];
+      return {
+        toUsd: (amounts: Readonly<Record<string, number>>) =>
+          loaded ? (amounts.MXN ?? 0) / 20 + (amounts.USD ?? 0) : null,
+        onChange: (listener: () => void) => void listeners.push(listener),
+        load: () => {
+          loaded = true;
+          for (const listener of listeners) listener();
+        },
+      };
+    };
+
+    it("keeps each platform's part of the LIVE, one record per viewer on each", async () => {
+      const history = await loaded();
+      history.start("kai", 0);
+      history.join("tiktok");
+      // On the LIVE, though it sends nothing
+      history.join("youtube");
+      vi.setSystemTime(1);
+      history.record(TOKIO_EVENTS.CHEER, {
+        user: twitcher("twitch:1"),
+        bits: 100,
+        message: "",
+      });
+      history.record(TOKIO_EVENTS.GIFT_SUB, {
+        user: twitcher("twitch:1"),
+        count: 5,
+        tier: "1000",
+      });
+      history.record(TOKIO_EVENTS.GIFT_SUB, {
+        user: kicker("kick:2"),
+        count: 2,
+        tier: "",
+      });
+      gifts(history, [2, gift(kicker("kick:2"), 50)]);
+      history.end(10);
+      await history.save();
+
+      const [live] = history.getHistory().lives;
+      expect(live).toMatchObject({ coins: 0, kicks: 50, gifts: 1 });
+      expect(live.platforms).toEqual({
+        tiktok: { amount: 0, gifts: 0, giftSubs: 0 },
+        youtube: { amount: 0, gifts: 0, giftSubs: 0 },
+        twitch: { amount: 100, gifts: 0, giftSubs: 5 },
+        kick: { amount: 50, gifts: 1, giftSubs: 2 },
+      });
+      expect(history.getHistory().gifters).toEqual([
+        expect.objectContaining({
+          userId: "twitch:1",
+          coins: 100,
+          gifts: 0,
+          giftSubs: 5,
+          platform: "twitch",
+        }),
+        expect.objectContaining({
+          userId: "kick:2",
+          coins: 50,
+          gifts: 1,
+          giftSubs: 2,
+          platform: "kick",
+        }),
+      ]);
+      expect((await read<LiveRecord>("0.json")).minutes).toEqual([
+        {
+          minute: 0,
+          gifters: { "twitch:1": [100, 0, 5], "kick:2": [50, 1, 2] },
+        },
+      ]);
+    });
+
+    it("counts gifted subs without an id in the LIVE only, in their platform's", async () => {
+      const history = await loaded();
+      history.start("kai", 0);
+      vi.setSystemTime(1);
+      for (const user of [kicker(""), twitcher(""), tuber("")]) {
+        history.record(TOKIO_EVENTS.GIFT_SUB, { user, count: 3, tier: "" });
+      }
+      history.end(10);
+      await history.save();
+
+      expect(history.getHistory()).toMatchObject({
+        lives: [
+          {
+            platforms: {
+              kick: { giftSubs: 3 },
+              twitch: { giftSubs: 3 },
+              youtube: { giftSubs: 3 },
+            },
+          },
+        ],
+        gifters: [],
+      });
+      expect((await read<LiveRecord>("0.json")).minutes).toEqual([
+        {
+          minute: 0,
+          gifters: {
+            "kick:": [0, 0, 3],
+            "twitch:": [0, 0, 3],
+            "youtube:": [0, 0, 3],
+          },
+        },
+      ]);
+    });
+
+    it("counts a Super Chat's dollars, and a YouTube Gift on a record the viewer has", async () => {
+      const history = await loaded();
+      history.start("kai", 0);
+      const yui = tuber("youtube:UC1");
+      // No record yet: the LIVE only
+      gifts(history, [1, gift(yui, 0)]);
+      history.record(TOKIO_EVENTS.SUPER_CHAT, superChat(yui, "$5.00", 5));
+      gifts(history, [2, gift(yui, 0)]);
+      history.end(10);
+
+      expect(history.getHistory()).toMatchObject({
+        lives: [{ platforms: { youtube: { amount: 5, gifts: 2 } } }],
+        gifters: [{ userId: "youtube:UC1", coins: 5, gifts: 1 }],
+      });
+    });
+
+    it("counts a Super Chat that came before the rates once they load, in its minute", async () => {
+      const history = await loaded();
+      const r = rates();
+      history.setRates(r);
+      history.start("kai", 0);
+      const yui = tuber("youtube:UC1");
+      vi.setSystemTime(1000);
+      history.record(
+        TOKIO_EVENTS.SUPER_CHAT,
+        superChat(yui, "MX$100.00", null),
+      );
+      expect(history.topByPlatform()).toEqual({});
+
+      vi.setSystemTime(2 * MINUTE);
+      history.record(TOKIO_EVENTS.SUPER_CHAT, superChat(yui, "$1.00", 1));
+      r.load();
+      history.end(3 * MINUTE);
+      await history.save();
+
+      expect(history.getHistory()).toMatchObject({
+        lives: [{ platforms: { youtube: { amount: 6 } } }],
+        gifters: [{ userId: "youtube:UC1", coins: 6, giftedAt: 2 * MINUTE }],
+      });
+      expect((await read<LiveRecord>("0.json")).minutes).toEqual([
+        { minute: 0, gifters: { "youtube:UC1": [5, 0, 0] } },
+        { minute: 2, gifters: { "youtube:UC1": [1, 0, 0] } },
+      ]);
+    });
+
+    it("leaves out a Super Chat whose rates didn't load before the LIVE ended, and one it can't read", async () => {
+      const warn = vi.spyOn(Logger, "warn");
+      const history = await loaded();
+      const r = rates();
+      history.setRates(r);
+      history.start("kai", 0);
+      history.join("youtube");
+      const yui = tuber("youtube:UC1");
+      history.record(TOKIO_EVENTS.SUPER_CHAT, superChat(yui, "MX$100.00"));
+      history.record(TOKIO_EVENTS.SUPER_CHAT, superChat(yui, "100 bananas"));
+      history.record(TOKIO_EVENTS.SUPER_CHAT, superChat(yui, "100 bananas"));
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenLastCalledWith(
+        `<History> Couldn't read the Super Chat amount "100 bananas", left out of the LIVE's dollars`,
+        undefined,
+      );
+      history.end(10);
+      r.load();
+
+      expect(warn).toHaveBeenLastCalledWith(
+        "<History> Left 1 Super Chat(s) out of the LIVE's dollars, the exchange rates didn't load before it ended",
+        undefined,
+      );
+      expect(history.getHistory()).toMatchObject({
+        lives: [{ platforms: { youtube: { amount: 0 } } }],
+        gifters: [],
+      });
+    });
+
+    it("ranks each platform by its amount, then gifted subs, then the earliest", async () => {
+      const history = await loaded();
+      history.start("kai", 0);
+      const cheer = (user: UserData, bits: number) =>
+        history.record(TOKIO_EVENTS.CHEER, { user, bits, message: "" });
+      const subs = (user: UserData, count: number) =>
+        history.record(TOKIO_EVENTS.GIFT_SUB, { user, count, tier: "" });
+      vi.setSystemTime(1);
+      cheer(twitcher("twitch:a"), 100);
+      vi.setSystemTime(2);
+      cheer(twitcher("twitch:b"), 100);
+      subs(twitcher("twitch:b"), 1);
+      vi.setSystemTime(3);
+      subs(twitcher("twitch:c"), 10);
+      gifts(history, [4, gift(viewer("t"), 1)]);
+
+      const ids = (list: { userId: string }[] | undefined) =>
+        list?.map((g) => g.userId);
+      expect(ids(history.topByPlatform().twitch)).toEqual([
+        "twitch:b",
+        "twitch:a",
+        "twitch:c",
+      ]);
+      history.end(10);
+      expect(
+        (await history.getGifters({}))?.map((g) => [g.userId, g.rank]),
+      ).toEqual([
+        ["twitch:b", 1],
+        ["twitch:a", 2],
+        ["t", 1],
+        ["twitch:c", 3],
+      ]);
+      expect(
+        (await history.getGifters({ from: 1 }))?.map((g) => g.userId),
+      ).toEqual(["twitch:b", "twitch:a", "t", "twitch:c"]);
+    });
+
+    it(`keeps ${MAX_GIFTERS} of each platform's in all time`, async () => {
+      const history = await loaded();
+      history.start("kai", 0);
+      for (let i = 0; i < MAX_GIFTERS; i++)
+        gifts(history, [10, gift(viewer(String(i)), 5)]);
+      // Twitch's have their own cap
+      history.record(TOKIO_EVENTS.GIFT_SUB, {
+        user: twitcher("twitch:1"),
+        count: 1,
+        tier: "",
+      });
+      gifts(history, [1, gift(viewer("old"), 1)]);
+      history.end(100);
+
+      const ids = history.getHistory().gifters.map((g) => g.userId);
+      expect(ids).not.toContain("old");
+      expect(ids).toContain("twitch:1");
+    });
+
+    it("gives overlays TikTok's and Kick's gift gifters only, as before", async () => {
+      const history = await loaded();
+      history.start("kai", 0);
+      gifts(history, [1, gift(kicker("kick:1"), 5)], [2, gift(viewer("1"), 9)]);
+      history.record(TOKIO_EVENTS.CHEER, {
+        user: twitcher("twitch:1"),
+        bits: 500,
+        message: "",
+      });
+      history.record(TOKIO_EVENTS.GIFT_SUB, {
+        user: kicker("kick:2"),
+        count: 9,
+        tier: "",
+      });
+      history.record(
+        TOKIO_EVENTS.SUPER_CHAT,
+        superChat(tuber("youtube:1"), "$50.00", 50),
+      );
+
+      const ids = () => {
+        const { live, allTime } = history.top();
+        return [live, allTime].map((list) => list.map((g) => g.userId));
+      };
+      expect(ids()).toEqual([
+        ["1", "kick:1"],
+        ["1", "kick:1"],
+      ]);
+      history.end(10);
+      expect(ids()).toEqual([[], ["1", "kick:1"]]);
+      expect(Object.keys(history.topByPlatform())).toEqual([]);
+    });
+
+    it("reads an older LIVE as TikTok's, two-number minutes with no gifted subs", async () => {
+      await mkdir(join(dir, "a"), { recursive: true });
+      const live = {
+        username: "kai",
+        startedAt: 0,
+        endedAt: 2 * MINUTE,
+        coins: 7,
+        kicks: 0,
+        gifts: 2,
+      };
+      const gifter = {
+        userId: "1",
+        username: "ana",
+        handle: "ana",
+        picture: "",
+        coins: 7,
+        gifts: 2,
+        giftedAt: MINUTE,
+      };
+      await writeFile(
+        join(dir, "a", "index.json"),
+        JSON.stringify({ lives: [live], gifters: [gifter], newest: 0 }),
+      );
+      await writeFile(
+        join(dir, "a", "0.json"),
+        JSON.stringify({
+          ...live,
+          gifters: [gifter],
+          minutes: [
+            { minute: 0, gifters: { 1: [5, 1] } },
+            { minute: 1, gifters: { 1: [2, 1] } },
+          ],
+        }),
+      );
+
+      const history = await loaded();
+
+      expect((await history.getLive(0))?.minutes).toEqual([
+        { minute: 0, gifters: { 1: [5, 1, 0] } },
+        { minute: 1, gifters: { 1: [2, 1, 0] } },
+      ]);
+      expect(await history.getTotals({})).toMatchObject({
+        platforms: { tiktok: { amount: 7, gifts: 2, giftSubs: 0 } },
+      });
+      expect(await history.getTotals({ from: MINUTE })).toEqual({
+        coins: 2,
+        kicks: 0,
+        gifts: 1,
+        platforms: { tiktok: { amount: 2, gifts: 1, giftSubs: 0 } },
+      });
+      expect(await history.getGifters({ from: MINUTE })).toEqual([
+        expect.objectContaining({ userId: "1", coins: 2, giftSubs: 0 }),
+      ]);
+    });
+
+    it("keeps a platform a cut LIVE was on in the dates' totals, with zeros", async () => {
+      const history = await loaded();
+      history.start("kai", 0);
+      history.join("twitch");
+      gifts(history, [1000, gift(viewer("1"), 5)]);
+      history.end(2 * MINUTE);
+
+      expect((await history.getTotals({ from: MINUTE }))?.platforms).toEqual({
+        tiktok: { amount: 0, gifts: 0, giftSubs: 0 },
+        twitch: { amount: 0, gifts: 0, giftSubs: 0 },
+      });
+    });
+
+    it("subtracts a deleted LIVE's gifted subs from all time", async () => {
+      const history = await loaded();
+      const subs = (count: number) =>
+        history.record(TOKIO_EVENTS.GIFT_SUB, {
+          user: twitcher("twitch:1"),
+          count,
+          tier: "",
+        });
+      history.start("kai", 0);
+      subs(2);
+      history.end(10);
+      history.start("kai", 20);
+      subs(3);
+      history.end(30);
+      await history.deleteLive(0);
+      expect(history.getHistory().gifters).toEqual([
+        expect.objectContaining({ userId: "twitch:1", giftSubs: 3 }),
+      ]);
+      await history.deleteLive(20);
+      expect(history.getHistory().gifters).toEqual([]);
+    });
   });
 
   it("tells its listeners when the overlays' lists may change", async () => {

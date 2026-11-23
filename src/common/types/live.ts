@@ -135,22 +135,24 @@ export type LiveSummary = {
 export type GiftMinute = {
   // Counted from the minute the LIVE started in
   minute: number;
-  // What each gifter sent in it, by user id, in their platform's gift
-  // currency. Gifts without an id go under "", a Kick one's under "kick:".
-  gifters: Record<string, [coins: number, gifts: number]>;
+  // What each viewer sent in it, by user id: the amount in their platform's
+  // currency (PLATFORM_CURRENCY), gifts and gifted subs. What came without
+  // an id goes under its platform's: "" for TikTok, then "kick:", "twitch:"
+  // and "youtube:". Older files have two numbers, read as no gifted subs.
+  gifters: Record<string, [amount: number, gifts: number, giftSubs: number]>;
 };
 
-// A LIVE with every viewer who sent gifts in it, the most coins first, and
+// A LIVE with every viewer who sent gifts in it, the most first, and
 // the minutes its gifts came in, so dates that cut it take only those
 export type LiveRecord = LiveSummary & {
   gifters: Gifter[];
   minutes: GiftMinute[];
 };
 
-// A gifter found by a search, with their place among all of them (1, the
-// most coins)
+// A gifter found by a search, with their place among their platform's
+// gifters (1, the most)
 export type RankedGifter = Gifter & { rank: number };
 
-// For Coin stats: the finished LIVEs, newest first, and all time's top
+// For Gift stats: the finished LIVEs, newest first, and all time's top
 // gifters
 export type LiveHistory = { lives: LiveSummary[]; gifters: Gifter[] };

@@ -1,6 +1,7 @@
 import {
   GiftMinute,
   Gifter,
+  HistoryTotals,
   LiveHistory,
   LiveRecord,
   LiveSummary,
@@ -10,18 +11,20 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
   TopGifter,
+  UserData,
 } from "@/common/types";
 import {
   allInRange,
   DateRange,
   formatError,
   GIFT_CURRENCY,
-  GiftCurrency,
   inRange,
   isPlatform,
   platformOf,
+  platformParts,
   viewerMatcher,
 } from "@/common/util";
+import { parseAmount } from "@/helper/amount";
 import { isMissing, renameWithRetry } from "@/helper/fs";
 import { GiftStreaks } from "@/helper/streaks";
 import Logger from "@/logger";
@@ -29,22 +32,29 @@ import { access, mkdir, readdir, rm } from "node:fs/promises";
 import { join, parse } from "node:path";
 import { z } from "zod";
 import type { JSONManagerService } from "../json";
+import type { RatesService } from "../rates";
 import { Service } from "../shared";
 
-// The live events a LIVE's record counts: only gifts (the user's call)
-export const HISTORY_EVENTS = [TOKIO_EVENTS.GIFT] as const;
+// The live events a LIVE's record counts: what viewers spend, each
+// platform's in its own currency (PLATFORM_CURRENCY), and gifted subs
+export const HISTORY_EVENTS = [
+  TOKIO_EVENTS.GIFT,
+  TOKIO_EVENTS.CHEER,
+  TOKIO_EVENTS.SUPER_CHAT,
+  TOKIO_EVENTS.GIFT_SUB,
+] as const;
 
 export type HistoryEvent = (typeof HISTORY_EVENTS)[number];
 
 // A profile keeps this many LIVEs. Past it, the oldest go as deleting them
 // would, gifts included.
 export const MAX_LIVES = 1500;
-// All time keeps this many gifters of each gift currency, the fewest dropped
+// All time keeps this many gifters of each platform, the fewest dropped
 // first
 export const MAX_GIFTERS = 10_000;
 // Overlays get this many of each list
 export const TOP_GIFTERS = 10;
-// Gift stats gets this many of each currency's
+// Gift stats gets this many of each platform's
 const SHOWN_GIFTERS = 100;
 
 const GifterSchema: z.ZodType<Gifter> = z.object({
@@ -80,7 +90,11 @@ const LiveSummarySchema = z.object({
 
 const GiftMinuteSchema = z.object({
   minute: z.number(),
-  gifters: z.record(z.string(), z.tuple([z.number(), z.number()])),
+  // Entries saved before gifted subs counted have two numbers
+  gifters: z.record(
+    z.string(),
+    z.tuple([z.number(), z.number(), z.number().default(0)]),
+  ),
 }) satisfies z.ZodType<GiftMinute>;
 
 const LiveRecordSchema: z.ZodType<LiveRecord> = LiveSummarySchema.extend({
@@ -88,7 +102,7 @@ const LiveRecordSchema: z.ZodType<LiveRecord> = LiveSummarySchema.extend({
   minutes: z.array(GiftMinuteSchema).default([]),
 });
 
-// The LIVEs oldest first, and all time's gifters the most coins first
+// The LIVEs oldest first, and all time's gifters in byAmount order
 const IndexSchema = z.object({
   lives: z.array(LiveSummarySchema),
   gifters: z.array(GifterSchema),
@@ -109,32 +123,55 @@ type Recorders = {
   [K in HistoryEvent]: (live: LiveSummary, data: TokioEventMap[K]) => void;
 };
 
-// The most coins first, ties to whoever got there first
+// A Super Chat waiting for the rates, with when it came
+type Waiting = { user: UserData; currency: string; value: number; at: number };
+
+// The most first in their platform's currency, then the most gifted subs,
+// ties to whoever got there first. Only a platform's own compare, so a list
+// sorted by it keeps each platform's order.
+const byAmount = (a: Gifter, b: Gifter) =>
+  b.coins - a.coins || b.giftSubs - a.giftSubs || a.giftedAt - b.giftedAt;
+
+// Overlays' order, as before gifted subs counted
 const byCoins = (a: Gifter, b: Gifter) =>
   b.coins - a.coins || a.giftedAt - b.giftedAt;
 
-// A gifter's currency, never mixed with another's in a ranking
-const currencyOf = (gifter: Gifter) => GIFT_CURRENCY[platformOf(gifter)];
+// The gifters overlays get: TikTok's and Kick's who sent gifts with a price
+const overlaid = (gifter: Gifter) =>
+  gifter.coins > 0 && GIFT_CURRENCY[platformOf(gifter)] !== null;
 
-// A minute key's currency, from its id's platform prefix ("kick:..."). Bare
-// ids, "" included, are TikTok's.
-const keyCurrency = (key: string) => {
-  const at = key.indexOf(":");
-  const prefix = at === -1 ? "" : key.slice(0, at);
-  return GIFT_CURRENCY[isPlatform(prefix) ? prefix : "tiktok"];
+// A minute key's platform, from its id's prefix ("kick:..."). Bare ids, ""
+// included, are TikTok's.
+const keyPlatform = (key: string): Platform => {
+  const prefix = key.slice(0, Math.max(0, key.indexOf(":")));
+  return isPlatform(prefix) ? prefix : "tiktok";
 };
 
-// Counts each currency's gifters as it's called, giving the one's place
+const noPart = (): HistoryTotals => ({ amount: 0, gifts: 0, giftSubs: 0 });
+
+const addPart = (
+  parts: Partial<Record<Platform, HistoryTotals>>,
+  platform: Platform,
+  { amount, gifts, giftSubs }: HistoryTotals,
+) => {
+  const part = (parts[platform] ??= noPart());
+  part.amount += amount;
+  part.gifts += gifts;
+  part.giftSubs += giftSubs;
+};
+
+// Counts each platform's gifters as it's called, giving the one's place
 const placer = () => {
-  const places = new Map<GiftCurrency | null, number>();
+  const places = new Map<Platform, number>();
   return (gifter: Gifter) => {
-    const place = (places.get(currencyOf(gifter)) ?? 0) + 1;
-    places.set(currencyOf(gifter), place);
+    const platform = platformOf(gifter);
+    const place = (places.get(platform) ?? 0) + 1;
+    places.set(platform, place);
     return place;
   };
 };
 
-// The sorted gifters within their currency's first `count`, in their order
+// The sorted gifters within their platform's first `count`, in their order
 const topOfEach = (sorted: Gifter[], count: number) => {
   const place = placer();
   return sorted.filter((gifter) => place(gifter) <= count);
@@ -160,7 +197,7 @@ const giftersIn = (record: LiveRecord, range: DateRange): Gifter[] => {
   const known = new Map(record.gifters.map((g) => [g.userId, g]));
   const sent = new Map<string, Gifter>();
   for (const { at, gifters } of minutesIn(record, range)) {
-    for (const [userId, [coins, gifts]] of Object.entries(gifters)) {
+    for (const [userId, [coins, gifts, giftSubs]] of Object.entries(gifters)) {
       const gifter = known.get(userId);
       if (!gifter) continue;
       const past = sent.get(userId);
@@ -168,6 +205,7 @@ const giftersIn = (record: LiveRecord, range: DateRange): Gifter[] => {
         ...gifter,
         coins: (past?.coins ?? 0) + coins,
         gifts: (past?.gifts ?? 0) + gifts,
+        giftSubs: (past?.giftSubs ?? 0) + giftSubs,
         // Their last gift in them, to the minute
         giftedAt: at,
       });
@@ -191,15 +229,20 @@ export class HistoryService extends Service {
   private _loading = "";
   // Oldest first
   private _lives: LiveSummary[] = [];
-  // All time, by user id, kept in byCoins order
+  // All time, by user id, kept in byAmount order
   private _gifters = new Map<string, Gifter>();
-  // All time's top TOP_GIFTERS, so top() never sorts all of it
+  // All time's top TOP_GIFTERS for overlays, so top() never sorts all of it
   private _best: Gifter[] = [];
   private _live: LiveSummary | null = null;
   private _liveGifters = new Map<string, Gifter>();
   // The minutes the LIVE in progress's gifts came in, oldest first
   private _minutes: GiftMinute[] = [];
   private _streaks = new GiftStreaks();
+  private _rates: Pick<RatesService, "toUsd"> | null = null;
+  // This LIVE's Super Chats that came before the rates loaded
+  private _waiting: Waiting[] = [];
+  // Super Chat amounts that couldn't be read, logged once each
+  private _unread = new Set<string>();
   // Final records of LIVEs that ended, until their file is written
   private _ended: LiveRecord[] = [];
   // Files of LIVEs a delete or the cap dropped, until an index without them
@@ -216,39 +259,56 @@ export class HistoryService extends Service {
       const { added } = this._streaks.add(event);
       if (added <= 0) return;
       const { user, gift } = event;
-      // gift.coins is in the platform's currency: a Kick gift's are Kicks
-      const currency = GIFT_CURRENCY[platformOf(user)];
-      const amount = currency ? added * Math.max(0, gift.coins) : 0;
-      live.gifts += added;
-      if (currency) live[currency] += amount;
-      // A gift without a user id or a price counts in its minute's totals
-      // only, a Kick one under "kick:" so its Kicks stay Kicks
-      const gifter = amount > 0 ? user.userId : undefined;
-      const id = gifter || (platformOf(user) === "kick" ? "kick:" : "");
-      const { gifters } = this._minute(live);
-      const [sent, count] = gifters[id] ?? [0, 0];
-      gifters[id] = [sent + amount, count + added];
-      if (gifter) {
-        const last = this._liveGifters.get(gifter);
-        this._liveGifters.set(gifter, {
-          userId: gifter,
-          username: user.username,
-          handle: user.handle,
-          picture: user.profilePictures[0] || (last?.picture ?? ""),
-          coins: (last?.coins ?? 0) + amount,
-          gifts: (last?.gifts ?? 0) + added,
-          giftSubs: last?.giftSubs ?? 0,
-          giftedAt: Date.now(),
-          ...(user.platform && { platform: user.platform }),
-        });
+      // gift.coins is in the platform's currency: a Kick gift's are Kicks.
+      // YouTube's Gifts have no price.
+      const priced = GIFT_CURRENCY[platformOf(user)] !== null;
+      const amount = priced ? added * Math.max(0, gift.coins) : 0;
+      this._count(live, user, { amount, gifts: added, giftSubs: 0 });
+    },
+    [TOKIO_EVENTS.CHEER]: (live, { user, bits }) => {
+      this._count(live, user, { amount: bits, gifts: 0, giftSubs: 0 });
+    },
+    [TOKIO_EVENTS.GIFT_SUB]: (live, { user, count }) => {
+      this._count(live, user, { amount: 0, gifts: 0, giftSubs: count });
+    },
+    [TOKIO_EVENTS.SUPER_CHAT]: (live, { user, amount, usd }) => {
+      if (typeof usd === "number") {
+        this._count(live, user, { amount: usd, gifts: 0, giftSubs: 0 });
+        return;
       }
-      this._emit();
+      const parsed = parseAmount(amount);
+      if (!parsed) {
+        if (this._unread.has(amount)) return;
+        this._unread.add(amount);
+        Logger.warn(
+          `<History> Couldn't read the Super Chat amount ${JSON.stringify(amount)}, left out of the LIVE's dollars`,
+          this._logFile,
+        );
+        return;
+      }
+      // Counted when the rates load, unless the LIVE ends first
+      this._waiting.push({ ...parsed, user, at: Date.now() });
+      this._countWaiting();
     },
   };
 
   public initialize({ json, folder }: { json: Json; folder: string }) {
     this._json = json;
     this._folder = folder;
+  }
+
+  /**
+   * Sets what converts the Super Chats to dollars. The ones that came before
+   * the rates loaded count once they do.
+   */
+  public setRates(rates: Pick<RatesService, "toUsd" | "onChange">) {
+    this._rates = rates;
+    rates.onChange(() => this._countWaiting());
+  }
+
+  /** A platform joined the LIVE: it's kept in it even if it sends nothing. */
+  public join(platform: Platform) {
+    if (this._live) addPart(this._live.platforms, platform, noPart());
   }
 
   /**
@@ -267,6 +327,7 @@ export class HistoryService extends Service {
     this._liveGifters = new Map();
     this._minutes = [];
     this._streaks.clear();
+    this._waiting = [];
     this._ended = [];
     // Their LIVEs are still in the index on disk, which keeps the files
     this._dropped = [];
@@ -342,6 +403,7 @@ export class HistoryService extends Service {
     this._liveGifters = new Map();
     this._minutes = [];
     this._streaks.clear();
+    this._waiting = [];
     this._emit();
   }
 
@@ -354,6 +416,13 @@ export class HistoryService extends Service {
   public end(now = Date.now()) {
     const live = this._live;
     if (!live) return;
+    if (this._waiting.length) {
+      Logger.warn(
+        `<History> Left ${this._waiting.length} Super Chat(s) out of the LIVE's dollars, the exchange rates didn't load before it ended`,
+        this._logFile,
+      );
+      this._waiting = [];
+    }
     const record = this._record(live, now);
     this._ended.push(record);
     this._finish(record);
@@ -368,10 +437,14 @@ export class HistoryService extends Service {
     void this._cap();
   }
 
-  /** The top 10s overlays get, with both numbers on everyone. */
+  /**
+   * The top 10s overlays get, with both numbers on everyone: TikTok's and
+   * Kick's gifters of gifts with a price, as before other platforms counted.
+   */
   public top(): { live: TopGifter[]; allTime: TopGifter[] } {
-    const live = [...this._liveGifters.values()];
-    const past = this._best.filter((g) => !this._liveGifters.has(g.userId));
+    const live = [...this._liveGifters.values()].filter(overlaid);
+    const ids = new Set(live.map((g) => g.userId));
+    const past = this._best.filter((g) => !ids.has(g.userId));
     return {
       live: live
         .sort(byCoins)
@@ -387,10 +460,13 @@ export class HistoryService extends Service {
     };
   }
 
-  /** This LIVE's top gifters on each platform, for Home, Studio and MCP. */
+  /**
+   * This LIVE's top gifters on each platform, for Home, Studio and MCP. Every
+   * record has an amount or gifted subs.
+   */
   public topByPlatform(): Partial<Record<Platform, Gifter[]>> {
     const tops: Partial<Record<Platform, Gifter[]>> = {};
-    for (const gifter of [...this._liveGifters.values()].sort(byCoins)) {
+    for (const gifter of [...this._liveGifters.values()].sort(byAmount)) {
       // Missing means TikTok
       const top = (tops[gifter.platform ?? "tiktok"] ??= []);
       if (top.length < TOP_GIFTERS) top.push({ ...gifter });
@@ -399,8 +475,8 @@ export class HistoryService extends Service {
   }
 
   /**
-   * The finished LIVEs, newest first, and each currency's top gifters of all
-   * time, in one list in byCoins order.
+   * The finished LIVEs, newest first, and each platform's top gifters of all
+   * time, in one list in byAmount order.
    */
   public getHistory(): LiveHistory {
     return {
@@ -418,10 +494,11 @@ export class HistoryService extends Service {
   }
 
   /**
-   * The finished LIVEs' coins, Kicks and gifts in some dates: a LIVE all in
-   * them counts whole, and one they cut only its gifts in them, so only those
-   * take reading a file. Null when another profile loaded while they were
-   * read.
+   * The finished LIVEs' coins, Kicks, gifts and each platform's part in some
+   * dates: a LIVE all in them counts whole, and one they cut only its gifts
+   * in them, so only those take reading a file. Each platform a LIVE was on
+   * is there, with zeros when it sent nothing in them. Null when another
+   * profile loaded while they were read.
    */
   public async getTotals(
     range: DateRange,
@@ -434,7 +511,13 @@ export class HistoryService extends Service {
       { coins: 0, kicks: 0, gifts: 0, platforms: {} };
     if (dir === null) return totals;
     for (const live of this._lives.filter((l) => inRange(l, range))) {
-      if (allInRange(live, range)) {
+      const whole = allInRange(live, range);
+      const parts = platformParts(live);
+      for (const platform of PLATFORMS) {
+        const part = parts[platform];
+        if (part) addPart(totals.platforms, platform, whole ? part : noPart());
+      }
+      if (whole) {
         totals.coins += live.coins;
         totals.kicks += live.kicks;
         totals.gifts += live.gifts;
@@ -442,9 +525,13 @@ export class HistoryService extends Service {
       }
       const record = await this._readLive(dir, live.startedAt);
       for (const { gifters } of minutesIn(record, range)) {
-        for (const [key, [amount, gifts]] of Object.entries(gifters)) {
-          const currency = keyCurrency(key);
-          if (currency) totals[currency] += amount;
+        for (const [key, [amount, gifts, giftSubs]] of Object.entries(
+          gifters,
+        )) {
+          const platform = keyPlatform(key);
+          addPart(totals.platforms, platform, { amount, gifts, giftSubs });
+          if (platform === "tiktok") totals.coins += amount;
+          if (platform === "kick") totals.kicks += amount;
           totals.gifts += gifts;
         }
       }
@@ -453,9 +540,10 @@ export class HistoryService extends Service {
   }
 
   /**
-   * Each currency's top SHOWN_GIFTERS of the finished LIVEs in some dates,
-   * counting only the gifts in them of a LIVE they cut, each with their place
-   * among their currency's gifters, and with a query only the ones whose name
+   * Each platform's top SHOWN_GIFTERS of the finished LIVEs in some dates, in
+   * one list in byAmount order, counting only the gifts in them of a LIVE
+   * they cut, each with their place among their platform's gifters, and with
+   * a query only the ones whose name
    * or @handle has it. Every LIVE whole is all time's list; other dates are
    * added up from the LIVEs' files, leaving out a file that doesn't load. Null
    * when another profile loaded while they were read, or the signal aborted.
@@ -473,7 +561,7 @@ export class HistoryService extends Service {
     if (dir === null) return [];
     const range = { from, to };
     const lives = this._lives.filter((l) => inRange(l, range));
-    // Kept in byCoins order, and read from no file
+    // Kept in byAmount order, and read from no file
     let ranked = [...this._gifters.values()];
     if (
       lives.length < this._lives.length ||
@@ -497,10 +585,11 @@ export class HistoryService extends Service {
             picture: gifter.picture || (past?.picture ?? ""),
             coins: (past?.coins ?? 0) + gifter.coins,
             gifts: (past?.gifts ?? 0) + gifter.gifts,
+            giftSubs: (past?.giftSubs ?? 0) + gifter.giftSubs,
           });
         }
       }
-      ranked = [...gifters.values()].sort(byCoins);
+      ranked = [...gifters.values()].sort(byAmount);
     }
 
     const named = viewerMatcher(query);
@@ -650,7 +739,7 @@ export class HistoryService extends Service {
     return {
       ...live,
       endedAt: now,
-      gifters: [...this._liveGifters.values()].sort(byCoins),
+      gifters: [...this._liveGifters.values()].sort(byAmount),
       // The minute now still changes before the save writes it, the others
       // never do
       minutes: this._minutes.map((m, i, all) =>
@@ -659,15 +748,85 @@ export class HistoryService extends Service {
     };
   }
 
-  // The LIVE in progress's minute now, added when it's new
-  private _minute(live: LiveSummary): GiftMinute {
+  // The LIVE in progress's minute `at` is in, added when it's new
+  private _minute(live: LiveSummary, at: number): GiftMinute {
     const minute =
-      Math.floor(Date.now() / MINUTE) - Math.floor(live.startedAt / MINUTE);
+      Math.floor(at / MINUTE) - Math.floor(live.startedAt / MINUTE);
     const last = this._minutes.at(-1);
     if (last?.minute === minute) return last;
-    const next = { minute, gifters: {} };
-    this._minutes.push(next);
-    return next;
+    const i = this._minutes.findIndex((m) => m.minute >= minute);
+    if (i === -1) {
+      const next = { minute, gifters: {} };
+      this._minutes.push(next);
+      return next;
+    }
+    // An earlier one, for a Super Chat that waited for the rates: copied, as
+    // a save still writing may hold it
+    const found = this._minutes[i];
+    const same = found.minute === minute;
+    const copy = { minute, gifters: same ? { ...found.gifters } : {} };
+    this._minutes.splice(i, same ? 1 : 0, copy);
+    return copy;
+  }
+
+  // Counts what a viewer sent at `at` in the LIVE, its platform's part, its
+  // minute and their record
+  private _count(
+    live: LiveSummary,
+    user: UserData,
+    sent: HistoryTotals,
+    at = Date.now(),
+  ) {
+    const platform = platformOf(user);
+    addPart(live.platforms, platform, sent);
+    if (!sent.amount && !sent.gifts && !sent.giftSubs) return;
+    live.gifts += sent.gifts;
+    // As Tokio kept them before other platforms
+    if (platform === "tiktok") live.coins += sent.amount;
+    if (platform === "kick") live.kicks += sent.amount;
+    const last = user.userId ? this._liveGifters.get(user.userId) : undefined;
+    // A viewer gets a record with an amount or gifted subs. A gift without a
+    // price (YouTube's Gifts) adds only to one they have.
+    const gifter =
+      user.userId && (last || sent.amount > 0 || sent.giftSubs > 0)
+        ? user.userId
+        : "";
+    // Without one, in the platform's own: "" for TikTok, "kick:" for Kick
+    const id = gifter || (platform === "tiktok" ? "" : `${platform}:`);
+    const { gifters } = this._minute(live, at);
+    const [amount, gifts, giftSubs] = gifters[id] ?? [0, 0, 0];
+    gifters[id] = [
+      amount + sent.amount,
+      gifts + sent.gifts,
+      giftSubs + sent.giftSubs,
+    ];
+    if (gifter) {
+      this._liveGifters.set(gifter, {
+        userId: gifter,
+        username: user.username,
+        handle: user.handle,
+        picture: user.profilePictures[0] || (last?.picture ?? ""),
+        coins: (last?.coins ?? 0) + sent.amount,
+        gifts: (last?.gifts ?? 0) + sent.gifts,
+        giftSubs: (last?.giftSubs ?? 0) + sent.giftSubs,
+        giftedAt: Math.max(at, last?.giftedAt ?? at),
+        ...(user.platform && { platform: user.platform }),
+      });
+    }
+    this._emit();
+  }
+
+  // The Super Chats that waited, once the rates load
+  private _countWaiting() {
+    const live = this._live;
+    const rates = this._rates;
+    if (!live || !rates) return;
+    this._waiting = this._waiting.filter(({ user, currency, value, at }) => {
+      const usd = rates.toUsd({ [currency]: value });
+      if (usd === null) return true;
+      this._count(live, user, { amount: usd, gifts: 0, giftSubs: 0 }, at);
+      return false;
+    });
   }
 
   // Adds a finished LIVE to the list and its gifters to all time. Its
@@ -682,6 +841,7 @@ export class HistoryService extends Service {
         picture: gifter.picture || (past?.picture ?? ""),
         coins: (past?.coins ?? 0) + gifter.coins,
         gifts: (past?.gifts ?? 0) + gifter.gifts,
+        giftSubs: (past?.giftSubs ?? 0) + gifter.giftSubs,
       });
     }
   }
@@ -716,20 +876,28 @@ export class HistoryService extends Service {
         );
         return;
       }
-      for (const { userId, coins, gifts } of record.gifters) {
+      for (const { userId, coins, gifts, giftSubs } of record.gifters) {
         // Gone when the cap dropped them. Below this LIVE's numbers, the cap
         // dropped them and later gifts brought them back without it.
         // shortcut: one whose later gifts reach this LIVE's still loses this
         // LIVE's numbers from them, an undercount. Track when each all-time
         // entry began if that ever matters.
         const gifter = this._gifters.get(userId);
-        if (!gifter || gifter.coins < coins || gifter.gifts < gifts) continue;
+        if (
+          !gifter ||
+          gifter.coins < coins ||
+          gifter.gifts < gifts ||
+          gifter.giftSubs < giftSubs
+        )
+          continue;
         const left = {
           ...gifter,
           coins: gifter.coins - coins,
           gifts: gifter.gifts - gifts,
+          giftSubs: gifter.giftSubs - giftSubs,
         };
-        if (left.coins <= 0 && left.gifts <= 0) this._gifters.delete(userId);
+        if (left.coins <= 0 && left.gifts <= 0 && left.giftSubs <= 0)
+          this._gifters.delete(userId);
         else this._gifters.set(userId, left);
       }
     });
@@ -752,18 +920,24 @@ export class HistoryService extends Service {
     return this._drop(this._lives.slice(0, over).map((l) => l.startedAt));
   }
 
-  // Sorts all time and caps each currency's, after it changes
+  // Sorts all time and caps each platform's, after it changes
   private _rank() {
     let kept = [...this._gifters.values()];
-    // Past the cap, the fewest go first, then the oldest last gift
+    // Past the cap, the fewest go first, then the fewest gifted subs, then
+    // the oldest last gift
     if (kept.length > MAX_GIFTERS)
       kept = topOfEach(
-        kept.sort((a, b) => b.coins - a.coins || b.giftedAt - a.giftedAt),
+        kept.sort(
+          (a, b) =>
+            b.coins - a.coins ||
+            b.giftSubs - a.giftSubs ||
+            b.giftedAt - a.giftedAt,
+        ),
         MAX_GIFTERS,
       );
-    const sorted = kept.sort(byCoins);
+    const sorted = kept.sort(byAmount);
     this._gifters = new Map(sorted.map((g) => [g.userId, g]));
-    this._best = sorted.slice(0, TOP_GIFTERS);
+    this._best = sorted.filter(overlaid).sort(byCoins).slice(0, TOP_GIFTERS);
   }
 
   // `gifter` is their newest: this LIVE's when they sent gifts in it
