@@ -12,7 +12,6 @@ import {
   platformParts,
   viewerMatcher,
 } from "@/common/util";
-import { MAX_FANS } from "@/services/fans";
 import { z } from "zod";
 import { fail, invokeOk, ok } from "../common";
 import {
@@ -99,22 +98,24 @@ export const sections: Sections = {
 export const kinds: Kinds = {
   fans: defineKind({
     notes:
-      "The fans the active profile has seen in its LIVEs, the highest fan levels first, then the most recently seen. query matches the nickname or @handle. They can't be removed.",
+      "The fans the active profile has seen in its LIVEs, each with its platform: TikTok's fan club by fanLevel, highest first; Twitch's and Kick's subscribers and YouTube's channel members by months subscribed (missing when unknown), most first; then the most recently seen. Each platform's fans come together, in the order tiktok, twitch, youtube, kick. superfan is TikTok's Super Fan, and always true on the other platforms. query matches the nickname or @handle. They can't be removed.",
     list: ({ fansService }, { query, limit }) => {
-      const found = fansService
-        .list(MAX_FANS)
-        .filter(viewerMatcher(query ?? ""));
+      const found = fansService.all().filter(viewerMatcher(query ?? ""));
       return ok({
         total: found.length,
-        fans: found
-          .slice(0, limit)
-          .map(({ username, handle, fanLevel, superfan, seenAt }) => ({
-            nickname: username,
-            handle,
-            fanLevel,
-            superfan,
-            lastSeenAt: iso(seenAt),
-          })),
+        fans: found.slice(0, limit).map((fan) => {
+          const platform = platformOf(fan);
+          return {
+            nickname: fan.username,
+            handle: fan.handle,
+            platform,
+            ...(platform === "tiktok"
+              ? { fanLevel: fan.fanLevel }
+              : fan.months && { months: fan.months }),
+            superfan: fan.superfan,
+            lastSeenAt: iso(fan.seenAt),
+          };
+        }),
       });
     },
   }),

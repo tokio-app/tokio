@@ -1,5 +1,9 @@
 import { TimerSettingsSchema } from "@/common/schemas";
-import { APP_EVENTS_RESPONSE, type Gifter } from "@/common/types";
+import {
+  APP_EVENTS_RESPONSE,
+  type Gifter,
+  type Platform,
+} from "@/common/types";
 import lives from "@/events/pages/lives";
 import tools from "@/events/pages/tools";
 import { createHandler } from "@test/handler";
@@ -122,7 +126,7 @@ describe("tools MCP tools", () => {
     });
   });
 
-  it("lists the fans matching a search, without pictures", async () => {
+  it("lists every platform's fans matching a search, without pictures", async () => {
     const fan = (username: string, handle: string, fanLevel: number) => ({
       userId: handle,
       username,
@@ -132,23 +136,53 @@ describe("tools MCP tools", () => {
       superfan: false,
       seenAt: 0,
     });
+    const sub = (handle: string, platform: Platform, months?: number) => ({
+      ...fan(handle, handle, 0),
+      userId: `${platform}:${handle}`,
+      fanBadge: "",
+      superfan: true,
+      platform,
+      ...(months && { months }),
+    });
     const h = createHandler({
       fansService: {
-        list: () => [fan("Kai", "kai", 20), fan("Ana", "ana_b", 5)],
+        all: () => [
+          fan("Kai", "kai", 20),
+          fan("Ana", "ana_b", 5),
+          sub("ana_t", "twitch", 14),
+          sub("ana_y", "youtube"),
+        ],
       },
     });
     const { call } = await mcpClient(h.handler);
+    const seen = "1970-01-01T00:00:00.000Z";
 
     expect((await call("list", { kind: "fans", query: "@ana" })).value).toEqual(
       {
-        total: 1,
+        total: 3,
         fans: [
           {
             nickname: "Ana",
             handle: "ana_b",
+            platform: "tiktok",
             fanLevel: 5,
             superfan: false,
-            lastSeenAt: "1970-01-01T00:00:00.000Z",
+            lastSeenAt: seen,
+          },
+          {
+            nickname: "ana_t",
+            handle: "ana_t",
+            platform: "twitch",
+            months: 14,
+            superfan: true,
+            lastSeenAt: seen,
+          },
+          {
+            nickname: "ana_y",
+            handle: "ana_y",
+            platform: "youtube",
+            superfan: true,
+            lastSeenAt: seen,
           },
         ],
       },
