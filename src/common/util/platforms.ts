@@ -115,6 +115,25 @@ export const platformOf = (user?: Pick<UserData, "platform"> | null) =>
 export const platformsOf = (trigger: AlertTrigger): Platform[] =>
   PLATFORMS.filter((platform) => PLATFORM_TRIGGERS[platform].includes(trigger));
 
+// An id's platform, from its prefix ("twitch:25", "kick:"): the other
+// platforms namespace theirs, TikTok's are bare
+export const idPlatform = (id: string): Platform => {
+  const prefix = id.slice(0, Math.max(0, id.indexOf(":")));
+  return isPlatform(prefix) ? prefix : "tiktok";
+};
+
+/**
+ * The platforms a trigger row covers: its own, else the profile's that send
+ * its event. The emotes, roles and variables it offers follow them.
+ */
+export const rowPlatforms = (
+  row: { type: AlertTrigger; platform?: Platform },
+  profilePlatforms: readonly Platform[],
+): Platform[] =>
+  row.platform
+    ? [row.platform]
+    : platformsOf(row.type).filter((p) => profilePlatforms.includes(p));
+
 /**
  * The triggers any of the platforms sends, in ALERT_TRIGGERS' order, with
  * Music change, which comes from Tokio.

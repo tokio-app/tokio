@@ -19,7 +19,7 @@ import {
   formatError,
   GIFT_CURRENCY,
   inRange,
-  isPlatform,
+  idPlatform,
   platformOf,
   platformParts,
   viewerMatcher,
@@ -137,13 +137,6 @@ const byCoins = (a: Gifter, b: Gifter) =>
 // The gifters overlays get: TikTok's and Kick's who sent gifts with a price
 const overlaid = (gifter: Gifter) =>
   gifter.coins > 0 && GIFT_CURRENCY[platformOf(gifter)] !== null;
-
-// A minute key's platform, from its id's prefix ("kick:..."). Bare ids, ""
-// included, are TikTok's.
-const keyPlatform = (key: string): Platform => {
-  const prefix = key.slice(0, Math.max(0, key.indexOf(":")));
-  return isPlatform(prefix) ? prefix : "tiktok";
-};
 
 const noPart = (): HistoryTotals => ({ amount: 0, gifts: 0, giftSubs: 0 });
 
@@ -524,7 +517,8 @@ export class HistoryService extends Service {
         for (const [key, [amount, gifts, giftSubs]] of Object.entries(
           gifters,
         )) {
-          const platform = keyPlatform(key);
+          // Bare ids, "" included, are TikTok's
+          const platform = idPlatform(key);
           addPart(totals.platforms, platform, { amount, gifts, giftSubs });
           if (platform === "tiktok") totals.coins += amount;
           totals.gifts += gifts;

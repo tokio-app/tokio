@@ -79,6 +79,8 @@
   "roles.follower": "Followers",
   "roles.moderator": "Moderators",
   "roles.superfan": "Super Fans",
+  "roles.subscribers": "Subscribers",
+  "roles.members": "Members",
   "gifts.operator.any": "Any price",
   "gifts.operator.eq": "Exactly",
   "gifts.operator.gt": "More than",

@@ -32,7 +32,7 @@ import { SoundLength } from "../SoundPicker/SoundLength";
 import styles from "./alertitem.module.css";
 import { minUnit, type MinUnit } from "./MinimumField";
 
-export { MinimumField, minUnit, type MinUnit } from "./MinimumField";
+export { MinimumField, minUnit } from "./MinimumField";
 export { TriggerRows, type TriggerRow } from "./TriggerRows";
 export { TriggerSelect } from "./TriggerSelect";
 

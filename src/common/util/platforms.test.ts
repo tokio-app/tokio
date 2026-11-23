@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 import {
   GIFT_CURRENCY,
   giftCurrencies,
+  idPlatform,
   isPlatform,
   PLATFORM_TRIGGERS,
   platformOf,
   platformsOf,
+  rowPlatforms,
   triggersFor,
 } from "./platforms";
 
@@ -97,5 +99,37 @@ describe("platforms", () => {
     expect(isPlatform("twitch")).toBe(true);
     expect(isPlatform("myspace")).toBe(false);
     expect(isPlatform(undefined)).toBe(false);
+  });
+});
+
+describe("idPlatform", () => {
+  it("reads an id's platform from its prefix, a bare one as TikTok's", () => {
+    expect(idPlatform("twitch:25")).toBe("twitch");
+    expect(idPlatform("kick:")).toBe("kick");
+    expect(idPlatform("youtube:@mia")).toBe("youtube");
+    expect(idPlatform("7123")).toBe("tiktok");
+    expect(idPlatform("")).toBe("tiktok");
+    expect(idPlatform("rumble:1")).toBe("tiktok");
+  });
+});
+
+describe("rowPlatforms", () => {
+  it("covers a row's own platform, else the profile's that send its event", () => {
+    const row = (type: (typeof ALERT_TRIGGERS)[number], platform?: "kick") => ({
+      type,
+      ...(platform && { platform }),
+    });
+    expect(rowPlatforms(row(EMOTE_TRIGGER, "kick"), PLATFORMS)).toEqual([
+      "kick",
+    ]);
+    expect(rowPlatforms(row(EMOTE_TRIGGER), ["twitch", "kick"])).toEqual([
+      "twitch",
+      "kick",
+    ]);
+    // Twitch sends no gifts
+    expect(rowPlatforms(row(TOKIO_EVENTS.GIFT), ["tiktok", "twitch"])).toEqual([
+      "tiktok",
+    ]);
+    expect(rowPlatforms(row(TOKIO_EVENTS.MUSIC_CHANGE), PLATFORMS)).toEqual([]);
   });
 });
