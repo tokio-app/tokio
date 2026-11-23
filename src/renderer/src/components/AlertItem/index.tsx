@@ -11,7 +11,6 @@ import {
   alertName,
   formatAdded,
   getAlertOverlayURL,
-  giftCurrencies,
   giftNames,
   PLATFORM_LABELS,
   takesRoles,
@@ -31,7 +30,9 @@ import { MediaThumbnail } from "../MediaPicker";
 import { PlayButton, TestState, testProps } from "../PlayButton";
 import { SoundLength } from "../SoundPicker/SoundLength";
 import styles from "./alertitem.module.css";
+import { minUnit, type MinUnit } from "./MinimumField";
 
+export { MinimumField, minUnit, type MinUnit } from "./MinimumField";
 export { TriggerRows, type TriggerRow } from "./TriggerRows";
 export { TriggerSelect } from "./TriggerSelect";
 
@@ -54,30 +55,6 @@ export const ROLE_NAMES: Record<ViewerRole, MessageKey> = {
   moderator: "roles.moderator",
   superfan: "roles.superfan",
 };
-
-export type MinUnit = "coins" | "kicks" | "either" | "bits" | "usd" | "subs";
-
-/**
- * What a row's minimum (min_coins) is in: Bits for Bits, US dollars for
- * Super Chats, subs for gifted subs, and for a gift its platform's currency,
- * or for any platform the profile's, "either" with both. Null for other
- * events and gifts without a price (YouTube's), unless a gift minimum is
- * saved, so it stays to fix.
- */
-export function minUnit(
-  trigger: Trigger,
-  profilePlatforms: readonly Platform[],
-): MinUnit | null {
-  if (trigger.type === TOKIO_EVENTS.CHEER) return "bits";
-  if (trigger.type === TOKIO_EVENTS.SUPER_CHAT) return "usd";
-  if (trigger.type === TOKIO_EVENTS.GIFT_SUB) return "subs";
-  if (trigger.type !== TOKIO_EVENTS.GIFT) return null;
-  const currencies = giftCurrencies(
-    trigger.platform ? [trigger.platform] : profilePlatforms,
-  );
-  if (currencies.length > 1) return "either";
-  return currencies[0] ?? (trigger.min_coins > 0 ? "coins" : null);
-}
 
 const WORTH: Record<MinUnit, MessageKey> = {
   coins: "components.alertItem.worth",
@@ -285,7 +262,12 @@ function rowSummary(
       if (!pictured) {
         parts.push(
           trigger.gifts.length === 0
-            ? t("common.anyGift")
+            ? // A Kick row's gifts are Kicks
+              t(
+                trigger.platform === "kick"
+                  ? "components.alertItem.anyKick"
+                  : "common.anyGift",
+              )
             : // Gifts the lists don't have yet, until they load
               (pickedNames(trigger, gifts, emotes, language) ??
                 t("components.alertItem.someGifts")),

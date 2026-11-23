@@ -2056,6 +2056,38 @@ describe("StudioEditor", () => {
     ).toBeVisible();
   });
 
+  it("holds a reaction to a minimum in its event's unit, as an alert's", async () => {
+    const { user } = await open(
+      scene(
+        elementOf("shape", {
+          when: "event",
+          trigger: TriggerSchema.parse({ type: TOKIO_EVENTS.CHEER, gifts: [] }),
+          also_triggers: [
+            TriggerSchema.parse({ type: TOKIO_EVENTS.FOLLOW, gifts: [] }),
+          ],
+        }),
+      ),
+    );
+    await user.click(row(/^Rectangle/));
+
+    // Bits have one, in Bits; a follow none
+    const minimum = field("Worth at least");
+    expect(minimum.getByText("Bits")).toBeVisible();
+    expect(
+      page().getAllByRole("spinbutton", { name: "Worth at least" }),
+    ).toHaveLength(1);
+    const input = minimum.getByRole("spinbutton");
+    await user.clear(input);
+    await user.type(input, "100");
+
+    await waitFor(() =>
+      expect(savedElement()).toMatchObject({
+        trigger: { type: TOKIO_EVENTS.CHEER, min_coins: 100 },
+        also_triggers: [{ type: TOKIO_EVENTS.FOLLOW, min_coins: 0 }],
+      }),
+    );
+  });
+
   it("offers a viewer's extra rows only the events a viewer sends, and no goal", async () => {
     const { user } = await open(scene(elementOf("viewer")));
     await user.click(row(/^Viewer's picture/));

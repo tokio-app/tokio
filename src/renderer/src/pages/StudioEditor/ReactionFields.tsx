@@ -22,6 +22,7 @@ import { triggersOf } from "@/common/util";
 import {
   EmoteOption,
   Field,
+  MinimumField,
   NumberInput,
   RadioGroup,
   Select,
@@ -146,6 +147,8 @@ export function ReactionFields<R extends Reaction>({
   const row = (index: number, label: string): TriggerRow => {
     const trigger = rows[index];
     let filter: ReactNode;
+    // Under the row: its minimum, as an alert's has
+    let more: ReactNode;
     if (trigger.type === GOAL_TRIGGER) {
       filter = (
         <span className={styles.likes}>
@@ -201,6 +204,12 @@ export function ReactionFields<R extends Reaction>({
           onChange={(changed) => setRow(index, changed)}
         />
       );
+      more = (
+        <MinimumField
+          trigger={trigger}
+          onChange={(changed) => setRow(index, changed)}
+        />
+      );
     }
     const main = (
       <>
@@ -214,7 +223,7 @@ export function ReactionFields<R extends Reaction>({
         {filter}
       </>
     );
-    return { main };
+    return { main, more };
   };
 
   const triggerFields = (

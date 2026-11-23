@@ -576,8 +576,9 @@ describe("gift rows on each platform", () => {
     expect(sum({}, ["tiktok", "kick"])).toBe(
       "Any gift, when the streak ends, worth 100+ coins or Kicks",
     );
+    // A Kick row's gifts are Kicks
     expect(sum({ platform: "kick" }, ["tiktok", "kick"])).toBe(
-      "Any gift, when the streak ends, worth 100+ Kicks",
+      "Any Kick, when the streak ends, worth 100+ Kicks",
     );
   });
 

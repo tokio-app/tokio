@@ -26,11 +26,11 @@ paths:
 - Gift alerts fire once per combo, on `repeatEnd`, or with `every_gift` once per gift, at most `queue_length` times per event.
 - `GiftStreaks` (`src/main/helper/streaks.ts`, also used by `LiveService`, `GamesService` and the timer) counts what each gift event adds to its sender's streak. `AlertsService` runs it only while alerts are on, so alerts turned on mid-streak play the whole count so far.
 - Matching is `matchesTrigger` (`src/main/helper/triggers.ts`), shared with `GamesService`. Both get `added` and `total` from `streakOf` (same file), which counts the event in their `GiftStreaks` once; `total` is the `{count}`. `AlertsService` keeps `enabled` and the sound, message or media check.
-- `triggerName` (`src/common/util/alerts.ts`) names a row's event wherever one shows: the picker, summaries, the editor's title, Games' labels and `init.ts`'s notices. A Kick row's Gift is "Kicks"; a row for any platform keeps "Gift".
+- `triggerName` (`src/common/util/alerts.ts`) names a row's event wherever one shows: the picker, summaries, the editor's title, Games' labels and `init.ts`'s notices. A Kick row's Gift is "Kicks", and its summary says "Any Kick" (the user's call); a row for any platform keeps "Gift".
 - An alert plays on its `trigger` or any of its `also_triggers` (Or rows, `MAX_TRIGGERS` in all, kept apart from `trigger` so an older Tokio still plays on the first). `handle` takes the first row that matches (`triggersOf(alert).find`): it decides `every_gift`'s repeat and the `alerts:<type>` queue, and `onError` gets it, so a notice names the row that fired (an Emote row on a chat still says Emote).
 - A trigger's `platform` limits it to that platform's events (missing is any; `.claude/rules/platforms.md`). The Redeem trigger's `keyword` is the reward's title, matched in any case, empty for any reward. Its variables are `{reward}`, with `{comment}` for what the viewer typed.
 - Alerts and Games share `TriggerSchema`, `TriggerFilter` and `TRIGGER_OPTIONS`; Games leaves five out (`GAME_TRIGGERS`). Game actions keep one trigger.
-- Only the Alerts editor offers these; game actions keep the defaults, which match everything:
+- Only the Alerts editor offers these, and Overlay Studio's reaction rows the minimum too; game actions keep the defaults, which match everything:
   - `min_coins` is a row's minimum in its event's own unit (the user's call: each money event its own). The saved name stays, for older files and an older Tokio.
     - **Gift:** the streak's worth when it ends (`gift.coins × total`), or each gift's with `every_gift`, in the gift's own currency. It applies only to any gift: picked gifts are the alert's choice, so the matcher, the editor and the summary ignore it then.
     - **Bits:** the cheer's Bits.
@@ -40,7 +40,7 @@ paths:
   - The editor and the summary name the unit by the row (`minUnit`):
     - Coins on a TikTok row and Kicks on a Kick row, coins or Kicks on a row for any platform when the profile has both, and none on a YouTube gift row (its gifts have no price) unless a minimum is already saved.
     - Bits, US dollars ("worth $5+", without cents, since a minimum is whole) or gifted subs on those events' rows.
-  - Overlay Studio's rows have no minimum: the field is the Alerts editor's own, outside `TriggerRows`.
+  - `MinimumField` (`components/AlertItem`) draws it under a row, in the Alerts editor and Overlay Studio's reaction rows alike (the user's call).
   - `roles` (`[]` is anyone): only Chat, Emote and Gift carry the viewer's roles, so `takesRoles` (`src/common/util/alerts.ts`, shared by the matcher, the editor and the summary) allows only them. Other triggers' saved roles are ignored.
 - The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: `matchesTrigger` matches it on `CHAT`. TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`.
 - Keywords (`hasKeyword`, `src/main/helper/chat.ts`) match whole words (`wholeWord`), except next to scripts written without spaces (Chinese, Japanese, Thai); an emoji between words counts as a space.
