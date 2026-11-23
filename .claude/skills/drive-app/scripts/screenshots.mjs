@@ -139,7 +139,14 @@ const LIVES = [
 ].map(([days, minutes, hours, coins, gifts]) => {
   const startedAt = evening - days * DAY + minutes * 60_000;
   const endedAt = startedAt + hours * 3_600_000;
-  return { username: "tokio.demo", startedAt, endedAt, coins, kicks: 0, gifts };
+  return {
+    username: "tokio.demo",
+    startedAt,
+    endedAt,
+    coins,
+    gifts,
+    platforms: { tiktok: { amount: coins, gifts, giftSubs: 0 } },
+  };
 });
 const GIFTERS = [
   ["Leo", "leo_on_air", 9870, 412],
@@ -157,6 +164,7 @@ const GIFTERS = [
   picture: "",
   coins,
   gifts,
+  giftSubs: 0,
   giftedAt: evening - (i + 1) * DAY,
 }));
 // TikTok's own badge for the level's tier, as the connector gets it
@@ -1417,6 +1425,7 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     kicks: 0,
     bits: 0,
     superChats: 0,
+    giftSubs: 0,
   };
   // Each minute's highest viewer count: a climb, a peak of 412, then
   // settling toward the 342 watching now
@@ -1448,8 +1457,9 @@ export default async ({ app, page, home, push, toggle, lang = "en" }) => {
     username,
     handle,
     picture: "",
-    live: { coins, gifts },
-    allTime: { coins, gifts },
+    coins,
+    gifts,
+    giftSubs: 0,
     giftedAt: Date.now() - (i + 1) * 60_000,
   }));
   await push("app:home:res:gifters", { byPlatform: { tiktok: gifters } });

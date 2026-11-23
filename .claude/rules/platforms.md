@@ -81,10 +81,18 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - Every request sends a desktop Chrome user agent, `hl=en&gl=US` and the `SOCS` cookie. The mapping reads English text ("Sent 20 … gift memberships", "sent Vice City heart", "Member for 6 months") and amounts as en-US shows them ("$4.99", "MX$100.00"), and the cookie answers the EU consent page, which would otherwise come instead of the LIVE.
 - The first `get_live_chat` answer is the chat's recent history and is dropped whole: Gifts carry no timestamp, so a time filter would let old ones through.
 - The end shows first in `updated_metadata`: within 30 s its viewership renderer loses `isLive` (it doesn't turn false) and counts the video's views ("72,481 views", "Streamed live …"), while the chat keeps answering for minutes. A missing `isLive` ends the connection with `ended`, and its count is never sent as viewers; a chat answer without a continuation ends it too.
-- Gifts (`giftMessageViewModel`) carry no price and no channel id. They arrive as `GIFT` with `coins: 0` (`shortcut:` in `providers/youtube`), a sender id `youtube:@handle` and a gift id from the picture's file name. Everyone else's id is `youtube:<channel id>`, so one viewer has two ids.
-- Each platform's currency is named and counted on its own, never added to another or ranked against it (the user's call): TikTok's coins, Kick's Kicks, Twitch's Bits, YouTube's Super Chats in US dollars. `GIFT_CURRENCY` (`src/common/util/platforms.ts`) says what each platform's gifts cost in (`coins`, `kicks` or none), a `Record` so a new platform has to decide; `giftCurrencies(platforms)` gives the ones a profile pays in. A gift without a currency counts as a gift, never as an amount, and never makes its sender a gifter (the user's call: hide the zero, `.claude/rules/history.md`).
+- Gifts (`giftMessageViewModel`) carry no price and no channel id. They arrive as `GIFT` with `coins: 0` (`shortcut:` in `providers/youtube`) and a gift id from the picture's file name.
+  - Everyone else's id is `youtube:<channel id>`. The provider remembers each handle's channel id from this LIVE's other events (the chat history at connect included), and sends a Gift under `youtube:<channel id>` when it knows it.
+  - A handle it hasn't seen keeps `youtube:@handle`, with no lookup, since a Gift has no price and they come in bursts. That viewer then has two ids.
+- Each platform's currency is named and counted on its own, never added to another or ranked against it (the user's call): TikTok's coins, Kick's Kicks, Twitch's Bits, YouTube's Super Chats in US dollars.
+- **What names each currency:**
+  - `PLATFORM_CURRENCY` (`src/common/util/platforms.ts`) names each platform's money, which Home, Gift stats, history and MCP count it in: `coins`, `kicks`, `bits` or `usd`.
+  - `GIFT_CURRENCY` says what each platform's gifts cost in (`coins`, `kicks` or none), and `giftCurrencies(platforms)` gives the ones a profile pays in.
+  - Both are `Record`s, so a new platform has to decide.
+- A gift without a currency counts as a gift, never as an amount, and makes its sender a gifter only beside money or gifted subs (the user's call: hide the zero, `.claude/rules/history.md`).
+- A Kick row's gift event is named Kicks, as Twitch's cheers are Bits (`triggerName`, `.claude/rules/alerts.md`).
 - A gifted membership counts once, from its purchase announcement, with the count read from its text; each recipient's redemption is dropped.
-- Super Chat amounts stay as YouTube shows them (`amount`), and `LiveService` adds them up in US dollars (`.claude/rules/live-session.md`). The timer adds the same seconds per Super Chat whatever it cost, and Gift stats leave them out.
+- Super Chat amounts stay as YouTube shows them (`amount`), and `LiveService` adds them up in US dollars (`.claude/rules/live-session.md`). The timer adds the same seconds per Super Chat whatever it cost. `ConnectorService` gives each one its own `usd`, which history and alert minimums use.
 - Placeholder items (`liveChatPlaceholderItemRenderer`) are messages held from readers and never filled in: ignored.
 
 ## Kick
@@ -94,7 +102,10 @@ Every provider except TikTok's namespaces the ids it sends: `twitch:<id>` for `U
 - The feeds are `chatrooms.<chatroom>.v2` (chat, subs, hosts), `chatroom_<chatroom>` (gifted subs, reward redemptions), `channel.<channel>` (live and offline) and `channel_<channel>` (Kicks). Never `chatrooms.<chatroom>`: it repeats every host. A publication's `data` is a JSON string inside the JSON.
 - The token is refreshed at 80% of its life for the same client id. Closes coded 3500-3999 and 4500-4999 are terminal: wait 5 minutes, doubling up to 30, then come back as a new client id. Any other drop reconnects from 1 s, doubling up to 30 s, never giving up; a reconnect redoes the lookup, which is how it learns the stream ended while away.
 - It connects while the channel is offline (the chat is the channel's), like Twitch, and `StopStreamBroadcast` ends the connection only for a stream seen live. Viewers come from the lookup every 60 s while live.
-- Each Kick is its own `GIFT`, its id `kick:<gift slug>` (`rage_quit`) and its `amount` in `coins`, read as Kicks everywhere Tokio counts it. Subs, gifted subs, hosts and redemptions name the viewer only by username, so they have no `userId`. Chat has no pictures; a Kick's sender has one.
+- Each Kick is its own `GIFT`, its id `kick:<gift slug>` (`rage_quit`) and its `amount` in `coins`, read as Kicks everywhere Tokio counts it. Subs, hosts and redemptions name the viewer only by username, so they have no `userId`. Chat has no pictures; a Kick's sender has one.
+- A gifted subs event names its gifter only by username too, so the provider finds their id (`kick:<id>`) in this LIVE's chat and Kicks, by username in any case, else with one lookup of their channel by `slugOf` (lowercase, `_` as `-`; the raw username is a 404). The lookup's `user_id` is chat's `sender.id` (checked 2026-11-22).
+  - The answer is kept for the connection, failures included, each failure logged once per name. After a failed lookup the event goes out without an id.
+  - A lookup holds that event back by its round trip, so it can come after events that arrived behind it.
 - The feed is unofficial and changed from Pusher to Centrifugo in October 2026. An event Tokio can't read is dropped and logged once per name, never thrown out of the socket's listener.
 
 ## The window
