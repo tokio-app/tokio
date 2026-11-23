@@ -23,7 +23,10 @@ paths:
 
 - `AlertTriggerSchema` derives the triggers from `TOKIO_EVENTS` (a new event: the `live-event` skill). `ROOM_USER` is left out there and from `AlertTrigger`: it comes every few seconds and is meant for overlays.
 - Music change alerts fire once each time a song starts (`MusicService.onSongChange`), not for one that fails to start, is skipped while it loads, or was already playing when a request came. Overlays get every `MUSIC_CHANGE`, queue changes too (songs a lower queue length drops included), but `MusicQueue.clear` sends one only when the queue held songs, since it runs on every chat while music is off.
-- Gift alerts fire once per combo, on `repeatEnd`, or with `every_gift` once per gift, at most `queue_length` times per event.
+- Gift alerts fire once per combo, on `repeatEnd`, or with `every_gift` once per gift, at most `queue_length` times per event. Only TikTok's gifts come in combos: Kick's and YouTube's arrive one at a time (`comboCount` 1, `repeatEnd` true), so their rows have no **When it plays** choice, streak note or streak summary (`rowStreaks`, `src/common/util/rows.ts`).
+- **A row offers what its platforms send** (the user's call). `rowPlatforms` gives them: the row's own platform, else the profile's that send its event. Alerts, Overlay Studio and Games share the rows, so all three follow it:
+  - The emote picker lists the emotes of those platforms, told by their id's prefix (`idPlatform`), and keeps picked ones to clear.
+  - The variables are the event's minus the ones no such platform fills (`rowVariables`): Kick's and YouTube's gifts have no `{count}`, and Kick's subs no `{comment}`. Studio's texts are still filled with every variable; only the editor's offer follows the row.
 - `GiftStreaks` (`src/main/helper/streaks.ts`, also used by `LiveService`, `GamesService` and the timer) counts what each gift event adds to its sender's streak. `AlertsService` runs it only while alerts are on, so alerts turned on mid-streak play the whole count so far.
 - Matching is `matchesTrigger` (`src/main/helper/triggers.ts`), shared with `GamesService`. Both get `added` and `total` from `streakOf` (same file), which counts the event in their `GiftStreaks` once; `total` is the `{count}`. `AlertsService` keeps `enabled` and the sound, message or media check.
 - `triggerName` (`src/common/util/alerts.ts`) names a row's event wherever one shows: the picker, summaries, the editor's title, Games' labels and `init.ts`'s notices. A Kick row's Gift is "Kicks", and its summary says "Any Kick" (the user's call); a row for any platform keeps "Gift".
@@ -42,6 +45,9 @@ paths:
     - Bits, US dollars ("worth $5+", without cents, since a minimum is whole) or gifted subs on those events' rows.
   - `MinimumField` (`components/AlertItem`) draws it under a row, in the Alerts editor and Overlay Studio's reaction rows alike (the user's call).
   - `roles` (`[]` is anyone): only Chat, Emote and Gift carry the viewer's roles, so `takesRoles` (`src/common/util/alerts.ts`, shared by the matcher, the editor and the summary) allows only them. Other triggers' saved roles are ignored.
+    - The editor offers a row the roles its platforms' events say (`rowRoles`): TikTok's chat, emotes and gifts say all three; Twitch's, YouTube's and Kick's chat and emotes say Moderators and their subscribers or members, from badges, but never who follows; their gifts say none.
+    - A role saved earlier stays shown to clear, and the matcher is unchanged.
+    - `roleName` names the Super Fan role as the row's platforms call it: Subscribers on Twitch and Kick, Members on YouTube, and every term on a row for any platform ("Super Fans, subscribers, and members", the user's call).
 - The Emote trigger (`EMOTE_TRIGGER`) isn't a live event: `matchesTrigger` matches it on `CHAT`. TikTok can't list a LIVE's emotes, so `StoreManagerService.recordEmotes` saves the ones seen in chat to `Profile.emotes`.
 - Keywords (`hasKeyword`, `src/main/helper/chat.ts`) match whole words (`wholeWord`), except next to scripts written without spaces (Chinese, Japanese, Thai); an emoji between words counts as a space.
 
