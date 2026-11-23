@@ -7,7 +7,6 @@ import {
 import { createStack, replyFailure } from "@/helper/events";
 import { saveFailure } from "@/helper/feedback";
 import { t } from "@/helper/i18n";
-import { MAX_FANS } from "@/services/fans";
 import type { TimerService } from "@/services/timer";
 import { z } from "zod";
 
@@ -172,7 +171,7 @@ events.push(
 events.push(
   APP_EVENTS.GET_FANS,
   ({ fansService }, e) => {
-    e.reply(APP_EVENTS_RESPONSE.FANS, { data: fansService.list(MAX_FANS) });
+    e.reply(APP_EVENTS_RESPONSE.FANS, { data: fansService.all() });
   },
   { notify: false },
 );
