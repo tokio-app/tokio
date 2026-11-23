@@ -119,6 +119,31 @@ describe("Kick mapping", () => {
         superfan: true,
       });
     });
+
+    it("reads a subscriber's months off their badge's count", () => {
+      const months = (badges: object[]) => {
+        const mapped = fromPublication("App\\Events\\ChatMessageEvent", {
+          content: "hi",
+          sender: { ...sender(), identity: { badges } },
+        });
+        return mapped?.event === TOKIO_EVENTS.CHAT
+          ? mapped.data.user.subMonths
+          : "not chat";
+      };
+
+      // As kick.com's chat sent it on 2026-11-23
+      expect(
+        months([
+          { type: "subscriber", text: "Subscriber", count: 3, sort_order: 9 },
+        ]),
+      ).toBe(3);
+      expect(months([{ type: "vip" }, { type: "founder", count: 14 }])).toBe(
+        14,
+      );
+      expect(months([{ type: "subscriber" }])).toBeUndefined();
+      expect(months([{ type: "subscriber", count: 0 }])).toBeUndefined();
+      expect(months([{ type: "og", count: 5 }])).toBeUndefined();
+    });
   });
 
   it("maps a subscription by its name", () => {

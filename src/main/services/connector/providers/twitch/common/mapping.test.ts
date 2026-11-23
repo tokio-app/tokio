@@ -75,6 +75,22 @@ describe("toChat", () => {
     });
   });
 
+  it("reads a subscriber's months off their badge's info", () => {
+    const months = (badges: { set_id: string; info?: string }[]) =>
+      toChat(chat([text("hey")], { badges }), "1")?.user.subMonths;
+
+    expect(months([{ set_id: "subscriber", info: "16" }])).toBe(16);
+    expect(
+      months([
+        { set_id: "moderator", info: "" },
+        { set_id: "founder", info: "3" },
+      ]),
+    ).toBe(3);
+    expect(months([{ set_id: "subscriber", info: "" }])).toBeUndefined();
+    expect(months([{ set_id: "subscriber" }])).toBeUndefined();
+    expect(months([{ set_id: "moderator", info: "7" }])).toBeUndefined();
+  });
+
   it("leaves emotes and cheermotes out of the text, each emote at its place", () => {
     const event = chat([
       text("Hi "),

@@ -12,7 +12,8 @@ type Sender = {
   id: number;
   username: string;
   slug: string;
-  identity?: { badges?: { type: string }[] };
+  // A subscriber's or founder's count is their months subscribed
+  identity?: { badges?: { type: string; count?: number }[] };
 };
 
 type ChatMessage = { content: string; sender: Sender };
@@ -109,7 +110,11 @@ function toChat(e: ChatMessage): ChatEvent {
     content = "";
     emotes = emotes.map((emote) => ({ ...emote, index: 0 }));
   }
-  const badges = new Set((e.sender.identity?.badges ?? []).map((b) => b.type));
+  const list = e.sender.identity?.badges ?? [];
+  const badges = new Set(list.map((b) => b.type));
+  const months = Number(
+    list.find((b) => b.type === "subscriber" || b.type === "founder")?.count,
+  );
   return {
     user: {
       username: e.sender.username,
@@ -121,6 +126,7 @@ function toChat(e: ChatMessage): ChatEvent {
       // Music's host check reads it
       moderator: badges.has("broadcaster") || badges.has("moderator"),
       superfan: badges.has("subscriber") || badges.has("founder"),
+      ...(months > 0 && { subMonths: months }),
     },
     comment: { content, emotes, lang: "" },
   };

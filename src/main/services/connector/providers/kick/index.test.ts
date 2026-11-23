@@ -294,8 +294,49 @@ describe("KickConnector", () => {
       expect(lookups("new-gifter")).toBe(1);
       expect(lookups("gone")).toBe(1);
       expect(
-        warn.mock.calls.filter(([m]) => m.includes("sub gifter")),
+        warn.mock.calls.filter(([m]) => m.includes("id of a viewer")),
       ).toHaveLength(1);
+    });
+
+    it("sends a sub under the viewer's id, from chat or a lookup", async () => {
+      const onSub = capture(TOKIO_EVENTS.SUBSCRIBE);
+      kick.override = (url) => {
+        if (url.endsWith("/channels/new-sub")) {
+          return json(200, {
+            id: 80,
+            user_id: 81,
+            slug: "new-sub",
+            chatroom: { id: 82 },
+          });
+        }
+        return url.endsWith("/channels/gone") ? json(404, {}) : undefined;
+      };
+      await connector.connect("streamer");
+      const subscribed = (username: string) =>
+        publish("chatrooms.20.v2", "App\\Events\\SubscriptionEvent", {
+          username,
+          months: 4,
+        });
+
+      publish("chatrooms.20.v2", "App\\Events\\ChatMessageEvent", {
+        content: "hi",
+        sender: { id: 5, username: "Viewer", slug: "viewer" },
+      });
+      subscribed("Viewer");
+      await vi.waitFor(() => expect(onSub).toHaveBeenCalledTimes(1));
+      subscribed("New_Sub");
+      await vi.waitFor(() => expect(onSub).toHaveBeenCalledTimes(2));
+      subscribed("gone");
+      await vi.waitFor(() => expect(onSub).toHaveBeenCalledTimes(3));
+
+      expect(
+        onSub.mock.calls.map(([e]) => [e.user.username, e.user.userId]),
+      ).toEqual([
+        ["Viewer", "kick:5"],
+        ["New_Sub", "kick:81"],
+        ["gone", undefined],
+      ]);
+      expect(onSub.mock.calls[1][0].months).toBe(4);
     });
 
     it("drops an event whose shape changed and keeps reading", async () => {

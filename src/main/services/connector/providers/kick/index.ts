@@ -1,4 +1,4 @@
-import { GiftSubEvent, TOKIO_EVENTS } from "@/common/types";
+import { TOKIO_EVENTS } from "@/common/types";
 import { formatError } from "@/common/util";
 import Logger from "@/logger";
 import { randomUUID } from "node:crypto";
@@ -244,22 +244,31 @@ export class KickConnector extends ConnectorProvider {
     }
     if (mapped.event === TOKIO_EVENTS.CHAT) {
       this.emitChat(mapped.data, () => this._conn === conn);
-    } else if (mapped.event === TOKIO_EVENTS.GIFT_SUB) {
-      void this._giftSub(conn, mapped.data);
+    } else if (
+      mapped.event === TOKIO_EVENTS.GIFT_SUB ||
+      mapped.event === TOKIO_EVENTS.SUBSCRIBE
+    ) {
+      void this._withId(conn, mapped);
     } else {
       this.emit(mapped.event, mapped.data);
     }
   }
 
-  // Kick names a sub gifter by username alone: sent under their id, so the
-  // subs land on their record, or without one when it can't be found
-  private async _giftSub(conn: Connection, data: GiftSubEvent) {
-    const userId = await this._userId(conn, data.user.username);
+  // Kick names a sub gifter or a subscriber by username alone: sent under
+  // their id, so the subs land on their record, or without one when it can't
+  // be found
+  private async _withId(
+    conn: Connection,
+    mapped: Extract<
+      Mapped,
+      { event: TOKIO_EVENTS.GIFT_SUB | TOKIO_EVENTS.SUBSCRIBE }
+    >,
+  ) {
+    const { user } = mapped.data;
+    const userId = await this._userId(conn, user.username);
     if (this._conn !== conn) return;
-    this.emit(
-      TOKIO_EVENTS.GIFT_SUB,
-      userId ? { ...data, user: { ...data.user, userId } } : data,
-    );
+    if (userId) mapped.data.user = { ...user, userId };
+    this.emit(mapped.event, mapped.data);
   }
 
   // A username's id from this LIVE's chat and Kicks, else looked up once,
@@ -276,7 +285,7 @@ export class KickConnector extends ConnectorProvider {
             })
             .catch((err: unknown) => {
               Logger.warn(
-                `<Kick> Couldn't find the id of a sub gifter -- ${formatError(err)}`,
+                `<Kick> Couldn't find the id of a viewer -- ${formatError(err)}`,
                 this._logFile,
               );
               return undefined;
