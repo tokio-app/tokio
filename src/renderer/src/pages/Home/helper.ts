@@ -13,11 +13,12 @@ import {
   TOKIO_EVENTS,
 } from "@/common/types";
 import {
-  GIFT_CURRENCY,
+  Currency,
   giftCurrencies,
-  GiftCurrency,
+  PLATFORM_CURRENCY,
   triggersFor,
 } from "@/common/util";
+import { amountLabel } from "@/helper/gifts";
 import type { IconType } from "react-icons";
 import { FaTiktok, FaTwitch, FaYoutube } from "react-icons/fa";
 import { SiKick } from "react-icons/si";
@@ -112,6 +113,11 @@ function liveStats(
       label: "home.totals.gifts",
       value: values.gifts,
     },
+    // Twitch's, YouTube's gifted memberships and Kick's
+    sent.includes(TOKIO_EVENTS.GIFT_SUB) && {
+      label: "home.totals.giftSubs",
+      value: values.giftSubs,
+    },
     currencies.includes("coins") && {
       label: "home.totals.coins",
       value: values.coins,
@@ -165,7 +171,8 @@ export type LiveGifters =
 
 // What a tab shows. All adds up the LIVE's platforms; likes, total views and
 // shares are TikTok's alone, so they're the same on both. Top gifters show
-// only on the tab of a platform whose gifts have a price, in its currency.
+// on each platform's tab, in its currency, never on All, which would rank
+// one currency against another.
 export function liveView(
   tab: HomeTab,
   platforms: readonly Platform[],
@@ -179,14 +186,13 @@ export function liveView(
   viewers: number;
   minutes: number[];
   stats: Stat[];
-  gifters: { currency: GiftCurrency; list: Gifter[] } | null;
+  gifters: { currency: Currency; list: Gifter[] } | null;
 } {
   const { session, views, likes, gifters } = numbers;
   const all = tab === "all";
   const shown = all ? platforms : [tab];
   // Either has the totals and each minute's viewers
   const part = all ? session : (session.platforms[tab] ?? NO_SESSION);
-  const currency = all ? null : GIFT_CURRENCY[tab];
   return {
     viewers: all ? views.current : (views.platformViewers[tab] ?? 0),
     minutes: part.viewers,
@@ -196,11 +202,26 @@ export function liveView(
       { ...part.totals, likes, views: views.total },
       session.usd,
     ),
-    gifters:
-      currency && !all
-        ? { currency, list: gifters.byPlatform[tab] ?? [] }
-        : null,
+    gifters: all
+      ? null
+      : {
+          currency: PLATFORM_CURRENCY[tab],
+          list: gifters.byPlatform[tab] ?? [],
+        },
   };
+}
+
+// "500 Bits · 3 gifted subs": what a top gifter sent, only their subs when
+// they sent nothing else
+export function sentLabel(
+  { coins, giftSubs }: Pick<Gifter, "coins" | "giftSubs">,
+  currency: Currency,
+  language: string,
+): string {
+  const subs = translate(language, "gifts.giftSubs", { count: giftSubs });
+  if (giftSubs > 0 && coins === 0) return subs;
+  const amount = amountLabel(coins, currency, language);
+  return giftSubs > 0 ? `${amount} · ${subs}` : amount;
 }
 
 // The chart's points, x and y from 0 to 100 with y down, as the SVG's viewBox

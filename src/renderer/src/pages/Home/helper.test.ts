@@ -9,6 +9,7 @@ import {
   liveView,
   nearestIndex,
   overlaysStatus,
+  sentLabel,
   songParts,
 } from "./helper";
 
@@ -61,6 +62,8 @@ describe("liveView", () => {
       { label: "home.totals.followers", value: 0 },
       { label: "home.totals.shares", value: 0 },
       { label: "home.totals.gifts", value: 5 },
+      // Kick sends gifted subs
+      { label: "home.totals.giftSubs", value: 0 },
       { label: "home.totals.coins", value: 20 },
       { label: "home.totals.kicks", value: 30 },
     ]);
@@ -72,6 +75,7 @@ describe("liveView", () => {
       minutes: [20],
       stats: [
         { label: "home.totals.gifts", value: 3 },
+        { label: "home.totals.giftSubs", value: 0 },
         { label: "home.totals.kicks", value: 30 },
       ],
       gifters: { currency: "kicks", list: [kai] },
@@ -82,16 +86,41 @@ describe("liveView", () => {
     });
   });
 
-  it("gives a platform with nothing yet zeros, and no gifters without a price", () => {
+  it("gives a platform with nothing yet zeros, and its gifters in dollars", () => {
     expect(liveView("youtube", ["youtube", "kick"], numbers)).toEqual({
       viewers: 0,
       minutes: [],
       stats: [
         { label: "home.totals.gifts", value: 0 },
+        { label: "home.totals.giftSubs", value: 0 },
         { label: "home.totals.superChats", value: 0, money: true },
       ],
-      gifters: null,
+      gifters: { currency: "usd", list: [] },
     });
+  });
+
+  it("counts Twitch's gifted subs, with its top gifters in Bits", () => {
+    const yui = gifter("Yui", 500, 0, { platform: "twitch", giftSubs: 3 });
+    const view = liveView("twitch", ["tiktok", "twitch"], {
+      ...numbers,
+      session: liveSession({
+        totals: liveTotals({ bits: 500, giftSubs: 3 }),
+        platforms: {
+          twitch: {
+            totals: liveTotals({ bits: 500, giftSubs: 3 }),
+            viewers: [],
+          },
+        },
+      }),
+      gifters: { byPlatform: { twitch: [yui] } },
+    });
+
+    expect(view.stats).toEqual([
+      { label: "home.totals.followers", value: 0 },
+      { label: "home.totals.giftSubs", value: 3 },
+      { label: "home.totals.bits", value: 500 },
+    ]);
+    expect(view.gifters).toEqual({ currency: "bits", list: [yui] });
   });
 
   it("shows Twitch's Bits and YouTube's Super Chats in dollars, null until the rates load", () => {
@@ -109,14 +138,16 @@ describe("liveView", () => {
     expect(labels(view("all"))).toEqual([
       "home.totals.followers",
       "home.totals.gifts",
+      "home.totals.giftSubs",
       "home.totals.bits",
       "home.totals.superChats",
     ]);
     expect(view("twitch").stats).toEqual([
       { label: "home.totals.followers", value: 0 },
+      { label: "home.totals.giftSubs", value: 0 },
       { label: "home.totals.bits", value: 250 },
     ]);
-    expect(view("twitch").gifters).toBeNull();
+    expect(view("twitch").gifters).toEqual({ currency: "bits", list: [] });
     expect(view("youtube").stats).toContainEqual({
       label: "home.totals.superChats",
       value: null,
@@ -139,7 +170,24 @@ describe("liveView", () => {
       { label: "home.totals.bits", value: 3 },
       { label: "home.totals.superChats", value: 4.5, money: true },
     ]);
-    expect(view.stats).toHaveLength(9);
+    expect(view.stats).toHaveLength(10);
+  });
+});
+
+describe("sentLabel", () => {
+  it("writes what a gifter sent in their currency, with their gifted subs", () => {
+    const sent = (
+      coins: number,
+      giftSubs: number,
+      currency = "bits" as const,
+    ) => sentLabel({ coins, giftSubs }, currency, "en");
+
+    expect(sent(2500, 0)).toBe("2,500 Bits");
+    expect(sent(2500, 3)).toBe("2,500 Bits · 3 gifted subs");
+    // Only the subs when they sent nothing else
+    expect(sent(0, 1)).toBe("1 gifted sub");
+    expect(sent(0, 0)).toBe("0 Bits");
+    expect(sentLabel({ coins: 57.4, giftSubs: 0 }, "usd", "en")).toBe("$57.40");
   });
 });
 

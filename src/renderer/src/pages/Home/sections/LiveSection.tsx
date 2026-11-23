@@ -1,9 +1,8 @@
 import { LiveSession, Platform } from "@/common/types";
 import { Avatar, Section } from "@/components";
-import { amountLabel } from "@/helper/gifts";
 import { useLanguage, useT } from "@/ui/i18n";
 import styles from "../home.module.css";
-import { LiveGifters, liveView, HomeTab, Views } from "../helper";
+import { LiveGifters, liveView, HomeTab, sentLabel, Views } from "../helper";
 import { StatValue } from "./StatValue";
 import { ViewersChart } from "./ViewersChart";
 
@@ -89,7 +88,7 @@ export function LiveSection({ tab, platforms, ...numbers }: Props) {
                         {name}
                       </span>
                       <span className={styles.gifter_coins}>
-                        {amountLabel(gifter.coins, gifters.currency, language)}
+                        {sentLabel(gifter, gifters.currency, language)}
                       </span>
                     </span>
                   </li>

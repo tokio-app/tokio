@@ -278,21 +278,21 @@ describe("Home's platforms", () => {
     [
       ["tiktok"],
       ["Likes", "Total views", "Shares", "Gifts", "Coins"],
-      ["Kicks", "Bits", "Super Chats"],
+      ["Gifted subs", "Kicks", "Bits", "Super Chats"],
     ],
     [
       ["twitch"],
-      ["Bits"],
+      ["Gifted subs", "Bits"],
       ["Likes", "Total views", "Shares", "Gifts", "Coins", "Super Chats"],
     ],
     [
       ["youtube"],
-      ["Gifts", "Super Chats"],
+      ["Gifts", "Gifted subs", "Super Chats"],
       ["New followers", "Likes", "Total views", "Shares", "Coins", "Bits"],
     ],
     [
       ["kick"],
-      ["Gifts", "Kicks"],
+      ["Gifts", "Gifted subs", "Kicks"],
       ["New followers", "Likes", "Total views", "Shares", "Coins", "Bits"],
     ],
   ] as [Platform[], string[], string[]][])(
@@ -309,10 +309,8 @@ describe("Home's platforms", () => {
       );
       for (const label of shown) expect(stat(label)).toBeInTheDocument();
       for (const label of hidden) expect(stat(label)).not.toBeInTheDocument();
-      // Top gifters come with a gift currency
-      expect(page().queryByText("Top gifters") !== null).toBe(
-        shown.includes("Coins") || shown.includes("Kicks"),
-      );
+      // Every platform's tab ranks its gifters in its currency
+      expect(page().getByText("Top gifters")).toBeVisible();
     },
   );
 
@@ -437,10 +435,36 @@ describe("Home's platforms", () => {
     expect(value("Super Chats")).toHaveTextContent("$1.23K");
     expect(value("Super Chats")).toHaveAttribute("title", "$1,234.50");
 
+    // Each tab's top gifters in its currency, with their gifted subs
+    await send(APP_EVENTS_RESPONSE.LIVE_GIFTERS, {
+      byPlatform: {
+        twitch: [
+          gifter("Di", 1500, 0, { platform: "twitch", giftSubs: 2 }),
+          gifter("Bo", 0, 0, { platform: "twitch", giftSubs: 5 }),
+        ],
+        youtube: [gifter("Yui", 57.4, 0, { platform: "youtube" })],
+      },
+    });
+    const gifters = () =>
+      within(page().getByRole("list", { name: "Top gifters" }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent);
+
+    await user.click(tab("Twitch"));
+    expect(value("Gifted subs")).toHaveTextContent("0");
+    expect(gifters()).toEqual([
+      "1DDi1,500 Bits · 2 gifted subs",
+      // Subs alone
+      "2BBo5 gifted subs",
+    ]);
+
     await user.click(tab("YouTube"));
     expect(value("Super Chats")).toHaveTextContent("$1.23K");
     expect(stat("Bits")).toBeNull();
-    // No price, so no top gifters
+    expect(gifters()).toEqual(["1YYui$57.40"]);
+
+    // None on All, which would rank one currency against another
+    await user.click(tab("All"));
     expect(page().queryByText("Top gifters")).toBeNull();
   });
 
