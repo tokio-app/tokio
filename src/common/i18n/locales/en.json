@@ -500,7 +500,7 @@
   "about.packages.repository": "Repository",
   "about.services.title": "Online services",
   "about.services.description": "Tokio talks to these services. They aren't covered by Tokio's license or the licenses above: each one is subject to its operator's terms and can stop working at any time.",
-  "about.services.disclaimer": "Tokio is not affiliated with, endorsed by, or associated with TikTok, ByteDance Ltd. or Twitch Interactive, Inc.",
+  "about.services.disclaimer": "Tokio is not affiliated with, endorsed by, or associated with TikTok, ByteDance Ltd., Twitch Interactive, Inc., YouTube, Google or Kick.",
   "tools.test.title": "Test overlays",
   "tools.test.description": "Send test events to an overlay you're building.",
   "tools.test.name": "Overlay name",
