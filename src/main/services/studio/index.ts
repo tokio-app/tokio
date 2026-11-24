@@ -107,8 +107,8 @@ const likesOf = (payload: TokioEventMap[AppEvents]) =>
     ? Math.max(0, payload.likeCount)
     : null;
 
-// The sources main keeps for lists: top gifters come from the history
-type Kept = Exclude<StudioListSource, "gifters">;
+// The sources main keeps for lists: the tops come from the history
+type Kept = Exclude<StudioListSource, "gifters" | "giftsubs">;
 
 const noLists = (): Record<Kept, StudioListEntry[]> => ({
   followers: [],

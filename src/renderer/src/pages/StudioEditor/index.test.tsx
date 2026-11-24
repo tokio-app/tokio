@@ -4398,6 +4398,50 @@ describe("StudioEditor", () => {
       expect(inList(kept, "Kick")).toBeNull();
     });
 
+    it("tops Twitch's Bits and its gifted subs as two sources", async () => {
+      const list = elementOf("list");
+      const { user } = await open(holding(list));
+      await send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = ["twitch"];
+        }),
+      );
+      await user.click(row(/^Top gifters/));
+
+      // The saved TikTok top stays to change, named by its money
+      await user.click(field("Shows").getByText("Top gifters this LIVE"));
+      const shows = page().getByRole("group", { name: "Shows" });
+      expect(inList(shows, "New followers")).toBeTruthy();
+      expect(inList(shows, "Latest gifts")).toBeNull();
+      await user.click(inList(shows, "Top gifted subs this LIVE")!);
+
+      // TikTok gifts no subs: the list moves to Twitch's
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          source: "giftsubs",
+          platform: "twitch",
+        }),
+      );
+      expect(row(/^Top gifted subs this LIVE/)).toBeVisible();
+
+      // Twitch's money top is its Bits
+      await user.click(field("Shows").getByText("Top gifted subs this LIVE"));
+      await user.click(
+        inList(
+          page().getByRole("group", { name: "Shows" }),
+          "Top Bits this LIVE",
+        )!,
+      );
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({
+          source: "gifters",
+          platform: "twitch",
+        }),
+      );
+      expect(row(/^Top Bits this LIVE/)).toBeVisible();
+    });
+
     it("lists another source, with its own rows and fields", async () => {
       const list = elementOf("list");
       const { user } = await open(holding(list));

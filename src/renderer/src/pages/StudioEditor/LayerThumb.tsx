@@ -10,6 +10,7 @@ import {
   LuAppWindow,
   LuCircleUserRound,
   LuGift,
+  LuHeartHandshake,
   LuImage,
   LuMessagesSquare,
   LuSmile,
@@ -22,6 +23,7 @@ import styles from "./studioeditor.module.css";
 // A list's icon, by what it lists
 const LIST_ICONS: Record<StudioListSource, IconType> = {
   gifters: LuTrophy,
+  giftsubs: LuHeartHandshake,
   followers: LuUserPlus,
   gifts: LuGift,
   chat: LuMessagesSquare,

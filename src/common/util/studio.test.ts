@@ -782,6 +782,21 @@ describe("Samples", () => {
     expect(rows("kick")[0].value).toBe("12.4K");
     expect(rows("kick")).not.toEqual(rows("youtube"));
   });
+
+  it("ranks a gifted subs list's sub gifters by their count", () => {
+    const samples = new Samples(["twitch"]);
+    const list = made("list", { source: "giftsubs", platform: "twitch" });
+    if (list.kind !== "list") throw new Error("made the wrong kind");
+
+    const rows = sampleDeps(samples, "en", {}).rows(list);
+
+    expect(rows.slice(0, 3).map((r) => r.value)).toEqual(["25", "9", "5"]);
+    expect(rows[0]).toMatchObject({ text: "", icon: "" });
+    // Not the money list's rows
+    const money = made("list", { source: "gifters", platform: "twitch" });
+    if (money.kind !== "list") throw new Error("made the wrong kind");
+    expect(sampleDeps(samples, "en", {}).rows(money)).not.toEqual(rows);
+  });
 });
 
 describe("listRow", () => {

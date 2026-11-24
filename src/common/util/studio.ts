@@ -631,6 +631,13 @@ function sampleEntry(
   if (source === "followers") {
     return row(generateEventSample(LISTED.followers, platform).data.user);
   }
+  if (source === "giftsubs") {
+    const { user } = generateEventSample(TOKIO_EVENTS.GIFT_SUB, platform).data;
+    // A leaderboard's falling counts: 25, 9, 5…
+    return row(user, {
+      value: Math.max(1, Math.round(25 / (index + 1) ** 1.5)),
+    });
+  }
   const spends = platform ?? "tiktok";
   const { user } = generateEventSample(SPENT[spends], spends).data;
   // A leaderboard's falling amounts: 12.4K, 4.4K, 2.4K…, or $124, $43.84…
@@ -673,13 +680,13 @@ export class Samples {
     source,
     platform,
   }: Pick<StudioElementOf<"list">, "source" | "platform">) {
-    const key = source === "gifters" ? `${source} ${platform}` : source;
+    const top = source === "gifters" || source === "giftsubs";
+    const key = top ? `${source} ${platform}` : source;
     let entries = this.lists.get(key);
     if (!entries) {
-      const from =
-        source === "gifters"
-          ? [platform]
-          : rowPlatforms({ type: LISTED[source] }, this.platforms);
+      const from = top
+        ? [platform]
+        : rowPlatforms({ type: LISTED[source] }, this.platforms);
       entries = Array.from({ length: STUDIO_MAX_LIST_ROWS }, (_, i) =>
         sampleEntry(source, i, from[i % from.length]),
       );

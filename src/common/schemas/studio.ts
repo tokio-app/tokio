@@ -91,10 +91,12 @@ export const STUDIO_SHAPES = [
   "bubble",
 ] as const;
 
-// What a list shows a row of: this LIVE's top gifters, or its newest
+// What a list shows a row of: this LIVE's top gifters in their platform's
+// money, its top sub gifters (Twitch, YouTube, Kick), or its newest
 // followers, gifts or chat messages
 export const STUDIO_LIST_SOURCES = [
   "gifters",
+  "giftsubs",
   "followers",
   "gifts",
   "chat",
@@ -409,8 +411,8 @@ export const StudioElementSchema = z.discriminatedUnion("kind", [
     ...ELEMENT,
     kind: z.literal("list"),
     source: z.enum(STUDIO_LIST_SOURCES).default("gifters"),
-    // Whose top gifters a gifters list shows: each platform's currency is
-    // counted apart, and older overlays showed TikTok's
+    // Whose top gifters or sub gifters the list shows: each platform's
+    // currency is counted apart, and older overlays showed TikTok's
     platform: z.enum(PLATFORMS).default("tiktok"),
     // How many it shows at most
     rows: z.number().int().min(1).max(STUDIO_MAX_LIST_ROWS).default(5),

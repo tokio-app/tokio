@@ -1,11 +1,13 @@
-import { StudioOverlay, StudioSource } from "@/common/schemas";
+import { StudioElementOf, StudioOverlay, StudioSource } from "@/common/schemas";
 import {
   CustomGift,
+  Gifter,
   STUDIO_MESSAGE,
   STUDIO_REACT_MESSAGE,
   StudioMessage,
   StudioNumbers,
   StudioReact,
+  StudioListEntry,
   StudioView,
 } from "@/common/types";
 import {
@@ -42,6 +44,28 @@ type Services = Pick<
   | "historyService"
   | "pathManagerService"
 >;
+
+// A top list's rows: who sent the most of the platform's money, with an
+// amount, or who gifted the most subs, apart (the user's call)
+const topOf = (
+  history: Pick<Services["historyService"], "topByPlatform" | "topSubGifters">,
+  { source, platform }: Pick<StudioElementOf<"list">, "source" | "platform">,
+): StudioListEntry[] =>
+  source === "giftsubs"
+    ? (history.topSubGifters()[platform] ?? []).map((g) =>
+        topRow(g, g.giftSubs),
+      )
+    : (history.topByPlatform()[platform] ?? [])
+        .filter((g) => g.coins > 0)
+        .map((g) => topRow(g, g.coins));
+
+const topRow = (gifter: Gifter, value: number): StudioListEntry => ({
+  picture: gifter.picture,
+  name: gifter.username || gifter.handle,
+  text: "",
+  icon: "",
+  value,
+});
 
 /**
  * The live numbers studio texts show: the LIVE's likes and viewers, the
@@ -121,18 +145,11 @@ function viewOf(
       sentPicture(element, studio.kept(overlay.id, element)?.values ?? null),
     fill: (element) =>
       goalValue(element.number, numbers, studio.counts(overlay)) / element.goal,
-    // This LIVE's top gifters on the list's platform, else the newest first
+    // This LIVE's top gifters on the list's platform, by its money alone or
+    // by gifted subs, else the newest first
     rows: (list) =>
-      (list.source === "gifters"
-        ? (services.historyService.topByPlatform()[list.platform] ?? []).map(
-            (g) => ({
-              picture: g.picture,
-              name: g.username || g.handle,
-              text: "",
-              icon: "",
-              value: g.coins,
-            }),
-          )
+      (list.source === "gifters" || list.source === "giftsubs"
+        ? topOf(services.historyService, list)
         : studio.list(list.source)
       ).map((entry) => listRow(entry, language(), listInUsd(list))),
     // The page doesn't show it; the editor names embeds itself

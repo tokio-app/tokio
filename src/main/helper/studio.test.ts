@@ -6,6 +6,7 @@ import {
 } from "@/common/schemas";
 import {
   Gifter,
+  Platform,
   STUDIO_MESSAGE,
   StudioMessage,
   TOKIO_EVENTS,
@@ -76,6 +77,7 @@ const setup = (
     gifters = [],
     kickGifters,
     youtubeGifters,
+    subGifters = {},
   }: {
     startedAt?: number | null;
     studio?: StudioService;
@@ -83,6 +85,8 @@ const setup = (
     gifters?: Gifter[];
     kickGifters?: Gifter[];
     youtubeGifters?: Gifter[];
+    // Each platform's top sub gifters
+    subGifters?: Partial<Record<Platform, Gifter[]>>;
   } = {},
 ) => {
   const sendToClient = vi.fn((_id: string, _data: unknown) => true);
@@ -111,6 +115,7 @@ const setup = (
         kick: kickGifters,
         youtube: youtubeGifters,
       }),
+      topSubGifters: () => subGifters,
     },
     pathManagerService: { files: { logs: { overlays: "overlays.log" } } },
   });
@@ -424,6 +429,45 @@ describe("sendStudioOverlays", () => {
       { rows: [{ name: "Kai", value: "40" }] },
       { rows: [{ name: "Yui", value: "$57.40" }] },
       { rows: [] },
+    ]);
+  });
+
+  it("tops a platform's money and its gifted subs apart", async () => {
+    const kick = (username: string, coins: number, giftSubs: number) => ({
+      userId: `kick:${username}`,
+      username,
+      handle: username.toLowerCase(),
+      picture: "",
+      coins,
+      gifts: 0,
+      giftSubs,
+      giftedAt: 0,
+      platform: "kick" as const,
+    });
+    const bea = kick("Bea", 300, 2);
+    // Gifted subs alone: on the subs top only
+    const gus = kick("Gus", 0, 7);
+    const { handler, views } = setup(
+      [
+        overlay(ID, [
+          element("k", { kind: "list", platform: "kick" }),
+          element("s", { kind: "list", source: "giftsubs", platform: "kick" }),
+        ]),
+      ],
+      { kickGifters: [bea, gus], subGifters: { kick: [gus, bea] } },
+    );
+
+    await sendStudioOverlays(handler);
+
+    const [[, view]] = views();
+    expect(view?.layers[0].elements).toMatchObject([
+      { rows: [{ name: "Bea", value: "300" }] },
+      {
+        rows: [
+          { name: "Gus", value: "7" },
+          { name: "Bea", value: "2" },
+        ],
+      },
     ]);
   });
 

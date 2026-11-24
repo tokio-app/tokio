@@ -19,6 +19,8 @@ import type { StageFit } from "@/common/studio/stage";
 import { CustomGift, Platform, StudioView } from "@/common/types";
 import {
   ALERT_MESSAGE_VARIABLES,
+  Currency,
+  PLATFORM_CURRENCY,
   STUDIO_NUMBERS,
   studioNumbersFor,
   triggersOf,
@@ -93,6 +95,26 @@ type NameContext = {
   t: (key: MessageKey) => string;
 };
 
+// The money each platform's top list ranks by, as its source's name says it
+const MONEY_TOPS: Record<Currency, MessageKey> = {
+  coins: "studio.list.sources.gifters",
+  bits: "studio.list.sources.bits",
+  kicks: "studio.list.sources.kicks",
+  usd: "studio.list.sources.superChats",
+};
+
+/**
+ * A list's source as the editor names it: the top gifters by their
+ * platform's money ("Top Bits this LIVE"), the others by what they list.
+ */
+export const listSourceName = ({
+  source,
+  platform,
+}: Pick<StudioElementOf<"list">, "source" | "platform">): MessageKey =>
+  source === "gifters"
+    ? MONEY_TOPS[PLATFORM_CURRENCY[platform]]
+    : `studio.list.sources.${source}`;
+
 /**
  * What the layers list calls an element with no label: what it shows (its
  * text, file, gift, emote, embed, shape or list's source), else its kind.
@@ -118,7 +140,7 @@ export function elementName(
       case "shape":
         return context.t(`studio.shapes.${element.shape}`);
       case "list":
-        return context.t(`studio.list.sources.${element.source}`);
+        return context.t(listSourceName(element));
       default:
         return "";
     }
