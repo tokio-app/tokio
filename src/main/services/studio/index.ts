@@ -22,7 +22,7 @@ import {
   fillStudioText,
   formatError,
   generateEmoteChatSample,
-  generateTikTokEventSample,
+  generateEventSample,
   goalValue,
   reactsToEvents,
   sentPicture,
@@ -295,7 +295,7 @@ export class StudioService extends Service {
         values =
           type === EMOTE_TRIGGER
             ? generateEmoteChatSample()
-            : generateTikTokEventSample(type).data;
+            : generateEventSample(type).data;
         samples.set(type, values);
       }
       const sample: StudioKept = {

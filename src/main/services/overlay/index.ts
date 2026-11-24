@@ -11,6 +11,7 @@ import {
   GiftEvent,
   OverlayApp,
   OverlayConfigRedux,
+  Platform,
   TokioPayload,
 } from "@/common/types";
 import { catalogState, createTestLive, formatError } from "@/common/util";
@@ -647,10 +648,17 @@ export class OverlayService extends Service {
     return { success: true, data: saved };
   }
 
-  // Every live event, as the next moment of the overlay's test LIVE, for its test button.
-  public getTestPayloads(id: string): TokioPayload[] {
-    let live = this._testLives.get(id);
-    if (!live) this._testLives.set(id, (live = createTestLive()));
+  /**
+   * Every live event the platforms send, as the next moment of the overlay's
+   * test LIVE, for its test button. Other platforms start another LIVE.
+   */
+  public getTestPayloads(
+    id: string,
+    platforms: readonly Platform[],
+  ): TokioPayload[] {
+    const key = `${id} ${platforms.join()}`;
+    let live = this._testLives.get(key);
+    if (!live) this._testLives.set(key, (live = createTestLive(platforms)));
     return live();
   }
 
@@ -683,8 +691,11 @@ export class OverlayService extends Service {
    * Sends every test payload to the overlay connected with `id`. Fails when
    * no overlay is connected with it.
    */
-  public sendTestEvents(id: string): OverlayResult {
-    const payloads = this.getTestPayloads(id);
+  public sendTestEvents(
+    id: string,
+    platforms: readonly Platform[],
+  ): OverlayResult {
+    const payloads = this.getTestPayloads(id, platforms);
     const sent = payloads.every((payload) =>
       this._server.sendToClient(id, payload),
     );

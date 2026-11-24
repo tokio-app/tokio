@@ -36,7 +36,7 @@ import {
   usesNumbers,
 } from "./studio";
 import { formatStat } from "./format";
-import { generateTikTokEventSample } from "./samples";
+import { generateEventSample } from "./samples";
 
 const ID = "8f14e45f-ceea-4672-9a8e-1b2c3d4e5f60";
 const box = { x: 0, y: 0, width: 100, height: 100 };
@@ -587,7 +587,7 @@ describe("sentPicture", () => {
   });
 
   it("reads the picture of the gift an event sent", () => {
-    const sent = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
+    const sent = generateEventSample(TOKIO_EVENTS.GIFT).data;
 
     expect(sentPicture(gift, sent)).toBe(sent.gift.image);
     expect(sentPicture(gift, chat("1"))).toBe("");

@@ -5,7 +5,7 @@ import {
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
-import { generateTikTokEventSample } from "@/common/util";
+import { generateEventSample } from "@/common/util";
 import Logger from "@/logger";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -65,7 +65,7 @@ const account: PlatformAccount = {
   key: "refresh",
 };
 
-const viewer = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data.user;
+const viewer = generateEventSample(TOKIO_EVENTS.CHAT).data.user;
 const chatOf = (content: string, lang = "en"): ChatEvent => ({
   user: viewer,
   comment: { content, emotes: [], lang },
@@ -150,7 +150,7 @@ describe("ConnectorService", () => {
     const { service, provider } = setup();
     const listener = vi.fn();
     const onReconnect = vi.fn();
-    const follow = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
+    const follow = generateEventSample(TOKIO_EVENTS.FOLLOW).data;
 
     service.on(TOKIO_EVENTS.FOLLOW, listener);
     service.onReconnect(onReconnect);
@@ -178,7 +178,7 @@ describe("ConnectorService", () => {
     service.onReconnect(reconnect);
     const first = new FakeConnector();
     const second = new FakeConnector();
-    const follow = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
+    const follow = generateEventSample(TOKIO_EVENTS.FOLLOW).data;
 
     service.addProvider("First", first, true);
     service.addProvider("Second", second, true);
@@ -258,11 +258,11 @@ describe("ConnectorService", () => {
     const { provider } = setup();
     provider.setLogFile("connector.log");
     const user = {
-      ...generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data.user,
+      ...generateEventSample(TOKIO_EVENTS.FOLLOW).data.user,
     };
     user.handle = "handle";
-    const gift = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
-    const chat = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data;
+    const gift = generateEventSample(TOKIO_EVENTS.GIFT).data;
+    const chat = generateEventSample(TOKIO_EVENTS.CHAT).data;
     const received = vi.fn();
     provider.on(TOKIO_EVENTS.GIFT, received);
 
@@ -276,7 +276,7 @@ describe("ConnectorService", () => {
     });
     provider.fire(
       TOKIO_EVENTS.ROOM_USER,
-      generateTikTokEventSample(TOKIO_EVENTS.ROOM_USER).data,
+      generateEventSample(TOKIO_EVENTS.ROOM_USER).data,
     );
     provider.fire(TOKIO_EVENTS.CONNECTED);
 

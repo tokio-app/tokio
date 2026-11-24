@@ -27,6 +27,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import {
+  activeProfile,
   type CallToolResult,
   deepMerge,
   fail,
@@ -222,7 +223,11 @@ export const kinds: Kinds = {
         return fail(`No overlay ${id} is served.`);
       }
       // TEST_OVERLAY's reply only makes an open Overlays page send them
-      const payloads = overlayService.getTestPayloads(id);
+      const profile = await activeProfile(handler);
+      const payloads = overlayService.getTestPayloads(
+        id,
+        profile?.platforms ?? ["tiktok"],
+      );
       const sent = payloads.every((p) => serverService.sendToClient(id, p));
       return ok({
         events: payloads.length,

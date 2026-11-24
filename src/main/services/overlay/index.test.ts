@@ -1,5 +1,5 @@
 import { OverlayMetadata, TestOverlay } from "@/common/schemas";
-import { CustomGift, GiftEvent, TOKIO_EVENTS } from "@/common/types";
+import { CustomGift, GiftEvent, Platform, TOKIO_EVENTS } from "@/common/types";
 import { defaultStoreData } from "@/common/util";
 import Logger from "@/logger";
 import { JSONManagerService } from "@/services/json";
@@ -1549,7 +1549,7 @@ describe("OverlayService", () => {
   });
 
   it("samples every live event for tests", () => {
-    const types = service.getTestPayloads("a").map((p) => p.type);
+    const types = service.getTestPayloads("a", ["tiktok"]).map((p) => p.type);
 
     expect(types).toContain(TOKIO_EVENTS.CHAT);
     expect(types).not.toContain(TOKIO_EVENTS.CONNECTED);
@@ -1559,10 +1559,10 @@ describe("OverlayService", () => {
 
   it("carries each overlay's test LIVE on from its last test", () => {
     // Who joined at a test, and every viewer its events come from
-    const test = (id: string) => {
-      const payloads = service.getTestPayloads(id);
+    const test = (id: string, platforms: Platform[] = ["tiktok", "twitch"]) => {
+      const payloads = service.getTestPayloads(id, platforms);
       const join = payloads.find((p) => p.type === TOKIO_EVENTS.MEMBER_JOIN);
-      // Twitch's and YouTube's events come from viewers of their own
+      // Twitch's events come from viewers of their own
       const viewers = payloads.flatMap((p) =>
         p.type !== "tokio:config" &&
         p.data &&
@@ -1585,6 +1585,10 @@ describe("OverlayService", () => {
     );
     // Another overlay's test LIVE starts with its own first viewer.
     expect([...other.viewers]).toEqual([other.joined]);
+    // So do other platforms, as after a profile switch.
+    const switched = test("a", ["tiktok"]);
+    expect([...switched.viewers]).toEqual([switched.joined]);
+    expect(test("a").joined).not.toBe(second.joined);
   });
 
   describe("test overlays", () => {
@@ -1629,17 +1633,21 @@ describe("OverlayService", () => {
     it("sends every test payload to the id", () => {
       sendToClient.mockReturnValue(true);
 
-      expect(service.sendTestEvents("dev")).toEqual({ success: true });
+      expect(service.sendTestEvents("dev", ["kick"])).toEqual({
+        success: true,
+      });
 
       const sent = sendToClient.mock.calls;
       expect(sent.every(([id]) => id === "dev")).toBe(true);
       expect(sent.map(([, p]) => p.type)).toEqual(
-        service.getTestPayloads("dev").map((p) => p.type),
+        service.getTestPayloads("dev", ["kick"]).map((p) => p.type),
       );
     });
 
     it("fails when no overlay is connected with the id", () => {
-      expect(service.sendTestEvents("dev")).toEqual({ success: false });
+      expect(service.sendTestEvents("dev", ["tiktok"])).toEqual({
+        success: false,
+      });
     });
   });
 });

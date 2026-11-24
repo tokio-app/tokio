@@ -21,7 +21,7 @@ import {
   delay,
   formatAlertMessage,
   formatError,
-  generateTikTokEventSample,
+  generateEventSample,
   IMAGE_EXTENSIONS,
 } from "@/common/util";
 import { t } from "@/helper/i18n";
@@ -233,7 +233,7 @@ export class GamesService extends Service {
     const event = trigger === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : trigger;
     const commands = this._commands(
       steps,
-      generateTikTokEventSample(event).data,
+      generateEventSample(event).data,
       edition,
     );
     return { success: true, data: await this._send(commands, edition) };

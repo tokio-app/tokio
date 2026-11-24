@@ -10,7 +10,7 @@ import {
 } from "@/common/types";
 import {
   AUDIO_EXTENSIONS,
-  generateTikTokEventSample,
+  generateEventSample,
   MEDIA_EXTENSIONS,
 } from "@/common/util";
 import { showOpenDialog } from "@/helper/dialog";
@@ -230,7 +230,7 @@ const speakTest = async (
   const event = trigger === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : trigger;
   const res = await alertsService.speak(
     tts,
-    generateTikTokEventSample(event).data,
+    generateEventSample(event).data,
     profile.tts,
   );
   if (res.skipped) {

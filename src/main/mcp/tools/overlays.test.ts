@@ -84,6 +84,7 @@ describe("overlays MCP tools", () => {
           storeManagerService: {
             getSettings: () => ({ overlays: served }),
             getStudio: () => [],
+            getProfileData: async () => ({ platforms: ["youtube"] }),
           },
         },
         { stack: overlays },
@@ -135,7 +136,7 @@ describe("overlays MCP tools", () => {
     });
 
     it("sends a served overlay its test events", async () => {
-      const { h, sendToClient } = setup();
+      const { h, getTestPayloads, sendToClient } = setup();
       const { call } = await mcpClient(h.handler);
 
       expect(
@@ -145,6 +146,8 @@ describe("overlays MCP tools", () => {
       expect(sendToClient).toHaveBeenCalledWith("gift-jar", {
         type: TOKIO_EVENTS.SHARE,
       });
+      // The profile's platforms' events
+      expect(getTestPayloads).toHaveBeenCalledWith("gift-jar", ["youtube"]);
     });
 
     it("keeps no test LIVE for an id that isn't served", async () => {
@@ -360,6 +363,7 @@ describe("overlays MCP tools", () => {
       const store = {
         getStudio: () => held,
         getLiveStats: () => ({ likes: 0, viewers: 0, views: 0 }),
+        getProfileData: async () => null,
         addStudioOverlay: vi.fn(async (id: string, name: string) => {
           held.push(StudioOverlaySchema.parse({ id, name }));
           return true;
@@ -821,6 +825,7 @@ describe("overlays MCP tools", () => {
             },
             sendTestEvents: vi.fn(() => ({ success: false })),
           },
+          storeManagerService: { getProfileData: async () => null },
         },
         { stack: tools },
       );

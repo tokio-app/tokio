@@ -8,7 +8,7 @@ import {
   formatAlertMessage,
   mediaKind,
 } from "./alerts";
-import { generateTikTokEventSample } from "./samples";
+import { generateEventSample } from "./samples";
 
 const user = { username: "Viewer", handle: "viewer", profilePictures: [] };
 
@@ -82,7 +82,7 @@ describe("formatAlertMessage", () => {
   // The picker lists these, so each must be filled for its trigger.
   it.each(ALERT_TRIGGERS)("fills every variable listed for %s", (trigger) => {
     const event = trigger === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : trigger;
-    const { data } = generateTikTokEventSample(event);
+    const { data } = generateEventSample(event);
     const message = ALERT_MESSAGE_VARIABLES[trigger]
       .map((name) => `{${name}}`)
       .join(" ");
@@ -91,7 +91,7 @@ describe("formatAlertMessage", () => {
   });
 
   it("fills a sample's handle without the @, like a live one", () => {
-    const { data } = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW);
+    const { data } = generateEventSample(TOKIO_EVENTS.FOLLOW);
 
     expect(formatAlertMessage("{handle}", data)).not.toMatch(/^@/);
   });

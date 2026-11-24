@@ -210,11 +210,17 @@ describe("tools events", () => {
       "replies success: %s from the service with the id",
       async (success) => {
         const sendTestEvents = vi.fn(() => ({ success }));
-        const h = createHandler({ overlayService: { sendTestEvents } });
+        const h = createHandler({
+          overlayService: { sendTestEvents },
+          storeManagerService: {
+            getProfileData: async () => ({ platforms: ["youtube"] }),
+          },
+        });
 
         await h.invoke(tools, APP_EVENTS.SEND_TEST_EVENTS, { id: "a1" });
 
-        expect(sendTestEvents).toHaveBeenCalledWith("a1");
+        // The profile's platforms' events
+        expect(sendTestEvents).toHaveBeenCalledWith("a1", ["youtube"]);
         expect(h.replies(APP_EVENTS_RESPONSE.SEND_TEST_EVENTS)).toEqual([
           { id: "a1", success },
         ]);
@@ -229,6 +235,7 @@ describe("tools events", () => {
             throw new Error("server off");
           },
         },
+        storeManagerService: { getProfileData: async () => null },
       });
 
       await h.invoke(tools, APP_EVENTS.SEND_TEST_EVENTS, { id: "a1" });

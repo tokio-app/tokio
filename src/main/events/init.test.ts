@@ -43,7 +43,7 @@ import {
   defaultProfile,
   defaultStoreData,
   formatStat,
-  generateTikTokEventSample,
+  generateEventSample,
   timerTriggers,
 } from "@/common/util";
 import config from "@/config";
@@ -580,7 +580,7 @@ describe("init events", () => {
 
     it.each(triggers)("passes %s to the alerts", async (trigger) => {
       const s = await live();
-      const { data } = generateTikTokEventSample(trigger);
+      const { data } = generateEventSample(trigger);
 
       // Music change comes once per song, through onSongChange
       const songStarts = {
@@ -630,8 +630,8 @@ describe("init events", () => {
 
     it("drops live events while the alerts are off", async () => {
       const s = await live({ alerts: false });
-      const first = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
-      const second = generateTikTokEventSample(TOKIO_EVENTS.SHARE).data;
+      const first = generateEventSample(TOKIO_EVENTS.FOLLOW).data;
+      const second = generateEventSample(TOKIO_EVENTS.SHARE).data;
 
       s.conn.emit(TOKIO_EVENTS.FOLLOW, first);
       s.features.alerts = true;
@@ -697,7 +697,7 @@ describe("init events", () => {
 
       s.conn.emit(
         TOKIO_EVENTS.GIFT,
-        generateTikTokEventSample(TOKIO_EVENTS.GIFT).data,
+        generateEventSample(TOKIO_EVENTS.GIFT).data,
       );
 
       await vi.waitFor(() => {
@@ -720,7 +720,7 @@ describe("init events", () => {
     it("names a Kicks alert Kicks when it fails", async () => {
       const s = await live();
       s.alertsService.handle.mockRejectedValue(new Error("decode failed"));
-      const { data } = generateTikTokEventSample(TOKIO_EVENTS.KICKS);
+      const { data } = generateEventSample(TOKIO_EVENTS.KICKS, "kick");
 
       s.conn.emit(TOKIO_EVENTS.KICKS, data);
 
@@ -915,7 +915,7 @@ describe("init events", () => {
     it.each(triggers)("passes %s to the games", async (trigger) => {
       // Whatever features are on
       const s = await live({ alerts: false });
-      const { data } = generateTikTokEventSample(trigger);
+      const { data } = generateEventSample(trigger);
 
       // Music change comes once per song, through the alerts' onSongChange
       const songStarts = {
@@ -1986,7 +1986,7 @@ describe("init events", () => {
 
     it.each(TIMER_EVENTS)("passes %s to the timer", async (event) => {
       const s = await live();
-      const { data } = generateTikTokEventSample(event);
+      const { data } = generateEventSample(event);
 
       emitLive(s.conn, event, data);
 
@@ -2213,7 +2213,7 @@ describe("init events", () => {
 
     it.each(FAN_EVENTS)("records the viewer of %s", async (event) => {
       const s = await live();
-      const { data } = generateTikTokEventSample(event);
+      const { data } = generateEventSample(event);
 
       emitLive(s.conn, event, data);
 
@@ -2226,7 +2226,7 @@ describe("init events", () => {
 
     it("records a sub with its months", async () => {
       const s = await live();
-      const { data } = generateTikTokEventSample(TOKIO_EVENTS.SUBSCRIBE);
+      const { data } = generateEventSample(TOKIO_EVENTS.SUBSCRIBE);
 
       emitLive(s.conn, TOKIO_EVENTS.SUBSCRIBE, { ...data, months: 7 });
 
@@ -2406,7 +2406,7 @@ describe("init events", () => {
 
     it.each(HISTORY_EVENTS)("records %s", async (event) => {
       const s = await live();
-      const { data } = generateTikTokEventSample(event);
+      const { data } = generateEventSample(event);
 
       emitLive(s.conn, event, data);
 
@@ -3326,9 +3326,7 @@ describe("init events", () => {
   describe("music playback", () => {
     it("pushes the queue to the window as it changes", async () => {
       const s = await live();
-      const { data: songs } = generateTikTokEventSample(
-        TOKIO_EVENTS.MUSIC_CHANGE,
-      );
+      const { data: songs } = generateEventSample(TOKIO_EVENTS.MUSIC_CHANGE);
 
       s.music.emit(TOKIO_EVENTS.MUSIC_CHANGE, songs);
       s.h.win.close();
@@ -3451,7 +3449,7 @@ describe("init events", () => {
       s.conn.emit(TOKIO_EVENTS.FOLLOW, { user });
       s.conn.emit(
         TOKIO_EVENTS.SHARE,
-        generateTikTokEventSample(TOKIO_EVENTS.SHARE).data,
+        generateEventSample(TOKIO_EVENTS.SHARE).data,
       );
       await vi.waitFor(() => expect(plays).toHaveLength(2));
       const [follow, share] = plays;

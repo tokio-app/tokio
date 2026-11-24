@@ -82,10 +82,12 @@ events.push(
 // No connected overlay isn't a failure, the page shows it.
 events.push(
   APP_EVENTS.SEND_TEST_EVENTS,
-  async ({ overlayService }, e, { id }) => {
+  async ({ overlayService, storeManagerService }, e, { id }) => {
+    const profile = await storeManagerService.getProfileData();
+    const platforms = profile?.platforms ?? ["tiktok"];
     e.reply(APP_EVENTS_RESPONSE.SEND_TEST_EVENTS, {
       id,
-      success: overlayService.sendTestEvents(id).success,
+      success: overlayService.sendTestEvents(id, platforms).success,
     });
   },
   {

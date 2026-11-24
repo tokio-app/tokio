@@ -42,7 +42,7 @@ import {
 import { formatDuration, formatMoney, formatStat, NO_MONEY } from "./format";
 import { giftCurrencies, PLATFORM_CURRENCY, triggersFor } from "./platforms";
 import { rowVariables } from "./rows";
-import { generateEmoteChatSample, generateTikTokEventSample } from "./samples";
+import { generateEmoteChatSample, generateEventSample } from "./samples";
 
 // The live numbers any text can show, as {likes}
 export const STUDIO_NUMBERS: (keyof StudioNumbers)[] = [
@@ -584,14 +584,14 @@ function sampleEntry(source: StudioListSource, index: number): StudioListEntry {
     ...fields,
   });
   if (source === "gifts") {
-    const { user, gift } = generateTikTokEventSample(TOKIO_EVENTS.GIFT).data;
+    const { user, gift } = generateEventSample(TOKIO_EVENTS.GIFT).data;
     return row(user, { icon: gift.image, value: gift.comboCount });
   }
   if (source === "chat") {
-    const { user, comment } = generateTikTokEventSample(TOKIO_EVENTS.CHAT).data;
+    const { user, comment } = generateEventSample(TOKIO_EVENTS.CHAT).data;
     return row(user, { text: comment.content });
   }
-  const { user } = generateTikTokEventSample(TOKIO_EVENTS.FOLLOW).data;
+  const { user } = generateEventSample(TOKIO_EVENTS.FOLLOW).data;
   // A leaderboard's falling coins: 12.4K, 4.4K, 2.4K…
   return source === "gifters"
     ? row(user, { value: Math.round(12_400 / (index + 1) ** 1.5) })
@@ -613,7 +613,7 @@ export class Samples {
       sample =
         type === EMOTE_TRIGGER
           ? generateEmoteChatSample()
-          : generateTikTokEventSample(type).data;
+          : generateEventSample(type).data;
       this.made.set(type, sample);
     }
     return sample;

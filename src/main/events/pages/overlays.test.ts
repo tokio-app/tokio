@@ -835,14 +835,23 @@ describe("overlays events", () => {
       const payloads: TokioPayload[] = [
         { type: TOKIO_EVENTS.ENVELOPE, data: undefined },
       ];
+      const getTestPayloads = vi.fn(() => payloads);
       const h = createHandler({
-        overlayService: { getTestPayloads: () => payloads },
+        overlayService: { getTestPayloads },
+        storeManagerService: {
+          getProfileData: async () => ({ platforms: ["twitch", "kick"] }),
+        },
       });
 
       await h.invoke(overlays, APP_EVENTS.TEST_OVERLAY, { id: "gift-jar" });
 
       expect(h.replies(APP_EVENTS_RESPONSE.TEST_OVERLAY)).toEqual([
         { payloads, id: "gift-jar" },
+      ]);
+      // The profile's platforms' events
+      expect(getTestPayloads).toHaveBeenCalledWith("gift-jar", [
+        "twitch",
+        "kick",
       ]);
     });
 
@@ -853,6 +862,7 @@ describe("overlays events", () => {
             throw new Error("no samples");
           },
         },
+        storeManagerService: { getProfileData: async () => null },
       });
 
       await h.invoke(overlays, APP_EVENTS.TEST_OVERLAY, { id: "gift-jar" });
