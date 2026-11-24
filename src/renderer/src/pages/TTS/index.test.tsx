@@ -10,17 +10,8 @@ import { send, sent } from "@test/ipc";
 import { section } from "@test/queries";
 import { renderWithProviders } from "@test/render";
 import { act, fireEvent, screen, within } from "@testing-library/react";
-import { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TTS } from ".";
-
-// The page is rendered without a router, so a link is a plain anchor
-vi.mock("@tanstack/react-router", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
-  Link: ({ to, children }: { to: string; children: ReactNode }) => (
-    <a href={to}>{children}</a>
-  ),
-}));
 
 const aria = voice("en-US-AriaNeural");
 const guy = voice("en-US-GuyNeural");

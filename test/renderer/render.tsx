@@ -3,7 +3,9 @@ import { NotificationsProvider } from "@/context/notifications";
 import { LanguageProvider } from "@/ui/i18n";
 import {
   createMemoryHistory,
+  createRootRoute,
   createRouter,
+  RouterContextProvider,
   RouterProvider,
 } from "@tanstack/react-router";
 import { render, RenderOptions, screen } from "@testing-library/react";
@@ -22,14 +24,23 @@ type Options = Omit<RenderOptions, "wrapper"> & {
  */
 export function providers() {
   const audio = createAudio();
+  // A page rendered alone still has a router for its back button and links,
+  // which warn on every render without one. It holds only a root route;
+  // renderApp's own router takes over below it.
+  const router = createRouter({
+    routeTree: createRootRoute(),
+    history: createMemoryHistory(),
+  });
 
   // jsdom's page has no ?lang, so it's English
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <LanguageProvider>
-      <AudioContext.Provider value={audio.value}>
-        <NotificationsProvider>{children}</NotificationsProvider>
-      </AudioContext.Provider>
-    </LanguageProvider>
+    <RouterContextProvider router={router}>
+      <LanguageProvider>
+        <AudioContext.Provider value={audio.value}>
+          <NotificationsProvider>{children}</NotificationsProvider>
+        </AudioContext.Provider>
+      </LanguageProvider>
+    </RouterContextProvider>
   );
 
   return { wrapper, audio };
