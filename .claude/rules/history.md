@@ -44,7 +44,7 @@ paths:
   - A finished LIVE's file is never rewritten, so a periodic save stays small however many LIVEs there are.
 - When a LIVE ends, its file is written one last time, then the index with its summary appended and its gifters added to all time. When an ended LIVE's file fails, the index waits for the next save, which writes both.
 - `MAX_LIVES` (1,500): past it, the oldest LIVEs go as a delete would, gifts included, after an end (`_cap`, which reads their files after the end's save) and when a profile loads. The user's call: All time always adds up to the LIVEs kept.
-- `byAmount` puts the most in a platform's currency first, then the most gifted subs, with ties going to the earlier `giftedAt`. Amounts of two currencies compare as plain numbers, so a list that mixes platforms is in each platform's own order, which is all its readers use: they filter by platform.
+- `byAmount` puts the most in a platform's currency first, then the most gifted subs, with ties going to the earlier `giftedAt`. `topSubGifters` ranks this LIVE's sub gifters by their gifted subs alone (`bySubs`), for Home's Top gifted subs. Amounts of two currencies compare as plain numbers, so a list that mixes platforms is in each platform's own order, which is all its readers use: they filter by platform.
 - `MAX_GIFTERS` caps each platform's gifters of all time on its own: the fewest go first, then the fewest gifted subs, then the oldest last gift. The page shows only the top `SHOWN_GIFTERS` and each LIVE keeps all its own gifters, so nobody shown is dropped.
 - On a quit or crash the next load adds what the last save missed from the LIVE's file.
 - Saves run one after another through `_saving`, so an older index can't land after a newer one, as when a LIVE's end races the cap's drop.
