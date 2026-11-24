@@ -44,7 +44,7 @@ paths:
   - A finished LIVE's file is never rewritten, so a periodic save stays small however many LIVEs there are.
 - When a LIVE ends, its file is written one last time, then the index with its summary appended and its gifters added to all time. When an ended LIVE's file fails, the index waits for the next save, which writes both.
 - `MAX_LIVES` (1,500): past it, the oldest LIVEs go as a delete would, gifts included, after an end (`_cap`, which reads their files after the end's save) and when a profile loads. The user's call: All time always adds up to the LIVEs kept.
-- `byAmount` puts the most in a platform's currency first, then the most gifted subs, with ties going to the earlier `giftedAt`. `topSubGifters` ranks this LIVE's sub gifters by their gifted subs alone (`bySubs`), for Home's Top gifted subs. Amounts of two currencies compare as plain numbers, so a list that mixes platforms is in each platform's own order, which is all its readers use: they filter by platform.
+- `byAmount` puts the most in a platform's currency first, then the most gifted subs, with ties going to the earlier `giftedAt`. `topSubGifters` ranks this LIVE's sub gifters by their gifted subs alone (`bySubs`, `src/common/util/history.ts`), for Home's Top gifted subs. Amounts of two currencies compare as plain numbers, so a list that mixes platforms is in each platform's own order, which is all its readers use: they filter by platform.
 - `MAX_GIFTERS` caps each platform's gifters of all time on its own: the fewest go first, then the fewest gifted subs, then the oldest last gift. The page shows only the top `SHOWN_GIFTERS` and each LIVE keeps all its own gifters, so nobody shown is dropped.
 - On a quit or crash the next load adds what the last save missed from the LIVE's file.
 - Saves run one after another through `_saving`, so an older index can't land after a newer one, as when a LIVE's end races the cap's drop.
@@ -75,9 +75,10 @@ paths:
 
 ## The page's data
 
-- `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and each platform's top gifters of all time, in one list. The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page and Tools' list ask again on each `GET_PROFILE` reply (a profile switch), and the page drops its `GIFTERS` replies then, which the same range would still match.
+- LIVE history ranks money and gifted subs apart (the user's call), as Home does: main gives two lists wherever it cuts or ranks one (`rankings`), so one read of the LIVEs' files serves both. The money list holds only who sent an amount, in `byAmount` order; the subs list only who gifted subs, in `bySubs` order. Each has its own ranks and is cut at `SHOWN_GIFTERS` per platform. A viewer who only gifted subs is only on the subs list.
+- `GET_LIVES` replies `LIVES`: the finished LIVEs, newest first, and each platform's top gifters of all time, in one list per ranking (`gifters`, `subGifters`). The LIVE in progress joins when it ends, when main pushes `LIVES` again; Home shows it until then. The page and Tools' list ask again on each `GET_PROFILE` reply (a profile switch), and the page drops its `GIFTERS` replies then, which the same range would still match.
 - `GET_LIVE { startedAt }` replies `LIVE` with that LIVE's record, failures with the `startedAt` too. The page drops a reply for another `startedAt`.
-- `GET_GIFTERS { from?, to?, query? }` replies `GIFTERS` with the top of the finished LIVEs from `from` (included) to `to` (left out), each with their `rank` among their own platform's gifters (`RankedGifter`), up to `SHOWN_GIFTERS` of each; the page filters by its tab's platform. The reply carries the range and the query, failures included.
+- `GET_GIFTERS { from?, to?, query? }` replies `GIFTERS` with the tops of the finished LIVEs from `from` (included) to `to` (left out), the money's in `data` and the gifted subs' in `subGifters`, each gifter with their `rank` in that list among their own platform's (`RankedGifter`), up to `SHOWN_GIFTERS` of each; the page filters by its tab's platform. The reply carries the range and the query, failures included.
   - A LIVE is in the dates when it starts in them or runs into them (`inRange`, `src/common/util/history.ts`). One they cut (not `allInRange`) counts only its gifts in them, from its minutes: a minute counts when any of it is in them.
   - A query matches name or @handle through `viewerMatcher` (`src/common/util/history.ts`), which the Fans page's search uses too.
   - Every LIVE whole reads all time's list. Other dates are added up by `getGifters` one file at a time, so a year of LIVEs isn't held at once, leaving out a file that doesn't load.
@@ -93,7 +94,10 @@ paths:
 - **A platform's tab** (`readout`):
   - Its money tile, then Gifts where it sends gifts (TikTok, YouTube) and Gifted subs where it sends them (Twitch, YouTube, Kick).
   - The list holds only the LIVEs that were on it, their amounts and bars in its money (`liveValue`), and the summary's count and length are theirs.
-  - Its gifters are main's lists filtered by `platformOf`, in main's order and with its ranks, each with their amount and gifted subs.
+  - Its gifters are main's lists filtered by `platformOf`, in main's order and with its ranks. A selected LIVE's come from its record, which holds all its gifters in `byAmount` order: the page keeps those with an amount, or sorts those with gifted subs by `bySubs`.
+  - Where the platform sends gifted subs (Twitch, YouTube, Kick), a `pill` `Tabs` over the list ("Rank by") switches between its money's top and its gifted subs', labeled with the readout's names. TikTok has no switch. Another platform's tab opens on its money; a new selection or dates keep the pick.
+  - The title names what the list ranks, as Home does: Top gifters (TikTok's coins), Top Bits, Top Kicks, Top Super Chats, Top gifted subs, for a selected LIVE too. Each row shows only its list's unit: the amount, with gifts where the platform sends them, or the gifted subs. An empty list says what it ranks, for the history or a LIVE and for some dates.
+  - The search looks in the list shown.
 - **All:** a money tile per platform, every gift and gifted sub, and the list by gift count, whose totals row says so ("1.5K gifts", the user's call) so it isn't read as money. It has no ranking and no search: a line asks to pick a platform. A selected LIVE shows only its own platforms' tiles there.
 - A selected LIVE that isn't on the picked tab shows the totals row, and stays selected for when its tab comes back.
 - The Tools row counts the LIVEs it keeps, as the other tools' rows count theirs (the user's call: a LIVE's money there stopped making sense once the page became the history).
