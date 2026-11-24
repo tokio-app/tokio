@@ -9,7 +9,12 @@ import {
   StudioOverlay,
   TriggerSchema,
 } from "@/common/schemas";
-import { APP_EVENTS, APP_EVENTS_RESPONSE, TOKIO_EVENTS } from "@/common/types";
+import {
+  APP_EVENTS,
+  APP_EVENTS_RESPONSE,
+  Platform,
+  TOKIO_EVENTS,
+} from "@/common/types";
 import { newStudioElement, newStudioGroup } from "@/common/util";
 import { rotateCursor } from "./helper";
 import { createAction } from "@/common/util";
@@ -1734,6 +1739,101 @@ describe("StudioEditor", () => {
       page().getByRole("radio", { name: "The emote a viewer sends" }),
     ).toBeChecked();
     expect(page().getByText(/once viewers use them/)).toBeVisible();
+  });
+
+  describe("on the profile's platforms", () => {
+    const usingPlatforms = (platforms: Platform[]) =>
+      send(
+        APP_EVENTS_RESPONSE.GET_PROFILE,
+        profileReply((p) => {
+          p.platforms = platforms;
+        }),
+      );
+
+    it("adds a Gift element only where gifts come", async () => {
+      const { user } = await open(holding());
+      // Twitch sends none, Kick sends Kicks
+      await usingPlatforms(["twitch", "kick"]);
+      await user.click(addMenu());
+      expect(screen.queryByRole("menuitem", { name: "Gift" })).toBeNull();
+      expect(screen.getByRole("menuitem", { name: "Emote" })).toBeVisible();
+      await user.keyboard("{Escape}");
+
+      await usingPlatforms(["youtube"]);
+      await user.click(addMenu());
+      expect(screen.getByRole("menuitem", { name: "Gift" })).toBeVisible();
+    });
+
+    it("picks from TikTok's gifts only with TikTok, or to change one picked", async () => {
+      const sent = elementOf("gift", { label: "Sent" });
+      const picked = elementOf("gift", { label: "Picked", gift: 5655 });
+      const { user } = await open(scene(sent, picked));
+      await usingPlatforms(["youtube"]);
+
+      await user.click(row(/^Sent/));
+      expect(
+        page().getByRole("radio", { name: "The gift a viewer sends" }),
+      ).toBeChecked();
+      expect(
+        page().queryByRole("radio", { name: "A gift you pick" }),
+      ).toBeNull();
+
+      await user.click(row(/^Picked/));
+      expect(
+        page().getByRole("radio", { name: "A gift you pick" }),
+      ).toBeChecked();
+    });
+
+    it("picks from the emotes of the profile's platforms", async () => {
+      const element = elementOf("emote");
+      const { user } = await open(scene(element));
+      await usingPlatforms(["kick"]);
+      await send(APP_EVENTS_RESPONSE.EMOTES, {
+        data: [
+          { id: "7001", image: "https://x/7001.png" },
+          {
+            id: "kick:37226",
+            image: "https://files.kick.com/emotes/37226/fullsize",
+          },
+        ],
+      });
+      await user.click(row(/^Emote/));
+
+      await user.click(
+        page().getByRole("radio", { name: "An emote you pick" }),
+      );
+
+      // TikTok's comes first, but the profile has only Kick
+      await waitFor(() =>
+        expect(savedElement()).toMatchObject({
+          emote: { id: "kick:37226" },
+        }),
+      );
+    });
+
+    it("lists followers and gifts only from platforms that send them", async () => {
+      const list = elementOf("list", { source: "gifts" });
+      const { user } = await open(holding(list));
+      await usingPlatforms(["twitch"]);
+      await user.click(row(/^Latest gifts/));
+
+      await user.click(field("Shows").getByText("Latest gifts"));
+      const shows = page().getByRole("group", { name: "Shows" });
+      expect(inList(shows, "New followers")).toBeTruthy();
+      // Twitch sends no gifts, but the saved source stays to change
+      expect(inList(shows, "Latest gifts")).toBeTruthy();
+      await user.keyboard("{Escape}");
+
+      await usingPlatforms(["kick"]);
+      await user.click(field("Shows").getByText("Latest gifts"));
+      expect(inList(shows, "New followers")).toBeNull();
+      await user.click(inList(shows, "Chat")!);
+      await waitFor(() =>
+        expect(lastSave()?.items[0]).toMatchObject({ source: "chat" }),
+      );
+      await user.click(field("Shows").getByText("Chat"));
+      expect(inList(shows, "Latest gifts")).toBeNull();
+    });
   });
 
   it("turns a shape's fill off and a border on", async () => {

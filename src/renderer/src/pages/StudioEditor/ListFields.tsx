@@ -4,6 +4,7 @@ import {
   STUDIO_MAX_LIST_GAP,
   STUDIO_MAX_LIST_ROWS,
   StudioElementOf,
+  StudioListSource,
 } from "@/common/schemas";
 import {
   Check,
@@ -13,8 +14,8 @@ import {
   NumberInput,
   Select,
 } from "@/components";
-import { PLATFORMS } from "@/common/types";
-import { PLATFORM_LABELS } from "@/common/util";
+import { AlertTrigger, PLATFORMS, TOKIO_EVENTS } from "@/common/types";
+import { PLATFORM_LABELS, triggersFor } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import { useOptions, useT } from "@/ui/i18n";
 import styles from "./studioeditor.module.css";
@@ -25,6 +26,12 @@ const SOURCES = STUDIO_LIST_SOURCES.map((value) => ({
 }));
 
 type List = StudioElementOf<"list">;
+
+// The event a source lists, when only some platforms send it
+const NEEDS: Partial<Record<StudioListSource, AlertTrigger>> = {
+  followers: TOKIO_EVENTS.FOLLOW,
+  gifts: TOKIO_EVENTS.GIFT,
+};
 
 type Props = {
   element: List;
@@ -39,9 +46,14 @@ type Props = {
  */
 export function ListFields({ element, onChange }: Props) {
   const t = useT();
-  const sources = useOptions(SOURCES);
-  const valued = element.source === "gifters" || element.source === "gifts";
   const platforms = usePlatforms();
+  const sent = triggersFor(platforms);
+  // Followers and gifts from the platforms that send them; a saved one stays
+  const sources = useOptions(SOURCES).filter(({ value }) => {
+    const needs = NEEDS[value];
+    return !needs || sent.includes(needs) || value === element.source;
+  });
+  const valued = element.source === "gifters" || element.source === "gifts";
   // Only once there's a choice: TikTok's gifters otherwise, as before the
   // other platforms
   const pickPlatform =
