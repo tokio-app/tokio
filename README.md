@@ -50,11 +50,11 @@ Tokio is a desktop app for Windows, macOS and Linux that connects to your TikTok
 </table>
 
 - [Music](https://tokio.ialfaro.com/docs/features/music-requests/): viewers request songs from chat, played on YouTube or Spotify.
-- [Chat translation](https://tokio.ialfaro.com/docs/features/chat-translation/): messages in other languages translated into yours, on Home, in TTS, alerts and overlays.
+- [Chat translation](https://tokio.ialfaro.com/docs/features/chat-translation/): TikTok chat in other languages translated into yours, on Home, in TTS, alerts and overlays.
 - [Live controls](https://tokio.ialfaro.com/docs/features/live-controls/): skip a song, stop TTS, replay an alert or pause everything with a shortcut from any app, or from your phone.
 - [MCP](https://tokio.ialfaro.com/docs/developers/mcp/): AI assistants like Claude Code can set up Tokio and drive it for you.
 - [LIVE history](https://tokio.ialfaro.com/docs/features/coin-stats/): every LIVE, what viewers sent on each platform in its own currency, and who sent the most. Overlays can show your top gifters.
-- [Fans](https://tokio.ialfaro.com/docs/features/fans/): the viewers with a fan level, which overlays can show too.
+- [Fans](https://tokio.ialfaro.com/docs/features/fans/): your TikTok fan club, and your subscribers and members on Twitch, YouTube and Kick. Overlays can show your TikTok fans.
 - [Profiles](https://tokio.ialfaro.com/docs/features/profiles-and-settings/): separate settings for different streams.
 
 Tokio is in English and Spanish. It follows your system's language, and **Settings → Language** changes it.
