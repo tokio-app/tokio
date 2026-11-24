@@ -266,9 +266,12 @@ describe("overlays MCP tools", () => {
       return { h, installFromCatalog };
     };
 
-    it("lists the catalog with each one's state", async () => {
+    it("lists the catalog with each one's state and platforms", async () => {
       const { h } = setup(
-        [entry(), entry({ id: "chat", name: "Chat", version: "2.0.0" })],
+        [
+          entry({ platforms: ["tiktok"] }),
+          entry({ id: "chat", name: "Chat", version: "2.0.0" }),
+        ],
         [app({ id: "chat", version: "1.4.0" })],
       );
       const { call } = await mcpClient(h.handler);
@@ -278,8 +281,19 @@ describe("overlays MCP tools", () => {
       expect(value).toMatchObject({
         total: 2,
         overlays: [
-          { id: "gift-jar", state: "install", installedVersion: null },
-          { id: "chat", state: "breaking", installedVersion: "1.4.0" },
+          {
+            id: "gift-jar",
+            platforms: ["tiktok"],
+            state: "install",
+            installedVersion: null,
+          },
+          // Every platform
+          {
+            id: "chat",
+            platforms: null,
+            state: "breaking",
+            installedVersion: "1.4.0",
+          },
         ],
       });
     });

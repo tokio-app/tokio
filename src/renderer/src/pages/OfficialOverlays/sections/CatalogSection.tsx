@@ -1,5 +1,10 @@
 import { CatalogOverlay } from "@/common/schemas";
-import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
+import {
+  APP_EVENTS,
+  APP_EVENTS_RESPONSE,
+  OverlayApp,
+  type Platform,
+} from "@/common/types";
 import { catalogState, CatalogState } from "@/common/util";
 import {
   BackButton,
@@ -22,13 +27,15 @@ import styles from "../officialoverlays.module.css";
 interface Props {
   // The installed overlays, to tell which official ones are
   overlays: OverlayApp[];
+  // The profile's, to list the overlays that work on them
+  platforms: Platform[];
 }
 
 /**
  * The official overlays, to install, update and remove. Main replies to both
  * with the new overlay list, which the page passes back down.
  */
-export function CatalogSection({ overlays }: Props) {
+export function CatalogSection({ overlays, platforms }: Props) {
   const t = useT();
   // Null while it loads
   const [catalog, setCatalog] = useState<CatalogOverlay[] | null>(null);
@@ -116,6 +123,7 @@ export function CatalogSection({ overlays }: Props) {
         <CatalogList
           catalog={catalog}
           search={search}
+          platforms={platforms}
           error={error}
           overlays={overlays}
           installing={installing}
@@ -131,6 +139,8 @@ interface ListProps {
   catalog: CatalogOverlay[] | null;
   // Shows only the overlays whose name or description has it
   search: string;
+  // Shows only the overlays that work on one of them, and the installed ones
+  platforms: Platform[];
   error: string | null;
   overlays: OverlayApp[];
   installing: string[];
@@ -142,6 +152,7 @@ interface ListProps {
 function CatalogList({
   catalog,
   search,
+  platforms,
   error,
   overlays,
   installing,
@@ -157,13 +168,21 @@ function CatalogList({
       </div>
     );
   }
-  if (catalog.length === 0) {
+  // Installed ones stay, so they can still be updated and removed. No
+  // platforms means every platform, as in catalogs from before them.
+  const usable = catalog.filter(
+    (entry) =>
+      !entry.platforms ||
+      entry.platforms.some((p) => platforms.includes(p)) ||
+      catalogState(entry, overlays) !== "install",
+  );
+  if (usable.length === 0) {
     return <EmptyState>{t("overlays.official.empty")}</EmptyState>;
   }
 
   // By what the card shows: you may not know an overlay's name yet
   const needle = search.trim().toLowerCase();
-  const shown = catalog.filter((entry) =>
+  const shown = usable.filter((entry) =>
     [entry.name, entry.description].some((text) =>
       text.toLowerCase().includes(needle),
     ),

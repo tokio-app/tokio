@@ -249,7 +249,7 @@ export const kinds: Kinds = {
 
   official_overlays: defineKind({
     notes:
-      "The official overlays' catalog, read from GitHub. state: install (not installed), installed (up to date), update, or breaking (a new first version number: ask the streamer before install_overlay with confirmBreaking).",
+      "The official overlays' catalog, read from GitHub. state: install (not installed), installed (up to date), update, or breaking (a new first version number: ask the streamer before install_overlay with confirmBreaking). platforms: where it works (null: every platform). This lists every entry; the app's Official overlays page shows only the ones for the profile's platforms, and the installed ones.",
     list: async ({ overlayService }, { query, limit }) => {
       const res = await overlayService.getCatalog();
       if (!res.success) {
@@ -269,6 +269,7 @@ export const kinds: Kinds = {
           version: e.version,
           description: e.description,
           hasSettings: e.config,
+          platforms: e.platforms ?? null,
           state: catalogState(e, installed),
           installedVersion:
             installed.find((o) => o.id === e.id && !o.external)?.version ??

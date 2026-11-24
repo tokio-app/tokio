@@ -1,6 +1,11 @@
 import { CatalogOverlay } from "@/common/schemas";
 import { APP_EVENTS, APP_EVENTS_RESPONSE, OverlayApp } from "@/common/types";
-import { catalogEntry, failure, overlayApp } from "@test/fixtures";
+import {
+  catalogEntry,
+  failure,
+  overlayApp,
+  profileReply,
+} from "@test/fixtures";
 import { send, sent } from "@test/ipc";
 import { renderApp } from "@test/render";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
@@ -153,6 +158,42 @@ describe("OfficialOverlays", () => {
     await user.click(page().getByRole("button", { name: "Close search" }));
 
     expect(page().getAllByRole("heading", { level: 3 })).toHaveLength(3);
+  });
+
+  it("lists the overlays for the profile's platforms, and the installed ones", async () => {
+    await renderApp("/overlays/official");
+    const tiktok = { platforms: ["tiktok" as const] };
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => (p.platforms = ["kick"])),
+    );
+    await overlays(overlayApp("top-likes"));
+    await catalog(
+      { ...GIFT_JAR, ...tiktok },
+      { ...TOP_LIKES, ...tiktok },
+      { ...CLOCK, platforms: ["tiktok", "twitch", "youtube", "kick"] },
+      // From a catalog before platforms: every platform
+      catalogEntry("social-links", { name: "Social Links" }),
+    );
+
+    const names = page()
+      .getAllByRole("heading", { level: 3 })
+      .map((h) => h.textContent);
+    expect(names).toEqual(["Top Likes", "Clock", "Social Links"]);
+    // Installed, so it can still be removed
+    expect(card(TOP_LIKES).getByText("Installed")).toBeInTheDocument();
+  });
+
+  it("says there are none when no overlay works on the profile's platforms", async () => {
+    await renderApp("/overlays/official");
+    await send(
+      APP_EVENTS_RESPONSE.GET_PROFILE,
+      profileReply((p) => (p.platforms = ["twitch"])),
+    );
+
+    await catalog({ ...GIFT_JAR, platforms: ["tiktok"] });
+
+    expect(page().getByText("No official overlays yet.")).toBeInTheDocument();
   });
 
   it("offers to install, update or remove each overlay", async () => {
