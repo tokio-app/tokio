@@ -539,9 +539,9 @@ describe("SoundPicker", () => {
       const gift = alert({}, TOKIO_EVENTS.GIFT);
       await openTts({
         ...gift,
-        trigger: { ...gift.trigger, platform: "kick" },
+        trigger: { ...gift.trigger, platform: "youtube" },
       });
-      // Kicks come one at a time
+      // YouTube's gifts come one at a time
       expect(
         screen.queryByRole("button", { name: "{count}" }),
       ).not.toBeInTheDocument();
