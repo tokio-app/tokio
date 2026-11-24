@@ -139,12 +139,21 @@ describe("matchesTrigger", () => {
     ).toBe(true);
   });
 
-  it("holds each money event to its own minimum: Bits, US dollars, subs", () => {
+  it("holds each money event to its own minimum: Bits, Kicks, US dollars, subs", () => {
     const { user } = follow("twitch");
     const cheer = (bits: number) => ({ user, bits, message: "" });
     const bits = trigger(TOKIO_EVENTS.CHEER, { min_coins: 100 });
     expect(matches(bits, TOKIO_EVENTS.CHEER, cheer(100))).toBe(true);
     expect(matches(bits, TOKIO_EVENTS.CHEER, cheer(99))).toBe(false);
+
+    const sent = (kicks: number) => ({
+      user: follow("kick").user,
+      kicks,
+      message: "",
+    });
+    const kicks = trigger(TOKIO_EVENTS.KICKS, { min_coins: 100 });
+    expect(matches(kicks, TOKIO_EVENTS.KICKS, sent(100))).toBe(true);
+    expect(matches(kicks, TOKIO_EVENTS.KICKS, sent(99))).toBe(false);
 
     const subs = (count: number) => ({ user, count, tier: "1000" });
     const five = trigger(TOKIO_EVENTS.GIFT_SUB, { min_coins: 5 });

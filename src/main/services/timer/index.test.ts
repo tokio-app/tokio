@@ -337,15 +337,19 @@ describe("TimerService", () => {
       expect(changes).toEqual([20_000]);
     });
 
-    it("counts a Kick gift's Kicks per Kick, and nothing for a YouTube gift", () => {
+    it("counts Kick's Kicks per Kick, and nothing for a YouTube gift", () => {
       ready(settings({}, { coin: 2, kick: 0.5 }));
-      const on = (platform: "kick" | "youtube", handle: string) => {
-        const event = gift(1, true, 100, handle);
-        return { ...event, user: { ...event.user, platform } };
-      };
+      const youtube = gift(1, true, 100, "y");
 
-      timer.handle(TOKIO_EVENTS.GIFT, on("kick", "k"));
-      timer.handle(TOKIO_EVENTS.GIFT, on("youtube", "y"));
+      timer.handle(TOKIO_EVENTS.KICKS, {
+        user: { ...viewer("k"), platform: "kick" },
+        kicks: 100,
+        message: "",
+      });
+      timer.handle(TOKIO_EVENTS.GIFT, {
+        ...youtube,
+        user: { ...youtube.user, platform: "youtube" },
+      });
 
       expect(changes).toEqual([50_000]);
     });

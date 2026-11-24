@@ -395,7 +395,7 @@ describe("sendStudioOverlays", () => {
       handle: "kai",
       picture: "",
       coins: 40,
-      gifts: 1,
+      gifts: 0,
       giftSubs: 0,
       giftedAt: 0,
       platform: "kick",

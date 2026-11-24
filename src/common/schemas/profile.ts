@@ -141,9 +141,9 @@ export const TriggerSchema = z.object({
   // Only used by member and super fan join triggers. A handle or name, empty
   // means anyone.
   user: z.string().default(""),
-  // The row's minimum in its event's unit, 0 for any: a gift's coins or
-  // Kicks (the streak's worth when it ends, or each gift's with every_gift),
-  // a cheer's Bits, a Super Chat's US dollars or a gift sub's count. Named
+  // The row's minimum in its event's unit, 0 for any: a gift's coins (the
+  // streak's worth when it ends, or each gift's with every_gift), a cheer's
+  // Bits, Kick's Kicks, a Super Chat's US dollars or a gift sub's count. Named
   // before the others had one, and kept for older files.
   min_coins: z.number().int().min(0).default(0),
   // The viewer has one of them. Empty means anyone, and events without a

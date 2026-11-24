@@ -75,7 +75,7 @@ export function studioNumbersFor(
     followers: sent.includes(TOKIO_EVENTS.FOLLOW),
     shares: sent.includes(TOKIO_EVENTS.SHARE),
     coins: currencies.includes("coins"),
-    kicks: currencies.includes("kicks"),
+    kicks: sent.includes(TOKIO_EVENTS.KICKS),
     bits: sent.includes(TOKIO_EVENTS.CHEER),
     superchats: sent.includes(TOKIO_EVENTS.SUPER_CHAT),
     gifts: sent.includes(TOKIO_EVENTS.GIFT),

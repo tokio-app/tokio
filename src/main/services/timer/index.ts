@@ -31,6 +31,7 @@ export const TIMER_EVENTS = [
   TOKIO_EVENTS.GIFT_SUB,
   TOKIO_EVENTS.CHEER,
   TOKIO_EVENTS.SUPER_CHAT,
+  TOKIO_EVENTS.KICKS,
 ] as const;
 
 type TimerEvent = (typeof TIMER_EVENTS)[number];
@@ -86,15 +87,9 @@ export class TimerService extends Service {
   private readonly _triggers: Triggers = {
     [TOKIO_EVENTS.GIFT]: (event) => {
       const { added } = this._streaks.add(event);
-      // Each platform's currency apart: a Kick gift's coins are its Kicks
-      const currency = GIFT_CURRENCY[platformOf(event.user)];
-      if (!currency) return 0;
-      const { coin, kick } = this._seconds();
-      return (
-        added *
-        Math.max(0, event.gift.coins) *
-        (currency === "kicks" ? kick : coin)
-      );
+      // Only TikTok's gifts have a price: YouTube's add nothing
+      if (!GIFT_CURRENCY[platformOf(event.user)]) return 0;
+      return added * Math.max(0, event.gift.coins) * this._seconds().coin;
     },
     [TOKIO_EVENTS.LIKE]: ({ likeCount }) => {
       const { likes, likes_every } = this._seconds();
@@ -115,6 +110,8 @@ export class TimerService extends Service {
     [TOKIO_EVENTS.GIFT_SUB]: ({ count }) =>
       Math.max(0, count) * this._seconds().gift_sub,
     [TOKIO_EVENTS.CHEER]: ({ bits }) => Math.max(0, bits) * this._seconds().bit,
+    [TOKIO_EVENTS.KICKS]: ({ kicks }) =>
+      Math.max(0, kicks) * this._seconds().kick,
     // Once each, whatever its amount: currencies differ
     [TOKIO_EVENTS.SUPER_CHAT]: () => this._seconds().superchat,
   };

@@ -717,15 +717,12 @@ describe("init events", () => {
       );
     });
 
-    it("names a Kick gift's alert Kicks when it fails", async () => {
+    it("names a Kicks alert Kicks when it fails", async () => {
       const s = await live();
       s.alertsService.handle.mockRejectedValue(new Error("decode failed"));
-      const { data } = generateTikTokEventSample(TOKIO_EVENTS.GIFT);
+      const { data } = generateTikTokEventSample(TOKIO_EVENTS.KICKS);
 
-      s.conn.emit(TOKIO_EVENTS.GIFT, {
-        ...data,
-        user: { ...data.user, platform: "kick" },
-      });
+      s.conn.emit(TOKIO_EVENTS.KICKS, data);
 
       await vi.waitFor(() => {
         expect(s.h.notices).toEqual([
@@ -791,13 +788,13 @@ describe("init events", () => {
       ]);
     });
 
-    it("names a Kick row's gift Kicks", async () => {
+    it("names a Kicks row Kicks", async () => {
       const { s, callback } = await onFailure();
       const first = alert();
 
       callback(first, undefined, {
         ...first.trigger,
-        type: TOKIO_EVENTS.GIFT,
+        type: TOKIO_EVENTS.KICKS,
         platform: "kick",
       });
 

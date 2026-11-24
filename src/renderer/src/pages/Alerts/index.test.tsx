@@ -1407,7 +1407,10 @@ describe("Alerts", () => {
       const { user } = await load(
         [
           alert("alert-1", worth({})),
-          alert("alert-2", worth({ platform: "kick" })),
+          alert(
+            "alert-2",
+            worth({ type: TOKIO_EVENTS.KICKS, platform: "kick" }),
+          ),
           alert("alert-3", worth({ platform: "youtube", min_coins: 0 })),
         ],
         (p) => {
@@ -1415,15 +1418,16 @@ describe("Alerts", () => {
         },
       );
 
-      expect(summary(0)).toHaveTextContent("worth 100+ coins or Kicks");
-      expect(summary(1)).toHaveTextContent("worth 100+ Kicks");
+      // Kick sends no gifts: its Kicks are a row of their own
+      expect(summary(0)).toHaveTextContent("worth 100+ coins");
+      expect(summary(1)).toHaveTextContent("Worth 100+ Kicks");
       const opened = await edit(user, 0);
       expect(
         opened.getByRole("group", { name: "Worth at least" }),
-      ).toHaveTextContent(/coins or Kicks/);
+      ).toHaveTextContent(/^Worth at least coinsThe/);
       await user.keyboard("{Escape}");
 
-      // TikTok's gifts can't set off a Kick row
+      // A Kicks row has no gifts, and its minimum is in Kicks
       const kick = await edit(user, 1);
       expect(kick.queryByText("Any gift")).toBeNull();
       expect(

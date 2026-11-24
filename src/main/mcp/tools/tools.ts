@@ -91,7 +91,7 @@ export const sections: Sections = {
       return error ?? ok({ saved: true, timer: timerState(handler) });
     },
     notes:
-      "The active profile's countdown timer (Tools → Countdown), a subathon clock viewers add time to. start is the minutes it starts from and goes back to on reset; cap the minutes added time stops at (0, no limit); multiplier multiplies every trigger's seconds. seconds holds what each event adds: coin per coin of TikTok's gifts, kick per Kick of Kick's, likes every likes_every likes, superfan, follow, share and chat (0 leaves one out); chat counts only messages with chat.keyword, once per viewer every chat.cooldown seconds. look sets its overlay at http://tokio-app.local:37891/timer/ (colors #rrggbb or #rrggbbaa; names empty for the app language's). The timer tool starts and adjusts it.",
+      "The active profile's countdown timer (Tools → Countdown), a subathon clock viewers add time to. start is the minutes it starts from and goes back to on reset; cap the minutes added time stops at (0, no limit); multiplier multiplies every trigger's seconds. seconds holds what each event adds: coin per coin of TikTok's gifts, kick per Kick sent on Kick, likes every likes_every likes, superfan, follow, share and chat (0 leaves one out); chat counts only messages with chat.keyword, once per viewer every chat.cooldown seconds. look sets its overlay at http://tokio-app.local:37891/timer/ (colors #rrggbb or #rrggbbaa; names empty for the app language's). The timer tool starts and adjusts it.",
   }),
 };
 

@@ -220,7 +220,7 @@ function TriggerTab({ alert, gifts, emotes, onChange }: TriggerTabProps) {
     const filter = FILTER_LABELS[trigger.type];
     const { roles } = trigger;
     const change = (changed: Trigger) => setRow(index, changed);
-    // Kick's and YouTube's gift rows have nothing to filter
+    // YouTube's gift rows have nothing to filter
     const filtered =
       filter &&
       (trigger.type !== TOKIO_EVENTS.GIFT ||

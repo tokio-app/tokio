@@ -32,6 +32,18 @@ describe("formatAlertMessage", () => {
     ).toBe("Viewer (viewer) sent 3 Rose");
   });
 
+  it("fills Kicks' count and pinned message, as a cheer's", () => {
+    const kicks = {
+      user: { ...user, follower: false },
+      kicks: 50,
+      message: "gg",
+    };
+
+    expect(
+      formatAlertMessage("{username}: {count} Kicks, {comment}", kicks),
+    ).toBe("Viewer: 50 Kicks, gg");
+  });
+
   it("names the song that is playing", () => {
     const songs = [
       { title: "Old", thumbnail: "", playing: false, played: true },

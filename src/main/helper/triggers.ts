@@ -83,14 +83,14 @@ export function matchesTrigger(
     return every_gift ? added > 0 : repeatEnd;
   }
 
-  // Bits, Super Chats and gifted subs have a minimum in their own unit
+  // Bits, Kicks, Super Chats and gifted subs have a minimum in their own unit
   const worth = worthOf(type, payload);
   return worth === null || worth >= trigger.min_coins;
 }
 
 /**
- * A Bits, Super Chat or gift sub event's worth in its row's minimum: its
- * Bits, US dollars or subs. Null for other events, and for a Super Chat
+ * A Bits, Kicks, Super Chat or gift sub event's worth in its row's minimum:
+ * its Bits, Kicks, US dollars or subs. Null for other events, and for a Super Chat
  * without dollars, so a missing rate never silences it.
  */
 function worthOf(
@@ -99,6 +99,7 @@ function worthOf(
 ): number | null {
   if (typeof payload !== "object" || payload === null) return null;
   if (type === TOKIO_EVENTS.CHEER && "bits" in payload) return payload.bits;
+  if (type === TOKIO_EVENTS.KICKS && "kicks" in payload) return payload.kicks;
   if (type === TOKIO_EVENTS.SUPER_CHAT && "sticker" in payload) {
     return payload.usd ?? null;
   }

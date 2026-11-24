@@ -8,27 +8,26 @@ import { NumberInput } from "../Elements";
 import { Field } from "../Page";
 import styles from "./alertitem.module.css";
 
-export type MinUnit = "coins" | "kicks" | "either" | "bits" | "usd" | "subs";
+export type MinUnit = "coins" | "kicks" | "bits" | "usd" | "subs";
 
 /**
- * What a row's minimum (min_coins) is in: Bits for Bits, US dollars for
- * Super Chats, subs for gifted subs, and for a gift its platform's currency,
- * or for any platform the profile's, "either" with both. Null for other
- * events and gifts without a price (YouTube's), unless a gift minimum is
- * saved, so it stays to fix.
+ * What a row's minimum (min_coins) is in: Bits for Bits, Kicks for Kicks, US
+ * dollars for Super Chats, subs for gifted subs, and coins for gifts the
+ * row's platforms price (TikTok's). Null for other events and gifts without
+ * a price (YouTube's), unless a gift minimum is saved, so it stays to fix.
  */
 export function minUnit(
   trigger: Trigger,
   profilePlatforms: readonly Platform[],
 ): MinUnit | null {
   if (trigger.type === TOKIO_EVENTS.CHEER) return "bits";
+  if (trigger.type === TOKIO_EVENTS.KICKS) return "kicks";
   if (trigger.type === TOKIO_EVENTS.SUPER_CHAT) return "usd";
   if (trigger.type === TOKIO_EVENTS.GIFT_SUB) return "subs";
   if (trigger.type !== TOKIO_EVENTS.GIFT) return null;
   const currencies = giftCurrencies(
     trigger.platform ? [trigger.platform] : profilePlatforms,
   );
-  if (currencies.length > 1) return "either";
   return currencies[0] ?? (trigger.min_coins > 0 ? "coins" : null);
 }
 
@@ -36,7 +35,6 @@ export function minUnit(
 const MIN_INPUT: Record<MinUnit, MessageKey> = {
   coins: "alerts.editor.minCoinsInput",
   kicks: "alerts.editor.minKicksInput",
-  either: "alerts.editor.minEitherInput",
   bits: "alerts.editor.minBitsInput",
   usd: "alerts.editor.minUsdInput",
   subs: "alerts.editor.minSubsInput",

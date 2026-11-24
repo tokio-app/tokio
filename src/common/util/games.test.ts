@@ -449,10 +449,10 @@ describe("gameEventText", () => {
     expect(text(giftAction([42]), "es-419")).toBe("Regalo");
   });
 
-  it("names a Kick row's gifts Kicks", () => {
+  it("names a Kicks row Kicks", () => {
     const kicks = action(
       (a) => (a.trigger.platform = "kick"),
-      TOKIO_EVENTS.GIFT,
+      TOKIO_EVENTS.KICKS,
     );
 
     expect(text(kicks)).toBe("Kicks");

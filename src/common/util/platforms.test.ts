@@ -78,17 +78,15 @@ describe("platforms", () => {
     ]);
   });
 
-  it("prices TikTok's gifts in coins and Kick's in Kicks, each apart", () => {
+  it("prices only TikTok's gifts, in coins: Kick's Kicks aren't gifts", () => {
     expect(GIFT_CURRENCY).toEqual({
       tiktok: "coins",
       twitch: null,
       youtube: null,
-      kick: "kicks",
+      kick: null,
     });
-    expect(giftCurrencies(["kick", "youtube", "tiktok"])).toEqual([
-      "coins",
-      "kicks",
-    ]);
+    expect(giftCurrencies(["kick", "youtube", "tiktok"])).toEqual(["coins"]);
+    expect(giftCurrencies(["kick"])).toEqual([]);
     expect(giftCurrencies(["twitch", "youtube"])).toEqual([]);
   });
 

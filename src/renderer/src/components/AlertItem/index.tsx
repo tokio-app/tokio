@@ -18,7 +18,6 @@ import {
   rowPlatforms,
   rowStreaks,
   takesRoles,
-  triggerName,
   triggersOf,
 } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
@@ -57,7 +56,6 @@ const GIFT_PLAYS: { value: "streak" | "gift"; label: MessageKey }[] = [
 const WORTH: Record<MinUnit, MessageKey> = {
   coins: "components.alertItem.worth",
   kicks: "components.alertItem.worthKicks",
-  either: "components.alertItem.worthEither",
   bits: "components.alertItem.worthBits",
   usd: "components.alertItem.worthUsd",
   subs: "components.alertItem.giftSubsAtLeast",
@@ -107,7 +105,7 @@ export function TriggerFilter({
   const catalog = streaks || trigger.gifts.length > 0;
   switch (trigger.type) {
     case TOKIO_EVENTS.GIFT:
-      // Kick's and YouTube's gifts have neither
+      // YouTube's gifts have neither
       if (!catalog && !streaks) return null;
       return (
         <div className={styles.stack}>
@@ -270,18 +268,13 @@ function rowSummary(
       if (!pictured) {
         parts.push(
           trigger.gifts.length === 0
-            ? // A Kick row's gifts are Kicks
-              t(
-                trigger.platform === "kick"
-                  ? "components.alertItem.anyKick"
-                  : "common.anyGift",
-              )
+            ? t("common.anyGift")
             : // Gifts the lists don't have yet, until they load
               (pickedNames(trigger, gifts, emotes, language) ??
                 t("components.alertItem.someGifts")),
         );
       }
-      // Kick's and YouTube's gifts come one at a time
+      // YouTube's gifts come one at a time
       if (rowStreaks(trigger, platforms)) {
         parts.push(
           trigger.every_gift
@@ -295,6 +288,7 @@ function rowSummary(
       }
       break;
     case TOKIO_EVENTS.CHEER:
+    case TOKIO_EVENTS.KICKS:
     case TOKIO_EVENTS.SUPER_CHAT:
     case TOKIO_EVENTS.GIFT_SUB:
       if (trigger.min_coins > 0 && unit) {
@@ -386,7 +380,7 @@ export function eventName(
   { type, platform }: { type: Trigger["type"]; platform?: Platform },
   t: (key: MessageKey, params?: Params) => string,
 ): string {
-  const event = t(triggerName({ type, platform }));
+  const event = t(ALERT_TRIGGER_LABELS[type]);
   return platform
     ? t("components.triggers.onPlatform", {
         event,

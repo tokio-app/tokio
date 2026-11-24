@@ -42,6 +42,7 @@ export const HISTORY_EVENTS = [
   TOKIO_EVENTS.CHEER,
   TOKIO_EVENTS.SUPER_CHAT,
   TOKIO_EVENTS.GIFT_SUB,
+  TOKIO_EVENTS.KICKS,
 ] as const;
 
 export type HistoryEvent = (typeof HISTORY_EVENTS)[number];
@@ -134,7 +135,8 @@ const byAmount = (a: Gifter, b: Gifter) =>
 const byCoins = (a: Gifter, b: Gifter) =>
   b.coins - a.coins || a.giftedAt - b.giftedAt;
 
-// The gifters overlays get: TikTok's and Kick's who sent gifts with a price
+// The gifters overlays get: TikTok's who sent coins. The other platforms'
+// money isn't gifts (Kick's Kicks, Twitch's Bits) or has no price.
 const overlaid = (gifter: Gifter) =>
   gifter.coins > 0 && GIFT_CURRENCY[platformOf(gifter)] !== null;
 
@@ -250,14 +252,16 @@ export class HistoryService extends Service {
       const { added } = this._streaks.add(event);
       if (added <= 0) return;
       const { user, gift } = event;
-      // gift.coins is in the platform's currency: a Kick gift's are Kicks.
-      // YouTube's Gifts have no price.
+      // Only TikTok's gifts have a price: YouTube's Gifts have none
       const priced = GIFT_CURRENCY[platformOf(user)] !== null;
       const amount = priced ? added * Math.max(0, gift.coins) : 0;
       this._count(live, user, { amount, gifts: added, giftSubs: 0 });
     },
     [TOKIO_EVENTS.CHEER]: (live, { user, bits }) => {
       this._count(live, user, { amount: bits, gifts: 0, giftSubs: 0 });
+    },
+    [TOKIO_EVENTS.KICKS]: (live, { user, kicks }) => {
+      this._count(live, user, { amount: kicks, gifts: 0, giftSubs: 0 });
     },
     [TOKIO_EVENTS.GIFT_SUB]: (live, { user, count }) => {
       this._count(live, user, { amount: 0, gifts: 0, giftSubs: count });
@@ -428,8 +432,8 @@ export class HistoryService extends Service {
   }
 
   /**
-   * The top 10s overlays get, with both numbers on everyone: TikTok's and
-   * Kick's gifters of gifts with a price, as before other platforms counted.
+   * The top 10s overlays get, with both numbers on everyone: TikTok's
+   * gifters of coins, as before other platforms counted.
    */
   public top(): { live: TopGifter[]; allTime: TopGifter[] } {
     const live = [...this._liveGifters.values()].filter(overlaid);

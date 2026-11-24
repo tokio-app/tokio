@@ -512,8 +512,8 @@ describe("Redeem and platforms", () => {
     expect(triggerLabel(withGift, t, "en")).toBe("Follow on Twitch or Gift");
   });
 
-  it("names a Kick row's gifts Kicks, any platform's still Gift", () => {
-    const kicks = alert({}, { type: TOKIO_EVENTS.GIFT, platform: "kick" });
+  it("names a Kicks row Kicks, any platform's gift still Gift", () => {
+    const kicks = alert({}, { type: TOKIO_EVENTS.KICKS, platform: "kick" });
     const any = alert({}, { type: TOKIO_EVENTS.GIFT });
 
     expect(triggerLabel(kicks, t, "en")).toBe("Kicks on Kick");
@@ -530,6 +530,7 @@ describe("money rows' minimums", () => {
       minUnit(alert({}, { type }).trigger, ["twitch", "youtube"]);
 
     expect(unit(TOKIO_EVENTS.CHEER)).toBe("bits");
+    expect(unit(TOKIO_EVENTS.KICKS)).toBe("kicks");
     expect(unit(TOKIO_EVENTS.SUPER_CHAT)).toBe("usd");
     expect(unit(TOKIO_EVENTS.GIFT_SUB)).toBe("subs");
     expect(unit(TOKIO_EVENTS.FOLLOW)).toBeNull();
@@ -537,6 +538,7 @@ describe("money rows' minimums", () => {
 
   it("sums up each minimum in its unit, and nothing at 0", () => {
     expect(sum(TOKIO_EVENTS.CHEER, 100)).toBe("Worth 100+ Bits");
+    expect(sum(TOKIO_EVENTS.KICKS, 100)).toBe("Worth 100+ Kicks");
     expect(sum(TOKIO_EVENTS.SUPER_CHAT, 5)).toBe("Worth $5+");
     expect(sum(TOKIO_EVENTS.GIFT_SUB, 5)).toBe("5+ gifted subs");
     expect(sum(TOKIO_EVENTS.CHEER, 0)).toBe("");
@@ -549,12 +551,11 @@ describe("gift rows on each platform", () => {
 
   it("takes the minimum in the row's currency", () => {
     expect(minUnit(row(), ["tiktok"])).toBe("coins");
-    expect(minUnit(row(), ["kick", "youtube"])).toBe("kicks");
-    expect(minUnit(row(), ["tiktok", "kick"])).toBe("either");
+    // Kick sends no gifts, and YouTube's have no price
+    expect(minUnit(row(), ["kick", "youtube"])).toBeNull();
+    expect(minUnit(row(), ["tiktok", "kick"])).toBe("coins");
     // A row for one platform, whatever the profile has
-    expect(minUnit(row({ platform: "tiktok" }), ["tiktok", "kick"])).toBe(
-      "coins",
-    );
+    expect(minUnit(row({ platform: "tiktok" }), ["youtube"])).toBe("coins");
     expect(minUnit(row({ platform: "youtube" }), ["tiktok"])).toBeNull();
     // A minimum saved where gifts have no price stays to fix
     expect(minUnit(row({ platform: "youtube", min_coins: 5 }), [])).toBe(
@@ -574,11 +575,7 @@ describe("gift rows on each platform", () => {
       );
 
     expect(sum({}, ["tiktok", "kick"])).toBe(
-      "Any gift, when the streak ends, worth 100+ coins or Kicks",
-    );
-    // A Kick row's gifts are Kicks, which come one at a time
-    expect(sum({ platform: "kick" }, ["tiktok", "kick"])).toBe(
-      "Any Kick, worth 100+ Kicks",
+      "Any gift, when the streak ends, worth 100+ coins",
     );
   });
 
@@ -604,12 +601,14 @@ describe("gift rows on each platform", () => {
       return shown;
     };
 
-    expect(picker(row(), ["tiktok", "kick"])).toBe(true);
-    expect(picker(row(), ["kick", "youtube"])).toBe(false);
-    expect(picker(row({ platform: "tiktok" }), ["kick"])).toBe(true);
-    expect(picker(row({ platform: "kick" }), ["tiktok", "kick"])).toBe(false);
+    expect(picker(row(), ["tiktok", "youtube"])).toBe(true);
+    expect(picker(row(), ["youtube"])).toBe(false);
+    expect(picker(row({ platform: "tiktok" }), ["youtube"])).toBe(true);
+    expect(picker(row({ platform: "youtube" }), ["tiktok", "youtube"])).toBe(
+      false,
+    );
     expect(
-      picker(row({ platform: "kick", gifts: [5655] }), ["kick"], "Rose"),
+      picker(row({ platform: "youtube", gifts: [5655] }), ["youtube"], "Rose"),
     ).toBe(true);
   });
 });

@@ -1,7 +1,5 @@
-import type { MessageKey } from "../i18n";
-import type { Alert, Trigger } from "../schemas/profile";
+import type { Alert } from "../schemas/profile";
 import {
-  ALERT_TRIGGER_LABELS,
   AlertTrigger,
   AppEvents,
   EMOTE_TRIGGER,
@@ -44,15 +42,6 @@ export const getSoundPreviewURL = (file: string) =>
 // A Minecraft picture's, by its folder's path in the app folder
 export const getPicturePreviewURL = (file: string) =>
   `${MEDIA_SCHEME}:///games/minecraft/${encodeURIComponent(file)}`;
-
-// A trigger row's event as its platform names it: a Kick row's gifts are
-// Kicks, as Twitch's cheers are Bits
-export const triggerName = (
-  trigger: Pick<Trigger, "type" | "platform">,
-): MessageKey =>
-  trigger.type === TOKIO_EVENTS.GIFT && trigger.platform === "kick"
-    ? "triggers.kicks"
-    : ALERT_TRIGGER_LABELS[trigger.type];
 
 // Every trigger an alert, or a Studio element or group, reacts to, its first
 // first

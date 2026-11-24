@@ -7,6 +7,7 @@ import type {
   SavedEmote,
 } from "@/common/schemas";
 import {
+  ALERT_TRIGGER_LABELS,
   CustomGift,
   EMOTE_TRIGGER,
   GameOverlayRow,
@@ -15,7 +16,6 @@ import {
 import bedrock from "../games/minecraft-bedrock.json";
 import java from "../games/minecraft-java.json";
 import { EVENT_SPRITES } from "../games/sprites";
-import { triggerName } from "./alerts";
 
 type Names = Record<string, string>;
 type Weather = Extract<GameStep, { type: "weather" }>["weather"];
@@ -162,8 +162,7 @@ export function giftNames(
 /**
  * The event's own text on the games overlay, in the language: the gifts'
  * names, "100 likes", chat's keyword quoted like the timer's carousel (“tnt”,
- * none without one, as its bubble says chat), or the trigger's name ("Kicks"
- * for any Kick).
+ * none without one, as its bubble says chat), or the trigger's name.
  * For an id in gifts twice, the first entry wins, so TikTok's list goes first.
  */
 export function gameEventText(
@@ -172,14 +171,10 @@ export function gameEventText(
   language: string,
 ) {
   const { trigger, likes_every } = action;
-  const label = translate(language, triggerName(trigger));
+  const label = translate(language, ALERT_TRIGGER_LABELS[trigger.type]);
   if (trigger.type === TOKIO_EVENTS.GIFT) {
-    if (trigger.gifts.length === 0) {
-      // A Kick row takes any Kick, its gifts' own name
-      return trigger.platform === "kick"
-        ? label
-        : translate(language, "common.anyGift");
-    }
+    if (trigger.gifts.length === 0)
+      return translate(language, "common.anyGift");
     return giftNames(trigger.gifts, gifts, language) ?? label;
   }
   if (trigger.type === TOKIO_EVENTS.LIKE) {

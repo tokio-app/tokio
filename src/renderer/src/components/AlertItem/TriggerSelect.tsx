@@ -1,11 +1,6 @@
 import { ALERT_TRIGGERS } from "@/common/schemas";
 import { AlertTrigger, Platform } from "@/common/types";
-import {
-  PLATFORM_LABELS,
-  platformsOf,
-  triggerName,
-  triggersFor,
-} from "@/common/util";
+import { PLATFORM_LABELS, platformsOf, triggersFor } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import { cx } from "@/helper/cx";
 import { useT } from "@/ui/i18n";
@@ -80,19 +75,9 @@ export function TriggerSelect<T extends Row>({
   const platforms = usePlatforms();
   const values = options.map((o) => o.value);
   const events = eventsFor(values, platforms, trigger.platform);
-  // Named as the row's platform names them: a Kick row's gifts are Kicks
-  const shown = options
-    .filter((o) => events.includes(o.value) || o.value === trigger.type)
-    .map((o) =>
-      isAlertTrigger(o.value)
-        ? {
-            ...o,
-            label: t(
-              triggerName({ type: o.value, platform: trigger.platform }),
-            ),
-          }
-        : o,
-    );
+  const shown = options.filter(
+    (o) => events.includes(o.value) || o.value === trigger.type,
+  );
   const event = (eventClass?: string) => (
     <Select
       className={eventClass}

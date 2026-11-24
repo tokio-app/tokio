@@ -295,13 +295,13 @@ describe("AlertEditor's minimum", () => {
     );
   const minimum = () => screen.queryByRole("group", { name: "Worth at least" });
 
-  // The streak's note only where gifts come in streaks, TikTok's: Kick's
-  // and YouTube's come one at a time
+  // The streak's note only where gifts come in streaks, TikTok's: YouTube's
+  // come one at a time
   it.each([
     [["tiktok"], {}, "coins", true],
-    [["kick"], {}, "Kicks", false],
-    [["tiktok", "kick"], {}, "coins or Kicks", true],
-    [["tiktok", "kick"], { platform: "kick" }, "Kicks", false],
+    // Kick sends no gifts
+    [["tiktok", "kick"], {}, "coins", true],
+    [["tiktok", "youtube"], { platform: "tiktok" }, "coins", true],
     // A minimum saved on a row with no price stays to fix
     [["youtube"], { min_coins: 10 }, "coins", false],
   ] as const)(
@@ -326,10 +326,11 @@ describe("AlertEditor's minimum", () => {
 
   it.each([
     [TOKIO_EVENTS.CHEER, "Worth at least", "Bits"],
+    [TOKIO_EVENTS.KICKS, "Worth at least", "Kicks"],
     [TOKIO_EVENTS.SUPER_CHAT, "Worth at least", "USD"],
     [TOKIO_EVENTS.GIFT_SUB, "At least", "gifted subs"],
   ] as const)("takes %s's in its own unit", (type, label, unit) => {
-    open(gift({ type }), ["twitch", "youtube"]);
+    open(gift({ type }), ["twitch", "youtube", "kick"]);
 
     expect(screen.getByRole("group", { name: label })).toHaveTextContent(
       new RegExp(`^${label} ${unit}$`),
@@ -438,10 +439,10 @@ describe("AlertEditor's rows on their platforms", () => {
     ]);
   });
 
-  it("has no roles or gift filter on a Kick gift row", () => {
-    open(row({ type: TOKIO_EVENTS.GIFT, platform: "kick" }), ALL);
+  it("has no roles or gift filter on a Kicks row, and a minimum", () => {
+    open(row({ type: TOKIO_EVENTS.KICKS, platform: "kick" }), ALL);
 
-    // Kicks come without badges, one at a time
+    // Kicks come without badges
     expect(roles()).toBeNull();
     expect(screen.queryByRole("group", { name: "Gifts" })).toBeNull();
     expect(

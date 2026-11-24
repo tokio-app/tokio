@@ -1,5 +1,6 @@
 import {
   GiftEvent,
+  KicksEvent,
   LiveRecord,
   LiveSummary,
   SuperChatEvent,
@@ -59,6 +60,13 @@ const superChat = (
 
 const MINUTE = 60_000;
 
+// Kick's Kicks, sent like gifts in the tests
+const kicked = (user: UserData, kicks: number): KicksEvent => ({
+  user,
+  kicks,
+  message: "",
+});
+
 const gift = (
   user: UserData,
   coins: number,
@@ -104,11 +112,15 @@ describe("HistoryService", () => {
     return history;
   };
 
-  // Sends each gift at its own time
-  const gifts = (history: HistoryService, ...sent: [number, GiftEvent][]) => {
+  // Sends each gift, or Kick's Kicks, at its own time
+  const gifts = (
+    history: HistoryService,
+    ...sent: [number, GiftEvent | KicksEvent][]
+  ) => {
     for (const [at, event] of sent) {
       vi.setSystemTime(at);
-      history.record(TOKIO_EVENTS.GIFT, event);
+      if ("kicks" in event) history.record(TOKIO_EVENTS.KICKS, event);
+      else history.record(TOKIO_EVENTS.GIFT, event);
     }
   };
 
@@ -194,15 +206,14 @@ describe("HistoryService", () => {
   it("keeps a gifter's platform, through a save and a load", async () => {
     const history = await loaded();
     history.start("kai", 0);
-    gifts(history, [1, gift(kicker("kick:1"), 5)]);
+    gifts(history, [1, kicked(kicker("kick:1"), 5)]);
 
-    expect(history.top().live[0].platform).toBe("kick");
+    expect(history.topByPlatform().kick?.[0].platform).toBe("kick");
     history.end(10);
     expect(await history.save()).toBe(true);
 
     const again = await loaded();
     expect(again.getHistory().gifters[0].platform).toBe("kick");
-    expect(again.top().allTime[0].platform).toBe("kick");
   });
 
   it("gives each platform's own top gifters in this LIVE", async () => {
@@ -212,14 +223,15 @@ describe("HistoryService", () => {
     gifts(
       history,
       [1, gift(viewer("ana"), 30)],
-      [2, gift(kicker("kick:1"), 5)],
-      [3, gift(kicker("kick:2"), 20)],
+      [2, kicked(kicker("kick:1"), 5)],
+      [3, kicked(kicker("kick:2"), 20)],
     );
 
     const tops = history.topByPlatform();
     expect(tops.tiktok?.map((g) => g.userId)).toEqual(["ana"]);
+    // Ranked by Kicks, which aren't gifts
     expect(tops.kick?.map((g) => g.userId)).toEqual(["kick:2", "kick:1"]);
-    expect(tops.kick?.[0]).toMatchObject({ coins: 20, gifts: 1 });
+    expect(tops.kick?.[0]).toMatchObject({ coins: 20, gifts: 0 });
 
     history.end(10);
     expect(history.topByPlatform()).toEqual({});
@@ -250,20 +262,21 @@ describe("HistoryService", () => {
     gifts(
       history,
       [1, gift(viewer("1"), 5)],
-      [2, gift(kicker("kick:1"), 100, 2)],
+      [2, kicked(kicker("kick:1"), 200)],
       // No id: the totals only, under "kick:"
-      [3, gift({ ...kicker("kick:2"), userId: "" }, 10)],
+      [3, kicked({ ...kicker("kick:2"), userId: "" }, 10)],
     );
     history.end(10);
     await history.save();
 
+    // Kicks are Kick's money, never gifts
     expect(history.getHistory().lives).toEqual([
       expect.objectContaining({
         coins: 5,
-        gifts: 4,
+        gifts: 1,
         platforms: {
           tiktok: { amount: 5, gifts: 1, giftSubs: 0 },
-          kick: { amount: 210, gifts: 3, giftSubs: 0 },
+          kick: { amount: 210, gifts: 0, giftSubs: 0 },
         },
       }),
     ]);
@@ -272,32 +285,32 @@ describe("HistoryService", () => {
         minute: 0,
         gifters: {
           1: [5, 1, 0],
-          "kick:1": [200, 2, 0],
-          "kick:": [10, 1, 0],
+          "kick:1": [200, 0, 0],
+          "kick:": [10, 0, 0],
         },
       },
     ]);
   });
 
-  it("splits a cut LIVE's totals by each gift's currency", async () => {
+  it("splits a cut LIVE's totals by each platform's currency", async () => {
     const history = await loaded();
     history.start("kai", 10 * MINUTE);
     gifts(
       history,
       [10 * MINUTE + 1000, gift(viewer("1"), 999)],
       [11 * MINUTE, gift(viewer("1"), 5)],
-      [11 * MINUTE + 1000, gift(kicker("kick:1"), 100)],
-      [11 * MINUTE + 2000, gift({ ...kicker("kick:2"), userId: "" }, 10)],
+      [11 * MINUTE + 1000, kicked(kicker("kick:1"), 100)],
+      [11 * MINUTE + 2000, kicked({ ...kicker("kick:2"), userId: "" }, 10)],
       [11 * MINUTE + 3000, gift({ ...viewer("2"), userId: "" }, 3)],
     );
     history.end(12 * MINUTE);
 
     expect(await history.getTotals({ from: 11 * MINUTE })).toEqual({
       coins: 8,
-      gifts: 4,
+      gifts: 2,
       platforms: {
         tiktok: { amount: 8, gifts: 2, giftSubs: 0 },
-        kick: { amount: 110, gifts: 2, giftSubs: 0 },
+        kick: { amount: 110, gifts: 0, giftSubs: 0 },
       },
     });
   });
@@ -308,9 +321,9 @@ describe("HistoryService", () => {
     gifts(
       history,
       [1, gift(viewer("a"), 100)],
-      [2, gift(kicker("kick:a"), 50)],
+      [2, kicked(kicker("kick:a"), 50)],
       [3, gift(viewer("b"), 20)],
-      [4, gift(kicker("kick:b", "bea"), 500)],
+      [4, kicked(kicker("kick:b", "bea"), 500)],
     );
     history.end(10);
 
@@ -329,8 +342,8 @@ describe("HistoryService", () => {
     expect(await places({ query: "bea" })).toEqual([["kick:b", 1]]);
     // Dates read from the files rank the same
     expect(await places({ from: 3 })).toEqual(ranked);
-    // Overlays' lists stay mixed
-    expect(history.top().allTime.map((g) => g.userId)).toEqual(all);
+    // Overlays get TikTok's coins alone
+    expect(history.top().allTime.map((g) => g.userId)).toEqual(["a", "b"]);
   });
 
   it("reads LIVEs saved before other platforms with no parts of their own", async () => {
@@ -465,7 +478,7 @@ describe("HistoryService", () => {
     // The fewest coins, and the older one is dropped
     gifts(history, [1, gift(viewer("old"), 1)], [2, gift(viewer("new"), 1)]);
     // Kicks have their own cap
-    gifts(history, [3, gift(kicker("kick:1"), 1)]);
+    gifts(history, [3, kicked(kicker("kick:1"), 1)]);
     history.end(100);
     expect(await history.save()).toBe(true);
 
@@ -1244,17 +1257,17 @@ describe("HistoryService", () => {
         count: 2,
         tier: "",
       });
-      gifts(history, [2, gift(kicker("kick:2"), 50)]);
+      gifts(history, [2, kicked(kicker("kick:2"), 50)]);
       history.end(10);
       await history.save();
 
       const [live] = history.getHistory().lives;
-      expect(live).toMatchObject({ coins: 0, gifts: 1 });
+      expect(live).toMatchObject({ coins: 0, gifts: 0 });
       expect(live.platforms).toEqual({
         tiktok: { amount: 0, gifts: 0, giftSubs: 0 },
         youtube: { amount: 0, gifts: 0, giftSubs: 0 },
         twitch: { amount: 100, gifts: 0, giftSubs: 5 },
-        kick: { amount: 50, gifts: 1, giftSubs: 2 },
+        kick: { amount: 50, gifts: 0, giftSubs: 2 },
       });
       expect(history.getHistory().gifters).toEqual([
         expect.objectContaining({
@@ -1267,7 +1280,7 @@ describe("HistoryService", () => {
         expect.objectContaining({
           userId: "kick:2",
           coins: 50,
-          gifts: 1,
+          gifts: 0,
           giftSubs: 2,
           platform: "kick",
         }),
@@ -1275,7 +1288,7 @@ describe("HistoryService", () => {
       expect((await read<LiveRecord>("0.json")).minutes).toEqual([
         {
           minute: 0,
-          gifters: { "twitch:1": [100, 0, 5], "kick:2": [50, 1, 2] },
+          gifters: { "twitch:1": [100, 0, 5], "kick:2": [50, 0, 2] },
         },
       ]);
     });
@@ -1444,10 +1457,14 @@ describe("HistoryService", () => {
       expect(ids).toContain("twitch:1");
     });
 
-    it("gives overlays TikTok's and Kick's gift gifters only, as before", async () => {
+    it("gives overlays TikTok's gifters only, as before", async () => {
       const history = await loaded();
       history.start("kai", 0);
-      gifts(history, [1, gift(kicker("kick:1"), 5)], [2, gift(viewer("1"), 9)]);
+      gifts(
+        history,
+        [1, kicked(kicker("kick:1"), 5)],
+        [2, gift(viewer("1"), 9)],
+      );
       history.record(TOKIO_EVENTS.CHEER, {
         user: twitcher("twitch:1"),
         bits: 500,
@@ -1467,12 +1484,10 @@ describe("HistoryService", () => {
         const { live, allTime } = history.top();
         return [live, allTime].map((list) => list.map((g) => g.userId));
       };
-      expect(ids()).toEqual([
-        ["1", "kick:1"],
-        ["1", "kick:1"],
-      ]);
+      // Kick's Kicks rank on Kick alone, never with TikTok's coins
+      expect(ids()).toEqual([["1"], ["1"]]);
       history.end(10);
-      expect(ids()).toEqual([[], ["1", "kick:1"]]);
+      expect(ids()).toEqual([[], ["1"]]);
       expect(Object.keys(history.topByPlatform())).toEqual([]);
     });
 

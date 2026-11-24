@@ -25,13 +25,12 @@ describe("rows on their platforms", () => {
       "gift",
       "count",
     ]);
-    // Kick's and YouTube's gifts come one at a time
-    expect(vars(gift, "kick")).toEqual(["username", "handle", "gift"]);
-    expect(vars(gift, undefined, ["youtube", "kick"])).toEqual([
-      "username",
-      "handle",
-      "gift",
-    ]);
+    // YouTube's gifts come one at a time
+    expect(vars(gift, "youtube")).toEqual(["username", "handle", "gift"]);
+    // Kick's Kicks say how many and their message, as Bits do
+    expect(vars(TOKIO_EVENTS.KICKS, "kick")).toEqual(
+      ALERT_MESSAGE_VARIABLES[TOKIO_EVENTS.KICKS],
+    );
     // Any platform: what any of the profile's fills
     expect(vars(gift, undefined)).toEqual(ALERT_MESSAGE_VARIABLES[gift]);
     // Kick's subs carry no message
