@@ -353,13 +353,18 @@ const singleUserFactory = () => ({
 const chatEventFactory = (
   user = chatterFactory(),
   numEmotes = randomBool(0.4) ? randomInt(1, 3) : 0,
+  // Only the overlays' test LIVE sends emotes alone: a test's message needs
+  // words to say
+  emoteOnly = false,
 ): ChatEvent => {
   const platform = platformOf(user);
   const { content, lang, translation }: Omit<ChatEvent["comment"], "emotes"> =
     platform !== "tiktok"
       ? {
           content:
-            numEmotes && randomBool(0.2) ? "" : pickRandom(CHAT_MESSAGES),
+            emoteOnly && numEmotes && randomBool(0.2)
+              ? ""
+              : pickRandom(CHAT_MESSAGES),
           lang: "",
         }
       : randomBool(0.25)
@@ -669,7 +674,7 @@ export const createTestLive = (platforms: readonly Platform[]) => {
       return [
         {
           type: TOKIO_EVENTS.CHAT,
-          data: chatEventFactory(pickRandom(twitch).chatter),
+          data: chatEventFactory(pickRandom(twitch).chatter, undefined, true),
         },
         { type: TOKIO_EVENTS.FOLLOW, data: { user: from() } },
         {
@@ -690,7 +695,7 @@ export const createTestLive = (platforms: readonly Platform[]) => {
       return [
         {
           type: TOKIO_EVENTS.CHAT,
-          data: chatEventFactory(pickRandom(youtube).chatter),
+          data: chatEventFactory(pickRandom(youtube).chatter, undefined, true),
         },
         { type: TOKIO_EVENTS.GIFT, data: youtubeGiftEventFactory(from()) },
         { type: TOKIO_EVENTS.SUBSCRIBE, data: subscribeEventFactory(from()) },
@@ -703,7 +708,7 @@ export const createTestLive = (platforms: readonly Platform[]) => {
       return [
         {
           type: TOKIO_EVENTS.CHAT,
-          data: chatEventFactory(pickRandom(kick).chatter),
+          data: chatEventFactory(pickRandom(kick).chatter, undefined, true),
         },
         { type: TOKIO_EVENTS.KICKS, data: kicksEventFactory(from()) },
         {

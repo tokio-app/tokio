@@ -54,6 +54,21 @@ describe("createTestLive", () => {
     }
   });
 
+  it("sends emotes alone in some of the other platforms' chat, as they do", () => {
+    const chats = lives
+      .flat(2)
+      .filter((p) => p.type === TOKIO_EVENTS.CHAT)
+      .map((p) => p.data);
+    const alone = chats.filter(({ comment }) => comment.content === "");
+
+    expect(alone.length).toBeGreaterThan(0);
+    for (const { user, comment } of alone) {
+      expect(platformOf(user)).not.toBe("tiktok");
+      expect(comment.emotes.length).toBeGreaterThan(0);
+      expect(comment.emotes.every((e) => e.index === 0)).toBe(true);
+    }
+  });
+
   it("sends only the profile's platforms' events, each from its own", () => {
     const profiles: Platform[][] = [
       ["tiktok"],
@@ -430,14 +445,17 @@ describe("generateEventSample", () => {
     }
   });
 
-  it("keeps the language for TikTok's chat, and an emote-only chat empty", () => {
+  it("keeps the language for TikTok's chat, and words for a test to say", () => {
     for (const platform of PLATFORMS) {
       for (const { comment } of many(() => generateEmoteChatSample(platform))) {
         expect(comment.emotes.length).toBeGreaterThan(0);
         if (platform === "tiktok") expect(comment.lang).not.toBe("");
-        if (comment.content === "") {
-          expect(comment.emotes.every((e) => e.index === 0)).toBe(true);
-        }
+        expect(comment.content).not.toBe("");
+      }
+      for (const { comment } of many(
+        () => generateEventSample(TOKIO_EVENTS.CHAT, platform).data,
+      )) {
+        expect(comment.content).not.toBe("");
       }
     }
   });
