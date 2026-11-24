@@ -165,6 +165,17 @@
   white-space: normal;
 }
 
+/* The gifted subs top has that count alone, on one line as long as it
+   needs */
+.subs .gifter {
+  grid-template-columns: 28px 28px minmax(0, 1fr) auto;
+}
+
+/* The money or gifted subs switch, kept with the list it picks */
+.ranking {
+  margin-bottom: calc(-1 * var(--space-3));
+}
+
 /* THE LIST */
 
 .side {

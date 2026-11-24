@@ -8,6 +8,7 @@ import {
   PLATFORMS,
 } from "@/common/types";
 import {
+  bySubs,
   DateRange,
   inRange,
   PLATFORM_LABELS,
@@ -43,7 +44,11 @@ import {
   StatsTab,
   statsTabs,
 } from "./helper";
-import { GiftersList, GiftersSection } from "./sections/GiftersSection";
+import {
+  GiftersList,
+  GiftersSection,
+  Ranking,
+} from "./sections/GiftersSection";
 import { ListSection } from "./sections/ListSection";
 import { SummarySection } from "./sections/SummarySection";
 
@@ -99,6 +104,8 @@ export function CoinStats() {
   const [clearing, setClearing] = useState(false);
   // The tab picked, kept while the history lacks it
   const [picked, setPicked] = useState<StatsTab>();
+  // The gifters' ranking picked on a tab; another tab opens on its money
+  const [ranked, setRanked] = useState<{ tab: StatsTab; by: Ranking }>();
   // The next LIVES is another profile's, which starts from its newest LIVE
   const switched = useRef(false);
   // The profile the last GET_PROFILE named. It also comes as a resync (an MCP
@@ -115,6 +122,7 @@ export function CoinStats() {
   const platforms = historyPlatforms(history?.lives ?? []);
   const tabs = statsTabs(platforms);
   const tab = picked && tabs.includes(picked) ? picked : tabs[0];
+  const by = ranked?.tab === tab ? ranked.by : "amount";
   // A platform's tab lists the LIVEs that were on it
   const tabLives =
     tab === "all" ? shown : shown.filter((l) => platformParts(l)[tab]);
@@ -227,12 +235,13 @@ export function CoinStats() {
       ? Object.values(parts).reduce((n, part) => n + part.gifts, 0)
       : (parts[tab]?.amount ?? 0);
 
-  // The gifters panel: a search's matches, or the selection's gifters
+  // The gifters panel: a search's matches, or the selection's gifters, in
+  // the ranking picked
   const gifters = (): GiftersList => {
     if (searching) {
       const found = isSearch(searchReply) ? searchReply : undefined;
       return {
-        gifters: paid(found?.data),
+        gifters: paid(by === "subs" ? found?.subGifters : found?.data),
         empty: t("coinStats.gifters.noMatch", { query: search.trim() }),
         failed:
           found?.success === false
@@ -242,17 +251,22 @@ export function CoinStats() {
     }
     if (live) {
       const got = reply?.startedAt === live.startedAt ? reply : undefined;
+      // The record holds all its gifters, in byAmount order
+      const all = got?.data?.gifters;
       return {
-        gifters: paid(got?.data?.gifters),
-        empty: t("coinStats.gifters.empty"),
+        gifters: paid(
+          by === "subs"
+            ? all?.filter((g) => g.giftSubs > 0).sort(bySubs)
+            : all?.filter((g) => g.coins > 0),
+        ),
         failed:
           got?.success === false ? t("coinStats.gifters.failed") : undefined,
       };
     }
     if (range) {
       return {
-        gifters: paid(dates?.data),
-        empty: t("coinStats.gifters.emptyDates"),
+        gifters: paid(by === "subs" ? dates?.subGifters : dates?.data),
+        dated: true,
         failed:
           dates?.success === false
             ? t("coinStats.gifters.failedDates")
@@ -260,8 +274,7 @@ export function CoinStats() {
       };
     }
     return {
-      gifters: paid(history.gifters),
-      empty: t("coinStats.gifters.empty"),
+      gifters: paid(by === "subs" ? history.subGifters : history.gifters),
     };
   };
 
@@ -290,7 +303,10 @@ export function CoinStats() {
               };
             })}
             value={tab}
-            onChange={setPicked}
+            onChange={(next) => {
+              setPicked(next);
+              setRanked(undefined);
+            }}
           />
         )}
         <div className={styles.dashboard}>
@@ -344,7 +360,8 @@ export function CoinStats() {
                       title={t("coinStats.allTime.clear")}
                       disabled={
                         history.lives.length === 0 &&
-                        history.gifters.length === 0
+                        history.gifters.length === 0 &&
+                        history.subGifters.length === 0
                       }
                       onClick={() => setClearing(true)}
                     >
@@ -357,11 +374,10 @@ export function CoinStats() {
             )}
             {/* One in both cases, so an open search stays open */}
             <GiftersSection
-              title={t(
-                live ? "coinStats.gifters.title" : "coinStats.gifters.top",
-              )}
               {...gifters()}
               platform={tab === "all" ? null : tab}
+              by={by}
+              onBy={(next) => setRanked({ tab, by: next })}
               search={search}
               onSearch={setSearch}
             />

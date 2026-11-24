@@ -1,62 +1,126 @@
-import { translate } from "@/common/i18n";
+import { MessageKey, translate } from "@/common/i18n";
 import { Gifter, Platform, RankedGifter, TOKIO_EVENTS } from "@/common/types";
-import { PLATFORM_CURRENCY, triggersFor } from "@/common/util";
+import { Currency, PLATFORM_CURRENCY, triggersFor } from "@/common/util";
 import {
   Avatar,
   EmptyState,
   SearchToggle,
   Section,
   Spinner,
+  Tabs,
 } from "@/components";
+import { cx } from "@/helper/cx";
 import { amountLabel, giftsLabel } from "@/helper/gifts";
 import { useLanguage, useT } from "@/ui/i18n";
 import styles from "../coinstats.module.css";
 
+// What a list ranks: the platform's money, or gifted subs
+export type Ranking = "amount" | "subs";
+
+// Each top, named by what it ranks as Home names it, with the switch's
+// label and what it says with no one on it: in the whole history or a
+// LIVE, then in some dates
+const TOPS: Record<
+  Currency | "subs",
+  { title: MessageKey; tab: MessageKey; empty: MessageKey; dates: MessageKey }
+> = {
+  coins: {
+    title: "coinStats.gifters.top",
+    tab: "coinStats.stats.coins",
+    empty: "coinStats.gifters.empty",
+    dates: "coinStats.gifters.emptyDates",
+  },
+  kicks: {
+    title: "coinStats.gifters.kicks",
+    tab: "coinStats.stats.kicks",
+    empty: "coinStats.gifters.emptyKicks",
+    dates: "coinStats.gifters.emptyDatesKicks",
+  },
+  bits: {
+    title: "coinStats.gifters.bits",
+    tab: "coinStats.stats.bits",
+    empty: "coinStats.gifters.emptyBits",
+    dates: "coinStats.gifters.emptyDatesBits",
+  },
+  usd: {
+    title: "coinStats.gifters.superChats",
+    tab: "coinStats.stats.superChats",
+    empty: "coinStats.gifters.emptySuperChats",
+    dates: "coinStats.gifters.emptyDatesSuperChats",
+  },
+  subs: {
+    title: "coinStats.gifters.subs",
+    tab: "coinStats.stats.giftSubs",
+    empty: "coinStats.gifters.emptySubs",
+    dates: "coinStats.gifters.emptyDatesSubs",
+  },
+};
+
+const topOf = (platform: Platform, by: Ranking) =>
+  TOPS[by === "subs" ? "subs" : PLATFORM_CURRENCY[platform]];
+
 export interface GiftersList {
-  // One platform's, the most first, undefined until main sends them. A
-  // search's come with their place among all of that platform's.
+  // One platform's in the ranking shown, the most first, undefined until
+  // main sends them. Main's come with their place among all of that
+  // platform's in it.
   gifters?: (Gifter | RankedGifter)[];
-  // What to say when there are none
-  empty: string;
+  // Some dates', which say so when there are none
+  dated?: boolean;
+  // What to say when there are none instead of the ranking's own (a
+  // search's)
+  empty?: string;
   // What to say when main couldn't send them, after its notice
   failed?: string;
 }
 
 interface Props extends GiftersList {
-  title: string;
   // Whose gifters, null on All, which would rank one currency against
   // another
   platform: Platform | null;
+  by: Ranking;
+  onBy: (by: Ranking) => void;
   search: string;
   onSearch: (search: string) => void;
 }
 
-// What each of the platform's gifters sent: their money, then their gifts
-// and gifted subs where it sends them
-function sentParts(platform: Platform, gifter: Gifter, language: string) {
-  const sent = triggersFor([platform]);
+// What each of the platform's gifters sent in the ranking's unit: their
+// money, with their gifts where it sends them, or their gifted subs
+function sentParts(
+  platform: Platform,
+  by: Ranking,
+  gifter: Gifter,
+  language: string,
+) {
+  if (by === "subs")
+    return [translate(language, "gifts.giftSubs", { count: gifter.giftSubs })];
   return [
     amountLabel(gifter.coins, PLATFORM_CURRENCY[platform], language),
-    sent.includes(TOKIO_EVENTS.GIFT) && giftsLabel(gifter.gifts, language),
-    sent.includes(TOKIO_EVENTS.GIFT_SUB) &&
-      translate(language, "gifts.giftSubs", { count: gifter.giftSubs }),
+    triggersFor([platform]).includes(TOKIO_EVENTS.GIFT) &&
+      giftsLabel(gifter.gifts, language),
   ].filter((part) => part !== false);
 }
 
 export function GiftersSection({
-  title,
   gifters,
+  dated,
   empty,
   failed,
   platform,
+  by,
+  onBy,
   search,
   onSearch,
 }: Props) {
   const t = useT();
   const language = useLanguage();
+  const top = platform && topOf(platform, by);
+  const title = t(top ? top.title : "coinStats.gifters.top");
+  // Twitch, YouTube and Kick rank their money and their gifted subs apart
+  const subs =
+    !!platform && triggersFor([platform]).includes(TOKIO_EVENTS.GIFT_SUB);
 
   let content;
-  if (!platform) {
+  if (!platform || !top) {
     content = <EmptyState>{t("coinStats.gifters.pickPlatform")}</EmptyState>;
   } else if (failed) {
     content = <EmptyState>{failed}</EmptyState>;
@@ -67,10 +131,15 @@ export function GiftersSection({
       </div>
     );
   } else if (gifters.length === 0) {
-    content = <EmptyState>{empty}</EmptyState>;
+    content = (
+      <EmptyState>{empty ?? t(dated ? top.dates : top.empty)}</EmptyState>
+    );
   } else {
     content = (
-      <ol className={styles.gifters} aria-label={title}>
+      <ol
+        className={cx(styles.gifters, by === "subs" && styles.subs)}
+        aria-label={title}
+      >
         {gifters.map((gifter, i) => (
           <li key={gifter.userId} className={styles.gifter}>
             <span className={styles.rank}>
@@ -87,7 +156,7 @@ export function GiftersSection({
               </span>
               <span className={styles.handle}>{`@${gifter.handle}`}</span>
             </span>
-            {sentParts(platform, gifter, language).map((part, n) => (
+            {sentParts(platform, by, gifter, language).map((part, n) => (
               <span key={n} className={styles.amount}>
                 {part}
               </span>
@@ -112,6 +181,19 @@ export function GiftersSection({
         )
       }
     >
+      {platform && subs && (
+        <Tabs
+          variant="pill"
+          className={styles.ranking}
+          label={t("coinStats.gifters.by")}
+          tabs={(["amount", "subs"] as const).map((value) => ({
+            value,
+            label: t(topOf(platform, value).tab),
+          }))}
+          value={by}
+          onChange={onBy}
+        />
+      )}
       {content}
     </Section>
   );
