@@ -14,8 +14,8 @@ paths:
 - A LIVE runs from `CONNECTED` to `DISCONNECTED`, the span of Home's session (`.claude/rules/live-session.md`). Drops the connector recovers from stay in it; a connection lost for good starts a new LIVE on the next connect.
 - `start(username)` gets the @username from `ConnectorService.username`, set before the provider connects because `CONNECTED` comes before `connect()` resolves.
 - `HISTORY_EVENTS` counts what viewers spend, each platform's in its own currency, and gifted subs (the user's calls):
-  - Gifts go through the service's own `GiftStreaks`: `added × max(0, coins)` in the sender's gift currency (`GIFT_CURRENCY`), as Home counts them. That's TikTok's coins and Kick's Kicks; YouTube's Gifts have no price. A treasure chest carries no data and a Super Fan event only the viewer, so neither counts.
-  - Twitch's cheers count their Bits, YouTube's Super Chats their `usd`, and gifted subs their `count`.
+  - Gifts go through the service's own `GiftStreaks`: `added × max(0, coins)` in the sender's gift currency (`GIFT_CURRENCY`), as Home counts them: TikTok's coins, since YouTube's Gifts have no price. A treasure chest carries no data and a Super Fan event only the viewer, so neither counts.
+  - Twitch's cheers count their Bits, Kick's `KICKS` their Kicks (never gifts), YouTube's Super Chats their `usd`, and gifted subs their `count`.
 - A LIVE keeps each platform's part in `platforms` (`{ amount, gifts, giftSubs }`, the amount in `PLATFORM_CURRENCY`), never added together. `coins` stays TikTok's coins and `gifts` every platform's, so an older Tokio still reads a newer file. A LIVE saved without `platforms` was TikTok's alone: every reader goes through `platformParts` (`src/common/util/history.ts`).
 - Every platform the LIVE was on gets a part, zeros included, so LIVE history lists the LIVE under it even without gifts: `init.ts` calls `join` for each platform connected at `CONNECTED` and for each one that comes up later.
 - **Super Chats before the rates:**
@@ -67,8 +67,8 @@ paths:
 - `allTime` merges a cached top of the finished LIVEs (`_best`) with this LIVE's gifters, so a push never sorts all of all time.
 - Each client gets it as it connects, then after each load, a LIVE's start and end, a delete or a clear, and gifts that count, through a `GIFTERS_PUSH_MS` `throttle` that reads the lists when it fires.
 - `tokio:gifters` stays as overlays read it:
-  - `top()` takes TikTok's and Kick's gifters with coins (`overlaid`) and ranks them together by coins, as before other platforms counted. Overlays tell them apart by `platform`.
-  - Twitch's and YouTube's supporters, and Kick's who only gifted subs, stay out of it.
+  - `top()` takes TikTok's gifters with coins (`overlaid`) and ranks them by coins, as before other platforms counted.
+  - Twitch's, YouTube's and Kick's supporters stay out of it, so Kicks never rank with coins.
 - Home's top gifters (`LIVE_GIFTERS`) go out in the same throttled push as `byPlatform`: each platform's own top (`topByPlatform`) in `byAmount` order, as `Gifter` records with this LIVE's numbers, gifted subs included. Overlays don't get it; Studio's gifters lists and MCP's `get_activity` use it too. `end()` empties them, so the push after a LIVE ends carries none.
 - Test sends a sample (see Previews in `.claude/rules/overlays.md`).
 - The SDK (`@tokioapp/overlay`) types it as `TOKIO_EVENTS.GIFTERS`. Overlays on an older version log it as an unknown type.
@@ -91,7 +91,7 @@ paths:
 - Both lists scroll inside the dashboard, so picking a LIVE with more gifters doesn't move the list.
 - **Tabs:** there's a tab per platform in the history (`historyPlatforms`, in `PLATFORMS` order, TikTok alone without LIVEs), then All with two or more (`statsTabs`), styled like Home's (the user's call: each platform in its own currency, never added up). With one platform there's no tab row.
 - **A platform's tab** (`readout`):
-  - Its money tile, then Gifts where it sends gifts (TikTok, YouTube, Kick) and Gifted subs where it sends them (Twitch, YouTube, Kick).
+  - Its money tile, then Gifts where it sends gifts (TikTok, YouTube) and Gifted subs where it sends them (Twitch, YouTube, Kick).
   - The list holds only the LIVEs that were on it, their amounts and bars in its money (`liveValue`), and the summary's count and length are theirs.
   - Its gifters are main's lists filtered by `platformOf`, in main's order and with its ranks, each with their amount and gifted subs.
 - **All:** a money tile per platform, every gift and gifted sub, and the list by gift count, whose totals row says so ("1.5K gifts", the user's call) so it isn't read as money. It has no ranking and no search: a line asks to pick a platform. A selected LIVE shows only its own platforms' tiles there.
