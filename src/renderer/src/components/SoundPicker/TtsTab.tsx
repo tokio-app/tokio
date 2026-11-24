@@ -1,6 +1,10 @@
 import { AlertTts, Trigger } from "@/common/schemas";
 import { TOKIO_EVENTS } from "@/common/types";
-import { ALERT_MESSAGE_VARIABLES, rowVariables } from "@/common/util";
+import {
+  ALERT_MESSAGE_VARIABLES,
+  rowVariables,
+  samplePlatform,
+} from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import { AlertTestRequest } from "@/hooks/useAlertTest";
 import { useVariables } from "@/hooks/useVariables";
@@ -77,6 +81,7 @@ export function TtsTab({
                 id: testId,
                 tts: value,
                 trigger: triggers[0].type,
+                platform: samplePlatform(triggers[0], platforms),
                 volume: PREVIEW_VOLUME,
               })
             }

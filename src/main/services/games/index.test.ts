@@ -1046,6 +1046,18 @@ describe("GamesService", () => {
       expect(res.data?.map((r) => r.command)).toEqual(minecraft.sent);
     });
 
+    it("takes the sample from the platform", async () => {
+      const minecraft = fakeMinecraft();
+      await service(minecraft).test({
+        edition: "bedrock",
+        trigger: TOKIO_EVENTS.FOLLOW,
+        platform: "twitch",
+        steps: [say("say {username}")],
+      });
+      // A Twitch display name, TikTok's have a space
+      expect(minecraft.sent).toEqual([expect.stringMatching(/^say \w+_\w+$/)]);
+    });
+
     it("fails with no game connected", async () => {
       const minecraft = fakeMinecraft("waiting");
       expect(

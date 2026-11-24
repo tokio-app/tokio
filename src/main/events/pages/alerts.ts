@@ -4,13 +4,12 @@ import {
   AppError,
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
-  EMOTE_TRIGGER,
   FEEDBACK_CODES,
-  TOKIO_EVENTS,
+  Platform,
 } from "@/common/types";
 import {
   AUDIO_EXTENSIONS,
-  generateEventSample,
+  generateTriggerSample,
   MEDIA_EXTENSIONS,
 } from "@/common/util";
 import { showOpenDialog } from "@/helper/dialog";
@@ -219,18 +218,19 @@ events.push(
   { notify: false },
 );
 
-// A TTS test speaks the message filled with sample values for its trigger.
+// A TTS test speaks the message filled with sample values for its trigger,
+// as the platform would send them.
 const speakTest = async (
   { alertsService, storeManagerService }: AppHandlerVariables,
   tts: AlertTts,
   trigger: AlertTrigger,
+  platform?: Platform,
 ) => {
   const profile = await storeManagerService.getProfileData();
   if (!profile) throw new Error("The active profile is missing.");
-  const event = trigger === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : trigger;
   const res = await alertsService.speak(
     tts,
-    generateEventSample(event).data,
+    generateTriggerSample(trigger, platform),
     profile.tts,
   );
   if (res.skipped) {
@@ -255,8 +255,9 @@ events.push(
   async (services, e, data) => {
     const { alertsService } = services;
     let res;
-    if ("tts" in data) res = await speakTest(services, data.tts, data.trigger);
-    else if ("url" in data) res = await alertsService.fetchSound(data.url);
+    if ("tts" in data) {
+      res = await speakTest(services, data.tts, data.trigger, data.platform);
+    } else if ("url" in data) res = await alertsService.fetchSound(data.url);
     else res = await alertsService.readSound(data.file);
     if (!res.success) throw new LoggedError(res.error);
 

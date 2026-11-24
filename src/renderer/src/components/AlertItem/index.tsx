@@ -17,6 +17,7 @@ import {
   roleName,
   rowPlatforms,
   rowStreaks,
+  samplePlatform,
   takesRoles,
   triggersOf,
 } from "@/common/util";
@@ -402,11 +403,20 @@ export function triggerLabel(
   return listOf(language, [...new Set(names)], { type: "or" });
 }
 
-/** The test of what the alert plays and shows, null when it has nothing. */
-export function alertTest(alert: Alert): AlertTestRequest | null {
-  const { id, volume, sound, tts } = alert;
+/**
+ * The test of what the alert plays and shows, null when it has nothing. A
+ * message is filled with a sample from the platform its trigger comes from.
+ */
+export function alertTest(
+  alert: Alert,
+  platforms: readonly Platform[],
+): AlertTestRequest | null {
+  const { id, volume, sound, tts, trigger } = alert;
   const media = alert.media ?? undefined;
-  if (tts) return { id, tts, trigger: alert.trigger.type, volume, media };
+  if (tts) {
+    const platform = samplePlatform(trigger, platforms);
+    return { id, tts, trigger: trigger.type, platform, volume, media };
+  }
   if (sound) {
     const { file, start } = sound;
     return { id, file, volume, media, start, end: sound.end ?? undefined };
@@ -468,7 +478,7 @@ export function AlertItem({
         )
         .join(ROWS) || undefined
     : undefined;
-  const test = alertTest(alert);
+  const test = alertTest(alert, platforms);
 
   return (
     <div className={cx(styles.row, !alert.enabled && styles.off)}>

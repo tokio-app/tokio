@@ -19,6 +19,7 @@ import {
   createAction,
   createStep,
   rowVariables,
+  samplePlatform,
 } from "@/common/util";
 import { usePlatforms } from "@/context/platforms";
 import {
@@ -330,6 +331,7 @@ function ActionItem({
                 id: action.id,
                 edition: action.edition,
                 trigger: trigger.type,
+                platform: samplePlatform(trigger, platforms),
                 steps,
               });
             }}

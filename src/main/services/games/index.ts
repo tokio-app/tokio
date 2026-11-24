@@ -10,10 +10,10 @@ import {
   AlertTrigger,
   AppEvents,
   CommandResult,
-  EMOTE_TRIGGER,
   GamesStatus,
   GameStatus,
   MINECRAFT_EDITION_NAMES,
+  Platform,
   TOKIO_EVENTS,
   TokioEventMap,
 } from "@/common/types";
@@ -21,7 +21,7 @@ import {
   delay,
   formatAlertMessage,
   formatError,
-  generateEventSample,
+  generateTriggerSample,
   IMAGE_EXTENSIONS,
 } from "@/common/util";
 import { t } from "@/helper/i18n";
@@ -218,22 +218,26 @@ export class GamesService extends Service {
     await Promise.all(runs);
   }
 
-  /** Runs the steps once with a sample of the trigger's event. */
+  /**
+   * Runs the steps once with a sample of the trigger's event, as the
+   * platform sends it.
+   */
   public async test({
     edition,
     trigger,
+    platform,
     steps,
   }: {
     edition: MinecraftEdition;
     trigger: AlertTrigger;
+    platform?: Platform;
     steps: GameStep[];
   }): Promise<ServiceResult<CommandResult[]>> {
     const unreachable = this._unreachable(edition);
     if (unreachable) return { success: false, error: unreachable };
-    const event = trigger === EMOTE_TRIGGER ? TOKIO_EVENTS.CHAT : trigger;
     const commands = this._commands(
       steps,
-      generateEventSample(event).data,
+      generateTriggerSample(trigger, platform),
       edition,
     );
     return { success: true, data: await this._send(commands, edition) };

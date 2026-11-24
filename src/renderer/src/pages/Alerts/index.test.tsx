@@ -926,9 +926,33 @@ describe("Alerts", () => {
       id: "alert-2",
       tts: message,
       trigger: TOKIO_EVENTS.FOLLOW,
+      platform: "tiktok",
       volume: 50,
       request: sent(APP_EVENTS.TEST_ALERT)[0].request + 1,
     });
+  });
+
+  it("tests a message with a sample of the platform its trigger comes from", async () => {
+    const tts = { sound: null, tts: speech("Welcome") };
+    const { user } = await load(
+      [
+        alert("alert-1", tts),
+        alert("alert-2", {
+          ...tts,
+          trigger: { ...trigger(TOKIO_EVENTS.FOLLOW), platform: "tiktok" },
+        }),
+      ],
+      (p) => {
+        p.platforms = ["kick", "twitch"];
+      },
+    );
+
+    // Kick has no follows: Twitch's, else the row's own
+    await user.click(rows()[0].getByRole("button", { name: "Play" }));
+    await user.click(rows()[1].getByRole("button", { name: "Play" }));
+    expect(
+      sent(APP_EVENTS.TEST_ALERT).map((r) => ("tts" in r ? r.platform : null)),
+    ).toEqual(["twitch", "tiktok"]);
   });
 
   describe("media", () => {

@@ -122,6 +122,7 @@ paths:
 - A Like alert offers `{username}`, `{handle}` and `{count}` (the batch's likes), since it plays each viewer's batch. Game actions and Overlay Studio, which count likes from every viewer, take `countedVariables`: the same lists with none on Like (the user's call). A text there that already has them still gets the last batch's, since `messageValues` reads the payload.
 - `{count}` in a gift alert's message is the streak's total, not TikTok's `comboCount`. It isn't offered on every gift; a message that has it gets the count so far. One event that adds several gifts makes the message once and sends one `ALERT_AUDIO` with `repeat`.
 - `_generate(..., false)` doesn't log a live alert's failed message; previews (`speak`) log their own, which `speakTest` counts on.
+- A TTS test (`TEST_ALERT`'s `tts` branch) fills the message with a sample from the `platform` it carries: the row's own, else the profile's first that sends its event (`samplePlatform`), resolved by the row's Play, the editor's Sound tab, the sound picker's TTS tab and MCP's alert test. Without one it's TikTok's (Music change).
 - Live alerts make their messages through a `TaskQueue` with the TTS page's cooldown and queue length.
 - `AlertsService.clear` runs wherever `ALERT_CLEAR` is sent: it drops the waiting messages, sounds and media, hides the media shown, and forgets the gift streaks, since their ends may be missed.
 

@@ -14,6 +14,7 @@ import {
   JAVA_ONLY_HAZARDS,
   JAVA_ONLY_STEPS,
   MINECRAFT_NAMES,
+  samplePlatform,
 } from "@/common/util";
 import { APP_EVENTS, APP_EVENTS_RESPONSE } from "@/common/types";
 import { z } from "zod";
@@ -259,7 +260,8 @@ export const kinds: Kinds = {
     // Runs what's saved, as the Games page's Test does with what it shows
     test: async (handler, id) => {
       if (id === undefined) return fail("Give the game action's id.");
-      const action = findAction((await profileOf(handler)).games, id);
+      const profile = await profileOf(handler);
+      const action = findAction(profile.games, id);
       if (!action) return noAction(id);
       const { error, data } = await invokeOk(
         handler,
@@ -268,6 +270,7 @@ export const kinds: Kinds = {
           id,
           edition: action.edition,
           trigger: action.trigger.type,
+          platform: samplePlatform(action.trigger, profile.platforms),
           steps: action.steps,
         },
         APP_EVENTS_RESPONSE.TEST_GAME_ACTION,

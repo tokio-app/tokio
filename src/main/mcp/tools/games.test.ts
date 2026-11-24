@@ -3,6 +3,7 @@ import {
   APP_EVENTS,
   APP_EVENTS_RESPONSE,
   type CommandResult,
+  type Platform,
   TOKIO_EVENTS,
 } from "@/common/types";
 import type { ServiceResult } from "@/services/shared";
@@ -25,7 +26,12 @@ const setup = () => {
       { name: "New", file: "new.png" },
     ],
   };
-  const profile = () => ({ name: "Main", games: state.games, emotes: [] });
+  const profile = () => ({
+    name: "Main",
+    games: state.games,
+    emotes: [],
+    platforms: ["kick", "twitch"] as Platform[],
+  });
   const updateProfileData = vi.fn(async (data: Partial<Profile>) => {
     if (data.games) state.games = data.games;
     return true;
@@ -265,6 +271,8 @@ describe("games MCP tools", () => {
       expect(test).toHaveBeenCalledWith({
         edition: "bedrock",
         trigger: TOKIO_EVENTS.FOLLOW,
+        // Kick has no follows: Twitch's sample
+        platform: "twitch",
         steps: [expect.objectContaining({ type: "spawn", mob: "zombie" })],
       });
       // The Games page shows them too

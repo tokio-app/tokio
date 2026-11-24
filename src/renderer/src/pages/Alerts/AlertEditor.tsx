@@ -123,7 +123,8 @@ export function AlertEditor({
   const t = useT();
   const language = useLanguage();
   const [tab, setTab] = useState<Tab>("trigger");
-  const test = alertTest(alert);
+  const platforms = usePlatforms();
+  const test = alertTest(alert, platforms);
   const tabs = useOptions(TABS);
 
   return (

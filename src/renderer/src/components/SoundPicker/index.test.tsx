@@ -476,6 +476,7 @@ describe("SoundPicker", () => {
         id: "alert-1:tts",
         tts: { ...DEFAULTS, message: "Thanks for the gift" },
         trigger: TOKIO_EVENTS.GIFT,
+        platform: "tiktok",
         volume: 100,
       });
     });

@@ -26,6 +26,7 @@ const TestSchema = z.object({
   id: z.string(),
   edition: GameActionSchema.shape.edition,
   trigger: TriggerSchema.shape.type,
+  platform: TriggerSchema.shape.platform,
   steps: z.array(GameStepSchema),
 });
 
@@ -103,8 +104,8 @@ events.push(
 events.push(
   APP_EVENTS.TEST_GAME_ACTION,
   async ({ gamesService }, e, data) => {
-    const { id, edition, trigger, steps } = TestSchema.parse(data);
-    const res = await gamesService.test({ edition, trigger, steps });
+    const { id, ...test } = TestSchema.parse(data);
+    const res = await gamesService.test(test);
     if (!res.success) {
       throw new AppFailure(
         FEEDBACK_CODES.GAME_TEST_FAILED,

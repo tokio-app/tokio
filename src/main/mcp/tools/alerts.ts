@@ -20,6 +20,7 @@ import {
   createAlert,
   formatError,
   getAlertOverlayURL,
+  samplePlatform,
 } from "@/common/util";
 import { t } from "@/helper/i18n";
 import { importPictures, upload } from "@/helper/library";
@@ -350,7 +351,11 @@ export const kinds: Kinds = {
         APP_EVENTS.TEST_ALERT,
         {
           ...(tts
-            ? { tts, trigger: alert.trigger.type }
+            ? {
+                tts,
+                trigger: alert.trigger.type,
+                platform: samplePlatform(alert.trigger, profile.platforms),
+              }
             : { file: sound!.file }),
           id: alert.id,
           request: 0,

@@ -119,6 +119,7 @@ describe("AlertItem", () => {
       id: "alert-1",
       tts: TTS,
       trigger: TOKIO_EVENTS.GIFT,
+      platform: "tiktok",
       volume: 80,
     });
   });

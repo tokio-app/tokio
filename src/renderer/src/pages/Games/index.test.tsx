@@ -737,7 +737,13 @@ describe("Games", () => {
 
     await user.click(first.getByRole("button", { name: "Test" }));
     expect(sent(APP_EVENTS.TEST_GAME_ACTION)).toEqual([
-      { id: "a1", edition: "bedrock", trigger: TOKIO_EVENTS.FOLLOW, steps },
+      {
+        id: "a1",
+        edition: "bedrock",
+        trigger: TOKIO_EVENTS.FOLLOW,
+        platform: "tiktok",
+        steps,
+      },
     ]);
 
     // Another action's reply
